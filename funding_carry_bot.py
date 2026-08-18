@@ -389,7 +389,7 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
             # (I8: the operator misreads the coming refusal as a stall).
             # The coin still COUNTS as waiting; only the promise is scoped.
             #
-            # [19-Aug (qf)] AND THE SCOPING NEEDS ITS OWN COUNTER, or (qc)
+            # [19-Aug (qg)] AND THE SCOPING NEEDS ITS OWN COUNTER, or (qc)
             # reintroduces the very ambiguity the census exists to remove one
             # layer in: `waiting 3 / next absent` is byte-identical between
             # "three coins are coming and the soonest is still being computed"
@@ -1130,7 +1130,7 @@ def main():
             if _cens.get("next"):
                 _why += f" | next {_cens['next']} in {_cens['next_eta_h']:.1f}h"
             elif _cens.get("waiting"):
-                # [19-Aug (qf)] A `waiting` count with no `next` is the one
+                # [19-Aug (qg)] A `waiting` count with no `next` is the one
                 # reading the log cannot explain on its own. Say WHY: every
                 # waiter is class-refused, so the wait ends in a refusal, not
                 # an open. Silence here is what cost the 19-Aug review a

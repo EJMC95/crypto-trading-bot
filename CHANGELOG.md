@@ -1,3 +1,93 @@
+## 2026-08-19 (qg) — `(qe)` FIXED THE FALSE PROMISE AND LEFT THE SILENCE: `waiting 3 / next none` still could not say whether ANY waiter is admissible — and the mutation round that verified the fix was itself void
+
+*(Renumbered from (qf) at push time — a concurrent session's 🪁 band-kelly
+birth took (qf) on origin/main while this was built. Theirs is merged with the
+letter in a commit subject and PR title; this one was unpushed and its only
+citations were its own two comment lines, so this is the side that moves. The
+cross-branch letter guard caught it — sixth catch in two days.)*
+
+**Found by the daily evidence review**, from the one number that did not fit:
+🌾 carry's live census read `waiting: 3, noncrypto: 0` with **no `next`**.
+
+`(qe)`, shipped hours earlier, was right: `next` may only promise a coin the
+class screen will ADMIT, because the screen sits deliberately LAST in gate
+order ((lk)) and a crypto_only book was advertising `next: SKHYNIXUSD` with a
+live countdown. But scoping the promise **removed the signal without replacing
+it**. `waiting N` with `next` absent is now byte-identical between:
+
+* "N coins are coming and the soonest admissible one is still being picked", and
+* "every one of those N will be REFUSED the moment its clock runs out."
+
+That is the exact ambiguity the census was built (2-Aug, a 40-minute
+investigation) to end, reintroduced one gate later — I18's `{open: 0}` shape,
+and this review hit it live: establishing which case carry was in required
+rebuilding the gate by hand against the scout payload, which is the
+second-copy-of-a-rule trap ((hj)) the census exists to make unnecessary.
+`hot_since` is NOT the census input (it carries coins that have since gone
+cold or thin — 22 entries against a `waiting` of 3), so the obvious shortcut
+answers a different question.
+
+**Shipped:** `waiting_admissible`, a **SUB-COUNT of `waiting`, never a bucket**
+— the partition contract is untouched by construction, and a test pins that.
+Carried in the degraded fallback dict too (a dark census must not KeyError a
+consumer), and the log line reads the counter rather than asserting `0`
+([[self-describing-labels-lie]]: a message that hardcodes its own claim cannot
+report the day the invariant breaks). The invariant now has a name and a test:
+**a promise exists if and only if at least one waiter is admissible.**
+
+Shadow-only book, pure observability: no gate, no lever, no era, no trade
+changes ⇒ **main-only under `(mm)`**. Not a dollar today; what it buys is that
+carry's ~12-Sep keep-or-retire call is read off a census that can distinguish
+starvation from a coming refusal — the same reason `(px)` walked the floor.
+
+### THE MUTATION ROUND WAS VOID, AND THAT IS THE BIGGER FINDING
+
+The first round reported baseline GREEN and 4 of 4 mutations RED. **All of it
+was false.** The restore then failed, and the file on disk was byte-identical
+to HEAD while `scan_census` returned a mutant's answer — a spy proved
+`class_ok("SKHYNIXUSD")` returned `False` on the very call whose counter
+incremented.
+
+Cause: `sys.pycache_prefix` on this Mac is `~/Library/Caches/com.apple.python`,
+**outside the repo**, so the harness's `find . -name __pycache__` was the null
+action; and the M2 mutation was a **line reorder**, same-SIZE by construction,
+so CPython's `(mtime, size)` check kept serving it. This is written up in
+[[mutation-tests-lie-under-out-of-tree-pycache]] — which I had, and did not
+apply. Having a note is not applying it.
+
+**MEASURED RECURRENCE: five times** — 31-Jul (`golive_readiness`), 6-Aug
+(`fleet_tuning._skewed`), 16-Aug (`audit_boot_stagger`, which poisoned a
+DIFFERENT session's interpreter and cost them an hour on a "main is red for
+everyone" that was not), 18-Aug (`LEDGER_QUARANTINE`, where all six mutations
+misread as survivors — a scorer bug, twice over), and 19-Aug here. Every
+session hand-rolls the harness and hand-rolls the same three bugs. Per the
+FORWARD MOTION rule 2 — *a fix closes a class or it is not finished* —
+fixing my own round would guarantee a sixth.
+
+**`scripts/mutate.py` makes the safe path the easy one** (the
+`session_commit.py` precedent), closing all three:
+1. **Bytecode** — runs under `PYTHONDONTWRITEBYTECODE=1`, so nothing is
+   written and nothing can be stale. Prevention, not a purge you can forget —
+   and it protects the other sessions on this Mac, not just the author.
+2. **Scoring** — the process **exit code**, never text. (`grep -q "failed"`
+   misses pytest's `FAILED`; in zsh `${PIPESTATUS[0]}` is a bashism and `$?`
+   after a pipeline is `tail`'s status, always 0.)
+3. **A mutation that never applied** — `apply_mutation` RAISES on an absent
+   target. "SURVIVED" and "never ran" are indistinguishable from the outside,
+   and the second one is what a quoting slip produces.
+
+It also refuses to score a mutant that does not COMPILE (a SyntaxError reddens
+the suite for the wrong reason and reads as a kill), requires the baseline
+green BEFORE mutating, and re-verifies green AFTER restoring — a round that
+cannot restore has proved nothing in either direction. Exit 0 only when
+baseline and restore are green and every mutation was killed.
+
+**Verified by re-running this entry's own round through it: 4/4 killed,
+baseline and restore green — including the size-preserving reorder that fooled
+the hand-rolled harness.** Registered in `SELFTEST_MODULES` (offline, pure: no
+git, no pytest, no DB), and its selftest pins the placebo guard in the
+direction that matters — an absent target must RAISE, never read as a pass.
+
 ## 2026-08-18 (qf) — 🪁 BAND-KELLY, THE MIRROR BOOK: the fleet's measured losers become its signal, and two of the three inversions died in measurement first
 
 *(Renumbered from (qe) at push time — a concurrent session's referee-wave

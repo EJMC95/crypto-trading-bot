@@ -57,6 +57,19 @@ SELFTEST_MODULES = [
     # Registered in the same commit that adds the tool, per this guard's own
     # rule — a --selftest nobody runs is the shape it exists to prevent.
     "scripts.session_commit",
+    # [2026-08-19 (qg)] the MUTATION HARNESS. Same shape as session_commit
+    # above — a hand-rolled step that every session re-implements and
+    # re-breaks, made safe once. Registered in the commit that adds it.
+    # --selftest is offline and pure: no git, no pytest, no DB (it exercises
+    # apply/compile/no-op/absent-target on a tempfile). The three bugs it
+    # closes are all MEASURED, five times across sessions: out-of-tree
+    # bytecode (`sys.pycache_prefix` is outside the repo, so a same-SIZE
+    # mutation survives `git checkout` and a restored file keeps running the
+    # mutant), scoring on text instead of the exit code, and a mutation that
+    # silently never applied — the last two both misreported a whole round on
+    # 18-Aug, and the first one voided a round on 19-Aug in the session that
+    # wrote this.
+    "scripts.mutate",
     # [2026-08-18 (qd)/I21] the WINNERS' DOCKET. SELFTEST_MODULES and
     # deliberately NOT ENFORCED_AUDITS, per this file's own rule: its verdict
     # reads the live ledger, which moves with every close and no code change.

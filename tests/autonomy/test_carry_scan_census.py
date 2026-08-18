@@ -320,7 +320,7 @@ def test_next_never_promises_a_coin_the_class_screen_will_refuse():
 
 
 def test_waiting_with_no_next_says_whether_any_waiter_is_admissible():
-    """[19-Aug (qf)] `(qc)` correctly stopped `next` promising a coin the class
+    """[19-Aug (qg)] `(qc)` correctly stopped `next` promising a coin the class
     screen will refuse — and left `waiting N / no next` meaning two different
     things: "the soonest admissible waiter is still being picked" vs "every
     waiter will be REFUSED when its clock runs out". Measured on the live row
@@ -356,7 +356,7 @@ def test_waiting_with_no_next_says_whether_any_waiter_is_admissible():
 
 def test_waiting_admissible_is_not_a_bucket_and_never_breaks_the_partition():
     """It counts a SUBSET of `waiting`, so adding it to the partition sum would
-    double-count. This pins the contract the (qf) counter must not break."""
+    double-count. This pins the contract the (qg) counter must not break."""
     c = _census()
     assert (c["held"] + c["thin"] + c["cold"] + c["waiting"]
             + c["noncrypto"] + c["eligible"] == c["scanned"]), c
