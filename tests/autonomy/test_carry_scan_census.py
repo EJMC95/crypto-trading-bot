@@ -158,7 +158,8 @@ def test_a_held_coin_is_counted_once_and_never_as_a_candidate():
     fund = {"BNB": _f(HOT, 9_000_000)}
     c = carry.scan_census(fund, {"BNB": {}}, {"BNB": T0 - 99 * 3600}, T0, H, BAR)
     assert c == {"scanned": 1, "held": 1, "thin": 0, "cold": 0,
-                 "waiting": 0, "noncrypto": 0, "eligible": 0}, c
+                 "waiting": 0, "noncrypto": 0, "eligible": 0,
+                 "waiting_admissible": 0}, c
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +294,7 @@ def test_the_degraded_census_carries_every_key_the_consumers_read():
                     fallback = {k.value for k in stmt.value.keys}
     assert fallback, "no dict fallback found in the census handler"
     required = {"scanned", "held", "thin", "cold", "waiting", "noncrypto",
-                "eligible"}
+                "eligible", "waiting_admissible"}
     assert required <= fallback, f"degraded census missing {required - fallback}"
 
 
@@ -316,3 +317,52 @@ def test_next_never_promises_a_coin_the_class_screen_will_refuse():
     c2 = carry.scan_census({"SKHYNIXUSD": _f(HOT, 30_100_000)}, {},
                            {"SKHYNIXUSD": T0 - 2.25 * 3600}, T0, H, BAR)
     assert c2["waiting"] == 1 and "next" not in c2, c2
+
+
+def test_waiting_with_no_next_says_whether_any_waiter_is_admissible():
+    """[19-Aug (qf)] `(qc)` correctly stopped `next` promising a coin the class
+    screen will refuse — and left `waiting N / no next` meaning two different
+    things: "the soonest admissible waiter is still being picked" vs "every
+    waiter will be REFUSED when its clock runs out". Measured on the live row
+    the morning after (`waiting 3`, no `next`), the daily review could not tell
+    which without rebuilding the gate by hand — the second-copy trap (hj).
+
+    `waiting_admissible` is the disambiguator, and it is a SUB-COUNT of
+    `waiting`, never a bucket, so the partition contract is untouched."""
+    # ALL waiters class-refused -> no promise, and the census says why.
+    only_screened = carry.scan_census(
+        {"SKHYNIXUSD": _f(HOT, 30_100_000), "BRENTOIL": _f(HOT, 12_000_000)},
+        {}, {"SKHYNIXUSD": T0 - 2.25 * 3600, "BRENTOIL": T0 - 1.0 * 3600},
+        T0, H, BAR)
+    assert only_screened["waiting"] == 2, only_screened
+    assert "next" not in only_screened, only_screened
+    assert only_screened["waiting_admissible"] == 0, only_screened
+
+    # A mixed cross-section: the count tracks the ADMISSIBLE subset only.
+    mixed = carry.scan_census(
+        {"SKHYNIXUSD": _f(HOT, 30_100_000), "KAITO": _f(HOT, 3_011_700)},
+        {}, {"SKHYNIXUSD": T0 - 2.25 * 3600, "KAITO": T0 - 1.0 * 3600},
+        T0, H, BAR)
+    assert mixed["waiting"] == 2, mixed
+    assert mixed["waiting_admissible"] == 1, mixed
+    assert mixed["next"] == "KAITO", mixed
+
+    # THE INVARIANT that makes the log line honest: a promise exists if and
+    # only if at least one waiter is admissible.
+    for c in (only_screened, mixed, _census()):
+        assert ("next" in c) == (c["waiting_admissible"] > 0), c
+        assert c["waiting_admissible"] <= c["waiting"], c
+
+
+def test_waiting_admissible_is_not_a_bucket_and_never_breaks_the_partition():
+    """It counts a SUBSET of `waiting`, so adding it to the partition sum would
+    double-count. This pins the contract the (qf) counter must not break."""
+    c = _census()
+    assert (c["held"] + c["thin"] + c["cold"] + c["waiting"]
+            + c["noncrypto"] + c["eligible"] == c["scanned"]), c
+    # The 2-Aug fixture is itself a mixed cell, which is the point: KAITO and
+    # WTI are BOTH waiting, but WTI is oil — so `waiting` is 2 while only one
+    # of them can ever be opened. Counting the admissible subset is exactly
+    # what tells the reader that.
+    assert c["waiting"] == 2 and c["waiting_admissible"] == 1, c
+    assert c["next"] == "KAITO", c

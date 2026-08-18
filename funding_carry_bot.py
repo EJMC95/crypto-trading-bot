@@ -368,7 +368,8 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
     persist_h = PERSIST_H if persist_h is None else persist_h
     class_ok = _class_ok if class_ok is None else class_ok
     out = {"scanned": len(fund or {}), "held": 0, "thin": 0,
-           "cold": 0, "waiting": 0, "noncrypto": 0, "eligible": 0}
+           "cold": 0, "waiting": 0, "noncrypto": 0, "eligible": 0,
+           "waiting_admissible": 0}
     nxt = None
     for c, f in (fund or {}).items():
         if c in (positions or {}):
@@ -387,7 +388,19 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
             # live countdown — a promise the gate order guarantees to break
             # (I8: the operator misreads the coming refusal as a stall).
             # The coin still COUNTS as waiting; only the promise is scoped.
+            #
+            # [19-Aug (qf)] AND THE SCOPING NEEDS ITS OWN COUNTER, or (qc)
+            # reintroduces the very ambiguity the census exists to remove one
+            # layer in: `waiting 3 / next absent` is byte-identical between
+            # "three coins are coming and the soonest is still being computed"
+            # and "all three will be REFUSED on class when their clock runs
+            # out". Measured 19-Aug on the live row — `waiting 3`, no `next` —
+            # and the daily review could not tell which without rebuilding the
+            # gate by hand (the second-copy-of-a-rule trap, (hj)).
+            # `waiting_admissible` is a SUB-COUNT of `waiting`, never a bucket:
+            # the partition contract above is untouched by construction.
             if class_ok(c):
+                out["waiting_admissible"] += 1
                 eta = persist_h - (t0 - (hot_since or {}).get(c, t0)) / 3600.0
                 if nxt is None or eta < nxt[1]:
                     nxt = (c, eta)
@@ -949,7 +962,8 @@ def main():
             except Exception:  # noqa: BLE001
                 _cens = {"scanned": len(fund or {}), "held": 0, "thin": 0,
                          "cold": 0, "waiting": 0, "noncrypto": 0,
-                         "eligible": 0, "error": "census failed"}
+                         "eligible": 0, "waiting_admissible": 0,
+                         "error": "census failed"}
 
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
@@ -1115,6 +1129,18 @@ def main():
                     f"eligible {_cens['eligible']}")
             if _cens.get("next"):
                 _why += f" | next {_cens['next']} in {_cens['next_eta_h']:.1f}h"
+            elif _cens.get("waiting"):
+                # [19-Aug (qf)] A `waiting` count with no `next` is the one
+                # reading the log cannot explain on its own. Say WHY: every
+                # waiter is class-refused, so the wait ends in a refusal, not
+                # an open. Silence here is what cost the 19-Aug review a
+                # hand-rebuild of the gate.
+                # Read the counter rather than asserting "0": a message that
+                # hardcodes its own claim cannot report the day the invariant
+                # breaks ([[self-describing-labels-lie]]).
+                _why += (f" | next none — "
+                         f"{_cens.get('waiting_admissible', 0)} of "
+                         f"{_cens['waiting']} waiting are class-admissible")
             print(f"[{now_iso()}] scan ok | {len(fund)} perps | open: {held} "
                   f"| open_pnl {open_pnl:+.2f} | realized {realized:+.2f} "
                   f"| {_why}")
