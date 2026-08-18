@@ -119,7 +119,23 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # funding distribution has collapsed — a market condition, not a defect. This
 # removes a STRUCTURAL blind spot in the rail; it does not buy a trade today
 # and must not be reported as if it did.
-MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "2e6"))  # 24h $ turnover floor
+# [2026-08-18 (pr) CORRECTED IN PLACE per I12 — the "zero unlock" above was a
+# POINT-IN-TIME census (3-Aug's loop), and over the whole tape it does not
+# hold. Measured on 9,996 scout snapshots / 34.9 days through
+# audit_book_overlap.supply_in (the gate rule's one owner): cell occupancy
+# (>=20% TRUE, crypto, 6h persist) at $2M floor = 5.73% / 3 coins
+# (KAITO/XMR/PAXG); at $1M = 13.42% / 6 coins (+ROBO/ENA/XRP), i.e. the
+# $1-2M volume band holds MORE of this cell's life than the >=2M band does.
+# The book had been flat 5.2 days at `eligible 0` when this shipped —
+# operator direction "expand where necessary and loosen, give more
+# opportunities". Default moves to the cage's own designed `lo` ($1M: clip
+# <=0.03% of daily turnover, held from the paragraph above); the registry
+# cage [1e6, 2e6] is unchanged, so the rail can now only TIGHTEN back toward
+# the old floor. I19 price, declared: per-book slippage on $1-2M books is
+# unmeasured — irrelevant to this MODELLED shadow book's fills, real for any
+# future go-live, and the real-money floors ({xp,live}.funding.min_vol)
+# are untouched by this change.
+MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (pr): 2e6 -> 1e6]
 
 # Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
 # HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
@@ -151,7 +167,25 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 # Entries additionally require the rate to have stayed hot >= PERSIST_H — the
 # research-backed filter: persistent funding pays carries, spikes pay fees.
 PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
-FLIP_GRACE_H = 1.0         # hours of adverse funding before a flip-close
+# [2026-08-18 (pr)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
+# (scripts/study_books_cohort_2026-08-13.py, this cell's OWN gate and coins,
+# 250d of settled fundings): grace 1h = +$27.25, t=1.95, h2 NEGATIVE, with
+# **192 of 231 exits churning the 30bps RT on sign wobbles**; 6h = +$41.17,
+# t=2.96, BOTH halves positive; 24h = +$50.12, t=3.52 — monotone, a plateau,
+# robust ex-best-coin. The book's own ledger agrees in shape ((gq): sided
+# *_flip exits -$17.32 vs decay_paid +$71.42), and its 9-loss era IS nine
+# flips. 6h over the 24h optimum for decidability (I17) — ~79% of the close
+# cadence at double the per-trade expectancy — and it mirrors PERSIST_H: six
+# hours of proof to buy, six to sell (the same choice 🏦 Rich Dad made on
+# this cell at (mf)). (mf) QUEUED this change to protect carry's mid-window
+# sample; that sample froze on 12-Aug ((pf): the class screen means it
+# CANNOT update), and the book held ZERO positions when this shipped, so
+# every future close is opened under the new rule — the cleanest policy
+# boundary this book will ever get. The older study_carry_flip_grace_lighter
+# "do not move from prose" pin is about ITS OWN uncalibrated replay ((he));
+# this move rides the (mf) harness instead, which the fleet already consumed
+# for Rich Dad. Ordinary exit tuning per (hc) — the era is unchanged.
+FLIP_GRACE_H = float(os.environ.get("CARRY_FLIP_GRACE_H", "6.0"))  # hours of adverse funding before a flip-close [2026-08-18 (pr): 1.0 -> 6.0]
 FEE_PAYBACK_MARGIN = 0.10  # $ net (after ALL fees incl. close) for a decay-close
 BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
 
@@ -996,7 +1030,10 @@ def main():
                            "caps": {"max_positions": MAX_POSITIONS,
                                     "enter_apr": _enter_apr,
                                     "min_vol": MIN_DAY_VOLUME, "max_vol": None,
-                                    "crypto_only": not ALLOW_NONCRYPTO},
+                                    "crypto_only": not ALLOW_NONCRYPTO,
+                                    # [(pr)] the exit gate publishes like the
+                                    # entry gate ((lz)/(pf) doctrine)
+                                    "flip_grace_h": FLIP_GRACE_H},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation

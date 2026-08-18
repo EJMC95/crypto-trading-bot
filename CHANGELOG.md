@@ -1,3 +1,85 @@
+## 2026-08-18 (px) — 🌾 CARRY GETS ITS SUPPLY BACK AND ITS MEASURED EXIT: min_vol $2M → $1M on the 34.9d ladder, flip grace 1h → 6h on the (mf) cell measurement — shipped together while the book is EMPTY, so the fresh sample has ONE policy
+
+**Operator, 18-Aug: "Whatever is money productive" → "Expand where necessary
+and loosen, give more opportunities."** The fleet's best-claimed book
+(allocation claim 0.1492%, the largest capital pointer at $12.4k of $17k) had
+been FLAT for 5.2 days at `eligible 0`, its era grade frozen forever on the
+removed non-crypto class ((pf)), and `(pu)`'s same-day fleet-wide hunt closed
+with exactly this diagnosis — *"supply-starved (🌾 carry: 0 eligible of 225)"*
+— without acting on it. This entry is the act, and both halves are measured.
+
+### 1 · `CARRY_MIN_VOL` 2e6 → 1e6 — the floor was holding more of the cell's life than the bar was
+
+The 3-Aug `(it)` registration recorded *"walking this cage to $1M today
+unlocks ZERO additional hot books"* — TRUE at that loop's census and FALSE
+over the tape, corrected in place per I12. Measured through
+`audit_book_overlap.supply_in` (the gate rule's ONE owner — no second copy),
+9,996 scout snapshots / 34.9 days, cell = ≥20% TRUE / crypto / 6h persist:
+
+| floor | snapshots w/ supply | occupancy | coins |
+|---|---:|---:|---|
+| $2.0M (old) | 573 | 5.73% | KAITO, XMR, PAXG |
+| $1.5M | 828 | 8.28% | +ROBO, +XRP |
+| **$1.0M (new)** | **1,341** | **13.42%** | **+ENA (6 total)** |
+
+2.3× the supply, all crypto, all inside the cage `(it)` designed for exactly
+this walk ($1M holds the clip ≤0.03% of daily turnover; below $1M stays
+blocked on unmeasured per-book slippage). Registry `env_default` synced
+(audit_lever_bounds green; the cage is now one-sided the OTHER way — the rail
+can only TIGHTEN back). Real-money floors (`{xp,live}.funding.min_vol`)
+untouched. I19 price, declared: modelled shadow fills make the slippage
+unknown a go-live question, not a today cost.
+
+### 2 · `FLIP_GRACE_H` 1.0 → 6.0 — the queued (mf) fix lands, because the sample it was protecting froze
+
+`(mf)` measured this cell's own gate and coins (250d settled fundings): grace
+1h = +$27.25, t=1.95, h2 NEGATIVE, **192/231 exits churning the 30bps RT on
+sign wobbles**; 6h = +$41.17, t=2.96, BOTH halves positive; 24h = +$50.12 —
+monotone plateau, robust ex-best-coin, and carry's own ledger agrees in shape
+((gq): sided flips −$17.32 vs decay_paid +$71.42; its 9-loss era IS nine
+flips). Rich Dad consumed 6h the same day; carry was QUEUED to protect its
+mid-window sample. **That rationale is dead**: the sample froze 12-Aug ((pf)
+— the class screen means it CANNOT update), and the book held ZERO positions
+at ship, so every future close opens under the new rule — the cleanest policy
+boundary available. 6h over the 24h optimum for decidability (I17), mirroring
+`PERSIST_H`. Env-tunable (`CARRY_FLIP_GRACE_H`); published in `caps` beside
+the entry gate ((lz)/(pf) doctrine). The `(he)` "do not move from prose" pin
+is about study_carry_flip_grace_lighter's own uncalibrated replay — that
+verdict STANDS for that file (its selftest now pins the 6.0 and keeps V0 at
+the ledger-era 1h); this move rides the (mf) harness the fleet already
+consumed. Ordinary exit tuning per (hc): the era is unchanged, and the
+empty-book boundary makes the split unambiguous anyway.
+
+### 3 · The declared consequence: a THREE-book collision component
+
+At $1M the carry gate reaches into 🛢️ Garrett's published band on
+[$1M,$2M) × ≥20% — a POPULATED sliver (ROBO/ENA + KAITO's excursions) — so
+`audit_book_overlap`'s transitive grouping fuses 🌾/🏦/🛢️ into one component.
+Verified against the live tape BEFORE shipping (the audit's own
+`collisions()` with the patched gate: `DECLARED`, not `!! UNDECLARED`).
+Declared in `KNOWN_CELL_COLLISIONS` with a fallback pair key so the
+declaration survives supply drift in either direction. NOT the (pm) shape:
+carry/Garrett differ in bar (20% vs 5%) and mechanism (delta-neutral accrual
+vs ranked directional); the cost is I20's accounting one (a coin held by both
+counts twice in allocation's independent claims — the effective-bet line is
+the standing correction). Owner: OPERATOR, folded into the ~12-Sep decision.
+
+### What this buys, honestly
+
+Not a dollar today — supply. The 12-Sep keep-or-retire call currently reads
+n=10 of a policy the book no longer runs. At 13.42% occupancy and the 6h
+grace, the decision gets fresh current-policy closes instead of a frozen
+sample. A book that cannot earn evidence has no path to any verdict but
+retirement (I17); this is the reach move, priced, inside every cage.
+
+Files: funding_carry_bot.py (floor, grace, caps), fleet_tuning.py (registry
+sync), scripts/audit_book_overlap.py (declarations),
+scripts/study_carry_flip_grace_lighter.py + tests/test_selftests.py (the
+(he) pin corrected in place). Suite green except the PRE-EXISTING (pv)
+citation failure from review-quarantine's unpushed worktree — theirs, not
+this entry's. Deploys on push (funding-carry + yield-harvester-shadow both
+carry deploy rules); verify by `caps.min_vol=1000000` + `caps.flip_grace_h=6`
+on the live row, not by the green run.
 ## 2026-08-18 (pw) — THE NEVER-EMPTY TIER'S DEPTH IS NEGATIVE: Garrett's cap widening measured and REFUSED, and the band's own edge has decayed on the trailing window
 
 **Operator, 18-Aug: "Find a path or a way to make it win and a growing PnL."**
@@ -109,8 +191,7 @@ right** — the `(po)` class, caught in the act:
   invalidates bytecode on `(mtime, size)`. M3 was a GENUINE hole — the window's
   upper edge was pinned only by assertions on pairs that are not in the table at
   all, so widening `15..15` to `15..17` changed nothing any test could see.
-  Both now covered; the size-preserving mutation is the one to reach for.
-## 2026-08-18 (pu) — "FIX ANYTHING THAT MAKES MORE MONEY": THE ANSWER IS NOTHING TODAY, AND THE REFUSALS ARE THE DELIVERABLE
+  Both now covered; the size-preserving mutation is the one to reach for.## 2026-08-18 (pu) — "FIX ANYTHING THAT MAKES MORE MONEY": THE ANSWER IS NOTHING TODAY, AND THE REFUSALS ARE THE DELIVERABLE
 
 Six measured lenses, 55 agents, three adversarial referees per proposal
 (turnover / calibration / reachability). **12 proposals survived refutation and

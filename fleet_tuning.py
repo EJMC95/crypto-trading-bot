@@ -475,9 +475,17 @@ LEVERS = {
         # per-book slippage here is unmeasured and the real-money funding
         # floors bottom at $2M. Step walks DOWN a notch at a time
         # (2.0 -> 1.75 -> 1.5 -> 1.25 -> 1.0), each one replay-gated.
+        # [2026-08-18 (pr)] env default 2e6 -> 1e6 (the cage's own designed
+        # `lo`): measured over 9,996 snapshots / 34.9d, the cell's occupancy
+        # at $2M is 5.73%/3 coins vs 13.42%/6 coins at $1M — the 3-Aug "zero
+        # unlock" census above was point-in-time and is corrected in place in
+        # the bot. The default now sits AT `lo`, so the cage is one-sided the
+        # OTHER way: the rail can only TIGHTEN back toward the operator's old
+        # floor. Loosening below $1M stays blocked on the unmeasured-slippage
+        # reason above.
         "kind": "float", "lo": 1e6, "hi": 2e6, "lane": "lighter-books",
-        "note": "Yield Harvester 24h $ turnover floor; env default 2e6",
-        "env_default": 2000000.0, "step": -250000.0},
+        "note": "Yield Harvester 24h $ turnover floor; env default 1e6 since (pr)",
+        "env_default": 1000000.0, "step": -250000.0},
     "fundspread.k": {
         # measured AT its cap: 10 open = exactly K=5 x 2 legs.
         # [2026-08-04] default 8 -> 5: the (fz) widening reverted per its own

@@ -504,9 +504,20 @@ def _selftest():
         #  place this file re-does the bot's `_bars()` arithmetic.
         assert abs(EXIT_APR_TRUE - _bot.EXIT_APR / 8.0) < 1e-12, (
             EXIT_APR_TRUE, _bot.EXIT_APR)
-        assert VARIANTS["V0 ship g1h"][0] == _bot.FLIP_GRACE_H, (
-            "V0 is supposed to BE the shipped rule; the bot's FLIP_GRACE_H "
-            f"moved to {_bot.FLIP_GRACE_H}")
+        # [2026-08-18 (pr)] The shipped rule MOVED to 6h — on the (mf)
+        # books-cohort measurement (a DIFFERENT harness, measured on the
+        # cell's own gate/coins), not on this file's replay, whose
+        # calibration failure ((he)) still stands and still gates ITS OWN
+        # recommendations. V0 stays g1h because the ledger this file
+        # calibrates against was produced under g1h; the drift check now
+        # pins the bot at the (pr) value so a THIRD value appearing in the
+        # bot is still caught.
+        assert VARIANTS["V0 ship g1h"][0] == 1.0, (
+            "V0 is the LEDGER-ERA rule (g1h); do not retag it")
+        assert _bot.FLIP_GRACE_H == 6.0, (
+            "the bot's FLIP_GRACE_H moved off the (pr) value "
+            f"({_bot.FLIP_GRACE_H}) — update this pin WITH the measurement "
+            "that moved it, the (he)/(pr) discipline")
 
     # 6) the era is read from ONE owner, not retyped here.
     src = open(os.path.abspath(__file__)).read()

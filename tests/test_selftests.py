@@ -416,8 +416,11 @@ SELFTEST_EXCLUDE = {
     # the (hc) accrual era. Era-clean it is 44 episodes, and on those the 8h
     # grace PASSES the both-halves bar it was rejected on — but the run is
     # UNCALIBRATED (V0-sim -$35.22 vs a -$15.13 ledger) so every recommendation
-    # is withheld. Still NO exit change; the blocker is replay fidelity, not
-    # the sample. Do not move FLIP_GRACE_H from prose.
+    # is withheld. THIS FILE's replay still may not recommend.
+    # [2026-08-18 (pr), corrected in place per I12: FLIP_GRACE_H HAS since
+    # moved, 1h -> 6h — not "from prose" but on the (mf) books-cohort
+    # measurement (the cell's own gate/coins, 250d), the same harness Rich
+    # Dad consumed at (mf). The study's own selftest now pins the 6.0 value.]
     "scripts/study_carry_flip_grace_lighter.py",
     # [2026-07-21] carry entry-gate sweep (the flip study's queued follow-up):
     # --selftest offline-green; full run pages the venue's funding API.
