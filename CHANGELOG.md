@@ -1,3 +1,84 @@
+## 2026-08-18 (ps) — THE CALIBRATION GATE GRADED THE HARNESS AGAINST TRADES IT CANNOT REPLAY, AND THAT FALSE PASS GUARDED THE FLEET'S LARGEST STOP POT
+
+**The defect.** `study_exit_sweep.main()` built the calibration baseline from
+EVERY row a book ever closed, while the replay scores only rows carrying both
+an entry price and a side. On 🎫 the Ticket Taker that is **46 of 161** rows.
+The two populations are not close and not interchangeable: ALL-rows
+**+0.085%/trade** vs the swept 46 at **−0.502%/trade**, a **0.588pp** gap. The
+excluded 115 are the pre-(gr) telemetry era — measured: zero unpriced and zero
+side-less closes on this book since 3-Aug — so the discarded population is not
+a random sample, it is an older book.
+
+**It flipped a verdict, toward a recommendation.** Replayed −0.126% against the
+ALL-rows baseline reads gap −0.207pp ⇒ **PASS** (tol 0.25), and the CLI printed
+a live candidate (`keep_shipped: false`, edge +0.50pp) for the book holding
+**−$72.51 of the fleet's stop family**. Against the trades it actually replayed
+the gap is **+0.376pp ⇒ FAIL, WITHHELD**. Third defect in this one gate —
+(kf) wired it into the CLI, (kn) fixed it reading a key nothing publishes, this
+one fixes it comparing the wrong two numbers. It has existed since (gx) and had
+never yet been asked the question it claims to answer.
+
+**Verified by differential effect, not by the book it was found on.** pm-albanese
+and pm-turnbull stamp a side on every priced close, so their two populations are
+identical and the gap moves **0.000pp** — both stay PASS with identical numbers.
+🎯 the sniper's verdict is unchanged (FAIL either way, −0.399pp ⇒ +0.297pp).
+The fix moves exactly the books whose populations differ and no others.
+Mutation-verified ×3 (revert the baseline to `rows`; default a missing
+`pnl_pct` to 0.0; drop the field) — all three redden
+`tests/autonomy/test_exit_telemetry.py`, AST-shaped because a substring test for
+`trades` passes against the defective `for r in rows` four characters away.
+
+**The census this corrects.** `STUDY_ENTRY_EXIT_FLEETWIDE_2026-08-15.md` reads
+"1 of 8 directional books calibrates (gillard)" — gillard was retired the same
+day by the (nf) slate, so that sentence now names a dead book. Re-measured
+today across every LIVING sweepable book: only four have a shipped exit rule
+readable from their module at all (georgia/avo/mum/douglas/grimes return None —
+no baseline, no recommendation by construction), and of those four
+**two calibrate: pm-albanese (gap +0.031pp) and pm-turnbull (+0.085pp)**.
+Neither yields anything shippable — see below. The other two FAIL.
+
+**Both calibrating books refuse, with numbers.** pm-albanese: no rule beats the
+shipped exit by ≥0.05pp in both halves, at 100 rules and again at **729** with
+the grid widened to sl 0.005–0.12 and hold 1–168h. pm-turnbull: the winner sits
+on the sl grid edge at every widening, and walking the sl axis alone at the
+winner's other legs gives +0.295/+0.276/+0.671/+0.591/+0.609/+0.546/+0.421/
++0.580/+0.480/+0.570% across sl 0.001→0.05 — **no interior optimum, a 0.4pp
+wobble on n=20 against a claimed 0.48pp "edge"**. That is the (gx) grid-edge
+artefact, reported unbounded and not shipped.
+
+**Where the money actually is, and why it is still unreachable.** The stop
+family across living books is **−$145.31**, and 🎫 the Ticket Taker is
+**−$72.51 of it (50%, n=49, five 0%-win `_sl` cells)** — the only book that is
+simultaneously the biggest pot and has registered, caged, consumed stop levers
+(`taker.sl` / `taker.tp` / `taker.max_hold_h`, `lighter-taker` lane). So the
+one reachable pot is exactly the one whose calibration now correctly fails.
+
+**Measured why it fails, non-circularly.** The harness's own docstring declares
+exit slippage unmodelled and the omission OPTIMISTIC. Measured independently
+from the ledger — realised stop fills against a known −3.000% trigger — the
+taker's stops fill at **−3.483% median / −3.596% mean, i.e. 0.483–0.596pp past
+trigger**, on 30.4% of the swept sample = **−0.181pp/trade of drag**. Applying
+that measured constant to the replay's stop exits only (not fitted to pass the
+gate; taken from fills against a trigger price) closes the gap from +0.388pp to
+**+0.173pp ⇒ PASS**. So the taker's exits become measurable for the first time
+if the harness models a per-book measured slip.
+
+**And then the cage binds — I18, exactly.** With slip modelled the sweep returns
+a BOUNDED winner: `{max_hold 12, sl 0.03 unchanged, tp 0.10}`, edge
+**+0.610pp/trade**, both halves positive (+6.71/+5.96 vs −10.74/−4.06), and
+drawdown IMPROVING 27.71% → 19.22%. **Both of its moving legs are outside their
+registry cages** — `taker.max_hold_h` lo=**24** (wants 12), `taker.tp` hi=**0.06**
+(wants 0.10) — and neither cage carries a derivation; the notes are bare
+restatements of the default. Restricted to what the cages actually permit the
+best candidate is `{max_hold 24, sl 0.025, tp 0.04}` at **+0.183pp**, still
+sitting on the cage floor (unbounded), still **negative in mean (−0.145%/trade)**
+and still negative in h1. **REFUSED on I19**: +0.183pp of unbounded, still-losing
+edge does not pay for the 30-day era reset any real sl/tp change costs this book.
+The binding constraint on the fleet's largest recoverable pot is the CAGE, not
+the stop — and the cage was drawn before the measurement that judges it existed.
+
+Nothing was shipped to any book. What shipped is the gate telling the truth.
+
 ## 2026-08-18 (pr) — THE SAME HALT DEFECT ONE SHELF UP, AND WORSE: 💸 THE FARMER READ IT ONCE, AT BOOT
 
 `(pq)` fixed 🙏 Avo LIVE and closed by naming what it had NOT fixed: 💸 the

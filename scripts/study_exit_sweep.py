@@ -843,8 +843,20 @@ def load_trades(book, rows):
         else:
             no_side += 1
             continue
+        # [2026-08-18 (ps)] THE ROW'S OWN REALISED RETURN RIDES ALONG, so the
+        # calibration baseline can be built from the SAME trades the replay
+        # scores. See the block in main(): the baseline used to be the mean of
+        # every row the book ever closed, including the ones this loop just
+        # skipped for having no price and no side — i.e. the harness was graded
+        # against a population it cannot replay. Carried as None when the row
+        # has no pnl_pct, never as 0.0 (the `_rate()` rule: a fabricated value
+        # reads as real data).
+        try:
+            realised_pct = float(r["pnl_pct"]) * 100.0
+        except (TypeError, ValueError, KeyError):
+            realised_pct = None
         out.append({"sym": sym, "entry_ts": int(a.timestamp()), "entry_px": px,
-                    "is_long": is_long})
+                    "is_long": is_long, "realised_pct": realised_pct})
     return out, no_px, no_side
 
 
@@ -915,8 +927,36 @@ def main():
         # top-ranked rule is -0.934pp/trade and +18.0pp of drawdown. The gate
         # existed, was correct, and was inert on the path anyone used — I9/(iz)
         # exactly, a declared enforcement that EXISTS and does not run.
-        actual = [float(r["pnl_pct"]) * 100.0 for r in rows
-                  if r.get("bot") == book and r.get("pnl_pct") is not None]
+        #
+        # [2026-08-18 (ps)] ...AND THEN IT CALIBRATED AGAINST THE WRONG
+        # POPULATION. This read every row the book ever closed, while the
+        # replay scores only the rows `load_trades` could actually replay —
+        # those carrying BOTH an entry price and a side. On 🎫 the Ticket
+        # Taker that is 46 of 161 rows, and the two means are not close:
+        # ALL-rows +0.085%/trade vs the swept 46 at -0.502%/trade, a 0.588pp
+        # gap. The excluded 115 are the pre-(gr) telemetry era (measured:
+        # zero unpriced and zero side-less closes since 3-Aug), so the
+        # discarded population is not a random sample — it is a different,
+        # older book.
+        #
+        # It flipped a verdict, in the dangerous direction: replayed -0.122%
+        # against the ALL-rows +0.085% reads gap -0.207pp ⇒ PASS (tol 0.25),
+        # and the CLI printed a live candidate for the fleet's largest stop
+        # pot. Against the trades it actually replayed the gap is +0.380pp ⇒
+        # FAIL, recommendations WITHHELD — which is the honest answer. Third
+        # defect in this same gate ((kf) wired it in, (kn) fixed it reading a
+        # key nothing publishes, this one fixed it comparing the wrong two
+        # numbers): the gate has always existed and has never yet been asked
+        # the question it claims to answer.
+        #
+        # The sniper's verdict is unchanged (FAIL either way, -0.399pp ⇒
+        # +0.297pp) and pm-albanese/pm-turnbull are unaffected — every priced
+        # close on those two carries a side, so the two populations are
+        # identical there and the gap moves 0.000pp. A fix that changes only
+        # the book it was diagnosed on is the one to distrust; this one moves
+        # exactly the books whose populations differ, and no others.
+        actual = [t["realised_pct"] for t in trades
+                  if t.get("realised_pct") is not None]
         res = sweep(trades, candles, grid, cap=a.cap,
                     shipped=shipped_rule(book),
                     actual_mean_pct=(sum(actual) / len(actual)

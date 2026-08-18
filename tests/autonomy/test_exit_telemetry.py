@@ -462,3 +462,64 @@ def test_the_funding_registry_refuses_the_live_real_money_book():
                 "book-hull-lshadow"):
         assert bot in ses.FUNDING_BOOKS, \
             f"{bot} earns funding — a price sweep measures the wrong thing"
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-18 (ps)] THE CALIBRATION GATE MUST BE GRADED AGAINST THE TRADES IT
+# REPLAYED — the third defect in the same gate, and the first one that flipped
+# a verdict toward a recommendation.
+#
+# (kf) wired the gate into the CLI; (kn) fixed it reading a key nothing
+# publishes; this pins the population. `main()` built the baseline from EVERY
+# row the book ever closed, while the replay scores only rows carrying both an
+# entry price and a side. On 🎫 the Ticket Taker that is 46 of 161 — the other
+# 115 are the pre-(gr) telemetry era — and the two means differ by 0.588pp
+# (ALL +0.085%/trade vs the swept 46 at -0.502%). Measured consequence: gap
+# -0.207pp ⇒ PASS and a printed candidate for the fleet's largest stop pot,
+# where the honest comparison is +0.376pp ⇒ FAIL, WITHHELD.
+#
+# AST-shaped on purpose: a substring test for "trades" passes against the
+# defective `for r in rows` line, which sits four characters away.
+# ---------------------------------------------------------------------------
+def test_calibration_baseline_is_built_from_the_swept_trades_not_every_row():
+    import ast
+    src = (_ROOT / "scripts" / "study_exit_sweep.py").read_text()
+    tree = ast.parse(src)
+    main = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "main")
+    binds = [n for n in ast.walk(main)
+             if isinstance(n, ast.Assign)
+             and any(isinstance(t, ast.Name) and t.id == "actual"
+                     for t in n.targets)]
+    assert len(binds) == 1, f"expected one `actual` binding, got {len(binds)}"
+    comp = binds[0].value
+    assert isinstance(comp, ast.ListComp), \
+        "the baseline must stay a comprehension over the swept trades"
+    src_iter = comp.generators[0].iter
+    assert isinstance(src_iter, ast.Name), ast.dump(src_iter)
+    assert src_iter.id == "trades", (
+        f"calibration baseline iterates `{src_iter.id}` — it must iterate "
+        "`trades`, the rows the replay actually scored. Grading the harness "
+        "against rows it cannot replay is not a calibration.")
+
+
+def test_load_trades_carries_the_rows_own_realised_return():
+    """The baseline above can only be built from the swept set if each trade
+    carries its own realised return — and it must be None, never 0.0, when the
+    row has none (the `_rate()` rule: a fabricated value reads as real data)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_ses3", _ROOT / "scripts" / "study_exit_sweep.py")
+    ses = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ses)
+    rows = [
+        {"bot": "b", "pair": "X/USDC", "opened_at": "2026-08-01T00:00:00+00:00",
+         "entry_price": 100.0, "side": "short", "pnl_pct": -0.031},
+        {"bot": "b", "pair": "X/USDC", "opened_at": "2026-08-01T01:00:00+00:00",
+         "entry_price": 100.0, "side": "long"},        # no pnl_pct at all
+    ]
+    trades, _, _ = ses.load_trades("b", rows)
+    assert len(trades) == 2, trades
+    assert abs(trades[0]["realised_pct"] - (-3.1)) < 1e-9, trades[0]
+    assert trades[1]["realised_pct"] is None, \
+        "a missing realised return must stay None, never 0.0"
