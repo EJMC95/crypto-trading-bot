@@ -1,4 +1,4 @@
-"""[19-Aug (qh)] THE CROSS-VENUE BENCH MUST BE THE FULL CROSS-SECTION.
+"""[19-Aug (qi)] THE CROSS-VENUE BENCH MUST BE THE FULL CROSS-SECTION.
 
 `funding_divergence` is published truncated to the top 5, and that truncation
 is why the 19-Aug divergence study could recover a per-coin gap AT OPEN for

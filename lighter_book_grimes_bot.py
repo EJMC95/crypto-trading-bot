@@ -189,7 +189,7 @@ DELIST_GIVEUP_H = 6.0
 ALLOW_NONCRYPTO = os.environ.get(
     "GRIMES_ALLOW_NONCRYPTO", "").strip().lower() in ("1", "true", "yes")
 
-#: [19-Aug (qh)] ENTRIES ARE RESTRICTED TO GATE-GRADED COINS. `(om)` fixed the
+#: [19-Aug (qi)] ENTRIES ARE RESTRICTED TO GATE-GRADED COINS. `(om)` fixed the
 #: gate by grading the founding study's fixed 18 while trading kept following
 #: the live universe — and published the hazard it created in `gate_drift`:
 #: "`ungraded` non-empty means the book can enter coins its own gate never
@@ -925,7 +925,7 @@ def main():
                 if coin in held_coins:
                     census["held"] += 1
                     continue
-                # [19-Aug (qh)] the graded-universe restrict (see the
+                # [19-Aug (qi)] the graded-universe restrict (see the
                 # TRADE_UNGRADED block above): a coin the gate never graded
                 # may not be ENTERED. Counted, never silent — and placed
                 # before the candle fetch so a skipped coin costs no REST
@@ -1197,7 +1197,7 @@ def _selftest():
     # 9) payload builders — the scorecard is public (rule 3)
     cen = {"scanned": 18, "held": 1, "no_bars": 0, "quiet": 16, "signal": 1,
            "opened": 1, "capped": 0, "unpriceable": 0, "gated": 0,
-           "ungraded_skip": 0}   # (qh) — fixture mirrors the real literal
+           "ungraded_skip": 0}   # (qi) — fixture mirrors the real literal
     sc2 = {s: dict(grade([]), asof=float(t)) for s in SETUPS}
     extra = build_extra(cen, positions, sc2, 1.23, 4.56)
     assert set(extra["scorecard"]) == set(SETUPS)

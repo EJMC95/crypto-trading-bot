@@ -132,7 +132,7 @@ def test_variant_takes_no_allocation_scale(monkeypatch):
 
 
 def test_variant_clip_is_its_own_measured_size_not_the_global(monkeypatch):
-    """[19-Aug (qh)] 🛢️ Garrett ran $30 clips for its whole life against a
+    """[19-Aug (qi)] 🛢️ Garrett ran $30 clips for its whole life against a
     founding study whose ONLY measured cell is $25 — `ctx.order_usd(ORDER_USD)`
     without `own` falls through to the global LIGHTER_ORDER_USD for every
     shadow book. The variant contract is env-only single-policy config, and

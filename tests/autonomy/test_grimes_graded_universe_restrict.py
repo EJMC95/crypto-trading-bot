@@ -1,4 +1,4 @@
-"""[19-Aug (qh)] 📐 GRIMES MAY NOT ENTER A COIN ITS OWN GATE NEVER GRADED.
+"""[19-Aug (qi)] 📐 GRIMES MAY NOT ENTER A COIN ITS OWN GATE NEVER GRADED.
 
 `(om)` fixed the flapping gate by grading the founding study's fixed 18
 (GATE_COINS) while trading kept following the live `resolve_universe()` — and

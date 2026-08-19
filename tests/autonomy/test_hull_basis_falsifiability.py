@@ -1,4 +1,4 @@
-"""[19-Aug (qh)] 🧮 HULL'S ADVERSE-BASIS VETO MUST BE FALSIFIABLE FROM ITS ROW.
+"""[19-Aug (qi)] 🧮 HULL'S ADVERSE-BASIS VETO MUST BE FALSIFIABLE FROM ITS ROW.
 
 The 10bps veto fired 0 times in its first 21d, and that zero was unreadable:
 retained premium history keeps only the scout's top-8 outliers (cutoff median

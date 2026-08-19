@@ -1743,7 +1743,7 @@ def main():
     _SUPERVISOR_BOT_ID = bot_id
     broker = ctx.broker
     dry_run = ctx.dry_run
-    # [19-Aug (qh)] own=bool(VARIANT): a VARIANT book's clip is part of its
+    # [19-Aug (qi)] own=bool(VARIANT): a VARIANT book's clip is part of its
     # BACKTESTED definition (Garrett's founding study measured EXACTLY $25 —
     # STUDY_THIN_TIER_MIN_VOL's only cell; larger-clip thin-book scaling is
     # declared UNMEASURED there), so it must keep its own env/default instead
@@ -2217,7 +2217,7 @@ def main():
         # [2026-07-15 GROWTH RAIL] live clip re-read each loop: the evidence
         # board's bounded live.clip_scale lever applies to NEW entries only
         # (open positions untouched); reverts with the lever's own expiry.
-        _clip = ctx.order_usd(ORDER_USD, own=bool(VARIANT))   # (qh) variant clip fidelity
+        _clip = ctx.order_usd(ORDER_USD, own=bool(VARIANT))   # (qi) variant clip fidelity
         # [2026-08-05 (jr) S1] allocation scale, SHADOW ARM ONLY: the live
         # arm's clip takes no capital lever ((ia)) and no allocation. NEW
         # entries only, like the lever above. Dark/stale organ -> 1.0.

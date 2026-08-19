@@ -390,7 +390,7 @@ def scan_census(fund, held, stable_since, t0, prem_map=None, apr_lo=None,
             continue
         apr = rate * H
         a = abs(apr)
-        # [19-Aug (qh)] THE FALSIFIABILITY TAP. The 10bps adverse-basis veto
+        # [19-Aug (qi)] THE FALSIFIABILITY TAP. The 10bps adverse-basis veto
         # fired 0 times in its first 21d — and that zero was UNREADABLE:
         # retained premium history keeps only the scout's top-8 outliers
         # (cutoff median 17.9bps > the veto), so band-coin premiums were
@@ -487,7 +487,7 @@ def build_state(positions, stable_since, stable_sign, last_ts, now=None,
     clock is."""
     return {"positions": positions, "hot_since": stable_since,
             "stable_sign": stable_sign, "last_ts": last_ts,
-            "veto_fires": int(veto_fires),   # (qh) survives restarts
+            "veto_fires": int(veto_fires),   # (qi) survives restarts
             "saved_ts": float(now if now is not None else time.time())}
 
 
@@ -514,7 +514,7 @@ def build_extra(census, positions, open_pnl, realized,
                  "max_positions": MAX_POSITIONS, "clip_usd": CLIP_USD,
                  "crypto_only": not ALLOW_NONCRYPTO},
         "scan": census,
-        # [19-Aug (qh)] the veto's falsifiability surface: the premiums of
+        # [19-Aug (qi)] the veto's falsifiability surface: the premiums of
         # every in-band admissible coin THIS loop (how close the population
         # runs to the 10bps bar), fetch coverage (0 = fetch failed, the
         # fail-OPEN dark case — distinguishable from "no band coins"), and
@@ -639,7 +639,7 @@ def main():
     positions = {}      # coin -> pos dict
     stable_since = {}   # coin -> ts (sign, in-band) became continuously true
     stable_sign = {}    # coin -> +1/-1, the sign the clock above certifies
-    veto_fires = 0      # (qh) cumulative adverse-basis loop-coin counts
+    veto_fires = 0      # (qi) cumulative adverse-basis loop-coin counts
     _saved = None
     try:
         # the CHECKED read ((jd)): a blip at boot must not seed empty
@@ -649,7 +649,7 @@ def main():
             positions = _saved["positions"] or {}
         if _saved is not None:
             try:
-                veto_fires = int(_saved.get("veto_fires") or 0)  # (qh)
+                veto_fires = int(_saved.get("veto_fires") or 0)  # (qi)
             except (TypeError, ValueError):
                 veto_fires = 0
         if _saved is not None:
@@ -782,7 +782,7 @@ def main():
             band_prems = {}
             census = scan_census(fund, held, stable_since, t0,
                                  prem_map=prem_map, prem_out=band_prems)
-            # [19-Aug (qh)] cumulative veto counter — LOOP-COIN counts (a
+            # [19-Aug (qi)] cumulative veto counter — LOOP-COIN counts (a
             # coin sitting adverse for 10 loops counts 10), declared as
             # such; persisted so a restart cannot zero the record.
             veto_fires += int(census.get("adverse_basis") or 0)

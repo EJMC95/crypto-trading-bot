@@ -497,7 +497,7 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # so the two join directly. Joining to paper_trades/bot ledgers needs
         # venues/symbol_map.from_lighter() — 5 keys differ (the 1000X markets).
         "funding": {s: lighter_apr[s] for s in stats if s in lighter_apr},
-        # [2026-08-19 (qh)] THE CROSS-VENUE BENCH, FULL CROSS-SECTION — the
+        # [2026-08-19 (qi)] THE CROSS-VENUE BENCH, FULL CROSS-SECTION — the
         # same argument that added `funding` above, one venue-set out.
         # `funding_divergence` is truncated to the top 5, so the retained
         # tape could answer "was this coin diverging when the book opened
@@ -706,7 +706,7 @@ def selftest():
     _h = historized(snap)
     assert "funding" in _h and _h["funding"] == snap["funding"], "history drops funding"
     assert "marks" in _h and "_marks" not in _h, _h.keys()
-    # [(qh)] the cross-venue bench must survive history for the SAME reason —
+    # [(qi)] the cross-venue bench must survive history for the SAME reason —
     # it exists only to be joined to a decision after the fact. It carries the
     # FULL cross-section, not `funding_divergence`'s top-5 truncation, which
     # is why the 19-Aug study could recover a gap-at-open for 15 of 270 closes.
