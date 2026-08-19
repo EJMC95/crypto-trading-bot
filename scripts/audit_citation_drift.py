@@ -241,6 +241,7 @@ def _selftest():
             g("init", "-q")
             g("config", "user.email", "t@t"); g("config", "user.name", "t")
             g("config", "commit.gpgsign", "false")
+            _A, _B = "z" + "z", "z" + "y"       # see the note below
             # A filler ROOT commit first: git marks the root boundary with the
             # same `^` as a shallow graft, so a citation committed there would
             # be skipped as "beyond this clone's history" and the control could
@@ -249,12 +250,19 @@ def _selftest():
             open("README", "w").write("root\n")
             g("add", "-A"); g("commit", "-qm", "root")
             open("CHANGELOG.md", "w").write(
-                "## 2026-08-19 (zz) — THE ORIGINAL SUBJECT, about liquidation\n")
-            open("mod.py", "w").write("# [2026-08-19 (zz)] cites the original\n")
+                f"## 2026-08-19 ({_A}) — THE ORIGINAL SUBJECT, liquidation\n")
+            # COMPOSED, never written literally. `audit_changelog_letters`
+            # tokenizes STRING literals too, so a fixture spelled out in
+            # citation form here would be read as a real citation of a letter
+            # that resolves to nothing — the self-reference trap that guard's
+            # own docstring warns about, walked into by the guard built to
+            # sit beside it. Caught by that guard, one push too late.
+            _cite = f"# [2026-08-19 ({_A})] cites the original\n"
+            open("mod.py", "w").write(_cite)
             g("add", "-A"); g("commit", "-qm", "one")
             # the letter is now reused for a completely different entry
             open("CHANGELOG.md", "w").write(
-                "## 2026-08-19 (zz) — AN ENTIRELY DIFFERENT SUBJECT, about "
+                f"## 2026-08-19 ({_A}) — AN ENTIRELY DIFFERENT SUBJECT, about "
                 "changelog housekeeping\n")
             g("add", "-A"); g("commit", "-qm", "two")
             found, st = audit(["mod.py"])
@@ -266,13 +274,14 @@ def _selftest():
                 print(f"  SELFTEST FAIL: end-to-end control expected exactly 1 "
                       f"drift finding, got {len(found)} (stats={st})")
                 bad += 1
-            elif found[0][2] != "zz":
+            elif found[0][2] != _A:
                 print(f"  SELFTEST FAIL: wrong letter reported: {found[0][2]!r}")
                 bad += 1
             # NEGATIVE half: an untouched letter must NOT be flagged.
             open("CHANGELOG.md", "a").write(
-                "\n## 2026-08-19 (zy) — A STABLE ENTRY\n")
-            open("mod2.py", "w").write("# [2026-08-19 (zy)] cites a stable one\n")
+                f"\n## 2026-08-19 ({_B}) — A STABLE ENTRY\n")
+            open("mod2.py", "w").write(
+                f"# [2026-08-19 ({_B})] cites a stable one\n")
             g("add", "-A"); g("commit", "-qm", "three")
             found2, _ = audit(["mod2.py"])
             if found2:
