@@ -398,13 +398,15 @@ jobs:
             if echo "$changed" | grep -qE "^(lighter_band_kelly_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.bandkelly$|$_shared)"; then
               svcs="${svcs:+$svcs,}band-kelly-shadow"
             fi
-            # [2026-08-19 (ri)] 🧭 nav-cook — COMMENTED until nav-cook-shadow
-            # is provisioned (the (lr)/(mk) one-shot pattern). Uncomment as
-            # ONE edit with the AUTO_IMAGES move; a routing fix cannot deploy
-            # itself ((gm)), so dispatch the service explicitly that first time.
-            # if echo "$changed" | grep -qE "^(lighter_nav_cook_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.navcook$|$_shared)"; then
-            #   svcs="${svcs:+$svcs,}nav-cook-shadow"
-            # fi
+            # [2026-08-19 ACTIVATED] 🧭 nav-cook — service provisioned by the
+            # one-shot dispatch (run 32239943061, deleted at this activation
+            # per the (lr) rule), row verified on /pnl.json with a
+            # CURRENT-at-HEAD build stamp after the pnl-dashboard reader
+            # catch-up. The grep carries the ghost module (it is IN this
+            # image), exactly the band-kelly shape above.
+            if echo "$changed" | grep -qE "^(lighter_nav_cook_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.navcook$|$_shared)"; then
+              svcs="${svcs:+$svcs,}nav-cook-shadow"
+            fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
             # trail-blazer-live = 💸 Funding Farmer — service names lie) are
