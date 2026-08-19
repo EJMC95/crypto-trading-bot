@@ -1784,7 +1784,16 @@ def main():
     _SUPERVISOR_BOT_ID = bot_id
     broker = ctx.broker
     dry_run = ctx.dry_run
-    order_usd = ctx.order_usd(ORDER_USD)
+    # [19-Aug (qi)] own=bool(VARIANT): a VARIANT book's clip is part of its
+    # BACKTESTED definition (Garrett's founding study measured EXACTLY $25 —
+    # STUDY_THIN_TIER_MIN_VOL's only cell; larger-clip thin-book scaling is
+    # declared UNMEASURED there), so it must keep its own env/default instead
+    # of the global LIGHTER_ORDER_USD ($30) that own=False falls through to —
+    # Garrett ran 1.2x its measured size for its whole life until this line.
+    # The Farmer twins (VARIANT="") keep own=False DELIBERATELY: they mirror
+    # live sizing as the control arm (the venues/__init__.py order_usd
+    # comment), so both real-money arms are byte-identical under this change.
+    order_usd = ctx.order_usd(ORDER_USD, own=bool(VARIANT))
     max_open = ctx.max_open_positions(MAX_OPEN_POSITIONS)
     venue_tag = None if ctx.mode == "hl_paper" else "lighter"
     shadow_tag = ctx.mode == "lighter_shadow"
@@ -2250,7 +2259,7 @@ def main():
         # [2026-07-15 GROWTH RAIL] live clip re-read each loop: the evidence
         # board's bounded live.clip_scale lever applies to NEW entries only
         # (open positions untouched); reverts with the lever's own expiry.
-        _clip = ctx.order_usd(ORDER_USD)
+        _clip = ctx.order_usd(ORDER_USD, own=bool(VARIANT))   # (qi) variant clip fidelity
         # [2026-08-05 (jr) S1] allocation scale, SHADOW ARM ONLY: the live
         # arm's clip takes no capital lever ((ia)) and no allocation. NEW
         # entries only, like the lever above. Dark/stale organ -> 1.0.

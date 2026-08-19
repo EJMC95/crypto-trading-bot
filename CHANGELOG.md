@@ -1,12 +1,17 @@
-## 2026-08-19 (qj) — THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean, and georgia's exit question turns out to be STRUCTURALLY unanswerable by the instrument I sent it to
+## 2026-08-19 (ql) — THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean, and georgia's exit question turns out to be STRUCTURALLY unanswerable by the instrument I sent it to
 
-**I11, run against my own `(qi)` §7 list** rather than against whatever was
+*(Renumbered from (qj) at push time — a concurrent session's "OPERATOR
+REFRAMES" entry took (qj) on origin/main and is cited by PR #185's own subject,
+so this side moves. Its references to this session's audit entry follow it from
+(qi) to (qk).)*
+
+**I11, run against my own `(qk)` §7 list** rather than against whatever was
 most interesting. Two carried items, both closed — one clean, one refuted.
 
 **1 · THE ORGAN SWEEP (the scope that died on a session limit) IS CLEAN.**
 All 27 TTL-bearing bus organs are well inside their windows — worst
 `age/ttl` is **0.40** (`fleet_respiration`), median ~0.17; nothing DARK,
-nothing near. `fleet_immune.sick=[]`. So `(qi)`'s "spot-check, not the
+nothing near. `fleet_immune.sick=[]`. So `(qk)`'s "spot-check, not the
 sweep" caveat is now discharged with the sweep itself.
 
 **2 · AND THE SWEEP FOUND THE THING THE BUS COULD NOT SAY: CI/DEPLOYS ARE
@@ -24,7 +29,7 @@ no shadow book can receive code until it clears. Queued for the operator;
 no code change can fix it and none was attempted.
 
 **3 · THE GEORGIA CARRIED ITEM IS REFUTED — and the refutation is the fix.**
-`(qi)` §7 carried: *"georgia's closes carry prices since (gr), so
+`(qk)` §7 carried: *"georgia's closes carry prices since (gr), so
 `study_exit_sweep`'s calibration gate can be attempted."* **It cannot.** The
 run reports `calibration: SKIPPED — shipped exit rule could not be read from
 its module`, and that message is the defect: it reads as a MISSING registry
@@ -50,7 +55,7 @@ of-derived.
 `exit_too_tight` diagnosis on georgia (reclaim **1.0**, fwd **+1.63%**,
 trailing-stop path **−$17.14/71** era) **cannot be actioned through this
 instrument at all.** Answering it needs a ladder-aware replay — a build, not a
-re-run. `(qi)` filed it as "run the sweep"; that was wrong and is corrected in
+re-run. `(qk)` filed it as "run the sweep"; that was wrong and is corrected in
 place per I12.
 
 **ALSO MEASURED, and it needed no fix:** the sweep discards 33 of georgia's 66
@@ -67,7 +72,13 @@ mutation had landed before scoring it, and it reddens. **A mutation you did not
 verify was APPLIED is not a mutation**; scoring it is the same shape as the
 scoped-`awk` that scanned one line.
 
-## 2026-08-19 (qi) — FLEET-WIDE AUDIT: THE FLEET IS NOT BLEEDING, IT IS STARVED AND UNDECIDABLE — four of five loss centres are already-closed populations, and the instruments still grading them are the actual defect
+## 2026-08-19 (qk) — FLEET-WIDE AUDIT: THE FLEET IS NOT BLEEDING, IT IS STARVED AND UNDECIDABLE — four of five loss centres are already-closed populations, and the instruments still grading them are the actual defect
+
+*(Renumbered from (qi) at push time — a concurrent session's "SIX HUNTERS"
+entry took (qi) on origin/main while this was built, and theirs is merged and
+cited. Per the collision rule the CITED entry keeps the letter and this side
+moves. Note the two entries independently measured the SAME three (qa) growth
+leads and independently closed all three NEGATIVE.)*
 
 **Operator: *"Where are we losing and why? More importantly how can we use this
 information to let our bots win? … No more circles maverick lets hit targets on
@@ -165,6 +176,216 @@ change:** real money is **$259.84 at ≈$0/day**. The one book quietly earning
 its gate is 🙏 avo shadow (era n=12, **t=2.41**, both halves positive,
 on_track). No lever in this codebase is worth two orders of magnitude — **the
 capital decision is.**
+
+## 2026-08-19 (qj) — THE OPERATOR REFRAMES: "risk-eliminating job vs profit-motivated job" — 🪁 band-kelly's risk-up package, decided and shipped inside the pre-first-close window
+
+**Operator, 18-Aug (Sydney 19-Aug): "We are looking at this as a risk
+eliminating job as opposed to a profit motivated job. Let's look at this
+differently and look at options, even though risk will be higher."** The
+options were laid out with their numbers and refusals; the operator picked
+the aggressive tier on all three. Everything below landed while the book
+had ZERO closes — the (hm) single-policy clock had not started, so the
+whole 30-day sample will be earned under ONE policy. A week later the same
+changes would have fractured the era; today they were free.
+
+THE PACKAGE, as decided:
+* **$250 × 4 snap clips** (was $80×4): the whole $1k works in a
+  dislocation storm, ~3.1× dollar throughput on the same measured edge.
+  Named, accepted price: deeper book-walks (the KAITO-depth risk); the
+  my_slip census keeps it measurable, revert `KELLY_CLIP_USD`.
+* **dipfade ADMITTED at $40×2 probe — an OPERATOR OVERRIDE of the I16
+  floor, on the record.** n=13 < 30, but t=−2.66 as a single
+  pre-registered candidate puts the mirror's 95% CI at ~[+0.28%, +2.05%]
+  per trade, entirely positive; the floor is a fleet-wide multiplicity
+  defense and this is one named hypothesis at probe size. The ghost is the
+  taker's own VETOED dip lens: its conviction bar (range_pos ≤ 0.05)
+  decides the event, its bracket (tp +4% / sl −3% / 48h) mirrors into the
+  short's exits — the ghost's tp is the mirror's loss side. Bracket
+  constants are declared literals DRIFT-PINNED against the taker's real
+  values in the test (importing the 295KB taker into the image would bloat
+  the import graph); own tag `short-dip_*`, own cooldown (the taker's 2h,
+  mirrored), graded alone, dies on its own record.
+* **MY-side slip gate 30 → 60bps**: take more of the ghost's events at
+  size; pays up to ~30bps on marginal fills against a +60bps/trade mean.
+* **NOT taken, named with receipts**: leverage (refuted, the (young)
+  study — Δt negative 13-of-13), brkfade admission (random-short P=0.78),
+  removing the 5% stop, allocation-scale before a claim exists.
+
+THE FIDELITY CATCH THE CLIP JUMP FORCED: the ghost-side event check was
+being priced at MY clip — at $80 a rounding error, at $250 it would have
+REFUSED events the real $10-clip ghost took, shrinking the founded event
+set with every dollar of size. The event-existence gate now prices at
+`ghost.ORDER_USD` via a second book_view fetched only at the rare entry
+moment; MY tradeability gates at my clip and my 60bps. AST-pinned
+(mutation M13 red). Worst-instant book loss with every slot stopped:
+4×$250×5% + 2×$40×4% ≈ **−$53 ≈ 5.3%**, inside the 15% bar
+(pinned); gross max ≈ $1,080 ≈ 1.08× equity, declared in caps.
+
+Mutations M10–M13 verified red (dip bracket sides, conviction bar, dip
+slip gate, ghost-clip pricing) — with the control re-run after the first
+M13 pass turned out to be a cwd-drift vacuous red, the (po) class caught
+in my own harness for the second time today. Suite 1861 green. The header,
+roster, caps payload and CLAUDE.md row all say what the book now does
+(I12); the dashboard OVERTRADE_LIMIT already covers the added family.
+
+## 2026-08-19 (qi) — SIX HUNTERS, THREE ADMITTED STUDIES ALL CLOSE **NEGATIVE**, AND THE FIVE THINGS WORTH SHIPPING ARE FIDELITY AND FALSIFIABILITY — NOT EDGE
+
+**Operator: "Improve the p n l of all bots" → "Implement every positive
+finding" → "Real or shadow let our hunters find us a green p n l and win
+rate."** Six measured hunters, adversarial referees on every positive claim
+(turnover / calibration / reachability / random-null / window-fitting), 10
+agents, 0 errors. Full digest in the session scratchpad; `(qa)`'s three
+ADMITTED-BUT-NEVER-RUN studies were the headline and **all three closed
+negative**, which is the most valuable thing in the pass: each was a standing
+question that would otherwise have been re-opened on a hunch forever.
+
+**On the win-rate half of the ask, stated once because it governs everything
+below (I15):** this fleet's two best earners win **42.6%** and **39.3%**. Win
+rate is REPORTED here, never targeted — the loss tail orders the P&L, and a
+book that wins often and loses on the tails is the shape retired twice
+already. So the hunt looked for green EXPECTANCY; no proposal was accepted or
+rejected on hit rate.
+
+### THE THREE STUDIES — closed, with numbers, so they stay closed
+
+**1 · DIVERGENCE-CONDITIONED HARVESTING — CLOSED NEGATIVE.** Cross-venue
+funding divergence is NOT an entry-time adverse-selection signal for this
+fleet. Pooled over the 4 graded funding books, 241 covered era closes bucketed
+by |gap| at open: 0–10pp n=199 **−$16.00**; 10–20pp n=21 **+$5.30** (the BEST
+bucket); 20–37.5pp n=8 −$3.43; ≥37.5pp n=13 −$10.98, collapsing to n=9 −$0.66
+once the already-shipped `(lk)` class screen is removed. **Non-monotone, best
+bucket in the middle, no plateau.** No screen ships on any book: the Farmer's
+LIVE arm has ZERO opens at |gap|≥30 (so every X≥30 removes nothing, and X=10
+turns the book negative); the shadow arm's best latent cell fails I19
+both-halves (h1 +$1.02→+$0.78); carry's apparent win is 4-of-5 the `(lk)`
+screen plus KAITO n=1. The three biggest fleet losers (LIT −$9.72, ZEC −$6.57,
+VVV −$3.01) held **gap-quiet end to end** — they are price/stop losses on
+floor-rate shorts, not cross-venue contradiction. Basis: 10,268 scout
+snapshots over 36d, all four eras covered, bench calibrated on the 15
+published values (7 comparable, median abs err 7.6pp, sign 7/7).
+
+**2 · FUNDING-EXTREME SQUEEZE — CLOSED NEGATIVE, IN BOTH DIRECTIONS.**
+Refuted in **all 9 cells** (bars 20/40/80% TRUE × 4/24/72h, lag-0 and lag-1
+agreeing, 208d, 22 crypto coins): every cell's receiving-side forward return
+is negative and never beats the same-coin same-side random null — 20%/24h
+−0.208%/episode (n=441, null −0.092%, P=0.689); 80%/24h −0.880%/episode
+(n=146, null −0.115%, P=0.957). **At the 80% bar the adverse price leg is ~5×
+the funding collected** (+0.182%/24h): the squeeze premium is real and the
+RECEIVER pays it — the fleet's harvest books have been eating exactly the leg
+this study suspected. The MIRROR (pay funding, ride with the crowd) is refused
+too: best-of-9 selection (P=0.043 uncorrected, ~0.39 Bonferroni), **3 of 146
+episodes carry 56% of gross** (the `(oj)` tail shape), collapses at adjacent
+bars, supply is $0.03–0.63M books with unmeasured slippage, ~$12/30d at face.
+
+**3 · LISTING LIFECYCLE — the founding thesis is REFUTED and the supply is
+DEAD.** 🎯 the sniper's listing LONG ("listings pop", tp+15/sl−10/6h) measured
+across every crypto birth the venue's own `created_at` exposes: **TP hit 2 of
+73 (2.7%)**, LAG-1 bracket −0.33%/episode vs an own-coin null of −0.05%
+(P=0.707), median day-7 debut return **−13.4%**. And the population is gone:
+last crypto births RAIL/CTR **85.1 days ago**; 2026 crypto births Jan–May=16,
+**Jun–Aug=0**; all 12 lifetime source events were non-crypto, 1 caught, and
+the non-crypto cohort has no edge either way (0 of 34 observable brackets hit
+either leg). **CLAUDE.md corrected in place (I12)** — its "deliberately
+unscreened (n=1, unmeasured, founding thesis)" is now measured and false. A
+`wait-then-short` variant reads +6.23%/episode but is recorded as **HYPOTHESIS
+ONLY, never arming evidence**: cluster-by-month t=1.91 (<2.0, the binding
+statistic), P=0.017 unadjusted ≈0.11 across the ≥7-variant sweep, and
+uncalibratable. A birth-rate tripwire may be WATCHED; firing it re-opens
+MEASUREMENT, never a build off this study.
+
+### WHAT SHIPPED — five fixes, every one fidelity/falsifiability, none an edge claim
+
+* **🛢️ Garrett clip fidelity.** It ran **$30** clips for its whole life against
+  a founding study whose ONLY measured cell is **$25** — `ctx.order_usd(...)`
+  without `own` falls through to the global `LIGHTER_ORDER_USD` for every
+  shadow book. `own=bool(VARIANT)` keys it: a VARIANT keeps its backtested
+  size, and the Farmer twins keep `own=False` **deliberately** (they mirror
+  live sizing as the control arm), verified behaviourally AND AST-pinned so a
+  third call site cannot reintroduce it. Ordinary tuning per `(hc)`; era clock
+  unchanged. Ships UNMARKED — reaches band-garrett-shadow only, **zero
+  judge-window cost**, both Farmer arms untouched.
+* **📐 Grimes may not enter a coin its own gate never graded.** `(om)` fixed the
+  flapping gate and published the hazard it created; measured 19-Aug, **100% of
+  287 bus samples/24h** carried ≥2 gate-ungraded coins in the traded universe
+  (APEX every sample), live `gate_drift.ungraded=[APEX, VVV]`. The book has
+  ZERO trades ever, so the restrict costs **$0.00 both halves** — a free
+  hazard closure. Skip-and-census (`ungraded_skip`, seeded in the literal),
+  after the held check, before the candle fetch. Revert
+  `GRIMES_TRADE_UNGRADED=1`.
+* **🧮 Hull's adverse-basis veto becomes falsifiable.** 0 fires in 21d was
+  UNREADABLE: retained premium history keeps only the scout's top-8 outliers
+  (cutoff median 17.9bps > the 10bps veto), so band-coin premiums were visible
+  in **1 of 5,580** candidate coin-snapshots — "0 fires" byte-identical
+  between a slack bar and blind history. `extra.basis` now publishes
+  `{band_prems, coverage, veto_fires}`, all three keys always present,
+  `coverage=0` distinguishing fetch-dark from no-band-coins, the counter
+  persisted across restarts. Publish-only; the prerequisite for ever PRICING
+  a veto move.
+* **🛰️ The scout historizes the FULL cross-venue bench.** The divergence study
+  could recover a per-coin gap AT OPEN for only **15 of 270** era closes,
+  because `funding_divergence` is published truncated to the top 5.
+  `xvenue_funding` carries the whole cross-section beside `funding` — the same
+  argument that added `funding` on 17-Jul. Absent, never 0.0, for a coin with
+  no external quote (I6). Coupled to no gate. This is what makes a
+  closed-negative class re-openable on EVIDENCE rather than on a hunch.
+* **🪁 band-kelly activation** was built here and **DROPPED at push**: a
+  concurrent session landed the identical activation first, including the same
+  `lighter_dislocation_bot.py` deploy-orphan its own audit caught. Verified
+  theirs is complete against their tree rather than assumed, and this branch
+  carries none of it.
+
+### REFUSALS RECORDED (each with its number, so none is re-proposed unpriced)
+
+* **🏦 kiyosaki payback-velocity bar binds NOTHING** — 0 of 6,011 snapshots
+  (21d) had any coin in [20%, 21.9%) passing floor+persist+$2M+crypto; the
+  distribution is quantized past the sliver. The drought is SUPPLY
+  (floor-passers present in 8.9% of snapshots, max 2 concurrent vs cap 6). Do
+  not loosen or blame the velocity bar.
+* **💸 Farmer instrument-class screen — NOT supported at the $10M tier.** LIVE
+  non-crypto n=7, t=−0.37; SHADOW n=20, t=−0.44 with dollar total and mean
+  disagreeing in sign and halves disagreeing within arms. The `(lk)` carry
+  precedent does not replicate here. XAU-specific exclusion refused as
+  post-hoc single-symbol (n=6).
+* **🎫 taker `TICKET_TOP_N` widening** — no positive-graded lens is
+  supply-capped: only `dip` sits at cap (60.6% of samples) and dip is the
+  standing realised veto (t=−2.66). Widening buys nothing and would re-tune an
+  organ mid-accrual of a pre-registered window.
+* **🔮 georgia restrict-only subset** — no bucket survives BH at FDR 0.05
+  (min p=0.18). The only significantly negative buckets are trailing-stop
+  exits, negative BY CONSTRUCTION (I7) and not entry-identifiable. Per `(hm)`
+  its long book sits ABOVE its side's random-entry null.
+* **💸 Farmer `max_hold` (tracking)** — n is STILL 10 (<30 per `(pu)`): pooled
+  mean −2.385%/trade, t=−3.08. ETA ~6–8 weeks; when it lands the counterfactual
+  must be funding-denominated, never a price-path sweep (`(kf)`).
+* **🧮 hull `BASIS_VETO_BPS` any change** — no number exists to price it; the
+  falsifiability tap above is the prerequisite.
+
+### TWO COMPLETENESS GAPS CLOSED BY READING, NOT BUILDING
+
+🏛️ **turnbull is ALIVE, not dead** — 395h without a close read as an I1
+quiet-vs-dead ambiguity; the parliament organ is fresh (1.3min), the book is
+`halted: false` with 1 open position and `last_skip: "XAG:already-in"`, i.e.
+the entry path is running and skipping because it already holds. Quiet, by
+construction of a mean-reverter that holds. 🙏 **Avo LIVE's "30% tx-budget
+skip"** is not reproducible from the payload — the row publishes no skip
+counter, and the book is simply at cap (4/4, clip $15.64 = equity/max_open
+exactly). Recorded as an observability gap, NOT a confirmed live defect.
+
+### THE HONEST HEADLINE
+
+Real money is **$259.84 at ~$0/day** and **nothing in this pass moves real
+dollars now**: the implementable delta is ~+$4.6/30d of shadow paper
+(sign-conditional) plus four $0-today hazard closures, and all three alpha
+studies closed negative. The needle sits exactly where the winners' docket
+already put it — 🎫 taker `exit:hold` (n=54, t=2.75) and 🙏 avo book-level
+(n=12, t=2.31), **both pre-registered 18-Aug and both HANDS-OFF**. So the
+single highest-leverage act this session could take was to protect those two
+windows and the judge's from contamination while shipping the free fixes, and
+that is what it did: no taker capacity or lens change, no avo config, no
+Farmer-arm restart. The path to real dollars is unchanged and has no shortcut
+this pass could find — a pre-registered window closes green, the gate passes,
+the operator decides. Weeks out at minimum, and the deposit is the lever the
+codebase does not contain.
 
 ## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
 
@@ -568,6 +789,17 @@ landed (swept: fixture-price and sub-minute scans across the whole ledger).
       DELETE FROM paper_trades WHERE trade_id = 'pm-albanese-lshadow-BTC-1787050638';
 
   Until then every grader is blind to it by construction.
+  **[19-Aug: EXECUTED — the operator made the call ("Proceed") and the row is
+  deleted.** Transaction committed only after `rowcount == 1` verified; full
+  row backed up to the session scratchpad first
+  (`DELETED_ROW_pm-albanese-BTC.json`). Post-delete readback: albanese raw
+  ledger 26 → 25 rows / +$1.81 — now EQUAL to the graded number the
+  quarantine was already serving, which is the quarantine proving itself;
+  both real July BTC trades (entries ~65,568 / ~62,996) survived, and a
+  fleet-wide scan found zero other fixture-priced (100.01) rows. The
+  `LEDGER_QUARANTINE` entry stays deliberately: it is windowed, pinned by
+  tests, and defense-in-depth costs nothing against a class that has now
+  happened once.]**
 ## 2026-08-18 (qa) — THE GROWTH DEEP DIVE: 300 DAYS OF VENUE DATA SAY LIQUIDITY DROUGHT, NOT FUNDING DROUGHT — AND THE TWO CARRIED ADJUDICATIONS ARE RUN
 
 Operator: *"Dive deep on all the knowledge you have and we have and you can

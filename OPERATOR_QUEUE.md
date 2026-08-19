@@ -75,7 +75,7 @@ total does not double-count the sub-account; shadow arm untouched).
 
 ---
 
-## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — five I17 calls + one restrict-only cap, all from the fleet-wide audit `(qi)`
+## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — five I17 calls + one restrict-only cap, all from the fleet-wide audit `(qk)`
 
 **Full evidence: `FLEET_AUDIT_2026-08-19.md`.** The audit's headline is that
 the fleet has **no open wound** — four of five loss centres are populations
@@ -157,7 +157,7 @@ the last green run I isolated**, so two instruments agree on the boundary.
 
 **Why it matters beyond red checks:** the same lockout kills
 `railway-redeploy.yml`, which is the ONLY automated deploy path. **No shadow
-book can receive code until this clears** — including the `(qi)` correctness
+book can receive code until this clears** — including the `(qk)` correctness
 fixes, which are merged-pending and will sit in main doing nothing.
 
 **A — check Settings → Billing on the repo's account ★** (the 28-Jul scar is

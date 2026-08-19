@@ -34,8 +34,13 @@ THE ROSTER IS MEASURED, NOT ASSUMED (scripts/study_band_kelly_2026-08-18.py
     t=+0.90, tail-driven), so its mirror shorts a fat right tail: every
     stop cell negative, maxDD ~23%, random-short P=0.78. A 21-close
     ledger's inverse is a 21-close bet.
-  * REFUSED — `dipfade` (taker dip lens inverted): n=13 < 30, the I16
-    floor. Day-31 candidate as the vetoed lens's sample accrues.
+  * LIVE-PROBE — `dipfade` (taker dip lens inverted): admitted 18-Aug by
+    OPERATOR OVERRIDE of the I16 floor (the risk-up decision, on the
+    record): n=13 < 30, but t=-2.66 as a single pre-registered candidate
+    puts the mirror's 95% CI at ~[+0.28%,+2.05%]/trade, entirely positive.
+    $40 probe clip x2, own tag (`short-dip_*`) so it is graded alone and
+    dies on its own record; the ghost is the taker's own conviction bar
+    and bracket, drift-pinned against the taker's real constants in tests.
   * OWNED — impulse-continuation inverted IS 🧘 book-douglas (I20): the
     largest measured loser's inversion is already minted, not re-taken.
   The refused/waiting families publish in `extra.roster` every loop so the
@@ -61,16 +66,23 @@ MIRROR MECHANICS
   * after a `maxhold` the coin is embargoed until |dev| <= EXIT_BPS once —
     the ghost's own (2026-07-21) non-convergence quarantine, mirrored.
   * fills: the ghost's own fill model — clip VWAP walked through the live
-    book (`book_view`), slip-gated at 30bps BOTH ways: the ghost's side
-    gates whether the event exists; the mirror's side gates whether it is
-    tradeable. Venue fee zero (measured); no flat slip constant is added
-    on top of a book-walked fill.
-  * DECLARED DEVIATIONS from pure negation, priced in the study: crypto-
-    only universe ((lk) — the screen CONCENTRATES the edge: ghost's crypto
-    subset t=-5.71 against -2.82 pooled; revert KELLY_ALLOW_NONCRYPTO=1),
-    and the $80 clip against the ghost's $10 (per-trade % is clip-
-    invariant; larger clips meet more slip and the census counts every
-    slip-refusal so the deviation stays visible — I18).
+    book (`book_view`). The GHOST-side event check is priced at the
+    ghost's own 30bps gate AT ITS OWN $10 clip (the event definition is
+    the ghost's, never mine); MY side gates at 60bps ([18-Aug risk-up],
+    was 30). Venue fee zero (measured); no flat slip constant is added on
+    top of a book-walked fill.
+  * DECLARED DEVIATIONS from pure negation, priced where measurable:
+    crypto-only entries ((lk) — the screen CONCENTRATES the edge: ghost's
+    crypto subset t=-5.71 against -2.82 pooled; revert
+    KELLY_ALLOW_NONCRYPTO=1); the $250 clip against the ghost's $10
+    ([18-Aug risk-up, operator decision pre-first-close]: per-trade % is
+    clip-invariant, larger clips meet more slip, and the my_slip census
+    keeps the cost visible — I18); the 60bps MY-side slip tolerance (pays
+    up to ~30bps extra on marginal fills against a +60bps/trade mean —
+    the accepted price of taking more of the ghost's events at size).
+    Worst instant with every slot stopped: 4x$250x5% + 2x$40x4% ~ -$53 ~
+    5.3% of the book, inside the 15% bar; gross max ~$1,080 ~ 1.08x
+    equity, declared.
 
 WHAT IS DELIBERATELY ABSENT
   * No regime gate: at a 5-minute median hold a 4h EMA gate is horizon-
@@ -140,8 +152,41 @@ START_EQUITY = 1000.0
 LOOP_SECONDS = ghost.LOOP_SECONDS          # 90s — the ghost's own cadence
 
 # ---- the mirror's own knobs (env-only; everything else is the ghost's) -----
-CLIP_USD = float(os.environ.get("KELLY_CLIP_USD", "80"))
+# [18-Aug RISK-UP, operator decision pre-first-close — "look at options,
+# even though risk will be higher": $250 x 4 deploys the whole book in a
+# storm (was $80 x 4 = $320 max working). Per-trade % is clip-invariant, so
+# this scales $ throughput ~3.1x on the same measured edge; the accepted
+# price is deeper book-walks (the named KAITO-depth risk), bounded by the
+# widened MY-side slip gate below and visible in the my_slip census.
+CLIP_USD = float(os.environ.get("KELLY_CLIP_USD", "250"))
 MAX_POSITIONS = int(os.environ.get("KELLY_MAX_POSITIONS", "4"))
+# MY-side slip tolerance, widened 30 -> 60bps in the same decision: take
+# events the ghost validated even when my clip walks deeper. The GHOST-side
+# event check stays at the ghost's own 30bps AT THE GHOST'S OWN $10 clip —
+# the event definition is the ghost's, never mine.
+MY_MAX_SLIP_BPS = float(os.environ.get("KELLY_MAX_SLIP_BPS", "60"))
+
+# ---- dipfade: the second mirror family, admitted at PROBE size ---------------
+# [18-Aug OPERATOR OVERRIDE OF THE I16 FLOOR, on the record: n=13 < 30, but
+# t=-2.66 as a single pre-registered candidate puts the mirror's 95% CI at
+# ~[+0.28%, +2.05%]/trade, entirely positive. Probe clip bounds the cost of
+# being wrong to ~friction on $40; own tag (short-dip) so the brain and the
+# referee grade it alone and it dies on its own record if the CI lied.]
+# The ghost is the taker's VETOED dip lens: a dip ticket the taker's own
+# conviction bar (range_pos <= 0.05) would have bought, held long under the
+# taker's bracket (tp +4% / sl -3% / 48h). The mirror holds the SHORT over
+# that same window: the ghost's tp is my loss side (-4%), its sl my win
+# (+3%). Bracket constants are DECLARED literals drift-pinned against the
+# taker's real values in tests/autonomy/test_band_kelly_mirror.py — the
+# taker module must not enter this image's import graph.
+DIP_CLIP_USD = float(os.environ.get("KELLY_DIP_CLIP_USD", "40"))
+DIP_MAX_POSITIONS = int(os.environ.get("KELLY_DIP_MAX_POSITIONS", "2"))
+DIP_RANGE_MAX = 0.05          # the taker's TT_DIP_RANGE conviction bar
+DIP_GHOST_TP = 0.04           # taker TT_TP  — ghost long's target = my stop
+DIP_GHOST_SL = 0.03           # taker |TT_SL| — ghost long's stop = my win
+DIP_MAX_HOLD_S = 48 * 3600.0  # taker TT_MAX_HOLD_H
+DIP_COOLDOWN_S = 2 * 3600.0   # taker SL_COOLDOWN_H, as a re-entry cooldown
+SCOUT_KEY = "lighter-market"  # the taker's own ticket source
 # The one declared deviation from pure negation: the mirror's own protective
 # stop, 5% adverse on MY side — the ghost's own HARD_STOP constant, mirrored.
 # Well inside the 15% go-live drawdown bar ((gv) reconciliation).
@@ -164,8 +209,11 @@ MIRROR_ROSTER = {
                 "why": "calibration control: ghost family +$126/t=+0.90 "
                        "over 578d — mirror shorts the fat tail; every stop "
                        "cell negative, random-short P=0.78"},
-    "dipfade": {"status": "waiting",
-                "why": "n=13 < 30 (I16 floor); day-31 candidate",
+    "dipfade": {"status": "live-probe",
+                "why": "OPERATOR OVERRIDE of the I16 floor, 18-Aug (risk-up "
+                       "decision): n=13, t=-2.66, mirror 95% CI "
+                       "[+0.28%,+2.05%]/trade as a single named candidate; "
+                       "$40 probe clip, own tag, dies on its own record",
                 "ghost": "taker dip lens (vetoed, untraded)"},
     "impulse_cont": {"status": "owned",
                      "why": "the inversion is 🧘 book-douglas (I20)"},
@@ -220,6 +268,58 @@ def mirror_exit(pos, dev_bps, exit_px, ghost_exit_px, now_ts):
             return "stop"
     if now_ts - pos["opened_ts"] >= ghost.MAX_HOLD_S:
         return "maxhold"
+    return None
+
+
+def dip_ghost_takes(ticket, crypto_ok):
+    """Would the taker's dip policy have BOUGHT this ticket? Its own
+    conviction bar (range_pos <= 0.05), plus the (lk) class screen the
+    whole fleet runs at entries. The scout's own `noncrypto` stamp is
+    honoured when present; absent means no opinion."""
+    try:
+        sym = str(ticket.get("sym") or "").strip()
+        if not sym:
+            return None
+        if float(ticket.get("range_pos", 1.0)) > DIP_RANGE_MAX:
+            return None
+        if ticket.get("noncrypto") is True:
+            return None
+        if crypto_ok and sym not in crypto_ok:
+            return None
+        return sym
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def dip_exit(pos, exit_px, now_ts):
+    """Exit for a dipfade mirror SHORT: the ghost long's bracket, mirrored.
+    Ghost tp (+4%) is my loss side; ghost sl (-3%) my win; 48h the clock;
+    my own 5% stop stays senior only beyond the ghost's own bounds.
+    Returns 'ghosttp'/'ghostsl'/'maxhold'/None."""
+    e = pos.get("entry")
+    if exit_px and e:
+        if exit_px >= e * (1.0 + DIP_GHOST_TP):
+            return "ghosttp"          # the ghost banked = the mirror pays
+        if exit_px <= e * (1.0 - DIP_GHOST_SL):
+            return "ghostsl"          # the ghost died = the mirror banks
+    if now_ts - pos["opened_ts"] >= DIP_MAX_HOLD_S:
+        return "maxhold"
+    return None
+
+
+def fresh_scout(state, now_ts):
+    """The taker's own freshness contract on the scout payload: within its
+    declared ttl, and never future-dated. Stale/dark -> None (no tickets is
+    'no opinion', never 'no dip exists')."""
+    try:
+        from datetime import datetime as _dt
+        upd = str((state or {}).get("updated") or "")
+        ts = _dt.fromisoformat(upd.replace("Z", "+00:00")).timestamp()
+        ttl = float(state.get("ttl_sec") or 900)
+        if 0 <= now_ts - ts <= ttl:
+            return state
+    except Exception:  # noqa: BLE001
+        pass
     return None
 
 
@@ -285,12 +385,14 @@ def sample_block(recent):
 
 
 def build_state(positions, recent, pend, noconv, enter_bps_eff, last_ts,
-                now=None):
+                now=None, dip_cd=None):
     """The persistence blob — ONE builder. `pend` is the ghost's confirm
     counter, `noconv` its non-convergence embargo; both are the ghost's own
-    memory, so a restart cannot re-enter an event the ghost had retired."""
+    memory, so a restart cannot re-enter an event the ghost had retired.
+    `dip_cd` is the dipfade re-entry cooldown (the taker's own shape)."""
     return {"positions": positions, "recent": recent, "pend": pend,
             "noconv": noconv, "enter_bps_eff": enter_bps_eff,
+            "dip_cd": dict(dip_cd or {}),
             "last_ts": last_ts,
             "saved_ts": float(now if now is not None else time.time())}
 
@@ -306,6 +408,15 @@ def build_extra(census, positions, recent, open_pnl, realized, enter_bps_eff):
         "realized": round(realized, 2),
         "caps": {"clip_usd": CLIP_USD, "max_positions": MAX_POSITIONS,
                  "my_hard_stop": MY_HARD_STOP,
+                 "my_max_slip_bps": MY_MAX_SLIP_BPS,
+                 "dip": {"clip_usd": DIP_CLIP_USD,
+                         "max_positions": DIP_MAX_POSITIONS,
+                         "ghost_tp": DIP_GHOST_TP, "ghost_sl": DIP_GHOST_SL,
+                         "max_hold_s": DIP_MAX_HOLD_S,
+                         "range_max": DIP_RANGE_MAX,
+                         "i16_override": "operator 18-Aug, n=13 probe"},
+                 "gross_max_usd": CLIP_USD * MAX_POSITIONS
+                 + DIP_CLIP_USD * DIP_MAX_POSITIONS,
                  "gate_bps": round(enter_bps_eff, 1),
                  "gate_floor_bps": ghost.EXIT_BPS * ghost.ENTER_FLOOR_MULT,
                  "gate_cap_bps": ghost.ENTER_BPS,
@@ -340,10 +451,11 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
             opened_at=datetime.fromtimestamp(
                 pos["opened_ts"], timezone.utc).isoformat(),
             closed_at=datetime.now(timezone.utc).isoformat(),
-            reason=f"{pos['side']}-snap_" + reason,
+            reason=f"{pos['side']}-{pos.get('family') or 'snap'}_" + reason,
             venue="lighter", shadow=True, side=pos["side"],
             entry_price=entry_px, exit_price=exit_px,
-            extra={"ghost_side": pos.get("ghost_side"),
+            extra={"family": pos.get("family") or "snap",
+                   "ghost_side": pos.get("ghost_side"),
                    "ghost_entry": pos.get("ghost_entry"),
                    "dev_at_entry_bps": pos.get("dev_at_entry"),
                    "dev_at_exit_bps": dev_now,
@@ -369,9 +481,10 @@ def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
     g_fill = bv["buy_vwap"] if g_side == "long" else bv["sell_vwap"]
     if my_fill is None or my_slip is None or not my_fill > 0:
         return None
-    if my_slip > ghost.MAX_ENTRY_SLIP_BPS:
+    if my_slip > MY_MAX_SLIP_BPS:
         return None
-    positions[coin] = {"coin": coin, "side": side, "ghost_side": g_side,
+    positions[coin] = {"coin": coin, "family": "snap",
+                       "side": side, "ghost_side": g_side,
                        "notional": CLIP_USD, "size": CLIP_USD / my_fill,
                        "entry": my_fill, "ghost_entry": g_fill,
                        "last_px": my_fill, "opened_ts": t0,
@@ -379,6 +492,30 @@ def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
                        "ref_at_entry": ref,
                        "spread_bps_entry": bv.get("spread_bps")}
     return positions[coin]
+
+
+def _open_dip(positions, sym, bv, t0, ticket):
+    """Open one dipfade mirror SHORT at MY side's book-walked VWAP. Same
+    consistency-rule signature discipline as _open_mirror: no streak, no
+    outcome, no equity input. The ghost's entry is the same mark the taker
+    would have bought (its buy vwap at its own read) — recorded for the
+    audit trail, not for exits (the dip bracket is %-of-MY-entry)."""
+    my_fill = bv["sell_vwap"]
+    my_slip = bv["sell_slip_bps"]
+    if my_fill is None or my_slip is None or not my_fill > 0:
+        return None
+    if my_slip > MY_MAX_SLIP_BPS:
+        return None
+    positions[sym] = {"coin": sym, "family": "dip",
+                      "side": "short", "ghost_side": "long",
+                      "notional": DIP_CLIP_USD,
+                      "size": DIP_CLIP_USD / my_fill,
+                      "entry": my_fill, "ghost_entry": bv.get("buy_vwap"),
+                      "last_px": my_fill, "opened_ts": t0,
+                      "range_pos": ticket.get("range_pos"),
+                      "chg_pct": ticket.get("chg_pct"),
+                      "spread_bps_entry": bv.get("spread_bps")}
+    return positions[sym]
 
 
 def main():
@@ -410,6 +547,7 @@ def main():
     recent = []          # rolling closed-trade sample (published, I15)
     pend = {}            # coin -> ghost confirm counter (CONFIRM_LOOPS)
     noconv = {}          # coin -> ts of ghost maxhold (embargo till basis clears)
+    dip_cd = {}          # coin -> ts of last dipfade entry/exit (cooldown)
     enter_bps_eff = ghost.ENTER_BPS
     try:
         _saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
@@ -423,6 +561,9 @@ def main():
                         if isinstance(v, (int, float))}
             if isinstance(_saved.get("noconv"), dict):
                 noconv = {str(k): float(v) for k, v in _saved["noconv"].items()
+                          if isinstance(v, (int, float))}
+            if isinstance(_saved.get("dip_cd"), dict):
+                dip_cd = {str(k): float(v) for k, v in _saved["dip_cd"].items()
                           if isinstance(v, (int, float))}
             if isinstance(_saved.get("enter_bps_eff"), (int, float)):
                 enter_bps_eff = float(_saved["enter_bps_eff"])
@@ -525,7 +666,14 @@ def main():
                     continue
                 held.pop("no_px_since", None)
                 held["last_px"] = my_px
-                reason = mirror_exit(held, dev_bps, my_px, g_px, t0)
+                if held.get("family") == "dip":
+                    reason = dip_exit(held, my_px, t0)
+                    # my 5% stop stays senior beyond the ghost's own bounds
+                    # (a gap through the bracket must still close the book)
+                    if reason is None and my_px >= held["entry"] * (1.0 + MY_HARD_STOP):
+                        reason = "stop"
+                else:
+                    reason = mirror_exit(held, dev_bps, my_px, g_px, t0)
                 if reason is None:
                     continue
                 pnl = _price_pnl(held, my_px)
@@ -539,8 +687,10 @@ def main():
                 # the ghost's own non-convergence quarantine, mirrored: a
                 # maxhold means the basis did NOT clear inside the hold —
                 # the coin sits out until |dev| <= EXIT_BPS proves it did.
-                if reason == "maxhold":
+                if reason == "maxhold" and held.get("family") != "dip":
                     noconv[coin] = t0
+                if held.get("family") == "dip":
+                    dip_cd[coin] = t0            # taker-shape re-entry cooldown
                 _close(bot_id, coin, held, reason, my_px, pnl, dev_now=dev_bps)
                 print(f"[{now_iso()}] CLOSE {coin} {held['side']} after "
                       f"{held_h:.2f}h [{reason}] pnl {pnl:+.2f} | dev "
@@ -574,14 +724,24 @@ def main():
             if pend[coin] < ghost.CONFIRM_LOOPS:
                 census["confirming"] += 1
                 continue
-            if len(positions) >= MAX_POSITIONS:
+            if sum(1 for p in positions.values()
+                   if p.get("family") != "dip") >= MAX_POSITIONS:
                 census["capped"] += 1
                 continue
             # the ghost's own slip gate decides whether the EVENT exists —
-            # the ghost only ever entered clips it could fill inside 30bps.
+            # and it is priced AT THE GHOST'S OWN $10 CLIP, never mine: at
+            # $250 my walk would refuse events the real ghost took, and the
+            # error grows with clip size (caught in the 18-Aug risk-up
+            # review). One extra book fetch only at this rare entry moment.
             g_side = ghost_side(dev_bps)
-            g_slip = (bv["buy_slip_bps"] if g_side == "long"
-                      else bv["sell_slip_bps"])
+            try:
+                bv_g = ghost.book_view(ctx, coin, ghost.ORDER_USD)
+            except Exception:  # noqa: BLE001
+                bv_g = None
+            g_slip = None
+            if bv_g is not None:
+                g_slip = (bv_g["buy_slip_bps"] if g_side == "long"
+                          else bv_g["sell_slip_bps"])
             if g_slip is None or g_slip > ghost.MAX_ENTRY_SLIP_BPS:
                 census["ghost_slip"] += 1
                 continue
@@ -603,6 +763,53 @@ def main():
                   f"the {'premium' if dev_bps > 0 else 'discount'} the ghost "
                   f"would fade")
 
+        # ---- dipfade entries (the second family, probe size) ---------------
+        # The taker's own ticket source, its own freshness contract; the
+        # ghost bar is its conviction filter. No tickets / dark scout is
+        # "no opinion", never "no dip exists".
+        census["dip_tickets"] = 0
+        census["dip_opened"] = 0
+        census["dip_cooldown"] = 0
+        census["dip_capped"] = 0
+        census["dip_slip"] = 0
+        try:
+            scout = fresh_scout(store.load_state(SCOUT_KEY), t0)
+        except Exception:  # noqa: BLE001
+            scout = None
+        if scout:
+            tickets = (scout.get("tickets") or {}).get("dip") or []
+            census["dip_tickets"] = len(tickets)
+            for tk in tickets:
+                sym = dip_ghost_takes(tk, crypto_ok)
+                if not sym or sym in positions:
+                    continue
+                if t0 - dip_cd.get(sym, 0.0) < DIP_COOLDOWN_S:
+                    census["dip_cooldown"] += 1
+                    continue
+                if sum(1 for p in positions.values()
+                       if p.get("family") == "dip") >= DIP_MAX_POSITIONS:
+                    census["dip_capped"] += 1
+                    break
+                try:
+                    if not ctx.supports(sym):
+                        continue
+                    bv_d = ghost.book_view(ctx, sym, DIP_CLIP_USD)
+                except Exception:  # noqa: BLE001
+                    bv_d = None
+                if bv_d is None:
+                    continue
+                pos = _open_dip(positions, sym, bv_d, t0, tk)
+                if pos is None:
+                    census["dip_slip"] += 1
+                    continue
+                dip_cd[sym] = t0
+                census["dip_opened"] += 1
+                print(f"[{now_iso()}] OPEN {sym} SHORT ${DIP_CLIP_USD:.0f} "
+                      f"[dipfade probe] range_pos "
+                      f"{tk.get('range_pos')} chg {tk.get('chg_pct')}% | "
+                      f"the ghost the taker vetoed buys the dip; the "
+                      f"mirror sells it")
+
         # zeroed counters drop; a coin the loop could not SEE keeps its
         # counter (the ghost's own behavior — a blind loop is not a quiet
         # one). Age-capped so a delisted coin cannot hold a slot forever.
@@ -610,6 +817,8 @@ def main():
         if len(pend) > 3 * ghost.UNIVERSE_N:
             pend = {}
         noconv = {c: t for c, t in noconv.items()
+                  if t0 - t < STATE_PRUNE_S}
+        dip_cd = {c: t for c, t in dip_cd.items()
                   if t0 - t < STATE_PRUNE_S}
 
         # the NEXT loop's adaptive gate, from every book seen THIS loop —
@@ -647,7 +856,8 @@ def main():
             pass
         try:
             store.save_state(bot_id, build_state(
-                positions, recent, pend, noconv, enter_bps_eff, last_ts, t0))
+                positions, recent, pend, noconv, enter_bps_eff, last_ts, t0,
+                dip_cd=dip_cd))
         except Exception:  # noqa: BLE001
             pass
         last_ts = t0
@@ -733,8 +943,41 @@ def _selftest():
     got = _open_mirror(ps, "Y", 75.0, bv, 5.0, 99.2)
     assert got and got["side"] == "long" and got["ghost_side"] == "short"
     assert got["entry"] == 100.02 and got["ghost_entry"] == 99.98
-    assert _open_mirror({}, "Z", 75.0, dict(bv, buy_slip_bps=31.0),
+    assert _open_mirror({}, "Z", 75.0, dict(bv, buy_slip_bps=MY_MAX_SLIP_BPS + 1),
                         5.0, 99.2) is None                      # my slip gate
+    assert _open_mirror({}, "Z2", 75.0, dict(bv, buy_slip_bps=45.0),
+                        5.0, 99.2) is not None  # 45bps admitted (60 gate)
+
+    # 6b) DIPFADE, the probe family: the taker's conviction bar decides the
+    #     event; the ghost long's bracket mirrors into my exits; my slip
+    #     gate holds at entry; the ladder's win/loss sides cannot swap.
+    assert dip_ghost_takes({"sym": "AAA", "range_pos": 0.04}, {"AAA"}) == "AAA"
+    assert dip_ghost_takes({"sym": "AAA", "range_pos": 0.06}, {"AAA"}) is None
+    assert dip_ghost_takes({"sym": "AAA", "range_pos": 0.01,
+                            "noncrypto": True}, {"AAA"}) is None
+    assert dip_ghost_takes({"sym": "WTI", "range_pos": 0.01}, {"AAA"}) is None
+    dpos = {"coin": "A", "family": "dip", "side": "short",
+            "entry": 100.0, "notional": 40.0, "opened_ts": 0.0,
+            "last_px": 100.0}
+    assert dip_exit(dpos, 104.1, 1.0) == "ghosttp"     # ghost banked = I pay
+    assert _price_pnl(dict(dpos), 104.1) < 0
+    assert dip_exit(dpos, 96.9, 1.0) == "ghostsl"      # ghost died = I bank
+    assert _price_pnl(dict(dpos), 96.9) > 0
+    assert dip_exit(dpos, 100.5, 1.0) is None
+    assert dip_exit(dpos, 100.5, DIP_MAX_HOLD_S) == "maxhold"
+    import inspect as _insp
+    assert list(_insp.signature(_open_dip).parameters) == [
+        "positions", "sym", "bv", "t0", "ticket"]      # consistency rule
+    dbv = {"mid": 100.0, "buy_vwap": 100.02, "sell_vwap": 99.98,
+           "buy_slip_bps": 2.0, "sell_slip_bps": 2.0, "spread_bps": 4.0}
+    got_d = _open_dip({}, "B", dbv, 5.0, {"range_pos": 0.03})
+    assert got_d and got_d["family"] == "dip" and got_d["side"] == "short"
+    assert got_d["notional"] == DIP_CLIP_USD
+    assert _open_dip({}, "C", dict(dbv, sell_slip_bps=MY_MAX_SLIP_BPS + 1),
+                     5.0, {}) is None
+    st_f = fresh_scout({"updated": "2000-01-01T00:00:00+00:00",
+                        "ttl_sec": 900}, 4102444800.0)
+    assert st_f is None                                # stale scout = None
 
     # 6) Publish/state builders: contracts a consumer reads.
     ex = build_extra({"scanned": 1}, ps, [], 0.5, -0.25, 61.0)

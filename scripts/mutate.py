@@ -125,6 +125,18 @@ def main(argv=None):
         ap.error("target, --tests and at least one --mutation are required")
 
     target = pathlib.Path(args.target)
+    # [19-Aug, first field use] REFUSE A DIRTY TARGET. Restore is
+    # `git checkout --`, which restores to HEAD — so running against an
+    # UNCOMMITTED fix silently destroys the fix at the first restore and the
+    # round "verifies" the pre-fix file. That is [[commit-before-mutation-
+    # rounds]] enforced in code rather than remembered: this tool wiped its
+    # own author's uncommitted edit the first time it was used in anger.
+    dirty = subprocess.run(["git", "diff", "--quiet", "--", str(target)])
+    if dirty.returncode != 0:
+        print(f"!! {target} has UNCOMMITTED changes. Commit first — restore "
+              "is `git checkout`, which would destroy them and mutate the "
+              "WRONG baseline. Nothing was run.")
+        return 2
     muts = []
     for spec in args.mutation:
         if "=>" not in spec:

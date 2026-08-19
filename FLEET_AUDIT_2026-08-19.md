@@ -198,7 +198,7 @@ spot-check, not the sweep, and it is the first thing the next pass should run.
 * 🔮 georgia's trailing-stop family is the one **measured fix-direction with no
   actuator** (brain reclaim 1.0, fwd +1.63%, −$17.14/71). ~~Its closes carry
   prices since (gr), so `study_exit_sweep`'s calibration gate can be
-  attempted~~ — **CORRECTED IN PLACE per I12 by (qj), which ran it: the gate
+  attempted~~ — **CORRECTED IN PLACE per I12 by (ql), which ran it: the gate
   cannot be attempted at all.** georgia exits on a time-decaying ROI ladder
   under an ATR ratchet, which is not a member of the harness's
   {tp, sl, trail, max_hold} rule space — so a `BOOK_EXITS` entry could only

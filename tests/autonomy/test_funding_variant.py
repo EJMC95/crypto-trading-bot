@@ -129,3 +129,51 @@ def test_variant_takes_no_allocation_scale(monkeypatch):
         "the allocation_scale consumer must be gated `shadow_tag and not "
         "VARIANT ...` — a variant scaled by an external organ is no longer "
         "single-policy by construction ((lp)/(nb))")
+
+
+def test_variant_clip_is_its_own_measured_size_not_the_global(monkeypatch):
+    """[19-Aug (qi)] 🛢️ Garrett ran $30 clips for its whole life against a
+    founding study whose ONLY measured cell is $25 — `ctx.order_usd(ORDER_USD)`
+    without `own` falls through to the global LIGHTER_ORDER_USD for every
+    shadow book. The variant contract is env-only single-policy config, and
+    the clip is config. Behavioural pin on the venues seam itself: own=True in
+    a shadow mode returns the caller's own default; own=False returns the
+    global — BOTH directions, so the fix and the Farmer twins' deliberate
+    mirroring are each load-bearing here."""
+    import venues
+    monkeypatch.setenv("LIGHTER_ORDER_USD", "30")
+    ctx = venues.venue_context(bot="test-variant-clip", default_hl_net="testnet",
+                               paper_start=1000.0)
+    monkeypatch.setattr(ctx, "mode", "lighter_shadow", raising=False)
+    assert ctx.order_usd(25.0, own=True) == 25.0, \
+        "a variant's own clip must survive the global env"
+    assert ctx.order_usd(25.0, own=False) == 30.0, \
+        "the Farmer twins mirror live sizing — own=False keeps the global"
+
+
+def test_farmer_call_sites_key_own_on_variant(monkeypatch):
+    """AST pin (a substring test is not a wiring test): EVERY `.order_usd(`
+    call in lighter_funding_bot.py must pass own=bool(VARIANT) — so the Farmer
+    (VARIANT='') stays byte-identical control-arm mirroring while any variant
+    keeps its measured size. A third call site added without the keyword
+    reintroduces the Garrett defect silently; this makes it loud."""
+    import ast
+    import pathlib
+    import lighter_funding_bot as fb
+    tree = ast.parse(pathlib.Path(fb.__file__.replace(".pyc", ".py"))
+                     .read_text(encoding="utf-8"))
+    sites = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "order_usd"):
+            kw = {k.arg: k.value for k in node.keywords}
+            ok = ("own" in kw and isinstance(kw["own"], ast.Call)
+                  and isinstance(kw["own"].func, ast.Name)
+                  and kw["own"].func.id == "bool"
+                  and len(kw["own"].args) == 1
+                  and isinstance(kw["own"].args[0], ast.Name)
+                  and kw["own"].args[0].id == "VARIANT")
+            sites.append((node.lineno, ok))
+    assert sites, "no order_usd call sites found — the scan is broken, not clean"
+    bad = [ln for ln, ok in sites if not ok]
+    assert not bad, f"order_usd call site(s) missing own=bool(VARIANT): lines {bad}"
