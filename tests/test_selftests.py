@@ -241,6 +241,11 @@ SELFTEST_MODULES = [
     # (mirror inversion pinned as a property, ghost import identity, both
     # exit ladders, empty-screen universe contract, publish/state builders).
     "lighter_band_kelly_bot",
+    # [2026-08-19 (re)/(rg)] 🧭 nav-cook — the [45,60)bps dislocation band that
+    # tiles BELOW band-kelly's floor. Its selftest pins the half-open ceiling
+    # (the I20 disjointness), the stop-before-data exit order, the fail-OPEN
+    # class screen, and that the shipped horizon is one the study measured.
+    "lighter_nav_cook_bot",
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",
