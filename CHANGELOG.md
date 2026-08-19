@@ -1,3 +1,54 @@
+## 2026-08-19 (rl) — THE WHOLE FLEET STOPPED RECEIVING CODE FOR THREE HOURS AND CI NEVER SAID SO: a commented-out deploy rule left its `fi` uncommented
+
+**Found by verifying a deploy landed, not by any guard.** After `(rk)` merged I
+checked 🧘 douglas's build stamp and it was still the OLD one. The redeploy run
+for that merge had FAILED — and so had **every redeploy since 07:54Z**.
+
+    Changed files: CHANGELOG.md lighter_book_douglas_bot.py ...
+    /home/runner/work/_temp/....sh: line 265: syntax error near unexpected token `fi'
+    ##[error]Process completed with exit code 2
+
+**THE BUG, and it is four characters.** `(ri)`'s 🧭 nav-cook birth shipped its
+deploy rule COMMENTED OUT — correct, that is the `(lr)`/`(mk)` pre-provision
+pattern — but commented the `if` and the body and **left the `fi`**:
+
+    # if echo "$changed" | grep -qE "^(lighter_nav_cook_bot\.py$|...)"; then
+    #   svcs="${svcs:+$svcs,}nav-cook-shadow"
+    fi                                      <-- stray, no opening `if`
+
+**WHY IT WAS EXPENSIVE OUT OF ALL PROPORTION TO ITS SIZE.** The `fi` sits in
+the DECIDE step, which runs **before any deploy**, so bash aborted the whole
+job at parse time: `svcs` was never computed and `railway up` never ran for
+ANY service. Three merges — `(ri)` nav-cook itself, `(rj)`, and `(rk)` — landed
+on main and reached **no container**. Nothing anywhere said "the fleet is
+frozen"; the runs just went red like any other CI failure, and CI red on a
+merge commit is the thing everyone has learned to read as somebody else's
+problem. The fleet kept trading its OLD code, publishing healthy rows, with a
+clean watchdog — the `(hu)` shape exactly: everything looks fine because
+nothing that looks is looking at this.
+
+**Shipped:** the `fi` commented (bash `-n` verified), and
+`tests/autonomy/test_workflow_shell_syntax.py` — **every `run:` block in every
+workflow must parse under `bash -n`**. Mutation-verified the only way that
+counts: restoring the stray `fi` reddens it.
+
+**WHY NO EXISTING GUARD COULD HAVE CAUGHT IT, stated because the gap is the
+lesson.** `audit_deploy_coverage` reasons about which PATHS map to which
+SERVICES — it is thorough about routing and completely blind to whether the
+script containing the routing can EXECUTE. That is the born-dark class one
+level up: a rule that cannot RUN is exactly as dark as a file that was never
+`COPY`'d, and this repo already has a guard for the second and had none for the
+first. The new test also carries a POSITIVE CONTROL (`(po)`): it asserts the
+stray-`fi` shape is actually rejected, so it can never pass by inspecting
+nothing.
+
+**THE PROCESS NOTE, which is the transferable half:** `(rk)` was merged on
+14/14 green CI and I still had to open the live payload to discover the fleet
+had been frozen for three hours. **A green PR proves the code is sound; only
+the payload proves it is RUNNING** — and the deploy step is exactly where those
+two diverge. Same lesson as `(ml)`'s stale reader and `(fd)`'s file-set stamp,
+now with a third instance and a guard.
+
 ## 2026-08-19 (rk) — THE CARD AND THE DISCIPLINE INSTRUMENT DISAGREED IN THE SAME PAYLOAD: rule 4's rolling sample could not be ASKED about the quarantine, so it kept counting rows the fleet had ruled void
 
 **Found by payload-verifying my own fix rather than trusting the merge.** The

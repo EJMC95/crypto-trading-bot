@@ -404,7 +404,7 @@ jobs:
             # itself ((gm)), so dispatch the service explicitly that first time.
             # if echo "$changed" | grep -qE "^(lighter_nav_cook_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.navcook$|$_shared)"; then
             #   svcs="${svcs:+$svcs,}nav-cook-shadow"
-            fi
+            # fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
             # trail-blazer-live = 💸 Funding Farmer — service names lie) are
