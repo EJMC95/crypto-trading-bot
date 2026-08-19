@@ -1,3 +1,102 @@
+## 2026-08-19 (qi) — FLEET-WIDE AUDIT: THE FLEET IS NOT BLEEDING, IT IS STARVED AND UNDECIDABLE — four of five loss centres are already-closed populations, and the instruments still grading them are the actual defect
+
+**Operator: *"Where are we losing and why? More importantly how can we use this
+information to let our bots win? … No more circles maverick lets hit targets on
+the point."*** Full memo: `FLEET_AUDIT_2026-08-19.md`. Eight parallel diagnosis
+agents over the live payloads and every book's own ledger, era-scoped; six
+returned, two scopes + the verify pass died on a session limit and **everything
+acted on below was re-derived by hand** (§7 of the memo names what was not
+swept, rather than dropping it quietly).
+
+**THE ANSWER TO "WHERE ARE WE LOSING": mostly, we already stopped.** Every
+material loss centre traces to a population identified, measured and gated off
+between 13-Aug and 18-Aug — ⚖️ Counterweight −$36.48/21 in legs made
+unenterable at (ki)/(jg), last one crystallised 5-Aug (30 closes since:
+−$0.72); 🧘 Douglas **97% two VOID rows** ((nm)/(pv)) against a clean post-fix
++$1.81/6; 🌾 carry **9 of 10 era losers** in the 13-Aug screened class; 🎯
+sniper −$5.48/16 in screened classes vs **+$1.67** elsewhere and +$0.35 on its
+post-screen sample. 🛢️ Garrett's −$5.82 is two real stops, **1.5 SE** from its
+own founding study, 5.1 days into a 30-day clock. **There is no open wound to
+plug.** The structural cause is (qa)'s measured drought — alt volume halving
+every 9.4 weeks — so the books are **starved, not edgeless**.
+
+**THE REAL FINDING: three instruments are answering on a dead sample, and that
+is what turns a starved book into a wrongly-retired one.** 🌾 carry publishes
+`t=−4.48 / "unreachable" / "more of the same closes cannot flip mean"` where
+*more of the same closes is structurally impossible* — 90% of that sample is
+instruments the gate refuses. Same shape on 🎯 sniper (`era=null`). And the
+fleet's ONLY capital claim — carry's 0.001492, **71% of the fleet's target** —
+is pooled n=101 of which **91 rows predate the era** and which still carries
+the (nc) phantom accrual; era-scoped it is `None`, current-policy **n=0**. No
+money acts on it ((lx)/(oy) hold every consumer at 1.0), but it is the number
+the fleet's own narrative calls its best-claimed book. **Deliberately NOT
+"fixed" by moving an era** — (pf) already ruled a narrowed universe is ordinary
+tuning; the precedent is REPORT the split, don't re-cut. Named so the ~12-Sep
+call is made with it in hand.
+
+**THREE CORRECTNESS FIXES SHIPPED, all mutation-verified (4+7+4 red, controls
+green):**
+* **The quarantine now reaches the SEED path.** `fetch_paper_aggregate` — the
+  totals ~13 books re-read at boot — was raw SQL with no `LEDGER_QUARANTINE`
+  filter while every GRADING consumer withholds those rows, so 🧘 Douglas
+  **re-seeded the two void rows on every reboot**: −$24.68/8 published against
+  +$1.81/6 graded, a **$26.48 permanent disagreement** between a book's card
+  and the record that decides it. `is_quarantined` stays the one owner ((hj));
+  fail-OPEN inherited; a clean book pays no second query.
+* **🏛️ Parliament no longer publishes a book whose state it could not read.**
+  `save()` has refused since the 21-Jul audit fix; `publish()` did not — so a
+  Postgres read blip published the **fresh-book constructor state** (equity
+  $1000.00, closed 0) as fact and `snapshot_equity` wrote it into the MTM
+  series the (ia) worse-of-both bar reads. **MEASURED: pm-albanese's published
+  MTM drawdown is 0.18% and (1001.84−1000.00)/1001.84 = 0.1838% — the flicker
+  exactly.** Immaterial at this book's P&L and NOT in general: the artifact is
+  `pnl_abs/equity`, so it **scales one-for-one with the book's own success**.
+  The mutation that matters is M6 — guard placed AFTER the writes still
+  poisons the series, and it reddens.
+* **The funding machine can answer its own entry-quality question now.** The
+  ledger recorded the `enter_apr` BAR and never the OBSERVATION the gate
+  admitted on, so the brain's 19-Aug `entry_quality` diagnosis on 🛢️ Garrett
+  **could not be tested against the one variable its entry gate is built on**.
+  Close rows gain `entry_apr` (signed TRUE apr at admission, ABSENT-when-unknown
+  per (ht)) and `accrued` (so price and carry grade apart). The (ir) `hot_h`
+  class, one field over. Telemetry only.
+
+**ALL THREE (qa) GROWTH LEADS MEASURED, ALL THREE DIED — the refusals are the
+deliverable (I19):**
+* **Divergence veto REFUSED and the prior WITHDRAWN**: (qa) named the LIT stop
+  cluster as its class; graded at entry the cluster's core is **agreement, not
+  divergence** (Lighter +0.11 vs HL +0.11, div 0.00) — and **0 of 300 pooled
+  entries** ever occurred at |div| ≥ 50pp, so the books' gates never admit one.
+  `STUDY_DIVERGENCE_VETO_2026-08-19.md`
+* **Squeeze events REFUTED over 1,139 events**: zero of 18 cells clear any bar,
+  grid centre **t=−2.71 both halves negative**, and random non-event entries
+  **BEAT** it (P_null 0.36–0.99). A fresh funding extreme is *actively bad*
+  entry information — the Farmer's LIT stops from the inside.
+  `STUDY_SQUEEZE_EVENTS_2026-08-19.md`
+* **Listing lifecycle: NOTHING ESTABLISHED** — n=12, the tempting 24h long
+  fails on n, on h2, and on **top-3 concentration 223%**, with survivorship
+  bias running the optimistic way. `STUDY_LISTING_LIFECYCLE_2026-08-19.md`
+Also refused: the brain's Garrett tightening (every implied direction is
+measured-REFUTED or UNMEASURED, and the variant has no reachable actuator) and
+porting carry's 6h grace to the Farmer (refuted in all 16 cells — grace is a
+cell property, not a doctrine).
+
+**WHAT IS LEFT IS DECISIONS, NOT TUNING.** Five books are formally undecidable
+and no pass changes that: ⚖️ Counterweight (t≥2 is **5.1 years** away; even 20
+consecutive +1% closes move t to +0.70 — *no achievable data flips it to
+KEEP*; pre-registration ~28-Aug stands, do not pre-empt), 💸 the **LIVE**
+Farmer (**1,332 days** to decidability on real capital), 👩 mum (swing-daily's
+exact retirement profile), 💼 turnbull (**16.4 days zero entries**, every skip
+below an authorless `ml_gate`), 📐 Grimes (gate flipped back all-three-CLOSED
+since (om)). Plus 🙏 Avo LIVE's cap: **$200 published against $62.53 equity**,
+restrict-only at zero expectancy price. All queued with evidence.
+
+**AND THE NUMBER THAT DWARFS THEM ALL, restated from (qa) because it did not
+change:** real money is **$259.84 at ≈$0/day**. The one book quietly earning
+its gate is 🙏 avo shadow (era n=12, **t=2.41**, both halves positive,
+on_track). No lever in this codebase is worth two orders of magnitude — **the
+capital decision is.**
+
 ## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
 
 **Executed end-to-end under the operator's "Continue maverick!" grant** (the

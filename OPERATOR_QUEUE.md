@@ -75,6 +75,72 @@ total does not double-count the sub-account; shadow arm untouched).
 
 ---
 
+## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — five I17 calls + one restrict-only cap, all from the fleet-wide audit `(qi)`
+
+**Full evidence: `FLEET_AUDIT_2026-08-19.md`.** The audit's headline is that
+the fleet has **no open wound** — four of five loss centres are populations
+already gated off between 13 and 18-Aug. What is left is not tuning; it is
+these decisions. Nothing below is executed by an agent.
+
+**Read this first, because it reframes every row:** the venue is in a measured
+liquidity drought ((qa): alt volume halving every 9.4 weeks, 44 weeks running).
+Several books below are **starved, not edgeless**. That is an argument for
+deciding them deliberately — not for retiring them as failures, and not for
+widening a gate to manufacture entries (I19).
+
+### A ★ — ⚖️ Counterweight: the ~28-Aug pre-registration stands, and today's read is RETIRE
+Not a bleed call — an **undecidability** call. The book is clean: −$0.48 open
+marks, screen holding, 30 closes in 14 days on the admissible basket. But the
+(jg) KEEP consolation has decayed monotonically **+0.461% → +0.307% → +0.163%**
+(t=+0.25, cluster-t +0.22), and t≥2 needs **~4,300 closes ≈ 5.1 years**. Even
+**20 consecutive +1% closes** before 28-Aug move admissible t only to **+0.70**
+— *no achievable data can flip this to KEEP*. **Do not pre-empt the date**
+(nothing decisive is met in the losing direction and the residual is ~cents/day
+at $5 legs); decide it on 28-Aug with this number in hand.
+
+### B ★ — 💸 the LIVE Farmer: an I17 call on the only live funding book
+era n=85, mean **+0.039%/trade**, t=0.29, **+$0.22 over 25.5 days**; trailing
+14d −$1.99/45 closes; shadow twin −$9.52. Horizon: **undecidable, ~4,337
+closes ≈ 1,332 days**. The 15-Aug study already refuted every exit-tuning
+escape on this cell (48 cells, zero winners) — *"the stall is edge."* Real
+capital ($197.31) sits on it. **This is explicitly NOT a tuning pass**; if you
+KEEP, the rationale should be recorded against the P=0.06/P=0.155 controls.
+
+### C — 👩 mum: swing-daily's retirement profile, one row over
+3 closes in 5.3 weeks, **0 in-era**, all four slots frozen in month-long trend
+holds; funding drag **−$2.15** exceeds **+$0.69** realised. `crypto-swing-daily`
+was retired at (nf) on n=3 in six weeks. mum was HELD as "green" — that green
+is **open marks, not evidence** (the (lo) precedent).
+
+### D — 💼 turnbull and 📐 Grimes: starved by their own gates
+turnbull: **zero entries for 16.4 days**; every observed skip is
+`ml-gate(0.19–0.43)` against a 0.45 bar, and the ML ensemble is near chance
+(oos_acc 0.51–0.57). `ml_gate` is registered but **declared authorless** — the
+I18 shape. Grimes: gate flipped back to **all-three-CLOSED** since (om)
+(keltner t=−0.20), 0 closes ever; its own study predicted this (0/31 retests
+open). Both were HELD at (nf) on numbers since measured. **Neither is a
+bar-lowering session** — the birth declarations say so themselves.
+
+### E ★ — 🙏 Avo LIVE notional cap: restrict-only, zero expectancy price
+Published `cap_usd` is **$200.00** against **$62.53 equity** (3.2×) and $38.61
+gross (5.2×) — so SafetyRails currently provides **no defence-in-depth** at the
+book's real scale. The effective constraint is structural (clip = equity/4), so
+**no trade the sizing can express reaches $200** and tightening changes nothing
+admissible. The specific value is your risk choice; ≈ current equity is the
+natural restore:
+
+```bash
+railway variables --service tide-rider-lighter-live --set "FREQTRADE_AVO_MARIA_MAX_NOTIONAL=65"
+```
+
+### F — the capital decision, restated because it dwarfs the rest
+Real money is **$259.84 at ≈$0/day**. The nearest genuine event is 🙏 avo's
+gate run (n=30 lands early-Sep; **t=+2.31 already passes**), worth ~$0.10–0.13/day
+at today's clip — and ~10× that only via a deposit. **No lever in the codebase
+is worth two orders of magnitude.**
+
+---
+
 ## 0 · PENDING DEPLOYS — **NONE. Section closed 13-Aug by the daily review.**
 
 *Closed per this file's own maintenance rule ("an item leaves the day it is
