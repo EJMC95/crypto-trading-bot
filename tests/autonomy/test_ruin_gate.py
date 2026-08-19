@@ -1,4 +1,4 @@
-"""[2026-08-19 (qq)] THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD
+"""[2026-08-19 (qz)] THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD
 NOTHING THAT WOULD DECLINE.
 
 `(no)` wired the venue's OWN margining truth into the live path — per-position
@@ -127,7 +127,7 @@ def test_a_position_the_venue_will_not_price_refuses():
                 {"XAU": 100.0, "BTC": 100.0})
     assert st["liq_unknown"] == ["BTC"]
     # A SHORT is never bounded — its loss grows without limit as price rises —
-    # so it stays in the refusing set. [(qs)] made this fixture a short on
+    # so it stays in the refusing set. [(rb)] made this fixture a short on
     # purpose: as a LONG at 1.0 x 100 against 197.52 of collateral it is
     # PROVABLY unliquidatable and the refusal would be the I7 failure, which is
     # the defect this file's `liq_none` tests now pin from the other side.
@@ -179,7 +179,7 @@ def test_a_shadow_arm_is_unaffected():
 # everything above tests the PREDICATE and nothing tested the CALL.
 #
 # AST for the call site, and stated honestly: AST sees identifiers in shapes,
-# not values or bindings ((qp) drove seven survivors through exactly that), so
+# not values or bindings ((qy) drove seven survivors through exactly that), so
 # the env contract below is driven behaviourally instead.
 # ---------------------------------------------------------------------------
 
@@ -256,7 +256,7 @@ def test_the_row_publishes_the_gate_s_bite():
 
 
 # ---------------------------------------------------------------------------
-# [2026-08-19 (qs)] THE TWO DEFECTS THE LIVE PAYLOAD EXPOSED, pinned from both
+# [2026-08-19 (rb)] THE TWO DEFECTS THE LIVE PAYLOAD EXPOSED, pinned from both
 # sides. Neither was hypothetical: 🙏 Avo LIVE was measured holding 4 positions
 # with `liq_unknown: [ADA, NVDA, QQQ, SPY]` and `nearest_liq: null`, and a
 # venue-wide control group (443 open positions across 110 accounts) put the

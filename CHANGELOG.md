@@ -1,8 +1,8 @@
-## 2026-08-19 (qs) — THE RUIN GATE READ THE SAFEST POSITION CLASS IN THE FLEET AS ITS MOST DANGEROUS STATE, AND WAS FAIL-**OPEN** ON THE ONE CASE IT EXISTS FOR
+## 2026-08-19 (rb) — THE RUIN GATE READ THE SAFEST POSITION CLASS IN THE FLEET AS ITS MOST DANGEROUS STATE, AND WAS FAIL-**OPEN** ON THE ONE CASE IT EXISTS FOR
 
-`(qq)` shipped a liquidation-distance gate and I called it verified. It was
+`(qz)` shipped a liquidation-distance gate and I called it verified. It was
 not. Two defects, both found by pointing the instrument at the LIVE payload and
-at the venue's own population before deploying it — which is the step `(qq)`
+at the venue's own population before deploying it — which is the step `(qz)`
 skipped, on a book that was FLAT and therefore could not exercise a single
 branch. **The gate never reached real money; it is fixed before its first
 enforced deploy, not after.**
@@ -61,7 +61,7 @@ arm of the publisher's branch — absent from `liq_unknown` AND absent from
 `priced` — so it dropped silently out of `min(priced)`. Reproduced against the
 real publisher and the real gate: XAU liq 50 (50% away, mark readable) + BTC
 liq 97 (**3% away**, mark blind) ⇒ `nearest_liq {XAU, 0.5}` ⇒ **allowed**.
-Supply BTC a mark and the identical book refuses. The docstring and `(qq)`'s
+Supply BTC a mark and the identical book refuses. The docstring and `(qz)`'s
 entry both asserted fail-CLOSED while this sat inside it, and the bot's own
 exit path already treats a blind mark as grave (`BLIND_STOP_MISSES` flattens
 after 3) — so the same condition was simultaneously grounds to flatten and
@@ -104,7 +104,7 @@ is that a consumer is tested against a payload ITS PUBLISHER built. 21 tests
 established without one; the enforced live deploy waits on a Farmer long
 appearing in the published block with `liq_none` classifying it correctly.
 
-## 2026-08-19 (qr) — THE REFEREE WAVE ON MY OWN MERGE: A CONFLICT MARKER WENT IN MID-LINE PAST AN ANCHORED GUARD, AND A `head -40` SILENTLY DROPPED THE REAL-MONEY HALF OF A RENUMBER
+## 2026-08-19 (ra) — THE REFEREE WAVE ON MY OWN MERGE: A CONFLICT MARKER WENT IN MID-LINE PAST AN ANCHORED GUARD, AND A `head -40` SILENTLY DROPPED THE REAL-MONEY HALF OF A RENUMBER
 
 Two defects, both mine, both found by an adversarial pass over a merge I had
 already pushed green — not by any guard. CI was **14 of 14** at the time. That
@@ -152,7 +152,7 @@ stale the moment two cases were added — doc-truth rot is worse in a guard,
 whose entire output IS a claim about what it checked).
 
 **DEFECT 2 — `head -40` DROPPED THE REAL-MONEY HALF OF A LETTER RENUMBER, AND
-THE ENTRY'S OWN NOTE THEN ASSERTED THE OPPOSITE.** Renumbering `(ql)` -> `(qq)`
+THE ENTRY'S OWN NOTE THEN ASSERTED THE OPPOSITE.** Renumbering `(ql)` -> `(qz)`
 I enumerated the citation sites with a `grep -rn ... | head -40` and built the
 file list from what printed. **There were 48 matching lines.** The eight that
 were cut included every hit in **`lighter_funding_bot.py` (5) and
@@ -176,7 +176,7 @@ truncation signature** — the same shape as `(hd)`'s lens returning exactly its
 cap. Count first, derive work-lists from `-l`, never from a capped line list.
 
 **AND THE RUIN GATE'S OWN PREMISE MOVED, measured on the live payload rather
-than assumed** — recorded here because `(qq)` shipped it: 🙏 Avo LIVE holds 4
+than assumed** — recorded here because `(qz)` shipped it: 🙏 Avo LIVE holds 4
 positions and publishes `liq_unknown: [ADA, NVDA, QQQ, SPY]` with
 `nearest_liq: null` under `mode: "cross"` and allocated `margin: 0.0` on every
 leg. `headroom_ok` fails CLOSED on a non-empty `liq_unknown`, so on that book
@@ -192,9 +192,9 @@ published" and "4x too close to liquidation" — opposite operator actions — a
 byte-identical (I18/(lv)). **No live deploy of this gate until both are
 resolved**; the carry PERSIST half is unaffected.
 
-## 2026-08-19 (qq) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
+## 2026-08-19 (qz) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
 
-*(Renumbered (ql) -> (qq) at push time: a concurrent session's carried-items
+*(Renumbered (ql) -> (qz) at push time: a concurrent session's carried-items
 entry took (ql) on main and is already merged, so this unmerged one moves —
 the convention's own tiebreak. **This note first read "Nothing outside this
 branch cited (ql) for this entry", and that was FALSE in the direction that
@@ -289,9 +289,9 @@ a genuinely hedged book's leverage capacity is governed by basis risk rather
 than price risk and is far higher. That is where the next dollar of risk
 appetite should be pointed.
 
-## 2026-08-19 (qp) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
+## 2026-08-19 (qy) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
 
-*(Renumbered (qj) -> (qm) -> (qp) across two push attempts: a concurrent
+*(Renumbered (qj) -> (qm) -> (qy) across two push attempts: a concurrent
 session's risk-up mirror package took (qj) on main, then another took (qm)
 while this branch was still unmerged. By the convention's own tiebreak MINE
 had the stronger claim on (qj) — seven citations from tracked code against
@@ -299,7 +299,7 @@ zero for theirs — but theirs was already MERGED, and renumbering a merged
 entry is the more disruptive act, so this is the side that moved both times.
 Stated rather than dressed up as the rule pointing this way.)*
 
-Found closing out `(qo)`'s referee wave — its F5 was declared "named not
+Found closing out `(qx)`'s referee wave — its F5 was declared "named not
 fixed", and I11 says carried work outranks new work, so it was the next brick.
 **The investigation found the referee had named the wrong half, and the
 adversarial pass over THIS fix then found a regression in it.** All line
@@ -314,7 +314,7 @@ before every bookkeeping step — verified structurally at `61f6155`:
 that stands by for hours and then wins the claim resumes from **its own boot
 snapshot of a world the incumbent has been moving ever since**:
 
-* **`positions` — the severe half, and the one `(qo)`'s referee missed.** The
+* **`positions` — the severe half, and the one `(qx)`'s referee missed.** The
   incumbent opened and closed carries during the standby. Adopting the old map
   closes a coin the incumbent ALREADY closed — and **the obvious description of
   that is wrong, which matters because it would send the operator to a scan
@@ -330,11 +330,11 @@ snapshot of a world the incumbent has been moving ever since**:
   produce a genuine second row.
 * **`hot_since`** — a coin hot at boot and hot now read as persisted across the
   whole unobserved standby: the PERMISSIVE direction `(iu)`/`(iq)` exist to
-  refuse. **`(qo)`'s F5 had this backwards** — it described *cold* clocks, and
+  refuse. **`(qx)`'s F5 had this backwards** — it described *cold* clocks, and
   on a real pair flip the pre-fix clock is stale-and-present, never cold,
   because the standby container's boot restore succeeded while the incumbent
   was alive. Corrected in place per I12 rather than graded as a magnitude
-  error. `(qo)`'s 6h → 12h move is what made me re-read the boot-only restore;
+  error. `(qx)`'s 6h → 12h move is what made me re-read the boot-only restore;
   it deepens a single wrong admission (up to 12h of unobserved time can stand
   in for persistence instead of 6h) while making wrong admission *rarer* — so
   "doubled the exposure" is right for the blackout and wrong for this half.
@@ -463,18 +463,18 @@ can now be handed over without silently restating a close, losing an open, or
 entering on a streak nobody watched, and without booking a phantom step-down
 into the equity series the go-live drawdown bar reads. (Deliberately *not*
 calling it "the fleet's best-evidenced book" any more: `(nc)` withdrew that
-headline — every pooled quote overstates by ~$13 — and `(qo)` records 🙏 avo as
+headline — every pooled quote overstates by ~$13 — and `(qx)` records 🙏 avo as
 the only above-bar book today. The honorific is still in circulation and is
 exactly the I12 archaeology class.) No trade changes while a single container
 holds the claim, which is the steady state; this is insurance on the
 transition, and the transition is reachable by design.
 
-## 2026-08-18 (qo) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
+## 2026-08-18 (qx) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
 
 *(Renumbered FOUR times at push time — written as (qg), moved when the
 mutation harness took (qg) on origin, again when band-kelly's activation took
 (qh), again from (qk) when a concurrent session's six-hunters entry took (qk)
-on main mid-review, and finally to (qo) when the fleet-wide-audit entry landed
+on main mid-review, and finally to (qx) when the fleet-wide-audit entry landed
 on (qk) as well. Every one of those is merged and cited from tracked files;
 this one was unmerged each time, so this is the side that moves — the
 convention's own tiebreak, decided by grepping rather than by who pushed
@@ -598,6 +598,563 @@ persistence rule its own tape supports, at zero cost to its era or its docket
 date; and the operator queue is a current document again instead of a museum
 of executed items.
 
+## 2026-08-19 (qw) — 🪁 BAND-KELLY'S CLAIM REPRODUCES EXACTLY AND SURVIVES JACKKNIFE — but MIRRORING A BOOK CREDITS YOU WITH ITS COSTS AS YOUR PROFIT, and the live book is accruing against a bar 34% too high
+
+Checked the fleet's largest measured claim independently, while the book is
+**live with an open position and 0 closes**. **It holds** — and it carries an
+arithmetic defect that inflates it by a third.
+
+**IT REPRODUCES, EXACTLY.** From the ghost's own ledger
+(`lighter-dislocation-lshadow`, n=189, 13-Jul -> 4-Aug): ALL n=189 mean
+-0.250%/t=-2.82; **CRYPTO subset n=65, mean -0.605%, t=-5.71**; non-crypto
+n=124, -0.064%, t=-0.53. The claimed mirror is n=65 / +0.605% / t=+5.71 — an
+exact match. **Unlike `(nu)` Schwager and `(nt)` Douglas, this founding number
+survives re-measurement.**
+
+**AND IT SURVIVES JACKKNIFE — the OPPOSITE of the `(po)` fat-tail failure.** The
+65 trades are **60% KAITO** (39), APEX 15, then eight coins with <=3 each.
+Concentration that severe is what made Schwager undecidable. Here: drop KAITO
+and it reads **+0.684% at t=+5.08**; drop APEX **+0.528% / +4.21**; every other
+single-coin drop lands +0.59..+0.63% at t=+5.5..+5.9. **No coin carries it, and
+dropping the dominant one RAISES the mean.**
+
+**THE DEFECT — a general one, not specific to this book.** A realised P&L is
+already NET of its own execution cost, so negating it hands the mirror that cost
+as profit AND forgets the mirror pays its own:
+
+    ghost_realised = price_move - ghost_slip
+    mirror         = -price_move - mirror_slip = -ghost_realised - (ghost_slip + mirror_slip)
+
+| | mean/trade | t |
+|---|---:|---:|
+| NAIVE mirror (the founding claim) | +0.605% | +5.71 |
+| **CORRECTED for double slippage** | **+0.397%** | **+3.58** |
+| overstatement | **0.209 pp/trade = 34% of the claim** | |
+
+*Sensitivity declared:* the correction uses CURRENT volumes (KAITO $0.42M ->
+2.52 bps/fill tier); point-in-time volume is not reconstructable (`(ny)`), and
+these coins sat in more liquid tiers earlier, so **34% is the conservative end**.
+The DIRECTION is certain — the double-count is arithmetic, not a model.
+
+**WHY IT MATTERS NOW:** band-kelly grades ~mid-Sep and its realised record will
+be read against **+0.605%**. At the corrected **+0.397%** bar, a perfectly
+healthy book would look like a 34% underperformer. **Correct the expectation
+before the sample lands, not after.** This does NOT weaken the book — at
++0.397%/trade, t=+3.58, jackknife-robust, it remains the fleet's best-evidenced
+claim by a wide margin, and ~3 orders of magnitude above the funding surface
+`(qq)` priced to zero.
+
+**A RECONSTRUCTION THAT FAILED, recorded so nobody repeats it.** I first tried
+to verify this from the scout's published telemetry (`prem_outliers` + `marks`,
+10,052 snapshots). It cannot be done: **`prem_outliers` is hard-capped at
+exactly 8 entries per snapshot**, truncating the event feed to the most extreme
+handful, and **`classes` is EMPTY before 5-Aug**, which silently dropped every
+pre-August event through the crypto screen and produced an implausible
+in-sample n=0 — my own harness defect, caught only by the implausibility (the
+`(po)` "a check that inspects nothing" shape). **The ghost's LEDGER is the right
+source (I14: the record decides); the telemetry is too lossy to audit this
+claim.**
+
+**CARRIED, NOT DONE:** `(qf)`'s roster refused `brkfade` and `dipfade` on numbers
+presumably computed the same naive way, and `dipfade` was ADMITTED 18-Aug on an
+operator override at n=13. **A 34% haircut can flip a marginal verdict in either
+direction — re-price the whole mirror roster on the corrected arithmetic before
+its next review.**
+
+No code touched; main-only by the `(mm)` rule. Working notes:
+`reports/expansion_research_log.md` Part 8.
+
+## 2026-08-19 (qv) — THE HELD HULL WIDENING IS REFUSED BY THE SAME MEASUREMENT THAT SHIPPED GARRETT'S: its floor drop lands in the ONE tier where the pin is known to lose — and its famous `t=+3.92` is a study, not a record
+
+*(Renumbered from (qq) at push time — a concurrent session's `(qq)` landed
+between this session's free-letter check and its push, so main briefly carried
+two. Neither is cited from code; this is the side that moves. FIFTH collision
+this session.)*
+
+`(qo)` held 🧮 Hull's `MIN_VOL` 2e6 → 5e5 on the stated ground that it "would
+pool a never-graded population into the fleet's cleanest measured record" and
+needed a `POLICY_ERA` split shipped with it. With CI restored that code change
+became possible, so the item came back up. **Both halves of that reasoning turn
+out to be wrong, and the answer is still no — for a better reason.**
+
+**1 · THE PIN IS INSIDE HULL'S BAND, AND THE DROP LANDS IN GARRETT'S TIER.**
+Hull gates apr **[7.82%, 20%)** and the venue's resting-default rate is
+**10.512% TRUE — inside it.** Measured over the last 2,000 scout snapshots,
+Hull-band supply by volume tier:
+
+| tier | coin-snapshots | AT the pin | off the pin |
+|---|---:|---:|---:|
+| **[$0.5M, $2M)** ← where the drop lands (Garrett's band) | 14,983 | **83.6%** | 16.4% |
+| [$2M, $10M) ← Hull today | 5,920 | **81.7%** | 18.3% |
+
+So the widening does **not** change Hull's mix — it is *already* pin-dominated.
+What it changes is the **liquidity of the pin coins it takes**, and that is
+exactly the axis `(qp)` measured today: the same pin reads **+0.0757%/trade at
+≥$10M** (💸 Farmer, n=72) and **−1.343%/trade at [$0.1M, $2M)** (🛢️ Garrett,
+n=13). Hull sits between them at [$2M, $10M). Dropping its floor to $0.5M moves
+it into the half where the pin is measured to LOSE. **Refused.**
+
+**2 · AND THE RECORD I WAS PROTECTING DOES NOT EXIST.** 🧮 Hull has **ZERO
+realised closes** — verified in the ledger, and consistent with
+`golive_readiness` listing it below floor at `n0`. Its celebrated **n=50,
++$6.69, t=+3.92, bootstrap P(mean≤0)=0.000** is `(ny)`'s **replay on 250d of
+tape**, not the book's own ledger. So there was no live sample to contaminate
+and no `POLICY_ERA` split to ship; that concern was aimed at something that is
+not there. `(qo)`'s stated reason for holding was therefore right by accident,
+and is corrected here per I12.
+
+**3 · WHAT HULL'S PROBLEM ACTUALLY IS.** Not its floor: it has never traded.
+`(ny)` already named the binding bar — **closes, not `t`** — at ~6.0/30d from a
+standing start, and the book is currently 2 of 4 slots with `eligible 0`. A
+widening that buys thin-tier pin supply does not fix that; it converts "no
+evidence" into "evidence from the tier we just measured as losing", which is
+worse than waiting, because a losing sample would be read as a verdict on the
+book rather than on the tier.
+
+**THE TRANSFERABLE RULE, which is now two-for-two today:** `(qp)` said a gate
+finding does not transfer between BOOKS at different tiers. This says the same
+finding does not transfer between TIERS within one book. **The tier is part of
+the hypothesis, not a parameter of it.** Both refusals came from the same two
+queries against the scout tape, and both would have looked like obvious wins on
+the proposal sheet.
+
+**Nothing changed.** No env, no code, no era. 🛢️ Garrett's `(qo)` tightening is
+unaffected — it stands on its own tier's evidence and its pre-registered read is
+still pending closes under the new gate.
+## 2026-08-19 (qu) — 🙏 AVO MARIA'S ENTRY PREDICTS NOTHING, MEASURED EXIT-FREE — AND THE OPERATOR KEEPS THE BOOK ANYWAY, ON THE RECORD, WITH A REVERT CRITERION
+
+**THE DECISION FIRST, because it is an operator call and it was made: 🙏 Avo
+Maria STAYS.** Operator, 19-Aug: *"no i want to keep avo maria."* This entry
+exists so that "keep" is a MONITORED decision with a stated price and a revert
+criterion, not a drift — the `(jg)` pre-registration pattern, and the thing
+I17's acknowledged-recurrence rule demands of any book we decline to retire.
+Price of the decision, measured: **−$0.68/month** (−1.081% of book per month at
+8.27 closes/30d), modelled maxDD **$20.77 (29.6%)**, no liquidation path at
+0.62× leverage. The honest case FOR keeping is I14: the live arm's own ledger is
+**n=3**, the record outranks any proxy, and the record has barely started.
+
+**WHY THE OPERATOR ASKED, AND WHAT THE ASK PRODUCED.** The brief was *"make avo
+maria make as much money as possible"* with standing permission to change the
+real-money arm. ~600 measured cells later the answer is that **no reachable
+parameter makes it more money**, and this entry records the refusals so the next
+session does not re-run them (I11).
+
+**THE DECISIVE MEASUREMENT — ASK THE ENTRY EXIT-FREE BEFORE SWEEPING ANY
+BRACKET.** Every prior sweep (entry rsi 30..55, trend on/off, band width, exit
+sell_zone 0.15..0.95, stop six ways, ROI ladder, timeframe 4h/8h/12h/1d,
+max_open 2..8) failed, and the reason was upstream of all of them. Stripped of
+stop, target and ladder, over 1,156 signals / 475d / 23 coins, the signal's
+excess over **matched-random** entries:
+
+    h= 1  2  3 bars (4h/8h/12h)   −0.131% / −0.171% / −0.139%
+                                  P(random ≥ signal) = 1.000 / 0.998 / 0.973
+    h= 6, 12                      −0.091% / −0.016%   (P 0.843 / 0.535)
+    h=30 (5d)                     +0.002%             (t=+0.01)
+
+**Random entries beat the signal outright at the short end.** The book's median
+hold is 3.5d (~21 bars), landing exactly where the excess is nil.
+
+**THE ONE POSITIVE-LOOKING CELL AND WHY IT IS NOT ONE.** h=60 (10d) reads excess
++1.381%, both halves positive, naive **t=+5.01**, i.i.d. P=0.000. It dies on
+every test that respects the data's own structure: cluster-robust t **+1.43**,
+month-as-unit **+0.81**, block-bootstrap 95% CI **[−1.11%, +2.57%]**, and a
+circular time-shift placebo (preserves spacing, density and cross-coin
+simultaneity) **P=0.285**. **The top 3 of 17 calendar months carry 97.3% of the
+entire excess**; drop them and it is +0.0498% at t=+0.19. Its "both halves
+positive" is one crash-rebound episode per half (2025-05 = 111% of H1's sum;
+2026-05 = 67% of H2's).
+
+**TWO INDEPENDENT CORROBORATIONS.** (1) DECOMPOSITION, 7 subsets × 3 horizons:
+only `rsi<42` carries information; **the trend filter `e50>e200` is actively
+destructive** — adding it LOWERS the mean of every base (R +0.208→+0.025,
+B +0.346→+0.187, R&B +0.349→+0.124); `bb_lower` fails its own dose-response;
+**0 of 21 cells survive Benjamini-Hochberg at FDR 0.05**. (2) CONDITIONAL
+STRUCTURE, 16 cells × 3 horizons: the signal's most extreme cell reads
+**|z|=1.63 while the null's OWN best-of-48 has median |z|=2.08** (p95 3.36),
+P=0.830 — *the signal is LESS structured than chance on the same grid.* 0
+discoveries under BH; smallest P=0.147.
+
+**A FOURTH UNDECIDABILITY CLASS: UNDECIDABLE BY FLATNESS.** Beside the
+slow-clock class (🌊/📊, too few closes) and the fat-tail class (🧙 Schwager,
+`t` hostage to 3 trades), this book has a normal close rate, **no tail
+concentration**, and is still ungradeable. The tell is the mirror of the tail
+test: trimming the top AND bottom 10 trades barely moves it (−0.5229% →
+−0.4675%, t=−0.994). At the measured mean/sd it needs **493 closes — 4.9 YEARS**
+to reach |t|=2.0. It can be proven neither winner nor loser.
+
+**THE TRAP THAT WOULD KEEP IT ALIVE FOREVER, stated so we do not fall for it:**
+P(the book shows a PROFIT at 12 months **by luck alone**) = **18.5%**. Measured
+live the same day — the shadow arm read **12W/3L, +$7.47, +0.996%/trade** and
+looked like it was working; it is not evidence (t=+0.66, 95% CI [−1.94%,
++3.94%], which CONTAINS the replay's −0.523%), and the replay reproduces that
+exact stretch (trailing 30d +0.600%, trailing 90d −0.876%). **A flat book will
+periodically look like it is winning, and that appearance sits INSIDE the
+negative record rather than departing from it.**
+
+**MECHANISM, arithmetic not mystery (I15):** the book wins **57.3%** and needs
+**62.7%** to break even — 28 stops at exactly −10.000% (−280pp) against 100
+`sell_into_strength` exits at +2.197% (+219.66pp). Wins capped by the target,
+losses capped only by the stop. That 5.4pp gap IS the deficit.
+
+**THE REVERT CRITERION — three watches with thresholds, so the decision is
+falsifiable.** Any ONE reopens the keep-or-retire call:
+1. **The book's own record clears the noise band.** To reach t=+2.0 the pooled
+   live+shadow ledger must average **≥ +1.649%/trade over the next 50 closes
+   (~6 months)** = **+$12.80 on a $62.58 book (+20.5%)**. Today: n=18,
+   +0.901%/trade, t=+0.66 — needs 166 closes / 1.7yr to resolve even if real.
+   **Anything less decides nothing and must not be read as working.**
+2. **The `rsi<25` dose-response turns back positive out-of-sample.** It is the
+   one term with a real, matched-null-surviving, monotone effect (+2.32%/trade
+   at h=12 historically, 19/23 coins positive) and it has decayed through zero:
+   rolling 120d **+4.97 → +2.05 → −0.31 → −0.41**, trailing 3 months −0.439%.
+   If a fresh 120d window prints **>+1.0%/trade at h=12 with cluster-robust
+   t≥2**, the entry FAMILY is alive and the conjunction is what kills it.
+3. **A non-falling-BTC regime arrives and the non-crypto sleeve separates**
+   (item 18 / D5 — the whole 475d tape is one regime).
+
+**THREE METHOD TRAPS RECORDED, each of which manufactured a phantom edge and
+was caught.** (a) **Overlapping forward windows inflate `t` ~3.5×** — quote the
+shift-placebo P, not the i.i.d. Monte-Carlo one, which read P=0.000 on the same
+cell the shift null put at 0.285. (b) **A local ±W-bar control is confounded BY
+CONSTRUCTION for a dip-buyer** — it gave **t=+25** and was DISCARDED: `close <
+bb_lower` puts the signal bar a measured 2.279% below its own ±15 neighbours,
+so with W≪h the "excess" is that entry discount re-expressed (I7). (c)
+**Non-overlapping subsampling flips the SIGN depending on how you thin** —
+greedy-first keeps the worst dip of each selloff (h=60: −1.14%), random-maximal
+over-weights isolated signals (+2.00%); rest conclusions only on tests that do
+not alter the signal set's composition.
+
+**WHAT DID NOT CHANGE.** No file in the book's path was edited: no entry, exit,
+stop, ROI, timeframe or sizing change ships, because none is measured to make
+money and the operator's own conditional was *"if it makes more money."* The one
+clean incidental finding — **the ROI ladder is provably inert**, deleting it
+yields a byte-identical trade list across 475d (max favourable excursion +10.84%
+against a 20% top rung) — is a tidy-up worth $0.00 and is NOT worth restarting a
+real-money container for ((mm)); it rides free on the next qualifying deploy.
+
+## 2026-08-19 (qt) — THE LADDER-AWARE REPLAY IS BUILT, AND ITS FIRST ANSWER REFUTES THE BRAIN: 🔮 georgia's stop is not too tight, and the convention that calibrates BEST is the one that would have shipped a lone spike
+
+*(Renumbered from (qr) at push time — a concurrent session's mirror-census
+entry took (qr) on origin/main and is cited by PR #187's own merge subject, so
+per the collision rule the CITED entry keeps the letter and this side moves.
+Third letter collision for this session in one night; every one was caught by
+`audit_changelog_letters`' cross-branch arm before it could reach main.)*
+
+`(ql)` DECLARED the family carriers unsweepable and named the only honest way
+to answer them — *"a ladder-aware replay — a build, not a re-run."* This is
+that build. `scripts/study_ladder_exit_sweep.py`, rules C1–C6 pre-registered
+in its header; full tables `STUDY_LADDER_EXIT_2026-08-19.md`.
+
+**THE QUESTION IT EXISTS TO SETTLE.** The brain has published `exit_too_tight`
+on 🔮 georgia in **129 of 129 runs for 8+ days** — reclaim **1.0**, forward
+**+1.63%**, trailing-stop path **−$17.14/71 era closes** against an roi path
+earning **+$17.70**. A measured direction with no instrument able to test it
+is the I18 shape, and `study_exit_sweep` cannot express georgia's rule (a
+time-decaying ROI ladder under an ATR ratchet) without handing `calibrate()`
+a rule the book does not run — the `(ps)` false pass.
+
+**C1 CALIBRATION PASSED, AND THE EXIT MIX REPRODUCES EXACTLY**: replayed
+`{tsl: 25, roi: 6}` against actual `{tsl: 25, roi: 6}` on 31 scored rows;
+mean +0.112pp vs actual −0.128pp (delta 0.241pp against a 0.25pp tolerance).
+
+**THE VERDICT: NO WIDENING IS SUPPORTED — the brain's direction is REFUTED**
+on the book's own replayable ledger. Sweeping the stop's width with the roi
+ladder HELD (C3): under the conservative arm no widening cell beats shipped at
+all (2.5×→5.0×: +0.112 → −0.003 → −0.131 → −0.026 → −0.097pp), and the worst
+single trade degrades **monotonically** with width in every arm (−0.76 →
+−1.79pp), so C5 fails for every widening cell. A wider stop here defers ruin
+rather than avoiding it.
+
+**THE METHODOLOGICAL FINDING IS THE BIGGER ONE, AND IT WAS FOUND BY MUTATING
+THE HARNESS AGAINST ITSELF.** The live loop is **90s** against a **15m**
+timeframe, so the real ratchet samples ~10× per bar and the intrabar order is
+genuinely ambiguous. Two conventions, neither dominating:
+* `adverse` (stop tested on the LOW before the HIGH ratchets) reproduces the
+  exit MIX **exactly** (81% vs 81%) and is 0.241pp off on the mean;
+* `ratchet_first` (mirrors the 90s loop) reproduces the MEAN to **0.045pp**
+  and overstates stop-outs (90% vs 81%).
+**The tempting move was to keep the arm that calibrated best on the mean and
+report its numbers — and that arm shows 3.0× and 4.0× BEATING shipped while
+3.5× between them is worse.** A broken plateau; exactly the lone spike C4
+exists to kill. Per the `(ne)`/gillard precedent both arms are now RUN and a
+verdict counts only if both agree. They do. Selectable via
+`LADDER_INTRABAR=adverse|ratchet_first`, `adverse` the default, and a test
+pins that neither arm can be hard-coded away.
+
+**INCIDENTAL, AND IT IS AN I18: georgia's carrier stoploss CANNOT BIND.** Every
+`stop_cap` value (5% / 7.5% / 10%) gives a **byte-identical** result at every
+multiplier — `min(mult*atr/px, cap)` never reaches the cap, because 2.5×ATR on
+15m bars is far tighter than 5%. `stoploss=-0.05` is decorative on this book.
+NOT removed (the carrier shares it with books where it does bind); recorded so
+nobody tunes it expecting an effect, and the harness prints the finding itself.
+
+**DECLARED LIMITS, because the sample is thin and the pass was marginal:**
+n=31 scored of 124 lifetime closes (only rows with entry+exit price AND side
+replay — prices since `(gr)`, side since `(kn)`; the sample heals forward);
+**2 of 33 rows excluded** because the `exit_signal`/`range_top` path needs the
+ENTRY strategy re-run and the sweep doctrine holds entries constant; and the
+`adverse` arm passed at **0.241pp against a 0.25pp tolerance** with the
+replayed mean differing in SIGN from actual on a book whose mean is ~0. **So
+the DIRECTION is the trustworthy output and no absolute per-trade number from
+this harness should be quoted.** Said here rather than discovered later.
+
+**WHAT IT BUYS BEYOND georgia:** the instrument generalises to 🙏 **avo
+maria** — the fleet's best-evidenced book and its nearest gate candidate — which
+rides the same SwingDip ladder and was equally untestable until now. Pinned by
+`tests/autonomy/test_ladder_exit_sweep.py`; **7 of 7 mutations verified red**,
+each checked as actually applied before scoring (the `(po)`/`(pv)` class).
+READ-ONLY: it recommends nothing on its own authority.
+
+## 2026-08-19 (qr) — 🪁 the census could not falsify the gate it publishes beside: two p98 conventions, one investigation
+
+*(Renumbered (qm)->(qn)->(qr) across two push-time collisions — concurrent
+sessions took (qm) and then (qn)-(qq) while this PR's CI rounds ran; the
+cross-branch letter guard caught both.)*
+
+First live hours of the risk-up mirror, working exactly as decided — 40-book
+unscreened scan, a real 170bps dislocation refused at the entry site because
+it is NON-crypto (`noncrypto: 1` in the census: the event fed the gate's
+distribution, confirmed, passed the ghost-clip slip check, and the (lk)
+screen declined the class — the whole point of moving the screen to the
+entry). But the readback ALSO showed `gate 60` beside `dev_p98 176.9`, which
+reads as a stuck gate and cost an investigation before it resolved as two
+DIFFERENT nearest-rank conventions: the ghost's `adaptive_enter_bps` indexes
+`round(p*(n-1))` — with one outlier in 40 books its p98 is the SECOND-largest
+|dev|, so the gate correctly ignores a lone spike — while the census stat
+used `int(p*n)` and showed the max. A falsifiability stat that cannot
+predict the number it falsifies is the (po) shape in miniature. The census
+now uses the gate's own index formula, publishes `dev_max_bps` beside it so
+the outlier stays visible, and the comment carries the incident. Display
+only; no trade changes; zero closes still (the policy clock remains clean).
+
+## 2026-08-19 (qq) — FOUR SURFACES PRICED IN ONE PASS: the directional-funding gate supplies neither timing nor selection, the allocation claim does not rank, and the tail's real signal is exactly consumed by execution
+
+**Operator reframe mid-session: *"We are looking at this as a risk eliminating
+job as opposed to a profit motivated job... look at options, even though risk
+will be higher."*** Accepted, and the numbers agreed: **$259.75 of real money
+against $16,026 of paper — 62:1**. Seven measurements followed, Lighter tape
+only. **Nothing applied — no lever, no deploy, no code change.** Full method:
+`STUDY_FUNDING_AND_TAIL_SURFACES_2026-08-19.md`.
+
+**1 · 💸 THE FARMER IS A DIRECTIONAL BOOK AND ITS DIRECTION WAS NEVER
+NULL-TESTED.** Its own header calls the thesis *"extreme funding marks crowded
+positioning that tends to mean-revert"* — a directional claim, and `(hm)`
+requires a random-entry null for those. Never applied, because these books are
+filed as "funding". Decomposing the ledger on production's own formula:
+**86.5% of the live real-money book's per-trade return is PRICE** (Garrett:
+100.9%), and the price term does not beat a matched random-entry null —
+**P(random >= actual) = 0.382 / 0.596 / 0.944** (paired calibration
+`corr(ledger, 5m replay)` = +0.996 to +0.998). Structural, not a bad month:
+mean `|price|` is **162x** the maximum funding accruable at the book's own 5%
+gate over its own holds; funding is linear in hold, price noise ~ sqrt(hold), so
+the crossover is **~51 years against a 72h cap**. **A fourth undecidability
+class — UNDECIDABLE BY SWAMPING**, beside I17's slow clock, `(po)`'s fat tail
+and `(pm)`'s redundancy. The gate's own horizon organ agrees independently
+(`t=0.29` *"needs ~1320d"* / `t=0.06` *"~36346d"* / `t=-1.05` *"unreachable"*).
+
+**2 · AND IT SUPPLIES NO SELECTION EITHER.** At the $10M floor the eligible pool
+is **13 coins EVER, median 7** — the gate picks 1 of ~7. Rank-1 paired against
+the equal-weight eligible basket at the same instant (so regime cancels),
+measuring **both** legs because the gate's fair defence is *"the price goes
+against you, that is what you are paid for"*: **price -0.0440%, funding
++0.0444%, TOTAL +0.0003% at t=0.00.** Funding is a fair price for the adverse
+selection it signals.
+
+**3 · THE SAME RESULT AT THE OPPOSITE END OF THE RANGE — and it corroborates a
+refutation the fleet already made and never applied here.** 22-Jul TAMERLANE
+killed the RECEIVING side of extreme funding in 25/25 cells, but that rejected a
+**proposed** book; **the live Farmer runs the identical mechanism at a 5% gate
+and was never re-examined.** The MIRROR (pay the funding) is **dead in 24 of 25
+cells**, and the one marginal cell dies on its own event population
+(SKHYNIXUSD/WTI/BRENTOIL — non-crypto, not liquid-tier). Funding and price
+**cancel in every cell, both directions**, to within ~10-20%. Read together:
+extreme gates -> adverse selection **>** funding (negative); mild gates -> **~=**
+funding (zero). **They scale together; there is no threshold at which this
+mechanism pays.**
+
+**4 · `fleet_allocation`'s CLAIM DOES NOT RANK — the ramp was refused before it
+was built.** The go-live gate is a STEP function (6 bars incl. `t>=2.0`) that has
+**never fired**, so evidence->money conversion is structurally zero. Proposed
+replacing it with a RAMP sized by I16's lower bound; built the walk-forward
+simulation (retired books kept in-pool while alive, Kraken/HL-era excluded),
+then tested the foundation: **Spearman(claim, forward) = -0.004 / -0.069**, and
+the terciles are **non-monotone — the MIDDLE bucket is worst**, the signature of
+noise. Claim-weighted returned -1.89% against equal-weight's -0.28%. **A tranche
+on this claim would deploy real money on noise.** Power limit declared: 24 days,
+18 books — *not demonstrated, point estimate ~zero*, not *proven useless*.
+
+**5 · THE ILLIQUID TAIL HAS A REAL SIGNAL AND IT IS EXACTLY ITS OWN COST.** The
+fleet trades **7 of 227** books; tested the other **137**, cross-sectional
+quintile long/short (market-neutral by construction, so item 18 cannot bite),
+execution lag enforced, staleness screened. **Cost re-derived from the fleet's
+OWN 3,015 `venue_orders`** instead of an inherited constant — which corrected my
+own first pass in both directions: the flat (js) 5.12 bps over-charged the
+tradeable $0.1-1M band (true mean **2.52**) and under-charged the dust by 3.4x
+(**mean 17.49, p90 398** — the dust is not a surface, it is a trap). On the
+tradeable universe: **gross +0.054%, cost 0.054%, net +0.000%, t=0.00** — while
+the **gross ranking beats a random ranking at P=0.0100**. Real, and exactly
+consumed.
+
+**6 · PASSIVE EXECUTION REFUTED, WITH A NUMBER.** Lighter's maker fee is
+**0.0000** and every bot crosses (`venue_orders` has no `post_only` column;
+3,558 rows, all taker), so this looked like the one untried lever. Modelled
+resting at `close(t)`: at **delta=0 it reads net +0.088%, t=1.63 — and a 100%
+fill rate is not a fill model, it is an assumption** (`low(t+1) <= close(t)`
+holds on almost every bar, handing the strategy the better of two prices with
+zero queue risk). **Price queue risk at all and the sign inverts: net -0.154%,
+t=-2.78** at 5 bps touch-through, deepening monotonically, consistent across
+halves (-1.92 / -2.08), block-boot CI **[-0.251%, -0.047%]**, P(net>0)=0.002.
+Fill rate stays at 89% — trades are not missed, **the trades you get are
+poisoned.** Spread saving +2.7 bps; adverse selection -18 bps.
+
+**THE STRATEGIC READING, which is the growth statement rather than the
+refusals:** the fleet's measured effects are **two orders of magnitude larger on
+PRICE DISLOCATION than on funding** — the retired snap-back ghost's realised
+-0.281%/trade (t=-2.97) is live-ledger evidence and band-kelly's founding claim
+is +0.605%/trade (t=+5.71), against a funding surface that prices to ~0.000% in
+every test above — **and the fleet runs three directional-funding books against
+one dislocation book born 18-Aug with zero closes.** Attention and capital are
+allocated inversely to where the measured signal is.
+
+**NOT CLAIMED:** that any live book loses. The Farmer's live row is **+$5.74
+realised**; the honest word throughout is *zero-edge* and *unproven*, never
+*losing*. **A correction that travels:** `(hm)`'s *"a random short earns
++0.2-1.1%/trade free"* was measured at the **Ticket Taker's** horizon — at the
+Farmer's (6h, majors) it is **+0.018-0.024%**. The free-short premium is
+HORIZON-DEPENDENT and must never be quoted across books (I14's shape, applied to
+the null instead of the grade).
+
+Files: `STUDY_FUNDING_AND_TAIL_SURFACES_2026-08-19.md` (new). Working notes in
+`reports/` (gitignored, local). **No code touched, so main-only by the `(mm)`
+rule — a deploy would restart both real-money containers for zero measured
+benefit and wipe memory-only halts.**
+
+## 2026-08-19 (qp) — "IF IT WORKS, ADJUST THE REAL BOT TOO": THE ANSWER IS **NO**, AND THE SIGN FLIPS BETWEEN THE TIERS — the same gate that is 96% of 🛢️ Garrett's LOSS is 127% of 💸 the Farmer's PROFIT
+
+**Operator: "If it works, adjust the real bot too."** The real-bot equivalent of
+`(qo)`'s Garrett tightening is exact and tempting: 💸 the Farmer runs the **same
+5% floor Garrett had**, and the venue's resting-default funding rate (~10.512%
+TRUE) sits ABOVE it, so the live book can enter the venue's do-nothing rate too.
+The proposal was already on the board as a judge candidate
+(`xp.funding.enter_apr 0.05 → 0.1095`, inside its cage).
+
+**MEASURED FIRST, AND IT INVERTS.** Same method as `(qo)` — every era close
+joined to the scout's `funding` cross-section at open (9,521 snapshots since
+17-Jul, **0 unmatched on either arm**):
+
+| book | tier | AT the pin | off the pin | pin share of P&L |
+|---|---|---:|---:|---:|
+| 🛢️ Garrett | [$0.1M, $2M) | **−1.343%**/trade (n=13) | −0.086% (n=9) | **95.8% of the LOSS** |
+| 💸 **Farmer LIVE** | ≥$10M | **+0.0757%**/trade (n=72) | −0.0721% (n=16) | **126.9% of the PROFIT** |
+| 💸 Farmer shadow | ≥$10M | **+0.0740%**/trade (n=110) | −0.1140% (n=45) | **270.4% of the PROFIT** |
+
+**Both Farmer arms agree, independently, and against Garrett.** Tightening the
+live gate to 0.1095 would remove **81.8% of the real book's entries and all of
+its realised profit** — it would have been a direct, confident, measured-looking
+way to break the only real-money book that makes money.
+
+**WHY THE SIGN FLIPS, so this is a rule and not a coincidence:** the pin is not
+a signal, it is the venue's *default state*. What differs is the TIER it is read
+in. In Garrett's thin band a resting rate means "nothing is happening on an
+illiquid book" — you collect ~nothing and pay the spread to leave. At the
+Farmer's ≥$10M floor the same resting rate still accrues on a book deep enough
+to exit cheaply, so it is the ordinary profitable state of a liquid carry. **A
+constant that is noise in one tier is the business in another.**
+
+**GENERAL RULE, engraved because this class keeps costing money:** a gate
+finding measured on one book does NOT transfer to another book at a different
+tier, however identical the constant looks. `(lp)` made Garrett a VARIANT of the
+Farmer's file precisely so one machine could serve both — and that shared
+lineage is exactly what makes "apply it to the real bot too" feel safe. It is
+not. Transfer requires re-measuring **on the target book's own ledger**; this
+one took two queries and would have cost the fleet its only profitable
+real-money arm.
+
+**NOTHING SHIPPED TO REAL MONEY.** No live gate moved, no `xp.funding.*`
+candidate queued — and the judge remains the sole writer of `live.funding.*`
+regardless. `(qo)`'s Garrett tightening stands on its own tier's evidence and is
+unaffected. The pre-registered read on whether Garrett's change WORKS is
+unchanged and still pending: it needs closes under the new gate, and the book
+was at 6/6 held when it shipped.
+
+**What the Farmer's numbers do say, recorded for the judge rather than acted on:
+neither arm separates significantly** (pin t=+0.54 live, +0.36 shadow; off-pin
+t=−0.19 / −0.30). So there is no supported gate move on the Farmer in EITHER
+direction today — the honest reading is "the 5% floor is not the problem", not
+"loosen it further".
+## 2026-08-19 (qo) — TWO SHADOW GATES MOVED ON THE OPERATOR'S "DO WHAT MAKES MORE MONEY, RISK OR NO RISK" — one verified from the ledger and biting, one shipped with its claim UNCONFIRMED and said so
+
+**Operator: "do what makes more money, risk or no risk."** Two env-only gate
+changes, live on the next loop, both on $1,000 SHADOW books. Real-money config
+(🙏 Avo's `MAX_NOTIONAL`, its slot count, the Farmer→Avo transfer, any deposit)
+was NOT touched — that stays an operator act, and it is the one limit the
+reframe does not move.
+
+### 1 · 🛢️ GARRETT `FUNDING_ENTER_APR` 0.05 → 0.1095 — a TIGHTENING, and the number is reproduced from its own ledger
+
+The venue's **resting-default funding rate** (~10.512% TRUE, the
+`funding_basis` 9.6e-5/hr constant) sits ABOVE Garrett's 5% floor, so the book
+has been entering the venue's do-nothing rate as if it were a signal. The gate
+now sits at the pin + half a grid step, which excludes it.
+
+**Verified independently before shipping, because the book's own ledger does
+NOT record entry APR** — `extra` carries `bars`/`hot_h` and no rate, so the
+proposing agent's figures could not be checked directly. Reconstructed instead
+by joining all 22 closes to the scout's `funding` cross-section at open
+(`bot_state_history`, 1,709 snapshots in window, **0 unmatched**):
+
+| Garrett entries | n | mean %/trade | total |
+|---|---:|---:|---:|
+| **AT the pin** (\|apr\|≈10.512%) | **13** | **−1.343%** | **−17.46%** |
+| off the pin | 9 | −0.086% | −0.77% |
+
+**59.1% of entries, 95.8% of realised loss.** The n's match the proposal
+exactly (13/9) and the means agree to ~0.1pp; the entry-share differs (59.1%
+realised vs its 84.7%) because that figure was over the supply window, not the
+ledger — noted rather than averaged. `t=−1.10` at n=13, so this is
+SUGGESTIVE, not proven; it ships because the downside of being wrong is fewer
+trades on a book already losing money, which is the cheapest possible way to
+be wrong. Corroborated by the 21-Jul Lighter sweep (the 5% bar: −$93.31/150d,
+20% win, flip 0W/23, monotone toward 20%). **Live and biting:** `gate_apr
+0.1095` in the row, `cold` 184 of 225.
+
+### 2 · 🏦 RICH DAD `RICHDAD_ALLOW_NONCRYPTO=1` — shipped, and its claimed payoff is NOT yet visible
+
+The class screen came from `(lk)`, which measured non-crypto at −$14.96/9 on
+🌾 carry — but **8 of those 9 exits were `*_flip` under `FLIP_GRACE_H=1h`, the
+exact exit `(px)` refuted and replaced with 6h on 18-Aug.** So the screen may
+have attributed an EXIT defect to the instrument CLASS. The replay behind the
+proposal reads +$0.777/trade (n=49, t=+3.60) on 180d of settled Lighter
+funding with only the screen moved.
+
+**Live readback says `crypto_only: false` — and the census has not moved:**
+`eligible 0, noncrypto 0, cold 197, thin 26, waiting 2`. The `noncrypto`
+bucket counts coins blocked by class ALONE, and it reads **0 both before and
+after** — i.e. at this instant the class screen was never the binding gate;
+**apr (cold 197) and volume (thin 26) are.** One snapshot is not a verdict
+(I7/I1 — the `(qe)` memo correction made exactly this point about the Farmer's
+`eligible 0`), and the claim was over a 14-day window. But the honest position
+is that the proposal's "3 → 13 coins, 0.5 → 8.2 closes/30d" is **unconfirmed
+on this book**, and I could not settle it retrospectively: `bot_state_history`
+holds no census rows for this key.
+
+**Tripwire, so this is falsifiable rather than hopeful:** if `eligible`/
+`noncrypto` stay at 0 through the next ~7 days, the class screen was not the
+constraint, the change bought nothing, and the real gate to argue about is the
+20% floor or the $2M volume bar — revert with `RICHDAD_ALLOW_NONCRYPTO` unset.
+
+### HELD, with reasons
+
+* **🧮 Hull `MIN_VOL` 2e6 → 5e5** — held. It would pool a never-graded
+  population into the fleet's cleanest measured record (n=50, +$6.69, t=+3.92,
+  bootstrap P(mean≤0)=0.000, earned AT the 7.82% floor). It needs a
+  `POLICY_ERA` split shipped WITH it; that is a code change, not an env one.
+* **🌾 carry class flip** — held. The replay reads +$0.713/trade (n=61,
+  t=+3.30) while the book's OWN era ledger reads −0.154%/trade (n=9, t=−4.01)
+  **at the same config**. A sign disagreement between replay and record is the
+  `(gx)`/`(ps)` calibration-gate class, and the record is senior (I14). That is
+  not "higher risk", it is no information — and the replay also used a $167
+  clip against carry's $300 `NOTIONAL`.
 ## 2026-08-19 (qn) — THE "PHANTOM FEE" IS NOT PHANTOM: CARRY ALREADY MEASURES ITS PERP LEG, AND THE ONLY REAL DEFECT IS A HYPERLIQUID CONSTANT ON A LIGHTER BOOK — plus the letters guard was blind to its own citation form
 
 *(Renumbered (qk) -> (qm) -> (qn) across three push attempts — concurrent

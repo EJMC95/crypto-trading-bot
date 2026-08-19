@@ -109,21 +109,47 @@ is worth two orders of magnitude.**
 
 ---
 
-## ~~🚨 NEW 19-Aug · GITHUB ACTIONS IS DARK — CI **and every auto-deploy** are down~~ — **RECOVERED 19-Aug 04:43:59Z, CORRECTED IN PLACE per I12; NO ACTION OUTSTANDING**
+## ✅ ~~19-Aug · GITHUB ACTIONS IS DARK~~ — **RESOLVED 19-Aug ~04:37Z (operator raised the spending limit). CI green, deploys running, PR #184 merged. The COST MEASUREMENT below is kept because it explains the recurrence and sizes it; the operator's decision on it is recorded and the item closes at the next daily review.**
 
-*Closed on the same instrument that opened it — the `fleet-watchdog` hourly
-heartbeat, which is the one signal here that runs on `main` with no PR code in
-it. Measured: run `32216819346` (19-Aug 04:43:59Z) **succeeded**, ending the
-three-run failure streak `32205969563` (01:43Z) · `32210855045` (03:04Z) ·
-`32213741453` (03:53Z), whose last green predecessor was `32197328429`
-(18-Aug 23:28:37Z) exactly as recorded below. Corroborated independently by a
-PR check suite that allocated a real runner and ran the full suite to a
-**substantive** verdict (1 failed / 1917 passed) rather than the outage's
-signature 2–4s zero-step failure. **So option A below was the right diagnosis
-to prepare and is now moot — do not go and check billing on account of this
-item.** The outage window is kept below rather than deleted: it is the second
-instance of the 28-Jul scar, and the fact that the fleet's own watchdog named
-the class before a human did is the reusable part.*
+*Independently corroborated from the one signal that runs on `main` with no PR
+code in it: the `fleet-watchdog` hourly heartbeat went green again at run
+`32216819346` (**19-Aug 04:43:59Z**), ending the failure streak `32205969563`
+(01:43Z) · `32210855045` (03:04Z) · `32213741453` (03:53Z) whose last green
+predecessor was `32197328429` (18-Aug 23:28:37Z). That lands ~7 min after the
+limit was raised, so the two accounts of the recovery agree to the minute.*
+
+**THE DECISION (operator, 19-Aug): leave CI structure alone and raise the
+spending limit.** Recorded rather than re-litigated — the consolidation option
+below is measured, refused by decision, and must not be re-proposed as if it
+were an open question.
+
+**THE MEASUREMENT, because it explains why this recurs and why the 28-Jul fix
+only bought three weeks.** Actions bills PER JOB, rounded UP to a full minute:
+
+| workflow | structure | measured burn |
+|---|---|---|
+| `changelog-check` | **12 jobs × ~6–17s**, billed as 12 min | ~15–20 runs/day ⇒ **~5,400–7,200 min/mo** |
+| `fleet-watchdog` | 1 job, hourly | **~720 min/mo** |
+| `tests` + `ci-notify` | 2 jobs/run | ~1,400–2,900 min/mo |
+
+**Total ≈ 7,500–11,000 min/month against a 2,000 (Free) / 3,000 (Pro)
+allowance** on a PRIVATE repo (public repos are unmetered — this cost exists
+only because the repo is private). So the dominant cost is NOT the scheduled
+watchdog at ~10%; it is 12 parallel guard jobs each billing a full minute for
+ten seconds of work. **The 28-Jul cadence cut (30-min → hourly) targeted the
+10%**, which is why it bought three weeks rather than fixing it.
+
+**Consequence to expect, stated plainly:** at this burn the limit will be
+reached again. The measured options if that becomes annoying are (a) consolidate
+`changelog-check`'s 12 jobs into 1 job with 12 named steps (~5,000–6,600 min/mo,
+costs the at-a-glance red/green matrix on the PR page), or (b) make the repo
+public (unmetered, but needs a secrets-in-history audit first — credentials were
+rotated in early Aug and that history has NOT been audited). Neither is being
+done; both are priced here so the next session does not re-derive them.
+
+---
+
+## ~~19-Aug · original report~~ — CI **and every auto-deploy** were down
 
 **The fleet's own watchdog diagnosed this before I did, and names the remedy:**
 `/watchdog.json` → *"GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last
@@ -283,16 +309,16 @@ allocation organ's live claims table, not this paragraph.]**
   decision day: carry's census `eligible` going positive under the NEW $1M
   floor (the ≥20%/$2M count had been 0.00 for 3+ days pre-`(px)`; the $1M
   cell historically reads occupied 13.42% of snapshots).]**
-  **[(qo) TRIPWIRE RE-BASING — read this before reading `eligible` on the
+  **[(qx) TRIPWIRE RE-BASING — read this before reading `eligible` on the
   decision day: the 13.42% base rate was measured at the 6h persistence
-  gate, and (qo) moved the live gate to 12h, which admits strictly fewer
+  gate, and (qx) moved the live gate to 12h, which admits strictly fewer
   windows (91% of qualifying windows die under 6h — most of what 13.42%
   counted never survives to 12h). A low `eligible` under the 12h gate is
   therefore NOT comparable to 13.42% and must not be read as "venue stall
   persists". Recompute the base rate at the shipped gate first:
   `python3 scripts/audit_book_overlap.py --gate 0.20 --floor 1e6
   --persist-h 12` — and judge supply against THAT number.]**
-  **[18-Aug later (qo) — PERSIST 12h SHIPPED, under your queue directive
+  **[18-Aug later (qx) — PERSIST 12h SHIPPED, under your queue directive
   ("implement all operator queue items that make the fleet improve/make more
   profit and win rate"), at the same clean boundary (px) used: the book held
   ZERO positions and the census read `eligible 0 / waiting 2` under the $1M
@@ -302,7 +328,7 @@ allocation organ's live claims table, not this paragraph.]**
   the code comment; pinned by tests/autonomy/test_carry_persistence_gate.py
   (4 mutations red). WHAT REMAINS FOR ~30-Aug IS NOW ONLY THE DECISION
   ITSELF: the keep-or-retire docket call — no tuning half rides on it any
-  more; if the call is retire, (qo) dies with the book at zero cost, exactly
+  more; if the call is retire, (qx) dies with the book at zero cost, exactly
   as this item priced it.]**
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped

@@ -18,7 +18,7 @@ funding each, the bot's OWN entry rule — AS OF 21-Jul: |apr| >= gate held
 PERSIST_H=6h continuously, ranked by |apr|, MAX_POSITIONS=8, $300 notional —
 and OWN exit cascade (then: flip 1h grace, fee-payback decay, 336h max-hold,
 2% bleed stop). Those are this table's VINTAGE; the harness now IMPORTS
-MAX_POSITIONS/PERSIST_H/FLIP_GRACE_H from the bot (see the (he)/(qo) notes
+MAX_POSITIONS/PERSIST_H/FLIP_GRACE_H from the bot (see the (he)/(qx) notes
 below), so a re-run measures the shipped book, not this one. Hedged carry: P&L =
 funding accrual - friction; no price leg (the hedge neutralizes it — that
 is the strategy's own claim, and the bot's own accounting).
@@ -69,9 +69,9 @@ NOTIONAL = 300.0
 # kept as the historical record of the decision that moved CARRY_ENTER_APR, with
 # its parameters now stated rather than assumed; a re-run at 12 is a different
 # measurement and should be recorded as one.
-# [2026-08-18 (qo)] PERSIST_H AND FLIP_GRACE_H WERE THE SAME (he) CLASS, TWO
+# [2026-08-18 (qx)] PERSIST_H AND FLIP_GRACE_H WERE THE SAME (he) CLASS, TWO
 # LINES DOWN FROM ITS FIX. Both were retyped literals: the bot moved
-# FLIP_GRACE_H 1h->6h at (px) and PERSIST_H 6h->12h at (qo), and this harness
+# FLIP_GRACE_H 1h->6h at (px) and PERSIST_H 6h->12h at (qx), and this harness
 # — the instrument that set CARRY_ENTER_APR, and the natural one for
 # validating or reverting either move — would have replayed a book the fleet
 # no longer runs, silently. Read from the bot like MAX_POSITIONS; the

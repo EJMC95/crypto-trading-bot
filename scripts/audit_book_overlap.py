@@ -143,7 +143,7 @@ def living_gates(cur):
                           # (the same (gl) phantom-rival class the volume
                           # ceiling already guards against, on the apr axis)
                           ("apr_hi", "apr_hi"),
-                          # [(qo)] the persistence gate — published since the
+                          # [(qx)] the persistence gate — published since the
                           # 🌾 12h move; books on one cell can now differ in
                           # REACH (carry 12h vs Rich Dad 6h), and a probe
                           # that ignores that credits the stricter book with
@@ -208,7 +208,7 @@ KNOWN_CELL_COLLISIONS = {
         "are differentiated in their rules though not in their published "
         "gate: 🏦 Rich Dad's payback-velocity bar is an EFFECTIVE ~21.9% "
         "(derived inside its exit rule, so `enter_apr` cannot show it) and its "
-        "exits are its own (liability_flip 6h, decay_paid). [(qo) 18-Aug: the "
+        "exits are its own (liability_flip 6h, decay_paid). [(qx) 18-Aug: the "
         "persistence AXIS now differentiates them too, and carry PUBLISHES it "
         "— caps.persist_h 12h vs Rich Dad's 6h greed guard, so the two books "
         "no longer take the same entry at the same instant: carry demands six "
@@ -629,10 +629,10 @@ def supply_in(rows, classes, region, persist_h=6.0):
     The same walk `report_supply` runs, parameterised by a region so the
     collision check can ask "is this intersection actually populated?".
 
-    [(qo)] `persist_h` is a CELL parameter, and 6.0 is only the historical
+    [(qx)] `persist_h` is a CELL parameter, and 6.0 is only the historical
     convention every recorded occupancy number was measured at ((px)'s
     13.42% ladder included). It is NOT any particular book's reach any more:
-    🌾 carry gates at 12h since (qo) while 🏦 Rich Dad stays at 6h — so a
+    🌾 carry gates at 12h since (qx) while 🏦 Rich Dad stays at 6h — so a
     question about ONE book's reachable supply must pass that book's own
     published `caps.persist_h` (living_gates now reads it), and a 6h-persist
     occupancy read OVERSTATES a 12h book's supply (91% of qualifying windows
@@ -728,7 +728,7 @@ def report_collisions(cur) -> int:
                   f"{'inf' if hi is None else f'{hi:.3g}'})"
                   f"  vol=[{(mn or 0)/1e6:.2f}M,"
                   f"{'inf' if mx is None else f'{mx/1e6:.2f}M'})"
-                  # [(qo)] differential REACH on a shared cell: two books at
+                  # [(qx)] differential REACH on a shared cell: two books at
                   # one apr/vol cell with different persistence do not take
                   # the same entries (91% of qualifying windows die under 6h)
                   + (f"  persist={g['persist_h']:g}h"

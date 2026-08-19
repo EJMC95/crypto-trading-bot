@@ -1,4 +1,4 @@
-"""[2026-08-19 (qp)] THE MUTATION HARNESS MUST REFUSE A DIRTY TARGET — and this
+"""[2026-08-19 (qy)] THE MUTATION HARNESS MUST REFUSE A DIRTY TARGET — and this
 is the POSITIVE CONTROL its own selftest structurally cannot carry.
 
 WHY THIS FILE EXISTS AT ALL. `scripts/mutate.py` restores between mutations

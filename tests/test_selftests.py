@@ -375,7 +375,7 @@ ENFORCED_AUDITS = [
     # the SAME row as distant history does not, and a removed anchor is
     # reported rather than silently skipping the check.
     "scripts/audit_live_roster.py",
-    # [2026-08-19 (qq)] MID-LINE conflict markers. changelog-check.yml has
+    # [2026-08-19 (qz)] MID-LINE conflict markers. changelog-check.yml has
     # carried an anchored `git grep -nE '^(<<<<<<<|>>>>>>>|=======$)'` since the
     # committed-stash-marker incident, and on 19-Aug the SAME class landed again
     # past it: a rebase end-marker appended to the END of a CHANGELOG prose line

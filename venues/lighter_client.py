@@ -257,7 +257,7 @@ def margin_state_from(acct, marks=None):
     gross = 0.0
     have_value = False
     modes, out, unknown = set(), {}, []
-    # [2026-08-19 (qs)] `bounded` = the subset of `unknown` the block can PROVE
+    # [2026-08-19 (rb)] `bounded` = the subset of `unknown` the block can PROVE
     # is unliquidatable. `blind` = positions the venue DID price whose mark is
     # unreadable — they matched neither arm of the branch below and so dropped
     # silently out of `nearest_liq`, which is a FAIL-OPEN hole in any consumer
@@ -298,7 +298,7 @@ def margin_state_from(acct, marks=None):
         liq, mark = rec.get("liq"), (marks or {}).get(coin)
         if liq is None:
             unknown.append(coin)
-            # [2026-08-19 (qs)] WHY the venue published nothing, when the block
+            # [2026-08-19 (rb)] WHY the venue published nothing, when the block
             # can prove it. `scripts/lighter_margin_model.liq_price` states the
             # algebra: `if is_long and inv >= 1.0: return 0.0` — a long at or
             # below 1x of collateral CANNOT be liquidated, because its whole
@@ -332,7 +332,7 @@ def margin_state_from(acct, marks=None):
             blind.append(coin)              # liq known, no mark supplied
         out[coin] = row
 
-    # [(qs)] Account-level, so it must run AFTER every position is seen.
+    # [(rb)] Account-level, so it must run AFTER every position is seen.
     bounded = sorted(_bounded_longs(positions, _num(acct.get("collateral")))
                      & set(unknown))
 
