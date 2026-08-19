@@ -723,6 +723,19 @@ unaffected — it stands on its own tier's evidence and its pre-registered read 
 still pending closes under the new gate.
 ## 2026-08-19 (qu) — 🙏 AVO MARIA'S ENTRY PREDICTS NOTHING, MEASURED EXIT-FREE — AND THE OPERATOR KEEPS THE BOOK ANYWAY, ON THE RECORD, WITH A REVERT CRITERION
 
+*(Commit attribution, recorded inline per the convention rather than rewritten:
+this entry's text was swept into a concurrent session's commit `edd99eb` — whose
+subject describes its own `(qq)` Hull entry — by the shared-index race this file
+documents at length. The content landed intact and was verified byte-present on
+origin; only the authoring subject is another session's. **It is NOT being
+fixed by rewriting history**: `edd99eb` is on `origin/main` and on
+`origin/claude/operator-queue-fleet-improvement-xcrhej`, so amending it means
+force-pushing shared history across ~12 live sessions to correct a commit
+subject — a destructive act for a cosmetic gain. The companion CLAUDE.md half
+went in cleanly under its own subject (`10019ef`) via
+`scripts/session_commit.py`. Fourth instance of this race recorded in this
+repo; the durable fix remains a per-session worktree.)*
+
 **THE DECISION FIRST, because it is an operator call and it was made: 🙏 Avo
 Maria STAYS.** Operator, 19-Aug: *"no i want to keep avo maria."* This entry
 exists so that "keep" is a MONITORED decision with a stated price and a revert
