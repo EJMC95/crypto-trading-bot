@@ -302,6 +302,64 @@ def test_the_control_arm_ACCUMULATES_when_a_trade_actually_closes():
     assert out["edge_pct"] == pytest.approx(1.5)
 
 
+def test_a_legacy_close_with_no_placebo_is_EXCLUDED_from_the_arm():
+    """[(rp)] Caught in mum v2's FIRST live payload: the arm read
+    `n: 4, mean_pct: 7.81` because her four v1 legacy flattens were counted.
+    Those are v1-policy marks being realised — not v2's edge — and they carry
+    no placebo, so the pair cannot be formed. Requiring BOTH legs excludes
+    them for free and keeps `n == null_n` true by construction."""
+    class _Stub:
+        pass
+    b = _Stub()
+    b.s = _mum()
+    b.bot_id = "freqtrade-mum-lshadow"
+    b.meta = {"BTC": {"accrued": 0.0, "opened_ts": 1.0, "tag": "sma-fast-above-slow",
+                      "entry": 100.0}}          # a v1 position: NO null_pair
+    b.last_mark = {"ETH": 201.0}
+    b.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    b.fund_realized = 0.0
+    b.n_closed = b.n_wins = 0
+    b.closed = []
+    b.cooldown = {}
+    fam.Book.record_close(b, "BTC", 108.0, 4.0, "v1_legacy", notional=50.0)
+    assert b.ctrl["n"] == 0, "a legacy close must not enter v2's control sample"
+    assert b.ctrl["sum"] == 0.0
+    assert fam._control_extra(b)["control"]["mean_pct"] is None
+
+
+def test_the_arm_survives_a_redeploy():
+    """A 30-day instrument in a container that redeploys whenever any shared
+    organ changes cannot live in memory: it would reset to zero forever and
+    never reach its own sample. Pinned by driving the real persist/restore
+    field list rather than asserting on a name."""
+    src = (ROOT / "lighter_family_bot.py").read_text()
+    persist = src[src.index("def persist(self):"):src.index("def persist(self):") + 1400]
+    assert '"ctrl": self.ctrl' in persist, "the control arm must be persisted"
+    restore = src[src.index("def restore(self):"):src.index("def persist(self):")]
+    assert 'saved.get("ctrl")' in restore, "the control arm must be restored"
+
+
+def test_pair_counts_can_never_diverge():
+    """n and null_n move together or not at all — the edge is a PAIRED
+    difference, and an unpaired observation cannot be differenced."""
+    class _Stub:
+        pass
+    b = _Stub()
+    b.s = _mum()
+    b.bot_id = "freqtrade-mum-lshadow"
+    b.fund_realized = 0.0
+    b.n_closed = b.n_wins = 0
+    b.closed = []
+    b.cooldown = {}
+    b.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    for i, (pair, mark) in enumerate((("ETH", 201.0), ("ZZZ", None), ("ETH", 201.0))):
+        b.meta = {"BTC": {"accrued": 0.0, "opened_ts": 1.0, "tag": "oversold-rebound",
+                          "entry": 100.0, "null_pair": pair, "null_entry": 200.0}}
+        b.last_mark = {"ETH": 201.0} if mark else {}
+        fam.Book.record_close(b, "BTC", 102.0, 1.0, "roi", notional=50.0)
+    assert b.ctrl["n"] == b.ctrl["null_n"] == 2, "the dark-placebo close is dropped from BOTH"
+
+
 def test_a_dark_placebo_never_breaks_a_close():
     """An instrument that can break a trading loop is worse than no
     instrument — two LIVING books share this process."""
@@ -320,5 +378,7 @@ def test_a_dark_placebo_never_breaks_a_close():
     b.closed = []
     b.cooldown = {}
     fam.Book.record_close(b, "BTC", 102.0, 1.0, "roi", notional=50.0)
-    assert b.ctrl["n"] == 1 and b.ctrl["null_n"] == 0
+    # atomic pairing: an unsettleable placebo drops the observation from BOTH
+    # legs rather than leaving the real leg counted against nothing
+    assert b.ctrl["n"] == 0 and b.ctrl["null_n"] == 0
     assert fam._control_extra(b)["control"]["edge_pct"] is None
