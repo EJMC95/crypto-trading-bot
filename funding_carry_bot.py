@@ -119,7 +119,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # funding distribution has collapsed — a market condition, not a defect. This
 # removes a STRUCTURAL blind spot in the rail; it does not buy a trade today
 # and must not be reported as if it did.
-# [2026-08-18 (px) — letter corrected from a stale (pr) at (qi); (pr) is the Farmer halt entry — CORRECTED IN PLACE per I12 — the "zero unlock" above was a
+# [2026-08-18 (px) — letter corrected from a stale (pr) at (qk); (pr) is the Farmer halt entry — CORRECTED IN PLACE per I12 — the "zero unlock" above was a
 # POINT-IN-TIME census (3-Aug's loop), and over the whole tape it does not
 # hold. Measured on 9,996 scout snapshots / 34.9 days through
 # audit_book_overlap.supply_in (the gate rule's one owner): cell occupancy
@@ -166,7 +166,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #   * bleed stop                       (catastrophic guard on adverse holds)
 # Entries additionally require the rate to have stayed hot >= PERSIST_H — the
 # research-backed filter: persistent funding pays carries, spikes pay fees.
-# [2026-08-18 (qi)] PERSIST 6h -> 12h — the ONE half (px) deliberately parked,
+# [2026-08-18 (qk)] PERSIST 6h -> 12h — the ONE half (px) deliberately parked,
 # shipped under the operator's queue directive ("implement all operator queue
 # items that make the fleet improve/make more profit and win rate"). Evidence:
 # STUDY_FUNDING_LIFECYCLE_2026-08-15.md §4 (E4), the cell's own 205d episode
@@ -187,7 +187,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 # under 12h. Ordinary entry tuning per (hc) — the era is unchanged, and the
 # ~30-Aug keep-or-retire docket call is UNTOUCHED (if that call is retire,
 # this dies with the book at zero cost, exactly as the queue item priced it).
-# TWO MORE COSTS, DECLARED (the same-hour referee wave, (qi)):
+# TWO MORE COSTS, DECLARED (the same-hour referee wave, (qk)):
 # (1) TIER TRANSFER UNMEASURED — the §4 walk ran on the pre-(px) ≥$2M cell;
 #     the [$1M,$2M) tier (px) admitted three days later (ROBO/ENA/XRP, now
 #     the MAJORITY of the widened cell's occupancy) was not in its episode
@@ -209,7 +209,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #     (1800s) exceeds the clock-restore bound (900s), so `takeover_step`
 #     always starts a takeover on cold clocks. That is the accepted price of
 #     refusing the permissive path.**
-PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qi): 6.0 -> 12.0]
+PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qk): 6.0 -> 12.0]
 # [2026-08-18 (px)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
 # (scripts/study_books_cohort_2026-08-13.py, this cell's OWN gate and coins,
 # 250d of settled fundings): grace 1h = +$27.25, t=1.95, h2 NEGATIVE, with
@@ -220,7 +220,7 @@ PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin mus
 # flips. 6h over the 24h optimum for decidability (I17) — ~79% of the close
 # cadence at double the per-trade expectancy — and it mirrors PERSIST_H: six
 # hours of proof to buy, six to sell (the same choice 🏦 Rich Dad made on
-# this cell at (mf)). [(qi) broke that mirror DELIBERATELY: entry persistence
+# this cell at (mf)). [(qk) broke that mirror DELIBERATELY: entry persistence
 # moved to 12h on its own §4 measurement while this exit grace stays at its
 # own measured 6h — each side sits on its own evidence, and symmetry was
 # never the argument for either.] (mf) QUEUED this change to protect carry's mid-window
@@ -411,7 +411,7 @@ def reclaim_after_standby(saved, ok_read, now, gap_cap_s=48 * 3600.0):
         the WHOLE standby, though nobody observed the hours between. That is
         the PERMISSIVE failure `(iu)`/`(iq)` exist to refuse — a spike entry
         wearing a streak, on the one book whose thesis is "persistent funding
-        pays carries, spikes pay fees". `(qi)` doubled the exposure by moving
+        pays carries, spikes pay fees". `(qk)` doubled the exposure by moving
         the gate 6h -> 12h, which is what surfaced this.
       * `last_ts` — the accrual clock. Stale positions + a stale clock happen
         to be self-consistent (both are the same boot snapshot), which is
@@ -1295,7 +1295,7 @@ def main():
                                     # [(px)] the exit gate publishes like the
                                     # entry gate ((lz)/(pf) doctrine)
                                     "flip_grace_h": FLIP_GRACE_H,
-                                    # [(qi)] the persistence gate too — an
+                                    # [(qk)] the persistence gate too — an
                                     # unpublished gate made the (lz)/(pf)
                                     # collisions undetectable, and this one
                                     # now DIFFERS from 🏦 Rich Dad's 6h on

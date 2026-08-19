@@ -189,6 +189,21 @@ def main(argv=None):
     # [(qj)] THE TARGET MUST BE COMMITTED. Every restore is `git checkout --`,
     # so uncommitted work in the target is destroyed by the FIRST mutation.
     # Refuse, loudly, before anything is touched.
+    #
+    # TWO SESSIONS FOUND THIS THE SAME DAY, and a `git diff --quiet` version
+    # landed on main first ([[commit-before-mutation-rounds]] — its memory
+    # pointer is kept here because it is the better name for the class). The
+    # two were COLLAPSED into this one rather than left side by side, because
+    # two copies of a rule are two rules ((hj)) and the first to run makes the
+    # second dead code. This is the surviving implementation on the merits,
+    # not on order: `git diff --quiet` compares worktree to INDEX, so it is
+    # blind to a STAGED-only fix (baseline and restore then silently
+    # disagree) and to an UNTRACKED target (where `git checkout --` fails
+    # outright under `check=True`, killing the round mid-way). `git status
+    # --porcelain` catches all three, fails OPEN where git cannot answer, and
+    # carries the measured index-vs-HEAD semantics plus a positive-control
+    # suite. That entry's comment also asserts the restore goes "to HEAD",
+    # which the measurement in `uncommitted()` refutes.
     if uncommitted(target):
         print(f"!! {target} has uncommitted changes, and every mutation "
               f"restores it with `git checkout --`.\n   Unstaged edits are "

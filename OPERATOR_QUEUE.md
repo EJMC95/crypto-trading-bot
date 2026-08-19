@@ -161,16 +161,16 @@ allocation organ's live claims table, not this paragraph.]**
   decision day: carry's census `eligible` going positive under the NEW $1M
   floor (the ≥20%/$2M count had been 0.00 for 3+ days pre-`(px)`; the $1M
   cell historically reads occupied 13.42% of snapshots).]**
-  **[(qi) TRIPWIRE RE-BASING — read this before reading `eligible` on the
+  **[(qk) TRIPWIRE RE-BASING — read this before reading `eligible` on the
   decision day: the 13.42% base rate was measured at the 6h persistence
-  gate, and (qi) moved the live gate to 12h, which admits strictly fewer
+  gate, and (qk) moved the live gate to 12h, which admits strictly fewer
   windows (91% of qualifying windows die under 6h — most of what 13.42%
   counted never survives to 12h). A low `eligible` under the 12h gate is
   therefore NOT comparable to 13.42% and must not be read as "venue stall
   persists". Recompute the base rate at the shipped gate first:
   `python3 scripts/audit_book_overlap.py --gate 0.20 --floor 1e6
   --persist-h 12` — and judge supply against THAT number.]**
-  **[18-Aug later (qi) — PERSIST 12h SHIPPED, under your queue directive
+  **[18-Aug later (qk) — PERSIST 12h SHIPPED, under your queue directive
   ("implement all operator queue items that make the fleet improve/make more
   profit and win rate"), at the same clean boundary (px) used: the book held
   ZERO positions and the census read `eligible 0 / waiting 2` under the $1M
@@ -180,7 +180,7 @@ allocation organ's live claims table, not this paragraph.]**
   the code comment; pinned by tests/autonomy/test_carry_persistence_gate.py
   (4 mutations red). WHAT REMAINS FOR ~30-Aug IS NOW ONLY THE DECISION
   ITSELF: the keep-or-retire docket call — no tuning half rides on it any
-  more; if the call is retire, (qi) dies with the book at zero cost, exactly
+  more; if the call is retire, (qk) dies with the book at zero cost, exactly
   as this item priced it.]**
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped

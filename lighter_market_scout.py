@@ -497,6 +497,24 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # so the two join directly. Joining to paper_trades/bot ledgers needs
         # venues/symbol_map.from_lighter() — 5 keys differ (the 1000X markets).
         "funding": {s: lighter_apr[s] for s in stats if s in lighter_apr},
+        # [2026-08-19 (qi)] THE CROSS-VENUE BENCH, FULL CROSS-SECTION — the
+        # same argument that added `funding` above, one venue-set out.
+        # `funding_divergence` is truncated to the top 5, so the retained
+        # tape could answer "was this coin diverging when the book opened
+        # it?" for almost nothing: the 19-Aug divergence study recovered a
+        # per-coin gap at open for only 15 of 270 era funding-book closes,
+        # and had to reconstruct the bench externally to say anything at
+        # all. That study CLOSED NEGATIVE (divergence is not an entry-time
+        # adverse-selection signal on today's coin mix) — this key is what
+        # makes the class RE-GRADEABLE on evidence if the mix shifts, rather
+        # than re-runnable only as a hunch. Keyed like `marks`/`funding` (raw
+        # Lighter symbol) so the three join directly; a coin with no
+        # cross-venue quote is ABSENT, never 0.0 — "no bench" and "bench of
+        # zero" are different facts (I6/I8), and the 9 tokenised non-crypto
+        # symbols genuinely have no external bench. DELIBERATELY COUPLED TO
+        # NO GATE: no book reads it, and the study that would justify one is
+        # the closed-negative class above.
+        "xvenue_funding": {d["sym"]: d["xvenue_apr"] for d in divergence},
         # [2026-07-17 BASIS STAMP — the tape describes its own units.]
         # Rows written BEFORE this fix carry true_apr_divisor 8.0: this organ
         # annualised Lighter's 8-HOUR funding fraction as if hourly, so every
@@ -688,6 +706,18 @@ def selftest():
     _h = historized(snap)
     assert "funding" in _h and _h["funding"] == snap["funding"], "history drops funding"
     assert "marks" in _h and "_marks" not in _h, _h.keys()
+    # [(qi)] the cross-venue bench must survive history for the SAME reason —
+    # it exists only to be joined to a decision after the fact. It carries the
+    # FULL cross-section, not `funding_divergence`'s top-5 truncation, which
+    # is why the 19-Aug study could recover a gap-at-open for 15 of 270 closes.
+    assert "xvenue_funding" in _h, "history drops the cross-venue bench"
+    assert _h["xvenue_funding"] == snap["xvenue_funding"]
+    assert snap["xvenue_funding"].get("RKLB") is not None, snap["xvenue_funding"]
+    assert len(snap["xvenue_funding"]) >= len(snap["funding_divergence"]), \
+        "the bench must not inherit the top-5 truncation it exists to fix"
+    # a coin with no external quote is ABSENT, never 0.0 (I6: "no bench" and
+    # "a bench of zero" are different facts)
+    assert "DEAD" not in snap["xvenue_funding"], snap["xvenue_funding"]
 
     # 4) Strategy tickets: each lens picks its setup, exclusions hold.
     def lb(sym, last, hi, lo, chg, qvol=5e6, prem=1.0):

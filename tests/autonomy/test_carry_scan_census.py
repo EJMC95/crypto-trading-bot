@@ -82,7 +82,7 @@ def _census():
     # persist_h is pinned to 6.0 — the gate in force on 2-Aug — for the same
     # reason H and BAR are passed explicitly: this fixture reconstructs THE
     # INCIDENT, and must not silently re-grade it under whatever the module
-    # default has since become ((qi) moved it to 12h on the §4 measurement;
+    # default has since become ((qk) moved it to 12h on the §4 measurement;
     # the CURRENT default is pinned in test_carry_persistence_gate.py).
     return carry.scan_census(fund, positions, hot_since, T0, H, BAR,
                              persist_h=6.0)
@@ -178,7 +178,7 @@ def test_a_held_coin_is_counted_once_and_never_as_a_candidate():
 # ---------------------------------------------------------------------------
 
 def test_a_hot_liquid_persistent_noncrypto_book_is_screened_not_eligible():
-    # 13h hot: "persistent" means past the CURRENT 12h gate ((qi)), so this
+    # 13h hot: "persistent" means past the CURRENT 12h gate ((qk)), so this
     # test keeps meaning what its name says as the default moves.
     fund = {"WTI": _f(HOT, 16_810_000), "KAITO": _f(HOT, 3_011_700)}
     hot = {"WTI": T0 - 13 * 3600, "KAITO": T0 - 13 * 3600}

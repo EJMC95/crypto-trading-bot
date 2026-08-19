@@ -1,7 +1,7 @@
 """[2026-08-19 (qj)] A FAILOVER TAKEOVER MUST ADOPT THE INCUMBENT'S WORLD, NOT
 RESUME ITS OWN BOOT SNAPSHOT.
 
-THE DEFECT, found closing out the `(qi)` referee wave's declared F5. `(hp)`
+THE DEFECT, found closing out the `(qk)` referee wave's declared F5. `(hp)`
 made the two carry containers a deliberate failover pair — first claimant
 keeps the book, the other IDLES and re-checks every loop. But the durable
 restore (`load_state_required` + `funding_basis.restore_hot_since`) runs ONCE,
@@ -17,7 +17,7 @@ own boot snapshot of a world the incumbent has been moving the whole time:
   * `hot_since` — a coin hot at boot and hot now reads as persisted across the
     entire standby, unobserved. That is the PERMISSIVE direction `(iu)`/`(iq)`
     exist to refuse, on the book whose thesis is "persistent funding pays
-    carries, spikes pay fees". `(qi)`'s 6h -> 12h move doubled the exposure,
+    carries, spikes pay fees". `(qk)`'s 6h -> 12h move doubled the exposure,
     which is what surfaced this.
   * `last_ts` — stale positions and a stale clock are self-consistent, which is
     precisely why the three must be adopted ATOMICALLY: fresh `accrued` under
