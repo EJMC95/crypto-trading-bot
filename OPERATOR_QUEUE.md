@@ -74,7 +74,7 @@ escape on this cell (48 cells, zero winners) — *"the stall is edge."* Real
 capital ($197.31) sits on it. **This is explicitly NOT a tuning pass**; if you
 KEEP, the rationale should be recorded against the P=0.06/P=0.155 controls.
 
-### C — 👩 mum: swing-daily's retirement profile, one row over
+### C ✅ — 👩 mum: **EXECUTED 19-Aug `(rd)`** — retired, ROW-scoped, reversible via `MUM_RETIRED_OVERRIDE=run`. Confirmed on its own ledger before acting: 3 closes lifetime, **all three opened 12-Jul so ZERO in-era**, ~2.4 closes/30d ⇒ ~12 months to the bar, funding drag −$2.15 > +$0.68 realised. Overturns the `(nf)` "green, slow" hold because that green is +$2.23 of OPEN MARKS (the `(lo)` precedent). 4 open paper positions freeze. Both halves + guard shipped, 5/5 mutations red. Exposed and fixed five tests that encoded "mum is alive"; `test_breakout4h_retired`'s survivor set is now DERIVED. Item closes at the next daily review.
 3 closes in 5.3 weeks, **0 in-era**, all four slots frozen in month-long trend
 holds; funding drag **−$2.15** exceeds **+$0.69** realised. `crypto-swing-daily`
 was retired at (nf) on n=3 in six weeks. mum was HELD as "green" — that green
@@ -89,7 +89,7 @@ I18 shape. Grimes: gate flipped back to **all-three-CLOSED** since (om)
 open). Both were HELD at (nf) on numbers since measured. **Neither is a
 bar-lowering session** — the birth declarations say so themselves.
 
-### E ★ — 🙏 Avo LIVE notional cap: restrict-only, zero expectancy price
+### E ★ — 🙏 Avo LIVE notional cap: restrict-only, zero expectancy price — **OPERATOR-ONLY BY DOCTRINE, not by capability.** CLAUDE.md's own routing table ends *"go-live/keys/SafetyRails caps stay operator-only forever"*, and this is a SafetyRails cap. (There is also no `railway` CLI in the session container, but that is incidental — the rule decides it.) Re-verified live 19-Aug 05:41Z: `cap_usd` **200.0** against equity **62.64**. Stated here so no future session re-attempts it as though it were merely blocked on tooling.
 Published `cap_usd` is **$200.00** against **$62.53 equity** (3.2×) and $38.61
 gross (5.2×) — so SafetyRails currently provides **no defence-in-depth** at the
 book's real scale. The effective constraint is structural (clip = equity/4), so

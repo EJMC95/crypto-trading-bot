@@ -719,6 +719,23 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
+    # [2026-08-19] 👩 mum — the I17 no_rate call, and it CORRECTS the (nf) hold
+    # four lines up rather than adding to it. (nf) kept mum as "green, slow";
+    # measured 19-Aug that green is OPEN MARKS, not evidence — the (lo)
+    # precedent, where 📊 Index Rider was retired with +$13.93 of open MTM
+    # abandoned for exactly this reason.
+    #   * 3 closes LIFETIME, and ALL THREE opened 2026-07-12 — i.e. **zero
+    #     in-era closes** against a 17-Jul era, so the book has never produced
+    #     a gradeable trade under the policy it currently runs;
+    #   * ~2.4 closes/30d measured => ~12 MONTHS to the 30-close bar;
+    #   * funding drag -$2.15 EXCEEDS +$0.68 realised, so the holding itself
+    #     is the cost;
+    #   * held 26-34 days each, every exit a death_cross.
+    # This is a STRONGER version of the profile (nf) retired `crypto-swing-daily`
+    # on ("n=3 in six weeks — the I17 UNDECIDABLE shape"): same rate, and mum's
+    # three are not even in-era. 4 open paper positions FREEZE, the (mr)/(nf)
+    # precedent. Reversible via `MUM_RETIRED_OVERRIDE=run`.
+    "freqtrade-mum":       "MUM_RETIRED_OVERRIDE",
 
 }
 

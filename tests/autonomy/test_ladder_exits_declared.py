@@ -44,14 +44,32 @@ def test_the_two_known_ladder_books_are_covered():
     assert "freqtrade-avo-maria-lshadow" in sweep.UNSWEEPABLE_EXITS
 
 
-def test_a_fixed_stop_book_is_NOT_excluded():
+def test_a_fixed_stop_carrier_is_NOT_excluded():
     """A detector that fires on everything trains the operator to ignore it.
-    Carriers with `roi = {}` (TrendMomo, MomoBreakout) exit on a fixed stop and
-    are expressible — they must stay sweepable."""
-    flat = {f"{s.bot}-lshadow" for s in fam.live_strategies()
-            if not (getattr(s, "roi", None) or {})}
-    assert flat, "expected at least one non-ladder live family book"
-    assert not (flat & set(sweep.UNSWEEPABLE_EXITS)), sorted(flat & set(sweep.UNSWEEPABLE_EXITS))
+
+    [2026-08-19] This asserted against the LIVE roster until 👩 mum — the last
+    flat-`roi` live family book — was retired (I17 no_rate). Every live family
+    book is a ladder book now, so a roster-based assertion would have had to be
+    deleted; the RULE is what matters and it is roster-independent, so the test
+    moves to the carrier CLASSES. Strictly stronger: it keeps biting no matter
+    which books happen to be alive.
+
+    Worth stating, because it is the reason the ladder harness exists at all:
+    with mum gone, `UNSWEEPABLE_EXITS` covers **100% of the live family**, so
+    `study_exit_sweep` can answer none of them.
+    """
+    flat_carriers = [c for c in (fam.TrendMomo, fam.MomoBreakout)
+                     if not (getattr(c, "roi", None) or {})]
+    assert flat_carriers, "TrendMomo/MomoBreakout are the flat-roi carriers"
+    # a flat-roi carrier must not be selected by the ladder predicate
+    for c in flat_carriers:
+        assert len(getattr(c, "roi", None) or {}) <= 1, c.__name__
+    # and every book the declaration DOES name must really carry a ladder
+    for row in sweep.UNSWEEPABLE_EXITS:
+        base = row[: -len("-lshadow")]
+        car = next((s for s in fam.live_strategies() if s.bot == base), None)
+        assert car is not None, f"{row} declared but not live"
+        assert len(getattr(car, "roi", None) or {}) > 1, f"{row} has no ladder"
 
 
 def test_the_reason_names_the_ladder_and_the_rule_space():

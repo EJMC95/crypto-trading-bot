@@ -57,6 +57,91 @@ The push auto-redeploys `band-kelly-shadow` (the bot file is on its own
 row. Positions restore across the restart, proven twice today including the
 (rb)-wave venues/ deploy an hour earlier (`db8609271cec` verified byte-equal
 to its own clean-dir prediction).
+## 2026-08-19 (rd) — 👩 mum RETIRED: the I17 no_rate call, and it CORRECTS a `(nf)` HOLD whose "green" was open marks — plus the five stale premises the retirement exposed
+
+*(Renumbered (qu) -> (rc) -> (rd) at push time — a concurrent session took (qu) on
+origin/main while this was built. FIFTH letter collision for this session in one
+night ((qi),(qj),(qr),(qu),(rc)); every one caught by `audit_changelog_letters`'
+cross-branch arm before reaching main, which is the guard working, and every
+one is also the cost of several sessions sharing one worktree — the fix is the
+per-session worktree this file already prescribes.)*
+
+**Operator: "Attend to operator queue."** The `(qk)` undecidability slate, worked.
+One of the five is executed here; the rest are stated with why they are not
+mine to take.
+
+**THE CALL: 👩 mum, the I17 `no_rate` class, ROW-scoped.** Measured on its own
+ledger 19-Aug:
+* **3 closes LIFETIME, and all three opened 2026-07-12** — so **ZERO are
+  in-era** against a 17-Jul era. The book has never produced a gradeable trade
+  under the policy it currently runs.
+* **~2.4 closes/30d ⇒ ~12 MONTHS** to the 30-close bar.
+* **Funding drag −$2.15 EXCEEDS +$0.68 realised** — the holding itself is the
+  cost; every exit was a `death_cross` at a 26–34 day hold.
+
+**IT OVERTURNS A PRIOR HOLD, DELIBERATELY.** `(nf)` kept mum as *"green,
+slow"*. That green is **+$2.23 of OPEN MARKS**, and the fleet has already ruled
+on marks-as-evidence: `(lo)` retired 📊 Index Rider with **+$13.93** of open MTM
+abandoned for exactly this reason. On the numbers mum is a *stronger* case than
+`crypto-swing-daily`, which `(nf)` itself retired for *"n=3 in six weeks — the
+I17 UNDECIDABLE shape"*: same rate, and mum's three are not even in-era.
+4 open paper positions FREEZE (the `(mr)`/`(nf)` precedent). Reversible via
+`MUM_RETIRED_OVERRIDE=run`. All three halves shipped — `RETIRED_BOOKS` guard,
+`RETIRED_ROWS` hide, `LEGACY_BOTS` prune — because doing one hides your own
+omission. Pinned by `tests/autonomy/test_mum_retired.py`; **5 of 5 mutations
+verified red**, including the too-broad one that idles the shared process.
+
+**THE INTERESTING PART IS WHAT THE RETIREMENT EXPOSED: FIVE TESTS THAT ENCODED
+"mum is alive" AS A PREMISE.** The suite went from 2 known-environment failures
+to 6, and not one was a defect in the retirement — each was a fixture built on
+mum being the surviving example of something. Every one is now **roster-derived
+rather than hand-listed**, which is the durable fix:
+* `evidence_review`'s selftest and `test_review_retired_roster` used mum as a
+  LIVING subject for the **bare-name trap** (`LEGACY_BOTS` carries the retired
+  Kraken-era `freqtrade-mum`; a substring rewrite would silently drop the
+  `-lshadow` twin from the go-live scan). Two living subjects remain and the
+  guarded semantics did not move.
+* `test_dashboard_money`'s **double-life fixture** — a bare id that is a RETIRED
+  paper row while remaining a CURRENT base so its `-lshadow` twin displays — had
+  already been moved to mum by `(nf)` when intraday was retired. It moves once
+  more, to georgia. A fixture that must be ALIVE will keep migrating; that is
+  now said in the comment.
+* `test_red_stop_slate` and `test_breakout4h_retired` hand-listed mum as a
+  survivor. `test_breakout4h_retired`'s survivor set is now **DERIVED**
+  (`STRATEGIES − RETIRED_BOOKS`), because the property under test is *"this
+  retirement took nobody else with it"* and that must not need editing every
+  time some OTHER book is retired for its own reasons. **Mutation-verified that
+  the derived form still reddens on collateral damage.**
+* **And one of them was MY OWN, from six hours earlier:**
+  `test_ladder_exits_declared` asserted at least one live family book has a flat
+  `roi`. After mum there are none — so it moved to the carrier CLASSES and is
+  now roster-independent, which is strictly stronger.
+
+**A CONSEQUENCE WORTH STATING ON ITS OWN: every live family book is now a
+LADDER book** (🙏 avo SwingDip, 🔮 georgia DayTraderGated). `UNSWEEPABLE_EXITS`
+therefore covers **100% of the live family**, so `study_exit_sweep` can answer
+none of them and `(qt)`'s ladder harness is the only instrument that can. The
+harness was built the night before this retirement made it the only one.
+
+**THE REST OF THE SLATE, and why each is NOT executed here:**
+* **⚖️ Counterweight** — HELD to its own **~28-Aug pre-registration**. The
+  evidence already determines the answer (no achievable data flips it to KEEP:
+  even 20 consecutive +1% closes move admissible `t` to +0.70 against a bar of
+  2.0), and that is precisely why pre-empting it would be the `(hs)`/`(ia)`
+  trap in reverse. A pre-registration honoured only when the answer is
+  uncertain is not a pre-registration.
+* **💸 the LIVE Farmer** — a real-money **capital** decision on the fleet's only
+  live funding book ($197.50). Retiring it takes real money from $259.84 to
+  ~$62. Not an agent's call.
+* **💼 turnbull / 📐 Grimes** — materially weaker than mum and NOT retired:
+  turnbull is **positive** (+$0.34) and its problem is an authorless gate, not
+  loss; Grimes is **6 days old** with a gate behaving exactly as its own study
+  predicted. Retiring a book that is working as designed would itself be the
+  circle this queue exists to stop.
+* **🙏 Avo LIVE's slack cap** ($200 vs $62.64 equity) — **operator-only
+  FOREVER** by this file's own routing table (*"go-live/keys/SafetyRails caps
+  stay operator-only"*), independent of the fact that no `railway` CLI exists
+  in this container. Stated so it is not re-attempted.
 
 ## 2026-08-19 (rc) — THE MIRROR ROSTER RE-PRICED ON THE CORRECTED ARITHMETIC: the operator's `dipfade` override SURVIVES, and the haircut's size is set by the GHOST'S COIN LIQUIDITY
 
