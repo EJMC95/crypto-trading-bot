@@ -112,3 +112,34 @@ def test_an_exception_from_git_fails_open(monkeypatch):
 
     monkeypatch.setattr(mutate.subprocess, "run", _boom)
     assert mutate.uncommitted("anything.py") is False
+
+
+def test_main_refuses_a_dirty_target_before_running_anything(repo, monkeypatch,
+                                                            capsys):
+    """THE ARM THAT ACTUALLY BINDS, and the reason the structural one is not
+    enough: `if False and uncommitted(target):` keeps the call inside the If
+    test, so an AST check for "main() branches on uncommitted()" still passes
+    while the guard is inert — measured, it survived that mutation.
+
+    What cannot be faked is the BEHAVIOUR: on a dirty target `main()` must
+    return non-zero having run NO tests and touched NO file. The sentinel
+    below fails loudly if execution ever reaches the baseline run, so a
+    bypassed guard cannot hide behind an exit code the red-baseline path
+    happens to share.
+    """
+    monkeypatch.chdir(repo)
+    (repo / "sample.py").write_text("X = 999\n", encoding="utf-8")
+
+    def _must_not_run(*a, **k):
+        raise AssertionError(
+            "mutate.main() ran the test suite on a target with uncommitted "
+            "changes — the next git_restore would have deleted that work")
+
+    monkeypatch.setattr(mutate, "run_tests", _must_not_run)
+    monkeypatch.setattr(mutate, "git_restore", _must_not_run)
+
+    rc = mutate.main(["sample.py", "-t", "tests/whatever.py", "-m", "X=>Y"])
+    assert rc == 2, rc
+    assert "uncommitted changes" in capsys.readouterr().out
+    # ...and the work is still exactly where the caller left it
+    assert (repo / "sample.py").read_text(encoding="utf-8") == "X = 999\n"
