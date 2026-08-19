@@ -1,3 +1,76 @@
+## 2026-08-19 (qt) — THE LADDER-AWARE REPLAY IS BUILT, AND ITS FIRST ANSWER REFUTES THE BRAIN: 🔮 georgia's stop is not too tight, and the convention that calibrates BEST is the one that would have shipped a lone spike
+
+*(Renumbered from (qr) at push time — a concurrent session's mirror-census
+entry took (qr) on origin/main and is cited by PR #187's own merge subject, so
+per the collision rule the CITED entry keeps the letter and this side moves.
+Third letter collision for this session in one night; every one was caught by
+`audit_changelog_letters`' cross-branch arm before it could reach main.)*
+
+`(ql)` DECLARED the family carriers unsweepable and named the only honest way
+to answer them — *"a ladder-aware replay — a build, not a re-run."* This is
+that build. `scripts/study_ladder_exit_sweep.py`, rules C1–C6 pre-registered
+in its header; full tables `STUDY_LADDER_EXIT_2026-08-19.md`.
+
+**THE QUESTION IT EXISTS TO SETTLE.** The brain has published `exit_too_tight`
+on 🔮 georgia in **129 of 129 runs for 8+ days** — reclaim **1.0**, forward
+**+1.63%**, trailing-stop path **−$17.14/71 era closes** against an roi path
+earning **+$17.70**. A measured direction with no instrument able to test it
+is the I18 shape, and `study_exit_sweep` cannot express georgia's rule (a
+time-decaying ROI ladder under an ATR ratchet) without handing `calibrate()`
+a rule the book does not run — the `(ps)` false pass.
+
+**C1 CALIBRATION PASSED, AND THE EXIT MIX REPRODUCES EXACTLY**: replayed
+`{tsl: 25, roi: 6}` against actual `{tsl: 25, roi: 6}` on 31 scored rows;
+mean +0.112pp vs actual −0.128pp (delta 0.241pp against a 0.25pp tolerance).
+
+**THE VERDICT: NO WIDENING IS SUPPORTED — the brain's direction is REFUTED**
+on the book's own replayable ledger. Sweeping the stop's width with the roi
+ladder HELD (C3): under the conservative arm no widening cell beats shipped at
+all (2.5×→5.0×: +0.112 → −0.003 → −0.131 → −0.026 → −0.097pp), and the worst
+single trade degrades **monotonically** with width in every arm (−0.76 →
+−1.79pp), so C5 fails for every widening cell. A wider stop here defers ruin
+rather than avoiding it.
+
+**THE METHODOLOGICAL FINDING IS THE BIGGER ONE, AND IT WAS FOUND BY MUTATING
+THE HARNESS AGAINST ITSELF.** The live loop is **90s** against a **15m**
+timeframe, so the real ratchet samples ~10× per bar and the intrabar order is
+genuinely ambiguous. Two conventions, neither dominating:
+* `adverse` (stop tested on the LOW before the HIGH ratchets) reproduces the
+  exit MIX **exactly** (81% vs 81%) and is 0.241pp off on the mean;
+* `ratchet_first` (mirrors the 90s loop) reproduces the MEAN to **0.045pp**
+  and overstates stop-outs (90% vs 81%).
+**The tempting move was to keep the arm that calibrated best on the mean and
+report its numbers — and that arm shows 3.0× and 4.0× BEATING shipped while
+3.5× between them is worse.** A broken plateau; exactly the lone spike C4
+exists to kill. Per the `(ne)`/gillard precedent both arms are now RUN and a
+verdict counts only if both agree. They do. Selectable via
+`LADDER_INTRABAR=adverse|ratchet_first`, `adverse` the default, and a test
+pins that neither arm can be hard-coded away.
+
+**INCIDENTAL, AND IT IS AN I18: georgia's carrier stoploss CANNOT BIND.** Every
+`stop_cap` value (5% / 7.5% / 10%) gives a **byte-identical** result at every
+multiplier — `min(mult*atr/px, cap)` never reaches the cap, because 2.5×ATR on
+15m bars is far tighter than 5%. `stoploss=-0.05` is decorative on this book.
+NOT removed (the carrier shares it with books where it does bind); recorded so
+nobody tunes it expecting an effect, and the harness prints the finding itself.
+
+**DECLARED LIMITS, because the sample is thin and the pass was marginal:**
+n=31 scored of 124 lifetime closes (only rows with entry+exit price AND side
+replay — prices since `(gr)`, side since `(kn)`; the sample heals forward);
+**2 of 33 rows excluded** because the `exit_signal`/`range_top` path needs the
+ENTRY strategy re-run and the sweep doctrine holds entries constant; and the
+`adverse` arm passed at **0.241pp against a 0.25pp tolerance** with the
+replayed mean differing in SIGN from actual on a book whose mean is ~0. **So
+the DIRECTION is the trustworthy output and no absolute per-trade number from
+this harness should be quoted.** Said here rather than discovered later.
+
+**WHAT IT BUYS BEYOND georgia:** the instrument generalises to 🙏 **avo
+maria** — the fleet's best-evidenced book and its nearest gate candidate — which
+rides the same SwingDip ladder and was equally untestable until now. Pinned by
+`tests/autonomy/test_ladder_exit_sweep.py`; **7 of 7 mutations verified red**,
+each checked as actually applied before scoring (the `(po)`/`(pv)` class).
+READ-ONLY: it recommends nothing on its own authority.
+
 ## 2026-08-19 (qr) — 🪁 the census could not falsify the gate it publishes beside: two p98 conventions, one investigation
 
 *(Renumbered (qm)->(qn)->(qr) across two push-time collisions — concurrent
@@ -19,6 +92,7 @@ predict the number it falsifies is the (po) shape in miniature. The census
 now uses the gate's own index formula, publishes `dev_max_bps` beside it so
 the outlier stays visible, and the comment carries the incident. Display
 only; no trade changes; zero closes still (the policy clock remains clean).
+
 ## 2026-08-19 (qq) — FOUR SURFACES PRICED IN ONE PASS: the directional-funding gate supplies neither timing nor selection, the allocation claim does not rank, and the tail's real signal is exactly consumed by execution
 
 **Operator reframe mid-session: *"We are looking at this as a risk eliminating
