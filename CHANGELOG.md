@@ -22,10 +22,14 @@ exemption waives the proxy, never the contract.
 
 Verified live in both states (I3 by circumstance): the audit exited 1 with
 the FAIL line before the entry and 0 after, same tree, same commit window —
-the exemption is what fired. Ships on PR #191 with (rd) so main's next suite
+the exemption is what fired. Ships on PR #191 with (rf) so main's next suite
 run is green; other open branches inherit it on their next rebase.
 
-## 2026-08-19 (rd) — THE CORRECTED BAR NOW STANDS WHERE THE GRADERS WILL READ IT: the mirror's published roster and fleet row carry (qw)/(rc) beside the founding numbers
+## 2026-08-19 (rf) — THE CORRECTED BAR NOW STANDS WHERE THE GRADERS WILL READ IT: the mirror's published roster and fleet row carry (qw)/(rc) beside the founding numbers
+
+[Renumbered from (rd) at push time: PR #190 merged (rd) = the mum retirement
+to main between my branch point and my push — the (hj) letter race, decided
+by the grep rule: main's pushed history keeps the letter.]
 
 `(qw)` corrected the mirror's founding arithmetic (+0.605% -> +0.397%/t=+3.58
 after double slippage) and `(rc)` re-priced the roster (the dipfade override
