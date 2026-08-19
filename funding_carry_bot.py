@@ -191,8 +191,61 @@ BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
 
 # Round-trip friction, as fractions of notional per SIDE of the round trip.
 PERP_FEE = 0.00045        # HL taker per perp fill (conservative base tier)
+# [19-Aug (qk)] PERP_FEE IS A HYPERLIQUID CONSTANT AND THIS BOOK STOPPED BEING
+# A HYPERLIQUID BOOK ON 17-JUL — but read the next paragraph before concluding
+# anything about this book's P&L, because the obvious conclusion is WRONG.
+#
+# The HL arm is retired (LIGHTER-ONLY); the only arm that runs is
+# `lighter_shadow`, where the venue's schedule is **zero** on all 203 active
+# books. So a Hyperliquid taker fee has no business on this arm — the same
+# stale-foreign-venue shape as the brain's Kraken-SPOT `FEE_RT` in (gg).
+#
+# **WHAT THIS FIX IS AND IS NOT — measured, because a session nearly shipped
+# the overstated version.** On `lighter_shadow` the perp leg's cost is ALREADY
+# MEASURED per fill by walking the live book (`measured_perp_cost` below);
+# PERP_FEE is only the FALLBACK when no book/price is available, plus the
+# banner and the decay-gate estimate. So this constant is NOT what the book
+# charges on a normal fill, and correcting it does NOT move the ledger.
+# Measured on the era sample (n=10, its own recorded `fees`/`notional`):
+# **median round-trip 22.2bps, range [20.7, 49.7]** — i.e. ~20bps of HEDGE_COST
+# plus ~2bps of MEASURED slippage, NOT the 29.0bps the constants imply. The
+# outlier (49.7bps, KAITO) is a thin book held 149.8h.
+#
+# So there is no phantom fee to delete here, and **no fee-based rescue for
+# 🌾 carry**: at its real charge it reads -0.155%/trade, t=-4.48, and the only
+# way to flip that sign is to delete HEDGE_COST — which this fix deliberately
+# does NOT do. Kiyosaki's header says that leg "is modelled, it does not
+# exist", and this file omits any PRICE term for the same reason
+# (`position_pnl` takes no mark): the hypothetical hedge is what cancels
+# price, so charging its cost and omitting price risk are two halves of ONE
+# coherent simulation. Deleting the cost while keeping no-price-term models a
+# FREE hedge — better than reality in both directions at once, which is how a
+# losing book gets laundered into a winner.
+#
+# VENUE-SCOPED, NEVER GLOBAL — the `_basis` lesson one seat over: a constant
+# that was right for one arm goes silently wrong when the file grows another,
+# so this dispatches on mode instead of overwriting the literal. `hl_paper`
+# keeps 4.5bps, which is CORRECT there. Value: 0.5bps/side, the conservative
+# end of the measured Lighter range (1.02bps RT by order-book walk at this
+# book's clip across 18 books; 0.24bps/side on the live Farmer's 38 real
+# fills). Env-overridable for the next re-measurement.
+PERP_FEE_LIGHTER = float(os.environ.get("CARRY_PERP_FEE_LIGHTER", "0.00005"))
+
+
+def perp_fee(mode):
+    """Per-side perp-leg cost for THIS file's two arms. Venue is PASSED, never
+    defaulted — a bare call would put Hyperliquid's taker fee back on the
+    Lighter arm, which is the defect this exists to close."""
+    return PERP_FEE_LIGHTER if _venue_of(mode) == "lighter" else PERP_FEE
+
+
 HEDGE_COST = 0.0010       # hedge-leg fee + spread per fill (other venue/spot)
 OPEN_COST = PERP_FEE + HEDGE_COST    # charged at open; same again at close
+
+
+def open_cost(mode):
+    """Round-trip-per-side friction on the arm actually running."""
+    return perp_fee(mode) + HEDGE_COST
 
 LOOP_SECONDS = 300        # funding is hourly; 5-min polling is plenty
 
@@ -489,7 +542,7 @@ def _perp_leg_fill(ctx, bot_id, coin, is_buy, notional, mark, publish=True):
     Funded modes never reach here (main() refuses them — no naked-perp path).
     """
     if ctx.mode == "hl_paper":
-        return PERP_FEE * notional, mark
+        return perp_fee(ctx.mode) * notional, mark
     from venues.shadow import fill_from_book  # local import: only lighter modes need it
     try:
         book = ctx.venue.orderbook(coin)
@@ -505,7 +558,9 @@ def _perp_leg_fill(ctx, bot_id, coin, is_buy, notional, mark, publish=True):
         if mid:
             ref, spread_bps = mid, (ask - bid) / mid * 1e4
     if not ref or ref <= 0:
-        return PERP_FEE * notional, mark   # no price to size/measure -> model it
+        # (qk) venue-scoped fallback: a Hyperliquid taker fee must not be
+        # the modelled cost on the Lighter arm when its book is unavailable.
+        return perp_fee(ctx.mode) * notional, mark   # no price -> model it
     size = notional / ref
     fill = fill_from_book(book, is_buy, size) if book else None
     fill_px = fill[0] if fill else ref
@@ -642,7 +697,8 @@ def main():
     print(f"[{now_iso()}] funding-carry DRY-RUN start | venue {_venue_of(_mode)} "
           f"| enter>={_enter_apr:.2%} APR "
           f"exit<{_exit_apr:.2%} | ${NOTIONAL:.0f} x max {MAX_POSITIONS} | "
-          f"friction {2*OPEN_COST*1e4:.0f}bps round-trip | realized so far "
+          f"friction {2*open_cost(_mode)*1e4:.0f}bps round-trip modelled "
+          f"(perp leg MEASURED per fill on lighter) | realized so far "
           f"${realized:+.2f} ({n_closed} closed)")
 
     # [2026-07-16 AUDIT FIX] restore the accrual clock: it reset to
@@ -776,7 +832,7 @@ def main():
                     first = pos.setdefault("missing_since", t0)
                     if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
                         continue
-                    pos["fees"] += OPEN_COST * pos["notional"] + \
+                    pos["fees"] += open_cost(_mode) * pos["notional"] + \
                         HEDGE_COST * pos["notional"]
                     pnl = pos["accrued"] - pos["fees"]
                     realized += pnl
@@ -835,7 +891,7 @@ def main():
                     pos.pop("flipped_since", None)
                 # Cheap MODELLED estimate first (no per-loop book read): drives
                 # the flip/expire/bleed backstops and the decay pre-filter.
-                close_fee_est = OPEN_COST * pos["notional"]
+                close_fee_est = open_cost(_mode) * pos["notional"]
                 net_if_closed = pos["accrued"] - (pos["fees"] + close_fee_est)
                 flipped = flipped_now and \
                     (t0 - pos["flipped_since"]) / 3600.0 >= FLIP_GRACE_H
