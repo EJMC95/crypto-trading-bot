@@ -198,8 +198,11 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #     when the (hp) failover pair flips, the takeover container starts cold
 #     clocks and cannot enter until a fresh window persists the full gate:
 #     that blackout is now ≥12h instead of ≥6h, on a supply whose median
-#     window is 2h. Pre-existing shape, cost doubled here, named not fixed —
-#     a takeover-path re-restore is its own change with its own tests.
+#     window is 2h. Pre-existing shape, cost doubled here. **CLOSED at (qj)
+#     the same day, and the investigation found the blackout was the SMALLER
+#     half — see `reclaim_after_standby`: the takeover also adopted stale
+#     POSITIONS (duplicate closes / lost opens) and a stale hot-streak clock
+#     (the PERMISSIVE spike entry (iu) refuses).**
 PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qi): 6.0 -> 12.0]
 # [2026-08-18 (px)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
 # (scripts/study_books_cohort_2026-08-13.py, this cell's OWN gate and coins,
@@ -367,6 +370,69 @@ def _class_ok(coin):
         return bool(fleet_bus.is_crypto(coin))
     except Exception:      # noqa: BLE001 — a class lookup must never stop a scan
         return True
+
+
+def reclaim_after_standby(saved, ok_read, now, gap_cap_s=48 * 3600.0):
+    """[(qj)] What a container must ADOPT the moment it wins the claim after
+    standing down — (ok, positions, hot_since, last_ts, why).
+
+    THE DEFECT THIS CLOSES. `(hp)` made the two carry containers a deliberate
+    failover pair: whichever claims the book first keeps it, the other IDLES
+    and re-checks every loop. The idler's durable-state restore runs ONCE, at
+    BOOT (`load_state_required` + `funding_basis.restore_hot_since`), and the
+    standby branch `continue`s before every bookkeeping step — so a container
+    that stands by for hours and then takes over resumes from **its own boot
+    snapshot of a world the incumbent has been moving ever since**. All three
+    halves of that world are stale, and they fail in different directions:
+
+      * `positions` — the incumbent opened and closed carries during the
+        standby. Adopting the old map means REOPENED phantoms (a coin the
+        incumbent already closed is closed a SECOND time, writing a duplicate
+        ledger row — the `(hp)` two-writer damage arriving through a different
+        door), LOST opens (the takeover's first `save_state` overwrites the
+        durable record with the older map, so carries the incumbent opened
+        simply vanish), and a possible double-open of a coin already held.
+      * `hot_since` — a coin hot at boot and hot now reads as persisted for
+        the WHOLE standby, though nobody observed the hours between. That is
+        the PERMISSIVE failure `(iu)`/`(iq)` exist to refuse — a spike entry
+        wearing a streak, on the one book whose thesis is "persistent funding
+        pays carries, spikes pay fees". `(qi)` doubled the exposure by moving
+        the gate 6h -> 12h, which is what surfaced this.
+      * `last_ts` — the accrual clock. Stale positions + a stale clock happen
+        to be self-consistent (both are the same boot snapshot), which is
+        exactly why this must be adopted ATOMICALLY with the other two: fresh
+        `accrued` values under an old clock would re-credit the whole standby
+        gap, the `(nc)` phantom-accrual class that already inflated this
+        book's pooled ledger by ~$13.
+
+    FAIL-CLOSED, in the one direction that matters: `ok_read` False means the
+    read itself failed (`load_state_checked`'s third state), and the caller
+    must then trade NOTHING and — critically — save NOTHING, because a save
+    from an unverified map is what destroys the durable record. Refusing costs
+    one loop; guessing costs the ledger. A genuinely empty state (`ok_read`
+    True, `saved` None) is a real answer and is adopted as a flat book.
+
+    PURE: no clock, no DB, no globals — `now` is passed in, and the hot-streak
+    rule stays `funding_basis`'s (ONE owner, `(iu)`), so this cannot drift
+    from the boot path it mirrors.
+    """
+    if not ok_read:
+        return (False, None, None, None,
+                "durable state read FAILED — refusing to trade or save on an "
+                "unverified map (the seed-on-failed-read class, (jb)/(ir))")
+    saved = saved or {}
+    pos = saved.get("positions")
+    positions = dict(pos) if isinstance(pos, dict) else {}
+    import funding_basis          # function-local, matching this file's idiom
+    hot_since, why = funding_basis.restore_hot_since(saved, now)
+    try:
+        _lt = float(saved.get("last_ts") or 0)
+    except (TypeError, ValueError):
+        _lt = 0.0
+    # Same bound the boot path uses: ancient state must not over-accrue.
+    last_ts = max(_lt, now - gap_cap_s) if _lt else now
+    return (True, positions, hot_since, last_ts,
+            f"adopted {len(positions)} open carry position(s); {why}")
 
 
 def scan_census(fund, positions, hot_since, t0, H, enter_apr,
@@ -691,6 +757,12 @@ def main():
     except Exception:  # noqa: BLE001 — incl. unbound saved-state
         _lt = 0.0
     last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
+
+    # [(qj)] Did THIS process stand down? The durable restore above runs once,
+    # at boot; a container that idles behind the (hp) claim and later wins it
+    # would otherwise resume from a boot snapshot of a world the incumbent has
+    # been moving for hours. See `reclaim_after_standby`.
+    _stood_down = False
     while True:
         t0 = time.time()
         # [2026-07-31 (hp)] SOLE-WRITER ENFORCEMENT, at the TOP of the loop.
@@ -776,8 +848,31 @@ def main():
                 })
             except Exception:  # noqa: BLE001
                 pass
+            # [(qj)] Remember it, so WINNING the claim later re-adopts the
+            # durable world instead of this process's stale boot snapshot.
+            _stood_down = True
             time.sleep(LOOP_SECONDS)
             continue
+
+        # [(qj)] TAKEOVER: this process has just WON a claim it did not hold.
+        # Adopt the incumbent's durable world before touching the book — the
+        # boot restore ran once and everything in memory is that old snapshot.
+        # Fail-CLOSED: on a failed read, trade NOTHING and save NOTHING this
+        # cycle (the flag stays set, so the next loop retries the adoption)
+        # rather than overwrite the durable record from an unverified map.
+        if _stood_down:
+            _ok_read, _st = store.load_state_checked(bot_id)
+            _adopted, _pos, _hot, _lts, _why_adopt = reclaim_after_standby(
+                _st, _ok_read, time.time())
+            if not _adopted:
+                print(f"[{now_iso()}] TAKEOVER HELD — {_why_adopt}", flush=True)
+                time.sleep(LOOP_SECONDS)
+                continue
+            positions, hot_since, last_ts = _pos, _hot, _lts
+            _stood_down = False
+            print(f"[{now_iso()}] TAKEOVER — claim won after standing down; "
+                  f"{_why_adopt}", flush=True)
+
         # [2026-07-30] Re-read the growth rail EVERY loop, then RE-DERIVE the
         # bars through the same one-owner `_bars()` call. Both halves matter:
         # a lever that moved ENTER_APR without this re-derivation would be

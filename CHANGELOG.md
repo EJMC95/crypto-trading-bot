@@ -1,3 +1,75 @@
+## 2026-08-19 (qj) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD: a takeover resumed the standby container's OWN boot snapshot, and the harness that was supposed to verify the fix deleted it
+
+Found closing out `(qi)`'s referee wave — its F5 was declared "named not
+fixed", and I11 says carried work outranks new work, so it was the next brick.
+**The investigation found the referee had named the SMALLER half.**
+
+**THE DEFECT.** `(hp)` made the two carry containers a deliberate failover
+pair: first claimant keeps the book, the other IDLES and re-checks each loop.
+But the durable restore (`load_state_required` + `funding_basis.restore_hot_since`)
+runs ONCE, at BOOT, and the standby branch `continue`s before every bookkeeping
+step. So a container that stands by for hours and then wins the claim resumes
+from **its own boot snapshot of a world the incumbent has been moving ever
+since** — verified structurally: `positions` is bound at two lines (640, 657),
+both pre-loop, and `restore_hot_since` is called exactly once (line 668).
+Three halves, failing in three directions:
+
+* **`positions` — the severe one, and the one the referee missed.** The
+  incumbent opened and closed carries during the standby. Adopting the old map
+  closes a coin the incumbent ALREADY closed — a duplicate ledger row, the
+  `(hp)` two-writer damage arriving through a different door — while carries it
+  OPENED are absent, and the takeover's first `save_state` overwrites the
+  durable record with the older map, so they vanish from the book entirely.
+* **`hot_since`** — a coin hot at boot and hot now reads as persisted across the
+  WHOLE standby, unobserved: the PERMISSIVE direction `(iu)`/`(iq)` exist to
+  refuse, a spike entry wearing a streak, on the one book whose thesis is
+  "persistent funding pays carries, spikes pay fees". `(qi)`'s 6h → 12h move
+  doubled the exposure, which is what surfaced this.
+* **`last_ts`** — the accrual clock. **Corrected mid-investigation:** my first
+  reading called this a double-count, and it is not — stale positions and a
+  stale clock are the same snapshot, so they are self-consistent. That is
+  precisely why the three must be adopted ATOMICALLY: fresh `accrued` under an
+  old clock WOULD re-credit the standby gap, the `(nc)` phantom-accrual class
+  that already inflated this book's pooled ledger by ~$13.
+
+**THE FIX.** `reclaim_after_standby(saved, ok_read, now)` — pure (no clock, no
+DB, no globals), the hot-streak rule still `funding_basis`'s ONE owner so the
+takeover path cannot drift from the boot path it mirrors, and the long-gap
+refusal therefore reaches this path for free. Wired at the claim-success edge
+behind a `_stood_down` flag, so a normal single-writer container is completely
+unaffected. **Fail-CLOSED in the one direction that matters:** a failed read
+(`load_state_checked`'s third state) means trade nothing and — critically —
+**save nothing** this cycle, the flag staying set so the next loop retries;
+refusing costs one loop, guessing costs the durable record. A genuinely empty
+state is a real answer (flat book), not a refusal, or a first-ever takeover
+would deadlock. `tests/autonomy/test_carry_takeover_state.py`, 9 tests
+including the AST arm that the LOOP actually calls it — a fix nobody calls is
+the registered-but-inert failure I18 names.
+
+**AND THE HARNESS BIT, WHICH IS THE SECOND HALF OF THIS ENTRY.**
+`scripts/mutate.py` restores between mutations with `git checkout -- <target>`.
+Run against a target whose fix is still UNCOMMITTED, the first restore
+**silently deletes the work under test** — measured here: the entire takeover
+fix, rebuilt from scratch. The tool's docstring did say "restored from git",
+and this session had even noted it an hour earlier; **knowing is not guarding**,
+the exact gap `(qg)`'s own header calls out ("Having a note is not applying
+it"). So `mutate.py` now REFUSES a dirty target before touching anything, with
+the reason — not a warning, because a warning on a run that then eats your file
+is indistinguishable from a clean run until you look ((gl)). Permissive where
+git cannot answer (outside a repo / git absent) so it can never block a
+legitimate round; selftest pins BOTH halves — the permissive default and that
+`main()` still consults it. This is the fourth bite in this family in three
+weeks and the first one the harness itself caused; the round it invalidated it
+also correctly reported (`the RESTORE is red — the round proved nothing`),
+which is the one part that worked as designed.
+
+**Forward metric:** 🌾 carry — the fleet's best-evidenced book and its only
+one behind a failover pair — can now be handed over without silently
+duplicating a close, losing an open, or entering on a streak nobody watched.
+No trade changes while a single container holds the claim, which is the
+steady state; this is insurance on the transition, and it was live-reachable
+by design.
+
 ## 2026-08-18 (qi) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
 
 *(Renumbered twice at push time — written as (qg), moved when the mutation

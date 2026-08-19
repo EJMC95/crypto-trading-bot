@@ -110,6 +110,42 @@ def git_restore(path):
     subprocess.run(["git", "checkout", "--", str(path)], check=True)
 
 
+def uncommitted(path):
+    """Does `path` have changes git would DISCARD on `checkout --`?
+
+    [2026-08-19 (qj)] THE FOURTH BUG IN THIS FAMILY, and this harness was the
+    one that bit. `git_restore` above is `git checkout -- <target>`: between
+    every mutation it throws the file back to HEAD. Run against a target whose
+    fix is still UNCOMMITTED and the first restore **silently deletes the work
+    being tested** — the round then reports a red restore (correctly, and only
+    because the tests were already written), but the code is already gone.
+    Measured the day this shipped: an entire takeover-state fix, rebuilt from
+    scratch.
+
+    The docstring did say "restored from git". Knowing is not guarding — the
+    same gap this file's own header calls out ("Having a note is not applying
+    it"). So the harness now REFUSES rather than warns: a warning on a run
+    that then destroys your file is indistinguishable from a clean run until
+    you look, which is the (gl) "a guard whose only output is a warning is not
+    a guard" rule.
+
+    Returns False (permissive) when git cannot answer — outside a repo, or git
+    absent. There is nothing to protect in that case, and this must not become
+    a reason a legitimate round cannot run.
+    """
+    try:
+        proc = subprocess.run(["git", "status", "--porcelain", "--", str(path)],
+                              capture_output=True, text=True, timeout=30)
+    except Exception:                             # noqa: BLE001 — git absent
+        return False
+    if proc.returncode != 0:
+        return False
+    # Any porcelain line for the path means git holds a different version than
+    # the tree — staged, unstaged, or untracked; `checkout --` discards the
+    # first two and FAILS on the third, so both are round-invalidating.
+    return bool(proc.stdout.strip())
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("target", nargs="?", help="source file to mutate")
@@ -131,6 +167,17 @@ def main(argv=None):
             ap.error(f"mutation must be 'old=>new': {spec!r}")
         old, new = spec.split("=>", 1)
         muts.append((old, new))
+
+    # [(qj)] THE TARGET MUST BE COMMITTED. Every restore is `git checkout --`,
+    # so uncommitted work in the target is destroyed by the FIRST mutation.
+    # Refuse, loudly, before anything is touched.
+    if uncommitted(target):
+        print(f"!! {target} has uncommitted changes, and every mutation "
+              f"restores it with `git checkout --` — running now would "
+              f"DELETE that work.\n   Commit (or stash) the target first, "
+              f"then re-run: the round mutates HEAD's version either way, so "
+              f"an uncommitted fix is never what you think you are testing.")
+        return 2
 
     # BASELINE FIRST. A round that starts red says nothing about the mutants.
     verdict, proc = run_tests(args.tests)
@@ -221,7 +268,19 @@ def _selftest():
         broken.write_text("def f(:\n", encoding="utf-8")
         assert compiles(broken) is False
 
-        # 5. the bytecode defence is declared where it is used, not assumed
+        # 5. [(qj)] the dirty-target guard is PERMISSIVE where git cannot
+        #    answer (a temp dir is not a repo) — it must never block a
+        #    legitimate round, only a destructive one.
+        assert uncommitted(f) is False, (
+            "uncommitted() must fail OPEN outside a repo — there is nothing "
+            "to protect there and blocking would be a false positive")
+        #    ...and main() must actually consult it, or the guard is inert.
+        _src = pathlib.Path(__file__).read_text(encoding="utf-8")
+        assert "if uncommitted(target):" in _src, (
+            "main() no longer checks the target for uncommitted changes — "
+            "the first git_restore would silently delete the work under test")
+
+        # 6. the bytecode defence is declared where it is used, not assumed
         assert "PYTHONDONTWRITEBYTECODE" in run_tests.__doc__ or True
         env_line = pathlib.Path(__file__).read_text(encoding="utf-8")
         assert 'env["PYTHONDONTWRITEBYTECODE"] = "1"' in env_line, (
