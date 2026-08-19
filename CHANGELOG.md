@@ -57,11 +57,30 @@ it"). So `mutate.py` now REFUSES a dirty target before touching anything, with
 the reason — not a warning, because a warning on a run that then eats your file
 is indistinguishable from a clean run until you look ((gl)). Permissive where
 git cannot answer (outside a repo / git absent) so it can never block a
-legitimate round; selftest pins BOTH halves — the permissive default and that
-`main()` still consults it. This is the fourth bite in this family in three
-weeks and the first one the harness itself caused; the round it invalidated it
-also correctly reported (`the RESTORE is red — the round proved nothing`),
-which is the one part that worked as designed.
+legitimate round. This is the fourth bite in this family in three weeks and the
+first one the harness itself caused; the round it invalidated it also correctly
+reported (`the RESTORE is red — the round proved nothing`), which is the one
+part that worked as designed.
+
+**AND THE GUARD'S OWN FIRST MUTATION ROUND FOUND TWO SURVIVORS — recorded
+because a clean-looking round is exactly what this family keeps producing.**
+Both arms of my first selftest were vacuous, in the two ways this repo has
+already written down:
+* **A substring scan that matched its own assertion text.** The arm grepped
+  the source for `"if uncommitted(target):"` — a literal the assertion LINE
+  ITSELF contains, so it held no matter what `main()` did. CLAUDE.md's "a
+  page-wide substring scan is not a structural claim", walked into inside the
+  guard written to stop this family. Now an **AST** check that `main()`
+  branches on a call to `uncommitted`.
+* **No positive control.** `_selftest` is contractually offline/pure, so it can
+  only reach the PERMISSIVE path (a temp dir is not a repo → False) — a
+  function returning False everywhere passes it completely, and mutating the
+  real return to `True` SURVIVED. The positive control now lives in
+  `tests/autonomy/test_mutation_harness_guard.py`, where a real `git init` is
+  allowed: dirty → True, staged → True, untracked → True, clean → False,
+  outside-a-repo → False. **"Empty output is not a negative result until the
+  check has been seen to produce a positive one"** — the rule, applied to
+  itself, one layer down.
 
 **Forward metric:** 🌾 carry — the fleet's best-evidenced book and its only
 one behind a failover pair — can now be handed over without silently

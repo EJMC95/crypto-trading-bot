@@ -48,6 +48,7 @@ EVERY mutation was killed. Anything else is a finding: a survivor means the
 suite does not actually test the thing you just changed.
 """
 import argparse
+import ast
 import os
 import pathlib
 import shutil
@@ -275,10 +276,23 @@ def _selftest():
             "uncommitted() must fail OPEN outside a repo — there is nothing "
             "to protect there and blocking would be a false positive")
         #    ...and main() must actually consult it, or the guard is inert.
-        _src = pathlib.Path(__file__).read_text(encoding="utf-8")
-        assert "if uncommitted(target):" in _src, (
-            "main() no longer checks the target for uncommitted changes — "
-            "the first git_restore would silently delete the work under test")
+        #    AST, NOT a substring: the first cut of this arm grepped the source
+        #    for "if uncommitted(target):" — which the assertion message ITSELF
+        #    contains, so it was true no matter what main() did, and the
+        #    mutation survived. That is CLAUDE.md's own "a page-wide substring
+        #    scan is not a structural claim", walked into inside the guard
+        #    written to stop exactly this family of self-deception.
+        _tree = ast.parse(pathlib.Path(__file__).read_text(encoding="utf-8"))
+        _main = next(n for n in ast.walk(_tree)
+                     if isinstance(n, ast.FunctionDef) and n.name == "main")
+        _gated = any(
+            isinstance(n, ast.If)
+            and any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name)
+                    and c.func.id == "uncommitted" for c in ast.walk(n.test))
+            for n in ast.walk(_main))
+        assert _gated, (
+            "main() no longer branches on uncommitted(target) — the first "
+            "git_restore would silently delete the work under test")
 
         # 6. the bytecode defence is declared where it is used, not assumed
         assert "PYTHONDONTWRITEBYTECODE" in run_tests.__doc__ or True
