@@ -504,12 +504,17 @@ class OversoldRebound(Carrier):
         `rate/8`. funding_basis.py's header states it; it is easy to miss.
 
     THE TWO NUMBERS THAT SHAPE V2, both measured on Lighter's own data:
-      1. CARRY: at the resting rate a long pays 1.2e-05/hr = **0.0288%/day =
-         ~0.86%/month** of notional (76% / 65% / 56% of hours were long-pays
-         on her BTC / LINK / LTC windows). A month-long hold therefore starts
-         ~0.9% behind; a 12-hour hold starts 0.014% behind. Carry punishes
-         DURATION, and v1 was built from the maximum-duration end.
-      2. EXECUTION IS NEARLY FREE: across **409 short-hold closes** in the
+      1. CARRY: MEASURED across 478 days x 20 coins, a long on the majors pays
+         a median **+0.0171%/day** of notional — so v1's 29-day median hold
+         starts **~0.50% behind** while v2's 12h cap starts 0.009% behind.
+         (The venue's RESTING-rate arithmetic gives 0.0288%/day; the realised
+         median is lower, and quoting the resting figure as the average was a
+         first-draft error corrected here.) The spread is wide and matters:
+         HYPE +0.0445%/day (1.33%/30d) and AAVE +0.0342 at one end, DOT and
+         SPY slightly NEGATIVE (longs are PAID) at the other; 65-95% of hours
+         are long-pays depending on the coin. Carry punishes DURATION, and v1
+         was built from the maximum-duration end of that table.
+      2. EXECUTION IS NEARLY FREE: across **~400 short-hold closes** in the
          fleet's own paper ledger the exit-side gap between the decision mark
          and the realised fill has a median of **-0.8 bps** (p90 5 bps) — the
          venue is zero-fee and these are majors, so the cost model is the
@@ -619,8 +624,9 @@ class OversoldRebound(Carrier):
         return 1.0                      # constant clip — consistency is structural
 
     def custom_exit(self, tag, age_min, profit):
-        """The carry-bounded time cap. At 0.0288%/day a 12h hold pays 0.014%
-        of notional; a month-long one pays ~0.86% — v1's tax, refused here."""
+        """The carry-bounded time cap. At the measured +0.0171%/day majors
+        median a 12h hold pays 0.009% of notional; v1's 29-day median hold
+        paid ~0.50% before it earned anything. That tax is refused here."""
         if age_min >= self.MAX_HOLD_MIN:
             return "max_hold"
         return None

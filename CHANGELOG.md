@@ -45,10 +45,16 @@ draft of the study divided by 8; `funding_basis.py`'s header states the
 convention and it is easy to read past.
 
 **3 · THE TWO NUMBERS THAT DESIGN V2, and together they are the indictment.**
-* **CARRY punishes DURATION.** At the resting rate a long pays
-  **0.0288%/day ≈ 0.86%/month** of notional. A month-long hold starts ~0.9%
-  behind; a 12-hour hold starts 0.014% behind.
-* **EXECUTION IS NEARLY FREE.** Across **409 short-hold closes** in the fleet's
+* **CARRY punishes DURATION.** MEASURED over 478 days x 20 coins: a long on
+  the majors pays a median **+0.0171%/day** of notional, so v1's 29-day median
+  hold started **~0.50% behind** and v2's 12h cap starts 0.009% behind. The
+  per-coin spread is wide and load-bearing — HYPE **+0.0445%/day** (1.33% per
+  30d), AAVE +0.0342, XAU +0.0302, while **DOT and SPY are slightly NEGATIVE**
+  (a long is PAID to hold); 65-95% of hours are long-pays by coin.
+  *Corrected in place (I12): an earlier draft of this entry quoted the venue's
+  RESTING-rate arithmetic (0.0288%/day) as though it were the measured
+  average. It is a reference point, not the mean.*
+* **EXECUTION IS NEARLY FREE.** Across **~400 short-hold closes** in the fleet's
   own paper ledger, the exit-side gap between decision mark and realised fill
   has a **median of −0.8 bps** (p90 5 bps) — zero-fee venue, majors, crossed
   spread only. Round trip ~1–2 bps.
