@@ -196,10 +196,16 @@ spot-check, not the sweep, and it is the first thing the next pass should run.
 
 ### Carried into the next pass
 * 🔮 georgia's trailing-stop family is the one **measured fix-direction with no
-  actuator** (brain reclaim 1.0, fwd +1.63%, −$17.14/71). Its closes carry
-  prices since (gr), so `study_exit_sweep`'s calibration gate can be attempted
-  — ship only if that gate passes and both halves improve; otherwise record the
-  refusal.
+  actuator** (brain reclaim 1.0, fwd +1.63%, −$17.14/71). ~~Its closes carry
+  prices since (gr), so `study_exit_sweep`'s calibration gate can be
+  attempted~~ — **CORRECTED IN PLACE per I12 by (qj), which ran it: the gate
+  cannot be attempted at all.** georgia exits on a time-decaying ROI ladder
+  under an ATR ratchet, which is not a member of the harness's
+  {tp, sl, trail, max_hold} rule space — so a `BOOK_EXITS` entry could only
+  calibrate against a rule the book does not run (the (ps) false-pass). Now
+  DECLARED in `study_exit_sweep.UNSWEEPABLE_EXITS` (with 🙏 avo maria, same
+  SwingDip ladder). **Answering georgia's exit question needs a ladder-aware
+  replay — a build, not a re-run.**
 * 🧘 Douglas's persisted `recent` sample still carries the two void rows. It is
   **reporting-only** (`_open_position` takes no sample input — the book's
   structural-consistency pin) and its entries carry no pair/date, so filtering

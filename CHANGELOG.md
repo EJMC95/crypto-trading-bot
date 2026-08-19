@@ -1,3 +1,72 @@
+## 2026-08-19 (qj) — THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean, and georgia's exit question turns out to be STRUCTURALLY unanswerable by the instrument I sent it to
+
+**I11, run against my own `(qi)` §7 list** rather than against whatever was
+most interesting. Two carried items, both closed — one clean, one refuted.
+
+**1 · THE ORGAN SWEEP (the scope that died on a session limit) IS CLEAN.**
+All 27 TTL-bearing bus organs are well inside their windows — worst
+`age/ttl` is **0.40** (`fleet_respiration`), median ~0.17; nothing DARK,
+nothing near. `fleet_immune.sick=[]`. So `(qi)`'s "spot-check, not the
+sweep" caveat is now discharged with the sweep itself.
+
+**2 · AND THE SWEEP FOUND THE THING THE BUS COULD NOT SAY: CI/DEPLOYS ARE
+DOWN, AND THE FLEET'S OWN WATCHDOG HAD ALREADY DIAGNOSED IT.**
+`/watchdog.json` problems, unread by this session until now:
+`GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last run_id 32197328429) —
+a billing lockout kills CI AND deploys silently (28-Jul scar); check the
+repo's Actions runs + Settings/Billing`. **Its `last run_id` is byte-equal to
+the last green run I had independently isolated** by bisecting scheduled runs
+on `main` (32197328429 = fleet-watchdog 18-Aug 23:28:37Z, 13s, success;
+19-Aug 01:43Z and 03:04Z both fail in 3s). Two instruments, same boundary,
+arrived at independently — which is the corroboration `(I6)` asks for.
+**The half that is NOT about CI: the same lockout kills the deploy path**, so
+no shadow book can receive code until it clears. Queued for the operator;
+no code change can fix it and none was attempted.
+
+**3 · THE GEORGIA CARRIED ITEM IS REFUTED — and the refutation is the fix.**
+`(qi)` §7 carried: *"georgia's closes carry prices since (gr), so
+`study_exit_sweep`'s calibration gate can be attempted."* **It cannot.** The
+run reports `calibration: SKIPPED — shipped exit rule could not be read from
+its module`, and that message is the defect: it reads as a MISSING registry
+entry and sends the next session to add one. It is not missing.
+🔮 georgia exits on a **time-decaying ROI ladder**
+(`{0: 1.8%, 180: 1.2%, 360: 0.8%, 720: 0.5%}`) under an **ATR ratchet** capped
+by the carrier stoploss; `walk_exit` expresses exactly one fixed `tp_pct`, one
+fixed `sl_pct`, one fixed `trail_pct`. **No member of that rule space is this
+book's shipped rule**, so the tempting `BOOK_EXITS` row — map the first rung to
+`tp_pct` — would hand `calibrate()` a rule the book does not run. That is
+`(ps)` exactly: a calibration gate graded against trades it cannot replay, and
+the FALSE PASS then guarded the fleet's largest stop pot.
+**Shipped instead: `UNSWEEPABLE_EXITS`**, DERIVED from `live_strategies()` (a
+carrier that gains a ladder is covered the day it lands, the `(pf)` rule), and
+the CLI now says **"IMPOSSIBLE, not missing"** with the actual rungs, ahead of
+the generic branch. Population today: 🔮 georgia **and 🙏 avo maria** — the
+fleet's best-evidenced book, same SwingDip ladder — while the flat-`roi`
+carriers stay sweepable, so the declaration cannot rot into firing on
+everything. Pinned by `tests/autonomy/test_ladder_exits_declared.py`;
+**6 of 6 mutations verified red**, including branch-order and hand-list-instead-
+of-derived.
+**THE CONSEQUENCE, stated because it is load-bearing:** the brain's standing
+`exit_too_tight` diagnosis on georgia (reclaim **1.0**, fwd **+1.63%**,
+trailing-stop path **−$17.14/71** era) **cannot be actioned through this
+instrument at all.** Answering it needs a ladder-aware replay — a build, not a
+re-run. `(qi)` filed it as "run the sweep"; that was wrong and is corrected in
+place per I12.
+
+**ALSO MEASURED, and it needed no fix:** the sweep discards 33 of georgia's 66
+priced closes for a missing `side`. Those are all **pre-`(kn)`** — last
+sideless close 05-Aug 21:04Z, first sided close 06-Aug 16:04Z, a clean
+boundary — so the publisher was fixed 6-Aug and the sample heals forward. Not
+retroactive, the `(gr)` precedent. Nothing to do.
+
+**Process note against myself (the `(po)`/`(pv)` class, caught in the act):**
+my first M4 mutation script contained a Python bug that left the target file
+untouched, and the harness printed **`SURVIVED`** — a clean false negative on a
+guard that is in fact enforced. Re-run with an explicit `grep` proving the
+mutation had landed before scoring it, and it reddens. **A mutation you did not
+verify was APPLIED is not a mutation**; scoring it is the same shape as the
+scoped-`awk` that scanned one line.
+
 ## 2026-08-19 (qi) — FLEET-WIDE AUDIT: THE FLEET IS NOT BLEEDING, IT IS STARVED AND UNDECIDABLE — four of five loss centres are already-closed populations, and the instruments still grading them are the actual defect
 
 **Operator: *"Where are we losing and why? More importantly how can we use this

@@ -141,6 +141,37 @@ is worth two orders of magnitude.**
 
 ---
 
+## 🚨 NEW 19-Aug · GITHUB ACTIONS IS DARK — CI **and every auto-deploy** are down
+
+**The fleet's own watchdog diagnosed this before I did, and names the remedy:**
+`/watchdog.json` → *"GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last
+run_id 32197328429) — a billing lockout kills CI AND deploys silently (28-Jul
+scar); check the repo's Actions runs + Settings/Billing"*.
+
+Independently corroborated by bisecting scheduled runs on `main` (no PR code
+involved): `fleet-watchdog` succeeded hourly through **18-Aug 23:28:37Z** (13s)
+and has failed in **~3 seconds with no downloadable logs** ever since —
+19-Aug 01:43Z, 03:04Z. Every PR check on every branch, from two different
+sessions, fails identically. **The watchdog's `last run_id` is byte-equal to
+the last green run I isolated**, so two instruments agree on the boundary.
+
+**Why it matters beyond red checks:** the same lockout kills
+`railway-redeploy.yml`, which is the ONLY automated deploy path. **No shadow
+book can receive code until this clears** — including the `(qi)` correctness
+fixes, which are merged-pending and will sit in main doing nothing.
+
+**A — check Settings → Billing on the repo's account ★** (the 28-Jul scar is
+the precedent; a spend cap or exhausted minutes produces exactly this
+signature: instant failure, no logs, scheduled runs on `main` affected).
+
+**B — if billing is fine**, the fallback is a manual `railway up` per service
+for anything urgent, and CI stays advisory until Actions returns.
+
+No code change can fix this and none was attempted. PR #184 is unaffected by
+anything in its own diff.
+
+---
+
 ## 0 · PENDING DEPLOYS — **NONE. Section closed 13-Aug by the daily review.**
 
 *Closed per this file's own maintenance rule ("an item leaves the day it is
