@@ -136,7 +136,29 @@ EXCLUDED_CLASSES = {7}                       # pre-IPO — measured -0.165%, n=4
 ALLOW_PREIPO = os.environ.get(
     "COOK_ALLOW_PREIPO", "").strip().lower() in ("1", "true", "yes")
 
-CONFIRM_LOOPS = ghost.CONFIRM_LOOPS          # 2 — matches the replay's lag
+# THE CONFIRM WINDOW IS A DURATION, NOT A COUNT — and this is exactly where
+# the ghost's convention and the MEASUREMENT's convention part company.
+#   study  : entry lagged 2 SNAPSHOTS of the scout's 5-min tape  = 600s
+#   ghost  : 2 LOOPS of its own 90s cadence                      = 180s
+# This file inherits every THRESHOLD from the study and inherited the confirm
+# COUNT from the ghost, so the shipped entry gate was 3.3x LOOSER than the one
+# that was graded: a dislocation had to persist 3 minutes here where the
+# measurement required 10. The old line said "2 — matches the replay's lag";
+# it matched the replay's COUNT. Same class as the horizon pin below — a
+# constant that must name a value the study actually measured, not a number
+# that merely looks like it. Measured consequence in the first 10.5h of live
+# trading: 24 closes (~9x the study's 6.2/day), median hold 5.5 MINUTES
+# against a 4h horizon, and 24 of 24 exits `converged` — the mirror's own
+# losing exit, which is the recorded cause of death of the ghost it mirrors.
+# DERIVED, not asserted: a bar written as a bare literal can be "fixed" by
+# editing the bar (verified — that mutation survived the first version of the
+# pin below). These are the study's own two published facts, so weakening the
+# rule now requires contradicting the document it cites.
+STUDY_SNAPSHOT_S = 300.0     # "10,052 snapshots, 5-min cadence" (the scout tape)
+STUDY_CONFIRM_LAGS = 2       # "Entry lagged 2 snapshots (the ghost's 2-loop confirm)"
+STUDY_CONFIRM_S = STUDY_SNAPSHOT_S * STUDY_CONFIRM_LAGS   # = 600s, the measured lag
+CONFIRM_SECONDS = float(os.environ.get("COOK_CONFIRM_S", str(STUDY_CONFIRM_S)))
+CONFIRM_LOOPS = max(1, int(-(-CONFIRM_SECONDS // LOOP_SECONDS)))   # ceil
 SAMPLE_N = 20
 STATE_PRUNE_S = 2 * 86400
 
@@ -300,6 +322,8 @@ def build_extra(census, positions, recent, open_pnl, realized):
             "min_vol_m": MIN_VOL_M,
             "universe_n": ghost.UNIVERSE_N,
             "confirm_loops": CONFIRM_LOOPS,
+            "confirm_s": CONFIRM_LOOPS * LOOP_SECONDS,
+            "study_confirm_s": STUDY_CONFIRM_S,
             "excluded_classes": sorted(EXCLUDED_CLASSES) if not ALLOW_PREIPO else [],
             "crypto_only": False,
             "tiles_with": "band-kelly >= %.0fbps (disjoint by construction)"
@@ -608,6 +632,19 @@ def _selftest():
     assert MAX_HOLD_S in HORIZON_PLATEAU_S, (
         "max hold %.0fs is outside the measured plateau %s"
         % (MAX_HOLD_S, HORIZON_PLATEAU_S))
+
+    # THE SHIPPED CONFIRM MUST COVER THE LAG THE STUDY MEASURED UNDER. The
+    # count is a cadence artifact; the DURATION is the rule. A confirm shorter
+    # than the measured lag admits dislocations the graded gate refused.
+    # The bar itself is DERIVED from STUDY_DISLOCATION_BAND_2026-08-19.md's
+    # own numbers, so it cannot be quietly relaxed to match the code.
+    assert (STUDY_SNAPSHOT_S, STUDY_CONFIRM_LAGS) == (300.0, 2), (
+        "the study's cadence/lag are quoted from its Method section")
+    assert STUDY_CONFIRM_S == 600.0
+    assert CONFIRM_LOOPS * LOOP_SECONDS >= STUDY_CONFIRM_S, (
+        "confirm %d loops x %ds = %ds is SHORTER than the measured lag %.0fs"
+        % (CONFIRM_LOOPS, LOOP_SECONDS, CONFIRM_LOOPS * LOOP_SECONDS,
+           STUDY_CONFIRM_S))
     assert _standby_key("nav-cook-lshadow") == "nav-cook-lshadow:standby"
     st = build_state({}, [], {}, 1.0, now=2.0)
     assert st["saved_ts"] == 2.0 and st["pend"] == {}

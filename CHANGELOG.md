@@ -1,3 +1,80 @@
+## 2026-08-20 (sa) — 🧭 nav-cook SHIPPED A GATE 3.3× LOOSER THAN THE ONE IT WAS GRADED ON: a confirm window is a DURATION, and it inherited the COUNT from a bot on a different cadence
+
+*(Renumbered (ro) -> (sa) at push time: `(ro)` was already merged and cited 5 times on `main` for the 👩 mum-v2 entry, so by the convention's own tiebreak the CITED entry keeps the letter and this one moves. The one in-tree reference, in CLAUDE.md's nav-cook row, is rewritten in the same commit — a renumber that leaves a dangling citation is the defect the rule exists to prevent.)*
+
+**The daily review's assessment pass, on a book one day old.** 🧭 nav-cook was
+born 19-Aug (ri) on a measured plateau — `n=216, +0.367%/trade, t=+2.74` at 4h.
+Its first 10.5 live hours read **n=24, −0.298%/trade, t=−1.88**, and the shape
+of the disagreement named the cause before any statistic could:
+
+| | study | live, first 10.5h |
+|---|---|---|
+| closes/day | 6.2 | **~55 (≈9×)** |
+| median hold | (4h horizon) | **5.5 MINUTES** |
+| `converged` share | — | **24 of 24** |
+| `max_hold` share | — | **0 of 24** |
+
+**THE DEFECT, provable by reading two numbers and no harness at all.** The study
+lagged entry by **2 SNAPSHOTS of the scout's 5-min tape = 600s**. The bot ships
+`CONFIRM_LOOPS = ghost.CONFIRM_LOOPS` — **2 LOOPS of the ghost's own 90s cadence
+= 180s** — under a comment reading *"2 — matches the replay's lag"*, and
+CLAUDE.md repeated it as *"the lag the measurement was made under"*. **It matched
+the replay's COUNT.** Every THRESHOLD in the file is the study's; the confirm
+COUNT is the ghost's; the two live on different clocks. Net effect: a dislocation
+had to persist **3 minutes** live where the graded gate required **10** — the
+shipped entry gate was **3.3× looser than the one that was measured**, which is
+exactly the direction that produces 9× the trades at shorter holds.
+
+**And 24 of 24 exits are `converged` — the mirror's own LOSING exit** (the file
+says so itself: *"convergence is the mirror's LOSS side"*). That is byte-for-byte
+the recorded cause of death of 🧲 the ghost it mirrors: *"100% `converged` exits
+since the widening (the book harvests its own entry gate)"*, t=−2.97, retired
+(jh). The 4h horizon the plateau was measured on has **never once been reached**.
+
+**FIXED — and the first version of the fix was DEFEATABLE, which is why the bar
+is now derived.** `STUDY_CONFIRM_S` began life as a literal `600.0`; the
+mutation round showed that editing that literal to `180.0` left the pin green
+(M1 SURVIVED). It is now **derived from the study's own two published facts** —
+`STUDY_SNAPSHOT_S (300.0, "5-min cadence") × STUDY_CONFIRM_LAGS (2, "entry
+lagged 2 snapshots")` — so weakening the rule requires contradicting the
+document it cites. `CONFIRM_LOOPS` is now `ceil(CONFIRM_SECONDS / LOOP_SECONDS)`
+= 7 loops, and the selftest pins `CONFIRM_LOOPS × LOOP_SECONDS >= STUDY_CONFIRM_S`
+— the exact twin of the horizon pin already in the file (*"THE SHIPPED HORIZON
+MUST BE ONE THE STUDY ACTUALLY MEASURED"*), which is the doctrine this constant
+should have been under from birth. **6 mutations verified RED**, including both
+bar-weakening ones and a control on the pre-existing horizon pin.
+
+`caps` now publishes **`confirm_s` and `study_confirm_s` beside `confirm_loops`**,
+because **the count alone is what hid this for a day** — `confirm_loops: 2` is
+byte-identical between "matches the measurement" and "3.3× looser than it".
+
+**THE TRANSFERABLE RULE: a confirm/persistence window is a DURATION. Inheriting
+its COUNT from a bot on a different cadence silently re-specifies the gate.**
+The fleet has ~6 persistence/confirm constants expressed as counts or bare hours
+(`CARRY_PERSIST_H`, `STABLE_H`/`FLIP_GRACE_H`, `CONFIRM_LOOPS` in the ghost and
+in 🪁 band-kelly). 🪁 band-kelly is the one to check next: it mirrors the SAME
+ghost and inherits the same `CONFIRM_LOOPS`, but its founding study was built on
+the ghost's own realised ledger rather than the 5-min tape, so the two may
+legitimately differ — **that is a measurement to make, not an assumption to
+copy**, and it is NOT made here.
+
+**WHAT THIS ENTRY DOES NOT CLAIM.** It does not claim the fix restores the edge.
+An independent replay of the band on the same tape (10,519 snapshots) **failed
+to reproduce the study's cell** — lag=2 read `n=697, −0.165%, t=−2.61` against
+the published `n=216, +0.367%, t=+2.74` — so per the calibration gate (*"a
+harness that cannot reproduce what DID happen may not say what WOULD have"*) it
+is REFUSED as evidence and no number from it is banked. It is reported only as
+a **direction agreeing with the live ledger** (mean and `converged` share both
+improve monotonically as the confirm lengthens: −0.155/−0.165/−0.094/−0.031%
+at 5/10/15/20-min confirms). **The reason it could not be calibrated is itself
+the finding: `STUDY_DISLOCATION_BAND_2026-08-19.md`'s harness was never
+committed**, so the founding claim of a live book is currently unreproducible by
+anyone including its author. Rebuilding it is the follow-up this entry names and
+does not discharge.
+
+**Era:** this changes which trades the book takes, so the 24 pre-fix closes are a
+different policy. The book is 1 day old and the sample is worth ~$5.71 — the
+cheapest possible moment to take the reset.
 ## 2026-08-20 (rz) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
 
 *(Renumbered (rc) -> (rf) -> (rh) -> (rz) at push time — the EIGHTH collision this
