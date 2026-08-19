@@ -302,6 +302,28 @@ def _selftest():
             # detection always return False — and this control starts flagging
             # a line whose provenance the guard cannot actually see, which is
             # precisely the unsound path the forward walk was rejected for.
+            # UNCOMMITTED CONTROL. This one pins the CENSUS, not a verdict:
+            # with the uncommitted branch disabled, `git show` on an all-zero
+            # sha fails, the title reads None, and the line is skipped anyway —
+            # so no verdict changes and only the BUCKET is wrong, reporting
+            # work-in-progress as "letter not yet written". That is still a
+            # false statement in a published census (I18), and the whole claim
+            # of this guard's summary line is that its skips are honest.
+            open("mod2.py", "a").write(
+                f"# [2026-08-19 ({_A})] written but not yet committed\n")
+            _f4, st4 = audit(["mod2.py"])
+            if _f4:
+                print(f"  SELFTEST FAIL: an UNCOMMITTED citation was judged: "
+                      f"{_f4}. A line being written now cannot have drifted.")
+                bad += 1
+            elif st4.get("skipped_uncommitted") != 1:
+                print("  SELFTEST FAIL: the uncommitted citation was not "
+                      f"counted as such (stats={st4}) — a skip filed under the "
+                      "wrong reason is a census that lies.")
+                bad += 1
+            subprocess.run(("git", "checkout", "--", "mod2.py"),
+                           capture_output=True, text=True)
+
             found3, st3 = audit(["rootmod.py"])
             if found3:
                 print("  SELFTEST FAIL: a citation at the history boundary was "
@@ -325,7 +347,8 @@ def _selftest():
     print("audit_citation_drift --selftest: OK — title comparison both ways, "
           "the 19-Aug incident replayed from real history, and an end-to-end "
           "renumber control (1 drift found, 1 stable citation ignored, 1 "
-          "boundary citation skipped and counted)")
+          "boundary citation skipped and counted, 1 uncommitted citation "
+          "counted under its own reason)")
     return 0
 
 
