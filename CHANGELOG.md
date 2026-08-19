@@ -457,7 +457,6 @@ this pass could find — a pre-registered window closes green, the gate passes,
 the operator decides. Weeks out at minimum, and the deposit is the lever the
 codebase does not contain.
 
->>>>>>> origin/main
 ## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
 
 **Executed end-to-end under the operator's "Continue maverick!" grant** (the
