@@ -206,11 +206,12 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 "pm-rudd-lshadow", "pm-morrison-lshadow",
                 "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
                 "freqtrade-dad-lshadow",
-                # [2026-08-19] 👩 mum — I17 no_rate (0 in-era closes ever,
-                # ~2.4 closes/30d => ~12 months to the bar, funding drag
-                # -$2.15 > +$0.68 realised). Corrects the (nf) "green, slow"
-                # hold: that green was open MARKS ((lo)). MUM_RETIRED_OVERRIDE.
-                "freqtrade-mum-lshadow",
+                # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by
+                # the operator and she is deliberately NOT hidden: she trades
+                # again as v2 (OversoldRebound, 1h, bracketed). The bare
+                # Kraken-era `freqtrade-mum` stays retired below — that is a
+                # DIFFERENT row, and conflating the two is the bare-name trap
+                # this file's own tests pin.
                 # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — 🙏 Avo Maria
                 # took the slot (same service/keys/sub-account, the slot's
                 # THIRD occupant; operator decision, cutover verified by
@@ -523,7 +524,7 @@ LABELS = {
     "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
     "equities-regime":             "📊 Index Rider — stock-perp regime",
     "equities-momentum":           "🏆 Stock Leaders — stock momentum",
-    "freqtrade-mum":               "👩 Mum — daily trend",
+    "freqtrade-mum":               "👩 Mum v2 — oversold rebound",
     "freqtrade-dad":               "👨 Dad — breakout rider",
     "freqtrade-avo-maria":         "🙏 Avo Maria — dip buyer",
     "freqtrade-georgia":           "🔮 Georgia — day trader",
@@ -540,7 +541,7 @@ LABELS = {
 # One-line strategy brief per bot (shared by its venue variants — the chips
 # say WHERE it runs, this says WHAT it does + current units).
 DESCRIPTIONS = {
-    "freqtrade-mum":       "TrendMomoV1 · 1d — long while SMA10>SMA40 with price above; exits on the cross-down · $50 × 4 slots",
+    "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; carries its OWN random-entry control arm · $50 × 4 slots",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
     "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 4 slots; LIVE clips = equity÷4 (slot swap 13-Aug)",
     "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",

@@ -301,11 +301,23 @@ POLICY_ERA = {
     # ten closes. An era that arrives after the sample does is an era that
     # arrives too late, and nobody would think to add it then.
     "freqtrade-mum": (
-        "2026-07-17",
-        "family book on lighter_family_bot, same 17-Jul accrual fix. Below the "
-        "report's min-closes floor today, so no effect is quoted; declared now "
-        "because the gate must never grade a wider sample than the brain, and "
-        "the brain scopes this book from the same date."),
+        # [2026-08-19 (ro)] MOVED 17-Jul -> 19-Aug. An era is the LATEST of
+        # every invalidating change, so the 17-Jul accrual reason below is
+        # PRESERVED rather than discarded by moving the date forward.
+        "2026-08-19T21:45",
+        "STRATEGY CHANGED IN KIND: 👩 mum was retired at (rd) on an I17 no_rate "
+        "call and REVIVED the same day by operator decision as v2 — TrendMomo "
+        "(SMA10/40 on 1d, state entry, death-cross exit, no time stop, -15% "
+        "stop) replaced by OversoldRebound (RSI(14)<25 outside an uptrend on "
+        "1h, bracket predefined at entry, 12h carry-bounded cap, -4% stop). "
+        "That is 'different in kind', not ordinary tuning: her three v1 closes "
+        "were all opened 2026-07-12, held 25-33 days, and every one exited on "
+        "a rule v2 does not contain. Keyed on the OPEN, so those three and the "
+        "four v1 positions flattened at revival (tagged `v1_legacy`) are "
+        "excluded by construction. Supersedes but preserves the earlier "
+        "reason: same 17-Jul accrual fix on lighter_family_bot. Kept in "
+        "lockstep with bot_learn.ERA_START — the gate's sample may never be "
+        "wider than the brain's."),
     "freqtrade-avo-maria": (
         "2026-07-17",
         "family book on lighter_family_bot, same 17-Jul accrual fix, n=4 closes "
