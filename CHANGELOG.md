@@ -1,3 +1,69 @@
+## 2026-08-19 (qw) — 🪁 BAND-KELLY'S CLAIM REPRODUCES EXACTLY AND SURVIVES JACKKNIFE — but MIRRORING A BOOK CREDITS YOU WITH ITS COSTS AS YOUR PROFIT, and the live book is accruing against a bar 34% too high
+
+Checked the fleet's largest measured claim independently, while the book is
+**live with an open position and 0 closes**. **It holds** — and it carries an
+arithmetic defect that inflates it by a third.
+
+**IT REPRODUCES, EXACTLY.** From the ghost's own ledger
+(`lighter-dislocation-lshadow`, n=189, 13-Jul -> 4-Aug): ALL n=189 mean
+-0.250%/t=-2.82; **CRYPTO subset n=65, mean -0.605%, t=-5.71**; non-crypto
+n=124, -0.064%, t=-0.53. The claimed mirror is n=65 / +0.605% / t=+5.71 — an
+exact match. **Unlike `(nu)` Schwager and `(nt)` Douglas, this founding number
+survives re-measurement.**
+
+**AND IT SURVIVES JACKKNIFE — the OPPOSITE of the `(po)` fat-tail failure.** The
+65 trades are **60% KAITO** (39), APEX 15, then eight coins with <=3 each.
+Concentration that severe is what made Schwager undecidable. Here: drop KAITO
+and it reads **+0.684% at t=+5.08**; drop APEX **+0.528% / +4.21**; every other
+single-coin drop lands +0.59..+0.63% at t=+5.5..+5.9. **No coin carries it, and
+dropping the dominant one RAISES the mean.**
+
+**THE DEFECT — a general one, not specific to this book.** A realised P&L is
+already NET of its own execution cost, so negating it hands the mirror that cost
+as profit AND forgets the mirror pays its own:
+
+    ghost_realised = price_move - ghost_slip
+    mirror         = -price_move - mirror_slip = -ghost_realised - (ghost_slip + mirror_slip)
+
+| | mean/trade | t |
+|---|---:|---:|
+| NAIVE mirror (the founding claim) | +0.605% | +5.71 |
+| **CORRECTED for double slippage** | **+0.397%** | **+3.58** |
+| overstatement | **0.209 pp/trade = 34% of the claim** | |
+
+*Sensitivity declared:* the correction uses CURRENT volumes (KAITO $0.42M ->
+2.52 bps/fill tier); point-in-time volume is not reconstructable (`(ny)`), and
+these coins sat in more liquid tiers earlier, so **34% is the conservative end**.
+The DIRECTION is certain — the double-count is arithmetic, not a model.
+
+**WHY IT MATTERS NOW:** band-kelly grades ~mid-Sep and its realised record will
+be read against **+0.605%**. At the corrected **+0.397%** bar, a perfectly
+healthy book would look like a 34% underperformer. **Correct the expectation
+before the sample lands, not after.** This does NOT weaken the book — at
++0.397%/trade, t=+3.58, jackknife-robust, it remains the fleet's best-evidenced
+claim by a wide margin, and ~3 orders of magnitude above the funding surface
+`(qq)` priced to zero.
+
+**A RECONSTRUCTION THAT FAILED, recorded so nobody repeats it.** I first tried
+to verify this from the scout's published telemetry (`prem_outliers` + `marks`,
+10,052 snapshots). It cannot be done: **`prem_outliers` is hard-capped at
+exactly 8 entries per snapshot**, truncating the event feed to the most extreme
+handful, and **`classes` is EMPTY before 5-Aug**, which silently dropped every
+pre-August event through the crypto screen and produced an implausible
+in-sample n=0 — my own harness defect, caught only by the implausibility (the
+`(po)` "a check that inspects nothing" shape). **The ghost's LEDGER is the right
+source (I14: the record decides); the telemetry is too lossy to audit this
+claim.**
+
+**CARRIED, NOT DONE:** `(qf)`'s roster refused `brkfade` and `dipfade` on numbers
+presumably computed the same naive way, and `dipfade` was ADMITTED 18-Aug on an
+operator override at n=13. **A 34% haircut can flip a marginal verdict in either
+direction — re-price the whole mirror roster on the corrected arithmetic before
+its next review.**
+
+No code touched; main-only by the `(mm)` rule. Working notes:
+`reports/expansion_research_log.md` Part 8.
+
 ## 2026-08-19 (qv) — THE HELD HULL WIDENING IS REFUSED BY THE SAME MEASUREMENT THAT SHIPPED GARRETT'S: its floor drop lands in the ONE tier where the pin is known to lose — and its famous `t=+3.92` is a study, not a record
 
 *(Renumbered from (qq) at push time — a concurrent session's `(qq)` landed
