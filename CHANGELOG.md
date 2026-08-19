@@ -1,3 +1,100 @@
+## 2026-08-19 (ri) — 🧭 nav-cook IS BORN: the [45,60)bps dislocation band that TILES BELOW 🪁 band-kelly's floor, measured to a plateau before a line was written
+
+**Operator: *"find a few different horizons and gates that actually work, build
+and commit deploy and push — named after the likes of captain cook and such."***
+`(re)` did the measuring; this is the build. **FIRST OF THE NAVIGATOR COHORT**
+(`nav-<surname>-lshadow`, for the navigators who charted coasts nobody had
+mapped — which is the book's job).
+
+**THE CELL, AND WHY IT IS NOT SOMEONE ELSE'S.** 🪁 band-kelly mirrors the
+retired dislocation ghost at **>=60bps**, crypto-only, 2h. This book takes
+**[45,60) bps** — strictly BELOW that floor, half-open on purpose, so the two
+**TILE** and every event nav-cook opens is one band-kelly **REFUSES**. I20
+differentiation by BAND (the only form it accepts), and it makes the `(lv)`
+subset trap *structurally unreachable*: a subset consumer running second is
+starved by definition, a DISJOINT band cannot be. Selftest-pinned
+(`GATE_HI_BPS <= 60`, mutation-verified).
+
+**MEASURED FIRST, and it is a PLATEAU not a lucky cell** — +0.185/+0.274/
++0.320/+0.367/+0.405 %/trade at 30m/1h/2h/4h/8h, **t=+2.69..+2.97 at every
+one**, both halves positive at every one; jackknife by coin t=+1.94..+3.01;
+block-bootstrap 95% CI **[+0.072%, +0.644%]**, P(>0)=0.991; and the
+**ghost-direction control LOSES at t=−3.53**, so the asymmetry is real rather
+than a sign convention. Shipped at n=216 / **+0.367%/trade / t=+2.74**.
+
+**HORIZONS, since the ask was plural:** the horizon is a plateau, so the choice
+is not "which cell wins" (8h does) but return vs DECIDABILITY — 30m gives ~5.9
+closes/day and the thinnest edge, 8h the best edge and ~5 weeks to a verdict.
+**Shipped at 4h: the plateau INTERIOR, ~1.5 closes/day, 30 closes in ~3 weeks.**
+Picking a swept grid's maximum is how `(oe)`-style artifacts ship, so
+`HORIZON_PLATEAU_S` pins the shipped hold to a cell the study actually measured
+(mutation-verified: 5h reddens it). **Deliberately ONE book, not several** —
+two books on the SAME band at different horizons would enter the same events,
+same coins, same side, and differ only in exit: that is I20's one-bet-held-twice,
+and only ONE band measured positive.
+
+**THE DEEP TAIL IS REFUSED BECAUSE IT IS MEASURED NEGATIVE** — at [150,inf) the
+mirror reads −0.31 to −0.50 %/trade: above the band, dislocations stop reverting
+and break. Hence a BAND WITH A CEILING, not a floor ((gl): publish the band, not
+just the floor).
+
+**NOT CRYPTO-SCREENED, DELIBERATELY.** The band is non-crypto by nature —
+commodity +0.566% (t=+2.06, n=57), Asian equity +0.131% (n=32), **crypto n=4** —
+so its siblings' `(lk)` screen would leave it four trades. It carries the one
+screen the evidence supports: **pre-IPO EXCLUDED** (−0.165%, n=45, the band's
+only negative class), restrict-only, declared as fitted on a small sample,
+`COOK_ALLOW_PREIPO=1` reverts. The screen reads the VENUE's own class via a new
+public `fleet_bus.venue_class()` — one owner, never a hand list (`(ki)`/`(lc)`
+measured a hand list wrong on 41 of 204 books) — and **FAILS OPEN on None**,
+because refusing on a dark scout would starve the book (mutation-verified both
+ways).
+
+**THE STALE-REFERENCE HAZARD WAS TESTED, NOT ASSUMED.** The edge concentrates
+when the underlying market is CLOSED (+0.409%/t=+2.34 vs **+0.007%/t=+0.02**
+open) — the exact `(lk)`/I7 signature ("a closed underlying market satisfies the
+gate structurally"). So the index was checked directly: if it were frozen,
+d(premium) would track d(mark) 1:1. Measured corr/slope — BRENTOIL 0.62/0.41,
+WTI 0.77/0.64, SKHYNIXUSD 0.40/0.16, H100 0.06/0.00, UNITREE 0.69/0.48 — **no
+symbol reaches the frozen signature (corr>0.9 AND slope>0.85)**. Declared: oil's
+index is PARTIALLY sticky out of hours, so some closed-hours premium is index
+lag.
+
+**BIRTH PARITY IN ONE COMMIT:** `claim_writer` at the TOP of the loop + `(ic)`
+standby key (stand down, never `sys.exit` — `restartPolicy=always` turns an exit
+into a crash-loop); `snapshot_equity` from day one; census that counts every
+refusal (`below_band`/`above_band`/`preipo`/`confirming`/`slip`/`capped`) so
+`opened: 0` is never byte-identical between "quiet" and "structurally
+impossible" (I18/`(lv)`); exit ladder with the **price stop SENIOR to every
+data-dependent rule** so a dark reference cannot trap a losing position
+(`(nm)`); `save_state` result never discarded (I4); `(gr)` price telemetry on
+every close; closes tagged `<side>-navband_<exit>` so the brain and the winners'
+docket grade it alone. **8 mutations verified RED**, incl. the half-open
+ceiling, the mirror side, the stop, the class screen both directions, and the
+horizon pin.
+
+**A TRAP THIS FILE WALKED INTO AND RECORDS:** its own selftest asserted the
+module never names the live venue by scanning its source — and **failed on its
+own assertion's text**, the documented *"a page-wide substring scan is not a
+structural claim"* shape. Fixed by building the token at runtime and scoping the
+scan to the body above `_selftest`.
+
+**PRE-PROVISION, deliberately.** `nav-cook-shadow` does not exist yet: the
+deploy PATH is live (so a change to the book is never silently routeless) but
+the decide-GREP is **COMMENTED**, and `Dockerfile.navcook` sits in
+`MANUAL_IMAGES_OK` with the reason — an unresolvable service name is the `(gl)`
+failure where four books' rules warned and deployed nothing. **Activation is ONE
+edit**: uncomment the grep + move the image to `AUTO_IMAGES`, then dispatch the
+service explicitly that first time (`(gm)`: a routing fix cannot deploy itself).
+$1k shadow, ZERO keys, env-only (no tuning lane → single-policy `(hm)` clock by
+construction). Fresh 30-day clock from first publish; gradeable ~mid-Sep on its
+OWN ledger (I14).
+
+Files: `lighter_nav_cook_bot.py`, `Dockerfile.navcook` (new); `fleet_bus.py`
+(+`venue_class`), `tests/test_selftests.py`, `scripts/audit_image_imports.py`,
+`scripts/audit_deploy_coverage.py`, `.github/workflows/railway-redeploy.yml`,
+`CLAUDE.md` (fleet row). Suite green; born-dark, deploy-coverage, venue-purity,
+lever-bounds and doctrine-enforcement all OK.
+
 ## 2026-08-19 (rh) — `session_commit` REFUSED CORRECTLY AND THE CALLER READ IT AS SUCCESS: stdout/stderr reorder under a pipe, and `| tail` eats the exit code
 
 **Self-inflicted, measured, and fixed in the tool rather than in a rule.** This

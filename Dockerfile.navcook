@@ -1,0 +1,36 @@
+# Image for 🧭 nav-cook (nav-cook-shadow) — the CHART-THE-SHALLOWS book,
+# shadow only. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.navcook
+#   VENUE=lighter_shadow
+#
+# FIRST OF THE NAVIGATOR COHORT (operator, 19-Aug). A $1,000 paper book that
+# mirrors the retired dislocation ghost in the residual band [45,60) bps —
+# strictly BELOW 🪁 band-kelly's 60bps floor, so the two TILE the surface and
+# every event this book takes is one band-kelly REFUSES (I20 differentiation
+# by BAND; the (lv) subset trap is unreachable for a DISJOINT band).
+# Founded on STUDY_DISLOCATION_BAND_2026-08-19.md: n=216, +0.367%/trade,
+# t=+2.74 at 4h, a PLATEAU over 30m-8h, both halves positive, bootstrap CI
+# [+0.072%, +0.644%], ghost-direction control loses at t=-3.53. ZERO keys.
+# Config is ENV-ONLY (no tuning lane) — single-policy (hm) clock by
+# construction, the Garrett/Kelly cohort idiom.
+#
+# COPY set mirrors Dockerfile.bandkelly: the bot imports
+# lighter_dislocation_bot for book_view / reference_prices / resolve_universe
+# (ONE owner, never a copy; its retirement guard sits inside main(), so the
+# import runs nothing). fleet_bus IS a guarded import (venue_class, for the
+# pre-IPO screen) and ships in the SAME commit as the import (born-dark rule).
+# fleet_tuning is deliberately ABSENT — env-only book, declared in
+# audit_image_imports.BORN_DARK_OK alongside its cohort siblings.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_nav_cook_bot.py lighter_dislocation_bot.py bot_pnl_store.py paper_broker.py fleet_bus.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_nav_cook_bot.py"]

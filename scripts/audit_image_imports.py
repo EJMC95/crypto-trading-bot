@@ -95,7 +95,15 @@ BORN_DARK_OK = {
                   # Garrett choice); the ghost module it imports
                   # (lighter_dislocation_bot) also guard-imports
                   # fleet_tuning, so one declaration covers both sites
-                  "Dockerfile.bandkelly")},
+                  "Dockerfile.bandkelly",
+                  # [2026-08-19 (ri)] 🧭 nav-cook — env-only by design (the
+                  # same Garrett/Kelly choice, so its (hm) clock is
+                  # single-policy by construction); like band-kelly it imports
+                  # the retired ghost module for book_view/reference_prices,
+                  # and that module guard-imports fleet_tuning, so this one
+                  # declaration covers both sites. A book with no tuning lane
+                  # must not carry the growth rail's clip lever.
+                  "Dockerfile.navcook")},
     # [2026-07-17 VENUE SWAP] market-context COPYs venues/ purely for
     # venues.symbol_map.from_lighter (the fleet<->Lighter symbol authority)
     # after moving off Hyperliquid. It is an INSTRUMENT-ONLY collector: it
