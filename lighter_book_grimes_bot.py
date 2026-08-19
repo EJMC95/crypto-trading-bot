@@ -189,6 +189,23 @@ DELIST_GIVEUP_H = 6.0
 ALLOW_NONCRYPTO = os.environ.get(
     "GRIMES_ALLOW_NONCRYPTO", "").strip().lower() in ("1", "true", "yes")
 
+#: [19-Aug (qh)] ENTRIES ARE RESTRICTED TO GATE-GRADED COINS. `(om)` fixed the
+#: gate by grading the founding study's fixed 18 while trading kept following
+#: the live universe — and published the hazard it created in `gate_drift`:
+#: "`ungraded` non-empty means the book can enter coins its own gate never
+#: tested — the one direction that matters." Measured 19-Aug: 100% of 24h bus
+#: samples carried >=2 gate-ungraded coins in the traded universe (APEX every
+#: sample, VVV ~60%, ADA ~43%), live `gate_drift.ungraded=[APEX, VVV]`. The
+#: restrict's measured cost is $0.00 in both halves — the book has ZERO trades
+#: ever — so this closes the published hazard for free. A held position is
+#: never skipped (exits/holds are untouched; the held check runs FIRST).
+#: Deliberately NOT the alternative fix (adding churn-entrant coins to
+#: GATE_COINS), which would reintroduce the `(oe)` universe-churn defect the
+#: fixed gate exists to end.
+TRADE_UNGRADED = os.environ.get(
+    "GRIMES_TRADE_UNGRADED", "").strip().lower() in ("1", "true", "yes")
+_GATE_SET = frozenset(GATE_COINS)
+
 #: The roster. `breakout` is DELIBERATELY absent — 🧙 book-schwager owns
 #: channel breakouts on this universe (I20); adding it here mints the same
 #: bet at a second row id. Selftest-pinned.
@@ -884,7 +901,7 @@ def main():
 
             # ---- scan for signals from OPEN setups ----------------------
             census = {"scanned": len(universe), "held": 0, "no_bars": 0,
-                      "quiet": 0, "signal": 0}
+                      "quiet": 0, "signal": 0, "ungraded_skip": 0}
             opened = capped = unpriceable = gated = 0
             held_coins = {p["coin"] for p in positions.values()}
             # ((mh)) a stale/empty trend cache FAILS CLOSED for the two
@@ -898,6 +915,14 @@ def main():
             for coin in universe:
                 if coin in held_coins:
                     census["held"] += 1
+                    continue
+                # [19-Aug (qh)] the graded-universe restrict (see the
+                # TRADE_UNGRADED block above): a coin the gate never graded
+                # may not be ENTERED. Counted, never silent — and placed
+                # before the candle fetch so a skipped coin costs no REST
+                # call. Held coins are handled above and are never skipped.
+                if not TRADE_UNGRADED and coin not in _GATE_SET:
+                    census["ungraded_skip"] += 1
                     continue
                 try:
                     end_ms = now_s * 1000
@@ -1162,7 +1187,8 @@ def _selftest():
 
     # 9) payload builders — the scorecard is public (rule 3)
     cen = {"scanned": 18, "held": 1, "no_bars": 0, "quiet": 16, "signal": 1,
-           "opened": 1, "capped": 0, "unpriceable": 0, "gated": 0}
+           "opened": 1, "capped": 0, "unpriceable": 0, "gated": 0,
+           "ungraded_skip": 0}   # (qh) — fixture mirrors the real literal
     sc2 = {s: dict(grade([]), asof=float(t)) for s in SETUPS}
     extra = build_extra(cen, positions, sc2, 1.23, 4.56)
     assert set(extra["scorecard"]) == set(SETUPS)
