@@ -164,3 +164,86 @@ def test_a_shadow_arm_is_unaffected():
     be idled by a rail about real money."""
     assert _rails(live=False).headroom_ok(None, None) is True
     assert _rails(live=False).headroom_ok({}, 0.10) is True
+
+
+# ---------------------------------------------------------------------------
+# THE WIRING. A gate nobody calls is the registered-but-inert failure this
+# whole file exists to close — one level up. The first mutation round proved
+# it: `if RUIN_GATE and not dry_run:` -> `if False:` SURVIVED, because
+# everything above tests the PREDICATE and nothing tested the CALL.
+#
+# AST for the call site, and stated honestly: AST sees identifiers in shapes,
+# not values or bindings ((qj) drove seven survivors through exactly that), so
+# the env contract below is driven behaviourally instead.
+# ---------------------------------------------------------------------------
+
+import ast          # noqa: E402
+import importlib    # noqa: E402
+import pathlib      # noqa: E402
+
+import lighter_funding_bot as farmer                      # noqa: E402
+
+
+def _farmer_main():
+    tree = ast.parse(pathlib.Path(farmer.__file__).read_text(encoding="utf-8"))
+    return next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "main")
+
+
+def test_the_live_farmer_actually_consults_the_gate():
+    """Mutation that reddens this: `if RUIN_GATE and not dry_run:` -> `if
+    False:`, or deleting the call. Both leave the money ungated."""
+    calls = {c.func.attr for c in ast.walk(_farmer_main())
+             if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)}
+    assert "headroom_ok" in calls, (
+        "the Farmer's entry site no longer consults the ruin gate — the "
+        "venue's liquidation price is read and published, and nothing "
+        "refuses on it again")
+
+
+def test_the_gate_is_guarded_by_its_kill_switch_and_skips_the_entry():
+    """The refusal must `continue` past the open, not merely log. A gate that
+    warns and then opens the position is the (gl) warning-is-not-a-guard
+    failure with real money behind it."""
+    for node in ast.walk(_farmer_main()):
+        if not isinstance(node, ast.If):
+            continue
+        names = {n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)}
+        if "RUIN_GATE" not in names:
+            continue
+        assert any(isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
+                   and c.func.attr == "headroom_ok" for c in ast.walk(node)), (
+            "the RUIN_GATE branch does not call headroom_ok")
+        assert any(isinstance(n, ast.Continue) for n in ast.walk(node)), (
+            "the ruin gate warns without skipping the entry")
+        return
+    raise AssertionError("no `if RUIN_GATE ...:` branch in the Farmer's main()")
+
+
+def test_the_kill_switch_is_real(monkeypatch):
+    """Behavioural, not structural: the env must actually reach the flag, and
+    `on` must be the default. Every gate in this fleet ships with a way out."""
+    try:
+        monkeypatch.setenv("LIGHTER_RUIN_GATE", "off")
+        importlib.reload(farmer)
+        assert farmer.RUIN_GATE is False
+    finally:
+        monkeypatch.delenv("LIGHTER_RUIN_GATE", raising=False)
+        importlib.reload(farmer)
+    assert farmer.RUIN_GATE is True, "the ruin gate must default to ON"
+
+
+def test_the_row_publishes_the_gate_s_bite():
+    """`ruin_skips` on the row every loop, `0` included — an omitted key is
+    byte-identical between 'never fired' and 'not running' ((lv)), and a gate
+    silently declining every entry would look exactly like a quiet market."""
+    src = pathlib.Path(farmer.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    published = any(
+        isinstance(n, ast.Dict)
+        and any(isinstance(k, ast.Constant) and k.value == "ruin_skips"
+                for k in n.keys)
+        for n in ast.walk(tree))
+    assert published, (
+        "the row no longer publishes ruin_skips — the gate's bite would be "
+        "visible only in container logs")
