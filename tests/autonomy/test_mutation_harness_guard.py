@@ -84,3 +84,31 @@ def test_outside_a_repo_it_fails_open(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "loose.py").write_text("Z = 1\n", encoding="utf-8")
     assert mutate.uncommitted("loose.py") is False
+
+
+def test_a_git_that_fails_but_prints_is_still_fail_open(monkeypatch):
+    """WHAT DOES THE CHECK READ UNDER TOTAL FAILURE? Outside a repo, git exits
+    non-zero AND prints nothing, so the exit-code branch and the stdout branch
+    happen to agree — which is why dropping the exit-code check SURVIVED the
+    first mutation round here. It is not redundant: it says *if git could not
+    answer, fail open no matter what it printed*, and that only becomes
+    visible when the two disagree. Faked, because a git that errors onto
+    stdout is not reproducible on demand.
+    """
+    class _Proc:
+        returncode = 128
+        stdout = "?? garbage-on-stdout\n"
+
+    monkeypatch.setattr(mutate.subprocess, "run", lambda *a, **k: _Proc())
+    assert mutate.uncommitted("anything.py") is False, (
+        "a failed git call must fail OPEN on its EXIT CODE, never on whatever "
+        "it happened to write to stdout")
+
+
+def test_an_exception_from_git_fails_open(monkeypatch):
+    """git absent entirely — the other total-failure mode."""
+    def _boom(*a, **k):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(mutate.subprocess, "run", _boom)
+    assert mutate.uncommitted("anything.py") is False
