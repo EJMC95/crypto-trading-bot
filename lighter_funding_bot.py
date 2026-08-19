@@ -48,6 +48,7 @@ import bot_pnl_store as store
 import funding_basis
 from venues import marks, venue_context
 from venues.fills import measured_from_reason, read_fill, slip_bps_of
+from venues import safety
 from venues.safety import capital_adjusted_day_start, open_notional
 
 # [2026-08-13 (lp)] VARIANT INSTANCES — one proven file, many books. Setting
@@ -1024,6 +1025,17 @@ _ENV_BARS["slope_gate"] = 1 if SLOPE_GATE else 0
 # candidates — it can never widen a gate, raise size, or add leverage. Fails
 # open (no veto state -> no vetoes). Toggle: FUNDING_QUALITY_VETO=off.
 QUALITY_VETO = os.environ.get("FUNDING_QUALITY_VETO", "on").strip().lower() \
+    not in ("off", "0", "false", "no")
+
+# ---- RUIN GATE [2026-08-19 (ql)] — refuse to ADD when the money sits inside
+# its own liquidation. The venue publishes a liq price per position and this
+# bot has read it since `(no)`; nothing declined on it until now. Measured on
+# the validated model at THIS book's HARD_STOP of 10%: 2x (where it runs)
+# leaves 4.94 stop-widths, 3x leaves 3.25, and 10x leaves 0.89 — under 1.0 the
+# liquidation fires BEFORE the stop and the stop is decorative. Leverage
+# capacity is a property of stop distance, not appetite. Fail-CLOSED by
+# construction; `off` restores the pre-(ql) behaviour exactly.
+RUIN_GATE = os.environ.get("LIGHTER_RUIN_GATE", "on").strip().lower() \
     not in ("off", "0", "false", "no")
 
 LOOP_SECONDS = int(os.environ.get("FUNDING_LOOP_SECONDS", "300"))
@@ -2501,6 +2513,14 @@ def main():
         # ---- manage open positions (held coins may no longer be hot) ----
         held_coins = set(pos) | set(meta)
         opened_this_loop = 0
+        # [(ql)] The loop's ONE margining read for the ruin gate, taken lazily
+        # at the first entry attempt and reused for the rest of the pass. Not
+        # the publish block's read: that one is deliberately POST-trade so the
+        # row shows the gross this loop actually ended at, while the gate must
+        # see the state it is deciding FROM. Two moments, two readings, said
+        # out loud rather than silently shared.
+        _ruin_state, _ruin_read = None, False
+        _ruin_skips = 0
         longs_admitted = 0        # [(oh)] LONGS opened this cycle — the
         # in-cycle half of the fleet long budget (see entry_admission)
         for coin in list(held_coins):
@@ -2930,6 +2950,32 @@ def main():
                     if not ctx.rails.notional_ok(open_ntl, clip):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
+                    # [2026-08-19 (ql)] THE RUIN GATE. The venue publishes the
+                    # liquidation price of every position and this loop has
+                    # read it since (no); until now nothing REFUSED on it, so
+                    # the cap above ("how much may I deploy?") and the daily
+                    # loss ("how much have I lost today?") were the only two
+                    # questions asked, and neither can see liquidation.
+                    # Measured on the validated model at this book's own 10%
+                    # HARD_STOP: 2x leaves 4.94 stop-widths of room and 10x
+                    # leaves 0.89 — i.e. the liquidation fires BEFORE the stop
+                    # and the stop is decorative. Fail-CLOSED (see
+                    # SafetyRails.headroom_ok); `LIGHTER_RUIN_GATE=off` is the
+                    # kill switch, and a shadow arm is unaffected by
+                    # construction.
+                    if RUIN_GATE and not dry_run:
+                        if not _ruin_read:
+                            _ruin_state = _margin_block(
+                                ctx, set(meta) | set(pos))
+                            _ruin_read = True
+                        if not ctx.rails.headroom_ok(_ruin_state, HARD_STOP):
+                            _ruin_skips += 1
+                            log.warning(
+                                "%s RUIN_GATE_SKIP — nearest liquidation is "
+                                "inside %.0fx the %.0f%% stop (or unreadable); "
+                                "refusing to add", coin,
+                                safety.LIQ_HEADROOM_K, HARD_STOP * 100)
+                            continue
                 _res = None
                 try:
                     if dry_run:
@@ -3143,6 +3189,13 @@ def main():
                        # telemetry read may never raise into a real-money
                        # trading loop.
                        "margin": _margin_block(ctx, set(meta) | set(pos)),
+                       # [(ql)] The ruin gate's BITE, on the row rather than
+                       # in container logs alone. `0` published every loop is
+                       # the point: an omitted key is byte-identical between
+                       # "the gate never fired" and "the gate is not running"
+                       # ((lv)), and this one silently declining every entry
+                       # would otherwise look exactly like a quiet market.
+                       "ruin_skips": _ruin_skips if RUIN_GATE else None,
                        # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
                        # row said "online" while entries were blocked and the
                        # ':live' save suppressed — only container logs said

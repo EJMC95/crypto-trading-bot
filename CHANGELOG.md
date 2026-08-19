@@ -1,3 +1,88 @@
+## 2026-08-19 (ql) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
+
+**Operator, 19-Aug, reframing the whole programme:** *"We are looking at this
+as a risk eliminating job as opposed to a profit motivated job. Let's look at
+this differently and look at options, even though risk will be higher."* Of the
+options put up, the one chosen was the enabling instrument: **the ruin bound.**
+Full memo: `STUDY_RUIN_BOUND_2026-08-19.md`.
+
+**THE REFRAME THAT MADE IT WORTH DOING.** Every leverage study this fleet has
+run — five of them — was judged on **`t`**, and every verdict is correct: a
+scalar multiplies mean and SD together so `t` is unchanged, and the one
+non-scalar design (risk-normalised sizing) was refuted hard on 🧘 Douglas
+(t +0.505 → −0.823, P(Δt≥0)=0.0014, 13 of 13 perturbations, three adversarial
+lenses). But `t` is a **learning** metric. "Scaling does not improve `t`" means
+*scaling teaches you nothing new*; it does NOT mean scaling is not worth doing,
+because on an edge you have already decided to believe a scalar is exactly how
+belief becomes dollars. The fleet had been reading "does not improve the
+evidence" as "is not worth doing" — and that conflation is what a profit frame
+has to break. What it cannot break is the arithmetic: real money is **$259.84**,
+so every code lever is worth cents and the capital decision is worth two orders
+of magnitude more than all of them. Said once, in the memo, and not sold as
+anything else.
+
+**THE GAP, and it is the registered-but-inert shape on the one number that
+matters.** `(no)` wired the venue's OWN margining truth into the live path —
+per-position `liquidation_price`, `nearest_liq.dist_frac`, a `liq_unknown`
+census — and **both live bots publish it**. `scripts/lighter_margin_model` then
+modelled the same quantity for hypothetical positions, **validated it forward
+against the venue to 0.001%**, and shipped `headroom_x` with the refusal bar
+(K=4) written into its own docstring. **Nothing refused on any of it**:
+`headroom_x`'s only declared consumer was ⚡ High Voltage, a book
+`BAND_YOUNG_HIGH_VOLTAGE_2026-08-16.md` refuted and never built, so the
+criterion shipped orphaned — and `venues/safety.py`, the one gate real money
+passes through, carried **zero** references to margin or liquidation. Its two
+questions were "how much may I deploy?" and "how much have I lost today?".
+Neither can see ruin. The fleet could watch itself approach liquidation and
+owned no instrument that would decline.
+
+**THE MEASUREMENT, and it is not what a risk-on framing would assume.**
+Leverage capacity is a property of **STOP DISTANCE**, not of appetite. At 💸
+the Farmer's shipped `HARD_STOP` of 10%, against the K=4 bar:
+
+    2x  -> 4.88x headroom   PERMITTED  (and it already runs here)
+    3x  -> 3.17x            refused
+    5x  -> 1.80x            refused
+    10x -> 0.78x            LIQUIDATION FIRES BEFORE THE STOP
+
+So the live book sits **one notch under its own ceiling, reached by luck** —
+nothing had ever computed this — and the regime where the stop is decorative is
+**five notches away with nothing in between**. A 3% stop would buy 5x; a 1%
+stop would buy 10x. The route to more leverage runs through a tighter stop,
+which is a different book with different expectancy: a measurable trade, not a
+dial. **The honest answer to "can we take more risk here for more profit" is
+NOT AT THIS STOP** — and that is a refusal with evidence, which the growth rule
+explicitly counts as satisfying it.
+
+**WHAT SHIPPED.** `SafetyRails.headroom_ok(margin_state, stop_frac)`, expressed
+in stop-widths because that is the only quantity that travels across books.
+**Fail-CLOSED, against this module's usual habit and deliberately:** every other
+degrade in `safety.py` fails OPEN so an outage can never idle a book, but the
+cost of a wrong default is different in kind here, so an unreadable margin
+state, a position the venue will not price, positions held but none priced, and
+an unknown stop all REFUSE (I10's reasoning for the go-live blocker). A flat
+book and every shadow arm stay permitted — otherwise the gate could never
+allow a first entry and would idle 20 paper books for a risk they cannot run.
+Wired into the Farmer's entry site beside the notional cap, one reading per
+loop, `LIGHTER_RUIN_GATE=off` as the kill switch, and **`ruin_skips` published
+on the row every loop including `0`**, because an omitted key is byte-identical
+between "never fired" and "not running" ((lv)) — a gate silently declining
+every entry would otherwise look exactly like a quiet market. 11 tests, every
+fixture built by `margin_state_from` from a venue-shaped payload with STRING
+numerics rather than a hand-written dict ((hj)); **6 mutations killed**.
+
+**DECLARED NOT DONE, because a half-closed gap advertised as closed is worse
+than an open one:** (1) this prices the DISTANCE to liquidation analytically
+and does **not** replay the tape to count how often a path would have breached
+it — that backtest is the natural next study and is not done here; (2) it says
+nothing about the delta-neutral books (🌾 carry, 🧮 Hull, 🏦 Rich Dad), which
+model P&L as `accrued − fees` with no price term and therefore have no stop for
+a headroom ratio to divide by. **Whether their real single-leg perp exposure is
+genuinely delta-neutral on the venue is the highest-value open question**, since
+a genuinely hedged book's leverage capacity is governed by basis risk rather
+than price risk and is far higher. That is where the next dollar of risk
+appetite should be pointed.
+
 ## 2026-08-19 (qj) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
 
 Found closing out `(qk)`'s referee wave — its F5 was declared "named not
