@@ -1,3 +1,166 @@
+## 2026-08-19 (qq) — THE HELD HULL WIDENING IS REFUSED BY THE SAME MEASUREMENT THAT SHIPPED GARRETT'S: its floor drop lands in the ONE tier where the pin is known to lose — and its famous `t=+3.92` is a study, not a record
+
+`(qo)` held 🧮 Hull's `MIN_VOL` 2e6 → 5e5 on the stated ground that it "would
+pool a never-graded population into the fleet's cleanest measured record" and
+needed a `POLICY_ERA` split shipped with it. With CI restored that code change
+became possible, so the item came back up. **Both halves of that reasoning turn
+out to be wrong, and the answer is still no — for a better reason.**
+
+**1 · THE PIN IS INSIDE HULL'S BAND, AND THE DROP LANDS IN GARRETT'S TIER.**
+Hull gates apr **[7.82%, 20%)** and the venue's resting-default rate is
+**10.512% TRUE — inside it.** Measured over the last 2,000 scout snapshots,
+Hull-band supply by volume tier:
+
+| tier | coin-snapshots | AT the pin | off the pin |
+|---|---:|---:|---:|
+| **[$0.5M, $2M)** ← where the drop lands (Garrett's band) | 14,983 | **83.6%** | 16.4% |
+| [$2M, $10M) ← Hull today | 5,920 | **81.7%** | 18.3% |
+
+So the widening does **not** change Hull's mix — it is *already* pin-dominated.
+What it changes is the **liquidity of the pin coins it takes**, and that is
+exactly the axis `(qp)` measured today: the same pin reads **+0.0757%/trade at
+≥$10M** (💸 Farmer, n=72) and **−1.343%/trade at [$0.1M, $2M)** (🛢️ Garrett,
+n=13). Hull sits between them at [$2M, $10M). Dropping its floor to $0.5M moves
+it into the half where the pin is measured to LOSE. **Refused.**
+
+**2 · AND THE RECORD I WAS PROTECTING DOES NOT EXIST.** 🧮 Hull has **ZERO
+realised closes** — verified in the ledger, and consistent with
+`golive_readiness` listing it below floor at `n0`. Its celebrated **n=50,
++$6.69, t=+3.92, bootstrap P(mean≤0)=0.000** is `(ny)`'s **replay on 250d of
+tape**, not the book's own ledger. So there was no live sample to contaminate
+and no `POLICY_ERA` split to ship; that concern was aimed at something that is
+not there. `(qo)`'s stated reason for holding was therefore right by accident,
+and is corrected here per I12.
+
+**3 · WHAT HULL'S PROBLEM ACTUALLY IS.** Not its floor: it has never traded.
+`(ny)` already named the binding bar — **closes, not `t`** — at ~6.0/30d from a
+standing start, and the book is currently 2 of 4 slots with `eligible 0`. A
+widening that buys thin-tier pin supply does not fix that; it converts "no
+evidence" into "evidence from the tier we just measured as losing", which is
+worse than waiting, because a losing sample would be read as a verdict on the
+book rather than on the tier.
+
+**THE TRANSFERABLE RULE, which is now two-for-two today:** `(qp)` said a gate
+finding does not transfer between BOOKS at different tiers. This says the same
+finding does not transfer between TIERS within one book. **The tier is part of
+the hypothesis, not a parameter of it.** Both refusals came from the same two
+queries against the scout tape, and both would have looked like obvious wins on
+the proposal sheet.
+
+**Nothing changed.** No env, no code, no era. 🛢️ Garrett's `(qo)` tightening is
+unaffected — it stands on its own tier's evidence and its pre-registered read is
+still pending closes under the new gate.
+## 2026-08-19 (qu) — 🙏 AVO MARIA'S ENTRY PREDICTS NOTHING, MEASURED EXIT-FREE — AND THE OPERATOR KEEPS THE BOOK ANYWAY, ON THE RECORD, WITH A REVERT CRITERION
+
+**THE DECISION FIRST, because it is an operator call and it was made: 🙏 Avo
+Maria STAYS.** Operator, 19-Aug: *"no i want to keep avo maria."* This entry
+exists so that "keep" is a MONITORED decision with a stated price and a revert
+criterion, not a drift — the `(jg)` pre-registration pattern, and the thing
+I17's acknowledged-recurrence rule demands of any book we decline to retire.
+Price of the decision, measured: **−$0.68/month** (−1.081% of book per month at
+8.27 closes/30d), modelled maxDD **$20.77 (29.6%)**, no liquidation path at
+0.62× leverage. The honest case FOR keeping is I14: the live arm's own ledger is
+**n=3**, the record outranks any proxy, and the record has barely started.
+
+**WHY THE OPERATOR ASKED, AND WHAT THE ASK PRODUCED.** The brief was *"make avo
+maria make as much money as possible"* with standing permission to change the
+real-money arm. ~600 measured cells later the answer is that **no reachable
+parameter makes it more money**, and this entry records the refusals so the next
+session does not re-run them (I11).
+
+**THE DECISIVE MEASUREMENT — ASK THE ENTRY EXIT-FREE BEFORE SWEEPING ANY
+BRACKET.** Every prior sweep (entry rsi 30..55, trend on/off, band width, exit
+sell_zone 0.15..0.95, stop six ways, ROI ladder, timeframe 4h/8h/12h/1d,
+max_open 2..8) failed, and the reason was upstream of all of them. Stripped of
+stop, target and ladder, over 1,156 signals / 475d / 23 coins, the signal's
+excess over **matched-random** entries:
+
+    h= 1  2  3 bars (4h/8h/12h)   −0.131% / −0.171% / −0.139%
+                                  P(random ≥ signal) = 1.000 / 0.998 / 0.973
+    h= 6, 12                      −0.091% / −0.016%   (P 0.843 / 0.535)
+    h=30 (5d)                     +0.002%             (t=+0.01)
+
+**Random entries beat the signal outright at the short end.** The book's median
+hold is 3.5d (~21 bars), landing exactly where the excess is nil.
+
+**THE ONE POSITIVE-LOOKING CELL AND WHY IT IS NOT ONE.** h=60 (10d) reads excess
++1.381%, both halves positive, naive **t=+5.01**, i.i.d. P=0.000. It dies on
+every test that respects the data's own structure: cluster-robust t **+1.43**,
+month-as-unit **+0.81**, block-bootstrap 95% CI **[−1.11%, +2.57%]**, and a
+circular time-shift placebo (preserves spacing, density and cross-coin
+simultaneity) **P=0.285**. **The top 3 of 17 calendar months carry 97.3% of the
+entire excess**; drop them and it is +0.0498% at t=+0.19. Its "both halves
+positive" is one crash-rebound episode per half (2025-05 = 111% of H1's sum;
+2026-05 = 67% of H2's).
+
+**TWO INDEPENDENT CORROBORATIONS.** (1) DECOMPOSITION, 7 subsets × 3 horizons:
+only `rsi<42` carries information; **the trend filter `e50>e200` is actively
+destructive** — adding it LOWERS the mean of every base (R +0.208→+0.025,
+B +0.346→+0.187, R&B +0.349→+0.124); `bb_lower` fails its own dose-response;
+**0 of 21 cells survive Benjamini-Hochberg at FDR 0.05**. (2) CONDITIONAL
+STRUCTURE, 16 cells × 3 horizons: the signal's most extreme cell reads
+**|z|=1.63 while the null's OWN best-of-48 has median |z|=2.08** (p95 3.36),
+P=0.830 — *the signal is LESS structured than chance on the same grid.* 0
+discoveries under BH; smallest P=0.147.
+
+**A FOURTH UNDECIDABILITY CLASS: UNDECIDABLE BY FLATNESS.** Beside the
+slow-clock class (🌊/📊, too few closes) and the fat-tail class (🧙 Schwager,
+`t` hostage to 3 trades), this book has a normal close rate, **no tail
+concentration**, and is still ungradeable. The tell is the mirror of the tail
+test: trimming the top AND bottom 10 trades barely moves it (−0.5229% →
+−0.4675%, t=−0.994). At the measured mean/sd it needs **493 closes — 4.9 YEARS**
+to reach |t|=2.0. It can be proven neither winner nor loser.
+
+**THE TRAP THAT WOULD KEEP IT ALIVE FOREVER, stated so we do not fall for it:**
+P(the book shows a PROFIT at 12 months **by luck alone**) = **18.5%**. Measured
+live the same day — the shadow arm read **12W/3L, +$7.47, +0.996%/trade** and
+looked like it was working; it is not evidence (t=+0.66, 95% CI [−1.94%,
++3.94%], which CONTAINS the replay's −0.523%), and the replay reproduces that
+exact stretch (trailing 30d +0.600%, trailing 90d −0.876%). **A flat book will
+periodically look like it is winning, and that appearance sits INSIDE the
+negative record rather than departing from it.**
+
+**MECHANISM, arithmetic not mystery (I15):** the book wins **57.3%** and needs
+**62.7%** to break even — 28 stops at exactly −10.000% (−280pp) against 100
+`sell_into_strength` exits at +2.197% (+219.66pp). Wins capped by the target,
+losses capped only by the stop. That 5.4pp gap IS the deficit.
+
+**THE REVERT CRITERION — three watches with thresholds, so the decision is
+falsifiable.** Any ONE reopens the keep-or-retire call:
+1. **The book's own record clears the noise band.** To reach t=+2.0 the pooled
+   live+shadow ledger must average **≥ +1.649%/trade over the next 50 closes
+   (~6 months)** = **+$12.80 on a $62.58 book (+20.5%)**. Today: n=18,
+   +0.901%/trade, t=+0.66 — needs 166 closes / 1.7yr to resolve even if real.
+   **Anything less decides nothing and must not be read as working.**
+2. **The `rsi<25` dose-response turns back positive out-of-sample.** It is the
+   one term with a real, matched-null-surviving, monotone effect (+2.32%/trade
+   at h=12 historically, 19/23 coins positive) and it has decayed through zero:
+   rolling 120d **+4.97 → +2.05 → −0.31 → −0.41**, trailing 3 months −0.439%.
+   If a fresh 120d window prints **>+1.0%/trade at h=12 with cluster-robust
+   t≥2**, the entry FAMILY is alive and the conjunction is what kills it.
+3. **A non-falling-BTC regime arrives and the non-crypto sleeve separates**
+   (item 18 / D5 — the whole 475d tape is one regime).
+
+**THREE METHOD TRAPS RECORDED, each of which manufactured a phantom edge and
+was caught.** (a) **Overlapping forward windows inflate `t` ~3.5×** — quote the
+shift-placebo P, not the i.i.d. Monte-Carlo one, which read P=0.000 on the same
+cell the shift null put at 0.285. (b) **A local ±W-bar control is confounded BY
+CONSTRUCTION for a dip-buyer** — it gave **t=+25** and was DISCARDED: `close <
+bb_lower` puts the signal bar a measured 2.279% below its own ±15 neighbours,
+so with W≪h the "excess" is that entry discount re-expressed (I7). (c)
+**Non-overlapping subsampling flips the SIGN depending on how you thin** —
+greedy-first keeps the worst dip of each selloff (h=60: −1.14%), random-maximal
+over-weights isolated signals (+2.00%); rest conclusions only on tests that do
+not alter the signal set's composition.
+
+**WHAT DID NOT CHANGE.** No file in the book's path was edited: no entry, exit,
+stop, ROI, timeframe or sizing change ships, because none is measured to make
+money and the operator's own conditional was *"if it makes more money."* The one
+clean incidental finding — **the ROI ladder is provably inert**, deleting it
+yields a byte-identical trade list across 475d (max favourable excursion +10.84%
+against a 20% top rung) — is a tidy-up worth $0.00 and is NOT worth restarting a
+real-money container for ((mm)); it rides free on the next qualifying deploy.
+
 ## 2026-08-19 (qt) — THE LADDER-AWARE REPLAY IS BUILT, AND ITS FIRST ANSWER REFUTES THE BRAIN: 🔮 georgia's stop is not too tight, and the convention that calibrates BEST is the one that would have shipped a lone spike
 
 *(Renumbered from (qr) at push time — a concurrent session's mirror-census
