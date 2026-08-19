@@ -1,3 +1,51 @@
+## 2026-08-19 (rk) — THE CARD AND THE DISCIPLINE INSTRUMENT DISAGREED IN THE SAME PAYLOAD: rule 4's rolling sample could not be ASKED about the quarantine, so it kept counting rows the fleet had ruled void
+
+**Found by payload-verifying my own fix rather than trusting the merge.** The
+`(qk)` seed-path fix landed and worked — 🧘 douglas's card went
+`pnl_abs −$24.68 / closed 8` → **`−$0.12 / closed 7`**, the two `(nm)`/`(pv)`
+void rows finally out of the totals, confirmed live 09:55Z. But the SAME
+payload carried:
+
+    realized  -0.12   closed 7
+    sample20  {"n": 9, "win": 0.444, "sum_usd": -26.60, "expectancy_r": -0.57}
+
+**`n=9` against `closed=7`, and −$26.60 against −$0.12** — the dashboard card
+and the book's OWN rule-4 discipline instrument disagreeing by exactly the two
+void rows, in one payload, at one instant. `(qk)` predicted this residual and
+called it self-healing in ~20 closes. That was the wrong call: a published
+number that contradicts its neighbour is not a cosmetic lag, it is the
+"instrument answering on a dead sample" class the whole `(qk)` audit was about,
+and I shipped one.
+
+**THE MECHANISM: the sample could not be ASKED.** `is_quarantined` keys on
+`(bot, pair, closed_at)`; `recent` entries carried `{pnl, r}` and nothing else.
+Not "the filter was missing" — the filter was **unaskable**, which is why
+`(qk)` reached for a self-healing story instead of a fix.
+
+**Shipped:** `recent_entry()` stamps `pair` + `closed_at` — the only additions,
+and they exist so the ONE owner can answer — and `admissible_recent()` filters
+at load. `is_quarantined` stays that owner (AST-pinned); no second copy of the
+rule. **Fail-OPEN twice over, deliberately:** an entry that predates the stamp
+CANNOT be classified and is **KEPT**, and a lookup that raises **admits**. A
+quarantine that swallows what it cannot classify silently shrinks every sample
+it touches — the disease, not the cure — so the two unstamped legacy rows age
+out of the 20-row window on their own (~4 days at ~3 closes/day) rather than
+being guessed at. Both fail-CLOSED variants are mutation-verified RED.
+
+`sample20` remains REPORTING-ONLY and the structural-consistency pin is
+re-asserted in the same test file: `_open_position` still takes no sample,
+streak, or equity input, so none of this can reach an entry decision.
+
+Pinned by `tests/autonomy/test_douglas_sample_quarantine.py`; **5 of 5
+mutations verified red**, each anchor-checked as applied before scoring.
+
+**The transferable lesson, and it is about verification not about douglas:**
+`(qk)` verified its fix by the number it changed and declared the number it
+did not. Reading the WHOLE payload after the deploy is what caught it — the
+same discipline `(hu)` names (a control group makes an absence a finding) and
+the same one `(ml)` names on the reporting side. **A fix is verified by the
+payload it produces, not by the field you were looking at.**
+
 ## 2026-08-19 (rj) — 🧭 nav-cook's BIRTH-COMPLETION: five registrations without which the dashboard FILTERS THE ROW the provisioning readback is about to look for
 
 `(ri)` built the book and its substance is complete — snapshot_equity called,
