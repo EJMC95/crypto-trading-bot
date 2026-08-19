@@ -834,8 +834,14 @@ def main():
             _a = sorted(abs(d) for d in devs_this_loop)
             census["dev_n"] = len(_a)
             census["dev_med_bps"] = round(_a[len(_a) // 2], 1)
-            census["dev_p98_bps"] = round(
-                _a[min(len(_a) - 1, int(0.98 * len(_a)))], 1)
+            # SAME nearest-rank convention as the gate's own function, or the
+            # census cannot falsify the gate: with one 170bps outlier in 40
+            # books the gate's p98 is the SECOND-largest (index round(.98*39))
+            # while a naive int(.98*n) shows the max — measured 19-Aug, that
+            # mismatch read as a stuck gate and cost an investigation.
+            _i = min(len(_a) - 1, max(0, int(round(0.98 * (len(_a) - 1)))))
+            census["dev_p98_bps"] = round(_a[_i], 1)
+            census["dev_max_bps"] = round(_a[-1], 1)
 
         # ---- publish -------------------------------------------------------
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())

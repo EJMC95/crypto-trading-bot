@@ -1,4 +1,10 @@
-## 2026-08-19 (qr) — THE LADDER-AWARE REPLAY IS BUILT, AND ITS FIRST ANSWER REFUTES THE BRAIN: 🔮 georgia's stop is not too tight, and the convention that calibrates BEST is the one that would have shipped a lone spike
+## 2026-08-19 (qt) — THE LADDER-AWARE REPLAY IS BUILT, AND ITS FIRST ANSWER REFUTES THE BRAIN: 🔮 georgia's stop is not too tight, and the convention that calibrates BEST is the one that would have shipped a lone spike
+
+*(Renumbered from (qr) at push time — a concurrent session's mirror-census
+entry took (qr) on origin/main and is cited by PR #187's own merge subject, so
+per the collision rule the CITED entry keeps the letter and this side moves.
+Third letter collision for this session in one night; every one was caught by
+`audit_changelog_letters`' cross-branch arm before it could reach main.)*
 
 `(ql)` DECLARED the family carriers unsweepable and named the only honest way
 to answer them — *"a ladder-aware replay — a build, not a re-run."* This is
@@ -64,6 +70,28 @@ rides the same SwingDip ladder and was equally untestable until now. Pinned by
 `tests/autonomy/test_ladder_exit_sweep.py`; **7 of 7 mutations verified red**,
 each checked as actually applied before scoring (the `(po)`/`(pv)` class).
 READ-ONLY: it recommends nothing on its own authority.
+
+## 2026-08-19 (qr) — 🪁 the census could not falsify the gate it publishes beside: two p98 conventions, one investigation
+
+*(Renumbered (qm)->(qn)->(qr) across two push-time collisions — concurrent
+sessions took (qm) and then (qn)-(qq) while this PR's CI rounds ran; the
+cross-branch letter guard caught both.)*
+
+First live hours of the risk-up mirror, working exactly as decided — 40-book
+unscreened scan, a real 170bps dislocation refused at the entry site because
+it is NON-crypto (`noncrypto: 1` in the census: the event fed the gate's
+distribution, confirmed, passed the ghost-clip slip check, and the (lk)
+screen declined the class — the whole point of moving the screen to the
+entry). But the readback ALSO showed `gate 60` beside `dev_p98 176.9`, which
+reads as a stuck gate and cost an investigation before it resolved as two
+DIFFERENT nearest-rank conventions: the ghost's `adaptive_enter_bps` indexes
+`round(p*(n-1))` — with one outlier in 40 books its p98 is the SECOND-largest
+|dev|, so the gate correctly ignores a lone spike — while the census stat
+used `int(p*n)` and showed the max. A falsifiability stat that cannot
+predict the number it falsifies is the (po) shape in miniature. The census
+now uses the gate's own index formula, publishes `dev_max_bps` beside it so
+the outlier stays visible, and the comment carries the incident. Display
+only; no trade changes; zero closes still (the policy clock remains clean).
 
 ## 2026-08-19 (qq) — FOUR SURFACES PRICED IN ONE PASS: the directional-funding gate supplies neither timing nor selection, the allocation claim does not rank, and the tail's real signal is exactly consumed by execution
 
