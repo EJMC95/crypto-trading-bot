@@ -365,7 +365,7 @@ def candidates(fund, held, stable_since, t0, prem_map=None, apr_lo=None,
 
 def scan_census(fund, held, stable_since, t0, prem_map=None, apr_lo=None,
                 apr_hi=None, min_vol=None, max_vol=None, stable_h=STABLE_H,
-                class_ok=None):
+                class_ok=None, prem_out=None):
     """WHY DID NOTHING OPEN? Buckets are mutually exclusive, mirror the gate
     order exactly, and sum to `scanned`. `above_band` is the carry cohort's
     supply, counted so the tiling is visible from the row itself; `deep` is
@@ -390,6 +390,24 @@ def scan_census(fund, held, stable_since, t0, prem_map=None, apr_lo=None,
             continue
         apr = rate * H
         a = abs(apr)
+        # [19-Aug (qh)] THE FALSIFIABILITY TAP. The 10bps adverse-basis veto
+        # fired 0 times in its first 21d — and that zero was UNREADABLE:
+        # retained premium history keeps only the scout's top-8 outliers
+        # (cutoff median 17.9bps > the veto), so band-coin premiums were
+        # visible in 1 of 5,580 candidate coin-snapshots. "0 fires" is
+        # byte-identical between a slack bar and blind history — the (ly)
+        # falsifiable-census principle applied to a gate. This records the
+        # premium of every IN-BAND, class-admissible coin into the caller's
+        # dict, so the row itself shows how close the band population runs
+        # to the bar. Output-only: the census buckets are untouched (the
+        # selftest pins their exact shape and partition).
+        if prem_out is not None and apr_lo <= a < apr_hi and class_ok(c):
+            _p = (prem_map or {}).get(c)
+            if _p is not None:
+                try:
+                    prem_out[c] = round(float(_p), 2)
+                except (TypeError, ValueError):
+                    pass
         if a < apr_lo:
             out["below_band"] += 1
         elif a >= apr_hi:
@@ -460,7 +478,8 @@ def carry_ledger(positions):
     return out
 
 
-def build_state(positions, stable_since, stable_sign, last_ts, now=None):
+def build_state(positions, stable_since, stable_sign, last_ts, now=None,
+                veto_fires=0):
     """The persistence blob — ONE builder so the selftest exercises the same
     payload main() saves. The stability clock rides the `hot_since` key so
     funding_basis.restore_hot_since (the (iu)-hardened restorer) owns the
@@ -468,10 +487,12 @@ def build_state(positions, stable_since, stable_sign, last_ts, now=None):
     clock is."""
     return {"positions": positions, "hot_since": stable_since,
             "stable_sign": stable_sign, "last_ts": last_ts,
+            "veto_fires": int(veto_fires),   # (qh) survives restarts
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, open_pnl, realized):
+def build_extra(census, positions, open_pnl, realized,
+                band_prems=None, veto_fires=0, prem_coverage=0):
     """The published `extra` — ONE builder ((hj)). `caps` publishes the FULL
     band, floor AND ceiling, apr AND volume — (gl)/I20: an unpublished
     ceiling is how a band book gets counted as a rival for supply its own
@@ -493,6 +514,16 @@ def build_extra(census, positions, open_pnl, realized):
                  "max_positions": MAX_POSITIONS, "clip_usd": CLIP_USD,
                  "crypto_only": not ALLOW_NONCRYPTO},
         "scan": census,
+        # [19-Aug (qh)] the veto's falsifiability surface: the premiums of
+        # every in-band admissible coin THIS loop (how close the population
+        # runs to the 10bps bar), fetch coverage (0 = fetch failed, the
+        # fail-OPEN dark case — distinguishable from "no band coins"), and
+        # the cumulative loop-coin fire counter (persisted). All three keys
+        # ALWAYS present — a key that appears only when it fires is the
+        # ambiguity this exists to remove ((qg)).
+        "basis": {"band_prems": dict(band_prems or {}),
+                  "coverage": int(prem_coverage),
+                  "veto_fires": int(veto_fires)},
         "carry_ledger": carry_ledger(positions),
     }
 
@@ -608,6 +639,7 @@ def main():
     positions = {}      # coin -> pos dict
     stable_since = {}   # coin -> ts (sign, in-band) became continuously true
     stable_sign = {}    # coin -> +1/-1, the sign the clock above certifies
+    veto_fires = 0      # (qh) cumulative adverse-basis loop-coin counts
     _saved = None
     try:
         # the CHECKED read ((jd)): a blip at boot must not seed empty
@@ -615,6 +647,11 @@ def main():
         _saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
         if _saved and isinstance(_saved.get("positions"), dict):
             positions = _saved["positions"] or {}
+        if _saved is not None:
+            try:
+                veto_fires = int(_saved.get("veto_fires") or 0)  # (qh)
+            except (TypeError, ValueError):
+                veto_fires = 0
         if _saved is not None:
             stable_since, _why = funding_basis.restore_hot_since(
                 _saved, time.time())
@@ -742,8 +779,13 @@ def main():
                     stable_sign.pop(c, None)
 
             held = set(positions)
+            band_prems = {}
             census = scan_census(fund, held, stable_since, t0,
-                                 prem_map=prem_map)
+                                 prem_map=prem_map, prem_out=band_prems)
+            # [19-Aug (qh)] cumulative veto counter — LOOP-COIN counts (a
+            # coin sitting adverse for 10 loops counts 10), declared as
+            # such; persisted so a restart cannot zero the record.
+            veto_fires += int(census.get("adverse_basis") or 0)
 
             # ---- entries: take the receiving side of stable carry -------
             free = MAX_POSITIONS - len(positions)
@@ -763,7 +805,9 @@ def main():
             # ---- publish -------------------------------------------------
             open_pnl = sum(position_pnl(p) for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
-            extra = build_extra(census, positions, open_pnl, realized)
+            extra = build_extra(census, positions, open_pnl, realized,
+                                band_prems=band_prems, veto_fires=veto_fires,
+                                prem_coverage=len(prem_map or {}))
             try:
                 store.publish(
                     bot_id, status="online", equity=equity,
@@ -778,7 +822,8 @@ def main():
                 pass
             try:
                 store.save_state(bot_id, build_state(
-                    positions, stable_since, stable_sign, last_ts, t0))
+                    positions, stable_since, stable_sign, last_ts, t0,
+                    veto_fires=veto_fires))
             except Exception:  # noqa: BLE001
                 pass
 
