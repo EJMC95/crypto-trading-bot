@@ -966,7 +966,7 @@ def _census_extra(b):
     if not getattr(b.s, "census", False):
         return {}
     out = dict(b.scan)
-    # [2026-08-19 (rq)] IS THE GATE EVEN REACHABLE? The census says WHY nothing
+    # [2026-08-19 (rr)] IS THE GATE EVEN REACHABLE? The census says WHY nothing
     # opened; this says HOW FAR AWAY the market is from opening something —
     # which is the difference between "quiet today" and "this threshold will
     # never fire", and 👩 mum v1 died of the second while every reading on her
@@ -1623,7 +1623,7 @@ def main():
                 sig = b.s.signals(bars, _extra) if new_candle else None
                 if new_candle:
                     b.last_sig_ts[coin] = sig_ts
-                # [(rq)] gate REACHABILITY: keep the last reading per coin so
+                # [(rr)] gate REACHABILITY: keep the last reading per coin so
                 # the row can say how far the market is from the entry bar.
                 if sig and isinstance(sig.get("rsi"), (int, float)):
                     b.last_rsi[coin] = float(sig["rsi"])

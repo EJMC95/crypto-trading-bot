@@ -119,16 +119,33 @@ KEY_ALIASES = {"implementation_shortfall": ("impl-shortfall",),
 #: must name why — the `BORN_DARK_OK` idiom.
 STAGGER_OK: dict[str, str] = {
     "lighter_ticket_taker": (
-        "a trading BOOK, not a bus organ: it publishes no bot_state key with a "
-        "ttl_sec, so the 3x-interval proxy (15 min) governs by fallback — but "
-        "its only cross-process reader is its bot_pnl row behind fleet_risk's "
-        "STALE_ROW_SEC=3900s (65 min) staleness filter, 4.3x the proxy. The "
-        "19-Aug merge storm (a 17-min run of sub-210s commit gaps on the "
-        "commit-time proxy) sat well inside that real contract, and the proxy "
-        "alone turned the whole fleet's suite red ((rg)). This waives the "
-        "PROXY, never the contract: a burst outlasting 65 min WOULD silence "
-        "the row for real — revisit if the deploy cadence ever sustains that."),
+        "TEMPORARY SUPPRESSION, NOT AN ACQUITTAL — and its original reason was "
+        "WRONG, corrected in place 19-Aug per I12. That reason claimed the "
+        "taker's only cross-process reader was its bot_pnl row behind "
+        "fleet_risk.STALE_ROW_SEC=3900s (65 min), i.e. 4.3x this guard's "
+        "3x-interval proxy, so the measured 17-min burst 'sat well inside the "
+        "real contract'. BOTH halves are false, verified by EXECUTING the "
+        "resolver rather than grepping it: pnl_dashboard.stale_secs_for("
+        "'lighter-ticket-taker-lshadow') returns 900s (VARIANT_STALE_SECONDS, "
+        "300s cadence x ~2 missed publishes), fleet_watchdog_svc turns any "
+        "row's `stale` flag into a paged problem, and the burst was 1034s — "
+        "which EXCEEDS that bar by 134s. So the proxy was not merely defensible, "
+        "it was NUMERICALLY RIGHT (900s == the 15-min proxy, ratio 1.0), and "
+        "this exemption is suppressing a TRUE POSITIVE: during that burst the "
+        "shadow Taker — the control arm the whole go-live rests on — could "
+        "genuinely be starved of its first run, and its row would read stale to "
+        "the watchdog. IT IS KEPT ONLY BECAUSE THE ALTERNATIVE IS WORSE TODAY: "
+        "removing it reddens the suite fleet-wide for every concurrent session "
+        "while the actual fix is already written and in flight. THE ACTUAL FIX "
+        "is the (ou) boot ladder — `sleep 20; run once; sleep 190;` before the "
+        "unchanged loop, so the organ reaches its first run at t=20 and every "
+        "later run still lands at t=210/510/810 — which run_all.sh's Taker "
+        "block still lacks (verified: a bare `( sleep 210` at the block head, "
+        "against golive_readiness's laddered shape 200 lines below). "
+        "DELETE THIS ENTRY the moment that ladder lands; it is dead weight the "
+        "second the organ can no longer be starved. Owner: PR #192."),
 }
+
 
 
 def declares_flag(script: str, flag: str) -> bool | None:

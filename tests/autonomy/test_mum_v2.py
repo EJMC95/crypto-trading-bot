@@ -231,7 +231,7 @@ def test_the_census_can_name_the_binding_constraint():
 
 
 def test_the_gauge_says_how_far_the_market_is_from_the_bar():
-    """(rq): the census says WHY nothing opened; the gauge says HOW FAR AWAY
+    """(rr): the census says WHY nothing opened; the gauge says HOW FAR AWAY
     the market is from opening something. `no_signal: 23` is byte-identical
     between "quiet today" and "this threshold will never fire" — and v1 died
     of the second while every reading on her row looked like the first."""
