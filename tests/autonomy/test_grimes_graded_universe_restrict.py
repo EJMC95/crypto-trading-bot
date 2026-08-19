@@ -92,20 +92,35 @@ def test_skip_sits_between_held_check_and_candle_fetch():
         "the restrict must run BEFORE the candle fetch"
 
 
-def test_the_skip_is_gated_on_trade_ungraded_and_gate_set():
-    """The skip's own condition must consult BOTH the revert env and
-    membership — a skip keyed on only one of them either cannot be reverted
-    or restricts nothing."""
+def test_entry_graded_ok_behaviour(monkeypatch):
+    """BEHAVIOURAL pin on the one owner of the rule — the first cut inlined
+    the condition and its mutation round left an inverted membership check
+    and an `if False and ...` both GREEN, because structural tests only see
+    that names appear, not what the condition computes."""
+    g = _fresh(monkeypatch)
+    graded = g.GATE_COINS[0]
+    assert g.entry_graded_ok(graded) is True, \
+        "a gate-graded coin must be enterable"
+    assert g.entry_graded_ok("NOT_A_REAL_COIN_XYZ") is False, \
+        "an ungraded coin must be refused by default"
+    g2 = _fresh(monkeypatch, GRIMES_TRADE_UNGRADED="1")
+    assert g2.entry_graded_ok("NOT_A_REAL_COIN_XYZ") is True, \
+        "the revert env must admit everything again"
+    assert g2.entry_graded_ok(g2.GATE_COINS[0]) is True
+
+
+def test_the_loop_consults_the_one_owner_and_counts_refusals():
+    """The entry loop must call entry_graded_ok (never a second inline copy
+    of the rule — (hj)) and must COUNT what it refuses."""
     import lighter_book_grimes_bot as g
     tree = ast.parse(pathlib.Path(g.__file__).read_text(encoding="utf-8"))
     loop = _entry_loop(tree)
     for node in ast.walk(loop):
         if not isinstance(node, ast.If):
             continue
-        names = {n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)}
-        if "TRADE_UNGRADED" in names:
-            assert "_GATE_SET" in names, \
-                "the skip must test membership of _GATE_SET"
+        calls = {c.func.id for c in ast.walk(node.test)
+                 if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+        if "entry_graded_ok" in calls:
             body_keys = {n.slice.value for n in ast.walk(node)
                          if isinstance(n, ast.Subscript)
                          and hasattr(n.slice, "value")
@@ -113,7 +128,7 @@ def test_the_skip_is_gated_on_trade_ungraded_and_gate_set():
             assert "ungraded_skip" in body_keys, \
                 "the skip must COUNT what it refuses, never silently drop it"
             return
-    raise AssertionError("no TRADE_UNGRADED-gated skip found in the entry loop")
+    raise AssertionError("entry loop does not consult entry_graded_ok")
 
 
 def test_census_literal_carries_the_bucket():

@@ -206,6 +206,15 @@ TRADE_UNGRADED = os.environ.get(
     "GRIMES_TRADE_UNGRADED", "").strip().lower() in ("1", "true", "yes")
 _GATE_SET = frozenset(GATE_COINS)
 
+
+def entry_graded_ok(coin):
+    """May `coin` be ENTERED under the graded-universe restrict?
+
+    ONE owner for the rule, so it is behaviourally testable — the first cut
+    inlined the condition in the loop and its mutation round proved the
+    structural tests could not see an inverted membership check."""
+    return TRADE_UNGRADED or coin in _GATE_SET
+
 #: The roster. `breakout` is DELIBERATELY absent — 🧙 book-schwager owns
 #: channel breakouts on this universe (I20); adding it here mints the same
 #: bet at a second row id. Selftest-pinned.
@@ -921,7 +930,7 @@ def main():
                 # may not be ENTERED. Counted, never silent — and placed
                 # before the candle fetch so a skipped coin costs no REST
                 # call. Held coins are handled above and are never skipped.
-                if not TRADE_UNGRADED and coin not in _GATE_SET:
+                if not entry_graded_ok(coin):
                     census["ungraded_skip"] += 1
                     continue
                 try:
