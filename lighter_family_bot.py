@@ -562,14 +562,26 @@ class OversoldRebound(Carrier):
     {n, mean_pct, null_pct, edge_pct} every loop, so at day 30 the verdict is
     her mean against her OWN null on the same clock, readable from the payload.
 
-    I20 — SHE TILES, SHE DOES NOT DUPLICATE. The entry requires **NOT
-    (e50 > e200)**, and 🙏 avo's SwingDip requires `e50 > e200`. The two cells
-    are therefore **disjoint by construction**, in the same process, on the
-    same universe: avo takes dips INSIDE an uptrend on 4h with a ~3.5-day
-    hold; mum takes the deep tail OUTSIDE one on 1h with a 12-hour cap. The
-    `(lv)` subset-starvation trap — a consumer that can be starved by a
-    superset running first — is structurally unreachable between them, the
-    same argument 🧭 nav-cook used to tile below 🪁 band-kelly's floor.
+    I20 — SHE TILES, AND THE CLAIM IS STATED AT ITS REAL STRENGTH. The entry
+    requires **NOT (e50 > e200)** while 🙏 avo's SwingDip requires
+    `e50 > e200`, so on the SAME timeframe the two predicates are disjoint by
+    construction and the `(lv)` subset-starvation trap — a consumer starved by
+    a superset running first in the same process — is unreachable between
+    them. avo takes dips INSIDE an uptrend on 4h holding ~3.5 days; mum takes
+    the deep tail OUTSIDE one on 1h capped at 12h.
+
+    **THE HONEST LIMIT, declared rather than glossed: the two books read trend
+    on DIFFERENT timeframes** (mum 1h, avo 4h), so a coin in a 4h uptrend that
+    is simultaneously in a 1h downtrend can satisfy BOTH — the predicates are
+    disjoint per-timeframe, not across timeframes, and a simultaneous long in
+    both books is therefore possible. That is I20's "one bet held twice" in its
+    weak form. It is NOT closed by a new gate here, because closing it would
+    mean shrinking mum's supply on no measurement; it is bounded by machinery
+    that already exists and binds fleet-wide — `fleet_risk`'s per-symbol cap
+    and the enforced 20-long budget, both checked at this loop's entry site.
+    Monitorable from the payload: mum's `held` map beside avo's. If the pair
+    is measured to co-hold materially, the cheap fix is a 4h-trend screen on
+    mum, and it should be made on that measurement rather than pre-emptively.
 
     DELIBERATELY NOT ENCODED, so nobody re-proposes them as oversights: no
     trend filter (measured destructive), no pyramiding, no ROI widening, no

@@ -94,12 +94,22 @@ drift and regime. `extra.control` publishes `{n, mean_pct, null_pct, edge_pct}`
 every loop, **always present including at n=0** ((lv)). At day 30 the verdict is
 her mean against her OWN null, on the same clock, readable from the payload.
 
-**I20 — SHE TILES, SHE DOES NOT DUPLICATE.** Her entry requires NOT-uptrend and
-🙏 avo's requires `e50 > e200`: the two cells are **disjoint by construction**, in
-the same process, on the same universe. avo takes dips INSIDE an uptrend on 4h
-holding ~3.5 days; mum takes the deep tail OUTSIDE one on 1h capped at 12h. The
-`(lv)` subset-starvation trap between them is structurally unreachable — the same
-argument 🧭 nav-cook used to tile below 🪁 band-kelly's floor.
+**I20 — SHE TILES, AND THE CLAIM IS STATED AT ITS REAL STRENGTH.** Her entry
+requires NOT-uptrend and 🙏 avo's requires `e50 > e200`, so **on the same
+timeframe the predicates are disjoint by construction** and the `(lv)`
+subset-starvation trap between two books in one process is unreachable. avo
+takes dips INSIDE an uptrend on 4h holding ~3.5 days; mum the deep tail OUTSIDE
+one on 1h capped at 12h.
+**THE HONEST LIMIT, declared rather than glossed:** the two read trend on
+DIFFERENT timeframes (1h vs 4h), so a coin in a 4h uptrend and a 1h downtrend
+can satisfy both, and a simultaneous long in both books is possible — I20's
+"one bet held twice" in its weak form. Deliberately NOT closed with a new gate:
+that would shrink mum's supply on no measurement. It is bounded by machinery
+that already binds fleet-wide (`fleet_risk`'s per-symbol cap and the enforced
+20-long budget, both checked at this entry site) and is monitorable from the
+payload (mum's `held` map beside avo's). If co-holding is MEASURED to be
+material, the cheap fix is a 4h-trend screen on mum — made on the measurement,
+not pre-emptively.
 
 **TWO REVIVAL HAZARDS THAT WOULD HAVE BITTEN SILENTLY, both closed:**
 * **Her four frozen v1 positions hold all four slots.** Revived as-is she could

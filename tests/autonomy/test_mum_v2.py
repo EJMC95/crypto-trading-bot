@@ -103,9 +103,12 @@ def test_she_has_a_real_stop_and_it_is_inside_the_gate_bar():
 def test_the_entry_refuses_the_trend_filter_that_was_measured_destructive():
     """(qu) measured avo's `e50>e200` filter as ACTIVELY DESTRUCTIVE (adding it
     lowered the mean of every base). v2 takes the deep tail OUTSIDE an uptrend
-    — which also makes her cell DISJOINT from avo's by construction (I20), so
-    the (lv) subset-starvation trap between two books in one process is
-    structurally unreachable."""
+    — which also makes her cell disjoint from avo's ON THE SAME TIMEFRAME
+    (I20), so the (lv) subset-starvation trap between two books in one process
+    is unreachable. NOTE the declared limit, which this test does NOT claim to
+    cover: the two books read trend on different timeframes (1h vs 4h), so
+    cross-timeframe co-holding of one coin remains possible and is bounded by
+    fleet_risk's per-symbol cap rather than by this predicate."""
     s = _mum()
     n = 260
     # a deep-oversold tape in a DOWNtrend: long decline, so e50 < e200
