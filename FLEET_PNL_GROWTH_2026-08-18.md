@@ -112,7 +112,35 @@ gate-bound. (A `--days 30` calibration row was attempted and NOT quoted: the
 harness serves the full cached span regardless of `--days` — identical n
 across a 6× window change — a quirk flagged for the next pass.)
 
-## 5 · THE THREE ADMITTED STUDIES (cheap, Lighter-only, each with its null) — where new edge could come from
+## 5 · THE THREE ADMITTED STUDIES — **ALL RUN AND CLOSED NEGATIVE 19-Aug ((qi)), corrected in place per I12 so this section can never be re-opened on a hunch**
+
+The section below proposed three studies. `(qi)`'s six-hunter pass ran all
+three the next day with adversarial referees, and **every one closed
+negative** — which is the most valuable outcome available: each was a
+standing question that would otherwise have been re-proposed forever. The
+closing numbers, so they stay closed:
+
+1. **Divergence-conditioned harvesting — CLOSED NEGATIVE.** Pooled over 241
+   covered era closes, the |gap|-at-open buckets are NON-MONOTONE with the
+   best bucket in the middle (0–10pp −$16.00 · 10–20pp +$5.30 · ≥37.5pp
+   −$10.98, collapsing to −$0.66 once the shipped `(lk)` screen is removed).
+   No screen ships on any book; the LIT/ZEC/VVV losses were gap-quiet end to
+   end — price/stop losses, not cross-venue contradiction.
+2. **Funding-extreme squeeze — CLOSED NEGATIVE IN BOTH DIRECTIONS.** All 9
+   cells refuted: every receiving-side forward return is negative and never
+   beats the own-coin null (80%/24h −0.880%/episode, null −0.115%, P=0.957);
+   at the 80% bar the adverse price leg is ~5× the funding collected — the
+   receiver PAYS the squeeze premium. The mirror (pay-and-ride) dies on
+   best-of-9 selection + the `(oj)` tail shape (3 of 146 episodes = 56% of
+   gross).
+3. **Listing lifecycle — the founding thesis REFUTED and the supply DEAD.**
+   TP hit 2 of 73 crypto births (2.7%), −0.33%/episode vs −0.05% null
+   (P=0.707), median day-7 debut −13.4% — and zero crypto births Jun–Aug
+   (last one 85 days ago). The sniper's "deliberately unscreened founding
+   thesis" line in CLAUDE.md was corrected in place the same pass.
+
+The original proposals are kept below as the record of what was asked:
+
 
 1. **Divergence-conditioned harvesting** — split funding extremes into
    Lighter-idiosyncratic (plumbing → harvest) vs cross-venue-mirrored
@@ -143,9 +171,9 @@ The adversarial referee wave completed on the capital/inventory/venue/decay
 lenses: **3 findings survived** (the avo path, the liquidity-drought reframe,
 the carry-census defect — now fixed), and most "refutations" were
 *stale-because-already-shipped* confirmations of this same day's work. The
-§5 outside-lens studies were **never refereed** (the final wave hit a session
-limit) — they are lens-proposed candidates, not refereed survivors, and any
-build on them starts with its own pre-registered study.
+§5 outside-lens studies were never refereed by THAT wave (it hit a session
+limit) — and the point is now moot: `(qi)` ran all three as full studies the
+next day and closed each negative (see the §5 header correction).
 
 ## 6 · REFUSALS RECORDED THIS PASS (I19 — each with its number)
 

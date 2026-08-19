@@ -1,3 +1,17 @@
+## 2026-08-19 (qm) — THE (qa) MEMO'S §5 IS CORRECTED IN PLACE: ALL THREE ADMITTED STUDIES NOW CLOSED NEGATIVE, AND THE MEMO SAYS SO WHERE IT PROPOSED THEM
+
+Small I12 pass, one file. `FLEET_PNL_GROWTH_2026-08-18.md` §5 proposed three
+studies as "where new edge could come from" and its referee-status note
+recorded them as "never refereed". `(qi)` ran all three the next day and
+closed each NEGATIVE (divergence-conditioning non-monotone, no screen ships;
+squeeze refuted in all 9 cells both directions, the receiver pays ~5× the
+funding at the 80% bar; listing thesis refuted at 2-of-73 TP with the supply
+dead 85 days). A standing doc that still ADVERTISES closed questions as open
+edge candidates is exactly the re-open-on-a-hunch surface I12 exists to
+remove — the closing numbers are now engraved in the §5 header above the
+original proposals, which stay as the record of what was asked. No code, no
+levers, no clocks.
+
 ## 2026-08-19 (ql) — THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean, and georgia's exit question turns out to be STRUCTURALLY unanswerable by the instrument I sent it to
 
 *(Renumbered from (qj) at push time — a concurrent session's "OPERATOR
