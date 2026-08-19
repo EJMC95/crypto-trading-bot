@@ -173,7 +173,7 @@ def test_a_shadow_arm_is_unaffected():
 # everything above tests the PREDICATE and nothing tested the CALL.
 #
 # AST for the call site, and stated honestly: AST sees identifiers in shapes,
-# not values or bindings ((qj) drove seven survivors through exactly that), so
+# not values or bindings ((qm) drove seven survivors through exactly that), so
 # the env contract below is driven behaviourally instead.
 # ---------------------------------------------------------------------------
 

@@ -198,7 +198,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #     when the (hp) failover pair flips, the takeover container starts cold
 #     clocks and cannot enter until a fresh window persists the full gate:
 #     that blackout is now ≥12h instead of ≥6h, on a supply whose median
-#     window is 2h. **CORRECTED AND PART-CLOSED at (qj) the same day — read
+#     window is 2h. **CORRECTED AND PART-CLOSED at (qm) the same day — read
 #     that entry, not this paragraph. (a) This described the wrong failure:
 #     on a real pair flip the pre-fix clock was stale-and-PRESENT (permissive
 #     entry), never cold, because the standby container's boot restore
@@ -379,7 +379,7 @@ def _class_ok(coin):
 
 
 def reclaim_after_standby(saved, ok_read, now, gap_cap_s=48 * 3600.0):
-    """[(qj)] What a container must ADOPT the moment it wins the claim after
+    """[(qm)] What a container must ADOPT the moment it wins the claim after
     standing down — (ok, positions, hot_since, last_ts, why).
 
     THE DEFECT THIS CLOSES. `(hp)` made the two carry containers a deliberate
@@ -841,7 +841,7 @@ def main():
         _lt = 0.0
     last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
 
-    # [(qj)] Did THIS process stand down? The durable restore above runs once,
+    # [(qm)] Did THIS process stand down? The durable restore above runs once,
     # at boot; a container that idles behind the (hp) claim and later wins it
     # would otherwise resume from a boot snapshot of a world the incumbent has
     # been moving for hours. See `reclaim_after_standby`.
@@ -931,13 +931,13 @@ def main():
                 })
             except Exception:  # noqa: BLE001
                 pass
-            # [(qj)] Remember it, so WINNING the claim later re-adopts the
+            # [(qm)] Remember it, so WINNING the claim later re-adopts the
             # durable world instead of this process's stale boot snapshot.
             _stood_down = True
             time.sleep(LOOP_SECONDS)
             continue
 
-        # [(qj)] TAKEOVER: this process has just WON a claim it did not hold.
+        # [(qm)] TAKEOVER: this process has just WON a claim it did not hold.
         # Adopt the incumbent's durable world before touching the book — the
         # boot restore ran once and everything in memory is that old snapshot.
         # Fail-CLOSED: on a failed read, trade NOTHING and save NOTHING this
@@ -949,7 +949,7 @@ def main():
             if not _proceed:
                 print(f"[{now_iso()}] TAKEOVER HELD — {_why_adopt}", flush=True)
                 try:
-                    # [(qj)] The held state gets a KEY, for the same reason
+                    # [(qm)] The held state gets a KEY, for the same reason
                     # standing down does ((ic)): otherwise this container is
                     # byte-identical to a dead one — the row simply stops
                     # moving with `status: "online"` as its last word (I1),
