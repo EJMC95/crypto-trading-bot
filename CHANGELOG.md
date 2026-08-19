@@ -1,3 +1,56 @@
+## 2026-08-19 (qp) — "IF IT WORKS, ADJUST THE REAL BOT TOO": THE ANSWER IS **NO**, AND THE SIGN FLIPS BETWEEN THE TIERS — the same gate that is 96% of 🛢️ Garrett's LOSS is 127% of 💸 the Farmer's PROFIT
+
+**Operator: "If it works, adjust the real bot too."** The real-bot equivalent of
+`(qo)`'s Garrett tightening is exact and tempting: 💸 the Farmer runs the **same
+5% floor Garrett had**, and the venue's resting-default funding rate (~10.512%
+TRUE) sits ABOVE it, so the live book can enter the venue's do-nothing rate too.
+The proposal was already on the board as a judge candidate
+(`xp.funding.enter_apr 0.05 → 0.1095`, inside its cage).
+
+**MEASURED FIRST, AND IT INVERTS.** Same method as `(qo)` — every era close
+joined to the scout's `funding` cross-section at open (9,521 snapshots since
+17-Jul, **0 unmatched on either arm**):
+
+| book | tier | AT the pin | off the pin | pin share of P&L |
+|---|---|---:|---:|---:|
+| 🛢️ Garrett | [$0.1M, $2M) | **−1.343%**/trade (n=13) | −0.086% (n=9) | **95.8% of the LOSS** |
+| 💸 **Farmer LIVE** | ≥$10M | **+0.0757%**/trade (n=72) | −0.0721% (n=16) | **126.9% of the PROFIT** |
+| 💸 Farmer shadow | ≥$10M | **+0.0740%**/trade (n=110) | −0.1140% (n=45) | **270.4% of the PROFIT** |
+
+**Both Farmer arms agree, independently, and against Garrett.** Tightening the
+live gate to 0.1095 would remove **81.8% of the real book's entries and all of
+its realised profit** — it would have been a direct, confident, measured-looking
+way to break the only real-money book that makes money.
+
+**WHY THE SIGN FLIPS, so this is a rule and not a coincidence:** the pin is not
+a signal, it is the venue's *default state*. What differs is the TIER it is read
+in. In Garrett's thin band a resting rate means "nothing is happening on an
+illiquid book" — you collect ~nothing and pay the spread to leave. At the
+Farmer's ≥$10M floor the same resting rate still accrues on a book deep enough
+to exit cheaply, so it is the ordinary profitable state of a liquid carry. **A
+constant that is noise in one tier is the business in another.**
+
+**GENERAL RULE, engraved because this class keeps costing money:** a gate
+finding measured on one book does NOT transfer to another book at a different
+tier, however identical the constant looks. `(lp)` made Garrett a VARIANT of the
+Farmer's file precisely so one machine could serve both — and that shared
+lineage is exactly what makes "apply it to the real bot too" feel safe. It is
+not. Transfer requires re-measuring **on the target book's own ledger**; this
+one took two queries and would have cost the fleet its only profitable
+real-money arm.
+
+**NOTHING SHIPPED TO REAL MONEY.** No live gate moved, no `xp.funding.*`
+candidate queued — and the judge remains the sole writer of `live.funding.*`
+regardless. `(qo)`'s Garrett tightening stands on its own tier's evidence and is
+unaffected. The pre-registered read on whether Garrett's change WORKS is
+unchanged and still pending: it needs closes under the new gate, and the book
+was at 6/6 held when it shipped.
+
+**What the Farmer's numbers do say, recorded for the judge rather than acted on:
+neither arm separates significantly** (pin t=+0.54 live, +0.36 shadow; off-pin
+t=−0.19 / −0.30). So there is no supported gate move on the Farmer in EITHER
+direction today — the honest reading is "the 5% floor is not the problem", not
+"loosen it further".
 ## 2026-08-19 (qo) — TWO SHADOW GATES MOVED ON THE OPERATOR'S "DO WHAT MAKES MORE MONEY, RISK OR NO RISK" — one verified from the ledger and biting, one shipped with its claim UNCONFIRMED and said so
 
 **Operator: "do what makes more money, risk or no risk."** Two env-only gate
