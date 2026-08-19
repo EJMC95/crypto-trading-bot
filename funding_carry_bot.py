@@ -119,7 +119,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # funding distribution has collapsed — a market condition, not a defect. This
 # removes a STRUCTURAL blind spot in the rail; it does not buy a trade today
 # and must not be reported as if it did.
-# [2026-08-18 (px) — letter corrected from a stale (pr) at (qk); (pr) is the Farmer halt entry — CORRECTED IN PLACE per I12 — the "zero unlock" above was a
+# [2026-08-18 (px) — letter corrected from a stale (pr) at (qo); (pr) is the Farmer halt entry — CORRECTED IN PLACE per I12 — the "zero unlock" above was a
 # POINT-IN-TIME census (3-Aug's loop), and over the whole tape it does not
 # hold. Measured on 9,996 scout snapshots / 34.9 days through
 # audit_book_overlap.supply_in (the gate rule's one owner): cell occupancy
@@ -166,7 +166,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #   * bleed stop                       (catastrophic guard on adverse holds)
 # Entries additionally require the rate to have stayed hot >= PERSIST_H — the
 # research-backed filter: persistent funding pays carries, spikes pay fees.
-# [2026-08-18 (qk)] PERSIST 6h -> 12h — the ONE half (px) deliberately parked,
+# [2026-08-18 (qo)] PERSIST 6h -> 12h — the ONE half (px) deliberately parked,
 # shipped under the operator's queue directive ("implement all operator queue
 # items that make the fleet improve/make more profit and win rate"). Evidence:
 # STUDY_FUNDING_LIFECYCLE_2026-08-15.md §4 (E4), the cell's own 205d episode
@@ -187,7 +187,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 # under 12h. Ordinary entry tuning per (hc) — the era is unchanged, and the
 # ~30-Aug keep-or-retire docket call is UNTOUCHED (if that call is retire,
 # this dies with the book at zero cost, exactly as the queue item priced it).
-# TWO MORE COSTS, DECLARED (the same-hour referee wave, (qk)):
+# TWO MORE COSTS, DECLARED (the same-hour referee wave, (qo)):
 # (1) TIER TRANSFER UNMEASURED — the §4 walk ran on the pre-(px) ≥$2M cell;
 #     the [$1M,$2M) tier (px) admitted three days later (ROBO/ENA/XRP, now
 #     the MAJORITY of the widened cell's occupancy) was not in its episode
@@ -198,7 +198,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #     when the (hp) failover pair flips, the takeover container starts cold
 #     clocks and cannot enter until a fresh window persists the full gate:
 #     that blackout is now ≥12h instead of ≥6h, on a supply whose median
-#     window is 2h. **CORRECTED AND PART-CLOSED at (qm) the same day — read
+#     window is 2h. **CORRECTED AND PART-CLOSED at (qp) the same day — read
 #     that entry, not this paragraph. (a) This described the wrong failure:
 #     on a real pair flip the pre-fix clock was stale-and-PRESENT (permissive
 #     entry), never cold, because the standby container's boot restore
@@ -209,7 +209,7 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #     (1800s) exceeds the clock-restore bound (900s), so `takeover_step`
 #     always starts a takeover on cold clocks. That is the accepted price of
 #     refusing the permissive path.**
-PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qk): 6.0 -> 12.0]
+PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qo): 6.0 -> 12.0]
 # [2026-08-18 (px)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
 # (scripts/study_books_cohort_2026-08-13.py, this cell's OWN gate and coins,
 # 250d of settled fundings): grace 1h = +$27.25, t=1.95, h2 NEGATIVE, with
@@ -220,7 +220,7 @@ PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin mus
 # flips. 6h over the 24h optimum for decidability (I17) — ~79% of the close
 # cadence at double the per-trade expectancy — and it mirrors PERSIST_H: six
 # hours of proof to buy, six to sell (the same choice 🏦 Rich Dad made on
-# this cell at (mf)). [(qk) broke that mirror DELIBERATELY: entry persistence
+# this cell at (mf)). [(qo) broke that mirror DELIBERATELY: entry persistence
 # moved to 12h on its own §4 measurement while this exit grace stays at its
 # own measured 6h — each side sits on its own evidence, and symmetry was
 # never the argument for either.] (mf) QUEUED this change to protect carry's mid-window
@@ -237,8 +237,61 @@ BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
 
 # Round-trip friction, as fractions of notional per SIDE of the round trip.
 PERP_FEE = 0.00045        # HL taker per perp fill (conservative base tier)
+# [19-Aug (qn)] PERP_FEE IS A HYPERLIQUID CONSTANT AND THIS BOOK STOPPED BEING
+# A HYPERLIQUID BOOK ON 17-JUL — but read the next paragraph before concluding
+# anything about this book's P&L, because the obvious conclusion is WRONG.
+#
+# The HL arm is retired (LIGHTER-ONLY); the only arm that runs is
+# `lighter_shadow`, where the venue's schedule is **zero** on all 203 active
+# books. So a Hyperliquid taker fee has no business on this arm — the same
+# stale-foreign-venue shape as the brain's Kraken-SPOT `FEE_RT` in (gg).
+#
+# **WHAT THIS FIX IS AND IS NOT — measured, because a session nearly shipped
+# the overstated version.** On `lighter_shadow` the perp leg's cost is ALREADY
+# MEASURED per fill by walking the live book (`measured_perp_cost` below);
+# PERP_FEE is only the FALLBACK when no book/price is available, plus the
+# banner and the decay-gate estimate. So this constant is NOT what the book
+# charges on a normal fill, and correcting it does NOT move the ledger.
+# Measured on the era sample (n=10, its own recorded `fees`/`notional`):
+# **median round-trip 22.2bps, range [20.7, 49.7]** — i.e. ~20bps of HEDGE_COST
+# plus ~2bps of MEASURED slippage, NOT the 29.0bps the constants imply. The
+# outlier (49.7bps, KAITO) is a thin book held 149.8h.
+#
+# So there is no phantom fee to delete here, and **no fee-based rescue for
+# 🌾 carry**: at its real charge it reads -0.155%/trade, t=-4.48, and the only
+# way to flip that sign is to delete HEDGE_COST — which this fix deliberately
+# does NOT do. Kiyosaki's header says that leg "is modelled, it does not
+# exist", and this file omits any PRICE term for the same reason
+# (`position_pnl` takes no mark): the hypothetical hedge is what cancels
+# price, so charging its cost and omitting price risk are two halves of ONE
+# coherent simulation. Deleting the cost while keeping no-price-term models a
+# FREE hedge — better than reality in both directions at once, which is how a
+# losing book gets laundered into a winner.
+#
+# VENUE-SCOPED, NEVER GLOBAL — the `_basis` lesson one seat over: a constant
+# that was right for one arm goes silently wrong when the file grows another,
+# so this dispatches on mode instead of overwriting the literal. `hl_paper`
+# keeps 4.5bps, which is CORRECT there. Value: 0.5bps/side, the conservative
+# end of the measured Lighter range (1.02bps RT by order-book walk at this
+# book's clip across 18 books; 0.24bps/side on the live Farmer's 38 real
+# fills). Env-overridable for the next re-measurement.
+PERP_FEE_LIGHTER = float(os.environ.get("CARRY_PERP_FEE_LIGHTER", "0.00005"))
+
+
+def perp_fee(mode):
+    """Per-side perp-leg cost for THIS file's two arms. Venue is PASSED, never
+    defaulted — a bare call would put Hyperliquid's taker fee back on the
+    Lighter arm, which is the defect this exists to close."""
+    return PERP_FEE_LIGHTER if _venue_of(mode) == "lighter" else PERP_FEE
+
+
 HEDGE_COST = 0.0010       # hedge-leg fee + spread per fill (other venue/spot)
 OPEN_COST = PERP_FEE + HEDGE_COST    # charged at open; same again at close
+
+
+def open_cost(mode):
+    """Round-trip-per-side friction on the arm actually running."""
+    return perp_fee(mode) + HEDGE_COST
 
 LOOP_SECONDS = 300        # funding is hourly; 5-min polling is plenty
 
@@ -379,7 +432,7 @@ def _class_ok(coin):
 
 
 def reclaim_after_standby(saved, ok_read, now, gap_cap_s=48 * 3600.0):
-    """[(qm)] What a container must ADOPT the moment it wins the claim after
+    """[(qp)] What a container must ADOPT the moment it wins the claim after
     standing down — (ok, positions, hot_since, last_ts, why).
 
     THE DEFECT THIS CLOSES. `(hp)` made the two carry containers a deliberate
@@ -411,7 +464,7 @@ def reclaim_after_standby(saved, ok_read, now, gap_cap_s=48 * 3600.0):
         the WHOLE standby, though nobody observed the hours between. That is
         the PERMISSIVE failure `(iu)`/`(iq)` exist to refuse — a spike entry
         wearing a streak, on the one book whose thesis is "persistent funding
-        pays carries, spikes pay fees". `(qk)` doubled the exposure by moving
+        pays carries, spikes pay fees". `(qo)` doubled the exposure by moving
         the gate 6h -> 12h, which is what surfaced this.
       * `last_ts` — the accrual clock. Stale positions + a stale clock happen
         to be self-consistent (both are the same boot snapshot), which is
@@ -675,7 +728,7 @@ def _perp_leg_fill(ctx, bot_id, coin, is_buy, notional, mark, publish=True):
     Funded modes never reach here (main() refuses them — no naked-perp path).
     """
     if ctx.mode == "hl_paper":
-        return PERP_FEE * notional, mark
+        return perp_fee(ctx.mode) * notional, mark
     from venues.shadow import fill_from_book  # local import: only lighter modes need it
     try:
         book = ctx.venue.orderbook(coin)
@@ -691,7 +744,9 @@ def _perp_leg_fill(ctx, bot_id, coin, is_buy, notional, mark, publish=True):
         if mid:
             ref, spread_bps = mid, (ask - bid) / mid * 1e4
     if not ref or ref <= 0:
-        return PERP_FEE * notional, mark   # no price to size/measure -> model it
+        # (qn) venue-scoped fallback: a Hyperliquid taker fee must not be
+        # the modelled cost on the Lighter arm when its book is unavailable.
+        return perp_fee(ctx.mode) * notional, mark   # no price -> model it
     size = notional / ref
     fill = fill_from_book(book, is_buy, size) if book else None
     fill_px = fill[0] if fill else ref
@@ -828,7 +883,8 @@ def main():
     print(f"[{now_iso()}] funding-carry DRY-RUN start | venue {_venue_of(_mode)} "
           f"| enter>={_enter_apr:.2%} APR "
           f"exit<{_exit_apr:.2%} | ${NOTIONAL:.0f} x max {MAX_POSITIONS} | "
-          f"friction {2*OPEN_COST*1e4:.0f}bps round-trip | realized so far "
+          f"friction {2*open_cost(_mode)*1e4:.0f}bps round-trip modelled "
+          f"(perp leg MEASURED per fill on lighter) | realized so far "
           f"${realized:+.2f} ({n_closed} closed)")
 
     # [2026-07-16 AUDIT FIX] restore the accrual clock: it reset to
@@ -841,7 +897,7 @@ def main():
         _lt = 0.0
     last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
 
-    # [(qm)] Did THIS process stand down? The durable restore above runs once,
+    # [(qp)] Did THIS process stand down? The durable restore above runs once,
     # at boot; a container that idles behind the (hp) claim and later wins it
     # would otherwise resume from a boot snapshot of a world the incumbent has
     # been moving for hours. See `reclaim_after_standby`.
@@ -931,13 +987,13 @@ def main():
                 })
             except Exception:  # noqa: BLE001
                 pass
-            # [(qm)] Remember it, so WINNING the claim later re-adopts the
+            # [(qp)] Remember it, so WINNING the claim later re-adopts the
             # durable world instead of this process's stale boot snapshot.
             _stood_down = True
             time.sleep(LOOP_SECONDS)
             continue
 
-        # [(qm)] TAKEOVER: this process has just WON a claim it did not hold.
+        # [(qp)] TAKEOVER: this process has just WON a claim it did not hold.
         # Adopt the incumbent's durable world before touching the book — the
         # boot restore ran once and everything in memory is that old snapshot.
         # Fail-CLOSED: on a failed read, trade NOTHING and save NOTHING this
@@ -949,7 +1005,7 @@ def main():
             if not _proceed:
                 print(f"[{now_iso()}] TAKEOVER HELD — {_why_adopt}", flush=True)
                 try:
-                    # [(qm)] The held state gets a KEY, for the same reason
+                    # [(qp)] The held state gets a KEY, for the same reason
                     # standing down does ((ic)): otherwise this container is
                     # byte-identical to a dead one — the row simply stops
                     # moving with `status: "online"` as its last word (I1),
@@ -1015,7 +1071,7 @@ def main():
                     first = pos.setdefault("missing_since", t0)
                     if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
                         continue
-                    pos["fees"] += OPEN_COST * pos["notional"] + \
+                    pos["fees"] += open_cost(_mode) * pos["notional"] + \
                         HEDGE_COST * pos["notional"]
                     pnl = pos["accrued"] - pos["fees"]
                     realized += pnl
@@ -1074,7 +1130,7 @@ def main():
                     pos.pop("flipped_since", None)
                 # Cheap MODELLED estimate first (no per-loop book read): drives
                 # the flip/expire/bleed backstops and the decay pre-filter.
-                close_fee_est = OPEN_COST * pos["notional"]
+                close_fee_est = open_cost(_mode) * pos["notional"]
                 net_if_closed = pos["accrued"] - (pos["fees"] + close_fee_est)
                 flipped = flipped_now and \
                     (t0 - pos["flipped_since"]) / 3600.0 >= FLIP_GRACE_H
@@ -1295,7 +1351,7 @@ def main():
                                     # [(px)] the exit gate publishes like the
                                     # entry gate ((lz)/(pf) doctrine)
                                     "flip_grace_h": FLIP_GRACE_H,
-                                    # [(qk)] the persistence gate too — an
+                                    # [(qo)] the persistence gate too — an
                                     # unpublished gate made the (lz)/(pf)
                                     # collisions undetectable, and this one
                                     # now DIFFERS from 🏦 Rich Dad's 6h on

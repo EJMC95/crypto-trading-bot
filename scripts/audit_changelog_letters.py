@@ -75,7 +75,20 @@ GLUED = re.compile(r"(?<!\A)(?<!\n)## (\d{4}-\d{2}-\d{2}) \(([a-z]+)\)")
 # a guard that cries wolf trains the operator to ignore it. These two forms
 # find 496 real citations with ZERO noise. LIMIT, declared rather than silent:
 # a bare prose citation is not checked; it is also not how code cites.
-CITE_DATED = re.compile(r"\[\d{4}-\d{2}-\d{2} \(([a-z]{1,3})\)\]")
+#
+# [2026-08-19 (qn)] THE SHORT DATE FORM WAS A BLIND SPOT, AND IT WAS FOUND THE
+# ONLY WAY A BLIND SPOT EVER IS — by walking into it. A session cited `(qn)`
+# in three files with NO `(qn)` entry in the changelog, and this guard reported
+# **"OK — 994 citations all resolve"**. Cause: `\d{4}-\d{2}-\d{2}` demands a
+# full ISO date, and the tree also stamps `[19-Aug (qn)]`. MEASURED at the fix:
+# **22 short-form citations across the tree were unverified** (vs 624 ISO), 7
+# of them predating that session — so this was live, not self-inflicted.
+# The widening stays inside the noise argument above: it requires the SAME
+# unambiguous `[<date> (xx)]` bracket, only with a `D-Mon`/`DD-Mon` date. It
+# does NOT reach for bare parens (the 278-hit noise case that argument
+# rejected). Re-measured after: still ZERO false hits.
+_DATE = r"(?:\d{4}-\d{2}-\d{2}|\d{1,2}-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))"
+CITE_DATED = re.compile(r"\[" + _DATE + r" \(([a-z]{1,3})\)\]")
 CITE_TICKED = re.compile(r"`\(([a-z]{1,3})\)`")
 
 

@@ -1,4 +1,9 @@
-## 2026-08-19 (ql) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
+## 2026-08-19 (qq) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
+
+*(Renumbered (ql) -> (qq) at push time: a concurrent session's carried-items
+entry took (ql) on main and is already merged, so this unmerged one moves —
+the convention's own tiebreak. Nothing outside this branch cited (ql) for this
+entry.)*
 
 **Operator, 19-Aug, reframing the whole programme:** *"We are looking at this
 as a risk eliminating job as opposed to a profit motivated job. Let's look at
@@ -83,16 +88,17 @@ a genuinely hedged book's leverage capacity is governed by basis risk rather
 than price risk and is far higher. That is where the next dollar of risk
 appetite should be pointed.
 
-## 2026-08-19 (qm) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
+## 2026-08-19 (qp) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
 
-*(Renumbered (qj) -> (qm) at push time: a concurrent session's risk-up
-mirror package took (qj) on main. By the convention's own tiebreak MINE had
-the stronger claim — seven citations from tracked code against zero for
-theirs — but theirs is already MERGED, and renumbering a merged entry is the
-more disruptive act, so this is the side that moved. Stated rather than
-dressed up as the rule pointing this way.)*
+*(Renumbered (qj) -> (qm) -> (qp) across two push attempts: a concurrent
+session's risk-up mirror package took (qj) on main, then another took (qm)
+while this branch was still unmerged. By the convention's own tiebreak MINE
+had the stronger claim on (qj) — seven citations from tracked code against
+zero for theirs — but theirs was already MERGED, and renumbering a merged
+entry is the more disruptive act, so this is the side that moved both times.
+Stated rather than dressed up as the rule pointing this way.)*
 
-Found closing out `(qk)`'s referee wave — its F5 was declared "named not
+Found closing out `(qo)`'s referee wave — its F5 was declared "named not
 fixed", and I11 says carried work outranks new work, so it was the next brick.
 **The investigation found the referee had named the wrong half, and the
 adversarial pass over THIS fix then found a regression in it.** All line
@@ -107,7 +113,7 @@ before every bookkeeping step — verified structurally at `61f6155`:
 that stands by for hours and then wins the claim resumes from **its own boot
 snapshot of a world the incumbent has been moving ever since**:
 
-* **`positions` — the severe half, and the one `(qk)`'s referee missed.** The
+* **`positions` — the severe half, and the one `(qo)`'s referee missed.** The
   incumbent opened and closed carries during the standby. Adopting the old map
   closes a coin the incumbent ALREADY closed — and **the obvious description of
   that is wrong, which matters because it would send the operator to a scan
@@ -123,11 +129,11 @@ snapshot of a world the incumbent has been moving ever since**:
   produce a genuine second row.
 * **`hot_since`** — a coin hot at boot and hot now read as persisted across the
   whole unobserved standby: the PERMISSIVE direction `(iu)`/`(iq)` exist to
-  refuse. **`(qk)`'s F5 had this backwards** — it described *cold* clocks, and
+  refuse. **`(qo)`'s F5 had this backwards** — it described *cold* clocks, and
   on a real pair flip the pre-fix clock is stale-and-present, never cold,
   because the standby container's boot restore succeeded while the incumbent
   was alive. Corrected in place per I12 rather than graded as a magnitude
-  error. `(qk)`'s 6h → 12h move is what made me re-read the boot-only restore;
+  error. `(qo)`'s 6h → 12h move is what made me re-read the boot-only restore;
   it deepens a single wrong admission (up to 12h of unobserved time can stand
   in for persistence instead of 6h) while making wrong admission *rarer* — so
   "doubled the exposure" is right for the blackout and wrong for this half.
@@ -256,19 +262,20 @@ can now be handed over without silently restating a close, losing an open, or
 entering on a streak nobody watched, and without booking a phantom step-down
 into the equity series the go-live drawdown bar reads. (Deliberately *not*
 calling it "the fleet's best-evidenced book" any more: `(nc)` withdrew that
-headline — every pooled quote overstates by ~$13 — and `(qk)` records 🙏 avo as
+headline — every pooled quote overstates by ~$13 — and `(qo)` records 🙏 avo as
 the only above-bar book today. The honorific is still in circulation and is
 exactly the I12 archaeology class.) No trade changes while a single container
 holds the claim, which is the steady state; this is insurance on the
 transition, and the transition is reachable by design.
 
-## 2026-08-18 (qk) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
+## 2026-08-18 (qo) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
 
-*(Renumbered THREE times at push time — written as (qg), moved when the
+*(Renumbered FOUR times at push time — written as (qg), moved when the
 mutation harness took (qg) on origin, again when band-kelly's activation took
-(qh), and finally from (qk) to (qk) when a concurrent session's six-hunters
-entry took (qk) on main mid-review. Theirs is merged and cited from nine
-tracked files; this one was unmerged, so this is the side that moves — the
+(qh), again from (qk) when a concurrent session's six-hunters entry took (qk)
+on main mid-review, and finally to (qo) when the fleet-wide-audit entry landed
+on (qk) as well. Every one of those is merged and cited from tracked files;
+this one was unmerged each time, so this is the side that moves — the
 convention's own tiebreak, decided by grepping rather than by who pushed
 first.)*
 
@@ -389,6 +396,284 @@ best-evidenced book — now opens every future position under the measured-best
 persistence rule its own tape supports, at zero cost to its era or its docket
 date; and the operator queue is a current document again instead of a museum
 of executed items.
+
+## 2026-08-19 (qn) — THE "PHANTOM FEE" IS NOT PHANTOM: CARRY ALREADY MEASURES ITS PERP LEG, AND THE ONLY REAL DEFECT IS A HYPERLIQUID CONSTANT ON A LIGHTER BOOK — plus the letters guard was blind to its own citation form
+
+*(Renumbered (qk) -> (qm) -> (qn) across three push attempts — concurrent
+sessions took (qk), (ql) and then (qm) on origin/main while this was being
+written. Theirs are merged, this was unpushed, so this is the side that
+moves each time. FOURTH letter collision this session; the cross-branch arm
+caught every one, which is the only reason the citations still resolve.)*
+
+**Operator reframed the mandate** ("we are looking at this as a risk eliminating
+job as opposed to a profit motivated job ... look at options, even though risk
+will be higher"), and a judge panel returned an aggressive slate. Its **#2
+ranked item, and the upside judge's top pick**, was: the four delta-neutral
+funding books charge a phantom **29–30bps** round trip assembled from a
+Hyperliquid taker fee plus a `HEDGE_COST` for an "off-venue hedge leg" they do
+not hold — cut it to 10bps and 🌾 carry's verdict flips from t=−4.25 to +1.72.
+
+**Verified before shipping, and it does not hold.** Re-graded from the book's
+OWN recorded `fees`/`notional` ((gr) telemetry), era n=10:
+
+| what carry ACTUALLY charged | value |
+|---|---|
+| median round trip | **22.2 bps** |
+| range | [20.7, 49.7] (49.7 = KAITO, a thin book held 149.8h) |
+| what the constants imply | 29.0 bps |
+
+The gap is the point: **on `lighter_shadow` the perp leg is ALREADY MEASURED per
+fill by an order-book walk** (`measured_perp_cost` → `fill_from_book`, adverse
+slippage only, price improvement floored to 0). `PERP_FEE` is only the
+**fallback** when no book/price is available, plus the banner and the decay-gate
+estimate. ~20bps of HEDGE_COST + ~2bps of measured slippage ≈ the 22.2bps
+observed. **There is no phantom fee to delete, and no fee-based rescue for
+carry** — at its real charge it reads −0.155%/trade, t=−4.48, and the sign only
+flips at ~3bps, i.e. with HEDGE_COST gone.
+
+**AND DELETING HEDGE_COST WOULD BE INCOHERENT, not merely aggressive.**
+🏦 Kiyosaki's header says that leg *"is modelled, it does not exist"* — and
+these books omit any PRICE term for the SAME reason (`position_pnl` takes no
+mark; carry realises `accrued − fees` inline). The hypothetical hedge is what
+cancels price. **Charging its cost and omitting price risk are two halves of ONE
+simulation**; removing the cost while keeping no-price-term models a hedge that
+is FREE — better than reality in both directions at once. That is the exact
+shape of a losing book laundered into a winner, and the panel's own writeup
+flagged the risk ("fits a model until a loser looks profitable") before
+recommending it anyway.
+
+**WHAT IS GENUINELY WRONG, AND IS FIXED.** `PERP_FEE = 0.00045` is a
+**Hyperliquid taker fee**, and this stopped being a Hyperliquid book on 17-Jul —
+the HL arm is retired, the only arm that runs is `lighter_shadow`, and Lighter's
+schedule is **zero on all 203 active books**. Same stale-foreign-venue shape as
+the brain's Kraken-SPOT `FEE_RT` in (gg). Fixed **venue-scoped**
+(`perp_fee(mode)` / `open_cost(mode)`), never as a global overwrite — which
+would invert the bug onto the honest arm, the `_basis` lesson fifteen lines up
+in the same file. `hl_paper` unchanged at 29.0bps; `lighter_shadow` 21.0bps
+modelled against the 22.2bps measured. Value 0.5bps/side, the conservative end
+of the measured range (1.02bps RT by book walk at this book's clip across 18
+books; 0.24bps/side on the live Farmer's 38 real fills), env-overridable.
+**The banner also stops announcing a friction the book does not charge** — the
+identical defect this file already fixed once for its APR bars, three lines
+above the line that was still wrong.
+
+**Ledger unmoved by construction** (the fallback path is rare) — so this is an
+accuracy fix that leaves the verdict exactly where the evidence puts it.
+4 tests, **4/4 mutations red**, including an AST pin that carry's
+`accrued − fees` realisation may never gain a price term without HEDGE_COST
+being re-derived in the same change.
+
+### THE GUARD WAS BLIND TO ITS OWN CITATION FORM, AND SAID "OK" WHILE IT WAS
+
+Writing the above, `audit_changelog_letters` reported **"OK — 994 citations all
+resolve"** while three files cited `(qk)` and **no `(qk)` entry existed**. Cause:
+`CITE_DATED` demanded a full ISO date (`\d{4}-\d{2}-\d{2}`) and the tree also
+stamps the short form `[19-Aug (qk)]`. **Measured at the fix: 22 short-form
+citations across the tree were unverified** (against 624 ISO-form) — and **7 of
+them predate this session**, so the hole was live, not self-inflicted. This is
+the same class the guard exists for and the same class `(po)` engraved this
+week: a check that inspects nothing reports clean, and clean gets quoted as
+evidence.
+
+Widened to accept `D-Mon`/`DD-Mon` inside the SAME unambiguous `[<date> (xx)]`
+bracket — deliberately NOT to bare parens, which the original comment measured
+at **278 noise hits** and correctly rejected. Re-measured after: still zero
+false hits. **Proven by positive control** rather than assumed: with `(qk)`
+cited and no entry, the widened guard lists `funding_carry_bot.py:194` and exits
+**1**; it was silent on exactly that line before. The short-form citations in
+this session's own `(qg)`/`(qi)` work are now checked for the first time.
+## 2026-08-19 (qm) — THE (qa) MEMO'S §5 IS CORRECTED IN PLACE: ALL THREE ADMITTED STUDIES NOW CLOSED NEGATIVE, AND THE MEMO SAYS SO WHERE IT PROPOSED THEM
+
+Small I12 pass, one file. `FLEET_PNL_GROWTH_2026-08-18.md` §5 proposed three
+studies as "where new edge could come from" and its referee-status note
+recorded them as "never refereed". `(qi)` ran all three the next day and
+closed each NEGATIVE (divergence-conditioning non-monotone, no screen ships;
+squeeze refuted in all 9 cells both directions, the receiver pays ~5× the
+funding at the 80% bar; listing thesis refuted at 2-of-73 TP with the supply
+dead 85 days). A standing doc that still ADVERTISES closed questions as open
+edge candidates is exactly the re-open-on-a-hunch surface I12 exists to
+remove — the closing numbers are now engraved in the §5 header above the
+original proposals, which stay as the record of what was asked. No code, no
+levers, no clocks.
+
+## 2026-08-19 (ql) — THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean, and georgia's exit question turns out to be STRUCTURALLY unanswerable by the instrument I sent it to
+
+*(Renumbered from (qj) at push time — a concurrent session's "OPERATOR
+REFRAMES" entry took (qj) on origin/main and is cited by PR #185's own subject,
+so this side moves. Its references to this session's audit entry follow it from
+(qi) to (qk).)*
+
+**I11, run against my own `(qk)` §7 list** rather than against whatever was
+most interesting. Two carried items, both closed — one clean, one refuted.
+
+**1 · THE ORGAN SWEEP (the scope that died on a session limit) IS CLEAN.**
+All 27 TTL-bearing bus organs are well inside their windows — worst
+`age/ttl` is **0.40** (`fleet_respiration`), median ~0.17; nothing DARK,
+nothing near. `fleet_immune.sick=[]`. So `(qk)`'s "spot-check, not the
+sweep" caveat is now discharged with the sweep itself.
+
+**2 · AND THE SWEEP FOUND THE THING THE BUS COULD NOT SAY: CI/DEPLOYS ARE
+DOWN, AND THE FLEET'S OWN WATCHDOG HAD ALREADY DIAGNOSED IT.**
+`/watchdog.json` problems, unread by this session until now:
+`GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last run_id 32197328429) —
+a billing lockout kills CI AND deploys silently (28-Jul scar); check the
+repo's Actions runs + Settings/Billing`. **Its `last run_id` is byte-equal to
+the last green run I had independently isolated** by bisecting scheduled runs
+on `main` (32197328429 = fleet-watchdog 18-Aug 23:28:37Z, 13s, success;
+19-Aug 01:43Z and 03:04Z both fail in 3s). Two instruments, same boundary,
+arrived at independently — which is the corroboration `(I6)` asks for.
+**The half that is NOT about CI: the same lockout kills the deploy path**, so
+no shadow book can receive code until it clears. Queued for the operator;
+no code change can fix it and none was attempted.
+
+**3 · THE GEORGIA CARRIED ITEM IS REFUTED — and the refutation is the fix.**
+`(qk)` §7 carried: *"georgia's closes carry prices since (gr), so
+`study_exit_sweep`'s calibration gate can be attempted."* **It cannot.** The
+run reports `calibration: SKIPPED — shipped exit rule could not be read from
+its module`, and that message is the defect: it reads as a MISSING registry
+entry and sends the next session to add one. It is not missing.
+🔮 georgia exits on a **time-decaying ROI ladder**
+(`{0: 1.8%, 180: 1.2%, 360: 0.8%, 720: 0.5%}`) under an **ATR ratchet** capped
+by the carrier stoploss; `walk_exit` expresses exactly one fixed `tp_pct`, one
+fixed `sl_pct`, one fixed `trail_pct`. **No member of that rule space is this
+book's shipped rule**, so the tempting `BOOK_EXITS` row — map the first rung to
+`tp_pct` — would hand `calibrate()` a rule the book does not run. That is
+`(ps)` exactly: a calibration gate graded against trades it cannot replay, and
+the FALSE PASS then guarded the fleet's largest stop pot.
+**Shipped instead: `UNSWEEPABLE_EXITS`**, DERIVED from `live_strategies()` (a
+carrier that gains a ladder is covered the day it lands, the `(pf)` rule), and
+the CLI now says **"IMPOSSIBLE, not missing"** with the actual rungs, ahead of
+the generic branch. Population today: 🔮 georgia **and 🙏 avo maria** — the
+fleet's best-evidenced book, same SwingDip ladder — while the flat-`roi`
+carriers stay sweepable, so the declaration cannot rot into firing on
+everything. Pinned by `tests/autonomy/test_ladder_exits_declared.py`;
+**6 of 6 mutations verified red**, including branch-order and hand-list-instead-
+of-derived.
+**THE CONSEQUENCE, stated because it is load-bearing:** the brain's standing
+`exit_too_tight` diagnosis on georgia (reclaim **1.0**, fwd **+1.63%**,
+trailing-stop path **−$17.14/71** era) **cannot be actioned through this
+instrument at all.** Answering it needs a ladder-aware replay — a build, not a
+re-run. `(qk)` filed it as "run the sweep"; that was wrong and is corrected in
+place per I12.
+
+**ALSO MEASURED, and it needed no fix:** the sweep discards 33 of georgia's 66
+priced closes for a missing `side`. Those are all **pre-`(kn)`** — last
+sideless close 05-Aug 21:04Z, first sided close 06-Aug 16:04Z, a clean
+boundary — so the publisher was fixed 6-Aug and the sample heals forward. Not
+retroactive, the `(gr)` precedent. Nothing to do.
+
+**Process note against myself (the `(po)`/`(pv)` class, caught in the act):**
+my first M4 mutation script contained a Python bug that left the target file
+untouched, and the harness printed **`SURVIVED`** — a clean false negative on a
+guard that is in fact enforced. Re-run with an explicit `grep` proving the
+mutation had landed before scoring it, and it reddens. **A mutation you did not
+verify was APPLIED is not a mutation**; scoring it is the same shape as the
+scoped-`awk` that scanned one line.
+
+## 2026-08-19 (qk) — FLEET-WIDE AUDIT: THE FLEET IS NOT BLEEDING, IT IS STARVED AND UNDECIDABLE — four of five loss centres are already-closed populations, and the instruments still grading them are the actual defect
+
+*(Renumbered from (qi) at push time — a concurrent session's "SIX HUNTERS"
+entry took (qi) on origin/main while this was built, and theirs is merged and
+cited. Per the collision rule the CITED entry keeps the letter and this side
+moves. Note the two entries independently measured the SAME three (qa) growth
+leads and independently closed all three NEGATIVE.)*
+
+**Operator: *"Where are we losing and why? More importantly how can we use this
+information to let our bots win? … No more circles maverick lets hit targets on
+the point."*** Full memo: `FLEET_AUDIT_2026-08-19.md`. Eight parallel diagnosis
+agents over the live payloads and every book's own ledger, era-scoped; six
+returned, two scopes + the verify pass died on a session limit and **everything
+acted on below was re-derived by hand** (§7 of the memo names what was not
+swept, rather than dropping it quietly).
+
+**THE ANSWER TO "WHERE ARE WE LOSING": mostly, we already stopped.** Every
+material loss centre traces to a population identified, measured and gated off
+between 13-Aug and 18-Aug — ⚖️ Counterweight −$36.48/21 in legs made
+unenterable at (ki)/(jg), last one crystallised 5-Aug (30 closes since:
+−$0.72); 🧘 Douglas **97% two VOID rows** ((nm)/(pv)) against a clean post-fix
++$1.81/6; 🌾 carry **9 of 10 era losers** in the 13-Aug screened class; 🎯
+sniper −$5.48/16 in screened classes vs **+$1.67** elsewhere and +$0.35 on its
+post-screen sample. 🛢️ Garrett's −$5.82 is two real stops, **1.5 SE** from its
+own founding study, 5.1 days into a 30-day clock. **There is no open wound to
+plug.** The structural cause is (qa)'s measured drought — alt volume halving
+every 9.4 weeks — so the books are **starved, not edgeless**.
+
+**THE REAL FINDING: three instruments are answering on a dead sample, and that
+is what turns a starved book into a wrongly-retired one.** 🌾 carry publishes
+`t=−4.48 / "unreachable" / "more of the same closes cannot flip mean"` where
+*more of the same closes is structurally impossible* — 90% of that sample is
+instruments the gate refuses. Same shape on 🎯 sniper (`era=null`). And the
+fleet's ONLY capital claim — carry's 0.001492, **71% of the fleet's target** —
+is pooled n=101 of which **91 rows predate the era** and which still carries
+the (nc) phantom accrual; era-scoped it is `None`, current-policy **n=0**. No
+money acts on it ((lx)/(oy) hold every consumer at 1.0), but it is the number
+the fleet's own narrative calls its best-claimed book. **Deliberately NOT
+"fixed" by moving an era** — (pf) already ruled a narrowed universe is ordinary
+tuning; the precedent is REPORT the split, don't re-cut. Named so the ~12-Sep
+call is made with it in hand.
+
+**THREE CORRECTNESS FIXES SHIPPED, all mutation-verified (4+7+4 red, controls
+green):**
+* **The quarantine now reaches the SEED path.** `fetch_paper_aggregate` — the
+  totals ~13 books re-read at boot — was raw SQL with no `LEDGER_QUARANTINE`
+  filter while every GRADING consumer withholds those rows, so 🧘 Douglas
+  **re-seeded the two void rows on every reboot**: −$24.68/8 published against
+  +$1.81/6 graded, a **$26.48 permanent disagreement** between a book's card
+  and the record that decides it. `is_quarantined` stays the one owner ((hj));
+  fail-OPEN inherited; a clean book pays no second query.
+* **🏛️ Parliament no longer publishes a book whose state it could not read.**
+  `save()` has refused since the 21-Jul audit fix; `publish()` did not — so a
+  Postgres read blip published the **fresh-book constructor state** (equity
+  $1000.00, closed 0) as fact and `snapshot_equity` wrote it into the MTM
+  series the (ia) worse-of-both bar reads. **MEASURED: pm-albanese's published
+  MTM drawdown is 0.18% and (1001.84−1000.00)/1001.84 = 0.1838% — the flicker
+  exactly.** Immaterial at this book's P&L and NOT in general: the artifact is
+  `pnl_abs/equity`, so it **scales one-for-one with the book's own success**.
+  The mutation that matters is M6 — guard placed AFTER the writes still
+  poisons the series, and it reddens.
+* **The funding machine can answer its own entry-quality question now.** The
+  ledger recorded the `enter_apr` BAR and never the OBSERVATION the gate
+  admitted on, so the brain's 19-Aug `entry_quality` diagnosis on 🛢️ Garrett
+  **could not be tested against the one variable its entry gate is built on**.
+  Close rows gain `entry_apr` (signed TRUE apr at admission, ABSENT-when-unknown
+  per (ht)) and `accrued` (so price and carry grade apart). The (ir) `hot_h`
+  class, one field over. Telemetry only.
+
+**ALL THREE (qa) GROWTH LEADS MEASURED, ALL THREE DIED — the refusals are the
+deliverable (I19):**
+* **Divergence veto REFUSED and the prior WITHDRAWN**: (qa) named the LIT stop
+  cluster as its class; graded at entry the cluster's core is **agreement, not
+  divergence** (Lighter +0.11 vs HL +0.11, div 0.00) — and **0 of 300 pooled
+  entries** ever occurred at |div| ≥ 50pp, so the books' gates never admit one.
+  `STUDY_DIVERGENCE_VETO_2026-08-19.md`
+* **Squeeze events REFUTED over 1,139 events**: zero of 18 cells clear any bar,
+  grid centre **t=−2.71 both halves negative**, and random non-event entries
+  **BEAT** it (P_null 0.36–0.99). A fresh funding extreme is *actively bad*
+  entry information — the Farmer's LIT stops from the inside.
+  `STUDY_SQUEEZE_EVENTS_2026-08-19.md`
+* **Listing lifecycle: NOTHING ESTABLISHED** — n=12, the tempting 24h long
+  fails on n, on h2, and on **top-3 concentration 223%**, with survivorship
+  bias running the optimistic way. `STUDY_LISTING_LIFECYCLE_2026-08-19.md`
+Also refused: the brain's Garrett tightening (every implied direction is
+measured-REFUTED or UNMEASURED, and the variant has no reachable actuator) and
+porting carry's 6h grace to the Farmer (refuted in all 16 cells — grace is a
+cell property, not a doctrine).
+
+**WHAT IS LEFT IS DECISIONS, NOT TUNING.** Five books are formally undecidable
+and no pass changes that: ⚖️ Counterweight (t≥2 is **5.1 years** away; even 20
+consecutive +1% closes move t to +0.70 — *no achievable data flips it to
+KEEP*; pre-registration ~28-Aug stands, do not pre-empt), 💸 the **LIVE**
+Farmer (**1,332 days** to decidability on real capital), 👩 mum (swing-daily's
+exact retirement profile), 💼 turnbull (**16.4 days zero entries**, every skip
+below an authorless `ml_gate`), 📐 Grimes (gate flipped back all-three-CLOSED
+since (om)). Plus 🙏 Avo LIVE's cap: **$200 published against $62.53 equity**,
+restrict-only at zero expectancy price. All queued with evidence.
+
+**AND THE NUMBER THAT DWARFS THEM ALL, restated from (qa) because it did not
+change:** real money is **$259.84 at ≈$0/day**. The one book quietly earning
+its gate is 🙏 avo shadow (era n=12, **t=2.41**, both halves positive,
+on_track). No lever in this codebase is worth two orders of magnitude — **the
+capital decision is.**
 
 ## 2026-08-19 (qj) — THE OPERATOR REFRAMES: "risk-eliminating job vs profit-motivated job" — 🪁 band-kelly's risk-up package, decided and shipped inside the pre-first-close window
 

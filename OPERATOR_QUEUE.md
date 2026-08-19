@@ -43,6 +43,128 @@ the exact kiyosaki/(mk) path. Then this item leaves the queue.
 
 ---
 
+## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — five I17 calls + one restrict-only cap, all from the fleet-wide audit `(qk)`
+
+**Full evidence: `FLEET_AUDIT_2026-08-19.md`.** The audit's headline is that
+the fleet has **no open wound** — four of five loss centres are populations
+already gated off between 13 and 18-Aug. What is left is not tuning; it is
+these decisions. Nothing below is executed by an agent.
+
+**Read this first, because it reframes every row:** the venue is in a measured
+liquidity drought ((qa): alt volume halving every 9.4 weeks, 44 weeks running).
+Several books below are **starved, not edgeless**. That is an argument for
+deciding them deliberately — not for retiring them as failures, and not for
+widening a gate to manufacture entries (I19).
+
+### A ★ — ⚖️ Counterweight: the ~28-Aug pre-registration stands, and today's read is RETIRE
+Not a bleed call — an **undecidability** call. The book is clean: −$0.48 open
+marks, screen holding, 30 closes in 14 days on the admissible basket. But the
+(jg) KEEP consolation has decayed monotonically **+0.461% → +0.307% → +0.163%**
+(t=+0.25, cluster-t +0.22), and t≥2 needs **~4,300 closes ≈ 5.1 years**. Even
+**20 consecutive +1% closes** before 28-Aug move admissible t only to **+0.70**
+— *no achievable data can flip this to KEEP*. **Do not pre-empt the date**
+(nothing decisive is met in the losing direction and the residual is ~cents/day
+at $5 legs); decide it on 28-Aug with this number in hand.
+
+### B ★ — 💸 the LIVE Farmer: an I17 call on the only live funding book
+era n=85, mean **+0.039%/trade**, t=0.29, **+$0.22 over 25.5 days**; trailing
+14d −$1.99/45 closes; shadow twin −$9.52. Horizon: **undecidable, ~4,337
+closes ≈ 1,332 days**. The 15-Aug study already refuted every exit-tuning
+escape on this cell (48 cells, zero winners) — *"the stall is edge."* Real
+capital ($197.31) sits on it. **This is explicitly NOT a tuning pass**; if you
+KEEP, the rationale should be recorded against the P=0.06/P=0.155 controls.
+
+### C — 👩 mum: swing-daily's retirement profile, one row over
+3 closes in 5.3 weeks, **0 in-era**, all four slots frozen in month-long trend
+holds; funding drag **−$2.15** exceeds **+$0.69** realised. `crypto-swing-daily`
+was retired at (nf) on n=3 in six weeks. mum was HELD as "green" — that green
+is **open marks, not evidence** (the (lo) precedent).
+
+### D — 💼 turnbull and 📐 Grimes: starved by their own gates
+turnbull: **zero entries for 16.4 days**; every observed skip is
+`ml-gate(0.19–0.43)` against a 0.45 bar, and the ML ensemble is near chance
+(oos_acc 0.51–0.57). `ml_gate` is registered but **declared authorless** — the
+I18 shape. Grimes: gate flipped back to **all-three-CLOSED** since (om)
+(keltner t=−0.20), 0 closes ever; its own study predicted this (0/31 retests
+open). Both were HELD at (nf) on numbers since measured. **Neither is a
+bar-lowering session** — the birth declarations say so themselves.
+
+### E ★ — 🙏 Avo LIVE notional cap: restrict-only, zero expectancy price
+Published `cap_usd` is **$200.00** against **$62.53 equity** (3.2×) and $38.61
+gross (5.2×) — so SafetyRails currently provides **no defence-in-depth** at the
+book's real scale. The effective constraint is structural (clip = equity/4), so
+**no trade the sizing can express reaches $200** and tightening changes nothing
+admissible. The specific value is your risk choice; ≈ current equity is the
+natural restore:
+
+```bash
+railway variables --service tide-rider-lighter-live --set "FREQTRADE_AVO_MARIA_MAX_NOTIONAL=65"
+```
+
+### F — the capital decision, restated because it dwarfs the rest
+Real money is **$259.84 at ≈$0/day**. The nearest genuine event is 🙏 avo's
+gate run (n=30 lands early-Sep; **t=+2.31 already passes**), worth ~$0.10–0.13/day
+at today's clip — and ~10× that only via a deposit. **No lever in the codebase
+is worth two orders of magnitude.**
+
+---
+
+## ~~🚨 NEW 19-Aug · GITHUB ACTIONS IS DARK — CI **and every auto-deploy** are down~~ — **RECOVERED 19-Aug 04:43:59Z, CORRECTED IN PLACE per I12; NO ACTION OUTSTANDING**
+
+*Closed on the same instrument that opened it — the `fleet-watchdog` hourly
+heartbeat, which is the one signal here that runs on `main` with no PR code in
+it. Measured: run `32216819346` (19-Aug 04:43:59Z) **succeeded**, ending the
+three-run failure streak `32205969563` (01:43Z) · `32210855045` (03:04Z) ·
+`32213741453` (03:53Z), whose last green predecessor was `32197328429`
+(18-Aug 23:28:37Z) exactly as recorded below. Corroborated independently by a
+PR check suite that allocated a real runner and ran the full suite to a
+**substantive** verdict (1 failed / 1917 passed) rather than the outage's
+signature 2–4s zero-step failure. **So option A below was the right diagnosis
+to prepare and is now moot — do not go and check billing on account of this
+item.** The outage window is kept below rather than deleted: it is the second
+instance of the 28-Jul scar, and the fact that the fleet's own watchdog named
+the class before a human did is the reusable part.*
+
+**The fleet's own watchdog diagnosed this before I did, and names the remedy:**
+`/watchdog.json` → *"GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last
+run_id 32197328429) — a billing lockout kills CI AND deploys silently (28-Jul
+scar); check the repo's Actions runs + Settings/Billing"*.
+
+Independently corroborated by bisecting scheduled runs on `main` (no PR code
+involved): `fleet-watchdog` succeeded hourly through **18-Aug 23:28:37Z** (13s)
+and has failed in **~3 seconds with no downloadable logs** ever since —
+19-Aug 01:43Z, 03:04Z. Every PR check on every branch, from two different
+sessions, fails identically. **The watchdog's `last run_id` is byte-equal to
+the last green run I isolated**, so two instruments agree on the boundary.
+
+**Why it matters beyond red checks:** the same lockout kills
+`railway-redeploy.yml`, which is the ONLY automated deploy path. **No shadow
+book can receive code until this clears** — including the `(qk)` correctness
+fixes, which are merged-pending and will sit in main doing nothing.
+
+**THE "JUST WAIT" OPTION IS RULED OUT, MEASURED.** The watchdog's *"billing
+lockout"* line is an INFERENCE from heartbeat age — it never reads billing — so
+it was worth testing against the one alternative that would mean do-nothing:
+a GitHub platform incident. `githubstatus.com/api/v2/summary.json`, 19-Aug
+04:2xZ: **"All Systems Operational", Actions `operational`, 0 active
+incidents.** GitHub is fine; the lockout is account-side. Also ruled out: a
+broken workflow file — **zero commits landed on `main` between the last green
+run (23:28Z) and the first red (01:43Z)**, so no change of ours caused it.
+
+**A — check Settings → Billing on the repo's account ★** (the 28-Jul scar is
+the precedent; a spend cap or exhausted minutes produces exactly this
+signature: instant failure, no logs, scheduled runs on `main` affected). With
+the platform ruled out and a code cause ruled out, this is the remaining
+explanation.
+
+**B — if billing is fine**, the fallback is a manual `railway up` per service
+for anything urgent, and CI stays advisory until Actions returns.
+
+No code change can fix this and none was attempted. PR #184 is unaffected by
+anything in its own diff.
+
+---
+
 *Closed at the 18-Aug queue sweep, per this file's own maintenance rule and
 each item's "closes at the next daily review" clause — this sweep is that
 review, and each closure was RE-VERIFIED against the live payload today, not
@@ -161,16 +283,16 @@ allocation organ's live claims table, not this paragraph.]**
   decision day: carry's census `eligible` going positive under the NEW $1M
   floor (the ≥20%/$2M count had been 0.00 for 3+ days pre-`(px)`; the $1M
   cell historically reads occupied 13.42% of snapshots).]**
-  **[(qk) TRIPWIRE RE-BASING — read this before reading `eligible` on the
+  **[(qo) TRIPWIRE RE-BASING — read this before reading `eligible` on the
   decision day: the 13.42% base rate was measured at the 6h persistence
-  gate, and (qk) moved the live gate to 12h, which admits strictly fewer
+  gate, and (qo) moved the live gate to 12h, which admits strictly fewer
   windows (91% of qualifying windows die under 6h — most of what 13.42%
   counted never survives to 12h). A low `eligible` under the 12h gate is
   therefore NOT comparable to 13.42% and must not be read as "venue stall
   persists". Recompute the base rate at the shipped gate first:
   `python3 scripts/audit_book_overlap.py --gate 0.20 --floor 1e6
   --persist-h 12` — and judge supply against THAT number.]**
-  **[18-Aug later (qk) — PERSIST 12h SHIPPED, under your queue directive
+  **[18-Aug later (qo) — PERSIST 12h SHIPPED, under your queue directive
   ("implement all operator queue items that make the fleet improve/make more
   profit and win rate"), at the same clean boundary (px) used: the book held
   ZERO positions and the census read `eligible 0 / waiting 2` under the $1M
@@ -180,7 +302,7 @@ allocation organ's live claims table, not this paragraph.]**
   the code comment; pinned by tests/autonomy/test_carry_persistence_gate.py
   (4 mutations red). WHAT REMAINS FOR ~30-Aug IS NOW ONLY THE DECISION
   ITSELF: the keep-or-retire docket call — no tuning half rides on it any
-  more; if the call is retire, (qk) dies with the book at zero cost, exactly
+  more; if the call is retire, (qo) dies with the book at zero cost, exactly
   as this item priced it.]**
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped

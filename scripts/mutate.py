@@ -114,7 +114,7 @@ def git_restore(path):
 def uncommitted(path):
     """Does `path` have changes git would DISCARD on `checkout --`?
 
-    [2026-08-19 (qm)] THE SIXTH BUG IN THIS FAMILY — `(qg)` above enumerates
+    [2026-08-19 (qp)] THE SIXTH BUG IN THIS FAMILY — `(qg)` above enumerates
     five, and this is the next — and the first one this harness itself caused. `git_restore` above is `git checkout -- <target>`: between
     every mutation it throws the file back to HEAD. Run against a target whose
     fix is still UNCOMMITTED and the first restore **silently deletes the work
@@ -186,7 +186,7 @@ def main(argv=None):
         old, new = spec.split("=>", 1)
         muts.append((old, new))
 
-    # [(qm)] THE TARGET MUST BE COMMITTED. Every restore is `git checkout --`,
+    # [(qp)] THE TARGET MUST BE COMMITTED. Every restore is `git checkout --`,
     # so uncommitted work in the target is destroyed by the FIRST mutation.
     # Refuse, loudly, before anything is touched.
     #
@@ -303,7 +303,7 @@ def _selftest():
         broken.write_text("def f(:\n", encoding="utf-8")
         assert compiles(broken) is False
 
-        # 5. [(qm)] the dirty-target guard is PERMISSIVE where git cannot
+        # 5. [(qp)] the dirty-target guard is PERMISSIVE where git cannot
         #    answer (a temp dir is not a repo) — it must never block a
         #    legitimate round, only a destructive one.
         assert uncommitted(f) is False, (

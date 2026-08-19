@@ -1,4 +1,4 @@
-"""[2026-08-19 (ql)] THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD
+"""[2026-08-19 (qq)] THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD
 NOTHING THAT WOULD DECLINE.
 
 `(no)` wired the venue's OWN margining truth into the live path — per-position
@@ -173,7 +173,7 @@ def test_a_shadow_arm_is_unaffected():
 # everything above tests the PREDICATE and nothing tested the CALL.
 #
 # AST for the call site, and stated honestly: AST sees identifiers in shapes,
-# not values or bindings ((qm) drove seven survivors through exactly that), so
+# not values or bindings ((qp) drove seven survivors through exactly that), so
 # the env contract below is driven behaviourally instead.
 # ---------------------------------------------------------------------------
 

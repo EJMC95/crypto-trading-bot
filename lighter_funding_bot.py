@@ -767,7 +767,7 @@ def entry_admission(coin, src, is_short, apr, st):
     return "open", None
 
 
-def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
+def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None, entry_apr=None):
     """The position's ENTRY receipt, pure — the meta dict every exit,
     grader and lever audit reads.
 
@@ -795,6 +795,18 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
             # from those entered at 12h. TELEMETRY ONLY — no bar, threshold or
             # decision reads it, and None on a legacy/blind entry.
             "hot_h": hot_h,
+            # [2026-08-19 fleet audit] THE COIN'S OBSERVED signed TRUE apr AT
+            # ADMISSION. The ledger has always recorded the enter_apr BAR
+            # (below, in `bars`) and never the OBSERVATION the gate read — so
+            # "were the entries taken at weak rates the problem?" was
+            # structurally unanswerable from the book's own record: the brain's
+            # 19-Aug entry_quality diagnosis on the Garrett variant could not
+            # be tested against the one variable the entry gate is built on.
+            # Same class, same shape, same fix as (ir)'s hot_h one field up.
+            # TELEMETRY ONLY — no bar, threshold or decision reads it, and
+            # None (key ABSENT at close) on a restored pre-stamp position:
+            # unknown stays unknown, never 0 (the (ht) degrade rule).
+            "entry_apr": entry_apr,
             "bars": {"enter_apr": ENTER_APR,
                      "take_profit": TAKE_PROFIT,
                      "max_hold_h": MAX_HOLD_H,
@@ -1479,7 +1491,8 @@ _slip_bps_of = slip_bps_of
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
                   reason, order_usd=ORDER_USD, venue=None, shadow=None,
-                  bars=None, src=None, measured=None, fill_src=None, hot_h=None):
+                  bars=None, src=None, measured=None, fill_src=None, hot_h=None,
+                  entry_apr=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
     pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip
     (the ENTRY clip — callers pass meta['clip'], not the current loop's clip,
@@ -1532,12 +1545,40 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             # money could not distinguish a measured round trip from an assumed
             # one, against a gross edge the CHANGELOG puts at +6.18bps/trade.
             # TELEMETRY ONLY: no bar, threshold or decision reads these keys.
-            extra=_close_fill_extra(
-                _close_hot_extra(
-                    _close_src_extra(_close_bars_extra(bars), src), hot_h),
-                measured, fill_src))
+            extra=_close_funding_extra(
+                _close_fill_extra(
+                    _close_hot_extra(
+                        _close_src_extra(_close_bars_extra(bars), src), hot_h),
+                    measured, fill_src),
+                entry_apr, fund_pnl))
     except Exception:
         pass
+
+
+def _close_funding_extra(out, entry_apr, fund_pnl):
+    """[2026-08-19 fleet audit] Stamp the funding decomposition on the close.
+
+    `entry_apr` — the coin's signed TRUE apr AT ADMISSION (the observation the
+    ENTER_APR bar read), from the entry receipt. ABSENT when unknown (a
+    position restored from pre-stamp state) rather than defaulted — unknown
+    stays unknown, never 0 (the (ht) degrade rule). `accrued` — the funding
+    component of pnl_abs, always known at close; without it the ledger's
+    pnl_abs is an unsplittable price+funding sum and study_exit_attribution
+    cannot ask which leg an exit family earns. setdefault-shaped like its
+    siblings, so it can never clobber a bars/src/fill key.
+    """
+    if not isinstance(out, dict):
+        out = {}
+    if entry_apr is not None:
+        try:
+            out.setdefault("entry_apr", round(float(entry_apr), 6))
+        except (TypeError, ValueError):
+            pass
+    try:
+        out.setdefault("accrued", round(float(fund_pnl), 6))
+    except (TypeError, ValueError):
+        pass
+    return out
 
 
 def _close_fill_extra(out, measured, fill_src):
@@ -2087,6 +2128,7 @@ def main():
                           venue=venue_tag, shadow=shadow_tag,
                           bars=(m or {}).get("bars"), src=(m or {}).get("src"),
                           hot_h=(m or {}).get("hot_h"),
+                          entry_apr=(m or {}).get("entry_apr"),
                           measured=_meas, fill_src=_src)
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was px_decision — the
@@ -2573,6 +2615,7 @@ def main():
                                           bars=(m or {}).get("bars"),
                                           src=(m or {}).get("src"),
                                           hot_h=(m or {}).get("hot_h"),
+                                          entry_apr=(m or {}).get("entry_apr"),
                                           measured=_bmeas, fill_src=_bsrc)
                             n_closed += 1
                             # [2026-07-28 AUDIT FIX] this path never counted a
@@ -2674,6 +2717,7 @@ def main():
                           venue=venue_tag, shadow=shadow_tag,
                           bars=(m or {}).get("bars"), src=(m or {}).get("src"),
                           hot_h=(m or {}).get("hot_h"),
+                          entry_apr=(m or {}).get("entry_apr"),
                           measured=_meas, fill_src=_src)
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was the decision price
@@ -3007,7 +3051,10 @@ def main():
                     # never a guess); the gate above has already required this
                     # to be >= PERSIST_H, so a 0.0 here would itself be a bug
                     # worth seeing in the ledger.
-                    hot_h=round((t0 - hot_since.get(coin, t0)) / 3600.0, 3))
+                    hot_h=round((t0 - hot_since.get(coin, t0)) / 3600.0, 3),
+                    # [2026-08-19] the observation behind the ENTER_APR bar —
+                    # the signed TRUE apr the gate admitted on.
+                    entry_apr=apr)
                 # [2026-07-28 AUDIT FIX] make this open visible to the REST of
                 # THIS loop's cap checks at its REAL clip: open_notional prices
                 # a position present in `pos` via meta['clip'] (conviction-
@@ -3521,6 +3568,20 @@ def _selftest_entry_admission():
     assert m["is_short"] is True and m["entry"] == 123.45
     assert m["opened_ts"] == 1700000000.0 and m["accrued"] == 0.0
     assert m["clip"] == 55.0 and m["src"] == "explore"
+    # [2026-08-19] the ENTER_APR observation: None (not 0) when unstamped,
+    # the signed value when given — and the close-row stamp keeps the
+    # absent-when-unknown contract while `accrued` is always recorded.
+    assert m["entry_apr"] is None, "unstamped entry_apr must be None, never 0"
+    m_apr = entry_stamp(True, 1.0, 0.0, 25.0, "exploit", entry_apr=-0.271)
+    assert m_apr["entry_apr"] == -0.271
+    _fx = _close_funding_extra({}, m_apr["entry_apr"], 0.1234567)
+    assert _fx["entry_apr"] == -0.271 and _fx["accrued"] == 0.123457
+    _fx2 = _close_funding_extra(None, None, 0.0)
+    assert "entry_apr" not in _fx2 and _fx2["accrued"] == 0.0, \
+        "restored pre-stamp position: entry_apr ABSENT, accrued still recorded"
+    _fx3 = _close_funding_extra({"entry_apr": -0.5, "accrued": 1.0}, -0.9, 2.0)
+    assert _fx3["entry_apr"] == -0.5 and _fx3["accrued"] == 1.0, \
+        "setdefault-shaped: never clobbers an existing key"
     b = m["bars"]
     assert b["enter_apr"] == ENTER_APR and b["take_profit"] == TAKE_PROFIT
     assert b["max_hold_h"] == MAX_HOLD_H
