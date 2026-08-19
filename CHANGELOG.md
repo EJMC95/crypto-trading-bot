@@ -1,3 +1,182 @@
+## 2026-08-19 (ql) — THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean, and georgia's exit question turns out to be STRUCTURALLY unanswerable by the instrument I sent it to
+
+*(Renumbered from (qj) at push time — a concurrent session's "OPERATOR
+REFRAMES" entry took (qj) on origin/main and is cited by PR #185's own subject,
+so this side moves. Its references to this session's audit entry follow it from
+(qi) to (qk).)*
+
+**I11, run against my own `(qk)` §7 list** rather than against whatever was
+most interesting. Two carried items, both closed — one clean, one refuted.
+
+**1 · THE ORGAN SWEEP (the scope that died on a session limit) IS CLEAN.**
+All 27 TTL-bearing bus organs are well inside their windows — worst
+`age/ttl` is **0.40** (`fleet_respiration`), median ~0.17; nothing DARK,
+nothing near. `fleet_immune.sick=[]`. So `(qk)`'s "spot-check, not the
+sweep" caveat is now discharged with the sweep itself.
+
+**2 · AND THE SWEEP FOUND THE THING THE BUS COULD NOT SAY: CI/DEPLOYS ARE
+DOWN, AND THE FLEET'S OWN WATCHDOG HAD ALREADY DIAGNOSED IT.**
+`/watchdog.json` problems, unread by this session until now:
+`GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last run_id 32197328429) —
+a billing lockout kills CI AND deploys silently (28-Jul scar); check the
+repo's Actions runs + Settings/Billing`. **Its `last run_id` is byte-equal to
+the last green run I had independently isolated** by bisecting scheduled runs
+on `main` (32197328429 = fleet-watchdog 18-Aug 23:28:37Z, 13s, success;
+19-Aug 01:43Z and 03:04Z both fail in 3s). Two instruments, same boundary,
+arrived at independently — which is the corroboration `(I6)` asks for.
+**The half that is NOT about CI: the same lockout kills the deploy path**, so
+no shadow book can receive code until it clears. Queued for the operator;
+no code change can fix it and none was attempted.
+
+**3 · THE GEORGIA CARRIED ITEM IS REFUTED — and the refutation is the fix.**
+`(qk)` §7 carried: *"georgia's closes carry prices since (gr), so
+`study_exit_sweep`'s calibration gate can be attempted."* **It cannot.** The
+run reports `calibration: SKIPPED — shipped exit rule could not be read from
+its module`, and that message is the defect: it reads as a MISSING registry
+entry and sends the next session to add one. It is not missing.
+🔮 georgia exits on a **time-decaying ROI ladder**
+(`{0: 1.8%, 180: 1.2%, 360: 0.8%, 720: 0.5%}`) under an **ATR ratchet** capped
+by the carrier stoploss; `walk_exit` expresses exactly one fixed `tp_pct`, one
+fixed `sl_pct`, one fixed `trail_pct`. **No member of that rule space is this
+book's shipped rule**, so the tempting `BOOK_EXITS` row — map the first rung to
+`tp_pct` — would hand `calibrate()` a rule the book does not run. That is
+`(ps)` exactly: a calibration gate graded against trades it cannot replay, and
+the FALSE PASS then guarded the fleet's largest stop pot.
+**Shipped instead: `UNSWEEPABLE_EXITS`**, DERIVED from `live_strategies()` (a
+carrier that gains a ladder is covered the day it lands, the `(pf)` rule), and
+the CLI now says **"IMPOSSIBLE, not missing"** with the actual rungs, ahead of
+the generic branch. Population today: 🔮 georgia **and 🙏 avo maria** — the
+fleet's best-evidenced book, same SwingDip ladder — while the flat-`roi`
+carriers stay sweepable, so the declaration cannot rot into firing on
+everything. Pinned by `tests/autonomy/test_ladder_exits_declared.py`;
+**6 of 6 mutations verified red**, including branch-order and hand-list-instead-
+of-derived.
+**THE CONSEQUENCE, stated because it is load-bearing:** the brain's standing
+`exit_too_tight` diagnosis on georgia (reclaim **1.0**, fwd **+1.63%**,
+trailing-stop path **−$17.14/71** era) **cannot be actioned through this
+instrument at all.** Answering it needs a ladder-aware replay — a build, not a
+re-run. `(qk)` filed it as "run the sweep"; that was wrong and is corrected in
+place per I12.
+
+**ALSO MEASURED, and it needed no fix:** the sweep discards 33 of georgia's 66
+priced closes for a missing `side`. Those are all **pre-`(kn)`** — last
+sideless close 05-Aug 21:04Z, first sided close 06-Aug 16:04Z, a clean
+boundary — so the publisher was fixed 6-Aug and the sample heals forward. Not
+retroactive, the `(gr)` precedent. Nothing to do.
+
+**Process note against myself (the `(po)`/`(pv)` class, caught in the act):**
+my first M4 mutation script contained a Python bug that left the target file
+untouched, and the harness printed **`SURVIVED`** — a clean false negative on a
+guard that is in fact enforced. Re-run with an explicit `grep` proving the
+mutation had landed before scoring it, and it reddens. **A mutation you did not
+verify was APPLIED is not a mutation**; scoring it is the same shape as the
+scoped-`awk` that scanned one line.
+
+## 2026-08-19 (qk) — FLEET-WIDE AUDIT: THE FLEET IS NOT BLEEDING, IT IS STARVED AND UNDECIDABLE — four of five loss centres are already-closed populations, and the instruments still grading them are the actual defect
+
+*(Renumbered from (qi) at push time — a concurrent session's "SIX HUNTERS"
+entry took (qi) on origin/main while this was built, and theirs is merged and
+cited. Per the collision rule the CITED entry keeps the letter and this side
+moves. Note the two entries independently measured the SAME three (qa) growth
+leads and independently closed all three NEGATIVE.)*
+
+**Operator: *"Where are we losing and why? More importantly how can we use this
+information to let our bots win? … No more circles maverick lets hit targets on
+the point."*** Full memo: `FLEET_AUDIT_2026-08-19.md`. Eight parallel diagnosis
+agents over the live payloads and every book's own ledger, era-scoped; six
+returned, two scopes + the verify pass died on a session limit and **everything
+acted on below was re-derived by hand** (§7 of the memo names what was not
+swept, rather than dropping it quietly).
+
+**THE ANSWER TO "WHERE ARE WE LOSING": mostly, we already stopped.** Every
+material loss centre traces to a population identified, measured and gated off
+between 13-Aug and 18-Aug — ⚖️ Counterweight −$36.48/21 in legs made
+unenterable at (ki)/(jg), last one crystallised 5-Aug (30 closes since:
+−$0.72); 🧘 Douglas **97% two VOID rows** ((nm)/(pv)) against a clean post-fix
++$1.81/6; 🌾 carry **9 of 10 era losers** in the 13-Aug screened class; 🎯
+sniper −$5.48/16 in screened classes vs **+$1.67** elsewhere and +$0.35 on its
+post-screen sample. 🛢️ Garrett's −$5.82 is two real stops, **1.5 SE** from its
+own founding study, 5.1 days into a 30-day clock. **There is no open wound to
+plug.** The structural cause is (qa)'s measured drought — alt volume halving
+every 9.4 weeks — so the books are **starved, not edgeless**.
+
+**THE REAL FINDING: three instruments are answering on a dead sample, and that
+is what turns a starved book into a wrongly-retired one.** 🌾 carry publishes
+`t=−4.48 / "unreachable" / "more of the same closes cannot flip mean"` where
+*more of the same closes is structurally impossible* — 90% of that sample is
+instruments the gate refuses. Same shape on 🎯 sniper (`era=null`). And the
+fleet's ONLY capital claim — carry's 0.001492, **71% of the fleet's target** —
+is pooled n=101 of which **91 rows predate the era** and which still carries
+the (nc) phantom accrual; era-scoped it is `None`, current-policy **n=0**. No
+money acts on it ((lx)/(oy) hold every consumer at 1.0), but it is the number
+the fleet's own narrative calls its best-claimed book. **Deliberately NOT
+"fixed" by moving an era** — (pf) already ruled a narrowed universe is ordinary
+tuning; the precedent is REPORT the split, don't re-cut. Named so the ~12-Sep
+call is made with it in hand.
+
+**THREE CORRECTNESS FIXES SHIPPED, all mutation-verified (4+7+4 red, controls
+green):**
+* **The quarantine now reaches the SEED path.** `fetch_paper_aggregate` — the
+  totals ~13 books re-read at boot — was raw SQL with no `LEDGER_QUARANTINE`
+  filter while every GRADING consumer withholds those rows, so 🧘 Douglas
+  **re-seeded the two void rows on every reboot**: −$24.68/8 published against
+  +$1.81/6 graded, a **$26.48 permanent disagreement** between a book's card
+  and the record that decides it. `is_quarantined` stays the one owner ((hj));
+  fail-OPEN inherited; a clean book pays no second query.
+* **🏛️ Parliament no longer publishes a book whose state it could not read.**
+  `save()` has refused since the 21-Jul audit fix; `publish()` did not — so a
+  Postgres read blip published the **fresh-book constructor state** (equity
+  $1000.00, closed 0) as fact and `snapshot_equity` wrote it into the MTM
+  series the (ia) worse-of-both bar reads. **MEASURED: pm-albanese's published
+  MTM drawdown is 0.18% and (1001.84−1000.00)/1001.84 = 0.1838% — the flicker
+  exactly.** Immaterial at this book's P&L and NOT in general: the artifact is
+  `pnl_abs/equity`, so it **scales one-for-one with the book's own success**.
+  The mutation that matters is M6 — guard placed AFTER the writes still
+  poisons the series, and it reddens.
+* **The funding machine can answer its own entry-quality question now.** The
+  ledger recorded the `enter_apr` BAR and never the OBSERVATION the gate
+  admitted on, so the brain's 19-Aug `entry_quality` diagnosis on 🛢️ Garrett
+  **could not be tested against the one variable its entry gate is built on**.
+  Close rows gain `entry_apr` (signed TRUE apr at admission, ABSENT-when-unknown
+  per (ht)) and `accrued` (so price and carry grade apart). The (ir) `hot_h`
+  class, one field over. Telemetry only.
+
+**ALL THREE (qa) GROWTH LEADS MEASURED, ALL THREE DIED — the refusals are the
+deliverable (I19):**
+* **Divergence veto REFUSED and the prior WITHDRAWN**: (qa) named the LIT stop
+  cluster as its class; graded at entry the cluster's core is **agreement, not
+  divergence** (Lighter +0.11 vs HL +0.11, div 0.00) — and **0 of 300 pooled
+  entries** ever occurred at |div| ≥ 50pp, so the books' gates never admit one.
+  `STUDY_DIVERGENCE_VETO_2026-08-19.md`
+* **Squeeze events REFUTED over 1,139 events**: zero of 18 cells clear any bar,
+  grid centre **t=−2.71 both halves negative**, and random non-event entries
+  **BEAT** it (P_null 0.36–0.99). A fresh funding extreme is *actively bad*
+  entry information — the Farmer's LIT stops from the inside.
+  `STUDY_SQUEEZE_EVENTS_2026-08-19.md`
+* **Listing lifecycle: NOTHING ESTABLISHED** — n=12, the tempting 24h long
+  fails on n, on h2, and on **top-3 concentration 223%**, with survivorship
+  bias running the optimistic way. `STUDY_LISTING_LIFECYCLE_2026-08-19.md`
+Also refused: the brain's Garrett tightening (every implied direction is
+measured-REFUTED or UNMEASURED, and the variant has no reachable actuator) and
+porting carry's 6h grace to the Farmer (refuted in all 16 cells — grace is a
+cell property, not a doctrine).
+
+**WHAT IS LEFT IS DECISIONS, NOT TUNING.** Five books are formally undecidable
+and no pass changes that: ⚖️ Counterweight (t≥2 is **5.1 years** away; even 20
+consecutive +1% closes move t to +0.70 — *no achievable data flips it to
+KEEP*; pre-registration ~28-Aug stands, do not pre-empt), 💸 the **LIVE**
+Farmer (**1,332 days** to decidability on real capital), 👩 mum (swing-daily's
+exact retirement profile), 💼 turnbull (**16.4 days zero entries**, every skip
+below an authorless `ml_gate`), 📐 Grimes (gate flipped back all-three-CLOSED
+since (om)). Plus 🙏 Avo LIVE's cap: **$200 published against $62.53 equity**,
+restrict-only at zero expectancy price. All queued with evidence.
+
+**AND THE NUMBER THAT DWARFS THEM ALL, restated from (qa) because it did not
+change:** real money is **$259.84 at ≈$0/day**. The one book quietly earning
+its gate is 🙏 avo shadow (era n=12, **t=2.41**, both halves positive,
+on_track). No lever in this codebase is worth two orders of magnitude — **the
+capital decision is.**
+
 ## 2026-08-19 (qj) — THE OPERATOR REFRAMES: "risk-eliminating job vs profit-motivated job" — 🪁 band-kelly's risk-up package, decided and shipped inside the pre-first-close window
 
 **Operator, 18-Aug (Sydney 19-Aug): "We are looking at this as a risk
@@ -207,6 +386,7 @@ Farmer-arm restart. The path to real dollars is unchanged and has no shortcut
 this pass could find — a pre-registered window closes green, the gate passes,
 the operator decides. Weeks out at minimum, and the deposit is the lever the
 codebase does not contain.
+
 ## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
 
 **Executed end-to-end under the operator's "Continue maverick!" grant** (the

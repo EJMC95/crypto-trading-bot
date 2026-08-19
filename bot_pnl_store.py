@@ -1334,8 +1334,50 @@ def fetch_paper_aggregate(bot):
             realized, closed, wins = cur.fetchone()
         closed = int(closed or 0)
         wins = int(wins or 0)
-        return {"realized": float(realized or 0.0), "closed": closed,
-                "wins": wins, "losses": closed - wins}
+        realized = float(realized or 0.0)
+        # [2026-08-19 fleet audit] THE QUARANTINE HAD TO REACH THIS PATH TOO.
+        # `fetch_paper_trades` below withholds LEDGER_QUARANTINE rows from
+        # every GRADING consumer (gate, brain, allocation, exit studies); this
+        # aggregate — the SEED a book re-reads at boot to recover its own
+        # cumulative totals — was raw SQL over the same table with no such
+        # filter. So the two answers disagreed about the same ledger, and the
+        # book's OWN published numbers carried what the fleet had already
+        # ruled inadmissible: 🧘 douglas re-seeded the two (nm)/(pv) void rows
+        # (phantom boot-frozen entry marks the venue never offered) on EVERY
+        # reboot, publishing pnl_abs -$24.68 / 8 closes against a graded record
+        # of +$1.81 / 6 closes — a $26.48 disagreement, permanent and
+        # self-healing in the wrong direction.
+        # `is_quarantined` stays the ONE owner of the question (a second copy
+        # of the rule is a second rule, (hj)); the pre-filter on `pair` is only
+        # a cheap way to avoid scanning a whole ledger to ask it. Fail-OPEN is
+        # inherited: an unparseable row is ADMITTED, so this can never silently
+        # shrink a book's totals beyond the declared windows.
+        try:
+            q_pairs = sorted({str(qp) for qp, qb, _lo, _hi, _why
+                              in LEDGER_QUARANTINE if qb in str(bot or "")})
+            if q_pairs:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT pair, closed_at, pnl_abs FROM paper_trades "
+                        "WHERE bot = %s AND pair = ANY(%s)",
+                        (bot, q_pairs),
+                    )
+                    rows = cur.fetchall()
+                for pair, closed_at, pnl in rows:
+                    if not is_quarantined(bot, pair, closed_at):
+                        continue
+                    pnl = float(pnl or 0.0)
+                    realized -= pnl
+                    closed -= 1
+                    if pnl > 0:
+                        wins -= 1
+        except Exception as e:  # noqa: BLE001
+            # Never let the withholding pass break the recovery it refines:
+            # an unfiltered total beats no total at all (the seed's whole job
+            # is surviving a local-file wipe).
+            _warn_once(f"paper-aggregate quarantine filter failed ({e})")
+        return {"realized": realized, "closed": max(0, closed),
+                "wins": max(0, wins), "losses": max(0, closed - wins)}
     except Exception as e:  # noqa: BLE001
         _warn_once(f"paper-trade read failed ({e})")
         return None

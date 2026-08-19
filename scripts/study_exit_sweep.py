@@ -219,6 +219,61 @@ BOOK_EXITS = {
         "sl_pct": ("CATASTROPHIC_STOP", _abs)}),
 }
 
+# [2026-08-19 fleet audit] BOOKS WHOSE SHIPPED EXIT IS OUTSIDE THIS HARNESS'S
+# MODEL — declared, so the refusal is a fact rather than a silent "unknown".
+#
+# `walk_exit` expresses exactly {tp_pct, sl_pct, max_hold_h, trail_pct}: ONE
+# fixed profit target, ONE fixed stop, ONE fixed trail. A family carrier with a
+# populated `roi` ladder exits on a TIME-DECAYING target (🔮 georgia:
+# 1.8% -> 1.2% at 3h -> 0.8% at 6h -> 0.5% at 12h) under an ATR RATCHET capped
+# by the carrier stoploss. Neither is a constant, so no member of this rule
+# space is that book's shipped rule.
+#
+# WHY THIS IS A DECLARATION AND NOT A TODO: the tempting fix is to map the
+# ladder's first rung to `tp_pct` and call it calibrated. That hands
+# `calibrate()` a rule the book does not run, and a baseline that is a fiction
+# is worse than no baseline — `(ps)`, where a calibration gate graded the
+# harness against trades it could not replay and the FALSE PASS then guarded
+# the fleet's largest stop pot. The sweep's own doctrine is that a harness which
+# cannot reproduce what DID happen may not say what WOULD have; this names the
+# books where that is structurally true.
+#
+# CONSEQUENCE, stated because it is load-bearing: the brain's standing
+# `exit_too_tight` diagnosis on 🔮 georgia (reclaim 1.0, fwd +1.63%,
+# trailing-stop path -$17.14/71 era) CANNOT be actioned through this
+# instrument at all. Answering it needs a ladder-aware replay, which is a build,
+# not a re-run. 🙏 avo maria — the fleet's best-evidenced book — is in the same
+# class via SwingDip's ladder.
+#
+# DERIVED from the live registry, never a hand list: a new family book, or a
+# carrier that GAINS a ladder, is covered the day it lands ((pf)'s rule).
+def _ladder_exit_books():
+    """{row_id: reason} for live family books whose exit is an ROI ladder."""
+    try:
+        from lighter_family_bot import live_strategies
+    except Exception:      # noqa: BLE001
+        return {}
+    out = {}
+    try:
+        for s in live_strategies():
+            roi = getattr(s, "roi", None) or {}
+            if len(roi) > 1:
+                rungs = ", ".join(f"{int(k)}m:{float(v) * 100:.2g}%"
+                                  for k, v in sorted(roi.items()))
+                out[f"{s.bot}-lshadow"] = (
+                    f"{type(s).__name__} exits on a time-decaying ROI ladder "
+                    f"({rungs}) under an ATR ratchet capped at "
+                    f"{abs(float(getattr(s, 'stoploss', 0))) * 100:.3g}% — not a "
+                    f"member of this harness's {{tp,sl,trail,max_hold}} rule "
+                    f"space, so no baseline here would be its shipped rule")
+    except Exception:      # noqa: BLE001
+        return {}
+    return out
+
+
+UNSWEEPABLE_EXITS = _ladder_exit_books()
+
+
 #: Books whose exit constants are BARE MODULE LITERALS — no env var, no lever.
 #: Recorded because "we could tune this" is false for them today: a code edit
 #: and a redeploy is the only path, so they cannot participate in the growth
@@ -988,6 +1043,15 @@ def main():
             _status = ("PASS" if cal.get("ok") else
                        "FAIL — every recommendation below is WITHHELD")
             print(f"   calibration: {cal.get('detail')} ({_status})")
+        elif book in UNSWEEPABLE_EXITS:
+            # [2026-08-19] Not "unknown" — STRUCTURALLY outside the rule space.
+            # The generic message below sent a reader off to add a BOOK_EXITS
+            # entry, which for these books can only produce a fiction ((ps)).
+            print(f"   calibration: IMPOSSIBLE, not missing — "
+                  f"{UNSWEEPABLE_EXITS[book]}.")
+            print(f"   Every row below is a rule this book DOES NOT RUN. "
+                  f"Answering its exit question needs a ladder-aware replay "
+                  f"(a build), never a BOOK_EXITS entry.")
         elif shipped_rule(book) is None:
             print(f"   calibration: SKIPPED — {book}'s shipped exit rule could "
                   f"not be read from its module, so there is no baseline to "

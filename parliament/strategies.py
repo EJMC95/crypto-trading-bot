@@ -532,6 +532,27 @@ class PMBot:
     def publish(self) -> None:
         if store is None or self.broker is None:
             return
+        # [2026-08-19 fleet audit] DO NOT PUBLISH A BOOK WHOSE STATE WE COULD
+        # NOT READ. `save()` twelve lines up has refused since the 21-Jul audit
+        # fix ("never overwrite durable state we could not read") and publish()
+        # did not — so a transient Postgres read blip left `_restored` False,
+        # save() correctly declined, and this method then published the
+        # FRESH-BOOK constructor state as fact: equity $1000.00, closed 0,
+        # wins 0 — and `snapshot_equity` below wrote that fabricated number
+        # into the MTM series the (ia) worse-of-both drawdown bar reads.
+        # MEASURED 19-Aug: pm-albanese's published MTM drawdown is 0.18%, and
+        # (1001.84 - 1000.00)/1001.84 = 0.1838% — the peak-to-fresh-book
+        # flicker, exactly. Immaterial at this book's P&L and NOT immaterial
+        # in general: the artifact is pnl_abs/equity, so it scales one-for-one
+        # with the book's own success, and a book that is winning is the one
+        # whose drawdown bar decides a go-live.
+        # A genuinely NEW book is unaffected: restore() sets `_restored` True
+        # on a clean read that returns no state, so a real fresh book still
+        # publishes $1000 on its first cycle. This refuses only the case where
+        # the read FAILED — where staleness is the honest signal (I1) and a
+        # $1000 row is a lie the watchdog cannot see.
+        if not self._restored:
+            return
         eq = self.broker.equity()
         try:
             store.publish(
