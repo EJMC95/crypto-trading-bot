@@ -203,11 +203,61 @@ def test_the_refusals_stay_on_the_record():
     r = kelly.MIRROR_ROSTER
     assert r["snapfade"]["status"] == "live"
     assert r["brkfade"]["status"] == "refused" and "P=0.7" in r["brkfade"]["why"]
-    assert r["dipfade"]["status"] == "waiting" and "I16" in r["dipfade"]["why"]
+    assert r["dipfade"]["status"] == "live-probe" and "I16" in r["dipfade"]["why"], (
+        "dipfade runs under an OPERATOR OVERRIDE of the I16 floor (18-Aug "
+        "risk-up decision) — the roster must say so, not launder it")
     assert r["impulse_cont"]["status"] == "owned" and "douglas" in (
         r["impulse_cont"]["why"])
     ex = kelly.build_extra({}, {}, [], 0.0, 0.0, 60.0)
     assert ex["roster"] is r, "the roster must publish every loop"
+
+
+def test_the_dip_ghost_bracket_matches_the_takers_real_constants():
+    """The dipfade ghost is the TAKER's dip policy. Its bracket lives here
+    as declared literals (importing the 295KB taker into the image would
+    bloat the import graph), so this test is the drift arm: a retyped
+    constant is a constant that drifts ((gv) doctrine) — the taker's real
+    values are the authority, imported IN THE TEST only."""
+    import lighter_ticket_taker as tt
+    assert kelly.DIP_GHOST_TP == tt.TAKE_PROFIT, "taker TT_TP moved"
+    assert kelly.DIP_GHOST_SL == abs(tt.STOP_LOSS), "taker TT_SL moved"
+    assert kelly.DIP_MAX_HOLD_S == tt.MAX_HOLD_H * 3600.0, "taker hold moved"
+    assert kelly.DIP_RANGE_MAX == tt.DIP_RANGE, "taker dip conviction bar moved"
+    assert kelly.DIP_COOLDOWN_S == tt.SL_COOLDOWN_H * 3600.0, "taker cooldown moved"
+
+
+def test_the_risk_up_package_is_the_operators_recorded_shape():
+    """[18-Aug operator decision]: $250x4 snap + $40x2 dip probe + 60bps
+    MY-side slip. The ghost-side event gate stays the ghost's own 30bps —
+    a widened EVENT definition would found the book on events the ghost
+    never took."""
+    assert kelly.CLIP_USD == 250.0 and kelly.MAX_POSITIONS == 4
+    assert kelly.DIP_CLIP_USD == 40.0 and kelly.DIP_MAX_POSITIONS == 2
+    assert kelly.MY_MAX_SLIP_BPS == 60.0
+    assert ghost_mod.MAX_ENTRY_SLIP_BPS == 30.0, (
+        "the ghost's own gate defines the EVENT; it must not follow mine")
+    worst = (kelly.CLIP_USD * kelly.MAX_POSITIONS * kelly.MY_HARD_STOP
+             + kelly.DIP_CLIP_USD * kelly.DIP_MAX_POSITIONS * kelly.DIP_GHOST_TP)
+    assert worst < 0.15 * 1000.0, (
+        f"worst-instant loss ${worst:.0f} breaches the 15% bar — the sizing "
+        "package was chosen to stay inside it")
+
+
+def test_the_ghost_event_check_is_priced_at_the_ghosts_own_clip():
+    """main() must fetch a book_view at ghost.ORDER_USD for the event-
+    existence check: at $250 a my-clip walk refuses events the real $10
+    ghost took, and the error grows with clip size. MUTATION: price the
+    ghost gate off my clip's view -> RED."""
+    fn = _main_fn()
+    found = False
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "book_view":
+            for a in n.args:
+                if (isinstance(a, ast.Attribute) and a.attr == "ORDER_USD"
+                        and getattr(a.value, "id", "") == "ghost"):
+                    found = True
+    assert found, ("no book_view(ctx, coin, ghost.ORDER_USD) in main() — the "
+                   "ghost-side event check is being priced at MY clip")
 
 
 def test_the_mirrors_own_stop_is_inside_the_gate_bar():

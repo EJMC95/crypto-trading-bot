@@ -1,3 +1,54 @@
+## 2026-08-19 (qj) — THE OPERATOR REFRAMES: "risk-eliminating job vs profit-motivated job" — 🪁 band-kelly's risk-up package, decided and shipped inside the pre-first-close window
+
+**Operator, 18-Aug (Sydney 19-Aug): "We are looking at this as a risk
+eliminating job as opposed to a profit motivated job. Let's look at this
+differently and look at options, even though risk will be higher."** The
+options were laid out with their numbers and refusals; the operator picked
+the aggressive tier on all three. Everything below landed while the book
+had ZERO closes — the (hm) single-policy clock had not started, so the
+whole 30-day sample will be earned under ONE policy. A week later the same
+changes would have fractured the era; today they were free.
+
+THE PACKAGE, as decided:
+* **$250 × 4 snap clips** (was $80×4): the whole $1k works in a
+  dislocation storm, ~3.1× dollar throughput on the same measured edge.
+  Named, accepted price: deeper book-walks (the KAITO-depth risk); the
+  my_slip census keeps it measurable, revert `KELLY_CLIP_USD`.
+* **dipfade ADMITTED at $40×2 probe — an OPERATOR OVERRIDE of the I16
+  floor, on the record.** n=13 < 30, but t=−2.66 as a single
+  pre-registered candidate puts the mirror's 95% CI at ~[+0.28%, +2.05%]
+  per trade, entirely positive; the floor is a fleet-wide multiplicity
+  defense and this is one named hypothesis at probe size. The ghost is the
+  taker's own VETOED dip lens: its conviction bar (range_pos ≤ 0.05)
+  decides the event, its bracket (tp +4% / sl −3% / 48h) mirrors into the
+  short's exits — the ghost's tp is the mirror's loss side. Bracket
+  constants are declared literals DRIFT-PINNED against the taker's real
+  values in the test (importing the 295KB taker into the image would bloat
+  the import graph); own tag `short-dip_*`, own cooldown (the taker's 2h,
+  mirrored), graded alone, dies on its own record.
+* **MY-side slip gate 30 → 60bps**: take more of the ghost's events at
+  size; pays up to ~30bps on marginal fills against a +60bps/trade mean.
+* **NOT taken, named with receipts**: leverage (refuted, the (young)
+  study — Δt negative 13-of-13), brkfade admission (random-short P=0.78),
+  removing the 5% stop, allocation-scale before a claim exists.
+
+THE FIDELITY CATCH THE CLIP JUMP FORCED: the ghost-side event check was
+being priced at MY clip — at $80 a rounding error, at $250 it would have
+REFUSED events the real $10-clip ghost took, shrinking the founded event
+set with every dollar of size. The event-existence gate now prices at
+`ghost.ORDER_USD` via a second book_view fetched only at the rare entry
+moment; MY tradeability gates at my clip and my 60bps. AST-pinned
+(mutation M13 red). Worst-instant book loss with every slot stopped:
+4×$250×5% + 2×$40×4% ≈ **−$53 ≈ 5.3%**, inside the 15% bar
+(pinned); gross max ≈ $1,080 ≈ 1.08× equity, declared in caps.
+
+Mutations M10–M13 verified red (dip bracket sides, conviction bar, dip
+slip gate, ghost-clip pricing) — with the control re-run after the first
+M13 pass turned out to be a cwd-drift vacuous red, the (po) class caught
+in my own harness for the second time today. Suite 1861 green. The header,
+roster, caps payload and CLAUDE.md row all say what the book now does
+(I12); the dashboard OVERTRADE_LIMIT already covers the added family.
+
 ## 2026-08-19 (qi) — SIX HUNTERS, THREE ADMITTED STUDIES ALL CLOSE **NEGATIVE**, AND THE FIVE THINGS WORTH SHIPPING ARE FIDELITY AND FALSIFIABILITY — NOT EDGE
 
 **Operator: "Improve the p n l of all bots" → "Implement every positive
