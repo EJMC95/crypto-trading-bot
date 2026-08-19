@@ -160,9 +160,20 @@ the last green run I isolated**, so two instruments agree on the boundary.
 book can receive code until this clears** — including the `(qk)` correctness
 fixes, which are merged-pending and will sit in main doing nothing.
 
+**THE "JUST WAIT" OPTION IS RULED OUT, MEASURED.** The watchdog's *"billing
+lockout"* line is an INFERENCE from heartbeat age — it never reads billing — so
+it was worth testing against the one alternative that would mean do-nothing:
+a GitHub platform incident. `githubstatus.com/api/v2/summary.json`, 19-Aug
+04:2xZ: **"All Systems Operational", Actions `operational`, 0 active
+incidents.** GitHub is fine; the lockout is account-side. Also ruled out: a
+broken workflow file — **zero commits landed on `main` between the last green
+run (23:28Z) and the first red (01:43Z)**, so no change of ours caused it.
+
 **A — check Settings → Billing on the repo's account ★** (the 28-Jul scar is
 the precedent; a spend cap or exhausted minutes produces exactly this
-signature: instant failure, no logs, scheduled runs on `main` affected).
+signature: instant failure, no logs, scheduled runs on `main` affected). With
+the platform ruled out and a code cause ruled out, this is the remaining
+explanation.
 
 **B — if billing is fine**, the fallback is a manual `railway up` per service
 for anything urgent, and CI stays advisory until Actions returns.
