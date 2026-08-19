@@ -96,7 +96,7 @@ def test_sample20_names_how_many_rows_it_could_not_classify():
     about, and it is ALWAYS present — an omitted key is byte-identical between
     "all stamped" and "not computed" ((lv))."""
     legacy = [{"pnl": -23.16, "r": -3.29}, {"pnl": -3.31, "r": -3.73}]
-    stamped = [dg.recent_entry("ROBO", _pos(), 1.0, "2026-08-19T09:00:00+00:00")]
+    stamped = [dg.recent_entry("ROBO", _pos(), 1.0, "2026-08-17T09:00:00+00:00")]
     assert dg.sample20(legacy + stamped)["unstamped"] == 2
     assert dg.sample20(stamped)["unstamped"] == 0
     assert dg.sample20([])["unstamped"] == 0

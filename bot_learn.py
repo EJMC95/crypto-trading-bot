@@ -313,7 +313,12 @@ ERA_START = {
     # 13-Jul: same DayTraderV5Gated sleeve/stop changes; 17-Jul accrual basis
     "freqtrade-georgia":   "2026-07-17T00:00",
     # 14-Jul: whitelist curated to the 10 backtest-positive pairs; 17-Jul accrual basis
-    "freqtrade-mum":       "2026-07-17T00:00",
+    # [2026-08-19 (ro)] 👩 mum v2: a NEW STRATEGY on this row (TrendMomo 1d ->
+    # OversoldRebound 1h), which is "different in kind" — the era rule's own
+    # words — so v1's three closes may not pool with v2's sample. Kept in
+    # lockstep with scripts/golive_readiness.POLICY_ERA: the gate's sample may
+    # never be wider than the brain's.
+    "freqtrade-mum":       "2026-08-19T21:45",
     # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier); 17-Jul accrual basis
     "freqtrade-dad":       "2026-07-17T00:00",
     # never had an era; same publisher, same accrual fix
