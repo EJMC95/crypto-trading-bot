@@ -380,7 +380,15 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # sequences"; lighter_band_kelly_bot.py, service
                 # band-kelly-shadow). Third of the musician cohort.
                 # Shadow-only; base never publishes.
-                "band-kelly"}
+                "band-kelly",
+                # [2026-08-19 (ri)] 🧭 nav-cook — the NAVIGATOR (the (re)
+                # [45,60)bps band book; lighter_nav_cook_bot.py, service
+                # nav-cook-shadow). First of the navigator cohort. Registered
+                # at birth-completion: without this the row filter (line
+                # ~781) drops nav-cook-lshadow from /pnl.json and the
+                # provisioning readback chases a ghost — the (ml) shape.
+                # Shadow-only; base never publishes.
+                "nav-cook"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -421,6 +429,9 @@ OVERTRADE_LIMIT = {
     "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
+    "nav-cook":              20,   # 🧭 the Navigator — 4h max hold x 4
+                                   # slots; a storm day can cycle each slot
+                                   # a few times, never 90s-fast
 }
 OVERTRADE_DEFAULT = 15
 
@@ -487,6 +498,7 @@ LABELS = {
     "book-schwager":               "🧙 The Wizard — ride-winners book",
     "book-hull":                   "🧮 The Professor — cost-of-carry book",
     "band-kelly":                  "🪁 the Mirror — rides what the losers fade",
+    "nav-cook":                    "🧭 the Navigator — charts the band below the mirror's floor",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",

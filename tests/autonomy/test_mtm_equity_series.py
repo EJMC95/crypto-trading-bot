@@ -60,6 +60,12 @@ MTM_REQUIRED = {
         "🪁 band-kelly — the mirror book, wired at BIRTH: holds are minutes "
         "but up to 4 concurrent $80 dislocation-momentum clips whose open "
         "drawdown between closes a realised-only bar cannot see",
+    "lighter_nav_cook_bot.py":
+        "🧭 nav-cook — wired at BIRTH (call present since (ri); registered "
+        "at birth-completion so a future edit removing it goes red): 4h "
+        "holds x 4 concurrent $80 band clips, and the band ABOVE it is "
+        "measured to BREAK rather than revert — open drawdown between "
+        "closes is exactly where that shape shows first",
     "lighter_book_grimes_bot.py":
         "📐 The Technician — wired at BIRTH: 1-3 day structure holds behind "
         "a replay gate; the gate can go quiet for weeks while positions ride",
