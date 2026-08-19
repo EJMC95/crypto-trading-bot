@@ -206,6 +206,11 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 "pm-rudd-lshadow", "pm-morrison-lshadow",
                 "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
                 "freqtrade-dad-lshadow",
+                # [2026-08-19] 👩 mum — I17 no_rate (0 in-era closes ever,
+                # ~2.4 closes/30d => ~12 months to the bar, funding drag
+                # -$2.15 > +$0.68 realised). Corrects the (nf) "green, slow"
+                # hold: that green was open MARKS ((lo)). MUM_RETIRED_OVERRIDE.
+                "freqtrade-mum-lshadow",
                 # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — 🙏 Avo Maria
                 # took the slot (same service/keys/sub-account, the slot's
                 # THIRD occupant; operator decision, cutover verified by

@@ -55,13 +55,18 @@ def test_the_other_six_books_keep_trading(monkeypatch):
     fam = _family()
     monkeypatch.delenv(OVERRIDE, raising=False)
     # [(nf) 15-Aug] dad/intraday/swing joined RETIRED_BOOKS in the red-stop
-    # slate, so the still-alive roster is the three greens and the count
-    # tracks the declaration instead of hardcoding "minus one".
+    # slate, so the still-alive roster is the greens and the count tracks the
+    # declaration instead of hardcoding "minus one".
+    # [2026-08-19] freqtrade-mum joined them on its own I17 no_rate call, so
+    # the survivor list is DERIVED now rather than hand-listed — the property
+    # under test is "this retirement took nobody else with it", which must not
+    # need editing every time some OTHER book is retired for its own reasons.
     live = {s.bot for s in fam.live_strategies()}
-    for still in ("freqtrade-mum", "freqtrade-avo-maria",
-                  "freqtrade-georgia"):
-        assert still in live, f"{still} was retired by collateral damage"
-    assert len(live) == len(fam.STRATEGIES) - len(fam.RETIRED_BOOKS), live
+    expected = {s.bot for s in fam.STRATEGIES} - set(fam.RETIRED_BOOKS)
+    assert live == expected, (
+        f"collateral damage: expected {sorted(expected)}, got {sorted(live)}")
+    assert BOT not in live, "the book this file retires must be out"
+    assert live, "the shared process must still run books"
 
 
 def test_the_override_resurrects_it_with_no_redeploy(monkeypatch):
