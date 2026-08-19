@@ -1,3 +1,88 @@
+## 2026-08-19 (qn) — THE "PHANTOM FEE" IS NOT PHANTOM: CARRY ALREADY MEASURES ITS PERP LEG, AND THE ONLY REAL DEFECT IS A HYPERLIQUID CONSTANT ON A LIGHTER BOOK — plus the letters guard was blind to its own citation form
+
+*(Renumbered (qk) -> (qm) -> (qn) across three push attempts — concurrent
+sessions took (qk), (ql) and then (qm) on origin/main while this was being
+written. Theirs are merged, this was unpushed, so this is the side that
+moves each time. FOURTH letter collision this session; the cross-branch arm
+caught every one, which is the only reason the citations still resolve.)*
+
+**Operator reframed the mandate** ("we are looking at this as a risk eliminating
+job as opposed to a profit motivated job ... look at options, even though risk
+will be higher"), and a judge panel returned an aggressive slate. Its **#2
+ranked item, and the upside judge's top pick**, was: the four delta-neutral
+funding books charge a phantom **29–30bps** round trip assembled from a
+Hyperliquid taker fee plus a `HEDGE_COST` for an "off-venue hedge leg" they do
+not hold — cut it to 10bps and 🌾 carry's verdict flips from t=−4.25 to +1.72.
+
+**Verified before shipping, and it does not hold.** Re-graded from the book's
+OWN recorded `fees`/`notional` ((gr) telemetry), era n=10:
+
+| what carry ACTUALLY charged | value |
+|---|---|
+| median round trip | **22.2 bps** |
+| range | [20.7, 49.7] (49.7 = KAITO, a thin book held 149.8h) |
+| what the constants imply | 29.0 bps |
+
+The gap is the point: **on `lighter_shadow` the perp leg is ALREADY MEASURED per
+fill by an order-book walk** (`measured_perp_cost` → `fill_from_book`, adverse
+slippage only, price improvement floored to 0). `PERP_FEE` is only the
+**fallback** when no book/price is available, plus the banner and the decay-gate
+estimate. ~20bps of HEDGE_COST + ~2bps of measured slippage ≈ the 22.2bps
+observed. **There is no phantom fee to delete, and no fee-based rescue for
+carry** — at its real charge it reads −0.155%/trade, t=−4.48, and the sign only
+flips at ~3bps, i.e. with HEDGE_COST gone.
+
+**AND DELETING HEDGE_COST WOULD BE INCOHERENT, not merely aggressive.**
+🏦 Kiyosaki's header says that leg *"is modelled, it does not exist"* — and
+these books omit any PRICE term for the SAME reason (`position_pnl` takes no
+mark; carry realises `accrued − fees` inline). The hypothetical hedge is what
+cancels price. **Charging its cost and omitting price risk are two halves of ONE
+simulation**; removing the cost while keeping no-price-term models a hedge that
+is FREE — better than reality in both directions at once. That is the exact
+shape of a losing book laundered into a winner, and the panel's own writeup
+flagged the risk ("fits a model until a loser looks profitable") before
+recommending it anyway.
+
+**WHAT IS GENUINELY WRONG, AND IS FIXED.** `PERP_FEE = 0.00045` is a
+**Hyperliquid taker fee**, and this stopped being a Hyperliquid book on 17-Jul —
+the HL arm is retired, the only arm that runs is `lighter_shadow`, and Lighter's
+schedule is **zero on all 203 active books**. Same stale-foreign-venue shape as
+the brain's Kraken-SPOT `FEE_RT` in (gg). Fixed **venue-scoped**
+(`perp_fee(mode)` / `open_cost(mode)`), never as a global overwrite — which
+would invert the bug onto the honest arm, the `_basis` lesson fifteen lines up
+in the same file. `hl_paper` unchanged at 29.0bps; `lighter_shadow` 21.0bps
+modelled against the 22.2bps measured. Value 0.5bps/side, the conservative end
+of the measured range (1.02bps RT by book walk at this book's clip across 18
+books; 0.24bps/side on the live Farmer's 38 real fills), env-overridable.
+**The banner also stops announcing a friction the book does not charge** — the
+identical defect this file already fixed once for its APR bars, three lines
+above the line that was still wrong.
+
+**Ledger unmoved by construction** (the fallback path is rare) — so this is an
+accuracy fix that leaves the verdict exactly where the evidence puts it.
+4 tests, **4/4 mutations red**, including an AST pin that carry's
+`accrued − fees` realisation may never gain a price term without HEDGE_COST
+being re-derived in the same change.
+
+### THE GUARD WAS BLIND TO ITS OWN CITATION FORM, AND SAID "OK" WHILE IT WAS
+
+Writing the above, `audit_changelog_letters` reported **"OK — 994 citations all
+resolve"** while three files cited `(qk)` and **no `(qk)` entry existed**. Cause:
+`CITE_DATED` demanded a full ISO date (`\d{4}-\d{2}-\d{2}`) and the tree also
+stamps the short form `[19-Aug (qk)]`. **Measured at the fix: 22 short-form
+citations across the tree were unverified** (against 624 ISO-form) — and **7 of
+them predate this session**, so the hole was live, not self-inflicted. This is
+the same class the guard exists for and the same class `(po)` engraved this
+week: a check that inspects nothing reports clean, and clean gets quoted as
+evidence.
+
+Widened to accept `D-Mon`/`DD-Mon` inside the SAME unambiguous `[<date> (xx)]`
+bracket — deliberately NOT to bare parens, which the original comment measured
+at **278 noise hits** and correctly rejected. Re-measured after: still zero
+false hits. **Proven by positive control** rather than assumed: with `(qk)`
+cited and no entry, the widened guard lists `funding_carry_bot.py:194` and exits
+**1**; it was silent on exactly that line before. The short-form citations in
+this session's own `(qg)`/`(qi)` work are now checked for the first time.
 ## 2026-08-19 (qm) — THE (qa) MEMO'S §5 IS CORRECTED IN PLACE: ALL THREE ADMITTED STUDIES NOW CLOSED NEGATIVE, AND THE MEMO SAYS SO WHERE IT PROPOSED THEM
 
 Small I12 pass, one file. `FLEET_PNL_GROWTH_2026-08-18.md` §5 proposed three

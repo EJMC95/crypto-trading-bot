@@ -191,7 +191,7 @@ BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
 
 # Round-trip friction, as fractions of notional per SIDE of the round trip.
 PERP_FEE = 0.00045        # HL taker per perp fill (conservative base tier)
-# [19-Aug (qk)] PERP_FEE IS A HYPERLIQUID CONSTANT AND THIS BOOK STOPPED BEING
+# [19-Aug (qn)] PERP_FEE IS A HYPERLIQUID CONSTANT AND THIS BOOK STOPPED BEING
 # A HYPERLIQUID BOOK ON 17-JUL — but read the next paragraph before concluding
 # anything about this book's P&L, because the obvious conclusion is WRONG.
 #
@@ -558,7 +558,7 @@ def _perp_leg_fill(ctx, bot_id, coin, is_buy, notional, mark, publish=True):
         if mid:
             ref, spread_bps = mid, (ask - bid) / mid * 1e4
     if not ref or ref <= 0:
-        # (qk) venue-scoped fallback: a Hyperliquid taker fee must not be
+        # (qn) venue-scoped fallback: a Hyperliquid taker fee must not be
         # the modelled cost on the Lighter arm when its book is unavailable.
         return perp_fee(ctx.mode) * notional, mark   # no price -> model it
     size = notional / ref
