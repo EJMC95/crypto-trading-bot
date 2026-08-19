@@ -1,8 +1,8 @@
-## 2026-08-19 (rc) — 👩 mum RETIRED: the I17 no_rate call, and it CORRECTS a `(nf)` HOLD whose "green" was open marks — plus the five stale premises the retirement exposed
+## 2026-08-19 (rd) — 👩 mum RETIRED: the I17 no_rate call, and it CORRECTS a `(nf)` HOLD whose "green" was open marks — plus the five stale premises the retirement exposed
 
-*(Renumbered from (qu) at push time — a concurrent session took (qu) on
-origin/main while this was built. FOURTH letter collision for this session in
-one night ((qi),(qj),(qr),(qu)); every one caught by `audit_changelog_letters`'
+*(Renumbered (qu) -> (rc) -> (rd) at push time — a concurrent session took (qu) on
+origin/main while this was built. FIFTH letter collision for this session in one
+night ((qi),(qj),(qr),(qu),(rc)); every one caught by `audit_changelog_letters`'
 cross-branch arm before reaching main, which is the guard working, and every
 one is also the cost of several sessions sharing one worktree — the fix is the
 per-session worktree this file already prescribes.)*
@@ -83,6 +83,51 @@ harness was built the night before this retirement made it the only one.
   FOREVER** by this file's own routing table (*"go-live/keys/SafetyRails caps
   stay operator-only"*), independent of the fact that no `railway` CLI exists
   in this container. Stated so it is not re-attempted.
+
+## 2026-08-19 (rc) — THE MIRROR ROSTER RE-PRICED ON THE CORRECTED ARITHMETIC: the operator's `dipfade` override SURVIVES, and the haircut's size is set by the GHOST'S COIN LIQUIDITY
+
+Discharges the carried item declared in `(qw)`.
+
+**A logical shortcut that halves the work:** the double-slippage correction
+always makes a mirror WORSE, so it can only flip an ADMISSION into a refusal,
+never the reverse. `brkfade` (refused) needs no re-check; only the two LIVE
+roster entries were at risk.
+
+Ghost source is the Ticket Taker's own closes, lens parsed from `reason`
+(`<side>-<lens>_<exit>`). **Trap recorded: `tag` is NULL on all 270 taker rows**,
+so the natural tag-based query returns nothing and looks like "no dip trades".
+
+| lens | n | ghost mean | ghost t | naive mirror (CI lo) | **corrected (CI lo)** | verdict |
+|---|---:|---:|---:|---:|---:|---|
+| **dip** | 13 | -1.162% | -2.66 | +1.162% (+0.31%) | **+1.061% (+0.20%)** | **SURVIVES** |
+| divergence | 203 | -0.252% | -1.10 | +0.252% (-0.20%) | +0.152% (-0.30%) | not viable |
+| breakoutup | 42 | -0.017% | -0.03 | +0.017% (-1.25%) | -0.084% (-1.35%) | not viable |
+| breakout | 10 | **+1.140%** | +1.23 | -1.140% (-2.95%) | -1.241% (-3.05%) | ghost WINS — mirror loses |
+
+The ghost reproduces exactly (n=13, -1.162%, t=-2.66) and the naive mirror CI
+reproduces the roster's published `[+0.28%, +2.05%]`. **Corrected, the lower
+bound holds above zero at +0.20% — the 18-Aug operator override stands.**
+
+**THE GENERALISABLE RULE, which is worth more than the 34% number in `(qw)`:**
+the correction is `ghost_slip + mirror_slip`, so it bites exactly where the
+ghost traded THIN books.
+
+| mirror | ghost's coins | haircut |
+|---|---|---|
+| snapfade | KAITO $0.42M, APEX $1.56M — thin | **34%** of the claim |
+| dipfade | taker tickets on liquid books | **8.7%** of the claim |
+
+**A mirror of a THIN-book loser is far less attractive than the naive negation
+suggests; a mirror of a LIQUID-book loser is barely affected.** Carry the rule,
+not the number.
+
+**Roster verdict: membership is CORRECT and unchanged** — both live entries
+survive, no additional lens qualifies. What changes is the EXPECTATION each is
+graded against: `snapfade` **+0.397%/t=+3.58** (not +0.605%/+5.71) and `dipfade`
+**+1.061%, CI lo +0.20%** on its n=13 probe.
+
+No code touched; main-only by the `(mm)` rule. Working notes:
+`reports/expansion_research_log.md` Part 9.
 
 ## 2026-08-19 (rb) — THE RUIN GATE READ THE SAFEST POSITION CLASS IN THE FLEET AS ITS MOST DANGEROUS STATE, AND WAS FAIL-**OPEN** ON THE ONE CASE IT EXISTS FOR
 
@@ -808,6 +853,19 @@ the proposal sheet.
 unaffected — it stands on its own tier's evidence and its pre-registered read is
 still pending closes under the new gate.
 ## 2026-08-19 (qu) — 🙏 AVO MARIA'S ENTRY PREDICTS NOTHING, MEASURED EXIT-FREE — AND THE OPERATOR KEEPS THE BOOK ANYWAY, ON THE RECORD, WITH A REVERT CRITERION
+
+*(Commit attribution, recorded inline per the convention rather than rewritten:
+this entry's text was swept into a concurrent session's commit `edd99eb` — whose
+subject describes its own `(qq)` Hull entry — by the shared-index race this file
+documents at length. The content landed intact and was verified byte-present on
+origin; only the authoring subject is another session's. **It is NOT being
+fixed by rewriting history**: `edd99eb` is on `origin/main` and on
+`origin/claude/operator-queue-fleet-improvement-xcrhej`, so amending it means
+force-pushing shared history across ~12 live sessions to correct a commit
+subject — a destructive act for a cosmetic gain. The companion CLAUDE.md half
+went in cleanly under its own subject (`10019ef`) via
+`scripts/session_commit.py`. Fourth instance of this race recorded in this
+repo; the durable fix remains a per-session worktree.)*
 
 **THE DECISION FIRST, because it is an operator call and it was made: 🙏 Avo
 Maria STAYS.** Operator, 19-Aug: *"no i want to keep avo maria."* This entry

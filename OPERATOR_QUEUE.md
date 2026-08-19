@@ -74,7 +74,7 @@ escape on this cell (48 cells, zero winners) — *"the stall is edge."* Real
 capital ($197.31) sits on it. **This is explicitly NOT a tuning pass**; if you
 KEEP, the rationale should be recorded against the P=0.06/P=0.155 controls.
 
-### C ✅ — 👩 mum: **EXECUTED 19-Aug `(rc)`** — retired, ROW-scoped, reversible via `MUM_RETIRED_OVERRIDE=run`. Confirmed on its own ledger before acting: 3 closes lifetime, **all three opened 12-Jul so ZERO in-era**, ~2.4 closes/30d ⇒ ~12 months to the bar, funding drag −$2.15 > +$0.68 realised. Overturns the `(nf)` "green, slow" hold because that green is +$2.23 of OPEN MARKS (the `(lo)` precedent). 4 open paper positions freeze. Both halves + guard shipped, 5/5 mutations red. Exposed and fixed five tests that encoded "mum is alive"; `test_breakout4h_retired`'s survivor set is now DERIVED. Item closes at the next daily review.
+### C ✅ — 👩 mum: **EXECUTED 19-Aug `(rd)`** — retired, ROW-scoped, reversible via `MUM_RETIRED_OVERRIDE=run`. Confirmed on its own ledger before acting: 3 closes lifetime, **all three opened 12-Jul so ZERO in-era**, ~2.4 closes/30d ⇒ ~12 months to the bar, funding drag −$2.15 > +$0.68 realised. Overturns the `(nf)` "green, slow" hold because that green is +$2.23 of OPEN MARKS (the `(lo)` precedent). 4 open paper positions freeze. Both halves + guard shipped, 5/5 mutations red. Exposed and fixed five tests that encoded "mum is alive"; `test_breakout4h_retired`'s survivor set is now DERIVED. Item closes at the next daily review.
 3 closes in 5.3 weeks, **0 in-era**, all four slots frozen in month-long trend
 holds; funding drag **−$2.15** exceeds **+$0.69** realised. `crypto-swing-daily`
 was retired at (nf) on n=3 in six weeks. mum was HELD as "green" — that green
