@@ -101,9 +101,16 @@ jobs:
           if not bots:
               problems.append("NO BOTS in feed")
           stale = sorted(b.get('bot','?') for b in bots if b.get('stale'))
-          off   = sorted(b.get('bot','?') for b in bots if b.get('status') not in (None, 'online'))
+          # [2026-08-19 (rn)] accepted set mirrors fleet_watchdog_svc's own
+          # 16-Jul audit fix ("halted is the NORMAL daily-loss state ... they
+          # paged as NOT ONLINE all day"; 'paper' is the hl_paper resting
+          # status). This copy predated that fix and had drifted — the (hj)
+          # second-copy-of-a-rule class, found while adding the reader check.
+          off   = sorted(b.get('bot','?') for b in bots if b.get('status') not in (None, 'online', 'halted', 'paper'))
+          halted = sorted(b.get('bot','?') for b in bots if b.get('status') == 'halted')
           if stale: problems.append("STALE: " + ", ".join(stale))
           if off:   problems.append("NOT ONLINE: " + ", ".join(off))
+          if halted: warnings.append("halted (daily-loss rule): " + ", ".join(halted))
           opens = sum(int(b.get('open_trades') or 0) for b in bots)
           if opens > 20:
               warnings.append(f"open positions {opens} exceed the 20-position budget")
@@ -115,6 +122,66 @@ jobs:
           open('warnings.txt','w').write("\n".join(warnings))
           open('snapshot.txt','w').write(f"bots={len(bots)} open_positions={opens} freshest={meta.get('freshest_update_age_sec')}s")
           print("problems:", problems or "none"); print("warnings:", warnings or "none")
+          PY
+
+      - name: Reader currency — was a pnl-dashboard deploy missed?
+        # [2026-08-19 (rn)] THE CLASS THIS CLOSES, measured live the same day:
+        # a red/frozen redeploy run leaves the SERVING dashboard on code older
+        # than main's registrations, and every row registered since is
+        # silently FILTERED from /pnl.json — the (rl) freeze ate the (rj)
+        # dashboard deploy and 🧭 nav-cook published invisibly behind a 06:27Z
+        # reader for ~2h until a manual catch-up dispatch. The (qh)
+        # reader-verify step cannot see this: it runs only when a deploy
+        # INCLUDES pnl-dashboard, and the failure here is a dashboard deploy
+        # that never started. This check runs hourly from OUTSIDE, deploy or
+        # no deploy (I13: liveness is only visible from outside).
+        # DASH_FILES mirrors railway-redeploy.yml's pnl-dashboard decide grep
+        # — a second copy of the routing rule, so it is drift-pinned by
+        # tests/autonomy/test_reader_currency_check.py ((hj)).
+        # FAIL-OPEN with a visible SKIP line: an unreachable watchdog.json is
+        # the feed probe's page, not this one's; only a POSITIVE stale reading
+        # appends a problem. GRACE covers build+boot so a fresh merge is not a
+        # false page (worst-case detection ~2 cycles).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          GRACE_S=1800
+          DASH_FILES="pnl_dashboard.py report_emailer.py compile_market_data.py bot_pnl_store.py Dockerfile.dashboard fleet_watchdog_svc.py"
+          STARTED=$(curl -fsS -m 20 "https://pnl-dashboard-production-858c.up.railway.app/watchdog.json" 2>/dev/null \
+                    | python3 -c 'import json,sys;print(json.load(sys.stdin).get("started",""))' 2>/dev/null || true)
+          if [ -z "$STARTED" ]; then
+            echo "reader-currency: SKIP (watchdog.json unreachable — the feed probe owns that page)" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          NEWEST=""
+          for f in $DASH_FILES; do
+            d=$(gh api "repos/$REPO/commits?path=$f&sha=main&per_page=1" --jq '.[0].commit.committer.date // empty' 2>/dev/null || true)
+            if [ -n "$d" ] && [ "$d" \> "$NEWEST" ]; then NEWEST="$d"; fi
+          done
+          if [ -z "$NEWEST" ]; then
+            echo "reader-currency: SKIP (commit API returned nothing — verified nothing, not clean)" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - "$STARTED" "$NEWEST" "$GRACE_S" <<'PY'
+          import sys, datetime as dt
+          started_s, newest_s, grace = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          parse = lambda s: dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+          now = dt.datetime.now(dt.timezone.utc)
+          started, newest = parse(started_s), parse(newest_s)
+          if (now - newest).total_seconds() > grace and started < newest:
+              msg = ("DASHBOARD READER STALE: serving container booted %s but main moved its "
+                     "files at %s — a pnl-dashboard deploy was missed, so rows registered since "
+                     "are silently filtered from /pnl.json; re-dispatch railway-redeploy with "
+                     "services=pnl-dashboard" % (started_s, newest_s))
+              prev = open("problems.txt").read()
+              with open("problems.txt", "a") as f:
+                  f.write(("\n" if prev and not prev.endswith("\n") else "") + msg)
+              print("reader-currency: STALE — " + msg)
+          else:
+              print("reader-currency: OK (reader %s vs newest dash commit %s)" % (started_s, newest_s))
           PY
 
       - name: Transition-aware alerting via single issue

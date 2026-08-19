@@ -202,11 +202,10 @@ the quarantine now reaches the boot seed path; funding closes now record
    fails ci-notify with the exact catch-up dispatch command in the message).
    Until then it is a runbook line: *after any red redeploy run, re-dispatch
    the services whose files were in the frozen pushes.*
-4. **`sample20` self-description** ((rk) residue): the douglas card will show
-   `n=9 / −$26.60` beside `closed 7 / −$0.12` for ~4 more days by design
-   (fail-open on unstamped legacy rows). Publish `unstamped: N` beside it so
-   the visible disagreement carries its own explanation instead of costing the
-   next reader an investigation.
+4. **`sample20` self-description** ((rk) residue) — **SHIPPED same evening
+   ((rn))**: `sample20` now publishes `unstamped: N` (always present, incl. 0),
+   so the visible n=9-vs-closed=7 disagreement carries its own explanation for
+   the ~4 days it persists.
 
 **Structural / this week:**
 5. **CI billing structure** — decided-not-done, but the measurement says the
@@ -225,11 +224,13 @@ the quarantine now reaches the boot seed path; funding closes now record
    observed through the publisher) should explicitly include one mixed-book
    observation; and decide `LIGHTER_RUIN_GATE`'s default *before* the next
    marker deploy, because the gate rides along with it.
-7. **Reader-currency as a standing check**: the (qh) verify step only fires
-   when a deploy *includes* pnl-dashboard; today's failure was a dashboard
-   deploy that never started. The hourly fleet-watchdog probe could assert
-   `/watchdog.json started` ≥ the newest main commit touching dashboard paths
-   — closing the stale-reader class from the outside, deploy or no deploy.
+7. **Reader-currency as a standing check** — **SHIPPED same evening ((rn))**:
+   the hourly fleet-watchdog run now asserts `/watchdog.json started` ≥ the
+   newest main commit touching the dashboard image's files (30-min grace,
+   visible SKIPs, drift-pinned copy of the decide grep's file set) and pages
+   through the existing single-issue channel. Verified against today's own
+   timestamps: 06:27 reader vs 08:08 commit → STALE; post-catch-up → OK.
+   Detection worst case ~2 hourly cycles, vs the ~4.5h this one ran.
 
 **Operator decisions pending (the queue, kept current today):**
 8. ⚖️ Counterweight — **~28-Aug pre-registration stands; today's read is
@@ -268,4 +269,8 @@ Dispatched the pnl-dashboard catch-up (reader-flip verified), activated
 nav-cook (decide rule live, AUTO_IMAGES, provisioner deleted), fixed its
 status string and the CLAUDE.md publish example that taught it, swept the
 three executed items out of the operator queue, and wrote this document.
-Entry: (rm). Everything else above is assessment, not change.
+Entry: (rm) — merged as PR #196, nav-cook redeploy verified by stamp readback
+(`ddc83aa0120e`, status `online`, watchdog problems `[]`). A second pass on
+the operator's "fix anything remaining" then shipped improvements #4 and #7
+above plus the watchdog status-set drift fix — entry (rn). Everything else
+above is assessment, not change.
