@@ -88,6 +88,31 @@ burst can shift earlier — exposure is unchanged, still bounded by `TT_MAX_OPEN
 and by ticket supply. SHADOW ONLY; the LIVE arm is a separate service with its
 own stagger.
 
+
+**RECONCILED WITH `(rg)`, WHICH FIXED THE SAME RED SUITE A DIFFERENT WAY —
+and its measurement is kept while its exemption is removed.** A concurrent
+session hit the identical `audit_boot_stagger` failure and answered it by
+DECLARING `lighter_ticket_taker` in `STAGGER_OK`, on a genuinely good argument:
+the organ publishes no `ttl_sec`, so the guard governs it by a 3x-interval
+PROXY (15 min), while its only cross-process reader is its `bot_pnl` row behind
+`fleet_risk.STALE_ROW_SEC=3900` (65 min) — 4.3x the proxy. **That is right, and
+it is why the burst misled no CONSUMER.** What it does not address is the other
+half: the book itself did not TRADE for 17 minutes, which is lost evidence on
+the fleet's own control arm regardless of who was reading it.
+
+So both halves are kept, in the places they belong: the boot ladder stays (it
+fixes the organ), and `(rg)`'s 3900s measurement moves into `run_all.sh` beside
+it, because it sets the URGENCY of any future firing — advisory until a burst
+approaches 65 minutes. **The `STAGGER_OK` entry itself is REMOVED, on a
+measurement rather than a preference:** with the ladder in place the exemption
+is dormant either way, but revert the ladder with the entry present and the
+guard exits **0**; revert it with the entry gone and it exits **1**. An
+exemption whose only remaining power is to hide the re-introduction of a fixed
+defect is the `DRIFT_OK` hole in another costume — *"prefer making the consumer
+a LITERAL over declaring the exemption"*. Stated plainly because it reverses a
+merged decision of another session, and should be visible rather than inferred
+from a diff.
+
 ## 2026-08-19 (rg) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
 
 [Renumbered from (re) at push time — the SECOND race in one PR: main took (re)
