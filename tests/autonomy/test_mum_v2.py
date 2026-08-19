@@ -119,16 +119,41 @@ def test_the_entry_refuses_the_trend_filter_that_was_measured_destructive():
     assert sig["rsi"] < s.RSI_MAX, "a monotonic decline must read deeply oversold"
     assert sig["enter"] == "oversold-rebound"
 
-    # the SAME oversold reading inside an uptrend must be REFUSED — that is
-    # avo's cell, not mum's
-    up = [100.0 + 0.30 * i for i in range(n - 12)] + \
-         [100.0 + 0.30 * (n - 12) - 3.0 * j for j in range(12)]
+    # The SAME deeply-oversold reading INSIDE an uptrend must be REFUSED —
+    # that is 🙏 avo's cell, and the disjointness is the whole I20 claim.
+    # NOTE the tape is constructed so `uptrend` is TRUE and rsi is deep, and
+    # both are asserted UNCONDITIONALLY: an earlier version guarded this with
+    # `if usig["uptrend"]:` and a mutation setting `outside_uptrend = True`
+    # SURVIVED, because a conditional assertion skips instead of failing.
+    m = 420
+    up = [50.0 + 0.9 * i for i in range(m)]
+    up = up + [up[-1] - 0.055 * up[-1] * (j + 1) / 6 for j in range(14)]
     ubars = {"c": up, "h": [c * 1.004 for c in up], "l": [c * 0.996 for c in up],
-             "v": [10.0] * n, "t": list(range(n))}
+             "v": [10.0] * len(up), "t": list(range(len(up)))}
     usig = s.signals(ubars, {"btc_regime_up": 1})
     assert usig is not None
-    if usig["uptrend"]:
-        assert usig["enter"] is None, "an uptrend dip belongs to avo, not mum"
+    assert usig["uptrend"] is True, "fixture must actually BE an uptrend"
+    assert usig["rsi"] < s.RSI_MAX, "fixture must actually be deeply oversold"
+    assert usig["enter"] is None, "an uptrend dip belongs to avo, not mum"
+
+
+def test_the_oversold_threshold_is_genuinely_DEEP():
+    """Pins the DEPTH, not just the direction: a mild pullback outside an
+    uptrend must still be refused. Without this, widening RSI_MAX to 95 — i.e.
+    'buy almost anything falling' — passes every other test in this file, and
+    that mutation did in fact survive the first round."""
+    s = _mum()
+    n = 300
+    mild = [100.0 - 0.02 * i + (1.6 if i % 2 else -1.6) for i in range(n)]
+    bars = {"c": mild, "h": [c * 1.004 for c in mild],
+            "l": [c * 0.996 for c in mild], "v": [10.0] * n,
+            "t": list(range(n))}
+    sig = s.signals(bars, {})
+    assert sig is not None
+    assert sig["uptrend"] is False, "fixture must be outside an uptrend"
+    assert 40 < sig["rsi"] < 65, "fixture must be a MILD reading, not a deep one"
+    assert sig["enter"] is None, "a mild dip is not this book's cell"
+    assert s.RSI_MAX <= 30, "an entry bar above 30 is no longer 'deep oversold'"
 
 
 def test_no_exit_signal_the_bracket_is_the_rule():
@@ -238,3 +263,59 @@ def test_the_frozen_v1_positions_are_released():
     src = (ROOT / "lighter_family_bot.py").read_text()
     assert 'reason = "v1_legacy"' in src
     assert 'FLATTEN_BEFORE_TS' in src
+
+
+def test_the_control_arm_ACCUMULATES_when_a_trade_actually_closes():
+    """Drives the real `Book.record_close`, not just the publisher.
+
+    The first mutation round disabled the accumulator inside `record_close`
+    and SURVIVED, because every control-arm test until now hand-fed `b.ctrl`
+    and only exercised `_control_extra`. That is the (qy) lesson exactly:
+    asserting on the reporting half cannot see a broken recording half. Here
+    the placebo is settled through the real code path — a +2% real trade
+    against a placebo coin that moved +0.5% must leave edge = +1.5pp.
+    """
+    class _Stub:
+        pass
+    b = _Stub()
+    b.s = _mum()
+    b.bot_id = "freqtrade-mum-lshadow"
+    b.meta = {"BTC": {"accrued": 0.0, "opened_ts": 1.0, "tag": "oversold-rebound",
+                      "entry": 100.0, "null_pair": "ETH", "null_entry": 200.0}}
+    b.last_mark = {"ETH": 201.0}          # the placebo moved +0.5%
+    b.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    b.fund_realized = 0.0
+    b.n_closed = b.n_wins = 0
+    b.closed = []
+    b.cooldown = {}
+
+    fam.Book.record_close(b, "BTC", 102.0, 1.0, "roi", notional=50.0)
+
+    assert b.ctrl["n"] == 1, "the real trade must be recorded"
+    assert b.ctrl["null_n"] == 1, "the placebo must settle on the same close"
+    assert b.ctrl["sum"] == pytest.approx(0.02), "1.0/50 = +2%"
+    assert b.ctrl["null_sum"] == pytest.approx(0.005), "201/200 - 1 = +0.5%"
+    out = fam._control_extra(b)["control"]
+    assert out["edge_pct"] == pytest.approx(1.5)
+
+
+def test_a_dark_placebo_never_breaks_a_close():
+    """An instrument that can break a trading loop is worse than no
+    instrument — two LIVING books share this process."""
+    class _Stub:
+        pass
+    b = _Stub()
+    b.s = _mum()
+    b.bot_id = "freqtrade-mum-lshadow"
+    # placebo coin was never marked this cycle: the lookup must degrade, not raise
+    b.meta = {"BTC": {"accrued": 0.0, "opened_ts": 1.0, "tag": "oversold-rebound",
+                      "entry": 100.0, "null_pair": "ZZZ", "null_entry": 200.0}}
+    b.last_mark = {}
+    b.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    b.fund_realized = 0.0
+    b.n_closed = b.n_wins = 0
+    b.closed = []
+    b.cooldown = {}
+    fam.Book.record_close(b, "BTC", 102.0, 1.0, "roi", notional=50.0)
+    assert b.ctrl["n"] == 1 and b.ctrl["null_n"] == 0
+    assert fam._control_extra(b)["control"]["edge_pct"] is None
