@@ -11,10 +11,14 @@ down.")
   One $1,000 shadow book that holds the OPPOSITE side of the fleet's
   measured losers, over exactly the windows the loser would have traded:
   enter when the ghost enters, hold the other side, exit when the ghost
-  exits. At mark on a zero-fee venue the mirror's per-trade return is the
-  exact negation of the ghost's, so a loser ledger at t <= -2 is founding
-  evidence at t >= +2 here. Third of the Australian-musician cohort
-  (barnes, garrett taken; young designed-and-refuted).
+  exits. At mark on a zero-fee venue the mirror's per-trade PRICE move is
+  the exact negation of the ghost's — but a realised ledger is NET of the
+  ghost's own execution, so negating it double-counts slippage:
+  mirror = -ghost_realised - (ghost_slip + mirror_slip) ((qw), 19-Aug).
+  A loser ledger at t <= -2 is still founding evidence here; the bar the
+  record is graded against is the CORRECTED expectation, never the naive
+  negation. Third of the Australian-musician cohort (barnes, garrett
+  taken; young designed-and-refuted).
 
 THE ROSTER IS MEASURED, NOT ASSUMED (scripts/study_band_kelly_2026-08-18.py
 — verdict logic pre-declared in its header; STUDY_BAND_KELLY_2026-08-18.md):
@@ -28,7 +32,11 @@ THE ROSTER IS MEASURED, NOT ASSUMED (scripts/study_band_kelly_2026-08-18.py
     t=+5.71, both halves and both sides positive, cluster-robust t=+2.84
     on the full set, ex-best-coin t=+5.08, win 82% (REPORTED, never a bar
     — I15). Median hold 0.09h, where the tape's drift term is 861x below
-    the mean — alpha, not beta ((hm) in mirror form).
+    the mean — alpha, not beta ((hm) in mirror form). [19-Aug (qw): the
+    claim REPRODUCES EXACTLY and survives jackknife (drop KAITO and it
+    RISES to +0.684%/t=+5.08) — then corrects for double slippage to
+    +0.397%/trade, t=+3.58: a 34% haircut because the ghost's coins were
+    THIN (KAITO $0.42M). GRADE THE LEDGER AGAINST +0.397%, NOT +0.605%.]
   * REFUSED — `brkfade` (breakout-4h/dad inverted): the (nt) calibration
     control killed it — over 578d the ghost family does NOT lose (+$126,
     t=+0.90, tail-driven), so its mirror shorts a fat right tail: every
@@ -41,6 +49,9 @@ THE ROSTER IS MEASURED, NOT ASSUMED (scripts/study_band_kelly_2026-08-18.py
     $40 probe clip x2, own tag (`short-dip_*`) so it is graded alone and
     dies on its own record; the ghost is the taker's own conviction bar
     and bracket, drift-pinned against the taker's real constants in tests.
+    [19-Aug (rc): survives the (qw) double-slippage correction —
+    +1.061%/trade, CI lo +0.20%, an 8.7% haircut only, because the
+    taker's dip tickets sit on LIQUID books. The override stands.]
   * OWNED — impulse-continuation inverted IS 🧘 book-douglas (I20): the
     largest measured loser's inversion is already minted, not re-taken.
   The refused/waiting families publish in `extra.roster` every loop so the
@@ -204,7 +215,10 @@ MIRROR_ROSTER = {
     "snapfade": {"status": "live",
                  "ghost": "lighter-dislocation-lshadow (retired (jh))",
                  "founding": "crypto n=65 +0.605%/t t=+5.71; both sides "
-                             "positive (study 2026-08-18)"},
+                             "positive (study 2026-08-18)",
+                 "corrected": "(qw) double-slippage: grade against "
+                              "+0.397%/t t=+3.58 (34% haircut — thin "
+                              "ghost coins)"},
     "brkfade": {"status": "refused",
                 "why": "calibration control: ghost family +$126/t=+0.90 "
                        "over 578d — mirror shorts the fat tail; every stop "
@@ -214,6 +228,9 @@ MIRROR_ROSTER = {
                        "decision): n=13, t=-2.66, mirror 95% CI "
                        "[+0.28%,+2.05%]/trade as a single named candidate; "
                        "$40 probe clip, own tag, dies on its own record",
+                "corrected": "(rc) double-slippage: +1.061%, CI lo +0.20% "
+                             "— override SURVIVES (8.7% haircut, liquid "
+                             "ghost books)",
                 "ghost": "taker dip lens (vetoed, untraded)"},
     "impulse_cont": {"status": "owned",
                      "why": "the inversion is 🧘 book-douglas (I20)"},

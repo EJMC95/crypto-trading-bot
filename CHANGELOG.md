@@ -1,3 +1,32 @@
+## 2026-08-19 (rd) — THE CORRECTED BAR NOW STANDS WHERE THE GRADERS WILL READ IT: the mirror's published roster and fleet row carry (qw)/(rc) beside the founding numbers
+
+`(qw)` corrected the mirror's founding arithmetic (+0.605% -> +0.397%/t=+3.58
+after double slippage) and `(rc)` re-priced the roster (the dipfade override
+SURVIVES at +1.061%, CI lo +0.20%) — but both landed in the CHANGELOG only,
+main-only by the (mm) rule. The surfaces a ~mid-Sep grader will actually read
+— the bot's own `extra.roster` payload and the CLAUDE.md fleet row — still
+quoted the naive negation, which is exactly I12's "doctrine that no longer
+describes the system is a defect". Corrected in place:
+
+* `lighter_band_kelly_bot.py`: the header now states the double-slippage
+  identity (mirror = -ghost_realised - (ghost_slip + mirror_slip)) beside the
+  exact-negation thesis, and BOTH live roster entries publish a `corrected`
+  field beside `founding` — the founding number stays as history, the
+  corrected one is the bar. Strings and one payload field only; no gate,
+  clip, side or exit byte moved.
+* CLAUDE.md band-kelly row: the (qw)/(rc) correction block after the founding
+  claim, carrying the transferable rule (a mirror's haircut scales with the
+  GHOST'S coin liquidity — thin-book losers mirror far worse than their
+  negation suggests).
+
+NOT a policy change: the book is env-only/single-policy by construction (the
+Garrett choice) and no config value moved, so the (hm) clock is untouched.
+The push auto-redeploys `band-kelly-shadow` (the bot file is on its own
+`paths:` rule) — predicted stamp `1714bbf7e0d2`/14, sentinel verifies on the
+row. Positions restore across the restart, proven twice today including the
+(rb)-wave venues/ deploy an hour earlier (`db8609271cec` verified byte-equal
+to its own clean-dir prediction).
+
 ## 2026-08-19 (rc) — THE MIRROR ROSTER RE-PRICED ON THE CORRECTED ARITHMETIC: the operator's `dipfade` override SURVIVES, and the haircut's size is set by the GHOST'S COIN LIQUIDITY
 
 Discharges the carried item declared in `(qw)`.
