@@ -1,4 +1,8 @@
-## 2026-08-19 (re) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
+## 2026-08-19 (rg) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
+
+[Renumbered from (re) at push time — the SECOND race in one PR: main took (re)
+for the dislocation-band study while this entry was in flight. Same (hj) rule:
+main's pushed history keeps the letter.]
 
 `test_enforced_audit_guard[audit_boot_stagger]` went red on MAIN (runs 593,
 596, and my PR #191's 597) — not on anyone's diff. The guard reads deploy
