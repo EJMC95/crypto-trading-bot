@@ -1,3 +1,603 @@
+## 2026-08-19 (rb) — THE RUIN GATE READ THE SAFEST POSITION CLASS IN THE FLEET AS ITS MOST DANGEROUS STATE, AND WAS FAIL-**OPEN** ON THE ONE CASE IT EXISTS FOR
+
+`(qz)` shipped a liquidation-distance gate and I called it verified. It was
+not. Two defects, both found by pointing the instrument at the LIVE payload and
+at the venue's own population before deploying it — which is the step `(qz)`
+skipped, on a book that was FLAT and therefore could not exercise a single
+branch. **The gate never reached real money; it is fixed before its first
+enforced deploy, not after.**
+
+**DEFECT 1 — I7, VERBATIM, IN A GATE WRITTEN TO ENFORCE DISCIPLINE.** 🙏 Avo
+LIVE holds 4 positions and publishes `liq_unknown: [ADA, NVDA, QQQ, SPY]` with
+`nearest_liq: null`, `mode: "cross"`, allocated `margin: 0.0` on every leg.
+`headroom_ok` refused on a non-empty `liq_unknown`, so on that book it would
+have refused **every entry, forever** — a book starvation dressed as a safety
+feature, and the exact question I7 tells you to ask (*what does this trigger
+read on a book that is always-in, always-empty, or always-at-cap?*) which I did
+not ask of my own gate.
+
+**And the venue is not withholding anything — it is telling the truth.** The
+control group (I6), read from Lighter's own public account endpoint across
+**443 open positions on 110 live accounts**:
+
+| class | liq published |
+|---|---|
+| cross SHORT | **145 / 145 = 100%** (incl. 97/97 below 0.25× collateral) |
+| cross LONG, notional > equity | 231 / 240 |
+| cross LONG below 0.30× collateral | **0 of 140** |
+| isolated | 57 / 58 |
+
+**Margin mode is not the discriminator — DIRECTION and LEVERAGE are**, and the
+repo's own algebra already said so: `lighter_margin_model.liq_price` returns
+`0.0` when `is_long and 1/leverage >= 1.0`, because a long's entire loss is
+bounded by its notional and the account still stands at a price of zero.
+`_liq_price` maps that 0 to None, which files the safest position class in the
+fleet under the same key as a genuine read failure. `(nu)` had already ruled on
+this in words — *"the venue publishing nothing for 🙏 Avo's four longs at 0.999x
+is CORRECT rather than a data gap"* — and no code consumed the ruling.
+
+Fixed by DERIVATION, never by loosening: `margin_state_from` publishes an
+additive **`liq_none`** (`liq_unknown` stays the superset, so no consumer
+contract moves) and the gate refuses on `liq_unknown − liq_none`. Every
+unreadable input still refuses. **The condition is ACCOUNT-level, and that is
+the whole subtlety — my first cut asked it per position and was wrong**: cross
+margin pools losses, so four longs each inside the collateral can sum to four
+times it. Verified against the real Avo block: `liq_unknown` reproduces
+byte-for-byte, `leverage 0.6178` matches, the gate now returns
+`(True, "unliquidatable")`, and the same book at >1× reverts to
+`(False, "liq_unpriced")`.
+
+**The cost of NOT fixing it was not hypothetical on the Farmer either.** 💸
+takes longs — `is_short = apr > 0`, so negative funding opens one — measured at
+3 of its last 47 live closes and 11 of 78 on its shadow twin, and because
+`liq_unknown` is an ACCOUNT-wide census checked ahead of the flat test, **one
+sub-1× long refused every new entry including shorts, for that long's whole
+life**: 0.91% of live holding time over 15.3 days, **14.30% on the identically
+coded shadow twin**.
+
+**DEFECT 2 — THE GATE WAS FAIL-OPEN ON THE ONE CONDITION IT EXISTS FOR.** A
+position the venue DID price whose order book is unreadable matched **neither**
+arm of the publisher's branch — absent from `liq_unknown` AND absent from
+`priced` — so it dropped silently out of `min(priced)`. Reproduced against the
+real publisher and the real gate: XAU liq 50 (50% away, mark readable) + BTC
+liq 97 (**3% away**, mark blind) ⇒ `nearest_liq {XAU, 0.5}` ⇒ **allowed**.
+Supply BTC a mark and the identical book refuses. The docstring and `(qz)`'s
+entry both asserted fail-CLOSED while this sat inside it, and the bot's own
+exit path already treats a blind mark as grave (`BLIND_STOP_MISSES` flattens
+after 3) — so the same condition was simultaneously grounds to flatten and
+invisible to the ruin gate. `mark_blind` was already computed and published by
+BOTH live bots with **zero readers** (I18's registered-but-inert shape).
+
+Closed at the PUBLISHER, which is the layer that has the fact: `margin_state_from`
+now names those coins in **`liq_mark_blind`** and the gate refuses on it. A
+first proposal to read the bots' own `mark_blind` field instead was **refused on
+review** — that set is built from the bot's held-map at a different moment from
+the venue read inside `_margin_block`, so a position absent from the earlier
+snapshot stays invisible in both. Same class, still fail-open.
+
+**DEFECT 3 — SEVEN REFUSALS, ONE COUNTER.** `state_unreadable`,
+`liq_unpriced`, `no_nearest` and *genuinely 3% from ruin* all produced the same
+`False` and the same `ruin_skips += 1`; the log line wrote the conflation into
+its own text (*"…inside 4x the 10% stop (or unreadable)"*). They demand
+**opposite** operator actions. `headroom_ok` is now `headroom_check` returning
+`(ok, reason)` — **renamed deliberately so any stale caller breaks loudly**
+rather than silently reading a truthy 2-tuple as success — over ten codes, and
+the row publishes `ruin_skips: {reason: n}` with `ruin_evals`, `ruin_last` and
+the effective bar `ruin_bar_frac`. `ruin_evals` matters on its own: `{}` was
+byte-identical between *"the gate allowed everything"* and *"no candidate ever
+reached the gate"*, and this read sits behind five earlier filters, so most
+loops never evaluate it (I18 / the (lv) census rule).
+
+**Reasons are reported by URGENCY, not by branch order** — a measured
+`too_close` outranks a bookkeeping `liq_unpriced`, because the first means
+de-lever now and the second means go look at the venue read. A guard that
+buries the urgent reason is the (gl) failure: a detector the operator learns to
+ignore.
+
+**STILL NOT ENFORCED ON REAL MONEY, and the reason is a gap no test can close.**
+The margin block shipped 16-Aug `(no)`; the Farmer's last live LONG closed
+15-Aug 16:46Z — **one day before the publisher existed** — so no Farmer long has
+ever been observed through this instrument. The long-side analysis, mine
+included, is venue population statistics plus algebra, and this repo's own rule
+is that a consumer is tested against a payload ITS PUBLISHER built. 21 tests
+(all fixtures publisher-built) and the live-Avo reproduction are what can be
+established without one; the enforced live deploy waits on a Farmer long
+appearing in the published block with `liq_none` classifying it correctly.
+
+## 2026-08-19 (ra) — THE REFEREE WAVE ON MY OWN MERGE: A CONFLICT MARKER WENT IN MID-LINE PAST AN ANCHORED GUARD, AND A `head -40` SILENTLY DROPPED THE REAL-MONEY HALF OF A RENUMBER
+
+Two defects, both mine, both found by an adversarial pass over a merge I had
+already pushed green — not by any guard. CI was **14 of 14** at the time. That
+is the entry: a green run is a statement about what was checked.
+
+**DEFECT 1 — A COMMITTED CONFLICT MARKER, MID-LINE, INVISIBLE TO THE GUARD
+BUILT FOR EXACTLY THIS.** `CHANGELOG.md:955` carried
+
+the text `gradeable ~mid-Sep on its OWN ledger (I14).` immediately followed,
+with **no newline between them**, by `>>>>>>> 3ce869e (subject)` —
+
+a rebase end-marker appended to the END of a prose line with no newline in
+front of it, inside entry `(qh)`. The other merge parent held a **clean copy of
+that same entry**, so the hand-resolution took the corrupt side and gained
+nothing by it. Traced to branch commit `61f6155`; absent from the merge base
+and from `origin/main`.
+
+**Why nothing caught it.** `changelog-check.yml` has run
+`git grep -nE '^(<<<<<<<|>>>>>>>|=======$)'` since the committed-stash-marker
+incident this file already records (*"THE SYNC CHANNEL WAS CORRUPT AND EVERY CI
+RUN SAID GREEN"*, three markers through seven commits). It is **caret-anchored**,
+so a marker at column 43 is not a marker to it. Re-verified both ways on the
+real bytes: the new guard fires on the actual committed line, the anchored
+check is **SILENT** on it. The class did not recur because the fix was weak —
+it recurred because the fix was anchored, and anchoring was the only thing
+stopping the pattern from matching its own source.
+
+**Closed executably: `scripts/audit_conflict_markers.py`**, registered in
+`ENFORCED_AUDITS` so it runs before a push rather than only in the workflow
+(the (ox)/(pb) placement rule — this catches CONTENT corruption, and a content
+defect must be catchable pre-push). `<<<<<<<`/`>>>>>>>` are flagged **anywhere on
+the line**; `=======` stays line-start-only and that asymmetry is **DECLARED, not
+silently chosen** — this tree is full of `# =========` banners and a rule that
+fired on those would be switched off within a day. Prose is excluded by
+**quoted-SPAN** detection, not adjacency. That distinction is not theoretical:
+my first cut tested the characters either side of the marker and **reddened
+within the hour on the comment registering the guard**, where the marker sits
+inside a longer backticked span and the adjacent character is `(`. Both that
+case and its mirror — *an unmatched apostrophe must not open a span that hides
+a real marker to its right* — are permanent controls. The file builds its own
+tokens as `"<" * 7` so it cannot flag itself, which is how it affords to drop
+the anchor. 12 cases, 6 positive / 6 negative, **counted from the data rather
+than asserted in the string** (the hand-written "(5 positive, 5 negative)" was
+stale the moment two cases were added — doc-truth rot is worse in a guard,
+whose entire output IS a claim about what it checked).
+
+**DEFECT 2 — `head -40` DROPPED THE REAL-MONEY HALF OF A LETTER RENUMBER, AND
+THE ENTRY'S OWN NOTE THEN ASSERTED THE OPPOSITE.** Renumbering `(ql)` -> `(qz)`
+I enumerated the citation sites with a `grep -rn ... | head -40` and built the
+file list from what printed. **There were 48 matching lines.** The eight that
+were cut included every hit in **`lighter_funding_bot.py` (5) and
+`venues/safety.py` (2)** — the LIVE Funding Farmer and SafetyRails, the real-money
+surface that `CLAUDE.md`'s own "LIVE BOTS ALWAYS IN AUDIT SCOPE" rule names.
+Seven citations of the ruin-gate entry stayed on `(ql)`, which in the merged
+file resolves to a concurrent session's unrelated CARRIED ITEMS entry — so the
+implementation and its own test cited **different entries**. All seven corrected.
+
+**`audit_changelog_letters` cannot see this and is not at fault**: its
+`dangling_code_citations` arm appends only `if letter not in known`, and `(ql)`
+IS a known header. A citation that resolves to the WRONG entry is green by
+construction — its declared blind spot, restated here because the next session
+will otherwise read its OK line as more than it says.
+
+The mechanism is now doctrine (`CLAUDE.md`, third costume of the
+inspects-nothing rule): **a cap is a display choice; the moment it reaches your
+reasoning it is a silent sampling step you did not declare.** `head` announces
+nothing when it cuts, and **a result exactly equal to its own limit is a
+truncation signature** — the same shape as `(hd)`'s lens returning exactly its
+cap. Count first, derive work-lists from `-l`, never from a capped line list.
+
+**AND THE RUIN GATE'S OWN PREMISE MOVED, measured on the live payload rather
+than assumed** — recorded here because `(qz)` shipped it: 🙏 Avo LIVE holds 4
+positions and publishes `liq_unknown: [ADA, NVDA, QQQ, SPY]` with
+`nearest_liq: null` under `mode: "cross"` and allocated `margin: 0.0` on every
+leg. `headroom_ok` fails CLOSED on a non-empty `liq_unknown`, so on that book
+it would refuse **every entry, forever** — not because the money is near ruin
+but because the venue publishes no per-position liq for cross margin. That is
+I7 verbatim (*a trigger a book satisfies STRUCTURALLY is not a measurement*) in
+a gate I wrote to enforce discipline, and I did not run I7's own question
+against it. The LIVE Farmer is flat (`n: 0`), so the gate is inert there today
+and changes no trade — which also means my "verified" claim rested on a book
+that could not exercise it. Second defect in the same gate, named not yet
+fixed: `ruin_skips` counts refusals and **cannot say WHY**, so "no liq
+published" and "4x too close to liquidation" — opposite operator actions — are
+byte-identical (I18/(lv)). **No live deploy of this gate until both are
+resolved**; the carry PERSIST half is unaffected.
+
+## 2026-08-19 (qz) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
+
+*(Renumbered (ql) -> (qz) at push time: a concurrent session's carried-items
+entry took (ql) on main and is already merged, so this unmerged one moves —
+the convention's own tiebreak. **This note first read "Nothing outside this
+branch cited (ql) for this entry", and that was FALSE in the direction that
+mattered** — it was true of `origin/main` and I wrote it as if it were true of
+the tree. Seven citations of THIS entry survived under `(ql)` in
+`lighter_funding_bot.py` (5) and `venues/safety.py` (2) — both live real-money
+surface — and every one of them resolved to main's unrelated CARRIED ITEMS
+entry until the referee wave caught it. Corrected in place per I12, with the
+mechanism recorded rather than tidied away: see the truncated-search rule
+added to CLAUDE.md in this same pass.)*
+
+**Operator, 19-Aug, reframing the whole programme:** *"We are looking at this
+as a risk eliminating job as opposed to a profit motivated job. Let's look at
+this differently and look at options, even though risk will be higher."* Of the
+options put up, the one chosen was the enabling instrument: **the ruin bound.**
+Full memo: `STUDY_RUIN_BOUND_2026-08-19.md`.
+
+**THE REFRAME THAT MADE IT WORTH DOING.** Every leverage study this fleet has
+run — five of them — was judged on **`t`**, and every verdict is correct: a
+scalar multiplies mean and SD together so `t` is unchanged, and the one
+non-scalar design (risk-normalised sizing) was refuted hard on 🧘 Douglas
+(t +0.505 → −0.823, P(Δt≥0)=0.0014, 13 of 13 perturbations, three adversarial
+lenses). But `t` is a **learning** metric. "Scaling does not improve `t`" means
+*scaling teaches you nothing new*; it does NOT mean scaling is not worth doing,
+because on an edge you have already decided to believe a scalar is exactly how
+belief becomes dollars. The fleet had been reading "does not improve the
+evidence" as "is not worth doing" — and that conflation is what a profit frame
+has to break. What it cannot break is the arithmetic: real money is **$259.84**,
+so every code lever is worth cents and the capital decision is worth two orders
+of magnitude more than all of them. Said once, in the memo, and not sold as
+anything else.
+
+**THE GAP, and it is the registered-but-inert shape on the one number that
+matters.** `(no)` wired the venue's OWN margining truth into the live path —
+per-position `liquidation_price`, `nearest_liq.dist_frac`, a `liq_unknown`
+census — and **both live bots publish it**. `scripts/lighter_margin_model` then
+modelled the same quantity for hypothetical positions, **validated it forward
+against the venue to 0.001%**, and shipped `headroom_x` with the refusal bar
+(K=4) written into its own docstring. **Nothing refused on any of it**:
+`headroom_x`'s only declared consumer was ⚡ High Voltage, a book
+`BAND_YOUNG_HIGH_VOLTAGE_2026-08-16.md` refuted and never built, so the
+criterion shipped orphaned — and `venues/safety.py`, the one gate real money
+passes through, carried **zero** references to margin or liquidation. Its two
+questions were "how much may I deploy?" and "how much have I lost today?".
+Neither can see ruin. The fleet could watch itself approach liquidation and
+owned no instrument that would decline.
+
+**THE MEASUREMENT, and it is not what a risk-on framing would assume.**
+Leverage capacity is a property of **STOP DISTANCE**, not of appetite. At 💸
+the Farmer's shipped `HARD_STOP` of 10%, against the K=4 bar:
+
+    2x  -> 4.88x headroom   PERMITTED  (and it already runs here)
+    3x  -> 3.17x            refused
+    5x  -> 1.80x            refused
+    10x -> 0.78x            LIQUIDATION FIRES BEFORE THE STOP
+
+So the live book sits **one notch under its own ceiling, reached by luck** —
+nothing had ever computed this — and the regime where the stop is decorative is
+**five notches away with nothing in between**. A 3% stop would buy 5x; a 1%
+stop would buy 10x. The route to more leverage runs through a tighter stop,
+which is a different book with different expectancy: a measurable trade, not a
+dial. **The honest answer to "can we take more risk here for more profit" is
+NOT AT THIS STOP** — and that is a refusal with evidence, which the growth rule
+explicitly counts as satisfying it.
+
+**WHAT SHIPPED.** `SafetyRails.headroom_ok(margin_state, stop_frac)`, expressed
+in stop-widths because that is the only quantity that travels across books.
+**Fail-CLOSED, against this module's usual habit and deliberately:** every other
+degrade in `safety.py` fails OPEN so an outage can never idle a book, but the
+cost of a wrong default is different in kind here, so an unreadable margin
+state, a position the venue will not price, positions held but none priced, and
+an unknown stop all REFUSE (I10's reasoning for the go-live blocker). A flat
+book and every shadow arm stay permitted — otherwise the gate could never
+allow a first entry and would idle 20 paper books for a risk they cannot run.
+Wired into the Farmer's entry site beside the notional cap, one reading per
+loop, `LIGHTER_RUIN_GATE=off` as the kill switch, and **`ruin_skips` published
+on the row every loop including `0`**, because an omitted key is byte-identical
+between "never fired" and "not running" ((lv)) — a gate silently declining
+every entry would otherwise look exactly like a quiet market. 11 tests, every
+fixture built by `margin_state_from` from a venue-shaped payload with STRING
+numerics rather than a hand-written dict ((hj)); **6 mutations killed**.
+
+**DECLARED NOT DONE, because a half-closed gap advertised as closed is worse
+than an open one:** (1) this prices the DISTANCE to liquidation analytically
+and does **not** replay the tape to count how often a path would have breached
+it — that backtest is the natural next study and is not done here; (2) it says
+nothing about the delta-neutral books (🌾 carry, 🧮 Hull, 🏦 Rich Dad), which
+model P&L as `accrued − fees` with no price term and therefore have no stop for
+a headroom ratio to divide by. **Whether their real single-leg perp exposure is
+genuinely delta-neutral on the venue is the highest-value open question**, since
+a genuinely hedged book's leverage capacity is governed by basis risk rather
+than price risk and is far higher. That is where the next dollar of risk
+appetite should be pointed.
+
+## 2026-08-19 (qy) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
+
+*(Renumbered (qj) -> (qm) -> (qy) across two push attempts: a concurrent
+session's risk-up mirror package took (qj) on main, then another took (qm)
+while this branch was still unmerged. By the convention's own tiebreak MINE
+had the stronger claim on (qj) — seven citations from tracked code against
+zero for theirs — but theirs was already MERGED, and renumbering a merged
+entry is the more disruptive act, so this is the side that moved both times.
+Stated rather than dressed up as the rule pointing this way.)*
+
+Found closing out `(qx)`'s referee wave — its F5 was declared "named not
+fixed", and I11 says carried work outranks new work, so it was the next brick.
+**The investigation found the referee had named the wrong half, and the
+adversarial pass over THIS fix then found a regression in it.** All line
+numbers below are at `61f6155` (the pre-fix tree); the fix shifts them ~+130.
+
+**THE DEFECT.** `(hp)` made the two carry containers a deliberate failover
+pair: first claimant keeps the book, the other IDLES and re-checks each loop.
+But the durable restore runs ONCE, at BOOT, and the standby branch `continue`s
+before every bookkeeping step — verified structurally at `61f6155`:
+`positions` is bound at exactly two lines (640, 657), both pre-loop, and
+`funding_basis.restore_hot_since` is called exactly once (668). So a container
+that stands by for hours and then wins the claim resumes from **its own boot
+snapshot of a world the incumbent has been moving ever since**:
+
+* **`positions` — the severe half, and the one `(qx)`'s referee missed.** The
+  incumbent opened and closed carries during the standby. Adopting the old map
+  closes a coin the incumbent ALREADY closed — and **the obvious description of
+  that is wrong, which matters because it would send the operator to a scan
+  that finds nothing.** `paper_trades` is `PRIMARY KEY (bot, trade_id)` with
+  `ON CONFLICT DO UPDATE` (bot_pnl_store.py:1206/1261), and this book's
+  `trade_id` is `{coin}:{opened_ts}` — IDENTICAL for the same position record.
+  So the second close does **not** append a duplicate row; it silently
+  RESTATES the existing one (stale `pnl_abs`, wrong `closed_at`, possibly wrong
+  exit reason, `n` unmoved). A duplicate-`trade_id` scan is blind to it BY
+  CONSTRUCTION — the exact mirror of `(hf)`, where two writers' ids never
+  collided; here they always do. LOST opens are real as stated (the takeover's
+  first `save_state` overwrites the durable record), and a double-open does
+  produce a genuine second row.
+* **`hot_since`** — a coin hot at boot and hot now read as persisted across the
+  whole unobserved standby: the PERMISSIVE direction `(iu)`/`(iq)` exist to
+  refuse. **`(qx)`'s F5 had this backwards** — it described *cold* clocks, and
+  on a real pair flip the pre-fix clock is stale-and-present, never cold,
+  because the standby container's boot restore succeeded while the incumbent
+  was alive. Corrected in place per I12 rather than graded as a magnitude
+  error. `(qx)`'s 6h → 12h move is what made me re-read the boot-only restore;
+  it deepens a single wrong admission (up to 12h of unobserved time can stand
+  in for persistence instead of 6h) while making wrong admission *rarer* — so
+  "doubled the exposure" is right for the blackout and wrong for this half.
+* **`last_ts`** — the accrual clock. **Corrected mid-investigation:** my first
+  reading called this a double-count, and it is not — stale positions and a
+  stale clock are the same snapshot, so they are self-consistent. That is
+  precisely why the fields must be adopted ATOMICALLY: fresh `accrued` under an
+  old clock WOULD re-credit the standby gap. Same *symptom* as `(nc)`'s ~$13
+  phantom accrual, different mechanism (`(nc)` is an 8x basis error; this would
+  be a re-credited interval) — read it as the class of "accrued inflated
+  without a trade", not as the same bug.
+
+**THE FIX.** `takeover_step(store, bot_id, now)` — the whole takeover behind
+one call, with the store INJECTED so it is drivable against a fake, over
+`reclaim_after_standby` (pure; the clock rule stays `funding_basis`'s ONE
+owner, so the long-gap refusal reaches this path for free). **The invariant is
+simply: a takeover must reconstruct exactly what a fresh BOOT reconstructs.**
+Fail-CLOSED on either read: trade nothing, **save nothing**, keep the flag set,
+retry next loop — deliberately not boot's `load_state_required`, whose refusal
+is a `SystemExit` (crash-looping a container holding live positions is worse
+than waiting). The held state now also writes the `(ic)` standby key with a
+`takeover_held` reason, so a refusing container is not byte-identical to a dead
+one (I1). Inert for a normal single-writer container.
+
+**WHAT THE CLOCK HALF ACTUALLY DOES — the code comment first said "CLOSED" and
+that was false.** A takeover is only reachable once the claim has EXPIRED
+(`WRITER_CLAIM_TTL` 1800s), and the incumbent writes `saved_ts` in the same
+loop whose top refreshed that claim, so the gap at the earliest possible
+takeover is ~1798s — already **2x** `HOT_RESTORE_MAX_GAP_S` (900s).
+`restore_hot_since` therefore returns `{}` in essentially every real failover.
+The permissive hazard is closed **by always clearing**, and what replaces it is
+a *deterministic* cold start: the ≥12h entry blackout F5 named is not gone, it
+is now guaranteed. That is the right trade and it is stated rather than sold;
+the arithmetic is pinned by a test so a future change to either constant
+surfaces there instead of silently making takeover permissive again.
+
+**THE REFEREE WAVE ON THIS FIX FOUND A REGRESSION I HAD SHIPPED, and it is the
+most valuable thing in this entry.** The first cut adopted `positions`,
+`hot_since` and `last_ts` — but NOT the ledger aggregates (`realized`,
+`n_closed`, `n_wins`), which are bound once at boot from
+`fetch_paper_aggregate` and only incremented in-loop. Demonstrated:
+
+    incumbent closes one carry for +$4.00 during the standby, then dies
+    TRUTH                equity 1055.32  closed 101  pnl_abs +54.00
+    before this fix      equity 1055.32  closed 100  pnl_abs +50.00
+    positions-only fix   equity 1051.32  closed 100  pnl_abs +50.00   <-- -$4.00
+
+**A regression, not an inherited gap:** the old code carried TWO stale halves
+that cancelled — for a funding book `open_pnl = accrued - fees`, so the closed
+coin still sitting in the stale map approximated its own realised P&L almost
+exactly. Adopting fresh positions against a stale aggregate breaks the
+cancellation and books a step-down with no trade behind it: `closed_trades`
+goes BACKWARDS on the row, and the same wrong equity is appended to
+`<bot>:equity` by `snapshot_equity` — which `golive_readiness.apply_mtm` reads
+worse-of-both for the **15% max-drawdown go-live bar**. The aggregate is now
+re-read in the same step under the same fail-closed rule.
+
+**AND THE TESTS WERE THE OTHER FINDING.** The first cut pinned the loop wiring
+with AST arms — "does `main()` mention these identifiers in these shapes" — and
+an adversarial round drove **seven survivors** through them, every one a
+realistic regression: hardcoding `ok_read=True` at the call site, calling the
+adopter and self-assigning the caller's own values, replacing the checked read
+with `True, None` (adopting an EMPTY world, then overwriting the durable
+record), never clearing the flag. AST cannot see values, argument bindings,
+dead code or self-assignment. Replaced with a behavioural drive of
+`takeover_step` against a fake store — **the same lesson this session had
+applied to `mutate.py` an hour earlier (a6ce1b2) and did not carry across one
+file.** The thin AST arm survives for what only AST can see (the call is
+routed, the branch `continue`s, all six fields plus the flag are rebound).
+
+**THE HARNESS BIT, WHICH IS THE SECOND HALF OF THIS ENTRY.**
+`scripts/mutate.py` restores between mutations with `git checkout -- <target>`.
+Run against a target whose fix is still uncommitted and the first restore
+**deletes the work under test** — measured here: the entire takeover fix,
+rebuilt from scratch. The docstring did say "restored from git", and this
+session had noted it an hour earlier; **knowing is not guarding**, the gap
+`(qg)` names in its own body ("Having a note is not applying it"). So the
+harness now REFUSES a dirty target before touching anything — not a warning,
+because a warning on a run that then eats your file is indistinguishable from
+a clean run until you look ((gl)). This is the **sixth** bite in this family,
+not the fourth: `(qg)` enumerates five (31-Jul, 6-Aug, 16-Aug, 18-Aug, 19-Aug)
+and this is the next — the count was wrong in the first draft and contradicted
+`mutate.py`'s own header eight lines up.
+
+**AND THE MECHANISM I WROTE FOR IT WAS ALSO WRONG, measured in a scratch repo:**
+`git checkout --` restores from the **INDEX, not HEAD**, so *staged* work
+SURVIVES it (only unstaged is destroyed; untracked fails the restore outright).
+The guard still refuses on staged — baseline and restore disagreeing is not
+worth reasoning about — but as a conservative choice, not because the work is
+lost. Worse, the refusal message advised "commit **(or stash)**": stashing
+removes the very fix you are testing, so a round after `git stash` measures
+HEAD-without-your-change while looking exactly like a round that passed. Both
+corrected; the remedy is COMMIT, full stop.
+
+**Its own first round found two survivors too**, recorded because a
+clean-looking round is what this family keeps producing: a substring scan that
+matched **its own assertion text** (`"if uncommitted(target):"` appears in the
+assertion line itself, so it held no matter what `main()` did — CLAUDE.md's "a
+page-wide substring scan is not a structural claim", walked into inside the
+guard written to stop it), and no positive control (the offline/pure selftest
+can only reach the permissive path, so a function returning False everywhere
+passed it). Now an AST check plus
+`tests/autonomy/test_mutation_harness_guard.py` with a real `git init`:
+dirty → True, staged → True, untracked → True, clean → False, outside-a-repo →
+False, and two faked total-failure reads pinning that a failed git call fails
+open on its EXIT CODE rather than on whatever it wrote to stdout.
+
+**AND A THIRD SESSION FOUND THE SAME HARNESS DEFECT THE SAME DAY** — a
+`git diff --quiet` refusal landed on `main` first (the `(qi)` six-hunters
+push), so the merge briefly carried TWO dirty-target guards with theirs
+running first and mine as dead code. **Collapsed to one on the merits, not on
+order** ((hj): two copies of a rule are two rules): `git diff --quiet` compares
+worktree to INDEX, so it is blind to a STAGED-only fix (baseline and restore
+then silently disagree) and to an UNTRACKED target (where `git checkout --`
+fails outright under `check=True` and kills the round mid-way); `git status
+--porcelain` catches all three, fails OPEN where git cannot answer, and carries
+the measured semantics plus the positive-control suite. Their comment also
+states the restore goes "to HEAD", which this entry's own measurement refutes.
+Their `[[commit-before-mutation-rounds]]` memory pointer is kept — it is the
+better name for the class. Two independent discoveries in one day is the
+`(qb)`/`(pv)` shape again, and the same rule applied: keep the instrument that
+measures more, say why, credit the other.
+
+**Forward metric:** 🌾 carry — the book behind the fleet's only failover pair —
+can now be handed over without silently restating a close, losing an open, or
+entering on a streak nobody watched, and without booking a phantom step-down
+into the equity series the go-live drawdown bar reads. (Deliberately *not*
+calling it "the fleet's best-evidenced book" any more: `(nc)` withdrew that
+headline — every pooled quote overstates by ~$13 — and `(qx)` records 🙏 avo as
+the only above-bar book today. The honorific is still in circulation and is
+exactly the I12 archaeology class.) No trade changes while a single container
+holds the claim, which is the steady state; this is insurance on the
+transition, and the transition is reachable by design.
+
+## 2026-08-18 (qx) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
+
+*(Renumbered FOUR times at push time — written as (qg), moved when the
+mutation harness took (qg) on origin, again when band-kelly's activation took
+(qh), again from (qk) when a concurrent session's six-hunters entry took (qk)
+on main mid-review, and finally to (qx) when the fleet-wide-audit entry landed
+on (qk) as well. Every one of those is merged and cited from tracked files;
+this one was unmerged each time, so this is the side that moves — the
+convention's own tiebreak, decided by grepping rather than by who pushed
+first.)*
+
+Operator: *"Fix and implement all operator queue items that make the fleet
+improve/make more profit and win rate."* The queue is the scope; this pass is
+the daily review its own maintenance rule calls for, plus the ONE substantive
+improvement item that was actually implementable today.
+
+**1 · 🌾 PERSIST 6h → 12h SHIPPED — the half `(px)` deliberately parked.**
+`STUDY_FUNDING_LIFECYCLE_2026-08-15.md` §4, the cell's own 205d episode walk:
+per-episode net MONOTONE INCREASING in entry persistence — P=1 −0.064%
+(enter-immediately −21.8%, t=−5.9) → P=6 +0.016% → **P=12 +0.161% (t=1.80,
+both halves positive, I16 lb 0.046)** → P=24 +0.269% (n=8 only); referee
+reproduced exactly, LAG-1 clean, ruled NOT denominator shrinkage (TOTAL net
+also peaks at P=12: +4.2% vs +1.5%); consistent with 🧮 Hull's independent
+24h persist on its own band. HYPOTHESIS-GRADE, stated: n=26, t below the 2.0
+bar. Why shipping it now is not the I17 behaviour the study feared: the
+operator's directive is the authority ((kd)/(hn) — a queue item with a banked
+measurement is a growth finding, implemented not filed), it went out at the
+SAME clean boundary `(px)` used this morning — the book held ZERO positions,
+census `eligible 0 / waiting 2` under the new $1M floor, so no mid-hold rule
+change and every future close opens under 12h — and the ~30-Aug
+keep-or-retire docket call is UNTOUCHED: no tuning half rides on it any more,
+and if that call is retire, this dies with the book at zero cost, exactly as
+the queue item priced it. **The supply tripwire had NOT fired at ship
+(eligible 0), recorded so the ~30-Aug day reads the supply story straight.**
+Restrict-direction; I19 price declared in the code comment (the 6h gate
+already consumes 81% of qualifying window-hours and misses 91% of windows —
+12h consumes more still; fewer, better episodes is the measured trade).
+Env-tunable `CARRY_PERSIST_H`; era unchanged (ordinary entry tuning per (hc),
+the ENTER_APR precedent); caps now PUBLISH `persist_h` beside `flip_grace_h`
+(the (lz)/(pf) unpublished-gate class — and the gate now DIFFERS from 🏦 Rich
+Dad's 6h on the shared cell, noted in `KNOWN_CELL_COLLISIONS`; the two books
+no longer take the same entry at the same instant). Pinned by
+`tests/autonomy/test_carry_persistence_gate.py` (default / env escape hatch /
+caps declaration by AST / the 12h bite through the census), **4 mutations
+verified RED through `(qg)`'s `scripts/mutate.py`** — baseline and restore
+green. The three census tests that reconstruct the 2-Aug and (qe) incidents
+now pin `persist_h=6.0` explicitly (the gate in force on their day), per that
+file's own H/BAR convention.
+
+**2 · THE QUEUE SWEEP — five closures verified against TODAY'S payload, not
+carried on old claims** (17 rows on /pnl.json, all fresh): wave-2 birth (all
+four book rows publishing), Avo live swap (`freqtrade-avo-maria-lighter`
+$62.46 via `tide-rider-lighter-live`, Taker LIVE row absent — no
+double-count), §0 pending deploys, §6 judge-unblock (both 💸 Farmer arms at
+equal build `ab7b8b378665` today), §7 red-stop slate (none of the retired
+rows present, 🎸 Barnes gone per (pm)). Corrected in place per I12: **🎸
+Barnesy's 4-Sep unfreeze items are MOOT** (book retired 17-Aug (pm); both
+fixes die with it, and the (mf) grace measurement lives on in carry/(px) and
+Rich Dad/(mf)); **S4 consensus-ensemble was stale since 4-Aug** — its own
+study (`STUDY_CONSENSUS_GATE_2026-08-04.md`) ruled REFUSAL WITH EVIDENCE (84
+cells; the fleet's gating signals are CONSTANTS on this tape) and (lp)
+re-confirmed 13-Aug (survivors −$8.02 vs unfiltered −$4.40), yet the bullet
+still said "measure before minting"; **Snap Back's "one act left"** was done
+5-Aug (service deleted, item 3.4); **§5 calendar**: SPY/QQQ graduation moved
+~mid-Sep per (qa)'s re-run, Barnesy off the calendar, Garrett/Rich Dad
+~12-Sep added with the declared cell-collision decision.
+
+**3 · WHAT THIS PASS DELIBERATELY DID NOT TAKE, so the next session does not
+re-litigate it:** the 🪁 band-kelly provisioning (⚡ item) is ACTIVELY OWNED
+by the session that birthed it — its one-shot provisioner merged as PR #181
+and its activation commit is already staged on `claude/opposite-trend-bot-cvkhc8`
+mid-pass; racing it risks a double-provision for zero gain (the I11 rule read
+in the other direction: their house, half-built, THEIR next brick). The
+remaining queue rows are operator-only acts (Railway deletions, the zombie
+alpaca decision, nrl-feed's project move) or PRE-REGISTERED DECISION DATES
+(⚖️ ~28-Aug, 🌾 ~30-Aug, the ~12-Sep cell call) — a directive to implement
+improvements does not pull forward a keep-or-retire decision, because those
+are not improvements, they are verdicts, and verdicts belong to their
+evidence windows.
+
+**4 · THE SAME-HOUR REFEREE WAVE (4 adversarial lenses over the commit),
+and what it changed before push.** Tests lens: CLEAN — all four pins
+independently re-mutation-verified, reload ordering and teardown probed both
+ways. Citations lens: 4 wrong letters, all fixed in place — the census
+next-promise incident is (qe) not (qc) (its own entry records the renumber);
+the min_vol/flip-grace entry is (px) not (pr), a stale letter the (px)
+commit itself wrote into `funding_carry_bot.py` and this pass inherited —
+all three code-comment sites corrected too ((pr) is the Farmer halt entry);
+the S4 reopen clause lives in the study's VERDICT block, not §8; the
+closing-line rule is FORWARD MOTION rule 4, not (hn). Correctness lens, three
+confirmed findings, each closed or declared: **F1 —
+`backtest_carry_gate_lighter.py` retyped `PERSIST_H=6.0`/`FLIP_GRACE_H=1.0`
+two lines under its own (he) retyped-constant postmortem**; both now IMPORT
+from the bot with 21-Jul-vintage fallbacks, and the header states the
+results table's vintage (selftest green under 12h). **F2 — the new
+`persist_h` caps key had zero consumers** (the registered-but-inert shape):
+`living_gates` now reads it, the collision report prints per-book persist
+(differential REACH on a shared cell), and `supply_in`'s docstring states
+that its 6.0 default is the historical CELL convention, not any book's
+reach — a carry-reach question must pass `--persist-h 12`. **F3 — the
+~30-Aug tripwire's 13.42% base rate was measured at 6h persist** and is no
+longer comparable to the live 12h census: the queue item now carries the
+re-basing instruction (recompute occupancy at `--persist-h 12` before
+reading a low `eligible` as venue drought). Declared, not fixed, in the
+code comment: **F4** — the §4 evidence predates the (px) $1M floor, so the
+12h transfer to the [$1M,$2M) tier is direction-only, unmeasured; **F5** —
+`restore_hot_since` runs at boot only, so a failover takeover's cold-clock
+entry blackout doubles from ≥6h to ≥12h (pre-existing shape, cost doubled
+here, a takeover-path re-restore is its own change). Queue-staleness lens:
+EIGHT more stale rows the first sweep missed, all corrected in place — S1's
+Farmer-shadow deferral (spent since (lx); arms verified equal today),
+the Farmer min_vol queue order ((ln) reversed it; ~11-Sep slot void via
+(pt)/(pz), the +$14.83 prior superseded by (pw)/(qa)), §6's 15-Aug window
+date (accrues from the 18-Aug alignment), Counterweight's docket numbers
+((qb): crypto +$5.94/n=94, post-screen n=23 +$0.95), item 3's service
+census (seven births since 5-Aug; barnes/schwager rows added as 3.8/3.9,
+schwager's still-active deploy rule named as the resurrect hazard), item
+1's 1-Aug funding-vs-directional frame ((nc) phantom accrual; 🙏 avo now
+the only above-bar book), and §5's Farmer-live/carry numbers ((qa)/(nc)).
+§6/§7's executed bodies are now actually removed — the first sweep's
+closure paragraph had claimed them closed while leaving them in the file,
+which is exactly the decay class this file audits.
+
+**Forward metric (FORWARD MOTION rule 4's closing line):** 🌾 carry — the fleet's
+best-evidenced book — now opens every future position under the measured-best
+persistence rule its own tape supports, at zero cost to its era or its docket
+date; and the operator queue is a current document again instead of a museum
+of executed items.
+
 ## 2026-08-19 (qw) — 🪁 BAND-KELLY'S CLAIM REPRODUCES EXACTLY AND SURVIVES JACKKNIFE — but MIRRORING A BOOK CREDITS YOU WITH ITS COSTS AS YOUR PROFIT, and the live book is accruing against a bar 34% too high
 
 Checked the fleet's largest measured claim independently, while the book is
@@ -883,6 +1483,7 @@ M13 pass turned out to be a cwd-drift vacuous red, the (po) class caught
 in my own harness for the second time today. Suite 1861 green. The header,
 roster, caps payload and CLAUDE.md row all say what the book now does
 (I12); the dashboard OVERTRADE_LIMIT already covers the added family.
+
 
 ## 2026-08-19 (qi) — SIX HUNTERS, THREE ADMITTED STUDIES ALL CLOSE **NEGATIVE**, AND THE FIVE THINGS WORTH SHIPPING ARE FIDELITY AND FALSIFIABILITY — NOT EDGE
 

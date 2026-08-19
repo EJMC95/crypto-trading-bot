@@ -136,6 +136,68 @@ def _liq_price(v):
     return f if (f is not None and f > 0) else None
 
 
+def _entry_notional(rec):
+    """|size| x entry for one position, or None if either input is unusable.
+
+    ENTRY-based, not mark-based: the forward verification recorded in
+    `margin_state_from`'s docstring uses `(|size| x entry) / collateral`, and
+    `value` (mark-based) misses by ~1.08%."""
+    if not isinstance(rec, dict):
+        return None
+    size, entry = _num(rec.get("size")), _num(rec.get("entry"))
+    if size is None or entry is None:
+        return None
+    if size != size or entry != entry:                 # NaN in, None out
+        return None
+    if entry <= 0:
+        return None
+    return abs(size) * entry
+
+
+def _bounded_longs(recs, collateral):
+    """The coins that PROVABLY cannot be liquidated, as a set.
+
+    The condition is the repo's own algebra, not a new model:
+    `scripts/lighter_margin_model.liq_price` returns 0.0 for a long whose
+    `1/leverage >= 1.0` — at a price of zero the account is still solvent, so
+    no adverse path reaches maintenance and the venue correctly publishes no
+    liquidation price. `_liq_price` maps that 0 to None, which is why the coin
+    lands in `liq_unknown` in the first place.
+
+    ACCOUNT-LEVEL, and that is the whole subtlety. My first cut asked the
+    question per position — `|size| x entry <= collateral` for each — and that
+    is WRONG under cross margin, which pools losses: four longs each inside the
+    collateral can sum to four times it, and the account is then perfectly
+    liquidatable. The sound condition is that the account's TOTAL entry
+    notional does not exceed its collateral, i.e. account leverage <= 1x, so
+    that a simultaneous total loss of every leg still leaves it solvent.
+
+    EVERY unreadable input returns the empty set, so an absent or unparseable
+    field keeps every coin in the refusing set rather than earning it an
+    exemption. A SHORT is never bounded — its loss grows without limit as the
+    price rises — and the presence of ANY short means the account-level bound
+    cannot be established at all, so nothing qualifies.
+    """
+    if collateral is None or collateral != collateral or collateral <= 0:
+        return set()
+    total = 0.0
+    longs = set()
+    for coin, rec in recs.items():
+        n = _entry_notional(rec)
+        if n is None:
+            return set()                               # one unreadable leg
+        size = _num((rec or {}).get("size"))
+        if size is None or size != size or size == 0:
+            return set()
+        if size < 0:
+            return set()                               # a short is unbounded
+        total += n
+        longs.add(coin)
+    if not longs or total > collateral:
+        return set()
+    return longs
+
+
 def margin_state_from(acct, marks=None):
     """The account's margining view, derived from ONE venue account payload.
 
@@ -195,6 +257,14 @@ def margin_state_from(acct, marks=None):
     gross = 0.0
     have_value = False
     modes, out, unknown = set(), {}, []
+    # [2026-08-19 (rb)] `bounded` = the subset of `unknown` the block can PROVE
+    # is unliquidatable. `blind` = positions the venue DID price whose mark is
+    # unreadable — they matched neither arm of the branch below and so dropped
+    # silently out of `nearest_liq`, which is a FAIL-OPEN hole in any consumer
+    # that reads only the nearest: a position 3% from its liquidation with a
+    # dark order book made the whole account look safe. Reproduced against this
+    # publisher and the real gate before the key was added.
+    blind = []
     for coin, rec in positions.items():
         val = rec.get("value")
         if val is not None:
@@ -228,6 +298,21 @@ def margin_state_from(acct, marks=None):
         liq, mark = rec.get("liq"), (marks or {}).get(coin)
         if liq is None:
             unknown.append(coin)
+            # [2026-08-19 (rb)] WHY the venue published nothing, when the block
+            # can prove it. `scripts/lighter_margin_model.liq_price` states the
+            # algebra: `if is_long and inv >= 1.0: return 0.0` — a long at or
+            # below 1x of collateral CANNOT be liquidated, because its whole
+            # loss is bounded by its notional and the account still stands at a
+            # price of zero. `_liq_price` then maps that 0 to None, so the coin
+            # lands in `liq_unknown` — the SAFEST position class in the fleet,
+            # filed under the same key as a genuine read failure.
+            #
+            # `liq_none` is ADDITIVE and `liq_unknown` stays the superset, so no
+            # existing consumer contract moves; a consumer that wants the honest
+            # split takes `set(liq_unknown) - set(liq_none)`. Fail-CLOSED: a
+            # SHORT never qualifies (its loss is unbounded above), and any coin
+            # whose size, entry or the account collateral is missing, unparseable
+            # or non-positive stays OUT of `liq_none`, i.e. keeps refusing.
         elif mark:
             m = _num(mark)
             if m and m > 0:
@@ -241,7 +326,15 @@ def margin_state_from(acct, marks=None):
                 # unambiguously; renaming the FIELD rather than rescaling the
                 # VALUE keeps every number already published still true.
                 row["dist_frac"] = abs(m - liq) / m
+            else:
+                blind.append(coin)          # liq known, mark unusable
+        else:
+            blind.append(coin)              # liq known, no mark supplied
         out[coin] = row
+
+    # [(rb)] Account-level, so it must run AFTER every position is seen.
+    bounded = sorted(_bounded_longs(positions, _num(acct.get("collateral")))
+                     & set(unknown))
 
     nearest = None
     priced = [(r["dist_frac"], c) for c, r in out.items() if "dist_frac" in r]
@@ -262,6 +355,10 @@ def margin_state_from(acct, marks=None):
         "positions": out,
         "nearest_liq": nearest,
         "liq_unknown": sorted(unknown),
+        # Published even when empty — the (lv) census rule: an omitted key is
+        # byte-identical between "nothing qualified" and "nothing was measured".
+        "liq_none": sorted(bounded),
+        "liq_mark_blind": sorted(blind),
     }
 
 
