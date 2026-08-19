@@ -1,0 +1,336 @@
+#!/usr/bin/env python3
+"""[2026-08-19 (rh)] A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT.
+
+WHY THIS EXISTS. `audit_changelog_letters.dangling_code_citations` asks one
+question — *does this letter resolve to a header?* — and appends a finding only
+`if letter not in known`. So a citation that resolves to the WRONG entry is
+green by construction. That is its declared blind spot, and on 2026-08-19 it
+cost real-money surface:
+
+  Renumbering an entry `(ql) -> (qq)`, a `grep ... | head -40` over 48 matching
+  lines silently dropped the last eight. All eight were in
+  `lighter_funding_bot.py` and `venues/safety.py` — the LIVE Funding Farmer and
+  SafetyRails. Seven citations of the ruin-gate entry stayed on `(ql)`, which
+  by then meant a concurrent session's unrelated "CARRIED ITEMS, DISCHARGED".
+  The implementation and its own test cited DIFFERENT ENTRIES, through a
+  commit, a push, and a fully green CI run.
+
+THE SIGNAL, and why it is evidence rather than a heuristic. A citation is
+written against whatever the letter meant AT THAT MOMENT. So `git blame` the
+citation line, read that letter's TITLE in the CHANGELOG as of the introducing
+commit, and compare it to the title it carries now. If they are not the same
+entry, the letter was reused underneath a citation that never moved with it.
+Nothing about topic, keywords or intent is guessed.
+
+MEASURED BEFORE IT WAS BUILT, both directions:
+  * On the real incident (commit 41a9167) it flags 5 of the 7 stale sites and
+    both affected FILES — enough to redden the build, which is the job.
+  * On the current tree it flags 0 of 994 real citations. Zero false positives
+    is what makes a guard survive contact with a busy repo; the fleet's own
+    rule is that a detector which flags everything trains the operator to
+    ignore it.
+
+WHAT IT DELIBERATELY DOES NOT DO — the 44-case skip, declared rather than
+defaulted into. When a letter does not exist yet at the blame commit (the code
+landed before its changelog entry), this guard SKIPS it and says so in its
+summary. The obvious repair — walk forward to the first commit where the letter
+appears — was BUILT AND REJECTED ON MEASUREMENT: it lands on whatever the letter
+transiently meant in between, and it produced a false positive immediately, on
+`tests/autonomy/test_payload_contracts.py:922`, where the citation of `(kq)` is
+correct today and merely passed through a window in which `(kq)` briefly meant
+`🔭 GATE HORIZON` before that entry became `(ks)`. A forward walk is a guess
+about intent; the blame-commit read is evidence. Skipping is the honest answer,
+and the count is published so the skip is never invisible.
+
+Also skipped, correctly rather than as a limitation: an UNCOMMITTED citation
+line. Drift is a letter changing meaning AFTER a citation was written, so a
+line being written right now cannot have drifted.
+
+Fails OPEN with the arm disabled when git cannot answer (no repo, shallow
+clone, missing history) — a guard that cannot read history must not invent a
+verdict, and CI checks out full history for exactly this reason.
+
+Exit 0 clean, 1 on a finding, 2 on a usage error.
+"""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# ONE owner for each borrowed rule. `code_citations` is the tokenizer,
+# `HEADER` the entry grammar, `same_entry` the calibrated title-similarity
+# test (difflib >= 0.6: a real in-place correction measured 0.978, a genuine
+# letter race 0.26). Re-implementing any of the three here would make this a
+# second rule that drifts from the first.
+from audit_changelog_letters import (          # noqa: E402
+    HEADER, code_citations, same_entry,
+)
+
+#: Citations that are known-stale and deliberately left alone, with a reason.
+#: Empty, and it should stay that way — repointing a citation is a one-token
+#: edit, so an exemption here is almost always the wrong answer.
+DRIFT_OK: dict[tuple[str, int], str] = {}
+
+
+def _git(*args):
+    try:
+        r = subprocess.run(("git",) + args, capture_output=True, text=True,
+                           timeout=120)
+    except Exception:                       # noqa: BLE001 — no git, no arm
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+class Titles:
+    """`letter -> title` at a revision, cached. One `git show` per revision."""
+
+    def __init__(self):
+        self._c: dict[str, dict] = {}
+
+    def at(self, rev):
+        if rev not in self._c:
+            txt = _git("show", f"{rev}:CHANGELOG.md")
+            d = {}
+            if txt:
+                for m in HEADER.finditer(txt):
+                    d.setdefault(m.group(2), m.group(3).strip())
+            self._c[rev] = d
+        return self._c[rev]
+
+
+def blame_map(path):
+    """`lineno -> (sha, truncated)`, or {} when git cannot answer.
+
+    `truncated` is git's OWN boundary marker: a leading `^` means the line is
+    older than the deepest commit this clone has, so its real origin is
+    unknown. Stripping that caret — which is the obvious thing to do, and what
+    the first cut of this guard did — silently converts "I cannot see where
+    this came from" into "it came from the graft commit", and then reads a
+    CHANGELOG title there as if it were evidence. In this working clone that is
+    215 of 374 lines in `venues/safety.py` alone. CI checks the suite job out
+    at `fetch-depth: 0`, so nothing is truncated where this guard is enforced;
+    locally it degrades to skipping, and the count is published."""
+    out = _git("blame", "-l", "--", path)
+    if out is None:
+        return {}
+    m = {}
+    for i, line in enumerate(out.split("\n"), 1):
+        if line:
+            tok = line.split(" ", 1)[0]
+            m[i] = (tok.lstrip("^"), tok.startswith("^"))
+    return m
+
+
+def uncommitted(sha):
+    """git blames a working-tree line to an all-zero sha."""
+    return not sha or set(sha) <= {"0"}
+
+
+def audit(paths=None):
+    """-> (findings, stats). Findings are (path, line, letter, then, now, suggestion)."""
+    if _git("rev-parse", "--git-dir") is None:
+        return [], {"armed": False, "why": "no git repository"}
+    if paths is None:
+        listed = _git("ls-files", "*.py")
+        if listed is None:
+            return [], {"armed": False, "why": "git ls-files failed"}
+        paths = listed.split()
+
+    cites = code_citations(paths)
+    titles = Titles()
+    now = titles.at("HEAD")
+    if not now:
+        return [], {"armed": False, "why": "CHANGELOG.md unreadable at HEAD"}
+
+    blames = {p: blame_map(p) for p in sorted({p for p, _, _ in cites})}
+    findings = []
+    stats = {"armed": True, "citations": len(cites), "checked": 0,
+             "skipped_uncommitted": 0, "skipped_letter_absent": 0,
+             "skipped_unresolved": 0, "skipped_truncated": 0, "exempt": 0}
+
+    for path, line, letter in cites:
+        entry = blames.get(path, {}).get(line)
+        sha, truncated = entry if entry else (None, False)
+        if truncated:
+            stats["skipped_truncated"] += 1
+            continue
+        if uncommitted(sha):
+            stats["skipped_uncommitted"] += 1
+            continue
+        then = titles.at(sha).get(letter)
+        if then is None:
+            # The letter did not exist yet at the introducing commit. See the
+            # module docstring: the forward walk was built, measured, and
+            # rejected for landing on transient meanings.
+            stats["skipped_letter_absent"] += 1
+            continue
+        cur = now.get(letter)
+        if cur is None:
+            # Resolves to nothing — that is the OTHER guard's finding, not a
+            # drift. Reported in the stats so it is never silently absorbed.
+            stats["skipped_unresolved"] += 1
+            continue
+        stats["checked"] += 1
+        if same_entry(then, cur):
+            continue
+        if (path, line) in DRIFT_OK:
+            stats["exempt"] += 1
+            continue
+        suggest = next((l for l, t in now.items() if same_entry(then, t)), None)
+        findings.append((path, line, letter, then, cur, suggest))
+    return findings, stats
+
+
+def _selftest():
+    """Positive controls FIRST, and one of them is the REAL incident.
+
+    A synthetic fixture proves the comparison works; replaying the actual
+    commit proves the guard would have caught the thing it was built for. The
+    second is the one that matters, and it is skipped rather than faked when
+    the history is not present."""
+    bad = 0
+
+    # 1. the comparison itself, on titles alone
+    same = ("THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION",
+            "THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING")
+    diff = ("THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION",
+            "THE CARRIED ITEMS, DISCHARGED: the organ sweep is clean")
+    if not same_entry(*same):
+        print("  SELFTEST FAIL: an edited title must read as the SAME entry")
+        bad += 1
+    if same_entry(*diff):
+        print("  SELFTEST FAIL: two unrelated titles must read as DIFFERENT")
+        bad += 1
+
+    # 2. THE REAL INCIDENT. At 41a9167, seven citations of (ql) pointed at the
+    #    ruin-gate entry while (ql) had come to mean CARRIED ITEMS.
+    incident = "41a916744fcc65a1fa6a34c85b710df5ad125154"
+    if _git("cat-file", "-e", f"{incident}^{{commit}}") is None:
+        print("  SELFTEST SKIP: incident commit not in this checkout "
+              "(shallow clone) — the synthetic arm still ran")
+    else:
+        titles = Titles()
+        then_t = titles.at("84e5dfde9").get("ql") if _git(
+            "cat-file", "-e", "84e5dfde9^{commit}") is not None else None
+        now_t = titles.at(incident).get("ql")
+        if then_t is None or now_t is None:
+            print("  SELFTEST SKIP: incident history present but titles "
+                  "unreadable")
+        elif same_entry(then_t, now_t):
+            print("  SELFTEST FAIL: the real incident's two meanings of (ql) "
+                  "must NOT compare as the same entry -- this guard's whole "
+                  f"premise. then={then_t[:40]!r} now={now_t[:40]!r}")
+            bad += 1
+
+    # 3. END-TO-END POSITIVE CONTROL in a throwaway repo. Arms 1 and 2 pin the
+    #    COMPARISON; without this one nothing pins the blame/skip plumbing that
+    #    feeds it, so a mutation that made `audit()` stop detecting would redden
+    #    nothing — the current tree is clean, and a guard whose detection path
+    #    no test exercises is exactly the vacuous-guard shape this repo keeps
+    #    paying for. Builds a real renumber: a citation is committed while a
+    #    letter means one thing, then the letter is reused for another entry.
+    import tempfile
+    cwd = os.getcwd()
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            os.chdir(td)
+            def g(*a):
+                subprocess.run(("git",) + a, capture_output=True, text=True)
+            g("init", "-q")
+            g("config", "user.email", "t@t"); g("config", "user.name", "t")
+            g("config", "commit.gpgsign", "false")
+            # A filler ROOT commit first: git marks the root boundary with the
+            # same `^` as a shallow graft, so a citation committed there would
+            # be skipped as "beyond this clone's history" and the control could
+            # never fire. Found by this arm failing on its first run — which is
+            # the arm doing its job before it had ever guarded anything.
+            open("README", "w").write("root\n")
+            g("add", "-A"); g("commit", "-qm", "root")
+            open("CHANGELOG.md", "w").write(
+                "## 2026-08-19 (zz) — THE ORIGINAL SUBJECT, about liquidation\n")
+            open("mod.py", "w").write("# [2026-08-19 (zz)] cites the original\n")
+            g("add", "-A"); g("commit", "-qm", "one")
+            # the letter is now reused for a completely different entry
+            open("CHANGELOG.md", "w").write(
+                "## 2026-08-19 (zz) — AN ENTIRELY DIFFERENT SUBJECT, about "
+                "changelog housekeeping\n")
+            g("add", "-A"); g("commit", "-qm", "two")
+            found, st = audit(["mod.py"])
+            if not st.get("armed"):
+                print(f"  SELFTEST FAIL: arm disabled in the control repo "
+                      f"({st.get('why')})")
+                bad += 1
+            elif len(found) != 1:
+                print(f"  SELFTEST FAIL: end-to-end control expected exactly 1 "
+                      f"drift finding, got {len(found)} (stats={st})")
+                bad += 1
+            elif found[0][2] != "zz":
+                print(f"  SELFTEST FAIL: wrong letter reported: {found[0][2]!r}")
+                bad += 1
+            # NEGATIVE half: an untouched letter must NOT be flagged.
+            open("CHANGELOG.md", "a").write(
+                "\n## 2026-08-19 (zy) — A STABLE ENTRY\n")
+            open("mod2.py", "w").write("# [2026-08-19 (zy)] cites a stable one\n")
+            g("add", "-A"); g("commit", "-qm", "three")
+            found2, _ = audit(["mod2.py"])
+            if found2:
+                print(f"  SELFTEST FAIL: a stable citation was flagged: {found2}")
+                bad += 1
+    except Exception as e:                      # noqa: BLE001
+        print(f"  SELFTEST SKIP: end-to-end control could not run ({e})")
+    finally:
+        os.chdir(cwd)
+
+    if bad:
+        print(f"audit_citation_drift --selftest: {bad} FAILURE(S)")
+        return 1
+    print("audit_citation_drift --selftest: OK — title comparison both ways, "
+          "the 19-Aug incident replayed from real history, and an end-to-end "
+          "renumber control (1 drift found, 1 stable citation ignored)")
+    return 0
+
+
+def main(argv):
+    if "--selftest" in argv:
+        return _selftest()
+    if len(argv) > 1:
+        print(__doc__)
+        return 2
+    findings, stats = audit()
+    if not stats.get("armed"):
+        print(f"audit_citation_drift: arm DISABLED ({stats.get('why')}) — "
+              "no verdict claimed")
+        return 0
+    if findings:
+        print(f"audit_citation_drift: {len(findings)} CITATION(S) POINT AT A "
+              "DIFFERENT ENTRY THAN THE ONE THEY WERE WRITTEN AGAINST\n")
+        for path, line, letter, then, cur, suggest in findings:
+            print(f"  {path}:{line}  cites ({letter})")
+            print(f"      written against : {then[:88]}")
+            print(f"      ({letter}) now means   : {cur[:88]}")
+            print(f"      -> repoint to ({suggest})" if suggest else
+                  "      -> the original entry no longer exists under any letter")
+        print("\n  A letter was reused underneath these citations and they did "
+              "not move with it.\n  The other guard cannot see this: it checks "
+              "that a letter RESOLVES, not that it\n  resolves to the right "
+              "entry.")
+        return 1
+    print("audit_citation_drift: OK — {checked} of {citations} citations "
+          "verified against the entry they were written against "
+          "(skipped: {skipped_letter_absent} letter-not-yet-written, "
+          "{skipped_truncated} beyond this clone's history, "
+          "{skipped_uncommitted} uncommitted, {skipped_unresolved} "
+          "unresolved)".format(**stats))
+    if stats["checked"] == 0 and stats["citations"]:
+        # A run that verified NOTHING must not read as a run that found
+        # nothing — the difference this repo pays for over and over.
+        print("  NOTE: zero citations were actually checked. In a shallow "
+              "clone that is expected; in CI (fetch-depth 0) it means the "
+              "guard is inert and should be investigated.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

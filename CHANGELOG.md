@@ -1,3 +1,93 @@
+## 2026-08-19 (rh) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
+
+*(Renumbered (rc) -> (rf) -> (rh) at push time — the SIXTH collision on this branch
+today, and the reason is worth one line rather than a shrug: this branch has
+been unmerged across a day in which several sessions each appended to the same
+file, so every rebase finds its letter taken. Theirs is merged and cited;
+mine moves, by the convention's own tiebreak. The citation sweep behind this
+move was UNCAPPED and reconciled by count — 5 references to `(rc)` in the tree,
+4 mine and rewritten, 1 (`STUDY_DISLOCATION_BAND_2026-08-19.md`) belonging to
+the merged entry and deliberately left. That is the discipline `(ra)` bought.)*
+
+Two things, both carried out of `(ra)`/`(rb)`: the one open defect class I had
+recorded but not closed, and a red `main` I caused myself.
+
+**1. THE BLIND SPOT, CLOSED — `scripts/audit_citation_drift.py`.**
+`audit_changelog_letters.dangling_code_citations` appends a finding only
+`if letter not in known`, so it asks *does this letter resolve?* and never *does
+it resolve to the entry it was written against?* On 19-Aug that gap cost
+real-money surface: a `head -40` over 48 matches dropped every citation in
+`lighter_funding_bot.py` and `venues/safety.py`, seven references to the
+ruin-gate entry stayed on `(ql)` after it became `(qz)`, and the implementation
+and its own test cited DIFFERENT ENTRIES through a commit, a push and a green CI
+run.
+
+**The signal is evidence, not a heuristic.** A citation is written against
+whatever the letter meant at that moment — so `git blame` the line, read that
+letter's TITLE as of the introducing commit, and compare it with the title it
+carries now. Nothing about topic or intent is guessed.
+
+**MEASURED IN BOTH DIRECTIONS BEFORE IT WAS BUILT**, which is the only reason to
+trust it: replayed at the defect commit `41a9167` it **fires and exits 1**,
+names the file, quotes both meanings and prints `-> repoint to (qq)`; on the
+current tree it verifies **950 of 995** citations and finds **zero**. Zero false
+positives on ~1,000 real citations is what lets a guard survive in a busy repo.
+
+**THREE CANDIDATE DESIGNS WERE MEASURED AND TWO REJECTED, which is the useful
+part.** (i) *Keyword overlap* between the citation line and the entry body
+flagged 6 of 7 real sites but **3 false positives on the current tree**, because
+this codebase SHOUTS in English and `DECLARED`/`BOOK`/`ENTRY` read as
+distinctive tokens. (ii) *Forward-walking* to the first commit where an absent
+letter appears looked like a strict improvement — it lifted the real incident to
+7 of 7 — and was **rejected on its own measurement**: it immediately produced a
+false positive at `tests/autonomy/test_payload_contracts.py:922`, where a
+citation of `(kq)` is correct today and merely passed through a window in which
+`(kq)` briefly meant `🔭 GATE HORIZON` before that became `(ks)`. **A forward
+walk is a guess about intent; the blame-commit read is evidence.** So the 35
+letter-not-yet-written cases are SKIPPED and the count is PUBLISHED, because a
+run that verified nothing must never read like a run that found nothing.
+
+Two more properties, both learned the hard way today: it uses git's **own `^`
+boundary marker** rather than stripping it — in this working clone 215 of 374
+lines in `venues/safety.py` are beyond the graft, and stripping the caret
+converts *"I cannot see where this came from"* into *"it came from the graft
+commit"* and then reads a title there as if it were evidence. And it **imports**
+`code_citations` / `HEADER` / `same_entry` from the letters guard rather than
+re-implementing them — `code_citations` was split out for exactly this, so the
+tokenizer, the entry grammar and the calibrated 0.6 title-similarity threshold
+each keep ONE owner. Registered in `ENFORCED_AUDITS`, which is load-bearing: it
+needs the suite job's `fetch-depth: 0`, and at depth 1 it would verify nothing
+while reporting clean.
+
+**2. `main` WENT RED ON THE MERGE, AND THE ORGAN IT NAMED HAD STOPPED TRADING.**
+`audit_boot_stagger` failed on `lighter_ticket_taker` — run `32222272921`,
+1 failed / 1949 passed. **I checked whether it was mine rather than assuming:**
+at `ba0a962` (immediately before the merge) the same guard reads OK; with the
+merge it FAILS. Mine.
+
+But the guard was not reporting a bookkeeping artifact. The taker still carried a
+bare `( sleep 210`, which the `(ou)` boot-ladder sweep had missed — it is one of
+only two such holdouts in 18 blocks — and a bare stagger **restarts from zero on
+every deploy**. Measured: deploys arrived closer together than 210s for
+**17 minutes without a break**, past the 15 min its consumers tolerate. So the
+shadow Ticket Taker — the control arm a go-live would rest on — silently stopped
+trading for the whole burst, and nothing reported it, because *an organ that
+never reaches its first run is not sick and every liveness contract reads fine.*
+That is the same class `(pi)` found on the real-money grader, on a different
+organ, surfaced only because my own merge finally pushed the burst past the bar.
+
+Fixed with the sweep's own shape — `sleep 20; run once; sleep 190;` then the
+unchanged loop — so **every subsequent run lands exactly where it did before**
+(t=210, 510, 810…) and only one run is added at t=20. Deliberately NOT the
+staleness-gated variant `golive_readiness` uses: that organ loops every 21600s
+and grades every book off a 20k-row ledger fetch, so an unconditional boot run
+is ~30x its frequency; this one already loops every 300s, so it is ~1x. **The
+cost is stated rather than buried**: during a burst the taker now evaluates
+entries once per deploy instead of not at all, so an entry's timing within a
+burst can shift earlier — exposure is unchanged, still bounded by `TT_MAX_OPEN`
+and by ticket supply. SHADOW ONLY; the LIVE arm is a separate service with its
+own stagger.
+
 ## 2026-08-19 (rg) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
 
 [Renumbered from (re) at push time — the SECOND race in one PR: main took (re)

@@ -118,16 +118,15 @@ KEY_ALIASES = {"implementation_shortfall": ("impl-shortfall",),
 #: Organs deliberately exempt, with the reason. An exemption is a DECISION and
 #: must name why — the `BORN_DARK_OK` idiom.
 STAGGER_OK: dict[str, str] = {
-    "lighter_ticket_taker": (
-        "a trading BOOK, not a bus organ: it publishes no bot_state key with a "
-        "ttl_sec, so the 3x-interval proxy (15 min) governs by fallback — but "
-        "its only cross-process reader is its bot_pnl row behind fleet_risk's "
-        "STALE_ROW_SEC=3900s (65 min) staleness filter, 4.3x the proxy. The "
-        "19-Aug merge storm (a 17-min run of sub-210s commit gaps on the "
-        "commit-time proxy) sat well inside that real contract, and the proxy "
-        "alone turned the whole fleet's suite red ((rg)). This waives the "
-        "PROXY, never the contract: a burst outlasting 65 min WOULD silence "
-        "the row for real — revisit if the deploy cadence ever sustains that."),
+    # [2026-08-19 (rh)] `lighter_ticket_taker` was declared here at (rg) and the
+    # declaration is REMOVED, not because its reasoning was wrong — it was
+    # right, and it is preserved in `run_all.sh` beside the fix — but because
+    # the organ now has a boot ladder, so the exemption guards nothing and
+    # MASKS a regression of that ladder. Measured both ways: revert the ladder
+    # with this entry present and the guard exits 0; revert it with the entry
+    # gone and the guard exits 1. An exemption that can only ever hide the
+    # re-introduction of a fixed defect is the DRIFT_OK hole in another costume
+    # — "prefer making the consumer a LITERAL over declaring the exemption".
 }
 
 

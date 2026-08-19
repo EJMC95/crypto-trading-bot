@@ -173,7 +173,44 @@ done &
 # lighter_shadow is the correct value AND the safe one: this container hosts the
 # SHADOW book — the control arm and the only evidence a go-live can rest on. The
 # LIVE arm is a separate service (Dockerfile.tickettaker) and sets its own.
-( sleep 210
+# [2026-08-19 (rh)] BOOT LADDER — the `(ou)` sweep missed this organ, and
+# `audit_boot_stagger` proved it the hard way: a bare `sleep 210` restarts from
+# zero on every deploy, so under this repo's push cadence the taker never
+# reached its FIRST run. Measured on origin/main after a merge: deploys arrived
+# closer together than 210s for 17 MINUTES without a break, past the 15 min its
+# consumers tolerate — i.e. the shadow book that is the fleet's own evidence
+# source silently stopped trading for the whole burst, and nothing reported it
+# (an organ that never reaches a first run is not sick; every liveness contract
+# reads fine).
+#
+# The shape is the sweep's own: one early run, then the ORIGINAL stagger, so
+# every subsequent run lands exactly where it did before (t=210, 510, 810...)
+# and only a single run is added at t=20. Not the staleness-gated variant
+# `golive_readiness` uses: that one grades every book off a 20k-row ledger
+# fetch every 21600s, so an unconditional boot run is ~30x its frequency —
+# this organ already loops every 300s, so one extra run per deploy is ~1x.
+#
+# THE COST, stated rather than buried: during a burst the taker now evaluates
+# entries once per deploy instead of not at all. Exposure is unchanged —
+# entries remain bounded by TT_MAX_OPEN and by ticket supply — but the timing
+# of an entry within a burst can shift earlier. That is the trade the fleet
+# already accepted for sixteen other organs, and the alternative measured here
+# is a book that stops trading entirely whenever three sessions push at once.
+# SHADOW ONLY: the LIVE arm is a separate service (Dockerfile.tickettaker) and
+# sets its own stagger, so nothing here touches real money.
+#
+# `(rg)`'s MEASUREMENT IS KEPT, because it is right and it sets the urgency of
+# any future firing: this organ publishes no bot_state key with a `ttl_sec`, so
+# the guard governs it by a 3x-interval PROXY (15 min) — while its only
+# cross-process reader is its `bot_pnl` row behind `fleet_risk`'s
+# `STALE_ROW_SEC=3900` (65 min), 4.3x the proxy. So a burst of this size
+# misleads no CONSUMER; what it costs is the book's own trading continuity,
+# which is why the ladder is the fix and the proxy is not the thing to waive.
+# If this guard ever fires here again, read it as advisory until the burst
+# approaches 65 minutes.
+( sleep 20
+  TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true
+  sleep 190
   while true; do
     TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true
     sleep 300
