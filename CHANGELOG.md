@@ -1,3 +1,84 @@
+## 2026-08-19 (rn) — THE REVIEW'S OWN LIST, WORKED: the stale-reader class gets an HOURLY OUTSIDE CHECK, the sample20 disagreement explains itself, and the watchdog's second NOT-ONLINE rule had drifted from the first
+
+**Operator: "Fix anything remaining save commit push and tidy up as per
+usual."** Worked against `REVIEW_2026-08-19_TODAYS_WORK.md`'s own ranked list
+(I11 — the carried list, not whatever is interesting), taking the items that
+are code and leaving the ones that are decisions. First, the (rm) loop is
+CLOSED with a readback, not a green run: nav-cook-shadow redeployed on the
+merge push, row `status "online"`, build `5aa8784f58d6 → ddc83aa0120e`,
+watchdog `problems: []` — the NOT-ONLINE page is gone; the spent check-in
+trigger was deleted (P5).
+
+**1 · READER CURRENCY, HOURLY, FROM OUTSIDE (review item 7 — closes today's
+class rather than today's instance).** The (qh) reader-verify step fires only
+when a deploy INCLUDES pnl-dashboard; today's failure was a dashboard deploy
+that never STARTED, which no in-band guard can see (I13). `fleet-watchdog.yml`
+now checks, every hourly run: serving `/watchdog.json started` must not
+predate the newest main commit touching the dashboard image's own files
+(30-min build+boot grace). A positive reading appends `DASHBOARD READER
+STALE ... re-dispatch railway-redeploy with services=pnl-dashboard` to the
+existing single-issue pager — the fix command IS the message (I8). Fail-OPEN
+with a VISIBLE skip: an unreachable watchdog.json is the feed probe's page,
+and both skip paths print `reader-currency: SKIP` into the step summary, so a
+run that verified nothing never reads like a run that found nothing ((po)).
+**Driven against today's own timestamps as the positive control**: 06:27:33
+reader vs the 08:08:17 (rj) commit → STALE with the exact catch-up command;
+the post-dispatch 10:48:29 reader → OK. Detection worst case ~2 hourly
+cycles, against the ~4.5h the real one ran. The step's `DASH_FILES` is
+necessarily a SECOND COPY of the decide grep's file set ((hj)), so
+`tests/autonomy/test_reader_currency_check.py` pins the two sets EQUAL by
+parsing both workflow texts (extractors carry their own non-empty +
+known-member positive controls; step order probe→check→alert pinned, because
+a correct check in the wrong slot pages nothing). **3 mutations verified
+red** (a file dropped from DASH_FILES; a SKIP line silenced; the step renamed,
+which kills both the order pin and the skip-visibility pin), each verified
+APPLIED before scoring and the file restored green after — run BY HAND,
+because `scripts/mutate.py` correctly REFUSED the target: it compile-checks
+mutants as Python, so a YAML workflow reports "does not compile — invalid
+mutation, not a kill" on every round. The refusal is the harness working, not
+a gap dodged; recorded so the next YAML mutation round is not mis-scored
+through it. bash -n coverage is free via (rl)'s own test.
+
+**2 · THE WATCHDOG'S SECOND NOT-ONLINE RULE HAD DRIFTED (found in passing,
+fixed in place per I12/(hj)).** The workflow's probe re-implements the
+NOT-ONLINE check as `status not in (None, 'online')` — it never received the
+16-Jul audit fix that `fleet_watchdog_svc` carries in its own comment
+("halted is the NORMAL daily-loss state ... they paged as NOT ONLINE all
+day"; 'paper' likewise). Two watchdogs, two rules: a halted book would page
+the hourly ISSUE while the in-service pager correctly stayed quiet. Aligned
+to the svc's accepted set `{None, online, halted, paper}`, halted rows go to
+warnings exactly as the svc does. No live instance today (no row publishes
+`halted` at this hour) — the drift was found by reading, and it is exactly
+the class that made nav-cook page this morning, one copy over.
+
+**3 · `sample20` NAMES WHAT IT CANNOT CLASSIFY (review item 4, the (rk)
+residue).** The fail-OPEN choice leaves 🧘 douglas publishing `n=9 / −$26.60`
+beside `closed 7 / −$0.12` for ~4 more days while the two unstamped legacy
+rows age out — a correct number pair that LOOKS like a defect and costs every
+reader the same investigation (rk) already ran. `sample20` now publishes
+`unstamped: N` (rows predating the pair/closed_at stamp — the ones the
+quarantine cannot be asked about), ALWAYS present including 0, because an
+omitted key is byte-identical between "all stamped" and "not computed"
+((lv)). Reporting-only; the structural pin that none of this reaches an entry
+decision is unmoved. Test added beside the (rk) suite (8 pass); **2/2
+mutations killed through `scripts/mutate.py`** (stamp predicate forced False;
+`unstamped` hardcoded to 0), baseline and restore green; selftest green.
+
+**NOT taken from the list, so the next session does not re-derive the scope:**
+the stale draft PRs (#153/#167/#168/#174 are other sessions' multi-day
+houses — disposition is a merge-conflict archaeology call, flagged for the
+operator; #192 is an ACTIVE session's branch with a letter collision its own
+CI will catch); the decide-step diff-since-last-green rework (touches the
+deploy path that froze the fleet this morning — not a tidy-up-pass change);
+the CI billing structure (operator decided 19-Aug, recorded in (ql));
+everything on the queue's decision slate (verdicts belong to their evidence
+windows).
+
+Tidy-up receipts: branch restarted from origin/main post-merge (the
+merged-PR rule), spent trigger deleted, review doc's items 4/7 annotated
+SHIPPED in place (a standing doc that advertises done work as open is the
+re-open surface I12 exists to remove).
+
 ## 2026-08-19 (rm) — THE DAILY REVIEW FINISHED 🧭 nav-cook's BIRTH: the (rl) freeze had eaten the dashboard's OWN redeploy, so the born row was publishing INVISIBLY — and its first visible hour paged NOT-ONLINE off this repo's own doc example
 
 **Operator: "Full review of today's work and list of improvements."** The

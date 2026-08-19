@@ -86,3 +86,17 @@ def test_the_sample_is_still_reporting_only():
     import inspect
     sig = inspect.signature(dg._open_position)
     assert "recent" not in sig.parameters and "sample" not in sig.parameters
+
+
+def test_sample20_names_how_many_rows_it_could_not_classify():
+    """[2026-08-19 follow-through on (rk)] The fail-OPEN choice leaves a ~4-day
+    window in which sample20 visibly disagrees with the card (n=9/−$26.60
+    beside closed 7/−$0.12, live). The disagreement must carry its own
+    explanation: `unstamped` counts the rows the quarantine cannot be asked
+    about, and it is ALWAYS present — an omitted key is byte-identical between
+    "all stamped" and "not computed" ((lv))."""
+    legacy = [{"pnl": -23.16, "r": -3.29}, {"pnl": -3.31, "r": -3.73}]
+    stamped = [dg.recent_entry("ROBO", _pos(), 1.0, "2026-08-19T09:00:00+00:00")]
+    assert dg.sample20(legacy + stamped)["unstamped"] == 2
+    assert dg.sample20(stamped)["unstamped"] == 0
+    assert dg.sample20([])["unstamped"] == 0

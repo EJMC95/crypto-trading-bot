@@ -316,13 +316,24 @@ def sample20(recent):
     Win rate is REPORTED, never a bar (I15)."""
     rows = list(recent or [])[-SAMPLE_N:]
     if not rows:
-        return {"n": 0, "expectancy_r": None, "win": None, "sum_usd": 0.0}
+        return {"n": 0, "expectancy_r": None, "win": None, "sum_usd": 0.0,
+                "unstamped": 0}
     rs = [r.get("r") for r in rows if isinstance(r.get("r"), (int, float))]
     wins = sum(1 for r in rows if (r.get("pnl") or 0) > 0)
+    # `unstamped`: rows predating the (rk) pair/closed_at stamp — the ones the
+    # quarantine CANNOT be asked about and keeps fail-OPEN. Published so the
+    # window in which sample20 visibly disagrees with the card (n=9/−$26.60
+    # beside closed 7/−$0.12, live 19-Aug) carries its own explanation instead
+    # of costing the next reader an investigation. Always present, including 0
+    # — an omitted key is byte-identical between "all stamped" and "not
+    # computed" ((lv)).
+    unstamped = sum(1 for r in rows
+                    if not (r.get("pair") and r.get("closed_at")))
     return {"n": len(rows),
             "expectancy_r": (round(sum(rs) / len(rs), 3) if rs else None),
             "win": round(wins / len(rows), 3),
-            "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2)}
+            "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2),
+            "unstamped": unstamped}
 
 
 def resolve_universe(held, current_time=None):
