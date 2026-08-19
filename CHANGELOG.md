@@ -1,3 +1,151 @@
+## 2026-08-19 (ro) — 👩 mum IS ALIVE: the operator reverses her retirement, and the autopsy says the disease was THE CLOCK — v2 is the same book with 24× the decisions, a hold bounded by measured carry, and its own control arm
+
+**Operator, 19-Aug: *"I now want you to unretire mum and bring her back to life,
+and do a deep, deep dive on why - give her the attention she needs to succeed,
+whatever way you do it."*** Reversing `(rd)` was the operator's call to make and
+it is made. Restoring v1 was NOT: her configuration produced ~2.4 closes/30d,
+so an un-hide alone would have handed back a book that cannot be graded for a
+year. She returns as a REDESIGN, and every choice below is anchored to a number
+measured on this venue's own data.
+
+**WHAT THE AUTOPSY FOUND, and the headline is not what `(rd)` said.**
+
+**1 · THE CLOCK WAS THE DISEASE.** Her entry was a STATE (`fast > slow`), not an
+event, so at boot every qualifying coin filled in the same second — all three
+lifetime closes stamped `2026-07-12T21:41:49Z`. Her ONLY exit was the SMA death
+CROSS, a roughly-monthly event, with `roi` disabled and no time stop. Holds:
+**33.1 / 29.1 / 25.1 days**. She was never losing — realised **+$0.679** — she
+was UNGRADEABLE, which is exactly what I17 is about.
+
+**2 · THE FUNDING-DRAG FIGURE IN `(rd)` IS WRONG, CORRECTED IN PLACE PER I12.**
+That entry retired her partly on *"funding drag −$2.15 EXCEEDS +$0.68
+realised"*. Summing the venue's OWN settled hourly series across her exact hold
+windows at her $50 clip:
+
+| trade | hold | settled funding | hours long-pays |
+|---|---:|---:|---:|
+| BTC | 33.1d | **−$0.220** | 76.2% |
+| LINK | 29.1d | **−$0.058** | 65.1% |
+| LTC | 25.1d | **+$0.032** | 55.9% |
+| **total** | | **−$0.246** | |
+
+Not −$2.15 — **off by ~9×** on the closed sample (that number must have pooled
+the four still-open positions and/or the bot's modelled accrual rather than the
+venue's settled truth). Her gross price P&L was +$1.985 and her ledger net
++$0.679. **The retirement's DECISIVE ground — the clock — is untouched**; the
+drag was a supporting claim and it was overstated.
+
+**A UNIT TRAP WORTH THE WHOLE ENTRY, because it inverts a number by 12.5×:**
+`/funding-rates` quotes per 8h as a FRACTION, but the SETTLED series
+`/api/v1/fundings` quotes **PERCENT PER HOUR**. Verified empirically rather than
+assumed — the median non-zero settled rate is **exactly 0.0012** on BTC/ETH/HYPE,
+which is the venue's documented resting default (9.6e-05 per 8h ⇒ 1.2e-05/hr ⇒
+0.0012 %/hr). The hourly fraction is `rate/100`, **never** `rate/8`. My own first
+draft of the study divided by 8; `funding_basis.py`'s header states the
+convention and it is easy to read past.
+
+**3 · THE TWO NUMBERS THAT DESIGN V2, and together they are the indictment.**
+* **CARRY punishes DURATION.** MEASURED over 478 days x 20 coins: a long on
+  the majors pays a median **+0.0171%/day** of notional, so v1's 29-day median
+  hold started **~0.50% behind** and v2's 12h cap starts 0.009% behind. The
+  per-coin spread is wide and load-bearing — HYPE **+0.0445%/day** (1.33% per
+  30d), AAVE +0.0342, XAU +0.0302, while **DOT and SPY are slightly NEGATIVE**
+  (a long is PAID to hold); 65-95% of hours are long-pays by coin.
+  *Corrected in place (I12): an earlier draft of this entry quoted the venue's
+  RESTING-rate arithmetic (0.0288%/day) as though it were the measured
+  average. It is a reference point, not the mean.*
+* **EXECUTION IS NEARLY FREE.** Across **~400 short-hold closes** in the fleet's
+  own paper ledger, the exit-side gap between decision mark and realised fill
+  has a **median of −0.8 bps** (p90 5 bps) — zero-fee venue, majors, crossed
+  spread only. Round trip ~1–2 bps.
+
+**So this venue charges almost nothing to trade OFTEN and a real amount to hold
+LONG — and v1 was configured at precisely the wrong corner of both. Turnover was
+free and she refused it.** That sentence is the deep dive.
+
+**WHAT V2 IS.** `OversoldRebound`, same row, same $1k, same 4 slots, same $50
+clip — a different clock and a different entry:
+* **1h bars, not 1d.** ~15 coins × 24 bars/day = **~360 decision points/day**
+  against v1's ~15. With a 12h cap and 4 slots the book is bounded at 8
+  closes/day, so **30 closes arrives in about a week instead of about a year.**
+* **Entry: `RSI(14) < 25` AND **NOT** `e50 > e200`.** This is not an invention —
+  it is the one cell this fleet has already MEASURED as carrying information and
+  nobody expresses. `(qu)`'s exit-free decomposition of 🙏 avo's SwingDip (1,156
+  signals / 475d / 23 coins) found only **`rsi<42` carries information** and the
+  **`e50>e200` trend filter is ACTIVELY DESTRUCTIVE** (adding it lowered the mean
+  of every base: R +0.208→+0.025, B +0.346→+0.187, R&B +0.349→+0.124), with
+  `rsi<25` the strongest term (+2.32%/trade at h=12, 19/23 coins).
+* **STATED HONESTLY: that dose-response has DECAYED THROUGH ZERO** on rolling
+  120d windows (+4.97 → +2.05 → −0.31 → −0.41). This entry is
+  **HYPOTHESIS-GRADE and must never be quoted as a proven edge.** What v2 buys
+  is that the question becomes answerable in a week rather than a year.
+* **Bracket predefined at entry, never widened** (🧘 Douglas's discipline):
+  roi ladder 2.0%→0 across 12h, −4% stop (v1 carried −15%, sized for a month),
+  and a **carry-bounded 12h `max_hold`**.
+
+**THE CONTROL ARM — the reason she is worth reviving rather than replacing.**
+`(hm)` requires a directional book to be graded against a **random-entry null,
+never against zero**, because a random long on this tape earns a non-zero amount
+for free. That rule has lived in studies and has **never been carried by a LIVE
+book**. mum v2 carries her own: at every entry she records the mark of a randomly
+chosen OTHER coin from her own universe, and at exit the same coin's mark — a
+matched-window, unmatched-signal placebo that costs no capital and controls for
+drift and regime. `extra.control` publishes `{n, mean_pct, null_pct, edge_pct}`
+every loop, **always present including at n=0** ((lv)). At day 30 the verdict is
+her mean against her OWN null, on the same clock, readable from the payload.
+
+**I20 — SHE TILES, AND THE CLAIM IS STATED AT ITS REAL STRENGTH.** Her entry
+requires NOT-uptrend and 🙏 avo's requires `e50 > e200`, so **on the same
+timeframe the predicates are disjoint by construction** and the `(lv)`
+subset-starvation trap between two books in one process is unreachable. avo
+takes dips INSIDE an uptrend on 4h holding ~3.5 days; mum the deep tail OUTSIDE
+one on 1h capped at 12h.
+**THE HONEST LIMIT, declared rather than glossed:** the two read trend on
+DIFFERENT timeframes (1h vs 4h), so a coin in a 4h uptrend and a 1h downtrend
+can satisfy both, and a simultaneous long in both books is possible — I20's
+"one bet held twice" in its weak form. Deliberately NOT closed with a new gate:
+that would shrink mum's supply on no measurement. It is bounded by machinery
+that already binds fleet-wide (`fleet_risk`'s per-symbol cap and the enforced
+20-long budget, both checked at this entry site) and is monitorable from the
+payload (mum's `held` map beside avo's). If co-holding is MEASURED to be
+material, the cheap fix is a 4h-trend screen on mum — made on the measurement,
+not pre-emptively.
+
+**TWO REVIVAL HAZARDS THAT WOULD HAVE BITTEN SILENTLY, both closed:**
+* **Her four frozen v1 positions hold all four slots.** Revived as-is she could
+  never open a trade — undecidable again by a NEW mechanism. They flatten once at
+  the boundary, tagged `v1_legacy`; they opened 12-Jul, i.e. BEFORE the era, and
+  `era_rows` keys on the OPEN, so they cannot pollute v2's grade.
+* **`custom_exit` was `isinstance`-gated on `DayTraderGated`,** so a time stop on
+  any NEW carrier was dead code — the registered-but-inert shape (I18), and
+  precisely how v1 held for a month. Now duck-typed.
+
+**ERA MOVED, both tables in lockstep** (`POLICY_ERA` and `bot_learn.ERA_START`
+→ `2026-08-19T21:45`, the same instant as the flatten boundary): a strategy
+change of this kind is *"different in kind"*, so v1's three closes may not pool
+into v2's sample. The 17-Jul accrual reason is preserved, not discarded — an era
+is the LATEST of every invalidating change.
+
+**THE TESTS CAUGHT A REAL DEFECT BEFORE IT SHIPPED**, which is the point of
+writing them first: `FLATTEN_BEFORE_TS` was initially set to a timestamp in the
+FUTURE, which would have flattened **v2's own entries on sight**. That arm now
+pins the boundary is in the past. `tests/autonomy/test_mum_v2.py` replaces
+`test_mum_retired.py` (15 tests: un-retirement in all three sites, the clock,
+the bracket's reachability, I20 disjointness, the control arm at n=0 and at n=2,
+blast-radius containment to mum alone, the era lockstep, the frozen-position
+release).
+
+**Blast radius, stated because two LIVING books share this process:** the control
+arm and census are scoped to a carrier that DECLARES them (mum only) and every
+control-arm write is wrapped — an instrument that can break a trading loop is
+worse than no instrument. 🙏 avo and 🔮 georgia's payloads and behaviour are
+unchanged, pinned by a test.
+
+**NOT CLAIMED:** that mum v2 makes money. Her entry is hypothesis-grade with a
+decayed prior, and this fleet has retired four books of her old shape. What is
+claimed is narrower and checkable: **she can now be DECIDED in about a week,
+against her own control, instead of never.**
+
 ## 2026-08-19 (rn) — THE REVIEW'S OWN LIST, WORKED: the stale-reader class gets an HOURLY OUTSIDE CHECK, the sample20 disagreement explains itself, and the watchdog's second NOT-ONLINE rule had drifted from the first
 
 **Operator: "Fix anything remaining save commit push and tidy up as per

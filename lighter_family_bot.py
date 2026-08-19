@@ -50,6 +50,7 @@ import argparse
 import logging
 import math
 import os
+import random
 import sys
 import time
 from datetime import datetime, timezone
@@ -468,6 +469,181 @@ class TrendMomo(Carrier):
         return 1.0
 
 
+class OversoldRebound(Carrier):
+    """👩 mum v2 — DEEP-OVERSOLD REBOUND, 1h, bracketed, OUTSIDE the uptrend.
+
+    [2026-08-19 (ro)] THE REVIVAL. mum v1 (TrendMomo, above) was retired hours
+    earlier by `(rd)` on an I17 `no_rate` call. The operator reversed it:
+    "unretire mum and bring her back to life... give her the attention she
+    needs to succeed." This class is that attention, and it is a REDESIGN
+    rather than a reprieve — reviving v1's shape would re-run the failure.
+
+    WHAT ACTUALLY KILLED HER — measured on her own record, not inferred:
+      * THE CLOCK, and it is the whole story. Her entry was a STATE
+        (`fast > slow`), so at boot every qualifying coin filled in the same
+        second — all three of her lifetime closes opened 2026-07-12T21:41:49Z.
+        Her ONLY exit was the SMA death CROSS, a roughly-monthly event, with
+        `roi` disabled and no time stop. Holds: 33.1 / 29.1 / 25.1 days.
+        Realised rate ~2.4 closes/30d against a 30-closes-in-30-days go-live
+        bar — ~12 MONTHS to decidability. She was never losing; she was
+        UNGRADEABLE, which is I17's whole point.
+      * THE FUNDING DRAG WAS REAL BUT SMALL — and `(rd)` overstated it, which
+        is corrected here per I12. Summing the venue's OWN settled hourly
+        series (`/api/v1/fundings`) across her exact hold windows at her $50
+        clip: BTC -$0.220, LINK -$0.058, LTC +$0.032 => **-$0.246 total**, not
+        the -$2.15 that entry claimed (that figure must have pooled the four
+        still-open positions and/or the bot's modelled accrual). Her gross
+        price P&L was +$1.985 and her ledger net +$0.679. The retirement's
+        DECISIVE ground — the clock — is untouched by the correction.
+      * NOTE THE UNIT TRAP, recorded because it inverts a number by 12.5x:
+        `/funding-rates` quotes per 8h as a FRACTION, but the SETTLED series
+        `/api/v1/fundings` quotes **percent per HOUR**. Verified empirically —
+        the median non-zero settled rate is exactly 0.0012 on BTC/ETH/HYPE,
+        which is the venue's documented resting default (9.6e-05 per 8h =>
+        1.2e-05/hr => 0.0012 %/hr). Hourly fraction is `rate/100`, never
+        `rate/8`. funding_basis.py's header states it; it is easy to miss.
+
+    THE TWO NUMBERS THAT SHAPE V2, both measured on Lighter's own data:
+      1. CARRY: MEASURED across 478 days x 20 coins, a long on the majors pays
+         a median **+0.0171%/day** of notional — so v1's 29-day median hold
+         starts **~0.50% behind** while v2's 12h cap starts 0.009% behind.
+         (The venue's RESTING-rate arithmetic gives 0.0288%/day; the realised
+         median is lower, and quoting the resting figure as the average was a
+         first-draft error corrected here.) The spread is wide and matters:
+         HYPE +0.0445%/day (1.33%/30d) and AAVE +0.0342 at one end, DOT and
+         SPY slightly NEGATIVE (longs are PAID) at the other; 65-95% of hours
+         are long-pays depending on the coin. Carry punishes DURATION, and v1
+         was built from the maximum-duration end of that table.
+      2. EXECUTION IS NEARLY FREE: across **~400 short-hold closes** in the
+         fleet's own paper ledger the exit-side gap between the decision mark
+         and the realised fill has a median of **-0.8 bps** (p90 5 bps) — the
+         venue is zero-fee and these are majors, so the cost model is the
+         crossed spread alone. Round trip ~1-2 bps.
+      TOGETHER THEY ARE THE INDICTMENT: this venue charges almost nothing to
+      trade OFTEN and a real amount to hold LONG, and v1 was configured at
+      precisely the wrong corner of both. Turnover was free and she refused it.
+
+    THE FIX IS THE CLOCK, EXPRESSED AS ARITHMETIC. Moving from 1d to 1h bars
+    multiplies the decision surface by 24: ~15 coins x 24 bars/day = ~360
+    coin-bars/day against v1's ~15. A deep-oversold tail fires on a few
+    percent of coin-bars, so signals arrive several times a day, and with 4
+    slots and a 12h cap the book is bounded at 8 closes/day. **30 closes
+    arrives in about a week instead of about a year.** The `scan` census
+    publishes the realised rate from the first loop, so this claim is
+    falsifiable from the row itself rather than taken on faith (I18).
+
+    THE ENTRY, AND WHY IT IS THIS ONE. It is NOT a new invention — it is the
+    one cell this fleet has already MEASURED as carrying information, and
+    nobody expresses. `(qu)`'s exit-free decomposition of 🙏 avo's SwingDip
+    (1,156 signals, 475d, 23 coins) found: only **`rsi < 42` carries
+    information**, and the **`e50 > e200` trend filter is ACTIVELY DESTRUCTIVE
+    — adding it LOWERED the mean of every base** (R +0.208 -> +0.025,
+    B +0.346 -> +0.187, R&B +0.349 -> +0.124). The `rsi < 25` dose-response
+    was the strongest term in the study (+2.32%/trade at h=12, 19/23 coins
+    positive). So v2 takes the deep tail and REFUSES the filter that was
+    hurting it.
+
+    HONESTY, because this is the part a good result must not paper over: that
+    dose-response has **DECAYED through zero** on rolling 120d windows
+    (+4.97 -> +2.05 -> -0.31 -> -0.41). This entry is therefore
+    **HYPOTHESIS-GRADE, stated as such** — it is not a proven edge and must
+    never be quoted as one. What v2 changes is that the question becomes
+    ANSWERABLE in a week rather than a year, and answered against a control
+    rather than against zero.
+
+    THE CONTROL ARM — the thing that makes her worth reviving. `(hm)` requires
+    a directional book to be graded against a RANDOM-ENTRY null, never against
+    zero, because a random long/short on this tape earns a non-zero amount for
+    free. That rule is honoured in studies and has never been carried by a
+    LIVE book. mum v2 carries her own: at every entry she records the mark of a
+    randomly chosen OTHER coin from her own universe, and at exit the same
+    coin's mark — a matched-window, unmatched-signal placebo that costs no
+    capital and controls for drift and regime. `extra.control` publishes
+    {n, mean_pct, null_pct, edge_pct} every loop, so at day 30 the verdict is
+    her mean against her OWN null on the same clock, readable from the payload.
+
+    I20 — SHE TILES, AND THE CLAIM IS STATED AT ITS REAL STRENGTH. The entry
+    requires **NOT (e50 > e200)** while 🙏 avo's SwingDip requires
+    `e50 > e200`, so on the SAME timeframe the two predicates are disjoint by
+    construction and the `(lv)` subset-starvation trap — a consumer starved by
+    a superset running first in the same process — is unreachable between
+    them. avo takes dips INSIDE an uptrend on 4h holding ~3.5 days; mum takes
+    the deep tail OUTSIDE one on 1h capped at 12h.
+
+    **THE HONEST LIMIT, declared rather than glossed: the two books read trend
+    on DIFFERENT timeframes** (mum 1h, avo 4h), so a coin in a 4h uptrend that
+    is simultaneously in a 1h downtrend can satisfy BOTH — the predicates are
+    disjoint per-timeframe, not across timeframes, and a simultaneous long in
+    both books is therefore possible. That is I20's "one bet held twice" in its
+    weak form. It is NOT closed by a new gate here, because closing it would
+    mean shrinking mum's supply on no measurement; it is bounded by machinery
+    that already exists and binds fleet-wide — `fleet_risk`'s per-symbol cap
+    and the enforced 20-long budget, both checked at this loop's entry site.
+    Monitorable from the payload: mum's `held` map beside avo's. If the pair
+    is measured to co-hold materially, the cheap fix is a 4h-trend screen on
+    mum, and it should be made on that measurement rather than pre-emptively.
+
+    DELIBERATELY NOT ENCODED, so nobody re-proposes them as oversights: no
+    trend filter (measured destructive), no pyramiding, no ROI widening, no
+    leverage, and no exit SIGNAL — the bracket is predefined at entry and never
+    moved, which is 🧘 Douglas's discipline and the reason his book is
+    gradeable. The clip is a constant $50 (`stake_mult` returns 1.0 and takes
+    no streak, outcome or equity input) so consistency is structural.
+    """
+    # take profit early, then decay to breakeven by the 12h cap: the carry
+    # measurement says duration is the tax, so the ladder pays for patience
+    # only while patience is cheap.
+    roi = {0: 0.020, 240: 0.012, 480: 0.006, 720: 0.0}
+    protections = {"cooldown_candles": 2,
+                   "slguard": {"lookback": 24, "trades": 3, "stop": 6},
+                   "maxdd": {"lookback": 72, "trades": 8, "dd": 0.15, "stop": 12}}
+    min_bars = 210                      # e200 on 1h needs >200 closed bars
+    RSI_MAX = 25.0                      # (qu)'s measured dose cell
+    MAX_HOLD_MIN = 720                  # 12h — the carry-bounded cap
+    control_arm = True                  # publishes its own random-entry null
+    census = True                       # publishes why nothing opened (I18)
+    #: v1 positions (opened 2026-07-12) are flattened on the first v2 loop —
+    #: they are v1-policy artifacts holding all four slots, and a book that
+    #: cannot enter cannot be graded. Their closes are tagged `v1_legacy` and
+    #: they opened BEFORE the era boundary, so `golive_readiness.era_rows`
+    #: (which keys on the OPEN) excludes them from v2's grade by construction.
+    #: 2026-08-19T21:45:00Z. MUST be in the PAST at deploy: a boundary in the
+    #: future flattens v2's OWN entries on sight — caught by
+    #: test_the_frozen_v1_positions_are_released before this shipped, which is
+    #: exactly what that arm is for.
+    FLATTEN_BEFORE_TS = 1787175900.0
+
+    def signals(self, bars, extra):
+        c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
+        if len(c) < self.min_bars:
+            return None
+        i = len(c) - 1
+        rsi = rsi_series(c, 14)
+        e50, e200 = ema_series(c, 50), ema_series(c, 200)
+        if None in (rsi[i], e50[i], e200[i]):
+            return None
+        # NOT an uptrend: the cell 🙏 avo structurally cannot take (I20), and
+        # the half (qu) measured the trend filter was destroying.
+        outside_uptrend = not (e50[i] > e200[i])
+        enter = (rsi[i] < self.RSI_MAX and outside_uptrend and v[i] > 0)
+        # No exit SIGNAL by design — the bracket predefined at entry is the
+        # whole exit rule (stop / roi ladder / max hold). Douglas's discipline.
+        return {"enter": "oversold-rebound" if enter else None,
+                "exit": False, "exit_reason": "bracket",
+                "rsi": rsi[i], "uptrend": not outside_uptrend}
+
+    def stake_mult(self, tag, bars):
+        return 1.0                      # constant clip — consistency is structural
+
+    def custom_exit(self, tag, age_min, profit):
+        """The carry-bounded time cap. At the measured +0.0171%/day majors
+        median a 12h hold pays 0.009% of notional; v1's 29-day median hold
+        paid ~0.50% before it earned anything. That tax is refused here."""
+        if age_min >= self.MAX_HOLD_MIN:
+            return "max_hold"
+        return None
+
+
 class MomoBreakout(Carrier):
     """MomoBreakoutV1 — Donchian breakout above the 200-EMA (validated on 4h)."""
     roi = {}
@@ -645,8 +821,13 @@ class DayTraderGated(Carrier):
 # crypto-trend-daily is NOT here: its Lighter shadow/live books already run in
 # the tide-rider service (one bot, one home, one writer).
 STRATEGIES = [
-    TrendMomo("freqtrade-mum", tf="1d", stoploss=-0.15, max_open=4,
-              style="trendmomo-1d"),
+    # [2026-08-19 (ro)] 👩 mum v2 — the operator's revival, redesigned rather
+    # than reprieved. 1d -> 1h is the clock fix (24x the decision surface);
+    # -15% -> -4% is a stop sized for a 12h hold instead of a month-long one.
+    # TrendMomo (v1's class) is KEPT above: the replay/study tools import it
+    # and her v1 ledger is history, not archaeology.
+    OversoldRebound("freqtrade-mum", tf="1h", stoploss=-0.04, max_open=4,
+                    style="oversold-1h"),
     MomoBreakout("freqtrade-dad", tf="4h", stoploss=-0.12, max_open=4,
                  style="momo-breakout-4h"),
     SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=4,
@@ -719,23 +900,14 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
-    # [2026-08-19] 👩 mum — the I17 no_rate call, and it CORRECTS the (nf) hold
-    # four lines up rather than adding to it. (nf) kept mum as "green, slow";
-    # measured 19-Aug that green is OPEN MARKS, not evidence — the (lo)
-    # precedent, where 📊 Index Rider was retired with +$13.93 of open MTM
-    # abandoned for exactly this reason.
-    #   * 3 closes LIFETIME, and ALL THREE opened 2026-07-12 — i.e. **zero
-    #     in-era closes** against a 17-Jul era, so the book has never produced
-    #     a gradeable trade under the policy it currently runs;
-    #   * ~2.4 closes/30d measured => ~12 MONTHS to the 30-close bar;
-    #   * funding drag -$2.15 EXCEEDS +$0.68 realised, so the holding itself
-    #     is the cost;
-    #   * held 26-34 days each, every exit a death_cross.
-    # This is a STRONGER version of the profile (nf) retired `crypto-swing-daily`
-    # on ("n=3 in six weeks — the I17 UNDECIDABLE shape"): same rate, and mum's
-    # three are not even in-era. 4 open paper positions FREEZE, the (mr)/(nf)
-    # precedent. Reversible via `MUM_RETIRED_OVERRIDE=run`.
-    "freqtrade-mum":       "MUM_RETIRED_OVERRIDE",
+    # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by the operator
+    # ("unretire mum and bring her back to life") and she is deliberately NOT
+    # listed here. She returns as v2 — a different strategy (OversoldRebound,
+    # 1h, bracketed) — because reviving v1's shape would re-run v1's failure:
+    # her disease was the CLOCK (~2.4 closes/30d => ~12 months to the bar),
+    # not a loss. The (rd) evidence stands as history except its funding-drag
+    # figure, corrected in place at the class: settled funding on her three
+    # closes was -$0.246, not -$2.15.
 
 }
 
@@ -761,6 +933,41 @@ def live_strategies():
 # ---------------------------------------------------------------------------
 # Per-book runtime (one ShadowBroker + protections + ledger per family bot)
 
+def _control_extra(b):
+    """[(ro)] 👩 mum v2's own random-entry null, published every loop.
+
+    ALWAYS PRESENT for a control-arm book, including at n=0 — an omitted key
+    is byte-identical between "no closes yet" and "the arm is not running"
+    ((lv)/I18), and this is the number her whole revival will be judged on.
+    `edge_pct` is the only figure that matters at day 30: her mean per trade
+    MINUS what a coin flip on the same clock earned.
+    """
+    if not getattr(b.s, "control_arm", False):
+        return {}
+    c = b.ctrl
+    mean = (c["sum"] / c["n"] * 100.0) if c["n"] else None
+    null = (c["null_sum"] / c["null_n"] * 100.0) if c["null_n"] else None
+    return {"control": {
+        "n": c["n"], "null_n": c["null_n"],
+        "mean_pct": round(mean, 4) if mean is not None else None,
+        "null_pct": round(null, 4) if null is not None else None,
+        "edge_pct": (round(mean - null, 4)
+                     if (mean is not None and null is not None) else None),
+        "basis": "matched-window random-coin placebo, same open/close instants "
+                 "((hm): a directional book is graded against a random-entry "
+                 "null, never against zero)"}}
+
+
+def _census_extra(b):
+    """[(ro)] WHY DID NOTHING OPEN? — the I18/(lv) rule: `opened: 0` must never
+    be byte-identical between "quiet market" and "structurally impossible".
+    v1's whole failure was invisible for five weeks because her row could not
+    say that her exit simply never fired."""
+    if not getattr(b.s, "census", False):
+        return {}
+    return {"scan": dict(b.scan)}
+
+
 class Book:
     def __init__(self, strat, venue, coins):
         from venues.safety import SafetyRails
@@ -778,6 +985,12 @@ class Book:
         self.last_sig_ts = {}     # coin -> last closed-candle ts acted on
         self.throttle = {"bucket": None, "n": 0}
         self.n_closed = self.n_wins = 0
+        # [2026-08-19 (ro)] 👩 mum v2's CONTROL ARM and census. Present on every
+        # Book (cheap, additive) but only POPULATED for a carrier that declares
+        # `control_arm` / `census`, so no other book's payload shape moves.
+        self.last_mark = {}      # coin -> most recent mark seen this cycle
+        self.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+        self.scan = {}           # per-cycle census counters
         self.halted_today = False
         self.day_start_equity = None
         self.last_accrue = time.time()
@@ -905,6 +1118,25 @@ class Book:
         fund_pnl = m.get("accrued", 0.0)
         self.fund_realized += fund_pnl
         total = price_pnl + fund_pnl
+        # [2026-08-19 (ro)] THE CONTROL ARM settles here, on the same clock as
+        # the real trade. (hm) requires a directional book to be graded against
+        # a RANDOM-ENTRY null rather than against zero — a random long on this
+        # tape earns a non-zero amount for free — and until now that rule lived
+        # only in studies. This is a matched-WINDOW, unmatched-SIGNAL placebo:
+        # same open and close instants, a coin picked at random from the book's
+        # own universe, no capital. Never raises: a control arm that can break
+        # a trading loop is worse than no control arm.
+        try:
+            if m.get("null_pair") and m.get("null_entry"):
+                _npx = self.last_mark.get(m["null_pair"])
+                if _npx and m["null_entry"] > 0:
+                    self.ctrl["null_sum"] += (_npx - m["null_entry"]) / m["null_entry"]
+                    self.ctrl["null_n"] += 1
+            if getattr(self.s, "control_arm", False) and notional:
+                self.ctrl["n"] += 1
+                self.ctrl["sum"] += total / notional
+        except Exception:  # noqa: BLE001
+            pass
         pct = total / notional if notional else total / STAKE_USD
         self.n_closed += 1
         self.n_wins += 1 if total > 0 else 0
@@ -1304,10 +1536,17 @@ def main():
                 continue
 
             locked = b.entries_locked(t0, tf_s)
+            # [(ro)] census: mutually-exclusive per-coin outcomes for THIS
+            # cycle, so a quiet row can name its own binding constraint.
+            b.scan = {"scanned": 0, "held": 0, "no_bars": 0, "no_px": 0,
+                      "no_signal": 0, "locked": 0, "capped": 0, "cooldown": 0,
+                      "vetoed": 0, "opened": 0}
 
             for coin in b.coins:
                 bars = cache.get(coin, b.s.tf)
+                b.scan["scanned"] += 1
                 if not bars or not bars["t"]:
+                    b.scan["no_bars"] += 1
                     continue
                 sig_ts = bars["t"][-1]
                 new_candle = b.last_sig_ts.get(coin) != sig_ts
@@ -1330,9 +1569,12 @@ def main():
 
                 held = coin in b.broker.pos
                 px = marks.fresh_mid(venue, coin)
+                if px:
+                    b.last_mark[coin] = px      # (ro) control-arm draw pool
 
                 # ---- manage an open long ----
                 if held:
+                    b.scan["held"] += 1
                     m = b.meta.get(coin) or {}
                     entry = m.get("entry") or 0.0
                     if px:
@@ -1369,6 +1611,18 @@ def main():
                     age_min = (t0 - (m.get("opened_ts") or t0)) / 60.0
                     reason = None
 
+                    # [2026-08-19 (ro)] LEGACY FLATTEN — a position opened
+                    # under a RETIRED policy is not this book's record and it
+                    # holds a slot the new policy needs. 👩 mum's four v1
+                    # positions (opened 2026-07-12) would otherwise occupy
+                    # every slot forever, and a book that cannot enter cannot
+                    # be graded. They close once, tagged, and they opened
+                    # BEFORE the era boundary so `era_rows` (which keys on the
+                    # OPEN) excludes them from v2's grade by construction.
+                    _fb = getattr(b.s, "FLATTEN_BEFORE_TS", 0.0)
+                    if _fb and (m.get("opened_ts") or 0) < _fb:
+                        reason = "v1_legacy"
+
                     # stop (georgia: trailing ATR ratchet; others: fixed)
                     if isinstance(b.s, DayTraderGated):
                         dist = b.s.atr_stop_dist(m.get("tag"), bars, px)
@@ -1383,8 +1637,13 @@ def main():
                         rung = max((k for k in b.s.roi if k <= age_min), default=None)
                         if rung is not None and profit >= b.s.roi[rung]:
                             reason = "roi"
-                    # custom_exit timeouts (georgia)
-                    if not reason and isinstance(b.s, DayTraderGated):
+                    # custom_exit timeouts (georgia's bounce/max-hold, and
+                    # 👩 mum v2's carry-bounded 12h cap). [2026-08-19 (ro)]
+                    # DUCK-TYPED rather than isinstance-gated: the old form
+                    # silently ignored a custom_exit on any new carrier, which
+                    # is the registered-but-inert shape (I18) — a time stop
+                    # that never fires is exactly how v1 held for a month.
+                    if not reason and hasattr(b.s, "custom_exit"):
                         reason = b.s.custom_exit(m.get("tag"), age_min, profit)
                     # exit signal on a fresh candle (trend_breakout vetoes it)
                     if not reason and sig and sig.get("exit") and \
@@ -1399,7 +1658,14 @@ def main():
                     continue
 
                 # ---- flat: consider an entry (new candle only) ----
-                if not sig or not sig.get("enter") or locked or not px:
+                if not px:
+                    b.scan["no_px"] += 1
+                    continue
+                if not sig or not sig.get("enter"):
+                    b.scan["no_signal"] += 1
+                    continue
+                if locked:
+                    b.scan["locked"] += 1
                     continue
                 # [2026-07-30 STEP 3] non-crypto books enter ONLY inside
                 # their own LONG-window — binding for every strategy,
@@ -1410,6 +1676,7 @@ def main():
                              b.bot_id, coin)
                     continue
                 if fleet_long_veto:
+                    b.scan["vetoed"] += 1
                     continue      # L2: fleet directional-long budget is full
                 if (fleet_long_headroom is not None
                         and cycle_admitted >= fleet_long_headroom):
@@ -1418,6 +1685,7 @@ def main():
                              cycle_admitted)
                     continue      # L2: this cycle already used the free slots
                 if b.broker.open_count() >= b.s.max_open:
+                    b.scan["capped"] += 1
                     continue
                 if symcap_blocked(fleet_symcap, coin, cycle_sym):
                     log.info("%s %s entry SKIPPED — fleet per-symbol cap %d "
@@ -1425,6 +1693,7 @@ def main():
                              b.bot_id, coin, fleet_symcap[0], coin)
                     continue      # L2: de-pileup — cap longs per symbol
                 if t0 < b.cooldown.get(coin, 0.0):
+                    b.scan["cooldown"] += 1
                     continue
                 if not b.throttle_ok(t0):
                     log.info("%s %s entry throttled (max %d/h)", b.bot_id, coin,
@@ -1459,8 +1728,23 @@ def main():
                 if isinstance(b.s, DayTraderGated):
                     dist = b.s.atr_stop_dist(tag, bars, entry_px)
                     stop_px = entry_px * (1 - dist)
-                b.meta[coin] = {"entry": entry_px, "opened_ts": t0, "tag": tag,
-                                "accrued": 0.0, "stop_px": stop_px}
+                _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
+                         "accrued": 0.0, "stop_px": stop_px}
+                # [2026-08-19 (ro)] draw this trade's PLACEBO: a random OTHER
+                # coin from the same universe, marked at this same instant.
+                # Drawn from marks already fetched this cycle, so it costs no
+                # extra venue call.
+                if getattr(b.s, "control_arm", False):
+                    try:
+                        _pool = [c for c in b.last_mark if c != coin]
+                        if _pool:
+                            _nc = random.choice(_pool)
+                            _meta["null_pair"] = _nc
+                            _meta["null_entry"] = b.last_mark[_nc]
+                    except Exception:  # noqa: BLE001
+                        pass
+                b.meta[coin] = _meta
+                b.scan["opened"] += 1
                 cycle_admitted += 1
                 _base = str(coin).split("/")[0]
                 cycle_sym[_base] = cycle_sym.get(_base, 0) + 1
@@ -1518,7 +1802,8 @@ def main():
                            "fund_realized": round(b.fund_realized, 4),
                            "fund_open": round(open_accr, 4),
                            "btc_regime_up": regime,
-                           "skipped_unlisted": b.s.skipped})
+                           "skipped_unlisted": b.s.skipped,
+                           **_control_extra(b), **_census_extra(b)})
             except Exception:  # noqa: BLE001
                 pass
             # [2026-08-15 (my)] I9: the MTM equity series for the six family/
