@@ -2562,7 +2562,17 @@ def main():
         # see the state it is deciding FROM. Two moments, two readings, said
         # out loud rather than silently shared.
         _ruin_state, _ruin_read = None, False
-        _ruin_skips = 0
+        # [(qs)] PER-REASON, not a scalar. Seven distinct refusals collapsed to
+        # one counter, and they demand OPPOSITE operator actions: `liq_unpriced`
+        # / `state_unreadable` mean investigate the venue read, `too_close`
+        # means de-lever NOW. `ruin_evals` is published beside it because
+        # `{}`/0 is byte-identical between "the gate allowed everything" and
+        # "no candidate ever reached the gate" — this read sits behind the
+        # prefilter, ranking, admission, spread and notional checks, so most
+        # loops never evaluate it at all (I18, the (lv) census rule).
+        _ruin_skips = {}
+        _ruin_evals = 0
+        _ruin_last = None
         longs_admitted = 0        # [(oh)] LONGS opened this cycle — the
         # in-cycle half of the fleet long budget (see entry_admission)
         for coin in list(held_coins):
@@ -3012,13 +3022,24 @@ def main():
                             _ruin_state = _margin_block(
                                 ctx, set(meta) | set(pos))
                             _ruin_read = True
-                        if not ctx.rails.headroom_ok(_ruin_state, HARD_STOP):
-                            _ruin_skips += 1
+                        _ok, _why = ctx.rails.headroom_check(
+                            _ruin_state, HARD_STOP)
+                        _ruin_evals += 1
+                        _ruin_last = _why
+                        if not _ok:
+                            _ruin_skips[_why] = _ruin_skips.get(_why, 0) + 1
+                            _near = (_ruin_state or {}).get("nearest_liq") or {}
                             log.warning(
-                                "%s RUIN_GATE_SKIP — nearest liquidation is "
-                                "inside %.0fx the %.0f%% stop (or unreadable); "
-                                "refusing to add", coin,
-                                safety.LIQ_HEADROOM_K, HARD_STOP * 100)
+                                "%s RUIN_GATE_SKIP reason=%s — bar is %.0fx the "
+                                "%.0f%% stop (= %.1f%% of price); nearest "
+                                "dist_frac=%s blind=%s unpriced=%s",
+                                coin, _why, safety.LIQ_HEADROOM_K,
+                                HARD_STOP * 100,
+                                safety.LIQ_HEADROOM_K * HARD_STOP * 100,
+                                _near.get("dist_frac"),
+                                (_ruin_state or {}).get("liq_mark_blind"),
+                                sorted(set((_ruin_state or {}).get("liq_unknown") or ())
+                                       - set((_ruin_state or {}).get("liq_none") or ())))
                             continue
                 _res = None
                 try:
@@ -3243,6 +3264,10 @@ def main():
                        # ((lv)), and this one silently declining every entry
                        # would otherwise look exactly like a quiet market.
                        "ruin_skips": _ruin_skips if RUIN_GATE else None,
+                       "ruin_evals": _ruin_evals if RUIN_GATE else None,
+                       "ruin_last": _ruin_last if RUIN_GATE else None,
+                       "ruin_bar_frac": (round(safety.LIQ_HEADROOM_K * HARD_STOP, 6)
+                                         if RUIN_GATE else None),
                        # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
                        # row said "online" while entries were blocked and the
                        # ':live' save suppressed — only container logs said

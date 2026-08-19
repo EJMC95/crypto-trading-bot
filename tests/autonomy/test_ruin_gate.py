@@ -77,14 +77,14 @@ def test_a_comfortable_distance_is_allowed():
     """liq at 50 against a mark of 100 = 50% away; a 10% stop needs 40%."""
     st = _state([_pos(liquidation_price="50.0")], {"XAU": 100.0})
     assert st["nearest_liq"]["dist_frac"] == pytest.approx(0.5)
-    assert _rails().headroom_ok(st, 0.10) is True
+    assert _rails().headroom_check(st, 0.10)[0] is True
 
 
 def test_inside_the_bar_is_refused():
     """liq at 70 = 30% away; a 10% stop needs 40%. This is the L=3 cell."""
     st = _state([_pos(liquidation_price="70.0")], {"XAU": 100.0})
     assert st["nearest_liq"]["dist_frac"] == pytest.approx(0.30)
-    assert _rails().headroom_ok(st, 0.10) is False
+    assert _rails().headroom_check(st, 0.10)[0] is False
 
 
 def test_the_boundary_is_inclusive_and_is_K_stop_widths():
@@ -92,16 +92,16 @@ def test_the_boundary_is_inclusive_and_is_K_stop_widths():
     K itself, so changing the constant moves the gate rather than a literal."""
     st = _state([_pos(liquidation_price="60.0")], {"XAU": 100.0})
     assert st["nearest_liq"]["dist_frac"] == pytest.approx(0.40)
-    assert _rails().headroom_ok(st, 0.40 / LIQ_HEADROOM_K) is True
-    assert _rails().headroom_ok(st, (0.40 / LIQ_HEADROOM_K) * 1.001) is False
+    assert _rails().headroom_check(st, 0.40 / LIQ_HEADROOM_K)[0] is True
+    assert _rails().headroom_check(st, (0.40 / LIQ_HEADROOM_K) * 1.001)[0] is False
 
 
 def test_a_tighter_stop_buys_leverage():
     """The finding, as a test: the SAME dangerous distance that refuses a 10%
     stop is fine for a 3% one. Leverage capacity follows stop distance."""
     st = _state([_pos(liquidation_price="80.0")], {"XAU": 100.0})   # 20% away
-    assert _rails().headroom_ok(st, 0.10) is False
-    assert _rails().headroom_ok(st, 0.03) is True
+    assert _rails().headroom_check(st, 0.10)[0] is False
+    assert _rails().headroom_check(st, 0.03)[0] is True
 
 
 def test_the_nearest_position_governs_not_the_average():
@@ -111,7 +111,7 @@ def test_the_nearest_position_governs_not_the_average():
                  _pos("BTC", liquidation_price="97.0")],
                 {"XAU": 100.0, "BTC": 100.0})
     assert st["nearest_liq"]["coin"] == "BTC"
-    assert _rails().headroom_ok(st, 0.10) is False
+    assert _rails().headroom_check(st, 0.10)[0] is False
 
 
 # ---------------------------------------------------------------------------
@@ -123,10 +123,16 @@ def test_a_position_the_venue_will_not_price_refuses():
     safe' is never byte-identical to 'not measured'. Holding a position whose
     death price is unpublished must REFUSE, not shrug."""
     st = _state([_pos("XAU", liquidation_price="50.0"),
-                 _pos("BTC", liquidation_price=None)],
+                 _pos("BTC", sign=-1, liquidation_price=None)],
                 {"XAU": 100.0, "BTC": 100.0})
     assert st["liq_unknown"] == ["BTC"]
-    assert _rails().headroom_ok(st, 0.10) is False
+    # A SHORT is never bounded — its loss grows without limit as price rises —
+    # so it stays in the refusing set. [(qs)] made this fixture a short on
+    # purpose: as a LONG at 1.0 x 100 against 197.52 of collateral it is
+    # PROVABLY unliquidatable and the refusal would be the I7 failure, which is
+    # the defect this file's `liq_none` tests now pin from the other side.
+    ok, why = _rails().headroom_check(st, 0.10)
+    assert ok is False and why == "liq_unpriced", why
 
 
 def test_positions_held_but_none_priced_refuses():
@@ -134,12 +140,12 @@ def test_positions_held_but_none_priced_refuses():
     account is NOT flat, so this is ignorance, not safety."""
     st = _state([_pos(liquidation_price="50.0")], marks=None)
     assert st["n"] == 1 and st["nearest_liq"] is None
-    assert _rails().headroom_ok(st, 0.10) is False
+    assert _rails().headroom_check(st, 0.10)[0] is False
 
 
 def test_an_unreadable_margin_state_refuses():
     for bad in (None, {}, [], "nope", 0):
-        assert _rails().headroom_ok(bad, 0.10) is False, bad
+        assert _rails().headroom_check(bad, 0.10)[0] is False, bad
 
 
 def test_an_unknown_stop_refuses():
@@ -147,7 +153,7 @@ def test_an_unknown_stop_refuses():
     permitted — the I8 unknown-degrading-to-a-guess failure, on a risk number."""
     st = _state([_pos(liquidation_price="50.0")], {"XAU": 100.0})
     for bad in (None, 0, 0.0, -0.10, "wide", float("nan"), float("inf")):
-        assert _rails().headroom_ok(st, bad) is False, bad
+        assert _rails().headroom_check(st, bad)[0] is False, bad
 
 
 def test_a_flat_book_is_allowed():
@@ -155,15 +161,15 @@ def test_a_flat_book_is_allowed():
     must be reachable or the book could never take its FIRST position."""
     st = _state([], {"XAU": 100.0})
     assert st["n"] == 0
-    assert _rails().headroom_ok(st, 0.10) is True
+    assert _rails().headroom_check(st, 0.10)[0] is True
 
 
 def test_a_shadow_arm_is_unaffected():
     """A paper book holds no venue account, so there is nothing to liquidate.
     Same live-only scoping as `daily_loss_hit` — and a shadow book must never
     be idled by a rail about real money."""
-    assert _rails(live=False).headroom_ok(None, None) is True
-    assert _rails(live=False).headroom_ok({}, 0.10) is True
+    assert _rails(live=False).headroom_check(None, None)[0] is True
+    assert _rails(live=False).headroom_check({}, 0.10)[0] is True
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +201,7 @@ def test_the_live_farmer_actually_consults_the_gate():
     False:`, or deleting the call. Both leave the money ungated."""
     calls = {c.func.attr for c in ast.walk(_farmer_main())
              if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)}
-    assert "headroom_ok" in calls, (
+    assert "headroom_check" in calls, (
         "the Farmer's entry site no longer consults the ruin gate — the "
         "venue's liquidation price is read and published, and nothing "
         "refuses on it again")
@@ -212,8 +218,8 @@ def test_the_gate_is_guarded_by_its_kill_switch_and_skips_the_entry():
         if "RUIN_GATE" not in names:
             continue
         assert any(isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
-                   and c.func.attr == "headroom_ok" for c in ast.walk(node)), (
-            "the RUIN_GATE branch does not call headroom_ok")
+                   and c.func.attr == "headroom_check" for c in ast.walk(node)), (
+            "the RUIN_GATE branch does not call headroom_check")
         assert any(isinstance(n, ast.Continue) for n in ast.walk(node)), (
             "the ruin gate warns without skipping the entry")
         return
@@ -247,3 +253,107 @@ def test_the_row_publishes_the_gate_s_bite():
     assert published, (
         "the row no longer publishes ruin_skips — the gate's bite would be "
         "visible only in container logs")
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-19 (qs)] THE TWO DEFECTS THE LIVE PAYLOAD EXPOSED, pinned from both
+# sides. Neither was hypothetical: 🙏 Avo LIVE was measured holding 4 positions
+# with `liq_unknown: [ADA, NVDA, QQQ, SPY]` and `nearest_liq: null`, and a
+# venue-wide control group (443 open positions across 110 accounts) put the
+# rule beyond doubt — cross SHORTS publish a liq 145/145, while 0 of 140 cross
+# longs below 0.30x of collateral do.
+# ---------------------------------------------------------------------------
+
+def test_a_provably_unliquidatable_long_does_not_refuse():
+    """I7: a trigger a book satisfies STRUCTURALLY is not a measurement.
+
+    A long whose entry notional does not exceed its collateral cannot be
+    liquidated — at a price of zero the account still stands — so the venue
+    publishes no liq price. The FIRST cut of this gate read that, the safest
+    position class in the fleet, as the most dangerous state it could see, and
+    would have refused every entry on 🙏 Avo forever."""
+    st = _state([_pos("ADA", position="1.0", avg_entry_price="100.0",
+                      liquidation_price=None)],
+                {"ADA": 100.0})
+    assert st["liq_unknown"] == ["ADA"]
+    assert st["liq_none"] == ["ADA"], "the block must PROVE it, not assume it"
+    ok, why = _rails().headroom_check(st, 0.10)
+    assert ok is True and why == "unliquidatable", why
+
+
+def test_an_over_leveraged_long_with_no_liq_still_refuses():
+    """The bounded proof is a DERIVATION, not a blanket long exemption: past 1x
+    of collateral a long CAN be liquidated, so an absent liq there is a real
+    unknown and must keep refusing."""
+    st = _state([_pos("ADA", position="10.0", avg_entry_price="100.0",
+                      liquidation_price=None)],
+                {"ADA": 100.0})
+    assert st["liq_unknown"] == ["ADA"]
+    assert st["liq_none"] == [], "1000 of notional against 197.52 is not bounded"
+    ok, why = _rails().headroom_check(st, 0.10)
+    assert ok is False and why == "liq_unpriced", why
+
+
+def test_a_bounded_long_beside_a_close_short_still_measures_the_short():
+    """The exemption must not swallow the book. A proven-safe long sitting
+    beside a genuinely endangered position must not stop the gate seeing it."""
+    st = _state([_pos("ADA", position="1.0", avg_entry_price="100.0",
+                      liquidation_price=None),
+                 _pos("XAU", sign=-1, liquidation_price="103.0")],
+                {"ADA": 100.0, "XAU": 100.0})
+    # The SHORT makes the account unbounded, so nothing earns the exemption —
+    # the conservative direction, and the reason the derivation is account-level
+    # rather than per-position: under cross margin the legs share collateral.
+    assert st["liq_none"] == []
+    ok, why = _rails().headroom_check(st, 0.10)     # 3% away, bar is 40%
+    assert ok is False and why == "too_close", (
+        "a MEASURED position inside the bar must outrank a bookkeeping refusal "
+        "— the operator's next action differs completely")
+
+
+def test_a_priced_position_with_a_blind_mark_refuses():
+    """THE FAIL-OPEN HOLE, reproduced before it was closed.
+
+    A position the venue DID price whose order book is unreadable matched
+    neither arm of the publisher's branch: absent from `liq_unknown` AND absent
+    from `priced`, so it dropped silently out of `min(priced)`. The gate then
+    reported the safest REMAINING position and allowed more notional while that
+    one sat 3% from its liquidation. Measured before the fix: XAU liq 50 (50%
+    away, mark readable) + BTC liq 97 (3% away, mark blind) returned True."""
+    st = _state([_pos("XAU", liquidation_price="50.0"),
+                 _pos("BTC", liquidation_price="97.0")],
+                {"XAU": 100.0})                     # BTC mark deliberately absent
+    assert st["liq_unknown"] == [], "BTC IS priced — this is not that class"
+    assert st["liq_mark_blind"] == ["BTC"], "the blind position must be named"
+    ok, why = _rails().headroom_check(st, 0.10)
+    assert ok is False and why == "mark_blind", why
+
+
+def test_every_refusal_names_a_distinct_reason():
+    """I18: the operator cannot act on a bare count. `liq_unpriced` means
+    investigate the venue read; `too_close` means de-lever NOW. Seven branches
+    collapsing to one False is the (lv) `{open: 0}` shape."""
+    seen = {}
+    seen["state_unreadable"] = _rails().headroom_check(None, 0.10)
+    seen["stop_unreadable"] = _rails().headroom_check(
+        _state([_pos()], {"XAU": 100.0}), None)
+    seen["liq_unpriced"] = _rails().headroom_check(
+        _state([_pos("BTC", sign=-1, liquidation_price=None)], {"BTC": 100.0}), 0.10)
+    seen["mark_blind"] = _rails().headroom_check(
+        _state([_pos("BTC", liquidation_price="97.0")], {}), 0.10)
+    seen["too_close"] = _rails().headroom_check(
+        _state([_pos(liquidation_price="97.0")], {"XAU": 100.0}), 0.10)
+    for want, (ok, why) in seen.items():
+        assert ok is False, (want, why)
+        assert why == want, f"expected reason {want!r}, got {why!r}"
+    assert len(set(seen)) == len(seen)
+
+
+def test_the_allowing_reasons_are_distinct_too():
+    """`flat`, `unliquidatable`, `ok` and `not_live` all allow — for entirely
+    different reasons, and a row that cannot tell them apart cannot tell a
+    healthy book from one the gate is structurally blind to."""
+    assert _rails(live=False).headroom_check({}, 0.10) == (True, "not_live")
+    assert _rails().headroom_check(_state([], {}), 0.10) == (True, "flat")
+    assert _rails().headroom_check(
+        _state([_pos(liquidation_price="50.0")], {"XAU": 100.0}), 0.10) == (True, "ok")

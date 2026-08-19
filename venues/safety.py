@@ -101,7 +101,7 @@ class SafetyRails:
             return True
         return (open_notional + add_usd) <= self.max_notional + 1e-9
 
-    def headroom_ok(self, margin_state, stop_frac) -> bool:
+    def headroom_check(self, margin_state, stop_frac):
         """May the book ADD notional without sitting inside its own liquidation?
 
         [2026-08-19 (qq)] THE GAP THIS CLOSES. `(no)` wired the venue's own
@@ -144,30 +144,61 @@ class SafetyRails:
         about real money, exactly like `daily_loss_hit`.
         """
         if not self.live:
-            return True
+            return True, "not_live"
         if not isinstance(margin_state, dict) or not margin_state:
-            return False                      # live and margining unreadable
+            return False, "state_unreadable"
         try:
             stop = float(stop_frac)
         except (TypeError, ValueError):
-            return False
+            return False, "stop_unreadable"
         if not (stop > 0) or stop != stop or stop in (float("inf"),):
-            return False                      # no stop -> headroom undefined
-        if margin_state.get("liq_unknown"):
-            return False                      # a position the venue won't price
-        if not margin_state.get("n"):
-            return True                       # flat: nothing can be liquidated
+            return False, "stop_unreadable"
+        # ---- gather, THEN report. Several refusals can hold at once, and the
+        # reason the operator sees decides what they do next, so the most
+        # ACTIONABLE one is reported rather than whichever branch is written
+        # first. `too_close` means de-lever now; `liq_unpriced` means go look
+        # at the venue read. A urgent reason masked by a bookkeeping one is the
+        # (gl) failure — a detector whose output the operator learns to ignore.
+        unpriced = (set(margin_state.get("liq_unknown") or ())
+                    - set(margin_state.get("liq_none") or ()))
+        blind = margin_state.get("liq_mark_blind") or ()
         near = margin_state.get("nearest_liq")
-        if not isinstance(near, dict):
-            return False                      # positions held, none priced
-        d = near.get("dist_frac")
-        try:
-            d = float(d)
-        except (TypeError, ValueError):
-            return False
-        if d != d or d <= 0:
-            return False
-        return d >= LIQ_HEADROOM_K * stop
+        d, d_ok = None, False
+        if isinstance(near, dict):
+            try:
+                d = float(near.get("dist_frac"))
+                d_ok = (d == d) and d > 0
+            except (TypeError, ValueError):
+                d_ok = False
+
+        # 1. MEASURED and inside the bar — the one refusal that means the money
+        #    is actually in danger. Always reported ahead of the others.
+        if d_ok and d < LIQ_HEADROOM_K * stop:
+            return False, "too_close"
+        # 2. A position the venue PRICED whose mark we cannot read. This is the
+        #    fail-OPEN case: it reaches neither `liq_unknown` nor `nearest_liq`,
+        #    so without this branch the gate reports the safest REMAINING
+        #    position while a blind one sits inside its own liquidation.
+        if blind:
+            return False, "mark_blind"
+        # 3. A position the venue would not price refuses — UNLESS the block can
+        #    PROVE it unliquidatable (`liq_none`). Absence of evidence stays a
+        #    refusal; a positive, checkable derivation does not.
+        if unpriced:
+            return False, "liq_unpriced"
+        if isinstance(near, dict) and not d_ok:
+            return False, "dist_unreadable"
+        if not margin_state.get("n"):
+            return True, "flat"               # flat: nothing can be liquidated
+        if d_ok:
+            return True, "ok"
+        # Every held position is a PROVEN-bounded long, so nothing can
+        # liquidate the account and there is nothing to measure against.
+        # Refusing here would be the I7 failure: a condition the book satisfies
+        # STRUCTURALLY, read as danger.
+        if margin_state.get("liq_none"):
+            return True, "unliquidatable"
+        return False, "no_nearest"            # positions held, none priced
 
     def daily_loss_hit(self, day_start_equity, equity) -> bool:
         """Absolute-dollar fleet rail for funded modes (the strategies keep

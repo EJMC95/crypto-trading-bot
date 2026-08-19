@@ -1,3 +1,109 @@
+## 2026-08-19 (qs) — THE RUIN GATE READ THE SAFEST POSITION CLASS IN THE FLEET AS ITS MOST DANGEROUS STATE, AND WAS FAIL-**OPEN** ON THE ONE CASE IT EXISTS FOR
+
+`(qq)` shipped a liquidation-distance gate and I called it verified. It was
+not. Two defects, both found by pointing the instrument at the LIVE payload and
+at the venue's own population before deploying it — which is the step `(qq)`
+skipped, on a book that was FLAT and therefore could not exercise a single
+branch. **The gate never reached real money; it is fixed before its first
+enforced deploy, not after.**
+
+**DEFECT 1 — I7, VERBATIM, IN A GATE WRITTEN TO ENFORCE DISCIPLINE.** 🙏 Avo
+LIVE holds 4 positions and publishes `liq_unknown: [ADA, NVDA, QQQ, SPY]` with
+`nearest_liq: null`, `mode: "cross"`, allocated `margin: 0.0` on every leg.
+`headroom_ok` refused on a non-empty `liq_unknown`, so on that book it would
+have refused **every entry, forever** — a book starvation dressed as a safety
+feature, and the exact question I7 tells you to ask (*what does this trigger
+read on a book that is always-in, always-empty, or always-at-cap?*) which I did
+not ask of my own gate.
+
+**And the venue is not withholding anything — it is telling the truth.** The
+control group (I6), read from Lighter's own public account endpoint across
+**443 open positions on 110 live accounts**:
+
+| class | liq published |
+|---|---|
+| cross SHORT | **145 / 145 = 100%** (incl. 97/97 below 0.25× collateral) |
+| cross LONG, notional > equity | 231 / 240 |
+| cross LONG below 0.30× collateral | **0 of 140** |
+| isolated | 57 / 58 |
+
+**Margin mode is not the discriminator — DIRECTION and LEVERAGE are**, and the
+repo's own algebra already said so: `lighter_margin_model.liq_price` returns
+`0.0` when `is_long and 1/leverage >= 1.0`, because a long's entire loss is
+bounded by its notional and the account still stands at a price of zero.
+`_liq_price` maps that 0 to None, which files the safest position class in the
+fleet under the same key as a genuine read failure. `(nu)` had already ruled on
+this in words — *"the venue publishing nothing for 🙏 Avo's four longs at 0.999x
+is CORRECT rather than a data gap"* — and no code consumed the ruling.
+
+Fixed by DERIVATION, never by loosening: `margin_state_from` publishes an
+additive **`liq_none`** (`liq_unknown` stays the superset, so no consumer
+contract moves) and the gate refuses on `liq_unknown − liq_none`. Every
+unreadable input still refuses. **The condition is ACCOUNT-level, and that is
+the whole subtlety — my first cut asked it per position and was wrong**: cross
+margin pools losses, so four longs each inside the collateral can sum to four
+times it. Verified against the real Avo block: `liq_unknown` reproduces
+byte-for-byte, `leverage 0.6178` matches, the gate now returns
+`(True, "unliquidatable")`, and the same book at >1× reverts to
+`(False, "liq_unpriced")`.
+
+**The cost of NOT fixing it was not hypothetical on the Farmer either.** 💸
+takes longs — `is_short = apr > 0`, so negative funding opens one — measured at
+3 of its last 47 live closes and 11 of 78 on its shadow twin, and because
+`liq_unknown` is an ACCOUNT-wide census checked ahead of the flat test, **one
+sub-1× long refused every new entry including shorts, for that long's whole
+life**: 0.91% of live holding time over 15.3 days, **14.30% on the identically
+coded shadow twin**.
+
+**DEFECT 2 — THE GATE WAS FAIL-OPEN ON THE ONE CONDITION IT EXISTS FOR.** A
+position the venue DID price whose order book is unreadable matched **neither**
+arm of the publisher's branch — absent from `liq_unknown` AND absent from
+`priced` — so it dropped silently out of `min(priced)`. Reproduced against the
+real publisher and the real gate: XAU liq 50 (50% away, mark readable) + BTC
+liq 97 (**3% away**, mark blind) ⇒ `nearest_liq {XAU, 0.5}` ⇒ **allowed**.
+Supply BTC a mark and the identical book refuses. The docstring and `(qq)`'s
+entry both asserted fail-CLOSED while this sat inside it, and the bot's own
+exit path already treats a blind mark as grave (`BLIND_STOP_MISSES` flattens
+after 3) — so the same condition was simultaneously grounds to flatten and
+invisible to the ruin gate. `mark_blind` was already computed and published by
+BOTH live bots with **zero readers** (I18's registered-but-inert shape).
+
+Closed at the PUBLISHER, which is the layer that has the fact: `margin_state_from`
+now names those coins in **`liq_mark_blind`** and the gate refuses on it. A
+first proposal to read the bots' own `mark_blind` field instead was **refused on
+review** — that set is built from the bot's held-map at a different moment from
+the venue read inside `_margin_block`, so a position absent from the earlier
+snapshot stays invisible in both. Same class, still fail-open.
+
+**DEFECT 3 — SEVEN REFUSALS, ONE COUNTER.** `state_unreadable`,
+`liq_unpriced`, `no_nearest` and *genuinely 3% from ruin* all produced the same
+`False` and the same `ruin_skips += 1`; the log line wrote the conflation into
+its own text (*"…inside 4x the 10% stop (or unreadable)"*). They demand
+**opposite** operator actions. `headroom_ok` is now `headroom_check` returning
+`(ok, reason)` — **renamed deliberately so any stale caller breaks loudly**
+rather than silently reading a truthy 2-tuple as success — over ten codes, and
+the row publishes `ruin_skips: {reason: n}` with `ruin_evals`, `ruin_last` and
+the effective bar `ruin_bar_frac`. `ruin_evals` matters on its own: `{}` was
+byte-identical between *"the gate allowed everything"* and *"no candidate ever
+reached the gate"*, and this read sits behind five earlier filters, so most
+loops never evaluate it (I18 / the (lv) census rule).
+
+**Reasons are reported by URGENCY, not by branch order** — a measured
+`too_close` outranks a bookkeeping `liq_unpriced`, because the first means
+de-lever now and the second means go look at the venue read. A guard that
+buries the urgent reason is the (gl) failure: a detector the operator learns to
+ignore.
+
+**STILL NOT ENFORCED ON REAL MONEY, and the reason is a gap no test can close.**
+The margin block shipped 16-Aug `(no)`; the Farmer's last live LONG closed
+15-Aug 16:46Z — **one day before the publisher existed** — so no Farmer long has
+ever been observed through this instrument. The long-side analysis, mine
+included, is venue population statistics plus algebra, and this repo's own rule
+is that a consumer is tested against a payload ITS PUBLISHER built. 21 tests
+(all fixtures publisher-built) and the live-Avo reproduction are what can be
+established without one; the enforced live deploy waits on a Farmer long
+appearing in the published block with `liq_none` classifying it correctly.
+
 ## 2026-08-19 (qr) — THE REFEREE WAVE ON MY OWN MERGE: A CONFLICT MARKER WENT IN MID-LINE PAST AN ANCHORED GUARD, AND A `head -40` SILENTLY DROPPED THE REAL-MONEY HALF OF A RENUMBER
 
 Two defects, both mine, both found by an adversarial pass over a merge I had
