@@ -1,3 +1,57 @@
+## 2026-08-19 (rh) — `session_commit` REFUSED CORRECTLY AND THE CALLER READ IT AS SUCCESS: stdout/stderr reorder under a pipe, and `| tail` eats the exit code
+
+**Self-inflicted, measured, and fixed in the tool rather than in a rule.** This
+session ran a `(qq)` → `(qv)` letter rename, invoked the repo's own safe-commit
+wrapper as `... 2>&1 | tail -3`, saw
+
+```
+ CHANGELOG.md | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+```
+
+and read it as a commit. It was **the `=== will commit ===` PREVIEW**. The tool
+had actually **REFUSED with exit 4** — its `(nx)` entry-deletion guard doing
+exactly its job, because a letter rename DELETES a `(qq)` header and is
+byte-indistinguishable from the global-rename that once destroyed a concurrent
+session's entry. The caller then pushed, got `Everything up-to-date`, and spent
+several minutes hunting an orphaned commit **that had never been created**.
+
+**TWO COMPOUNDING CAUSES, both reproduced in a scratch repo before fixing:**
+1. The refusal goes to **stderr**, the preview to **stdout**. stderr is
+   unbuffered; a **piped** stdout is block-buffered. So under `2>&1` they
+   REORDER — the refusal flushes first and the innocent stat lands last, which
+   is precisely what `tail` keeps.
+2. **`| tail` replaces the tool's exit status with `tail`'s.** Exit 4 reads 0.
+   The same `${PIPESTATUS}`/`$?` trap `(pv)` recorded for mutation scoring,
+   one seat over — and this time in the tool that guards commits.
+
+A guard whose failure is invisible under the most common invocation is the
+`(po)` class in the safety tool itself: *a check that inspects nothing reports
+clean, and clean gets quoted as evidence.*
+
+**THE FIX MAKES TRUNCATION SAFE, because "don't pipe it" is a rule nobody
+reads ((gl)).** Every exit path now stamps its outcome as the **LAST LINE ON
+STDOUT** via `_verdict()`:
+
+```
+session_commit: REFUSED (exit 4) — this commit DELETES a changelog entry — see stderr
+session_commit: COMMITTED (exit 0) — 8b7c32f — verify with `git merge-base --is-ancestor 8b7c32f HEAD` before pushing
+```
+
+`sys.stdout.flush()` before the stderr blocks so the merged order is honest, and
+the success line now carries the **short SHA** — a shared tree can move HEAD out
+from under a commit, and without the sha an orphaned one is unrecoverable.
+
+**Proven by positive control on the exact invocation that failed**, not by
+inspection: with a fake letter-rename staged, `2>&1 | tail -3` AND `2>&1 |
+tail -1` both now print `session_commit: REFUSED (exit 4)`. Before this change
+`tail -1` printed a clean stat.
+
+**What this does NOT change:** the entry-deletion guard was RIGHT to refuse and
+still refuses. A deliberate letter rename is committed the way the guard's own
+message says — `CHANGELOG.md` separately, after reading the refusal. The lesson
+is not "the guard was too strict", it is that **a correct refusal that the
+caller cannot see is worth nothing**.
 ## 2026-08-19 (rg) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
 
 [Renumbered from (re) at push time — the SECOND race in one PR: main took (re)

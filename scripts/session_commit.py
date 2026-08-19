@@ -166,6 +166,32 @@ def verify_readback(snap, index=None):
     return bad
 
 
+# [2026-08-19 (rh)] THE VERDICT MUST SURVIVE A PIPE, AND IT DID NOT.
+# MEASURED, self-inflicted: this tool correctly REFUSED a commit (exit 4, the
+# entry-deletion guard doing its job on a letter-rename) and the caller read it
+# as SUCCESS, because the invocation was `... 2>&1 | tail -3`. Two compounding
+# reasons, both reproduced in a scratch repo:
+#   1. the refusal goes to STDERR while the "=== will commit ===" preview goes
+#      to STDOUT, and stderr is unbuffered while a piped stdout is block-
+#      buffered — so they REORDER, and the last lines in the pipe are the
+#      innocent-looking stat, not the refusal;
+#   2. `| tail` replaces the tool's exit code with tail's, so exit 4 reads 0.
+# The caller then pushed, got "Everything up-to-date", and spent the next
+# minutes hunting an orphaned commit that never existed.
+# The fix is not "do not pipe" — a rule nobody reads is not a control ((gl)).
+# It is to make the OUTCOME the LAST LINE ON STDOUT, so even `tail -1` cannot
+# show a false success, and to flush stdout before writing to stderr so the
+# ordering is honest when the two are merged.
+def _verdict(code, detail=""):
+    """Stamp the outcome as the final stdout line, then return `code`."""
+    sys.stdout.flush()
+    sys.stderr.flush()
+    word = "COMMITTED" if code == 0 else "REFUSED"
+    print(f"session_commit: {word} (exit {code})" + (f" — {detail}" if detail else ""))
+    sys.stdout.flush()
+    return code
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Commit explicit paths from a shared worktree, safely.")
@@ -200,7 +226,7 @@ def main(argv=None):
               "ignores the shared INDEX, never the shared WORKING TREE).\n"
               "Re-run with `--shared " + " ".join(undeclared) + "` after "
               "reading the diff below it prints.\n", file=sys.stderr)
-        return 2
+        return _verdict(2, 'refused a shared doctrine file without --shared')
 
     # A private index: a concurrent `git add` cannot reach this commit, and this
     # commit cannot disturb anyone else's staged set.
@@ -244,7 +270,7 @@ def main(argv=None):
         add = _git("add", "-A", "--", *paths, index=index)
         if add.returncode != 0:
             sys.stderr.write(add.stderr)
-            return 1
+            return _verdict(1, 'git add failed')
         st = _git("diff", "--cached", "--stat", "HEAD", index=index)
         print("\n=== will commit ===")
         print(st.stdout or "  (no changes)")
@@ -259,6 +285,7 @@ def main(argv=None):
             _git("diff", "--cached", "HEAD", "--", "CHANGELOG.md",
                  index=index).stdout)
         if gone:
+            sys.stdout.flush()   # (rh) honest order when 2>&1 is merged
             print("\nREFUSING — this commit DELETES changelog entr(ies):\n",
                   file=sys.stderr)
             for h in gone:
@@ -269,10 +296,10 @@ def main(argv=None):
                   "(`git show HEAD:CHANGELOG.md`) and re-run. If a deletion is\n"
                   "genuinely intended, commit CHANGELOG.md separately.\n",
                   file=sys.stderr)
-            return 4
+            return _verdict(4, 'this commit DELETES a changelog entry — see stderr')
         if a.dry_run:
             print("--dry-run: nothing committed")
-            return 0
+            return _verdict(0, 'dry-run, nothing committed')
 
         snap = snapshot(paths)
         r = _git("commit", "-m", a.message, index=index)
@@ -289,7 +316,7 @@ def main(argv=None):
                 print(f"    {p}", file=sys.stderr)
             print("\nThe commit EXISTS. Inspect it (`git show --stat HEAD`) "
                   "before pushing.", file=sys.stderr)
-            return 3
+            return _verdict(3, 'commit made but read-back MISMATCHED — inspect HEAD')
         # [(ob)] REFRESH THE WORKTREE'S REAL INDEX FOR OUR PATHS ONLY.
         # The commit was built in a PRIVATE index, so the worktree's own index
         # never learned about it and still reports our files as modified (and a
@@ -307,9 +334,14 @@ def main(argv=None):
                   f"{' '.join(paths)} — `git status` may show phantom changes "
                   "until you run `git reset HEAD -- <paths>`", file=sys.stderr)
         files = _git("show", "--stat", "--format=", "HEAD", index=index).stdout
+        sha = _git("rev-parse", "--short", "HEAD", index=index).stdout.strip()
         print("\n=== read-back OK — the commit holds exactly these bytes ===")
         print(files)
-        return 0
+        # the SHA is printed so a caller can prove LATER that HEAD still
+        # contains this commit — a shared tree can move HEAD out from under
+        # it, and without the sha an orphaned commit is unrecoverable.
+        return _verdict(0, f"{sha} — verify with "
+                        f"`git merge-base --is-ancestor {sha} HEAD` before pushing")
     finally:
         if os.path.exists(index):
             os.unlink(index)
