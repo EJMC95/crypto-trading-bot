@@ -1,3 +1,75 @@
+## 2026-08-19 (rq) — 👩 mum v2's CENSUS SAYS *WHY* NOTHING OPENED AND COULD NOT SAY *HOW FAR AWAY* IT WAS — the one reading that would have caught v1 in hours instead of five weeks
+
+Her first clean payload (build `644317c0a910`, control arm reset to
+`n:0 / null_n:0`, the `(rp)` fix landed) reads:
+
+    scan: {scanned: 23, held: 0, opened: 0, no_signal: 23}
+
+Everything about that is correct and it is **the same string a structurally
+impossible book publishes.** `no_signal: 23` is byte-identical between *"the
+market is quiet today"* and *"this threshold will never fire on this venue"* —
+and **v1 died of the second while every reading on her row looked like the
+first.** `(ro)`'s autopsy named the clock as the disease; this is the
+instrument that would have made the diagnosis takeable in HOURS. I18/(lv) says
+a component that opens nothing must publish its own census at its own bar; the
+census half shipped with her, and the *distance* half — the half that makes
+`opened: 0` interpretable — did not.
+
+**WHAT SHIPPED.** `_census_extra` gains a reachability gauge beside the
+counters, fed by a per-coin capture of the last RSI the scan actually computed.
+The FIELDS (values below are the shape, not a reading — the first live ones
+land on her row at the next publish and are quoted in the readback, never
+here):
+
+    rsi_bar     the entry bar itself, published so no reader hardcodes it
+    rsi_min     the CLOSEST coin to the bar — the leading indicator
+    rsi_med     where the middle of her universe sits
+    rsi_read    how many coins produced a reading at all
+    near_bar    coins within 8 points of firing
+
+`rsi_min` is the number that answers the question. A week of `rsi_min: 58`
+means the bar is unreachable on this tape and the call is a re-spec, not
+patience. A day of `rsi_min: 26` with `near_bar: 6` means she is one candle
+from trading and the right move is to wait. **Those two futures are
+indistinguishable on the census alone**, which is precisely the (lv) shape:
+a book cannot be steered by a signal that reads identically in the case where
+it is fine and the case where it is dead.
+
+**REPORTED, NEVER A GATE.** Nothing here decides a trade, sizes a clip or
+moves a lever — it is the (lv) `sleeves.extreme.scan` pattern, published so
+the call stays falsifiable. Same discipline as I15's demoted win rate.
+
+**THE HONEST DEGRADE, and it is the part with a trap in it.** On an empty
+reading set the gauge is **ABSENT**, not zero. A fabricated `rsi_min: 0.0`
+would read as *"a coin is sitting AT the bar"* — the loudest possible
+statement — produced from no data whatsoever, which is I8's
+unknown-never-degrades-to-a-guess at a gauge instead of a detector. Pinned by
+its own test.
+
+**BLAST RADIUS.** Populated only for a carrier that declares `census`, exactly
+as `(ro)`'s control arm is populated only under `control_arm`; every other
+family book's payload shape is byte-unchanged. Pinned.
+
+**THE INERTNESS TRAP, CLOSED IN BOTH HALVES.** A gauge nothing writes to
+publishes nothing forever and reads as *"no readings"* — i.e. it would produce
+exactly the silence it exists to break, the registered-but-inert failure (I18)
+in its purest form. So the test pins BOTH ends: the carrier must EMIT an `rsi`
+on a bar it does **not** enter (the no-entry case is the only one the gauge
+ever measures), and the scan loop must CAPTURE it.
+
+Six tests added to `tests/autonomy/test_mum_v2.py` (25 → 31); **six mutations
+run against the shipped gauge, all six RED** — `rsi_min` reading the FARTHEST
+coin instead of the closest (`vals[0]`→`vals[-1]`), the `near_bar` window
+widened to admit everything (`+8`→`+80`), the emptiness guard inverted so the
+gauge fires only on no data, the loop's feeder deleted (the inert case), the
+published bar hardcoded to 0.0, and the carrier's own `rsi` blanked at source.
+`--selftest` green.
+
+**WHAT THIS DOES NOT CLAIM.** It does not say her bar is right — `(ro)`'s cell
+is the measured `(qu)` dose cell and stands on that measurement. It says that
+if the bar IS wrong, her row will say so while it still costs a re-spec rather
+than a season.
+
 ## 2026-08-19 (rp) — 👩 mum v2's FIRST LIVE PAYLOAD INDICTED HER OWN CONTROL ARM: it counted the v1 legacy flattens, and it could not have survived a redeploy
 
 She is ALIVE — `freqtrade-mum-lshadow` back on /pnl.json at 22:11Z, `status
