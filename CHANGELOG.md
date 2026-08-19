@@ -1,9 +1,104 @@
+## 2026-08-19 (qr) — THE REFEREE WAVE ON MY OWN MERGE: A CONFLICT MARKER WENT IN MID-LINE PAST AN ANCHORED GUARD, AND A `head -40` SILENTLY DROPPED THE REAL-MONEY HALF OF A RENUMBER
+
+Two defects, both mine, both found by an adversarial pass over a merge I had
+already pushed green — not by any guard. CI was **14 of 14** at the time. That
+is the entry: a green run is a statement about what was checked.
+
+**DEFECT 1 — A COMMITTED CONFLICT MARKER, MID-LINE, INVISIBLE TO THE GUARD
+BUILT FOR EXACTLY THIS.** `CHANGELOG.md:955` carried
+
+the text `gradeable ~mid-Sep on its OWN ledger (I14).` immediately followed,
+with **no newline between them**, by `>>>>>>> 3ce869e (subject)` —
+
+a rebase end-marker appended to the END of a prose line with no newline in
+front of it, inside entry `(qh)`. The other merge parent held a **clean copy of
+that same entry**, so the hand-resolution took the corrupt side and gained
+nothing by it. Traced to branch commit `61f6155`; absent from the merge base
+and from `origin/main`.
+
+**Why nothing caught it.** `changelog-check.yml` has run
+`git grep -nE '^(<<<<<<<|>>>>>>>|=======$)'` since the committed-stash-marker
+incident this file already records (*"THE SYNC CHANNEL WAS CORRUPT AND EVERY CI
+RUN SAID GREEN"*, three markers through seven commits). It is **caret-anchored**,
+so a marker at column 43 is not a marker to it. Re-verified both ways on the
+real bytes: the new guard fires on the actual committed line, the anchored
+check is **SILENT** on it. The class did not recur because the fix was weak —
+it recurred because the fix was anchored, and anchoring was the only thing
+stopping the pattern from matching its own source.
+
+**Closed executably: `scripts/audit_conflict_markers.py`**, registered in
+`ENFORCED_AUDITS` so it runs before a push rather than only in the workflow
+(the (ox)/(pb) placement rule — this catches CONTENT corruption, and a content
+defect must be catchable pre-push). `<<<<<<<`/`>>>>>>>` are flagged **anywhere on
+the line**; `=======` stays line-start-only and that asymmetry is **DECLARED, not
+silently chosen** — this tree is full of `# =========` banners and a rule that
+fired on those would be switched off within a day. Prose is excluded by
+**quoted-SPAN** detection, not adjacency. That distinction is not theoretical:
+my first cut tested the characters either side of the marker and **reddened
+within the hour on the comment registering the guard**, where the marker sits
+inside a longer backticked span and the adjacent character is `(`. Both that
+case and its mirror — *an unmatched apostrophe must not open a span that hides
+a real marker to its right* — are permanent controls. The file builds its own
+tokens as `"<" * 7` so it cannot flag itself, which is how it affords to drop
+the anchor. 12 cases, 6 positive / 6 negative, **counted from the data rather
+than asserted in the string** (the hand-written "(5 positive, 5 negative)" was
+stale the moment two cases were added — doc-truth rot is worse in a guard,
+whose entire output IS a claim about what it checked).
+
+**DEFECT 2 — `head -40` DROPPED THE REAL-MONEY HALF OF A LETTER RENUMBER, AND
+THE ENTRY'S OWN NOTE THEN ASSERTED THE OPPOSITE.** Renumbering `(ql)` -> `(qq)`
+I enumerated the citation sites with a `grep -rn ... | head -40` and built the
+file list from what printed. **There were 48 matching lines.** The eight that
+were cut included every hit in **`lighter_funding_bot.py` (5) and
+`venues/safety.py` (2)** — the LIVE Funding Farmer and SafetyRails, the real-money
+surface that `CLAUDE.md`'s own "LIVE BOTS ALWAYS IN AUDIT SCOPE" rule names.
+Seven citations of the ruin-gate entry stayed on `(ql)`, which in the merged
+file resolves to a concurrent session's unrelated CARRIED ITEMS entry — so the
+implementation and its own test cited **different entries**. All seven corrected.
+
+**`audit_changelog_letters` cannot see this and is not at fault**: its
+`dangling_code_citations` arm appends only `if letter not in known`, and `(ql)`
+IS a known header. A citation that resolves to the WRONG entry is green by
+construction — its declared blind spot, restated here because the next session
+will otherwise read its OK line as more than it says.
+
+The mechanism is now doctrine (`CLAUDE.md`, third costume of the
+inspects-nothing rule): **a cap is a display choice; the moment it reaches your
+reasoning it is a silent sampling step you did not declare.** `head` announces
+nothing when it cuts, and **a result exactly equal to its own limit is a
+truncation signature** — the same shape as `(hd)`'s lens returning exactly its
+cap. Count first, derive work-lists from `-l`, never from a capped line list.
+
+**AND THE RUIN GATE'S OWN PREMISE MOVED, measured on the live payload rather
+than assumed** — recorded here because `(qq)` shipped it: 🙏 Avo LIVE holds 4
+positions and publishes `liq_unknown: [ADA, NVDA, QQQ, SPY]` with
+`nearest_liq: null` under `mode: "cross"` and allocated `margin: 0.0` on every
+leg. `headroom_ok` fails CLOSED on a non-empty `liq_unknown`, so on that book
+it would refuse **every entry, forever** — not because the money is near ruin
+but because the venue publishes no per-position liq for cross margin. That is
+I7 verbatim (*a trigger a book satisfies STRUCTURALLY is not a measurement*) in
+a gate I wrote to enforce discipline, and I did not run I7's own question
+against it. The LIVE Farmer is flat (`n: 0`), so the gate is inert there today
+and changes no trade — which also means my "verified" claim rested on a book
+that could not exercise it. Second defect in the same gate, named not yet
+fixed: `ruin_skips` counts refusals and **cannot say WHY**, so "no liq
+published" and "4x too close to liquidation" — opposite operator actions — are
+byte-identical (I18/(lv)). **No live deploy of this gate until both are
+resolved**; the carry PERSIST half is unaffected.
+
 ## 2026-08-19 (qq) — THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD NOTHING THAT WOULD DECLINE — and the leverage answer is that the live book is already at its ceiling
 
 *(Renumbered (ql) -> (qq) at push time: a concurrent session's carried-items
 entry took (ql) on main and is already merged, so this unmerged one moves —
-the convention's own tiebreak. Nothing outside this branch cited (ql) for this
-entry.)*
+the convention's own tiebreak. **This note first read "Nothing outside this
+branch cited (ql) for this entry", and that was FALSE in the direction that
+mattered** — it was true of `origin/main` and I wrote it as if it were true of
+the tree. Seven citations of THIS entry survived under `(ql)` in
+`lighter_funding_bot.py` (5) and `venues/safety.py` (2) — both live real-money
+surface — and every one of them resolved to main's unrelated CARRIED ITEMS
+entry until the referee wave caught it. Corrected in place per I12, with the
+mechanism recorded rather than tidied away: see the truncated-search rule
+added to CLAUDE.md in this same pass.)*
 
 **Operator, 19-Aug, reframing the whole programme:** *"We are looking at this
 as a risk eliminating job as opposed to a profit motivated job. Let's look at
@@ -952,7 +1047,7 @@ so nobody hunts a "failed" deploy. Provisioner deleted; `MANUAL_IMAGES_OK`
 → `AUTO_IMAGES`; decide rule live (carrying the ghost module);
 OPERATOR_QUEUE item closed. Clock: fresh 30 days from first publish
 (18-Aug), ~2.8 crypto closes/day measured on the ghost's ledger →
-gradeable ~mid-Sep on its OWN ledger (I14).>>>>>>> 3ce869e (The operator-queue sweep: carry PERSIST 6h->12h ships at the clean boundary; the queue's stale rows corrected in place (qh))
+gradeable ~mid-Sep on its OWN ledger (I14).
 ## 2026-08-19 (qg) — `(qe)` FIXED THE FALSE PROMISE AND LEFT THE SILENCE: `waiting 3 / next none` still could not say whether ANY waiter is admissible — and the mutation round that verified the fix was itself void
 
 *(Renumbered from (qf) at push time — a concurrent session's 🪁 band-kelly

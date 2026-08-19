@@ -375,6 +375,17 @@ ENFORCED_AUDITS = [
     # the SAME row as distant history does not, and a removed anchor is
     # reported rather than silently skipping the check.
     "scripts/audit_live_roster.py",
+    # [2026-08-19 (qq)] MID-LINE conflict markers. changelog-check.yml has
+    # carried an anchored `git grep -nE '^(<<<<<<<|>>>>>>>|=======$)'` since the
+    # committed-stash-marker incident, and on 19-Aug the SAME class landed again
+    # past it: a rebase end-marker appended to the END of a CHANGELOG prose line
+    # with no newline in front, so `^` never matched and the guard reported
+    # clean through a commit AND a push. Found by an adversarial byte-compare
+    # against the other merge parent, not by any check. This scan is the
+    # un-anchored twin; it is registered HERE rather than only in the workflow
+    # by the rule at the head of this list — the corruption it catches is
+    # content, and a content defect must be catchable before a push.
+    "scripts/audit_conflict_markers.py",
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can

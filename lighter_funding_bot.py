@@ -1039,14 +1039,14 @@ _ENV_BARS["slope_gate"] = 1 if SLOPE_GATE else 0
 QUALITY_VETO = os.environ.get("FUNDING_QUALITY_VETO", "on").strip().lower() \
     not in ("off", "0", "false", "no")
 
-# ---- RUIN GATE [2026-08-19 (ql)] — refuse to ADD when the money sits inside
+# ---- RUIN GATE [2026-08-19 (qq)] — refuse to ADD when the money sits inside
 # its own liquidation. The venue publishes a liq price per position and this
 # bot has read it since `(no)`; nothing declined on it until now. Measured on
 # the validated model at THIS book's HARD_STOP of 10%: 2x (where it runs)
 # leaves 4.94 stop-widths, 3x leaves 3.25, and 10x leaves 0.89 — under 1.0 the
 # liquidation fires BEFORE the stop and the stop is decorative. Leverage
 # capacity is a property of stop distance, not appetite. Fail-CLOSED by
-# construction; `off` restores the pre-(ql) behaviour exactly.
+# construction; `off` restores the pre-(qq) behaviour exactly.
 RUIN_GATE = os.environ.get("LIGHTER_RUIN_GATE", "on").strip().lower() \
     not in ("off", "0", "false", "no")
 
@@ -2555,7 +2555,7 @@ def main():
         # ---- manage open positions (held coins may no longer be hot) ----
         held_coins = set(pos) | set(meta)
         opened_this_loop = 0
-        # [(ql)] The loop's ONE margining read for the ruin gate, taken lazily
+        # [(qq)] The loop's ONE margining read for the ruin gate, taken lazily
         # at the first entry attempt and reused for the rest of the pass. Not
         # the publish block's read: that one is deliberately POST-trade so the
         # row shows the gross this loop actually ended at, while the gate must
@@ -2994,7 +2994,7 @@ def main():
                     if not ctx.rails.notional_ok(open_ntl, clip):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
-                    # [2026-08-19 (ql)] THE RUIN GATE. The venue publishes the
+                    # [2026-08-19 (qq)] THE RUIN GATE. The venue publishes the
                     # liquidation price of every position and this loop has
                     # read it since (no); until now nothing REFUSED on it, so
                     # the cap above ("how much may I deploy?") and the daily
@@ -3236,7 +3236,7 @@ def main():
                        # telemetry read may never raise into a real-money
                        # trading loop.
                        "margin": _margin_block(ctx, set(meta) | set(pos)),
-                       # [(ql)] The ruin gate's BITE, on the row rather than
+                       # [(qq)] The ruin gate's BITE, on the row rather than
                        # in container logs alone. `0` published every loop is
                        # the point: an omitted key is byte-identical between
                        # "the gate never fired" and "the gate is not running"

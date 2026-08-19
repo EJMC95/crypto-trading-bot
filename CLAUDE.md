@@ -1513,6 +1513,32 @@ All new bots:
   correcting someone, **re-run their check rather than substituting your own
   narrower one** — both corrections issued that day were wrong in the
   consequential direction for exactly that reason.
+  **[19-Aug (qq)] THE THIRD COSTUME: A TRUNCATED SEARCH READS AS AN EXHAUSTIVE
+  ONE.** The rule above is about a check that inspects NOTHING. This is a check
+  that inspects MOST of it and reports as if it had finished, which is worse,
+  because the output looks like real work. Measured: renumbering three changelog
+  letters, I enumerated the citation sites with
+
+      grep -rn '(q[klm])' --include='*.py' --include='*.md' ... . | ... | head -40
+
+  and built the file list from what it printed. There were **48** matching lines.
+  `head -40` cut the last eight, and the two files that fell off the end were
+  **`lighter_funding_bot.py` and `venues/safety.py` — the LIVE Funding Farmer and
+  SafetyRails**, i.e. the real-money surface. Seven citations of the ruin-gate
+  entry were left pointing at another session's unrelated entry, the tree was
+  committed, CI went green, and the entry's own renumber note asserted the
+  opposite. Nothing in the output said it had been cut: `head` is silent by
+  construction.
+  THE RULES: **never pipe an enumeration you are going to ACT on through `head`,
+  `-m`, `| head -n`, or any other cap** — cap the output you are *reading*, never
+  the set you are *deriving work from*; **count first and reconcile** (`| wc -l`
+  before `| head`, and if the count equals the cap, assume truncation until
+  proven otherwise — a result exactly equal to its own limit is a truncation
+  signature, the same shape as `(hd)`'s lens returning exactly its cap); and
+  **derive the work-list from `-l`/`--files-with-matches`**, which is per-file and
+  far harder to truncate, then verify each file's hits individually. The general
+  form: *a cap is a display choice; the moment it reaches your reasoning it is a
+  silent sampling step you did not declare.*
 - **ANY PRODUCER PIPED INTO `grep -q` UNDER `pipefail` CAN INVERT A MATCH
   (14-Aug (ml) — it bit TWICE IN ONE HOUR, in two different costumes).**
   `grep -q` exits at the FIRST match; under `set -o pipefail` the pipeline's

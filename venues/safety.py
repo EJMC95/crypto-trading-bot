@@ -46,7 +46,7 @@ _PILOT_ALIASES = {
 }
 
 
-#: [2026-08-19 (ql)] HOW MANY STOP-WIDTHS OF ROOM THE MONEY MUST HAVE BEFORE
+#: [2026-08-19 (qq)] HOW MANY STOP-WIDTHS OF ROOM THE MONEY MUST HAVE BEFORE
 #: ITS OWN LIQUIDATION. 4 is the bar `scripts/lighter_margin_model.headroom_x`
 #: was designed around; it shipped there with NO consumer because the book it
 #: was written for (⚡ High Voltage) was refuted and never built, so the number
@@ -104,7 +104,7 @@ class SafetyRails:
     def headroom_ok(self, margin_state, stop_frac) -> bool:
         """May the book ADD notional without sitting inside its own liquidation?
 
-        [2026-08-19 (ql)] THE GAP THIS CLOSES. `(no)` wired the venue's own
+        [2026-08-19 (qq)] THE GAP THIS CLOSES. `(no)` wired the venue's own
         margining truth into the live path — `margin_state` carries the
         VENUE-PUBLISHED liquidation price per position, the distance to the
         nearest one, and a census of positions whose death price the venue
