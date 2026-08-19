@@ -429,9 +429,24 @@ OVERTRADE_LIMIT = {
     "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
-    "nav-cook":              20,   # 🧭 the Navigator — 4h max hold x 4
-                                   # slots; a storm day can cycle each slot
-                                   # a few times, never 90s-fast
+    "nav-cook":              20,   # 🧭 the Navigator. [2026-08-19 CORRECTED
+                                   # IN PLACE — the original rationale here
+                                   # ("4h max hold x 4 slots") reasoned from
+                                   # the DESIGN and the tape disagrees.]
+                                   # MEASURED on its first 24 closes: 55.9
+                                   # closes/day, ALL 24 exiting `converged`
+                                   # at a ~5min median hold — the 4h bound is
+                                   # never reached, and its own founding study
+                                   # chose 4h "for decidability at ~1.5
+                                   # closes/day", so the book runs ~37x the
+                                   # cadence it was designed for. The limit is
+                                   # deliberately LEFT at the design-implied
+                                   # value rather than raised to fit: the card
+                                   # SHOULD flag this, because a book trading
+                                   # 37x its design is a live question (it has
+                                   # no re-entry cooldown, where its sibling
+                                   # 🪁 band-kelly has one), not a threshold
+                                   # to tune away. Owner: the nav-cook session.
 }
 OVERTRADE_DEFAULT = 15
 
@@ -550,6 +565,7 @@ DESCRIPTIONS = {
     "book-schwager":        "Market Wizards as rules — 4h Donchian-20 breakouts with EMA20>50 confirm; cut losses at 2×ATR, ride winners on a wide 3.5×ATR chandelier trail, NO profit target and NO pyramid (measured and refuted); one position per coin",
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
     "band-kelly":           "holds the OPPOSITE side of the fleet's measured losers over exactly the windows the loser would have traded — v1 mirrors retired 🧲 Snap Back: LONG the premium-rich dislocations it shorted, SHORT the discounts it bought, exit when the ghost's own rules (converged/stop/2h) would have exited · refused/waiting mirror families publish in extra.roster · env-only, single-policy clock",
+    "nav-cook":             "rides the SAME dislocations 🪁 band-kelly mirrors, in the band it REFUSES — premium [45,60) bps, strictly below the mirror's 60bps floor, so the two TILE the surface and every event this book takes is one band-kelly declines (I20 by BAND, not by row id) · non-crypto by nature (the band's crypto population is n=4) with pre-IPO excluded as the only class measured negative · 4h hold, exits on the venue's own index residual · env-only, single-policy clock",
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",

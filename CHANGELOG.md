@@ -1,3 +1,92 @@
+## 2026-08-19 (rq) — A VERIFICATION SWEEP OVER MY OWN CLAIMS FOUND THREE FALSE ONES, AND THE WORST WAS A GUARD EXEMPTION JUSTIFIED BY A SAFETY MARGIN THAT DOES NOT EXIST
+
+[Renumbered (ro) -> (rq) at push time: main took (ro) for mum's un-retirement
+and (rp) while this was in flight — the (hj) rule, main's pushed history keeps
+the letter. All 3 citations moved together, count-reconciled.]
+
+Ran five independent read-only lenses plus an adversarial referee over
+everything this session had already merged — tree state, the (rg) CI fix, the
+(rf) mirror corrections, the (rj) nav-cook registrations, and live fleet health
+— asking of each claim not "did I write it" but "is it TRUE of the system".
+**27 claims came back non-TRUE.** Most were the sweep correctly refuting
+hypotheses it had been handed (no stale rows, no duplicate writer, no other
+session's work stranded in the tree — all good news). Three were mine, and I
+had verified all three the wrong way: by re-reading my own diff.
+
+**1 — THE ONE THAT MATTERS. `(rg)`'s exemption reason was false in the
+direction that flatters it.** I declared 🎫 the Ticket Taker in
+`audit_boot_stagger.STAGGER_OK` on the stated ground that the guard's 15-min
+3x-interval PROXY was governing while the taker's only real cross-process
+contract was `fleet_risk.STALE_ROW_SEC` at 65 min — "4.3x the proxy", the
+burst "well inside". **Every load-bearing number there is wrong.**
+`pnl_dashboard.VARIANT_STALE_SECONDS` pins `lighter-ticket-taker-lshadow` at
+**900s**, `fleet_watchdog_svc` pages on any row's `stale` flag, and the burst
+was **1034s — 134s PAST that bar**. The ratio is **1.0, not 4.3x**: the proxy
+was not a loose stand-in for the real contract, it was numerically EQUAL to
+it. So the guard was RIGHT and my exemption suppresses a **true positive** —
+on the shadow book that is the control arm every go-live rests on, which still
+has no early-run mitigation (`run_all.sh` opens its block with a bare
+`( sleep 210`). It is kept only because deleting it reddens the suite
+fleet-wide while the real fix — the (ou) boot ladder — sits in PR #192; the
+reason now says exactly that, and says **delete this entry when the ladder
+lands**. HOW THE ERROR SURVIVED: I grepped the dict I expected to be
+authoritative and stopped. The sweep EXECUTED `stale_secs_for(...)` and got
+900. *A second reader is invisible to a check that stops at the first one.*
+
+**2 — `(rj)` claimed "LABELS + DESCRIPTIONS" and only LABELS landed.** 🧭
+nav-cook's dashboard card rendered with no strategy line. Cosmetic — `desc_for`
+does `.get(base, "")` and drops empties — but the entry asserted work that did
+not exist, and **nothing in the repo enforces DESCRIPTIONS membership**, which
+is why a false claim in a merged entry went a day unchallenged. Found with a
+peer control (band-kelly, minted a day earlier, is in both dicts), which is
+what makes the absence evidence rather than a convention (I6). Shipped.
+
+**3 — `(rj)`'s OVERTRADE_LIMIT rationale reasoned from the design, and the tape
+disagrees.** I wrote "4h max hold x 4 slots" for nav-cook's limit of 20.
+MEASURED on its first 24 closes: **55.9 closes/day, ALL 24 exiting `converged`
+at a ~5 minute median hold** — the 4h bound is never reached, and its own
+founding study picked 4h *"for decidability at ~1.5 closes/day"*, so the book
+runs **~37x the cadence it was designed for**. **The limit STAYS at 20**: a
+card that flags a book trading 37x its design is doing its job, and raising the
+threshold to fit observed behaviour would tune away the finding. The rationale
+is corrected at its own site; the underlying question — nav-cook has no
+re-entry cooldown where its sibling 🪁 band-kelly has one (grep: 21 matches vs
+0) — belongs to the nav-cook session.
+
+**THE TRANSFERABLE LESSON, and it is not "verify more".** All three claims were
+checked before merging — against my own diff, which is the one artifact
+guaranteed to agree with me. The sweep checked them against the SYSTEM and all
+three broke. This repo already says a consumer must be tested against a payload
+its publisher built ((hj)); the same rule applies to a CLAIM: verify it against
+the thing it asserts about, never against the thing that asserts it.
+
+**CARRIED, NOT MINE TO FIX** (findings the sweep raised against other sessions'
+surfaces, recorded so they are not rediscovered): 🧭 nav-cook has no dedicated
+pytest file where every sibling book has one; its founding study
+`STUDY_DISLOCATION_BAND_2026-08-19.md` shipped **prose with no script**, so
+n=216/+0.367%/t=+2.74 cannot be re-run, refuted, or re-cut (the crypto-only
+subset — the one number that would reconcile it against 🪁 band-kelly's
+corrected +0.397% bar — is therefore unobtainable); its live record is running
+against that claim (n=24, −0.298%/trade, 24/24 `converged`, the exact shape of
+its own retired ghost); `fleet_agronomy.py`'s hand roster is stale fleet-wide
+(12 dead rows listed, 7 living books missing); `study_exit_sweep` has no
+BOOK_EXITS entry for it; and CLAUDE.md still calls it PRE-PROVISION and 👩 mum
+a living book, both hours stale. On the real-money surface: 🙏 the live Avo
+Maria publishes `liq_unknown` for **3 of 3** open positions with
+`nearest_liq: null` (leverage 0.37, so small, but zero liquidation headroom is
+published), and 💸 the live Farmer's census stops at the PREFILTER bar, so
+`eligible 2 / free_slots 2 / opening nothing` has no bucket that explains it.
+
+**MY OWN BOOK, declared and not acted on:** 🪁 band-kelly has NO upper bound on
+the residual it will take (`abs(dev) >= enter_bps_eff`, gate capped at 150 but
+nothing above), while the sibling study measures **[150,inf) at −0.18 to −0.50
+%/trade** and nav-cook explicitly refuses that tail. Two of my seven snap
+trades were 394 and 503 bps. Not changed here: the founding ledger's own events
+included deep ones, that study is all-instrument while this book is crypto-only,
+and it is un-rerunnable — so an entry-gate change would be a widening on a
+number I cannot reproduce (I19). Named as the first question the ~18-Sep grade
+should ask.
+
 ## 2026-08-19 (rn) — THE REVIEW'S OWN LIST, WORKED: the stale-reader class gets an HOURLY OUTSIDE CHECK, the sample20 disagreement explains itself, and the watchdog's second NOT-ONLINE rule had drifted from the first
 
 **Operator: "Fix anything remaining save commit push and tidy up as per
@@ -271,7 +360,22 @@ birth (an hour of "missing rows" against healthy writers).
 Registered, using the book's own constants read from its module:
 
 * `pnl_dashboard.py` — VARIANT_ONLY + "nav-cook" (the admission), an
-  OVERTRADE_LIMIT (20 — 4h holds x 4 slots), LABELS + DESCRIPTIONS.
+  OVERTRADE_LIMIT (20), LABELS ~~+ DESCRIPTIONS~~. **[19-Aug (rq), CORRECTED
+  IN PLACE per I12: the DESCRIPTIONS half NEVER LANDED — only LABELS did.**
+  Caught by a verification sweep with a peer control (🪁 band-kelly, minted a
+  day earlier, is in both dicts; so is every other living book). Consequence
+  was cosmetic rather than a row-drop — `desc_for()` does
+  `DESCRIPTIONS.get(base, "")` and joins only non-empty parts, so the 🧭 card
+  rendered its label and payload-derived units with no strategy line — and
+  NOTHING enforces DESCRIPTIONS membership, which is why a claim in this entry
+  went a day unchallenged. Now shipped. The OVERTRADE_LIMIT rationale was also
+  wrong and is corrected at its own site: "4h holds x 4 slots" reasoned from
+  the DESIGN, and the tape disagrees — 24 closes in 10.3h = **55.9/day, all 24
+  `converged` at a ~5min median hold**, ~37x the ~1.5/day its founding study
+  chose 4h for. The limit STAYS at 20 deliberately: the card should flag a book
+  trading 37x its design, and that question (nav-cook has no re-entry cooldown
+  where its sibling has one) belongs to the nav-cook session, not to a
+  threshold tuned to fit.]
 * `scripts/fleet_books.py` ROW_ENTRY — code-currency stamp resolution.
 * `tests/autonomy/test_mtm_equity_series.py` MTM_REQUIRED — the call exists
   since (ri); membership makes a future edit REMOVING it go red (the belt;
@@ -460,12 +564,30 @@ itself documents as "measurably wrong in both directions". Nothing anyone
 merges goes green until the storm ages out of the window (~days), so this is
 exactly the guard's own escape hatch's job.
 
-THE MEASURED REASON, not a snooze: the taker publishes **no bot_state key
-with a ttl_sec** (its bot_state use is its own broker-state persistence), so
-the proxy governs by fallback — but its only cross-process reader is its
-bot_pnl row behind `fleet_risk.STALE_ROW_SEC=3900s` (**65 min**, the
-authoritative_row staleness filter), 4.3x the proxy. The 17-min burst sat
-well inside the real contract; no reader saw data past its bar. The
+~~THE MEASURED REASON, not a snooze: the taker publishes no bot_state key
+with a ttl_sec, so the proxy governs by fallback — but its only cross-process
+reader is its bot_pnl row behind `fleet_risk.STALE_ROW_SEC=3900s` (65 min),
+4.3x the proxy. The 17-min burst sat well inside the real contract.~~
+**[19-Aug (rq), CORRECTED IN PLACE per I12 — THAT REASON IS FALSE, AND IT IS
+FALSE IN THE DIRECTION THAT FLATTERS THE EXEMPTION.** Found by a verification
+sweep over this session's own claims. (1) The taker's row has a SECOND
+cross-process reader, TIGHTER than fleet_risk: `pnl_dashboard`'s
+`VARIANT_STALE_SECONDS` pins `lighter-ticket-taker-lshadow` at **900s**, and
+`fleet_watchdog_svc` turns any row's `stale` flag into a paged problem.
+Verified by EXECUTING `stale_secs_for('lighter-ticket-taker-lshadow')` → 900,
+not by reading the dict. (2) So the ratio is **1.0, not 4.3x** — the proxy was
+not a loose stand-in, it was NUMERICALLY EQUAL to the real tightest contract.
+(3) And the burst **1034s EXCEEDS 900s by 134s**, so "well inside" is exactly
+backwards: no reader saw data past its bar only because the burst ended.
+**CONSEQUENCE, stated plainly: this exemption suppresses a TRUE POSITIVE.**
+The shadow Taker — the control arm the go-live rests on — has no early-run
+mitigation (`run_all.sh` still opens its block with a bare `( sleep 210`,
+against golive_readiness's laddered shape), so a deploy burst can genuinely
+starve it. The exemption is KEPT only because removing it reddens the suite
+fleet-wide for every concurrent session while the real fix is already written
+and in flight: the (ou) boot ladder, in PR #192. **It must be DELETED the
+moment that ladder lands.** The `STAGGER_OK` reason now carries all of this,
+and the original 65-min claim is struck rather than quietly reworded.] The
 `STAGGER_OK` entry says all of this in place and names the bound that still
 binds: **a burst outlasting 65 min WOULD silence the row for real** — the
 exemption waives the proxy, never the contract.
