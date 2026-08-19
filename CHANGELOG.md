@@ -53,9 +53,24 @@ the class that made nav-cook page this morning, one copy over.
 
 **3 · `sample20` NAMES WHAT IT CANNOT CLASSIFY (review item 4, the (rk)
 residue).** The fail-OPEN choice leaves 🧘 douglas publishing `n=9 / −$26.60`
-beside `closed 7 / −$0.12` for ~4 more days while the two unstamped legacy
+beside `closed 7 / −$0.12` for ~4 more days while the unstamped legacy
 rows age out — a correct number pair that LOOKS like a defect and costs every
-reader the same investigation (rk) already ran. `sample20` now publishes
+reader the same investigation (rk) already ran. **[CORRECTED IN PLACE at the
+post-merge readback (I12): live `unstamped` reads 9, not 2 — ALL nine rows in
+the current window predate the stamp, because the stamp marks only closes
+written AFTER the (rk) code reached the container (~10:25Z, the (rl)-freeze
+side-effect deploy), and douglas has closed nothing since. The TWO void rows
+are the subset of those nine that explain the dollar disagreement; "the two
+unstamped legacy rows" above (and in (rk), which this echoed) conflated the
+void pair with the unstamped population. The merge message's predicted
+`unstamped: 2` was therefore wrong; the test's semantics (2 legacy + 1
+stamped ⇒ 2) are unchanged and correct. Readback receipt: build
+`1075b0a1be28 → d7d9e3aef68e`, `sample20 {n: 9, unstamped: 9}`. The
+reader-currency check's FIRST LIVE RUN is also verified, by dispatch rather
+than by waiting for the :07 schedule: fleet-watchdog run 32247715805 (green)
+prints `reader-currency: OK (reader 2026-08-19T10:48:29+00:00 vs newest dash
+commit 2026-08-19T08:04:20Z)` — the step reads the real feed and the real
+commits API, and the hour's alerting step still ran after it.]** `sample20` now publishes
 `unstamped: N` (rows predating the pair/closed_at stamp — the ones the
 quarantine cannot be asked about), ALWAYS present including 0, because an
 omitted key is byte-identical between "all stamped" and "not computed"
