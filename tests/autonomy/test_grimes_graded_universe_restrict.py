@@ -115,20 +115,38 @@ def test_the_loop_consults_the_one_owner_and_counts_refusals():
     import lighter_book_grimes_bot as g
     tree = ast.parse(pathlib.Path(g.__file__).read_text(encoding="utf-8"))
     loop = _entry_loop(tree)
+    def _is_exact_gate(test):
+        """EXACTLY `not entry_graded_ok(coin)` — any wrapping (an `and False`,
+        a second clause) is a watered-down site the first mutation round
+        proved this file cannot otherwise see."""
+        return (isinstance(test, ast.UnaryOp)
+                and isinstance(test.op, ast.Not)
+                and isinstance(test.operand, ast.Call)
+                and isinstance(test.operand.func, ast.Name)
+                and test.operand.func.id == "entry_graded_ok"
+                and len(test.operand.args) == 1
+                and isinstance(test.operand.args[0], ast.Name)
+                and test.operand.args[0].id == "coin")
+    exact = None
     for node in ast.walk(loop):
         if not isinstance(node, ast.If):
             continue
-        calls = {c.func.id for c in ast.walk(node.test)
-                 if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
-        if "entry_graded_ok" in calls:
-            body_keys = {n.slice.value for n in ast.walk(node)
-                         if isinstance(n, ast.Subscript)
-                         and hasattr(n.slice, "value")
-                         and isinstance(n.slice.value, str)}
-            assert "ungraded_skip" in body_keys, \
-                "the skip must COUNT what it refuses, never silently drop it"
-            return
-    raise AssertionError("entry loop does not consult entry_graded_ok")
+        mentions = any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name)
+                       and c.func.id == "entry_graded_ok"
+                       for c in ast.walk(node.test))
+        if not mentions:
+            continue
+        assert _is_exact_gate(node.test), (
+            f"line {node.lineno}: the gate condition must be EXACTLY "
+            "`not entry_graded_ok(coin)` — found a wrapped/diluted form")
+        exact = node
+    assert exact is not None, "entry loop does not consult entry_graded_ok"
+    body_keys = {n.slice.value for n in ast.walk(exact)
+                 if isinstance(n, ast.Subscript)
+                 and hasattr(n.slice, "value")
+                 and isinstance(n.slice.value, str)}
+    assert "ungraded_skip" in body_keys, \
+        "the skip must COUNT what it refuses, never silently drop it"
 
 
 def test_census_literal_carries_the_bucket():
