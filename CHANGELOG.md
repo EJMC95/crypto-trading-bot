@@ -1,3 +1,76 @@
+## 2026-08-19 (qo) — TWO SHADOW GATES MOVED ON THE OPERATOR'S "DO WHAT MAKES MORE MONEY, RISK OR NO RISK" — one verified from the ledger and biting, one shipped with its claim UNCONFIRMED and said so
+
+**Operator: "do what makes more money, risk or no risk."** Two env-only gate
+changes, live on the next loop, both on $1,000 SHADOW books. Real-money config
+(🙏 Avo's `MAX_NOTIONAL`, its slot count, the Farmer→Avo transfer, any deposit)
+was NOT touched — that stays an operator act, and it is the one limit the
+reframe does not move.
+
+### 1 · 🛢️ GARRETT `FUNDING_ENTER_APR` 0.05 → 0.1095 — a TIGHTENING, and the number is reproduced from its own ledger
+
+The venue's **resting-default funding rate** (~10.512% TRUE, the
+`funding_basis` 9.6e-5/hr constant) sits ABOVE Garrett's 5% floor, so the book
+has been entering the venue's do-nothing rate as if it were a signal. The gate
+now sits at the pin + half a grid step, which excludes it.
+
+**Verified independently before shipping, because the book's own ledger does
+NOT record entry APR** — `extra` carries `bars`/`hot_h` and no rate, so the
+proposing agent's figures could not be checked directly. Reconstructed instead
+by joining all 22 closes to the scout's `funding` cross-section at open
+(`bot_state_history`, 1,709 snapshots in window, **0 unmatched**):
+
+| Garrett entries | n | mean %/trade | total |
+|---|---:|---:|---:|
+| **AT the pin** (\|apr\|≈10.512%) | **13** | **−1.343%** | **−17.46%** |
+| off the pin | 9 | −0.086% | −0.77% |
+
+**59.1% of entries, 95.8% of realised loss.** The n's match the proposal
+exactly (13/9) and the means agree to ~0.1pp; the entry-share differs (59.1%
+realised vs its 84.7%) because that figure was over the supply window, not the
+ledger — noted rather than averaged. `t=−1.10` at n=13, so this is
+SUGGESTIVE, not proven; it ships because the downside of being wrong is fewer
+trades on a book already losing money, which is the cheapest possible way to
+be wrong. Corroborated by the 21-Jul Lighter sweep (the 5% bar: −$93.31/150d,
+20% win, flip 0W/23, monotone toward 20%). **Live and biting:** `gate_apr
+0.1095` in the row, `cold` 184 of 225.
+
+### 2 · 🏦 RICH DAD `RICHDAD_ALLOW_NONCRYPTO=1` — shipped, and its claimed payoff is NOT yet visible
+
+The class screen came from `(lk)`, which measured non-crypto at −$14.96/9 on
+🌾 carry — but **8 of those 9 exits were `*_flip` under `FLIP_GRACE_H=1h`, the
+exact exit `(px)` refuted and replaced with 6h on 18-Aug.** So the screen may
+have attributed an EXIT defect to the instrument CLASS. The replay behind the
+proposal reads +$0.777/trade (n=49, t=+3.60) on 180d of settled Lighter
+funding with only the screen moved.
+
+**Live readback says `crypto_only: false` — and the census has not moved:**
+`eligible 0, noncrypto 0, cold 197, thin 26, waiting 2`. The `noncrypto`
+bucket counts coins blocked by class ALONE, and it reads **0 both before and
+after** — i.e. at this instant the class screen was never the binding gate;
+**apr (cold 197) and volume (thin 26) are.** One snapshot is not a verdict
+(I7/I1 — the `(qe)` memo correction made exactly this point about the Farmer's
+`eligible 0`), and the claim was over a 14-day window. But the honest position
+is that the proposal's "3 → 13 coins, 0.5 → 8.2 closes/30d" is **unconfirmed
+on this book**, and I could not settle it retrospectively: `bot_state_history`
+holds no census rows for this key.
+
+**Tripwire, so this is falsifiable rather than hopeful:** if `eligible`/
+`noncrypto` stay at 0 through the next ~7 days, the class screen was not the
+constraint, the change bought nothing, and the real gate to argue about is the
+20% floor or the $2M volume bar — revert with `RICHDAD_ALLOW_NONCRYPTO` unset.
+
+### HELD, with reasons
+
+* **🧮 Hull `MIN_VOL` 2e6 → 5e5** — held. It would pool a never-graded
+  population into the fleet's cleanest measured record (n=50, +$6.69, t=+3.92,
+  bootstrap P(mean≤0)=0.000, earned AT the 7.82% floor). It needs a
+  `POLICY_ERA` split shipped WITH it; that is a code change, not an env one.
+* **🌾 carry class flip** — held. The replay reads +$0.713/trade (n=61,
+  t=+3.30) while the book's OWN era ledger reads −0.154%/trade (n=9, t=−4.01)
+  **at the same config**. A sign disagreement between replay and record is the
+  `(gx)`/`(ps)` calibration-gate class, and the record is senior (I14). That is
+  not "higher risk", it is no information — and the replay also used a $167
+  clip against carry's $300 `NOTIONAL`.
 ## 2026-08-19 (qn) — THE "PHANTOM FEE" IS NOT PHANTOM: CARRY ALREADY MEASURES ITS PERP LEG, AND THE ONLY REAL DEFECT IS A HYPERLIQUID CONSTANT ON A LIGHTER BOOK — plus the letters guard was blind to its own citation form
 
 *(Renumbered (qk) -> (qm) -> (qn) across three push attempts — concurrent
