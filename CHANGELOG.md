@@ -1,3 +1,64 @@
+## 2026-08-19 (rm) — THE DAILY REVIEW FINISHED 🧭 nav-cook's BIRTH: the (rl) freeze had eaten the dashboard's OWN redeploy, so the born row was publishing INVISIBLY — and its first visible hour paged NOT-ONLINE off this repo's own doc example
+
+**Operator: "Full review of today's work and list of improvements."** The
+review is `REVIEW_2026-08-19_TODAYS_WORK.md`; this entry is the work the
+review itself surfaced and closed, because a review that files a live defect
+it can fix in one word is the (hn) failure.
+
+**1 · THE (rl) RESIDUE: the unfreeze fixed the PARSER and never caught up the
+missed deploys — and the one that stayed missed was the READER.** (rl)'s fix
+redeployed the shadow books as a side effect (the workflow file is in their
+own decide greps — the (gm) structural fix doing its job), but pnl-dashboard
+is deliberately NOT on that list, so the (rj) merge's dashboard deploy —
+frozen at 08:08Z — was never re-run. Measured at review time: watchdog
+`started 06:27:33Z`, i.e. the serving reader predated the (rj) nav-cook
+registration by two hours, while the provisioner (run 32239943061, 09:53Z,
+green) had already put the writer up. **`nav-cook-lshadow` was publishing to
+bot_pnl and being FILTERED from /pnl.json** — the exact ghost-row condition
+(rj) predicted, live for ~1h. Fixed by a one-service catch-up dispatch
+(`services=pnl-dashboard`); the (qh) reader-verify step rode it; readback:
+`started 10:48:29Z`, 18 rows, nav-cook publishing, and `audit_code_currency`
+reads the row **CURRENT at HEAD**. THE CLASS, named: the (qh) guard verifies
+the reader flips **when a deploy includes pnl-dashboard** — it cannot see a
+dashboard deploy that never started. A freeze/red run needs a per-service
+catch-up (diff since last GREEN deploy, not since event.before); left as a
+recommendation in the review, not built here.
+
+**2 · THE ROW THEN PAGED `NOT ONLINE: nav-cook-lshadow` — a one-word birth
+defect this file itself taught.** The book published `status="running"`;
+`fleet_watchdog_svc` accepts exactly `{None, online, halted, paper}` and
+pages on everything else, and the other 17 rows all say `online`. The string
+came from **CLAUDE.md's own "How Bots Publish" example**, which has said
+`"status": "running"` since it was written — the doc was the defect's source,
+so both are corrected (the example now names the watchdog's accepted set).
+Tree-wide grep: nav-cook was the only publisher on the wrong string; the one
+other hit is a dashboard-money test fixture the watchdog never reads.
+
+**3 · ACTIVATION, the (rj)-declared preconditions now met** (row publishing,
+stamp verified CURRENT): decide grep LIVE, `Dockerfile.navcook` →
+`AUTO_IMAGES`, spent provisioner DELETED (the (lr) rule — an armed
+provisioner is how a retired service gets resurrected). This push touches the
+bot file, so the now-live rule deploys nav-cook-shadow carrying the status
+fix in the same run — the (gm) "a routing fix cannot deploy itself" trap does
+not apply because the routed file is in the same push. Verify by the row's
+`extra.build` moving off `5aa8784f58d6`, not by the green run.
+
+**4 · QUEUE SWEEP (the maintenance rule's daily review):** three executed
+items left the file — 🪁 band-kelly provisioning (EXECUTED 18-Aug, first
+close now on the row), slate C 👩 mum (EXECUTED (rd)), GITHUB ACTIONS DARK
+(RESOLVED ~04:37Z, cost measurement kept in (ql)) — each closure re-verified
+against the live payload at closing time, per the 18-Aug sweep's precedent.
+
+Review headline, so the next session reads one line: **28 entries, ~12k
+insertions, 8 merges; one book born+activated (🧭), one activated+risk-upped
++re-priced (🪁, first close n=1 against the corrected +0.397% bar), one
+retired (👩); every real-money proposal today was measured and REFUSED
+((qp)/(qv)/(qq)/(qn)) — real money unchanged at ~$260 and the binding
+constraint is the capital decision, not code.** Carried: PR #192 (letters
+collision to resolve), 4 stale draft PRs, the ruin gate's enforced deploy
+behind its declared Farmer-long observation, richdad's ~7d tripwire,
+garrett's pre-registered read, the slate's operator decisions.
+
 ## 2026-08-19 (rl) — THE WHOLE FLEET STOPPED RECEIVING CODE FOR THREE HOURS AND CI NEVER SAID SO: a commented-out deploy rule left its `fi` uncommented
 
 **Found by verifying a deploy landed, not by any guard.** After `(rk)` merged I

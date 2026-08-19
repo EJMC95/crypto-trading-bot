@@ -517,8 +517,13 @@ def main():
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())
         equity = START_EQUITY + realized + open_pnl
         try:
+            # "online", NOT "running": the watchdog's NOT-ONLINE check accepts
+            # exactly {None, online, halted, paper} (fleet_watchdog_svc), so a
+            # "running" row pages on every sweep. This book shipped "running"
+            # for its first hour — copied from CLAUDE.md's own publish example,
+            # which said "running" and is corrected with this line.
             store.publish(
-                bot=bot_id, status="running", equity=round(equity, 2),
+                bot=bot_id, status="online", equity=round(equity, 2),
                 pnl_abs=round(equity - START_EQUITY, 2),
                 pnl_pct=(equity - START_EQUITY) / START_EQUITY,
                 open_trades=len(positions), closed_trades=n_closed,

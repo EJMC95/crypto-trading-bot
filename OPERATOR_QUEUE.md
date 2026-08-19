@@ -12,38 +12,7 @@ Recommended options are marked ★.
 
 ---
 
-## ⚡ ~~WAITING ON YOU~~ · 🪁 band-kelly — **EXECUTED 18-Aug ~22:16Z under your "Continue maverick" grant: PR #180/#181 merged, service provisioned by the one-shot dispatch (workflow deleted at activation per the (lr) rule), row verified by stamp readback (`5eea92e33277`/n=14 byte-equal to prediction). The readback surfaced and closed a second (ml) stale-reader instance (run 537). Activation + the pre-first-close fidelity pass land with the (qh) PR. Item closes at the next daily review.**
-
-**Born 18-Aug on your ask** (*"does the exact opposite of all of the major
-losing sequences"*): `lighter_band_kelly_bot.py`, the measured mirror of
-retired 🧲 Snap Back (founding claim crypto n=65, +0.605%/trade, t=+5.71 —
-`STUDY_BAND_KELLY_2026-08-18.md`; brkfade and dipfade measured and REFUSED,
-on the record). Everything is wired pre-provision (row map, dashboard,
-tests, image); the deploy rule ships COMMENTED because since (hj) an
-unresolvable service name is a hard error. Two steps:
-
-**A ★ — provision (you, or any session with Railway access, ~2 min):**
-
-```bash
-railway add --service band-kelly-shadow
-railway variables --service band-kelly-shadow \
-  --set "RAILWAY_DOCKERFILE_PATH=Dockerfile.bandkelly" \
-  --set "VENUE=lighter_shadow" \
-  --set 'DATABASE_URL=${{Postgres.DATABASE_URL}}'   # REFERENCE form, never a literal ((kb))
-railway up --service band-kelly-shadow --detach
-```
-
-**B — activation commit (any session, after the row publishes):** verify
-`band-kelly-lshadow` on /pnl.json carries an `extra.build` stamp matching
-the local prediction (`build_compute` against the image's own COPY set —
-compare `build_n` too, (fd)), then uncomment the three-line decide rule in
-`railway-redeploy.yml` (search "band-kelly") and move `Dockerfile.bandkelly`
-from `MANUAL_IMAGES_OK` to `AUTO_IMAGES` in `audit_deploy_coverage.py` —
-the exact kiyosaki/(mk) path. Then this item leaves the queue.
-
----
-
-## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — five I17 calls + one restrict-only cap, all from the fleet-wide audit `(qk)`
+## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — was five I17 calls + one restrict-only cap, from the fleet-wide audit `(qk)`; **C (👩 mum) EXECUTED 19-Aug `(rd)`** and left at the 19-Aug review sweep, four calls + the cap remain
 
 **Full evidence: `FLEET_AUDIT_2026-08-19.md`.** The audit's headline is that
 the fleet has **no open wound** — four of five loss centres are populations
@@ -74,11 +43,6 @@ escape on this cell (48 cells, zero winners) — *"the stall is edge."* Real
 capital ($197.31) sits on it. **This is explicitly NOT a tuning pass**; if you
 KEEP, the rationale should be recorded against the P=0.06/P=0.155 controls.
 
-### C ✅ — 👩 mum: **EXECUTED 19-Aug `(rd)`** — retired, ROW-scoped, reversible via `MUM_RETIRED_OVERRIDE=run`. Confirmed on its own ledger before acting: 3 closes lifetime, **all three opened 12-Jul so ZERO in-era**, ~2.4 closes/30d ⇒ ~12 months to the bar, funding drag −$2.15 > +$0.68 realised. Overturns the `(nf)` "green, slow" hold because that green is +$2.23 of OPEN MARKS (the `(lo)` precedent). 4 open paper positions freeze. Both halves + guard shipped, 5/5 mutations red. Exposed and fixed five tests that encoded "mum is alive"; `test_breakout4h_retired`'s survivor set is now DERIVED. Item closes at the next daily review.
-3 closes in 5.3 weeks, **0 in-era**, all four slots frozen in month-long trend
-holds; funding drag **−$2.15** exceeds **+$0.69** realised. `crypto-swing-daily`
-was retired at (nf) on n=3 in six weeks. mum was HELD as "green" — that green
-is **open marks, not evidence** (the (lo) precedent).
 
 ### D — 💼 turnbull and 📐 Grimes: starved by their own gates
 turnbull: **zero entries for 16.4 days**; every observed skip is
@@ -109,85 +73,18 @@ is worth two orders of magnitude.**
 
 ---
 
-## ✅ ~~19-Aug · GITHUB ACTIONS IS DARK~~ — **RESOLVED 19-Aug ~04:37Z (operator raised the spending limit). CI green, deploys running, PR #184 merged. The COST MEASUREMENT below is kept because it explains the recurrence and sizes it; the operator's decision on it is recorded and the item closes at the next daily review.**
-
-*Independently corroborated from the one signal that runs on `main` with no PR
-code in it: the `fleet-watchdog` hourly heartbeat went green again at run
-`32216819346` (**19-Aug 04:43:59Z**), ending the failure streak `32205969563`
-(01:43Z) · `32210855045` (03:04Z) · `32213741453` (03:53Z) whose last green
-predecessor was `32197328429` (18-Aug 23:28:37Z). That lands ~7 min after the
-limit was raised, so the two accounts of the recovery agree to the minute.*
-
-**THE DECISION (operator, 19-Aug): leave CI structure alone and raise the
-spending limit.** Recorded rather than re-litigated — the consolidation option
-below is measured, refused by decision, and must not be re-proposed as if it
-were an open question.
-
-**THE MEASUREMENT, because it explains why this recurs and why the 28-Jul fix
-only bought three weeks.** Actions bills PER JOB, rounded UP to a full minute:
-
-| workflow | structure | measured burn |
-|---|---|---|
-| `changelog-check` | **12 jobs × ~6–17s**, billed as 12 min | ~15–20 runs/day ⇒ **~5,400–7,200 min/mo** |
-| `fleet-watchdog` | 1 job, hourly | **~720 min/mo** |
-| `tests` + `ci-notify` | 2 jobs/run | ~1,400–2,900 min/mo |
-
-**Total ≈ 7,500–11,000 min/month against a 2,000 (Free) / 3,000 (Pro)
-allowance** on a PRIVATE repo (public repos are unmetered — this cost exists
-only because the repo is private). So the dominant cost is NOT the scheduled
-watchdog at ~10%; it is 12 parallel guard jobs each billing a full minute for
-ten seconds of work. **The 28-Jul cadence cut (30-min → hourly) targeted the
-10%**, which is why it bought three weeks rather than fixing it.
-
-**Consequence to expect, stated plainly:** at this burn the limit will be
-reached again. The measured options if that becomes annoying are (a) consolidate
-`changelog-check`'s 12 jobs into 1 job with 12 named steps (~5,000–6,600 min/mo,
-costs the at-a-glance red/green matrix on the PR page), or (b) make the repo
-public (unmetered, but needs a secrets-in-history audit first — credentials were
-rotated in early Aug and that history has NOT been audited). Neither is being
-done; both are priced here so the next session does not re-derive them.
-
----
-
-## ~~19-Aug · original report~~ — CI **and every auto-deploy** were down
-
-**The fleet's own watchdog diagnosed this before I did, and names the remedy:**
-`/watchdog.json` → *"GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last
-run_id 32197328429) — a billing lockout kills CI AND deploys silently (28-Jul
-scar); check the repo's Actions runs + Settings/Billing"*.
-
-Independently corroborated by bisecting scheduled runs on `main` (no PR code
-involved): `fleet-watchdog` succeeded hourly through **18-Aug 23:28:37Z** (13s)
-and has failed in **~3 seconds with no downloadable logs** ever since —
-19-Aug 01:43Z, 03:04Z. Every PR check on every branch, from two different
-sessions, fails identically. **The watchdog's `last run_id` is byte-equal to
-the last green run I isolated**, so two instruments agree on the boundary.
-
-**Why it matters beyond red checks:** the same lockout kills
-`railway-redeploy.yml`, which is the ONLY automated deploy path. **No shadow
-book can receive code until this clears** — including the `(qk)` correctness
-fixes, which are merged-pending and will sit in main doing nothing.
-
-**THE "JUST WAIT" OPTION IS RULED OUT, MEASURED.** The watchdog's *"billing
-lockout"* line is an INFERENCE from heartbeat age — it never reads billing — so
-it was worth testing against the one alternative that would mean do-nothing:
-a GitHub platform incident. `githubstatus.com/api/v2/summary.json`, 19-Aug
-04:2xZ: **"All Systems Operational", Actions `operational`, 0 active
-incidents.** GitHub is fine; the lockout is account-side. Also ruled out: a
-broken workflow file — **zero commits landed on `main` between the last green
-run (23:28Z) and the first red (01:43Z)**, so no change of ours caused it.
-
-**A — check Settings → Billing on the repo's account ★** (the 28-Jul scar is
-the precedent; a spend cap or exhausted minutes produces exactly this
-signature: instant failure, no logs, scheduled runs on `main` affected). With
-the platform ruled out and a code cause ruled out, this is the remaining
-explanation.
-
-**B — if billing is fine**, the fallback is a manual `railway up` per service
-for anything urgent, and CI stays advisory until Actions returns.
-
-No code change can fix this and none was attempted. PR #184 is unaffected by
-anything in its own diff.
+*Closed at the 19-Aug review sweep (`REVIEW_2026-08-19_TODAYS_WORK.md`), per
+each item's own "closes at the next daily review" clause, every closure
+re-verified against the live payload at closing time: the 🪁 band-kelly
+provisioning ⚡ item (EXECUTED 18-Aug ~22:16Z, activation landed with (qh);
+the row is publishing with its FIRST close, n=1, and reads CURRENT at HEAD),
+the slate's C — 👩 mum (EXECUTED 19-Aug (rd); row absent from /pnl.json,
+guard + hide + prune all shipped), and the GITHUB ACTIONS DARK incident
+(RESOLVED ~04:37Z by the operator raising the spending limit; watchdog
+problems [] at close). The Actions COST MEASUREMENT (≈7,500–11,000 job-min/mo
+vs a 2,000–3,000 allowance; consolidation and repo-public options priced,
+neither taken) lives in the (ql) changelog entry and this file's git history
+— expect the limit to be reached again on the current structure.*
 
 ---
 

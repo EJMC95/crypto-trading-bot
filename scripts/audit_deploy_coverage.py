@@ -467,7 +467,15 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                "Dockerfile.douglas": "book-douglas-shadow",
                "Dockerfile.grimes": "book-grimes-shadow",
                "Dockerfile.schwager": "book-schwager-shadow",
-               "Dockerfile.hull": "book-hull-shadow"}
+               "Dockerfile.hull": "book-hull-shadow",
+               # [2026-08-19] 🧭 nav-cook — moved here from MANUAL_IMAGES_OK
+               # at activation: service provisioned by the dispatched
+               # nav-cook-provision.yml (deleted in the same commit, the (lr)
+               # rule), row verified on /pnl.json CURRENT at HEAD via
+               # audit_code_currency after the pnl-dashboard reader catch-up
+               # dispatch (the stale reader was hiding the row — the exact
+               # (ml)/(rj) class).
+               "Dockerfile.navcook": "nav-cook-shadow"}
 
 
 # ---------------------------------------------------------------------------
@@ -480,15 +488,6 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
 # image is archaeology, I12).
 # ---------------------------------------------------------------------------
 MANUAL_IMAGES_OK = {
-    "Dockerfile.navcook": (
-        "🧭 nav-cook (nav-cook-shadow) — BORN 19-Aug (ri), PRE-PROVISION. The "
-        "service does not exist yet, so the deploy rule ships COMMENTED and "
-        "this image is declared here rather than in AUTO_IMAGES: an "
-        "unresolvable service name is the (gl) failure where four books' "
-        "levers reached no container for a day. MOVE IT TO AUTO_IMAGES at "
-        "activation, exactly as 🪁 band-kelly and 🛢️ Garrett were — the "
-        "(lr)/(mk) one-shot provisioner pattern."
-    ),
     "Dockerfile": (
         "The legacy single shared image from the pre-split era — its own header "
         "says each Railway service overrides the Start Command. No living "
