@@ -1,3 +1,42 @@
+## 2026-08-19 (rj) — 🧭 nav-cook's BIRTH-COMPLETION: five registrations without which the dashboard FILTERS THE ROW the provisioning readback is about to look for
+
+`(ri)` built the book and its substance is complete — snapshot_equity called,
+price telemetry passed, COOK_HARD_STOP declared, decide rule correctly
+COMMENTED pre-provision, image in MANUAL_IMAGES_OK. What the birth commit did
+not carry is REGISTRY membership, and one absence is a birth blocker measured
+against the live filter, not inferred: `pnl_dashboard` admits a row only when
+its base is in `CURRENT_BOTS` (`r["bot"] in CURRENT_BOTS or
+venue_variant(r["bot"])[0] in CURRENT_BOTS`), and "nav-cook" was in no
+constituent set — so `nav-cook-lshadow` would publish to bot_pnl and be
+DROPPED from /pnl.json, sending the provisioning verification chasing a ghost
+row exactly the way the (ml) stale-reader incident did at 🪁 band-kelly's
+birth (an hour of "missing rows" against healthy writers).
+
+Registered, using the book's own constants read from its module:
+
+* `pnl_dashboard.py` — VARIANT_ONLY + "nav-cook" (the admission), an
+  OVERTRADE_LIMIT (20 — 4h holds x 4 slots), LABELS + DESCRIPTIONS.
+* `scripts/fleet_books.py` ROW_ENTRY — code-currency stamp resolution.
+* `tests/autonomy/test_mtm_equity_series.py` MTM_REQUIRED — the call exists
+  since (ri); membership makes a future edit REMOVING it go red (the belt;
+  the sweep alone stops caring the moment the call disappears).
+* `tests/autonomy/test_exit_telemetry.py` PRICE_BOOKS — same shape for the
+  (gr) price contract.
+* `tests/autonomy/test_stop_vs_gate.py` STOPS — ("lighter_nav_cook_bot",
+  "COOK_HARD_STOP"), 5% inside the 15% bar, per that file's header rule.
+
+DELIBERATELY NOT TOUCHED: the book itself, the commented decide rule, the
+provisioner path, MANUAL_IMAGES_OK — activation stays the (ri) session's own
+flow. This is completing a sibling's house, not moving into it.
+
+DECLARED, because the record should carry it: this session had independently
+built the SAME cell as `nav-flinders` (same study, convergent constants —
+$80x4, 4h, 5%, 0.5M floor, fail-closed class screen) before (ri) landed on
+main mid-build. Two books on one cell is I20's one-bet-held-twice, and (ri)
+is the operator-directed build ("named after the likes of captain cook and
+such"), so the flinders build was DISCARDED unpushed and its registry work
+re-aimed here. Cost: one session's build time; letters were never consumed.
+
 ## 2026-08-19 (ri) — 🧭 nav-cook IS BORN: the [45,60)bps dislocation band that TILES BELOW 🪁 band-kelly's floor, measured to a plateau before a line was written
 
 **Operator: *"find a few different horizons and gates that actually work, build
