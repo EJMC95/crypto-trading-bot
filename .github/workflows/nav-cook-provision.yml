@@ -1,0 +1,87 @@
+# One-shot provisioning for 🧭 nav-cook (the chart-the-shallows book) — DELETE
+# AFTER USE. [2026-08-19 (ri)] A faithful copy of the band-kelly provisioner
+# (itself the final books-provision shape with every (ml) postmortem fix), with
+# only the service/image/row names changed. Nothing else was "improved": this
+# file's value is that it is the version that already worked.
+# (an armed provisioning tool is how a retired service gets resurrected by
+# accident — the (lr) rule; the wave-2 provisioner was deleted at (mk)
+# activation, this one goes the same way). Creates the shadow service, sets
+# its env-only config + the DATABASE_URL REFERENCE form ((kb)), and runs the
+# first deploy with the redeploy workflow's retry shape. The repo's
+# project-scoped RAILWAY_TOKEN does the work; sessions hold no credentials.
+#
+# Faithful copy of the FINAL books-provision.yml (all four (ml) postmortem
+# fixes included: no grep -q pipelines under pipefail, herestring-free
+# checks) with ONE deliberate change: the `railway variables` read-back echo
+# is GONE — (ml)'s own postscript measured that its sed redaction survived
+# by column-width luck, and the standing rule is now "logs carry variable
+# NAMES only; the --set exit code is the check".
+#
+# A green run here is NOT a running book — the proof is the row
+# nav-cook-lshadow publishing on /pnl.json with an extra.build stamp
+# matching the local prediction ((iw)/(fd): compare build AND build_n).
+name: Provision nav-cook
+on:
+  workflow_dispatch: {}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Create service, set variables, first deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          SVC="nav-cook-shadow"
+          DF="Dockerfile.navcook"
+
+          echo "::group::$SVC — create (tolerated if it already exists)"
+          railway add --service "$SVC" || railway add -s "$SVC" || \
+            echo "railway add failed — service may already exist; continuing to verify"
+          echo "::endgroup::"
+
+          echo "::group::$SVC — verify the service resolves"
+          status_json="$(railway status --json || true)"
+          case "$status_json" in
+            *"\"$SVC\""*) : ;;
+            *)
+              echo "::error::service '$SVC' did not resolve after create"
+              printf '%s\n' "$status_json" | head -50
+              exit 1
+              ;;
+          esac
+          echo "::endgroup::"
+
+          echo "::group::$SVC — set variables"
+          # The DATABASE_URL REFERENCE form ((kb): a literal URL on any
+          # service is a defect). Assembled in shell so GitHub's own
+          # dollar-double-brace expression parser never sees it — and this
+          # comment cannot name that token literally either: Actions scans
+          # the ENTIRE run scalar, comments included ((lr), 422).
+          DB_REF="$(printf '$%s' '{{Postgres.DATABASE_URL}}')"
+          railway variables --service "$SVC" \
+            --set "VENUE=lighter_shadow" \
+            --set "RAILWAY_DOCKERFILE_PATH=${DF}" \
+            --set "DATABASE_URL=${DB_REF}" \
+            --skip-deploys || { echo "::error::$SVC variable set failed"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::$SVC — first deploy"
+          ok=0
+          for i in 1 2 3; do
+            if railway up --service "$SVC" --ci; then ok=1; break; fi
+            echo "retry $i failed; sleeping"; sleep 15
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::$SVC railway up failed x3"; exit 1
+          fi
+          echo "::endgroup::"
+          echo "Provisioned. Verify by the ROW: nav-cook-lshadow on"
+          echo "/pnl.json with extra.build stamped — a green run is NOT that proof."
