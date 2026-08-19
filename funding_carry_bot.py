@@ -119,7 +119,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # funding distribution has collapsed — a market condition, not a defect. This
 # removes a STRUCTURAL blind spot in the rail; it does not buy a trade today
 # and must not be reported as if it did.
-# [2026-08-18 (pr) CORRECTED IN PLACE per I12 — the "zero unlock" above was a
+# [2026-08-18 (px) — letter corrected from a stale (pr) at (qx); (pr) is the Farmer halt entry — CORRECTED IN PLACE per I12 — the "zero unlock" above was a
 # POINT-IN-TIME census (3-Aug's loop), and over the whole tape it does not
 # hold. Measured on 9,996 scout snapshots / 34.9 days through
 # audit_book_overlap.supply_in (the gate rule's one owner): cell occupancy
@@ -135,7 +135,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # unmeasured — irrelevant to this MODELLED shadow book's fills, real for any
 # future go-live, and the real-money floors ({xp,live}.funding.min_vol)
 # are untouched by this change.
-MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (pr): 2e6 -> 1e6]
+MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (px): 2e6 -> 1e6]
 
 # Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
 # HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
@@ -166,8 +166,51 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #   * bleed stop                       (catastrophic guard on adverse holds)
 # Entries additionally require the rate to have stayed hot >= PERSIST_H — the
 # research-backed filter: persistent funding pays carries, spikes pay fees.
-PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
-# [2026-08-18 (pr)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
+# [2026-08-18 (qx)] PERSIST 6h -> 12h — the ONE half (px) deliberately parked,
+# shipped under the operator's queue directive ("implement all operator queue
+# items that make the fleet improve/make more profit and win rate"). Evidence:
+# STUDY_FUNDING_LIFECYCLE_2026-08-15.md §4 (E4), the cell's own 205d episode
+# walk — per-episode net is MONOTONE INCREASING in persistence: P=1 -0.064%
+# (enter-immediately LOSES -21.8%, t=-5.9) -> P=6 +0.016% -> P=12 +0.161%
+# (t=1.80, BOTH halves positive, I16 lower bound 0.046) -> P=24 +0.269% (n=8
+# only). Referee: reproduced exactly, LAG-1 clean, NOT denominator shrinkage
+# (TOTAL net also peaks at P=12: +4.2% vs P=6's +1.5%) — and it is consistent
+# with 🧮 Hull's independently measured 24h persist on its own band.
+# HYPOTHESIS-GRADE, stated plainly: n=26 episodes, t below the 2.0 bar. The
+# I19 price is declared: this is RESTRICT-direction (admits strictly fewer
+# entries), and the study's own supply census says the 6h gate already
+# consumes 81% of qualifying window-hours and misses 91% of windows outright
+# (median window 2h) — 12h consumes more still; fewer, better episodes is the
+# measured trade, not a free lunch. Shipped at the cleanest boundary this
+# book offers: ZERO open positions, census `eligible 0 / waiting 2` under the
+# new $1M floor, so no mid-hold rule change and every future close opens
+# under 12h. Ordinary entry tuning per (hc) — the era is unchanged, and the
+# ~30-Aug keep-or-retire docket call is UNTOUCHED (if that call is retire,
+# this dies with the book at zero cost, exactly as the queue item priced it).
+# TWO MORE COSTS, DECLARED (the same-hour referee wave, (qx)):
+# (1) TIER TRANSFER UNMEASURED — the §4 walk ran on the pre-(px) ≥$2M cell;
+#     the [$1M,$2M) tier (px) admitted three days later (ROBO/ENA/XRP, now
+#     the MAJORITY of the widened cell's occupancy) was not in its episode
+#     sample. Direction only there: P=1 loses everywhere it has ever been
+#     measured, and the thin-tier study found thin-tier funding RICHER per
+#     episode — but 12h-vs-6h on that tier is a hypothesis, not a number.
+# (2) FAILOVER BLACKOUT DOUBLED — `restore_hot_since` runs at BOOT only, so
+#     when the (hp) failover pair flips, the takeover container starts cold
+#     clocks and cannot enter until a fresh window persists the full gate:
+#     that blackout is now ≥12h instead of ≥6h, on a supply whose median
+#     window is 2h. **CORRECTED AND PART-CLOSED at (qy) the same day — read
+#     that entry, not this paragraph. (a) This described the wrong failure:
+#     on a real pair flip the pre-fix clock was stale-and-PRESENT (permissive
+#     entry), never cold, because the standby container's boot restore
+#     succeeded while the incumbent was alive. (b) The far worse half was
+#     stale POSITIONS — a silently RESTATED close (not a duplicate row: the
+#     trade_id collides and the upsert overwrites) and lost opens. (c) The
+#     BLACKOUT ITSELF IS NOT CLOSED and is now DETERMINISTIC: the claim TTL
+#     (1800s) exceeds the clock-restore bound (900s), so `takeover_step`
+#     always starts a takeover on cold clocks. That is the accepted price of
+#     refusing the permissive path.**
+PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qx): 6.0 -> 12.0]
+# [2026-08-18 (px)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
 # (scripts/study_books_cohort_2026-08-13.py, this cell's OWN gate and coins,
 # 250d of settled fundings): grace 1h = +$27.25, t=1.95, h2 NEGATIVE, with
 # **192 of 231 exits churning the 30bps RT on sign wobbles**; 6h = +$41.17,
@@ -177,7 +220,10 @@ PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
 # flips. 6h over the 24h optimum for decidability (I17) — ~79% of the close
 # cadence at double the per-trade expectancy — and it mirrors PERSIST_H: six
 # hours of proof to buy, six to sell (the same choice 🏦 Rich Dad made on
-# this cell at (mf)). (mf) QUEUED this change to protect carry's mid-window
+# this cell at (mf)). [(qx) broke that mirror DELIBERATELY: entry persistence
+# moved to 12h on its own §4 measurement while this exit grace stays at its
+# own measured 6h — each side sits on its own evidence, and symmetry was
+# never the argument for either.] (mf) QUEUED this change to protect carry's mid-window
 # sample; that sample froze on 12-Aug ((pf): the class screen means it
 # CANNOT update), and the book held ZERO positions when this shipped, so
 # every future close is opened under the new rule — the cleanest policy
@@ -185,7 +231,7 @@ PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
 # "do not move from prose" pin is about ITS OWN uncalibrated replay ((he));
 # this move rides the (mf) harness instead, which the fleet already consumed
 # for Rich Dad. Ordinary exit tuning per (hc) — the era is unchanged.
-FLIP_GRACE_H = float(os.environ.get("CARRY_FLIP_GRACE_H", "6.0"))  # hours of adverse funding before a flip-close [2026-08-18 (pr): 1.0 -> 6.0]
+FLIP_GRACE_H = float(os.environ.get("CARRY_FLIP_GRACE_H", "6.0"))  # hours of adverse funding before a flip-close [2026-08-18 (px): 1.0 -> 6.0]
 FEE_PAYBACK_MARGIN = 0.10  # $ net (after ALL fees incl. close) for a decay-close
 BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
 
@@ -383,6 +429,146 @@ def _class_ok(coin):
         return bool(fleet_bus.is_crypto(coin))
     except Exception:      # noqa: BLE001 — a class lookup must never stop a scan
         return True
+
+
+def reclaim_after_standby(saved, ok_read, now, gap_cap_s=48 * 3600.0):
+    """[(qy)] What a container must ADOPT the moment it wins the claim after
+    standing down — (ok, positions, hot_since, last_ts, why).
+
+    THE DEFECT THIS CLOSES. `(hp)` made the two carry containers a deliberate
+    failover pair: whichever claims the book first keeps it, the other IDLES
+    and re-checks every loop. The idler's durable-state restore runs ONCE, at
+    BOOT (`load_state_required` + `funding_basis.restore_hot_since`), and the
+    standby branch `continue`s before every bookkeeping step — so a container
+    that stands by for hours and then takes over resumes from **its own boot
+    snapshot of a world the incumbent has been moving ever since**. All three
+    halves of that world are stale, and they fail in different directions:
+
+      * `positions` — the incumbent opened and closed carries during the
+        standby. Adopting the old map means REOPENED phantoms (a coin the
+        incumbent already closed is closed a SECOND time) — and note WHAT that
+        does, because the obvious guess is wrong and would send the operator
+        to a scan that finds nothing: `paper_trades` is `PRIMARY KEY (bot,
+        trade_id)` with `ON CONFLICT DO UPDATE`, and this book's `trade_id` is
+        `{coin}:{opened_ts}` — IDENTICAL for the same position record. So the
+        second close does not append a duplicate row, it **silently RESTATES
+        the existing one**: stale `pnl_abs`/`pnl_pct`, a wrong `closed_at`, a
+        possibly wrong exit `reason`, and `n` unmoved. A duplicate-`trade_id`
+        scan is blind to it BY CONSTRUCTION — the mirror of `(hf)`, where two
+        writers' ids never collided; here they always do. Plus LOST opens (the
+        takeover's first `save_state` overwrites the durable record with the
+        older map, so carries the incumbent opened simply vanish) and a
+        possible double-open of a coin already held, which DOES produce a
+        genuine second row.
+      * `hot_since` — a coin hot at boot and hot now reads as persisted for
+        the WHOLE standby, though nobody observed the hours between. That is
+        the PERMISSIVE failure `(iu)`/`(iq)` exist to refuse — a spike entry
+        wearing a streak, on the one book whose thesis is "persistent funding
+        pays carries, spikes pay fees". `(qx)` doubled the exposure by moving
+        the gate 6h -> 12h, which is what surfaced this.
+      * `last_ts` — the accrual clock. Stale positions + a stale clock happen
+        to be self-consistent (both are the same boot snapshot), which is
+        exactly why this must be adopted ATOMICALLY with the other two: fresh
+        `accrued` values under an old clock would re-credit the whole standby
+        gap, the `(nc)` phantom-accrual class that already inflated this
+        book's pooled ledger by ~$13.
+
+    FAIL-CLOSED, in the one direction that matters: `ok_read` False means the
+    read itself failed (`load_state_checked`'s third state), and the caller
+    must then trade NOTHING and — critically — save NOTHING, because a save
+    from an unverified map is what destroys the durable record. Refusing costs
+    one loop; guessing costs the ledger. A genuinely empty state (`ok_read`
+    True, `saved` None) is a real answer and is adopted as a flat book.
+
+    WHAT THE CLOCK ACTUALLY DOES HERE, stated because the arithmetic is not
+    obvious and the first version of this docstring implied the opposite: a
+    takeover is only reachable once the incumbent's claim has EXPIRED
+    (`WRITER_CLAIM_TTL` 1800s), and the incumbent saves `saved_ts` in the same
+    loop whose top refreshed that claim — so the gap at the earliest possible
+    takeover is ~1798s, already **2x** `funding_basis.HOT_RESTORE_MAX_GAP_S`
+    (900s). `restore_hot_since` therefore returns `{}` in essentially EVERY
+    real failover. That is the correct answer (nobody observed those hours),
+    and it is a TRADE, not a free win: the pre-fix permissive clock is gone,
+    and what replaces it is a deterministic cold start — every coin must
+    re-prove the full `PERSIST_H` before this container may enter. Say it
+    plainly rather than calling the entry blackout "closed".
+
+    PURE: no clock, no DB, no globals — `now` is passed in, and the hot-streak
+    rule stays `funding_basis`'s (ONE owner, `(iu)`), so this cannot drift
+    from the boot path it mirrors.
+    """
+    if not ok_read:
+        return (False, None, None, None,
+                "durable state read FAILED — refusing to trade or save on an "
+                "unverified map (the seed-on-failed-read class, (jd))")
+    saved = saved or {}
+    pos = saved.get("positions")
+    positions = dict(pos) if isinstance(pos, dict) else {}
+    import funding_basis          # function-local, matching this file's idiom
+    hot_since, why = funding_basis.restore_hot_since(saved, now)
+    try:
+        _lt = float(saved.get("last_ts") or 0)
+    except (TypeError, ValueError):
+        _lt = 0.0
+    # Same bound the boot path uses: ancient state must not over-accrue.
+    last_ts = max(_lt, now - gap_cap_s) if _lt else now
+    return (True, positions, hot_since, last_ts,
+            f"adopted {len(positions)} open carry position(s); {why}")
+
+
+def takeover_step(store, bot_id, now):
+    """(proceed, world, why) — THE WHOLE TAKEOVER, behind one testable call.
+
+    **THE INVARIANT: a takeover must reconstruct exactly what a fresh BOOT
+    reconstructs.** Boot reads four things — the ledger aggregate
+    (`fetch_paper_aggregate`), `positions`, the gap-bounded `hot_since`, and
+    `last_ts`. The first version of this fix adopted only the last three, and
+    that omission was a REGRESSION rather than an inherited gap:
+
+        incumbent closes one carry for +$4.00 during the standby, then dies
+        TRUTH                equity 1055.32  closed 101  pnl_abs +54.00
+        before this fix      equity 1055.32  closed 100  pnl_abs +50.00
+        with positions only  equity 1051.32  closed 100  pnl_abs +50.00  <-- -$4.00
+
+    Before the fix the book carried TWO stale halves that cancelled: for a
+    funding book `open_pnl = accrued - fees`, so the closed coin still sitting
+    in the stale position map approximated its own realised P&L almost exactly.
+    Adopting fresh positions against a STALE aggregate breaks the cancellation
+    and books a step-down with no trade behind it — `closed_trades` on the row
+    goes BACKWARDS, and the same wrong equity is appended to `<bot>:equity` by
+    `snapshot_equity`, which `golive_readiness.apply_mtm` reads worse-of-both
+    for the 15% max-drawdown GO-LIVE bar. On this book. So the aggregate is
+    re-read here, under the same fail-closed rule as the state.
+
+    FAIL-CLOSED ON EITHER READ. `load_state_checked` distinguishes "no row"
+    from "could not find out"; `fetch_paper_aggregate` returns None on any
+    failure. Either one unresolved means HOLD — trade nothing, save nothing,
+    keep the flag set and retry next loop. Deliberately NOT boot's
+    `load_state_required`, whose refusal is a `SystemExit`: crash-looping a
+    container that is already holding live positions is worse than waiting.
+
+    The store is injected rather than imported so this is drivable end-to-end
+    against a fake — the a6ce1b2 lesson, which the first cut of these tests
+    did not apply: AST arms that check an identifier appears in a shape cannot
+    see values, argument bindings, dead code or self-assignment, and that is
+    where every realistic regression in this branch lives.
+    """
+    ok_read, saved = store.load_state_checked(bot_id)
+    ok, positions, hot_since, last_ts, why = reclaim_after_standby(
+        saved, ok_read, now)
+    if not ok:
+        return False, None, why
+    agg = store.fetch_paper_aggregate(bot_id)
+    if agg is None:
+        return False, None, (
+            "ledger aggregate read FAILED — refusing to trade or save with a "
+            "fresh position map against stale realised totals (the step-down "
+            "that reaches the go-live MTM bar)")
+    return True, {"positions": positions, "hot_since": hot_since,
+                  "last_ts": last_ts, "realized": float(agg["realized"]),
+                  "n_closed": int(agg["closed"]), "n_wins": int(agg["wins"])}, (
+        f"{why}; ledger {int(agg['closed'])} closes / "
+        f"{float(agg['realized']):+.2f} realised")
 
 
 def scan_census(fund, positions, hot_since, t0, H, enter_apr,
@@ -710,6 +896,12 @@ def main():
     except Exception:  # noqa: BLE001 — incl. unbound saved-state
         _lt = 0.0
     last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
+
+    # [(qy)] Did THIS process stand down? The durable restore above runs once,
+    # at boot; a container that idles behind the (hp) claim and later wins it
+    # would otherwise resume from a boot snapshot of a world the incumbent has
+    # been moving for hours. See `reclaim_after_standby`.
+    _stood_down = False
     while True:
         t0 = time.time()
         # [2026-07-31 (hp)] SOLE-WRITER ENFORCEMENT, at the TOP of the loop.
@@ -795,8 +987,55 @@ def main():
                 })
             except Exception:  # noqa: BLE001
                 pass
+            # [(qy)] Remember it, so WINNING the claim later re-adopts the
+            # durable world instead of this process's stale boot snapshot.
+            _stood_down = True
             time.sleep(LOOP_SECONDS)
             continue
+
+        # [(qy)] TAKEOVER: this process has just WON a claim it did not hold.
+        # Adopt the incumbent's durable world before touching the book — the
+        # boot restore ran once and everything in memory is that old snapshot.
+        # Fail-CLOSED: on a failed read, trade NOTHING and save NOTHING this
+        # cycle (the flag stays set, so the next loop retries the adoption)
+        # rather than overwrite the durable record from an unverified map.
+        if _stood_down:
+            _proceed, _world, _why_adopt = takeover_step(
+                store, bot_id, time.time())
+            if not _proceed:
+                print(f"[{now_iso()}] TAKEOVER HELD — {_why_adopt}", flush=True)
+                try:
+                    # [(qy)] The held state gets a KEY, for the same reason
+                    # standing down does ((ic)): otherwise this container is
+                    # byte-identical to a dead one — the row simply stops
+                    # moving with `status: "online"` as its last word (I1),
+                    # and both audit_ledger_integrity and fleet_immune send
+                    # the operator to the standby key to tell them apart.
+                    store.save_state(_standby_key(bot_id), {
+                        "standing_down": True,
+                        "takeover_held": _why_adopt,
+                        "book": bot_id,
+                        "svc": store.service_name() or None,
+                        "venue": ctx.mode,
+                        "caps": {"max_positions": MAX_POSITIONS,
+                                 "enter_apr": _enter_apr},
+                        "updated": now_iso(),
+                        "ttl_sec": store.WRITER_CLAIM_TTL,
+                    })
+                except Exception:  # noqa: BLE001
+                    pass
+                time.sleep(LOOP_SECONDS)
+                continue
+            positions = _world["positions"]
+            hot_since = _world["hot_since"]
+            last_ts = _world["last_ts"]
+            realized = _world["realized"]
+            n_closed = _world["n_closed"]
+            n_wins = _world["n_wins"]
+            _stood_down = False
+            print(f"[{now_iso()}] TAKEOVER — claim won after standing down; "
+                  f"{_why_adopt}", flush=True)
+
         # [2026-07-30] Re-read the growth rail EVERY loop, then RE-DERIVE the
         # bars through the same one-owner `_bars()` call. Both halves matter:
         # a lever that moved ENTER_APR without this re-derivation would be
@@ -1109,9 +1348,15 @@ def main():
                                     "enter_apr": _enter_apr,
                                     "min_vol": MIN_DAY_VOLUME, "max_vol": None,
                                     "crypto_only": not ALLOW_NONCRYPTO,
-                                    # [(pr)] the exit gate publishes like the
+                                    # [(px)] the exit gate publishes like the
                                     # entry gate ((lz)/(pf) doctrine)
-                                    "flip_grace_h": FLIP_GRACE_H},
+                                    "flip_grace_h": FLIP_GRACE_H,
+                                    # [(qx)] the persistence gate too — an
+                                    # unpublished gate made the (lz)/(pf)
+                                    # collisions undetectable, and this one
+                                    # now DIFFERS from 🏦 Rich Dad's 6h on
+                                    # the shared cell
+                                    "persist_h": PERSIST_H},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation

@@ -79,7 +79,13 @@ def _incident():
 
 def _census():
     fund, positions, hot_since = _incident()
-    return carry.scan_census(fund, positions, hot_since, T0, H, BAR)
+    # persist_h is pinned to 6.0 — the gate in force on 2-Aug — for the same
+    # reason H and BAR are passed explicitly: this fixture reconstructs THE
+    # INCIDENT, and must not silently re-grade it under whatever the module
+    # default has since become ((qx) moved it to 12h on the §4 measurement;
+    # the CURRENT default is pinned in test_carry_persistence_gate.py).
+    return carry.scan_census(fund, positions, hot_since, T0, H, BAR,
+                             persist_h=6.0)
 
 
 def test_the_incident_reads_as_liquidity_not_a_stall():
@@ -172,8 +178,10 @@ def test_a_held_coin_is_counted_once_and_never_as_a_candidate():
 # ---------------------------------------------------------------------------
 
 def test_a_hot_liquid_persistent_noncrypto_book_is_screened_not_eligible():
+    # 13h hot: "persistent" means past the CURRENT 12h gate ((qx)), so this
+    # test keeps meaning what its name says as the default moves.
     fund = {"WTI": _f(HOT, 16_810_000), "KAITO": _f(HOT, 3_011_700)}
-    hot = {"WTI": T0 - 9 * 3600, "KAITO": T0 - 9 * 3600}
+    hot = {"WTI": T0 - 13 * 3600, "KAITO": T0 - 13 * 3600}
     c = carry.scan_census(fund, {}, hot, T0, H, BAR)
     assert c["noncrypto"] == 1 and c["eligible"] == 1, c
     # gate ORDER: class is judged LAST, so the bucket means "blocked by class
@@ -186,7 +194,7 @@ def test_a_hot_liquid_persistent_noncrypto_book_is_screened_not_eligible():
 def test_the_screen_is_reversible_without_a_deploy(monkeypatch):
     monkeypatch.setattr(carry, "ALLOW_NONCRYPTO", True)
     fund = {"WTI": _f(HOT, 16_810_000)}
-    c = carry.scan_census(fund, {}, {"WTI": T0 - 9 * 3600}, T0, H, BAR)
+    c = carry.scan_census(fund, {}, {"WTI": T0 - 13 * 3600}, T0, H, BAR)
     assert c["eligible"] == 1 and c["noncrypto"] == 0, c
 
 
@@ -195,7 +203,7 @@ def test_a_missing_fleet_bus_fails_open(monkeypatch):
     dark-scout fallback INSIDE `is_crypto` is the load-bearing degrade."""
     monkeypatch.setattr(carry, "fleet_bus", None)
     fund = {"WTI": _f(HOT, 16_810_000)}
-    c = carry.scan_census(fund, {}, {"WTI": T0 - 9 * 3600}, T0, H, BAR)
+    c = carry.scan_census(fund, {}, {"WTI": T0 - 13 * 3600}, T0, H, BAR)
     assert c["eligible"] == 1 and c["noncrypto"] == 0, c
 
 
@@ -307,15 +315,17 @@ def test_next_never_promises_a_coin_the_class_screen_will_refuse():
     ADMISSIBLE waiter; the screened coin still counts as `waiting`."""
     # SKHYNIXUSD: hot, liquid, 2.25h into a 6h persistence -> eta 3.75h.
     # KAITO: hot, liquid, crypto, only 1h in -> eta 5h (LATER than SKHYNIX).
+    # persist_h pinned to the incident's own 6h gate, the _census() rationale.
     fund = {"SKHYNIXUSD": _f(HOT, 30_100_000), "KAITO": _f(HOT, 3_011_700)}
     hot = {"SKHYNIXUSD": T0 - 2.25 * 3600, "KAITO": T0 - 1.0 * 3600}
-    c = carry.scan_census(fund, {}, hot, T0, H, BAR)
+    c = carry.scan_census(fund, {}, hot, T0, H, BAR, persist_h=6.0)
     assert c["waiting"] == 2, c            # the bucket contract is untouched
     assert c["next"] == "KAITO", c         # the sooner NON-admissible coin lost
     assert c["next_eta_h"] == pytest.approx(5.0, abs=0.01), c
     # With ONLY the screened coin waiting there is no honest promise at all.
     c2 = carry.scan_census({"SKHYNIXUSD": _f(HOT, 30_100_000)}, {},
-                           {"SKHYNIXUSD": T0 - 2.25 * 3600}, T0, H, BAR)
+                           {"SKHYNIXUSD": T0 - 2.25 * 3600}, T0, H, BAR,
+                           persist_h=6.0)
     assert c2["waiting"] == 1 and "next" not in c2, c2
 
 

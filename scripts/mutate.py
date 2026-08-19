@@ -48,6 +48,7 @@ EVERY mutation was killed. Anything else is a finding: a survivor means the
 suite does not actually test the thing you just changed.
 """
 import argparse
+import ast
 import os
 import pathlib
 import shutil
@@ -110,6 +111,59 @@ def git_restore(path):
     subprocess.run(["git", "checkout", "--", str(path)], check=True)
 
 
+def uncommitted(path):
+    """Does `path` have changes git would DISCARD on `checkout --`?
+
+    [2026-08-19 (qy)] THE SIXTH BUG IN THIS FAMILY — `(qg)` above enumerates
+    five, and this is the next — and the first one this harness itself caused. `git_restore` above is `git checkout -- <target>`: between
+    every mutation it throws the file back to HEAD. Run against a target whose
+    fix is still UNCOMMITTED and the first restore **silently deletes the work
+    being tested** — the round then reports a red restore (correctly, and only
+    because the tests were already written), but the code is already gone.
+    Measured the day this shipped: an entire takeover-state fix, rebuilt from
+    scratch.
+
+    The docstring did say "restored from git". Knowing is not guarding — the
+    same gap CHANGELOG `(qg)` names in its own body ("Having a note is not
+    applying it"). So the harness now REFUSES rather than warns: a warning on a run
+    that then destroys your file is indistinguishable from a clean run until
+    you look, which is the (gl) "a guard whose only output is a warning is not
+    a guard" rule.
+
+    WHAT `git checkout --` ACTUALLY DOES, measured rather than assumed — the
+    first version of this docstring got it wrong and the error survived into
+    the operator-facing message:
+
+        staged only   `M  f.py`   after restore: the STAGED content SURVIVES
+        unstaged      ` M f.py`   after restore: destroyed  <-- the real bite
+        untracked     `?? f.py`   restore FAILS, rc=1, `check=True` kills the run
+
+    It restores from the INDEX, not from HEAD. So a staged fix is not deleted,
+    and a round on a staged target really is testing your change. This still
+    refuses on staged — a round whose baseline is one thing and whose restore
+    is another is not worth reasoning about — but it refuses as a CONSERVATIVE
+    choice, not because the work would be lost. The remedy is COMMIT: stashing
+    removes the fix, so a round after `git stash` genuinely measures
+    HEAD-without-your-change while looking exactly like a round that passed.
+
+    Returns False (permissive) when git cannot answer — outside a repo, or git
+    absent. There is nothing to protect in that case, and this must not become
+    a reason a legitimate round cannot run.
+    """
+    try:
+        proc = subprocess.run(["git", "status", "--porcelain", "--", str(path)],
+                              capture_output=True, text=True, timeout=30)
+    except Exception:                             # noqa: BLE001 — git absent
+        return False
+    if proc.returncode != 0:
+        return False
+    # Any porcelain line for the path means git holds a different version than
+    # the tree. Unstaged is the one that is DESTROYED; untracked FAILS the
+    # restore outright; staged survives but makes baseline and restore
+    # disagree. All three invalidate the round, so all three refuse.
+    return bool(proc.stdout.strip())
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("target", nargs="?", help="source file to mutate")
@@ -125,24 +179,40 @@ def main(argv=None):
         ap.error("target, --tests and at least one --mutation are required")
 
     target = pathlib.Path(args.target)
-    # [19-Aug, first field use] REFUSE A DIRTY TARGET. Restore is
-    # `git checkout --`, which restores to HEAD — so running against an
-    # UNCOMMITTED fix silently destroys the fix at the first restore and the
-    # round "verifies" the pre-fix file. That is [[commit-before-mutation-
-    # rounds]] enforced in code rather than remembered: this tool wiped its
-    # own author's uncommitted edit the first time it was used in anger.
-    dirty = subprocess.run(["git", "diff", "--quiet", "--", str(target)])
-    if dirty.returncode != 0:
-        print(f"!! {target} has UNCOMMITTED changes. Commit first — restore "
-              "is `git checkout`, which would destroy them and mutate the "
-              "WRONG baseline. Nothing was run.")
-        return 2
     muts = []
     for spec in args.mutation:
         if "=>" not in spec:
             ap.error(f"mutation must be 'old=>new': {spec!r}")
         old, new = spec.split("=>", 1)
         muts.append((old, new))
+
+    # [(qy)] THE TARGET MUST BE COMMITTED. Every restore is `git checkout --`,
+    # so uncommitted work in the target is destroyed by the FIRST mutation.
+    # Refuse, loudly, before anything is touched.
+    #
+    # TWO SESSIONS FOUND THIS THE SAME DAY, and a `git diff --quiet` version
+    # landed on main first ([[commit-before-mutation-rounds]] — its memory
+    # pointer is kept here because it is the better name for the class). The
+    # two were COLLAPSED into this one rather than left side by side, because
+    # two copies of a rule are two rules ((hj)) and the first to run makes the
+    # second dead code. This is the surviving implementation on the merits,
+    # not on order: `git diff --quiet` compares worktree to INDEX, so it is
+    # blind to a STAGED-only fix (baseline and restore then silently
+    # disagree) and to an UNTRACKED target (where `git checkout --` fails
+    # outright under `check=True`, killing the round mid-way). `git status
+    # --porcelain` catches all three, fails OPEN where git cannot answer, and
+    # carries the measured index-vs-HEAD semantics plus a positive-control
+    # suite. That entry's comment also asserts the restore goes "to HEAD",
+    # which the measurement in `uncommitted()` refutes.
+    if uncommitted(target):
+        print(f"!! {target} has uncommitted changes, and every mutation "
+              f"restores it with `git checkout --`.\n   Unstaged edits are "
+              f"DELETED by that restore; an untracked file fails it outright; "
+              f"staged content survives but leaves baseline and restore "
+              f"disagreeing.\n   COMMIT the target first, then re-run — do "
+              f"NOT stash, which removes the very fix you are trying to test "
+              f"and leaves the round measuring HEAD without it.")
+        return 2
 
     # BASELINE FIRST. A round that starts red says nothing about the mutants.
     verdict, proc = run_tests(args.tests)
@@ -233,7 +303,32 @@ def _selftest():
         broken.write_text("def f(:\n", encoding="utf-8")
         assert compiles(broken) is False
 
-        # 5. the bytecode defence is declared where it is used, not assumed
+        # 5. [(qy)] the dirty-target guard is PERMISSIVE where git cannot
+        #    answer (a temp dir is not a repo) — it must never block a
+        #    legitimate round, only a destructive one.
+        assert uncommitted(f) is False, (
+            "uncommitted() must fail OPEN outside a repo — there is nothing "
+            "to protect there and blocking would be a false positive")
+        #    ...and main() must actually consult it, or the guard is inert.
+        #    AST, NOT a substring: the first cut of this arm grepped the source
+        #    for "if uncommitted(target):" — which the assertion message ITSELF
+        #    contains, so it was true no matter what main() did, and the
+        #    mutation survived. That is CLAUDE.md's own "a page-wide substring
+        #    scan is not a structural claim", walked into inside the guard
+        #    written to stop exactly this family of self-deception.
+        _tree = ast.parse(pathlib.Path(__file__).read_text(encoding="utf-8"))
+        _main = next(n for n in ast.walk(_tree)
+                     if isinstance(n, ast.FunctionDef) and n.name == "main")
+        _gated = any(
+            isinstance(n, ast.If)
+            and any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name)
+                    and c.func.id == "uncommitted" for c in ast.walk(n.test))
+            for n in ast.walk(_main))
+        assert _gated, (
+            "main() no longer branches on uncommitted(target) — the first "
+            "git_restore would silently delete the work under test")
+
+        # 6. the bytecode defence is declared where it is used, not assumed
         assert "PYTHONDONTWRITEBYTECODE" in run_tests.__doc__ or True
         env_line = pathlib.Path(__file__).read_text(encoding="utf-8")
         assert 'env["PYTHONDONTWRITEBYTECODE"] = "1"' in env_line, (
