@@ -1,3 +1,161 @@
+## 2026-08-19 (qi) — SIX HUNTERS, THREE ADMITTED STUDIES ALL CLOSE **NEGATIVE**, AND THE FIVE THINGS WORTH SHIPPING ARE FIDELITY AND FALSIFIABILITY — NOT EDGE
+
+**Operator: "Improve the p n l of all bots" → "Implement every positive
+finding" → "Real or shadow let our hunters find us a green p n l and win
+rate."** Six measured hunters, adversarial referees on every positive claim
+(turnover / calibration / reachability / random-null / window-fitting), 10
+agents, 0 errors. Full digest in the session scratchpad; `(qa)`'s three
+ADMITTED-BUT-NEVER-RUN studies were the headline and **all three closed
+negative**, which is the most valuable thing in the pass: each was a standing
+question that would otherwise have been re-opened on a hunch forever.
+
+**On the win-rate half of the ask, stated once because it governs everything
+below (I15):** this fleet's two best earners win **42.6%** and **39.3%**. Win
+rate is REPORTED here, never targeted — the loss tail orders the P&L, and a
+book that wins often and loses on the tails is the shape retired twice
+already. So the hunt looked for green EXPECTANCY; no proposal was accepted or
+rejected on hit rate.
+
+### THE THREE STUDIES — closed, with numbers, so they stay closed
+
+**1 · DIVERGENCE-CONDITIONED HARVESTING — CLOSED NEGATIVE.** Cross-venue
+funding divergence is NOT an entry-time adverse-selection signal for this
+fleet. Pooled over the 4 graded funding books, 241 covered era closes bucketed
+by |gap| at open: 0–10pp n=199 **−$16.00**; 10–20pp n=21 **+$5.30** (the BEST
+bucket); 20–37.5pp n=8 −$3.43; ≥37.5pp n=13 −$10.98, collapsing to n=9 −$0.66
+once the already-shipped `(lk)` class screen is removed. **Non-monotone, best
+bucket in the middle, no plateau.** No screen ships on any book: the Farmer's
+LIVE arm has ZERO opens at |gap|≥30 (so every X≥30 removes nothing, and X=10
+turns the book negative); the shadow arm's best latent cell fails I19
+both-halves (h1 +$1.02→+$0.78); carry's apparent win is 4-of-5 the `(lk)`
+screen plus KAITO n=1. The three biggest fleet losers (LIT −$9.72, ZEC −$6.57,
+VVV −$3.01) held **gap-quiet end to end** — they are price/stop losses on
+floor-rate shorts, not cross-venue contradiction. Basis: 10,268 scout
+snapshots over 36d, all four eras covered, bench calibrated on the 15
+published values (7 comparable, median abs err 7.6pp, sign 7/7).
+
+**2 · FUNDING-EXTREME SQUEEZE — CLOSED NEGATIVE, IN BOTH DIRECTIONS.**
+Refuted in **all 9 cells** (bars 20/40/80% TRUE × 4/24/72h, lag-0 and lag-1
+agreeing, 208d, 22 crypto coins): every cell's receiving-side forward return
+is negative and never beats the same-coin same-side random null — 20%/24h
+−0.208%/episode (n=441, null −0.092%, P=0.689); 80%/24h −0.880%/episode
+(n=146, null −0.115%, P=0.957). **At the 80% bar the adverse price leg is ~5×
+the funding collected** (+0.182%/24h): the squeeze premium is real and the
+RECEIVER pays it — the fleet's harvest books have been eating exactly the leg
+this study suspected. The MIRROR (pay funding, ride with the crowd) is refused
+too: best-of-9 selection (P=0.043 uncorrected, ~0.39 Bonferroni), **3 of 146
+episodes carry 56% of gross** (the `(oj)` tail shape), collapses at adjacent
+bars, supply is $0.03–0.63M books with unmeasured slippage, ~$12/30d at face.
+
+**3 · LISTING LIFECYCLE — the founding thesis is REFUTED and the supply is
+DEAD.** 🎯 the sniper's listing LONG ("listings pop", tp+15/sl−10/6h) measured
+across every crypto birth the venue's own `created_at` exposes: **TP hit 2 of
+73 (2.7%)**, LAG-1 bracket −0.33%/episode vs an own-coin null of −0.05%
+(P=0.707), median day-7 debut return **−13.4%**. And the population is gone:
+last crypto births RAIL/CTR **85.1 days ago**; 2026 crypto births Jan–May=16,
+**Jun–Aug=0**; all 12 lifetime source events were non-crypto, 1 caught, and
+the non-crypto cohort has no edge either way (0 of 34 observable brackets hit
+either leg). **CLAUDE.md corrected in place (I12)** — its "deliberately
+unscreened (n=1, unmeasured, founding thesis)" is now measured and false. A
+`wait-then-short` variant reads +6.23%/episode but is recorded as **HYPOTHESIS
+ONLY, never arming evidence**: cluster-by-month t=1.91 (<2.0, the binding
+statistic), P=0.017 unadjusted ≈0.11 across the ≥7-variant sweep, and
+uncalibratable. A birth-rate tripwire may be WATCHED; firing it re-opens
+MEASUREMENT, never a build off this study.
+
+### WHAT SHIPPED — five fixes, every one fidelity/falsifiability, none an edge claim
+
+* **🛢️ Garrett clip fidelity.** It ran **$30** clips for its whole life against
+  a founding study whose ONLY measured cell is **$25** — `ctx.order_usd(...)`
+  without `own` falls through to the global `LIGHTER_ORDER_USD` for every
+  shadow book. `own=bool(VARIANT)` keys it: a VARIANT keeps its backtested
+  size, and the Farmer twins keep `own=False` **deliberately** (they mirror
+  live sizing as the control arm), verified behaviourally AND AST-pinned so a
+  third call site cannot reintroduce it. Ordinary tuning per `(hc)`; era clock
+  unchanged. Ships UNMARKED — reaches band-garrett-shadow only, **zero
+  judge-window cost**, both Farmer arms untouched.
+* **📐 Grimes may not enter a coin its own gate never graded.** `(om)` fixed the
+  flapping gate and published the hazard it created; measured 19-Aug, **100% of
+  287 bus samples/24h** carried ≥2 gate-ungraded coins in the traded universe
+  (APEX every sample), live `gate_drift.ungraded=[APEX, VVV]`. The book has
+  ZERO trades ever, so the restrict costs **$0.00 both halves** — a free
+  hazard closure. Skip-and-census (`ungraded_skip`, seeded in the literal),
+  after the held check, before the candle fetch. Revert
+  `GRIMES_TRADE_UNGRADED=1`.
+* **🧮 Hull's adverse-basis veto becomes falsifiable.** 0 fires in 21d was
+  UNREADABLE: retained premium history keeps only the scout's top-8 outliers
+  (cutoff median 17.9bps > the 10bps veto), so band-coin premiums were visible
+  in **1 of 5,580** candidate coin-snapshots — "0 fires" byte-identical
+  between a slack bar and blind history. `extra.basis` now publishes
+  `{band_prems, coverage, veto_fires}`, all three keys always present,
+  `coverage=0` distinguishing fetch-dark from no-band-coins, the counter
+  persisted across restarts. Publish-only; the prerequisite for ever PRICING
+  a veto move.
+* **🛰️ The scout historizes the FULL cross-venue bench.** The divergence study
+  could recover a per-coin gap AT OPEN for only **15 of 270** era closes,
+  because `funding_divergence` is published truncated to the top 5.
+  `xvenue_funding` carries the whole cross-section beside `funding` — the same
+  argument that added `funding` on 17-Jul. Absent, never 0.0, for a coin with
+  no external quote (I6). Coupled to no gate. This is what makes a
+  closed-negative class re-openable on EVIDENCE rather than on a hunch.
+* **🪁 band-kelly activation** was built here and **DROPPED at push**: a
+  concurrent session landed the identical activation first, including the same
+  `lighter_dislocation_bot.py` deploy-orphan its own audit caught. Verified
+  theirs is complete against their tree rather than assumed, and this branch
+  carries none of it.
+
+### REFUSALS RECORDED (each with its number, so none is re-proposed unpriced)
+
+* **🏦 kiyosaki payback-velocity bar binds NOTHING** — 0 of 6,011 snapshots
+  (21d) had any coin in [20%, 21.9%) passing floor+persist+$2M+crypto; the
+  distribution is quantized past the sliver. The drought is SUPPLY
+  (floor-passers present in 8.9% of snapshots, max 2 concurrent vs cap 6). Do
+  not loosen or blame the velocity bar.
+* **💸 Farmer instrument-class screen — NOT supported at the $10M tier.** LIVE
+  non-crypto n=7, t=−0.37; SHADOW n=20, t=−0.44 with dollar total and mean
+  disagreeing in sign and halves disagreeing within arms. The `(lk)` carry
+  precedent does not replicate here. XAU-specific exclusion refused as
+  post-hoc single-symbol (n=6).
+* **🎫 taker `TICKET_TOP_N` widening** — no positive-graded lens is
+  supply-capped: only `dip` sits at cap (60.6% of samples) and dip is the
+  standing realised veto (t=−2.66). Widening buys nothing and would re-tune an
+  organ mid-accrual of a pre-registered window.
+* **🔮 georgia restrict-only subset** — no bucket survives BH at FDR 0.05
+  (min p=0.18). The only significantly negative buckets are trailing-stop
+  exits, negative BY CONSTRUCTION (I7) and not entry-identifiable. Per `(hm)`
+  its long book sits ABOVE its side's random-entry null.
+* **💸 Farmer `max_hold` (tracking)** — n is STILL 10 (<30 per `(pu)`): pooled
+  mean −2.385%/trade, t=−3.08. ETA ~6–8 weeks; when it lands the counterfactual
+  must be funding-denominated, never a price-path sweep (`(kf)`).
+* **🧮 hull `BASIS_VETO_BPS` any change** — no number exists to price it; the
+  falsifiability tap above is the prerequisite.
+
+### TWO COMPLETENESS GAPS CLOSED BY READING, NOT BUILDING
+
+🏛️ **turnbull is ALIVE, not dead** — 395h without a close read as an I1
+quiet-vs-dead ambiguity; the parliament organ is fresh (1.3min), the book is
+`halted: false` with 1 open position and `last_skip: "XAG:already-in"`, i.e.
+the entry path is running and skipping because it already holds. Quiet, by
+construction of a mean-reverter that holds. 🙏 **Avo LIVE's "30% tx-budget
+skip"** is not reproducible from the payload — the row publishes no skip
+counter, and the book is simply at cap (4/4, clip $15.64 = equity/max_open
+exactly). Recorded as an observability gap, NOT a confirmed live defect.
+
+### THE HONEST HEADLINE
+
+Real money is **$259.84 at ~$0/day** and **nothing in this pass moves real
+dollars now**: the implementable delta is ~+$4.6/30d of shadow paper
+(sign-conditional) plus four $0-today hazard closures, and all three alpha
+studies closed negative. The needle sits exactly where the winners' docket
+already put it — 🎫 taker `exit:hold` (n=54, t=2.75) and 🙏 avo book-level
+(n=12, t=2.31), **both pre-registered 18-Aug and both HANDS-OFF**. So the
+single highest-leverage act this session could take was to protect those two
+windows and the judge's from contamination while shipping the free fixes, and
+that is what it did: no taker capacity or lens change, no avo config, no
+Farmer-arm restart. The path to real dollars is unchanged and has no shortcut
+this pass could find — a pre-registered window closes green, the gate passes,
+the operator decides. Weeks out at minimum, and the deposit is the lever the
+codebase does not contain.
 ## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
 
 **Executed end-to-end under the operator's "Continue maverick!" grant** (the
