@@ -400,6 +400,17 @@ landed (swept: fixture-price and sub-minute scans across the whole ledger).
       DELETE FROM paper_trades WHERE trade_id = 'pm-albanese-lshadow-BTC-1787050638';
 
   Until then every grader is blind to it by construction.
+  **[19-Aug: EXECUTED — the operator made the call ("Proceed") and the row is
+  deleted.** Transaction committed only after `rowcount == 1` verified; full
+  row backed up to the session scratchpad first
+  (`DELETED_ROW_pm-albanese-BTC.json`). Post-delete readback: albanese raw
+  ledger 26 → 25 rows / +$1.81 — now EQUAL to the graded number the
+  quarantine was already serving, which is the quarantine proving itself;
+  both real July BTC trades (entries ~65,568 / ~62,996) survived, and a
+  fleet-wide scan found zero other fixture-priced (100.01) rows. The
+  `LEDGER_QUARANTINE` entry stays deliberately: it is windowed, pinned by
+  tests, and defense-in-depth costs nothing against a class that has now
+  happened once.]**
 ## 2026-08-18 (qa) — THE GROWTH DEEP DIVE: 300 DAYS OF VENUE DATA SAY LIQUIDITY DROUGHT, NOT FUNDING DROUGHT — AND THE TWO CARRIED ADJUDICATIONS ARE RUN
 
 Operator: *"Dive deep on all the knowledge you have and we have and you can
