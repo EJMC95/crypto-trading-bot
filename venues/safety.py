@@ -46,6 +46,15 @@ _PILOT_ALIASES = {
 }
 
 
+#: [2026-08-19 (ql)] HOW MANY STOP-WIDTHS OF ROOM THE MONEY MUST HAVE BEFORE
+#: ITS OWN LIQUIDATION. 4 is the bar `scripts/lighter_margin_model.headroom_x`
+#: was designed around; it shipped there with NO consumer because the book it
+#: was written for (⚡ High Voltage) was refuted and never built, so the number
+#: existed and guarded nothing. Env-tunable, and RAISING it is the safe
+#: direction.
+LIQ_HEADROOM_K = float(os.environ.get("LIGHTER_LIQ_HEADROOM_K", "4"))
+
+
 class SafetyRails:
     def __init__(self, bot: str, venue_mode: str):
         self.bot = bot
@@ -91,6 +100,74 @@ class SafetyRails:
         if self.max_notional is None:
             return True
         return (open_notional + add_usd) <= self.max_notional + 1e-9
+
+    def headroom_ok(self, margin_state, stop_frac) -> bool:
+        """May the book ADD notional without sitting inside its own liquidation?
+
+        [2026-08-19 (ql)] THE GAP THIS CLOSES. `(no)` wired the venue's own
+        margining truth into the live path — `margin_state` carries the
+        VENUE-PUBLISHED liquidation price per position, the distance to the
+        nearest one, and a census of positions whose death price the venue
+        will not state. Both live bots publish it. **Nothing refused on it.**
+        This module is the one gate real money passes through and it knew only
+        two numbers: a notional cap and a daily-loss cap. Neither can see
+        liquidation, so the fleet could watch itself approach ruin and had no
+        instrument that would decline.
+
+        WHY IT IS EXPRESSED IN STOP-WIDTHS rather than a bare percentage. A
+        stop is the loss the book has ALREADY decided to accept; liquidation
+        is the loss it cannot survive. The only question that travels across
+        books is how many of the first fit inside the second — measured on the
+        validated model:
+
+            stop 10% (💸 the Farmer's HARD_STOP, and it runs at 2x)
+                L=2  -> 4.94x  OK        L=3  -> 3.25x  refused
+                L=5  -> 1.90x  refused   L=10 -> 0.89x  LIQUIDATES FIRST
+            stop 3%   -> 5x is fine (6.34x);  stop 1% -> 10x is fine (8.91x)
+
+        So the live book already sits one notch under its own ceiling, reached
+        by luck rather than by design, and the catastrophic regime — where the
+        liquidation fires BEFORE the stop and the stop is decorative — is five
+        notches away with nothing in between. Leverage capacity is a property
+        of STOP DISTANCE, not of appetite, and this gate is what makes that
+        arithmetic binding instead of merely true.
+
+        FAIL-CLOSED, AGAINST THIS FLEET'S USUAL HABIT, and deliberately: every
+        other degrade here fails OPEN so an organ outage can never idle a book.
+        The cost of a wrong default is different in kind on this one — an open
+        failure is a liquidation of real money, so an unreadable margin state,
+        an unpriced position, or an unknown stop all REFUSE. Same reasoning
+        I10 gives for the go-live blocker.
+
+        Returns True for a non-live arm: a shadow book holds no venue account,
+        so there is nothing to liquidate and nothing to read. The rail is
+        about real money, exactly like `daily_loss_hit`.
+        """
+        if not self.live:
+            return True
+        if not isinstance(margin_state, dict) or not margin_state:
+            return False                      # live and margining unreadable
+        try:
+            stop = float(stop_frac)
+        except (TypeError, ValueError):
+            return False
+        if not (stop > 0) or stop != stop or stop in (float("inf"),):
+            return False                      # no stop -> headroom undefined
+        if margin_state.get("liq_unknown"):
+            return False                      # a position the venue won't price
+        if not margin_state.get("n"):
+            return True                       # flat: nothing can be liquidated
+        near = margin_state.get("nearest_liq")
+        if not isinstance(near, dict):
+            return False                      # positions held, none priced
+        d = near.get("dist_frac")
+        try:
+            d = float(d)
+        except (TypeError, ValueError):
+            return False
+        if d != d or d <= 0:
+            return False
+        return d >= LIQ_HEADROOM_K * stop
 
     def daily_loss_hit(self, day_start_equity, equity) -> bool:
         """Absolute-dollar fleet rail for funded modes (the strategies keep

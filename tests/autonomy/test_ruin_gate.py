@@ -1,0 +1,166 @@
+"""[2026-08-19 (ql)] THE FLEET COULD WATCH ITSELF APPROACH LIQUIDATION AND HAD
+NOTHING THAT WOULD DECLINE.
+
+`(no)` wired the venue's OWN margining truth into the live path — per-position
+`liquidation_price`, the distance to the nearest one, and a census of
+positions the venue will not price — and both live bots publish it.
+`scripts/lighter_margin_model` then modelled the same thing for hypothetical
+positions and validated it forward to **0.001%** against the venue, carrying a
+`headroom_x` helper whose docstring names the refusal bar (K=4). And nothing
+refused: `headroom_x`'s only declared consumer was ⚡ High Voltage, a book that
+was REFUTED and never built, so the criterion shipped orphaned. `SafetyRails` —
+the one gate real money passes through — knew a notional cap and a daily-loss
+cap, neither of which can see liquidation. That is I18's registered-but-inert
+shape landing on the single number a leverage decision depends on.
+
+WHY STOP-WIDTHS. A stop is the loss the book has already accepted; liquidation
+is the loss it cannot survive. Measured on the validated model, for 💸 the
+Farmer's shipped 10% HARD_STOP:
+
+    L=2  -> 4.94x headroom (it runs here)   L=3  -> 3.25x  refused
+    L=5  -> 1.90x refused                   L=10 -> 0.89x  LIQUIDATES FIRST
+
+The live book sits one notch under its own ceiling — reached by luck, since
+nothing computed this — and five notches from the regime where the stop is
+decorative because liquidation fires first. Leverage capacity is a property of
+STOP DISTANCE, not appetite.
+
+EVERY FIXTURE HERE IS BUILT BY THE PUBLISHER (`margin_state_from`) from a
+venue-shaped account payload with STRING numerics, never hand-written — the
+rule that caught four consumer/publisher mismatches in one session ((hj)).
+"""
+import os
+import sys
+
+import pytest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from venues.lighter_client import margin_state_from            # noqa: E402
+from venues.safety import SafetyRails, LIQ_HEADROOM_K          # noqa: E402
+
+pytestmark = pytest.mark.autonomy
+
+
+def _pos(symbol="XAU", **kw):
+    """The venue's own shape — every numeric a STRING, as AccountPosition
+    declares. A float fixture would quietly pass a parser that mishandles
+    strings, which is the failure `(no)` exists to prevent."""
+    row = {"symbol": symbol, "sign": 1, "position": "1.0",
+           "avg_entry_price": "100.0", "position_value": "100.0",
+           "unrealized_pnl": "0.0", "liquidation_price": "50.0",
+           "initial_margin_fraction": "0.1", "allocated_margin": "10.0",
+           "margin_mode": 0}
+    row.update(kw)
+    return row
+
+
+def _state(positions, marks, equity="197.52"):
+    """PUBLISHER-BUILT margin state — never a hand-written dict."""
+    return margin_state_from(
+        {"total_asset_value": equity, "collateral": equity,
+         "positions": positions}, marks=marks)
+
+
+def _rails(live=True):
+    return SafetyRails("perps-funding-lighter",
+                       "lighter_live" if live else "lighter_shadow")
+
+
+# ---------------------------------------------------------------------------
+# the arithmetic the gate exists to enforce
+# ---------------------------------------------------------------------------
+
+def test_a_comfortable_distance_is_allowed():
+    """liq at 50 against a mark of 100 = 50% away; a 10% stop needs 40%."""
+    st = _state([_pos(liquidation_price="50.0")], {"XAU": 100.0})
+    assert st["nearest_liq"]["dist_frac"] == pytest.approx(0.5)
+    assert _rails().headroom_ok(st, 0.10) is True
+
+
+def test_inside_the_bar_is_refused():
+    """liq at 70 = 30% away; a 10% stop needs 40%. This is the L=3 cell."""
+    st = _state([_pos(liquidation_price="70.0")], {"XAU": 100.0})
+    assert st["nearest_liq"]["dist_frac"] == pytest.approx(0.30)
+    assert _rails().headroom_ok(st, 0.10) is False
+
+
+def test_the_boundary_is_inclusive_and_is_K_stop_widths():
+    """Exactly K stop-widths passes; a hair under does not — and the bar is
+    K itself, so changing the constant moves the gate rather than a literal."""
+    st = _state([_pos(liquidation_price="60.0")], {"XAU": 100.0})
+    assert st["nearest_liq"]["dist_frac"] == pytest.approx(0.40)
+    assert _rails().headroom_ok(st, 0.40 / LIQ_HEADROOM_K) is True
+    assert _rails().headroom_ok(st, (0.40 / LIQ_HEADROOM_K) * 1.001) is False
+
+
+def test_a_tighter_stop_buys_leverage():
+    """The finding, as a test: the SAME dangerous distance that refuses a 10%
+    stop is fine for a 3% one. Leverage capacity follows stop distance."""
+    st = _state([_pos(liquidation_price="80.0")], {"XAU": 100.0})   # 20% away
+    assert _rails().headroom_ok(st, 0.10) is False
+    assert _rails().headroom_ok(st, 0.03) is True
+
+
+def test_the_nearest_position_governs_not_the_average():
+    """Two positions, one safe and one nearly dead: the gate must read the
+    NEAREST. An average would let a comfortable leg mask a dying one."""
+    st = _state([_pos("XAU", liquidation_price="50.0"),
+                 _pos("BTC", liquidation_price="97.0")],
+                {"XAU": 100.0, "BTC": 100.0})
+    assert st["nearest_liq"]["coin"] == "BTC"
+    assert _rails().headroom_ok(st, 0.10) is False
+
+
+# ---------------------------------------------------------------------------
+# fail-CLOSED — the direction that is the opposite of every other rail here
+# ---------------------------------------------------------------------------
+
+def test_a_position_the_venue_will_not_price_refuses():
+    """`liq_unknown` is the census `(no)` publishes precisely so 'measured and
+    safe' is never byte-identical to 'not measured'. Holding a position whose
+    death price is unpublished must REFUSE, not shrug."""
+    st = _state([_pos("XAU", liquidation_price="50.0"),
+                 _pos("BTC", liquidation_price=None)],
+                {"XAU": 100.0, "BTC": 100.0})
+    assert st["liq_unknown"] == ["BTC"]
+    assert _rails().headroom_ok(st, 0.10) is False
+
+
+def test_positions_held_but_none_priced_refuses():
+    """No marks supplied -> no `dist_frac` anywhere -> nothing measured. The
+    account is NOT flat, so this is ignorance, not safety."""
+    st = _state([_pos(liquidation_price="50.0")], marks=None)
+    assert st["n"] == 1 and st["nearest_liq"] is None
+    assert _rails().headroom_ok(st, 0.10) is False
+
+
+def test_an_unreadable_margin_state_refuses():
+    for bad in (None, {}, [], "nope", 0):
+        assert _rails().headroom_ok(bad, 0.10) is False, bad
+
+
+def test_an_unknown_stop_refuses():
+    """Headroom is undefined without a stop, and undefined must not read as
+    permitted — the I8 unknown-degrading-to-a-guess failure, on a risk number."""
+    st = _state([_pos(liquidation_price="50.0")], {"XAU": 100.0})
+    for bad in (None, 0, 0.0, -0.10, "wide", float("nan"), float("inf")):
+        assert _rails().headroom_ok(st, bad) is False, bad
+
+
+def test_a_flat_book_is_allowed():
+    """Nothing open cannot be liquidated — the one permissive case, and it
+    must be reachable or the book could never take its FIRST position."""
+    st = _state([], {"XAU": 100.0})
+    assert st["n"] == 0
+    assert _rails().headroom_ok(st, 0.10) is True
+
+
+def test_a_shadow_arm_is_unaffected():
+    """A paper book holds no venue account, so there is nothing to liquidate.
+    Same live-only scoping as `daily_loss_hit` — and a shadow book must never
+    be idled by a rail about real money."""
+    assert _rails(live=False).headroom_ok(None, None) is True
+    assert _rails(live=False).headroom_ok({}, 0.10) is True
