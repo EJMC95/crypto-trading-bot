@@ -1,3 +1,105 @@
+## 2026-08-19 (qq) — FOUR SURFACES PRICED IN ONE PASS: the directional-funding gate supplies neither timing nor selection, the allocation claim does not rank, and the tail's real signal is exactly consumed by execution
+
+**Operator reframe mid-session: *"We are looking at this as a risk eliminating
+job as opposed to a profit motivated job... look at options, even though risk
+will be higher."*** Accepted, and the numbers agreed: **$259.75 of real money
+against $16,026 of paper — 62:1**. Seven measurements followed, Lighter tape
+only. **Nothing applied — no lever, no deploy, no code change.** Full method:
+`STUDY_FUNDING_AND_TAIL_SURFACES_2026-08-19.md`.
+
+**1 · 💸 THE FARMER IS A DIRECTIONAL BOOK AND ITS DIRECTION WAS NEVER
+NULL-TESTED.** Its own header calls the thesis *"extreme funding marks crowded
+positioning that tends to mean-revert"* — a directional claim, and `(hm)`
+requires a random-entry null for those. Never applied, because these books are
+filed as "funding". Decomposing the ledger on production's own formula:
+**86.5% of the live real-money book's per-trade return is PRICE** (Garrett:
+100.9%), and the price term does not beat a matched random-entry null —
+**P(random >= actual) = 0.382 / 0.596 / 0.944** (paired calibration
+`corr(ledger, 5m replay)` = +0.996 to +0.998). Structural, not a bad month:
+mean `|price|` is **162x** the maximum funding accruable at the book's own 5%
+gate over its own holds; funding is linear in hold, price noise ~ sqrt(hold), so
+the crossover is **~51 years against a 72h cap**. **A fourth undecidability
+class — UNDECIDABLE BY SWAMPING**, beside I17's slow clock, `(po)`'s fat tail
+and `(pm)`'s redundancy. The gate's own horizon organ agrees independently
+(`t=0.29` *"needs ~1320d"* / `t=0.06` *"~36346d"* / `t=-1.05` *"unreachable"*).
+
+**2 · AND IT SUPPLIES NO SELECTION EITHER.** At the $10M floor the eligible pool
+is **13 coins EVER, median 7** — the gate picks 1 of ~7. Rank-1 paired against
+the equal-weight eligible basket at the same instant (so regime cancels),
+measuring **both** legs because the gate's fair defence is *"the price goes
+against you, that is what you are paid for"*: **price -0.0440%, funding
++0.0444%, TOTAL +0.0003% at t=0.00.** Funding is a fair price for the adverse
+selection it signals.
+
+**3 · THE SAME RESULT AT THE OPPOSITE END OF THE RANGE — and it corroborates a
+refutation the fleet already made and never applied here.** 22-Jul TAMERLANE
+killed the RECEIVING side of extreme funding in 25/25 cells, but that rejected a
+**proposed** book; **the live Farmer runs the identical mechanism at a 5% gate
+and was never re-examined.** The MIRROR (pay the funding) is **dead in 24 of 25
+cells**, and the one marginal cell dies on its own event population
+(SKHYNIXUSD/WTI/BRENTOIL — non-crypto, not liquid-tier). Funding and price
+**cancel in every cell, both directions**, to within ~10-20%. Read together:
+extreme gates -> adverse selection **>** funding (negative); mild gates -> **~=**
+funding (zero). **They scale together; there is no threshold at which this
+mechanism pays.**
+
+**4 · `fleet_allocation`'s CLAIM DOES NOT RANK — the ramp was refused before it
+was built.** The go-live gate is a STEP function (6 bars incl. `t>=2.0`) that has
+**never fired**, so evidence->money conversion is structurally zero. Proposed
+replacing it with a RAMP sized by I16's lower bound; built the walk-forward
+simulation (retired books kept in-pool while alive, Kraken/HL-era excluded),
+then tested the foundation: **Spearman(claim, forward) = -0.004 / -0.069**, and
+the terciles are **non-monotone — the MIDDLE bucket is worst**, the signature of
+noise. Claim-weighted returned -1.89% against equal-weight's -0.28%. **A tranche
+on this claim would deploy real money on noise.** Power limit declared: 24 days,
+18 books — *not demonstrated, point estimate ~zero*, not *proven useless*.
+
+**5 · THE ILLIQUID TAIL HAS A REAL SIGNAL AND IT IS EXACTLY ITS OWN COST.** The
+fleet trades **7 of 227** books; tested the other **137**, cross-sectional
+quintile long/short (market-neutral by construction, so item 18 cannot bite),
+execution lag enforced, staleness screened. **Cost re-derived from the fleet's
+OWN 3,015 `venue_orders`** instead of an inherited constant — which corrected my
+own first pass in both directions: the flat (js) 5.12 bps over-charged the
+tradeable $0.1-1M band (true mean **2.52**) and under-charged the dust by 3.4x
+(**mean 17.49, p90 398** — the dust is not a surface, it is a trap). On the
+tradeable universe: **gross +0.054%, cost 0.054%, net +0.000%, t=0.00** — while
+the **gross ranking beats a random ranking at P=0.0100**. Real, and exactly
+consumed.
+
+**6 · PASSIVE EXECUTION REFUTED, WITH A NUMBER.** Lighter's maker fee is
+**0.0000** and every bot crosses (`venue_orders` has no `post_only` column;
+3,558 rows, all taker), so this looked like the one untried lever. Modelled
+resting at `close(t)`: at **delta=0 it reads net +0.088%, t=1.63 — and a 100%
+fill rate is not a fill model, it is an assumption** (`low(t+1) <= close(t)`
+holds on almost every bar, handing the strategy the better of two prices with
+zero queue risk). **Price queue risk at all and the sign inverts: net -0.154%,
+t=-2.78** at 5 bps touch-through, deepening monotonically, consistent across
+halves (-1.92 / -2.08), block-boot CI **[-0.251%, -0.047%]**, P(net>0)=0.002.
+Fill rate stays at 89% — trades are not missed, **the trades you get are
+poisoned.** Spread saving +2.7 bps; adverse selection -18 bps.
+
+**THE STRATEGIC READING, which is the growth statement rather than the
+refusals:** the fleet's measured effects are **two orders of magnitude larger on
+PRICE DISLOCATION than on funding** — the retired snap-back ghost's realised
+-0.281%/trade (t=-2.97) is live-ledger evidence and band-kelly's founding claim
+is +0.605%/trade (t=+5.71), against a funding surface that prices to ~0.000% in
+every test above — **and the fleet runs three directional-funding books against
+one dislocation book born 18-Aug with zero closes.** Attention and capital are
+allocated inversely to where the measured signal is.
+
+**NOT CLAIMED:** that any live book loses. The Farmer's live row is **+$5.74
+realised**; the honest word throughout is *zero-edge* and *unproven*, never
+*losing*. **A correction that travels:** `(hm)`'s *"a random short earns
++0.2-1.1%/trade free"* was measured at the **Ticket Taker's** horizon — at the
+Farmer's (6h, majors) it is **+0.018-0.024%**. The free-short premium is
+HORIZON-DEPENDENT and must never be quoted across books (I14's shape, applied to
+the null instead of the grade).
+
+Files: `STUDY_FUNDING_AND_TAIL_SURFACES_2026-08-19.md` (new). Working notes in
+`reports/` (gitignored, local). **No code touched, so main-only by the `(mm)`
+rule — a deploy would restart both real-money containers for zero measured
+benefit and wipe memory-only halts.**
+
 ## 2026-08-19 (qp) — "IF IT WORKS, ADJUST THE REAL BOT TOO": THE ANSWER IS **NO**, AND THE SIGN FLIPS BETWEEN THE TIERS — the same gate that is 96% of 🛢️ Garrett's LOSS is 127% of 💸 the Farmer's PROFIT
 
 **Operator: "If it works, adjust the real bot too."** The real-bot equivalent of
