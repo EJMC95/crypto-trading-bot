@@ -1,93 +1,158 @@
-## 2026-08-19 (qj) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD: a takeover resumed the standby container's OWN boot snapshot, and the harness that was supposed to verify the fix deleted it
+## 2026-08-19 (qj) — THE FAILOVER PAIR HANDED THE BOOK OVER WITH A STALE WORLD — and the referee wave then caught my own fix booking a $4 step-down into the go-live equity series
 
 Found closing out `(qi)`'s referee wave — its F5 was declared "named not
 fixed", and I11 says carried work outranks new work, so it was the next brick.
-**The investigation found the referee had named the SMALLER half.**
+**The investigation found the referee had named the wrong half, and the
+adversarial pass over THIS fix then found a regression in it.** All line
+numbers below are at `61f6155` (the pre-fix tree); the fix shifts them ~+130.
 
 **THE DEFECT.** `(hp)` made the two carry containers a deliberate failover
 pair: first claimant keeps the book, the other IDLES and re-checks each loop.
-But the durable restore (`load_state_required` + `funding_basis.restore_hot_since`)
-runs ONCE, at BOOT, and the standby branch `continue`s before every bookkeeping
-step. So a container that stands by for hours and then wins the claim resumes
-from **its own boot snapshot of a world the incumbent has been moving ever
-since** — verified structurally: `positions` is bound at two lines (640, 657),
-both pre-loop, and `restore_hot_since` is called exactly once (line 668).
-Three halves, failing in three directions:
+But the durable restore runs ONCE, at BOOT, and the standby branch `continue`s
+before every bookkeeping step — verified structurally at `61f6155`:
+`positions` is bound at exactly two lines (640, 657), both pre-loop, and
+`funding_basis.restore_hot_since` is called exactly once (668). So a container
+that stands by for hours and then wins the claim resumes from **its own boot
+snapshot of a world the incumbent has been moving ever since**:
 
-* **`positions` — the severe one, and the one the referee missed.** The
+* **`positions` — the severe half, and the one `(qi)`'s referee missed.** The
   incumbent opened and closed carries during the standby. Adopting the old map
-  closes a coin the incumbent ALREADY closed — a duplicate ledger row, the
-  `(hp)` two-writer damage arriving through a different door — while carries it
-  OPENED are absent, and the takeover's first `save_state` overwrites the
-  durable record with the older map, so they vanish from the book entirely.
-* **`hot_since`** — a coin hot at boot and hot now reads as persisted across the
-  WHOLE standby, unobserved: the PERMISSIVE direction `(iu)`/`(iq)` exist to
-  refuse, a spike entry wearing a streak, on the one book whose thesis is
-  "persistent funding pays carries, spikes pay fees". `(qi)`'s 6h → 12h move
-  doubled the exposure, which is what surfaced this.
+  closes a coin the incumbent ALREADY closed — and **the obvious description of
+  that is wrong, which matters because it would send the operator to a scan
+  that finds nothing.** `paper_trades` is `PRIMARY KEY (bot, trade_id)` with
+  `ON CONFLICT DO UPDATE` (bot_pnl_store.py:1206/1261), and this book's
+  `trade_id` is `{coin}:{opened_ts}` — IDENTICAL for the same position record.
+  So the second close does **not** append a duplicate row; it silently
+  RESTATES the existing one (stale `pnl_abs`, wrong `closed_at`, possibly wrong
+  exit reason, `n` unmoved). A duplicate-`trade_id` scan is blind to it BY
+  CONSTRUCTION — the exact mirror of `(hf)`, where two writers' ids never
+  collided; here they always do. LOST opens are real as stated (the takeover's
+  first `save_state` overwrites the durable record), and a double-open does
+  produce a genuine second row.
+* **`hot_since`** — a coin hot at boot and hot now read as persisted across the
+  whole unobserved standby: the PERMISSIVE direction `(iu)`/`(iq)` exist to
+  refuse. **`(qi)`'s F5 had this backwards** — it described *cold* clocks, and
+  on a real pair flip the pre-fix clock is stale-and-present, never cold,
+  because the standby container's boot restore succeeded while the incumbent
+  was alive. Corrected in place per I12 rather than graded as a magnitude
+  error. `(qi)`'s 6h → 12h move is what made me re-read the boot-only restore;
+  it deepens a single wrong admission (up to 12h of unobserved time can stand
+  in for persistence instead of 6h) while making wrong admission *rarer* — so
+  "doubled the exposure" is right for the blackout and wrong for this half.
 * **`last_ts`** — the accrual clock. **Corrected mid-investigation:** my first
   reading called this a double-count, and it is not — stale positions and a
   stale clock are the same snapshot, so they are self-consistent. That is
-  precisely why the three must be adopted ATOMICALLY: fresh `accrued` under an
-  old clock WOULD re-credit the standby gap, the `(nc)` phantom-accrual class
-  that already inflated this book's pooled ledger by ~$13.
+  precisely why the fields must be adopted ATOMICALLY: fresh `accrued` under an
+  old clock WOULD re-credit the standby gap. Same *symptom* as `(nc)`'s ~$13
+  phantom accrual, different mechanism (`(nc)` is an 8x basis error; this would
+  be a re-credited interval) — read it as the class of "accrued inflated
+  without a trade", not as the same bug.
 
-**THE FIX.** `reclaim_after_standby(saved, ok_read, now)` — pure (no clock, no
-DB, no globals), the hot-streak rule still `funding_basis`'s ONE owner so the
-takeover path cannot drift from the boot path it mirrors, and the long-gap
-refusal therefore reaches this path for free. Wired at the claim-success edge
-behind a `_stood_down` flag, so a normal single-writer container is completely
-unaffected. **Fail-CLOSED in the one direction that matters:** a failed read
-(`load_state_checked`'s third state) means trade nothing and — critically —
-**save nothing** this cycle, the flag staying set so the next loop retries;
-refusing costs one loop, guessing costs the durable record. A genuinely empty
-state is a real answer (flat book), not a refusal, or a first-ever takeover
-would deadlock. `tests/autonomy/test_carry_takeover_state.py`, 9 tests
-including the AST arm that the LOOP actually calls it — a fix nobody calls is
-the registered-but-inert failure I18 names.
+**THE FIX.** `takeover_step(store, bot_id, now)` — the whole takeover behind
+one call, with the store INJECTED so it is drivable against a fake, over
+`reclaim_after_standby` (pure; the clock rule stays `funding_basis`'s ONE
+owner, so the long-gap refusal reaches this path for free). **The invariant is
+simply: a takeover must reconstruct exactly what a fresh BOOT reconstructs.**
+Fail-CLOSED on either read: trade nothing, **save nothing**, keep the flag set,
+retry next loop — deliberately not boot's `load_state_required`, whose refusal
+is a `SystemExit` (crash-looping a container holding live positions is worse
+than waiting). The held state now also writes the `(ic)` standby key with a
+`takeover_held` reason, so a refusing container is not byte-identical to a dead
+one (I1). Inert for a normal single-writer container.
 
-**AND THE HARNESS BIT, WHICH IS THE SECOND HALF OF THIS ENTRY.**
+**WHAT THE CLOCK HALF ACTUALLY DOES — the code comment first said "CLOSED" and
+that was false.** A takeover is only reachable once the claim has EXPIRED
+(`WRITER_CLAIM_TTL` 1800s), and the incumbent writes `saved_ts` in the same
+loop whose top refreshed that claim, so the gap at the earliest possible
+takeover is ~1798s — already **2x** `HOT_RESTORE_MAX_GAP_S` (900s).
+`restore_hot_since` therefore returns `{}` in essentially every real failover.
+The permissive hazard is closed **by always clearing**, and what replaces it is
+a *deterministic* cold start: the ≥12h entry blackout F5 named is not gone, it
+is now guaranteed. That is the right trade and it is stated rather than sold;
+the arithmetic is pinned by a test so a future change to either constant
+surfaces there instead of silently making takeover permissive again.
+
+**THE REFEREE WAVE ON THIS FIX FOUND A REGRESSION I HAD SHIPPED, and it is the
+most valuable thing in this entry.** The first cut adopted `positions`,
+`hot_since` and `last_ts` — but NOT the ledger aggregates (`realized`,
+`n_closed`, `n_wins`), which are bound once at boot from
+`fetch_paper_aggregate` and only incremented in-loop. Demonstrated:
+
+    incumbent closes one carry for +$4.00 during the standby, then dies
+    TRUTH                equity 1055.32  closed 101  pnl_abs +54.00
+    before this fix      equity 1055.32  closed 100  pnl_abs +50.00
+    positions-only fix   equity 1051.32  closed 100  pnl_abs +50.00   <-- -$4.00
+
+**A regression, not an inherited gap:** the old code carried TWO stale halves
+that cancelled — for a funding book `open_pnl = accrued - fees`, so the closed
+coin still sitting in the stale map approximated its own realised P&L almost
+exactly. Adopting fresh positions against a stale aggregate breaks the
+cancellation and books a step-down with no trade behind it: `closed_trades`
+goes BACKWARDS on the row, and the same wrong equity is appended to
+`<bot>:equity` by `snapshot_equity` — which `golive_readiness.apply_mtm` reads
+worse-of-both for the **15% max-drawdown go-live bar**. The aggregate is now
+re-read in the same step under the same fail-closed rule.
+
+**AND THE TESTS WERE THE OTHER FINDING.** The first cut pinned the loop wiring
+with AST arms — "does `main()` mention these identifiers in these shapes" — and
+an adversarial round drove **seven survivors** through them, every one a
+realistic regression: hardcoding `ok_read=True` at the call site, calling the
+adopter and self-assigning the caller's own values, replacing the checked read
+with `True, None` (adopting an EMPTY world, then overwriting the durable
+record), never clearing the flag. AST cannot see values, argument bindings,
+dead code or self-assignment. Replaced with a behavioural drive of
+`takeover_step` against a fake store — **the same lesson this session had
+applied to `mutate.py` an hour earlier (a6ce1b2) and did not carry across one
+file.** The thin AST arm survives for what only AST can see (the call is
+routed, the branch `continue`s, all six fields plus the flag are rebound).
+
+**THE HARNESS BIT, WHICH IS THE SECOND HALF OF THIS ENTRY.**
 `scripts/mutate.py` restores between mutations with `git checkout -- <target>`.
-Run against a target whose fix is still UNCOMMITTED, the first restore
-**silently deletes the work under test** — measured here: the entire takeover
-fix, rebuilt from scratch. The tool's docstring did say "restored from git",
-and this session had even noted it an hour earlier; **knowing is not guarding**,
-the exact gap `(qg)`'s own header calls out ("Having a note is not applying
-it"). So `mutate.py` now REFUSES a dirty target before touching anything, with
-the reason — not a warning, because a warning on a run that then eats your file
-is indistinguishable from a clean run until you look ((gl)). Permissive where
-git cannot answer (outside a repo / git absent) so it can never block a
-legitimate round. This is the fourth bite in this family in three weeks and the
-first one the harness itself caused; the round it invalidated it also correctly
-reported (`the RESTORE is red — the round proved nothing`), which is the one
-part that worked as designed.
+Run against a target whose fix is still uncommitted and the first restore
+**deletes the work under test** — measured here: the entire takeover fix,
+rebuilt from scratch. The docstring did say "restored from git", and this
+session had noted it an hour earlier; **knowing is not guarding**, the gap
+`(qg)` names in its own body ("Having a note is not applying it"). So the
+harness now REFUSES a dirty target before touching anything — not a warning,
+because a warning on a run that then eats your file is indistinguishable from
+a clean run until you look ((gl)). This is the **sixth** bite in this family,
+not the fourth: `(qg)` enumerates five (31-Jul, 6-Aug, 16-Aug, 18-Aug, 19-Aug)
+and this is the next — the count was wrong in the first draft and contradicted
+`mutate.py`'s own header eight lines up.
 
-**AND THE GUARD'S OWN FIRST MUTATION ROUND FOUND TWO SURVIVORS — recorded
-because a clean-looking round is exactly what this family keeps producing.**
-Both arms of my first selftest were vacuous, in the two ways this repo has
-already written down:
-* **A substring scan that matched its own assertion text.** The arm grepped
-  the source for `"if uncommitted(target):"` — a literal the assertion LINE
-  ITSELF contains, so it held no matter what `main()` did. CLAUDE.md's "a
-  page-wide substring scan is not a structural claim", walked into inside the
-  guard written to stop this family. Now an **AST** check that `main()`
-  branches on a call to `uncommitted`.
-* **No positive control.** `_selftest` is contractually offline/pure, so it can
-  only reach the PERMISSIVE path (a temp dir is not a repo → False) — a
-  function returning False everywhere passes it completely, and mutating the
-  real return to `True` SURVIVED. The positive control now lives in
-  `tests/autonomy/test_mutation_harness_guard.py`, where a real `git init` is
-  allowed: dirty → True, staged → True, untracked → True, clean → False,
-  outside-a-repo → False. **"Empty output is not a negative result until the
-  check has been seen to produce a positive one"** — the rule, applied to
-  itself, one layer down.
+**AND THE MECHANISM I WROTE FOR IT WAS ALSO WRONG, measured in a scratch repo:**
+`git checkout --` restores from the **INDEX, not HEAD**, so *staged* work
+SURVIVES it (only unstaged is destroyed; untracked fails the restore outright).
+The guard still refuses on staged — baseline and restore disagreeing is not
+worth reasoning about — but as a conservative choice, not because the work is
+lost. Worse, the refusal message advised "commit **(or stash)**": stashing
+removes the very fix you are testing, so a round after `git stash` measures
+HEAD-without-your-change while looking exactly like a round that passed. Both
+corrected; the remedy is COMMIT, full stop.
 
-**Forward metric:** 🌾 carry — the fleet's best-evidenced book and its only
-one behind a failover pair — can now be handed over without silently
-duplicating a close, losing an open, or entering on a streak nobody watched.
-No trade changes while a single container holds the claim, which is the
-steady state; this is insurance on the transition, and it was live-reachable
-by design.
+**Its own first round found two survivors too**, recorded because a
+clean-looking round is what this family keeps producing: a substring scan that
+matched **its own assertion text** (`"if uncommitted(target):"` appears in the
+assertion line itself, so it held no matter what `main()` did — CLAUDE.md's "a
+page-wide substring scan is not a structural claim", walked into inside the
+guard written to stop it), and no positive control (the offline/pure selftest
+can only reach the permissive path, so a function returning False everywhere
+passed it). Now an AST check plus
+`tests/autonomy/test_mutation_harness_guard.py` with a real `git init`:
+dirty → True, staged → True, untracked → True, clean → False, outside-a-repo →
+False, and two faked total-failure reads pinning that a failed git call fails
+open on its EXIT CODE rather than on whatever it wrote to stdout.
+
+**Forward metric:** 🌾 carry — the book behind the fleet's only failover pair —
+can now be handed over without silently restating a close, losing an open, or
+entering on a streak nobody watched, and without booking a phantom step-down
+into the equity series the go-live drawdown bar reads. (Deliberately *not*
+calling it "the fleet's best-evidenced book" any more: `(nc)` withdrew that
+headline — every pooled quote overstates by ~$13 — and `(qi)` records 🙏 avo as
+the only above-bar book today. The honorific is still in circulation and is
+exactly the I12 archaeology class.) No trade changes while a single container
+holds the claim, which is the steady state; this is insurance on the
+transition, and the transition is reachable by design.
 
 ## 2026-08-18 (qi) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
 

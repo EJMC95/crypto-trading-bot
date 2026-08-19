@@ -44,6 +44,7 @@ import pytest
 
 import funding_carry_bot as carry
 import funding_basis
+from funding_carry_bot import takeover_step
 
 pytestmark = pytest.mark.autonomy
 
@@ -142,7 +143,103 @@ def test_it_never_aliases_the_saved_dict():
 
 
 # ---------------------------------------------------------------------------
-# 5 · the loop actually wires it (AST — a fix nobody calls is not a fix)
+# 5 · THE TAKEOVER ITSELF, DRIVEN BEHAVIOURALLY (the a6ce1b2 lesson).
+#
+# The first cut of this section was AST-only — "does `main()` mention these
+# identifiers in these shapes". An adversarial round drove SEVEN survivors
+# through it, every one a realistic regression: hardcoding `ok_read=True` at
+# the call site, throwing the adopter's result away and self-assigning the
+# caller's own values, replacing the checked read with `True, None` (which
+# adopts an EMPTY world and then overwrites the durable record), and never
+# clearing the flag. AST arms cannot see values, argument bindings, dead code
+# or self-assignment — which is where all of those live. `takeover_step` takes
+# its store as an argument precisely so the whole step can be driven against a
+# fake, and these tests are the pins that survive mutation.
+# ---------------------------------------------------------------------------
+
+class FakeStore:
+    """The durable side of the world, as the INCUMBENT left it."""
+
+    def __init__(self, saved=None, ok_read=True, agg=None):
+        self._saved, self._ok, self._agg = saved, ok_read, agg
+        self.reads = 0
+
+    def load_state_checked(self, bot):
+        self.reads += 1
+        return self._ok, self._saved
+
+    def fetch_paper_aggregate(self, bot):
+        return self._agg
+
+
+def _agg(realized=54.0, closed=101, wins=40):
+    return {"realized": realized, "closed": closed, "wins": wins,
+            "losses": closed - wins}
+
+
+def test_the_takeover_adopts_the_incumbents_whole_world():
+    """All SIX fields, from the durable record — not the caller's memory."""
+    store = FakeStore(saved=_durable(), agg=_agg())
+    ok, world, why = takeover_step(store, "bot", NOW)
+    assert ok, why
+    assert world["positions"] == {"XMR": {"side": "short_perp", "accrued": 1.23}}
+    assert world["hot_since"] == {"XMR": NOW - 60.0}
+    assert world["last_ts"] == NOW - 300.0
+    assert (world["realized"], world["n_closed"], world["n_wins"]) == (54.0, 101, 40)
+
+
+def test_the_ledger_aggregate_is_re_read_not_carried():
+    """THE REGRESSION THIS EXISTS FOR. Adopting a fresh position map against a
+    STALE realised total books a step-down with no trade behind it: the row's
+    `closed_trades` goes BACKWARDS and the same wrong equity reaches
+    `<bot>:equity`, which the go-live max-drawdown bar reads worse-of-both.
+    Measured at -$4.00 on a one-close standby before this was fixed."""
+    store = FakeStore(saved=_durable(positions={}), agg=_agg(realized=54.0,
+                                                             closed=101))
+    ok, world, _ = takeover_step(store, "bot", NOW)
+    assert ok
+    # the incumbent's close is present in BOTH halves, so nothing cancels and
+    # nothing double-counts: flat book, ledger truth.
+    assert world["positions"] == {} and world["realized"] == 54.0
+    assert world["n_closed"] == 101
+
+
+def test_a_failed_state_read_holds_and_hands_back_no_world():
+    store = FakeStore(saved=_durable(), ok_read=False, agg=_agg())
+    ok, world, why = takeover_step(store, "bot", NOW)
+    assert ok is False and world is None and "FAILED" in why
+
+
+def test_a_failed_aggregate_read_also_holds():
+    """Both reads are load-bearing: a fresh map under unknown realised totals
+    is exactly the step-down above, so an unavailable ledger must HOLD too."""
+    store = FakeStore(saved=_durable(), agg=None)
+    ok, world, why = takeover_step(store, "bot", NOW)
+    assert ok is False and world is None
+    assert "aggregate" in why.lower()
+
+
+def test_a_long_standby_clears_the_clock_through_the_whole_step():
+    """End-to-end, not just in the adopter: at a REAL takeover the gap always
+    exceeds the trusted bound (claim TTL 1800s vs restore bound 900s), so the
+    honest outcome is cold clocks — a deterministic re-prove, not a restore."""
+    store = FakeStore(saved=_durable(hot_age_s=10 * 3600.0,
+                                     saved_age_s=1798.0), agg=_agg())
+    ok, world, why = takeover_step(store, "bot", NOW)
+    assert ok and world["hot_since"] == {}, why
+    assert world["positions"], "only the CLOCK fails closed, never the book"
+
+
+def test_the_claim_ttl_exceeds_the_clock_restore_bound():
+    """The arithmetic the docstring rests on, pinned so a future change to
+    either constant surfaces here instead of silently making the takeover
+    permissive again."""
+    import bot_pnl_store
+    assert bot_pnl_store.WRITER_CLAIM_TTL > funding_basis.HOT_RESTORE_MAX_GAP_S
+
+
+# ---------------------------------------------------------------------------
+# 6 · the loop wires it — the minimum AST arm, now that behaviour is covered
 # ---------------------------------------------------------------------------
 
 def _main_fn():
@@ -152,13 +249,10 @@ def _main_fn():
 
 
 def test_the_standby_branch_records_that_it_stood_down():
-    """Mutation that reddens this: drop `_stood_down = True` from the standby
-    branch — the takeover then silently resumes the stale world again."""
     fn = _main_fn()
     for node in ast.walk(fn):
         if not isinstance(node, ast.If):
             continue
-        # the standby branch: `if not _ok_writer:`
         if not (isinstance(node.test, ast.UnaryOp)
                 and isinstance(node.test.op, ast.Not)
                 and isinstance(node.test.operand, ast.Name)
@@ -174,31 +268,32 @@ def test_the_standby_branch_records_that_it_stood_down():
     raise AssertionError("standby branch (`if not _ok_writer:`) not found")
 
 
-def test_the_claim_success_path_adopts_before_trading():
-    """The adopter must be CALLED inside main(), guarded by the flag, and the
-    refusal path must `continue` — trading or saving on a refused read is the
-    damage this whole file is about."""
+def test_the_claim_success_path_calls_the_step_and_clears_the_flag():
+    """Deliberately thin: it pins only what AST CAN see — that main() routes
+    the takeover through `takeover_step`, `continue`s on a hold, rebinds all
+    six fields, and CLEARS the flag (an un-cleared flag re-adopts durable
+    state every loop and turns one transient read failure into a permanent
+    refusal to trade). Everything about VALUES is covered above."""
     fn = _main_fn()
-    guarded = None
-    for node in ast.walk(fn):
-        if (isinstance(node, ast.If) and isinstance(node.test, ast.Name)
-                and node.test.id == "_stood_down"):
-            guarded = node
-            break
+    guarded = next((n for n in ast.walk(fn)
+                    if isinstance(n, ast.If) and isinstance(n.test, ast.Name)
+                    and n.test.id == "_stood_down"), None)
     assert guarded is not None, (
-        "no `if _stood_down:` takeover branch in main() — the adopter is "
-        "defined and never called, which is the registered-but-inert failure")
+        "no `if _stood_down:` takeover branch in main() — the step is defined "
+        "and never called, the registered-but-inert failure")
     calls = {c.func.id for c in ast.walk(guarded)
              if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
-    assert "reclaim_after_standby" in calls, calls
+    assert "takeover_step" in calls, calls
     assert any(isinstance(n, ast.Continue) for n in ast.walk(guarded)), (
-        "the takeover branch has no `continue` — a refused read must not fall "
+        "the takeover branch has no `continue` — a held read must not fall "
         "through into the trading pass and the save that follows it")
     rebound = {t.id for a in ast.walk(guarded) if isinstance(a, ast.Assign)
                for t in (a.targets[0].elts
                          if isinstance(a.targets[0], ast.Tuple) else a.targets)
                if isinstance(t, ast.Name)}
-    for name in ("positions", "hot_since", "last_ts"):
+    for name in ("positions", "hot_since", "last_ts",
+                 "realized", "n_closed", "n_wins", "_stood_down"):
         assert name in rebound, (
-            f"the takeover branch never rebinds `{name}` — the three are one "
-            f"snapshot and adopting them apart re-creates the (nc) class")
+            f"the takeover branch never rebinds `{name}` — the six fields are "
+            f"one snapshot and adopting them apart re-creates the very "
+            f"step-down and (nc) accrual classes this step exists to prevent")

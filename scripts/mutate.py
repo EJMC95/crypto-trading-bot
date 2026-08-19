@@ -114,8 +114,8 @@ def git_restore(path):
 def uncommitted(path):
     """Does `path` have changes git would DISCARD on `checkout --`?
 
-    [2026-08-19 (qj)] THE FOURTH BUG IN THIS FAMILY, and this harness was the
-    one that bit. `git_restore` above is `git checkout -- <target>`: between
+    [2026-08-19 (qj)] THE SIXTH BUG IN THIS FAMILY — `(qg)` above enumerates
+    five, and this is the next — and the first one this harness itself caused. `git_restore` above is `git checkout -- <target>`: between
     every mutation it throws the file back to HEAD. Run against a target whose
     fix is still UNCOMMITTED and the first restore **silently deletes the work
     being tested** — the round then reports a red restore (correctly, and only
@@ -124,11 +124,27 @@ def uncommitted(path):
     scratch.
 
     The docstring did say "restored from git". Knowing is not guarding — the
-    same gap this file's own header calls out ("Having a note is not applying
-    it"). So the harness now REFUSES rather than warns: a warning on a run
+    same gap CHANGELOG `(qg)` names in its own body ("Having a note is not
+    applying it"). So the harness now REFUSES rather than warns: a warning on a run
     that then destroys your file is indistinguishable from a clean run until
     you look, which is the (gl) "a guard whose only output is a warning is not
     a guard" rule.
+
+    WHAT `git checkout --` ACTUALLY DOES, measured rather than assumed — the
+    first version of this docstring got it wrong and the error survived into
+    the operator-facing message:
+
+        staged only   `M  f.py`   after restore: the STAGED content SURVIVES
+        unstaged      ` M f.py`   after restore: destroyed  <-- the real bite
+        untracked     `?? f.py`   restore FAILS, rc=1, `check=True` kills the run
+
+    It restores from the INDEX, not from HEAD. So a staged fix is not deleted,
+    and a round on a staged target really is testing your change. This still
+    refuses on staged — a round whose baseline is one thing and whose restore
+    is another is not worth reasoning about — but it refuses as a CONSERVATIVE
+    choice, not because the work would be lost. The remedy is COMMIT: stashing
+    removes the fix, so a round after `git stash` genuinely measures
+    HEAD-without-your-change while looking exactly like a round that passed.
 
     Returns False (permissive) when git cannot answer — outside a repo, or git
     absent. There is nothing to protect in that case, and this must not become
@@ -142,8 +158,9 @@ def uncommitted(path):
     if proc.returncode != 0:
         return False
     # Any porcelain line for the path means git holds a different version than
-    # the tree — staged, unstaged, or untracked; `checkout --` discards the
-    # first two and FAILS on the third, so both are round-invalidating.
+    # the tree. Unstaged is the one that is DESTROYED; untracked FAILS the
+    # restore outright; staged survives but makes baseline and restore
+    # disagree. All three invalidate the round, so all three refuse.
     return bool(proc.stdout.strip())
 
 
@@ -174,10 +191,12 @@ def main(argv=None):
     # Refuse, loudly, before anything is touched.
     if uncommitted(target):
         print(f"!! {target} has uncommitted changes, and every mutation "
-              f"restores it with `git checkout --` — running now would "
-              f"DELETE that work.\n   Commit (or stash) the target first, "
-              f"then re-run: the round mutates HEAD's version either way, so "
-              f"an uncommitted fix is never what you think you are testing.")
+              f"restores it with `git checkout --`.\n   Unstaged edits are "
+              f"DELETED by that restore; an untracked file fails it outright; "
+              f"staged content survives but leaves baseline and restore "
+              f"disagreeing.\n   COMMIT the target first, then re-run — do "
+              f"NOT stash, which removes the very fix you are trying to test "
+              f"and leaves the round measuring HEAD without it.")
         return 2
 
     # BASELINE FIRST. A round that starts red says nothing about the mutants.
