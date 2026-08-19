@@ -1,3 +1,30 @@
+## 2026-08-19 (re) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
+
+`test_enforced_audit_guard[audit_boot_stagger]` went red on MAIN (runs 593,
+596, and my PR #191's 597) — not on anyone's diff. The guard reads deploy
+cadence from commit times (`git log`, its declared CI fallback), and today's
+multi-session merge storm put a **17-min run of sub-210s commit gaps** into
+main's last-60 window. Against 🎫 lighter_ticket_taker's 210s stagger that
+tripped the **3x-interval PROXY tolerance (15 min)** — the fallback the guard
+itself documents as "measurably wrong in both directions". Nothing anyone
+merges goes green until the storm ages out of the window (~days), so this is
+exactly the guard's own escape hatch's job.
+
+THE MEASURED REASON, not a snooze: the taker publishes **no bot_state key
+with a ttl_sec** (its bot_state use is its own broker-state persistence), so
+the proxy governs by fallback — but its only cross-process reader is its
+bot_pnl row behind `fleet_risk.STALE_ROW_SEC=3900s` (**65 min**, the
+authoritative_row staleness filter), 4.3x the proxy. The 17-min burst sat
+well inside the real contract; no reader saw data past its bar. The
+`STAGGER_OK` entry says all of this in place and names the bound that still
+binds: **a burst outlasting 65 min WOULD silence the row for real** — the
+exemption waives the proxy, never the contract.
+
+Verified live in both states (I3 by circumstance): the audit exited 1 with
+the FAIL line before the entry and 0 after, same tree, same commit window —
+the exemption is what fired. Ships on PR #191 with (rd) so main's next suite
+run is green; other open branches inherit it on their next rebase.
+
 ## 2026-08-19 (rd) — THE CORRECTED BAR NOW STANDS WHERE THE GRADERS WILL READ IT: the mirror's published roster and fleet row carry (qw)/(rc) beside the founding numbers
 
 `(qw)` corrected the mirror's founding arithmetic (+0.605% -> +0.397%/t=+3.58
