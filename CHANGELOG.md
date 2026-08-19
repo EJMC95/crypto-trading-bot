@@ -1,3 +1,56 @@
+## 2026-08-19 (rp) — 👩 mum v2's FIRST LIVE PAYLOAD INDICTED HER OWN CONTROL ARM: it counted the v1 legacy flattens, and it could not have survived a redeploy
+
+She is ALIVE — `freqtrade-mum-lshadow` back on /pnl.json at 22:11Z, `status
+online`, `style oversold-1h`, build `cdf4d75c9f19`, and the revival mechanics
+worked exactly as designed: her four frozen v1 positions flattened on the first
+loop (`closed 3 -> 7`), all four slots free, census publishing
+`scanned 23 / no_signal 19 / opened 0`.
+
+**AND THE SAME PAYLOAD SHOWED THE INSTRUMENT WAS WRONG.** Read in full rather
+than at the field I was looking for ((rk)'s lesson, one day old):
+
+    control: {"n": 4, "mean_pct": 7.8115, "null_n": 0,
+              "null_pct": null, "edge_pct": null}
+
+**`n: 4` on a book with zero v2 trades, and a headline `+7.81%`.** Those four
+are the v1 LEGACY FLATTENS — v1-policy marks being realised, opened 12-Jul
+under a rule v2 does not contain. They are exactly the sample `POLICY_ERA`
+exists to exclude, and they walked straight into the instrument standing beside
+it, because the real leg accumulated on ANY close while the placebo leg needed
+a partner. An arm built to answer "is her edge real" opened its life reporting
++7.81% of somebody else's trades.
+
+**FIX: THE PAIR ACCUMULATES ATOMICALLY OR NOT AT ALL.** Both legs, or neither.
+This is not tidiness — it makes `n == null_n` **true by construction**, and it
+excludes every legacy close for free without special-casing a reason string
+(the general rule beats the instance, FORWARD MOTION rule 2). An unpaired
+observation cannot be differenced against anything, so dropping it is the
+honest statistic rather than a loss: `edge_pct` is a PAIRED difference and a
+paired difference needs pairs.
+
+**AND THE SECOND DEFECT, which no payload could show and which would have been
+fatal in about a week: `ctrl` was never persisted.** It lived in `Book.__init__`
+only, and `family-lighter-shadow` redeploys whenever ANY shared organ changes —
+several times a day today alone. A thirty-day instrument that resets to zero on
+every deploy can never reach its own sample; it would have published a
+confident, permanently-restarting number for a month. Now written by `persist()`
+and shape-checked on `restore()`, degrading to a fresh arm rather than raising
+inside the boot path (I4: a long-run measurement may not depend on uptime).
+
+Pinned by four new tests in `tests/autonomy/test_mum_v2.py` — the legacy-close
+exclusion driven through the REAL `record_close`, the persist/restore field
+pair, and an explicit `n == null_n` invariant across a settleable, an
+unsettleable and a settleable close. **3/3 mutations verified red** (the pairing
+condition collapsed to the old one, the persist dropped, the restore blanked);
+21 tests green; selftest green.
+
+**The transferable half:** both of today's control-arm defects were invisible
+to every test I wrote BEFORE it ran, and visible in the first payload it
+produced. The arm's own design — publish the number even at zero — is what made
+the contamination legible in ten seconds. **An instrument that reports at n=0
+tells you it is broken; one that stays silent until it has data tells you
+nothing until the data is already spoiled.**
+
 ## 2026-08-19 (ro) — 👩 mum IS ALIVE: the operator reverses her retirement, and the autopsy says the disease was THE CLOCK — v2 is the same book with 24× the decisions, a hold bounded by measured carry, and its own control arm
 
 **Operator, 19-Aug: *"I now want you to unretire mum and bring her back to life,

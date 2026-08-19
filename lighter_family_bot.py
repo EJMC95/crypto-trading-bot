@@ -1043,6 +1043,21 @@ class Book:
                     self.last_accrue = max(_lt, time.time() - 48 * 3600)
             except Exception:  # noqa: BLE001
                 pass
+            # [(rp)] restore the control arm's accumulated pairs, shape-checked
+            # so a malformed blob degrades to a fresh arm rather than raising
+            # inside the boot path.
+            try:
+                _c = saved.get("ctrl") or {}
+                if isinstance(_c, dict):
+                    self.ctrl = {k: (float(_c[k]) if k in ("sum", "null_sum")
+                                     else int(_c[k]))
+                                 for k in ("n", "sum", "null_sum", "null_n")
+                                 if k in _c} or self.ctrl
+                    for k, d in (("n", 0), ("sum", 0.0),
+                                 ("null_sum", 0.0), ("null_n", 0)):
+                        self.ctrl.setdefault(k, d)
+            except Exception:  # noqa: BLE001
+                self.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
             log.info("%s restored: $%.2f, %d open", self.bot_id,
                      self.broker.equity(), self.broker.open_count())
         if store.load_daily_halt(self.bot_id,
@@ -1062,7 +1077,15 @@ class Book:
                 "broker": self.broker.to_state(), "meta": self.meta,
                 "closed": self.closed[-200:], "fund_realized": self.fund_realized,
                 "guard_until": self.guard_until, "cooldown": self.cooldown,
-                "last_accrue": self.last_accrue})
+                "last_accrue": self.last_accrue,
+                # [(rp)] the control arm is a THIRTY-DAY instrument living in a
+                # container that redeploys whenever any shared organ changes.
+                # In-memory it reset to zero on every deploy and could never
+                # reach its own sample — an instrument that silently loses its
+                # evidence is worse than none (I4: never discard a persistence
+                # result, and never let a long-run measurement depend on
+                # uptime).
+                "ctrl": self.ctrl})
         except Exception:  # noqa: BLE001
             pass
 
@@ -1126,15 +1149,28 @@ class Book:
         # same open and close instants, a coin picked at random from the book's
         # own universe, no capital. Never raises: a control arm that can break
         # a trading loop is worse than no control arm.
+        # THE PAIR ACCUMULATES ATOMICALLY OR NOT AT ALL, and that is a
+        # correctness rule rather than tidiness. [2026-08-19 (rp)] The first
+        # live payload counted mum's FOUR v1 legacy flattens into this arm —
+        # `n: 4, mean_pct: 7.81` — because the real leg was recorded whenever a
+        # trade closed while the placebo leg needed a partner. Those closes are
+        # v1-policy marks being realised, not v2's edge, and they had no
+        # placebo (they opened before v2 existed), so the arm's headline
+        # started at +7.81% on a sample that is not this book's record: the
+        # exact contamination `POLICY_ERA` exists to prevent, one instrument
+        # over. Requiring BOTH legs makes `n == null_n` true by construction,
+        # excludes every legacy close for free, and keeps the comparison
+        # PAIRED — an unpaired observation cannot be differenced against
+        # anything, so dropping it is the honest statistic, not a loss.
         try:
-            if m.get("null_pair") and m.get("null_entry"):
-                _npx = self.last_mark.get(m["null_pair"])
-                if _npx and m["null_entry"] > 0:
-                    self.ctrl["null_sum"] += (_npx - m["null_entry"]) / m["null_entry"]
-                    self.ctrl["null_n"] += 1
-            if getattr(self.s, "control_arm", False) and notional:
+            _np, _ne = m.get("null_pair"), m.get("null_entry")
+            _npx = self.last_mark.get(_np) if _np else None
+            if (getattr(self.s, "control_arm", False) and notional
+                    and _np and _ne and _npx and float(_ne) > 0):
                 self.ctrl["n"] += 1
                 self.ctrl["sum"] += total / notional
+                self.ctrl["null_n"] += 1
+                self.ctrl["null_sum"] += (float(_npx) - float(_ne)) / float(_ne)
         except Exception:  # noqa: BLE001
             pass
         pct = total / notional if notional else total / STAKE_USD
