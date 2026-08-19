@@ -1,3 +1,64 @@
+## 2026-08-19 (re) — THE DISLOCATION EDGE IS IN THE BAND 🪁 BAND-KELLY REFUSES: [45,60) bps is a PLATEAU at t=+2.7..+3.0 while its own [60,inf) set reads +0.61, and the deep tail is NEGATIVE
+
+**Operator: *"find a few different horizons and gates that actually work"*** on
+the one surface `(qq)` left open. Measured before anything is built.
+
+Mirror direction replayed on the scout's own snapshots — **10,052 snapshots,
+5-min cadence, 15-Jul → 19-Aug** — `prem_outliers` for signal, `marks` for
+price, entry lagged 2 snapshots (the ghost's 2-loop confirm), episodes not
+ticks, **one round trip of the book's OWN slippage** charged per coin tier (a
+forward replay, so the `(qw)` double-slippage error does not apply).
+
+**Truncation checked FIRST:** `prem_outliers` is hard-capped at 8 entries; the
+8th-ranked outlier sits at a median **16.9 bps**, so a 45 bps gate is hidden in
+only **0.2%** of snapshots. Gates ≥45 are safe; 30 is marginal (2.1%) and is
+reported, not proposed.
+
+| gate band | 30m | 1h | 2h | 4h | 8h |
+|---|---|---|---|---|---|
+| [30,45) | −0.003 (−0.07) | +0.008 (+0.14) | +0.048 (+0.64) | +0.071 (+0.90) | +0.074 (+0.87) |
+| **[45,60)** | **+0.185 (+2.74)** | **+0.274 (+2.97)** | **+0.320 (+2.69)** | **+0.367 (+2.74)** | **+0.405 (+2.95)** |
+| [60,90) | +0.070 (+0.74) | +0.076 (+0.67) | +0.064 (+0.46) | +0.205 (+1.31) | +0.172 (+0.93) |
+| [90,150) | −0.030 (−0.30) | −0.022 (−0.18) | −0.037 (−0.22) | +0.032 (+0.17) | +0.033 (+0.15) |
+| [150,inf) | −0.179 (−1.34) | −0.359 (−1.57) | −0.311 (−1.11) | −0.407 (−1.08) | −0.497 (−1.23) |
+| **[60,inf) — band-kelly's OWN set** | −0.056 (−0.80) | +0.006 (+0.07) | **+0.073 (+0.61)** | +0.088 (+0.65) | +0.110 (+0.72) |
+
+**[45,60) is a PLATEAU, not a lucky cell** — positive at all five horizons,
+monotone in hold. **The deep tail [150,inf) is NEGATIVE**: the most extreme
+dislocations do not revert, they break. And **the live book's own admission set
+is weak** (+0.073% at its shipped 2h).
+
+**SCRUTINY — it survives all of it.** Both halves positive at every horizon (H1
+t=+1.83..+2.12, H2 t=+1.85..+2.34); jackknife by coin at 4h leaves t=+1.94..+3.01
+(dropping the dominant coin H100 still reads +0.284%/+1.94); block bootstrap
+95% CI **[+0.072%, +0.644%]**, P(>0)=**0.991**; and the ghost-direction control
+LOSES at **t=−3.53**, so the asymmetry is real rather than a sign convention.
+
+**THE HAZARD WAS TESTED, NOT ASSUMED.** The edge concentrates when the
+underlying market is CLOSED (+0.409%/t=+2.34 vs **+0.007%/t=+0.02** open) —
+exactly the stale-reference signature, and the `(lk)`/I7 shape the fleet has
+already been burned by. **Tested directly: the index is NOT frozen.** If it
+were, `d(premium)` would track `d(mark)` one-for-one; measured per symbol the
+correlation/slope are BRENTOIL 0.62/0.41, WTI 0.77/0.64, SKHYNIXUSD 0.40/0.16,
+H100 0.06/0.00, UNITREE 0.69/0.48 — **no symbol reaches the frozen signature
+(corr>0.9 AND slope>0.85)**. Declared caveat: oil's index is *partially* sticky
+out of hours, so some closed-hours premium is index lag.
+
+**CLASS DECOMPOSITION:** commodity +0.566% (t=+2.06, n=57), Asian equity +0.131%
+(t=+1.33, n=32), **pre-IPO −0.165% (n=45 — the band's only negative class)**,
+crypto n=4. **The band is NON-CRYPTO by nature**, which is why crypto-only
+band-kelly cannot reach it and why this is a genuine I20 tiling rather than the
+same bet at a new row id — and the `(lv)` subset trap is structurally avoided,
+since this cell is one band-kelly REFUSES.
+
+**Specifies a book** (navigator cohort, operator naming ask): band **[45,60)
+bps**, max hold **4h** (plateau interior, chosen for decidability not maximum),
+pre-IPO excluded (restrict-only, declared as fitted on n=45, revertible). NOT
+encoded and declared: the 30 bps band, the negative [150,inf) tail, any crypto
+expression. **No book shipped in this entry — this is the measurement that has
+to come first.** Full method + honesty gates:
+`STUDY_DISLOCATION_BAND_2026-08-19.md`.
+
 ## 2026-08-19 (rd) — 👩 mum RETIRED: the I17 no_rate call, and it CORRECTS a `(nf)` HOLD whose "green" was open marks — plus the five stale premises the retirement exposed
 
 *(Renumbered (qu) -> (rc) -> (rd) at push time — a concurrent session took (qu) on
