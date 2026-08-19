@@ -141,7 +141,40 @@ is worth two orders of magnitude.**
 
 ---
 
-## 🚨 NEW 19-Aug · GITHUB ACTIONS IS DARK — CI **and every auto-deploy** are down
+## ✅ ~~19-Aug · GITHUB ACTIONS IS DARK~~ — **RESOLVED 19-Aug ~04:37Z (operator raised the spending limit). CI green, deploys running, PR #184 merged. The COST MEASUREMENT below is kept because it explains the recurrence and sizes it; the operator's decision on it is recorded and the item closes at the next daily review.**
+
+**THE DECISION (operator, 19-Aug): leave CI structure alone and raise the
+spending limit.** Recorded rather than re-litigated — the consolidation option
+below is measured, refused by decision, and must not be re-proposed as if it
+were an open question.
+
+**THE MEASUREMENT, because it explains why this recurs and why the 28-Jul fix
+only bought three weeks.** Actions bills PER JOB, rounded UP to a full minute:
+
+| workflow | structure | measured burn |
+|---|---|---|
+| `changelog-check` | **12 jobs × ~6–17s**, billed as 12 min | ~15–20 runs/day ⇒ **~5,400–7,200 min/mo** |
+| `fleet-watchdog` | 1 job, hourly | **~720 min/mo** |
+| `tests` + `ci-notify` | 2 jobs/run | ~1,400–2,900 min/mo |
+
+**Total ≈ 7,500–11,000 min/month against a 2,000 (Free) / 3,000 (Pro)
+allowance** on a PRIVATE repo (public repos are unmetered — this cost exists
+only because the repo is private). So the dominant cost is NOT the scheduled
+watchdog at ~10%; it is 12 parallel guard jobs each billing a full minute for
+ten seconds of work. **The 28-Jul cadence cut (30-min → hourly) targeted the
+10%**, which is why it bought three weeks rather than fixing it.
+
+**Consequence to expect, stated plainly:** at this burn the limit will be
+reached again. The measured options if that becomes annoying are (a) consolidate
+`changelog-check`'s 12 jobs into 1 job with 12 named steps (~5,000–6,600 min/mo,
+costs the at-a-glance red/green matrix on the PR page), or (b) make the repo
+public (unmetered, but needs a secrets-in-history audit first — credentials were
+rotated in early Aug and that history has NOT been audited). Neither is being
+done; both are priced here so the next session does not re-derive them.
+
+---
+
+## ~~19-Aug · original report~~ — CI **and every auto-deploy** were down
 
 **The fleet's own watchdog diagnosed this before I did, and names the remedy:**
 `/watchdog.json` → *"GITHUB ACTIONS DARK: hourly heartbeat 4.5h old (last
