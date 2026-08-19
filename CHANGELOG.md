@@ -1,4 +1,9 @@
-## 2026-08-19 (qq) — THE HELD HULL WIDENING IS REFUSED BY THE SAME MEASUREMENT THAT SHIPPED GARRETT'S: its floor drop lands in the ONE tier where the pin is known to lose — and its famous `t=+3.92` is a study, not a record
+## 2026-08-19 (qv) — THE HELD HULL WIDENING IS REFUSED BY THE SAME MEASUREMENT THAT SHIPPED GARRETT'S: its floor drop lands in the ONE tier where the pin is known to lose — and its famous `t=+3.92` is a study, not a record
+
+*(Renumbered from (qq) at push time — a concurrent session's `(qq)` landed
+between this session's free-letter check and its push, so main briefly carried
+two. Neither is cited from code; this is the side that moves. FIFTH collision
+this session.)*
 
 `(qo)` held 🧮 Hull's `MIN_VOL` 2e6 → 5e5 on the stated ground that it "would
 pool a never-graded population into the fleet's cleanest measured record" and
