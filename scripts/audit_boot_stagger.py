@@ -117,7 +117,18 @@ KEY_ALIASES = {"implementation_shortfall": ("impl-shortfall",),
 
 #: Organs deliberately exempt, with the reason. An exemption is a DECISION and
 #: must name why — the `BORN_DARK_OK` idiom.
-STAGGER_OK: dict[str, str] = {}
+STAGGER_OK: dict[str, str] = {
+    "lighter_ticket_taker": (
+        "a trading BOOK, not a bus organ: it publishes no bot_state key with a "
+        "ttl_sec, so the 3x-interval proxy (15 min) governs by fallback — but "
+        "its only cross-process reader is its bot_pnl row behind fleet_risk's "
+        "STALE_ROW_SEC=3900s (65 min) staleness filter, 4.3x the proxy. The "
+        "19-Aug merge storm (a 17-min run of sub-210s commit gaps on the "
+        "commit-time proxy) sat well inside that real contract, and the proxy "
+        "alone turned the whole fleet's suite red ((rg)). This waives the "
+        "PROXY, never the contract: a burst outlasting 65 min WOULD silence "
+        "the row for real — revisit if the deploy cadence ever sustains that."),
+}
 
 
 def declares_flag(script: str, flag: str) -> bool | None:
