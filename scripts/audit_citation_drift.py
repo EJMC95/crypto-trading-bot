@@ -242,15 +242,20 @@ def _selftest():
             g("config", "user.email", "t@t"); g("config", "user.name", "t")
             g("config", "commit.gpgsign", "false")
             _A, _B = "z" + "z", "z" + "y"       # see the note below
-            # A filler ROOT commit first: git marks the root boundary with the
-            # same `^` as a shallow graft, so a citation committed there would
-            # be skipped as "beyond this clone's history" and the control could
-            # never fire. Found by this arm failing on its first run — which is
-            # the arm doing its job before it had ever guarded anything.
+            # THE ROOT COMMIT IS ALSO A BOUNDARY. git marks it with the same
+            # `^` as a shallow graft, so a citation committed there would be
+            # skipped as "beyond this clone's history" and the positive control
+            # could never fire. Found by this arm failing on its first run —
+            # which is the arm doing its job before it had ever guarded
+            # anything. It is now used TWICE: as the filler that lets the
+            # positive control work, and as its own NEGATIVE control below.
             open("README", "w").write("root\n")
-            g("add", "-A"); g("commit", "-qm", "root")
             open("CHANGELOG.md", "w").write(
                 f"## 2026-08-19 ({_A}) — THE ORIGINAL SUBJECT, liquidation\n")
+            # A citation born IN the root commit, i.e. at the boundary.
+            open("rootmod.py", "w").write(
+                f"# [2026-08-19 ({_A})] cited from beyond the horizon\n")
+            g("add", "-A"); g("commit", "-qm", "root")
             # COMPOSED, never written literally. `audit_changelog_letters`
             # tokenizes STRING literals too, so a fixture spelled out in
             # citation form here would be read as a real citation of a letter
@@ -287,6 +292,28 @@ def _selftest():
             if found2:
                 print(f"  SELFTEST FAIL: a stable citation was flagged: {found2}")
                 bad += 1
+
+            # BOUNDARY NEGATIVE CONTROL — the arm two mutations survived
+            # without. `rootmod.py`'s citation sits in the root commit, which
+            # git marks `^`, so its true origin is unknowable in the general
+            # case (a shallow graft looks identical). Its letter HAS since
+            # changed meaning, so the only thing stopping a finding here is the
+            # truncation skip itself. Disable that skip — or make the `^`
+            # detection always return False — and this control starts flagging
+            # a line whose provenance the guard cannot actually see, which is
+            # precisely the unsound path the forward walk was rejected for.
+            found3, st3 = audit(["rootmod.py"])
+            if found3:
+                print("  SELFTEST FAIL: a citation at the history boundary was "
+                      f"JUDGED rather than skipped: {found3}. Its origin is "
+                      "unknowable — reading a title at the graft commit is a "
+                      "guess wearing evidence's clothes.")
+                bad += 1
+            elif not st3.get("skipped_truncated"):
+                print("  SELFTEST FAIL: the boundary citation was neither "
+                      f"flagged nor counted as truncated (stats={st3}) — the "
+                      "skip must be VISIBLE, not silent.")
+                bad += 1
     except Exception as e:                      # noqa: BLE001
         print(f"  SELFTEST SKIP: end-to-end control could not run ({e})")
     finally:
@@ -297,7 +324,8 @@ def _selftest():
         return 1
     print("audit_citation_drift --selftest: OK — title comparison both ways, "
           "the 19-Aug incident replayed from real history, and an end-to-end "
-          "renumber control (1 drift found, 1 stable citation ignored)")
+          "renumber control (1 drift found, 1 stable citation ignored, 1 "
+          "boundary citation skipped and counted)")
     return 0
 
 
