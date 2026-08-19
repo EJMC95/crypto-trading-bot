@@ -57,6 +57,10 @@ LEGACY_BOTS = [
     "band-barnes-lshadow",
     "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
     "freqtrade-dad-lshadow",
+    # [2026-08-19] 👩 mum — the I17 no_rate retirement; ledger kept, summary
+    # row pruned so a frozen card cannot sit in the fleet totals.
+    # Reversible via MUM_RETIRED_OVERRIDE=run.
+    "freqtrade-mum-lshadow",
     # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — pruned once
     # freqtrade-avo-maria-lighter publishes from the same sub-account
     # (verified at cutover: stamp e49ba8fa7ed2, baseline $62.80). Ledger

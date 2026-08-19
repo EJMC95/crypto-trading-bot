@@ -25,9 +25,14 @@ def test_family_slate_books_are_out_and_greens_stay(monkeypatch):
         monkeypatch.delenv(env, raising=False)
     live = {s.bot for s in fam.live_strategies()}
     assert not (FAMILY_RETIRED & live), live
-    # the too-broad mutation: retiring three books must not silence the rest
-    for keep in ("freqtrade-mum", "freqtrade-avo-maria", "freqtrade-georgia"):
+    # the too-broad mutation: retiring books must not silence the rest.
+    # [2026-08-19] freqtrade-mum was a "keep" here until its own I17 no_rate
+    # retirement (0 in-era closes ever, ~2.4 closes/30d). The row-scope rule is
+    # what this line guards and it is UNCHANGED — two living books still prove
+    # the guard did not idle the shared process.
+    for keep in ("freqtrade-avo-maria", "freqtrade-georgia"):
         assert keep in live, f"{keep} must stay alive — the (mr) row-scope rule"
+    assert live, "the family process must still run books"
 
 
 def test_family_overrides_resurrect_each_book(monkeypatch):

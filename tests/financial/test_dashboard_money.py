@@ -299,7 +299,7 @@ def test_fetch_rows_drops_retired_hidden_and_unknown(monkeypatch):
         {"bot": "crypto-trend-daily-lighter", "equity": 1034.67},   # RETIRED
         {"bot": "lighter-ticket-taker-lighter", "equity": 62.80},   # RETIRED
         {"bot": "freqtrade-avo-maria-lighter", "equity": 62.80},    # survivor
-        {"bot": "freqtrade-mum-lshadow", "equity": 1000.0},   # hidden below
+        {"bot": "freqtrade-mum-lshadow", "equity": 1000.0},   # retired + hidden
         {"bot": "totally-unknown-bot", "equity": 999.0},      # not current
     ]
     _install_fake_psycopg2(monkeypatch, db_rows)
@@ -316,14 +316,17 @@ def test_fetch_rows_variant_passes_while_its_retired_base_row_stays_out(monkeypa
     # row (14-Jul Kraken cut) while remaining a CURRENT base so its -lshadow
     # twin displays. The filter must express both halves at once.
     # [(nf) 15-Aug] intraday's -lshadow row is itself retired now (red-stop
-    # slate), so the double-life fixture moves to mum — same ex-Kraken class
-    assert "freqtrade-mum" in pd.CURRENT_BOTS
-    assert "freqtrade-mum" in pd.RETIRED_ROWS
-    db_rows = [{"bot": "freqtrade-mum-lshadow", "equity": 1000.0},
-               {"bot": "freqtrade-mum", "equity": 1000.0}]
+    # slate), so the double-life fixture moved to mum — same ex-Kraken class.
+    # [2026-08-19] and mum is now retired too (I17 no_rate), so it moves ONE
+    # MORE TIME, to georgia: the fixture must be a book whose -lshadow twin is
+    # ALIVE, or it stops testing the double life it exists for.
+    assert "freqtrade-georgia" in pd.CURRENT_BOTS
+    assert "freqtrade-georgia" in pd.RETIRED_ROWS
+    db_rows = [{"bot": "freqtrade-georgia-lshadow", "equity": 1000.0},
+               {"bot": "freqtrade-georgia", "equity": 1000.0}]
     _install_fake_psycopg2(monkeypatch, db_rows)
     out = pd.fetch_rows(hidden=set())
-    assert "freqtrade-mum-lshadow" in out    # variant of a current base
+    assert "freqtrade-georgia-lshadow" in out    # variant of a current base
     assert "crypto-intraday-15m" not in out        # retired paper row stays gone
 
 

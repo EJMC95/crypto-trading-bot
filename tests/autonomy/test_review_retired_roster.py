@@ -93,7 +93,9 @@ def test_named_retirements_cannot_be_nominated(review, dead):
 
 @pytest.mark.parametrize("alive", [
     "freqtrade-georgia-lshadow",
-    "freqtrade-mum-lshadow",
+    # [2026-08-19] freqtrade-mum-lshadow was here until it was RETIRED (I17
+    # no_rate: 0 in-era closes ever, ~2.4 closes/30d). Two living subjects
+    # still exercise the trap; the semantics being guarded did not move.
     "freqtrade-avo-maria-lshadow",   # the LIVE pair's control arm
 ])
 def test_the_bare_name_trap_does_not_retire_a_living_book(review, alive, legacy):
@@ -144,11 +146,11 @@ def test_retired_is_only_ever_used_as_exact_membership():
     Written because the first cut of this file did NOT catch it. Mutating the
     go-live guard to `any(d in bot for d in RETIRED)` left every other test in
     here green — the set contents are identical, only the matching semantics
-    move — and that mutant silently drops `freqtrade-georgia-lshadow`,
-    `freqtrade-mum-lshadow` and `freqtrade-avo-maria-lshadow` out of the scan,
-    because `LEGACY_BOTS` carries their retired Kraken-era BARE names. Three
-    living books, one of them the live pair's control arm, would stop being
-    graded with no error raised anywhere. A set-contents assertion cannot see
+    move — and that mutant silently drops `freqtrade-georgia-lshadow` and
+    `freqtrade-avo-maria-lshadow` out of the scan, because `LEGACY_BOTS`
+    carries their retired Kraken-era BARE names. Living books, one of them the
+    live pair's control arm, would stop being graded with no error raised
+    anywhere. A set-contents assertion cannot see
     that; only the call site can. ("A substring test is not a wiring test.")
 
     The contract: every read of `RETIRED` outside its own assignment must be
