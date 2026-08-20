@@ -81,17 +81,52 @@ KEY = "fleet-allocation"
 # 5400 = 3 missed cycles, the fleet's usual staleness slack.
 TTL_SEC = int(os.environ.get("ALLOC_TTL_SEC", "5400"))       # 3 x 1800s loop
 
-# One-sided Z for the lower bound. 1.28 = 90%: deliberately gentler than the
-# go-live gate's t>=2.0, because this decides where to LEARN next, not what may
-# hold real money. Using the gate's bar here would starve every undecided book
-# and the fleet would stop discovering anything.
+# The ONE standard of evidence, as a confidence level rather than a critical
+# value. 90% one-sided: deliberately gentler than the go-live gate's t>=2.0,
+# because this decides where to LEARN next, not what may hold real money. Using
+# the gate's bar here would starve every undecided book and the fleet would stop
+# discovering anything. `golive_readiness`'s horizon power gate reads THIS
+# constant, so the fleet applies one standard whether it is feeding a book or
+# doubting one (I17's amended text, now shared in code rather than in prose).
+CONF = float(os.environ.get("ALLOC_CONF", "0.90"))
+# The large-sample limit of that confidence level, and the FLOOR on the critical
+# value. 1.2816 is what `t_crit` converges to as n grows; keeping it as a floor
+# means `ALLOC_Z_LOWER` stays a live lever that can only make the bound
+# STRICTER, never looser than the sample itself supports (the cage principle —
+# a lever whose only reachable direction is "loosen past the evidence" is not a
+# lever, it is a hole).
 Z_LOWER = float(os.environ.get("ALLOC_Z_LOWER", "1.28"))
 # The probe floor, as a fraction of the flat book size. A book cannot earn
 # evidence with no capital.
 PROBE_FLOOR = float(os.environ.get("ALLOC_PROBE_FLOOR", "0.25"))
-# Books below this many closes are UNDECIDED — they get the probe floor and no
-# more, whatever their mean looks like.
-MIN_N = int(os.environ.get("ALLOC_MIN_N", "20"))
+#: [2026-08-20] THE LUCK FLOOR — 20 -> 10, and it is a COMPUTABILITY floor now,
+#: not a decidability verdict.
+#:
+#: What it used to be: `n >= 20 or the claim is 0.0, whatever the mean looks
+#: like`. That is a CLIFF, and it was a SECOND penalty for a small sample on top
+#: of the standard error, which already does exactly that job — and does it
+#: continuously. Measured on the live payload the day this changed: three living
+#: books held a genuinely positive lower bound and published 0.000 because of
+#: it (🙏 avo shadow n=17 bound +0.362%/trade at t=1.92; its live twin n=4; 👩
+#: mum n=7), and — the half that actually matters — FIVE books published
+#: `claim_era: None` for the same reason, including 🌾 carry, the fleet's
+#: highest-ranked book. `claim_era` is the ONLY field a consumer may act on
+#: ((lx)), so a cliff on the ERA sample, which is by construction the smaller
+#: one, made the organ structurally incapable of ever feeding anything:
+#: `n_with_era_claim` had been **0 across the whole fleet**, every day, since
+#: the era twin shipped.
+#:
+#: Why 10 and not 0: measured in the same pass, a RETIRED book's 3-close era
+#: sample (perps-donchian-breakout-lshadow, three near-identical wins, t=33)
+#: yields a bound of **+2.97%/trade** with no floor at all — it would have
+#: outranked every living book in the fleet on three trades. The t critical
+#: value widens the interval for a thin sample but it cannot repair a VARIANCE
+#: ESTIMATE built from three numbers.
+#:
+#: 10 is not a new invention: it is the winners' docket's own luck floor (I21 —
+#: *"the n>=10 floor, not BH, is what stops a consistent 3-close streak from
+#: outranking evidence"*), so the two instruments that rank books now agree.
+MIN_N = int(os.environ.get("ALLOC_MIN_N", "10"))
 
 #: [2026-08-20 (sh)] HOW HARD EVIDENCE TILTS THE SPLIT — and why it is a TILT
 #: rather than the whole split.
@@ -169,6 +204,101 @@ def book_class(bot):
     return "funding" if any(m in b for m in FUNDING_MARKERS) else "directional"
 
 
+def _betacf(a, b, x, itmax=200, eps=3e-14):
+    """Continued fraction for the incomplete beta (Lentz). Stdlib only."""
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    if abs(d) < 1e-300:
+        d = 1e-300
+    d = 1.0 / d
+    h = d
+    for m in range(1, itmax + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-300:
+            d = 1e-300
+        c = 1.0 + aa / c
+        if abs(c) < 1e-300:
+            c = 1e-300
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-300:
+            d = 1e-300
+        c = 1.0 + aa / c
+        if abs(c) < 1e-300:
+            c = 1e-300
+        d = 1.0 / d
+        delt = d * c
+        h *= delt
+        if abs(delt - 1.0) < eps:
+            break
+    return h
+
+
+def _betainc(a, b, x):
+    """Regularized incomplete beta I_x(a, b)."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbeta = (math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+             + a * math.log(x) + b * math.log1p(-x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return math.exp(lbeta) * _betacf(a, b, x) / a
+    return 1.0 - math.exp(lbeta) * _betacf(b, a, 1.0 - x) / b
+
+
+def _t_cdf(t, df):
+    """P(T <= t) for Student's t with `df` degrees of freedom."""
+    x = df / (df + t * t)
+    p = 0.5 * _betainc(df / 2.0, 0.5, x)
+    return 1.0 - p if t > 0 else p
+
+
+def t_crit(n, conf=None, floor=None):
+    """The one-sided critical value this fleet applies to a sample of size `n`.
+
+    [2026-08-20] WHY THIS EXISTS, and why a constant was wrong.
+
+    The bound was `mean - 1.28*SE` at every sample size. 1.28 is the NORMAL
+    quantile — the value a t-interval converges to as n grows — so applying it
+    to n=4 or n=17 understates what a finite sample costs. The interval was too
+    NARROW on exactly the books the fleet most needed to be careful about, and
+    the mitigation in place for that was a hard `n >= 20` cliff, which does not
+    widen anything: it deletes the estimate. One instrument was too generous and
+    the other too blunt, and together they produced a table of zeros.
+
+    The t critical value is the instrument that already does this job correctly
+    and continuously: 1.533 at n=5, 1.337 at n=17, 1.290 at n=101, 1.2816 in the
+    limit. A thin sample is doubted MORE, and it is doubted by an amount the
+    sample itself determines rather than by a threshold someone picked.
+
+    `floor` (default `Z_LOWER`) keeps the env lever live in the STRICT direction
+    only — see the constant's own note. Fails toward the STRICTER value: any
+    arithmetic trouble returns the floor rather than a guess, because the guess
+    would be in the direction of handing out a claim.
+    """
+    conf = CONF if conf is None else conf
+    floor = Z_LOWER if floor is None else floor
+    try:
+        df = int(n) - 1
+        if df < 1:
+            return None                 # no dispersion estimate exists at n<2
+        lo, hi = 0.0, 200.0
+        for _ in range(200):            # bisection: ~1e-58, far past need
+            mid = (lo + hi) / 2.0
+            if _t_cdf(mid, df) < conf:
+                lo = mid
+            else:
+                hi = mid
+        return max(floor, (lo + hi) / 2.0)
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return floor
+
+
 def sample_stats(pcts):
     """(n, mean, se) for a per-trade return sample, or None when the sample
     cannot support a bound (n<2 or variance below the floor).
@@ -198,18 +328,39 @@ def sample_stats(pcts):
     return n, mean, math.sqrt(var / n)
 
 
-def lower_bound(pcts, z=Z_LOWER):
+def bound_and_crit(pcts, z=None):
+    """(lower bound, critical value) — computed TOGETHER, in one place.
+
+    [2026-08-20] This function exists because of a mutation that survived. The
+    first draft had `allocate` call `t_crit(n)` a second time to publish the
+    `crit` field, so reverting `lower_bound` to a constant left the payload
+    still advertising a t value it had not used — the published evidence would
+    have described a different judgement than the published claim, silently.
+    That is the second-copy-of-a-rule shape ((hj)) in miniature, inside a single
+    file, and only a mutation exposed it (I3).
+    """
+    st = sample_stats(pcts)
+    if st is None:
+        return None, None
+    n, mean, se = st
+    crit = t_crit(n) if z is None else z
+    if crit is None:                     # unreachable behind sample_stats' n>=2
+        return None, None
+    return mean - crit * se, crit
+
+
+def lower_bound(pcts, z=None):
     """One-sided lower confidence bound on mean per-trade return.
 
     Returns None when the sample cannot support one (n<2 or zero variance) —
     NEVER 0.0, because "no opinion" and "measured zero" must not collapse into
     the same number. Callers treat None as undecided.
+
+    [2026-08-20] `z=None` means DERIVE IT FROM THE SAMPLE (`t_crit`), which is
+    the correct instrument and the default. An explicit `z` is honoured so a
+    test can pin a value; production never passes one.
     """
-    st = sample_stats(pcts)
-    if st is None:
-        return None
-    _n, mean, se = st
-    return mean - z * se
+    return bound_and_crit(pcts, z=z)[0]
 
 
 def claims(books):
@@ -226,6 +377,47 @@ def claims(books):
         lb = lower_bound(pcts) if n >= MIN_N else None
         out[bot] = max(0.0, lb) if lb is not None else 0.0
     return out
+
+
+def n_req_claim(n, mean, se, conf=None):
+    """How many closes this book needs before its OWN bound clears zero.
+
+    [2026-08-20] THE FEED-DIRECTION NUMBER. `claim: 0.0` is the same byte for a
+    book 46 closes away from a claim and one that will never have one, and a
+    table of identical zeros is why this organ read as broken. Operator, the day
+    this shipped: *"If everything is 0.000 then you've missed something."*
+
+    Holding the sample's mean and dispersion fixed, `se` scales as 1/sqrt(n), so
+    the bound clears zero once `n > (crit * sd / mean)^2`. `crit` itself depends
+    on n, so iterate — it converges in a handful of passes because the critical
+    value moves far more slowly than n.
+
+    None when no amount of MORE OF THE SAME SAMPLE gets there (mean <= 0), which
+    is the honest answer: that book does not need closes, it needs a different
+    result. Never a promise — it is the floor of a projection, on the (ks)
+    horizon's own terms, and nothing consumes it.
+    """
+    try:
+        if not mean or mean <= 0 or not se or se <= 0 or n < 2:
+            return None
+        sd = se * math.sqrt(n)
+        need = n
+        for _ in range(12):
+            crit = t_crit(max(2, int(math.ceil(need))), conf=conf)
+            if crit is None:
+                return None
+            nxt = (crit * sd / mean) ** 2
+            if abs(nxt - need) < 0.5:
+                need = nxt
+                break
+            need = nxt
+        # The FLOOR binds too: a book cannot hold a claim below MIN_N however
+        # good its arithmetic looks, so reporting a smaller number would be a
+        # lie about what the book actually needs.
+        need = max(int(math.ceil(need)), MIN_N)
+        return need if need > n else n
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return None
 
 
 def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
@@ -284,6 +476,20 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
             why = "bound<=0"
         else:
             why = None
+        # [2026-08-20] THE UN-TRUNCATED BOUND, and the distance to a claim.
+        # `claim` is `max(0, bound)` and must stay that way — a book cannot
+        # claim negative capital, and that field is the published contract every
+        # consumer reads. But truncating at zero threw the ORDERING away: on the
+        # live payload 15 of 19 books published byte-identical `0.0` while their
+        # bounds ranged from -0.02% (📊 georgia, 46 closes from a claim) to
+        # -0.64% (🏛️ albanese). Same number, entirely different situations, and
+        # no reader could tell them apart. The information was computed and
+        # discarded one character before the payload.
+        #
+        # REPORTED, NEVER RANKED — I15's warning is that a demoted-but-reported
+        # statistic migrates into an actuator, so `claim` stays the only field
+        # the split reads and these ship beside it as evidence.
+        raw_bound, crit = bound_and_crit(books[b])
         out[b] = {
             "n": n,
             "class": book_class(b),
@@ -293,6 +499,15 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
             # through to the payload boundary instead of stopping at it).
             "mean_pct": round(st[1], 8) if st else None,
             "se_pct": round(st[2], 8) if st else None,
+            # The bound BEFORE `max(0, ...)`. None only when no bound exists.
+            "bound_pct": round(raw_bound, 8) if raw_bound is not None else None,
+            # The critical value this sample was actually judged at, so the
+            # published claim is reproducible without re-deriving the rule.
+            "crit": round(crit, 4) if crit is not None else None,
+            # Closes needed for this book's own bound to clear zero, at its
+            # measured mean and dispersion. None = a positive mean is not what
+            # this sample has, so more of it will not get there.
+            "n_req_claim": (n_req_claim(st[0], st[1], st[2]) if st else None),
             "target_usd": round(target, 2),
             "current_usd": round(book_usd, 2),
             "delta_usd": round(target - book_usd, 2),
@@ -390,7 +605,8 @@ def build(books, book_usd=BOOK_USD):
         "ttl_sec": TTL_SEC,
         "advisory": True,
         "moves_capital": False,
-        "rule": (f"claim = max(0, mean - {Z_LOWER}*SE) on per-trade %, "
+        "rule": (f"claim = max(0, mean - t*SE) on per-trade %, t = one-sided "
+                 f"Student-t at {CONF:.0%} on n-1 df (floor {Z_LOWER}), "
                  f"n>={MIN_N}; every book keeps a {PROBE_FLOOR:.0%} probe "
                  f"floor; total capital is conserved"),
         "n_books": len(alloc),
@@ -682,9 +898,17 @@ def _selftest():
     # different sample than the one that was ranked.
     ev = allocate({"w": [0.02, 0.01, 0.03, -0.005] * 8}, book_usd=1000.0)["w"]
     assert ev["mean_pct"] is not None and ev["se_pct"] is not None
+    # [2026-08-20] reproduce through the PUBLISHED `crit`, not through the
+    # module constant. The critical value now varies with n, so a reader with
+    # only the payload must still be able to rebuild the ranked number — that
+    # is what makes `crit` load-bearing rather than decorative.
+    assert ev["crit"] is not None
     assert abs(ev["claim"] - max(0.0, ev["mean_pct"]
-                                 - Z_LOWER * ev["se_pct"])) < 1e-6, \
+                                 - ev["crit"] * ev["se_pct"])) < 1e-5, \
         "the published claim must be reproducible from the published stats"
+    assert abs(ev["bound_pct"] - (ev["mean_pct"]
+                                  - ev["crit"] * ev["se_pct"])) < 1e-5, \
+        "bound_pct must be the SAME bound, before the max(0, .) truncation"
     # a claim ALWAYS sits below its own sample mean — this is what red-lines
     # any estimator (pooling, shrinkage, a rate multiplier) that would hand a
     # book a claim its own sample cannot support.
@@ -694,6 +918,50 @@ def _selftest():
     # "no opinion" must reach the payload as None, never as 0.0 --------------
     thin_ev = allocate({"t": [0.01, 0.02]}, book_usd=1000.0)["t"]
     assert thin_ev["claim"] == 0.0 and thin_ev["undecided_why"] == "below-min-n"
+
+    # --- [2026-08-20] THE CRITICAL VALUE IS THE T VALUE, NOT A CONSTANT ------
+    # Pinned against the PUBLISHED table. A future "simplification" back to a
+    # bare 1.28 reddens here, which is the whole point of writing the numbers
+    # down rather than trusting the implementation.
+    for df, want in ((1, 3.0777), (2, 1.8856), (5, 1.4759), (10, 1.3722),
+                     (16, 1.3368), (30, 1.3104), (100, 1.2901)):
+        got = t_crit(df + 1, floor=0.0)
+        assert abs(got - want) < 5e-4, f"t_crit df={df}: {got} vs {want}"
+    assert abs(t_crit(10_000_001, floor=0.0) - 1.2816) < 1e-3, \
+        "t must converge to the normal quantile in the large-sample limit"
+    # MONOTONE: a thinner sample is doubted MORE. This is the property the whole
+    # change rests on — it is what lets the n>=20 cliff go away safely.
+    crits = [t_crit(k, floor=0.0) for k in (3, 5, 10, 20, 50, 200)]
+    assert all(a > b for a, b in zip(crits, crits[1:])), crits
+    assert t_crit(1) is None, "n<2 has no dispersion estimate, so no bound"
+    # The env lever may only TIGHTEN — never loosen past what n supports.
+    assert t_crit(500, floor=2.0) == 2.0
+    assert t_crit(3, floor=1.28) > 1.28
+
+    # --- the same sample, judged honestly, still ranks above a luckier one ---
+    # n=17 at t=1.92 keeps a claim (the live 🙏 avo shadow shape); n=3 at a
+    # freak t does NOT, because MIN_N stops it before the statistics (I21).
+    lucky = allocate({"three": [0.031, 0.030, 0.032],
+                      "seventeen": [0.03, 0.01, 0.02, 0.04, 0.005] * 3 + [0.02, 0.03]},
+                     book_usd=1000.0)
+    assert lucky["three"]["claim"] == 0.0, \
+        "a 3-close streak must not out-claim a measured book (I21's floor)"
+    assert lucky["seventeen"]["claim"] > 0.0
+    assert lucky["seventeen"]["target_usd"] > lucky["three"]["target_usd"]
+
+    # --- the FEED number: a zero claim must say what the book NEEDS ---------
+    # 15 of 19 live books published byte-identical 0.0; this is what makes them
+    # distinguishable without turning a report into a bar.
+    near = allocate({"near": [0.02, -0.018, 0.021, -0.019, 0.001] * 6},
+                    book_usd=1000.0)["near"]
+    assert near["claim"] == 0.0 and near["bound_pct"] is not None
+    assert near["bound_pct"] < 0, "a floored claim must still publish its bound"
+    assert near["n_req_claim"] and near["n_req_claim"] > near["n"], \
+        "a positive-mean book below the bar must publish its distance to it"
+    loser = allocate({"loser": [-0.02, -0.01, -0.03, 0.0] * 6},
+                     book_usd=1000.0)["loser"]
+    assert loser["n_req_claim"] is None, \
+        "a negative mean needs a different result, not more closes — say so"
     flat_ev = allocate({"f": [0.01] * 30}, book_usd=1000.0)["f"]
     assert flat_ev["mean_pct"] is None and flat_ev["se_pct"] is None, \
         "zero variance is NO OPINION — it must not publish a mean"

@@ -1,3 +1,151 @@
+## 2026-08-20 (si) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
+
+**Operator:** *"If everything is 0.000 then you've missed something and you've
+got something wrong. Find out why and fix it. This whole fleet 0 business needs
+to change and whatever is causing this disease needs to be killed, not the fleet
+or its endless possibilities for success."*
+
+He was right, and the cause was not where `(sh)` looked. `(sh)` fixed the SPLIT
+(one claim of 0.0015 was taking $13,366 of $19,000 and starving 17 of 19 books
+to the probe floor). This is the CLAIM itself, and it had **three** separate
+defects, measured on the live payload rather than reasoned about:
+
+**1 — A CLIFF WHERE A CONTINUOUS PENALTY ALREADY EXISTED.** `claims()` read
+`lower_bound(pcts) if n >= MIN_N else None` with `MIN_N = 20`, whose own comment
+said *"books below this many closes are UNDECIDED ... whatever their mean looks
+like"*. That is a **second** penalty for a small sample on top of the standard
+error, which already does exactly that job and does it continuously. Measured:
+three living books held a genuinely positive lower bound and published `0.000`
+because of it — 🙏 avo shadow **n=17, mean +1.085%, t=1.92, bound +0.362%**; its
+live twin n=4; 👩 mum n=7.
+
+**2 — AND THE CLIFF LANDED HARDEST ON THE ONLY FIELD A CONSUMER MAY ACT ON.**
+`claim_era` is era-scoped by `(lx)`, so its sample is by construction the
+SMALLER one — and a fixed `n >= 20` on that sample made the organ structurally
+incapable of ever feeding anything. Measured across the live payload: **five**
+books published `claim_era: None` purely from the floor, including 🌾 carry, the
+fleet's top-ranked book (n=101 pooled, **n_era=10**). The headline field
+`n_with_era_claim` has read **0 across the entire fleet, every day since the era
+twin shipped**. Not "no book qualified" — no book *could*.
+
+**3 — THE CRITICAL VALUE WAS THE LARGE-SAMPLE ONE AT EVERY SAMPLE SIZE.** The
+bound was `mean - 1.28*SE` for n=4 and for n=195 alike. 1.28 is the NORMAL
+quantile — the number a t-interval converges to as n grows — so the interval was
+too NARROW on exactly the thin books the cliff was there to protect against. One
+instrument too generous, the other too blunt, and between them a table of zeros.
+
+### The fix — one instrument, derived from the sample, in both directions
+
+* **`t_crit(n)`** — the one-sided Student-t critical value at n-1 df, stdlib
+  only (Lentz continued fraction for the incomplete beta, bisected). 1.533 at
+  n=5, 1.337 at n=17, 1.290 at n=101, 1.2816 in the limit. A thin sample is
+  doubted MORE, by an amount the sample itself determines rather than by a
+  threshold someone picked. Pinned in the selftest **against the published
+  table** at seven df plus the normal limit, and pinned MONOTONE — a future
+  "simplification" back to a constant reddens.
+* **`Z_LOWER` survives as the FLOOR**, not the value, so `ALLOC_Z_LOWER` stays a
+  live lever that can only make the bound STRICTER. A lever whose only reachable
+  direction is "loosen past the evidence" is not a lever, it is a hole (I18).
+* **`MIN_N` 20 -> 10**, and it is a COMPUTABILITY floor now, not a decidability
+  verdict. Why a floor at all: measured in the same pass, a retired book's
+  3-close sample (three near-identical wins, t=33) yields a bound of
+  **+2.97%/trade** with no floor — it would have outranked every living book in
+  the fleet on three trades. The t value widens a thin interval; it cannot
+  repair a variance estimate built from three numbers. **10 is not a new
+  invention** — it is the winners' docket's own luck floor (I21: *"the n>=10
+  floor, not BH, is what stops a consistent 3-close streak from outranking
+  evidence"*), so the fleet's two ranking instruments now agree.
+* **The same instrument doubts a book as feeds one, in CODE.** `(sh)` wrote that
+  claim as two constants that happened to match, which stays green against two
+  independent implementations. `golive_readiness.horizon_crit` now defers to
+  `fleet_allocation.t_crit` and the test pins it **by identity at five sample
+  sizes**. Consequence in the retirement direction: a thin sample gets a WIDER
+  upper bound, so it is *harder* to route onto the I17 docket — the feed
+  direction, and it falls back to `underpowered` (not a docket verdict) if the
+  owner is ever absent from an image.
+
+### The zeros that remain are honest — so they now say something
+
+15 of 19 books published byte-identical `0.0` while their bounds ran from
+**-0.018%** (📊 georgia, 46 closes from a claim) to **-0.668%** (🏛️ albanese).
+Same number, entirely different situations, and the ordering was computed and
+discarded one character before the payload. `claim` KEEPS its meaning — a book
+cannot claim negative capital and it is the field every consumer reads — and
+three fields now ship beside it:
+
+* **`bound_pct`** — the bound before `max(0, .)`.
+* **`crit`** — the critical value this sample was actually judged at, so the
+  claim is reproducible from the payload alone.
+* **`n_req_claim`** — closes needed for this book's own bound to clear zero at
+  its measured mean and dispersion (georgia **187**, albanese **271**, turnbull
+  **586**, the Farmer's shadow **532**). `None` when the mean is negative,
+  because that book does not need closes, it needs a different result. **9 of 19
+  books now publish a distance instead of an undifferentiated zero.**
+
+REPORTED, NEVER RANKED — I15's warning is that a demoted-but-reported statistic
+migrates into an actuator, so `claim` stays the only field the split reads.
+
+### Measured: what it costs and what it buys
+
+`fleet_bus.allocation_scale` is read by exactly three books (🌾 carry, ⚖️
+Counterweight, 💸 the Farmer's shadow arm), so the sizing price is exactly the
+change in THEIR `scale_effective`, both columns computed under the same `(sh)`
+tilt so this isolates the claim arithmetic:
+
+| consumer | before | after |
+|---|---|---|
+| 🌾 carry | 1.0000 | 1.0000 |
+| ⚖️ Counterweight | 0.9594 | **0.9457** |
+| 💸 Farmer shadow | 0.9594 | **0.9457** |
+
+**The whole cost is -1.4% of clip on two paper books** (~$13 of notional each),
+and it is dilution from one more book earning a place at the table, not a
+restriction. **No book loses a claim** — carry 0.001492 -> 0.001481, the
+Farmer's live row 0.000129 -> 0.000112, both still claimants. What it buys:
+
+* **books with an ERA claim: 0 -> 1.** The first in the fleet's history. 🙏 avo
+  shadow reads `claim_era +0.088%` on n_era=14 and `scale_effective` **1.6413**.
+* books with a pooled claim: 2 -> 3.
+* 🌾 carry's `claim_era` goes **None -> 0.0** — from "no opinion" to "measured,
+  and the bound is at or below zero". That is the honest sentence about a book
+  ranked #1 on a pooled sample whose own era says **-0.155%/trade at t=-4.25**,
+  and it was previously unsayable. 🪁 band-kelly likewise.
+* 0 books at the probe floor; total capital conserved to the cent.
+
+**STATED PLAINLY, because it is the uncomfortable half:** the first book this
+feeds is 🙏 avo, whose entry `(qu)` measured as predicting **nothing** exit-free
+and whose good run this file already says *"sits INSIDE the negative record"*.
+Two things make that the right outcome rather than a defect. The instrument is
+honest — that sample supports that bound, and the answer to "avo is unproven" is
+its own pre-registered `(qu)` revert criterion, not a cliff that also zeroed
+carry's era claim and everyone else's. And **avo does not consume
+`allocation_scale`** (it is a family book; the three consumers are all funding
+books), so the 1.64x is advisory today. This change moves no book's sizing
+except the -1.4% above.
+
+### Two defects found by the guards, not by reading
+
+* **A mutation SURVIVED, and it mattered.** Reverting `lower_bound` to the
+  constant left `allocate` still publishing `crit` from its OWN second
+  `t_crit(n)` call — the payload would have advertised a t value it had not
+  used. That is the second-copy-of-a-rule shape ((hj)) inside a single file.
+  `bound_and_crit` now computes both together and is the one owner; the
+  mutation reddens. **9/9 mutations verified RED** across both files.
+* **My own new test caught a crash on the path it exists to serve.** The
+  fail-closed branch formatted `upper` unconditionally and raised `TypeError`
+  when no upper bound could be computed — the (po) shape, where the safe branch
+  is the untested one.
+
+**NOT CHANGED, deliberately:** `claim`'s semantics, the `(sh)` tilt's input (a
+one-day-old split re-aimed on an unmeasured formula in the same week is what
+I19 forbids), and the era gate's seniority. Files: `fleet_allocation.py`,
+`scripts/golive_readiness.py`, `tests/autonomy/test_fleet_allocation.py`,
+`tests/autonomy/test_horizon_power_gate.py`. Full suite green; the two reds in
+this container (`test_funding_variant`, `test_margin_truth`) are the absent
+`lighter` SDK degrading a margin-mode enum to its raw code, are present on
+`origin/main` unchanged, and CI is green there.
+
+
 ## 2026-08-20 (sh) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
 
 **Operator:** *"Keep the books, fix your arithmetic to everything you want to

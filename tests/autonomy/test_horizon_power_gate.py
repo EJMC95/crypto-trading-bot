@@ -85,10 +85,14 @@ def test_it_says_how_many_closes_would_decide_the_sign():
     pcts = [-0.05, 0.06, -0.04, 0.05, -0.06, 0.04, -0.05, 0.05, -0.04, -0.01]
     hz, s = _horizon(pcts)
     assert isinstance(hz.get("n_req_decide"), int) and hz["n_req_decide"] > len(pcts), hz
-    # se scales as 1/sqrt(n), so n_req is where the upper bound reaches zero
+    # se scales as 1/sqrt(n), so n_req is where the upper bound reaches zero.
+    # [2026-08-20] the critical value comes from `horizon_crit` — the ONE owner
+    # — not from a retyped constant. Typing `g.HORIZON_Z` here made the test
+    # agree with the code only while the code used a constant too.
     import math
-    want = math.ceil(len(pcts) * (g.HORIZON_Z * s["se_pct"] / abs(s["mean_pct"])) ** 2)
-    assert hz["n_req_decide"] == want, (hz["n_req_decide"], want)
+    crit = g.horizon_crit(len(pcts))
+    want = math.ceil(len(pcts) * (crit * s["se_pct"] / abs(s["mean_pct"])) ** 2)
+    assert hz["n_req_decide"] == want, (hz["n_req_decide"], want, crit)
 
 
 # --------------------------------------------------- the OTHER direction
@@ -138,9 +142,61 @@ def test_an_unmeasurable_se_never_counts_as_an_exclusion():
 
 
 def test_the_gate_uses_the_same_z_as_the_allocation_lower_bound():
-    """One standard of evidence for feeding and for doubting."""
+    """One standard of evidence for feeding and for doubting.
+
+    [2026-08-20] pinned by IDENTITY, not by two constants that happen to match.
+    Comparing `HORIZON_Z == Z_LOWER` stayed green against two independent
+    implementations of the bound, which is the second-rule shape ((hj) — "pin
+    re-use by identity, not by asserting constant names are absent").
+    """
     import fleet_allocation as fa
     assert g.HORIZON_Z == fa.Z_LOWER, (
         f"the horizon doubts a book at z={g.HORIZON_Z} but the allocation "
         f"organ feeds one at z={fa.Z_LOWER}; a fleet that applies a different "
         f"standard in each direction will drift toward whichever is stricter")
+    # ... and the same INSTRUMENT, at every sample size, not just the same
+    # large-sample floor.
+    for n in (3, 5, 12, 40, 300):
+        assert g.horizon_crit(n) == fa.t_crit(n, floor=g.HORIZON_Z), n
+    assert g.horizon_crit(5) > g.horizon_crit(300), \
+        "a thin sample must be doubted with a WIDER interval, in both organs"
+
+
+def test_the_horizon_fails_toward_keeping_a_book_when_the_owner_is_missing():
+    """No instrument is not evidence for a retirement verdict (I6).
+
+    `horizon_crit` imports the rule's single owner. If that import ever breaks
+    — a COPY set that drops `fleet_allocation.py`, a rename — the honest result
+    is that no sample has been shown to exclude a positive mean, so nothing may
+    reach the retirement docket on that path.
+    """
+    import builtins
+    real = builtins.__import__
+
+    def _no_alloc(name, *a, **k):
+        if name == "fleet_allocation":
+            raise ImportError("simulated: module absent from this image")
+        return real(name, *a, **k)
+
+    # The fixture must DISCRIMINATE: it is a sample that WOULD be excluded if
+    # the code quietly fell back to the constant, so a fallback is visible as a
+    # verdict flip rather than hidden behind a book that was underpowered
+    # anyway. The first draft used the thin fixture and passed under the
+    # mutation — a vacuous test, caught by I3 and not by reading it.
+    pcts = [-0.02] * 40 + [-0.018] * 40
+    hz_ok, s_ok = _horizon(pcts)
+    assert hz_ok["verdict"] == "unreachable", (
+        "control: with the owner present this sample IS a measured loser")
+    assert s_ok["mean_pct"] + g.HORIZON_Z * s_ok["se_pct"] < 0, (
+        "control: the constant fallback would also exclude it, so a flip to "
+        "'unreachable' below can only come from the fallback")
+
+    builtins.__import__ = _no_alloc
+    try:
+        assert g.horizon_crit(50) is None
+        hz, _ = _horizon(pcts)
+        assert hz["verdict"] != "unreachable", (
+            "a missing critical-value owner must NOT route a book to the "
+            "retirement docket — that is absence of evidence acting as proof")
+    finally:
+        builtins.__import__ = real

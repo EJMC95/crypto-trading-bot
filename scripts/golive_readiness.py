@@ -1280,11 +1280,43 @@ HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 # A verdict can flip on one trade, so a single reading is noise. The book must
 # hold a stuck verdict for DOCKET_DAYS, and the clock RESETS the moment the
 # verdict changes — a book that recovers leaves the docket and starts over.
-#: [2026-08-20 (sh)] The one-sided z the horizon uses to ask whether a negative
-#: mean is negative BEYOND NOISE. Same 1.28 (90%) that `fleet_allocation`'s I16
-#: lower bound uses, deliberately: the fleet should apply one standard of
-#: evidence whether it is deciding to FEED a book or to doubt one.
+#: [2026-08-20 (sh)] The one-sided bar the horizon uses to ask whether a
+#: negative mean is negative BEYOND NOISE. The SAME standard `fleet_allocation`
+#: applies to feed a book, deliberately: the fleet should not doubt a book on
+#: one bar and feed it on another.
+#:
+#: [2026-08-20] AND THE SAME INSTRUMENT, not merely the same number. `horizon_crit`
+#: below defers to `fleet_allocation.t_crit`, so a thin sample is doubted with a
+#: WIDER interval — which in this direction means a book is far harder to route
+#: onto the retirement docket on a handful of trades. This constant survives as
+#: the large-sample limit and the env lever, exactly as it does over there.
 HORIZON_Z = float(os.environ.get("GOLIVE_HORIZON_Z", "1.28"))
+
+
+def horizon_crit(n):
+    """The critical value for a sample of `n`, from the ONE owner of that rule.
+
+    Imported lazily because `fleet_allocation` imports `era_rows` from THIS
+    module (inside a function, so there is no cycle at import time — but a
+    module-level import here would create one).
+
+    FAILS CLOSED IN THE FEED DIRECTION: any import or arithmetic trouble returns
+    the large-sample floor, which is the SMALLEST value this can legitimately
+    take, so the upper bound is as tight as it ever gets and `mean_excluded`
+    is at its most permissive... which is the wrong way round for a retirement
+    verdict. So the caller must treat a None as "not excluded" — see
+    `gate_horizon`. A second copy of the t rule is deliberately NOT provided:
+    that would be a second rule ((hj)), and the two would drift exactly where it
+    matters least visibly.
+    """
+    try:
+        from fleet_allocation import t_crit             # noqa: PLC0415
+    except Exception:                                   # noqa: BLE001
+        return None
+    try:
+        return t_crit(n, floor=HORIZON_Z)
+    except Exception:                                   # noqa: BLE001
+        return None
 DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: Verdicts that mean "not on a path to the gate at the current trajectory".
 #: `no_rate` is deliberately NOT here unconditionally — a newborn book is
@@ -1538,7 +1570,13 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     # the upper bound sits at or below zero has the sample actually ruled a
     # positive mean out.
     se = s.get("se_pct")
-    upper = (mean + HORIZON_Z * se) if (mean is not None and se) else None
+    # [2026-08-20] the critical value comes from the SAMPLE, via the allocation
+    # organ's single owner of that rule. `None` (import unavailable) means the
+    # sample has NOT been shown to exclude a positive mean — absence of the
+    # instrument is never evidence for a retirement verdict (I6).
+    hcrit = horizon_crit(n)
+    upper = ((mean + hcrit * se)
+             if (mean is not None and se and hcrit is not None) else None)
     # Has the SAMPLE excluded a positive mean? An unmeasurable SE (n<2, zero
     # dispersion) is NOT an exclusion — absence of evidence never promotes a
     # book toward the docket (I6).
@@ -1549,19 +1587,29 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
         n_dec = None
         try:
             if mean < 0:
-                n_dec = int(math.ceil(n * (HORIZON_Z * se / abs(mean)) ** 2))
+                n_dec = int(math.ceil(
+                    n * ((hcrit or HORIZON_Z) * se / abs(mean)) ** 2))
         except (TypeError, ValueError, ZeroDivisionError, OverflowError):
             n_dec = None
+        # [2026-08-20] `upper` may be None here — the branch is reached whenever
+        # the sample has NOT been shown to exclude a positive mean, and "no
+        # upper bound could be computed" is one of those ways (n<2, zero
+        # dispersion, or the critical-value owner absent from this image). The
+        # first draft formatted it unconditionally and raised TypeError on
+        # exactly the fail-closed path it exists to serve, which is the (po)
+        # shape: the safe branch was the untested one. Found by its own
+        # mutation test on the day it was written.
+        ub = f"{100 * upper:+.3f}%" if upper is not None else "un-computable"
         out.update(
             verdict="underpowered",
             n_req_decide=n_dec,
             why=(f"mean {100 * mean:+.3f}% is below the bar but its upper "
-                 f"bound {100 * upper:+.3f}% is still ABOVE zero — this sample "
+                 f"bound {ub} is still ABOVE zero — this sample "
                  f"has not excluded a positive mean, so more closes CAN flip "
                  f"it. Needs ~{n_dec} closes to decide the sign"
                  if n_dec else
                  f"mean {100 * mean:+.3f}% is below the bar but its upper "
-                 f"bound is still above zero — not yet decidable"))
+                 f"bound ({ub}) is not at or below zero — not yet decidable"))
         if rate and rate > 0 and n_dec and n_dec > n:
             out["eta_days"] = _fin((n_dec - n) / rate, 1)
         return out

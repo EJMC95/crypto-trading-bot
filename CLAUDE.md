@@ -220,11 +220,35 @@ should the money go?" — so the best-evidenced book and a zero-close book held
 identical capital for weeks. Measured 1-Aug: FUNDING 4 books / 297 closes /
 +$72.89 with three measured claims; DIRECTIONAL 16 books / 867 closes / −$9.21
 with ZERO — while 80% of capital sat directional. A claim is
-`max(0, mean − 1.28·SE)`: ranking on the mean rewards small samples that got
+`max(0, mean − t·SE)`: ranking on the mean rewards small samples that got
 lucky, and the incubator already learned this in fills. The organ is ADVISORY
 by construction (moves no capital, writes no lever) — offense here means the
 number exists and is ranked honestly, not that an organ spends money.
-  ENFORCED BY: `fleet_allocation.py::lower_bound`, `tests/autonomy/test_fleet_allocation.py::test_luck_does_not_outrank_evidence`
+**[20-Aug (si)] AMENDED — THE CRITICAL VALUE IS DERIVED FROM THE SAMPLE, AND
+THE CLIFF THAT STOOD IN FOR IT IS GONE.** This read `1.28·SE` at EVERY sample
+size, which is the NORMAL quantile — the value a t-interval converges to as n
+grows — so the interval was too NARROW on exactly the thin books that needed
+care, and the mitigation for that was a hard `n >= 20` cliff. **A cliff is a
+second penalty for a small sample on top of the SE, which already does that job
+continuously**, and it does not widen an interval — it deletes the estimate.
+Measured on the live payload: three living books held a genuinely positive bound
+and published 0.000 (🙏 avo shadow n=17, bound +0.362%/trade at t=1.92), and —
+the half that mattered — **FIVE books published `claim_era: None` purely from
+the floor**, including 🌾 carry. `claim_era` is the only field a consumer may act
+on ((lx)) and its sample is by construction the smaller one, so the fleet-wide
+`n_with_era_claim` had read **0 every day since the era twin shipped**: not "no
+book qualified" but "no book could". Now `t_crit(n)` (one-sided Student-t at
+n−1 df, pinned against the published table) and `MIN_N = 10` — a COMPUTABILITY
+floor, and I21's own luck floor rather than a new invention, because the t value
+widens a thin interval but cannot repair a variance estimate built from three
+numbers (measured: a 3-close sample at t=33 claims +2.97%/trade unfloored).
+`Z_LOWER` survives as the FLOOR on the critical value, so the env lever may only
+TIGHTEN. Measured after: era claims 0 → 1, pooled 2 → 3, no book loses a claim,
+and the whole sizing price is −1.4% of clip on two paper books. The floored
+zeros now publish `bound_pct`, `crit` and `n_req_claim` — REPORTED, never ranked
+(I15) — because 15 of 19 books read byte-identical 0.0 while their bounds ran
+from −0.018% to −0.668%.
+  ENFORCED BY: `fleet_allocation.py::lower_bound`, `fleet_allocation.py::t_crit`, `tests/autonomy/test_fleet_allocation.py::test_luck_does_not_outrank_evidence`, `tests/autonomy/test_fleet_allocation.py::test_the_critical_value_is_derived_from_the_sample_not_fixed`
 
 ### I17 · A BOOK THAT CANNOT REACH ITS OWN BAR IS NOT A SLOW WINNER — KEEP EVERY BOOK DECIDABLE, OR RETIRE IT
 Eight of twenty-three books had <13 closes on 29-Jul; two had ZERO after 20+
@@ -268,9 +292,19 @@ question, a gate it cannot reach — and the answer is to FEED it. Retirement
 requires a MEASURED exclusion (an upper bound at or below zero, or a supply that
 does not exist), never a thin sample, never a verdict computed on a starved one.
 A refusal to retire on insufficient evidence is a correct outcome of this
-invariant, not an evasion of it. **The same z (1.28) is used to doubt a book as
-to feed one** — one standard of evidence in both directions, pinned by a test.
-  ENFORCED BY: `fleet_allocation.py::CLAIM_TILT`, `tests/autonomy/test_allocation_consumer.py::test_no_book_is_starved_by_a_rivals_claim`, `scripts/golive_readiness.py::HORIZON_Z`, `tests/autonomy/test_horizon_power_gate.py::test_underpowered_is_not_on_the_retirement_docket`
+invariant, not an evasion of it. **The same critical value is used to doubt a
+book as to feed one** — one standard of evidence in both directions, pinned by a
+test. **[20-Aug (si)] CORRECTED IN PLACE per I12: this read "the same z (1.28)",
+and it was true only as two constants that happened to match** — a pin that
+stays green against two independent implementations of the bound, which is the
+second-rule shape ((hj): pin re-use by IDENTITY). `golive_readiness.horizon_crit`
+now defers to `fleet_allocation.t_crit`, so both organs judge a sample of n at
+the same Student-t value and the test pins that identity at five sample sizes.
+In the doubt direction this is strictly the FEED direction: a thin sample gets a
+WIDER upper bound, so it is harder to route onto this docket, and a missing
+critical-value owner degrades to `underpowered` — which is not a docket verdict
+— rather than to a retirement.
+  ENFORCED BY: `fleet_allocation.py::CLAIM_TILT`, `tests/autonomy/test_allocation_consumer.py::test_no_book_is_starved_by_a_rivals_claim`, `scripts/golive_readiness.py::horizon_crit`, `tests/autonomy/test_horizon_power_gate.py::test_underpowered_is_not_on_the_retirement_docket`, `tests/autonomy/test_horizon_power_gate.py::test_the_horizon_fails_toward_keeping_a_book_when_the_owner_is_missing`
 
 ### I18 · WHEN A BOOK STALLS, FIND THE BINDING CONSTRAINT — AND THE BINDING CONSTRAINT MUST BE A REACHABLE LEVER
 🌾 carry went 98.9h without an open holding 6 of 12 slots, with BOTH its
