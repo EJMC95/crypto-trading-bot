@@ -1,3 +1,70 @@
+## 2026-08-20 (sg) — A LEVERED BOOK ON THE 1× BROKER DOES NOT MIS-REPORT, IT BOOKS A PROFIT THE VENUE WOULD NEVER HAVE LET IT COLLECT — the paper account can be liquidated now
+
+`(sf)`'s I22 admits leverage only as the OUTPUT of a volatility target on a book
+whose ruin distance is modelled. **Nothing in this fleet could model one.**
+`paper_broker.py` is *"cash-settled perps, leverage 1"*: no margin requirement,
+no maintenance level, no liquidation, no liquidation event. That is the
+prerequisite the ⚓ nav-flinders design named as a blocker, and it is a blocker
+for a reason that is worse than imprecision.
+
+**MEASURED, as a direct comparison of the same trades on both accounts:** a 3×
+long ($3,000 notional on $1,000 equity) taken to −33% and then recovered in full.
+
+| account | equity after the round trip |
+|---|---:|
+| `PaperBroker` (1×, today) | **$1,000.00** — rides it down, marks it back, books the recovery |
+| `LeveredPaperBroker` | **< $100** — closed out at −31.27%, and gone |
+
+**A gap of >$900 on identical prices.** That gap is not error, it is fiction:
+the 1× broker publishes a P&L the venue would never have permitted, and it does
+so in the one direction that matters — **it makes ruin invisible.** A leveraged
+shadow book on it is not weak evidence, it is anti-evidence.
+
+**THE MODEL is cross-margin**, which is what `market_config.market_margin_mode
+== 0` means here:
+
+    gross           = SUM |size_i * mark_i|
+    maintenance_req = SUM |size_i * mark_i| * mmf_i        <- PER MARKET
+    liquidated     <=>  equity <= maintenance_req
+
+**`mmf` is per market and it varies by 16×** — measured 20-Aug across the 212
+active books: 1.20%×7 · 2.40%×9 · 3.00%×25 · 6.00%×89 · 12%×40 · 20%×35. Fed by
+`fleet_bus.market_margins()` from `(se)`, consumed in the shape that accessor
+actually publishes (the (hj) rule, tested against it).
+
+**THE NUMBER THIS EXISTS TO GET RIGHT.** `distance_to_liquidation()` is
+`(equity − maintenance_req) / gross`, **not `1/L`** — the naive form is the
+distance to ZERO equity and it OVERSTATES the safety margin by exactly `mmf`. At
+3× the same position liquidates at **31.27% on a 3% market and 24.24% on a 12%
+one**, a 7pp spread from the margin tier alone. That is the class of error `(se)`
+caught in a shipped ruin table hours earlier, now unmakeable: the broker computes
+it from the venue's own per-market number.
+
+**FAIL-CLOSED throughout, same direction as `(se)`.** An unknown market gets
+`UNKNOWN_MARGIN` = the venue's HARSHEST tier (20%/12%), never a generous default;
+a half-readable margin row is SKIPPED so the market keeps the harsh spec rather
+than a partly-parsed one; `imf = 0` is junk, not infinite leverage. Liquidation
+is **total** — every position closes, not just the loser, because a venue closes
+the ACCOUNT — and it **survives a restart** via `to_state`/`restore_state`, since
+a memory-only halt is a failure this fleet has already paid for.
+
+**TESTS FOUND MY OWN ARITHMETIC FIRST, twice, and the fixtures are now DERIVED
+rather than guessed.** The first draft asserted that a −24% move separates the
+3% and 12% markets: it liquidates NEITHER (the thresholds are 31.27% and 24.24%,
+solved from `x >= (E0 − G0·mmf)/(G0·(1−mmf))`). It also asserted a liquidation on
+a **0.5× long**, which cannot happen at any price — a position smaller than the
+equity backing it can never reach the requirement. Both were my fixture
+arithmetic, not the code; both are now computed in the test and stated in it.
+
+12 tests, **5 mutations red** (the breach comparison loosened, the harsh default
+replaced with a free one, `UNKNOWN_MARGIN` softened, the liquidated bit dropped
+on restore, and the per-market `mmf` replaced with one assumed rate — the exact
+defect the class exists to prevent). `paper_broker` selftest green; the base
+class is untouched, so every existing 1× book is byte-unaffected.
+
+**NOT CONSUMED BY ANY BOOK.** This is the instrument; ⚓ nav-flinders is the
+first caller and comes next.
+
 ## 2026-08-20 (sf) — I22 SHIPS: A BOOK MUST SPEND THE ECOSYSTEM, AND TWO OF THE WALLS THIS SESSION HIT WERE IMAGINARY — a wrong API path and an untested query parameter
 
 **Operator, 20-Aug:** *"im over the constant brick wall you put up that nothing
