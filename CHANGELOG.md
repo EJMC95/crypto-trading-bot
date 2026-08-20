@@ -14,22 +14,40 @@ mechanism from the code or kill it — measured the sentence.
 `SafetyRails.notional_ok` returns a **BOOLEAN**. The caller's `continue`
 discards the whole CANDIDATE, not the excess. So:
 
-* 💸 **the LIVE Farmer**, on its shipped config (`order_usd $37.50`, cap
-  `$150`, conviction OFF): a brain rung of **4.5 asks $168.75** — over the cap
-  **from an EMPTY book**. Every ranked candidate takes the skip, every loop,
-  indefinitely. **The brain rewarding this book for its evidence would have
-  stopped it trading**, logging one line per coin and nothing else. Below that
-  point the same rail INVERTS selection: a 1.0x entry is refused only when the
-  book is FULL; a 6.7x entry is refused when it is EMPTY, and the coins refused
-  first are the highest-conviction ones.
+* 💸 **the LIVE Farmer.** **[NUMBERS CORRECTED IN PLACE against the live row,
+  which is the record (I14): the audit modelled `order_usd $37.50` from a
+  `(no)`-era changelog line and /pnl.json publishes `clip_usd: 30.0`,
+  `max_open: 5`, `equity: $194.28` right now. The direction was right and the
+  threshold was not — quote these.]** At clip $30 against the operator's $150
+  cap, the **outright halt is the top rung**: m=6.7 asks $201 from an EMPTY
+  book, every candidate skipped, every loop, indefinitely — **the brain
+  rewarding this book for its evidence would have stopped it trading.**
+  And below that rung the failure is subtler and arguably worse, because it
+  looks like it is working: a fixed cap turns a bigger clip into FEWER BETS.
+
+  | brain | clip | slots that fit | gross | x equity |
+  |---|---|---|---|---|
+  | 1.0 | $30 | **5 of 5** | $150 | 0.77x |
+  | 2.0 | $60 | **2 of 5** | $120 | 0.62x |
+  | 3.0 | $90 | **1 of 5** | $90 | 0.46x |
+  | 4.5 | $135 | **1 of 5** | $135 | 0.69x |
+  | 6.7 | $201 | **0 of 5** | $0 | HALT |
+
+  **A brain expand makes this book hold LESS, not more** — five bets collapse
+  to one and gross FALLS — on a funding book whose edge is breadth. The same
+  rail also inverts selection: a 1.0x entry is refused only when the book is
+  FULL; a 6.7x entry is refused when it is EMPTY, so the coins refused first
+  are the highest-conviction ones.
 * 🙏 **the LIVE Avo arm** broke an invariant its own module states —
   *"gross notional can never exceed account equity — the book is 1.00x by
-  construction and no lever reaches past it."* At the live equity (~$63, clip
-  ~$15.70, cap $200) a rung of 6.39 puts two slots at $99.98 = **3.19x
-  equity**, with a −10% stop underneath.
+  construction and no lever reaches past it."* Live-verified: equity **$62.95**,
+  clip **$15.74**, 4 slots, cap **$200** — and that cap is **3.18x this book's
+  equity**, so it never protected the invariant at all. At m=2.0 all four slots
+  fill at $31.48 = **2.00x equity**; at m=3.0, **3.00x equity**, with a −10%
+  stop underneath. The cap does not even begin to bind until m>=3.0.
 * 🙏 **Avo's REDUCE side was a silent retirement.** The min-clip floor is $5
-  against a $15.70 clip, so rungs of 1/4.5 ($3.49) and 1/6.7 ($2.34) sent
-  EVERY entry to `continue`. Zero trades for as long as the brain holds the
+  against the live $15.74 clip, so rungs of 1/4.5 ($3.50) and 1/6.7 ($2.35)
+  sent EVERY entry to `continue`. Zero trades for as long as the brain holds the
   reduce, while the row publishes `status: online` and `clip_usd: 15.70` —
   byte-identical to "no signals today", and **self-locking**, because a book
   that stops trading stops producing the closes that would lift the reduce.

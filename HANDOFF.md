@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 22:48 Sydney (12:48Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-20 23:02 Sydney (13:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `farmer-cap-collapses-slots-under-conviction`  ·  owner: **OPERATOR**
+💸 the LIVE Farmer's notional cap turns a bigger clip into FEWER BETS. Live-verified: clip $30, cap $150, 5 slots, equity $194.28 — at brain 1.0x it holds 5 positions for $150 gross; at 2.0x it holds TWO ($120); at 3.0x it holds ONE ($90). Gross FALLS as conviction rises, on a funding book whose edge is breadth. (sp)'s trim fixes the outright halt at 6.7x; it cannot fix this, because a fixed cap and a bigger clip are arithmetically the same constraint.
+
+_Still open because:_ the resolution is a cap that scales with equity rather than a fixed dollar env, or an explicit concentration policy — and SafetyRails caps are OPERATOR-ONLY by design, which is the one limit neither permission nor a doc edit moves. What a session can do is measure whether 5 small bets beat 1 large one on this book's own ledger; nobody has.
 
 ### `allocation-organ-4x-on-carry`  ·  owner: **OPERATOR**
 💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right now (`delta_usd: +13,500` on a $1,000 book, the fleet's only measured claim), and carry runs 12 slots x $300. That is **$14,400 of gross on a $1,000 book** from the allocation organ alone, before the brain says anything — 14.4x equity on a book whose modelled `HEDGE_COST * notional` is calibrated at $300 a position. (sp)'s brain bound is derived from carry's CONSTANTS precisely so it does not double this; it also does not fix it.
@@ -64,8 +69,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (69 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si))
+## Shipped today (71 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp))
 
+- `7f34d28` Close the class the rail guard could not see: worst-case gross per book (sp)
+- `78ffde3` The rails now actually dispose: trim, not refuse — and the brain's lookup is atomic (sp)
 - `4119336` Merge remote-tracking branch 'origin/main' into claude/fleet-wide-bugs-improvements-64qta3
 - `314f5a3` WIP: brain sizing reaches every book (letter pending)
 - `f835deb` The brain's range reaches 6.7x, either way (si)

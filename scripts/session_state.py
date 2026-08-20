@@ -85,6 +85,26 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "farmer-cap-collapses-slots-under-conviction",
+        "owner": "OPERATOR",
+        "what": "💸 the LIVE Farmer's notional cap turns a bigger clip into "
+                "FEWER BETS. Live-verified: clip $30, cap $150, 5 slots, "
+                "equity $194.28 — at brain 1.0x it holds 5 positions for $150 "
+                "gross; at 2.0x it holds TWO ($120); at 3.0x it holds ONE "
+                "($90). Gross FALLS as conviction rises, on a funding book "
+                "whose edge is breadth. (sp)'s trim fixes the outright halt at "
+                "6.7x; it cannot fix this, because a fixed cap and a bigger "
+                "clip are arithmetically the same constraint.",
+        "why_open": "the resolution is a cap that scales with equity rather "
+                    "than a fixed dollar env, or an explicit "
+                    "concentration policy — and SafetyRails caps are "
+                    "OPERATOR-ONLY by design, which is the one limit neither "
+                    "permission nor a doc edit moves. What a session can do is "
+                    "measure whether 5 small bets beat 1 large one on this "
+                    "book's own ledger; nobody has.",
+        "closes_when": lambda: _has("venues/safety.py", "max_notional_frac"),
+    },
+    {
         "id": "allocation-organ-4x-on-carry",
         "owner": "OPERATOR",
         "what": "💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right "
