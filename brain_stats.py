@@ -72,7 +72,7 @@ EXP_SOFT_T = 2.0             # ...and PnL positive at >= 2 sigma
 EXP_HARD_POST_WR = 0.60      # 1.5x
 EXP_HARD_W_LO = 0.55
 EXP_HARD_T = 2.5
-# [2026-08-20 (sh)] 2.0x — THE CEILING STEP, and the reason it exists.
+# [2026-08-20 (sm)] 2.0x — THE CEILING STEP, and the reason it exists.
 #
 # **Operator: "training wheels need to go off and they need to start growing
 # and learning with the brain that has every loss we've had or win and can let
@@ -98,7 +98,7 @@ EXP_MAX_POST_WR = 0.65       # 2.0x
 EXP_MAX_W_LO = 0.60
 EXP_MAX_T = 3.5
 
-# [2026-08-20 (si)] **THE RANGE REACHES 6.7x, BOTH WAYS. Eamon, explicitly:
+# [2026-08-20 (sn)] **THE RANGE REACHES 6.7x, BOTH WAYS. Eamon, explicitly:
 # "The brain needs to be able to go to 6.7x specifically either way now."**
 #
 # The rungs above 2.0x and below 0.5x are DATA rather than another six
@@ -147,7 +147,7 @@ REDUCE_LADDER = (
     (1.0 / 3.0,  0.25,  0.40,  -2.0,  30.0),
 )
 MIN_N_EFF_HARD = 18.0        # decayed evidence floor under the raw n>=30 floor
-# [(sh)] the 2.0x step needs MORE decayed evidence than 1.5x, not the same
+# [(sm)] the 2.0x step needs MORE decayed evidence than 1.5x, not the same
 # amount: a book can hold a high `t` on a thin decayed sample, and doubling a
 # stake off forgotten trades is the shape this floor exists to refuse.
 MIN_N_EFF_MAX = 30.0         # the 2.0x rung's floor; the table below owns
@@ -370,7 +370,7 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
     if stats["pnl_w"] >= 0:
         if not expand:
             return None, ev
-        # [(sh)/(si)] the ceiling steps FIRST — the ladder is walked
+        # [(sm)/(sn)] the ceiling steps FIRST — the ladder is walked
         # strongest-bar down, so a tag that clears 6.7x is never silently
         # handed 1.25x. Table-driven so that ordering is a property of the
         # data and not of a hand-written chain.
@@ -387,7 +387,7 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
                 and t >= EXP_SOFT_T):
             return 1.25, ev
         return None, ev
-    # [(si)] the DEEP cuts first, same strongest-bar-down rule as the expand
+    # [(sn)] the DEEP cuts first, same strongest-bar-down rule as the expand
     # side. Above the existing 0.5x block so the ordering is total; the 0.5x
     # rung and its EMER fast-path below are untouched.
     for _m, _pw, _wh, _t, _ne in REDUCE_LADDER:
@@ -546,7 +546,7 @@ def _selftest():
     bad = weighted_bucket([mk(-3, d % 10, -0.02) for d in range(34)]
                           + [mk(2, d % 10, 0.01) for d in range(4)], now)
     m, ev = qualify_v3(bad, eb_prior([], [], []))
-    # [2026-08-20 (si)] WAS 0.5 — this case now reaches the 1/3 rung, and the
+    # [2026-08-20 (sn)] WAS 0.5 — this case now reaches the 1/3 rung, and the
     # change is the instruction working rather than a regression. Its own
     # evidence is overwhelming (t=-9.16, post_wr 0.157, Wilson UPPER 0.202 on
     # n_eff 37.3): before the range reached 6.7x either way, the deepest the
@@ -591,7 +591,7 @@ def _selftest():
                       expand=True)[0] is None
     # Reduce side is untouched by the EXPAND SWITCH — that is the property
     # here, not the value: throwing the expand kill switch must not change
-    # what a bleeder gets. [(si)] the value is now 1/3, and it is the SAME
+    # what a bleeder gets. [(sn)] the value is now 1/3, and it is the SAME
     # either way, which is what this line has always been about.
     assert qualify_v3(bad, eb_prior([], [], []), expand=True)[0] == m
 
@@ -612,14 +612,14 @@ def _selftest():
     # bleeder from above is NOT (streak gate still applies to it).
     disaster = weighted_bucket([mk(-2.0, 0.2)] * 42 + [mk(1.0, 0.2)] * 4, now)
     m_d, ev_d = qualify_v3(disaster, eb_prior([], [], []))
-    # [(si)] 1/4.5 now, not 0.5 — and the pair below is the property worth
+    # [(sn)] 1/4.5 now, not 0.5 — and the pair below is the property worth
     # having: `disaster` (t=-13.95, n_eff 46.0) is cut DEEPER than `bad`
     # (t=-9.16, n_eff 37.3). Before the range reached 6.7x either way both got
     # exactly HALF, so the brain could see the difference between them and had
     # no way to say it.
     assert abs(m_d - 1.0 / 4.5) < 1e-9 and ev_d["urgent"] is True, (m_d, ev_d)
     m_b, ev_b = qualify_v3(bad, eb_prior([], [], []))
-    # [(si)] the ordinary bleeder is 1/3 now, and still NOT urgent — the
+    # [(sn)] the ordinary bleeder is 1/3 now, and still NOT urgent — the
     # streak gate applies to it. The deep rungs inherit the same EMER test as
     # the 0.5x rung, so "how deep" and "how fast" stay independent.
     assert abs(m_b - 1.0 / 3.0) < 1e-9 and ev_b["urgent"] is False, ev_b

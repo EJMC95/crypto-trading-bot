@@ -1,11 +1,16 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 20:07 Sydney (10:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-20 21:35 Sydney (11:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
+### `brain-mults-are-two-opinions-wide`  ·  owner: **session**
+(so) wired every living book to the brain's stake multiplier, including both real-money rows — and on the day it shipped the brain had exactly TWO published opinions across twenty books (taker short-divergence 0.75, Counterweight long 0.75). The plumbing is done; the ORGAN is nearly silent, because a mult needs >=30 era closes AND >=3 consecutive runs and most books never reach the first. The open question is whether those floors are right now that the range is 6.7x either way: a floor calibrated for a 1.5x ceiling is not obviously the floor for a 6.7x one.
+
+_Still open because:_ moving a brain floor changes what sizes EVERY book, real money included — it needs its own measurement (how many buckets would qualify at each floor, and what their realised expectancy was), not a judgement call.
+
 ### `taker-replay-blind-to-breakoutup`  ·  owner: **session**
-lighter_ticket_replay refuses every breakout entry (`_up = False if lens == "breakout"`), so the scout tuner's gate cannot see the taker's ONLY living lens. (sf) pinned the cages shut against the resulting one-way ratchet; the DURABLE fix is to give the replay the taker's own breakoutup relabel via up_read(), after which the cage pins are a decision to re-make on evidence.
+lighter_ticket_replay refuses every breakout entry (`_up = False if lens == "breakout"`), so the scout tuner's gate cannot see the taker's ONLY living lens. (sk) pinned the cages shut against the resulting one-way ratchet; the DURABLE fix is to give the replay the taker's own breakoutup relabel via up_read(), after which the cage pins are a decision to re-make on evidence.
 
 _Still open because:_ changes what the tuner's leaderboard measures — needs its own before/after on the recorded tape, not a refactor.
 
@@ -32,7 +37,7 @@ _Still open because:_ 18 bot edits and 18 deploys; do it a book at a time on the
 ### `unmeasurable-lever-backlog`  ·  owner: **session**
 30 registered levers still have no QUANTITIES spec — no recorded quantity to profile them against. The ratchet in audit_lever_measurability stops the pile GROWING; draining it is per-lever work: record what the knob cuts, then spec it.
 
-_Still open because:_ each one needs the bot to stamp its own governing quantity first (the (sf) give_back/mae_ret pattern).
+_Still open because:_ each one needs the bot to stamp its own governing quantity first (the (sk) give_back/mae_ret pattern).
 
 ### `live-taker-divergence-stop-unpriced`  ·  owner: **session**
 The LIVE taker's short-divergence stop reads +28pp reclaim excess and +2.10% held at 24h over n=22 — a measured SIGNAL with no priced VALUE. lighter_ticket_replay is the calibrated instrument; a candle walk is not (it has no short branch).
@@ -49,8 +54,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (54 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh))
+## Shipped today (56 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si))
 
+- `314f5a3` WIP: brain sizing reaches every book (letter pending)
+- `f835deb` The brain's range reaches 6.7x, either way (si)
 - `98f787a` Regenerate the handoff after the (sh) work (sh)
 - `966abc4` Nineteen designs, one way of judging them — the manifest (sh)
 - `e31648f` The ceiling becomes a measurement, and the brain's training wheel comes off (sh)

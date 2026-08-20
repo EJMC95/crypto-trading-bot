@@ -215,7 +215,7 @@ LEVERS = {
     "taker.max_hold_h": {
         "kind": "float", "lo": 48.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48", "env_default": 48.0},
-    # [2026-08-20 (sf)] THE RESTRICTIVE END OF EVERY BREAKOUTUP CAGE IS NOW
+    # [2026-08-20 (sk)] THE RESTRICTIVE END OF EVERY BREAKOUTUP CAGE IS NOW
     # PINNED AT THE MODULE DEFAULT, because the actuator that moves these is
     # STRUCTURALLY BLIND to the lens they govern.
     #
@@ -263,7 +263,7 @@ LEVERS = {
     # actuator. The two levers below are registered for CONSUMPTION only, and
     # their cages are one-sided at the default for exactly this reason.
     #
-    # [2026-08-20 (sf)] THE BREAKOUT ARM'S TREND EXIT JOINS THE RAIL. Under
+    # [2026-08-20 (sk)] THE BREAKOUT ARM'S TREND EXIT JOINS THE RAIL. Under
     # BULL_MODE `bull_exit()` routes breakout/breakoutup to a DIFFERENT exit
     # from every other lens — no TP cap, a wide hard stop, and a trailing
     # give-back off the peak — and both of its numbers were bare env literals
@@ -579,7 +579,7 @@ LEVERS = {
         "note": "Yield Harvester 24h $ turnover floor; env default 1e6 since (pr)",
         "env_default": 1000000.0, "step": -250000.0},
     "carry.payback_max_h": {
-        # [2026-08-20 (sf)] THE OTHER HALF OF THE LIQUIDITY GATE, and the only
+        # [2026-08-20 (sk)] THE OTHER HALF OF THE LIQUIDITY GATE, and the only
         # one that can OPEN this book. `carry.min_vol`'s cage is one-sided in
         # the TIGHTEN direction (default sits at `lo`), so after (pr) the rail
         # had no lever anywhere that could widen 🌾 carry's intake — the fleet's

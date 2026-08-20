@@ -47,7 +47,7 @@ jobs:
   # designs or stamp bookkeeping and stay informational rows in the step
   # summary (a red on a deliberate design is the cry-wolf trap the script's
   # own header records). Guarded by tests/autonomy/test_code_currency_wired.py.
-  # [2026-08-20 (sh)] THE CEILING, beside the floors. Operator: "The discussion
+  # [2026-08-20 (sm)] THE CEILING, beside the floors. Operator: "The discussion
   # of the floor is too often had, where the conversation of how high the
   # ceiling goes is of little discussion." Every bar this fleet runs on a
   # schedule asks whether a book is SAFE; this asks how high it could go and

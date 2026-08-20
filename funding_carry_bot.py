@@ -137,7 +137,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # are untouched by this change.
 MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (px): 2e6 -> 1e6]
 
-# [2026-08-20 (sf)] THE TURNOVER FLOOR IS A PROXY, AND THE THING IT PROXIES FOR
+# [2026-08-20 (sk)] THE TURNOVER FLOOR IS A PROXY, AND THE THING IT PROXIES FOR
 # IS NOW MEASURED — so the book stops refusing on an unmeasured quantity.
 #
 # The floor above exists for one stated reason: *"per-book slippage here is
@@ -520,7 +520,7 @@ def apply_tuning():
                         # registered-but-inert: the exact failure the
                         # `lighter-books` lane was created to prevent.
                         ("carry.min_vol", "MIN_DAY_VOLUME"),
-                        # [2026-08-20 (sf)] the measured half of the liquidity
+                        # [2026-08-20 (sk)] the measured half of the liquidity
                         # gate. `carry.min_vol` can only ever TIGHTEN toward
                         # the old floor (cage hi = the old default), so without
                         # this the rail had no lever that could OPEN the book's
@@ -759,7 +759,7 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
     too illiquid" rather than "illiquid", which is the distinction that made
     the incident legible.
 
-    [2026-08-20 (sf)] `depth_ok(coin, f) -> bool` is the measured liquidity
+    [2026-08-20 (sk)] `depth_ok(coin, f) -> bool` is the measured liquidity
     escape (see `depth_admits`). It is consulted ONLY for a coin that clears
     every OTHER gate and fails on turnover alone — the smallest set whose
     decision it can change, which is also what bounds its REST cost. A coin it
@@ -782,7 +782,7 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
         if abs(f["rate"] * H) < enter_apr:
             out["cold"] += 1
             continue
-        # [(sf)] turnover is a FAST PATH now, not a verdict. A sub-floor coin
+        # [(sk)] turnover is a FAST PATH now, not a verdict. A sub-floor coin
         # is asked the question the floor was standing in for — but only once
         # it would otherwise be eligible, so a coin still waiting out its
         # persistence never costs a book read.
@@ -1375,7 +1375,7 @@ def main():
                                "accrued": round(pos.get("accrued") or 0.0, 4),
                                "fees": round(pos.get("fees") or 0.0, 4),
                                "notional": pos.get("notional"),
-                               # [(sj)] I22 receipts: the two independent
+                               # [(so)] I22 receipts: the two independent
                                # scales this stake was sized by.
                                "alloc_scale": pos.get("alloc_scale"),
                                "brain_mult": pos.get("brain_mult"),
@@ -1431,7 +1431,7 @@ def main():
             # taking down trading, which is the inverse of why it was added.
             # Degrades to a zeroed census (every key present, so the log line
             # and `extra.scan` stay well-formed) and never to a partial dict.
-            # [(sf)] ONE liquidity decision per coin per loop, shared by the
+            # [(sk)] ONE liquidity decision per coin per loop, shared by the
             # census and the candidate expression below. Two separate probes
             # would be two REST reads AND — worse — two chances to disagree
             # about the same coin, which is exactly the drift the census's own
@@ -1440,7 +1440,7 @@ def main():
             # so it is per-LOOP rather than per-call.
             _alloc = (fleet_bus.allocation_scale(bot_id)
                       if fleet_bus is not None else None) or 1.0
-            # [2026-08-20 (sj)] the brain's scale, ON TOP of the allocation
+            # [2026-08-20 (so)] the brain's scale, ON TOP of the allocation
             # organ's — two different questions, deliberately composed. The
             # allocation organ asks "how much of the fleet's capital does this
             # BOOK deserve?"; the brain asks "how has this book's own
@@ -1449,7 +1449,7 @@ def main():
             # earns (+$71.42), so it is exactly the shape a per-side scale can
             # act on.
             # ONE notional for the whole loop, taken over BOTH sides: the
-            # depth probe below prices the clip it is admitting, and the (sf)
+            # depth probe below prices the clip it is admitting, and the (sk)
             # census contract forbids the census and the gate pricing
             # different numbers. A per-side clip would price one and enter the
             # other. `min` over the sides is the same rule ⚖️ takes for the
@@ -1470,7 +1470,7 @@ def main():
                     except Exception:  # noqa: BLE001
                         ok, det = False, {"why": "probe-error"}
                     _memo[c] = ok
-                    # [(sf)] RECEIPTS, the (eu) §B pattern — recorded for
+                    # [(sk)] RECEIPTS, the (eu) §B pattern — recorded for
                     # ADMITTED **and** REFUSED coins, because a gate profiled
                     # only on what it let through cannot say where its bound
                     # should sit. Without these the new lever is a cage nobody
@@ -1522,7 +1522,7 @@ def main():
                      and abs(f["rate"] * _H) >= _enter_apr
                      and (t0 - hot_since.get(c, t0)) >= PERSIST_H * 3600.0
                      and _class_ok(c)                # [(lk)] crypto perps only
-                     # [(sf)] turnover OR measured depth. Ordered last and
+                     # [(sk)] turnover OR measured depth. Ordered last and
                      # memoised, so the book read happens only for a coin that
                      # has already cleared every other gate. Reads the SAME
                      # `_depth_ok` the census used, so the row's `scan` can
@@ -1544,7 +1544,7 @@ def main():
                         "accrued": 0.0,
                         "fees": perp_open_cost + HEDGE_COST * _notional,
                         "entry_apr": apr,
-                        # [(sj)] I22 receipt — the two scales that produced
+                        # [(so)] I22 receipt — the two scales that produced
                         # this notional, recorded SEPARATELY. Multiplied
                         # together they are unattributable, and this book
                         # already carries the allocation organ's scale, so a
@@ -1616,7 +1616,7 @@ def main():
                                     # now DIFFERS from 🏦 Rich Dad's 6h on
                                     # the shared cell
                                     "persist_h": PERSIST_H,
-                                    # [(sf)] the liquidity gate is TWO numbers
+                                    # [(sk)] the liquidity gate is TWO numbers
                                     # now — the turnover fast path above and
                                     # the measured-payback escape. Both are
                                     # published, because a reader who sees
@@ -1686,7 +1686,7 @@ def main():
                 store.save_state(bot_id, {"positions": positions, "hot_since": hot_since,
                                            "last_ts": last_ts,
                                            "saved_ts": time.time(),
-                                           # [(sf)] the `state:` source
+                                           # [(sk)] the `state:` source
                                            # `audit_lever_authority` profiles
                                            # `carry.payback_max_h` against
                                            "depth_scan": {

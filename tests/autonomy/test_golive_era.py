@@ -271,7 +271,7 @@ def test_the_promotion_judge_is_era_safe_BY_CONSTRUCTION():
     starts pooling pre-basis-fix rows into a paired real-money comparison and
     needs its own era.
 
-    [2026-08-20 (sf)] UPGRADED FROM A SUBSTRING SCAN TO AN AST ONE, and the
+    [2026-08-20 (sk)] UPGRADED FROM A SUBSTRING SCAN TO AN AST ONE, and the
     upgrade was forced by a legitimate refactor: `paired_eval` now reaches the
     arms through `match_policy(...)` (the entry-policy match), so the literal
     `arm_trades(rows, live_bot, start_ts, end_ts` stopped appearing while the

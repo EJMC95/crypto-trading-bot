@@ -613,7 +613,7 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
                    "sl_frac": pos.get("sl_frac"),
                    "tp_frac": pos.get("tp_frac"),
                    "notional": pos.get("notional"),
-                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
                    "brain_mult": pos.get("brain_mult"),
                    "spread_bps_entry": pos.get("spread_bps_entry"),
                    "spread_bps_exit": spread_exit,
@@ -631,7 +631,7 @@ def _open_position(positions, setup, coin, side, mark, sl, tp, hold_bars,
     if not mark or mark <= 0 or not sl or sl <= 0:
         return None
     key = f"{setup}:{coin}"
-    # [(sj)] `notional` defaults to the book's own clip, so every existing
+    # [(so)] `notional` defaults to the book's own clip, so every existing
     # caller (and the selftest fixtures) size exactly as before; the brain's
     # scale arrives as an argument rather than by reaching into module state.
     ntl = CLIP_USD if notional is None else float(notional)
@@ -981,7 +981,7 @@ def main():
                     # ((nm)) entry priced on the live book, not the
                     # boot-frozen funding mark.
                     mark = fresh_mid(ctx.venue, coin) or 0.0
-                    # [2026-08-20 (sj)] the brain sizes this entry, keyed on
+                    # [2026-08-20 (so)] the brain sizes this entry, keyed on
                     # the SAME `<side>-<setup>` record_close publishes. This
                     # book is the one the multiplier fits best: it runs a
                     # ROSTER, so the brain grades each setup separately and
@@ -1002,7 +1002,7 @@ def main():
                     acted[akey] = bars[i][0]
                     held_coins.add(coin)
                     opened += 1
-                    # [(sj)] this print sat AFTER the `break` below and was
+                    # [(so)] this print sat AFTER the `break` below and was
                     # unreachable — the book has never logged an open in its
                     # life, which is the (I22) never-recorded class in its
                     # cheapest form. Moved above the break, where it runs.

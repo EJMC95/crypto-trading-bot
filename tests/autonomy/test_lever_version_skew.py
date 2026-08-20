@@ -151,7 +151,7 @@ class TestItShipsInert:
         "scout.dip_range_max": 0.2, "xp.funding.slope_gate": 0,
     }
 
-    #: [2026-08-20 (sf)] DELIBERATELY CLAMPED — a live lever this registry now
+    #: [2026-08-20 (sk)] DELIBERATELY CLAMPED — a live lever this registry now
     #: refuses ON PURPOSE, with the value it snaps back to. Split out rather
     #: than deleted, because "this cage moved a live lever" is a decision that
     #: must stay visible and stay asserted: silently dropping the row would
@@ -183,7 +183,7 @@ class TestItShipsInert:
         was, becomes = pair
         c = ft.clamp(name, was)
         assert c is not None and abs(float(c) - becomes) < 1e-9, (
-            f"{name} no longer clamps {was} -> {becomes}: the (sf) cage pin "
+            f"{name} no longer clamps {was} -> {becomes}: the (sk) cage pin "
             "has been undone and the one-way ratchet is open again")
 
     def test_neither_declaration_can_be_emptied_into_silence(self):
@@ -191,7 +191,7 @@ class TestItShipsInert:
         `DELIBERATELY_CLAMPED` leaves the parametrized test above with zero
         cases, and a parametrize over nothing PASSES. That is the
         check-that-inspects-nothing failure — the guard would go green while
-        asserting nothing at all, and the (sf) cage pin could then be undone
+        asserting nothing at all, and the (sk) cage pin could then be undone
         with the suite still clean."""
         assert self.DELIBERATELY_CLAMPED, (
             "the deliberate-clamp declaration is empty — the clamp assertions "

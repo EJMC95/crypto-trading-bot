@@ -181,7 +181,7 @@ def living_gates(cur):
         # deploy lands they read None and this arm stays silent on them.
         co = e.get("crypto_only", caps.get("crypto_only"))
         g["crypto_only"] = co if isinstance(co, bool) else None
-        # [2026-08-20 (sf)] A CONDITIONAL FLOOR IS NOT THE FLOOR IT PUBLISHES.
+        # [2026-08-20 (sk)] A CONDITIONAL FLOOR IS NOT THE FLOOR IT PUBLISHES.
         # 🌾 carry's turnover floor became a FAST PATH rather than a verdict:
         # below it, a coin is admitted on MEASURED book depth and payback
         # (`funding_carry_bot.depth_admits`). So `caps.min_vol` still reads
@@ -279,7 +279,7 @@ KNOWN_CELL_COLLISIONS = {
         "with 🏦 Rich Dad — one transitive component, three books, two "
         "different declared overlaps (see the comment above this entry and "
         "the pair entry). Owner: OPERATOR, ~12-Sep. "
-        "[2026-08-20 (sf)] THE SLIVER IS NOW THE WHOLE BAND, and this is a "
+        "[2026-08-20 (sk)] THE SLIVER IS NOW THE WHOLE BAND, and this is a "
         "material widening of the (px) overlap rather than a restatement of "
         "it. 🌾 carry's turnover floor became a FAST PATH: below it a coin is "
         "admitted on MEASURED depth and payback, so carry's effective reach "
@@ -778,7 +778,7 @@ def report_collisions(cur) -> int:
             g = gates[b]
             mn, mx = g.get("min_vol"), g.get("max_vol")
             hi = g.get("apr_hi")
-            # [(sf)] a floor of 0 that came from a DEPTH ESCAPE must say so:
+            # [(sk)] a floor of 0 that came from a DEPTH ESCAPE must say so:
             # printed bare it reads as "this book has no floor", which is a
             # different and much less useful fact than "this book's floor is
             # conditional and its published one is $Xm".

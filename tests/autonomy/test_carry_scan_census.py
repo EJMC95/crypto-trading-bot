@@ -163,7 +163,7 @@ def test_a_held_coin_is_counted_once_and_never_as_a_candidate():
     """`held` short-circuits: a held coin must not also be graded on the bar."""
     fund = {"BNB": _f(HOT, 9_000_000)}
     c = carry.scan_census(fund, {"BNB": {}}, {"BNB": T0 - 99 * 3600}, T0, H, BAR)
-    # [(sf)] `depth_admitted` joins the payload as a SUB-COUNT (like
+    # [(sk)] `depth_admitted` joins the payload as a SUB-COUNT (like
     # `waiting_admissible`) when the measured-liquidity escape shipped. The
     # exact-dict form is kept deliberately: it is what makes a silently added
     # or renamed bucket break the partition contract loudly.

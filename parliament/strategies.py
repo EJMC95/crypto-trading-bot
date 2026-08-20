@@ -399,7 +399,7 @@ class PMBot:
         # expand mults in all six PM books on the very day the operator
         # mandated the widening. Cap at the bus's own documented consumer
         # ceiling (1.5 — fleet_bus.MULT_CEIL), floor unchanged.
-        # [2026-08-20 (si)] BOTH ends come from the bus now. The ceiling was
+        # [2026-08-20 (sn)] BOTH ends come from the bus now. The ceiling was
         # already read from it; the floor was a hardcoded 0.3, so when the
         # range went to 6.7x EITHER WAY (Eamon's ask) these books could have
         # expressed the raise and not the matching cut — an asymmetry that

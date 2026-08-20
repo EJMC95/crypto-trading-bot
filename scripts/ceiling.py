@@ -359,7 +359,7 @@ def render(res):
 def render_designs(res, books):
     """Each book's own design beside its measured headroom.
 
-    [(sh)] The divergent half, and the reason `fleet_manifest` exists: a
+    [(sm)] The divergent half, and the reason `fleet_manifest` exists: a
     ceiling number alone tells a book to go faster; a ceiling number beside
     what that book is FOR tells it which direction is up. `flies_when` is
     written per book precisely because one fleet-wide notion of "better"

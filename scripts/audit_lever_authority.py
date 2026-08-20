@@ -260,7 +260,7 @@ QUANTITIES = {
     # (scan_receipts: slope ratios recorded for EVERY decision incl. skips,
     # UNCLAMPED conviction scores, per-cycle explore pool size). Entries
     # stay honestly UNMEASURED until the next --measure run accrues n. ----
-    # [2026-08-20 (sf)] 🎫 THE BREAKOUT ARM'S TREND EXIT. Both knobs became
+    # [2026-08-20 (sk)] 🎫 THE BREAKOUT ARM'S TREND EXIT. Both knobs became
     # registered levers today and neither could be PROFILED, because the
     # quantity each cuts lived in memory and died at close. The bot now stamps
     # them (`give_back`, `mae_ret` on the close row) — so these read UNMEASURED
@@ -282,7 +282,7 @@ QUANTITIES = {
         "gate": "lighter_ticket_taker.exit_reason — trail iff give-back from "
                 "the peak >= this, on the lenses bull_exit routes to the "
                 "trend exit",
-        "note": "MAXIMUM give-back per position, stamped at close since (sf); "
+        "note": "MAXIMUM give-back per position, stamped at close since (sk); "
                 "recorded for EVERY trend-exit close, not only trailed ones, "
                 "so the distribution is not truncated at the bar"},
     "taker.brk_sl": {
@@ -293,9 +293,9 @@ QUANTITIES = {
         "gate": "lighter_ticket_taker.exit_reason — hard stop iff adverse "
                 "excursion reaches this magnitude",
         "note": "MAXIMUM adverse excursion per position, stamped at close "
-                "since (sf); abs because the lever is signed and the "
+                "since (sk); abs because the lever is signed and the "
                 "excursion is negative"},
-    # [2026-08-20 (sf)] 🌾 carry's measured-liquidity bound — the FIRST
+    # [2026-08-20 (sk)] 🌾 carry's measured-liquidity bound — the FIRST
     # QUANTITIES spec on the `lighter-books` lane, and it exists because the
     # lever shipped with its own receipts rather than after them. The header
     # above warns that "a saturated bare run is how a genuinely inert new cage
@@ -1350,7 +1350,7 @@ def _measure(dsn):                                        # pragma: no cover
             if kind == "hold_h":
                 vals = [(ts(c) - ts(o)) / 3600.0 for _p, o, c, _r, _x in rows]
             elif kind == "xfield":
-                # [2026-08-20 (sf)] A FIELD STAMPED ON THE CLOSE ROW'S `extra`.
+                # [2026-08-20 (sk)] A FIELD STAMPED ON THE CLOSE ROW'S `extra`.
                 # The two ledger kinds above derive their quantity from the
                 # row's TIMESTAMPS, which is all the ledger used to carry — so
                 # any lever cutting something the bot knew and did not record

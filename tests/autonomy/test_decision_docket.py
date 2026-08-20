@@ -275,10 +275,23 @@ class TestTheBatchStampIsDisclosedAsAFloor:
                  "pm-turnbull-lshadow"]
         seen = {n: {"reason": "unreachable", "since": stamp} for n in names}
         cur = {n: book("unreachable") for n in names}
-        d, _ = G.decision_docket(cur, seen, "2026-08-13T12:28:34+00:00")
-        assert len(d) == 9, "all nine cross in the same publish"
+        d, sn = G.decision_docket(cur, seen, "2026-08-13T12:28:34+00:00")
+        # [2026-08-17 (rv)] EIGHT, not nine — and the ninth is the point.
+        # ⚖️ `perps-funding-spread` had a RECORDED decision with a ~28-Aug date
+        # by 13-Aug, so `DECIDED_UNTIL` defers it: on that day it genuinely was
+        # not a call anyone still owed. The batch property this fixture exists
+        # for is untouched.
+        assert len(d) == 8, "all that cross AND are still undecided"
+        assert "perps-funding-spread-lshadow" not in {e["book"] for e in d}
+        # `batch_n` is still NINE, because it counts `seen` (every stuck book)
+        # rather than `docket` (the matured, undeferred ones). That distinction
+        # was deliberate and its own comment called it "NOT load-bearing today";
+        # the deferral is the first thing to make the two differ, so it is
+        # load-bearing now and this asserts it.
         assert all(e["since_is_floor"] and e["batch_n"] == 9 for e in d)
         assert all("AT LEAST" in e["why"] for e in d)
+        # PROPERTY 2 of the deferral: the clock survives underneath it.
+        assert sn["perps-funding-spread-lshadow"]["since"] == stamp
 
 
 class TestTheMeasuredFleet:
@@ -324,7 +337,13 @@ class TestTheMeasuredFleet:
         _, seen = G.decision_docket(self._cur(), {}, iso(T0))
         later = iso(T0 + timedelta(days=G.DOCKET_DAYS))
         d, _ = G.decision_docket(self._cur(), seen, later)
-        assert len(d) == 14
+        # [2026-08-17 (rv)] 13, not 14 — ⚖️ `perps-funding-spread` carried a
+        # recorded decision dated ~28-Aug, past this replay's clock, so the
+        # docket correctly stops asking for a call that was already made. The
+        # other thirteen are unchanged; the method name keeps its historical
+        # count because the reading it replays is the 6-Aug one.
+        assert len(d) == 13
+        assert "perps-funding-spread-lshadow" not in {x["book"] for x in d}
         # gillard carries the fleet's largest stuck sample — the operator
         # should see the numbers, not a count
         g = next(x for x in d if x["book"] == "pm-gillard-lshadow")

@@ -85,11 +85,32 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "brain-mults-are-two-opinions-wide",
+        "owner": "session",
+        "what": "(so) wired every living book to the brain's stake multiplier, "
+                "including both real-money rows — and on the day it shipped the "
+                "brain had exactly TWO published opinions across twenty books "
+                "(taker short-divergence 0.75, Counterweight long 0.75). The "
+                "plumbing is done; the ORGAN is nearly silent, because a mult "
+                "needs >=30 era closes AND >=3 consecutive runs and most books "
+                "never reach the first. The open question is whether those "
+                "floors are right now that the range is 6.7x either way: a "
+                "floor calibrated for a 1.5x ceiling is not obviously the floor "
+                "for a 6.7x one.",
+        "why_open": "moving a brain floor changes what sizes EVERY book, real "
+                    "money included — it needs its own measurement (how many "
+                    "buckets would qualify at each floor, and what their "
+                    "realised expectancy was), not a judgement call.",
+        # closes when the floors stop being the shipped constants, i.e. someone
+        # has actually re-decided them rather than inherited them.
+        "closes_when": lambda: not _has("bot_learn.py", "PROMOTE_RUNS = 3"),
+    },
+    {
         "id": "taker-replay-blind-to-breakoutup",
         "owner": "session",
         "what": "lighter_ticket_replay refuses every breakout entry "
                 "(`_up = False if lens == \"breakout\"`), so the scout tuner's "
-                "gate cannot see the taker's ONLY living lens. (sf) pinned the "
+                "gate cannot see the taker's ONLY living lens. (sk) pinned the "
                 "cages shut against the resulting one-way ratchet; the DURABLE "
                 "fix is to give the replay the taker's own breakoutup relabel "
                 "via up_read(), after which the cage pins are a decision to "
@@ -159,7 +180,7 @@ CARRIED = [
                 "audit_lever_measurability stops the pile GROWING; draining it "
                 "is per-lever work: record what the knob cuts, then spec it.",
         "why_open": "each one needs the bot to stamp its own governing "
-                    "quantity first (the (sf) give_back/mae_ret pattern).",
+                    "quantity first (the (sk) give_back/mae_ret pattern).",
         "closes_when": lambda: _ratchet_at_or_below("unmeasurable", 0),
     },
     {

@@ -1,4 +1,4 @@
-"""[(sf)] The judge's paired bar was comparing two arms on different policies.
+"""[(sk)] The judge's paired bar was comparing two arms on different policies.
 
 🧪 the experiment judge is the fleet's ONLY designed path to more real money:
 a candidate is promoted when the shadow twin beats the live control per-trade

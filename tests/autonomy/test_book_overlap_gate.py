@@ -256,7 +256,7 @@ class TestArmPairsAreNotTwoBooks:
 
 
 class TestAConditionalFloorIsNotTheFloorItPublishes:
-    """[(sf)] 🌾 carry's turnover floor became a FAST PATH rather than a
+    """[(sk)] 🌾 carry's turnover floor became a FAST PATH rather than a
     verdict: below it, a coin is admitted on MEASURED book depth and payback.
     So `caps.min_vol` keeps reading $1M while the book's real reach extends
     underneath it — and this guard, whose whole job is "who else can take this

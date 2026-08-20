@@ -1,4 +1,4 @@
-"""[(sf)] The growth rail could only ever SHRINK the taker's one living lens.
+"""[(sk)] The growth rail could only ever SHRINK the taker's one living lens.
 
 MEASURED ON THE LIVE BUS, 2026-08-20. 🎫 the Ticket Taker's shadow book trades
 exactly one lens — `long-breakoutup` holds every open slot, `dip` and
@@ -99,7 +99,7 @@ def test_the_replay_still_cannot_see_the_lens_so_the_upstream_fix_is_open():
     import lighter_ticket_replay as R
     src = inspect.getsource(R)
     assert '_up = False if lens == "breakout" else None' in src, (
-        "the replay's breakout blindness has changed — re-read (sf): the "
+        "the replay's breakout blindness has changed — re-read (sk): the "
         "cage pins above were justified BY that blindness, and if the gate "
         "can now see the lens they are a decision to re-make on evidence, "
         "not a rule to keep by inertia")

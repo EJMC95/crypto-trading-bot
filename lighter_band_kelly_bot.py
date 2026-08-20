@@ -526,7 +526,7 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
             venue="lighter", shadow=True, side=pos["side"],
             entry_price=entry_px, exit_price=exit_px,
             extra={"family": pos.get("family") or "snap",
-                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
                    "brain_mult": pos.get("brain_mult"),
                    "ghost_side": pos.get("ghost_side"),
                    "ghost_entry": pos.get("ghost_entry"),
@@ -844,7 +844,7 @@ def main():
             if coin not in crypto_ok:
                 census["noncrypto"] += 1
                 continue
-            # [2026-08-20 (sj)] the brain sizes MY leg, keyed on the SAME
+            # [2026-08-20 (so)] the brain sizes MY leg, keyed on the SAME
             # `<side>-snap` _close publishes. Two fidelity rules, both learned
             # by this book at (qj): the GHOST's gate above is priced at the
             # ghost's own $10 clip and is untouched here — resizing my leg must
@@ -907,7 +907,7 @@ def main():
                        if p.get("family") == "dip") >= DIP_MAX_POSITIONS:
                     census["dip_capped"] += 1
                     break
-                # [(sj)] same rule on the probe sleeve, its own bucket
+                # [(so)] same rule on the probe sleeve, its own bucket
                 # (`short-dip`) — this is the sleeve admitted on an operator
                 # override of the I16 floor at n=13, so it is exactly the one
                 # whose size should follow its record as the record arrives.
@@ -1085,7 +1085,7 @@ def _selftest():
     # 5) CONSISTENCY RULE: _open_mirror's signature carries no streak, no
     #    outcome, no equity — size cannot vary with results without
     #    changing this function's shape (the douglas pin, kept).
-    #    [(sj)] `notional`/`brain_mult` join the whitelist and the ban stays:
+    #    [(so)] `notional`/`brain_mult` join the whitelist and the ban stays:
     #    the brain's scale is a per-(book, side) function of >=30 closes over
     #    >=3 runs, identical for every trade in a cycle, so it cannot express
     #    "I just lost, bet differently" — which is the thing this pin exists
@@ -1099,7 +1099,7 @@ def _selftest():
         assert _banned not in list(inspect.signature(_open_dip).parameters), \
             f"_open_dip grew a '{_banned}' input"
     # the size defaults to the book's own clip, so an un-sized caller is
-    # byte-identical to the pre-(sj) book, and the fees/size follow the SIZED
+    # byte-identical to the pre-(so) book, and the fees/size follow the SIZED
     # notional rather than the constant.
     _pb = _open_mirror({}, "BM", 75.0,
                        {"mid": 100.0, "buy_vwap": 100.0, "sell_vwap": 100.0,

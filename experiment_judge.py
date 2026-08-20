@@ -118,7 +118,7 @@ CANDIDATES = [
     # to the candidate the venue's own tape actually supports. Reordering is
     # restrict-safe: no bar moves, no lever changes, the paired bar still
     # gates every promotion.
-    # [2026-08-20 (sf)] max-hold-24 JUMPS THE QUEUE, and it is the
+    # [2026-08-20 (sk)] max-hold-24 JUMPS THE QUEUE, and it is the
     # best-evidenced candidate this queue has ever carried.
     #
     # THE MEASUREMENT, on 328 ledger closes (279 priced, 14-Jul->19-Aug)
@@ -435,7 +435,7 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None,
             continue
         if levers is not None and not ran_candidate(r, levers):
             continue
-        # [(sf)] entry-policy match — see `match_policy`. Applied here so the
+        # [(sk)] entry-policy match — see `match_policy`. Applied here so the
         # decision is made while the ROW is in hand; a caller filtering the
         # returned (ts, pct) pairs cannot, because close_ts is not unique.
         if keep_srcs is not None and _src_of(r) not in keep_srcs:
@@ -497,7 +497,7 @@ def match_policy(rows, bot, start_ts, end_ts, keep, levers=None):
     silently dropped because an off-policy row overwrote their key. A join on a
     non-unique key is not a filter.
 
-    [2026-08-20 (sf)] WHY THE PAIRED BAR NEEDED THIS. The judge's whole job is
+    [2026-08-20 (sk)] WHY THE PAIRED BAR NEEDED THIS. The judge's whole job is
     "did the experiment arm beat the control by MARGIN_PP?", and `arm_trades`
     gated the experiment arm on the lever RECEIPT alone — proof it ran the
     candidate's BARS — while saying nothing about which ENTRY POLICY produced
@@ -573,7 +573,7 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     sh, _sh_drop = match_policy(rows, shadow_bot, start_ts, end_ts, _keep0,
                                 levers=cand_levers)
     lv, _lv_drop = match_policy(rows, live_bot, start_ts, end_ts, _keep0)
-    # [2026-08-20 (sf)] COMPARE LIKE WITH LIKE — see `match_policy`. The
+    # [2026-08-20 (sk)] COMPARE LIKE WITH LIKE — see `match_policy`. The
     # control defines the policy set; the experiment arm is restricted to it,
     # and so is the control, so the restriction is symmetric and no unstamped
     # row is guessed at. Published (`policy_match`) rather than silent: a
@@ -637,7 +637,7 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     half_sh_min = max(2, min_closes // 2)
     half_lv_min = max(3, live_min // 2)
     for a, b, label in (((start_ts, mid, "h1"), (mid, end_ts, "h2")) if both_halves else ()):
-        # [(sf)] the halves take the SAME policy match as the full window.
+        # [(sk)] the halves take the SAME policy match as the full window.
         # Caught by the fix's own fixture: matching only the full window left
         # the both-halves gate — the doctrine's central noise filter — reading
         # the biased sample, so a candidate could clear the window bar and be
@@ -2284,7 +2284,7 @@ def _selftest():
     # now UNREACHABLE at its current mean (~1,152 closes needed), the
     # 7-day de-risking slot costs more than it insures. Operator-directed
     # 13-Aug, executed under the real-money grant; paired bar unchanged.
-    # [2026-08-20 (sf)] max-hold-24 leads. Its prior is the strongest this
+    # [2026-08-20 (sk)] max-hold-24 leads. Its prior is the strongest this
     # queue has carried: a CALIBRATED own-tape replay (27/27 tp, 97.9%
     # non-barrier reproduced), a single interior peak reproduced INDEPENDENTLY
     # on both arms, two bootstraps (trade P<=0 = 0.0017; symbol-cluster CI
@@ -2301,7 +2301,7 @@ def _selftest():
                                            # CONDITIONED placebo + two
                                            # bootstraps + coin jackknife, and
                                            # both arms peak at the same cell
-                                           # independently ((sf))
+                                           # independently ((sk))
                    "slope-gate-off": 1,    # venue-supported ((dp))
                    "min-vol-1e5": 2,       # calibrated own-tape replay, both
                                            # halves +ve — strong DIRECT prior
@@ -2504,7 +2504,7 @@ def _selftest():
     # is (ju)'s rule applied to tp-0.06 as well. Walked one slot at a time so
     # the DRAIN ORDER is pinned, not just the list: this is what actually
     # decides which question the fleet asks next.
-    # [2026-08-20 (sf)] max-hold-24 drains FIRST — the queue's strongest prior
+    # [2026-08-20 (sk)] max-hold-24 drains FIRST — the queue's strongest prior
     # (see its CANDIDATES note) and the only candidate that moves the drawdown
     # bar. Walked one slot at a time so the DRAIN ORDER is pinned, not just the
     # list: this is what actually decides which question the fleet asks next.

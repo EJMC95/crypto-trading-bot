@@ -377,6 +377,45 @@ def resolve_universe(configured, width, min_vol_m, current_time=None):
     return out
 
 
+def crypto_only_now():
+    """This book's DECLARED class screen, derived from its two entry paths.
+
+    [2026-08-17] ⚖️ Counterweight was the last book still printing `class
+    screen UNPUBLISHED`, and it is the one where the declaration is worth the
+    most: era-scoped, its 21 off-class legs carry **−$36.48** while its 70
+    on-class legs read **+$5.32** — a book on the decision docket as
+    `unreachable` since 6-Aug whose still-tradeable population is POSITIVE.
+
+    IT WAS MISSED TWICE FOR THE SAME STRUCTURAL REASON. `(pf)` declared the
+    retrofitted carry books and `(pj)` finished "the last three" — but both
+    worked from `audit_book_overlap.living_gates`, which only sees books that
+    publish an `enter_apr`. A cross-sectional book has no entry apr, so it was
+    never in the list of the unpublished and could not be. A detector's roster
+    is part of the detector.
+
+    **DERIVED, NOT ASSERTED, AND HONEST ABOUT BEING PARTIAL.** Two paths admit
+    a coin here and only one is screened: `resolve_universe` filters the
+    scout's TOP-UP crypto-only `(ki)` and deliberately does NOT filter the
+    configured core (*"it is the backtested list ... those names are never
+    dropped"*). So the truthful value is the conjunction — the screen holds
+    only while the core itself is all-crypto. It is today (30 names, every one
+    crypto) and every off-class leg this book has ever traded arrived by
+    top-up, which is why the population really is removed. Put a non-crypto
+    name in `FUNDSPREAD_COINS` and this correctly flips to `False` on its own,
+    rather than a hardcoded `True` quietly lying — the drift `(pj)`'s
+    `test_the_declaration_tracks_the_switch_not_a_literal` exists to catch.
+
+    Fail-OPEN to `None` (unpublished, the third value): a dark `fleet_bus`
+    cannot classify the core, and an unpublished screen may neither
+    manufacture a finding nor erase one (I6, `(ph)`'s rule).
+    """
+    try:
+        return all(bool(fleet_bus.is_crypto(str(c).strip().upper()))
+                   for c in COINS if str(c).strip())
+    except Exception:      # noqa: BLE001
+        return None
+
+
 def lighter_backfill(market_id, hours):
     """Bootstrap the ranking window from LIGHTER'S OWN SETTLED funding series
     (/api/v1/fundings) — the venue this book actually trades and earns on.
@@ -487,7 +526,7 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
             # tested — the price PATH cannot be joined to the trade.
             # Telemetry only; no gate moves.
             entry_price=ent_px, exit_price=exit_px,
-            # [(sj)] I22 receipts (notional + the scales that produced it).
+            # [(so)] I22 receipts (notional + the scales that produced it).
             # This book had NO `extra` at all, so its every sizing term was
             # unrecorded — the allocation organ has been rewriting its clip
             # since (jr) and no close could say by how much.
@@ -716,7 +755,7 @@ def main():
         # clip; held legs keep their entry size). The live arm's clip stays
         # PINNED at GOLIVE_ORDER_USD per (ia) — capital levers do not reach
         # real money, and the allocation organ doubly so. Dark bus -> 1.0.
-        # [2026-08-20 (sj)] and the BRAIN's scale beside it, same arm, same
+        # [2026-08-20 (so)] and the BRAIN's scale beside it, same arm, same
         # NEW-entries-only rule. Two properties carry this one:
         #  * ONE scale for BOTH legs. This book is DOLLAR-NEUTRAL by
         #    construction — one clip opens a long leg and a short leg — while
@@ -773,7 +812,12 @@ def main():
                        # [2026-07-30] effective cap — see funding_carry_bot
                        "caps": {"k": K, "legs": 2 * K,
                                 "universe_n": UNIVERSE_N,
-                                "universe": len(COINS)},
+                                "universe": len(COINS),
+                                # [(ru)] see `crypto_only_now` — DERIVED from
+                                # the core + the (ki) top-up screen, so it
+                                # tracks the switch rather than asserting a
+                                # literal. None = unpublished, never a guess.
+                                "crypto_only": crypto_only_now()},
                                      "style": "xsect-funding-spread"})
             except Exception:  # noqa: BLE001
                 pass
@@ -866,7 +910,7 @@ def main():
                                # the clip this leg was opened at — the
                                # `open_notional()` doctrine, applied to grading.
                                "notional": float(order_usd),
-                               # [(sj)] and the two scales that produced it,
+                               # [(so)] and the two scales that produced it,
                                # recorded SEPARATELY — multiplied together
                                # they are unattributable, and this book
                                # carries both organs.
@@ -917,7 +961,12 @@ def main():
                        # fourth I had already counted as done.
                        "caps": {"k": K, "legs": 2 * K,
                                 "universe_n": UNIVERSE_N,
-                                "universe": len(COINS)},
+                                "universe": len(COINS),
+                                # [(ru)] see `crypto_only_now` — DERIVED from
+                                # the core + the (ki) top-up screen, so it
+                                # tracks the switch rather than asserting a
+                                # literal. None = unpublished, never a guess.
+                                "crypto_only": crypto_only_now()},
                        "held": {c: ("S" if m.get("is_short") else "L")
                                 for c, m in meta.items()},
                        "fund_realized": round(fund_realized, 4),

@@ -414,7 +414,7 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
             venue="lighter", shadow=True, side=pos["side"],
             entry_price=entry_px, exit_price=exit_px,
             extra={"atr_frac": pos.get("atr_frac"),
-                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
                    "brain_mult": pos.get("brain_mult"),
                    "sl_frac": pos.get("sl_frac"),
                    "tp_frac": pos.get("tp_frac"),
@@ -434,7 +434,7 @@ def _open_position(positions, coin, side, mark, atr, t0, signal_t,
     with results without changing this function's shape. An unpriceable mark
     refuses the entry.
 
-    [2026-08-20 (sj)] `notional` arrives as an argument and the rule 3 pin is
+    [2026-08-20 (so)] `notional` arrives as an argument and the rule 3 pin is
     UNCHANGED, because the two are about different things and it is worth
     saying which. What Douglas forbids — and what this book MEASURED at
     +$27.01 -> −$11.32 — is *your last outcome* moving *your next bet*: a
@@ -669,7 +669,7 @@ def main():
                 # 12:00 bar of [0.014507, 0.014938]). An unpriceable coin
                 # refuses the entry, which _open_position already enforces.
                 mark = fresh_mid(ctx.venue, coin) or 0.0
-                # [2026-08-20 (sj)] the brain's per-(book, side) scale, keyed
+                # [2026-08-20 (so)] the brain's per-(book, side) scale, keyed
                 # on the SAME `<side>-impulse` record_close publishes. See
                 # _open_position's note for why this is not the cooldown
                 # overlay this book measured and refused.
@@ -802,7 +802,7 @@ def _selftest():
         assert banned not in params, \
             f"_open_position grew a '{banned}' input — outcomes must not " \
             "size trades (the measured cooldown overlay cost $38.33). " \
-            "[(sj)] `notional`/`brain_mult` are DELIBERATELY allowed and " \
+            "[(so)] `notional`/`brain_mult` are DELIBERATELY allowed and " \
             "are not this: the brain's scale is a per-(book, side) function " \
             "of >=30 closes over >=3 runs, identical for every trade in a " \
             "cycle, so it cannot express 'I just lost, bet differently'."

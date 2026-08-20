@@ -1,4 +1,4 @@
-"""[(sf)] The breakout arm's TREND EXIT becomes reachable by the growth rail.
+"""[(sk)] The breakout arm's TREND EXIT becomes reachable by the growth rail.
 
 THE GAP. Under BULL_MODE `bull_exit()` routes breakout/breakoutup to a
 DIFFERENT exit from every other lens — no TP cap, a wide hard stop, and a
@@ -42,7 +42,7 @@ def test_the_trend_exit_knob_is_registered_caged_and_consumed(lever, attr,
     assert lev["lane"] == "lighter-taker", lev
     assert lev["env_default"] == default == getattr(TT, attr), (
         "the registry default must be the value the consumer actually runs")
-    # [(sf)] ONE-SIDED at the default, deliberately — see
+    # [(sk)] ONE-SIDED at the default, deliberately — see
     # tests/autonomy/test_breakoutup_ratchet.py. While the actuator that would
     # move these is blind to the lens they govern, its restrict path enacts for
     # free and its expand path is arithmetically impossible, so a cage with

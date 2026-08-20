@@ -52,7 +52,7 @@ DESIGN = {
                   "being right about price.",
         "flies_when": "it holds MORE good carries at once — its ceiling is "
                       "slots x supply, and its supply gate now measures depth "
-                      "instead of guessing at it ((sf)).",
+                      "instead of guessing at it ((sk)).",
         "floor": "a carry must repay its own round trip; decay_paid is the "
                  "measured winner and the sided flips are the measured loss.",
     },
@@ -63,7 +63,7 @@ DESIGN = {
                   "reversion.",
         "flies_when": "its take-profit fires more often — that exit is 100% "
                       "win on both arms and everything else is drag. Its "
-                      "returns INVERT past 24h ((sf)).",
+                      "returns INVERT past 24h ((sk)).",
         "floor": "real money: the judge is the only writer of live.funding.*, "
                  "and SafetyRails is senior to every lever.",
     },
@@ -73,7 +73,7 @@ DESIGN = {
                   "Farmer — the ONLY designed path to more real money.",
         "flies_when": "the paired bar can actually promote something. It had "
                       "not in five weeks, because the comparison was rigged "
-                      "against it ((sf)).",
+                      "against it ((sk)).",
         "floor": "it must stay comparable to the live arm, or it measures a "
                  "policy delta and calls it edge.",
     },
@@ -94,7 +94,7 @@ DESIGN = {
                   "liquid one, run by the proven funding machine.",
         "flies_when": "its band stays its own. 🌾 carry's measured-depth gate "
                       "now reaches the same coins, and 6 of 6 of Garrett's "
-                      "top-ranked candidates are >=20% APR ((sf)).",
+                      "top-ranked candidates are >=20% APR ((sk)).",
         "floor": "env-only config and no tuning lane — a single-policy clock "
                  "by construction.",
     },
@@ -141,7 +141,7 @@ DESIGN = {
         "flies_when": "it FILLS ITS SLOTS. 5 of 6 go-live bars, failing only "
                       "t; 310 closes from gradeable at 0.5 of 5 slots (83.5 "
                       "days) or 7.6 days at full occupancy. It is the closest "
-                      "book in the fleet to real money ((sh)).",
+                      "book in the fleet to real money ((sm)).",
         "floor": "its trailing stop is NOT the leak — reclaim 74% against a "
                  "placebo of 75%. Do not widen it.",
     },
@@ -170,7 +170,7 @@ DESIGN = {
                   "fixed at entry and a 12h carry-bounded cap.",
         "flies_when": "her clock keeps working. v1 died of the CLOCK, not of "
                       "losing: ~2.4 closes/30d meant ~12 months to a 30-close "
-                      "bar. She is +4.658%/trade on a cap of FOUR ((sh)).",
+                      "bar. She is +4.658%/trade on a cap of FOUR ((sm)).",
         "floor": "she carries her own CONTROL ARM — the first live book to do "
                  "so — so her edge is answered from her own payload.",
     },

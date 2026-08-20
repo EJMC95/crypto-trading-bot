@@ -1,4 +1,4 @@
-"""[(sf)] 🌾 carry's liquidity gate stops PROXYING and starts MEASURING.
+"""[(sk)] 🌾 carry's liquidity gate stops PROXYING and starts MEASURING.
 
 THE CAGE. The fleet's best-evidenced book (n=101, +$66.21, the only one that has
 ever cleared the `t` bar) was holding **0 of 12 slots** with **`eligible: 0` of

@@ -139,7 +139,18 @@ PERSIST_H = 6.0                 # hot >= this long before entry (parent's bar)
 FLIP_GRACE_H = 6.0              # a liability must persist before it is sold
 MAX_HOLD_H = 14 * 24            # recycle capital (parent's bar)
 DELIST_GIVEUP_H = 24.0          # coin absent from the map this long -> close
-MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "2e6"))
+#: [2026-08-20] 2e6 -> 1e6, CORRECTED IN PLACE per I12. This floor was
+#: inherited verbatim from 🌾 carry at birth (13-Aug) and carry MOVED IT on
+#: 18-Aug `(px)` after measuring its own cell: a 34.9-day ladder took cell
+#: occupancy 5.73% -> 13.42% and the qualifying population 3 -> 6 coins, all
+#: crypto, inside the `(it)` cage. This book enters the SAME cell on the same
+#: venue and was simply left behind — an inherited constant whose own source
+#: has since moved is not an independent choice, it is a stale copy. Measured
+#: consequence of being left behind: 7 days alive, ZERO trades, census
+#: `cold 209/228`. The gate this book adds on top (payback velocity,
+#: ~21.9% TRUE) is unchanged and still binds ABOVE carry's 20% floor, so this
+#: admits nothing the 21-Jul sweep did not validate (I19, restrict-preserving).
+MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "1e6"))
 
 # ---- lesson 2: capacity (cash flow only, so clip == exposure to costs) ------
 CLIP_USD = float(os.environ.get("RICHDAD_CLIP_USD", "80"))
@@ -403,7 +414,7 @@ def _close(bot_id, key, pos, reason, exit_rate, pnl):
                    "accrued": round(pos.get("accrued") or 0.0, 4),
                    "fees": round(pos.get("fees") or 0.0, 4),
                    "notional": pos.get("notional"),
-                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
                    "brain_mult": pos.get("brain_mult"),
                    "held_h": round(held_h, 2)})
     except Exception:  # noqa: BLE001
@@ -584,7 +595,7 @@ def main():
                 for c, f, apr in candidates(fund, held, hot_since, t0,
                                             max_n=free):
                     side = "short" if apr > 0 else "long"
-                    # [2026-08-20 (sj)] the brain sizes this entry, under the
+                    # [2026-08-20 (so)] the brain sizes this entry, under the
                     # SAME tag record_close publishes (`<side>-cashflow_<exit>`)
                     # so the lookup key and the bucket key cannot drift.
                     # Kiyosaki-consistent, not a bolt-on: buying MORE of the

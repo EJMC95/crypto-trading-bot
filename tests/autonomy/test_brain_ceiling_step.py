@@ -1,4 +1,4 @@
-"""[(sh)] The brain holds every win and loss and could say at most "half again".
+"""[(sm)] The brain holds every win and loss and could say at most "half again".
 
 **Operator, 2026-08-20: "training wheels need to go off and they need to start
 growing and learning with the brain that has every loss we've had or win and
@@ -111,7 +111,7 @@ def test_each_axis_alone_keeps_a_book_off_the_top_step(weaken):
 def test_the_ladders_are_walked_STRONGEST_BAR_FIRST():
     """Order matters: walked weakest-first, a tag that clears the top rung
     would be handed the bottom one and the whole range would be dead on
-    arrival. [(si)] Asserted on the TABLES rather than on source positions —
+    arrival. [(sn)] Asserted on the TABLES rather than on source positions —
     the rungs above 2.0x and below 0.5x are data now, and ordering is a
     property of the data."""
     ups = [r[0] for r in B.EXPAND_LADDER]
@@ -156,13 +156,13 @@ def test_the_top_rung_ships_inert_and_that_is_the_point():
 
 
 def test_the_live_books_DO_size_off_the_brain_now():
-    """[2026-08-20 (sj)] CORRECTED IN PLACE (I12) — THIS TEST USED TO ASSERT
+    """[2026-08-20 (so)] CORRECTED IN PLACE (I12) — THIS TEST USED TO ASSERT
     THE OPPOSITE, and leaving it standing would have been worse than deleting
     it, because it PASSED VACUOUSLY against the new wiring.
 
     It was `test_no_live_book_reads_a_brain_multiplier`, and it worked by
     deriving the set of functions that call `fleet_bus.stake_multiplier` and
-    refusing them to the two real-money modules. When (sj) wired the live books
+    refusing them to the two real-money modules. When (so) wired the live books
     through `brain_clip` — which reaches the payload via `brain_mult_raw`, not
     `stake_multiplier` — the derivation simply stopped seeing them. A green
     run then meant nothing at all, which is this repo's own "a check that
@@ -230,7 +230,7 @@ def test_every_consumer_reads_BOTH_ends_from_the_bus():
             # SURVIVING mutation walked straight past it: the Parliament
             # aliases the ceiling into `_ceil` a line earlier, so the literal
             # never appears in the clamp itself.
-            # [(sj)] The second draft over-corrected — it flagged ANY
+            # [(so)] The second draft over-corrected — it flagged ANY
             # `max(<number>, min(...))` in a file that so much as MENTIONS the
             # ceiling, and the day `lighter_family_bot` gained a docstring
             # reference it reported three unrelated clamps (a funding-based
@@ -240,7 +240,7 @@ def test_every_consumer_reads_BOTH_ends_from_the_bus():
             # `min` end to actually BE the bus ceiling. That keeps the
             # Parliament's `_ceil` in scope — the mutation that motivated the
             # loosening — and drops the false positives.
-            # [(sj)] BOTH ends are resolved through local aliases, not just
+            # [(so)] BOTH ends are resolved through local aliases, not just
             # the ceiling. A THIRD surviving mutation found that gap: with the
             # ceiling alias handled, `_floor = getattr(fleet_bus,
             # "MULT_FLOOR", 0.3)` -> `_floor = 0.3` walked straight past,

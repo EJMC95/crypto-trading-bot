@@ -786,7 +786,7 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None, entry_apr=None,
     """
     return {"is_short": is_short, "entry": px, "opened_ts": now_ts,
             "accrued": 0.0, "clip": clip, "src": src,
-            # [2026-08-20 (sj)] THE BRAIN SCALE IN FORCE AT ENTRY. `clip`
+            # [2026-08-20 (so)] THE BRAIN SCALE IN FORCE AT ENTRY. `clip`
             # above is base x conviction x brain and is therefore
             # unattributable on its own — the same reason `bars` records the
             # ENTRY-time levers rather than the close-time ones.
@@ -2999,7 +2999,7 @@ def main():
                 if px is None:
                     continue
                 clip = order_usd * conviction_mult(apr)   # Lever 2: dark default -> order_usd
-                # [2026-08-20 (sj)] THE BRAIN SIZES THIS ENTRY — and this is
+                # [2026-08-20 (so)] THE BRAIN SIZES THIS ENTRY — and this is
                 # the FIRST real-money book to read it. Eamon: "Implement into
                 # live and other bots without it."
                 #
@@ -3121,7 +3121,7 @@ def main():
                 # contract (see entry_stamp's docstring for the history).
                 meta[coin] = entry_stamp(
                     is_short, px, t0, clip, src,
-                    # [(sj)] I22 receipt: `clip` is the product of the base,
+                    # [(so)] I22 receipt: `clip` is the product of the base,
                     # the conviction mult and the brain's, and a single number
                     # cannot say which moved. `conv_mult` is already recorded
                     # on the order row; this is its sibling.

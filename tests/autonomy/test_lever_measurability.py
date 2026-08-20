@@ -1,4 +1,4 @@
-"""[(sg)] The never-recorded class, closed fleet-wide rather than one at a time.
+"""[(sl)] The never-recorded class, closed fleet-wide rather than one at a time.
 
 **Operator, 2026-08-20: "Fix this never recorded issue across the fleet, I am
 so tired of going over the same trivial problem."**

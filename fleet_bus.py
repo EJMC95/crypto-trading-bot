@@ -29,10 +29,10 @@ _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 
 # TWO-WAY guardrails for the brain's L4 stake multipliers (reduce-only
 # until 21-Jul): whatever the brain publishes, a strategy sizes inside
-# [0.5, 2.0] since (sh) — reductions as before, boosts only on the v3 mirror bars
+# [0.5, 2.0] since (sm) — reductions as before, boosts only on the v3 mirror bars
 # (Wilson LOWER bound + t, full n floor, 3-run streak — bot_learn/
 # brain_stats EXP_*). Neutral 1.0 on any doubt.
-# [2026-08-20 (si)] 6.7x EITHER WAY (Eamon, explicitly). The floor is DERIVED
+# [2026-08-20 (sn)] 6.7x EITHER WAY (Eamon, explicitly). The floor is DERIVED
 # from the ceiling rather than typed, so "either way" is true by construction
 # and the next move needs one edit, not two that can drift apart.
 MULT_FLOOR = 1.0 / 6.7
@@ -43,17 +43,17 @@ MULT_FLOOR = 1.0 / 6.7
 # EXP_*). The clamp still bounds whatever arrives; only SHADOW books read
 # mults. Deliberate scope expansion of the documented reduce-only
 # contract, recorded in CLAUDE.md the same day.
-# [2026-08-20 (sh)] 1.5 -> 2.0. The clamp is what a CONSUMER may express, and
+# [2026-08-20 (sm)] 1.5 -> 2.0. The clamp is what a CONSUMER may express, and
 # it was one notch below what the brain can now SAY: `brain_stats` gained a
 # 2.0x ceiling step (post_wr>0.65, Wilson lo>0.60, t>=3.5, n_eff>=30 — above
 # every headline this fleet has re-measured and lost, at-or-below the two that
 # survived). Leaving the clamp at 1.5 would have made that tier emit-and-be-
 # swallowed, which is the registered-but-inert failure with extra steps.
-# [2026-08-20 (sj)] "SHADOW ONLY: no live bot reads a brain multiplier" stood
+# [2026-08-20 (so)] "SHADOW ONLY: no live bot reads a brain multiplier" stood
 # here and is CORRECTED IN PLACE per I12 — it no longer describes the fleet.
 # Eamon: "Implement into live and other bots without it." Both real-money rows
 # read the brain now, and the sentence that made that sound forbidden was the
-# doctrine half of the same training wheel (sh) took off the number. What
+# doctrine half of the same training wheel (sm) took off the number. What
 # replaces it is not a weaker rule, it is a DIFFERENT one, and it is the reason
 # this is safe: the multiplier PROPOSES a size, and every senior rail still
 # DISPOSES — SafetyRails.notional_ok, the kill switch, the daily-loss halt and
@@ -100,7 +100,7 @@ def is_fresh(payload, current_time):
 def stake_multiplier(bot, entry_tag, current_time=None):
     """The brain's L4 per-(bot, enter_tag) stake multiplier — TWO-WAY since
     21-Jul (operator: "brain needs to be able to widen too"), clamped to
-    [MULT_FLOOR, MULT_CEIL] = [1/6.7, 6.7] since (si) — 6.7x either way.
+    [MULT_FLOOR, MULT_CEIL] = [1/6.7, 6.7] since (sn) — 6.7x either way.
 
     Published by bot_learn.py to bot_state 'brain-stake-mults'. Reduce side
     (0.5/0.75): a tag's negative expectancy clears the trade-count floor AND
@@ -110,7 +110,7 @@ def stake_multiplier(bot, entry_tag, current_time=None):
     urgent fast-path; kill switches BRAIN_MULT_ENGINE=v2 /
     BRAIN_MULT_EXPAND=off zero it). Neutral 1.0 on any doubt.
 
-    [2026-08-20 (sj)] "SHADOW books only — no live bot reads mults" was here
+    [2026-08-20 (so)] "SHADOW books only — no live bot reads mults" was here
     and is CORRECTED IN PLACE (I12): every living book reads this now, real
     money included. See MULT_CEIL's note for why that is a rails question and
     not a clamp question. Prefer `brain_clip`/`brain_clip_multi` at a sizing
@@ -195,7 +195,7 @@ def brain_clip_multi(buckets, base_usd, current_time=None):
     THE ONE CALL SHAPE for every book, so the rule has one owner and each
     book's wiring is a single line at its own sizing site.
 
-    [2026-08-20 (sj)] **Eamon: "Implement into live and other bots without
+    [2026-08-20 (so)] **Eamon: "Implement into live and other bots without
     it."** Until today the brain's sizing reached only the family books, the
     freqtrade strategies and the Parliament — thirteen books, BOTH real-money
     rows among them, sized off a constant while the organ holding every close
@@ -973,7 +973,7 @@ if __name__ == "__main__":
     _mults = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
               "mults": {"freqtrade-avo-maria-lshadow":
                         {"long-swing-dip": {"mult": 1.25},
-                         # [(si)] 2.0 and 0.25 are now INSIDE the range, so
+                         # [(sn)] 2.0 and 0.25 are now INSIDE the range, so
                          # they no longer test the clamp — they test that the
                          # clamp stopped flattening them, which is the change.
                          # The clamp itself needs values outside 6.7x either
@@ -987,19 +987,19 @@ if __name__ == "__main__":
                             _now) == 1.25, "expand mult passes the clamp"
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-huge",
                             _now) == MULT_CEIL == 6.7, \
-        "over-ceiling clamps to MULT_CEIL (6.7 since (si))"
+        "over-ceiling clamps to MULT_CEIL (6.7 since (sn))"
     # …and the two the clamp USED to flatten now pass through untouched
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-big",
                             _now) == 2.0, "2.0x was flattened by the old ceiling"
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-deep",
                             _now) == 0.25, "0.25x was flattened by the old floor"
-    # [(si)] 6.7x EITHER WAY — the floor is the ceiling's reciprocal, derived
+    # [(sn)] 6.7x EITHER WAY — the floor is the ceiling's reciprocal, derived
     # rather than typed, so the two can never drift apart.
     assert abs(MULT_FLOOR * MULT_CEIL - 1.0) < 1e-12, (MULT_FLOOR, MULT_CEIL)
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-bad",
                             _now) == MULT_FLOOR, "under-floor clamps"
 
-    # [2026-08-20 (sj)] brain_mult_raw / brain_mult_multi / brain_clip: the
+    # [2026-08-20 (so)] brain_mult_raw / brain_mult_multi / brain_clip: the
     # accessors every book's sizing site now calls. The property that carries
     # the whole design is the SILENT bucket — it must not out-vote an opining
     # one, because that is precisely the case both real users of the multi

@@ -1,4 +1,4 @@
-"""[2026-08-20 (sj)] THE BRAIN SIZES EVERY LIVING BOOK — and the rails still
+"""[2026-08-20 (so)] THE BRAIN SIZES EVERY LIVING BOOK — and the rails still
 refuse it.
 
 Eamon: *"Implement into live and other bots without it."*
@@ -61,7 +61,7 @@ SIZERS = {"brain_clip", "brain_clip_multi", "brain_mult_multi",
 #: books that DELIBERATELY do not size off the brain, each with the measured
 #: reason. An entry here is a decision; an omission is a bug.
 DEAF_OK = {
-    # (none today — the whole point of (sj). Kept so the next refusal has to be
+    # (none today — the whole point of (so). Kept so the next refusal has to be
     # written down rather than silently dropped from BOOKS.)
 }
 
@@ -138,7 +138,7 @@ def test_the_sizing_key_matches_the_ledger_bucket_key(name):
     A book whose sizing lookup uses a key its ledger never writes gets 1.0
     forever and nothing anywhere says so. It is not hypothetical: 💸 the
     Farmer stamps the `tag` column `long-funding` while its `reason` prefix
-    reads `long`, and the first draft of (sj) looked the mult up under `long`
+    reads `long`, and the first draft of (so) looked the mult up under `long`
     — on the fleet's REAL MONEY. Caught by reading the publisher, not the
     consumer.
 

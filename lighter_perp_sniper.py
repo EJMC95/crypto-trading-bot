@@ -402,7 +402,7 @@ def entry_tag(was_long, src=None):
     """The enter_tag this book's closes carry — and therefore the EXACT key
     the brain's stake multiplier must be looked up under.
 
-    [2026-08-20 (sj)] Extracted from `close_reason` rather than retyped beside
+    [2026-08-20 (so)] Extracted from `close_reason` rather than retyped beside
     it. `close_reason` now composes from this, so a source that stops being
     whitelisted, or a side that changes shape, moves BOTH the ledger bucket
     and the sizing lookup in one edit. A retyped key is the registered-but-
@@ -430,7 +430,7 @@ def close_reason(was_long, exit_reason, src=None):
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
                    try_snipe, is_held=lambda s: False,
                    max_attempts=PENDING_MAX_ATTEMPTS,
-                   max_age_sec=PENDING_MAX_AGE_SEC):
+                   max_age_sec=PENDING_MAX_AGE_SEC, census=None):
     """One snipe pass over `candidates`. Mutates `pending` and `baseline`.
 
     `try_snipe(sym, open_now)` does the I/O and returns True only if a position
@@ -464,14 +464,32 @@ def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
     was anticipated for the TAG and forgotten for the ORDER. First occurrence
     wins here too, so the two agree by construction.
 
+    [2026-08-20] `census` is an optional dict this pass FILLS with the reason
+    every candidate did not open. This book was the last living one publishing
+    no scan census at all — it shipped `caps` and nothing else, so `open_trades:
+    0` was byte-identical between "no listing happened", "the cooldown ledger
+    suppressed everything" and "the cap is full", and the book could not be
+    asked why it was quiet (I18/(lv), the rule every sibling already follows).
+    It matters more here than anywhere: `(qi)` measured this book's founding
+    listing thesis REFUTED and its supply DEAD — no crypto birth on this venue
+    in 85 days — so "quiet" is the expected state and the only way to tell a
+    healthy quiet from a broken one is a census that names which.
+
     Returns (open_now, sniped, abandoned).
     """
     sniped, abandoned, seen = [], [], set()
+    c = census if census is not None else {}
+    for k in ("offered", "dupe", "held", "abandoned", "capped", "failed",
+              "opened"):
+        c.setdefault(k, 0)
     for sym in candidates:
+        c["offered"] += 1
         if sym in seen:
+            c["dupe"] += 1
             continue          # [(nv)] one attempt per symbol per pass
         seen.add(sym)
         if is_held(sym):
+            c["held"] += 1
             pending.pop(sym, None)
             baseline.add(sym)
             log.info("%s: already held — folding into baseline (snipe landed)", sym)
@@ -482,6 +500,7 @@ def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
         # Checked first and uniformly, so a symbol blocked purely by the cap
         # still ages out instead of sitting pending forever.
         if rec["attempts"] >= max_attempts or age >= max_age_sec:
+            c["abandoned"] += 1
             pending.pop(sym, None)
             baseline.add(sym)
             abandoned.append(sym)
@@ -490,17 +509,20 @@ def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
                         sym, rec["attempts"], age / 60)
             continue
         if open_now >= max_open:
+            c["capped"] += 1
             # The cap is the fleet's state, not this listing's fault: stay
             # pending and burn no retry budget, so a freed slot still gets it.
             log.info("%s: cap %d reached — stays pending (age %.0f min)",
                      sym, max_open, age / 60)
             continue
         if try_snipe(sym, open_now):
+            c["opened"] += 1
             pending.pop(sym, None)
             baseline.add(sym)
             sniped.append(sym)
             open_now += 1
             continue
+        c["failed"] += 1
         rec["attempts"] += 1
     return open_now, sniped, abandoned
 
@@ -769,7 +791,7 @@ def main():
         if not px:
             log.info("%s: %s — staying pending, will retry next loop", sym, why)
             return False
-        # [2026-08-20 (sj)] the brain sizes the snipe, PER ADMISSION SOURCE —
+        # [2026-08-20 (so)] the brain sizes the snipe, PER ADMISSION SOURCE —
         # which is the whole reason (na) source-stamped these tags. The three
         # sources are three different bets sharing one row (a listing pop, a
         # volume surge, a young book), the (qi) study measured them to be
@@ -830,7 +852,7 @@ def main():
                 _meta = surge_admission(sym, _surge_ratios, SURGE_MULT)
                 if _meta is not None:
                     entry_meta[sym] = _meta
-        # [(sj)] I22 receipt, written LAST and MERGED. entry_meta is the
+        # [(so)] I22 receipt, written LAST and MERGED. entry_meta is the
         # book's existing durable per-open extra map (restored at boot, popped
         # by the close), so the scale survives a restart exactly as the surge
         # telemetry does. Written last because the surge branch above ASSIGNS
@@ -1041,13 +1063,26 @@ def main():
             _src_map.setdefault(_s, "surge")
         for _s in _young:
             _src_map.setdefault(_s, "young")
+        # [2026-08-20] THE CENSUS, per SOURCE. A single `opened: 0` cannot tell
+        # a dead source from a blocked one, and this book has one of each: the
+        # LISTING source is refuted and structurally starved ((qi): no crypto
+        # birth in 85 days), while surge/young are live and can be blocked by
+        # the cooldown ledger or the cap. Counting them separately is what makes
+        # the difference readable from the row.
+        _census = {"listing": len(new_listings), "surge": len(_surge),
+                   "young": len(_young),
+                   "surge_cooldown": len(active_done(surge_done,
+                                                     now.timestamp())),
+                   "not_young": len(not_young),
+                   "pending": len(pending), "max_open": max_open,
+                   "open_before": open_now}
         open_now, _sniped, _abandoned = run_snipe_pass(
             candidates=new_listings + _surge + _young, pending=pending,
             baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
             try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n,
                                               src=_src_map.get(s)),
-            is_held=lambda s: s in _held_now)
+            is_held=lambda s: s in _held_now, census=_census)
 
         # ----- manage open snipes (TP / SL / max-hold) -----
         held = (broker.szi() if dry_run
@@ -1206,6 +1241,10 @@ def main():
                                  # was NOT: `caps` present proves the container
                                  # is running code that carries apply_tuning.
                                  # Publish-only; no gate moves.
+                                 # [2026-08-20] I18: why nothing opened. See
+                                 # run_snipe_pass — this was the last living
+                                 # book publishing no scan census at all.
+                                 "scan": _census,
                                  "caps": {"surge_mult": SURGE_MULT,
                                           "max_open": MAX_OPEN,
                                           # [2026-08-17 (pk)] THE CLASS AXIS
@@ -1759,7 +1798,7 @@ def selftest():
         def is_crypto(self, sym):        # [(lk)] the surge source is crypto-only
             return str(sym).upper() != "SPXUSD"
 
-        # [(sj)] the brain's sizing accessor. `mult` is settable so the drive
+        # [(so)] the brain's sizing accessor. `mult` is settable so the drive
         # below can prove the SIZED path, not just the neutral one. The
         # accessor's own contract (clamp, staleness, dark-brain, silent
         # bucket) is proven in fleet_bus's selftest against fleet_bus's own
@@ -1807,7 +1846,7 @@ def selftest():
         f"the admission telemetry was not recorded: {_blob7.get('entry_meta')}"
     assert "SPXUSD" not in _blob7["entry_src"], "the class screen let SPXUSD in"
     assert "QUIET" not in _blob7["entry_meta"], _blob7["entry_meta"]
-    # [(sj)] and the brain SIZES it. Same fixture, same admission, mult 2x:
+    # [(so)] and the brain SIZES it. Same fixture, same admission, mult 2x:
     # the venue must receive DOUBLE the size, and the scale must land in the
     # durable receipt map beside the surge telemetry rather than replacing it.
     # Asserted on the VENUE and on the SAVED BLOB, because a sizing term that
@@ -2145,6 +2184,39 @@ def selftest():
         "an unrecognised source must degrade to the un-stamped tag"
     _tag, _exit = store.split_reason(close_reason(True, "tp", None))
     assert (_tag, _exit) == ("long", "tp"), (_tag, _exit)
+
+    # ---------------------------------------------------------------- (2026-08-20)
+    # THE CENSUS. Every route out of the pass must be COUNTED, or `opened: 0`
+    # keeps meaning nothing — which is the whole reason this book got one.
+    _c = {}
+    _pend, _base = {}, set()
+    _n, _sn, _ab = run_snipe_pass(
+        candidates=["AAA", "AAA", "BBB", "CCC"], pending=_pend, baseline=_base,
+        now_ts=1000.0, open_now=0, max_open=1,
+        try_snipe=lambda s, n: s == "BBB",
+        is_held=lambda s: s == "AAA", census=_c)
+    assert _c["offered"] == 4, _c
+    assert _c["dupe"] == 1, "a symbol seen twice in one pass must be counted once"
+    assert _c["held"] == 1, _c
+    assert _c["opened"] == 1, _c
+    assert _c["capped"] == 1, "CCC arrives with the cap full and must say so"
+    assert sum(_c[k] for k in ("dupe", "held", "opened", "capped",
+                               "failed", "abandoned")) == _c["offered"], (
+        "every offered candidate must land in exactly one bucket, or the "
+        "census can silently lose a refusal — the defect it exists to prevent")
+
+    # A FAILED snipe is its own bucket, distinct from a capped one: one means
+    # the venue refused us, the other means we refused ourselves.
+    _c2, _p2, _b2 = {}, {}, set()
+    run_snipe_pass(candidates=["ZZZ"], pending=_p2, baseline=_b2, now_ts=1000.0,
+                   open_now=0, max_open=9, try_snipe=lambda s, n: False,
+                   census=_c2)
+    assert _c2["failed"] == 1 and _c2["capped"] == 0 and _c2["opened"] == 0, _c2
+
+    # And the census stays OPTIONAL — every existing caller passes none.
+    run_snipe_pass(candidates=["QQQ"], pending={}, baseline=set(),
+                   now_ts=1000.0, open_now=0, max_open=9,
+                   try_snipe=lambda s, n: True)
 
     print("All perp sniper self-tests passed (one-sided debut book RETRIES and "
           "still snipes; cap/exception/skip never absorb; give-up bounded by "

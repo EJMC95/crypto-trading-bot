@@ -1,4 +1,4 @@
-"""[(sh)] The fleet measured six floors and no ceiling.
+"""[(sm)] The fleet measured six floors and no ceiling.
 
 **Operator: "The discussion of the floor is too often had, where the
 conversation of how high the ceiling goes is of little discussion... they know

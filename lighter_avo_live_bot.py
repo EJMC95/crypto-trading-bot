@@ -57,7 +57,7 @@ own stake_mult and the board's live.clip_scale lever, capped by the hard
 notional rail. Protections' drawdown denominator is the live baseline, not
 the shadow's $1,000 (20% of a paper grand would never bind on a $63 book).
 
-[2026-08-20 (sj)] THE LIVE ARM NOW SIZES OFF THE BRAIN. Eamon: "Implement
+[2026-08-20 (so)] THE LIVE ARM NOW SIZES OFF THE BRAIN. Eamon: "Implement
 into live and other bots without it." This paragraph used to open "WHAT THE
 LIVE ARM DELIBERATELY DOES NOT DO: read brain stake-mults (doctrine: no live
 bot sizes off the brain)", and that clause is CORRECTED IN PLACE per I12
@@ -610,7 +610,7 @@ def main(_ctx=None, once=False):
                     side="long", shadow=False,
                     extra={"policy": _policy(), "fill_measured": measured,
                            "fill_src": why, "clip": m.get("clip"),
-                           # [(sj)] I22 receipt: the brain scale this REAL
+                           # [(so)] I22 receipt: the brain scale this REAL
                            # stake was sized at. `clip` is base x strategy
                            # stake_mult x brain and cannot be decomposed.
                            "brain_mult": m.get("brain_mult")})
@@ -918,7 +918,7 @@ def main(_ctx=None, once=False):
                     brain_gated_tags.append(f"{sym}:{ledger_tag(tag)}")
                     continue
                 stake = clip * S.stake_mult(tag, bars)
-                # [2026-08-20 (sj)] ...and the brain's per-tag scale on top,
+                # [2026-08-20 (so)] ...and the brain's per-tag scale on top,
                 # across BOTH rows — the same pair, the same `ledger_tag`
                 # identity and the same fail-safe as the regime gate above, so
                 # a gate and a size can never disagree about which bucket this
@@ -957,7 +957,7 @@ def main(_ctx=None, once=False):
                     pass
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
-                             # [(sj)] I22 receipt, carried on the durable
+                             # [(so)] I22 receipt, carried on the durable
                              # position record so it survives a restart and
                              # reaches the close row.
                              "brain_mult": round(bmult, 4),

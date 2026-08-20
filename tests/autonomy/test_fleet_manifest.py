@@ -1,4 +1,4 @@
-"""[(sh)] Nineteen designs, one way of judging them — until now.
+"""[(sm)] Nineteen designs, one way of judging them — until now.
 
 **Operator: "we are tasked to create multiple strategy bots, who get
 complimented and enhanced by instruments that let them fly to the ceiling if

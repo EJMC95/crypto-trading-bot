@@ -1,4 +1,4 @@
-"""[(sg)] I11 finally has enforcement: the carried list cannot rot either way.
+"""[(sl)] I11 finally has enforcement: the carried list cannot rot either way.
 
 **Operator, 2026-08-20: "can all of the works done today; every day be recorded
 properly so I am starting from where I left off every day rather than doing

@@ -45,7 +45,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import bot_pnl_store as store
-# [2026-08-20 (sj)] the brain's sizing accessor. UNGUARDED, deliberately, and
+# [2026-08-20 (so)] the brain's sizing accessor. UNGUARDED, deliberately, and
 # the Dockerfile gains the COPY in the same commit: every import in this file
 # is unguarded on purpose (a missing module is a boot crash-loop, not a silent
 # degrade), and `audit_image_imports.py` is what verifies the claim. Both
@@ -341,7 +341,7 @@ TUNABLE = (("taker.dip_range", "DIP_RANGE"),
            # stamp at close reads the module attr, so a lever overlay moves
            # future stamps (never an already-written sl_block entry).
            ("taker.sl_cooldown_h", "SL_COOLDOWN_H"),
-           # [2026-08-20 (sf)] the breakout arm's TREND exit — see the registry
+           # [2026-08-20 (sk)] the breakout arm's TREND exit — see the registry
            # note. `bull_exit()` reads these as module globals, so the overlay
            # reaches the routing through the same single owner main() uses,
            # exactly as the reversion bracket above does. Defined further down
@@ -1495,7 +1495,7 @@ def _close_extra(m):
     stamped = isinstance(m.get("bars"), dict) and m.get("bars")
     out = {"bars": (m.get("bars") if stamped else entry_bars()),
            "bars_basis": ("entry" if stamped else "close-legacy")}
-    # [2026-08-20 (sf)] the trend exit's own receipts ride the close row. See
+    # [2026-08-20 (sk)] the trend exit's own receipts ride the close row. See
     # the tracking site in main() for why MAXIMUM rather than final. Absent on
     # a position that never saw a mark (a legacy row, or one closed on its
     # first cycle), and absent is UNKNOWN — a grader must not read a missing
@@ -2440,7 +2440,7 @@ def main(_ctx=None):
             _ret = (mark / entry - 1.0) * _sgn if entry else 0.0
             if _ret > m.get("peak_ret", 0.0):
                 m["peak_ret"] = _ret
-            # [2026-08-20 (sf)] RECEIPTS FOR THE TREND EXIT'S OWN TWO KNOBS.
+            # [2026-08-20 (sk)] RECEIPTS FOR THE TREND EXIT'S OWN TWO KNOBS.
             # `taker.brk_trail` and `taker.brk_sl` became registered levers
             # today, and neither could ever be PROFILED, because the quantity
             # each one cuts was tracked in memory and thrown away at close:
@@ -2846,7 +2846,7 @@ def main(_ctx=None):
             is_long = t.get("side", "long") != "short"
             if is_long and long_budget_full:
                 continue          # L2 veto: fleet long budget is full
-            # [2026-08-20 (sj)] THE BRAIN SIZES THIS ENTRY, per (side, lens).
+            # [2026-08-20 (so)] THE BRAIN SIZES THIS ENTRY, per (side, lens).
             # This book is the reason the wiring exists: on the morning it
             # shipped the brain's entire published opinion across the fleet was
             # two mults, and one of them was THIS row's `short-divergence` at
@@ -2985,7 +2985,7 @@ def main(_ctx=None):
             pos[sym] = {"size": size if is_long else -size, "entry": entry_px}
             meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,
                          "entry": entry_px,
-                         # [(sj)] I22 receipt — the brain scale in force when
+                         # [(so)] I22 receipt — the brain scale in force when
                          # this clip was set. `clip` alone cannot say whether a
                          # small position was a calm book (vol_clip), a fleet
                          # drawdown (gov) or the brain, and those are three

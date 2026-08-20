@@ -312,11 +312,25 @@ def sample_block(recent):
             "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2)}
 
 
-def build_state(positions, recent, pend, last_ts, now=None):
+def build_state(positions, recent, pend, last_ts, now=None,
+                realized=0.0, n_closed=0, n_wins=0):
     """The persistence blob — ONE builder. `pend` is the confirm counter, so a
-    restart cannot skip the 2-loop confirm the measurement was made under."""
+    restart cannot skip the 2-loop confirm the measurement was made under.
+
+    [2026-08-20] `realized` / `n_closed` / `n_wins` ARE PERSISTED, and were
+    not. `main()` read all three out of this blob at boot (`st.get("n_closed")`)
+    and this builder never put them in — so every restart silently reset the
+    book's entire realised record to zero. MEASURED on the live row the day it
+    was found: the dashboard published `closed_trades: 0`, `pnl_abs: 0.0`,
+    `equity: 1000.00` while this book's own ledger held **34 closes and
+    -$3.80**. That is I4's silent-write-failure shape with the sign reversed —
+    not a write that fails, a field that was never written — and it is
+    load-bearing well beyond display: `golive_readiness`, `fleet_allocation`
+    and the horizon sweep all read the row, so the book was structurally
+    invisible to every organ that grades it."""
     return {"positions": positions, "recent": recent, "pend": pend,
-            "last_ts": last_ts,
+            "last_ts": last_ts, "realized": float(realized),
+            "n_closed": int(n_closed), "n_wins": int(n_wins),
             "saved_ts": float(now if now is not None else time.time())}
 
 
@@ -389,7 +403,7 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
             side=pos["side"],
             entry_price=pos.get("entry"), exit_price=exit_px,
             extra={"dev_entry_bps": pos.get("dev_entry_bps"),
-                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
                    "brain_mult": pos.get("brain_mult"),
                    "dev_exit_bps": (round(dev_now, 1)
                                     if dev_now is not None else None),
@@ -406,7 +420,7 @@ def _open(positions, coin, dev_bps, bv, t0, cls=None, notional=None,
     """Open the mirror leg. Entry price is the REAL side's VWAP for my clip —
     a long pays the ask walk, a short earns the bid walk.
 
-    [(sj)] `bv` must be the book view walked for `notional`, not for the flat
+    [(so)] `bv` must be the book view walked for `notional`, not for the flat
     clip: the whole point of this entry price is that it pays the walk, so a
     brain-scaled clip priced off the base clip's VWAP would book a fill the
     venue never offered. The caller re-walks; this asserts nothing it cannot
@@ -486,7 +500,7 @@ def main():
         census = {"scanned": len(universe), "ref_blind": 0 if ref else 1,
                   "no_book": 0, "held": 0, "in_band": 0, "below_band": 0,
                   "above_band": 0, "preipo": 0, "confirming": 0,
-                  # [(sj)] a candidate the brain resized and whose book could
+                  # [(so)] a candidate the brain resized and whose book could
                   # not then be re-walked at the sized clip. Its own bucket
                   # because "we could not price the SIZE" is a different
                   # refusal from "the venue has no book" and from "too thin" —
@@ -567,7 +581,7 @@ def main():
                 census["capped"] += 1
                 continue
             side = mirror_side(dev_bps)
-            # [2026-08-20 (sj)] the brain sizes this entry, keyed on the SAME
+            # [2026-08-20 (so)] the brain sizes this entry, keyed on the SAME
             # `<side>-navband` _close publishes. A resized clip must be
             # RE-WALKED before it is priced or gated: this book's entry is a
             # VWAP through the real book and its slip gate is the one thing
@@ -621,7 +635,9 @@ def main():
 
         try:
             saved = store.save_state(
-                bot_id, build_state(positions, recent, pend, t0))
+                bot_id, build_state(positions, recent, pend, t0,
+                                    realized=realized, n_closed=n_closed,
+                                    n_wins=n_wins))
             if saved is False:
                 # I4: never discard a persistence result.
                 print("[%s] STATE NOT PERSISTED — positions/clock at risk"
@@ -726,6 +742,17 @@ def _selftest():
     assert _standby_key("nav-cook-lshadow") == "nav-cook-lshadow:standby"
     st = build_state({}, [], {}, 1.0, now=2.0)
     assert st["saved_ts"] == 2.0 and st["pend"] == {}
+
+    # [2026-08-20] THE REALISED RECORD MUST SURVIVE A RESTART (I4). main()
+    # reads all four of these back out of the blob at boot; a builder that
+    # drops them republishes a traded book as a virgin one — which is exactly
+    # what the live row did (closed_trades 0 against a 34-close ledger).
+    st = build_state({"X": {}}, [], {}, 1.0, now=2.0,
+                     realized=-3.8, n_closed=34, n_wins=11)
+    for k, v in (("realized", -3.8), ("n_closed", 34), ("n_wins", 11)):
+        assert st[k] == v, "%s must persist — a restart resets the book's record" % k
+    # ...and the round trip must reconstruct them the way main() does.
+    assert int(st.get("n_closed") or 0) == 34 and float(st.get("realized") or 0) == -3.8
 
     # NO LEVERAGE, NO REAL MONEY: this module must never size off equity or
     # touch a live venue mode.
