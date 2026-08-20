@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Does `fleet_bus.NONCRYPTO_BASES` still match the venue?  [2026-08-20 (sg)]
+"""Does `fleet_bus.NONCRYPTO_BASES` still match the venue?  [2026-08-20 (sl)]
 
 WHY THIS EXISTS. `fleet_bus.is_crypto` answers in three tiers: an explicit
 override, the scout's published `classes` (the venue's own `strategy_index`),

@@ -420,14 +420,14 @@ GUARD_ONLY_AUDITS = [
     # CANNOT calibrate against this book at 1m — see its header) is a finding
     # to re-run, never to re-argue from prose.
     "scripts/study_sniper_exit_shape_2026-08-20.py",
-    # [2026-08-20 (sg)] The DEBUT-DIRECTION study behind the young-source
+    # [2026-08-20 (sl)] The DEBUT-DIRECTION study behind the young-source
     # supply fix. Path-invoked for the same hyphenated-filename reason as the
     # study above; its `--selftest` is offline and pure (synthetic bars with
     # known answers), and it pins the two things that decide whether the study
     # may speak: that `venue_priced` is a CLASSIFICATION and not `class == 2`,
     # and that entries are LAG-1 at a bar open rather than clamped.
     "scripts/study_sniper_debut_direction_2026-08-20.py",
-    # [2026-08-20 (sg)] The dark-scout fallback drift guard. Its LIVE run needs
+    # [2026-08-20 (sl)] The dark-scout fallback drift guard. Its LIVE run needs
     # the venue, so CI runs only `--selftest` — which pins the comparison logic
     # itself (drift in both directions, the override excluded from both,
     # inactive books ignored). The live check is a one-command operator action;

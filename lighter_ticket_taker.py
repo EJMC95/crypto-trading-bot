@@ -606,7 +606,7 @@ TRADFI_BASES = {s.strip().upper() for s in os.environ.get(
     "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE,"
     "WTI,BRENTOIL,NATGAS,USOIL,XAU,XAG,XCU,XPD,XPT,PAXG,WHEAT,CORN,"
     "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH,"
-    # [2026-08-20 (sg)] THE EIGHT THIS LIST HAD DRIFTED BY — the (kt) shape
+    # [2026-08-20 (sl)] THE EIGHT THIS LIST HAD DRIFTED BY — the (kt) shape
     # again, two weeks later, and found the same way: measured against the
     # venue's own `strategy_index`, 8 of 101 active non-crypto books were
     # absent from BOTH this list and `fleet_bus.NONCRYPTO_BASES`. All eight

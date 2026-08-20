@@ -1,11 +1,11 @@
 # 🎯 THE SNIPER'S SUPPLY WAS NEVER DEAD — IT WAS SCREENED OUT
-### 2026-08-20 (sg) · operator: *"bring the sniper back to life and make it do its intended job"* / *"don't continue if it's going to be negative, restrictive and choking of the bot"*
+### 2026-08-20 (sl) · operator: *"bring the sniper back to life and make it do its intended job"* / *"don't continue if it's going to be negative, restrictive and choking of the bot"*
 
 ---
 
 ## THE HEADLINE
 
-`(qi)` and `(sf)` both reported the sniper's debut supply as **dead — "ZERO
+`(qi)` and `(sk)` both reported the sniper's debut supply as **dead — "ZERO
 crypto births for 86 days"**. That is true of `strategy_index == 2` and **false
 of the cohort this book trades.**
 
@@ -82,7 +82,7 @@ the correction keeps the correct half and drops the part that rested on n=2.
 ## 3 · THE DIRECTION QUESTION — MEASURED, AND REFUSED
 
 Four independent prior measurements say debuts bleed ((qi) day-7 −13.4%;
-(qi) wait-then-short +6.23%/episode; (sf) supply census −8.30% at 168h; this
+(qi) wait-then-short +6.23%/episode; (sk) supply census −8.30% at 168h; this
 study's debut-bar cells). The young-window cells agree:
 
 | cell (venue-priced) | 6h | 24h | 72h | 168h |
@@ -106,7 +106,7 @@ best trade** (ex-top1 +1.160 / +1.304, i.e. *higher* than the mean).
 
 **A random minute beats the sniper's entry.** The +1.4%/+1.5% is the *drift of
 shorting young venue-priced books for 3–7 days*; the entry timing contributes
-nothing, and slightly less than nothing. This is `(sf)`'s finding — the entry
+nothing, and slightly less than nothing. This is `(sk)`'s finding — the entry
 carries no directional information — reproduced on the young cohort specifically
 and in both directions.
 
@@ -151,7 +151,7 @@ OLD  is_crypto      scanned=210  age_ok=8  fresh=8  class_ok=0  vol_ok=0  -> []
 NEW  venue_priced   scanned=210  age_ok=8  fresh=8  class_ok=2  vol_ok=1  -> ['CASHCAT']
 ```
 
-The surge source is **untouched** — its evidence is real and `(sf)` measured
+The surge source is **untouched** — its evidence is real and `(sk)` measured
 class-7 surge at −0.840%/trade, negative at every hold.
 
 **THE EXPECTANCY PRICE, STATED (I19).** The admitted cell measures
@@ -185,11 +185,11 @@ venue** — a guard that no-ops offline would report clean.
 - **Survivorship:** `orderBookDetails` lists only books alive today, so a book
   born and delisted inside the window is invisible. Every number here is
   optimistic by an unmeasured amount, worst on the thin debut cohort.
-- 1h resolution against a 60s decision loop; per `(sf)` that gap is real and
+- 1h resolution against a 60s decision loop; per `(sk)` that gap is real and
   one-sided. **Rank and direction are what this study is for, never levels.**
 - `created_at` is epoch-0 on MRNA and US10Y; both are excluded rather than
   coerced.
 
 **Instrument:** `scripts/study_sniper_debut_direction_2026-08-20.py`
-(registered `--selftest`; reuses the `(sf)` harness's exit walker, slippage
+(registered `--selftest`; reuses the `(sk)` harness's exit walker, slippage
 tiers and scorer rather than growing a second copy of the rule).

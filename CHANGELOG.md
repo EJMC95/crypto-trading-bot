@@ -1,11 +1,13 @@
-## 2026-08-20 (si) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
+## 2026-08-20 (sn) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
+
+*[RENUMBERED (si) -> (sn): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
 **Operator:** *"If everything is 0.000 then you've missed something and you've
 got something wrong. Find out why and fix it. This whole fleet 0 business needs
 to change and whatever is causing this disease needs to be killed, not the fleet
 or its endless possibilities for success."*
 
-He was right, and the cause was not where `(sh)` looked. `(sh)` fixed the SPLIT
+He was right, and the cause was not where `(sm)` looked. `(sm)` fixed the SPLIT
 (one claim of 0.0015 was taking $13,366 of $19,000 and starving 17 of 19 books
 to the probe floor). This is the CLAIM itself, and it had **three** separate
 defects, measured on the live payload rather than reasoned about:
@@ -55,7 +57,7 @@ instrument too generous, the other too blunt, and between them a table of zeros.
   invention** — it is the winners' docket's own luck floor (I21: *"the n>=10
   floor, not BH, is what stops a consistent 3-close streak from outranking
   evidence"*), so the fleet's two ranking instruments now agree.
-* **The same instrument doubts a book as feeds one, in CODE.** `(sh)` wrote that
+* **The same instrument doubts a book as feeds one, in CODE.** `(sm)` wrote that
   claim as two constants that happened to match, which stays green against two
   independent implementations. `golive_readiness.horizon_crit` now defers to
   `fleet_allocation.t_crit` and the test pins it **by identity at five sample
@@ -89,7 +91,7 @@ migrates into an actuator, so `claim` stays the only field the split reads.
 
 `fleet_bus.allocation_scale` is read by exactly three books (🌾 carry, ⚖️
 Counterweight, 💸 the Farmer's shadow arm), so the sizing price is exactly the
-change in THEIR `scale_effective`, both columns computed under the same `(sh)`
+change in THEIR `scale_effective`, both columns computed under the same `(sm)`
 tilt so this isolates the claim arithmetic:
 
 | consumer | before | after |
@@ -136,7 +138,7 @@ except the -1.4% above.
   when no upper bound could be computed — the (po) shape, where the safe branch
   is the untested one.
 
-**NOT CHANGED, deliberately:** `claim`'s semantics, the `(sh)` tilt's input (a
+**NOT CHANGED, deliberately:** `claim`'s semantics, the `(sm)` tilt's input (a
 one-day-old split re-aimed on an unmeasured formula in the same week is what
 I19 forbids), and the era gate's seniority. Files: `fleet_allocation.py`,
 `scripts/golive_readiness.py`, `tests/autonomy/test_fleet_allocation.py`,
@@ -146,7 +148,9 @@ this container (`test_funding_variant`, `test_margin_truth`) are the absent
 `origin/main` unchanged, and CI is green there.
 
 
-## 2026-08-20 (sh) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
+## 2026-08-20 (sm) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
+
+*[RENUMBERED (sh) -> (sm): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
 **Operator:** *"Keep the books, fix your arithmetic to everything you want to
 retire and start using an approach where instead of finding a way to kill
@@ -215,7 +219,7 @@ cannot reach — **and the answer is to FEED it**. Retirement requires a MEASURE
 exclusion (an upper bound at or below zero, or a supply that does not exist),
 never a thin sample and never a verdict computed on a starved one. **A refusal to
 retire on insufficient evidence is a correct outcome of I17, not an evasion of
-it.** Concretely: `(sf)` escalated a keep-or-retire call on 🎯 the sniper citing
+it.** Concretely: `(sk)` escalated a keep-or-retire call on 🎯 the sniper citing
 horizon `unreachable` and claim 0.000 — **neither number survives its own fix**
 (its upper bound is +0.814%, and 0.000 was the split's floor, which read 0.000
 for *every book in the fleet* including one at +4.66%/trade). Withdrawn in place.
@@ -434,10 +438,12 @@ Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
 
-## 2026-08-20 (sg) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
+## 2026-08-20 (sl) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
 
-*(Renumbered (se) -> (sg) at push time — the THIRD collision this branch has
-taken today, and the companion entry moved (sd) -> (sf) with it. `main` took
+*[RENUMBERED (sg) -> (sl): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+
+*(Renumbered (se) -> (sl) at push time — the THIRD collision this branch has
+taken today, and the companion entry moved (sd) -> (sk) with it. `main` took
 (sa)/(sb)/(sc) for nav-cook and Counterweight, then (sd)/(se) for the leverage
 pass, all while this was in flight. Each of those is merged and cited, so by
 the convention's own tiebreak they keep their letters and these move. Every
@@ -779,9 +785,11 @@ does not discharge.
 different policy. The book is 1 day old and the sample is worth ~$5.71 — the
 cheapest possible moment to take the reset.
 
-## 2026-08-20 (sf) — THE SNIPER NEVER HAD THE POTENCY IT IS BEING ASKED TO RECOVER: one memecoin was 157% of the predecessor's lifetime P&L, the exit ladder everyone remembers as the earner COST money on it, and the successor's entries sit at the 50th percentile of random — every candidate refused, and the two dead sources that hid for 86 and 66 days are now visible
+## 2026-08-20 (sk) — THE SNIPER NEVER HAD THE POTENCY IT IS BEING ASKED TO RECOVER: one memecoin was 157% of the predecessor's lifetime P&L, the exit ladder everyone remembers as the earner COST money on it, and the successor's entries sit at the 50th percentile of random — every candidate refused, and the two dead sources that hid for 86 and 66 days are now visible
 
-*(Renumbered (sa) -> (sd) -> (sf) at push time. `main` took `(sa)` mid-flight for
+*[RENUMBERED (sf) -> (sk): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+
+*(Renumbered (sa) -> (sd) -> (sk) at push time. `main` took `(sa)` mid-flight for
 the nav-cook confirm-window entry, which is merged and cited, so by the
 convention's own tiebreak the CITED entry keeps the letter and this one
 moves. In-tree citations were repointed in the same commit, enumerated
