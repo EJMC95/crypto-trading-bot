@@ -3205,7 +3205,26 @@ def main():
                 try:
                     raw = {"apr": round(apr, 3), "spread_bps": round(spread_bps, 1),
                            "leg": "open", "mctx": _mctx_slice(_mctx, coin),
-                           "conv_mult": round(clip / order_usd, 3) if order_usd else 1.0,
+                           # [2026-08-20 (sp)] CONVICTION AND THE BRAIN ARE
+                           # RECORDED SEPARATELY. This was `clip / order_usd`,
+                           # which after (so) is conviction x brain x any trim
+                           # — so on the shipped live config (conviction OFF,
+                           # so the true conv_mult is 1.000 on every entry) a
+                           # brain mult of 3.0 would have written
+                           # `conv_mult: 3.0` onto REAL-MONEY order rows. The
+                           # census that measures CONVICTION_HI's authority
+                           # (`conviction.hi` / `_rx_conv`) and any future
+                           # study of that lever would then read a conviction
+                           # distribution that was entirely the brain's. A
+                           # receipt that attributes one organ's move to
+                           # another is worse than no receipt (I23).
+                           "conv_mult": round(conviction_mult(apr), 3),
+                           "brain_mult": round(bmult, 4),
+                           # the product actually sent, so nothing has to be
+                           # reconstructed by multiplying the two back
+                           # together and hoping no trim intervened.
+                           "clip_mult": (round(clip / order_usd, 3)
+                                         if order_usd else 1.0),
                            "slope": {"apr_prev": (round(_slope_prev, 4)
                                                   if _slope_prev is not None else None),
                                      "lookback_h": SLOPE_LOOKBACK_H,

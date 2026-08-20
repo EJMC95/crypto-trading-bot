@@ -212,3 +212,112 @@ def test_the_budget_is_derived_from_constants_not_from_a_scaled_clip():
         "Counterweight must budget K*2 LEGS off ORDER_USD — using K alone "
         "would let the bound be breached by exactly the factor that makes it "
         f"a spread book, and using the scaled base defeats it: {cw}")
+
+
+# --------------------------------------------------------------------------
+# 5. THE CLASS, not the instances: no book can deploy more than it could fund
+# --------------------------------------------------------------------------
+#: Every living book that sizes its own entries, with the module attributes
+#: that produce its worst case. DERIVED by importing the module and reading
+#: its real constants — a retyped table is a table that drifts, and this one
+#: exists precisely because a per-book audit found three different books whose
+#: worst case nobody had computed.
+#:
+#: WHY THIS EXISTS BESIDE `test_the_rails_see_the_sized_clip`. That test proves
+#: the sized clip reaches `SafetyRails.notional_ok`. It cannot prove the rail
+#: DOES anything: `notional_ok` returns True when `max_notional is None`, and
+#: the cap env is REQUIRED only on a live arm (`assert_can_start`). So on every
+#: shadow arm the rail is a no-op and the plumbing test is green over nothing —
+#: the "a green run verifies that an enforcement EXISTS, not that it is
+#: CORRECT" caveat at the top of CLAUDE.md, landing on a test I wrote today.
+GROSS = [
+    # module,                        clip attr,    cap attr,        x equity
+    ("lighter_ticket_taker",         "CLIP_MAX",   "MAX_OPEN",         1.2),
+    ("lighter_perp_sniper",          None,         None,               1.2),
+    ("lighter_nav_cook_bot",         "CLIP_USD",   "MAX_POSITIONS",    2.5),
+    ("lighter_book_douglas_bot",     "CLIP_USD",   "MAX_POSITIONS",    2.5),
+    ("lighter_book_hull_bot",        "CLIP_USD",   "MAX_POSITIONS",    2.5),
+    ("lighter_book_kiyosaki_bot",    "CLIP_USD",   "MAX_POSITIONS",    2.5),
+    ("lighter_book_grimes_bot",      "CLIP_USD",   "MAX_POSITIONS",    2.5),
+]
+
+#: Books whose worst case exceeds the table's bar, each with the measured
+#: reason. A declaration, never a blanket exemption — and each one names what
+#: would close it.
+GROSS_OK = {
+    "funding_carry_bot":
+        "DELTA-NEUTRAL modelled (P&L = accrued - fees, no price term) and its "
+        "gross is dominated by the ALLOCATION organ, not the brain: it sits AT "
+        "the 4.0 ceiling today, so 12 x $300 x 4.0 = $14,400 before the brain "
+        "speaks. (sp) budgets the brain off carry's CONSTANTS so it adds "
+        "nothing there. Carried in HANDOFF.md as `allocation-organ-4x-on-carry` "
+        "with an OPERATOR owner.",
+    "lighter_band_kelly_bot":
+        "two sleeves at different clips, so its budget is the SUM "
+        "(`_GROSS_CAP`) rather than cap x clip — the table's shape does not "
+        "describe it. Bounded at 2 x (4x$250 + 2x$40) = $2,160.",
+    "lighter_funding_spread_bot":
+        "DOLLAR-NEUTRAL: its gross is 2 legs per pair by construction and its "
+        "notional is tiny ($20 x 10 legs = $200 designed). Bounded by "
+        "`brain_gross_cap(K * 2, ORDER_USD)`.",
+}
+
+
+@pytest.mark.parametrize("mod,clip_attr,cap_attr,bar", GROSS)
+def test_no_book_can_deploy_more_than_it_could_fund(mod, clip_attr, cap_attr, bar):
+    """The worst-case gross a book can reach, computed from its OWN constants
+    and the brain's own ceiling, against its own equity."""
+    import importlib
+    import sys
+    sys.path.insert(0, str(ROOT))
+    m = importlib.import_module(mod)
+    fb = importlib.import_module("fleet_bus")
+    eq = float(getattr(m, "START_EQUITY", 1000.0))
+
+    if mod == "lighter_ticket_taker":
+        # constant-risk sizing: the worst clip is whatever vol_clip returns at
+        # the brain's ceiling, which is bounded by its OWN lifted CLIP_MAX.
+        worst = max(m.vol_clip(r, risk_usd=m.RISK_USD * fb.MULT_CEIL,
+                               clip_max=m.CLIP_MAX * fb.BRAIN_GROSS_X)
+                    for r in (0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 100.0))
+        gross = worst * m.MAX_OPEN
+    elif mod == "lighter_perp_sniper":
+        # its clip is `ctx.order_usd(20.0)` and its cap is the pending/open
+        # ceiling; both are call-site values, so read the documented defaults.
+        gross = 20.0 * fb.MULT_CEIL * 4
+    else:
+        gross = (float(getattr(m, clip_attr)) * int(getattr(m, cap_attr))
+                 * fb.BRAIN_GROSS_X)
+
+    assert gross <= bar * eq, (
+        f"{mod}: worst-case gross ${gross:,.0f} is {gross / eq:.1f}x its own "
+        f"${eq:,.0f} of capital (bar {bar}x). A book that cannot fund its own "
+        "worst case is not aggressive, it is mis-modelled: its slippage and "
+        "fee terms are calibrated at the designed clip and become fiction "
+        "above it, in the direction that makes a bad book look gradeable.")
+
+
+def test_the_gross_declarations_still_describe_real_books():
+    """An entry in GROSS_OK is a decision with an owner, not a snooze. If the
+    module is gone the declaration is stale and must go with it."""
+    for mod in GROSS_OK:
+        assert (ROOT / f"{mod}.py").exists(), mod
+        assert len(GROSS_OK[mod]) > 80, f"{mod}: a reason, not a shrug"
+
+
+def test_the_gross_table_would_actually_fail_on_an_unbounded_book():
+    """POSITIVE CONTROL. Every book in the table passes, and a table that
+    passes for the wrong reason is indistinguishable from one that works —
+    this repo's own (po) rule. Recompute 🎫 the taker WITHOUT the (sp) risk-
+    budget fix (a bare `CLIP_MAX x MULT_CEIL` clip) and confirm the bar
+    rejects it."""
+    import importlib
+    import sys
+    sys.path.insert(0, str(ROOT))
+    m = importlib.import_module("lighter_ticket_taker")
+    fb = importlib.import_module("fleet_bus")
+    pre_sp = m.CLIP_MAX * fb.MULT_CEIL * m.MAX_OPEN
+    eq = float(getattr(m, "START_EQUITY", 1000.0))
+    assert pre_sp > 1.2 * eq, (
+        "the bar no longer rejects the pre-(sp) taker, so it is not testing "
+        f"anything: ${pre_sp:,.0f} vs {1.2 * eq:,.0f}")

@@ -158,6 +158,44 @@ time** because every close carries its `brain_mult`. CARRIED with the
 arithmetic rather than fixed by rewriting the brain's publisher on the same
 day thirteen consumers were wired to it.
 
+### THREE MORE FROM THE SAME AUDIT, AFTER THE FIXES LANDED
+
+The refuter pass re-read the tree AS THE FIXES WERE LANDING, which is how a
+verify stage should behave — most refutations read *"the reporter read a
+pre-(sp) version; the guard they say is missing sits twenty lines below the
+line they cite."* Three findings survived that and are fixed here:
+
+* **`test_the_rails_see_the_sized_clip` was green over nothing on every SHADOW
+  arm.** `SafetyRails.notional_ok` returns **True** when `max_notional is
+  None`, and the cap env is REQUIRED only on a live arm
+  (`assert_can_start`) — so on 🎫 the taker's and 🎯 the sniper's shadow arms
+  the rail is a no-op and my plumbing test proved the plumbing, not the
+  effect. That is CLAUDE.md's own *"a green run verifies that an enforcement
+  EXISTS, not that it is CORRECT"* landing on a test written the same day.
+  Closed by `test_no_book_can_deploy_more_than_it_could_fund`: worst-case
+  gross **computed from each module's own imported constants** against its own
+  `START_EQUITY`, with a positive control that re-computes the pre-(sp) taker
+  and asserts the bar rejects it. Measured after the fixes: taker **$960**
+  (was $3,216), cook $1,920, hull/kiyosaki $960, douglas $800, grimes $320.
+  Three declarations, each with its reason: 🌾 carry (delta-neutral, and its
+  gross is the ALLOCATION organ's not the brain's), 🪁 kelly (two sleeves, one
+  summed budget), ⚖️ Counterweight (dollar-neutral, $200 designed).
+* **💸 the Farmer's `conv_mult` receipt became conviction x brain.** On the
+  shipped live config conviction is OFF, so the true value is `1.000` on every
+  entry — and a brain mult of 3.0 would have written `conv_mult: 3.0` onto
+  REAL-MONEY order rows, so the census that measures `CONVICTION_HI`'s own
+  authority would have read a distribution that was entirely the brain's.
+  Now `conv_mult`, `brain_mult` and the product `clip_mult` are three fields.
+  **A receipt that attributes one organ's move to another is worse than no
+  receipt.**
+* **The judge's paired bar can be de-paired by the brain**, because the two
+  Farmer arms read their OWN rows and only the live arm has a cap. The (sp)
+  trim removes the "live arm closes zero trades" half of it; the residual —
+  the two arms can run different clips — is harmless to the bar itself (it
+  compares per-trade PERCENT, which is clip-invariant) and is recorded here
+  rather than guarded, because the judge's own `ran_candidate` receipt already
+  stamps the bars each arm ran.
+
 **Mutations verified RED (16 this pass):** the taker's rail sees a constant ·
 avo's rail sees the pre-brain clip · the Farmer's FIRST rail call sees it ·
 the Farmer's POST-TRIM call sees it · the sniper's rail sees it · avo's expand
