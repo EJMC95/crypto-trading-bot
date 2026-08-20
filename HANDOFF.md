@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 19:41 Sydney (09:41Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-20 19:50 Sydney (09:50Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -24,6 +24,11 @@ Capital sits in INVERSE proportion to measured edge: the two worst books run at 
 
 _Still open because:_ moving capital between books is an operator call, not a session one — the organ already ranks it honestly (I16).
 
+### `books-should-declare-themselves`  ·  owner: **session**
+18 of 19 living books do not publish `extra.thesis` — their design lives in `fleet_manifest`'s bridge table instead of on the row. `design_for` already prefers a book's own publication, so each migration is one publish-site edit and the manifest entry goes quiet on its own.
+
+_Still open because:_ 18 bot edits and 18 deploys; do it a book at a time on the next deploy each one earns for another reason.
+
 ### `unmeasurable-lever-backlog`  ·  owner: **session**
 30 registered levers still have no QUANTITIES spec — no recorded quantity to profile them against. The ratchet in audit_lever_measurability stops the pile GROWING; draining it is per-lever work: record what the knob cuts, then spec it.
 
@@ -44,8 +49,9 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (51 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg))
+## Shipped today (52 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh))
 
+- `e31648f` The ceiling becomes a measurement, and the brain's training wheel comes off (sh)
 - `f0fba40` The never-recorded class, closed fleet-wide; and I11 finally has teeth (sg)
 - `e34b6a2` The only path to more real money was rigged against ever promoting (sf)
 - `a173a93` The growth rail could only ever SHRINK the taker's one living lens (sf)

@@ -356,16 +356,52 @@ def render(res):
     return "\n".join(L)
 
 
+def render_designs(res, books):
+    """Each book's own design beside its measured headroom.
+
+    [(sh)] The divergent half, and the reason `fleet_manifest` exists: a
+    ceiling number alone tells a book to go faster; a ceiling number beside
+    what that book is FOR tells it which direction is up. `flies_when` is
+    written per book precisely because one fleet-wide notion of "better"
+    cannot say that 🌾 carry flies by holding more, 🔮 georgia by becoming
+    gradeable, and 🧮 Hull by simply surviving to thirty closes.
+    """
+    try:
+        import fleet_manifest as FM
+    except Exception:                                            # noqa: BLE001
+        return ""
+    extras = {b.get("bot"): (b.get("extra") or {}) for b in books}
+    L = ["", "  ── what each book is FOR, and what flying looks like for IT ──"]
+    for bot, r in sorted(res.items()):
+        d = FM.design_for(bot, extras.get(bot))
+        if not d:
+            L.append(f"\n  {bot}  — NO DECLARED DESIGN")
+            continue
+        head = f"{d.get('emoji', '')}  {d.get('name', bot)}".strip()
+        L.append(f"\n  {head}  ({bot})")
+        if d.get("design"):
+            L.append(f"     is for   : {d['design']}")
+        if d.get("flies_when"):
+            L.append(f"     flies when: {d['flies_when']}")
+        if d.get("floor"):
+            L.append(f"     never    : {d['floor']}")
+        L.append(f"     measured : {r.get('verdict')} — {r.get('binding', '')}")
+    return "\n".join(L)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--ledger")
     ap.add_argument("--feed")
     ap.add_argument("--publish", action="store_true")
+    ap.add_argument("--designs", action="store_true",
+                    help="each book's declared design beside its headroom")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
-    res = survey(load_rows(ledger=a.ledger), load_books(feed=a.feed))
+    _books = load_books(feed=a.feed)
+    res = survey(load_rows(ledger=a.ledger), _books)
     print(render(res))
     proven = {k: v for k, v in res.items() if v.get("verdict") == "PROVEN"}
     if proven:
@@ -379,6 +415,8 @@ def main(argv=None):
           "positive (I16).\n  For the rest the ceiling is DECIDABILITY — how "
           "fast it can learn what it is.\n  Rate headroom comes from UNUSED "
           "SLOTS at the book's own hold, never a shorter one.")
+    if a.designs:
+        print(render_designs(res, _books))
     if a.publish:
         import bot_pnl_store as store
         ok = store.save_state(KEY, {
@@ -455,6 +493,20 @@ def selftest():
     # too thin says so rather than inventing a number
     assert book_ceiling(closes=[0.01] * 4, span_days=4, concurrency=1.0,
                         cap=4, clip=80.0, equity=1000.0)["verdict"] == "TOO-THIN"
+
+    # the design renderer names the book, its ceiling AND its floor — a
+    # ceiling printed without the floor beside it is how "go higher" becomes
+    # reckless, which is the whole reason the manifest carries both
+    demo = {"perps-funding-carry-lshadow": {"verdict": "PROVEN",
+                                            "binding": "SLOTS"}}
+    txt = render_designs(demo, [{"bot": "perps-funding-carry-lshadow",
+                                 "extra": {}}])
+    assert "is for" in txt and "flies when" in txt and "never" in txt, txt
+    assert "🌾" in txt and "SLOTS" in txt, txt
+    # a book with no declared design SAYS SO rather than being skipped
+    gap = render_designs({"mystery-book": {"verdict": "PROVEN"}},
+                         [{"bot": "mystery-book", "extra": {}}])
+    assert "NO DECLARED DESIGN" in gap, gap
 
     assert closes_for_t([0.01] * 10) is None      # sd == 0
     assert closes_for_t([-0.01, -0.02]) is None   # mean <= 0

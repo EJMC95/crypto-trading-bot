@@ -140,6 +140,18 @@ CARRIED = [
         "closes_when": lambda: False,
     },
     {
+        "id": "books-should-declare-themselves",
+        "owner": "session",
+        "what": "18 of 19 living books do not publish `extra.thesis` — their "
+                "design lives in `fleet_manifest`'s bridge table instead of on "
+                "the row. `design_for` already prefers a book's own "
+                "publication, so each migration is one publish-site edit and "
+                "the manifest entry goes quiet on its own.",
+        "why_open": "18 bot edits and 18 deploys; do it a book at a time on "
+                    "the next deploy each one earns for another reason.",
+        "closes_when": lambda: _thesis_coverage_complete(),
+    },
+    {
         "id": "unmeasurable-lever-backlog",
         "owner": "session",
         "what": "30 registered levers still have no QUANTITIES spec — no "
@@ -185,6 +197,16 @@ CARRIED = [
         "closes_when": lambda: False,
     },
 ]
+
+
+def _thesis_coverage_complete():
+    """True once every living row publishes its OWN design and the bridge
+    table is empty — the state this carried item is waiting for."""
+    try:
+        import fleet_manifest
+        return not fleet_manifest.DESIGN
+    except Exception:                                            # noqa: BLE001
+        return False
 
 
 def _ratchet_at_or_below(key, n):

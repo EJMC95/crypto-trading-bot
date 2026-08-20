@@ -69,6 +69,52 @@ third and capped the other two.
 
 It promotes nothing and moves nothing. Like `golive_readiness`, it publishes.
 
+### AND THE SYNERGY PIECE: NINETEEN DESIGNS, ONE WAY OF JUDGING THEM
+
+**Operator: "we are tasked to create multiple strategy bots, who get
+complimented and enhanced by instruments that let them fly to the ceiling if
+they wish to... so they can achieve their designated different designs. We need
+synergy."**
+
+Measured 20-Aug: of nineteen living rows, **exactly one** — 🧭 nav-cook, the
+newest — publishes what it is FOR. Every other book's design sits in 1,400 lines
+of `CLAUDE.md`: unreadable to any organ, unscoreable by any grader, and
+unfindable by an operator checking a book's behaviour against its purpose. **That
+is the missing synergy, precisely — nineteen different designs and one notion of
+"better".**
+
+`fleet_manifest.py` gives every living book three lines it can be judged by:
+
+    🌾  Yield Harvester
+       is for    : harvest persistent funding, delta-neutral — paid for
+                   patience rather than for being right about price
+       flies when: it holds MORE good carries at once — its ceiling is
+                   slots x supply
+       never     : a carry must repay its own round trip
+
+    🔮  Georgia
+       is for    : intraday 15m across three tags, each graded on its own
+       flies when: it FILLS ITS SLOTS — 5 of 6 bars, 7.6 days from gradeable
+                   at full occupancy against 83.5 today
+       never     : its trailing stop is NOT the leak (74% vs a 75% placebo)
+
+**`flies_when` is the divergent half and the reason this is not decoration.** One
+fleet-wide rule cannot say that 🌾 carry flies by holding MORE, 🔮 georgia by
+becoming GRADEABLE, 🧮 Hull by simply SURVIVING to thirty closes, and 🪁 the
+Mirror by its ghosts continuing to be wrong. The test asserts no two books share
+one.
+
+**The floor stays, beside the ceiling, on purpose** — a ceiling printed without
+the floor next to it is exactly how "go higher" becomes reckless.
+
+**THE BOOK'S OWN PUBLICATION WINS.** `design_for` prefers `extra.thesis` off the
+live row and falls back to the table. This file is a BRIDGE, not a second source
+of truth: as each book learns to declare itself (nav-cook's pattern) its entry
+goes quiet on its own, and the two can never drift into disagreeing. A junk or
+empty thesis falls back rather than erasing a design; an unknown row gets
+NOTHING, because an invented purpose is worse than none. It decides nothing —
+asserted, not described.
+
 ### AND THE TRAINING WHEEL, WHICH WAS ON THE BRAIN ITSELF
 
 `brain_stats`' expand ladder stopped at **1.5×**. So the organ holding every

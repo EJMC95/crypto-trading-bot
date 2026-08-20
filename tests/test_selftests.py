@@ -138,6 +138,7 @@ SELFTEST_MODULES = [
     # result, no recommendation, fail-closed when no baseline is supplied.
     "scripts.audit_lever_measurability",
     "scripts.ceiling",
+    "fleet_manifest",
     "scripts.session_state",
     "scripts.study_exit_sweep",
     "scripts.study_stop_reclaim",
