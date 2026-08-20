@@ -51,16 +51,20 @@ def _rows():
 
 
 def _publish(rows=None, ttl=3600, age_s=0):
-    """Build the payload THE PUBLISHER builds — never a hand-written fixture.
-    (hj): a consumer tested against a fixture its publisher did not build
-    certifies whatever the consumer already does."""
+    """Build the payload through the REAL publisher — `sc.build_snapshot` — not
+    a hand-rolled copy of it.
+
+    The first draft of this file rebuilt the `margins` map inline, and a
+    mutation round caught it: deleting the scout's own `imf > 0` filter left
+    every test GREEN, because the test was grading its own arithmetic instead of
+    the publisher's. That is (hj) exactly — a consumer tested against a fixture
+    its publisher did not build certifies whatever the consumer already does."""
     stats = sc.book_stats(rows or _rows(), 0.0)
-    margins = {s: {"max_lev": round(10000.0 / v["imf"], 2),
-                   "imf_bps": v["imf"], "mmf_bps": v["mmf"]}
-               for s, v in stats.items() if (v.get("imf") or 0) > 0}
-    return {"margins": margins, "ttl_sec": ttl,
-            "updated": (datetime.now(timezone.utc)
-                        - timedelta(seconds=age_s)).isoformat()}
+    snap = sc.build_snapshot(stats, {}, {}, {})
+    snap["ttl_sec"] = ttl
+    snap["updated"] = (datetime.now(timezone.utc)
+                       - timedelta(seconds=age_s)).isoformat()
+    return snap
 
 
 def test_the_scout_captures_the_margin_fractions():
