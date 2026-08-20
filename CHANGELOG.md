@@ -148,7 +148,7 @@ does not.
 ## 2026-08-20 (sh) — TWO PARKED IMPROVEMENTS SHIPPED, AND THE ONE THAT MOVED THE OTHER WAY IS WHY THEY WERE WORTH MEASURING
 
 Continuing the operator's *"implement all improvements"* directive. Both items
-here were sitting in `(sf)`'s "measured, not shipped" list.
+here were sitting in `(sj)`'s "measured, not shipped" list.
 
 ### 🔮 Georgia — `trend_breakout`'s stop joins the sibling tags at 3.5×ATR
 The tag left behind by the 2026-07-13 change, and the one whose stop had become
@@ -514,9 +514,9 @@ now reads `baseline: GREEN` and kills correctly.
 Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
-## 2026-08-20 (sf) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
+## 2026-08-20 (sj) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
 
-*(Renumbered (sd) -> (sf) before push: `main` took (sd) for the leverage entry and (se) for the margin-surface one while this was being written. The cited entry keeps the letter; this one had no citations outside its own header.)*
+*(Renumbered (sd) -> (sf) -> **(sj)** before merge. `main` took (sd) for the leverage entry and (se) for the margin-surface one while this was being written; then, while this branch waited on CI, it took (sf) too for the I22 entry. The letter that is already on `main` keeps it — neither is cited from tracked code, so the tie-break is which one a reader of `main` would already be relying on. All four citation sites were enumerated with a COUNT first, per the truncated-search rule; every one was inside this file.)*
 
 **Operator, 20-Aug:** *"it is clear that the bots are too restricted, entry and
 exits are completely off, its as if they all share the same metrics and
