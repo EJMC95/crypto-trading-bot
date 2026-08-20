@@ -100,6 +100,36 @@ Real money cannot reach any of this: `funding_carry_bot.main()` refuses every
 mode but `lighter_shadow`, and the live funding floors are `{xp,live}.funding.min_vol`
 in a different file. Asserted, not asserted-in-prose.
 
+### THE OBJECTION, MEASURED AND REFUSED — INCLUDING A CAGE I ALMOST ADDED
+
+The shipped gate was then driven against the LIVE venue (not the study — the
+study shares its cost model with the bot, but `depth_admits` has its own budget,
+kill switch and fail-closed branches). It admits 13 of 17 sub-floor hot books
+and refuses four on payback: FOLKS 59.9h, RAIL 64.5h, CAP 80.3h, MINIMAX 151.8h.
+Every fail-closed branch fires on live data — spent budget reads the venue zero
+times, the kill switch reads it zero times, an unfillable clip and a zero rate
+both refuse.
+
+Two admissions looked wrong at a glance and I drafted a **minimum-depth-coverage
+floor** to catch them. Then I measured the thing the floor would have guarded,
+and it binds on nothing:
+
+    STBL     24h turnover $2,785      visible depth $202,292   = 2,529x the clip
+    H100     24h turnover $88,355     visible depth $2,732     =    34x the clip
+    median across the whole admitted set                        = 2,529x
+    books that cannot fill FIVE times the clip from visible depth: NONE
+
+**STBL is the whole argument in one row.** It turns over $2,785 a day and can
+absorb two and a half thousand clips right now — turnover measures how often
+somebody trades, depth measures whether *you* can, and at this clip they are
+different quantities. H100 is the one genuinely wide book (272bps) and the gate
+prices it correctly rather than being fooled: at 3331% APR it still repays in
+7.2 hours.
+
+So the coverage floor was dropped. It is recorded here because the alternative —
+shipping it — would have been a cage added on an intuition, on the same day and
+in the same file as one removed for exactly that reason.
+
 ### THE OTHER INSTRUMENT — `scripts/study_stop_reclaim.py`, and what it REFUSED
 
 On 2026-07-13 the family book's counter-trend stop went 2.0x → 3.5x ATR on one
