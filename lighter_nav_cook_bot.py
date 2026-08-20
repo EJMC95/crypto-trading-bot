@@ -124,7 +124,30 @@ EXIT_BPS = float(os.environ.get("COOK_EXIT_BPS", "30"))
 HORIZON_PLATEAU_S = (1800, 3600, 7200, 14400, 28800)   # all measured positive
 MAX_HOLD_S = float(os.environ.get("COOK_MAX_HOLD_S", str(4 * 3600)))
 HARD_STOP = float(os.environ.get("COOK_HARD_STOP", "0.05"))
-CLIP_USD = float(os.environ.get("COOK_CLIP_USD", "80"))
+# [2026-08-20 (sc)] CLIP $80 -> $240 — LEVERAGE, MEASURED AND PRICED.
+# In this fleet "leverage" is deployed notional / equity (there is no leverage
+# knob and that is deliberate — see leverage-measured-and-rejected-five-times),
+# so raising the clip IS the lever. Six prior rejections all levered books with
+# ~ZERO measured edge, where leverage is pure variance amplification; this is
+# the first book where the question is well-posed: a reproducible +0.373%/trade
+# at t=+2.61 ((sb)), a HARD 5% PRICE stop, and mean-reverting exposure.
+# Measured on the book's own 226-trade series (sd 2.147%/trade):
+#     L   gross expo   liq @      stop @   35d return   maxDD    15% bar
+#     1       32%      100.0%      5.0%      +6.94%     -1.89%    PASS
+#     3       96%       33.3%      5.0%     +22.06%     -5.60%    PASS   <- shipped
+#     5      160%       20.0%      5.0%     +38.94%     -9.22%    PASS   <- ceiling
+#     8      256%       12.5%      5.0%     +67.89%    -14.46%    at the bar
+#    12      384%        8.3%      5.0%    +114.09%    -21.13%    FAIL
+# THE STOP FIRES BEFORE LIQUIDATION AT EVERY LEVEL UP TO 12x — liquidation is
+# not the binding constraint, the 15% drawdown bar is. Kelly on the measured
+# distribution is 8.10x and half-Kelly 4.05x; 3x is BELOW half-Kelly on purpose,
+# because Kelly on an ESTIMATED edge is fragile (a 2x overestimate of the mean
+# turns half-Kelly into full-Kelly) and this edge rests on n=226 in ONE 35-day
+# window. I19 price, stated: 3x the exposure and 3x the drawdown for the SAME
+# per-trade expectancy — this buys $ throughput, it does not buy edge.
+# The live ledger has NOT yet confirmed the replay (the (sa) era reset left it
+# near zero), so this is sized on a replay and says so.
+CLIP_USD = float(os.environ.get("COOK_CLIP_USD", "240"))
 MAX_POSITIONS = int(os.environ.get("COOK_MAX_POSITIONS", "4"))
 MAX_ENTRY_SLIP_BPS = float(os.environ.get("COOK_MAX_SLIP_BPS", "30"))
 MIN_VOL_M = float(os.environ.get("COOK_MIN_VOL_M", "0.5"))
@@ -645,6 +668,16 @@ def _selftest():
         "confirm %d loops x %ds = %ds is SHORTER than the measured lag %.0fs"
         % (CONFIRM_LOOPS, LOOP_SECONDS, CONFIRM_LOOPS * LOOP_SECONDS,
            STUDY_CONFIRM_S))
+    # LEVERAGE PIN: gross exposure must stay inside the level whose MEASURED
+    # drawdown clears the 15% go-live bar. maxDD scales ~linearly in the clip
+    # (-1.89% at $80), so the ceiling is the clip where it reaches 15%.
+    MEASURED_MAXDD_AT_80 = 0.0189
+    implied = MEASURED_MAXDD_AT_80 * (CLIP_USD / 80.0)
+    assert implied < 0.15, (
+        "clip $%.0f implies ~%.1f%% maxDD, past the 15%% go-live bar"
+        % (CLIP_USD, 100 * implied))
+    assert CLIP_USD * MAX_POSITIONS <= 5.0 * 80.0 * 4, (
+        "gross exposure beyond the measured 5x ceiling")
     assert _standby_key("nav-cook-lshadow") == "nav-cook-lshadow:standby"
     st = build_state({}, [], {}, 1.0, now=2.0)
     assert st["saved_ts"] == 2.0 and st["pend"] == {}
