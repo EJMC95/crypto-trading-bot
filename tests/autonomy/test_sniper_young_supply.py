@@ -1,6 +1,6 @@
 """🎯 The young source's supply: the screen must ask the RIGHT question.
 
-[2026-08-20 (se)] `(lk)` put ONE instrument-class screen on the sniper's surge
+[2026-08-20 (sg)] `(lk)` put ONE instrument-class screen on the sniper's surge
 AND young sources, justified on evidence that was almost entirely surge's:
 non-crypto surge −$5.01 over 13 closes versus non-crypto **young −$1.19 over
 TWO**. The young leg rested on n=2.
@@ -15,12 +15,12 @@ consecutive days. Its live supply that day was 7 books — 5 zero-volume ghosts
 and exactly 2 with real turnover, CASHCAT and UNITREE, both class 7, both
 refused. And the supply was never dead: on the venue-priced axis births run
 1.67–2.00/30d and did not stop in any month measured (CAP Jun, ANSEM Jul,
-CASHCAT Aug). The "86 days dry" figure in `(qi)`/`(sd)` is true of class 2 and
+CASHCAT Aug). The "86 days dry" figure in `(qi)`/`(sf)` is true of class 2 and
 false of this book's cohort.
 
 WHAT THESE TESTS PIN, in the order they matter:
 1. The two sources ask DIFFERENT questions, and neither silently becomes the
-   other. Surge stays crypto-only — its evidence is untouched and `(sd)`
+   other. Surge stays crypto-only — its evidence is untouched and `(sf)`
    measured class-7 surge at −0.840%/trade, negative at every hold.
 2. `venue_priced` admits crypto-native class-7 debuts and still refuses
    tokenised equity/FX/commodity/pre-IPO — the half of (lk) the tape supports
@@ -140,7 +140,7 @@ def test_the_two_sources_ask_different_questions():
     """Surge and young must not share a screen — that WAS the defect."""
     assert sniper._class_ok is not sniper._young_class_ok
     # surge: crypto-only, unchanged, and still refusing the class-7 cohort
-    # whose surge (sd) measured at -0.840%/trade
+    # whose surge (sf) measured at -0.840%/trade
     assert sniper._class_ok("CASHCAT") is False
     assert sniper._class_ok("BTC") is True
     # young: priced-here, and therefore admitting it
@@ -171,7 +171,7 @@ def test_surge_candidates_still_defaults_to_the_crypto_screen():
 
 
 def test_the_census_shows_where_the_young_source_now_dies():
-    """The (sd) funnel and this fix are one mechanism: the census must move.
+    """The (sf) funnel and this fix are one mechanism: the census must move.
 
     Before the fix the live funnel read `class_ok=0` — the screen was the
     killing gate. After it, the screen passes and the volume floor becomes the

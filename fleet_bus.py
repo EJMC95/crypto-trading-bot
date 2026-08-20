@@ -390,6 +390,58 @@ def long_symbol_blocked(base, current_time=None):
         return False
 
 
+def market_margins(sym=None, current_time=None):
+    """[2026-08-20 (se)] The venue's OWN margin surface, per market.
+
+    Returns `{sym: {"max_lev": float, "imf_bps": float, "mmf_bps": float}}`, or
+    a single market's dict when `sym` is given, or `None`/`{}` when the scout is
+    dark or stale.
+
+    WHY THIS EXISTS — operator mandate, 2026-08-20: *"you have not set the bots
+    up in any way that we could ever really even use leverage."* That is exactly
+    right and the cause was mechanical: the venue publishes
+    `default_initial_margin_fraction` and `maintenance_margin_fraction` on every
+    row of an endpoint the scout already fetched, and NOTHING in this fleet read
+    them. Measured across 212 active books the day this shipped: 20x available
+    on 21 markets (BTC ETH WTI US100), 15x on 24 (SOL XAU NVDA AAPL), 10x on 88
+    — while every Lighter book sizes a flat dollar clip at 1x. The only
+    `LEVERAGE` constant in the tree belonged to a RETIRED Hyperliquid bot.
+
+    THE CONTRACT IS FAIL-CLOSED, and it is the OPPOSITE of this module's usual
+    one. Every other accessor here degrades to "keep your configured default",
+    because the cost of being wrong is a missed shadow trade. Here the cost of a
+    wrong default is a LIQUIDATION, which is an unrecoverable loss of the whole
+    book — so a dark scout, a stale payload or an absent symbol returns None,
+    and a caller that cannot read a margin MUST size as if no leverage were
+    available. Never invent a limit; never treat absence as "no limit".
+    """
+    snap = _load("lighter-market", current_time)
+    if not isinstance(snap, dict) or not is_fresh(snap, current_time):
+        return None if sym else {}
+    m = snap.get("margins")
+    if not isinstance(m, dict):
+        return None if sym else {}
+    if sym is not None:
+        row = m.get(sym)
+        return row if isinstance(row, dict) and (row.get("max_lev") or 0) > 0 else None
+    return {k: v for k, v in m.items()
+            if isinstance(v, dict) and (v.get("max_lev") or 0) > 0}
+
+
+def max_leverage(sym, default=1.0, current_time=None):
+    """[2026-08-20 (se)] The venue's max leverage for one market, or `default`.
+
+    `default=1.0` is deliberate and load-bearing: an unreadable margin means the
+    caller gets UNLEVERED sizing, never a guess. Raising the default would turn
+    a dark bus into leverage nobody chose.
+    """
+    row = market_margins(sym, current_time=current_time)
+    try:
+        return float(row["max_lev"]) if row else float(default)
+    except (TypeError, ValueError, KeyError):
+        return float(default)
+
+
 def scout_universe(min_vol_m=0.0, limit=None, current_time=None):
     """[2026-07-30 FLEET UNIVERSE — operator: "full universe ... every bot
     needs every tool"] The venue's LIVE tradable universe, as the market
@@ -559,7 +611,7 @@ NONCRYPTO_BASES = {s.strip().upper() for s in os.environ.get(
     "XIAOMI,"
     # 7=pre-IPO / private
     "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE,"
-    # [2026-08-20 (se)] THE EIGHT THIS LIST HAD DRIFTED BY, measured against
+    # [2026-08-20 (sg)] THE EIGHT THIS LIST HAD DRIFTED BY, measured against
     # the venue's own `strategy_index` the same way (ki) measured the original
     # 41: of 101 active non-crypto books, EIGHT were absent from this fallback.
     # With a live scout the screen was right (tier 2 answers); with a DARK or
@@ -681,7 +733,7 @@ def is_crypto(sym, current_time=None):
     return s not in NONCRYPTO_BASES
 
 
-#: [2026-08-20 (se)] Class-7 books that are NOT priced here. `strategy_index 7`
+#: [2026-08-20 (sg)] Class-7 books that are NOT priced here. `strategy_index 7`
 #: is the venue's grab-bag, and its members do not share an answer to the
 #: question `venue_priced` asks: ANSEM and CASHCAT are crypto-native tokens
 #: whose ONLY market is this book, while ANTHROPIC, OPENAI, SPCX and UNITREE
@@ -717,7 +769,7 @@ _VENUE_PRICED_EXOTICS = {"ANSEM", "CAP", "CASHCAT"}
 
 
 def venue_priced(sym, current_time=None):
-    """Is THIS VENUE where `sym` is priced?  [2026-08-20 (se)]
+    """Is THIS VENUE where `sym` is priced?  [2026-08-20 (sg)]
 
     A DIFFERENT question from `is_crypto`, and the one the (lk) instrument-class
     screen was really asking. That screen's argument was never about class — it
@@ -731,7 +783,7 @@ def venue_priced(sym, current_time=None):
     `is_crypto` therefore refuses ANSEM and CASHCAT — the exact cohort a debut
     sniper exists to trade — while a book like 🌾 carry, which wants "is this a
     crypto FUNDING signal", is right to keep asking `is_crypto`. Both questions
-    are legitimate; they are not the same question, and (se) measured the cost
+    are legitimate; they are not the same question, and (sg) measured the cost
     of conflating them at a source that sat at ZERO admissible candidates for
     66 days while its cohort arrived at ~1.7-2.0 births/30d throughout.
 

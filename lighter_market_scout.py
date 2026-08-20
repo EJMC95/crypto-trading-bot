@@ -200,6 +200,26 @@ def book_stats(books, min_qvol):
                                    and not isinstance(b.get("strategy_index"),
                                                       bool)
                                    else None),
+                # [2026-08-20 (se)] THE VENUE'S MARGIN SURFACE — the third time
+                # this exact story has repeated on this endpoint, after
+                # `created_at` and `strategy_index`: it is on every row of a
+                # response this organ already fetches, and the whole fleet threw
+                # it away. Measured across the 212 active books today:
+                #   20x on 21 (BTC ETH WTI US100)  15x on 24 (SOL XAU NVDA AAPL)
+                #   10x on 88   8x on 3   5x on 40   3x on 36
+                # and EVERY Lighter book in this fleet sizes at 1x notional,
+                # because nothing in the tree can see these numbers. The only
+                # `LEVERAGE` constant in the repo belongs to a RETIRED
+                # Hyperliquid bot.
+                #
+                # Both fractions are in basis points (imf 2000 = 20% initial
+                # margin = 5x max). `mmf` is published beside it because it is
+                # the RUIN number: a leverage design that cannot state its
+                # distance to the maintenance margin is not a design. 0 =
+                # unparseable, which consumers must read as "unknown", never as
+                # "no limit" — the fail-closed direction for a margin field.
+                "imf": float(b.get("default_initial_margin_fraction") or 0.0),
+                "mmf": float(b.get("maintenance_margin_fraction") or 0.0),
             }
         except (TypeError, ValueError):
             continue
@@ -582,6 +602,24 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # the field over any list, stated as a number.
         "classes": {s: v["strategy_index"] for s, v in stats.items()
                     if v.get("strategy_index") is not None},
+        # [2026-08-20 (se)] THE LEVERAGE SURFACE, published for the first time.
+        # OPERATOR MANDATE: *"you have not set the bots up in any way that we
+        # could ever really even use leverage ... we should be running this
+        # mandate and doctrine on building bots that can utilize every aspect of
+        # the ecosystem we are currently working on."* He is right, and the cause
+        # is mechanical: NOTHING in this fleet could SEE these numbers, so every
+        # Lighter book sizes a flat dollar clip at 1x while the venue offers up
+        # to 20x. `max_lev` = 10000/imf; `mmf_bps` is the maintenance margin, the
+        # number any leverage design must quote its distance to.
+        #
+        # Published, NOT consumed — no book's sizing changes on this commit. A
+        # sizing model is a book-level design decision and gets its own measured
+        # pass; this is the instrument that makes such a design possible at all,
+        # and its absence is why the fleet never had one.
+        "margins": {s: {"max_lev": round(10000.0 / v["imf"], 2),
+                        "imf_bps": v["imf"], "mmf_bps": v["mmf"]}
+                    for s, v in stats.items()
+                    if (v.get("imf") or 0) > 0},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]

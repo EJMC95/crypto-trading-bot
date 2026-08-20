@@ -52,6 +52,7 @@ import ast
 import os
 import pathlib
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -101,8 +102,16 @@ def run_tests(selector, cwd="."):
     """
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    # [2026-08-20 (sd)] SPLIT THE SELECTOR. It used to be passed as ONE argv
+    # element, so a perfectly natural `-t "tests/x.py -k name"` reached pytest
+    # as a single FILENAME, exited non-zero, and produced a permanent
+    # `baseline: RED` — which makes every mutation look killed. A whole
+    # nav-cook round was reported as verified on that basis. The harness's own
+    # job is to make the safe path the easy one, and refusing a multi-token
+    # selector was the opposite. shlex so quoted ids like
+    # `tests/x.py::test[param with spaces]` survive.
     proc = subprocess.run(
-        [sys.executable, "-m", "pytest", selector, "-q"],
+        [sys.executable, "-m", "pytest", *shlex.split(selector), "-q"],
         cwd=cwd, env=env, capture_output=True, text=True)
     return (GREEN if proc.returncode == 0 else RED), proc
 

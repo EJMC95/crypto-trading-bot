@@ -1,6 +1,6 @@
 """🎯 Perp Sniper: the PER-SOURCE CENSUS — I18/(lv) on a book with three sources.
 
-[2026-08-20 (sd)] `{admitted: 0}` is byte-identical between "this source was
+[2026-08-20 (sf)] `{admitted: 0}` is byte-identical between "this source was
 quiet today" and "this source is structurally incapable of ever admitting
 anything". That ambiguity is not hypothetical here — it hid two dead sources
 for months, measured the day this shipped:

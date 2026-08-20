@@ -48,6 +48,9 @@ scripts/.tiderider_perp_cache.json
 # NOTE: .claude/settings.local.json stays TRACKED on purpose (15-Jul #55/#56:
 # it mirrors the claude-code-remote allowlist to every checkout).
 scripts/.*.json
+# [2026-08-20 (sc)] and the PICKLE ones — the wildcard above is .json only,
+# so a .pkl tape cache (nav-cook's is 58MB) sailed past it into `git add`.
+scripts/.*.pkl
 
 # test artifacts
 .coverage
