@@ -260,6 +260,23 @@ QUANTITIES = {
     # (scan_receipts: slope ratios recorded for EVERY decision incl. skips,
     # UNCLAMPED conviction scores, per-cycle explore pool size). Entries
     # stay honestly UNMEASURED until the next --measure run accrues n. ----
+    # [2026-08-20 (sf)] 🌾 carry's measured-liquidity bound — the FIRST
+    # QUANTITIES spec on the `lighter-books` lane, and it exists because the
+    # lever shipped with its own receipts rather than after them. The header
+    # above warns that "a saturated bare run is how a genuinely inert new cage
+    # arrives invisibly"; a new cage that cannot be profiled would be exactly
+    # that. `depth_scan.payback_h` records EVERY probe, admitted and refused,
+    # so the distribution the bound cuts is observable rather than truncated
+    # at the bound (the emission-truncation trap the Farmer's receipts note).
+    "carry.payback_max_h": {
+        "source": "state:perps-funding-carry-lshadow",
+        "extract": ("list", ("depth_scan", "payback_h")),
+        "abs": False, "dir": "le", "to_q": 1.0, "unit": "hours",
+        "min_n": MIN_N_TAPE, "precision": 0.01,
+        "gate": "funding_carry_bot.depth_admits — admit a sub-floor coin iff "
+                "measured payback <= this many hours",
+        "note": "recorded for admitted AND refused probes; UNMEASURED until "
+                "a --measure run accrues n, which is the honest reading"},
     "live.funding.slope_gate": {
         "source": "state:funding-scan-live", "extract": ("list", ("slope", "ratios")),
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "slope_ratio",

@@ -1,3 +1,174 @@
+## 2026-08-20 (sf) — 🌾 THE FLEET'S BEST BOOK WAS IDLE AT 0 OF 12 SLOTS BEHIND A GATE THAT MEASURED THE WRONG THING: turnover is not fill cost, and on an $80 clip it is not even correlated with it
+
+**Operator, this session: *"do not continue on a risk and constraint and choking
+of everything basis ... focus on where each bot can enter exit and operate
+better"* / *"being overly risk adverse and overly constraining and restrictive
+clearly doesn't work so do the opposite"* / *"if you can work out why they are
+losing entry and exits, then surely you can work out that tightening and
+constraining them into a tiny cage isn't the solution here."*** This entry is
+that pass. It ships one widening, three REFUSALS that each stop a widening, and
+two instruments that make the question askable per book from now on.
+
+### THE CAGE
+
+🌾 `perps-funding-carry-lshadow` is the fleet's best-evidenced book — n=101,
++$66.21 all-time, the only book that has ever cleared the `t` bar. Measured
+2026-08-20 on its own live row: **`held: 0` of `max_positions: 12`**, and
+**`eligible: 0` of `scanned: 228`**, while its own payload advertised
+`hottest_funding_apr` of **+301%, +200%, −1395%**.
+
+Its `CARRY_MIN_VOL` floor exists for one stated reason, `(px)`'s own words:
+*"per-book slippage here is unmeasured"* ([[lighter-slippage-is-per-book-not-per-venue]]).
+The floor is not a view about turnover. **It is a stand-in for a cost nobody had
+measured** — a defensible place to start and an indefensible place to stay,
+because an unmeasured quantity is a reason to measure, not a reason to keep
+refusing. Every motion available to the growth rail on this book restricted it
+further: `carry.min_vol`'s cage went one-sided in the TIGHTEN direction at
+`(pr)`, `PERSIST_H` went 6h → 12h at `(qx)` on a gate its own study says misses
+**91% of qualifying windows**, and the class screen closed the rest. The book's
+problem was that it could not find a trade, and every lever pointed the other
+way.
+
+### SO I MEASURED IT — `scripts/study_depth_vs_volume.py`
+
+Walk the LIVE book both ways for the clip this book actually trades, through the
+fleet's own fill model, and convert the result into the unit the decision is
+denominated in: **`payback_h = rt_cost / (apr / 8760)`** — how many hours of
+funding repay the fill. Of the **20 books over the 20% TRUE APR bar, the $1M
+floor refused SIXTEEN.** Every one of the sixteen filled an $80 clip out of
+visible depth, and every one repaid its measured round trip inside the max hold:
+
+| | TRUE apr | 24h $vol | measured RT | payback | the floor said |
+|---|---|---|---|---|---|
+| UNITREE | 1162% | $858k | 34.8 bps | **2.6h** | REFUSED |
+| KAITO | 131% | $226k | 7.6 bps | **5.0h** | REFUSED |
+| ZRO | 123% | $543k | 18.0 bps | **12.9h** | REFUSED |
+| XMR | 55% | $934k | 5.1 bps | **8.2h** | REFUSED |
+| EWY | 23% | $692k | 2.8 bps | **10.7h** | REFUSED |
+| **PUMP** | **20%** | **$4.8M** | **9.4 bps** | **40.7h** | **admitted** |
+
+**XMR is a third of PUMP's turnover and costs it 5.1bps against PUMP's 9.4.
+UNITREE repays fifteen times faster and was refused while PUMP was admitted.**
+On a clip this size the two quantities are close to orthogonal, and the reason
+is visible in the output's own `lvls` column: **19 of the 20 fill at the TOP
+LEVEL.** The floor was protecting the book against a size it has never traded,
+and in doing so it was selecting for the slowest-paying carries in the venue.
+
+### THE FIX — a fast path, not a verdict
+
+`depth_admits()`. A coin at or above the floor is admitted exactly as before
+(**zero behaviour change on everything that already passes, and no book read at
+all**). A coin below it gets the question the floor was standing in for: *can
+this clip be filled, and does the carry repay what the fill costs?* Both, or
+refuse. `carry.payback_max_h` is the bound — registered, caged **[6h, 168h]**
+(`hi` is a QUARTER of the 336h max hold: a carry needing most of its life to
+break even has no margin for the rate decaying, which is the thing carries
+actually do), default 48h, consumed through `apply_tuning`.
+
+**BETTER IN BOTH DIRECTIONS, which is the I19 shape rather than a widening.** At
+48h the measured venue admits UNITREE/KAITO/ZRO/XMR/EWY and eleven more, and
+**refuses FOLKS ($1,198 of turnover, 53.9h) and RAIL ($490, 66.8h)** — the two
+books nobody could trade — where the flat floor refused those two for the wrong
+reason and took fourteen good books down with them.
+
+Every uncertainty **fails CLOSED** — no book, unfillable depth, an unreadable
+rate, a venue error, an exhausted probe budget. This function's `True` opens a
+position, so it follows `lens_wins` (I15), not the degrade-to-default habit.
+`CARRY_DEPTH_ADMIT=0` restores the flat floor exactly.
+
+Three things that are the difference between a gate and a gesture:
+* **THE CENSUS AND THE ENTRY PATH SHARE ONE DECISION.** `_depth_ok` is memoised
+  per loop and handed to both. Two probes would be two REST reads and — worse —
+  two chances to disagree about the same coin, which is the drift `scan_census`'s
+  own contract forbids. `depth_admitted` is a SUB-COUNT, never a bucket: the
+  partition still sums to `scanned`.
+* **THE PROBE NEVER FIRES ON A COIN WHOSE DECISION IT CANNOT CHANGE.** Only a
+  coin already hot, already persistent and already class-admitted but below the
+  floor — the smallest set that matters, which is also what bounds the REST
+  cost, under a per-loop budget that fails closed when spent.
+* **THE LEVER SHIPS WITH ITS OWN RECEIPTS.** `depth_scan.payback_h` records
+  every probe, **admitted AND refused**, and `audit_lever_authority` gains the
+  FIRST `QUANTITIES` spec on the `lighter-books` lane. That guard's header warns
+  that *"a saturated bare run is how a genuinely inert new cage arrives
+  invisibly"* — a new cage nobody can profile would have been exactly that.
+  Recording refusals is the load-bearing half: a bound profiled only on what it
+  admitted sees a distribution already cut at the bound, so every re-measure
+  agrees with wherever the bound happens to sit and the lever can never move on
+  evidence. It reads UNMEASURED today, pending accrual, which is honest.
+
+Real money cannot reach any of this: `funding_carry_bot.main()` refuses every
+mode but `lighter_shadow`, and the live funding floors are `{xp,live}.funding.min_vol`
+in a different file. Asserted, not asserted-in-prose.
+
+### THE OTHER INSTRUMENT — `scripts/study_stop_reclaim.py`, and what it REFUSED
+
+On 2026-07-13 the family book's counter-trend stop went 2.0x → 3.5x ATR on one
+measurement: *"the 2.0x stop fired on noise, 77-89% of stop-outs reclaimed entry
+within 24h."* That was a real win-more move and it was **never asked of any
+other stop in the fleet.** Now it is, in one command, for every book: for each
+stop-shaped exit, did price come back through the ENTRY within H hours — against
+a **same-coin random-start placebo** (I6), because on a volatile tape some
+fraction of any level is revisited for free and a bare reclaim rate means
+nothing. Fleet-wide, 24h, against Lighter's own candles:
+
+| book / tag | n | usd | reclaim | placebo | excess | held @24h |
+|---|---|---|---|---|---|---|
+| taker `long-breakoutup_trail` | 13 | −9.59 | 77% | 41% | **+36pp** | **+3.81%** |
+| **taker-LIVE** `short-divergence_sl` | 22 | −9.48 | 59% | 31% | **+28pp** | **+2.10%** |
+| pm-albanese `short-trend_sl` | 9 | −4.03 | 67% | 45% | +22pp | +1.35% |
+| pm-abbott `short-burst_sl` | 27 | −5.47 | 89% | 69% | +20pp | +1.95% |
+| **georgia `long-trend-breakout_...`** | **43** | **−17.11** | **74%** | **75%** | **−1pp** | +0.22% |
+| book-douglas `short-impulse_sl` | 16 | −25.08 | 56% | 54% | +3pp | **−4.96%** |
+| band-garrett `short_stop` | 4 | −9.92 | 0% | 0% | +0pp | −0.72% |
+
+**The bottom three rows are the point.** Georgia's trend-breakout stop is the
+single biggest stop-loss line in the shadow fleet — 66 exits, −$17.11, against
++$26.67 of ROI wins on the same signal — and it is **doing its job**: its reclaim
+rate is exactly what the tape gives away for free. The P&L table alone would have
+sold that widening; the control group killed it. Same for Douglas, whose stopped
+positions are **−4.96% worse** 24h later, and Garrett, whose stops never reclaim
+at all. **Three stops that look like cages in the ledger and are not.**
+
+### AND TWO MORE REFUSALS, on the one that DID look like a cage
+
+The taker's `breakoutup` trail is the fleet's strongest reclaim signal, and
+`TT_BRK_TRAIL`/`TT_BRK_SL` are **bare env literals with no registry entry** — the
+exit binding the taker's best long lens is unreachable by the growth rail (I18,
+still open, recorded here rather than fixed blind). `scripts/study_trail_sweep.py`
+prices it against the same tape, with the `(gx)` calibration gate:
+
+1. **The trail widening is WITHHELD.** The harness overstates the shipped rule by
+   **+0.508pp** against a ±0.5pp tolerance, and the entire trail effect across
+   6%→OFF is **~0.10pp**. The error exceeds the finding. Not shipped.
+2. **The clock widening is WITHHELD too, and by a second, independent test.**
+   The sweep exposed that **23–32 of 37 exits are the clock, not the trail** —
+   the trend exit has no TP cap, a wide stop and a trail, every component saying
+   *let it run*, and then inherits the mean-reversion arm's `MAX_HOLD_H`. The
+   grid looked emphatic (48h +1.42%/trade → 96h +2.20% → 168h +3.04%, monotone
+   under BOTH within-bar conventions, with `sl` count flat at 2 the whole way).
+   **Leave-one-symbol-out collapses it: without HYPE the 48h→96h gain falls from
+   +0.78pp to +0.07pp.** One coin is the finding. Not shipped.
+
+A refusal with evidence satisfies the growth rule; a widening that skips the gate
+is a step back in a growth costume. Three of them here, each with the number that
+killed it — and the instruments stay, so the next candidate costs one command
+instead of a session.
+
+### CARRIED
+
+* `taker.brk_trail` / `taker.brk_sl` / the breakout arm's clock are unregistered
+  (I18). The trend exit should have its own `MAX_HOLD_H` separate from the
+  reversion arm's — a pure refactor with no behaviour change — so the tuner can
+  price them through the real replay. Not done here: the two measurements above
+  refused the VALUES, and registering a knob is worth doing on its own merits,
+  not as a consolation.
+* 🎫 the LIVE taker's `short-divergence_sl` reads +28pp reclaim excess and
+  **+2.10% held at 24h over n=22** on real money. Real-money row: measured and
+  handed over, not touched.
+* Georgia is **5 of 6 bars, failing only `t` (1.11 < 2.0)** — the fleet's closest
+  book to the gate. Its stop is not the leak; where its `t` comes from is the
+  next question worth a session.
+
 ## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
 
 [Renumbered (sd) -> (se): main took (sd) for the nav-cook leverage entry while

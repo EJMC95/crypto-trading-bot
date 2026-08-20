@@ -486,6 +486,33 @@ LEVERS = {
         "kind": "float", "lo": 1e6, "hi": 2e6, "lane": "lighter-books",
         "note": "Yield Harvester 24h $ turnover floor; env default 1e6 since (pr)",
         "env_default": 1000000.0, "step": -250000.0},
+    "carry.payback_max_h": {
+        # [2026-08-20 (sf)] THE OTHER HALF OF THE LIQUIDITY GATE, and the only
+        # one that can OPEN this book. `carry.min_vol`'s cage is one-sided in
+        # the TIGHTEN direction (default sits at `lo`), so after (pr) the rail
+        # had no lever anywhere that could widen 🌾 carry's intake — the fleet's
+        # best-evidenced book, sitting at 0 of 12 slots with `eligible: 0` of
+        # 228 scanned. That is I18 in its purest form: every reachable motion
+        # restricted a book whose problem was that it could not find a trade.
+        #
+        # WHAT IT GATES. A coin below the turnover floor is admitted only if
+        # the LIVE book can fill this book's clip and the funding repays the
+        # MEASURED round trip within this many hours (`depth_admits`). It is a
+        # bound on a payback horizon, not on volume, so it is denominated in
+        # the same units as the decision — unlike turnover, which measured
+        # 2026-08-20 as close to orthogonal to fill cost at an $80 clip.
+        #
+        # CAGE. `lo` 6h is roughly the fastest payback the venue has ever
+        # offered (UNITREE at 1162% APR repays 34.8bps in 2.6h, so even `lo`
+        # admits the extremes); `hi` 168h is a QUARTER of the 336h max hold —
+        # deliberately far short of it, because a carry that needs most of its
+        # maximum life just to break even has no margin for the rate decaying,
+        # which is the thing carries actually do. Step walks UP a notch at a
+        # time, each one replay-gated like every other lever on this lane.
+        "kind": "float", "lo": 6.0, "hi": 168.0, "lane": "lighter-books",
+        "note": ("Yield Harvester max payback horizon (h) for a sub-floor "
+                 "coin admitted on MEASURED book depth; env default 48"),
+        "env_default": 48.0, "step": 12.0},
     "fundspread.k": {
         # measured AT its cap: 10 open = exactly K=5 x 2 legs.
         # [2026-08-04] default 8 -> 5: the (fz) widening reverted per its own
