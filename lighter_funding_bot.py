@@ -767,7 +767,8 @@ def entry_admission(coin, src, is_short, apr, st):
     return "open", None
 
 
-def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None, entry_apr=None):
+def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None, entry_apr=None,
+                brain_mult=1.0):
     """The position's ENTRY receipt, pure — the meta dict every exit,
     grader and lever audit reads.
 
@@ -785,6 +786,11 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None, entry_apr=None):
     """
     return {"is_short": is_short, "entry": px, "opened_ts": now_ts,
             "accrued": 0.0, "clip": clip, "src": src,
+            # [2026-08-20 (so)] THE BRAIN SCALE IN FORCE AT ENTRY. `clip`
+            # above is base x conviction x brain and is therefore
+            # unattributable on its own — the same reason `bars` records the
+            # ENTRY-time levers rather than the close-time ones.
+            "brain_mult": brain_mult,
             # [2026-08-03 (ir)] HOW LONG THE COIN HAD BEEN HOT AT ENTRY.
             # PERSIST_H (4h) is the entry gate, and until now the ledger
             # recorded the BAR but never the OBSERVATION — so "should the
@@ -2993,6 +2999,55 @@ def main():
                 if px is None:
                     continue
                 clip = order_usd * conviction_mult(apr)   # Lever 2: dark default -> order_usd
+                # [2026-08-20 (so)] THE BRAIN SIZES THIS ENTRY — and this is
+                # the FIRST real-money book to read it. Eamon: "Implement into
+                # live and other bots without it."
+                #
+                # WHY IT IS SAFE, stated where a future reader will look:
+                #   * It returns a NUMBER. Every senior rail is downstream and
+                #     untouched — the notional cap two lines below sees THIS
+                #     clip (not the flat one), the ruin gate sees it, the kill
+                #     switch, the daily-loss halt and SafetyRails' operator-
+                #     owned caps are all unchanged. The multiplier proposes;
+                #     the rails dispose.
+                #   * It is evidence-gated at the source: bot_learn publishes a
+                #     mult only on >=30 era closes held for >=3 consecutive
+                #     runs, and fleet_bus clamps whatever arrives.
+                #   * It is fail-safe: a dark, stale or junk brain is 1.0.
+                #   * It does not move the (hm) era clock — a clip change is
+                #     (hc) ordinary tuning and per-trade % is clip-invariant,
+                #     which is also why the experiment judge's paired bar (a
+                #     per-trade percentage comparison) is unaffected.
+                # AT SHIP IT CHANGES NOTHING on this book, and that is the
+                # honest way to land it: the brain has no published opinion on
+                # either Farmer arm today, so the first trade this resizes will
+                # be one the brain has earned the right to resize.
+                #
+                # VARIANTS ARE EXCLUDED, for the (nb) reason exactly: 🛢️
+                # Garrett exists to validate a study cell measured AT $25
+                # clips, and a capital scale that quarter-sized it once already
+                # made that dollar claim unreproducible. env-only config means
+                # env-only SIZE too.
+                #
+                # THE KEY IS `<side>-funding`, NOT `<side>`, AND THAT IS NOT A
+                # STYLE CHOICE. This book is one of only two in the fleet that
+                # stamps the ledger's `tag` COLUMN explicitly ((bz), so the
+                # brain could form an opinion on the largest real-money book at
+                # all) — and `bot_pnl_store.fetch_paper_trades` prefers a
+                # stored tag over the reason prefix ("a stored tag is richer
+                # than the reason prefix: 'long-funding' beats 'long'"). So the
+                # brain buckets these closes under `long-funding` while the
+                # reason alone would say `long`. Looking the mult up under
+                # `long` would have returned 1.0 forever, silently, on the
+                # fleet's real money — the registered-but-inert failure in the
+                # one place it is most expensive. Caught by reading the
+                # publisher, not the consumer.
+                bmult = 1.0
+                _clip_prebrain = clip
+                if not VARIANT and fleet_bus is not None:
+                    clip, bmult = fleet_bus.brain_clip(
+                        bot_id,
+                        "short-funding" if is_short else "long-funding", clip)
                 size = round(clip / px, 6)
                 if not dry_run:
                     # [2026-07-15 AUDIT FIX v2] real deployed notional (held at
@@ -3001,9 +3056,55 @@ def main():
                     open_ntl = _open_notional(pos, meta, open_now, order_usd)
                     # cap check sees the CONVICTION clip, not the flat one — a
                     # bigger clip must be admitted against the cap it will fill.
+                    #
+                    # [2026-08-20 (sp)] THE RAIL TRIMS THE BRAIN'S INCREASE
+                    # RATHER THAN REFUSING THE TRADE — and this is a CORRECTION
+                    # of what (so) claimed one commit earlier. That entry said
+                    # "the multiplier proposes; the rails dispose", meaning the
+                    # cap would harmlessly refuse an over-size clip. It does
+                    # not: `notional_ok` is a BOOLEAN, so the `continue` below
+                    # discards the WHOLE CANDIDATE, not the excess.
+                    #
+                    # MEASURED on the shipped live config (order_usd $37.50,
+                    # cap $150, conviction OFF): a brain rung of 4.5 asks for
+                    # $168.75 and 6.7 asks for $251.25 — both over the cap FROM
+                    # AN EMPTY BOOK. Every ranked candidate would take this
+                    # `continue`, every loop, forever. **The brain rewarding
+                    # this book for its evidence would have stopped it trading
+                    # altogether**, logging one skip line per coin and nothing
+                    # else. A rail that turns "size this down" into "never
+                    # trade again" is not a safety property, and the direction
+                    # of the failure — a book silenced by its own good grade —
+                    # is the worst one available.
+                    #
+                    # The trim NEVER goes below the pre-brain clip, so with the
+                    # brain neutral, reducing, dark or stale this block is
+                    # byte-identical to what it was: an un-scaled clip that
+                    # does not fit is still refused, exactly as before. The
+                    # operator's cap is untouched and still senior — it decides
+                    # HOW MUCH; it no longer decides WHETHER.
                     if not ctx.rails.notional_ok(open_ntl, clip):
-                        log.info("%s NOTIONAL_CAP_SKIP", coin)
-                        continue
+                        _room = max(0.0, float(ctx.rails.max_notional or 0.0)
+                                    - float(open_ntl))
+                        if clip > _clip_prebrain and _room >= _clip_prebrain:
+                            _trimmed = min(clip, _room)
+                            log.info("%s BRAIN_CLIP_TRIMMED $%.2f -> $%.2f "
+                                     "(cap $%s, deployed $%.2f)",
+                                     coin, clip, _trimmed,
+                                     ctx.rails.max_notional, open_ntl)
+                            clip = _trimmed
+                            bmult = (clip / _clip_prebrain
+                                     if _clip_prebrain else bmult)
+                            size = round(clip / px, 6)
+                        else:
+                            log.info("%s NOTIONAL_CAP_SKIP", coin)
+                            continue
+                        if not ctx.rails.notional_ok(open_ntl, clip):
+                            # belt and braces: the trim is derived from the
+                            # rail's own numbers, so this cannot fire — and if
+                            # it ever does, the rail wins, not the arithmetic.
+                            log.info("%s NOTIONAL_CAP_SKIP (post-trim)", coin)
+                            continue
                     # [2026-08-19 (qz)] THE RUIN GATE. The venue publishes the
                     # liquidation price of every position and this loop has
                     # read it since (no); until now nothing REFUSED on it, so
@@ -3067,6 +3168,11 @@ def main():
                 # contract (see entry_stamp's docstring for the history).
                 meta[coin] = entry_stamp(
                     is_short, px, t0, clip, src,
+                    # [(so)] I22 receipt: `clip` is the product of the base,
+                    # the conviction mult and the brain's, and a single number
+                    # cannot say which moved. `conv_mult` is already recorded
+                    # on the order row; this is its sibling.
+                    brain_mult=round(bmult, 4),
                     # [(ir)] the observation behind the PERSIST_H bar. `t0`
                     # default => 0.0 for a coin with no clock (never negative,
                     # never a guess); the gate above has already required this
@@ -3099,7 +3205,26 @@ def main():
                 try:
                     raw = {"apr": round(apr, 3), "spread_bps": round(spread_bps, 1),
                            "leg": "open", "mctx": _mctx_slice(_mctx, coin),
-                           "conv_mult": round(clip / order_usd, 3) if order_usd else 1.0,
+                           # [2026-08-20 (sp)] CONVICTION AND THE BRAIN ARE
+                           # RECORDED SEPARATELY. This was `clip / order_usd`,
+                           # which after (so) is conviction x brain x any trim
+                           # — so on the shipped live config (conviction OFF,
+                           # so the true conv_mult is 1.000 on every entry) a
+                           # brain mult of 3.0 would have written
+                           # `conv_mult: 3.0` onto REAL-MONEY order rows. The
+                           # census that measures CONVICTION_HI's authority
+                           # (`conviction.hi` / `_rx_conv`) and any future
+                           # study of that lever would then read a conviction
+                           # distribution that was entirely the brain's. A
+                           # receipt that attributes one organ's move to
+                           # another is worse than no receipt (I23).
+                           "conv_mult": round(conviction_mult(apr), 3),
+                           "brain_mult": round(bmult, 4),
+                           # the product actually sent, so nothing has to be
+                           # reconstructed by multiplying the two back
+                           # together and hoping no trim intervened.
+                           "clip_mult": (round(clip / order_usd, 3)
+                                         if order_usd else 1.0),
                            "slope": {"apr_prev": (round(_slope_prev, 4)
                                                   if _slope_prev is not None else None),
                                      "lookback_h": SLOPE_LOOKBACK_H,

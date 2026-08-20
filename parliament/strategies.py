@@ -399,8 +399,16 @@ class PMBot:
         # expand mults in all six PM books on the very day the operator
         # mandated the widening. Cap at the bus's own documented consumer
         # ceiling (1.5 — fleet_bus.MULT_CEIL), floor unchanged.
+        # [2026-08-20 (sn)] BOTH ends come from the bus now. The ceiling was
+        # already read from it; the floor was a hardcoded 0.3, so when the
+        # range went to 6.7x EITHER WAY (Eamon's ask) these books could have
+        # expressed the raise and not the matching cut — an asymmetry that
+        # silently makes the brain's protective side weaker here than
+        # everywhere else. `MAX_NOTIONAL` below still re-checks the REAL
+        # multiplied clip, which is what keeps the wider ceiling safe here.
         _ceil = getattr(fleet_bus, "MULT_CEIL", 1.5) if fleet_bus else 1.5
-        usd = ORDER_USD * max(0.3, min(_ceil, stake_mult))
+        _floor = getattr(fleet_bus, "MULT_FLOOR", 0.3) if fleet_bus else 0.3
+        usd = ORDER_USD * max(_floor, min(_ceil, stake_mult))
         # [2026-07-28 AUDIT FIX] re-check the cap with the REAL clip:
         # _entry_blocked gated on flat ORDER_USD but the brain mult can size
         # this entry up to 1.5x — the exact never-count*current-clip class

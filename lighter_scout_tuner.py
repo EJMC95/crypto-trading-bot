@@ -151,7 +151,19 @@ SWEEP_TP = [0.03, 0.04, 0.05, 0.06]
 # (lighter_ticket_taker.py:171), and simply never proposes a different one.
 # Restore the grid with TUNER_SWEEP_SL only if a tail-bearing tape exists.
 SWEEP_SL = [float(os.environ.get("TUNER_SWEEP_SL", "-0.03"))]
-SWEEP_HOLD = [24.0, 48.0, 72.0]
+# [2026-08-20 (sk)] THE 24h RUNG IS GONE, and its removal is the durable half
+# of the breakoutup ratchet fix rather than a bounds tidy-up. This sweep's
+# replay CANNOT FILL breakoutup (`lighter_ticket_replay.py:206` refuses every
+# breakout entry), so on that lens a candidate's delta is exactly $0.00 —
+# restrict passes `not_worse` for free while expand can never clear
+# MARGIN_HALF. A rung BELOW the module default therefore had a one-way path
+# into the live lever, and it took it: measured on the bus 20-Aug,
+# `taker.max_hold_h` sat at 24.0, set by this tuner from an event-sentinel
+# proposal, on the book's ONLY living lens. The registry cage now stops at the
+# default (lo 48.0) so the rung could not enact anyway; deleting it here means
+# the sweep stops SPENDING a replay slot on a candidate the cage will refuse,
+# and stops advertising a value this file may not have.
+SWEEP_HOLD = [48.0, 72.0]
 
 # [2026-07-21 ORGAN PROPOSALS] levers this tuner will consider when another
 # organ proposes them (fleet_proposals), with each attr's TIGHTER direction —

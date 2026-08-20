@@ -57,10 +57,23 @@ own stake_mult and the board's live.clip_scale lever, capped by the hard
 notional rail. Protections' drawdown denominator is the live baseline, not
 the shadow's $1,000 (20% of a paper grand would never bind on a $63 book).
 
-WHAT THE LIVE ARM DELIBERATELY DOES NOT DO: read brain stake-mults (doctrine:
-no live bot sizes off the brain), read fleet_allocation (real money never
-reads it — AST-pinned in tests/autonomy/test_allocation_consumer.py), or
-consume any tuning lane of its own (env-only config, the Garrett/Kiyosaki
+[2026-08-20 (so)] THE LIVE ARM NOW SIZES OFF THE BRAIN. Eamon: "Implement
+into live and other bots without it." This paragraph used to open "WHAT THE
+LIVE ARM DELIBERATELY DOES NOT DO: read brain stake-mults (doctrine: no live
+bot sizes off the brain)", and that clause is CORRECTED IN PLACE per I12
+rather than left standing as history — a doctrine line that no longer
+describes the system is a defect, and this one described a training wheel.
+What replaces it is a rails argument, not a weaker rule: the mult returns a
+NUMBER, and `rails.notional_ok` below still refuses it, the kill switch still
+kills, the daily-loss halt still halts and SafetyRails' caps remain
+operator-only. The multiplier proposes; the rails dispose. It reads BOTH rows
+(live + its shadow control arm) under `ledger_tag`, exactly as the regime gate
+five lines from the sizing site already did — an arm with n=3 of its own
+cannot earn an opinion, and its designed control arm can (I14).
+
+WHAT THE LIVE ARM STILL DELIBERATELY DOES NOT DO: read fleet_allocation (real
+money never reads it — AST-pinned in tests/autonomy/test_allocation_consumer.py)
+or consume any tuning lane of its own (env-only config, the Garrett/Kiyosaki
 rule — a single-policy (hm) clock by construction). Restrict-only reads it
 KEEPS: the fleet long-budget veto + per-symbol cap (it is a directional LONG
 book), the brain's regime entry gate (restrict-only, fail-open), and the
@@ -80,7 +93,8 @@ import fleet_tuning as tuning
 from lighter_family_bot import (
     STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE,
     regime_inputs_for, btc_regime_up, btc_tide_up, noncrypto_regimes,
-    noncrypto_entry_blocked, brain_entry_gated, ledger_reason, ledger_tag,
+    noncrypto_entry_blocked, brain_entry_gated, brain_clip_for,
+    ledger_reason, ledger_tag,
     symcap_state, symcap_blocked, _interval_ms, MOMO_TIDE_GATE,
     NONCRYPTO_EFFECTIVE,
 )
@@ -429,6 +443,7 @@ def main(_ctx=None, once=False):
         locked_until = 0.0
         fleet_long_veto = False
         brain_gated_tags = []
+        brain_expand_refused = brain_floored = 0
         coin_vetoed = {}
         live_scale = 1.0
 
@@ -504,6 +519,16 @@ def main(_ctx=None, once=False):
                         if locked_until else None),
                     "fleet_long_veto": fleet_long_veto,
                     "brain_gated": brain_gated_tags,
+                    # [(sp)] the brain's two REFUSED sizings. `expand_refused`
+                    # counts entries where the brain wanted this REAL-MONEY
+                    # book bigger and was held at 1.0x (restrict-only, see the
+                    # entry site); `floored` counts reduces that would have
+                    # fallen under MIN_CLIP_USD and were floored to it instead
+                    # of silently skipping the trade. Both are ZERO on a
+                    # neutral brain, so a non-zero here always means something
+                    # happened.
+                    "brain_expand_refused": brain_expand_refused,
+                    "brain_floored": brain_floored,
                     "coin_veto": {c: coin_vetoed[c]
                                   for c in sorted(coin_vetoed)},
                     "live_clip_scale": live_scale,
@@ -595,7 +620,11 @@ def main(_ctx=None, once=False):
                     entry_price=entry or None, exit_price=exit_px or None,
                     side="long", shadow=False,
                     extra={"policy": _policy(), "fill_measured": measured,
-                           "fill_src": why, "clip": m.get("clip")})
+                           "fill_src": why, "clip": m.get("clip"),
+                           # [(so)] I22 receipt: the brain scale this REAL
+                           # stake was sized at. `clip` is base x strategy
+                           # stake_mult x brain and cannot be decomposed.
+                           "brain_mult": m.get("brain_mult")})
             except Exception:  # noqa: BLE001
                 pass
 
@@ -740,6 +769,11 @@ def main(_ctx=None, once=False):
 
         locked_until = entries_locked(closed_win, t0, baseline)
         brain_gated_tags = []
+        # [(sp)] the two brain-sizing refusals, PUBLISHED. Neither is silent:
+        # a refused expand and a floored reduce are both decisions this book
+        # made about real money, and a decision nobody can see is the class
+        # (so) was written to close.
+        brain_expand_refused = brain_floored = 0
         cycle_admitted = 0
 
         # ---- manage venue truth: every held position, every cycle ----------
@@ -900,6 +934,52 @@ def main(_ctx=None, once=False):
                     brain_gated_tags.append(f"{sym}:{ledger_tag(tag)}")
                     continue
                 stake = clip * S.stake_mult(tag, bars)
+                # [2026-08-20 (so)] ...and the brain's per-tag scale on top,
+                # across BOTH rows — the same pair, the same `ledger_tag`
+                # identity and the same fail-safe as the regime gate above, so
+                # a gate and a size can never disagree about which bucket this
+                # trade is in.
+                #
+                # [2026-08-20 (sp)] TWO CORRECTIONS, both to (so), both found
+                # by driving the arithmetic against this book's REAL numbers
+                # rather than reading the code.
+                #
+                # (1) **RESTRICT-ONLY, like every other lever that reaches this
+                # book.** This module's own `_clip_scale_now` docstring states
+                # the invariant: *"with clip = equity/max_open and stake_mult
+                # <= 1.0, gross notional can never exceed account equity — the
+                # book is 1.00x by construction and no lever reaches past it."*
+                # (so) broke that silently. At the modelled live equity (~$63,
+                # clip ~$15.70, cap $200) a brain rung of 6.39 puts TWO slots
+                # at $99.98 = $199.96 gross = **3.19x equity** on a book
+                # documented as 1.00x, with a -10% stop underneath it. Expanding
+                # a real-money book past its own equity is a LEVERAGE decision,
+                # and I22 is explicit that leverage adds no decidability and is
+                # admissible only as the output of a measured vol target, which
+                # this book does not have. So the brain may SHRINK Avo and not
+                # grow it — the same `min(1.0, ...)` shape as `live.clip_scale`,
+                # and the same reason. Its expand side is an operator/gate
+                # decision, not a bus read. 💸 the Farmer keeps BOTH directions:
+                # it has a real notional cap and, since (sp), a rail that TRIMS.
+                #
+                # (2) **A REDUCE MUST MAKE THE BOOK SMALLER, NOT RETIRE IT.**
+                # The floor below is $5 against a $15.70 clip, so any rung at
+                # or under 1/3.2 sent every entry to `continue` — the deep
+                # rungs 1/4.5 ($3.49) and 1/6.7 ($2.34) BOTH do. That is a
+                # 100% halt: zero entries for as long as the brain holds the
+                # reduce, while the row keeps publishing `status: online` and
+                # `clip_usd: 15.70`. Byte-identical to "no signals today", and
+                # self-locking — a book that stops trading stops producing the
+                # closes that would lift the reduce. Now it floors at
+                # MIN_CLIP_USD, the smallest size the venue will take, and SAYS
+                # SO on the row.
+                stake, bmult = brain_clip_for((BOT_ROW, SHADOW_ROW), tag, stake)
+                if bmult > 1.0:
+                    stake, bmult = clip * S.stake_mult(tag, bars), 1.0
+                    brain_expand_refused += 1
+                if stake < MIN_CLIP_USD <= clip * S.stake_mult(tag, bars):
+                    brain_floored += 1
+                    stake = MIN_CLIP_USD
                 if stake < MIN_CLIP_USD:
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
@@ -930,6 +1010,10 @@ def main(_ctx=None, once=False):
                     pass
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
+                             # [(so)] I22 receipt, carried on the durable
+                             # position record so it survives a restart and
+                             # reaches the close row.
+                             "brain_mult": round(bmult, 4),
                              "clip": round(stake, 2), "last_px": px}
                 pos[sym] = {"size": size, "entry": fpx or px}
                 cycle_admitted += 1
@@ -937,6 +1021,7 @@ def main(_ctx=None, once=False):
                 cycle_sym[base] = cycle_sym.get(base, 0) + 1
                 _PRINT(f"[avo-live] {iso(t_now)} OPEN {sym} long "
                        f"${stake:.2f} @ {fpx or px:.6g} [{tag}]"
+                       f"{'' if bmult == 1.0 else f' brain {bmult:.2f}x'}"
                        f"{'' if meas else ' (entry UNMEASURED)'}")
 
         # ---- publish + persist ---------------------------------------------

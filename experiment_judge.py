@@ -118,6 +118,64 @@ CANDIDATES = [
     # to the candidate the venue's own tape actually supports. Reordering is
     # restrict-safe: no bar moves, no lever changes, the paired bar still
     # gates every promotion.
+    # [2026-08-20 (sk)] max-hold-24 JUMPS THE QUEUE, and it is the
+    # best-evidenced candidate this queue has ever carried.
+    #
+    # THE MEASUREMENT, on 328 ledger closes (279 priced, 14-Jul->19-Aug)
+    # replayed against Lighter's own 15m candles. CALIBRATION GATE PASSED:
+    # the harness reproduces 27/27 take-profit closes and 238/243 (97.9%) of
+    # the non-barrier ones. Return by realised hold, pooled:
+    #     0-3h   +0.285%  (n=85, t=+2.30)      24-48h  -1.797%  (n=20, t=-1.89)
+    #     3-6h   +0.481%  (n=37, t=+2.59)      48-73h  -1.797%  (n=22, t=-3.07)
+    #     6-12h  +0.413%  (n=67, t=+1.97)
+    #     12-24h +0.569%  (n=48, t=+1.24)
+    # **The book's returns invert at 24h.** The cap sweep, computed SEPARATELY
+    # per arm and peaking at 24h on BOTH — a single interior peak bracketed by
+    # worse cells on both sides, not a grid edge:
+    #     LIVE   (n=91)  72h +0.113 (t=+0.81, halves +15.0/-4.7)
+    #                 -> 24h +0.217 (t=+1.76, halves +15.8/+4.0)
+    #     SHADOW (n=159) 72h -0.054 (t=-0.28, halves +18.3/-26.9)
+    #                 -> 24h +0.270 (t=+1.59, halves +36.4/+6.5)
+    # Pooled delta +0.1924pp; trade bootstrap 95% CI [+0.064, +0.325],
+    # P(delta<=0)=0.0017; symbol-cluster bootstrap CI [+0.049, +0.468].
+    # Realised-path maxDD **41.99pp -> 14.52pp**. The gain is spread across
+    # every exit family, not one.
+    #
+    # AND IT IS NOT THE TAPE. Two same-coin/same-side placebos: an
+    # unconditioned random-start truncation gains +0.230pp where this book's
+    # own gains +1.278pp; the rigorous one — synthetic positions CONDITIONED
+    # IDENTICALLY (same barriers, required to survive 24h untouched, so the
+    # survivorship selection is matched) — returns -0.299% on the forward leg
+    # against this book's -1.278%. Excess -0.979pp, t=-2.44, P(excess>=0)=0.011.
+    # That kills the martingale/conditioning explanation. A random short on
+    # these coins earns -0.07%/24h, so this is not the (hm) free-short bonus
+    # either. Jackknife by coin: no coin carries it (t=+2.33..+3.73 across all
+    # eight drops).
+    #
+    # THE PRICE, DECLARED. `BRACKET_SIG_FIELDS` includes `max_hold_h`, so a
+    # promotion RESETS the 30-day era on both arms and costs the live row 26.6
+    # of the 30 days it has banked. Cheap here, and checked: the live row's own
+    # horizon organ says its t bar needs ~1208d at the current trajectory, so
+    # the window bar was never binding — and the cap is precisely what changes
+    # the trajectory (t +0.82 -> +1.76 live, -0.25 -> +1.59 shadow, and the
+    # halves bar flips FAIL->PASS on both arms). Forfeited tail accrual is
+    # netted pro-rata into every number above (mean +0.097pp/affected trade).
+    # Roughly one extra round trip per truncated position, ~0.012pp against a
+    # +0.19pp gain. Turnover is NOT the win: the book runs 4/6 and 3/5 slots
+    # against `eligible: 2`, so a shorter hold buys no extra entries today.
+    #
+    # WHY IT GOES FIRST. `slope-gate-off` has been `phase: running` with
+    # `promoted_ts: null` for five weeks behind a paired bar that was
+    # structurally biased against it (see `match_policy` — the shadow arm's
+    # explore bucket was a 0.161pp handicap against a 0.50pp margin, now
+    # fixed). This candidate is the only one in the queue whose evidence
+    # includes a conditioned placebo, a calibration gate and two bootstraps,
+    # and it is the only one that moves the DRAWDOWN bar. 24.0 is the cage
+    # floor of `xp.funding.max_hold_h` ([24.0, 96.0]), so no cage change is
+    # needed. No flap risk: `pos_bars()` prices max_hold at ENTRY, so it
+    # reaches only new positions. The judge remains the sole writer of
+    # `live.funding.*` — nothing here touches the live arm.
+    {"name": "max-hold-24",     "levers": {"xp.funding.max_hold_h": 24.0}},
     {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
     # [2026-08-13 (ln) ORDER SWAPPED — min-vol-1e5 now runs BEFORE
     # min-vol-2e6, by operator directive ("fix all of the above and ...
@@ -362,7 +420,8 @@ def ran_candidate(row, levers):
     return True
 
 
-def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
+def arm_trades(rows, bot, start_ts, end_ts=None, levers=None,
+               keep_srcs=None):
     """[(close_ts, pnl_pct)] for one arm inside the window, oldest first.
 
     levers=None keeps the historical behaviour (time-window attribution only) —
@@ -376,6 +435,11 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
             continue
         if levers is not None and not ran_candidate(r, levers):
             continue
+        # [(sk)] entry-policy match — see `match_policy`. Applied here so the
+        # decision is made while the ROW is in hand; a caller filtering the
+        # returned (ts, pct) pairs cannot, because close_ts is not unique.
+        if keep_srcs is not None and _src_of(r) not in keep_srcs:
+            continue
         try:
             ts = parse_ts(r.get("close_ts"))
         except Exception:
@@ -384,6 +448,96 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
             out.append((ts, float(r["profit_ratio"])))
     out.sort()
     return out
+
+
+def _src_of(row):
+    """The ENTRY POLICY that produced a close, or None when unstamped."""
+    x = row.get("extra") if isinstance(row, dict) else None
+    if isinstance(x, str):
+        try:
+            x = json.loads(x)
+        except Exception:                                        # noqa: BLE001
+            x = None
+    v = (x or {}).get("src") if isinstance(x, dict) else None
+    return str(v) if isinstance(v, str) and v else None
+
+
+def policy_srcs(rows, bot, start_ts, end_ts=None):
+    """The set of entry policies one arm actually ran in the window.
+
+    None (not an empty set) when the arm stamps nothing — "I cannot tell" and
+    "the arm ran no policies" are different states, and only the first must
+    disable the match.
+    """
+    seen, any_row = set(), False
+    for r in rows or []:
+        if str(r.get("bot")) != bot or r.get("profit_ratio") is None:
+            continue
+        try:
+            ts = parse_ts(r.get("close_ts"))
+        except Exception:                                        # noqa: BLE001
+            continue
+        if not (ts >= start_ts and (end_ts is None or ts < end_ts)):
+            continue
+        any_row = True
+        sv = _src_of(r)
+        if sv:
+            seen.add(sv)
+    return seen if (seen or not any_row) else None
+
+
+def match_policy(rows, bot, start_ts, end_ts, keep, levers=None):
+    """Restrict one arm to closes whose entry policy the CONTROL also ran.
+    Returns (trades, dropped).
+
+    FILTERS AT THE ROW, deliberately. The first draft joined `arm_trades`'
+    `[(ts, pct)]` back onto the rows by TIMESTAMP, and a fixture caught it
+    within the hour: two closes can share a close_ts — ⚖️ Counterweight closes
+    ten legs in one instant, and even here 3 of 40 on-policy closes were
+    silently dropped because an off-policy row overwrote their key. A join on a
+    non-unique key is not a filter.
+
+    [2026-08-20 (sk)] WHY THE PAIRED BAR NEEDED THIS. The judge's whole job is
+    "did the experiment arm beat the control by MARGIN_PP?", and `arm_trades`
+    gated the experiment arm on the lever RECEIPT alone — proof it ran the
+    candidate's BARS — while saying nothing about which ENTRY POLICY produced
+    the close. The two arms do not run the same one: the shadow twin runs
+    `explore_k=2` (+ scaled conviction) and the live control runs
+    `explore_k=0`, so a third of the experiment arm's closes are a policy the
+    control never runs.
+
+    MEASURED post-28-Jul, the src-stamped era, both arms on one build so no
+    `arm_drift` fires: shadow ALL n=113 mean -0.1711%/trade, of which
+    src=exploit n=74 mean -0.0104% and src=explore n=38 mean **-0.4961%**;
+    live n=73 mean -0.0368% and 72 of its 73 stamped `exploit`. The paired gap
+    the judge computed was **-0.1343pp**; on src-matched subsets it is
+    **+0.0264pp**. The explore bucket was a **0.161pp handicap against a
+    +0.50pp margin** — 32% of the bar, charged to the experiment before it
+    started.
+
+    THIS IS NOT HYPOTHETICAL AND IT IS NOT CHEAP. The judge's ONE completed
+    verdict in five weeks reads `RELEASED-OPERATOR ... 3-variable A/B (shadow
+    ran explore+conviction mid-window)` — the asymmetry already destroyed a
+    candidate — and the growth promoter has been parked on "shadow arm not
+    positive in its own right", which is circular, because explore is what
+    makes it not positive. Zero promotions to real money in five weeks, on the
+    fleet's ONLY designed path to more of it.
+
+    SYMMETRIC, so no guess is made. Both arms are restricted to the SAME src
+    set, which also drops unstamped rows from both rather than assuming an
+    unstamped close was exploit. FAIL-SAFE toward today's behaviour: `keep` of
+    None (the control stamps nothing) filters nothing, and an empty result
+    filters nothing — a bias fix that can silence the judge entirely would be
+    a worse defect than the bias.
+    """
+    everything = arm_trades(rows, bot, start_ts, end_ts, levers=levers)
+    if keep is None:
+        return everything, 0
+    kept = arm_trades(rows, bot, start_ts, end_ts, levers=levers,
+                      keep_srcs=keep)
+    if not kept:
+        return everything, 0
+    return kept, len(everything) - len(kept)
 
 
 def _mean_pct(trades):
@@ -415,10 +569,21 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     min_closes = min_closes or MIN_CLOSES
     live_min = live_min or LIVE_MIN_CLOSES
     margin_pp = MARGIN_PP if margin_pp is None else margin_pp
-    sh = arm_trades(rows, shadow_bot, start_ts, end_ts, levers=cand_levers)
-    lv = arm_trades(rows, live_bot, start_ts, end_ts)
+    _keep0 = policy_srcs(rows, live_bot, start_ts, end_ts)
+    sh, _sh_drop = match_policy(rows, shadow_bot, start_ts, end_ts, _keep0,
+                                levers=cand_levers)
+    lv, _lv_drop = match_policy(rows, live_bot, start_ts, end_ts, _keep0)
+    # [2026-08-20 (sk)] COMPARE LIKE WITH LIKE — see `match_policy`. The
+    # control defines the policy set; the experiment arm is restricted to it,
+    # and so is the control, so the restriction is symmetric and no unstamped
+    # row is guessed at. Published (`policy_match`) rather than silent: a
+    # sample that shrank by a third without saying so is the same class of
+    # defect this fixes.
+    _keep = _keep0
     v = {"promote": False, "n_shadow": len(sh), "n_live": len(lv),
-         "shadow_mean_pct": _mean_pct(sh), "live_mean_pct": _mean_pct(lv)}
+         "shadow_mean_pct": _mean_pct(sh), "live_mean_pct": _mean_pct(lv),
+         "policy_match": {"keep": sorted(_keep) if _keep else None,
+                          "dropped_shadow": _sh_drop, "dropped_live": _lv_drop}}
     # [2026-07-17 ARM DRIFT] The arms are running DIFFERENT CODE, so this
     # comparison contains a code delta and cannot be read as edge. Same class as
     # ARM SKEW below, and checked FIRST: skew asks "is the arm running the
@@ -472,8 +637,20 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     half_sh_min = max(2, min_closes // 2)
     half_lv_min = max(3, live_min // 2)
     for a, b, label in (((start_ts, mid, "h1"), (mid, end_ts, "h2")) if both_halves else ()):
-        sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers)
-        lv_h = arm_trades(rows, live_bot, a, b)
+        # [(sk)] the halves take the SAME policy match as the full window.
+        # Caught by the fix's own fixture: matching only the full window left
+        # the both-halves gate — the doctrine's central noise filter — reading
+        # the biased sample, so a candidate could clear the window bar and be
+        # failed by a half that still counted the control's off-policy closes.
+        # A half-applied bias fix is worse than none: it looks corrected.
+        sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers,
+                          keep_srcs=_keep)
+        lv_h = arm_trades(rows, live_bot, a, b, keep_srcs=_keep)
+        if _keep is not None and not sh_h:
+            # same fail-safe as the full window: never let the match starve a
+            # half into a verdict about missing data
+            sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers)
+            lv_h = arm_trades(rows, live_bot, a, b)
         if len(sh_h) < half_sh_min or len(lv_h) < half_lv_min:
             v[label] = {"shadow_n": len(sh_h), "live_n": len(lv_h)}
             v["why"] = (f"{label} under-powered: shadow {len(sh_h)}/"
@@ -2107,20 +2284,34 @@ def _selftest():
     # now UNREACHABLE at its current mean (~1,152 closes needed), the
     # 7-day de-risking slot costs more than it insures. Operator-directed
     # 13-Aug, executed under the real-money grant; paired bar unchanged.
-    assert names[:5] == ["slope-gate-off", "min-vol-1e5", "min-vol-2e6",
-                         "tp-0.06", "enter-gate-0.105"], names
+    # [2026-08-20 (sk)] max-hold-24 leads. Its prior is the strongest this
+    # queue has carried: a CALIBRATED own-tape replay (27/27 tp, 97.9%
+    # non-barrier reproduced), a single interior peak reproduced INDEPENDENTLY
+    # on both arms, two bootstraps (trade P<=0 = 0.0017; symbol-cluster CI
+    # [+0.049, +0.468]), a coin jackknife that no drop breaks, and — the part
+    # nothing else in the queue has — an IDENTICALLY CONDITIONED placebo
+    # (matched survivors, same barriers, same 24h survival requirement) that
+    # rules out the martingale explanation at P=0.011. It is also the only
+    # candidate that moves the DRAWDOWN bar (realised maxDD 41.99 -> 14.52pp).
+    assert names[:6] == ["max-hold-24", "slope-gate-off", "min-vol-1e5",
+                         "min-vol-2e6", "tp-0.06", "enter-gate-0.105"], names
     # the rule itself, asserted independently of the literal above: every
     # static is ranked by the strength of its recorded prior, strongest first.
-    _PRIOR_RANK = {"slope-gate-off": 0,    # venue-supported ((dp))
-                   "min-vol-1e5": 1,       # calibrated own-tape replay, both
-                                           # halves +ve — strongest DIRECT prior
-                   "min-vol-2e6": 2,       # unrefuted friction-tier prior —
+    _PRIOR_RANK = {"max-hold-24": 0,       # calibrated own-tape replay +
+                                           # CONDITIONED placebo + two
+                                           # bootstraps + coin jackknife, and
+                                           # both arms peak at the same cell
+                                           # independently ((sk))
+                   "slope-gate-off": 1,    # venue-supported ((dp))
+                   "min-vol-1e5": 2,       # calibrated own-tape replay, both
+                                           # halves +ve — strong DIRECT prior
+                   "min-vol-2e6": 3,       # unrefuted friction-tier prior —
                                            # indirect ((ln) swap)
-                   "tp-0.06": 3,           # MUTE — no both-halves-positive tp
-                   "enter-gate-0.105": 4}  # tape prior AGAINST it
-    _ranks = [_PRIOR_RANK[n] for n in names[:5]]
+                   "tp-0.06": 4,           # MUTE — no both-halves-positive tp
+                   "enter-gate-0.105": 5}  # tape prior AGAINST it
+    _ranks = [_PRIOR_RANK[n] for n in names[:6]]
     assert _ranks == sorted(_ranks), \
-        f"statics must run strongest-prior-first ((ju)'s rule): {names[:5]}"
+        f"statics must run strongest-prior-first ((ju)'s rule): {names[:6]}"
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -2135,7 +2326,8 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "min-vol-1e5", "min-vol-2e6", "tp-0.06",
+    assert n2 == ["max-hold-24", "slope-gate-off", "min-vol-1e5",
+                  "min-vol-2e6", "tp-0.06",
                   "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
@@ -2312,22 +2504,18 @@ def _selftest():
     # is (ju)'s rule applied to tp-0.06 as well. Walked one slot at a time so
     # the DRAIN ORDER is pinned, not just the list: this is what actually
     # decides which question the fleet asks next.
-    assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
-    assert next_candidate(pool, ["slope-gate-off"],
-                          None)["name"] == "min-vol-1e5"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5"],
-                          None)["name"] == "min-vol-2e6"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5",
-                                 "min-vol-2e6"],
-                          None)["name"] == "tp-0.06"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5",
-                                 "min-vol-2e6", "tp-0.06"],
-                          None)["name"] == "enter-gate-0.105"
+    # [2026-08-20 (sk)] max-hold-24 drains FIRST — the queue's strongest prior
+    # (see its CANDIDATES note) and the only candidate that moves the drawdown
+    # bar. Walked one slot at a time so the DRAIN ORDER is pinned, not just the
+    # list: this is what actually decides which question the fleet asks next.
+    _drained = []
+    for _expect in ("max-hold-24", "slope-gate-off", "min-vol-1e5",
+                    "min-vol-2e6", "tp-0.06", "enter-gate-0.105"):
+        assert next_candidate(pool, list(_drained), None)["name"] == _expect, \
+            (_drained, _expect)
+        _drained.append(_expect)
     # the statics precede queue proposals by pool construction (statics first)
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
-                                 "min-vol-1e5", "tp-0.06",
-                                 "enter-gate-0.105"],
-                          None)["name"] == "xp-tp-0.05"
+    assert next_candidate(pool, _drained, None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----

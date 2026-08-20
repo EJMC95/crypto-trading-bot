@@ -45,6 +45,13 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import bot_pnl_store as store
+# [2026-08-20 (so)] the brain's sizing accessor. UNGUARDED, deliberately, and
+# the Dockerfile gains the COPY in the same commit: every import in this file
+# is unguarded on purpose (a missing module is a boot crash-loop, not a silent
+# degrade), and `audit_image_imports.py` is what verifies the claim. Both
+# images that carry this file — Dockerfile.tickettaker and Dockerfile.freqtrade
+# — now COPY fleet_bus.py.
+import fleet_bus
 import funding_basis
 from paper_broker import PaperBroker
 # [2026-07-17] The fill read is SHARED with the live Funding Farmer now
@@ -333,7 +340,15 @@ TUNABLE = (("taker.dip_range", "DIP_RANGE"),
            # [2026-07-21] the post-stop cooldown joins the growth rail: the
            # stamp at close reads the module attr, so a lever overlay moves
            # future stamps (never an already-written sl_block entry).
-           ("taker.sl_cooldown_h", "SL_COOLDOWN_H"))
+           ("taker.sl_cooldown_h", "SL_COOLDOWN_H"),
+           # [2026-08-20 (sk)] the breakout arm's TREND exit — see the registry
+           # note. `bull_exit()` reads these as module globals, so the overlay
+           # reaches the routing through the same single owner main() uses,
+           # exactly as the reversion bracket above does. Defined further down
+           # the file than TUNABLE; harmless, because apply_tuning resolves
+           # through globals() at CALL time, and the selftest pins that.
+           ("taker.brk_trail", "BRK_TRAIL"),
+           ("taker.brk_sl", "BRK_SL"))
 
 
 def apply_tuning():
@@ -416,14 +431,30 @@ def fetch_marks_and_funding():
 # PURE DECISION LOGIC (unit-tested offline)
 # ---------------------------------------------------------------------------
 
-def vol_clip(day_range_pct):
+def vol_clip(day_range_pct, risk_usd=None, clip_max=None):
     """Constant-risk clip: RISK_USD / expected adverse move (~half the daily
     range, floored at 0.5%), bounded [CLIP_MIN, CLIP_MAX]. Falls back to
-    CLIP_USD when the book has no range data."""
+    CLIP_USD when the book has no range data.
+
+    [2026-08-20 (sp)] `risk_usd`/`clip_max` exist so the brain's conviction
+    enters this book AS RISK, not as a clip multiplier applied after the fact.
+    (so) multiplied the RESULT, which broke the one property this function
+    exists for: every trade risks the same $1.50, and `CLIP_MAX` is the ceiling
+    that keeps a calm book from taking an oversized position. A post-hoc x6.7
+    bypassed both — worse, because the mult is per-(side, lens) and the clip is
+    per-COIN, the two normalisations FOUGHT: a favoured lens on a wide-range
+    alt got the largest vol_clip AND the largest boost, so the risk-equalising
+    this function does was inverted exactly where it mattered most.
+    Scaling the RISK BUDGET instead is what conviction actually means — risk
+    more on the bucket that has earned it — and the [CLIP_MIN, clip_max] bound
+    still applies afterwards, so the ceiling holds. Defaults keep every other
+    caller (and the replay) byte-identical."""
+    _risk = RISK_USD if risk_usd is None else float(risk_usd)
+    _cmax = CLIP_MAX if clip_max is None else float(clip_max)
     if not day_range_pct or day_range_pct <= 0:
         return CLIP_USD
     adverse = max(day_range_pct / 2.0, 0.5) / 100.0
-    return round(min(CLIP_MAX, max(CLIP_MIN, RISK_USD / adverse)), 2)
+    return round(min(_cmax, max(CLIP_MIN, _risk / adverse)), 2)
 
 
 def book_spread_bps(book):
@@ -1480,6 +1511,15 @@ def _close_extra(m):
     stamped = isinstance(m.get("bars"), dict) and m.get("bars")
     out = {"bars": (m.get("bars") if stamped else entry_bars()),
            "bars_basis": ("entry" if stamped else "close-legacy")}
+    # [2026-08-20 (sk)] the trend exit's own receipts ride the close row. See
+    # the tracking site in main() for why MAXIMUM rather than final. Absent on
+    # a position that never saw a mark (a legacy row, or one closed on its
+    # first cycle), and absent is UNKNOWN — a grader must not read a missing
+    # give_back as zero, which is why these are omitted rather than defaulted.
+    for _k in ("peak_ret", "give_back", "mae_ret", "brain_mult"):
+        _v = m.get(_k)
+        if isinstance(_v, (int, float)) and not isinstance(_v, bool):
+            out[_k] = round(float(_v), 6)
     # [2026-07-29 (fx) POLICY STAMP] The bars stamp records the EXIT bracket.
     # It says nothing about which SIGNALS the bot was allowed to take — and
     # that is the field whose absence caused three separate mis-gradings in one
@@ -2416,6 +2456,25 @@ def main(_ctx=None):
             _ret = (mark / entry - 1.0) * _sgn if entry else 0.0
             if _ret > m.get("peak_ret", 0.0):
                 m["peak_ret"] = _ret
+            # [2026-08-20 (sk)] RECEIPTS FOR THE TREND EXIT'S OWN TWO KNOBS.
+            # `taker.brk_trail` and `taker.brk_sl` became registered levers
+            # today, and neither could ever be PROFILED, because the quantity
+            # each one cuts was tracked in memory and thrown away at close:
+            # the trail fires on GIVE-BACK from the peak, the stop on ADVERSE
+            # EXCURSION, and the ledger recorded neither. A cage nobody can
+            # measure is `audit_lever_authority`'s named failure — and it is
+            # the reason both widenings had to be WITHHELD today rather than
+            # decided: the harness had to reconstruct from hourly candles what
+            # the bot already knew to the loop.
+            #
+            # MAXIMUM, not final, on both: the bar cuts the worst point the
+            # position ever reached, so a distribution of final values would
+            # be the wrong one (and, for the trail, truncated at the bar by
+            # construction — the emission-truncation trap). Observable-only;
+            # `exit_reason` reads neither.
+            m["give_back"] = max(m.get("give_back", 0.0),
+                                 m.get("peak_ret", 0.0) - _ret)
+            m["mae_ret"] = min(m.get("mae_ret", 0.0), _ret)
             meta[sym] = m
             _ebars, _etrail = bull_exit(m.get("lens"))
             if _ebars is not None:
@@ -2803,7 +2862,32 @@ def main(_ctx=None):
             is_long = t.get("side", "long") != "short"
             if is_long and long_budget_full:
                 continue          # L2 veto: fleet long budget is full
-            clip = round(vol_clip(ranges.get(sym)) * gov, 2)
+            # [2026-08-20 (so)] THE BRAIN SIZES THIS ENTRY, per (side, lens).
+            # This book is the reason the wiring exists: on the morning it
+            # shipped the brain's entire published opinion across the fleet was
+            # two mults, and one of them was THIS row's `short-divergence` at
+            # 0.75 (n=78, t=-1.43), held for 11 consecutive runs into a
+            # consumer that did not exist. The lens is the natural bucket —
+            # the taker already grades, vetoes and tunes per lens, and sizing
+            # was the one lens-shaped decision still taken flat.
+            # ORDER MATTERS: the governor (`gov`) is the FLEET's drawdown
+            # brake and the brain's mult is this BOOK's evidence; both are
+            # multiplicative and both apply, and the notional cap below still
+            # sees the final number.
+            # [(sp)] the brain scales the RISK BUDGET and vol_clip converts
+            # risk -> clip exactly as it always has, so constant-risk sizing
+            # survives and CLIP_MAX still binds — see vol_clip's own note.
+            # The ceiling is lifted by BRAIN_GROSS_X (not by the full 6.7x):
+            # this book's cap is 6 slots, so an unlifted ceiling would make the
+            # brain inert on a calm book while a fully-lifted one would put
+            # $3,216 of gross on a $1,000 shadow row.
+            _bm = fleet_bus.brain_mult_multi(
+                [(BOT_ROW, f"{'long' if is_long else 'short'}-{lens}")])
+            clip = round(vol_clip(
+                ranges.get(sym), risk_usd=RISK_USD * _bm,
+                clip_max=CLIP_MAX * getattr(fleet_bus, "BRAIN_GROSS_X", 1.0)
+            ) * gov, 2)
+            bmult = _bm
             size = clip / mark
             ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
                                         "prem_bps", "apr_pct", "gap_pct")}
@@ -2927,6 +3011,12 @@ def main(_ctx=None):
             pos[sym] = {"size": size if is_long else -size, "entry": entry_px}
             meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,
                          "entry": entry_px,
+                         # [(so)] I22 receipt — the brain scale in force when
+                         # this clip was set. `clip` alone cannot say whether a
+                         # small position was a calm book (vol_clip), a fleet
+                         # drawdown (gov) or the brain, and those are three
+                         # different findings.
+                         "brain_mult": bmult,
                          "accrued_to": iso(t_now), "funding_paid": 0.0,
                          "evidence": ev,
                          # [2026-07-22 FLAP FIX] the bars priced at entry
@@ -2936,7 +3026,8 @@ def main(_ctx=None):
             opened_lenses.add(lens)
             print(f"[ticket-taker] {iso(t_now)} OPEN "
                   f"{'long' if is_long else 'SHORT'} {sym} ({lens}) "
-                  f"${clip} @ {entry_px} (range {round(ranges.get(sym) or 0, 1)}%) "
+                  f"${clip}{'' if bmult == 1.0 else f' (brain {bmult:.2f}x)'}"
+                  f" @ {entry_px} (range {round(ranges.get(sym) or 0, 1)}%) "
                   f"evidence={ev}")
 
     # [(dv)] persist the up-regime cache for the next run-once boot — same gate

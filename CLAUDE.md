@@ -127,7 +127,18 @@ a changelog that reads like progress. **State at the end of every pass what is
 carried, and start the next pass from that list** — not from whatever is most
 interesting. `audit_recurrence` is the measurement: a subject you keep returning
 to is a house you keep re-entering without finishing.
-  ENFORCED BY: `scripts/audit_recurrence.py::audit`, `scripts/audit_recurrence.py::MAX_ENTRIES`
+**[2026-08-20 (sl)] AND IT FINALLY HAS THE OTHER HALF.** `audit_recurrence`
+measures circling AFTER it happens; it never told a session where to START.
+*Eamon: "can all of the works done today; every day be recorded properly so
+I am starting from where I left off every day rather than doing circles like an
+incompetent."* `scripts/session_state.py` is that record and it is DERIVED, not
+remembered: SHIPPED is read from git, STUCK from the live fleet, and every
+CARRIED row carries a `closes_when` **predicate evaluated against the repo** —
+so a finished item is reported CLOSE THIS and reddens CI, and an unfinished one
+cannot be dropped without deleting a row somebody has to justify. `HANDOFF.md`
+is its output. **Read it first; regenerate it last.** The CHANGELOG stays the
+long-form history — it is a fine record and a hopeless handoff.
+  ENFORCED BY: `scripts/audit_recurrence.py::audit`, `scripts/audit_recurrence.py::MAX_ENTRIES`, `scripts/session_state.py::carried_status`, `scripts/session_state.py::CARRIED`
 
 ### I12 · DOCTRINE IS LIVE OR IT IS ARCHAEOLOGY
 **Operator, 31-Jul:** *"we can't refer back to a doctrine that was established at
@@ -363,6 +374,67 @@ markets, N_eff 1.4, one side, 1x, 187 days to gate" is this invariant WORKING,
 and the answer is to redesign or decline, never to widen the tape or lower the
 bar.
   ENFORCED BY: `scripts/audit_book_spend.py::birth_census`, `scripts/audit_book_spend.py::MAX_DAYS_TO_GATE`
+
+**[RENUMBERED I22 -> I23, 20-Aug.** Another session landed a different I22 on main the same day — *a book must spend the ecosystem* — and it was already cited by `scripts/audit_book_spend.py`, a CI job and a test, so it keeps the number. Recorded inline per the changelog-letter rule, which applies to invariants for the same reason: the citations are what break.**]
+### I23 · A KNOB MUST RECORD THE QUANTITY IT CUTS, AND AN ACTUATOR MUST BE ABLE TO SEE WHAT IT STEERS
+**Eamon, 20-Aug: *"Fix this never recorded issue across the fleet, I am so
+tired of going over the same trivial problem."*** They were right, and it is one
+problem in four costumes — all four found in a single session:
+* 🎫 `taker.brk_trail` / `taker.brk_sl` — the give-back and the adverse
+  excursion each lever cuts lived in memory and died at close, so two widenings
+  were WITHHELD while a harness reconstructed from hourly candles what the bot
+  already knew to the loop;
+* 🌾 carry's turnover floor — a stand-in for a cost DECLARED unmeasured and
+  left that way for weeks, gating the fleet's best-evidenced book to
+  `eligible: 0` of 228 scanned;
+* 🎫 `brk_range` / `max_hold_h` — steered by a tuner whose replay cannot fill
+  the lens, so restrict enacted at delta `$0.00` for free while expand could
+  never clear `MARGIN_HALF`: a **one-way ratchet**, and it had walked both to
+  their tightest setting;
+* 💸 the judge's paired bar — compared two arms running different ENTRY
+  policies, a 0.161pp handicap against a 0.50pp margin, and zero promotions to
+  real money in five weeks on the fleet's only path to more of it.
+
+**The single shape: the thing that decides is not measuring the thing it decides
+about.** Fixing instances is the circle; the class closes two ways. (1) Every
+registered lever needs a recorded quantity — a `QUANTITIES` spec naming the
+source and field — or a declaration with a reason and an owner. Measured the day
+this shipped: **45 of 64 levers had neither**, and **15 of the 21 book levers
+steered books that no longer trade.** (2) An actuator may not move a knob its
+own gate cannot observe; where it structurally cannot, the cage's restrictive
+end is pinned at the operator default so the blind path can only ever be
+neutral, never tightening. Both are RATCHETS, not bars — a guard that reddens
+the build on a pre-existing backlog gets exempted within a day and then guards
+nothing ((mz)'s lesson) — so the backlog may only shrink and a NEW instance
+fails immediately.
+  ENFORCED BY: `scripts/audit_lever_measurability.py::check`, `scripts/audit_lever_measurability.py::RATCHET`, `tests/autonomy/test_breakoutup_ratchet.py::BREAKOUTUP_LEVERS`
+**[RENUMBERED I23 -> I24, 20-Aug — same collision, same reason.]**
+### I24 · A BOOK HAS A CEILING AND IT IS A MEASUREMENT — CAPACITY IS NOT EDGE, AND IT IS NOT FREE TO IGNORE
+**Eamon, 20-Aug: *"The discussion of the floor is too often had, where the
+conversation of how high the ceiling goes is of little discussion... they know
+the floor all too well."*** Count the bars: the go-live gate asks six questions
+and **every one is a floor** (≥30d, ≥30 closes, mean>0, t≥2.0, both halves,
+maxDD<15%) — six ways of asking *don't be bad*. Add the stops, vetoes, screens,
+cages, the governor and the halt, and until (sm) **not one instrument asked what
+the most a book could earn is, or what stood in the way.** So the fleet optimised
+the only thing it measured. Measured 20-Aug, slot occupancy against each book's
+OWN cap beside its own mean: 👩 mum **+4.658%/trade at 100% of a cap of four**,
+🙏 avo +1.085% at 40%, 🔮 georgia +0.122% at **9%** — while ⚖️ Counterweight
+**−1.433% at 102%** and 🛢️ Garrett −1.460% at 88%. **Capital sat in inverse
+proportion to measured edge**, and no organ had been asked the question that
+shows it. Output decomposes exactly — `$/day = rate × clip × mean_pct` — and two
+of the three are pure capacity that cost NO expectancy (per-trade % is invariant
+to clip, `(hl)`, measured). **A ceiling is computed only on a book whose EDGE
+LOWER BOUND is positive** (I16 — scale a coin flip and you scale a coin flip);
+for the rest the ceiling is DECIDABILITY, *how fast can this book learn what it
+is*, which is where I17 and the ceiling meet. Rate headroom comes from UNUSED
+SLOTS at the book's own hold, **never a shorter one** — that is denominator
+shrinkage, which `(hl)` measured as the whole of 25 of 30 "more trades"
+candidates. And a ceiling is REACHABLE, never promised: it says a book could run
+N× faster if its slots filled, not that the signal exists to fill them — the
+book's own census answers that.
+  ENFORCED BY: `scripts/ceiling.py::book_ceiling`, `scripts/ceiling.py::MIN_N`, `tests/autonomy/test_ceiling.py::test_a_losing_book_is_never_given_a_ceiling`
+
 <!-- INVARIANTS:END -->
 
 
@@ -1071,13 +1143,55 @@ its row is dashboard-retired regardless; stop the process when found.
   Wilson LOWER bound, t ≥ +2.0/+2.5, full n floor only, no family-praise
   inheritance, no urgent fast-path — `brain_stats.EXP_*`; same 3-run streak
   gate). Expand is v3-ONLY (`BRAIN_MULT_ENGINE=v2` zeroes it) with its own
-  kill switch `BRAIN_MULT_EXPAND=off`; consumers clamp [0.5, **1.5**]
-  (`fleet_bus.MULT_CEIL` — was 1.0; deliberate documented-contract scope
-  expansion, CHANGELOG (bh)). Payload stamps `mode: two-way|reduce-only`.
-  Consumers: `lighter_family_bot.py` at entry (keyed `<bot_id>` +
-  `long-<tag hyphenated>`, 15-Jul) and the freqtrade strategies'
-  `custom_stake_amount` — both via `fleet_bus.py`; SHADOW books only, no
-  live bot reads mults.
+  kill switch `BRAIN_MULT_EXPAND=off`. Payload stamps `mode: two-way|reduce-only`.
+  **[19/20-Aug (sm)/(sn)/(so)] THE RANGE IS 6.7x EITHER WAY AND EVERY LIVING
+  BOOK NOW READS IT — REAL MONEY INCLUDED.** This block said *"consumers clamp
+  [0.5, 1.5] … SHADOW books only, no live bot reads mults"*; both halves are
+  CORRECTED IN PLACE per I12, because neither describes the fleet.
+  * **The clamp** is `[fleet_bus.MULT_FLOOR, fleet_bus.MULT_CEIL]` = **[1/6.7,
+    6.7]** (Eamon, 20-Aug: *"The brain needs to be able to go to 6.7x
+    specifically either way now"*). The floor is DERIVED from the ceiling, so
+    "either way" is true by construction; the bounds are deliberately not
+    restated in any consumer's prose, because a retyped constant drifts and
+    this one already had, twice.
+  * **The consumers** are every living book, via one owner:
+    `fleet_bus.brain_clip(bot, tag, base_usd) -> (usd, mult)`, or
+    `brain_clip_multi(buckets, base_usd)` where one clip spans several buckets
+    (⚖️ Counterweight's two legs; 🙏 Avo's live+shadow pair) — min over the
+    buckets that HAVE an opinion, silent buckets never out-voting them.
+  * **WHY WIRING IT INTO REAL MONEY IS A NUMBER, NOT AN AUTHORITY.** The mult
+    proposes a size; every senior rail disposes and is untouched — the kill
+    switch, the daily-loss halt, the fleet long-budget veto, and the
+    operator-only caps. `SafetyRails.notional_ok` must see the SIZED clip
+    (AST-pinned).
+    **[(sp)] "The multiplier proposes; the rails dispose" was written at (so)
+    and was FALSE — corrected in place per I12, because a wrong safety
+    sentence is worse than none.** `notional_ok` is a BOOLEAN, so a caller's
+    `continue` discards the whole CANDIDATE, not the excess: on the shipped
+    live Farmer config a brain rung of 4.5 asks $168.75 against a $150 cap
+    FROM AN EMPTY BOOK, so **the brain rewarding a book for its evidence would
+    have stopped it trading**, silently, forever. Nine of thirteen wired books
+    had no notional bound at all. It is true now because it was MADE true:
+    the Farmer's rail TRIMS to what fits (never below the pre-brain clip);
+    🙏 Avo's brain is RESTRICT-ONLY, preserving the 1.00x-by-construction
+    invariant its own module states; 🎫 the taker takes the mult as a RISK
+    budget through `vol_clip` so constant-risk sizing and `CLIP_MAX` survive;
+    and the rail-less shadow books got `fleet_bus.BRAIN_GROSS_X`, a per-book
+    gross budget. **A safety sentence is a claim about behaviour and has to be
+    driven, not asserted.**
+  * **The key must be the LEDGER's bucket key, not the reason prefix.**
+    `fetch_paper_trades` prefers a stored `tag` COLUMN over the reason prefix
+    ("'long-funding' beats 'long'"), and exactly two books stamp one: 💸 the
+    Farmer (`<side>-funding`) and 🧭 cook (`<side>-navband`). Looking a mult
+    up under the wrong one returns 1.0 forever, silently — it was caught on
+    the real-money row before it shipped.
+  * **Declared exceptions, each with a reason:** funding VARIANTS (🛢️ Garrett
+    — the (nb) rule: env-only config means env-only SIZE, and a capital scale
+    already made its study cell unreproducible once), and ⚖️ Counterweight's
+    LIVE arm (clip PINNED at `GOLIVE_ORDER_USD` per (ia)).
+  Enforced fleet-wide by `tests/autonomy/test_brain_sizing_reaches_every_book.py`
+  (a roster test, so a NEW book cannot ship deaf) and
+  `tests/autonomy/test_brain_ceiling_step.py`.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
 - `signal-bus`, `regime-oracle`, `market-pulse` — published context (funding
@@ -2036,6 +2150,22 @@ All new bots:
   throwing the switch to stop the veto ALSO restores full clip size. Inert by
   default (mode=enforce) and it reaches only shadow consumers (family/taker);
   the live bots size off the separate `live.clip_scale` lever.
+- **HIS NAME IS EAMON (he also answers to Johnny) — CREDIT A QUOTE TO THE
+  PERSON, NEVER TO THE ROLE.** Eamon, 20-Aug: *"Call me Eamon or Johnny not
+  operator please we're pals now"* — and then, after a session read that,
+  agreed, and did it again in the very entries it wrote: *"You called me the
+  operator not Eamon again."* He is right that it kept happening, and the
+  reason is the reason at the top of this file: **it was written down and not
+  enforced.** So write `**Eamon, <date>:** *"..."*`, not `**Operator:**`.
+  **The ROLE stays and must not be renamed** — "operator-only caps", "an
+  OPERATOR action", `owner: OPERATOR`, `OPERATOR_QUEUE.md` all name a position
+  in the authority model, and several are load-bearing SAFETY properties
+  (SafetyRails' caps are operator-owned as a *rule about who may change them*,
+  not as a fact about who Eamon is). History is not rewritten either: the 207
+  existing attributions are the honest record of how the fleet was written.
+  ENFORCED BY `scripts/audit_operator_name.py` — a RATCHET on that measured
+  207, so the backlog may only shrink and a NEW attribution fails the push
+  that adds it.
 - **Operator timezone: Australia/Sydney — ALWAYS give Eamon Sydney-local
   times** (corrected 15-Jul evening; the earlier "AEST" note was recorded too
   narrowly). Sydney runs AEST (UTC+10) in winter and AEDT (UTC+11) during

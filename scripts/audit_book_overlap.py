@@ -181,6 +181,32 @@ def living_gates(cur):
         # deploy lands they read None and this arm stays silent on them.
         co = e.get("crypto_only", caps.get("crypto_only"))
         g["crypto_only"] = co if isinstance(co, bool) else None
+        # [2026-08-20 (sk)] A CONDITIONAL FLOOR IS NOT THE FLOOR IT PUBLISHES.
+        # 🌾 carry's turnover floor became a FAST PATH rather than a verdict:
+        # below it, a coin is admitted on MEASURED book depth and payback
+        # (`funding_carry_bot.depth_admits`). So `caps.min_vol` still reads
+        # $1M while the book's real reach extends underneath it, and this
+        # guard — which exists to answer "who else can take this supply?" —
+        # would UNDERSTATE the one book whose reach just grew. A gate this
+        # file misdescribes is the (gl) phantom-rival class inverted: a rival
+        # that is real and invisible, which is the worse direction, because an
+        # UNDECLARED collision is what fails the run and a missed one is what
+        # silently starves a sibling.
+        #
+        # NOT a guess at an effective number: there isn't one. The escape is
+        # per-coin and depends on the live book, so the honest representation
+        # of "how deep can this book reach" is UNBOUNDED BELOW. That is a
+        # measurement, not a worst case — 2026-08-20, of the 16 hot books
+        # under carry's floor, 16 of 16 filled its clip and repaid inside the
+        # max hold (scripts/study_depth_vs_volume.py). The books it cannot
+        # reach are excluded by PAYBACK, which is an apr-and-depth question
+        # this file's volume axis cannot express, so the floor is the wrong
+        # place to encode it and 0 is the truthful entry.
+        da = e.get("depth_admit", caps.get("depth_admit"))
+        g["depth_admit"] = da if isinstance(da, bool) else None
+        if da is True:
+            g["min_vol_published"] = g.get("min_vol")
+            g["min_vol"] = 0.0
         if g.get("enter_apr") is not None:
             out[bot] = g
     return out
@@ -252,7 +278,35 @@ KNOWN_CELL_COLLISIONS = {
         "[0.1M,2M) on a populated sliver, while still sharing the >=$2M cell "
         "with 🏦 Rich Dad — one transitive component, three books, two "
         "different declared overlaps (see the comment above this entry and "
-        "the pair entry). Owner: OPERATOR, ~12-Sep.",
+        "the pair entry). Owner: OPERATOR, ~12-Sep. "
+        "[2026-08-20 (sk)] THE SLIVER IS NOW THE WHOLE BAND, and this is a "
+        "material widening of the (px) overlap rather than a restatement of "
+        "it. 🌾 carry's turnover floor became a FAST PATH: below it a coin is "
+        "admitted on MEASURED depth and payback, so carry's effective reach "
+        "runs to the bottom of 🛢️ Garrett's [0.1M, 2M) band, not just its top "
+        "[1M, 2M) slice. `living_gates` reads carry's published "
+        "`depth_admit` and models the floor as UNBOUNDED BELOW so this guard "
+        "does not understate the widened book — the inverse of the (gl) "
+        "phantom-rival class, and the worse direction, because a rival that "
+        "is real and invisible starves a sibling with nothing failing. "
+        "MEASURED at the widening, 2026-08-20: at the >=20% TRUE bar the "
+        "venue offered 20 books and 16 sat under carry's old floor; the six "
+        "that are BOTH >=20% and inside Garrett's band are UNITREE ($858k), "
+        "ZRO ($543k), KAITO ($226k), ANSEM ($181k), APEX ($179k), CXMT "
+        "($137k). WHY IT IS STILL NOT THE (lv) STARVATION SHAPE, stated so "
+        "the next reader can check rather than trust: those two books are "
+        "SEPARATE PROCESSES with separate held-sets, so neither consumes the "
+        "other's supply within a loop — the Barnes trap needed one loop, one "
+        "shared held-set and a subset gate running second. What they DO share "
+        "is I20's accounting cost, unchanged and already declared above: a "
+        "coin held by both counts twice in fleet_allocation's independent "
+        "claims. AND ONE NEW ASYMMETRY WORTH THE OPERATOR'S ATTENTION: those "
+        "six coins are the TOP of Garrett's ranked book (its own (pl) "
+        "measurement found 6 of 6 top-ranked candidates are >=20%), so carry "
+        "is now a rival for exactly the supply Garrett ranks first. That is a "
+        "RANKING collision, not a gate collision, and this file's axes "
+        "(apr x vol x class) cannot express it — declared here rather than "
+        "detected. Owner: OPERATOR, same ~12-Sep decision point.",
     frozenset({"perps-funding-carry-lshadow", "band-garrett-lshadow"}):
         "(px) fallback key: the carry/Garrett sliver alone, for tapes where "
         "the >=$2M Rich Dad intersection reads empty. Same declaration as "
@@ -724,9 +778,15 @@ def report_collisions(cur) -> int:
             g = gates[b]
             mn, mx = g.get("min_vol"), g.get("max_vol")
             hi = g.get("apr_hi")
+            # [(sk)] a floor of 0 that came from a DEPTH ESCAPE must say so:
+            # printed bare it reads as "this book has no floor", which is a
+            # different and much less useful fact than "this book's floor is
+            # conditional and its published one is $Xm".
+            _lo = ("depth" if g.get("depth_admit") is True
+                   else f"{(mn or 0) / 1e6:.2f}M")
             print(f"     {b:32s} apr=[{g['enter_apr']:.3g},"
                   f"{'inf' if hi is None else f'{hi:.3g}'})"
-                  f"  vol=[{(mn or 0)/1e6:.2f}M,"
+                  f"  vol=[{_lo},"
                   f"{'inf' if mx is None else f'{mx/1e6:.2f}M'})"
                   # [(qx)] differential REACH on a shared cell: two books at
                   # one apr/vol cell with different persistence do not take

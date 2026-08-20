@@ -398,6 +398,21 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
 SNIPE_SOURCES = ("listing", "surge", "young")
 
 
+def entry_tag(was_long, src=None):
+    """The enter_tag this book's closes carry — and therefore the EXACT key
+    the brain's stake multiplier must be looked up under.
+
+    [2026-08-20 (so)] Extracted from `close_reason` rather than retyped beside
+    it. `close_reason` now composes from this, so a source that stops being
+    whitelisted, or a side that changes shape, moves BOTH the ledger bucket
+    and the sizing lookup in one edit. A retyped key is the registered-but-
+    inert failure in its quietest form: the lookup silently returns 1.0
+    forever and nothing anywhere says so.
+    """
+    side = "long" if was_long else "short"
+    return f"{side}-{src}" if src in SNIPE_SOURCES else side
+
+
 def close_reason(was_long, exit_reason, src=None):
     """The ledger close tag, source-stamped — the taker's lens pattern.
 
@@ -409,10 +424,7 @@ def close_reason(was_long, exit_reason, src=None):
     enter_tag='long-young' / exit='max_hold' and the brain buckets each source
     separately. Forward-only: rows written before this stamp keep their tags.
     """
-    side = "long" if was_long else "short"
-    if src in SNIPE_SOURCES:
-        return f"{side}-{src}_{exit_reason}"
-    return f"{side}_{exit_reason}"
+    return f"{entry_tag(was_long, src)}_{exit_reason}"
 
 
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
@@ -779,7 +791,17 @@ def main():
         if not px:
             log.info("%s: %s — staying pending, will retry next loop", sym, why)
             return False
-        size = round(order_usd / px, 6)
+        # [2026-08-20 (so)] the brain sizes the snipe, PER ADMISSION SOURCE —
+        # which is the whole reason (na) source-stamped these tags. The three
+        # sources are three different bets sharing one row (a listing pop, a
+        # volume surge, a young book), the (qi) study measured them to be
+        # nothing like each other, and until now they were all sized the same.
+        # `clip` (not order_usd) is what the cap below must see: a bigger clip
+        # has to be admitted against the cap it will actually fill.
+        clip, bmult = (fleet_bus.brain_clip(bot_id, entry_tag(DIRECTION_LONG,
+                                                              src), order_usd)
+                       if fleet_bus is not None else (order_usd, 1.0))
+        size = round(clip / px, 6)
         if size <= 0:
             # PaperBroker.open() silently no-ops on size<=0 and market_open would
             # send a zero clip: returning True here would log a phantom "SNIPED"
@@ -787,7 +809,7 @@ def main():
             # absorption this file was fixed for. Refuse instead.
             log.error("%s: clip $%.2f at px %.6f rounds to size 0 — NOT sniping"
                       " (check LIGHTER_ORDER_USD); staying pending",
-                      sym, order_usd, px)
+                      sym, clip, px)
             return False
         if dry_run:
             broker.mark(sym, px)
@@ -808,11 +830,11 @@ def main():
             # notional and walked a new clip straight through the operator's
             # hard cap. `meta={}` — this bot keeps no per-position clip record,
             # so the venue's own avg entry price prices each held position.
-            open_ntl = open_notional(ctx.venue.positions(), {}, open_now, order_usd)
-            if not ctx.rails.notional_ok(open_ntl, order_usd):
+            open_ntl = open_notional(ctx.venue.positions(), {}, open_now, clip)
+            if not ctx.rails.notional_ok(open_ntl, clip):
                 log.info("%s NOTIONAL_CAP_SKIP ($%.2f deployed + $%.2f clip > "
                          "cap $%s) — staying pending",
-                         sym, open_ntl, order_usd, ctx.rails.max_notional)
+                         sym, open_ntl, clip, ctx.rails.max_notional)
                 return False
             try:
                 ctx.venue.market_open(sym, DIRECTION_LONG, size)
@@ -830,9 +852,20 @@ def main():
                 _meta = surge_admission(sym, _surge_ratios, SURGE_MULT)
                 if _meta is not None:
                     entry_meta[sym] = _meta
-        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f) [src=%s]",
-                 sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, order_usd,
-                 src or "?")
+        # [(so)] I22 receipt, written LAST and MERGED. entry_meta is the
+        # book's existing durable per-open extra map (restored at boot, popped
+        # by the close), so the scale survives a restart exactly as the surge
+        # telemetry does. Written last because the surge branch above ASSIGNS
+        # the key — a receipt written first is silently overwritten, which is
+        # how it failed the first time it was run. Recorded only when the
+        # scale MOVED: absence already means "flat clip", and a column of 1.0s
+        # on a book the brain has no opinion about is noise, not evidence.
+        if bmult != 1.0:
+            entry_meta[sym] = dict(entry_meta.get(sym) or {},
+                                   brain_mult=round(bmult, 4))
+        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f%s) [src=%s]",
+                 sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, clip,
+                 "" if bmult == 1.0 else f" brain {bmult:.2f}x", src or "?")
         return True
 
     # [2026-07-16 AUDIT FIX] seed W/L from the durable ledger — this bot
@@ -1765,6 +1798,18 @@ def selftest():
         def is_crypto(self, sym):        # [(lk)] the surge source is crypto-only
             return str(sym).upper() != "SPXUSD"
 
+        # [(so)] the brain's sizing accessor. `mult` is settable so the drive
+        # below can prove the SIZED path, not just the neutral one. The
+        # accessor's own contract (clamp, staleness, dark-brain, silent
+        # bucket) is proven in fleet_bus's selftest against fleet_bus's own
+        # payload — what this stand-in exists to test is the CONSUMER: that
+        # the size, the notional cap check and the receipt all read the sized
+        # clip rather than the flat one.
+        mult = 1.0
+
+        def brain_clip(self, _bot, _tag, base):
+            return base * self.mult, self.mult
+
     # QUIET carries `ratio: None`. It is not a decoration, and it is the one
     # property a unit test on `surge_ratio_map` CANNOT state: `surge_candidates`
     # reads that field as `float(r.get("ratio") or 0.0)` (-> 0.0, simply not a
@@ -1801,6 +1846,32 @@ def selftest():
         f"the admission telemetry was not recorded: {_blob7.get('entry_meta')}"
     assert "SPXUSD" not in _blob7["entry_src"], "the class screen let SPXUSD in"
     assert "QUIET" not in _blob7["entry_meta"], _blob7["entry_meta"]
+    # [(so)] and the brain SIZES it. Same fixture, same admission, mult 2x:
+    # the venue must receive DOUBLE the size, and the scale must land in the
+    # durable receipt map beside the surge telemetry rather than replacing it.
+    # Asserted on the VENUE and on the SAVED BLOB, because a sizing term that
+    # only shows up in a log line is the never-recorded class this pass exists
+    # to close.
+    _bus.mult = 2.0
+    try:
+        ven7b = _FakeVenue(_srg_markets, _srg_books, {})
+        fs7b = _drive(ven7b, 1000.0, CLIP,
+                      {"baseline": ["OLD", "SRG"], "entry_ts": {},
+                       "pending": {}}, bus=_bus)
+    finally:
+        _bus.mult = 1.0
+    assert [o[0] for o in ven7b.opened] == ["SRG"], ven7b.opened
+    assert abs(ven7b.opened[0][2] - 2 * ven7.opened[0][2]) < 1e-5, (
+        "the brain's 2x never reached the order size: "
+        f"{ven7b.opened[0][2]} vs {ven7.opened[0][2]}")   # 6dp size rounding
+    _m7b = fs7b.saves[-1][1]["entry_meta"]["SRG"]
+    assert _m7b["brain_mult"] == 2.0, _m7b
+    assert _m7b["surge_ratio"] == 5.0, ("the receipt REPLACED the admission "
+                                        f"telemetry instead of joining it: {_m7b}")
+    # a flat clip records NOTHING — absence already means 1.0, and a column of
+    # 1.0s on a book the brain has no opinion about is noise, not evidence.
+    assert "brain_mult" not in _blob7["entry_meta"]["SRG"], \
+        _blob7["entry_meta"]["SRG"]
 
     # ...and the record SURVIVES A RESTART and reaches the LEDGER ROW — the
     # whole point of a durable map, and the leg with three call sites between

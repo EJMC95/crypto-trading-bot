@@ -526,6 +526,8 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
             venue="lighter", shadow=True, side=pos["side"],
             entry_price=entry_px, exit_price=exit_px,
             extra={"family": pos.get("family") or "snap",
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "ghost_side": pos.get("ghost_side"),
                    "ghost_entry": pos.get("ghost_entry"),
                    "dev_at_entry_bps": pos.get("dev_at_entry"),
@@ -537,7 +539,23 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
         pass
 
 
-def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
+def _deployed(positions):
+    """This book's currently-deployed gross, for the (sp) brain gross bound."""
+    return sum(float(p.get("notional") or 0.0) for p in positions.values())
+
+
+#: [(sp)] TWO FAMILIES, ONE BUDGET. kelly is the only wired book whose sleeves
+#: run different clips, so its designed gross is the SUM of the two rather than
+#: one `cap x clip` — computed here so the bound moves with either sleeve's
+#: config instead of being retyped as a number that drifts. Both sleeves draw
+#: on it, which is correct: they share one $1,000 book.
+_GROSS_CAP = ((CLIP_USD * MAX_POSITIONS + DIP_CLIP_USD * DIP_MAX_POSITIONS)
+              * getattr(fleet_bus, "BRAIN_GROSS_X", 2.0)
+              if fleet_bus is not None else None)
+
+
+def _open_mirror(positions, coin, dev_bps, bv, t0, ref, notional=None,
+                 brain_mult=1.0):
     """Open one mirror position at MY side's book-walked VWAP. SIGNATURE IS
     THE CONSISTENCY RULE: no streak, no last-outcome, no equity parameter
     exists, so size cannot vary with results without changing this
@@ -554,9 +572,11 @@ def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
         return None
     if my_slip > MY_MAX_SLIP_BPS:
         return None
+    ntl = CLIP_USD if notional is None else float(notional)
     positions[coin] = {"coin": coin, "family": "snap",
                        "side": side, "ghost_side": g_side,
-                       "notional": CLIP_USD, "size": CLIP_USD / my_fill,
+                       "notional": ntl, "size": ntl / my_fill,
+                       "brain_mult": brain_mult,
                        "entry": my_fill, "ghost_entry": g_fill,
                        "last_px": my_fill, "opened_ts": t0,
                        "dev_at_entry": round(dev_bps, 1),
@@ -565,7 +585,7 @@ def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
     return positions[coin]
 
 
-def _open_dip(positions, sym, bv, t0, ticket):
+def _open_dip(positions, sym, bv, t0, ticket, notional=None, brain_mult=1.0):
     """Open one dipfade mirror SHORT at MY side's book-walked VWAP. Same
     consistency-rule signature discipline as _open_mirror: no streak, no
     outcome, no equity input. The ghost's entry is the same mark the taker
@@ -577,10 +597,12 @@ def _open_dip(positions, sym, bv, t0, ticket):
         return None
     if my_slip > MY_MAX_SLIP_BPS:
         return None
+    ntl = DIP_CLIP_USD if notional is None else float(notional)
     positions[sym] = {"coin": sym, "family": "dip",
                       "side": "short", "ghost_side": "long",
-                      "notional": DIP_CLIP_USD,
-                      "size": DIP_CLIP_USD / my_fill,
+                      "notional": ntl,
+                      "size": ntl / my_fill,
+                      "brain_mult": brain_mult,
                       "entry": my_fill, "ghost_entry": bv.get("buy_vwap"),
                       "last_px": my_fill, "opened_ts": t0,
                       "range_pos": ticket.get("range_pos"),
@@ -837,14 +859,40 @@ def main():
             if coin not in crypto_ok:
                 census["noncrypto"] += 1
                 continue
-            pos = _open_mirror(positions, coin, dev_bps, bv, t0, r)
+            # [2026-08-20 (so)] the brain sizes MY leg, keyed on the SAME
+            # `<side>-snap` _close publishes. Two fidelity rules, both learned
+            # by this book at (qj): the GHOST's gate above is priced at the
+            # ghost's own $10 clip and is untouched here — resizing my leg must
+            # never change which events the ghost is deemed to have taken — and
+            # MY book must be RE-WALKED at the sized clip, because my entry IS
+            # a VWAP and my slip gate is what keeps a big clip out of a thin
+            # coin. Fail-CLOSED: no re-walk, no entry.
+            _side = mirror_side(dev_bps)
+            _clip, _bm = (fleet_bus.brain_clip(
+                bot_id, f"{_side}-snap", CLIP_USD,
+                deployed_usd=_deployed(positions),
+                gross_cap_usd=_GROSS_CAP)
+                if fleet_bus is not None else (CLIP_USD, 1.0))
+            bv_m = bv
+            if _bm != 1.0:
+                try:
+                    bv_m = ghost.book_view(ctx, coin, _clip)
+                except Exception:  # noqa: BLE001
+                    bv_m = None
+                if not bv_m:
+                    census["resize_blind"] = census.get("resize_blind", 0) + 1
+                    continue
+            pos = _open_mirror(positions, coin, dev_bps, bv_m, t0, r,
+                               notional=_clip, brain_mult=_bm)
             if pos is None:
                 census["my_slip"] += 1
                 continue
             pend[coin] = 0
             census["opened"] += 1
             print(f"[{now_iso()}] OPEN {coin} {pos['side'].upper()} "
-                  f"${CLIP_USD:.0f} @ {pos['entry']:.6g} | dev "
+                  f"${_clip:.0f}"
+                  f"{'' if _bm == 1.0 else f' (brain {_bm:.2f}x)'}"
+                  f" @ {pos['entry']:.6g} | dev "
                   f"{dev_bps:+.1f}bps (gate {enter_bps_eff:.0f}) | riding "
                   f"the {'premium' if dev_bps > 0 else 'discount'} the ghost "
                   f"would fade")
@@ -876,21 +924,32 @@ def main():
                        if p.get("family") == "dip") >= DIP_MAX_POSITIONS:
                     census["dip_capped"] += 1
                     break
+                # [(so)] same rule on the probe sleeve, its own bucket
+                # (`short-dip`) — this is the sleeve admitted on an operator
+                # override of the I16 floor at n=13, so it is exactly the one
+                # whose size should follow its record as the record arrives.
+                _dclip, _dbm = (fleet_bus.brain_clip(
+                    bot_id, "short-dip", DIP_CLIP_USD,
+                    deployed_usd=_deployed(positions),
+                    gross_cap_usd=_GROSS_CAP)
+                    if fleet_bus is not None else (DIP_CLIP_USD, 1.0))
                 try:
                     if not ctx.supports(sym):
                         continue
-                    bv_d = ghost.book_view(ctx, sym, DIP_CLIP_USD)
+                    bv_d = ghost.book_view(ctx, sym, _dclip)
                 except Exception:  # noqa: BLE001
                     bv_d = None
                 if bv_d is None:
                     continue
-                pos = _open_dip(positions, sym, bv_d, t0, tk)
+                pos = _open_dip(positions, sym, bv_d, t0, tk,
+                                notional=_dclip, brain_mult=_dbm)
                 if pos is None:
                     census["dip_slip"] += 1
                     continue
                 dip_cd[sym] = t0
                 census["dip_opened"] += 1
-                print(f"[{now_iso()}] OPEN {sym} SHORT ${DIP_CLIP_USD:.0f} "
+                print(f"[{now_iso()}] OPEN {sym} SHORT ${_dclip:.0f}"
+                      f"{'' if _dbm == 1.0 else f' (brain {_dbm:.2f}x)'} "
                       f"[dipfade probe] range_pos "
                       f"{tk.get('range_pos')} chg {tk.get('chg_pct')}% | "
                       f"the ghost the taker vetoed buys the dip; the "
@@ -1044,8 +1103,30 @@ def _selftest():
     # 5) CONSISTENCY RULE: _open_mirror's signature carries no streak, no
     #    outcome, no equity — size cannot vary with results without
     #    changing this function's shape (the douglas pin, kept).
+    #    [(so)] `notional`/`brain_mult` join the whitelist and the ban stays:
+    #    the brain's scale is a per-(book, side) function of >=30 closes over
+    #    >=3 runs, identical for every trade in a cycle, so it cannot express
+    #    "I just lost, bet differently" — which is the thing this pin exists
+    #    to forbid and which THIS book's parent measured at +$27.01 -> -$11.32.
     params = list(inspect.signature(_open_mirror).parameters)
-    assert params == ["positions", "coin", "dev_bps", "bv", "t0", "ref"], params
+    assert params == ["positions", "coin", "dev_bps", "bv", "t0", "ref",
+                      "notional", "brain_mult"], params
+    for _banned in ("streak", "last_pnl", "last_outcome", "equity", "wins",
+                    "losses", "cooldown", "consecutive", "drawdown"):
+        assert _banned not in params, _banned
+        assert _banned not in list(inspect.signature(_open_dip).parameters), \
+            f"_open_dip grew a '{_banned}' input"
+    # the size defaults to the book's own clip, so an un-sized caller is
+    # byte-identical to the pre-(so) book, and the fees/size follow the SIZED
+    # notional rather than the constant.
+    _pb = _open_mirror({}, "BM", 75.0,
+                       {"mid": 100.0, "buy_vwap": 100.0, "sell_vwap": 100.0,
+                        "buy_slip_bps": 1.0, "sell_slip_bps": 1.0,
+                        "spread_bps": 2.0}, 5.0, 99.2,
+                       notional=CLIP_USD * 2, brain_mult=2.0)
+    assert _pb["notional"] == CLIP_USD * 2 and _pb["brain_mult"] == 2.0
+    assert abs(_pb["size"] - (CLIP_USD * 2) / 100.0) < 1e-12, \
+        "size must follow the SIZED notional, not the constant clip"
     # and it fills at MY side's vwap, slip-gated
     ps = {}
     bv = {"mid": 100.0, "buy_vwap": 100.02, "sell_vwap": 99.98,
@@ -1077,7 +1158,8 @@ def _selftest():
     assert dip_exit(dpos, 100.5, DIP_MAX_HOLD_S) == "maxhold"
     import inspect as _insp
     assert list(_insp.signature(_open_dip).parameters) == [
-        "positions", "sym", "bv", "t0", "ticket"]      # consistency rule
+        "positions", "sym", "bv", "t0", "ticket",
+        "notional", "brain_mult"]                      # consistency rule
     dbv = {"mid": 100.0, "buy_vwap": 100.02, "sell_vwap": 99.98,
            "buy_slip_bps": 2.0, "sell_slip_bps": 2.0, "spread_bps": 4.0}
     got_d = _open_dip({}, "B", dbv, 5.0, {"range_pos": 0.03})
