@@ -1,3 +1,68 @@
+## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT IS GRADED 3.6× WORSE THAN IT PERFORMS: the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
+
+[Renumbered (sa) -> (sb) -> (sc): main took (sa) for nav-cook's gate fix, then
+(sb) for nav-cook's founding-claim reproduction, both while this was in flight.
+4 code citations moved each time, counted per file.]
+
+**Operator: *"restore it if it increases the p n l and win rate"* / *"can this
+fleet's work start to look at expansion and opportunity rather than limiting this
+and limiting that."*** This is the expansion answer, and it is not a new book —
+it is a book the fleet is about to retire on a number that is wrong.
+
+**THE DEFECT.** `_record_close` computed `pnl_pct` from the PRICE MOVE while its
+own caller computes `total = price_pnl + accr`. So `pnl_abs` has always carried
+funding and `pnl_pct` never did — two fields, two bases — and
+`golive_readiness` grades `mean_pct` and `t` on **the one that discards the
+book's entire thesis**. A delta-neutral carry book takes small price losses to
+collect larger funding by design; priced on the move alone, its winning trades
+read as losers.
+
+**MEASURED, on the 27 closes `/trades.json` still exposes:**
+
+| basis | mean/trade | t | win |
+|---|---:|---:|---:|
+| price-only — **what the gate grades** | **−0.392%** | −0.30 | 55.6% |
+| funding-inclusive — what it earned | **−0.109%** | −0.06 | 55.6% |
+
+`pnl_pct` equalled the pure price return on **27 of 27** rows, while
+`pnl_abs / pnl_pct` ranged **4.4 → 21.1** (CoV 108%) — that spread IS the
+funding. **The contradiction needs no clip assumption at all:** the percentage
+claims −0.392%/trade across 27 trades while the dollars over those same trades
+are **−$0.15**, i.e. flat. Both cannot be true.
+
+**WHY IT MATTERS NOW, not later.** ⚖️ Counterweight carries a pre-registered
+keep-or-retire call at **~28-Aug**, and the live gate reads
+`mean_pct −1.723%, t −1.95, horizon **unreachable**` — *"more of the same closes
+cannot flip mean/t/halves"*. That verdict is computed on the broken basis. The
+book may still be a loser; what it may not be is **retired on a number that is
+3.6× too pessimistic**. This is I14 in its original form — the record decides,
+and the record was being read wrong.
+
+**WHAT SHIPPED.** The position stamps **its own notional at entry**
+(`"notional": float(order_usd)`), because `order_usd` is rewritten mid-life by
+the allocation scale — the clip in force at CLOSE is not the clip the leg was
+opened at. That is the `open_notional()` doctrine applied to grading rather than
+to caps. `_record_close` then grades `total_pnl / notional`.
+
+**HONEST DEGRADE, declared:** a position restored from a pre-(sb) payload carries
+no notional and stays on the price basis, rather than being re-based off the
+CURRENT clip — a guess dressed as a correction (I8). Those rows remain visibly
+the old basis, and the era does NOT move: this is an accounting-basis correction
+of exactly the kind `(hc)` names as era-resetting, but it changes only how
+**future** closes are RECORDED, so the boundary question is deferred to the
+~28-Aug call with both numbers in hand rather than pre-empted here.
+
+**RESTRICT-DIRECTION, and pinned as such.** No entry, exit, size or lever moves —
+`_record_close` remains a recorder, and a test fails the build if `broker.open`,
+`broker.close`, `market_open` or an `order_usd` assignment ever appears inside it.
+6 tests, 4 mutations red, `--selftest` green.
+
+**SCOPE, stated because it bounds the claim:** `/trades.json` caps at 500 rows,
+so the 27 measured here are a recent subset of the book's 120 lifetime / 100
+in-era closes. The 3.6× is the direction and magnitude on visible data, **not** a
+restatement of the gate's number — that recomputes itself from the full ledger as
+new closes land on the corrected basis.
+
 ## 2026-08-20 (sb) — 🧭 nav-cook's FOUNDING CLAIM REPRODUCES, THE CONFLICTING REPLAY IS EXPLAINED, AND THE HARNESS IS FINALLY IN THE REPO
 
 `(sa)` fixed the confirm-window defect and named a follow-up it deliberately did
@@ -65,6 +130,7 @@ on its first run.
 
 Files: `scripts/study_dislocation_band_2026-08-19.py` (new, selftest-registered).
 No bot code touched; main-only by the `(mm)` rule.
+
 
 ## 2026-08-20 (sa) — 🧭 nav-cook SHIPPED A GATE 3.3× LOOSER THAN THE ONE IT WAS GRADED ON: a confirm window is a DURATION, and it inherited the COUNT from a bot on a different cadence
 
@@ -279,6 +345,7 @@ that STILL EXISTS and now carries a different entry, with the committed
 citation untouched — fires, names the file, and quotes both meanings. The two
 guards partition the space cleanly: one owns *resolves to nothing*, the other
 owns *resolves to the wrong thing*, and neither claims the other's finding.
+
 
 ## 2026-08-20 (ry) — FOUR DECLARED ENFORCEMENTS WERE INERT, HARVESTED FROM A STALE PR THAT COULD NEVER MERGE — including a fleet-wide death recorder that has never recorded a death
 

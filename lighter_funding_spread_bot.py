@@ -440,9 +440,32 @@ def fresh_mid(ctx, coin):
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
-                  reason, shadow):
+                  reason, shadow, notional=None):
+    # [2026-08-20 (sc)] pnl_pct WAS PRICE-ONLY ON A FUNDING BOOK, AND THE GO-LIVE
+    # GATE GRADES ON pnl_pct. The caller computes `total = price_pnl + accr`, so
+    # `pnl_abs` has always carried funding while this percentage discarded it —
+    # the two fields were on DIFFERENT BASES, and the bar that decides real money
+    # read the one that omits the book's entire thesis.
+    #
+    # MEASURED on the 27 closes /trades.json still exposes: `pnl_pct` matches the
+    # pure price return on 27 of 27 rows, while `pnl_abs / pnl_pct` ranges 4.4 to
+    # 21.1 (CoV 108%) — that spread IS the funding. Re-based, the same trades read
+    # -0.109%/trade (t=-0.06) against the -0.392%/trade (t=-0.30) the gate sees:
+    # the book is graded ~3.6x worse than it performs. The contradiction needs no
+    # assumption at all — the percentage says it loses 0.392%/trade over 27
+    # trades while the dollars over those same trades are -$0.15, i.e. flat.
+    #
+    # Restrict-direction safety: this changes a MEASUREMENT, never an entry, an
+    # exit or a size. No trade the book takes moves.
     pnl_pct = None
-    if ent_px:
+    if notional:
+        pnl_pct = float(total_pnl) / float(notional)
+    elif ent_px:
+        # HONEST DEGRADE, not a silent one: a position restored from a payload
+        # written before this change carries no notional, so its percentage stays
+        # price-only rather than being invented from the CURRENT clip (which may
+        # not be the clip it was opened at). Those rows are the old basis and are
+        # visibly the old basis.
         pnl_pct = ((exit_px - ent_px) / ent_px) if was_long \
             else ((ent_px - exit_px) / ent_px)
     oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
@@ -660,7 +683,7 @@ def main():
                  price_pnl, accr, reason)
         _record_close(bot_id, coin, m.get("entry"), m.get("opened_ts"), px,
                       total, was_long=not m.get("is_short"), reason=reason,
-                      shadow=shadow_tag)
+                      shadow=shadow_tag, notional=m.get("notional"))
         meta.pop(coin, None)
 
     while True:
@@ -804,6 +827,13 @@ def main():
                     ent = broker.pos.get(c)
                     meta[c] = {"is_short": is_short,
                                "entry": (ent[1] if ent else px),
+                               # [2026-08-20 (sc)] THE POSITION'S OWN NOTIONAL,
+                               # stamped at entry. `order_usd` moves mid-life
+                               # (the allocation scale rewrites it at the top of
+                               # the loop), so the clip in force at CLOSE is not
+                               # the clip this leg was opened at — the
+                               # `open_notional()` doctrine, applied to grading.
+                               "notional": float(order_usd),
                                "opened_ts": t0, "accrued": 0.0}
                     log.info("OPEN %s %s $%.0f @ %.6g (%dh mean %+.1f%% apr)",
                              c, "SHORT" if is_short else "LONG", order_usd,
