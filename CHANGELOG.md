@@ -102,7 +102,16 @@ sweep; the allocation-consumer name check; and the Counterweight live-clip pin.
 **Verification.** Every fix proved by execution: the recorder counted reaching
 `save_state`, the amnesia detector driven through all four fixture shapes, the
 gate run against the publisher's real key form, the oracle's selftest run to its
-final OK line. `fleet_immune`, `regime_oracle` and `lighter_funding_spread_bot`
+final OK line. `tests/autonomy/test_inert_enforcements.py` (9 tests) pins all
+four, and **8 mutations were run against it, all 8 RED** — the missing import
+restored, the caller's result discarded again, the amnesia guard re-blinded in
+both directions, the brain's stamp renamed, the gate reverted to the bare base,
+and the oracle's killer `sys.exit` reintroduced. The FIRST round found a
+SURVIVOR — `tests/test_selftests.py` does not cover `record_organ_error` at all
+— which is why the new file exists; and the test's own first draft matched the
+forbidden string inside this entry's explanatory COMMENT rather than the code,
+the "a page-wide substring scan is not a structural claim" trap, now filtered to
+executable lines. `fleet_immune`, `regime_oracle` and `lighter_funding_spread_bot`
 selftests green. Suite: `test_funding_variant` and `test_margin_truth` remain the
 only failures and both predate this pass — note that `regime_oracle` and
 `test_crypto_only_universe` were NOT pre-existing repo failures at all but a
