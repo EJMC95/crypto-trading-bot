@@ -196,7 +196,7 @@ LEVERS = {
         "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-taker",
         "note": "dip conviction bar (range_pos <=); default 0.05", "env_default": 0.05},
     "taker.brk_range": {
-        "kind": "float", "lo": 0.90, "hi": 0.97, "lane": "lighter-taker",
+        "kind": "float", "lo": 0.90, "hi": 0.95, "lane": "lighter-taker",
         "note": "breakout conviction bar (range_pos >=); default 0.95", "env_default": 0.95},
     "taker.momo_chg": {
         "kind": "float", "lo": 3.0, "hi": 6.0, "lane": "lighter-taker",
@@ -213,8 +213,56 @@ LEVERS = {
         "kind": "float", "lo": -0.04, "hi": -0.02, "lane": "lighter-taker",
         "note": "stop-loss fraction; default -0.03", "env_default": -0.03},
     "taker.max_hold_h": {
-        "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
+        "kind": "float", "lo": 48.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48", "env_default": 48.0},
+    # [2026-08-20 (sf)] THE RESTRICTIVE END OF EVERY BREAKOUTUP CAGE IS NOW
+    # PINNED AT THE MODULE DEFAULT, because the actuator that moves these is
+    # STRUCTURALLY BLIND to the lens they govern.
+    #
+    # MEASURED, on the live bus: `taker.brk_range` sat at **0.97** (cage hi =
+    # tightest; default 0.95) and `taker.max_hold_h` at **24.0** (cage lo =
+    # tightest; default 48) — BOTH `set_by: scout-tuner`, both from
+    # `organ-proposal:event-sentinel`. And `lighter_ticket_replay.py:206` reads
+    # `_up = False if lens == "breakout" else None`, so `bull_entry_ok` refuses
+    # EVERY breakout entry and the tuner's replay contains ZERO breakoutup
+    # trades. Its own published baseline agrees: breakout taken=0 closed=0.
+    #
+    # THE CONSEQUENCE IS ARITHMETIC, NOT STATISTICS. On a lens the gate cannot
+    # fill, a candidate's replay delta is exactly $0.00 — so RESTRICT passes
+    # `not_worse` for free (it fails only if `var < base - tol`), while EXPAND
+    # needs `+MARGIN_HALF` on BOTH halves and can never clear $0.00, and the
+    # starving-widen path needs `taken > 0` and logs "0 replay fills — no
+    # evidence". **The cage on this book's only living lens could only ever get
+    # smaller.** That is the one-way ratchet, in the actuator.
+    #
+    # WHAT THIS FIX CLAIMS, AND WHAT IT DOES NOT. `clamp()` is
+    # `min(hi, max(lo, v))` and runs at READ as well as write, so pinning the
+    # restrictive end at the default snaps both live levers back on the next
+    # `get_lever` — no lever write, no deploy race. It is NOT a widening: the
+    # values return to what the operator configured, and reach in the growth
+    # direction is untouched (max_hold may still go to 72, brk_range down to
+    # 0.90). It is also NOT sold as alpha — the 24h->48h restoration measures
+    # +0.22pp to +0.57pp/trade on the book's own closes but LOSES to a
+    # same-coin random-start placebo (P=0.45..0.88), i.e. most of it is
+    # exposure rather than edge. **The claim is that an unevidenced
+    # restriction is reversed**, and the burden for undoing a restriction a
+    # blind gate imposed is not the burden for widening past a validated one.
+    #
+    # `taker.div_gap_pp` is DELIBERATELY LEFT at its levered 75.0 (default
+    # 62.5). Its lens is divergence, which the replay CAN see (42 taken), so
+    # the tuner had real evidence — and a 12-rung ladder through that replay
+    # reads negative at every rung and monotonically LESS negative as the bar
+    # tightens. Fixing the ratchet means fixing it where the gate is blind,
+    # not everywhere a lever moved.
+    #
+    # THE DURABLE FIX IS UPSTREAM and is NOT in this change: teach
+    # `lighter_ticket_replay` the taker's own breakoutup relabel so the gate
+    # can SEE the lens before it is allowed to steer it. Until then, do NOT
+    # add any breakoutup constant to `lighter_scout_tuner`'s PROPOSAL_TAKER /
+    # TAKER_LADDERS / SWEEP_* — that hands more of this book to a blind
+    # actuator. The two levers below are registered for CONSUMPTION only, and
+    # their cages are one-sided at the default for exactly this reason.
+    #
     # [2026-08-20 (sf)] THE BREAKOUT ARM'S TREND EXIT JOINS THE RAIL. Under
     # BULL_MODE `bull_exit()` routes breakout/breakoutup to a DIFFERENT exit
     # from every other lens — no TP cap, a wide hard stop, and a trailing
@@ -246,7 +294,7 @@ LEVERS = {
         # cage past 0.15 is reach into a region where the lever does nothing.
         # `lo` 0.04 keeps a tightening notch available if the trend arm ever
         # measures better banking earlier.
-        "kind": "float", "lo": 0.04, "hi": 0.15, "lane": "lighter-taker",
+        "kind": "float", "lo": 0.06, "hi": 0.15, "lane": "lighter-taker",
         "note": ("breakout TREND exit: give-back off the peak before banking; "
                  "env default 0.06 (TT_BRK_TRAIL)"),
         "env_default": 0.06, "step": 0.01},
@@ -255,7 +303,7 @@ LEVERS = {
         # widest the arm's own rationale supports ("entries draw -3.4% before
         # running"); -0.05 is a notch tighter than shipped and still wider
         # than the reversion bracket's -0.03, which the breakout pop churns.
-        "kind": "float", "lo": -0.12, "hi": -0.05, "lane": "lighter-taker",
+        "kind": "float", "lo": -0.12, "hi": -0.07, "lane": "lighter-taker",
         "note": ("breakout TREND exit: wide hard stop; env default -0.07 "
                  "(TT_BRK_SL)"),
         "env_default": -0.07, "step": -0.01},

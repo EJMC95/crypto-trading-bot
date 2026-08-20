@@ -42,8 +42,15 @@ def test_the_trend_exit_knob_is_registered_caged_and_consumed(lever, attr,
     assert lev["lane"] == "lighter-taker", lev
     assert lev["env_default"] == default == getattr(TT, attr), (
         "the registry default must be the value the consumer actually runs")
-    assert lev["lo"] < default < lev["hi"], (
-        f"{lever} has no room in one direction: {lev}")
+    # [(sf)] ONE-SIDED at the default, deliberately — see
+    # tests/autonomy/test_breakoutup_ratchet.py. While the actuator that would
+    # move these is blind to the lens they govern, its restrict path enacts for
+    # free and its expand path is arithmetically impossible, so a cage with
+    # room in the TIGHTEN direction is a one-way ratchet. All the room is in
+    # the growth direction; that the restrictive end sits AT the default is
+    # asserted there, and here we only require the cage is not welded shut.
+    assert lev["lo"] <= default <= lev["hi"] and lev["lo"] != lev["hi"], (
+        f"{lever} cage is degenerate: {lev}")
     assert (lever, attr) in TT.TUNABLE, (
         f"{lever} is registered but not in TUNABLE — registered-but-inert, "
         "the exact failure the lighter-books lane was created to prevent")

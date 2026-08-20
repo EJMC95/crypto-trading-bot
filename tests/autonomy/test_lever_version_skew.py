@@ -146,10 +146,26 @@ class TestItShipsInert:
     book by surprise."""
 
     OPEN_ON_THE_BUS = {
-        "taker.momo_chg": 6.0, "taker.brk_range": 0.97,
+        "taker.momo_chg": 6.0,
         "evsent.min_sources": 3, "evsent.severity_bar": 0.55,
         "scout.dip_range_max": 0.2, "xp.funding.slope_gate": 0,
     }
+
+    #: [2026-08-20 (sf)] DELIBERATELY CLAMPED — a live lever this registry now
+    #: refuses ON PURPOSE, with the value it snaps back to. Split out rather
+    #: than deleted, because "this cage moved a live lever" is a decision that
+    #: must stay visible and stay asserted: silently dropping the row would
+    #: make the next accidental clamp indistinguishable from this intended one.
+    #:
+    #: `taker.brk_range` sat at 0.97 — the TIGHTEST end of its old cage, above
+    #: the 0.95 module default — put there by the scout-tuner from an
+    #: event-sentinel proposal, on 🎫 the Ticket Taker's ONLY living lens. The
+    #: tuner's replay cannot fill that lens (`lighter_ticket_replay.py:206`
+    #: refuses every breakout entry), so restrict enacted for free and expand
+    #: was arithmetically impossible: a one-way ratchet. The cage's restrictive
+    #: end is now pinned AT the default, which reverses the lever at the
+    #: consumer with no lever write.
+    DELIBERATELY_CLAMPED = {"taker.brk_range": (0.97, 0.95)}
 
     @pytest.mark.parametrize("name,value", sorted(OPEN_ON_THE_BUS.items()))
     def test_no_open_lever_skews_under_head(self, name, value):
@@ -157,3 +173,34 @@ class TestItShipsInert:
         assert c is not None and abs(float(c) - float(value)) < 1e-9, (
             f"{name} would start refusing — this guard is meant to be inert "
             f"on the currently-open set")
+
+    @pytest.mark.parametrize("name,pair", sorted(DELIBERATELY_CLAMPED.items()))
+    def test_a_deliberate_clamp_still_clamps_to_the_declared_value(self, name,
+                                                                   pair):
+        """The other direction, and it is the one that matters: if a later
+        cage edit quietly restored the old bound, the ratchet would be back
+        and nothing else in the suite would notice."""
+        was, becomes = pair
+        c = ft.clamp(name, was)
+        assert c is not None and abs(float(c) - becomes) < 1e-9, (
+            f"{name} no longer clamps {was} -> {becomes}: the (sf) cage pin "
+            "has been undone and the one-way ratchet is open again")
+
+    def test_neither_declaration_can_be_emptied_into_silence(self):
+        """Caught by a SURVIVING mutation on the day this shipped: emptying
+        `DELIBERATELY_CLAMPED` leaves the parametrized test above with zero
+        cases, and a parametrize over nothing PASSES. That is the
+        check-that-inspects-nothing failure — the guard would go green while
+        asserting nothing at all, and the (sf) cage pin could then be undone
+        with the suite still clean."""
+        assert self.DELIBERATELY_CLAMPED, (
+            "the deliberate-clamp declaration is empty — the clamp assertions "
+            "above are now vacuous")
+        assert self.OPEN_ON_THE_BUS, (
+            "the inert-set declaration is empty — same vacuity, other half")
+
+    def test_the_two_sets_are_disjoint(self):
+        """A lever cannot be both inert and deliberately clamped — the
+        contradiction would make one of the two assertions vacuous."""
+        assert not (set(self.OPEN_ON_THE_BUS)
+                    & set(self.DELIBERATELY_CLAMPED))

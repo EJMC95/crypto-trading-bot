@@ -184,6 +184,73 @@ is a step back in a growth costume. Three of them here, each with the number tha
 killed it — and the instruments stay, so the next candidate costs one command
 instead of a session.
 
+### 🎫 AND THE ONE THE FLEET'S OWN AUDIT FOUND: THE GROWTH RAIL COULD ONLY EVER SHRINK THE TAKER'S ONE LIVING LENS
+
+A nine-book per-book audit ran behind this pass, every finding attacked by two
+adversarial lenses. Its first result is the operator's complaint located in the
+actuator, and I verified the mechanism myself before acting on it because it is
+arithmetic rather than statistics.
+
+🎫 the Ticket Taker's shadow book trades exactly ONE lens — `long-breakoutup`
+holds every open slot; `dip` and `divergence` are both vetoed by the book's own
+realised record. **Measured on the live bus, both registered levers that reach
+that lens sat at the TIGHTEST end of their cage:**
+
+    taker.brk_range   0.97   cage [0.90, 0.97]   hi = tightest   default 0.95
+    taker.max_hold_h  24.0   cage [24.0, 72.0]   lo = tightest   default 48.0
+
+Both `set_by: scout-tuner`, both from `organ-proposal:event-sentinel`. And
+`lighter_ticket_replay.py:206` reads `_up = False if lens == "breakout" else
+None`, so `bull_entry_ok` refuses **every** breakout entry and the replay that
+gates those enactments contains **zero** breakoutup trades. The tuner's own
+published baseline says so in its own words: `breakout taken=0 closed=0`.
+
+**The consequence is arithmetic.** On a lens the gate cannot fill, a candidate's
+replay delta is exactly `$0.00`:
+
+    RESTRICT  fails only if `var < base - tol`   ->  0.00 passes: ENACTED FREE
+    EXPAND    needs +MARGIN_HALF on both halves  ->  0.00 can never clear it
+    STARVING  needs `taken > 0`                  ->  "0 replay fills — no evidence"
+
+**The cage on this book's only living lens could only ever get smaller,
+forever.** Not a tuning accident — a structural property of pointing a blind
+gate at a live lens. And the setting it ratcheted to is the worst cell this
+session measured: 24h reads **+0.343%/trade** against 48h's **+1.422%**.
+
+**THE FIX: pin each cage's restrictive end AT the module default.** `clamp()` is
+`min(hi, max(lo, v))` and runs at READ, so both live levers snap back on the next
+`get_lever` — no lever write, no deploy race. Reach in the growth direction is
+untouched (max_hold may still go to 72, brk_range down to 0.90). It propagates to
+every place that could re-introduce it: the tuner's own `SWEEP_HOLD` loses its
+24h rung, the incubator's **enactable** gene pool loses the 24.0 and 0.97 alleles
+(its RESEARCH grids keep theirs — they are required to extend beyond the cage,
+and truncating them was my error, caught by the incubator's own selftest).
+
+**WHAT THIS DOES NOT CLAIM.** It is not a widening — the values return to what
+the operator configured. And it is not sold as alpha: restoring 24h → 48h
+measures +0.22pp to +0.57pp/trade on the book's own closes and **loses to a
+same-coin random-start placebo (P=0.45–0.88)**, i.e. most of it is exposure
+rather than edge. The claim is that **an unevidenced restriction is reversed**,
+and the burden for undoing a restriction a blind gate imposed is not the burden
+for widening past a validated one.
+
+**`taker.div_gap_pp` is deliberately left at its levered 75.0 (default 62.5).**
+Its lens is divergence, which the replay CAN see (42 taken), so the tuner had
+real evidence — and a 12-rung ladder through that replay reads negative at every
+rung and monotonically LESS negative as the bar tightens. Fixing a ratchet means
+fixing it where the gate is blind, not everywhere a lever moved.
+
+**THE DURABLE FIX IS UPSTREAM AND IS NOT HERE:** teach the replay the taker's own
+breakoutup relabel so the gate can SEE the lens before it is allowed to steer it.
+Until that lands, no breakoutup constant may enter the tuner's ladders — asserted,
+not merely written down. The `(sf)` trend-exit levers above are registered for
+CONSUMPTION only and their cages are one-sided at the default for this reason.
+
+Ten mutations verified red — **and one SURVIVED and was fixed**: emptying the
+new `DELIBERATELY_CLAMPED` declaration left its parametrized test with zero
+cases, and a parametrize over nothing passes. That is the
+check-that-inspects-nothing failure, in a guard written in this same entry.
+
 ### THE RISK MY OWN CHANGE CREATED, FOUND AND CLOSED IN THE SAME PASS
 
 Widening a gate is the same act as minting a book, and I20 says the same thing
