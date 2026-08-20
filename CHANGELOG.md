@@ -154,6 +154,40 @@ is a step back in a growth costume. Three of them here, each with the number tha
 killed it — and the instruments stay, so the next candidate costs one command
 instead of a session.
 
+### THE RISK MY OWN CHANGE CREATED, FOUND AND CLOSED IN THE SAME PASS
+
+Widening a gate is the same act as minting a book, and I20 says the same thing
+about it: *"name every living book whose gate already admits them."* Carry's
+floor is now conditional, so **`audit_book_overlap` was reading a floor that no
+longer describes the book.** `living_gates` takes each book's gate from its own
+published `caps`, and `caps.min_vol` still says $1M while the real reach runs
+underneath it.
+
+That is the `(gl)` phantom-rival class **inverted**, and the inverted direction
+is the worse one: a phantom rival is noise an operator learns to ignore, but a
+rival that is REAL and INVISIBLE starves a sibling with nothing failing the run.
+`living_gates` now reads the published `depth_admit` and models the floor as
+UNBOUNDED BELOW — not a guess at an effective number, because there isn't one:
+the escape is per-coin. It is a measurement (16 of 16 sub-floor hot books passed
+on 20-Aug), and the books carry cannot reach are excluded by PAYBACK, which is a
+question this file's volume axis cannot express.
+
+The `(px)` declaration is extended in place: **the sliver is now the whole band.**
+Carry reaches to the bottom of 🛢️ Garrett's `[0.1M, 2M)`, not just its top slice,
+and the six coins that are both ≥20% and inside Garrett's band are named
+(UNITREE, ZRO, KAITO, ANSEM, APEX, CXMT). **It is NOT the `(lv)` starvation
+shape** — those are separate processes with separate held-sets, where the Barnes
+trap needed one loop, one shared held-set and a subset gate running second. But
+one new asymmetry is declared rather than detected: Garrett's own `(pl)`
+measurement found **6 of 6 of its top-ranked candidates are ≥20%**, so carry is
+now a rival for exactly the supply Garrett ranks first. That is a RANKING
+collision, and this guard's axes (apr × vol × class) cannot express it. Owner:
+OPERATOR, the same ~12-Sep decision point.
+
+Four more mutations verified red on that arm, including the one that matters
+most — a truthy-instead-of-bool read, which would let a malformed payload widen
+a book's claimed reach and manufacture a collision.
+
 ### CARRIED
 
 * `taker.brk_trail` / `taker.brk_sl` / the breakout arm's clock are unregistered
