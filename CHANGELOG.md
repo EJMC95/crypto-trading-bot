@@ -74,6 +74,110 @@ by construction). Central estimate `S_d = 0.293` ⇒ **47 days to gate**. It nee
 LEVERAGE 1 with no maintenance requirement, so a levered book on it survives
 excursions a real account would not and BOOKS THE RECOVERY. That is the next
 build, not this one.
+## 2026-08-20 (sg) — THE REPLAY THAT GATES EVERY GROWTH-RAIL ACTUATOR WAS BLIND TO 39% OF THE TAKER, AND SAID SO ONLY IN A CODE COMMENT
+
+**Operator, 20-Aug:** *"What is with everything measuring and not shipping - we
+find positive improvement and leave them sitting there doing nothing and
+eventually getting missed and not growing ... Implement all improvements
+please this backwards momentum has to stop."*
+
+Taken, and the first thing it caught was one of my OWN parked items. I had
+recorded 🎫 the Ticket Taker's trail defect as "measured, not shipped — this
+book's era clock is the one thing standing between it and a go-live grade, and
+a bracket change resets it." **That reason is FALSE.** The era signature is
+`("venue", "bull", "lenses", "sides")` — `lighter_ticket_taker.current_policy`
+and `golive_readiness.POLICY_SIG_FIELDS`, pinned byte-equal — and a bracket or
+trail is not in it. `(hc)` says so explicitly: capacity and bracket tuning is
+ORDINARY and must not reset an era. I invented a blocker out of a doctrine that
+says the opposite, and parked a fix behind it.
+
+Going after that fix properly then found something much bigger.
+
+### The attribution that looked like the finding was outcome-conditioned
+`long-breakoutup_hold` n=27 **+$23.77** (59% win, 24.1h) against
+`long-breakoutup_trail` n=18 **−$9.59** (33% win, 13.0h), same lens. That reads
+as "the trail is destroying the book's best bucket" — and it cannot, because a
+position exits via `trail` ONLY if it was in profit and gave the peak back. The
+buckets are not randomly assigned. **I7: a split a book satisfies structurally
+is not a measurement.** So the question went to `lighter_ticket_replay`, which
+drives the taker's own code over the recorded tape.
+
+### The replay could not reproduce the book — and the gap was 39% of it
+The replay forces the breakout lens INERT:
+
+    _up = False if lens == "breakout" else None   # "the replay cannot
+                                                 #  reproduce up_read"
+
+That is **declared, not a bug** — and checking it against the design before
+believing it is this repo's own rule. But the consequence was far larger than
+the note implied, and nothing published it:
+
+* The taker relabels an up-regime crypto breakout to the taker-internal lens
+  **`breakoutup` BEFORE the brain veto** ((dk)) — that relabel is exactly how
+  the subset escapes the broad `breakout` veto and fills. With `up=False` the
+  relabel never fires, the ticket stays `breakout`, the veto kills it, and the
+  lens reads `taken: 0`.
+* **MEASURED: `breakoutup` is 14 of the taker's 36 closes in 7 days (39%)** and
+  its `hold` bucket is the book's single largest earner.
+* A whole-file grep across the five consumers — `lighter_ticket_replay`,
+  `lighter_scout_tuner`, `lighter_market_scout`, `strategy_incubator`,
+  `fleet_proprioception` — finds the string `breakoutup` in **none of them**.
+* So the live `scout-tuner` payload published **`baseline_net: -19.97`** for a
+  book whose row reads **+$30.11**. Every lever candidate this fleet has walked
+  on the taker was scored against the LOSING 61% of it. A lever that helped
+  `breakoutup` and hurt `divergence` could only ever be rejected.
+
+### It was reproducible, not merely declarable
+`up_read` is already time-parameterised (`end_ms = now_ts * 1000`), so the
+regime can be resolved AS OF each snapshot with no look-ahead.
+`daily_up_resolver(symbols, lo, hi)` fetches daily closes ONCE per symbol and
+answers each snapshot from the bars that had already CLOSED at that instant —
+the same completed-bar rule `up_read` applies when it drops the still-forming
+daily bar. Keyed on the bar's **close** (`t + 86400`), because keying on the
+open would read a bar a full day early: look-ahead wearing an off-by-one.
+
+Measured on the same 2,008-snapshot / 7-day tape:
+
+| | closed net | open (unrealized) | implied |
+|---|---|---|---|
+| **without resolver** (what every actuator sees today) | −$18.73 | +$0.78 | **−$17.95** |
+| **with resolver** | −$12.31 | **+$29.26** | **+$16.95** |
+
+**A $34.90 correction to the number the growth rail compares everything
+against**, and `breakoutup` comes back at `taken=15` against the live ledger's
+14 closes over the same window — the calibration this harness could not
+previously offer on that lens. `divergence` correctly falls 36 → 24 taken,
+because breakoutup now competes for the same 6 slots exactly as it does live.
+
+### What shipped
+* `replay(..., up_resolver=None)` — **OPT-IN**, so every existing caller is
+  byte-identical until it asks for coverage. The relabel mirrors the taker's
+  own three conditions (up is True AND long AND crypto), in the same order,
+  before the veto.
+* **`coverage` in every report** (I18/(lv)): a run that cannot reach a lens now
+  NAMES it and why. `taken: 0` was byte-identical between "quiet" and
+  "structurally impossible", which is how this survived in a code comment.
+* `lighter_scout_tuner` builds the resolver once per cycle and threads it
+  through `replay_with` — the single choke point, so a candidate and its
+  baseline are never scored over different coverage. Fail-safe to the old
+  behaviour with a printed REDUCED COVERAGE line, kill switch
+  `SCOUT_TUNER_UP_RESOLVER=0`, and the cycle payload carries `coverage`.
+* A 6-hour per-symbol series cache, since daily bars move once a day.
+
+**Nine mutations verified RED across both files** — and two of them SURVIVED
+the first round, both because the pin was self-referential rather than because
+the code was right: the relabel test satisfied all three conditions at once (so
+a mutant relabelling on `long` alone passed), and `_daily_closes` was never
+exercised at all because the resolver arms inject a pre-keyed series (so the
+bar-close-vs-bar-open keying — the actual look-ahead risk — was untested).
+Both now have independent negative cases. That is I3 doing its job on me twice
+in one file.
+
+**The trail question is still open and is now ANSWERABLE**: with coverage the
+breakoutup bucket reads `{trail: 5, hold: 4}` at 56% win on n=9 closes — too
+thin to move a constant on, but for the first time it is a number the harness
+can produce at all. Sweeping `TT_BRK_TRAIL` is now a real experiment rather
+than a comparison of two outcome-conditioned buckets.
 
 ## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
 
