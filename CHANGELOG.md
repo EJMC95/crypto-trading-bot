@@ -251,6 +251,336 @@ books' entry sizing, so this changes paper position sizes today — 17 books get
 `test_allocation_consumer.py`), and `FLEET_ALLOCATION_MODE=advisory` reverts every
 consumer to its env default at the accessor. Era NOT reset anywhere: no book's
 trading RULE changed.
+## 2026-08-20 (sf) — I22 SHIPS: A BOOK MUST SPEND THE ECOSYSTEM, AND TWO OF THE WALLS THIS SESSION HIT WERE IMAGINARY — a wrong API path and an untested query parameter
+
+**Operator, 20-Aug:** *"im over the constant brick wall you put up that nothing
+works, the rulebook that chokes everything until it cant move. lets find a way to
+see where the light is pointed and drive towards that"* / *"we should be running
+this mandate and doctrine on building bots that can utilize every aspect of the
+ecosystem we are currently working on."*
+
+**THE INVARIANT (I22), and it is arithmetic rather than exhortation.** With
+`t = S_d*sqrt(T)`, **days-to-gate = (2/S_d)^2**, and for independent sleeves
+`S_d^2 = SUM S_i^2`. **Decidability velocity is ADDITIVE — one construct is one
+term in that sum**, so a single-sleeve book does not merely earn less, it earns a
+DECISION more slowly by the square. That is every I17 retirement this fleet has
+made, collecting: 🌊 9 buys/0 sells in 22d · 📊 17.2 closes/yr · 🧙 ~719 closes =
+40 months · 🎸 0 of 9 episodes independent of its parent. **The operator's
+diagnosis was right and it has an equation.**
+
+Enforced by `scripts/audit_book_spend.py`: a book born on or after today
+publishes `extra.spend` — `markets_scanned` · `n_eff` (correlation-aware, never a
+symbol count) · `sides` · `gross_x` · `days_to_gate_obs` — and **a design whose
+days-to-gate exceeds 60 is a STUDY, not a book.** Scoped to BIRTHS on purpose:
+requiring it of all 19 existing rows would redden the build over history and
+teach everyone to route around the guard, so the pre-I22 books sit in a
+`GRANDFATHERED` map that carries a REASON each (the `BORN_DARK_OK` idiom).
+Fail-CLOSED on the feed. Selftest runs FIRST and offline in CI so a network
+wobble can never masquerade as a pass.
+
+**WIDTH IS NOT THE CLAIM, and the invariant says so in its own text** — market
+count is not bet count: 8 crypto markets are **1.35** independent bets (mean
+pairwise corr +0.545), 8 cross-class are **4.81**. `fleet_risk` publishes
+`long_effective_n` as `1/HHI` over DISTINCT SYMBOLS and so reports 9.0 for 9
+correlated longs, **overstating independence ~5x inside the organ whose own
+docstring warns that "23 open longs that are all crypto beta is ~one trade, and
+nothing said so."** And leverage adds **no** `S_d` — it multiplies mean and sd
+alike, so `t` is invariant; it multiplies dollars and drawdown, and is admissible
+only as an OUTPUT of a vol target on a book whose `N_eff` has been measured.
+
+**AND NOW THE PART WORTH MORE THAN THE INVARIANT.** The operator's word was
+*wall*. Two of the walls this session hit were **mine, and both were imaginary**:
+
+* **`/api/v1/candlesticks` returns 403 — because THAT PATH DOES NOT EXIST.**
+  `/api/v1/candles` returns **200** with full OHLC, verified this pass. I reported
+  the 403 as an environment block, tested it from two egress paths, and designed
+  the 👩 mum autopsy around *not having price history*. The endpoint was there the
+  whole time under a different name. That false constraint has already suppressed
+  at least one price-path study.
+* **`/trades.json` "caps at 500 rows" — it does not.** `?bot=<id>&limit=5000`
+  returns the full ledger (141 for 🔮 georgia, 120 for ⚖️ Counterweight). I wrote
+  the cap into `(sc)` as a declared limitation **instead of testing the query
+  parameter**, and measured a real-money-adjacent claim on 27 rows when 120 were
+  available.
+
+**The consequence is recorded in `(sc)`, corrected in place per I12: that entry's
+"3.6x" was an artifact of the 27-row RECENT window; on the full 120 the fix is
+worth 1.11x** (price-only −1.433%/trade t=−1.91 vs funding-inclusive −1.292%
+t=−1.84), the code fix stands unchanged, and its argument that ⚖️ Counterweight
+faced retirement on a materially wrong number **does not**.
+
+**THE LESSON, which is the operator's point in a form I can act on: a constraint
+I have not tested is not a constraint, it is an assumption — and this fleet's own
+doctrine already says empty output is not a negative result ((po)) without ever
+extending it to "a 403 is not a closed door" or "a default page size is not a
+cap".** Both walls were load-bearing in my reasoning within an hour of being
+invented. Before declaring any limit, probe it: try the other path, pass the
+parameter, read the API surface.
+
+Also landed this pass: the venue's margin surface is LIVE on the bus (212 markets
+— `20x:21, 15x:24, 10x:88`), and the full-ecosystem design completed — winner
+⚓ `nav-flinders-lshadow`, per-market sigma-normalised dislocation across all
+classes, sized by vol target, **ledgering one PORTFOLIO EPISODE per UTC day so
+the gate's iid per-close `t` IS the book's honest daily `t`** (`cluster == iid`
+by construction). Central estimate `S_d = 0.293` ⇒ **47 days to gate**. It needs a
+`LeveredPaperBroker` with modelled liquidation first — `paper_broker.py` is
+LEVERAGE 1 with no maintenance requirement, so a levered book on it survives
+excursions a real account would not and BOOKS THE RECOVERY. That is the next
+build, not this one.
+## 2026-08-20 (si) — 🛢️ GARRETT'S STOP IS RIGHT, ITS THINNESS THEORY IS WRONG, AND ITS REAL PROBLEM IS ALREADY ON THE DOCKET — three refutations, no knob turned
+
+`(sh)` closed with *"the honest next step is pooling the funding-directional
+family's 15 stop exits"*. Done in the same session, because a stated next step
+that waits for another day is exactly the rot the operator is objecting to.
+**Nothing shipped here** — and that is the finding, arrived at with numbers
+rather than caution.
+
+### 1. The stop is CORRECT — refuted at the pooled sample
+Garrett's five `short_stop` exits are **87% of its entire loss** (−$12.58 of
+−$15.56), which reads like a stop firing on noise. It is not. Pooled across all
+three books sharing the constant (🛢️ Garrett 5 · 💸 Farmer shadow 9 · 💸 Farmer
+LIVE 2 = **16 stop exits**), asked the same question that moved 🔮 Georgia's
+sibling tags in July — *after the stop, did price come back?*
+
+| horizon | got back to entry | median BEST move vs entry |
+|---|---|---|
+| 24h | **1 of 9 = 11%** | **−4.93%** |
+| 72h | 4 of 11 = 36% | −4.39% |
+| 168h | 6 of 12 = 50% | +2.50% |
+
+**The July precedent moved a stop on 77–89% reclaim within 24h. This is 11%.**
+At their BEST point in the 24h after being stopped, these positions are still
+~5% underwater — they do not snap back, they keep going. The median loss booked
+is −10.02%, i.e. the stop fires exactly where it is set and the move continues.
+Same question, same method, opposite answer — which is why the question was
+worth asking on this book rather than generalising Georgia's result to it.
+
+**Structural note that made this the only admissible action anyway:**
+`HARD_STOP` is a SHARED module constant read by the LIVE Farmer and by the
+judge's A/B control arm. `(ci)` restored both arms to 0.10 precisely so the
+paired promotion bar varies only the xp candidate. Moving the code default
+would touch real money AND re-confound the fleet's only path to `live.funding.*`.
+Garrett takes a per-service env, so it *could* have had its own — the blocker
+was evidential, and now it is answered: don't.
+
+### 2. The thin-tier theory is REFUTED by its own ledger
+Garrett trades the **[$100k, $2M)** band, so "thin coins move violently" is the
+obvious explanation. Measured: the stopped coins are the **HIGHER**-volume ones
+— median **$0.92M** against **$0.56M** for everything it did not stop out of.
+The five stops are VVV, ADA, ZRO, GRASS, LINK; the untouched positions are the
+genuinely tiny non-crypto books (CTR, SKY, ZK, CXMT, GRAM, NATGAS), every one of
+which closed inside ±$0.15. Raising its floor would have removed the flat trades
+and kept the losing ones.
+
+### 3. What is actually wrong is not a parameter
+Split by instrument class:
+
+| class | n | total | mean %/trade | t | stops | win |
+|---|---:|---:|---:|---:|---:|---:|
+| **crypto** | 24 | **−$14.08** | **−2.114%** | **−2.17** | 5 | 42% |
+| non-crypto | 4 | +$0.05 | +0.170% | +0.66 | 0 | 50% |
+
+The book's whole loss is its crypto arm at **t=−2.17**. **A crypto screen is
+NOT the response** — it would delete the only population this book has a real
+sample of and leave n=4 behind, which is the `(hs)`/`(ia)` trap in its purest
+form: making a book look better by removing its evidence.
+
+**And the fleet already knows.** `golive-readiness` grades it n=27, t=−1.83,
+mean −1.460%, halves −1.58/−9.79, horizon verdict **`unreachable`** — *"more of
+the same closes cannot flip mean/t/halves"*. Its era is **6.2 days old** (born
+13-Aug). So this is an I17 keep-or-retire call on a young book, owned by the
+OPERATOR, already visible in the payload that exists to surface exactly this.
+The correct action from a session is to sharpen the attribution and leave the
+decision where it belongs, not to invent a parameter change so the pass has
+something to show.
+
+**Three refusals, each with the number that produced it.** Per the standing
+rule, a refusal with evidence satisfies the growth mandate; a silent omission
+does not.
+
+## 2026-08-20 (sh) — TWO PARKED IMPROVEMENTS SHIPPED, AND THE ONE THAT MOVED THE OTHER WAY IS WHY THEY WERE WORTH MEASURING
+
+Continuing the operator's *"implement all improvements"* directive. Both items
+here were sitting in `(sj)`'s "measured, not shipped" list.
+
+### 🔮 Georgia — `trend_breakout`'s stop joins the sibling tags at 3.5×ATR
+The tag left behind by the 2026-07-13 change, and the one whose stop had become
+the book's largest losing bucket: `long-trend-breakout_trailing_stop_loss`
+fires **66 times at 9% win** (−$17.11, median hold 1.9h) against `_roi` n=35 at
+**100% win** (+$26.67, 2.4h) on the SAME tag.
+
+That split is **outcome-conditioned (I7)** and licenses nothing — a position
+exits via the ratchet only if it went the wrong way — so it was run as a
+COUNTERFACTUAL: her 68 real priced entries held constant, only the multiplier
+moving, her own rule (ratcheting ATR stop, ROI ladder, 1440m cap) walked at
+LAG-1 over Lighter's own candles.
+
+**CALIBRATION GATE FIRST (gx):** at the shipped 2.5× the replay reads
++0.042%/trade against her actual +0.250% — gap −0.209pp, inside tolerance, so
+the sweep may speak. PAIRED against 2.5× on the same entries:
+
+| mult | Δ %/trade | t | h1 | h2 |
+|---|---|---|---|---|
+| 2.0× | +0.091% | +1.98 | +0.023% | +0.158% |
+| 3.0× | −0.016% | −0.27 | +0.102% | −0.133% |
+| **3.5×** | **+0.103%** | **+1.11** | **+0.121%** | **+0.085%** |
+| 4.0× | +0.041% | +0.40 | +0.084% | −0.002% |
+| 5.0× | +0.067% | +0.55 | +0.210% | −0.075% |
+
+**Only 2.0× and 3.5× clear the both-halves floor**; 3.0/4.0/5.0 fail it. Stops
+fall 27 → 22, ROI exits rise 41 → 46, win 60% → 68% — the July mechanism, on
+the tag that missed it.
+
+**WHY 3.5× AND NOT THE SWEEP'S BEST CELL.** The surface is WIGGLY, not a
+plateau (2.0 nearly matches 3.5 while 3.0 dips between them), and picking the
+maximum of a noisy surface is the `(oe)` artifact. **3.5× is not a value this
+sweep discovered — it is the fleet's own prior for this book's sibling tags,
+and the sweep's job was to check the prior is not harmful.** t=+1.11 is sub-bar
+and is stated, not dressed up.
+
+**AND THE SAME SWEEP REFUSED THE OBVIOUS GENERALISATION.** `range_on` was run
+identically and moves the OTHER way: 3.5× reads **−0.280%/trade, t=−2.25, BOTH
+halves negative** (calibration gap +0.031pp). It stays at 2.5×. That asymmetry
+is the reason this is one tag and not a rewrite of the rule — a blanket
+widening would have been the easy, plausible, wrong change, and nothing in the
+code says one tag measured up while its neighbour measured down. Pinned by
+`tests/autonomy/test_georgia_stop_tags.py`, **4 mutations verified red**
+including "widen everything" and "range_on also widened".
+
+### 🎯 Perp Sniper — the last living book publishing no census at all
+It shipped `caps` and nothing else, so `open_trades: 0` was byte-identical
+between *no listing happened*, *the cooldown ledger suppressed everything* and
+*the cap is full*. Every sibling already follows I18/(lv); this one was exempt
+by omission.
+
+It matters more here than anywhere, because `(qi)` measured this book's
+founding listing thesis **REFUTED** and its supply **DEAD** — no crypto birth on
+this venue in 85 days, Jun–Aug 2026 births = 0. So "quiet" is the EXPECTED
+state, and a census is the only thing that can distinguish a healthy quiet from
+a broken one. `run_snipe_pass` is the single choke point every refusal passes
+through, so it now counts them: `offered / dupe / held / abandoned / capped /
+failed / opened`, plus per-SOURCE supply (`listing / surge / young`) and the
+structural suppressors (`surge_cooldown`, `not_young`, `pending`, `max_open`).
+
+Per-source matters: this book has one dead source and two live ones, and a
+single `opened: 0` cannot tell them apart. `failed` is deliberately its own
+bucket beside `capped` — one means the venue refused us, the other means we
+refused ourselves.
+
+**The arm that makes it a census rather than decoration** is the accounting
+identity: every offered candidate must land in exactly one bucket, so a refusal
+route added later cannot silently vanish. Census stays OPTIONAL (existing
+callers pass none). **5 mutations verified red.**
+
+### Still open, and now for a stated reason rather than a vague one
+🛢️ Garrett's four −10.2% stops (87% of its loss) remain at n=4 — a stop is not
+moved on four observations, and the honest next step is pooling the funding-
+directional family's 15 stop exits, not a bolder read of the same four.
+
+## 2026-08-20 (sg) — THE REPLAY THAT GATES EVERY GROWTH-RAIL ACTUATOR WAS BLIND TO 39% OF THE TAKER, AND SAID SO ONLY IN A CODE COMMENT
+
+**Operator, 20-Aug:** *"What is with everything measuring and not shipping - we
+find positive improvement and leave them sitting there doing nothing and
+eventually getting missed and not growing ... Implement all improvements
+please this backwards momentum has to stop."*
+
+Taken, and the first thing it caught was one of my OWN parked items. I had
+recorded 🎫 the Ticket Taker's trail defect as "measured, not shipped — this
+book's era clock is the one thing standing between it and a go-live grade, and
+a bracket change resets it." **That reason is FALSE.** The era signature is
+`("venue", "bull", "lenses", "sides")` — `lighter_ticket_taker.current_policy`
+and `golive_readiness.POLICY_SIG_FIELDS`, pinned byte-equal — and a bracket or
+trail is not in it. `(hc)` says so explicitly: capacity and bracket tuning is
+ORDINARY and must not reset an era. I invented a blocker out of a doctrine that
+says the opposite, and parked a fix behind it.
+
+Going after that fix properly then found something much bigger.
+
+### The attribution that looked like the finding was outcome-conditioned
+`long-breakoutup_hold` n=27 **+$23.77** (59% win, 24.1h) against
+`long-breakoutup_trail` n=18 **−$9.59** (33% win, 13.0h), same lens. That reads
+as "the trail is destroying the book's best bucket" — and it cannot, because a
+position exits via `trail` ONLY if it was in profit and gave the peak back. The
+buckets are not randomly assigned. **I7: a split a book satisfies structurally
+is not a measurement.** So the question went to `lighter_ticket_replay`, which
+drives the taker's own code over the recorded tape.
+
+### The replay could not reproduce the book — and the gap was 39% of it
+The replay forces the breakout lens INERT:
+
+    _up = False if lens == "breakout" else None   # "the replay cannot
+                                                 #  reproduce up_read"
+
+That is **declared, not a bug** — and checking it against the design before
+believing it is this repo's own rule. But the consequence was far larger than
+the note implied, and nothing published it:
+
+* The taker relabels an up-regime crypto breakout to the taker-internal lens
+  **`breakoutup` BEFORE the brain veto** ((dk)) — that relabel is exactly how
+  the subset escapes the broad `breakout` veto and fills. With `up=False` the
+  relabel never fires, the ticket stays `breakout`, the veto kills it, and the
+  lens reads `taken: 0`.
+* **MEASURED: `breakoutup` is 14 of the taker's 36 closes in 7 days (39%)** and
+  its `hold` bucket is the book's single largest earner.
+* A whole-file grep across the five consumers — `lighter_ticket_replay`,
+  `lighter_scout_tuner`, `lighter_market_scout`, `strategy_incubator`,
+  `fleet_proprioception` — finds the string `breakoutup` in **none of them**.
+* So the live `scout-tuner` payload published **`baseline_net: -19.97`** for a
+  book whose row reads **+$30.11**. Every lever candidate this fleet has walked
+  on the taker was scored against the LOSING 61% of it. A lever that helped
+  `breakoutup` and hurt `divergence` could only ever be rejected.
+
+### It was reproducible, not merely declarable
+`up_read` is already time-parameterised (`end_ms = now_ts * 1000`), so the
+regime can be resolved AS OF each snapshot with no look-ahead.
+`daily_up_resolver(symbols, lo, hi)` fetches daily closes ONCE per symbol and
+answers each snapshot from the bars that had already CLOSED at that instant —
+the same completed-bar rule `up_read` applies when it drops the still-forming
+daily bar. Keyed on the bar's **close** (`t + 86400`), because keying on the
+open would read a bar a full day early: look-ahead wearing an off-by-one.
+
+Measured on the same 2,008-snapshot / 7-day tape:
+
+| | closed net | open (unrealized) | implied |
+|---|---|---|---|
+| **without resolver** (what every actuator sees today) | −$18.73 | +$0.78 | **−$17.95** |
+| **with resolver** | −$12.31 | **+$29.26** | **+$16.95** |
+
+**A $34.90 correction to the number the growth rail compares everything
+against**, and `breakoutup` comes back at `taken=15` against the live ledger's
+14 closes over the same window — the calibration this harness could not
+previously offer on that lens. `divergence` correctly falls 36 → 24 taken,
+because breakoutup now competes for the same 6 slots exactly as it does live.
+
+### What shipped
+* `replay(..., up_resolver=None)` — **OPT-IN**, so every existing caller is
+  byte-identical until it asks for coverage. The relabel mirrors the taker's
+  own three conditions (up is True AND long AND crypto), in the same order,
+  before the veto.
+* **`coverage` in every report** (I18/(lv)): a run that cannot reach a lens now
+  NAMES it and why. `taken: 0` was byte-identical between "quiet" and
+  "structurally impossible", which is how this survived in a code comment.
+* `lighter_scout_tuner` builds the resolver once per cycle and threads it
+  through `replay_with` — the single choke point, so a candidate and its
+  baseline are never scored over different coverage. Fail-safe to the old
+  behaviour with a printed REDUCED COVERAGE line, kill switch
+  `SCOUT_TUNER_UP_RESOLVER=0`, and the cycle payload carries `coverage`.
+* A 6-hour per-symbol series cache, since daily bars move once a day.
+
+**Nine mutations verified RED across both files** — and two of them SURVIVED
+the first round, both because the pin was self-referential rather than because
+the code was right: the relabel test satisfied all three conditions at once (so
+a mutant relabelling on `long` alone passed), and `_daily_closes` was never
+exercised at all because the resolver arms inject a pre-keyed series (so the
+bar-close-vs-bar-open keying — the actual look-ahead risk — was untested).
+Both now have independent negative cases. That is I3 doing its job on me twice
+in one file.
+
+**The trail question is still open and is now ANSWERABLE**: with coverage the
+breakoutup bucket reads `{trail: 5, hold: 4}` at 56% win on n=9 closes — too
+thin to move a constant on, but for the first time it is a number the harness
+can produce at all. Sweeping `TT_BRK_TRAIL` is now a real experiment rather
+than a comparison of two outcome-conditioned buckets.
 
 ## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
 
@@ -437,6 +767,7 @@ now reads `baseline: GREEN` and kills correctly.
 Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
+## 2026-08-20 (sj) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
 
 ## 2026-08-20 (sl) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
 
@@ -573,7 +904,172 @@ young screen changes which trades the book takes, so its 33 closes are a
 different policy — but the source it changes has contributed ZERO of them, so
 there is nothing in the sample to invalidate. Declared rather than assumed.**
 
-## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT IS GRADED 3.6× WORSE THAN IT PERFORMS: the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
+*(Renumbered (sd) -> (sf) -> **(sj)** before merge. `main` took (sd) for the leverage entry and (se) for the margin-surface one while this was being written; then, while this branch waited on CI, it took (sf) too for the I22 entry. The letter that is already on `main` keeps it — neither is cited from tracked code, so the tie-break is which one a reader of `main` would already be relying on. All four citation sites were enumerated with a COUNT first, per the truncated-search rule; every one was inside this file.)*
+
+**Operator, 20-Aug:** *"it is clear that the bots are too restricted, entry and
+exits are completely off, its as if they all share the same metrics and
+parameters which is false and ive never asked or it. individually look at where
+each bot is being choked, where its entry could be better, how it could exit
+more effectively and stop this perpetual risk focused nothing works mantra."*
+
+**The shared-parameter claim is CORRECT and it is measurable from the live
+payload.** Four unrelated books publish `clip_usd: 80.0` (📐 Grimes, 🧮 Hull,
+🏦 Kiyosaki, 🧭 nav-cook); two publish `min_vol: 2000000.0` (🧮/🏦); two publish
+`min_vol_m: 1.0` (🧘 Douglas, 📐); two publish `universe_n: 18` and two more
+`universe_n: 40`. Those are birth-inheritance, not per-book derivations. The
+sharp form of the defect is **an inherited constant whose own SOURCE has since
+moved**, and this pass found one and shipped the correction.
+
+**Every change below is on ONE book, from THAT book's own number.** None is a
+fleet-wide sweep — that is the habit being corrected.
+
+### 👩 mum — the EXIT was truncating a measured cell by more than half
+Her `MAX_HOLD_MIN` was 12h, set on the carry-drag measurement (+0.0171%/day),
+which priced the COST of holding and never measured the BENEFIT. Measured on
+her shipped cell's own tape (RSI(14)<25 AND NOT e50>e200, 1,055 signals, 18
+coins, 208d Lighter 1h, exit-free per `(qu)`'s own "run the exit-free forward
+test FIRST"):
+
+| hold | 4h | 8h | **12h** | 18h | **24h** | 36h | 48h |
+|---|---|---|---|---|---|---|---|
+| mean | +0.069% | +0.293% | **+0.583%** | +1.088% | **+1.233%** | +0.874% | +1.554% |
+| t | +0.94 | +2.59 | **+4.54** | +7.45 | **+8.30** | +6.02 | +8.96 |
+
+Positive in BOTH chronological halves from 8h out. The carry drag at 24h is
+**0.017% against a +1.233% gain** — two orders of magnitude below the term the
+cap was set to avoid, so it does not bind anywhere in this range. **12h → 24h**,
+and the ROI ladder stretched over the same 24h because its terminal
+exit-at-any-profit rung firing at 12h is the mechanism doing the truncating.
+24h is the plateau INTERIOR, not the maximum (48h reads higher and is
+deliberately not taken — shipping a swept grid's maximum is how an `(oe)`-style
+artifact deploys). Ladder LEVELS are not loosened: the early rungs are RAISED
+(240m 1.2%→1.6%, 480m 0.6%→1.2%). 25 pins green.
+
+**AND A CORRECTION TO MY OWN FIRST READING, before it becomes folklore.** I
+first called mum "the clearest choke in the fleet" off her census field
+`rsi_min: 36.5` against a bar of 25 — i.e. nothing near the bar. That is a
+**SNAPSHOT, not a rate**, and reading it as a rate is the (hd)/I7 error this
+repo keeps paying for. Measured: the cell fires **152 times per 30 days across
+18 coins**. She is not starved and her bar is not too tight — the dose-response
+is monotone DECREASING in the bar (rsi<25 +1.233% at 24h; <30 +0.628%; <35
++0.427%; <40 +0.309%), so widening it would have diluted her edge 2–4×. **The
+widening I was about to ship would have made her worse.** The bar stays at 25.
+
+### 🏦 Rich Dad — an inherited floor its own source had already moved
+`MIN_VOL` was `2e6`, taken verbatim from 🌾 carry at birth (13-Aug). **Carry
+moved it to `1e6` on 18-Aug `(px)`** after measuring its own cell: occupancy
+5.73% → 13.42%, qualifying population 3 → 6 coins, all crypto, inside the
+`(it)` cage. Kiyosaki enters the SAME cell on the same venue and was left
+behind — 7 days alive, **ZERO trades**, census `cold 209/228`. **2e6 → 1e6.**
+Its own extra gate (payback velocity, ~21.9% TRUE) is untouched and still binds
+ABOVE carry's 20% floor, so this admits nothing the 21-Jul sweep did not
+validate (I19, restrict-preserving).
+
+### 🧮 Hull — at its cap with 11 candidates, on a book whose binding bar is CLOSES
+`(ny)` states this book's constraint in its own words: *"THE BINDING BAR HERE IS
+CLOSES, NOT `t`"* — 6.0 closes/30d, ~5 months to 30 from a standing start.
+Measured today: `held 4` against `MAX_POSITIONS 4` with **11 books in-band and
+liquid** (scanned 228, below_band 106, above_band 21, thin 90). The cap, not the
+gate, is rationing its evidence. **4 → 6**, which raises closes/30d roughly in
+proportion — I17 decidability bought directly. Not an expectancy widening (I19):
+per-trade % is invariant to position count, the book is delta-neutral MODELLED
+(P&L is accrued − fees, no price term), and 6 × $80 stays inside the same gross
+envelope its siblings run. Gate, band and exits untouched.
+
+### 🧭 nav-cook — its dashboard row has never reflected a single trade it made
+`build_state()` did not carry `realized`, `n_closed` or `n_wins`, while `main()`
+read all three back out of that blob at boot. So **every restart silently reset
+the book's entire realised record to zero.** Measured on the live row: it
+publishes `closed_trades: 0`, `pnl_abs: 0.0`, `equity: 1000.00` while its own
+ledger holds **34 closes and −$3.80**. This is I4's shape with the sign reversed
+— not a write that fails, a field that was never written — and it is load-bearing
+far beyond display: `golive_readiness`, `fleet_allocation` and the horizon sweep
+all read the ROW, so a trading book was structurally invisible to every organ
+that grades it. Fixed, with the round trip pinned; 2 mutations verified red.
+
+### THE FIFTH FIX WAS MEASURED, BUILT, AND THEN WITHDRAWN — this is the part worth keeping
+From the same ledger I measured what looked like a clean second nav-cook defect:
+**58.2 closes/day live against the founding study's 6.2/day (9.4×), 65% of
+closes (22 of 34) re-entries into a coin just exited** (SKHYNIXUSD 11 times,
+SAMSUNGUSD 7 — the book's two worst lines), median hold **5.3 min**, and the 4h
+`MAX_HOLD_S` reached **0 of 34 times**. I built a 60-minute re-entry embargo,
+replayed it over the book's own ledger (−$3.80 → −$2.80, refusing 11 re-entries
+worth −1.254%), selftested it and mutation-verified it.
+
+**Then it was withdrawn, for two independently sufficient reasons:**
+1. **The premise was false.** I justified it as *"the study counted EPISODES and
+   the bot trades TICKS"*. `scripts/study_dislocation_band_2026-08-19.py` — which
+   `(sb)` landed on main hours earlier — shows the study's `replay()` blocks only
+   a coin **currently open** (`if sym in opened`) and re-enters on the very next
+   snapshot. **The study has no cooldown either.** The claim did not survive
+   contact with the harness it cited.
+2. **The cause was already cured.** `(sa)` fixed this book's confirm window the
+   same morning — *"a confirm window is a DURATION, and it inherited the COUNT
+   from a bot on a different cadence"*, **3.3× looser than measured**. Commit
+   `1bd0644` is 06:19:34Z; my 34-trade sample runs 19-Aug 23:40Z → 20-Aug 01:09Z,
+   **entirely pre-fix**. A coin must now hold in-band 630s instead of ~190s
+   before re-entry, which attacks the same churn at its source.
+
+So the churn was real and my measurement of it corroborates `(sa)` independently
+from the ledger side — but shipping a second restriction on top of a gate that
+had just been tightened 3.3×, justified by a pre-fix sample, is **precisely the
+over-restriction the operator is objecting to.** Recorded rather than deleted,
+because "I measured it, built it, and it was already fixed" is the outcome this
+changelog is least likely to hear about otherwise.
+
+### Reported, not acted on — the honest per-book residue
+* **📐 Grimes** (0 trades in 7 days): its gate refuses all three setups on their
+  own trailing records (keltner n=130 t=−0.37, failtest n=375 t=−1.48, pullback
+  n=140 t=−0.82). That is the gate WORKING, not a choke, and no bar move fixes
+  an absent edge — it is an I17 keep-or-retire call, owner OPERATOR. Its one
+  free widening is **`breakout`, excluded because "that supply is 🧙
+  book-schwager's" — and Schwager was RETIRED 17-Aug**, so the exclusion now
+  guards nothing. Not taken here: it needs a fourth setup owner plus a gate
+  scorecard, and Schwager's own breakout measured t=0.86 / random-null P=0.183,
+  so the expected value does not justify the build in this pass.
+* **🧘 Douglas** — the counterfactual is WITHHELD per `(gx)`. My harness
+  reproduces the shipped cell's ENTRY COUNT to within 5 of `(nt)`'s n=641 at
+  `(nt)`'s own cutoff, but not its P&L level (+$2.90 vs +$17.38), so it may not
+  speak about alternative brackets. What its own ledger says stands: 16 stop-outs
+  / 11 take-profits at sl 1.0×ATR / tp 1.5×ATR is **59.3% stops against the 60%
+  a random walk gives that geometry** — the bracket is fair and the entry is
+  contributing nothing at K=2.5 on this sample.
+* **🔮 Georgia** — `long-trend-breakout_trailing_stop_loss` fires **66 times at
+  9% win** (−$17.11, median hold 1.9h) against `_roi` n=35 at 100% win, 2.4h, on
+  the SAME tag. The fleet already made this exact call once — `atr_stop_dist`
+  carries *"[2026-07-13] counter-trend stop 2.0x → 3.5x ... the 2.0x stop fired
+  on noise, 77-89% of stop-outs reclaimed entry within 24h"* — and left
+  `trend_breakout` at 2.5×. **Re-running that measurement on the tag left behind
+  gives 62%, not 77-89%** (n=13 with 24h of forward candles; only 15% reached the
+  +1.8% ROI rung). **Weaker than the evidence that justified the original change,
+  so it is NOT shipped** — it is the best-motivated candidate in the fleet and it
+  needs the other 53 stop-outs to age past 24h first.
+
+## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT'S GRADE WAS ON THE WRONG BASIS — worth 1.11×, NOT the 3.6× this entry first claimed (CORRECTED IN PLACE): the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
+
+**[CORRECTED IN PLACE 2026-08-20, per I12 — THE HEADLINE NUMBER WAS WRONG AND THE
+CONCLUSION IT SUPPORTED DOES NOT HOLD.]** This entry measured on 27 closes and
+said the cap forced it: *"/trades.json caps at 500 rows, so these 27 are a recent
+subset."* **The cap does not bind — `?bot=<id>&limit=5000` returns all 120.** I
+declared a limitation instead of testing the query parameter, and the 27 rows
+were not a random subset but the most RECENT window, where funding happened to
+dominate. On the full ledger:
+
+| basis | n | mean/trade | t | win |
+|---|---:|---:|---:|---:|
+| price-only (what the gate grades) | 120 | **−1.433%** | −1.91 | 48.3% |
+| funding-inclusive (the fix) | 120 | **−1.292%** | −1.84 | 50.0% |
+
+**Worth 1.11×, not 3.6×.** The median implied clip is also $19.85 across the full
+ledger, not the $5.00 the 27-row window suggested — so that assumption was
+window-specific too. **THE CODE FIX STANDS AND IS UNCHANGED**: `pnl_pct` and
+`pnl_abs` genuinely were on different bases (price return matched `pnl_pct` on
+27 of 27 rows; the fix is structural, not a magnitude claim). **What does NOT
+stand is this entry's argument that ⚖️ Counterweight faced retirement on a number
+that was materially wrong.** At −1.29% vs −1.43% the verdict is the same book
+either way, and the ~28-Aug keep-or-retire call is untouched by this. The
+correction is recorded rather than quietly amended because the original framing
+reached the operator.
 
 [Renumbered (sa) -> (sb) -> (sc): main took (sa) for nav-cook's gate fix, then
 (sb) for nav-cook's founding-claim reproduction, both while this was in flight.
@@ -1241,6 +1737,324 @@ missing local `numpy`/`pandas`, now installed; that correction matters because
 those two had been quoted as "known pre-existing" for two sessions.
 
 
+## 2026-08-20 (rx) — THE STUDY SAVED YESTERDAY COULD NOT PRODUCE ITS OWN TABLE: a calibration anchored to a LIVE feed decays within the hour, and a decaying gate gets loosened until it passes
+
+`(ru)` saved the class-split evidence as a study so its numbers could be re-run
+rather than re-argued. **Run an hour later it refused everything**, and both
+causes were the harness's, not a real drift:
+
+| anchor | published | the harness read | why |
+|---|---|---|---|
+| ⚖️ Counterweight | 70 / +$5.32 | 72 / +$5.40 | the book TRADED TWICE MORE |
+| 🎸 Barnes | 0 / 9 | 54 / 14 | the book was RETIRED `(pm)` and left `/pnl.json`, so `retired_sleeves` found no payload, dropped nothing, and graded the dead `xsect` sleeve's 49 closes |
+
+**An anchor is a HISTORICAL FACT and the feeds are LIVE.** So everything the
+anchor depends on is now pinned — `CALIB_AS_OF` cuts the ledger at the instant
+the numbers were measured, and `CALIB_SLEEVES` declares the sleeve state as of
+that instant rather than fetching it from a publisher that no longer exists.
+**The cut is keyed on the CLOSE**, because that is when a row enters the ledger
+the grader reads; the selftest carries a STRADDLER (opened before, closed after)
+so the basis is pinned and not merely chosen. Calibration is frozen; the report
+still runs on everything.
+
+**Barnes surfaced the same defect on the REPORT side, and it gets I1 rather than
+a fix.** A book with no `/pnl.json` row has unreadable sleeve state, so grading
+it is guesswork — it is now NAMED on its own line (*"ABSENT: retired or dark,
+NOT graded"*) instead of silently graded or silently dropped. `{n: 68}` on a
+retired book and `{n: 9}` on a live one are byte-identical to a reader who does
+not know the publisher is gone.
+
+**THE MUTATION RUN IS THE ENTRY.** Six rounds, and every survivor taught
+something the first draft had wrong:
+
+1. *"calibrate runs on the LIVE pass"* survived because that line sat in the
+   network-only shell. Fixed STRUCTURALLY, not by testing it: `assemble` now
+   RUNS the calibration and returns a verdict instead of handing its input out,
+   so the shell can only print and the mutation lands in tested code.
+2. *"tolerance loosened to 100.0"* survived — because my own tolerance fixture
+   **derived its gap from `CALIB_TOL_USD`**, so it widened along with the
+   constant it was pinning. A fixture that scales with the thing it guards
+   asserts nothing. Now a literal 2-cent gap, plus a direct pin on the constant.
+3. *"an anchor's published total edited"* survived for the same reason one level
+   up: every fixture was BUILT from `PUBLISHED`, so editing an anchor moved the
+   fixture with it and re-baselined the gate in silence. The three anchors, the
+   as-of and the sleeve state are now restated as LITERALS in the selftest.
+
+**5 of 5 red on the final run**, including all three survivors. The general
+shape, which is the part worth keeping: **a guard whose fixture is computed from
+the thing it guards is a guard that agrees with any change.** That is the
+self-reference sibling of `(gx)`'s calibration rule, and it survived three
+rounds of my own mutation testing before the third round caught it.
+
+Live: calibration PASSES on all three anchors, the table prints, and 🌾 carry is
+the one book still flagged REMOVED POPULATION. Registered in `SELFTEST_MODULES`
+`(ru)`; read-only, promotes nothing.
+## 2026-08-20 (rw) — BOTH OF MY OWN P&L RECOMMENDATIONS DIED IN MEASUREMENT: 🎯 the Sniper's "missing" bracket exists and cannot reach, and 🎫 the Taker's "open" entry lever shipped on 31-Jul
+
+**[RENUMBERED (pm) -> (pq) at push time — a parallel session had published a different `(pm)` on main (the 🎸 Barnes retirement); the cited entry keeps the letter.]**
+
+`(ru)`'s report closed with five forward items. Two were actionable, both on
+books sitting on the I17 docket — so they were **measured, not shipped**, which
+keeps the operator's keep-or-retire call informed rather than pre-empted. Neither
+survived, and the refusals are the deliverable (I19, and `(hl)`'s 25-of-30
+precedent).
+
+**1 · 🎯 THE SNIPER HAS A BRACKET. My report said it had none, and that was a bad
+grep, not a measurement.** `+15%` take-profit / `−10%` stop / 6h hold, bare
+module literals already declared in `HARDCODED_EXITS`. I grepped `^TP_|^SL_` and
+the constants are named `TAKE_PROFIT_PCT`/`STOP_LOSS_PCT`; the harness read them
+correctly the moment it was pointed at the book, which is the argument for
+running the tool instead of reading the file.
+
+**The corrected finding is sharper than the wrong one.** The bracket exists and
+is unreachable at its own horizon — over 29 closes the realised move is median
+**1.25%**, p90 5.18%, largest ever 10.68%, and the take-profit has been reached
+**0 times**, the stop **once**. That is why every close reads `max_hold`: not an
+absent bracket, an arithmetically dead one.
+
+**2 · AND THE SWEEP CANNOT SAY WHAT TO REPLACE IT WITH — the calibration gate
+refuses.** `study_exit_sweep` replays the shipped rule at −0.918%/trade against a
+ledger of −1.219%: a **+0.301pp gap outside the 0.25pp tolerance**, so every
+recommendation is WITHHELD. The class split is the interesting part and it
+**refuted my own hypothesis**: I expected the tokenised non-crypto names
+(QQQ/META/USDKRW/WHEAT) to break a candle walk through closed underlying
+markets. The opposite — **non-crypto CALIBRATES at +0.032pp** while the 3 crypto
+trades miss by +1.738pp, and candle coverage is a full 6 bars per hold window in
+both classes, so there is no data gap to blame.
+
+**So the only subset this harness can calibrate is the population `(lk)` screened
+off on 13-Aug.** The Sniper's exit question is answerable only on trades the book
+has stopped taking — which is `(ru)`'s class-split finding arriving a second
+time, on a different instrument, about the same book. A grid-edge winner did
+appear (96h max-hold, +4.591%/trade) and is recorded UNBOUNDED and unbankable:
+top of the grid, behind a failed gate, the exact shape `(gx)` warns of.
+
+**3 · 🎫 THE TAKER'S "ATTACK ENTRY SELECTIVITY" WAS ALREADY DONE, TWO WEEKS AGO.**
+The 23-Jul root cause names the mechanism — the divergence SIGNAL grades
+forward-positive at n>11k and realised P&L is eaten by EXECUTION on wide-quote
+books — and the surviving instrument is the quoted-spread gate. The volume floor
+was rejected at n=37 `(study_div_vol_floor)` and re-rejected at n=99
+`(study_taker_spread_gate)`. `TT_SPREAD_GATE_BPS` has shipped at **20** since
+`(hr)`, which also fixed the arm that GRADES the book running ungated while the
+live arm was gated. **The 32% hit rate in `(ru)` is therefore a POST-gate
+number**, and the honest open follow-up is the one that study named for itself:
+re-run once the divergence ledger grows and the live arm has recorded spread.
+
+**ONE PUBLISHER GAP CHECKED AND CLEARED rather than reported.** The sweep skipped
+9 of 29 closes for a missing `side` — the `(kf)` inversion class. Every such row
+opened **≤3-Aug** and every row from **5-Aug** carries it: the 4-Aug
+source-stamped tag fixed it, so this is drained history, not a live defect. Worth
+recording because "9 rows have no side" reads like a defect until you check the
+dates, and `(kf)` is a real enough hazard to deserve the check.
+
+**NOTHING SHIPPED TO A BOT, deliberately.** Both books are on the docket, and I17
+says a docketed book is a keep-or-retire call and *"never another tuning pass"*.
+Measuring is not tuning: what this buys is that the 🎯 Sniper item in
+`OPERATOR_QUEUE.md` can now say its exit question has been asked and cannot be
+answered on the population it still trades — which is evidence for the decision
+rather than a reason to defer it again. Report corrected in place;
+`(ru)`'s forward list no longer recommends either move.
+## 2026-08-20 (rv) — TWO OF THE SEVEN DOCKET ITEMS WERE ALREADY DECIDED BY THE OPERATOR, WITH DATES, AND THE DOCKET RE-ASKED EVERY PUBLISH: the deferral that expires
+
+Continuing `(ru)`'s decomposition into the surface it feeds. The decision docket
+is the fleet's I17 queue, and its entire job is to be acted on. Measured on the
+live payload — **7 matured items, and 2 of them were not open questions**:
+
+| book | docket said | actually |
+|---|---|---|
+| 🌾 `perps-funding-carry` | `unreachable`, 8.4d, decide | **DECIDED-WAIT 5-Aug**, ride to ~30-Aug (OPERATOR_QUEUE item 2) |
+| ⚖️ `perps-funding-spread` | `unreachable`, 10.5d, decide | **~28-Aug**, pre-registered in `(jg)`'s own revert criterion, carried in CLAUDE.md |
+
+**29% of the docket was noise**, because it can see a VERDICT and cannot see a
+DECISION — the cry-wolf failure `(gl)` names and `(lh)` re-learned: *a detector
+that flags everything trains the operator to ignore it.* And it is worse than
+ordinary noise here: both deferred books have a live keep-or-retire question
+underneath, so training the reader to skip them is training them to skip the two
+that matter most on the day the dates arrive.
+
+**`DECIDED_UNTIL` + `decided_until()`, and three properties keep it a DEFERRAL
+rather than a silencer** — a table that could hide a book is a worse defect than
+the noise it fixes:
+1. **It EXPIRES.** Past its date the book returns carrying `decision_overdue`
+   and an `asks` that says a date was set and has passed — *louder* than the
+   verdict it replaced.
+2. **The clock survives underneath it.** `seen` is written BEFORE the deferral
+   check, so a returning book's `days_held` is honest rather than restarted.
+3. **Fail toward ESCALATION.** An unreadable date defers nothing. Every other
+   fail-safe in this file leans toward silence because the cost of a false alarm
+   is attention; here the cost of silence is a book nobody decides, so the
+   direction inverts — stated in place so the asymmetry is not read as a slip.
+
+Each entry names the date, the reason, AND where the decision is recorded; the
+selftest asserts that last part, because an entry that cannot be traced to an
+operator act is not a decision, and this table would become the way to hide a
+book.
+
+**THE SELFTEST CAUGHT THE FEATURE BEING INERT ON ITS FIRST RUN.** `parse_stamp`
+returns a **naive** datetime for a bare `"2026-08-30"` and an **aware** one for a
+full stamp, so `cur < due` raised `TypeError` — straight into the fail-open
+guard, which dutifully escalated. Every entry read "not deferred": the table
+would have looked configured and deferred nothing, the registered-but-inert
+shape I18 exists for, inside the guard written to prevent noise. Normalised
+explicitly, with the incident recorded at the line.
+
+**IT ALSO MADE A DELIBERATELY-NOT-LOAD-BEARING CHOICE LOAD-BEARING.** `(lu)`
+counts `batch_n` over `seen` (every stuck book) rather than `docket` (the
+matured ones) and its own comment says the two are equivalent today, the
+distinction "NOT load-bearing", kept only in case maturity ever varies per book.
+The deferral is the first thing to make them differ — a deferred book is in
+`seen` and not in `docket` — so `batch_n` stays correct at 9 while the docket
+reads 8, exactly as that comment predicted. Both historical regression fixtures
+in `test_decision_docket.py` move by one and now assert the distinction rather
+than the coincidence.
+
+**THE DOCKET, LIVE, AFTER THE CHANGE: 7 → 5**, and the two that left are the two
+with recorded dates. **7 of 7 mutations verified red** (deferral never expires ·
+expired deferral returns quietly · deferring restarts the clock · unreadable date
+defers instead of escalating · naive/aware normalisation dropped · double suffix
+strip `(hc)` · an entry omits where the decision is recorded).
+
+**AND THE FIVE THAT REMAIN ARE NOW BRIEFED** — `OPERATOR_QUEUE.md` gains the
+per-book evidence with lettered options, and `(pk)`'s class split changed three
+of them: 🎯 the Sniper's `unreachable` is computed on a sample **79% of which it
+can no longer enter** (on what it can, +$2.21/n=6 — undecidable, not
+unreachable); 🎸 Barnes has **zero** closes under its current policy and 0 of 225
+coins eligible; 🏛️ Turnbull needs an effect **42× larger than it shows** before
+its own sample could detect it. One of the five is not an I17 question at all —
+💸 the LIVE Farmer is flat, not losing, and "keep-or-retire" mis-frames a
+real-money book earning 3c/day whose exit surface is already measured out.
+
+Publish-only and read-only: no trade, no lever, no era, no bar ⇒ **main-only**
+under `(mm)`. Deciding stays the operator's act and the `(hn)` routing table does
+not move.
+## 2026-08-20 (ru) — FOUR DOCKET VERDICTS ARE COMPUTED ON POPULATIONS THEIR BOOKS NO LONGER ADMIT, AND THE GRADER WOULD NOT SAY SO: the class split becomes a published number
+
+**[RECONCILED at push time: a PARALLEL SESSION shipped `(pk)` and `(pm)` on main while this branch was open. Their `(pk)` publishes the 🎯 Sniper's whole-gate `crypto_only: False` — the case this entry's three-valued design already handles, and it lands as "both", correctly unflagged. Their `(pm)` RETIRED 🎸 Barnes on the same evidence this measured. Neither changes a number here; both are named so the table below is read as the state at measurement, not a claim about now.]**
+
+**[SUPERSEDED IN PART, 20-Aug — the OPERATOR_QUEUE brief this entry shipped is DROPPED and not re-applied.** Three days passed while this branch waited on review, and `(qk)`'s fleet-wide audit produced a better slate on 19-Aug: it quantifies ⚖️ Counterweight as *unflippable* (t≥2 needs ~4,300 closes ≈ 5.1 years; even 20 consecutive +1% closes reach only t=+0.70), reads 💸 the LIVE Farmer at era n=85 / t=0.29, and carries the reframe this entry did not have — **the venue is in a measured liquidity drought** ((qa): alt volume halving every 9.4 weeks, 44 weeks running), so several books are **STARVED, NOT EDGELESS**. That distinction changes what a low `t` means here and it is the senior reading. Adding a second, staler I17 brief to the one surface whose job is to be acted on would be the cry-wolf failure `(gl)` names, so it was not added. **What survives is the CODE** — the published split, the deferral and the saved study — none of which was on main, and all of which makes the *next* such slate cheaper to build.]**
+
+**Found by a fleet-wide P&L decomposition** (operator: *"deep analysis on
+increasing pnl of each bot"*), driving this module's own `era_rows` over the
+live ledger so every number is the one the bars are actually computed on.
+
+`(pf)` measured this for two books and named the right response in its own
+words — *"REPORT the class split beside the pooled grade, do not re-cut the
+sample"* — then shipped the DECLARATION (`caps.crypto_only`) and left the
+report. So the split stayed **derivable** and the decision-docket item an
+operator acts on still showed the pooled number alone. Both `(pf)`'s review and
+this one re-derived it by hand from the raw ledger. Measured, era-scoped:
+
+| book | pooled (what the docket shows) | still-tradeable |
+|---|---|---|
+| ⚖️ `perps-funding-spread` | n=91 **−$31.16** | n=70 **+$5.32** |
+| 🎯 `lighter-perp-sniper` | n=29 **−$3.08** | n=6 **+$2.21** |
+| 🌾 `perps-funding-carry` | n=10 −$15.45 | n=1 −$0.49 |
+| 🎸 `band-barnes` | n=9 −$1.45 | n=0 |
+
+**Two of the four read POSITIVE on the population they can still enter**, and
+all four have been sitting on the docket as `unreachable` for 8.7–10.5 days
+asking for a keep-or-retire call. That is an I17 decision offered on a policy
+the book no longer runs.
+
+This is the defect the cluster-`t` publish closed one field over, and its
+argument transfers verbatim: **a number a decision depends on must be READABLE,
+not recomputable.**
+
+**SHIPPED — `class_split`, reported, never a bar.** `BAR_NAMES` is untouched,
+`grade()` never sees it, and no sample or era moves: `(pf)` ruled the era stays
+put (CLAUDE.md calls a universe change ordinary tuning, and a narrowing is that
+act mirrored), so this reports beside the pooled grade exactly as `(jg)`/`(ki)`
+did on ⚖️ Counterweight. It rides on the book payload, on the **docket item**,
+and on the CLI line. `published_class_screen` becomes the ONE owner of "what
+screen does this book publish" — `audit_book_overlap.living_gates` reads the
+same field for a different question, and imports rather than copying `(hj)`, in
+the direction `audit_ledger_integrity` already established.
+
+Three-valued throughout, and the third value did real work: **`None` withheld a
+finding I had already half-written.** ⚖️ Counterweight publishes no screen, so
+it correctly got the split with no flag — which sent me to read the code instead
+of asserting, and the code says the crypto screen covers the scout TOP-UP and
+deliberately **not** the configured core (*"it is the backtested list … those
+names are never dropped"*). An unpublished screen may neither manufacture a
+finding nor erase one `(ph)`, and here it stopped a wrong one.
+
+**AND ⚖️ COUNTERWEIGHT WAS THE LAST BOOK PRINTING `UNPUBLISHED`, MISSED TWICE
+FOR ONE STRUCTURAL REASON.** `(pf)` declared the retrofitted carry books and
+`(pj)` finished "the last three" — but both worked from
+`audit_book_overlap.living_gates`, which only sees books publishing an
+`enter_apr`. A cross-sectional book has none, so it could never appear in the
+list of the unpublished. **A detector's roster is part of the detector.** Its
+declaration is now `crypto_only_now()`, **DERIVED from both entry paths** —
+`all(is_crypto(c) for c in COINS)` conjoined with the `(ki)` top-up screen — so
+it is `True` today (30 names, every one crypto; and all 16 off-class names it
+has ever traded arrived by top-up) and flips to `False` on its own the moment a
+non-crypto name enters `FUNDSPREAD_COINS`. Verified both ways. A hardcoded
+`True` would be the literal `(pj)`'s own guard exists to catch.
+
+**Publish-only on both files — changes no trade, no lever, no era ⇒ main-only
+under `(mm)`.** The grader promotes nothing by construction; Counterweight's
+change is one caps field.
+
+Verified: **8/8 mutations red** (screen inverted, non-bool screen truthy, each
+publish shape dropped, raising classifier guessed, clean book publishing nothing
+instead of `off_class.n=0`, a finding fired on an UNPUBLISHED screen, empty
+split instead of `None`); selftest, `audit_image_imports` (the new `fleet_bus`
+import into a SHIPPED file — COPY present), `audit_doctrine_enforcement`,
+`audit_undefined_names`, `audit_deploy_coverage` all green; full suite carries
+the same 3 pre-existing failures as a clean tree and no new ones. **And the
+consumer was tested against a payload its publisher built `(hj)`**: the real
+`era_rows → class_split → book_payload` path over the live ledger reproduces
+`(pf)`/`(nk)`'s three independently published splits **exactly** — that
+calibration is what licenses the rest of the table.
+
+**WHAT WAS DELIBERATELY NOT DONE, because it is already measured.** The
+decomposition put the funding cohort's biggest single leak at the `flip` exit
+(🌾 carry: 9 of 10 in-era closes, 0% win; 💸 Farmer shadow `short_flip` −$15.81
+at 39.5% win) and two sibling books have measured a grace fix that works
+(🏦 Rich Dad `(mf)` +$26.88→+$42.09; 🧮 Hull `(ny)` t=+3.92). **Porting it is
+REFUTED on the Farmer's own cell** — `STUDY_FUNDING_LIFECYCLE_2026-08-15.md` §2,
+calibration passed both ways, zero of 48 cells beat shipped, *"grace is a cell
+property, not a doctrine"* — and re-running it would be the circle `(hn)` names.
+Recorded here so the next decomposition does not rediscover the same leak and
+reach for the same refuted fix.
+
+**ADDENDUM 17-Aug — the report this entry came from was AUDITED CLAIM-BY-CLAIM,
+and two of my own numbers were wrong in the same way.** 114 of 116 numeric claims
+reproduced from source; the two that did not were both **quoted from a doc
+snapshot instead of the live payload** — the exact anti-drift failure `(ph)`
+confessed to the same morning, committed twice in one report by the session that
+had just read `(ph)`:
+
+1. *"⚖️ Counterweight's 91 closes are ~28 independent decisions"* — lifted from a
+   code comment in `book_payload`. The LIVE cluster reads **26 batches, n_eff
+   39.6** (largest batch 12 legs). The comment was right when written; the sample
+   moved.
+2. *"📐 Grimes's replay gate opened on 16-Aug (keltner t=+0.53), scan reads
+   `signal 0`"* — taken from CLAUDE.md's `(oe)` headline. **Both halves are now
+   false**: all three setups read CLOSED (keltner n=129 **t=−0.37**, failtest
+   n=369 t=−1.43, pullback n=136 t=−0.93) and the scan reads **`signal 1, gated
+   1`** — the book found a setup and its own gate refused it. That is `(om)`'s
+   fixed-universe gate working as designed, and `gate_drift` reads
+   `ungraded: []`, so the hazard `(om)` published is not materialising.
+
+**CLAUDE.md's 📐 Grimes row is CORRECTED IN PLACE per I12** — it led with *"THE
+GATE HAS OPENED"* as a bold headline while the live state is the opposite, which
+is a doctrine that no longer describes the system, i.e. a defect rather than
+history.
+
+A third correction went the other way, and is worth recording because the
+*correction* was the error: a first pass called 🧘 Douglas's 3.29×/3.73× stop
+overshoot unremarkable against "243 fleet-wide stop exits, median 1.16×, 35 above
+1.5×". That pooled **retired books' ledgers** into a claim about how the current
+fleet's stops fill. Against the right control group — **67 stop exits across the
+three other LIVING books that declare a stop** — the median is **1.09×** and the
+worst in the whole set is **1.72×**, so Douglas really is outside it and the
+original finding stands. `(nm)`'s venue-tape root cause was never in doubt; only
+my framing of it was.
+
+**The transferable lesson, and it is the one this fleet keeps paying for:** a
+number in a doc is a measurement's *fossil*. Re-run the source before quoting it,
+including — especially — when the source is this repo's own doctrine.
 ## 2026-08-20 (rt) — THE HORIZON QUESTION CANNOT BE ANSWERED BACKWARDS ON THIS BOOK, AND THE REASON IS A NUMBER: a 1.9-MINUTE MEDIAN HOLD AGAINST A 1-MINUTE CANDLE. So 🪁 band-kelly now measures it FORWARD.
 
 **Operator: *"open the horizons, give them room to breathe and grow."*** `(rs)`

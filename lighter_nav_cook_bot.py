@@ -312,11 +312,25 @@ def sample_block(recent):
             "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2)}
 
 
-def build_state(positions, recent, pend, last_ts, now=None):
+def build_state(positions, recent, pend, last_ts, now=None,
+                realized=0.0, n_closed=0, n_wins=0):
     """The persistence blob — ONE builder. `pend` is the confirm counter, so a
-    restart cannot skip the 2-loop confirm the measurement was made under."""
+    restart cannot skip the 2-loop confirm the measurement was made under.
+
+    [2026-08-20] `realized` / `n_closed` / `n_wins` ARE PERSISTED, and were
+    not. `main()` read all three out of this blob at boot (`st.get("n_closed")`)
+    and this builder never put them in — so every restart silently reset the
+    book's entire realised record to zero. MEASURED on the live row the day it
+    was found: the dashboard published `closed_trades: 0`, `pnl_abs: 0.0`,
+    `equity: 1000.00` while this book's own ledger held **34 closes and
+    -$3.80**. That is I4's silent-write-failure shape with the sign reversed —
+    not a write that fails, a field that was never written — and it is
+    load-bearing well beyond display: `golive_readiness`, `fleet_allocation`
+    and the horizon sweep all read the row, so the book was structurally
+    invisible to every organ that grades it."""
     return {"positions": positions, "recent": recent, "pend": pend,
-            "last_ts": last_ts,
+            "last_ts": last_ts, "realized": float(realized),
+            "n_closed": int(n_closed), "n_wins": int(n_wins),
             "saved_ts": float(now if now is not None else time.time())}
 
 
@@ -583,7 +597,9 @@ def main():
 
         try:
             saved = store.save_state(
-                bot_id, build_state(positions, recent, pend, t0))
+                bot_id, build_state(positions, recent, pend, t0,
+                                    realized=realized, n_closed=n_closed,
+                                    n_wins=n_wins))
             if saved is False:
                 # I4: never discard a persistence result.
                 print("[%s] STATE NOT PERSISTED — positions/clock at risk"
@@ -688,6 +704,17 @@ def _selftest():
     assert _standby_key("nav-cook-lshadow") == "nav-cook-lshadow:standby"
     st = build_state({}, [], {}, 1.0, now=2.0)
     assert st["saved_ts"] == 2.0 and st["pend"] == {}
+
+    # [2026-08-20] THE REALISED RECORD MUST SURVIVE A RESTART (I4). main()
+    # reads all four of these back out of the blob at boot; a builder that
+    # drops them republishes a traded book as a virgin one — which is exactly
+    # what the live row did (closed_trades 0 against a 34-close ledger).
+    st = build_state({"X": {}}, [], {}, 1.0, now=2.0,
+                     realized=-3.8, n_closed=34, n_wins=11)
+    for k, v in (("realized", -3.8), ("n_closed", 34), ("n_wins", 11)):
+        assert st[k] == v, "%s must persist — a restart resets the book's record" % k
+    # ...and the round trip must reconstruct them the way main() does.
+    assert int(st.get("n_closed") or 0) == 34 and float(st.get("realized") or 0) == -3.8
 
     # NO LEVERAGE, NO REAL MONEY: this module must never size off equity or
     # touch a live venue mode.

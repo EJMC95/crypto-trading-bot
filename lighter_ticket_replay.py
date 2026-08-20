@@ -45,6 +45,7 @@ dashboard's public /bus.json), writes nothing anywhere.
 import argparse
 import json
 import os
+import urllib.parse
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -98,10 +99,140 @@ def load_tape(source="auto", hours=48, limit=2200):
 
 
 # ---------------------------------------------------------------------------
+# UP-REGIME RESOLUTION — the coverage gap this harness used to declare and
+# tolerate, closed.
+#
+# [2026-08-20] `breakout` was FORCED INERT here (`_up = False`) because the
+# shadow arm gates it on `up_read`'s candle-EMA regime "which the replay cannot
+# reproduce (no venue.candles)". That was true and it was declared — but the
+# consequence was larger than the note implied, and it was invisible:
+#
+#   * The taker relabels an up-regime crypto breakout to the taker-internal
+#     lens `breakoutup` BEFORE the brain veto ((dk)), which is precisely how
+#     that subset escapes the broad `breakout` veto and fills. With `up=False`
+#     the relabel never fires, the ticket stays `breakout`, the veto kills it,
+#     and the lens reads `taken: 0`.
+#   * MEASURED 20-Aug: `breakoutup` produced **14 of the taker's 36 closes in
+#     7 days (39%)** and is the book's single largest earner in the exit
+#     attribution (`long-breakoutup_hold` n=27 **+$23.77**). The live
+#     `scout-tuner` payload published `baseline_net: -19.97` for a book whose
+#     row reads **+$30.11** — the baseline every lever candidate is judged
+#     against covered the losing 61% of the book.
+#   * Everything replay-gated inherits that: the scout tuner's lever walks,
+#     `fleet_proprioception`'s $ counterfactual (the ONLY lane with one) and
+#     the incubator's genotype scores. A lever that helps `breakoutup` and
+#     hurts `divergence` could only ever be rejected.
+#
+# `up_read` is already time-parameterised (`end_ms = now_ts * 1000`), so this
+# is reproducible rather than merely declarable: fetch DAILY closes ONCE per
+# symbol over the tape's span and answer each snapshot from the bars that had
+# already CLOSED at that instant. No look-ahead is possible by construction —
+# a bar is admitted only when its close falls at or before the snapshot, which
+# is the same completed-bar rule `up_read` applies when it drops the still-
+# forming daily bar.
+#
+# OPT-IN. `replay(up_resolver=None)` keeps the old behaviour byte-for-byte, so
+# every existing caller is unchanged until it asks for coverage.
+
+_CANDLE_API = os.environ.get("REPLAY_CANDLE_API", "https://mainnet.zklighter.elliot.ai")
+
+
+def _api_get(path, **params):
+    url = f"{_CANDLE_API}{path}?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode())
+
+
+def daily_up_resolver(symbols, lo_ts, hi_ts, fetch=None):
+    """Build `up(sym, ts) -> True/False/None`, the replay's stand-in for
+    `tt.up_read`, from DAILY closes fetched ONCE per symbol.
+
+    Tri-state exactly like `up_regime`, and fail-CLOSED in the same direction:
+    a symbol with no usable history answers None, which refuses the long rather
+    than admitting it. `fetch(sym, start_ts, end_ts) -> {close_ts: close}` is
+    injectable so the selftest never touches the network.
+    """
+    warm = int((tt.EMA_N + 8) * 86400)
+    series = {}
+    for sym in sorted(set(symbols)):
+        key = (sym, int(lo_ts) // 21600, int(hi_ts) // 21600)
+        if fetch is None and key in _SERIES_CACHE:
+            series[sym] = _SERIES_CACHE[key]     # daily bars move once a day
+            continue
+        try:
+            series[sym] = dict(fetch(sym, int(lo_ts) - warm, int(hi_ts)) or {}) \
+                if fetch else _daily_closes(sym, int(lo_ts) - warm, int(hi_ts))
+        except Exception:      # noqa: BLE001 — a candle blip fails CLOSED
+            series[sym] = {}
+        if fetch is None and series[sym]:
+            _SERIES_CACHE[key] = series[sym]
+
+    def up(sym, ts):
+        bars = series.get(sym)
+        if not bars:
+            return None
+        # COMPLETED bars only, and only those that had closed by `ts` — this is
+        # the no-look-ahead guarantee, and it mirrors up_read dropping the
+        # still-forming daily bar.
+        closes = [c for t, c in sorted(bars.items()) if t <= ts]
+        return tt.up_regime(closes)
+
+    up.coverage = {s: len(v) for s, v in series.items()}
+    return up
+
+
+def _daily_closes(sym, start_ts, end_ts):
+    """{bar_close_ts: close} of DAILY bars. A bar stamped `t` OPENS at t, so it
+    has CLOSED at t + 86400 — keying on the close is what makes the resolver's
+    `t <= ts` test honest rather than off by one day in the optimistic
+    direction."""
+    ids = _market_ids()
+    mid = ids.get(sym)
+    if mid is None:
+        return {}
+    cs = _api_get("/api/v1/candles", market_id=mid, resolution="1d",
+                  start_timestamp=int(start_ts), end_timestamp=int(end_ts),
+                  count_back=400).get("c") or []
+    out = {}
+    for c in cs:
+        try:
+            out[int(c["t"]) // 1000 + 86400] = float(c["c"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+_MARKET_IDS = {}
+_SERIES_CACHE = {}
+
+
+def _market_ids():
+    if not _MARKET_IDS:
+        rows = _api_get("/api/v1/orderBookDetails").get("order_book_details") or []
+        for r in rows:
+            if r.get("symbol") is not None and r.get("market_id") is not None:
+                _MARKET_IDS[str(r["symbol"])] = r["market_id"]
+    return _MARKET_IDS
+
+
+#: Lenses the replay cannot reach without an `up_resolver`, and the reason.
+#: Published in every report so `taken: 0` is never byte-identical between
+#: "quiet" and "structurally impossible" (I18/(lv)).
+UNREACHABLE_WITHOUT_RESOLVER = {
+    "breakout": "up-regime forced False (no candle-EMA read) — the brain's "
+                "broad breakout veto then refuses every ticket",
+    "breakoutup": "never relabelled from breakout, so this lens cannot appear "
+                  "at all — it is 39% of the live book's closes",
+}
+
+
+# ---------------------------------------------------------------------------
 # Replay core (pure — unit-tested via --selftest)
 # ---------------------------------------------------------------------------
 
-def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
+def replay(tape, clip_usd=None, max_open=None, coin_veto=None,
+           up_resolver=None):
     """Run the taker's decision code over the tape. Returns the report dict.
 
     `coin_veto`: an iterable of coin bases the production taker would refuse
@@ -204,6 +335,15 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
             # stamp-gated breakout leg would be non-comparable and would pollute
             # the tuner's leaderboard. The shadow arm is the breakout instrument.
             _up = False if lens == "breakout" else None
+            if up_resolver is not None and lens == "breakout":
+                # PARITY with the taker's own relabel ((dk)): resolve the
+                # up-regime as of THIS snapshot, and rename the up-regime
+                # crypto subset to `breakoutup` BEFORE the veto, exactly as
+                # the entry loop does. Same order, same crypto screen — a
+                # different order here would grade a lens the bot never runs.
+                _up = up_resolver(sym, snap_dt.timestamp())
+                if _up is True and side == "long" and tt._is_crypto(sym):
+                    lens = "breakoutup"
             if tt.BULL_MODE and not tt.bull_entry_ok(lens, side, t, up=_up):
                 continue
             pos[sym] = {"lens": lens, "side": side, "entry": mark,
@@ -243,6 +383,12 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
                                  "pnl_usd": [], "exits": {}})
     return {
         "snapshots": len(tape),
+        # I18: a lens reading `taken: 0` must say WHICH kind of zero it is.
+        "coverage": {
+            "up_resolver": up_resolver is not None,
+            "unreachable": {} if up_resolver is not None
+            else dict(UNREACHABLE_WITHOUT_RESOLVER),
+        },
         "span": (f"{tape[0][0].isoformat(timespec='seconds')} -> "
                  f"{tape[-1][0].isoformat(timespec='seconds')}") if tape else None,
         "stress_vetoed_cycles": vetoed_cycles,
@@ -261,6 +407,16 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
 
 
 def print_report(rep, used):
+    cov = rep.get("coverage") or {}
+    if cov.get("unreachable"):
+        print("[replay] COVERAGE GAP — these lenses cannot appear in this run; "
+              "`taken: 0` below does NOT mean quiet:")
+        for lens, why in sorted(cov["unreachable"].items()):
+            print(f"           {lens}: {why}")
+        print("[replay] pass --up-resolver to close it (fetches daily closes).")
+    elif cov.get("up_resolver"):
+        print("[replay] coverage: FULL — up-regime resolved per snapshot, "
+              "breakout/breakoutup reachable.")
     print(f"[replay] tape: {rep['snapshots']} marks-bearing snapshots "
           f"({used}) span {rep['span']} | stress-vetoed cycles: "
           f"{rep['stress_vetoed_cycles']}")
@@ -388,8 +544,105 @@ def selftest():
     assert replay(tape, clip_usd=50.0, max_open=6,
                   coin_veto={"ZZZ"})["lenses"]["breakout"]["taken"] == base_taken, \
         "vetoing an unrelated coin must not change anything"
+    # ---------------------------------------------------------------- (2026-08-20)
+    # THE UP-REGIME RESOLVER. Offline throughout: `fetch` is injected, so this
+    # never touches the network.
+    DAY = 86400
+    t0 = int(dt(0).timestamp())
+
+    # A rising series: close > EMA and EMA rising => up_regime True.
+    rising = {t0 - (30 - i) * DAY: 100.0 + 4.0 * i for i in range(31)}
+    falling = {t0 - (30 - i) * DAY: 100.0 - 2.0 * i for i in range(31)}
+
+    def fake_fetch(sym, lo, hi):
+        return {"AAA": rising, "BBB": falling}.get(sym, {})
+
+    up = daily_up_resolver(["AAA", "BBB"], t0 - 5 * DAY, t0, fetch=fake_fetch)
+    assert up("AAA", t0) is True, "a rising daily series must read UP"
+    assert up("BBB", t0) is False, "a falling daily series must read NOT-up"
+    assert up("CCC", t0) is None, "an unknown symbol fails CLOSED (None), never False"
+
+    # NO LOOK-AHEAD. Asked as of a time before any bar had closed, the resolver
+    # must not see the series at all. This is the arm that matters: a resolver
+    # that answers from bars closing AFTER the snapshot would hand the replay
+    # tomorrow's regime and quietly manufacture edge.
+    assert up("AAA", t0 - 40 * DAY) is None, \
+        "a resolver must not read a bar that had not closed at the snapshot"
+    early = up("AAA", t0 - 26 * DAY)
+    assert early is None or isinstance(early, bool)
+    assert len([c for t, c in rising.items() if t <= t0 - 26 * DAY]) < len(rising), \
+        "the truncation must actually drop bars, or the arm above proves nothing"
+
+    # THE RELABEL MATCHES THE TAKER'S. Up-regime + long + crypto => breakoutup,
+    # which is how that subset escapes the broad breakout veto ((dk)).
+    _brk_tape = [snap(0, {"BTC": 100.0},
+                      {"breakout": [{"sym": "BTC", "range_pos": 0.99, "vol_m": 5.0}]}),
+                 snap(1, {"BTC": 101.0})]
+
+    def btc_up(sym, ts):
+        return True
+
+    _r = replay(_brk_tape, clip_usd=50.0, max_open=6, up_resolver=btc_up)
+    assert _r["lenses"].get("breakoutup", {}).get("taken", 0) == 1, \
+        "an up-regime crypto long breakout must be relabelled to breakoutup"
+    assert _r["lenses"].get("breakout", {}).get("taken", 0) == 0, \
+        "...and must NOT also count as breakout — that would double-count it"
+
+    # ...and the three conditions are pinned INDEPENDENTLY. Asserting only the
+    # all-true case leaves the AND defeatable: a mutant that relabels on `long`
+    # alone passed the arm above, which is why each half now has its own
+    # negative case.
+    _nc_tape = [snap(0, {"WTI": 100.0},
+                     {"breakout": [{"sym": "WTI", "range_pos": 0.99, "vol_m": 5.0}]}),
+                snap(1, {"WTI": 101.0})]
+    assert "breakoutup" not in replay(_nc_tape, clip_usd=50.0, max_open=6,
+                                      up_resolver=btc_up)["lenses"], \
+        "a NON-CRYPTO breakout must never be relabelled — the taker screens it"
+    assert "breakoutup" not in replay(_brk_tape, clip_usd=50.0, max_open=6,
+                                      up_resolver=lambda s, t: False)["lenses"], \
+        "a NOT-up breakout must stay `breakout` and meet the broad veto"
+    assert "breakoutup" not in replay(_brk_tape, clip_usd=50.0, max_open=6,
+                                      up_resolver=lambda s, t: None)["lenses"], \
+        "an UNKNOWN regime must fail CLOSED, never relabel"
+
+    # THE DAILY SERIES IS KEYED ON THE BAR'S CLOSE, NOT ITS OPEN. A bar stamped
+    # `t` opens at t and closes at t+86400; keying on the open would let the
+    # resolver read a bar a full day before it finished, which is look-ahead
+    # wearing an off-by-one. Exercised directly — the resolver arms above inject
+    # a pre-keyed series and never reach this function.
+    _saved_api, _saved_ids = _api_get, dict(_MARKET_IDS)
+    try:
+        _MARKET_IDS.clear()
+        _MARKET_IDS["AAA"] = 1
+
+        def _fake_api(path, **kw):
+            return {"c": [{"t": (t0 - 2 * DAY) * 1000, "c": "42.0"}]}
+
+        globals()["_api_get"] = _fake_api
+        got = _daily_closes("AAA", t0 - 10 * DAY, t0)
+        assert got == {t0 - DAY: 42.0}, (
+            "a daily bar OPENING at t must be keyed at its CLOSE t+86400; got %r"
+            % (got,))
+    finally:
+        globals()["_api_get"] = _saved_api
+        _MARKET_IDS.clear()
+        _MARKET_IDS.update(_saved_ids)
+
+    # DEFAULT IS UNCHANGED. Every existing caller passes no resolver, and must
+    # get exactly the old numbers.
+    _r0 = replay(_brk_tape, clip_usd=50.0, max_open=6)
+    assert "breakoutup" not in _r0["lenses"], \
+        "without a resolver the breakoutup lens cannot appear"
+    assert _r0["coverage"]["unreachable"], (
+        "a run that cannot reach a lens must SAY so — `taken: 0` is otherwise "
+        "byte-identical between quiet and structurally impossible (I18)")
+    assert not _r["coverage"]["unreachable"] and _r["coverage"]["up_resolver"], \
+        "a resolved run must report FULL coverage, not a stale gap"
+    assert set(UNREACHABLE_WITHOUT_RESOLVER) == {"breakout", "breakoutup"}
+
     print("[replay] selftest OK (tp/sl/hold, dip bar, stress veto, "
-          "one-per-lens, fee accounting, sl-cooldown mirror, coin-veto mirror)")
+          "one-per-lens, fee accounting, sl-cooldown mirror, coin-veto mirror, "
+          "up-resolver + no-look-ahead + coverage)")
 
 
 def main():
@@ -401,6 +654,10 @@ def main():
                     help="db-source max snapshots")
     ap.add_argument("--source", choices=("auto", "db", "bus"), default="auto")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--up-resolver", action="store_true",
+                    help="resolve the up-regime from daily closes so the "
+                         "breakout/breakoutup lenses are reachable (one "
+                         "candle fetch per symbol; no look-ahead)")
     args = ap.parse_args()
     if args.selftest:
         selftest()
@@ -410,7 +667,16 @@ def main():
         print("[replay] no marks-bearing snapshots in range — marks publish "
               "since 15-Jul ~04:27Z; widen --hours or try later.")
         return
-    print_report(replay(tape), used)
+    resolver = None
+    if args.up_resolver:
+        syms = sorted({t.get("sym") for _, p in tape
+                       for arr in (p.get("tickets") or {}).values()
+                       for t in (arr or []) if t.get("sym")})
+        resolver = daily_up_resolver(syms, tape[0][0].timestamp(),
+                                     tape[-1][0].timestamp())
+        got = sum(1 for v in resolver.coverage.values() if v)
+        print(f"[replay] up-resolver: daily closes for {got}/{len(syms)} symbols")
+    print_report(replay(tape, up_resolver=resolver), used)
 
 
 if __name__ == "__main__":
