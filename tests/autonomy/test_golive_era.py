@@ -266,15 +266,44 @@ def test_the_farmer_declaration_records_that_no_post_fix_window_passes_t():
 def test_the_promotion_judge_is_era_safe_BY_CONSTRUCTION():
     """Checked, not assumed — this is the pipeline that is the ONLY writer of
     `live.funding.*` on a real-money book, so "probably fine" is not an answer.
-    Every arm comparison goes through `arm_trades(rows, bot, start_ts, end_ts)`
-    and the windows begin at the candidate's own `started_ts`, all of which
-    postdate 17-Jul. If that windowing is ever removed, the judge starts pooling
-    pre-fix rows into a paired real-money comparison and needs its own era."""
-    src = (_ROOT / "experiment_judge.py").read_text()
-    assert "arm_trades(rows, shadow_bot, start_ts, end_ts" in src
-    assert "arm_trades(rows, live_bot, start_ts, end_ts" in src, (
-        "the judge no longer windows the LIVE arm from the candidate's start — "
-        "it would now pool pre-basis-fix rows into a real-money promotion bar")
+    Every arm comparison must be WINDOWED from the candidate's own `started_ts`,
+    all of which postdate 17-Jul. If that windowing is ever removed, the judge
+    starts pooling pre-basis-fix rows into a paired real-money comparison and
+    needs its own era.
+
+    [2026-08-20 (sf)] UPGRADED FROM A SUBSTRING SCAN TO AN AST ONE, and the
+    upgrade was forced by a legitimate refactor: `paired_eval` now reaches the
+    arms through `match_policy(...)` (the entry-policy match), so the literal
+    `arm_trades(rows, live_bot, start_ts, end_ts` stopped appearing while the
+    windowing itself was untouched. **A source substring is not a structural
+    claim** — it fails on a rename and passes on a hand-rolled copy. What this
+    asserts now is the PROPERTY: inside `paired_eval`, every call that fetches
+    an arm's trades carries both a start and an end, so no path can quietly
+    widen a real-money comparison to the whole ledger.
+    """
+    import ast
+    tree = ast.parse((_ROOT / "experiment_judge.py").read_text())
+    fetchers = {"arm_trades", "match_policy", "policy_srcs"}
+    body = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "paired_eval")
+    unwindowed, named = [], set()
+    for node in ast.walk(body):
+        if not (isinstance(node, ast.Call)
+                and getattr(node.func, "id", None) in fetchers):
+            continue
+        named.add(ast.unparse(node))
+        kw = {k.arg for k in node.keywords if k.arg}
+        # (rows, bot, start_ts, end_ts, ...) positionally, or named
+        if len(node.args) >= 4 or {"start_ts", "end_ts"} <= kw \
+                or (len(node.args) >= 3 and "end_ts" in kw):
+            continue
+        unwindowed.append((node.lineno, ast.unparse(node)[:90]))
+    assert not unwindowed, (
+        "the judge no longer windows an arm from the candidate's start — it "
+        f"would pool pre-basis-fix rows into a real-money bar: {unwindowed}")
+    assert named, "no arm fetch found inside paired_eval — the scan is blind"
+    assert any("shadow_bot" in c for c in named), named
+    assert any("live_bot" in c for c in named), named
 
 
 def test_the_ticket_taker_IS_an_accruing_book_and_is_scoped_too():

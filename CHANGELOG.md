@@ -251,6 +251,99 @@ new `DELIBERATELY_CLAMPED` declaration left its parametrized test with zero
 cases, and a parametrize over nothing passes. That is the
 check-that-inspects-nothing failure, in a guard written in this same entry.
 
+### 💸 AND THE ONE THAT MATTERS MOST: THE FLEET'S ONLY PATH TO MORE REAL MONEY WAS RIGGED AGAINST EVER PROMOTING ANYTHING
+
+🧪 the experiment judge is the fleet's **only designed route to more real
+money**: a candidate is promoted when the shadow twin beats the live control
+per-trade by `MARGIN_PP` (0.50pp) on the window and both halves. `arm_trades`
+gated the shadow arm on the lever RECEIPT — proof it ran the candidate's BARS —
+and said nothing about which ENTRY POLICY produced each close.
+
+**The arms do not run the same one.** The shadow twin runs `explore_k=2` plus
+scaled conviction; the live control runs `explore_k=0`. So a third of the
+experiment arm's closes came from a policy the control never runs — and they are
+the losing third. Reproduced independently from the paper ledger, post-28-Jul
+(both arms on one build, so no `arm_drift` fires):
+
+    shadow ALL       n=113   mean -0.1711%/trade
+      src=exploit    n= 74   mean -0.0104%
+      src=explore    n= 38   mean -0.4961%
+    live  ALL        n= 73   mean -0.0368%   (72 of 73 stamped `exploit`)
+
+    paired gap AS THE JUDGE COMPUTED IT   -0.1343pp
+    paired gap on SRC-MATCHED subsets     +0.0264pp
+
+**A 0.161pp handicap against a 0.50pp bar — 32% of it, charged to the experiment
+before it started.** And it is not hypothetical: the judge's ONE completed
+verdict in five weeks reads `RELEASED-OPERATOR ... 3-variable A/B (shadow ran
+explore+conviction mid-window)`, while the growth promoter sits parked on *"shadow
+arm not positive in its own right"* — circular, because explore is what makes it
+not positive. **Zero promotions to real money in five weeks.**
+
+`policy_srcs` + `match_policy` fix it: the control defines the policy set and
+BOTH arms are cut to it, so the restriction is symmetric and no unstamped row is
+guessed at. Fail-safe toward today's behaviour at every branch — an unstamped
+control filters nothing, and an all-off-policy arm falls back rather than
+reporting an empty sample the floors would read as "not enough data yet" forever.
+Published as `policy_match`, because a sample that shrank by a third without
+saying so is the same class of defect. The judge remains the sole writer of
+`live.funding.*`; this touches the COMPARISON, never the authority.
+
+**TWO DEFECTS IN MY OWN FIX, BOTH CAUGHT BY ITS OWN FIXTURE, both worth more
+than the fix:**
+* the first draft joined trades back onto rows **by `close_ts`** — and a close
+  timestamp is not unique. ⚖️ Counterweight closes ten legs in one instant, and
+  even in the test fixture 3 of 40 on-policy closes vanished because an
+  off-policy row overwrote their key. **A join on a non-unique key is not a
+  filter.** Filtering moved into `arm_trades`, where the row is in hand.
+* the match reached the full window and **not the halves** — so the both-halves
+  gate, the doctrine's central noise filter, kept reading the biased sample. A
+  candidate could clear the window bar and be failed by a half still counting
+  off-policy closes. **A half-applied bias fix is worse than none: it looks
+  corrected.**
+
+Seven mutations verified red — **and one SURVIVED**: leaving the CONTROL arm
+unfiltered inside `paired_eval` went undetected, because the symmetry test
+exercised `match_policy` directly and never the wiring. Closed with a
+`paired_eval`-level test.
+
+### 💸 AND THE CANDIDATE THAT NOW GOES THROUGH IT: THE FARMER'S RETURNS INVERT AT 24h
+
+With the bar unrigged, the queue gets the best-evidenced candidate it has ever
+carried. On 328 closes (279 priced) replayed against Lighter's own 15m candles,
+**calibration gate PASSED** (27/27 take-profits, 97.9% of non-barrier closes
+reproduced):
+
+    0-3h   +0.285% (n=85, t=+2.30)     24-48h  -1.797% (n=20, t=-1.89)
+    3-6h   +0.481% (n=37, t=+2.59)     48-73h  -1.797% (n=22, t=-3.07)
+    6-12h  +0.413% (n=67, t=+1.97)
+    12-24h +0.569% (n=48, t=+1.24)
+
+**Every hour past 24h destroys money the book had already earned.** The cap
+sweep peaks at 24h on BOTH arms computed separately — a single interior peak
+bracketed by worse cells either side, not a grid edge: live 72h +0.113
+(t=+0.81, halves +15.0/−4.7) → 24h +0.217 (t=+1.76, halves +15.8/+4.0); shadow
+72h −0.054 (t=−0.28, halves +18.3/−26.9) → 24h +0.270 (t=+1.59, halves
++36.4/+6.5). **The halves bar flips FAIL→PASS on both arms, and realised maxDD
+goes 41.99pp → 14.52pp.**
+
+**And it is not the tape.** Two same-coin placebos, the second decisive: synthetic
+positions conditioned IDENTICALLY — same barriers, required to survive 24h
+untouched, so the survivorship selection is matched — return −0.299% on the
+forward leg against this book's −1.278%. Excess −0.979pp, t=−2.44, P(excess≥0)
+= 0.011. That kills the martingale explanation. A random short on these coins
+earns −0.07%/24h, so it is not the `(hm)` free-short bonus either. No coin
+carries it (jackknife t=+2.33..+3.73 across all eight drops).
+
+Queued as `max-hold-24` at the head of the judge's serial queue, ranked strongest
+prior in its own contract. **It is not enacted by me** — 24.0 is the cage floor of
+`xp.funding.max_hold_h`, the judge sets the shadow lever, the paired bar grades
+it, and the judge alone may write `live.funding.*`. The price is declared: a
+promotion resets the 30-day era on both arms, costing the live row 26.6 banked
+days — cheap, because that row's own horizon organ says its `t` bar needs ~1208d
+at the current trajectory, so the window bar was never binding and the cap is
+precisely what changes the trajectory.
+
 ### THE RISK MY OWN CHANGE CREATED, FOUND AND CLOSED IN THE SAME PASS
 
 Widening a gate is the same act as minting a book, and I20 says the same thing
