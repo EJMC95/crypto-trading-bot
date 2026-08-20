@@ -965,7 +965,27 @@ def _census_extra(b):
     say that her exit simply never fired."""
     if not getattr(b.s, "census", False):
         return {}
-    return {"scan": dict(b.scan)}
+    out = dict(b.scan)
+    # [2026-08-19 (rr)] IS THE GATE EVEN REACHABLE? The census says WHY nothing
+    # opened; this says HOW FAR AWAY the market is from opening something —
+    # which is the difference between "quiet today" and "this threshold will
+    # never fire", and 👩 mum v1 died of the second while every reading on her
+    # row looked like the first. `no_signal: 23` alone cannot tell them apart.
+    # Reported, never a gate: nothing here decides a trade.
+    try:
+        bar = getattr(b.s, "RSI_MAX", None)
+        if bar is not None and b.last_rsi:
+            vals = sorted(b.last_rsi.values())
+            out["rsi_bar"] = bar
+            out["rsi_min"] = round(vals[0], 1)          # closest coin to the bar
+            out["rsi_med"] = round(vals[len(vals) // 2], 1)
+            out["rsi_read"] = len(vals)                 # coins with a reading
+            # how many sit within 8 points of the bar — the leading indicator
+            # of supply, visible hours before an entry rather than days after
+            out["near_bar"] = sum(1 for v in vals if v < bar + 8)
+    except Exception:  # noqa: BLE001
+        pass
+    return {"scan": out}
 
 
 class Book:
@@ -989,6 +1009,7 @@ class Book:
         # Book (cheap, additive) but only POPULATED for a carrier that declares
         # `control_arm` / `census`, so no other book's payload shape moves.
         self.last_mark = {}      # coin -> most recent mark seen this cycle
+        self.last_rsi = {}       # coin -> last computed RSI (gate reachability)
         self.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
         self.scan = {}           # per-cycle census counters
         self.halted_today = False
@@ -1602,6 +1623,10 @@ def main():
                 sig = b.s.signals(bars, _extra) if new_candle else None
                 if new_candle:
                     b.last_sig_ts[coin] = sig_ts
+                # [(rr)] gate REACHABILITY: keep the last reading per coin so
+                # the row can say how far the market is from the entry bar.
+                if sig and isinstance(sig.get("rsi"), (int, float)):
+                    b.last_rsi[coin] = float(sig["rsi"])
 
                 held = coin in b.broker.pos
                 px = marks.fresh_mid(venue, coin)

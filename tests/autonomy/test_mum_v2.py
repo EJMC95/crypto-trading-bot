@@ -225,8 +225,82 @@ def test_the_census_can_name_the_binding_constraint():
     b = _B()
     b.s = _mum()
     b.scan = {"scanned": 15, "no_signal": 15, "opened": 0}
+    b.last_rsi = {}
     out = fam._census_extra(b)
     assert out["scan"]["scanned"] == 15 and out["scan"]["opened"] == 0
+
+
+def test_the_gauge_says_how_far_the_market_is_from_the_bar():
+    """(rr): the census says WHY nothing opened; the gauge says HOW FAR AWAY
+    the market is from opening something. `no_signal: 23` is byte-identical
+    between "quiet today" and "this threshold will never fire" — and v1 died
+    of the second while every reading on her row looked like the first."""
+    class _B:
+        pass
+    b = _B()
+    b.s = _mum()
+    b.scan = {"scanned": 4, "no_signal": 4, "opened": 0}
+    #                bar-4  bar+2  bar+13  bar+27   (bar is RSI_MAX = 25)
+    b.last_rsi = {"A": 21.0, "B": 27.0, "C": 38.0, "D": 52.0}
+    scan = fam._census_extra(b)["scan"]
+    assert scan["rsi_bar"] == b.s.RSI_MAX
+    assert scan["rsi_min"] == 21.0, "the closest coin to the bar"
+    assert scan["rsi_read"] == 4
+    # within 8 points of the bar: 21.0 and 27.0 qualify, 38.0 and 52.0 do not.
+    # This is the leading indicator — visible hours before an entry, where the
+    # entry itself is only visible days after.
+    assert scan["near_bar"] == 2
+
+
+def test_the_gauge_is_absent_rather_than_zero_when_nothing_was_read():
+    """A fabricated `rsi_min: 0.0` on a dark scan would read as "a coin is AT
+    the bar" — the loudest possible reading, from no data at all. Absence is
+    the honest degrade (I8: unknown never degrades to a guess)."""
+    class _B:
+        pass
+    b = _B()
+    b.s = _mum()
+    b.scan = {"scanned": 0, "opened": 0}
+    b.last_rsi = {}
+    scan = fam._census_extra(b)["scan"]
+    for k in ("rsi_min", "rsi_med", "near_bar", "rsi_read"):
+        assert k not in scan, f"{k} was invented from an empty reading set"
+
+
+def test_the_gauge_has_a_feeder_and_a_source():
+    """A gauge nothing writes to is the registered-but-inert shape (I18) — it
+    would publish nothing forever and read as "no readings", i.e. exactly the
+    silence it exists to break. Two halves, both required: the carrier must
+    EMIT an rsi on every evaluated bar, and the loop must CAPTURE it."""
+    s = _mum()
+    n = 300                                     # a mild tape that never enters
+    mild = [100.0 - 0.02 * i + (1.6 if i % 2 else -1.6) for i in range(n)]
+    bars = {"c": mild, "h": [c * 1.004 for c in mild],
+            "l": [c * 0.996 for c in mild], "v": [10.0] * n,
+            "t": list(range(n))}
+    sig = s.signals(bars, {})
+    assert sig["enter"] is None, "fixture must be the NO-ENTRY case"
+    assert sig is not None and isinstance(sig.get("rsi"), (int, float)), (
+        "signals() must report its rsi even when it does NOT enter — the "
+        "no-entry case is the only one the gauge exists to measure")
+    src = (ROOT / "lighter_family_bot.py").read_text()
+    assert "b.last_rsi[coin] = float(sig[\"rsi\"])" in src, (
+        "the scan loop must feed b.last_rsi, or the gauge is inert")
+
+
+def test_other_family_books_do_not_grow_a_gauge():
+    """Same blast-radius rule as the control arm: a book that declares no
+    census keeps its payload shape exactly as it was."""
+    class _B:
+        pass
+    for s in fam.STRATEGIES:
+        if getattr(s, "census", False):
+            continue
+        b = _B()
+        b.s = s
+        b.scan = {"scanned": 9}
+        b.last_rsi = {"A": 10.0}
+        assert fam._census_extra(b) == {}
 
 
 # --- 5 · the two things a revival silently breaks --------------------------
