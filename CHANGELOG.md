@@ -71,10 +71,14 @@ substitute for edge** and wrong to generalise into **leverage as the output of a
 sizing model**. This entry does not settle that design; it ends the state where
 the fleet could not have had the conversation.
 
-5 tests; publisher and reader driven END TO END (the payload built by
-`book_stats`, read through the real `_load`/`is_fresh` path) — which is how a
-first draft calling an invented `_fresh_state` helper was caught before it
-shipped. Scout `--selftest` green.
+5 tests, **4 mutations red**, scout `--selftest` green — and the round earned
+its place twice over. The first draft of the accessor called an invented
+`_fresh_state` helper that does not exist in `fleet_bus`; driving it end to end
+against the real `_load`/`is_fresh` path caught it. Then a mutation deleting the
+scout's own `imf > 0` filter **SURVIVED**, because the test had rebuilt the
+`margins` map inline instead of calling `build_snapshot` — it was grading its own
+arithmetic rather than the publisher's, (hj) inside the very file that cites (hj).
+Rewired through the real publisher, the mutation goes red.
 
 
 ## 2026-08-20 (sd) — LEVERAGE, MEASURED AND SHIPPED ON THE ONE BOOK WHERE THE QUESTION IS WELL-POSED — and the mutation round that licensed the book was VOID
