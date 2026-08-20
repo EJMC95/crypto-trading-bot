@@ -527,8 +527,8 @@ class OversoldRebound(Carrier):
     multiplies the decision surface by 24: ~15 coins x 24 bars/day = ~360
     coin-bars/day against v1's ~15. A deep-oversold tail fires on a few
     percent of coin-bars, so signals arrive several times a day, and with 4
-    slots and a 12h cap the book is bounded at 8 closes/day. **30 closes
-    arrives in about a week instead of about a year.** The `scan` census
+    slots and the 24h cap below the book is bounded at 4 closes/day. **30
+    closes arrives in about ten days instead of about a year.** The `scan` census
     publishes the realised rate from the first loop, so this claim is
     falsifiable from the row itself rather than taken on faith (I18).
 
@@ -542,6 +542,32 @@ class OversoldRebound(Carrier):
     was the strongest term in the study (+2.32%/trade at h=12, 19/23 coins
     positive). So v2 takes the deep tail and REFUSES the filter that was
     hurting it.
+
+    **THE HOLD IS 24h, AND IT WAS 12h — CORRECTED IN PLACE 2026-08-20 (I12).**
+    v1's disease was the clock, so v2 capped the hold at 12h on the carry
+    measurement (+0.0171%/day majors median: duration is the tax). That
+    reasoning was right and the number was wrong, because it priced only the
+    COST of holding and never measured the BENEFIT. Measured now on the
+    shipped cell's own tape — 1,055 signals, 18 coins, 208d of Lighter 1h,
+    exit-free per `(qu)`'s own "run the exit-free forward test FIRST":
+
+        hold    4h      8h     12h     18h     24h     36h     48h
+        mean +0.069 +0.293 +0.583 +1.088 +1.233 +0.874 +1.554  %
+        t     +0.94  +2.59  +4.54  +7.45  +8.30  +6.02  +8.96
+
+    Every cell from 8h out is positive in BOTH chronological halves. The carry
+    drag the 12h cap was protecting against is **0.017% at 24h against a
+    +1.233% gain** — two orders of magnitude below the term it was set to
+    avoid, so it does not bind anywhere in this range. 24h is the plateau
+    INTERIOR, not its maximum: 48h reads higher and is deliberately NOT taken,
+    because shipping a swept grid's maximum is how an `(oe)`-style artifact
+    gets deployed (🧭 nav-cook's `HORIZON_PLATEAU_S` is the same discipline).
+    The ROI ladder is stretched over the same 24h so its terminal
+    exit-at-any-profit rung moves with the cap — that rung firing at 12h is
+    the mechanism that was truncating +1.233% back to +0.583%. The ladder's
+    LEVELS are not loosened: the early rungs are RAISED (240m 1.2%->1.6%,
+    480m 0.6%->1.2%), so she demands more before banking early, which is the
+    restrict direction on the entry side of the trade.
 
     HONESTY, because this is the part a good result must not paper over: that
     dose-response has **DECAYED through zero** on rolling 120d windows
@@ -568,7 +594,7 @@ class OversoldRebound(Carrier):
     construction and the `(lv)` subset-starvation trap — a consumer starved by
     a superset running first in the same process — is unreachable between
     them. avo takes dips INSIDE an uptrend on 4h holding ~3.5 days; mum takes
-    the deep tail OUTSIDE one on 1h capped at 12h.
+    the deep tail OUTSIDE one on 1h capped at 24h.
 
     **THE HONEST LIMIT, declared rather than glossed: the two books read trend
     on DIFFERENT timeframes** (mum 1h, avo 4h), so a coin in a 4h uptrend that
@@ -584,22 +610,26 @@ class OversoldRebound(Carrier):
     mum, and it should be made on that measurement rather than pre-emptively.
 
     DELIBERATELY NOT ENCODED, so nobody re-proposes them as oversights: no
-    trend filter (measured destructive), no pyramiding, no ROI widening, no
+    trend filter (measured destructive), no pyramiding, no ROI LEVEL
+    loosening (the ladder was stretched in TIME and its early rungs RAISED), no
     leverage, and no exit SIGNAL — the bracket is predefined at entry and never
     moved, which is 🧘 Douglas's discipline and the reason his book is
     gradeable. The clip is a constant $50 (`stake_mult` returns 1.0 and takes
     no streak, outcome or equity input) so consistency is structural.
     """
-    # take profit early, then decay to breakeven by the 12h cap: the carry
-    # measurement says duration is the tax, so the ladder pays for patience
-    # only while patience is cheap.
-    roi = {0: 0.020, 240: 0.012, 480: 0.006, 720: 0.0}
+    # Take profit early, then decay to breakeven by the 24h cap. The carry
+    # measurement says duration is a tax; the 2026-08-20 horizon measurement
+    # says it is a tax two orders of magnitude smaller than what patience buys
+    # here, so the ladder now stretches across the whole cap instead of
+    # surrendering at 12h. See the docstring's table.
+    roi = {0: 0.020, 240: 0.016, 480: 0.012, 720: 0.008,
+           1080: 0.004, 1440: 0.0}
     protections = {"cooldown_candles": 2,
                    "slguard": {"lookback": 24, "trades": 3, "stop": 6},
                    "maxdd": {"lookback": 72, "trades": 8, "dd": 0.15, "stop": 12}}
     min_bars = 210                      # e200 on 1h needs >200 closed bars
     RSI_MAX = 25.0                      # (qu)'s measured dose cell
-    MAX_HOLD_MIN = 720                  # 12h — the carry-bounded cap
+    MAX_HOLD_MIN = 1440                 # 24h — the MEASURED plateau interior
     control_arm = True                  # publishes its own random-entry null
     census = True                       # publishes why nothing opened (I18)
     #: v1 positions (opened 2026-07-12) are flattened on the first v2 loop —

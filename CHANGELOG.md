@@ -260,6 +260,146 @@ now reads `baseline: GREEN` and kills correctly.
 Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
+## 2026-08-20 (sd) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
+
+**Operator, 20-Aug:** *"it is clear that the bots are too restricted, entry and
+exits are completely off, its as if they all share the same metrics and
+parameters which is false and ive never asked or it. individually look at where
+each bot is being choked, where its entry could be better, how it could exit
+more effectively and stop this perpetual risk focused nothing works mantra."*
+
+**The shared-parameter claim is CORRECT and it is measurable from the live
+payload.** Four unrelated books publish `clip_usd: 80.0` (📐 Grimes, 🧮 Hull,
+🏦 Kiyosaki, 🧭 nav-cook); two publish `min_vol: 2000000.0` (🧮/🏦); two publish
+`min_vol_m: 1.0` (🧘 Douglas, 📐); two publish `universe_n: 18` and two more
+`universe_n: 40`. Those are birth-inheritance, not per-book derivations. The
+sharp form of the defect is **an inherited constant whose own SOURCE has since
+moved**, and this pass found one and shipped the correction.
+
+**Every change below is on ONE book, from THAT book's own number.** None is a
+fleet-wide sweep — that is the habit being corrected.
+
+### 👩 mum — the EXIT was truncating a measured cell by more than half
+Her `MAX_HOLD_MIN` was 12h, set on the carry-drag measurement (+0.0171%/day),
+which priced the COST of holding and never measured the BENEFIT. Measured on
+her shipped cell's own tape (RSI(14)<25 AND NOT e50>e200, 1,055 signals, 18
+coins, 208d Lighter 1h, exit-free per `(qu)`'s own "run the exit-free forward
+test FIRST"):
+
+| hold | 4h | 8h | **12h** | 18h | **24h** | 36h | 48h |
+|---|---|---|---|---|---|---|---|
+| mean | +0.069% | +0.293% | **+0.583%** | +1.088% | **+1.233%** | +0.874% | +1.554% |
+| t | +0.94 | +2.59 | **+4.54** | +7.45 | **+8.30** | +6.02 | +8.96 |
+
+Positive in BOTH chronological halves from 8h out. The carry drag at 24h is
+**0.017% against a +1.233% gain** — two orders of magnitude below the term the
+cap was set to avoid, so it does not bind anywhere in this range. **12h → 24h**,
+and the ROI ladder stretched over the same 24h because its terminal
+exit-at-any-profit rung firing at 12h is the mechanism doing the truncating.
+24h is the plateau INTERIOR, not the maximum (48h reads higher and is
+deliberately not taken — shipping a swept grid's maximum is how an `(oe)`-style
+artifact deploys). Ladder LEVELS are not loosened: the early rungs are RAISED
+(240m 1.2%→1.6%, 480m 0.6%→1.2%). 25 pins green.
+
+**AND A CORRECTION TO MY OWN FIRST READING, before it becomes folklore.** I
+first called mum "the clearest choke in the fleet" off her census field
+`rsi_min: 36.5` against a bar of 25 — i.e. nothing near the bar. That is a
+**SNAPSHOT, not a rate**, and reading it as a rate is the (hd)/I7 error this
+repo keeps paying for. Measured: the cell fires **152 times per 30 days across
+18 coins**. She is not starved and her bar is not too tight — the dose-response
+is monotone DECREASING in the bar (rsi<25 +1.233% at 24h; <30 +0.628%; <35
++0.427%; <40 +0.309%), so widening it would have diluted her edge 2–4×. **The
+widening I was about to ship would have made her worse.** The bar stays at 25.
+
+### 🏦 Rich Dad — an inherited floor its own source had already moved
+`MIN_VOL` was `2e6`, taken verbatim from 🌾 carry at birth (13-Aug). **Carry
+moved it to `1e6` on 18-Aug `(px)`** after measuring its own cell: occupancy
+5.73% → 13.42%, qualifying population 3 → 6 coins, all crypto, inside the
+`(it)` cage. Kiyosaki enters the SAME cell on the same venue and was left
+behind — 7 days alive, **ZERO trades**, census `cold 209/228`. **2e6 → 1e6.**
+Its own extra gate (payback velocity, ~21.9% TRUE) is untouched and still binds
+ABOVE carry's 20% floor, so this admits nothing the 21-Jul sweep did not
+validate (I19, restrict-preserving).
+
+### 🧮 Hull — at its cap with 11 candidates, on a book whose binding bar is CLOSES
+`(ny)` states this book's constraint in its own words: *"THE BINDING BAR HERE IS
+CLOSES, NOT `t`"* — 6.0 closes/30d, ~5 months to 30 from a standing start.
+Measured today: `held 4` against `MAX_POSITIONS 4` with **11 books in-band and
+liquid** (scanned 228, below_band 106, above_band 21, thin 90). The cap, not the
+gate, is rationing its evidence. **4 → 6**, which raises closes/30d roughly in
+proportion — I17 decidability bought directly. Not an expectancy widening (I19):
+per-trade % is invariant to position count, the book is delta-neutral MODELLED
+(P&L is accrued − fees, no price term), and 6 × $80 stays inside the same gross
+envelope its siblings run. Gate, band and exits untouched.
+
+### 🧭 nav-cook — its dashboard row has never reflected a single trade it made
+`build_state()` did not carry `realized`, `n_closed` or `n_wins`, while `main()`
+read all three back out of that blob at boot. So **every restart silently reset
+the book's entire realised record to zero.** Measured on the live row: it
+publishes `closed_trades: 0`, `pnl_abs: 0.0`, `equity: 1000.00` while its own
+ledger holds **34 closes and −$3.80**. This is I4's shape with the sign reversed
+— not a write that fails, a field that was never written — and it is load-bearing
+far beyond display: `golive_readiness`, `fleet_allocation` and the horizon sweep
+all read the ROW, so a trading book was structurally invisible to every organ
+that grades it. Fixed, with the round trip pinned; 2 mutations verified red.
+
+### THE FIFTH FIX WAS MEASURED, BUILT, AND THEN WITHDRAWN — this is the part worth keeping
+From the same ledger I measured what looked like a clean second nav-cook defect:
+**58.2 closes/day live against the founding study's 6.2/day (9.4×), 65% of
+closes (22 of 34) re-entries into a coin just exited** (SKHYNIXUSD 11 times,
+SAMSUNGUSD 7 — the book's two worst lines), median hold **5.3 min**, and the 4h
+`MAX_HOLD_S` reached **0 of 34 times**. I built a 60-minute re-entry embargo,
+replayed it over the book's own ledger (−$3.80 → −$2.80, refusing 11 re-entries
+worth −1.254%), selftested it and mutation-verified it.
+
+**Then it was withdrawn, for two independently sufficient reasons:**
+1. **The premise was false.** I justified it as *"the study counted EPISODES and
+   the bot trades TICKS"*. `scripts/study_dislocation_band_2026-08-19.py` — which
+   `(sb)` landed on main hours earlier — shows the study's `replay()` blocks only
+   a coin **currently open** (`if sym in opened`) and re-enters on the very next
+   snapshot. **The study has no cooldown either.** The claim did not survive
+   contact with the harness it cited.
+2. **The cause was already cured.** `(sa)` fixed this book's confirm window the
+   same morning — *"a confirm window is a DURATION, and it inherited the COUNT
+   from a bot on a different cadence"*, **3.3× looser than measured**. Commit
+   `1bd0644` is 06:19:34Z; my 34-trade sample runs 19-Aug 23:40Z → 20-Aug 01:09Z,
+   **entirely pre-fix**. A coin must now hold in-band 630s instead of ~190s
+   before re-entry, which attacks the same churn at its source.
+
+So the churn was real and my measurement of it corroborates `(sa)` independently
+from the ledger side — but shipping a second restriction on top of a gate that
+had just been tightened 3.3×, justified by a pre-fix sample, is **precisely the
+over-restriction the operator is objecting to.** Recorded rather than deleted,
+because "I measured it, built it, and it was already fixed" is the outcome this
+changelog is least likely to hear about otherwise.
+
+### Reported, not acted on — the honest per-book residue
+* **📐 Grimes** (0 trades in 7 days): its gate refuses all three setups on their
+  own trailing records (keltner n=130 t=−0.37, failtest n=375 t=−1.48, pullback
+  n=140 t=−0.82). That is the gate WORKING, not a choke, and no bar move fixes
+  an absent edge — it is an I17 keep-or-retire call, owner OPERATOR. Its one
+  free widening is **`breakout`, excluded because "that supply is 🧙
+  book-schwager's" — and Schwager was RETIRED 17-Aug**, so the exclusion now
+  guards nothing. Not taken here: it needs a fourth setup owner plus a gate
+  scorecard, and Schwager's own breakout measured t=0.86 / random-null P=0.183,
+  so the expected value does not justify the build in this pass.
+* **🧘 Douglas** — the counterfactual is WITHHELD per `(gx)`. My harness
+  reproduces the shipped cell's ENTRY COUNT to within 5 of `(nt)`'s n=641 at
+  `(nt)`'s own cutoff, but not its P&L level (+$2.90 vs +$17.38), so it may not
+  speak about alternative brackets. What its own ledger says stands: 16 stop-outs
+  / 11 take-profits at sl 1.0×ATR / tp 1.5×ATR is **59.3% stops against the 60%
+  a random walk gives that geometry** — the bracket is fair and the entry is
+  contributing nothing at K=2.5 on this sample.
+* **🔮 Georgia** — `long-trend-breakout_trailing_stop_loss` fires **66 times at
+  9% win** (−$17.11, median hold 1.9h) against `_roi` n=35 at 100% win, 2.4h, on
+  the SAME tag. The fleet already made this exact call once — `atr_stop_dist`
+  carries *"[2026-07-13] counter-trend stop 2.0x → 3.5x ... the 2.0x stop fired
+  on noise, 77-89% of stop-outs reclaimed entry within 24h"* — and left
+  `trend_breakout` at 2.5×. **Re-running that measurement on the tag left behind
+  gives 62%, not 77-89%** (n=13 with 24h of forward candles; only 15% reached the
+  +1.8% ROI rung). **Weaker than the evidence that justified the original change,
+  so it is NOT shipped** — it is the best-motivated candidate in the fleet and it
+  needs the other 53 stop-outs to age past 24h first.
 
 ## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT'S GRADE WAS ON THE WRONG BASIS — worth 1.11×, NOT the 3.6× this entry first claimed (CORRECTED IN PLACE): the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
 
