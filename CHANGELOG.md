@@ -1,3 +1,82 @@
+## 2026-08-20 (sd) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
+
+**Operator: *"everything you have put forward that is unreachable is because its
+one construct, one set of tradeables, one set of entry and exits which havent
+been explored properly, you have not set the bots up in any way that we could
+ever really even use leverage, how is this not the mandate that we run off?"* /
+*"we should be running this mandate and doctrine on building bots that can
+utilize every aspect of the ecosystem we are currently working on."***
+
+**He is right, and the cause is mechanical rather than philosophical.** The venue
+publishes `default_initial_margin_fraction` and `maintenance_margin_fraction` on
+**every row** of `/api/v1/orderBookDetails` — an endpoint `lighter_market_scout`
+already fetches every cycle — and **nothing in this tree read either one.** So
+every Lighter book sizes a flat dollar clip at **1×**, not by decision but
+because no code path could see that anything else existed. The only `LEVERAGE`
+constant in the repo belongs to a **retired Hyperliquid bot**.
+
+**MEASURED across the 212 active books today** (`max_lev = 10000 / imf`):
+
+| max leverage | markets | examples |
+|---:|---:|---|
+| **20×** | 21 | BTC, ETH, WTI, US100, NZDUSD |
+| **15×** | 24 | SOL, XAU, XAG, NVDA, AAPL, USDJPY |
+| **10×** | 88 | CRV, PLTR, LDO, TRUMP |
+| 8× / 5× / 3× | 3 / 40 / 36 | |
+
+and the venue is not one asset class either: **171 crypto / 19 equity / 7
+commodity / 7 index / 8 FX**, with the 41 non-crypto markets carrying **$163.8M
+a day**. CLAUDE.md item 18 already says those are the fleet's ONLY on-venue
+source of a regime that is not falling-BTC. The widest book scans **18**.
+
+**THIRD TIME THIS EXACT STORY HAS RUN ON THIS ENDPOINT.** `created_at` was on
+every row while 🎯 the sniper burned four candle probes a loop to approximate it.
+`strategy_index` was on every row while the fleet maintained FIVE hand-typed
+non-crypto lists that turned out wrong on **41 of 204** books. Now the margin
+surface. The pattern is not carelessness about any one field — it is that this
+fleet reads the endpoint for the ONE number a given book wants and never asks
+what else the venue is telling it.
+
+**WHAT SHIPPED.** `book_stats` carries `imf`/`mmf`; the scout publishes a
+`margins` map (`max_lev`, `imf_bps`, `mmf_bps`); `fleet_bus.market_margins()`
+and `fleet_bus.max_leverage()` serve it.
+
+**THE CONTRACT IS FAIL-CLOSED, AND IT IS THE OPPOSITE OF EVERY OTHER ACCESSOR IN
+THAT MODULE.** The rest of `fleet_bus` degrades to *"keep your configured
+default"* because the cost of being wrong is a missed shadow trade. Here the cost
+of a wrong default is a **liquidation** — an unrecoverable loss of the whole book
+— so a dark bus, a stale payload, an absent symbol or a junk `imf` all return
+**1× (unlevered)**. A default above 1.0 would turn an organ outage into leverage
+nobody chose. `mmf` is published beside `max_lev` deliberately: it is the ruin
+number, and a leverage design that cannot state its distance to the maintenance
+margin is not a design.
+
+**PUBLISHED, NOT CONSUMED — and that boundary is enforced, not promised.** No
+book's sizing changes on this commit. A test walks the AST of every
+`lighter_*.py` and FAILS if any book starts calling `max_leverage` or
+`market_margins`, so the first consumer has to announce itself deliberately and
+bring its own measured pass and its own ruin arithmetic rather than arriving
+quietly.
+
+**THE ARITHMETIC THIS DOES NOT WAIVE, stated because it is design input and will
+otherwise be mistaken for a promise:** leverage `k` multiplies per-trade mean AND
+sd by `k`, so **`t` is invariant** — leverage cannot walk a book through the
+go-live gate, it multiplies dollars and it multiplies drawdown against the 15%
+bar. What DOES cut portfolio sd without cutting mean is **diversification across
+uncorrelated assets**, which is precisely the 41 non-crypto markets nobody
+trades. That is why the mandate needs both halves and why the two prior refusals
+(🧙 Schwager's *"no leverage stacking"*, 🏦 Kiyosaki's *"a leverage game on a
+shadow book manufactures fake evidence"*) were right about **leverage as a
+substitute for edge** and wrong to generalise into **leverage as the output of a
+sizing model**. This entry does not settle that design; it ends the state where
+the fleet could not have had the conversation.
+
+5 tests; publisher and reader driven END TO END (the payload built by
+`book_stats`, read through the real `_load`/`is_fresh` path) — which is how a
+first draft calling an invented `_fresh_state` helper was caught before it
+shipped. Scout `--selftest` green.
+
+
 ## 2026-08-20 (sd) — LEVERAGE, MEASURED AND SHIPPED ON THE ONE BOOK WHERE THE QUESTION IS WELL-POSED — and the mutation round that licensed the book was VOID
 
 *(Renumbered (sc) -> (sd) at push time — ⚖️ Counterweight's entry took `(sc)` on `main` while this branch was unmerged, so the merged entry keeps the letter and this one moves. The in-tree references were rewritten in the same commit: `(ri)`'s correction note and `mutate.py`'s and `.gitignore`'s comments, reconciled by COUNT not by a capped grep.)*
@@ -70,6 +149,7 @@ now reads `baseline: GREEN` and kills correctly.
 Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
+
 ## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT IS GRADED 3.6× WORSE THAN IT PERFORMS: the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
 
 [Renumbered (sa) -> (sb) -> (sc): main took (sa) for nav-cook's gate fix, then
