@@ -55,6 +55,26 @@ from it). 🙏 Avo's spec records what was verified rather than assumed: it size
 off its OWN `live.avo.clip_scale`, **not** the shared `live.clip_scale`, so the
 board moving the Farmer's dial cannot resize it.
 
+**SAID PLAINLY BEFORE ANYONE READS THIS AS MORE THAN IT IS: THIS ORGAN DOES
+NOT RUN.** `fleet_agronomy` has been DECLARED not-wired since 2026-07-22 — its
+own docstring says *"not in run_all.sh, has no COPY in any Dockerfile, and has
+no consumer... a thermometer sitting on the bench — run it by hand"* — and I
+confirmed it against the live bus rather than the docstring: `fleet-agronomy`
+is **ABSENT from /bus.json's 30 keys**, i.e. it has never published. So what
+this pass bought is a thermometer that is ACCURATE WHEN SOMEONE READS IT, not
+a new signal arriving anywhere. Wiring it is the review decision its own header
+reserves (loop + COPY + `--publish` together), and it is NOT taken here.
+**And one fidelity note that falls straight out of running it by hand:** a
+spec with `guards=()` reads **`clear`** on the guards check, so a book with
+guards I had not declared would publish reassurance it had not earned — the
+"green-but-empty" shape this organ's own doctrine names. Caught on 🪁
+band-kelly, which really does carry two persisted re-entry guards (a 2h dip
+cooldown and the ghost's condition-based non-convergence embargo, the exact
+`duration_h=None` case the `Guard` docstring cites), so it now gets a FULL
+spec instead of the env-only shape. The remaining six env-only books declare
+`guards=()` because that is what their source says; if any of them gains one,
+its spec is where it belongs.
+
 **AND THE CLASS IS CLOSED, not the instance.**
 `tests/autonomy/test_agronomy_coverage.py` diffs the organ against
 `fleet_books.ROW_ENTRY` — the maintained row→module registry a book joins at

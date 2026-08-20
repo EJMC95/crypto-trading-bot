@@ -470,11 +470,26 @@ BOOKS = {b.row: b for b in [
     # asks "does this book have light and water" cannot answer for a book it
     # has never heard of, and every one of these is ENV-ONLY, which is exactly
     # the condition worth reporting.
-    _envonly("band-kelly-lshadow", "lighter_band_kelly_bot.py", 6,
-             "🪁 the Mirror. Holds the opposite side of measured losers; the "
+    # 🪁 band-kelly gets a FULL spec rather than the env-only shape: it really
+    # does carry two re-entry guards, and declaring `guards=()` for a book that
+    # has them would read CLEAR on the guards check — the "green-but-empty"
+    # verdict this organ's own doctrine warns about. Both are PERSISTED in
+    # build_state, so neither is memory-only.
+    BookSpec(
+        "band-kelly-lshadow", "lighter_band_kelly_bot.py", knob_floor=6,
+        guards=(Guard("dip_cooldown", "short-dip_*", 2.0, "dip_cd",
+                      source="DIP_COOLDOWN_S = 2*3600 (the taker's "
+                             "SL_COOLDOWN_H, mirrored)"),
+                Guard("noconv_embargo", "*-snap_maxhold", None, "noconv",
+                      source="the ghost's own non-convergence quarantine, "
+                             "mirrored — releases when |dev| <= EXIT_BPS, a "
+                             "CONDITION not a clock (duration_h=None)")),
+        expects=("fleet-risk", "coin-vetoes"),
+        note="🪁 the Mirror. Holds the opposite side of measured losers; the "
              "ghost's gate math is IMPORTED from lighter_dislocation_bot, so "
              "its entry bar is a retired module's frozen constants — "
-             "unreachable by any lever by design."),
+             "unreachable by any lever by design, and moving one would void "
+             "the founding negation rather than widen the book."),
     _envonly("nav-cook-lshadow", "lighter_nav_cook_bot.py", 9,
              "🧭 the Navigator. Premium band [45,60)bps, strictly below "
              "band-kelly's floor so the two TILE. NOTE: measured 55.9 "
