@@ -1,4 +1,8 @@
-## 2026-08-20 (rs) — FOUR DECLARED ENFORCEMENTS WERE INERT, HARVESTED FROM A STALE PR THAT COULD NEVER MERGE — including a fleet-wide death recorder that has never recorded a death
+## 2026-08-20 (ry) — FOUR DECLARED ENFORCEMENTS WERE INERT, HARVESTED FROM A STALE PR THAT COULD NEVER MERGE — including a fleet-wide death recorder that has never recorded a death
+
+[Renumbered (rs) -> (ry) at rebase time: main took (rs) for PR #204 while this
+was in flight, and (rt) for #206 minutes later. All 9 code citations moved
+together, counted per file rather than from one grep.]
 
 The operator asked for the stale draft PRs to be cleared. Four of the five
 (#153, #167, #168 from 7–13 Aug) have **no merge base with main at all** — main's
