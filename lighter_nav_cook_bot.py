@@ -671,7 +671,14 @@ def _selftest():
     # LEVERAGE PIN: gross exposure must stay inside the level whose MEASURED
     # drawdown clears the 15% go-live bar. maxDD scales ~linearly in the clip
     # (-1.89% at $80), so the ceiling is the clip where it reaches 15%.
+    # This is a MEASURED number (the 226-trade series at the $80 clip), not a
+    # tunable. Pinned against itself because the first version of this round
+    # left it as a bare literal and a mutation to 0.0001 SURVIVED — the same
+    # "a bar can be fixed by editing the bar" class that `(sa)` fixed by
+    # deriving the confirm window instead of asserting it.
     MEASURED_MAXDD_AT_80 = 0.0189
+    assert abs(MEASURED_MAXDD_AT_80 - 0.0189) < 1e-9, (
+        "measured maxDD at the $80 clip is evidence, not a knob")
     implied = MEASURED_MAXDD_AT_80 * (CLIP_USD / 80.0)
     assert implied < 0.15, (
         "clip $%.0f implies ~%.1f%% maxDD, past the 15%% go-live bar"
