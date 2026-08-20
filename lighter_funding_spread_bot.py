@@ -508,7 +508,7 @@ def main():
     # because the cost is a missed shadow trade. Here the cost is unsupervised
     # real money, so absence of evidence must never read as permission.
     if ctx.mode == "lighter_live":
-        # [2026-08-20 (rs)] THE ROW ID, NOT THE BARE BASE. This passed `BOT`
+        # [2026-08-20 (ry)] THE ROW ID, NOT THE BARE BASE. This passed `BOT`
         # ("perps-funding-spread") while `golive-readiness.books` is keyed by
         # the LEDGER's bot column — `ctx.bot_id`, i.e. BOT + the venue suffix.
         # Verified against the live publisher: its books map carries
@@ -993,7 +993,7 @@ def _selftest():
     _fresh = datetime.fromtimestamp(_now - 60, timezone.utc).isoformat()
     _stale = datetime.fromtimestamp(_now - 200_000, timezone.utc).isoformat()
 
-    # [2026-08-20 (rs)] KEYED THE WAY THE PUBLISHER KEYS IT. This fixture used
+    # [2026-08-20 (ry)] KEYED THE WAY THE PUBLISHER KEYS IT. This fixture used
     # `BOT`, the bare base — so it agreed with the (then broken) consumer and
     # both disagreed with `golive_readiness`, which keys `books` by the ledger's
     # bot column. The (hj) rule verbatim: a consumer must be tested against a

@@ -899,7 +899,7 @@ def brain_amnesia(brain_state, vitals_state, max_skew_s=None):
     b, v = (brain_state or {}), (vitals_state or {})
     bt = _parse_ts(b.get("updated") or b.get("updated_at"))
     vt = _parse_ts(v.get("updated") or v.get("updated_at"))
-    # [2026-08-20 (rs)] A BLIND DETECTOR MUST SAY SO — it may not read as
+    # [2026-08-20 (ry)] A BLIND DETECTOR MUST SAY SO — it may not read as
     # "healthy". This returned [] whenever either stamp was unreadable, and the
     # brain's memory payload NEVER carried one: `save_state` records the time in
     # the bot_state `updated_at` COLUMN while `fetch_states` selects only
@@ -1594,7 +1594,7 @@ def _selftest():
     assert brain_amnesia({"runs": 337, "updated": "2026-07-31T13:00:00+00:00"},
                          {"run": 338, "updated": _ok_t}) == [], \
         "an hour of skew is a slow cycle, not a failed write"
-    # [2026-08-20 (rs)] FAIL-SAFE QUIET, WHERE THE SILENCE IS INFORMATIVE — and
+    # [2026-08-20 (ry)] FAIL-SAFE QUIET, WHERE THE SILENCE IS INFORMATIVE — and
     # NOT where it is the guard failing to work. This loop used to include
     # `{"updated": "nope"}` as a must-stay-quiet case, i.e. it certified the very
     # blindness that made I2's enforcement inert: the brain's blob carries no

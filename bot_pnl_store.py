@@ -1984,7 +1984,7 @@ def record_organ_error(key, exc=None, where=None):
     it in the payload the fleet ALREADY watches, so `fleet_immune` reaches the
     operator by the path every organ already uses — no new plumbing.
     """
-    # [2026-08-20 (rs)] THE MISSING IMPORT THAT MADE THIS A NO-OP FROM THE DAY
+    # [2026-08-20 (ry)] THE MISSING IMPORT THAT MADE THIS A NO-OP FROM THE DAY
     # IT SHIPPED. `datetime` is not a module-level name in this file — every
     # other user imports it locally — so the `datetime.now(...)` below raised
     # NameError on EVERY call, the blanket `except Exception: return False`
@@ -2049,7 +2049,7 @@ def organ_main(key, fn, *args, **kwargs):
         lines = [ln.strip() for ln in tb.strip().splitlines()]
         if len(lines) >= 2:
             where = lines[-2][:200]
-        # [2026-08-20 (rs)] READ THE RESULT AND SAY WHICH HAPPENED (I4/I8).
+        # [2026-08-20 (ry)] READ THE RESULT AND SAY WHICH HAPPENED (I4/I8).
         # This discarded the return value and printed "recorded ... so the
         # immune organ can see it" unconditionally — FALSE on every call for as
         # long as `record_organ_error` carried its missing import, and false

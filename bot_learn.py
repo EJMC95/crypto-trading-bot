@@ -458,7 +458,7 @@ def _save_state(state):
     shout here stops the NEXT cause of the same shape being invisible.
     """
     saved = []
-    # [2026-08-20 (rs)] STAMP THE BLOB, NOT JUST THE COLUMN. `save_state` writes
+    # [2026-08-20 (ry)] STAMP THE BLOB, NOT JUST THE COLUMN. `save_state` writes
     # the time to the bot_state `updated_at` COLUMN, but `fetch_states` — the
     # batch read every organ uses — selects only `(bot, state)`. So the payload
     # `fleet_immune.brain_amnesia` receives carried NO timestamp at all, `bt`

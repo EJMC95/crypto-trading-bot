@@ -702,7 +702,7 @@ def _selftest():
             mock.patch(__name__ + ".UNIVERSE", ["BTC", "ZEC", "GHOST"]), \
             mock.patch(__name__ + ".time", mock.Mock(time=lambda: now,
                                                      sleep=lambda s: None)):
-        # [2026-08-20 (rs)] `sys.exit(store.organ_main(...))` — the production
+        # [2026-08-20 (ry)] `sys.exit(store.organ_main(...))` — the production
         # __main__ line, copy-pasted into the selftest. It raised SystemExit(0)
         # and KILLED THE PROCESS HERE, so every assertion below never ran and
         # the final "selftest OK" line never printed — while

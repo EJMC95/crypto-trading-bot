@@ -1,4 +1,4 @@
-"""[2026-08-20 (rs)] FOUR DECLARED ENFORCEMENTS THAT EXISTED AND DID NOTHING.
+"""[2026-08-20 (ry)] FOUR DECLARED ENFORCEMENTS THAT EXISTED AND DID NOTHING.
 
 Harvested from PR #153, a branch that can never merge (no merge base with main
 — main's history was rebuilt under it), whose diff was nonetheless right. Each
