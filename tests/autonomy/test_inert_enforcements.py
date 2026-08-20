@@ -16,6 +16,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
 import bot_pnl_store as store  # noqa: E402
 import fleet_immune as fi  # noqa: E402
 
@@ -72,7 +74,11 @@ def test_organ_main_does_not_claim_a_record_it_did_not_make(monkeypatch, capsys)
 
 
 # --- 2 · I2's amnesia check must not be blind ------------------------------
-_VIT = {"run": 338, "updated": "2026-07-31T14:12:06+00:00"}
+# Timestamps are COMPUTED, never literals: a date the era tables own would make
+# a legitimate table move redden a test that is not about dates at all
+# (audit_era_date_literals caught exactly that on this file's first draft).
+_NOW = datetime.now(timezone.utc)
+_VIT = {"run": 338, "updated": _NOW.isoformat()}
 
 
 def test_brain_amnesia_reports_when_it_cannot_see():
@@ -97,8 +103,8 @@ def test_brain_amnesia_stays_quiet_where_silence_is_informative():
 
 def test_brain_amnesia_still_detects_real_amnesia():
     """The original detector must survive the blindness fix."""
-    out = fi.brain_amnesia({"runs": 337, "updated": "2026-07-28T14:00:00+00:00"},
-                           _VIT)
+    stale = (_NOW - timedelta(hours=72)).isoformat()
+    out = fi.brain_amnesia({"runs": 337, "updated": stale}, _VIT)
     assert out and "MEMORY NOT PERSISTING" in out[0]["detail"]
 
 
