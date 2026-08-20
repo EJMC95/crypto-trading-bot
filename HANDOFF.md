@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 19:50 Sydney (09:50Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-20 19:52 Sydney (09:52Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -49,8 +49,9 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (52 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh))
+## Shipped today (53 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh))
 
+- `966abc4` Nineteen designs, one way of judging them — the manifest (sh)
 - `e31648f` The ceiling becomes a measurement, and the brain's training wheel comes off (sh)
 - `f0fba40` The never-recorded class, closed fleet-wide; and I11 finally has teeth (sg)
 - `e34b6a2` The only path to more real money was rigged against ever promoting (sf)
