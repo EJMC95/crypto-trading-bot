@@ -260,6 +260,41 @@ QUANTITIES = {
     # (scan_receipts: slope ratios recorded for EVERY decision incl. skips,
     # UNCLAMPED conviction scores, per-cycle explore pool size). Entries
     # stay honestly UNMEASURED until the next --measure run accrues n. ----
+    # [2026-08-20 (sf)] 🎫 THE BREAKOUT ARM'S TREND EXIT. Both knobs became
+    # registered levers today and neither could be PROFILED, because the
+    # quantity each cuts lived in memory and died at close. The bot now stamps
+    # them (`give_back`, `mae_ret` on the close row) — so these read UNMEASURED
+    # until closes accrue under the stamp, which is the honest state, and then
+    # become the first thing this guard can say about the exit that binds the
+    # taker's best long lens.
+    #
+    # SCOPED BY REASON SUFFIX, deliberately: the trail bar must be profiled
+    # against the give-back distribution of the positions the TREND exit
+    # governed, not against every close the book ever made. `_breakoutup` and
+    # `_breakout` are the two lenses `bull_exit` routes there; the suffix
+    # matches the exit tag, so both trail-closed and hold-closed breakouts
+    # count — which is the untruncated distribution the bar cuts through.
+    "taker.brk_trail": {
+        "source": "ledger:lighter-ticket-taker-lshadow",
+        "extract": ("xfield", ("give_back", None)),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "give_back_frac",
+        "min_n": MIN_N_LEDGER, "precision": 0.0001,
+        "gate": "lighter_ticket_taker.exit_reason — trail iff give-back from "
+                "the peak >= this, on the lenses bull_exit routes to the "
+                "trend exit",
+        "note": "MAXIMUM give-back per position, stamped at close since (sf); "
+                "recorded for EVERY trend-exit close, not only trailed ones, "
+                "so the distribution is not truncated at the bar"},
+    "taker.brk_sl": {
+        "source": "ledger:lighter-ticket-taker-lshadow",
+        "extract": ("xfield", ("mae_ret", None)),
+        "abs": True, "dir": "ge", "to_q": 1.0, "unit": "adverse_frac",
+        "min_n": MIN_N_LEDGER, "precision": 0.0001,
+        "gate": "lighter_ticket_taker.exit_reason — hard stop iff adverse "
+                "excursion reaches this magnitude",
+        "note": "MAXIMUM adverse excursion per position, stamped at close "
+                "since (sf); abs because the lever is signed and the "
+                "excursion is negative"},
     # [2026-08-20 (sf)] 🌾 carry's measured-liquidity bound — the FIRST
     # QUANTITIES spec on the `lighter-books` lane, and it exists because the
     # lever shipped with its own receipts rather than after them. The header
@@ -1314,6 +1349,26 @@ def _measure(dsn):                                        # pragma: no cover
             rows = [r for r in ledger(q["source"].split(":", 1)[1]) if r[1]]
             if kind == "hold_h":
                 vals = [(ts(c) - ts(o)) / 3600.0 for _p, o, c, _r, _x in rows]
+            elif kind == "xfield":
+                # [2026-08-20 (sf)] A FIELD STAMPED ON THE CLOSE ROW'S `extra`.
+                # The two ledger kinds above derive their quantity from the
+                # row's TIMESTAMPS, which is all the ledger used to carry — so
+                # any lever cutting something the bot knew and did not record
+                # was unprofilable by construction, and stayed UNMEASURED
+                # forever however many --measure runs ran. General on purpose:
+                # every book that stamps a decision quantity at close becomes
+                # profilable by adding a spec, with no further change here.
+                # `arg` is (field, reason_suffix|None); the suffix scopes the
+                # sample to one exit family, because a bar that governs the
+                # trail must not be profiled against positions the stop closed.
+                fld, suf = arg
+                for _p, _o, _c, r, x in rows:
+                    if suf and not str(r or "").endswith(suf):
+                        continue
+                    d = x if isinstance(x, dict) else {}
+                    v = d.get(fld)
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        vals.append(float(v))
             elif kind == "gap_after":
                 opens = sorted((p, ts(o)) for p, o, _c, _r, _x in rows)
                 for p, _o, c, r, _x in rows:

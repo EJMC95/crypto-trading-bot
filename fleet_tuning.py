@@ -215,6 +215,50 @@ LEVERS = {
     "taker.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48", "env_default": 48.0},
+    # [2026-08-20 (sf)] THE BREAKOUT ARM'S TREND EXIT JOINS THE RAIL. Under
+    # BULL_MODE `bull_exit()` routes breakout/breakoutup to a DIFFERENT exit
+    # from every other lens — no TP cap, a wide hard stop, and a trailing
+    # give-back off the peak — and both of its numbers were bare env literals
+    # with no registry entry. So the growth rail could move the fixed
+    # reversion bracket (`taker.tp`/`taker.sl`) that divergence uses and could
+    # not touch the exit that actually binds the taker's best long lens:
+    # `long-breakoutup_hold` n=27 +$23.77 (+1.412%/trade) against
+    # `long-breakoutup_trail` n=18 -$9.59 (-1.722%). That is I18 — the binding
+    # constraint must be a reachable lever — and until now it was not one.
+    #
+    # REGISTERING MOVES NOTHING (the `disloc.exit_bps` idiom): both defaults
+    # are today's values and this ships INERT. It is reach, not a set value,
+    # and the distinction matters here because the widening these knobs invite
+    # was MEASURED AND WITHHELD the same day: on the trail, the harness's own
+    # calibration drift (+0.508pp) exceeds the whole 6%->OFF effect (~0.10pp);
+    # on the clock, leave-one-symbol-out takes the 48h->96h gain from +0.78pp
+    # to +0.07pp without HYPE. What the rail gets is the ABILITY to walk them
+    # through `lighter_scout_tuner`'s replay gate hourly, on evidence, instead
+    # of a session hand-setting a number two measurements refused.
+    #
+    # SHADOW ONLY, structurally: `lighter_ticket_taker.apply_tuning` returns
+    # an empty dict when TT_VENUE == lighter_live, and the live arm is
+    # divergence-SHORT only (`LIVE_SIDES`), so the breakout branch of
+    # `bull_exit` is unreachable on real money twice over.
+    "taker.brk_trail": {
+        # Cage `hi` stops at 0.15 because the sweep measured the rule
+        # SATURATING there — 15%, 20% and trail-OFF are the same book, so a
+        # cage past 0.15 is reach into a region where the lever does nothing.
+        # `lo` 0.04 keeps a tightening notch available if the trend arm ever
+        # measures better banking earlier.
+        "kind": "float", "lo": 0.04, "hi": 0.15, "lane": "lighter-taker",
+        "note": ("breakout TREND exit: give-back off the peak before banking; "
+                 "env default 0.06 (TT_BRK_TRAIL)"),
+        "env_default": 0.06, "step": 0.01},
+    "taker.brk_sl": {
+        # Signed like `taker.sl`, so `lo` is the WIDER stop. -0.12 is the
+        # widest the arm's own rationale supports ("entries draw -3.4% before
+        # running"); -0.05 is a notch tighter than shipped and still wider
+        # than the reversion bracket's -0.03, which the breakout pop churns.
+        "kind": "float", "lo": -0.12, "hi": -0.05, "lane": "lighter-taker",
+        "note": ("breakout TREND exit: wide hard stop; env default -0.07 "
+                 "(TT_BRK_SL)"),
+        "env_default": -0.07, "step": -0.01},
     # [2026-07-21] post-stop re-entry cooldown (TT_SL_COOLDOWN_H, default
     # 2.0h — the same-day churn fix: NBIS -$5.37/8, BOT -$4.60/3, every
     # same-minute re-entry a loser). Registered so the proposal channel and

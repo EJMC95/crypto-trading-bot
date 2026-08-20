@@ -333,7 +333,15 @@ TUNABLE = (("taker.dip_range", "DIP_RANGE"),
            # [2026-07-21] the post-stop cooldown joins the growth rail: the
            # stamp at close reads the module attr, so a lever overlay moves
            # future stamps (never an already-written sl_block entry).
-           ("taker.sl_cooldown_h", "SL_COOLDOWN_H"))
+           ("taker.sl_cooldown_h", "SL_COOLDOWN_H"),
+           # [2026-08-20 (sf)] the breakout arm's TREND exit — see the registry
+           # note. `bull_exit()` reads these as module globals, so the overlay
+           # reaches the routing through the same single owner main() uses,
+           # exactly as the reversion bracket above does. Defined further down
+           # the file than TUNABLE; harmless, because apply_tuning resolves
+           # through globals() at CALL time, and the selftest pins that.
+           ("taker.brk_trail", "BRK_TRAIL"),
+           ("taker.brk_sl", "BRK_SL"))
 
 
 def apply_tuning():
@@ -1480,6 +1488,15 @@ def _close_extra(m):
     stamped = isinstance(m.get("bars"), dict) and m.get("bars")
     out = {"bars": (m.get("bars") if stamped else entry_bars()),
            "bars_basis": ("entry" if stamped else "close-legacy")}
+    # [2026-08-20 (sf)] the trend exit's own receipts ride the close row. See
+    # the tracking site in main() for why MAXIMUM rather than final. Absent on
+    # a position that never saw a mark (a legacy row, or one closed on its
+    # first cycle), and absent is UNKNOWN — a grader must not read a missing
+    # give_back as zero, which is why these are omitted rather than defaulted.
+    for _k in ("peak_ret", "give_back", "mae_ret"):
+        _v = m.get(_k)
+        if isinstance(_v, (int, float)) and not isinstance(_v, bool):
+            out[_k] = round(float(_v), 6)
     # [2026-07-29 (fx) POLICY STAMP] The bars stamp records the EXIT bracket.
     # It says nothing about which SIGNALS the bot was allowed to take — and
     # that is the field whose absence caused three separate mis-gradings in one
@@ -2416,6 +2433,25 @@ def main(_ctx=None):
             _ret = (mark / entry - 1.0) * _sgn if entry else 0.0
             if _ret > m.get("peak_ret", 0.0):
                 m["peak_ret"] = _ret
+            # [2026-08-20 (sf)] RECEIPTS FOR THE TREND EXIT'S OWN TWO KNOBS.
+            # `taker.brk_trail` and `taker.brk_sl` became registered levers
+            # today, and neither could ever be PROFILED, because the quantity
+            # each one cuts was tracked in memory and thrown away at close:
+            # the trail fires on GIVE-BACK from the peak, the stop on ADVERSE
+            # EXCURSION, and the ledger recorded neither. A cage nobody can
+            # measure is `audit_lever_authority`'s named failure — and it is
+            # the reason both widenings had to be WITHHELD today rather than
+            # decided: the harness had to reconstruct from hourly candles what
+            # the bot already knew to the loop.
+            #
+            # MAXIMUM, not final, on both: the bar cuts the worst point the
+            # position ever reached, so a distribution of final values would
+            # be the wrong one (and, for the trail, truncated at the bar by
+            # construction — the emission-truncation trap). Observable-only;
+            # `exit_reason` reads neither.
+            m["give_back"] = max(m.get("give_back", 0.0),
+                                 m.get("peak_ret", 0.0) - _ret)
+            m["mae_ret"] = min(m.get("mae_ret", 0.0), _ret)
             meta[sym] = m
             _ebars, _etrail = bull_exit(m.get("lens"))
             if _ebars is not None:

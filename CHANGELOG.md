@@ -218,14 +218,64 @@ Four more mutations verified red on that arm, including the one that matters
 most — a truthy-instead-of-bool read, which would let a malformed payload widen
 a book's claimed reach and manufacture a collision.
 
+### THE CARRIED ITEM, CLEARED IN THE SAME PASS — THE TREND EXIT JOINS THE RAIL
+
+The refusals above are only half an answer. Both widenings were withheld because
+the *measurement* could not decide them — and the reason it could not is that
+**the two knobs governing the taker's trend exit were bare env literals with no
+registry entry, and the quantity each one cuts was never written down.**
+
+Under BULL_MODE `bull_exit()` routes breakout/breakoutup to a different exit
+from every other lens: no TP cap, a wide hard stop, a trailing give-back. The
+growth rail could move the fixed reversion bracket that divergence uses
+(`taker.tp` / `taker.sl`) and could not touch the exit binding the book's best
+long lens. That is I18, and it was open.
+
+**`taker.brk_trail` [0.04, 0.15] and `taker.brk_sl` [-0.12, -0.05] are now
+registered, caged and consumed, at today's values.** Registering moves nothing —
+that is the `disloc.exit_bps` idiom and it matters here specifically, because
+the widening these knobs invite is the one two measurements refused this morning.
+What the rail gains is the ability to walk them through the scout tuner's replay
+gate, hourly, on evidence, instead of a session hand-setting a number. `hi` on
+the trail stops at 0.15 because the sweep measured the rule SATURATING there —
+15%, 20% and trail-OFF are the same book, so a cage past it is reach into a
+region where the lever does nothing.
+
+**And the receipts, which are the load-bearing half.** A registered lever nobody
+can profile is the cage-nobody-can-measure failure, and it is *why* today's two
+attempts had to reconstruct from hourly candles what the bot already knew to the
+loop. The trail fires on GIVE-BACK from the peak; the stop on ADVERSE EXCURSION.
+Both now ride the close row (`give_back`, `mae_ret`), as **maxima, not final
+values** — a position that gave back 8% and recovered to 1% by close TRIPPED a
+6% trail on the way, and a final-value stamp would teach the profiler the bar is
+never approached. Absent stays **absent**: a missing `give_back` read as 0.0 is
+the best possible value and would drag the whole distribution to the tight end
+of the cage.
+
+`audit_lever_authority` gains a general `xfield` ledger extractor to read them —
+its two existing ledger kinds both derive from row TIMESTAMPS, which is all the
+ledger used to carry, so *any* lever cutting something the bot knew and did not
+record was unprofilable by construction and would have stayed UNMEASURED however
+many `--measure` runs ran. Scoped by reason suffix, because a bar governing the
+trail must not be profiled against positions the stop closed. Both specs read
+UNMEASURED today pending accrual, which is the honest state.
+
+Structurally shadow-only, twice over: `apply_tuning` returns an empty dict when
+`TT_VENUE == lighter_live`, and the live arm is divergence-SHORT only, so the
+breakout branch of `bull_exit` is unreachable on real money even if a lever were
+set. Both facts are asserted, not described. 12 further mutations verified red.
+
 ### CARRIED
 
-* `taker.brk_trail` / `taker.brk_sl` / the breakout arm's clock are unregistered
-  (I18). The trend exit should have its own `MAX_HOLD_H` separate from the
-  reversion arm's — a pure refactor with no behaviour change — so the tuner can
-  price them through the real replay. Not done here: the two measurements above
-  refused the VALUES, and registering a knob is worth doing on its own merits,
-  not as a consolation.
+* ~~`taker.brk_trail` / `taker.brk_sl` are unregistered~~ **DONE in this same
+  pass — see the section above.** What remains carried is the breakout arm's
+  CLOCK: `bull_exit` hands it the reversion arm's `MAX_HOLD_H`, so a trend exit
+  built to let a winner run inherits a mean-reversion book's timer, and 23-32 of
+  37 replayed exits are that clock rather than the trail. Deliberately NOT split
+  here: giving it an independent constant would decouple it from a lever the
+  rail actively moves (the ledger shows 24/48/72), which is a behaviour change,
+  and the only evidence for it is the 48h->96h grid that leave-one-symbol-out
+  just killed. It needs its own measurement, not a refactor smuggled in.
 * 🎫 the LIVE taker's `short-divergence_sl` reads +28pp reclaim excess and
   **+2.10% held at 24h over n=22** on real money. Real-money row: measured and
   handed over, not touched.
