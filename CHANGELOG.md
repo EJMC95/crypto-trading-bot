@@ -260,7 +260,9 @@ now reads `baseline: GREEN` and kills correctly.
 Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
-## 2026-08-20 (sd) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
+## 2026-08-20 (sf) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
+
+*(Renumbered (sd) -> (sf) before push: `main` took (sd) for the leverage entry and (se) for the margin-surface one while this was being written. The cited entry keeps the letter; this one had no citations outside its own header.)*
 
 **Operator, 20-Aug:** *"it is clear that the bots are too restricted, entry and
 exits are completely off, its as if they all share the same metrics and
