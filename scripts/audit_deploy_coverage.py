@@ -467,7 +467,15 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                "Dockerfile.douglas": "book-douglas-shadow",
                "Dockerfile.grimes": "book-grimes-shadow",
                "Dockerfile.schwager": "book-schwager-shadow",
-               "Dockerfile.hull": "book-hull-shadow"}
+               "Dockerfile.hull": "book-hull-shadow",
+               # [2026-08-19] 🧭 nav-cook — moved here from MANUAL_IMAGES_OK
+               # at activation: service provisioned by the dispatched
+               # nav-cook-provision.yml (deleted in the same commit, the (lr)
+               # rule), row verified on /pnl.json CURRENT at HEAD via
+               # audit_code_currency after the pnl-dashboard reader catch-up
+               # dispatch (the stale reader was hiding the row — the exact
+               # (ml)/(rj) class).
+               "Dockerfile.navcook": "nav-cook-shadow"}
 
 
 # ---------------------------------------------------------------------------

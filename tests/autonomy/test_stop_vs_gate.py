@@ -64,6 +64,11 @@ STOPS = [
     # declared at birth so the reconciliation is explicit, per this file's
     # own header rule.
     ("lighter_band_kelly_bot", "KELLY_HARD_STOP"),
+    # [2026-08-19] 🧭 nav-cook — protective stop 5% adverse on its side (the
+    # dislocation family's constant; the (re) study's replay charged the
+    # same 5%). INSIDE the 15% bar — declared at birth-completion per this
+    # file's own header rule.
+    ("lighter_nav_cook_bot", "COOK_HARD_STOP"),
 ]
 
 #: Stops KNOWINGLY wider than the go-live drawdown bar, each with the reason.

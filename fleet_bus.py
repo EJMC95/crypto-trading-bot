@@ -595,6 +595,29 @@ def _venue_class(sym, current_time=None):
         return None
 
 
+def venue_class(sym, current_time=None):
+    """The venue's own `strategy_index` for `sym`, or None when unknown.
+
+    Public accessor over `_venue_class` so a consumer that needs the CLASS
+    (not merely "is it crypto") reads the venue's own answer instead of
+    keeping a hand list — the defect `(ki)`/`(lc)` measured at 41 wrong books
+    of 204. Splits the quote off first, exactly as `is_crypto` does.
+
+    Contract: None means NO OPINION (dark/stale scout, unlisted symbol), and
+    every caller must fail OPEN on it — refusing on None would silently starve
+    a book every time the scout blinked.
+    Known indices: 2=crypto 3=commodities 4=FX 5=US equities 6=Asian equities
+    7=pre-IPO.
+    """
+    try:
+        s = str(sym or "").strip().upper().split("/")[0]
+    except Exception:      # noqa: BLE001
+        return None
+    if not s:
+        return None
+    return _venue_class(s, current_time)
+
+
 def is_crypto(sym, current_time=None):
     """True when `sym` is a crypto book on this venue.
 

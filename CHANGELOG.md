@@ -1,7 +1,8 @@
-## 2026-08-19 (rh) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
+## 2026-08-20 (rz) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
 
-*(Renumbered (rc) -> (rf) -> (rh) at push time — the SIXTH collision on this branch
-today, and the reason is worth one line rather than a shrug: this branch has
+*(Renumbered (rc) -> (rf) -> (rh) -> (rz) at push time — the EIGHTH collision this
+branch has taken (the count itself was wrong at "sixth" one revision ago and is
+corrected here rather than left to compound), and the reason is worth one line rather than a shrug: this branch has
 been unmerged across a day in which several sessions each appended to the same
 file, so every rebase finds its letter taken. Theirs is merged and cited;
 mine moves, by the convention's own tiebreak. The citation sweep behind this
@@ -89,30 +90,1190 @@ and by ticket supply. SHADOW ONLY; the LIVE arm is a separate service with its
 own stagger.
 
 
-**RECONCILED WITH `(rg)`, WHICH FIXED THE SAME RED SUITE A DIFFERENT WAY —
-and its measurement is kept while its exemption is removed.** A concurrent
-session hit the identical `audit_boot_stagger` failure and answered it by
-DECLARING `lighter_ticket_taker` in `STAGGER_OK`, on a genuinely good argument:
-the organ publishes no `ttl_sec`, so the guard governs it by a 3x-interval
-PROXY (15 min), while its only cross-process reader is its `bot_pnl` row behind
-`fleet_risk.STALE_ROW_SEC=3900` (65 min) — 4.3x the proxy. **That is right, and
-it is why the burst misled no CONSUMER.** What it does not address is the other
-half: the book itself did not TRADE for 17 minutes, which is lost evidence on
-the fleet's own control arm regardless of who was reading it.
+**RECONCILED WITH `(rg)` AND `(rs)` — AND `(rg)`'s ARGUMENT IS REFUTED, so the
+note I wrote yesterday calling it "right" is CORRECTED IN PLACE per I12.**
 
-So both halves are kept, in the places they belong: the boot ladder stays (it
-fixes the organ), and `(rg)`'s 3900s measurement moves into `run_all.sh` beside
-it, because it sets the URGENCY of any future firing — advisory until a burst
-approaches 65 minutes. **The `STAGGER_OK` entry itself is REMOVED, on a
-measurement rather than a preference:** with the ladder in place the exemption
-is dormant either way, but revert the ladder with the entry present and the
-guard exits **0**; revert it with the entry gone and it exits **1**. An
-exemption whose only remaining power is to hide the re-introduction of a fixed
-defect is the `DRIFT_OK` hole in another costume — *"prefer making the consumer
-a LITERAL over declaring the exemption"*. Stated plainly because it reverses a
-merged decision of another session, and should be visible rather than inferred
-from a diff.
+Two other sessions hit this same red suite. `(rg)` answered it by DECLARING
+`lighter_ticket_taker` in `STAGGER_OK`, arguing the guard's 15-min reading is a
+PROXY over a 65-min real contract (`fleet_risk.STALE_ROW_SEC=3900`), so no
+consumer was misled — and I preserved that argument beside my fix as correct.
+**It is not correct.** `lighter-ticket-taker-lshadow` is named explicitly in
+`pnl_dashboard.VARIANT_STALE_SECONDS` at **900s**, the dashboard stamps `stale`
+on the row from that number, and `fleet_watchdog_svc` pages on exactly that
+field. The burst was **1020s**. So a REAL contract was breached and a page was
+owed, not merely a proxy tripped; `fleet_risk`'s 3900s is a second, laxer
+reader, never the binding one. `(rs)` independently shipped the same boot
+ladder with the right bar, and this branch's `run_all.sh` now carries the
+correction beside the fix rather than the refuted premise.
 
+**Three sessions converged on deleting the exemption, and the reason I gave for
+it survives because it is measurable rather than rhetorical:** with the ladder
+in place the entry is dormant either way, but revert the ladder with the entry
+PRESENT and the guard exits **0** — with it GONE it exits **1**. Its only
+remaining power was to hide the re-introduction of a fixed defect, which is the
+`DRIFT_OK` hole in another costume.
+
+**AND THE GUARD'S FIRST REAL FIRING WAS A FALSE POSITIVE, which fixed it.**
+Run mid-merge it flagged `session_commit.py:169`, because `now` came from
+`git show HEAD:CHANGELOG.md` — the file BEFORE the conflict was resolved — so
+it judged a citation against a letter the resolution had already moved. `now`
+is the WORKING TREE from `(rz)` on: the question is whether a citation still
+means what it meant *as the file stands*, and the file that matters is the one
+about to be committed, which is precisely what a pre-push guard exists to
+judge. Fallback to HEAD when the working copy is unreadable, so the arm
+degrades rather than vanishes.
+
+**Re-controlled on the real tree, and it took three attempts — each one naming
+a class boundary I had not stated.** (1) Editing the citation line itself
+proved nothing: that makes it UNCOMMITTED, which is skipped by design, and a
+line being written now cannot have drifted. (2) Deleting the letter entirely
+proved nothing either: that is the DANGLING case, which
+`audit_changelog_letters` owns, and this guard correctly counted it
+`skipped_unresolved` rather than claiming it. (3) The real shape — a letter
+that STILL EXISTS and now carries a different entry, with the committed
+citation untouched — fires, names the file, and quotes both meanings. The two
+guards partition the space cleanly: one owns *resolves to nothing*, the other
+owns *resolves to the wrong thing*, and neither claims the other's finding.
+
+## 2026-08-20 (ry) — FOUR DECLARED ENFORCEMENTS WERE INERT, HARVESTED FROM A STALE PR THAT COULD NEVER MERGE — including a fleet-wide death recorder that has never recorded a death
+
+[Renumbered (rs) -> (ry) at rebase time: main took (rs) for PR #204 while this
+was in flight, and (rt) for #206 minutes later. All 9 code citations moved
+together, counted per file rather than from one grep.]
+
+The operator asked for the stale draft PRs to be cleared. Four of the five
+(#153, #167, #168 from 7–13 Aug) have **no merge base with main at all** — main's
+history was rebuilt under them, so each now differs in ~200 files and merging any
+would REVERT a week of work. The reflex is to close them. **The reflex is wrong
+on its own: a branch that cannot merge can still be RIGHT**, and #153's diff
+turned out to be eight bug fixes, five of which never landed anywhere.
+
+So the PRs were mined before being closed. What follows is the four that
+reproduce on today's `main`, each verified by RUNNING rather than by reading.
+
+**1 · `record_organ_error` HAS NEVER RECORDED ANYTHING — a missing import, and
+it took the whole `(hw)` deliverable with it.** `datetime` is not a module-level
+name in `bot_pnl_store.py`; every other user imports it locally. This function
+did not, so `datetime.now(timezone.utc)` raised **NameError on every call**, the
+blanket `except Exception: return False` swallowed it, and it returned False
+without ever reaching `save_state`. Proved, not inferred — both DB calls stubbed
+to succeed, then counted:
+
+    record_organ_error returned: False      save_state called: 0 times
+
+`(hw)`'s measured finding was *"20 of 22 organs had no way to report their own
+death"*. The mechanism it shipped to close that has been dead since 1-Aug. And
+the caller made it **worse than silent**: `organ_main` discarded the result and
+printed *"ORGAN FAULT recorded on its own bot_state key so the immune organ can
+see it"* — a sentence that has never once been true. I4 (never discard a
+persistence result) and I8 (a detector must name something actionable) failing in
+the same four lines. Both fixed; the caller now says which of the two happened,
+because they need different acts from the operator.
+
+**2 · I2's declared enforcement returns `[]` FOREVER — the guard was blind, and
+being blind read as healthy.** `brain_amnesia` computes memory-vs-vitals skew
+from `b.get("updated") or b.get("updated_at")`. The brain's blob carries
+**neither**: `save_state` writes the time to the bot_state `updated_at` COLUMN,
+and `fetch_states` — the batch read every organ uses — selects only
+`(bot, state)`. Verified in the live payload: `brain_vitals` carries `updated`,
+`brain` carries only `updated_at`, and that one is added by the DASHBOARD when
+serving, not by the publisher. So `bt` was None on every real cycle and I2
+reported nothing, ever. `audit_doctrine_enforcement` stayed green throughout
+**because the NAME resolves** — this file's own "a green run verifies that a
+declared enforcement EXISTS, not that it is CORRECT" caveat, realised.
+
+Fixed in both halves, because either alone is cosmetic: `bot_learn._save_state`
+now stamps `updated` INTO the blob (giving the detector something to read), and
+`brain_amnesia` REPORTS blindness instead of returning quiet. The distinction is
+kept sharp — quiet still means a booting brain (no memory row) or nothing to
+compare against (dark vitals); a memory row that exists with no readable stamp is
+now named, and the report says explicitly it is **not** a claim of amnesia but a
+claim that nothing can currently tell. **The old selftest had certified the
+blindness**: `{"updated": "nope"}` sat in a must-stay-quiet loop. That case now
+asserts the opposite, with the reason inline.
+
+**3 · I10's REAL-MONEY gate is structurally unpassable.** ⚖️ Counterweight's
+`golive_blocker(BOT)` asks for `"perps-funding-spread"` while the publisher keys
+`books` by the ledger's bot column. Confirmed against the live payload — the map
+holds `perps-funding-spread-lshadow` and **no bare base at all**. Fail-closed, so
+never an unsafe admit; but a genuinely READY book with `FUNDSPREAD_GOLIVE=1`
+would still be refused, with a message that reads like the grader not knowing the
+book exists. Demonstrated both ways on the publisher's real key shape:
+
+    bare base (the bug) -> 'go-live gate has no entry for perps-funding-spread'
+    row id   (the fix)  -> None
+
+**Fourth instance of the bare-vs-suffixed key class** (FEE_RT, ERA_START,
+era_epoch_for). `ctx.bot_id` exactly, never a match on either spelling — the
+suffix is the difference between two books, so a READY SHADOW twin must never arm
+the LIVE arm. The selftest could not have caught it: its fixture keyed `books` by
+`BOT` too, so consumer and fixture agreed with each other and both disagreed with
+the publisher — **the (hj) rule verbatim**. The fixture is now keyed the way
+`golive_readiness` keys it and 13 call sites moved with it.
+
+**4 · `regime_oracle`'s selftest killed itself a third of the way in, and CI
+called it PASSING.** A copy-pasted production line —
+`sys.exit(store.organ_main('regime-oracle', main))` — sat inside `_selftest`,
+raising SystemExit(0). **39 assertions below it never ran** and the final OK line
+never printed, while `tests/test_selftests.py`, which checks only the exit code,
+marked the module green. Every coverage, staleness, dark-venue and per-asset
+contract in that file was unenforced.
+
+Worth recording how nearly this was missed *again*: a scoped
+`awk '/^def _selftest/,/^def /'` over the region returned EMPTY and would have
+been reported as "not present". The whole-file `grep` found it at line 703. That
+is the (po) rule — *empty output is not a negative result* — inside the very pass
+harvesting a bug of the same family.
+
+Fixing it exposed a second defect immediately, which is the point of un-deadening
+a test: with the assertions live, `main()` published NOTHING, because the fixture
+mocks `load_state` while the organ reads through `load_state_checked` (the seed
+guard). A new guard assertion — *"main() published NOTHING"* — caught that on the
+first run. With `load_state_checked` mocked in all three blocks, **all 39
+assertions pass**: the contracts were right all along, they were simply never
+checked.
+
+**PR DISPOSITION.** #153's four remaining items are NOT harvested here and are
+named rather than dropped: ⚖️ Counterweight's `pnl_pct` is price-only while its
+`pnl_abs` carries funding (a grading-BASIS change on a book with a live
+keep-or-retire date — it moves the numbers the go-live gate reads, so it earns
+its own pass and its own measurement, not a ride-along); the I15 expand-direction
+sweep; the allocation-consumer name check; and the Counterweight live-clip pin.
+
+**Verification.** Every fix proved by execution: the recorder counted reaching
+`save_state`, the amnesia detector driven through all four fixture shapes, the
+gate run against the publisher's real key form, the oracle's selftest run to its
+final OK line. `tests/autonomy/test_inert_enforcements.py` (9 tests) pins all
+four, and **8 mutations were run against it, all 8 RED** — the missing import
+restored, the caller's result discarded again, the amnesia guard re-blinded in
+both directions, the brain's stamp renamed, the gate reverted to the bare base,
+and the oracle's killer `sys.exit` reintroduced. The FIRST round found a
+SURVIVOR — `tests/test_selftests.py` does not cover `record_organ_error` at all
+— which is why the new file exists; and the test's own first draft matched the
+forbidden string inside this entry's explanatory COMMENT rather than the code,
+the "a page-wide substring scan is not a structural claim" trap, now filtered to
+executable lines. `fleet_immune`, `regime_oracle` and `lighter_funding_spread_bot`
+selftests green. Suite: `test_funding_variant` and `test_margin_truth` remain the
+only failures and both predate this pass — note that `regime_oracle` and
+`test_crypto_only_universe` were NOT pre-existing repo failures at all but a
+missing local `numpy`/`pandas`, now installed; that correction matters because
+those two had been quoted as "known pre-existing" for two sessions.
+
+
+## 2026-08-20 (rt) — THE HORIZON QUESTION CANNOT BE ANSWERED BACKWARDS ON THIS BOOK, AND THE REASON IS A NUMBER: a 1.9-MINUTE MEDIAN HOLD AGAINST A 1-MINUTE CANDLE. So 🪁 band-kelly now measures it FORWARD.
+
+**Operator: *"open the horizons, give them room to breathe and grow."*** `(rs)`
+named the real constraint on both mirror books — not the max hold, which is
+INERT (band-kelly's median is 0.09h against a 2h cap), but the **`converged`
+exit**, which closes the moment the basis narrows: 6 of band-kelly's 7 snap
+trades exited `conv` for **−$13.97** while the ONE that escaped convergence made
+**+$13.17**. This pass tried to measure it and **REFUSED, twice, with the
+mechanism** — then built the instrument that can.
+
+**REFUSAL 1 — THE CONV BAR IS UNSWEEPABLE: THIS VENUE STORES NO INDEX HISTORY.**
+The exit fires on |mark/index − 1|, so moving the bar needs the RESIDUAL path.
+Candles carry price only. (The 1m/5m candles do expose a second OHLC set —
+uppercase `O/H/L/C` — and I checked rather than hoped: they are **identical
+duplicates** of the lowercase fields, not an index series.) The only stored
+residual is the scout's `prem_outliers`, hard-capped at 8 entries per snapshot,
+which `(qw)` already ruled too lossy to audit this book. Independent confirmation
+from a second direction.
+
+**REFUSAL 2 — AND HOLDING-LONGER IS NOT MEASURABLE EITHER, WHICH I DID NOT
+EXPECT.** P&L needs only PRICE, and 1-minute candles reach back **45+ days**,
+covering the ghost's whole 13-Jul→4-Aug ledger — so I built
+`scripts/study_band_kelly_horizon_2026-08-20.py`: anchor the level on the
+ledger's own realised % (so the founding cell reproduces EXACTLY, by
+construction) and let candles supply only the incremental move past the exit.
+It refuses.
+* The LEVEL gate (candle close vs the ledger's own fill) reads median **27.8
+  bps**, p90 152.8 — the ghost traded THIN books (KAITO ~$0.42M/day) where a
+  book-walked VWAP and a last-trade close genuinely differ.
+* **I did not raise that tolerance to get a number** — widening until a number
+  appears is chasing the artifact. I replaced it with the gate that tests what
+  the harness actually CLAIMS: a RATIO. Does the candle path reproduce the
+  ghost's OWN realised move over its OWN hold? **It does not**: correlation
+  **+0.807**, median error **41.4 bps** against an effect size of ~40 bps, and
+  the mean move disagrees in **SIGN** (candles −14.0 bps vs ledger +7.1 bps).
+* **THE MECHANISM, measured, so nobody re-attempts this:** the ghost's median
+  hold is **1.9 MINUTES**. Entry and exit land inside the same 1-minute bar, so
+  the "path" is one close. Worked example — two APEX trades the ledger records
+  at **−235.1 bps** and **+217.6 bps** both reconstruct to **0.0 bps**. Where
+  the hold is long enough the harness is excellent (KAITO 8.4 min: −511.5 vs
+  −508.2; 9.3 min: −147.7 vs −148.0), which is what proves the failure is
+  RESOLUTION, not a bug. *The signal and the measurement noise are the same
+  size, because the book trades faster than the venue records.*
+
+**SO THE ONLY INSTRUMENT AT THE RIGHT TIMESCALE AND THE RIGHT BASIS IS THE BOOK
+ITSELF** — it already reads the venue's own order book every 90 seconds. 🪁
+band-kelly now keeps watching each coin AFTER it closes and records what
+holding on WOULD have paid: `+15m / +30m / +1h / +2h`, mirror-side signed,
+sampled from its own `book_view` mids, published every loop as
+`extra.holdwatch` with **n beside every mean** so a thin cell reads as thin
+(I15). By ~mid-Sep the grade has a MEASURED answer to "should this book hold
+longer" instead of an argument.
+
+**IT CHANGES NO TRADE, AND THAT IS PINNED RATHER THAN PROMISED.** An AST test
+walks the eight functions that actually decide (`mirror_side`, `ghost_side`,
+`mirror_exit`, `dip_exit`, `dip_ghost_takes`, `_open_mirror`, `_open_dip`,
+`_price_pnl`) and fails if ANY of them so much as names the watch — because a
+decision function reading its own counterfactual is a book trading a number it
+invented. The decider set is asserted total, so a renamed function cannot slip
+out of the check. Bounded (`HOLDWATCH_MAX`, pruned at 2x the longest horizon)
+and persisted, so it neither grows without limit nor resets every deploy.
+**6 of 6 mutations verified red**, control green both sides: mirror sign
+flipped, a sampled horizon re-firing, the SUM published as a MEAN, the watch
+lost on restart, the aggregate never published, and a decider peeking at the
+counterfactual.
+
+**WHAT THIS DOES NOT DO, stated so the next reader does not over-read it.** It
+does not widen anything. band-kelly's exits are the GHOST'S OWN constants and
+the founding claim is the negation of a ledger that embeds them, so holding
+longer remains a NEW POLICY with a fresh (hm) clock — an operator decision
+priced through I19, and now one that will have evidence behind it. The
+`(hm)` clock is untouched: no gate, clip, side or exit byte moved.
+`nav-cook`'s version of this question stays unanswerable for a further reason
+that is not mine to fix — its founding study shipped prose with no script.
+
+## 2026-08-19 (rs) — FEWER GUARDS, MORE ROOM: the taker gets the fix instead of my exemption, the Navigator stops being flagged for trading, and the organ that asks "does this book have room to grow" can finally see 8 books it had never heard of — one of them REAL MONEY
+
+**Operator: *"Fix, open the horizons, give them room to breathe and grow. Not so
+much nervous parenting."*** Read as a correction to my own posture, and it was
+the right correction: my previous pass answered a true finding with a
+SUPPRESSION and answered a fast book with a PERMANENT WARNING. Both are undone
+here, and the fix each was standing in for is shipped instead.
+
+**1 — THE TAKER GETS THE LADDER; MY EXEMPTION IS DELETED.** `(rq)` established
+that the `STAGGER_OK` entry I added was silencing a TRUE positive: the shadow
+Ticket Taker — the control arm every go-live rests on — carried a bare
+`( sleep 210` with no early run, so a merge burst could starve it of its first
+run entirely, and its row is held to a **900s** bar that a 1034s burst exceeds.
+I kept the suppression and named PR #192 as the owner of the real fix. Fifteen
+hours later that PR was still open on a stale base. **So the four lines shipped
+here** — `sleep 20; run once; sleep 190;` then the unchanged loop, so every
+later run still lands at t=210/510/810 and exactly one run is added — and
+`STAGGER_OK` is now **EMPTY**, with a note saying it should stay that way.
+Verified the honest way: the audit exits 0 and the taker's row reads
+`20s / 300s / 0m / mitigated`, i.e. **the ladder is carrying it, not a
+declaration**. `bash -n` clean. If #192 lands later the same block is already
+correct and the conflict is trivial. *An exemption silences the guard; a ladder
+removes the condition.*
+
+**2 — THE NAVIGATOR STOPS BEING FLAGGED FOR TRADING.** I set 🧭 nav-cook's
+`OVERTRADE_LIMIT` to 20 from its DESIGN ("4h hold x 4 slots") and then, when the
+tape showed **55.9 closes/day**, argued the permanent warning was a true
+positive worth keeping. That is the nervous reading. A threshold that is always
+on is not a signal — it is the `(gl)` cry-wolf shape, and it trains the operator
+to ignore the chip. **20 → 120**, ~2x its observed normal, so the card flags a
+real DOUBLING. The genuine question underneath — 56/day against a founding study
+that chose 4h *"for decidability at ~1.5 closes/day"*, with no re-entry cooldown
+where its sibling 🪁 band-kelly has one — is recorded in `(rq)` and belongs to
+the nav-cook session. It does not belong in a permanently lit warning.
+
+**3 — 🌱 AGRONOMY WAS BLIND TO 8 OF 18 LIVING BOOKS, INCLUDING A REAL-MONEY
+ROW.** This is the one that actually matters for "room to grow", because
+`fleet_agronomy` is the organ whose entire question is *"does this plant have
+light and water"* — and measured against the live feed it covered **10 of 18
+rows**. Invisible to it: the whole BOOKS/BAND/NAV cohort born 13–19 Aug
+(band-garrett, band-kelly, book-douglas, book-grimes, book-hull, book-kiyosaki,
+nav-cook) and **`freqtrade-avo-maria-lighter` — the LIVE book**. Worse than
+absence: it still specced `lighter-ticket-taker-lighter`, the live arm 🙏 Avo
+REPLACED on 13-Aug `(ma)`, so the standing scan described a book that no longer
+trades and said nothing about the one holding real money. That is `(ci)`/`(ma)`
+exactly — *a standing audit rule that names a retired bot sends every future
+audit to check the wrong file* — landing on the organ meant to notice a starved
+book. **All 8 now specced (23 → 31).** The seven shadow books share an
+`_envonly()` shape whose `levers=()` is the TRUE statement about them, not a
+placeholder: the growth rail cannot move one knob on any of them, deliberately
+(the Garrett choice), and now the organ can SAY so. Knob floors are MEASURED
+(counted env-read module constants: 6/9/8/8/8/6, and 35 for Garrett because it
+is a variant instance of the Farmer's module and none of those 35 is reachable
+from it). 🙏 Avo's spec records what was verified rather than assumed: it sizes
+off its OWN `live.avo.clip_scale`, **not** the shared `live.clip_scale`, so the
+board moving the Farmer's dial cannot resize it.
+
+**SAID PLAINLY BEFORE ANYONE READS THIS AS MORE THAN IT IS: THIS ORGAN DOES
+NOT RUN.** `fleet_agronomy` has been DECLARED not-wired since 2026-07-22 — its
+own docstring says *"not in run_all.sh, has no COPY in any Dockerfile, and has
+no consumer... a thermometer sitting on the bench — run it by hand"* — and I
+confirmed it against the live bus rather than the docstring: `fleet-agronomy`
+is **ABSENT from /bus.json's 30 keys**, i.e. it has never published. So what
+this pass bought is a thermometer that is ACCURATE WHEN SOMEONE READS IT, not
+a new signal arriving anywhere. Wiring it is the review decision its own header
+reserves (loop + COPY + `--publish` together), and it is NOT taken here.
+**And one fidelity note that falls straight out of running it by hand:** a
+spec with `guards=()` reads **`clear`** on the guards check, so a book with
+guards I had not declared would publish reassurance it had not earned — the
+"green-but-empty" shape this organ's own doctrine names. Caught on 🪁
+band-kelly, which really does carry two persisted re-entry guards (a 2h dip
+cooldown and the ghost's condition-based non-convergence embargo, the exact
+`duration_h=None` case the `Guard` docstring cites), so it now gets a FULL
+spec instead of the env-only shape. The remaining six env-only books declare
+`guards=()` because that is what their source says; if any of them gains one,
+its spec is where it belongs.
+
+**AND THE CLASS IS CLOSED, not the instance.**
+`tests/autonomy/test_agronomy_coverage.py` diffs the organ against
+`fleet_books.ROW_ENTRY` — the maintained row→module registry a book joins at
+birth — so a new book cannot go unscanned quietly again; absence must be a
+DECLARED exemption with a reason (retired 🎸 Barnesy and 🧙 Schwager, plus
+`market-context` which is a publisher and not a book). A third test asserts
+every real-money row is present AND `live=True`, because a live book specced as
+shadow is graded by the wrong standard. **4 of 4 mutations verified red** with
+the control green on both sides: a book vanishing from the organ, the live row
+vanishing, the live row demoted to `live=False`, and a stale exemption naming a
+row that does not exist.
+
+**WHAT I DID NOT DO, and why it is the honest next step rather than a
+widening.** The real "horizon" on both mirror books is not the max hold — that
+bound is INERT, never reached (band-kelly median 0.09h against a 2h cap;
+nav-cook 24/24 exits before 4h). It is the **`converged` exit**, which closes as
+soon as the basis narrows: 6 of band-kelly's 7 snap trades exited `conv` for
+−$13.97 while its single non-conv exit made **+$13.17**, and all 24 of
+nav-cook's closes are `converged` for −$5.71. So "let them run" points squarely
+at loosening convergence — and it is not free. band-kelly's conv bar is the
+GHOST'S OWN constant, and the founding claim IS the negation of a ledger that
+embeds those exits, so moving it does not widen the book, it voids the evidence
+(I19). nav-cook's is un-measurable from this repo at all: its founding study
+shipped prose with no script. **The measurable version — replay band-kelly's own
+tape at a series of conv bars through its existing study harness — is real work
+with a real answer, and it is the next thing worth doing on these books.**
+
+## 2026-08-19 (rr) — 👩 mum v2's CENSUS SAYS *WHY* NOTHING OPENED AND COULD NOT SAY *HOW FAR AWAY* IT WAS — the one reading that would have caught v1 in hours instead of five weeks
+
+[Renumbered (rq) -> (rr) at merge time. A concurrent session took (rq) for its
+verification sweep and pushed first. NOTE the strict reading of the (hj) rule
+would have gone the OTHER way — "the CITED entry keeps the letter, decide by
+grepping the tree, not by who pushed first" — and on the tree THIS entry has 3
+code citations (`lighter_family_bot.py` x2, `tests/autonomy/test_mum_v2.py`)
+while theirs has ZERO outside the changelog. I moved anyway, and the reason is
+worth recording: theirs is already MERGED, and renumbering merged history is a
+bigger hazard than moving three citations in an unmerged branch — the (lz)/(nx)
+concurrent-session class. Cheapness of the move, not seniority, decided it.
+All 3 citations moved together; count-reconciled with `grep -c`, never `head`.
+
+Her first clean payload (build `644317c0a910`, control arm reset to
+`n:0 / null_n:0`, the `(rp)` fix landed) reads:
+
+    scan: {scanned: 23, held: 0, opened: 0, no_signal: 23}
+
+Everything about that is correct and it is **the same string a structurally
+impossible book publishes.** `no_signal: 23` is byte-identical between *"the
+market is quiet today"* and *"this threshold will never fire on this venue"* —
+and **v1 died of the second while every reading on her row looked like the
+first.** `(ro)`'s autopsy named the clock as the disease; this is the
+instrument that would have made the diagnosis takeable in HOURS. I18/(lv) says
+a component that opens nothing must publish its own census at its own bar; the
+census half shipped with her, and the *distance* half — the half that makes
+`opened: 0` interpretable — did not.
+
+**WHAT SHIPPED.** `_census_extra` gains a reachability gauge beside the
+counters, fed by a per-coin capture of the last RSI the scan actually computed.
+The FIELDS (values below are the shape, not a reading — the first live ones
+land on her row at the next publish and are quoted in the readback, never
+here):
+
+    rsi_bar     the entry bar itself, published so no reader hardcodes it
+    rsi_min     the CLOSEST coin to the bar — the leading indicator
+    rsi_med     where the middle of her universe sits
+    rsi_read    how many coins produced a reading at all
+    near_bar    coins within 8 points of firing
+
+`rsi_min` is the number that answers the question. A week of `rsi_min: 58`
+means the bar is unreachable on this tape and the call is a re-spec, not
+patience. A day of `rsi_min: 26` with `near_bar: 6` means she is one candle
+from trading and the right move is to wait. **Those two futures are
+indistinguishable on the census alone**, which is precisely the (lv) shape:
+a book cannot be steered by a signal that reads identically in the case where
+it is fine and the case where it is dead.
+
+**REPORTED, NEVER A GATE.** Nothing here decides a trade, sizes a clip or
+moves a lever — it is the (lv) `sleeves.extreme.scan` pattern, published so
+the call stays falsifiable. Same discipline as I15's demoted win rate.
+
+**THE HONEST DEGRADE, and it is the part with a trap in it.** On an empty
+reading set the gauge is **ABSENT**, not zero. A fabricated `rsi_min: 0.0`
+would read as *"a coin is sitting AT the bar"* — the loudest possible
+statement — produced from no data whatsoever, which is I8's
+unknown-never-degrades-to-a-guess at a gauge instead of a detector. Pinned by
+its own test.
+
+**BLAST RADIUS.** Populated only for a carrier that declares `census`, exactly
+as `(ro)`'s control arm is populated only under `control_arm`; every other
+family book's payload shape is byte-unchanged. Pinned.
+
+**THE INERTNESS TRAP, CLOSED IN BOTH HALVES.** A gauge nothing writes to
+publishes nothing forever and reads as *"no readings"* — i.e. it would produce
+exactly the silence it exists to break, the registered-but-inert failure (I18)
+in its purest form. So the test pins BOTH ends: the carrier must EMIT an `rsi`
+on a bar it does **not** enter (the no-entry case is the only one the gauge
+ever measures), and the scan loop must CAPTURE it.
+
+Six tests added to `tests/autonomy/test_mum_v2.py` (25 → 31); **six mutations
+run against the shipped gauge, all six RED** — `rsi_min` reading the FARTHEST
+coin instead of the closest (`vals[0]`→`vals[-1]`), the `near_bar` window
+widened to admit everything (`+8`→`+80`), the emptiness guard inverted so the
+gauge fires only on no data, the loop's feeder deleted (the inert case), the
+published bar hardcoded to 0.0, and the carrier's own `rsi` blanked at source.
+`--selftest` green.
+
+**WHAT THIS DOES NOT CLAIM.** It does not say her bar is right — `(ro)`'s cell
+is the measured `(qu)` dose cell and stands on that measurement. It says that
+if the bar IS wrong, her row will say so while it still costs a re-spec rather
+than a season.
+
+
+## 2026-08-19 (rq) — A VERIFICATION SWEEP OVER MY OWN CLAIMS FOUND THREE FALSE ONES, AND THE WORST WAS A GUARD EXEMPTION JUSTIFIED BY A SAFETY MARGIN THAT DOES NOT EXIST
+
+[Renumbered (ro) -> (rq) at push time: main took (ro) for mum's un-retirement
+and (rp) while this was in flight — the (hj) rule, main's pushed history keeps
+the letter. All 3 citations moved together, count-reconciled.]
+
+Ran five independent read-only lenses plus an adversarial referee over
+everything this session had already merged — tree state, the (rg) CI fix, the
+(rf) mirror corrections, the (rj) nav-cook registrations, and live fleet health
+— asking of each claim not "did I write it" but "is it TRUE of the system".
+**27 claims came back non-TRUE.** Most were the sweep correctly refuting
+hypotheses it had been handed (no stale rows, no duplicate writer, no other
+session's work stranded in the tree — all good news). Three were mine, and I
+had verified all three the wrong way: by re-reading my own diff.
+
+**1 — THE ONE THAT MATTERS. `(rg)`'s exemption reason was false in the
+direction that flatters it.** I declared 🎫 the Ticket Taker in
+`audit_boot_stagger.STAGGER_OK` on the stated ground that the guard's 15-min
+3x-interval PROXY was governing while the taker's only real cross-process
+contract was `fleet_risk.STALE_ROW_SEC` at 65 min — "4.3x the proxy", the
+burst "well inside". **Every load-bearing number there is wrong.**
+`pnl_dashboard.VARIANT_STALE_SECONDS` pins `lighter-ticket-taker-lshadow` at
+**900s**, `fleet_watchdog_svc` pages on any row's `stale` flag, and the burst
+was **1034s — 134s PAST that bar**. The ratio is **1.0, not 4.3x**: the proxy
+was not a loose stand-in for the real contract, it was numerically EQUAL to
+it. So the guard was RIGHT and my exemption suppresses a **true positive** —
+on the shadow book that is the control arm every go-live rests on, which still
+has no early-run mitigation (`run_all.sh` opens its block with a bare
+`( sleep 210`). It is kept only because deleting it reddens the suite
+fleet-wide while the real fix — the (ou) boot ladder — sits in PR #192; the
+reason now says exactly that, and says **delete this entry when the ladder
+lands**. HOW THE ERROR SURVIVED: I grepped the dict I expected to be
+authoritative and stopped. The sweep EXECUTED `stale_secs_for(...)` and got
+900. *A second reader is invisible to a check that stops at the first one.*
+
+**2 — `(rj)` claimed "LABELS + DESCRIPTIONS" and only LABELS landed.** 🧭
+nav-cook's dashboard card rendered with no strategy line. Cosmetic — `desc_for`
+does `.get(base, "")` and drops empties — but the entry asserted work that did
+not exist, and **nothing in the repo enforces DESCRIPTIONS membership**, which
+is why a false claim in a merged entry went a day unchallenged. Found with a
+peer control (band-kelly, minted a day earlier, is in both dicts), which is
+what makes the absence evidence rather than a convention (I6). Shipped.
+
+**3 — `(rj)`'s OVERTRADE_LIMIT rationale reasoned from the design, and the tape
+disagrees.** I wrote "4h max hold x 4 slots" for nav-cook's limit of 20.
+MEASURED on its first 24 closes: **55.9 closes/day, ALL 24 exiting `converged`
+at a ~5 minute median hold** — the 4h bound is never reached, and its own
+founding study picked 4h *"for decidability at ~1.5 closes/day"*, so the book
+runs **~37x the cadence it was designed for**. **The limit STAYS at 20**: a
+card that flags a book trading 37x its design is doing its job, and raising the
+threshold to fit observed behaviour would tune away the finding. The rationale
+is corrected at its own site; the underlying question — nav-cook has no
+re-entry cooldown where its sibling 🪁 band-kelly has one (grep: 21 matches vs
+0) — belongs to the nav-cook session.
+
+**THE TRANSFERABLE LESSON, and it is not "verify more".** All three claims were
+checked before merging — against my own diff, which is the one artifact
+guaranteed to agree with me. The sweep checked them against the SYSTEM and all
+three broke. This repo already says a consumer must be tested against a payload
+its publisher built ((hj)); the same rule applies to a CLAIM: verify it against
+the thing it asserts about, never against the thing that asserts it.
+
+**CARRIED, NOT MINE TO FIX** (findings the sweep raised against other sessions'
+surfaces, recorded so they are not rediscovered): 🧭 nav-cook has no dedicated
+pytest file where every sibling book has one; its founding study
+`STUDY_DISLOCATION_BAND_2026-08-19.md` shipped **prose with no script**, so
+n=216/+0.367%/t=+2.74 cannot be re-run, refuted, or re-cut (the crypto-only
+subset — the one number that would reconcile it against 🪁 band-kelly's
+corrected +0.397% bar — is therefore unobtainable); its live record is running
+against that claim (n=24, −0.298%/trade, 24/24 `converged`, the exact shape of
+its own retired ghost); `fleet_agronomy.py`'s hand roster is stale fleet-wide
+(12 dead rows listed, 7 living books missing); `study_exit_sweep` has no
+BOOK_EXITS entry for it; and CLAUDE.md still calls it PRE-PROVISION and 👩 mum
+a living book, both hours stale. On the real-money surface: 🙏 the live Avo
+Maria publishes `liq_unknown` for **3 of 3** open positions with
+`nearest_liq: null` (leverage 0.37, so small, but zero liquidation headroom is
+published), and 💸 the live Farmer's census stops at the PREFILTER bar, so
+`eligible 2 / free_slots 2 / opening nothing` has no bucket that explains it.
+
+**MY OWN BOOK, declared and not acted on:** 🪁 band-kelly has NO upper bound on
+the residual it will take (`abs(dev) >= enter_bps_eff`, gate capped at 150 but
+nothing above), while the sibling study measures **[150,inf) at −0.18 to −0.50
+%/trade** and nav-cook explicitly refuses that tail. Two of my seven snap
+trades were 394 and 503 bps. Not changed here: the founding ledger's own events
+included deep ones, that study is all-instrument while this book is crypto-only,
+and it is un-rerunnable — so an entry-gate change would be a widening on a
+number I cannot reproduce (I19). Named as the first question the ~18-Sep grade
+should ask.
+
+## 2026-08-19 (rp) — 👩 mum v2's FIRST LIVE PAYLOAD INDICTED HER OWN CONTROL ARM: it counted the v1 legacy flattens, and it could not have survived a redeploy
+
+She is ALIVE — `freqtrade-mum-lshadow` back on /pnl.json at 22:11Z, `status
+online`, `style oversold-1h`, build `cdf4d75c9f19`, and the revival mechanics
+worked exactly as designed: her four frozen v1 positions flattened on the first
+loop (`closed 3 -> 7`), all four slots free, census publishing
+`scanned 23 / no_signal 19 / opened 0`.
+
+**AND THE SAME PAYLOAD SHOWED THE INSTRUMENT WAS WRONG.** Read in full rather
+than at the field I was looking for ((rk)'s lesson, one day old):
+
+    control: {"n": 4, "mean_pct": 7.8115, "null_n": 0,
+              "null_pct": null, "edge_pct": null}
+
+**`n: 4` on a book with zero v2 trades, and a headline `+7.81%`.** Those four
+are the v1 LEGACY FLATTENS — v1-policy marks being realised, opened 12-Jul
+under a rule v2 does not contain. They are exactly the sample `POLICY_ERA`
+exists to exclude, and they walked straight into the instrument standing beside
+it, because the real leg accumulated on ANY close while the placebo leg needed
+a partner. An arm built to answer "is her edge real" opened its life reporting
++7.81% of somebody else's trades.
+
+**FIX: THE PAIR ACCUMULATES ATOMICALLY OR NOT AT ALL.** Both legs, or neither.
+This is not tidiness — it makes `n == null_n` **true by construction**, and it
+excludes every legacy close for free without special-casing a reason string
+(the general rule beats the instance, FORWARD MOTION rule 2). An unpaired
+observation cannot be differenced against anything, so dropping it is the
+honest statistic rather than a loss: `edge_pct` is a PAIRED difference and a
+paired difference needs pairs.
+
+**AND THE SECOND DEFECT, which no payload could show and which would have been
+fatal in about a week: `ctrl` was never persisted.** It lived in `Book.__init__`
+only, and `family-lighter-shadow` redeploys whenever ANY shared organ changes —
+several times a day today alone. A thirty-day instrument that resets to zero on
+every deploy can never reach its own sample; it would have published a
+confident, permanently-restarting number for a month. Now written by `persist()`
+and shape-checked on `restore()`, degrading to a fresh arm rather than raising
+inside the boot path (I4: a long-run measurement may not depend on uptime).
+
+Pinned by four new tests in `tests/autonomy/test_mum_v2.py` — the legacy-close
+exclusion driven through the REAL `record_close`, the persist/restore field
+pair, and an explicit `n == null_n` invariant across a settleable, an
+unsettleable and a settleable close. **3/3 mutations verified red** (the pairing
+condition collapsed to the old one, the persist dropped, the restore blanked);
+21 tests green; selftest green.
+
+**The transferable half:** both of today's control-arm defects were invisible
+to every test I wrote BEFORE it ran, and visible in the first payload it
+produced. The arm's own design — publish the number even at zero — is what made
+the contamination legible in ten seconds. **An instrument that reports at n=0
+tells you it is broken; one that stays silent until it has data tells you
+nothing until the data is already spoiled.**
+
+## 2026-08-19 (ro) — 👩 mum IS ALIVE: the operator reverses her retirement, and the autopsy says the disease was THE CLOCK — v2 is the same book with 24× the decisions, a hold bounded by measured carry, and its own control arm
+
+**Operator, 19-Aug: *"I now want you to unretire mum and bring her back to life,
+and do a deep, deep dive on why - give her the attention she needs to succeed,
+whatever way you do it."*** Reversing `(rd)` was the operator's call to make and
+it is made. Restoring v1 was NOT: her configuration produced ~2.4 closes/30d,
+so an un-hide alone would have handed back a book that cannot be graded for a
+year. She returns as a REDESIGN, and every choice below is anchored to a number
+measured on this venue's own data.
+
+**WHAT THE AUTOPSY FOUND, and the headline is not what `(rd)` said.**
+
+**1 · THE CLOCK WAS THE DISEASE.** Her entry was a STATE (`fast > slow`), not an
+event, so at boot every qualifying coin filled in the same second — all three
+lifetime closes stamped `2026-07-12T21:41:49Z`. Her ONLY exit was the SMA death
+CROSS, a roughly-monthly event, with `roi` disabled and no time stop. Holds:
+**33.1 / 29.1 / 25.1 days**. She was never losing — realised **+$0.679** — she
+was UNGRADEABLE, which is exactly what I17 is about.
+
+**2 · THE FUNDING-DRAG FIGURE IN `(rd)` IS WRONG, CORRECTED IN PLACE PER I12.**
+That entry retired her partly on *"funding drag −$2.15 EXCEEDS +$0.68
+realised"*. Summing the venue's OWN settled hourly series across her exact hold
+windows at her $50 clip:
+
+| trade | hold | settled funding | hours long-pays |
+|---|---:|---:|---:|
+| BTC | 33.1d | **−$0.220** | 76.2% |
+| LINK | 29.1d | **−$0.058** | 65.1% |
+| LTC | 25.1d | **+$0.032** | 55.9% |
+| **total** | | **−$0.246** | |
+
+Not −$2.15 — **off by ~9×** on the closed sample (that number must have pooled
+the four still-open positions and/or the bot's modelled accrual rather than the
+venue's settled truth). Her gross price P&L was +$1.985 and her ledger net
++$0.679. **The retirement's DECISIVE ground — the clock — is untouched**; the
+drag was a supporting claim and it was overstated.
+
+**A UNIT TRAP WORTH THE WHOLE ENTRY, because it inverts a number by 12.5×:**
+`/funding-rates` quotes per 8h as a FRACTION, but the SETTLED series
+`/api/v1/fundings` quotes **PERCENT PER HOUR**. Verified empirically rather than
+assumed — the median non-zero settled rate is **exactly 0.0012** on BTC/ETH/HYPE,
+which is the venue's documented resting default (9.6e-05 per 8h ⇒ 1.2e-05/hr ⇒
+0.0012 %/hr). The hourly fraction is `rate/100`, **never** `rate/8`. My own first
+draft of the study divided by 8; `funding_basis.py`'s header states the
+convention and it is easy to read past.
+
+**3 · THE TWO NUMBERS THAT DESIGN V2, and together they are the indictment.**
+* **CARRY punishes DURATION.** MEASURED over 478 days x 20 coins: a long on
+  the majors pays a median **+0.0171%/day** of notional, so v1's 29-day median
+  hold started **~0.50% behind** and v2's 12h cap starts 0.009% behind. The
+  per-coin spread is wide and load-bearing — HYPE **+0.0445%/day** (1.33% per
+  30d), AAVE +0.0342, XAU +0.0302, while **DOT and SPY are slightly NEGATIVE**
+  (a long is PAID to hold); 65-95% of hours are long-pays by coin.
+  *Corrected in place (I12): an earlier draft of this entry quoted the venue's
+  RESTING-rate arithmetic (0.0288%/day) as though it were the measured
+  average. It is a reference point, not the mean.*
+* **EXECUTION IS NEARLY FREE.** Across **~400 short-hold closes** in the fleet's
+  own paper ledger, the exit-side gap between decision mark and realised fill
+  has a **median of −0.8 bps** (p90 5 bps) — zero-fee venue, majors, crossed
+  spread only. Round trip ~1–2 bps.
+
+**So this venue charges almost nothing to trade OFTEN and a real amount to hold
+LONG — and v1 was configured at precisely the wrong corner of both. Turnover was
+free and she refused it.** That sentence is the deep dive.
+
+**WHAT V2 IS.** `OversoldRebound`, same row, same $1k, same 4 slots, same $50
+clip — a different clock and a different entry:
+* **1h bars, not 1d.** ~15 coins × 24 bars/day = **~360 decision points/day**
+  against v1's ~15. With a 12h cap and 4 slots the book is bounded at 8
+  closes/day, so **30 closes arrives in about a week instead of about a year.**
+* **Entry: `RSI(14) < 25` AND **NOT** `e50 > e200`.** This is not an invention —
+  it is the one cell this fleet has already MEASURED as carrying information and
+  nobody expresses. `(qu)`'s exit-free decomposition of 🙏 avo's SwingDip (1,156
+  signals / 475d / 23 coins) found only **`rsi<42` carries information** and the
+  **`e50>e200` trend filter is ACTIVELY DESTRUCTIVE** (adding it lowered the mean
+  of every base: R +0.208→+0.025, B +0.346→+0.187, R&B +0.349→+0.124), with
+  `rsi<25` the strongest term (+2.32%/trade at h=12, 19/23 coins).
+* **STATED HONESTLY: that dose-response has DECAYED THROUGH ZERO** on rolling
+  120d windows (+4.97 → +2.05 → −0.31 → −0.41). This entry is
+  **HYPOTHESIS-GRADE and must never be quoted as a proven edge.** What v2 buys
+  is that the question becomes answerable in a week rather than a year.
+* **Bracket predefined at entry, never widened** (🧘 Douglas's discipline):
+  roi ladder 2.0%→0 across 12h, −4% stop (v1 carried −15%, sized for a month),
+  and a **carry-bounded 12h `max_hold`**.
+
+**THE CONTROL ARM — the reason she is worth reviving rather than replacing.**
+`(hm)` requires a directional book to be graded against a **random-entry null,
+never against zero**, because a random long on this tape earns a non-zero amount
+for free. That rule has lived in studies and has **never been carried by a LIVE
+book**. mum v2 carries her own: at every entry she records the mark of a randomly
+chosen OTHER coin from her own universe, and at exit the same coin's mark — a
+matched-window, unmatched-signal placebo that costs no capital and controls for
+drift and regime. `extra.control` publishes `{n, mean_pct, null_pct, edge_pct}`
+every loop, **always present including at n=0** ((lv)). At day 30 the verdict is
+her mean against her OWN null, on the same clock, readable from the payload.
+
+**I20 — SHE TILES, AND THE CLAIM IS STATED AT ITS REAL STRENGTH.** Her entry
+requires NOT-uptrend and 🙏 avo's requires `e50 > e200`, so **on the same
+timeframe the predicates are disjoint by construction** and the `(lv)`
+subset-starvation trap between two books in one process is unreachable. avo
+takes dips INSIDE an uptrend on 4h holding ~3.5 days; mum the deep tail OUTSIDE
+one on 1h capped at 12h.
+**THE HONEST LIMIT, declared rather than glossed:** the two read trend on
+DIFFERENT timeframes (1h vs 4h), so a coin in a 4h uptrend and a 1h downtrend
+can satisfy both, and a simultaneous long in both books is possible — I20's
+"one bet held twice" in its weak form. Deliberately NOT closed with a new gate:
+that would shrink mum's supply on no measurement. It is bounded by machinery
+that already binds fleet-wide (`fleet_risk`'s per-symbol cap and the enforced
+20-long budget, both checked at this entry site) and is monitorable from the
+payload (mum's `held` map beside avo's). If co-holding is MEASURED to be
+material, the cheap fix is a 4h-trend screen on mum — made on the measurement,
+not pre-emptively.
+
+**TWO REVIVAL HAZARDS THAT WOULD HAVE BITTEN SILENTLY, both closed:**
+* **Her four frozen v1 positions hold all four slots.** Revived as-is she could
+  never open a trade — undecidable again by a NEW mechanism. They flatten once at
+  the boundary, tagged `v1_legacy`; they opened 12-Jul, i.e. BEFORE the era, and
+  `era_rows` keys on the OPEN, so they cannot pollute v2's grade.
+* **`custom_exit` was `isinstance`-gated on `DayTraderGated`,** so a time stop on
+  any NEW carrier was dead code — the registered-but-inert shape (I18), and
+  precisely how v1 held for a month. Now duck-typed.
+
+**ERA MOVED, both tables in lockstep** (`POLICY_ERA` and `bot_learn.ERA_START`
+→ `2026-08-19T21:45`, the same instant as the flatten boundary): a strategy
+change of this kind is *"different in kind"*, so v1's three closes may not pool
+into v2's sample. The 17-Jul accrual reason is preserved, not discarded — an era
+is the LATEST of every invalidating change.
+
+**THE TESTS CAUGHT A REAL DEFECT BEFORE IT SHIPPED**, which is the point of
+writing them first: `FLATTEN_BEFORE_TS` was initially set to a timestamp in the
+FUTURE, which would have flattened **v2's own entries on sight**. That arm now
+pins the boundary is in the past. `tests/autonomy/test_mum_v2.py` replaces
+`test_mum_retired.py` (15 tests: un-retirement in all three sites, the clock,
+the bracket's reachability, I20 disjointness, the control arm at n=0 and at n=2,
+blast-radius containment to mum alone, the era lockstep, the frozen-position
+release).
+
+**Blast radius, stated because two LIVING books share this process:** the control
+arm and census are scoped to a carrier that DECLARES them (mum only) and every
+control-arm write is wrapped — an instrument that can break a trading loop is
+worse than no instrument. 🙏 avo and 🔮 georgia's payloads and behaviour are
+unchanged, pinned by a test.
+
+**NOT CLAIMED:** that mum v2 makes money. Her entry is hypothesis-grade with a
+decayed prior, and this fleet has retired four books of her old shape. What is
+claimed is narrower and checkable: **she can now be DECIDED in about a week,
+against her own control, instead of never.**
+
+## 2026-08-19 (rn) — THE REVIEW'S OWN LIST, WORKED: the stale-reader class gets an HOURLY OUTSIDE CHECK, the sample20 disagreement explains itself, and the watchdog's second NOT-ONLINE rule had drifted from the first
+
+**Operator: "Fix anything remaining save commit push and tidy up as per
+usual."** Worked against `REVIEW_2026-08-19_TODAYS_WORK.md`'s own ranked list
+(I11 — the carried list, not whatever is interesting), taking the items that
+are code and leaving the ones that are decisions. First, the (rm) loop is
+CLOSED with a readback, not a green run: nav-cook-shadow redeployed on the
+merge push, row `status "online"`, build `5aa8784f58d6 → ddc83aa0120e`,
+watchdog `problems: []` — the NOT-ONLINE page is gone; the spent check-in
+trigger was deleted (P5).
+
+**1 · READER CURRENCY, HOURLY, FROM OUTSIDE (review item 7 — closes today's
+class rather than today's instance).** The (qh) reader-verify step fires only
+when a deploy INCLUDES pnl-dashboard; today's failure was a dashboard deploy
+that never STARTED, which no in-band guard can see (I13). `fleet-watchdog.yml`
+now checks, every hourly run: serving `/watchdog.json started` must not
+predate the newest main commit touching the dashboard image's own files
+(30-min build+boot grace). A positive reading appends `DASHBOARD READER
+STALE ... re-dispatch railway-redeploy with services=pnl-dashboard` to the
+existing single-issue pager — the fix command IS the message (I8). Fail-OPEN
+with a VISIBLE skip: an unreachable watchdog.json is the feed probe's page,
+and both skip paths print `reader-currency: SKIP` into the step summary, so a
+run that verified nothing never reads like a run that found nothing ((po)).
+**Driven against today's own timestamps as the positive control**: 06:27:33
+reader vs the 08:08:17 (rj) commit → STALE with the exact catch-up command;
+the post-dispatch 10:48:29 reader → OK. Detection worst case ~2 hourly
+cycles, against the ~4.5h the real one ran. The step's `DASH_FILES` is
+necessarily a SECOND COPY of the decide grep's file set ((hj)), so
+`tests/autonomy/test_reader_currency_check.py` pins the two sets EQUAL by
+parsing both workflow texts (extractors carry their own non-empty +
+known-member positive controls; step order probe→check→alert pinned, because
+a correct check in the wrong slot pages nothing). **3 mutations verified
+red** (a file dropped from DASH_FILES; a SKIP line silenced; the step renamed,
+which kills both the order pin and the skip-visibility pin), each verified
+APPLIED before scoring and the file restored green after — run BY HAND,
+because `scripts/mutate.py` correctly REFUSED the target: it compile-checks
+mutants as Python, so a YAML workflow reports "does not compile — invalid
+mutation, not a kill" on every round. The refusal is the harness working, not
+a gap dodged; recorded so the next YAML mutation round is not mis-scored
+through it. bash -n coverage is free via (rl)'s own test.
+
+**2 · THE WATCHDOG'S SECOND NOT-ONLINE RULE HAD DRIFTED (found in passing,
+fixed in place per I12/(hj)).** The workflow's probe re-implements the
+NOT-ONLINE check as `status not in (None, 'online')` — it never received the
+16-Jul audit fix that `fleet_watchdog_svc` carries in its own comment
+("halted is the NORMAL daily-loss state ... they paged as NOT ONLINE all
+day"; 'paper' likewise). Two watchdogs, two rules: a halted book would page
+the hourly ISSUE while the in-service pager correctly stayed quiet. Aligned
+to the svc's accepted set `{None, online, halted, paper}`, halted rows go to
+warnings exactly as the svc does. No live instance today (no row publishes
+`halted` at this hour) — the drift was found by reading, and it is exactly
+the class that made nav-cook page this morning, one copy over.
+
+**3 · `sample20` NAMES WHAT IT CANNOT CLASSIFY (review item 4, the (rk)
+residue).** The fail-OPEN choice leaves 🧘 douglas publishing `n=9 / −$26.60`
+beside `closed 7 / −$0.12` for ~4 more days while the unstamped legacy
+rows age out — a correct number pair that LOOKS like a defect and costs every
+reader the same investigation (rk) already ran. **[CORRECTED IN PLACE at the
+post-merge readback (I12): live `unstamped` reads 9, not 2 — ALL nine rows in
+the current window predate the stamp, because the stamp marks only closes
+written AFTER the (rk) code reached the container (~10:25Z, the (rl)-freeze
+side-effect deploy), and douglas has closed nothing since. The TWO void rows
+are the subset of those nine that explain the dollar disagreement; "the two
+unstamped legacy rows" above (and in (rk), which this echoed) conflated the
+void pair with the unstamped population. The merge message's predicted
+`unstamped: 2` was therefore wrong; the test's semantics (2 legacy + 1
+stamped ⇒ 2) are unchanged and correct. Readback receipt: build
+`1075b0a1be28 → d7d9e3aef68e`, `sample20 {n: 9, unstamped: 9}`. The
+reader-currency check's FIRST LIVE RUN is also verified, by dispatch rather
+than by waiting for the :07 schedule: fleet-watchdog run 32247715805 (green)
+prints `reader-currency: OK (reader 2026-08-19T10:48:29+00:00 vs newest dash
+commit 2026-08-19T08:04:20Z)` — the step reads the real feed and the real
+commits API, and the hour's alerting step still ran after it.]** `sample20` now publishes
+`unstamped: N` (rows predating the pair/closed_at stamp — the ones the
+quarantine cannot be asked about), ALWAYS present including 0, because an
+omitted key is byte-identical between "all stamped" and "not computed"
+((lv)). Reporting-only; the structural pin that none of this reaches an entry
+decision is unmoved. Test added beside the (rk) suite (8 pass); **2/2
+mutations killed through `scripts/mutate.py`** (stamp predicate forced False;
+`unstamped` hardcoded to 0), baseline and restore green; selftest green.
+
+**NOT taken from the list, so the next session does not re-derive the scope:**
+the stale draft PRs (#153/#167/#168/#174 are other sessions' multi-day
+houses — disposition is a merge-conflict archaeology call, flagged for the
+operator; #192 is an ACTIVE session's branch with a letter collision its own
+CI will catch); the decide-step diff-since-last-green rework (touches the
+deploy path that froze the fleet this morning — not a tidy-up-pass change);
+the CI billing structure (operator decided 19-Aug, recorded in (ql));
+everything on the queue's decision slate (verdicts belong to their evidence
+windows).
+
+Tidy-up receipts: branch restarted from origin/main post-merge (the
+merged-PR rule), spent trigger deleted, review doc's items 4/7 annotated
+SHIPPED in place (a standing doc that advertises done work as open is the
+re-open surface I12 exists to remove).
+
+## 2026-08-19 (rm) — THE DAILY REVIEW FINISHED 🧭 nav-cook's BIRTH: the (rl) freeze had eaten the dashboard's OWN redeploy, so the born row was publishing INVISIBLY — and its first visible hour paged NOT-ONLINE off this repo's own doc example
+
+**Operator: "Full review of today's work and list of improvements."** The
+review is `REVIEW_2026-08-19_TODAYS_WORK.md`; this entry is the work the
+review itself surfaced and closed, because a review that files a live defect
+it can fix in one word is the (hn) failure.
+
+**1 · THE (rl) RESIDUE: the unfreeze fixed the PARSER and never caught up the
+missed deploys — and the one that stayed missed was the READER.** (rl)'s fix
+redeployed the shadow books as a side effect (the workflow file is in their
+own decide greps — the (gm) structural fix doing its job), but pnl-dashboard
+is deliberately NOT on that list, so the (rj) merge's dashboard deploy —
+frozen at 08:08Z — was never re-run. Measured at review time: watchdog
+`started 06:27:33Z`, i.e. the serving reader predated the (rj) nav-cook
+registration by two hours, while the provisioner (run 32239943061, 09:53Z,
+green) had already put the writer up. **`nav-cook-lshadow` was publishing to
+bot_pnl and being FILTERED from /pnl.json** — the exact ghost-row condition
+(rj) predicted, live for ~1h. Fixed by a one-service catch-up dispatch
+(`services=pnl-dashboard`); the (qh) reader-verify step rode it; readback:
+`started 10:48:29Z`, 18 rows, nav-cook publishing, and `audit_code_currency`
+reads the row **CURRENT at HEAD**. THE CLASS, named: the (qh) guard verifies
+the reader flips **when a deploy includes pnl-dashboard** — it cannot see a
+dashboard deploy that never started. A freeze/red run needs a per-service
+catch-up (diff since last GREEN deploy, not since event.before); left as a
+recommendation in the review, not built here.
+
+**2 · THE ROW THEN PAGED `NOT ONLINE: nav-cook-lshadow` — a one-word birth
+defect this file itself taught.** The book published `status="running"`;
+`fleet_watchdog_svc` accepts exactly `{None, online, halted, paper}` and
+pages on everything else, and the other 17 rows all say `online`. The string
+came from **CLAUDE.md's own "How Bots Publish" example**, which has said
+`"status": "running"` since it was written — the doc was the defect's source,
+so both are corrected (the example now names the watchdog's accepted set).
+Tree-wide grep: nav-cook was the only publisher on the wrong string; the one
+other hit is a dashboard-money test fixture the watchdog never reads.
+
+**3 · ACTIVATION, the (rj)-declared preconditions now met** (row publishing,
+stamp verified CURRENT): decide grep LIVE, `Dockerfile.navcook` →
+`AUTO_IMAGES`, spent provisioner DELETED (the (lr) rule — an armed
+provisioner is how a retired service gets resurrected). This push touches the
+bot file, so the now-live rule deploys nav-cook-shadow carrying the status
+fix in the same run — the (gm) "a routing fix cannot deploy itself" trap does
+not apply because the routed file is in the same push. Verify by the row's
+`extra.build` moving off `5aa8784f58d6`, not by the green run.
+
+**4 · QUEUE SWEEP (the maintenance rule's daily review):** three executed
+items left the file — 🪁 band-kelly provisioning (EXECUTED 18-Aug, first
+close now on the row), slate C 👩 mum (EXECUTED (rd)), GITHUB ACTIONS DARK
+(RESOLVED ~04:37Z, cost measurement kept in (ql)) — each closure re-verified
+against the live payload at closing time, per the 18-Aug sweep's precedent.
+
+Review headline, so the next session reads one line: **28 entries, ~12k
+insertions, 8 merges; one book born+activated (🧭), one activated+risk-upped
++re-priced (🪁, first close n=1 against the corrected +0.397% bar), one
+retired (👩); every real-money proposal today was measured and REFUSED
+((qp)/(qv)/(qq)/(qn)) — real money unchanged at ~$260 and the binding
+constraint is the capital decision, not code.** Carried: PR #192 (letters
+collision to resolve), 4 stale draft PRs, the ruin gate's enforced deploy
+behind its declared Farmer-long observation, richdad's ~7d tripwire,
+garrett's pre-registered read, the slate's operator decisions.
+
+## 2026-08-19 (rl) — THE WHOLE FLEET STOPPED RECEIVING CODE FOR THREE HOURS AND CI NEVER SAID SO: a commented-out deploy rule left its `fi` uncommented
+
+**Found by verifying a deploy landed, not by any guard.** After `(rk)` merged I
+checked 🧘 douglas's build stamp and it was still the OLD one. The redeploy run
+for that merge had FAILED — and so had **every redeploy since 07:54Z**.
+
+    Changed files: CHANGELOG.md lighter_book_douglas_bot.py ...
+    /home/runner/work/_temp/....sh: line 265: syntax error near unexpected token `fi'
+    ##[error]Process completed with exit code 2
+
+**THE BUG, and it is four characters.** `(ri)`'s 🧭 nav-cook birth shipped its
+deploy rule COMMENTED OUT — correct, that is the `(lr)`/`(mk)` pre-provision
+pattern — but commented the `if` and the body and **left the `fi`**:
+
+    # if echo "$changed" | grep -qE "^(lighter_nav_cook_bot\.py$|...)"; then
+    #   svcs="${svcs:+$svcs,}nav-cook-shadow"
+    fi                                      <-- stray, no opening `if`
+
+**WHY IT WAS EXPENSIVE OUT OF ALL PROPORTION TO ITS SIZE.** The `fi` sits in
+the DECIDE step, which runs **before any deploy**, so bash aborted the whole
+job at parse time: `svcs` was never computed and `railway up` never ran for
+ANY service. Three merges — `(ri)` nav-cook itself, `(rj)`, and `(rk)` — landed
+on main and reached **no container**. Nothing anywhere said "the fleet is
+frozen"; the runs just went red like any other CI failure, and CI red on a
+merge commit is the thing everyone has learned to read as somebody else's
+problem. The fleet kept trading its OLD code, publishing healthy rows, with a
+clean watchdog — the `(hu)` shape exactly: everything looks fine because
+nothing that looks is looking at this.
+
+**Shipped:** the `fi` commented (bash `-n` verified), and
+`tests/autonomy/test_workflow_shell_syntax.py` — **every `run:` block in every
+workflow must parse under `bash -n`**. Mutation-verified the only way that
+counts: restoring the stray `fi` reddens it.
+
+**WHY NO EXISTING GUARD COULD HAVE CAUGHT IT, stated because the gap is the
+lesson.** `audit_deploy_coverage` reasons about which PATHS map to which
+SERVICES — it is thorough about routing and completely blind to whether the
+script containing the routing can EXECUTE. That is the born-dark class one
+level up: a rule that cannot RUN is exactly as dark as a file that was never
+`COPY`'d, and this repo already has a guard for the second and had none for the
+first. The new test also carries a POSITIVE CONTROL (`(po)`): it asserts the
+stray-`fi` shape is actually rejected, so it can never pass by inspecting
+nothing.
+
+**THE PROCESS NOTE, which is the transferable half:** `(rk)` was merged on
+14/14 green CI and I still had to open the live payload to discover the fleet
+had been frozen for three hours. **A green PR proves the code is sound; only
+the payload proves it is RUNNING** — and the deploy step is exactly where those
+two diverge. Same lesson as `(ml)`'s stale reader and `(fd)`'s file-set stamp,
+now with a third instance and a guard.
+
+## 2026-08-19 (rk) — THE CARD AND THE DISCIPLINE INSTRUMENT DISAGREED IN THE SAME PAYLOAD: rule 4's rolling sample could not be ASKED about the quarantine, so it kept counting rows the fleet had ruled void
+
+**Found by payload-verifying my own fix rather than trusting the merge.** The
+`(qk)` seed-path fix landed and worked — 🧘 douglas's card went
+`pnl_abs −$24.68 / closed 8` → **`−$0.12 / closed 7`**, the two `(nm)`/`(pv)`
+void rows finally out of the totals, confirmed live 09:55Z. But the SAME
+payload carried:
+
+    realized  -0.12   closed 7
+    sample20  {"n": 9, "win": 0.444, "sum_usd": -26.60, "expectancy_r": -0.57}
+
+**`n=9` against `closed=7`, and −$26.60 against −$0.12** — the dashboard card
+and the book's OWN rule-4 discipline instrument disagreeing by exactly the two
+void rows, in one payload, at one instant. `(qk)` predicted this residual and
+called it self-healing in ~20 closes. That was the wrong call: a published
+number that contradicts its neighbour is not a cosmetic lag, it is the
+"instrument answering on a dead sample" class the whole `(qk)` audit was about,
+and I shipped one.
+
+**THE MECHANISM: the sample could not be ASKED.** `is_quarantined` keys on
+`(bot, pair, closed_at)`; `recent` entries carried `{pnl, r}` and nothing else.
+Not "the filter was missing" — the filter was **unaskable**, which is why
+`(qk)` reached for a self-healing story instead of a fix.
+
+**Shipped:** `recent_entry()` stamps `pair` + `closed_at` — the only additions,
+and they exist so the ONE owner can answer — and `admissible_recent()` filters
+at load. `is_quarantined` stays that owner (AST-pinned); no second copy of the
+rule. **Fail-OPEN twice over, deliberately:** an entry that predates the stamp
+CANNOT be classified and is **KEPT**, and a lookup that raises **admits**. A
+quarantine that swallows what it cannot classify silently shrinks every sample
+it touches — the disease, not the cure — so the two unstamped legacy rows age
+out of the 20-row window on their own (~4 days at ~3 closes/day) rather than
+being guessed at. Both fail-CLOSED variants are mutation-verified RED.
+
+`sample20` remains REPORTING-ONLY and the structural-consistency pin is
+re-asserted in the same test file: `_open_position` still takes no sample,
+streak, or equity input, so none of this can reach an entry decision.
+
+Pinned by `tests/autonomy/test_douglas_sample_quarantine.py`; **5 of 5
+mutations verified red**, each anchor-checked as applied before scoring.
+
+**The transferable lesson, and it is about verification not about douglas:**
+`(qk)` verified its fix by the number it changed and declared the number it
+did not. Reading the WHOLE payload after the deploy is what caught it — the
+same discipline `(hu)` names (a control group makes an absence a finding) and
+the same one `(ml)` names on the reporting side. **A fix is verified by the
+payload it produces, not by the field you were looking at.**
+
+## 2026-08-19 (rj) — 🧭 nav-cook's BIRTH-COMPLETION: five registrations without which the dashboard FILTERS THE ROW the provisioning readback is about to look for
+
+`(ri)` built the book and its substance is complete — snapshot_equity called,
+price telemetry passed, COOK_HARD_STOP declared, decide rule correctly
+COMMENTED pre-provision, image in MANUAL_IMAGES_OK. What the birth commit did
+not carry is REGISTRY membership, and one absence is a birth blocker measured
+against the live filter, not inferred: `pnl_dashboard` admits a row only when
+its base is in `CURRENT_BOTS` (`r["bot"] in CURRENT_BOTS or
+venue_variant(r["bot"])[0] in CURRENT_BOTS`), and "nav-cook" was in no
+constituent set — so `nav-cook-lshadow` would publish to bot_pnl and be
+DROPPED from /pnl.json, sending the provisioning verification chasing a ghost
+row exactly the way the (ml) stale-reader incident did at 🪁 band-kelly's
+birth (an hour of "missing rows" against healthy writers).
+
+Registered, using the book's own constants read from its module:
+
+* `pnl_dashboard.py` — VARIANT_ONLY + "nav-cook" (the admission), an
+  OVERTRADE_LIMIT (20), LABELS ~~+ DESCRIPTIONS~~. **[19-Aug (rq), CORRECTED
+  IN PLACE per I12: the DESCRIPTIONS half NEVER LANDED — only LABELS did.**
+  Caught by a verification sweep with a peer control (🪁 band-kelly, minted a
+  day earlier, is in both dicts; so is every other living book). Consequence
+  was cosmetic rather than a row-drop — `desc_for()` does
+  `DESCRIPTIONS.get(base, "")` and joins only non-empty parts, so the 🧭 card
+  rendered its label and payload-derived units with no strategy line — and
+  NOTHING enforces DESCRIPTIONS membership, which is why a claim in this entry
+  went a day unchallenged. Now shipped. The OVERTRADE_LIMIT rationale was also
+  wrong and is corrected at its own site: "4h holds x 4 slots" reasoned from
+  the DESIGN, and the tape disagrees — 24 closes in 10.3h = **55.9/day, all 24
+  `converged` at a ~5min median hold**, ~37x the ~1.5/day its founding study
+  chose 4h for. The limit STAYS at 20 deliberately: the card should flag a book
+  trading 37x its design, and that question (nav-cook has no re-entry cooldown
+  where its sibling has one) belongs to the nav-cook session, not to a
+  threshold tuned to fit.]
+* `scripts/fleet_books.py` ROW_ENTRY — code-currency stamp resolution.
+* `tests/autonomy/test_mtm_equity_series.py` MTM_REQUIRED — the call exists
+  since (ri); membership makes a future edit REMOVING it go red (the belt;
+  the sweep alone stops caring the moment the call disappears).
+* `tests/autonomy/test_exit_telemetry.py` PRICE_BOOKS — same shape for the
+  (gr) price contract.
+* `tests/autonomy/test_stop_vs_gate.py` STOPS — ("lighter_nav_cook_bot",
+  "COOK_HARD_STOP"), 5% inside the 15% bar, per that file's header rule.
+
+DELIBERATELY NOT TOUCHED: the book itself, the commented decide rule, the
+provisioner path, MANUAL_IMAGES_OK — activation stays the (ri) session's own
+flow. This is completing a sibling's house, not moving into it.
+
+DECLARED, because the record should carry it: this session had independently
+built the SAME cell as `nav-flinders` (same study, convergent constants —
+$80x4, 4h, 5%, 0.5M floor, fail-closed class screen) before (ri) landed on
+main mid-build. Two books on one cell is I20's one-bet-held-twice, and (ri)
+is the operator-directed build ("named after the likes of captain cook and
+such"), so the flinders build was DISCARDED unpushed and its registry work
+re-aimed here. Cost: one session's build time; letters were never consumed.
+
+## 2026-08-19 (ri) — 🧭 nav-cook IS BORN: the [45,60)bps dislocation band that TILES BELOW 🪁 band-kelly's floor, measured to a plateau before a line was written
+
+**Operator: *"find a few different horizons and gates that actually work, build
+and commit deploy and push — named after the likes of captain cook and such."***
+`(re)` did the measuring; this is the build. **FIRST OF THE NAVIGATOR COHORT**
+(`nav-<surname>-lshadow`, for the navigators who charted coasts nobody had
+mapped — which is the book's job).
+
+**THE CELL, AND WHY IT IS NOT SOMEONE ELSE'S.** 🪁 band-kelly mirrors the
+retired dislocation ghost at **>=60bps**, crypto-only, 2h. This book takes
+**[45,60) bps** — strictly BELOW that floor, half-open on purpose, so the two
+**TILE** and every event nav-cook opens is one band-kelly **REFUSES**. I20
+differentiation by BAND (the only form it accepts), and it makes the `(lv)`
+subset trap *structurally unreachable*: a subset consumer running second is
+starved by definition, a DISJOINT band cannot be. Selftest-pinned
+(`GATE_HI_BPS <= 60`, mutation-verified).
+
+**MEASURED FIRST, and it is a PLATEAU not a lucky cell** — +0.185/+0.274/
++0.320/+0.367/+0.405 %/trade at 30m/1h/2h/4h/8h, **t=+2.69..+2.97 at every
+one**, both halves positive at every one; jackknife by coin t=+1.94..+3.01;
+block-bootstrap 95% CI **[+0.072%, +0.644%]**, P(>0)=0.991; and the
+**ghost-direction control LOSES at t=−3.53**, so the asymmetry is real rather
+than a sign convention. Shipped at n=216 / **+0.367%/trade / t=+2.74**.
+
+**HORIZONS, since the ask was plural:** the horizon is a plateau, so the choice
+is not "which cell wins" (8h does) but return vs DECIDABILITY — 30m gives ~5.9
+closes/day and the thinnest edge, 8h the best edge and ~5 weeks to a verdict.
+**Shipped at 4h: the plateau INTERIOR, ~1.5 closes/day, 30 closes in ~3 weeks.**
+Picking a swept grid's maximum is how `(oe)`-style artifacts ship, so
+`HORIZON_PLATEAU_S` pins the shipped hold to a cell the study actually measured
+(mutation-verified: 5h reddens it). **Deliberately ONE book, not several** —
+two books on the SAME band at different horizons would enter the same events,
+same coins, same side, and differ only in exit: that is I20's one-bet-held-twice,
+and only ONE band measured positive.
+
+**THE DEEP TAIL IS REFUSED BECAUSE IT IS MEASURED NEGATIVE** — at [150,inf) the
+mirror reads −0.31 to −0.50 %/trade: above the band, dislocations stop reverting
+and break. Hence a BAND WITH A CEILING, not a floor ((gl): publish the band, not
+just the floor).
+
+**NOT CRYPTO-SCREENED, DELIBERATELY.** The band is non-crypto by nature —
+commodity +0.566% (t=+2.06, n=57), Asian equity +0.131% (n=32), **crypto n=4** —
+so its siblings' `(lk)` screen would leave it four trades. It carries the one
+screen the evidence supports: **pre-IPO EXCLUDED** (−0.165%, n=45, the band's
+only negative class), restrict-only, declared as fitted on a small sample,
+`COOK_ALLOW_PREIPO=1` reverts. The screen reads the VENUE's own class via a new
+public `fleet_bus.venue_class()` — one owner, never a hand list (`(ki)`/`(lc)`
+measured a hand list wrong on 41 of 204 books) — and **FAILS OPEN on None**,
+because refusing on a dark scout would starve the book (mutation-verified both
+ways).
+
+**THE STALE-REFERENCE HAZARD WAS TESTED, NOT ASSUMED.** The edge concentrates
+when the underlying market is CLOSED (+0.409%/t=+2.34 vs **+0.007%/t=+0.02**
+open) — the exact `(lk)`/I7 signature ("a closed underlying market satisfies the
+gate structurally"). So the index was checked directly: if it were frozen,
+d(premium) would track d(mark) 1:1. Measured corr/slope — BRENTOIL 0.62/0.41,
+WTI 0.77/0.64, SKHYNIXUSD 0.40/0.16, H100 0.06/0.00, UNITREE 0.69/0.48 — **no
+symbol reaches the frozen signature (corr>0.9 AND slope>0.85)**. Declared: oil's
+index is PARTIALLY sticky out of hours, so some closed-hours premium is index
+lag.
+
+**BIRTH PARITY IN ONE COMMIT:** `claim_writer` at the TOP of the loop + `(ic)`
+standby key (stand down, never `sys.exit` — `restartPolicy=always` turns an exit
+into a crash-loop); `snapshot_equity` from day one; census that counts every
+refusal (`below_band`/`above_band`/`preipo`/`confirming`/`slip`/`capped`) so
+`opened: 0` is never byte-identical between "quiet" and "structurally
+impossible" (I18/`(lv)`); exit ladder with the **price stop SENIOR to every
+data-dependent rule** so a dark reference cannot trap a losing position
+(`(nm)`); `save_state` result never discarded (I4); `(gr)` price telemetry on
+every close; closes tagged `<side>-navband_<exit>` so the brain and the winners'
+docket grade it alone. **8 mutations verified RED**, incl. the half-open
+ceiling, the mirror side, the stop, the class screen both directions, and the
+horizon pin.
+
+**A TRAP THIS FILE WALKED INTO AND RECORDS:** its own selftest asserted the
+module never names the live venue by scanning its source — and **failed on its
+own assertion's text**, the documented *"a page-wide substring scan is not a
+structural claim"* shape. Fixed by building the token at runtime and scoping the
+scan to the body above `_selftest`.
+
+**PRE-PROVISION, deliberately.** `nav-cook-shadow` does not exist yet: the
+deploy PATH is live (so a change to the book is never silently routeless) but
+the decide-GREP is **COMMENTED**, and `Dockerfile.navcook` sits in
+`MANUAL_IMAGES_OK` with the reason — an unresolvable service name is the `(gl)`
+failure where four books' rules warned and deployed nothing. **Activation is ONE
+edit**: uncomment the grep + move the image to `AUTO_IMAGES`, then dispatch the
+service explicitly that first time (`(gm)`: a routing fix cannot deploy itself).
+$1k shadow, ZERO keys, env-only (no tuning lane → single-policy `(hm)` clock by
+construction). Fresh 30-day clock from first publish; gradeable ~mid-Sep on its
+OWN ledger (I14).
+
+Files: `lighter_nav_cook_bot.py`, `Dockerfile.navcook` (new); `fleet_bus.py`
+(+`venue_class`), `tests/test_selftests.py`, `scripts/audit_image_imports.py`,
+`scripts/audit_deploy_coverage.py`, `.github/workflows/railway-redeploy.yml`,
+`CLAUDE.md` (fleet row). Suite green; born-dark, deploy-coverage, venue-purity,
+lever-bounds and doctrine-enforcement all OK.
+
+## 2026-08-19 (rh) — `session_commit` REFUSED CORRECTLY AND THE CALLER READ IT AS SUCCESS: stdout/stderr reorder under a pipe, and `| tail` eats the exit code
+
+**Self-inflicted, measured, and fixed in the tool rather than in a rule.** This
+session ran a `(qq)` → `(qv)` letter rename, invoked the repo's own safe-commit
+wrapper as `... 2>&1 | tail -3`, saw
+
+```
+ CHANGELOG.md | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+```
+
+and read it as a commit. It was **the `=== will commit ===` PREVIEW**. The tool
+had actually **REFUSED with exit 4** — its `(nx)` entry-deletion guard doing
+exactly its job, because a letter rename DELETES a `(qq)` header and is
+byte-indistinguishable from the global-rename that once destroyed a concurrent
+session's entry. The caller then pushed, got `Everything up-to-date`, and spent
+several minutes hunting an orphaned commit **that had never been created**.
+
+**TWO COMPOUNDING CAUSES, both reproduced in a scratch repo before fixing:**
+1. The refusal goes to **stderr**, the preview to **stdout**. stderr is
+   unbuffered; a **piped** stdout is block-buffered. So under `2>&1` they
+   REORDER — the refusal flushes first and the innocent stat lands last, which
+   is precisely what `tail` keeps.
+2. **`| tail` replaces the tool's exit status with `tail`'s.** Exit 4 reads 0.
+   The same `${PIPESTATUS}`/`$?` trap `(pv)` recorded for mutation scoring,
+   one seat over — and this time in the tool that guards commits.
+
+A guard whose failure is invisible under the most common invocation is the
+`(po)` class in the safety tool itself: *a check that inspects nothing reports
+clean, and clean gets quoted as evidence.*
+
+**THE FIX MAKES TRUNCATION SAFE, because "don't pipe it" is a rule nobody
+reads ((gl)).** Every exit path now stamps its outcome as the **LAST LINE ON
+STDOUT** via `_verdict()`:
+
+```
+session_commit: REFUSED (exit 4) — this commit DELETES a changelog entry — see stderr
+session_commit: COMMITTED (exit 0) — 8b7c32f — verify with `git merge-base --is-ancestor 8b7c32f HEAD` before pushing
+```
+
+`sys.stdout.flush()` before the stderr blocks so the merged order is honest, and
+the success line now carries the **short SHA** — a shared tree can move HEAD out
+from under a commit, and without the sha an orphaned one is unrecoverable.
+
+**Proven by positive control on the exact invocation that failed**, not by
+inspection: with a fake letter-rename staged, `2>&1 | tail -3` AND `2>&1 |
+tail -1` both now print `session_commit: REFUSED (exit 4)`. Before this change
+`tail -1` printed a clean stat.
+
+**What this does NOT change:** the entry-deletion guard was RIGHT to refuse and
+still refuses. A deliberate letter rename is committed the way the guard's own
+message says — `CHANGELOG.md` separately, after reading the refusal. The lesson
+is not "the guard was too strict", it is that **a correct refusal that the
+caller cannot see is worth nothing**.
 ## 2026-08-19 (rg) — THE MERGE STORM TURNED THE WHOLE FLEET'S SUITE RED THROUGH A 15-MIN PROXY ON A 65-MIN CONTRACT: the taker is declared in STAGGER_OK, waiving the proxy and keeping the contract
 
 [Renumbered from (re) at push time — the SECOND race in one PR: main took (re)
@@ -129,12 +1290,30 @@ itself documents as "measurably wrong in both directions". Nothing anyone
 merges goes green until the storm ages out of the window (~days), so this is
 exactly the guard's own escape hatch's job.
 
-THE MEASURED REASON, not a snooze: the taker publishes **no bot_state key
-with a ttl_sec** (its bot_state use is its own broker-state persistence), so
-the proxy governs by fallback — but its only cross-process reader is its
-bot_pnl row behind `fleet_risk.STALE_ROW_SEC=3900s` (**65 min**, the
-authoritative_row staleness filter), 4.3x the proxy. The 17-min burst sat
-well inside the real contract; no reader saw data past its bar. The
+~~THE MEASURED REASON, not a snooze: the taker publishes no bot_state key
+with a ttl_sec, so the proxy governs by fallback — but its only cross-process
+reader is its bot_pnl row behind `fleet_risk.STALE_ROW_SEC=3900s` (65 min),
+4.3x the proxy. The 17-min burst sat well inside the real contract.~~
+**[19-Aug (rq), CORRECTED IN PLACE per I12 — THAT REASON IS FALSE, AND IT IS
+FALSE IN THE DIRECTION THAT FLATTERS THE EXEMPTION.** Found by a verification
+sweep over this session's own claims. (1) The taker's row has a SECOND
+cross-process reader, TIGHTER than fleet_risk: `pnl_dashboard`'s
+`VARIANT_STALE_SECONDS` pins `lighter-ticket-taker-lshadow` at **900s**, and
+`fleet_watchdog_svc` turns any row's `stale` flag into a paged problem.
+Verified by EXECUTING `stale_secs_for('lighter-ticket-taker-lshadow')` → 900,
+not by reading the dict. (2) So the ratio is **1.0, not 4.3x** — the proxy was
+not a loose stand-in, it was NUMERICALLY EQUAL to the real tightest contract.
+(3) And the burst **1034s EXCEEDS 900s by 134s**, so "well inside" is exactly
+backwards: no reader saw data past its bar only because the burst ended.
+**CONSEQUENCE, stated plainly: this exemption suppresses a TRUE POSITIVE.**
+The shadow Taker — the control arm the go-live rests on — has no early-run
+mitigation (`run_all.sh` still opens its block with a bare `( sleep 210`,
+against golive_readiness's laddered shape), so a deploy burst can genuinely
+starve it. The exemption is KEPT only because removing it reddens the suite
+fleet-wide for every concurrent session while the real fix is already written
+and in flight: the (ou) boot ladder, in PR #192. **It must be DELETED the
+moment that ladder lands.** The `STAGGER_OK` reason now carries all of this,
+and the original 65-min claim is struck rather than quietly reworded.] The
 `STAGGER_OK` entry says all of this in place and names the bound that still
 binds: **a burst outlasting 65 min WOULD silence the row for real** — the
 exemption waives the proxy, never the contract.

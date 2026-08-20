@@ -206,11 +206,12 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 "pm-rudd-lshadow", "pm-morrison-lshadow",
                 "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
                 "freqtrade-dad-lshadow",
-                # [2026-08-19] 👩 mum — I17 no_rate (0 in-era closes ever,
-                # ~2.4 closes/30d => ~12 months to the bar, funding drag
-                # -$2.15 > +$0.68 realised). Corrects the (nf) "green, slow"
-                # hold: that green was open MARKS ((lo)). MUM_RETIRED_OVERRIDE.
-                "freqtrade-mum-lshadow",
+                # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by
+                # the operator and she is deliberately NOT hidden: she trades
+                # again as v2 (OversoldRebound, 1h, bracketed). The bare
+                # Kraken-era `freqtrade-mum` stays retired below — that is a
+                # DIFFERENT row, and conflating the two is the bare-name trap
+                # this file's own tests pin.
                 # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — 🙏 Avo Maria
                 # took the slot (same service/keys/sub-account, the slot's
                 # THIRD occupant; operator decision, cutover verified by
@@ -380,7 +381,15 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # sequences"; lighter_band_kelly_bot.py, service
                 # band-kelly-shadow). Third of the musician cohort.
                 # Shadow-only; base never publishes.
-                "band-kelly"}
+                "band-kelly",
+                # [2026-08-19 (ri)] 🧭 nav-cook — the NAVIGATOR (the (re)
+                # [45,60)bps band book; lighter_nav_cook_bot.py, service
+                # nav-cook-shadow). First of the navigator cohort. Registered
+                # at birth-completion: without this the row filter (line
+                # ~781) drops nav-cook-lshadow from /pnl.json and the
+                # provisioning readback chases a ghost — the (ml) shape.
+                # Shadow-only; base never publishes.
+                "nav-cook"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -421,6 +430,22 @@ OVERTRADE_LIMIT = {
     "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
+    "nav-cook":             120,   # 🧭 the Navigator. MEASURED on its first
+                                   # 24 closes: 55.9 closes/day, all exiting
+                                   # `converged` at a ~5min median hold — the
+                                   # 4h bound is never reached. 120 is ~2x its
+                                   # observed normal, so the card flags a real
+                                   # DOUBLING rather than lighting up every
+                                   # hour on healthy behaviour. [Corrected
+                                   # 19-Aug: this shipped at 20, reasoned from
+                                   # the DESIGN ("4h hold x 4 slots"), which
+                                   # would have kept a permanent warning on a
+                                   # book that is simply fast. A threshold that
+                                   # is always on is not a signal. The separate
+                                   # question — whether ~56/day vs the study's
+                                   # ~1.5/day means a missing re-entry cooldown
+                                   # — belongs in the changelog (rq) and to the
+                                   # nav-cook session, not to a lit-up chip.]
 }
 OVERTRADE_DEFAULT = 15
 
@@ -487,6 +512,7 @@ LABELS = {
     "book-schwager":               "🧙 The Wizard — ride-winners book",
     "book-hull":                   "🧮 The Professor — cost-of-carry book",
     "band-kelly":                  "🪁 the Mirror — rides what the losers fade",
+    "nav-cook":                    "🧭 the Navigator — charts the band below the mirror's floor",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
@@ -496,7 +522,7 @@ LABELS = {
     "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
     "equities-regime":             "📊 Index Rider — stock-perp regime",
     "equities-momentum":           "🏆 Stock Leaders — stock momentum",
-    "freqtrade-mum":               "👩 Mum — daily trend",
+    "freqtrade-mum":               "👩 Mum v2 — oversold rebound",
     "freqtrade-dad":               "👨 Dad — breakout rider",
     "freqtrade-avo-maria":         "🙏 Avo Maria — dip buyer",
     "freqtrade-georgia":           "🔮 Georgia — day trader",
@@ -513,7 +539,7 @@ LABELS = {
 # One-line strategy brief per bot (shared by its venue variants — the chips
 # say WHERE it runs, this says WHAT it does + current units).
 DESCRIPTIONS = {
-    "freqtrade-mum":       "TrendMomoV1 · 1d — long while SMA10>SMA40 with price above; exits on the cross-down · $50 × 4 slots",
+    "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; carries its OWN random-entry control arm · $50 × 4 slots",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
     "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 4 slots; LIVE clips = equity÷4 (slot swap 13-Aug)",
     "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",
@@ -538,6 +564,7 @@ DESCRIPTIONS = {
     "book-schwager":        "Market Wizards as rules — 4h Donchian-20 breakouts with EMA20>50 confirm; cut losses at 2×ATR, ride winners on a wide 3.5×ATR chandelier trail, NO profit target and NO pyramid (measured and refuted); one position per coin",
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
     "band-kelly":           "holds the OPPOSITE side of the fleet's measured losers over exactly the windows the loser would have traded — v1 mirrors retired 🧲 Snap Back: LONG the premium-rich dislocations it shorted, SHORT the discounts it bought, exit when the ghost's own rules (converged/stop/2h) would have exited · refused/waiting mirror families publish in extra.roster · env-only, single-policy clock",
+    "nav-cook":             "rides the SAME dislocations 🪁 band-kelly mirrors, in the band it REFUSES — premium [45,60) bps, strictly below the mirror's 60bps floor, so the two TILE the surface and every event this book takes is one band-kelly declines (I20 by BAND, not by row id) · non-crypto by nature (the band's crypto population is n=4) with pre-IPO excluded as the only class measured negative · 4h hold, exits on the venue's own index residual · env-only, single-policy clock",
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",

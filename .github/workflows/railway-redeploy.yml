@@ -84,6 +84,14 @@ on:
       # (hj) an unresolvable service name is a hard ::error::.
       - 'lighter_band_kelly_bot.py'
       - 'Dockerfile.bandkelly'
+      # [2026-08-19 (ri)] 🧭 nav-cook — PRE-PROVISION. The path is LIVE (so a
+      # change to the book is never silently routeless) but the DECIDE grep
+      # below is COMMENTED until the service exists: an unresolvable name is
+      # the (gl) failure where four books' rules warned and deployed nothing.
+      # Uncomment the grep at activation, together with moving
+      # Dockerfile.navcook out of MANUAL_IMAGES_OK into AUTO_IMAGES.
+      - 'lighter_nav_cook_bot.py'
+      - 'Dockerfile.navcook'
       # the ghost module rides IN the band-kelly image (its gate math is
       # imported, one owner) — removed from paths: when snap-back retired
       # (5-Aug), re-added at kelly's activation routed to the MIRROR. The
@@ -389,6 +397,15 @@ jobs:
             # carries the ghost module (it is IN this image).
             if echo "$changed" | grep -qE "^(lighter_band_kelly_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.bandkelly$|$_shared)"; then
               svcs="${svcs:+$svcs,}band-kelly-shadow"
+            fi
+            # [2026-08-19 ACTIVATED] 🧭 nav-cook — service provisioned by the
+            # one-shot dispatch (run 32239943061, deleted at this activation
+            # per the (lr) rule), row verified on /pnl.json with a
+            # CURRENT-at-HEAD build stamp after the pnl-dashboard reader
+            # catch-up. The grep carries the ghost module (it is IN this
+            # image), exactly the band-kelly shape above.
+            if echo "$changed" | grep -qE "^(lighter_nav_cook_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.navcook$|$_shared)"; then
+              svcs="${svcs:+$svcs,}nav-cook-shadow"
             fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,

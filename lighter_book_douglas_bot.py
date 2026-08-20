@@ -263,6 +263,52 @@ def bracket_exit(pos, mark, t0):
     return None
 
 
+def recent_entry(key, pos, pnl, closed_at=None):
+    """One rolling-sample row, STAMPED so the ledger quarantine can reach it.
+
+    [2026-08-19] The sample used to carry only {pnl, r}. That is unfalsifiable:
+    `bot_pnl_store.is_quarantined` keys on (bot, pair, closed_at), so a row the
+    fleet has RULED inadmissible could not be identified here and kept being
+    counted. Measured live: after the seed-path fix landed, this book published
+    `closed 7 / realized -0.12` beside `sample20 {n: 9, sum_usd: -26.60}` — the
+    card and rule 4's own discipline instrument disagreeing by exactly the two
+    (nm)/(pv) void rows, in the same payload.
+
+    `pair` + `closed_at` are the ONLY additions, and they exist so the ONE
+    owner of the question can answer it — never a second copy of the rule.
+    """
+    return {"pnl": round(pnl, 4),
+            "r": (round((pnl / pos["notional"]) / pos["sl_frac"], 3)
+                  if pos.get("sl_frac") else None),
+            "pair": key,
+            "closed_at": closed_at or datetime.now(timezone.utc).isoformat()}
+
+
+def admissible_recent(bot_id, recent):
+    """`recent` minus rows the ledger quarantine withholds.
+
+    Entries stamped before this shipped carry no `pair`/`closed_at`, so they
+    CANNOT be asked and are KEPT — fail-OPEN, the same contract
+    `is_quarantined` itself uses. They age out of the 20-row window on their
+    own; the alternative is guessing which unstamped row is which, and a
+    quarantine that swallows rows it cannot classify is the disease, not the
+    cure.
+    """
+    out = []
+    for e in (recent or []):
+        if not isinstance(e, dict):
+            continue
+        pair, closed_at = e.get("pair"), e.get("closed_at")
+        if pair and closed_at:
+            try:
+                if store.is_quarantined(bot_id, pair, closed_at):
+                    continue
+            except Exception:      # noqa: BLE001 — unaskable ⇒ admitted
+                pass
+        out.append(e)
+    return out
+
+
 def sample20(recent):
     """Rule 4: the rolling 20-trade sample, published every loop. R-multiple
     = return / stop-fraction at entry, so expectancy is denominated in the
@@ -270,13 +316,24 @@ def sample20(recent):
     Win rate is REPORTED, never a bar (I15)."""
     rows = list(recent or [])[-SAMPLE_N:]
     if not rows:
-        return {"n": 0, "expectancy_r": None, "win": None, "sum_usd": 0.0}
+        return {"n": 0, "expectancy_r": None, "win": None, "sum_usd": 0.0,
+                "unstamped": 0}
     rs = [r.get("r") for r in rows if isinstance(r.get("r"), (int, float))]
     wins = sum(1 for r in rows if (r.get("pnl") or 0) > 0)
+    # `unstamped`: rows predating the (rk) pair/closed_at stamp — the ones the
+    # quarantine CANNOT be asked about and keeps fail-OPEN. Published so the
+    # window in which sample20 visibly disagrees with the card (n=9/−$26.60
+    # beside closed 7/−$0.12, live 19-Aug) carries its own explanation instead
+    # of costing the next reader an investigation. Always present, including 0
+    # — an omitted key is byte-identical between "all stamped" and "not
+    # computed" ((lv)).
+    unstamped = sum(1 for r in rows
+                    if not (r.get("pair") and r.get("closed_at")))
     return {"n": len(rows),
             "expectancy_r": (round(sum(rs) / len(rs), 3) if rs else None),
             "win": round(wins / len(rows), 3),
-            "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2)}
+            "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2),
+            "unstamped": unstamped}
 
 
 def resolve_universe(held, current_time=None):
@@ -443,7 +500,10 @@ def main():
         if _saved and isinstance(_saved.get("positions"), dict):
             positions = _saved["positions"] or {}
         if _saved and isinstance(_saved.get("recent"), list):
-            recent = _saved["recent"][-SAMPLE_N:]
+            # [2026-08-19] withhold quarantined rows from rule 4's sample the
+            # same way the seed path withholds them from the totals, so the
+            # card and the discipline instrument cannot disagree again.
+            recent = admissible_recent(bot_id, _saved["recent"])[-SAMPLE_N:]
         if _saved and isinstance(_saved.get("acted"), dict):
             acted = {str(k): v for k, v in _saved["acted"].items()
                      if isinstance(v, (int, float))}
@@ -515,10 +575,7 @@ def main():
                 realized += pnl
                 n_closed += 1
                 n_wins += 1 if pnl > 0 else 0
-                recent.append({"pnl": round(pnl, 4),
-                               "r": (round(
-                                   (pnl / pos["notional"]) / pos["sl_frac"], 3)
-                                   if pos.get("sl_frac") else None)})
+                recent.append(recent_entry(key, pos, pnl))
                 recent = recent[-SAMPLE_N:]
                 _close(bot_id, key, pos, "delisted", px, pnl)
                 print(f"[{now_iso()}] CLOSE {key} [delisted] "
@@ -536,10 +593,7 @@ def main():
             realized += pnl
             n_closed += 1
             n_wins += 1 if pnl > 0 else 0
-            recent.append({"pnl": round(pnl, 4),
-                           "r": (round(
-                               (pnl / pos["notional"]) / pos["sl_frac"], 3)
-                               if pos.get("sl_frac") else None)})
+            recent.append(recent_entry(key, pos, pnl))
             recent = recent[-SAMPLE_N:]
             held_h = (t0 - pos["opened_ts"]) / 3600.0
             _close(bot_id, key, pos, reason, mark, pnl,

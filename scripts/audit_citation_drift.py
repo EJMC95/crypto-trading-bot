@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[2026-08-19 (rh)] A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT.
+"""[2026-08-19 (rz)] A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT.
 
 WHY THIS EXISTS. `audit_changelog_letters.dangling_code_citations` asks one
 question — *does this letter resolve to a header?* — and appends a finding only
@@ -89,6 +89,17 @@ class Titles:
     def __init__(self):
         self._c: dict[str, dict] = {}
 
+    def working_tree(self):
+        """`letter -> title` from CHANGELOG.md on disk, or {} if unreadable."""
+        try:
+            txt = open("CHANGELOG.md", encoding="utf-8").read()
+        except OSError:
+            return {}
+        d = {}
+        for m in HEADER.finditer(txt):
+            d.setdefault(m.group(2), m.group(3).strip())
+        return d
+
     def at(self, rev):
         if rev not in self._c:
             txt = _git("show", f"{rev}:CHANGELOG.md")
@@ -140,7 +151,16 @@ def audit(paths=None):
 
     cites = code_citations(paths)
     titles = Titles()
-    now = titles.at("HEAD")
+    # [(rz)] `now` is the WORKING TREE, not HEAD — found by this guard's first
+    # real firing, which was a FALSE POSITIVE. Mid-merge it read
+    # `git show HEAD:CHANGELOG.md`, i.e. the file BEFORE the conflict was
+    # resolved, and reported a citation as drifted against a letter the
+    # resolution had already moved. The question this guard asks is "does this
+    # citation still mean what it meant, AS THE FILE STANDS NOW" — and the file
+    # that matters is the one about to be committed, which is exactly the state
+    # a pre-push guard exists to judge. Falls back to HEAD when the working
+    # copy is unreadable, so the arm degrades rather than disappears.
+    now = titles.working_tree() or titles.at("HEAD")
     if not now:
         return [], {"armed": False, "why": "CHANGELOG.md unreadable at HEAD"}
 

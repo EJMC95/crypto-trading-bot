@@ -60,6 +60,10 @@ PRICE_BOOKS = [
     # (fills book-walked VWAPs), every close carries prices + side + the
     # residual at entry/exit so the thesis stays auditable.
     "lighter_band_kelly_bot",        # 🪁 the Mirror
+    # [2026-08-19] 🧭 nav-cook — the band book: P&L is the price path (fills
+    # book-walked), every close carries prices + side; prices present since
+    # (ri), registered at birth-completion so the guard holds them there.
+    "lighter_nav_cook_bot",          # 🧭 the Navigator
 ]
 
 #: Books whose P&L is driven by FUNDING ACCRUAL -> a price sweep is the wrong

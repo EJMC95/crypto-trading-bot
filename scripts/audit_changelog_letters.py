@@ -237,7 +237,7 @@ def code_citations(paths):
     """-> [(path, lineno, letter)] for EVERY changelog citation in tracked
     python comments/strings, resolving or not.
 
-    [2026-08-19 (rh)] Split out of `dangling_code_citations` so the extraction
+    [2026-08-19 (rz)] Split out of `dangling_code_citations` so the extraction
     rule has ONE owner and two consumers: that function (does the letter
     resolve to anything?) and `scripts/audit_citation_drift.py` (does it still
     resolve to the SAME ENTRY it was written against?). A second copy of this

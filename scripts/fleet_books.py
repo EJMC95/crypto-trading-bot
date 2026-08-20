@@ -70,6 +70,9 @@ ROW_ENTRY = {
     # was born, per the (jb) gate, PRE-provision so the FIRST stamped
     # publish is already covered.
     "band-kelly-lshadow": "lighter_band_kelly_bot.py",
+    # [2026-08-19 (ri)] 🧭 nav-cook — the NAVIGATOR (the (re) band book),
+    # mapped at birth-completion so code-currency can resolve its stamp.
+    "nav-cook-lshadow": "lighter_nav_cook_bot.py",
     "crypto-breakout-4h-lshadow": "lighter_family_bot.py",
     "crypto-intraday-15m-lshadow": "lighter_family_bot.py",
     "crypto-swing-daily-lshadow": "lighter_family_bot.py",

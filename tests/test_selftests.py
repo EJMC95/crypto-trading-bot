@@ -241,6 +241,11 @@ SELFTEST_MODULES = [
     # (mirror inversion pinned as a property, ghost import identity, both
     # exit ladders, empty-screen universe contract, publish/state builders).
     "lighter_band_kelly_bot",
+    # [2026-08-19 (re)/(ri)] 🧭 nav-cook — the [45,60)bps dislocation band that
+    # tiles BELOW band-kelly's floor. Its selftest pins the half-open ceiling
+    # (the I20 disjointness), the stop-before-data exit order, the fail-OPEN
+    # class screen, and that the shipped horizon is one the study measured.
+    "lighter_nav_cook_bot",
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",
@@ -386,7 +391,7 @@ ENFORCED_AUDITS = [
     # by the rule at the head of this list — the corruption it catches is
     # content, and a content defect must be catchable before a push.
     "scripts/audit_conflict_markers.py",
-    # [2026-08-19 (rh)] Citation DRIFT — the blind spot `audit_changelog_letters`
+    # [2026-08-19 (rz)] Citation DRIFT — the blind spot `audit_changelog_letters`
     # declares in its own docstring: it checks that a letter RESOLVES, never
     # that it resolves to the entry the citation was written against. On 19-Aug
     # a renumber left seven citations of the ruin-gate entry pointing at another

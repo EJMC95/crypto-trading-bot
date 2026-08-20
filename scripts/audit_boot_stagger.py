@@ -117,17 +117,19 @@ KEY_ALIASES = {"implementation_shortfall": ("impl-shortfall",),
 
 #: Organs deliberately exempt, with the reason. An exemption is a DECISION and
 #: must name why — the `BORN_DARK_OK` idiom.
-STAGGER_OK: dict[str, str] = {
-    # [2026-08-19 (rh)] `lighter_ticket_taker` was declared here at (rg) and the
-    # declaration is REMOVED, not because its reasoning was wrong — it was
-    # right, and it is preserved in `run_all.sh` beside the fix — but because
-    # the organ now has a boot ladder, so the exemption guards nothing and
-    # MASKS a regression of that ladder. Measured both ways: revert the ladder
-    # with this entry present and the guard exits 0; revert it with the entry
-    # gone and the guard exits 1. An exemption that can only ever hide the
-    # re-introduction of a fixed defect is the DRIFT_OK hole in another costume
-    # — "prefer making the consumer a LITERAL over declaring the exemption".
-}
+STAGGER_OK: dict[str, str] = {}
+#: EMPTY, and it should stay that way. The one entry this ever held
+#: (lighter_ticket_taker, 19-Aug) was a TEMPORARY suppression of a TRUE
+#: positive — deleted the same day the real fix landed, the (ou) boot
+#: ladder in run_all.sh. An exemption here silences the guard; a ladder
+#: removes the condition. Prefer the ladder every time.
+#:
+#: [(rz)] MEASURED, from the other session that reached this independently:
+#: with the ladder in place the entry is dormant either way, but revert the
+#: ladder with the entry PRESENT and this guard exits 0 — with it GONE it
+#: exits 1. So its only remaining power was to hide the re-introduction of a
+#: fixed defect, which is the `DRIFT_OK` hole in another costume.
+
 
 
 def declares_flag(script: str, flag: str) -> bool | None:

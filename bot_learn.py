@@ -313,7 +313,12 @@ ERA_START = {
     # 13-Jul: same DayTraderV5Gated sleeve/stop changes; 17-Jul accrual basis
     "freqtrade-georgia":   "2026-07-17T00:00",
     # 14-Jul: whitelist curated to the 10 backtest-positive pairs; 17-Jul accrual basis
-    "freqtrade-mum":       "2026-07-17T00:00",
+    # [2026-08-19 (ro)] 👩 mum v2: a NEW STRATEGY on this row (TrendMomo 1d ->
+    # OversoldRebound 1h), which is "different in kind" — the era rule's own
+    # words — so v1's three closes may not pool with v2's sample. Kept in
+    # lockstep with scripts/golive_readiness.POLICY_ERA: the gate's sample may
+    # never be wider than the brain's.
+    "freqtrade-mum":       "2026-08-19T21:45",
     # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier); 17-Jul accrual basis
     "freqtrade-dad":       "2026-07-17T00:00",
     # never had an era; same publisher, same accrual fix
@@ -453,6 +458,20 @@ def _save_state(state):
     shout here stops the NEXT cause of the same shape being invisible.
     """
     saved = []
+    # [2026-08-20 (ry)] STAMP THE BLOB, NOT JUST THE COLUMN. `save_state` writes
+    # the time to the bot_state `updated_at` COLUMN, but `fetch_states` — the
+    # batch read every organ uses — selects only `(bot, state)`. So the payload
+    # `fleet_immune.brain_amnesia` receives carried NO timestamp at all, `bt`
+    # was always None, and I2's declared enforcement returned [] forever. The
+    # detector's other half is fixed in fleet_immune; this is what gives it
+    # something to read. Cheap, additive, and it makes the skew computable from
+    # any consumer of the blob rather than only from a DB column read.
+    try:
+        from datetime import datetime, timezone
+        state["updated"] = datetime.now(timezone.utc).isoformat(
+            timespec="seconds")
+    except Exception:                                # noqa: BLE001
+        pass
     try:
         import bot_pnl_store as store
         if store.save_state("learning-brain", state):
