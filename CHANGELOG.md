@@ -1,3 +1,71 @@
+## 2026-08-20 (sb) — 🧭 nav-cook's FOUNDING CLAIM REPRODUCES, THE CONFLICTING REPLAY IS EXPLAINED, AND THE HARNESS IS FINALLY IN THE REPO
+
+`(sa)` fixed the confirm-window defect and named a follow-up it deliberately did
+not discharge: **`STUDY_DISLOCATION_BAND_2026-08-19.md`'s harness was never
+committed**, so a live book's founding claim was unreproducible by anyone
+including its author — and `(sa)`'s own independent replay read
+`n=697, −0.165%, t=−2.61` against the published `n=216, +0.367%, t=+2.74`,
+correctly REFUSING itself under the calibration gate. The scratchpad holding the
+original is now gone, which is the argument for this entry rather than against
+it. `scripts/study_dislocation_band_2026-08-19.py` is the reconstruction,
+committed, with a selftest.
+
+**THE CLAIM REPRODUCES.** On a tape now 10,346 snapshots (was 10,052):
+
+| | n | mean/trade | t |
+|---|---:|---:|---:|
+| published | 216 | +0.367% | +2.74 |
+| **this harness** | **226** | **+0.373%** | **+2.61** |
+
+The n gap is tape growth. The whole published grid reproduces within noise —
+[45,60) positive at all five horizons (+0.189/+0.277/+0.325/+0.373/+0.412,
+t=+2.61..+3.09), [150,inf) still NEGATIVE, [60,inf) still weak.
+
+**AND THE CONFLICTING REPLAY IS EXPLAINED — it is a CONVENTION, not a data
+disagreement.** The harness now names every place two honest replays can
+diverge, and the load-bearing one is the confirm:
+
+| C2 convention | n | mean | t |
+|---|---:|---:|---:|
+| **strict** — band holds at t−2 **AND** t | 226 | +0.373% | +2.61 |
+| **loose** — band holds at t−2 only | **756** | +0.069% | +1.26 |
+
+`(sa)`'s **n=697 sits with the loose reading**, not the strict one. Neither
+replay was wrong; they answered different questions, and nothing in the study
+document said which. **A published number needs its conventions published with
+it — that is what made two competent replays disagree by 3.2× in n and by sign
+in mean.**
+
+**THE ARTEFACT WAS TESTED, NOT ASSUMED.** `prem_outliers` is hard-capped at 8
+entries, so a held symbol can simply DROP OFF the feed; the study read that as
+convergence (C3), and it is **43% of exits** (98 of 226) — far too much weight
+to leave unexamined. Refusing the artefact outright (hold until stop/max_hold
+instead) still clears:
+
+| C3 convention | n | mean | t |
+|---|---:|---:|---:|
+| absent ⇒ converged (as published) | 226 | +0.373% | +2.61 |
+| **absent ⇒ HOLD (artefact refused)** | 215 | **+0.343%** | **+2.11** |
+
+Same at the plateau's far end (8h: +0.412%/t=+3.03 vs +0.369%/t=+2.31). **The
+claim is not resting on the truncation.**
+
+**WHAT THIS DOES AND DOES NOT SETTLE.** It restores the founding claim as
+*reproducible evidence* and explains the conflict. It does NOT vindicate the
+book's live performance — `(sa)`'s live finding stands unchanged (24 pre-fix
+closes at −0.298%/trade under a gate 3.3× too loose, now era-reset), and the
+forward ledger remains the only thing that decides (I14). A reproducible replay
+is a precondition for trusting a claim, never a substitute for the record.
+
+**One thing the selftest caught, recorded so nobody "tidies" it:** the fill-cost
+tiers are **NOT monotone in liquidity** — (qq) measured $1–2M at a MEAN 5.35 bps
+against $0.1–1M's 2.52, because that tier carries a fat tail (median 1.03). The
+first version of the assert encoded the intuition instead of the data and failed
+on its first run.
+
+Files: `scripts/study_dislocation_band_2026-08-19.py` (new, selftest-registered).
+No bot code touched; main-only by the `(mm)` rule.
+
 ## 2026-08-20 (sa) — 🧭 nav-cook SHIPPED A GATE 3.3× LOOSER THAN THE ONE IT WAS GRADED ON: a confirm window is a DURATION, and it inherited the COUNT from a bot on a different cadence
 
 *(Renumbered (ro) -> (sa) at push time: `(ro)` was already merged and cited 5 times on `main` for the 👩 mum-v2 entry, so by the convention's own tiebreak the CITED entry keeps the letter and this one moves. The one in-tree reference, in CLAUDE.md's nav-cook row, is rewritten in the same commit — a renumber that leaves a dangling citation is the defect the rule exists to prevent.)*
