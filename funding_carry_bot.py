@@ -1470,7 +1470,12 @@ def main():
                     deployed_usd=sum(float(p.get("notional") or 0.0)
                                      for p in positions.values()),
                     gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
-                                                            NOTIONAL))
+                                                            NOTIONAL),
+                    # ONE clip sizes every entry this loop opens — the depth
+                    # probe has to price the clip it is admitting, so the
+                    # notional is hoisted above the census. Without `slots`
+                    # the bound is evaluated once and applied up to 12 times.
+                    slots=max(1, MAX_POSITIONS - len(positions)))
                 if fleet_bus is not None else (_base, 1.0))
             _probe = {"left": DEPTH_PROBE_BUDGET, "used": 0}
             _depth_memo = {}

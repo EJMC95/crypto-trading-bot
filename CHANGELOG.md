@@ -176,6 +176,41 @@ time** because every close carries its `brain_mult`. CARRIED with the
 arithmetic rather than fixed by rewriting the brain's publisher on the same
 day thirteen consumers were wired to it.
 
+### AND THE BOUND FAILED A SECOND WAY — THE CALL PATTERN
+
+The audit's late verifiers, re-reading the tree after the fix, drove the bound
+through carry's REAL loop instead of through one call. **🌾 carry hoists ONE
+`_notional` above its census** (the `(sk)` depth probe has to price the clip it
+is admitting) and applies it to every entry that loop opens. So the bound read
+`deployed` once and was used twelve times: **sized $7,200 from an EMPTY book,
+opened twelve at it, $86,400** — against the $96,480 it was introduced to
+prevent. **It bought almost nothing.** ⚖️ Counterweight has the identical shape,
+rebinding one `order_usd` for every leg of its rebalance.
+
+`slots` closes it: the caller declares how many positions one clip will size
+and the room is divided. Verified over a whole fill from empty —
+carry at alloc 1.0 lands **exactly on its $7,200 cap**; at the live alloc 4.0 it
+lands on **$14,400, exactly the no-brain gross**, i.e. the brain gets zero room
+on the book that has already spent its budget, which is the right answer;
+Counterweight lands exactly on $400.
+
+**Both failures of this bound are the same mistake in two costumes: testing the
+ARITHMETIC of one call instead of the BEHAVIOUR of the loop.** First the
+sequence, then the call pattern. It is the reason the guard now drives a full
+slot-fill rather than asserting a formula.
+
+**⚖️ Counterweight also gets a flatness gate on the brain's contribution.** Its
+rebalance KEEPS held legs (`if c in meta: continue`), so a clip that moves
+mid-life leaves generations of legs at different sizes — measured, one step
+from 1.0 to 6.7 replacing a single short leg leaves **$570 of net directional
+delta on a book that models zero price exposure**. The gross bound caps the
+magnitude and cannot fix the asymmetry, because the asymmetry is between
+GENERATIONS, not between sides. The brain may now only move this clip while the
+book is flat, so every leg of a generation is sized by one number. The
+ALLOCATION organ is deliberately NOT gated: it has rebound this clip every loop
+since `(jr)` and narrowing that is a separate change with a separate owner —
+what this refuses to do is make a pre-existing asymmetry 6.7x wider.
+
 ### THREE MORE FROM THE SAME AUDIT, AFTER THE FIXES LANDED
 
 The refuter pass re-read the tree AS THE FIXES WERE LANDING, which is how a
