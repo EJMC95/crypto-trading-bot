@@ -1,3 +1,128 @@
+## 2026-08-20 (ry) — FOUR DECLARED ENFORCEMENTS WERE INERT, HARVESTED FROM A STALE PR THAT COULD NEVER MERGE — including a fleet-wide death recorder that has never recorded a death
+
+[Renumbered (rs) -> (ry) at rebase time: main took (rs) for PR #204 while this
+was in flight, and (rt) for #206 minutes later. All 9 code citations moved
+together, counted per file rather than from one grep.]
+
+The operator asked for the stale draft PRs to be cleared. Four of the five
+(#153, #167, #168 from 7–13 Aug) have **no merge base with main at all** — main's
+history was rebuilt under them, so each now differs in ~200 files and merging any
+would REVERT a week of work. The reflex is to close them. **The reflex is wrong
+on its own: a branch that cannot merge can still be RIGHT**, and #153's diff
+turned out to be eight bug fixes, five of which never landed anywhere.
+
+So the PRs were mined before being closed. What follows is the four that
+reproduce on today's `main`, each verified by RUNNING rather than by reading.
+
+**1 · `record_organ_error` HAS NEVER RECORDED ANYTHING — a missing import, and
+it took the whole `(hw)` deliverable with it.** `datetime` is not a module-level
+name in `bot_pnl_store.py`; every other user imports it locally. This function
+did not, so `datetime.now(timezone.utc)` raised **NameError on every call**, the
+blanket `except Exception: return False` swallowed it, and it returned False
+without ever reaching `save_state`. Proved, not inferred — both DB calls stubbed
+to succeed, then counted:
+
+    record_organ_error returned: False      save_state called: 0 times
+
+`(hw)`'s measured finding was *"20 of 22 organs had no way to report their own
+death"*. The mechanism it shipped to close that has been dead since 1-Aug. And
+the caller made it **worse than silent**: `organ_main` discarded the result and
+printed *"ORGAN FAULT recorded on its own bot_state key so the immune organ can
+see it"* — a sentence that has never once been true. I4 (never discard a
+persistence result) and I8 (a detector must name something actionable) failing in
+the same four lines. Both fixed; the caller now says which of the two happened,
+because they need different acts from the operator.
+
+**2 · I2's declared enforcement returns `[]` FOREVER — the guard was blind, and
+being blind read as healthy.** `brain_amnesia` computes memory-vs-vitals skew
+from `b.get("updated") or b.get("updated_at")`. The brain's blob carries
+**neither**: `save_state` writes the time to the bot_state `updated_at` COLUMN,
+and `fetch_states` — the batch read every organ uses — selects only
+`(bot, state)`. Verified in the live payload: `brain_vitals` carries `updated`,
+`brain` carries only `updated_at`, and that one is added by the DASHBOARD when
+serving, not by the publisher. So `bt` was None on every real cycle and I2
+reported nothing, ever. `audit_doctrine_enforcement` stayed green throughout
+**because the NAME resolves** — this file's own "a green run verifies that a
+declared enforcement EXISTS, not that it is CORRECT" caveat, realised.
+
+Fixed in both halves, because either alone is cosmetic: `bot_learn._save_state`
+now stamps `updated` INTO the blob (giving the detector something to read), and
+`brain_amnesia` REPORTS blindness instead of returning quiet. The distinction is
+kept sharp — quiet still means a booting brain (no memory row) or nothing to
+compare against (dark vitals); a memory row that exists with no readable stamp is
+now named, and the report says explicitly it is **not** a claim of amnesia but a
+claim that nothing can currently tell. **The old selftest had certified the
+blindness**: `{"updated": "nope"}` sat in a must-stay-quiet loop. That case now
+asserts the opposite, with the reason inline.
+
+**3 · I10's REAL-MONEY gate is structurally unpassable.** ⚖️ Counterweight's
+`golive_blocker(BOT)` asks for `"perps-funding-spread"` while the publisher keys
+`books` by the ledger's bot column. Confirmed against the live payload — the map
+holds `perps-funding-spread-lshadow` and **no bare base at all**. Fail-closed, so
+never an unsafe admit; but a genuinely READY book with `FUNDSPREAD_GOLIVE=1`
+would still be refused, with a message that reads like the grader not knowing the
+book exists. Demonstrated both ways on the publisher's real key shape:
+
+    bare base (the bug) -> 'go-live gate has no entry for perps-funding-spread'
+    row id   (the fix)  -> None
+
+**Fourth instance of the bare-vs-suffixed key class** (FEE_RT, ERA_START,
+era_epoch_for). `ctx.bot_id` exactly, never a match on either spelling — the
+suffix is the difference between two books, so a READY SHADOW twin must never arm
+the LIVE arm. The selftest could not have caught it: its fixture keyed `books` by
+`BOT` too, so consumer and fixture agreed with each other and both disagreed with
+the publisher — **the (hj) rule verbatim**. The fixture is now keyed the way
+`golive_readiness` keys it and 13 call sites moved with it.
+
+**4 · `regime_oracle`'s selftest killed itself a third of the way in, and CI
+called it PASSING.** A copy-pasted production line —
+`sys.exit(store.organ_main('regime-oracle', main))` — sat inside `_selftest`,
+raising SystemExit(0). **39 assertions below it never ran** and the final OK line
+never printed, while `tests/test_selftests.py`, which checks only the exit code,
+marked the module green. Every coverage, staleness, dark-venue and per-asset
+contract in that file was unenforced.
+
+Worth recording how nearly this was missed *again*: a scoped
+`awk '/^def _selftest/,/^def /'` over the region returned EMPTY and would have
+been reported as "not present". The whole-file `grep` found it at line 703. That
+is the (po) rule — *empty output is not a negative result* — inside the very pass
+harvesting a bug of the same family.
+
+Fixing it exposed a second defect immediately, which is the point of un-deadening
+a test: with the assertions live, `main()` published NOTHING, because the fixture
+mocks `load_state` while the organ reads through `load_state_checked` (the seed
+guard). A new guard assertion — *"main() published NOTHING"* — caught that on the
+first run. With `load_state_checked` mocked in all three blocks, **all 39
+assertions pass**: the contracts were right all along, they were simply never
+checked.
+
+**PR DISPOSITION.** #153's four remaining items are NOT harvested here and are
+named rather than dropped: ⚖️ Counterweight's `pnl_pct` is price-only while its
+`pnl_abs` carries funding (a grading-BASIS change on a book with a live
+keep-or-retire date — it moves the numbers the go-live gate reads, so it earns
+its own pass and its own measurement, not a ride-along); the I15 expand-direction
+sweep; the allocation-consumer name check; and the Counterweight live-clip pin.
+
+**Verification.** Every fix proved by execution: the recorder counted reaching
+`save_state`, the amnesia detector driven through all four fixture shapes, the
+gate run against the publisher's real key form, the oracle's selftest run to its
+final OK line. `tests/autonomy/test_inert_enforcements.py` (9 tests) pins all
+four, and **8 mutations were run against it, all 8 RED** — the missing import
+restored, the caller's result discarded again, the amnesia guard re-blinded in
+both directions, the brain's stamp renamed, the gate reverted to the bare base,
+and the oracle's killer `sys.exit` reintroduced. The FIRST round found a
+SURVIVOR — `tests/test_selftests.py` does not cover `record_organ_error` at all
+— which is why the new file exists; and the test's own first draft matched the
+forbidden string inside this entry's explanatory COMMENT rather than the code,
+the "a page-wide substring scan is not a structural claim" trap, now filtered to
+executable lines. `fleet_immune`, `regime_oracle` and `lighter_funding_spread_bot`
+selftests green. Suite: `test_funding_variant` and `test_margin_truth` remain the
+only failures and both predate this pass — note that `regime_oracle` and
+`test_crypto_only_universe` were NOT pre-existing repo failures at all but a
+missing local `numpy`/`pandas`, now installed; that correction matters because
+those two had been quoted as "known pre-existing" for two sessions.
+
+
 ## 2026-08-20 (rt) — THE HORIZON QUESTION CANNOT BE ANSWERED BACKWARDS ON THIS BOOK, AND THE REASON IS A NUMBER: a 1.9-MINUTE MEDIAN HOLD AGAINST A 1-MINUTE CANDLE. So 🪁 band-kelly now measures it FORWARD.
 
 **Operator: *"open the horizons, give them room to breathe and grow."*** `(rs)`
@@ -176,6 +301,7 @@ embeds those exits, so moving it does not widen the book, it voids the evidence
 shipped prose with no script. **The measurable version — replay band-kelly's own
 tape at a series of conv bars through its existing study harness — is real work
 with a real answer, and it is the next thing worth doing on these books.**
+
 ## 2026-08-19 (rr) — 👩 mum v2's CENSUS SAYS *WHY* NOTHING OPENED AND COULD NOT SAY *HOW FAR AWAY* IT WAS — the one reading that would have caught v1 in hours instead of five weeks
 
 [Renumbered (rq) -> (rr) at merge time. A concurrent session took (rq) for its
