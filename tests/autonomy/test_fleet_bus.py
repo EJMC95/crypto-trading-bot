@@ -59,14 +59,22 @@ def test_stake_multiplier_clamps_below_half_to_floor():
 def test_stake_multiplier_clamps_above_one_to_ceiling():
     # [2026-07-21 TWO-WAY, operator: "brain needs to be able to widen too"]
     # This test used to pin reduce-only (ceiling 1.0). The contract changed
-    # deliberately: expand mults (1.25/1.5) pass, and the clamp now bounds
-    # at 1.5 — anything above still cannot boost past it.
+    # deliberately: expand mults pass, and the clamp bounds the top.
+    # [2026-08-20 (sh)] AND THE CEILING MOVED AGAIN, 1.5 -> 2.0, on the same
+    # kind of deliberate contract change (operator: "training wheels need to
+    # go off ... the brain that has every loss we've had or win"). The value
+    # is asserted through `fleet_bus.MULT_CEIL` rather than retyped, so the
+    # next move needs one edit and not two — but the BEHAVIOUR either side of
+    # it is pinned literally, because that is what a clamp is for.
     _prime("brain-stake-mults", _fresh(
-        mults={"b": {"t": {"mult": 1.5}}}))
-    assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_CEIL == 1.5
+        mults={"b": {"t": {"mult": fleet_bus.MULT_CEIL}}}))
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_CEIL
+    assert fleet_bus.MULT_CEIL == 2.0, (
+        "the ceiling moved without this contract being re-read — (sh) set it "
+        "to 2.0 to match brain_stats' new top tier; a change here must say why")
     _prime("brain-stake-mults", _fresh(
-        mults={"b": {"t": {"mult": 3.0}}}))
-    assert fleet_bus.stake_multiplier("b", "t", NOW) == 1.5, "over-ceiling clamps"
+        mults={"b": {"t": {"mult": 9.0}}}))
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == 2.0, "over-ceiling clamps"
     _prime("brain-stake-mults", _fresh(
         mults={"b": {"t": {"mult": 1.25}}}))
     assert fleet_bus.stake_multiplier("b", "t", NOW) == 1.25, "expand step passes"

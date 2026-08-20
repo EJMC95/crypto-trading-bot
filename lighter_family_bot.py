@@ -115,7 +115,8 @@ def brain_stake_mult(bot_id, tag):
     """The brain's TWO-WAY per-(bot, tag) stake multiplier for an entry
     (reduce-only until 21-Jul), looked up under EXACTLY the identity this
     book's ledger rows carry (bot_id row name + ledger_tag). fleet_bus owns
-    the fail-safe contract (fresh payload only, clamp [0.5, 1.5], neutral
+    the fail-safe contract (fresh payload only, clamp [0.5, 2.0]
+    since (sh) — the brain's ceiling step; was [0.5, 1.5]; neutral
     1.0 on any doubt); the guard here only covers an image built without
     fleet_bus.py."""
     try:
@@ -1775,7 +1776,8 @@ def main():
                 # brain's per-tag multiplier — reduce (0.5/0.75) since
                 # 15-Jul, and since 21-Jul also EXPAND (1.25/1.5) for tags
                 # proving out on the v3 mirror bars (operator: "brain needs
-                # to be able to widen too"). fleet_bus clamps [0.5, 1.5].
+                # to be able to widen too"). fleet_bus clamps [0.5, 2.0]
+                # since (sh) — the brain's ceiling step.
                 bm = brain_stake_mult(b.bot_id, tag)
                 if bm != 1.0:
                     log.info("%s %s brain stake-mult x%.2f (%s)",

@@ -69,10 +69,39 @@ SOFT_T = -0.7
 EXP_SOFT_POST_WR = 0.55      # 1.25x: shrunk wr above this...
 EXP_SOFT_W_LO = 0.50         # ...with even the pessimistic bound past coin-flip
 EXP_SOFT_T = 2.0             # ...and PnL positive at >= 2 sigma
-EXP_HARD_POST_WR = 0.60      # 1.5x: the ceiling step
+EXP_HARD_POST_WR = 0.60      # 1.5x
 EXP_HARD_W_LO = 0.55
 EXP_HARD_T = 2.5
+# [2026-08-20 (sh)] 2.0x — THE CEILING STEP, and the reason it exists.
+#
+# **Operator: "training wheels need to go off and they need to start growing
+# and learning with the brain that has every loss we've had or win and can let
+# the bots adjust themselves accordingly."** Until now the ladder stopped at
+# 1.5x, so the brain — which holds every close this fleet has ever made — could
+# never express more than "half again" about a book however overwhelming its
+# own evidence. 👩 mum measures +4.658%/trade and the most the brain could ever
+# say about her was 1.5x. That is a training wheel, not a bar.
+#
+# THE BAR IS SET WHERE THIS FLEET'S OWN HISTORY PUTS IT. `t >= 3.5` is not a
+# round number: it sits ABOVE every headline this fleet has re-measured and
+# lost (🧙 Schwager t=1.88 -> "not established"; 📐 Grimes' keltner t=0.49;
+# 🧘 Douglas t=0.50) and at-or-below the two that SURVIVED re-measurement
+# (🧮 Hull t=+3.92 on n=50, 🌾 carry t=3.10 on n=101). A tier that doubles a
+# stake should clear the level where this fleet's claims have historically
+# stopped dissolving, and 2.5 is demonstrably not that level.
+#
+# It is deliberately HARDER than the tier below on every axis — win rate,
+# Wilson lower bound, t AND the decayed-evidence floor — so the ladder is
+# monotone in strictness, which the selftest pins. SHADOW BOOKS ONLY: no live
+# bot reads a brain multiplier, and `fleet_bus.allowed()` clamps every consumer.
+EXP_MAX_POST_WR = 0.65       # 2.0x: the ceiling step
+EXP_MAX_W_LO = 0.60
+EXP_MAX_T = 3.5
 MIN_N_EFF_HARD = 18.0        # decayed evidence floor under the raw n>=30 floor
+# [(sh)] the 2.0x step needs MORE decayed evidence than 1.5x, not the same
+# amount: a book can hold a high `t` on a thin decayed sample, and doubling a
+# stake off forgotten trades is the shape this floor exists to refuse.
+MIN_N_EFF_MAX = 30.0
 MIN_N_EFF_SOFT = 9.0         # under the raw n>=15 floor
 KAPPA_MIN, KAPPA_MAX = 5.0, 15.0
 # Family condemnation (soft tier only): when the tag's OWN family is big
@@ -291,6 +320,12 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
     if stats["pnl_w"] >= 0:
         if not expand:
             return None, ev
+        # [(sh)] the ceiling step FIRST — the ladder is checked strongest-bar
+        # down, so a book that clears 2.0x is not silently handed 1.5x.
+        if (n >= min_n and n_eff >= MIN_N_EFF_MAX and stats["pnl_w"] > 0
+                and post > EXP_MAX_POST_WR and w_lo > EXP_MAX_W_LO
+                and t >= EXP_MAX_T):
+            return 2.0, ev
         if (n >= min_n and n_eff >= MIN_N_EFF_HARD and stats["pnl_w"] > 0
                 and post > EXP_HARD_POST_WR and w_lo > EXP_HARD_W_LO
                 and t >= EXP_HARD_T):

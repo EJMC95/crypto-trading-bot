@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 19:09 Sydney (09:09Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-20 19:41 Sydney (09:41Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -13,6 +13,16 @@ _Still open because:_ changes what the tuner's leaderboard measures — needs it
 bull_exit() hands the breakout TREND exit the reversion arm's MAX_HOLD_H. A rule built to let a winner run (no TP cap, wide stop, trailing give-back) is timed by a mean-reversion book's clock; 23-32 of 37 replayed exits are that clock, not the trail.
 
 _Still open because:_ splitting it decouples the arm from a lever the rail actively moves, and the only evidence for 48h->96h died to leave-one-symbol-out (+0.78pp -> +0.07pp ex-HYPE).
+
+### `ceiling-slots-georgia`  ·  owner: **session**
+🔮 georgia is 310 closes from t=2.0 — 83.5 DAYS at today's 0.5 of 5 slots, 7.6 days at full occupancy. An 11x speed-up to decidability on the fleet's closest book to real money, costing zero expectancy. `scripts/ceiling.py` names it; what it does NOT say is whether her SIGNAL can fill those slots.
+
+_Still open because:_ the ceiling is REACHABLE, not promised — the next step is her own census: what refuses the other 4.5 slots, the regime gate, the universe, or no signal at all.
+
+### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
+Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
+
+_Still open because:_ moving capital between books is an operator call, not a session one — the organ already ranks it honestly (I16).
 
 ### `unmeasurable-lever-backlog`  ·  owner: **session**
 30 registered levers still have no QUANTITIES spec — no recorded quantity to profile them against. The ratchet in audit_lever_measurability stops the pile GROWING; draining it is per-lever work: record what the knob cuts, then spec it.
@@ -34,8 +44,9 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (50 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf))
+## Shipped today (51 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg))
 
+- `f0fba40` The never-recorded class, closed fleet-wide; and I11 finally has teeth (sg)
 - `e34b6a2` The only path to more real money was rigged against ever promoting (sf)
 - `a173a93` The growth rail could only ever SHRINK the taker's one living lens (sf)
 - `308f6e7` The trend exit joins the rail, and starts recording what its knobs cut (sf)

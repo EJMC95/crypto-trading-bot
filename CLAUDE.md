@@ -367,6 +367,32 @@ the build on a pre-existing backlog gets exempted within a day and then guards
 nothing ((mz)'s lesson) — so the backlog may only shrink and a NEW instance
 fails immediately.
   ENFORCED BY: `scripts/audit_lever_measurability.py::check`, `scripts/audit_lever_measurability.py::RATCHET`, `tests/autonomy/test_breakoutup_ratchet.py::BREAKOUTUP_LEVERS`
+### I23 · A BOOK HAS A CEILING AND IT IS A MEASUREMENT — CAPACITY IS NOT EDGE, AND IT IS NOT FREE TO IGNORE
+**Operator, 20-Aug: *"The discussion of the floor is too often had, where the
+conversation of how high the ceiling goes is of little discussion... they know
+the floor all too well."*** Count the bars: the go-live gate asks six questions
+and **every one is a floor** (≥30d, ≥30 closes, mean>0, t≥2.0, both halves,
+maxDD<15%) — six ways of asking *don't be bad*. Add the stops, vetoes, screens,
+cages, the governor and the halt, and until (sh) **not one instrument asked what
+the most a book could earn is, or what stood in the way.** So the fleet optimised
+the only thing it measured. Measured 20-Aug, slot occupancy against each book's
+OWN cap beside its own mean: 👩 mum **+4.658%/trade at 100% of a cap of four**,
+🙏 avo +1.085% at 40%, 🔮 georgia +0.122% at **9%** — while ⚖️ Counterweight
+**−1.433% at 102%** and 🛢️ Garrett −1.460% at 88%. **Capital sat in inverse
+proportion to measured edge**, and no organ had been asked the question that
+shows it. Output decomposes exactly — `$/day = rate × clip × mean_pct` — and two
+of the three are pure capacity that cost NO expectancy (per-trade % is invariant
+to clip, `(hl)`, measured). **A ceiling is computed only on a book whose EDGE
+LOWER BOUND is positive** (I16 — scale a coin flip and you scale a coin flip);
+for the rest the ceiling is DECIDABILITY, *how fast can this book learn what it
+is*, which is where I17 and the ceiling meet. Rate headroom comes from UNUSED
+SLOTS at the book's own hold, **never a shorter one** — that is denominator
+shrinkage, which `(hl)` measured as the whole of 25 of 30 "more trades"
+candidates. And a ceiling is REACHABLE, never promised: it says a book could run
+N× faster if its slots filled, not that the signal exists to fill them — the
+book's own census answers that.
+  ENFORCED BY: `scripts/ceiling.py::book_ceiling`, `scripts/ceiling.py::MIN_N`, `tests/autonomy/test_ceiling.py::test_a_losing_book_is_never_given_a_ceiling`
+
 <!-- INVARIANTS:END -->
 
 

@@ -137,6 +137,7 @@ SELFTEST_MODULES = [
     # detection, and the CALIBRATION gate — no reproduction of the observed
     # result, no recommendation, fail-closed when no baseline is supplied.
     "scripts.audit_lever_measurability",
+    "scripts.ceiling",
     "scripts.session_state",
     "scripts.study_exit_sweep",
     "scripts.study_stop_reclaim",

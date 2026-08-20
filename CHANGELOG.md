@@ -1,3 +1,106 @@
+## 2026-08-20 (sh) — THE CEILING BECOMES A MEASUREMENT: six bars asked "don't be bad", none asked how high, and capital sat in INVERSE proportion to measured edge
+
+**Operator: "The discussion of the floor is too often had, where the
+conversation of how high the ceiling goes is of little discussion... they know
+the floor all too well."** / **"training wheels need to go off and they need to
+start growing and learning with the brain that has every loss we've had or win
+and can let the bots adjust themselves accordingly so they can achieve their
+designated different designs. We need synergy."**
+
+### THE COUNT THAT MAKES THE POINT
+
+The go-live gate asks six questions — ≥30 days, ≥30 closes, mean>0, t≥2.0, both
+halves positive, maxDD<15%. **Every one is a floor.** Six ways of asking *don't
+be bad*. Add the stops, the vetoes, the class screens, the cages, the drawdown
+governor and the halt, and there was **not one instrument in the tree** that
+asked what the most a book could earn is, or what stood in the way.
+
+So the fleet optimised the only thing it measured. Slot occupancy against each
+book's OWN cap, beside its own mean per trade, 20-Aug:
+
+| book | mean %/trade | slot use |
+|---|---|---|
+| 👩 mum | **+4.658%** | **100%** of a cap of FOUR — 0.18 closes/day |
+| 🙏 avo | +1.085% | 40% |
+| 🌾 carry | +0.254% | 49% |
+| 🔮 georgia | +0.122% | **9%** ← the fleet's closest book to the gate |
+| 🎫 taker | −0.167% | 74% |
+| ⚖️ Counterweight | **−1.433%** | **102%** ← the worst book, FULL |
+| 🛢️ Garrett | −1.460% | 88% |
+
+**The two worst books run at 88–102% of capacity. The best runs at 100% of a cap
+of four and takes one trade every five days.** Capital in inverse proportion to
+measured edge, and no organ had been asked the question that shows it.
+
+### `scripts/ceiling.py` — the mirror of the go-live gate
+
+Output decomposes exactly: **`$/day = rate × clip × mean_pct`**. Two of the three
+are pure capacity and neither costs expectancy — per-trade % is INVARIANT to
+clip, which `(hl)` measured and then nobody used. The fleet spent months on the
+third and capped the other two.
+
+**THE FIRST LIVE RUN, and the headline is the book nearest real money:**
+
+    🔮 georgia   310 more closes to t=2.0
+                 83.5 days at today's 0.5 of 5 slots
+                  7.6 days at full occupancy      <- an 11x speed-up
+    PROVEN books  $+1.452/day at their measured lower bound
+                  $+3.015/day at their reachable ceiling  (2.1x)
+                  — and NOT ONE of those dollars needs a better strategy.
+
+**THE DISCIPLINE IS THE DESIGN, not a caveat bolted on:**
+* **A ceiling is computed only on a book whose EDGE LOWER BOUND is positive**
+  (I16 — never the mean). Scale a coin flip and you scale a coin flip. Of 16
+  books, only three qualify.
+* **For an unproven book the ceiling lever is the rate of EVIDENCE, not money** —
+  closes to t=2.0 at its own mean/sd, now versus at full slots. That is where
+  I17's decidability and the ceiling meet: *how fast can this book learn what it
+  is?*
+* **A negative mean is a keep-or-retire question, never a capacity one.** The
+  instrument refuses to scale a loser and says so in those words.
+* **Rate headroom comes from UNUSED SLOTS at the book's own hold, never a
+  shorter one** — that is denominator shrinkage, the whole of the 25-of-30
+  candidates `(hl)` killed.
+* **The clip is bounded by the drawdown bar and by measured depth.**
+* **A ceiling is REACHABLE, never promised**: it says a book could run N× faster
+  *if its slots filled*, not that the signal exists to fill them. The book's own
+  census answers that, and saying otherwise is the `(gl)` overstatement the
+  operator learns to ignore.
+
+It promotes nothing and moves nothing. Like `golive_readiness`, it publishes.
+
+### AND THE TRAINING WHEEL, WHICH WAS ON THE BRAIN ITSELF
+
+`brain_stats`' expand ladder stopped at **1.5×**. So the organ holding every
+close this fleet has ever made could never say more than "half again" about a
+book, however overwhelming its own evidence — 👩 mum measures **+4.658%/trade**
+and 1.5× was the most the brain could express about her. **That is a training
+wheel, not a bar**: a bar is a level evidence can clear, and this was a level
+evidence could not clear however good it got.
+
+A 2.0× ceiling step now exists, **harder on every axis** (post_wr>0.65, Wilson
+lower>0.60, t≥3.5, n_eff≥30 against 18) and checked FIRST so a book that clears
+it is not silently handed 1.5×. `MULT_CEIL` 1.5 → 2.0, or the tier would emit
+and be swallowed.
+
+**The `t` is not a round number.** 3.5 sits **above every headline this fleet has
+re-measured and lost** (🧙 Schwager 1.88, 📐 Grimes' keltner 0.49, 🧘 Douglas
+0.50) **and at-or-below the two that survived** (🧮 Hull +3.92, 🌾 carry +3.10).
+A tier that doubles a stake should clear the level where this fleet's claims
+have historically stopped dissolving, and 2.5 demonstrably is not it.
+
+**SHADOW ONLY — and I verified it rather than quoting the doctrine.** Two wrong
+drafts of that test, both worth keeping: scanning for calls named `stake_mult`
+fired on 🙏 Avo's LIVE arm, which calls the STRATEGY's own constant `1.0` — **a
+name is not a data flow**; then following the whole import graph fired too,
+because the live book imports `lighter_family_bot` and that module reaches the
+brain at line 123 inside `brain_stake_mult`, **a function the live book does not
+import and never calls** — **importing a module is not executing its lines**.
+The shipped test derives the wrapper set and asserts neither real-money module
+calls it nor imports it. Four stale copies of the old `[0.5, 1.5]` clamp
+corrected in place (I12); a fifth match in `venues/__init__.py` was a DIFFERENT
+lever's cage and was left alone — the `(ow)` blanket-replace lesson.
+
 ## 2026-08-20 (sg) — THE NEVER-RECORDED CLASS, CLOSED FLEET-WIDE: 45 of 64 levers could not be measured, 15 steered books that no longer exist, and I11 finally has enforcement
 
 **Operator, three asks in one message:** *"Fix this never recorded issue across

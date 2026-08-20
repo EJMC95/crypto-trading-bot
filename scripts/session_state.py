@@ -114,6 +114,32 @@ CARRIED = [
                                     "BRK_MAX_HOLD_H"),
     },
     {
+        "id": "ceiling-slots-georgia",
+        "owner": "session",
+        "what": "🔮 georgia is 310 closes from t=2.0 — 83.5 DAYS at today's 0.5 "
+                "of 5 slots, 7.6 days at full occupancy. An 11x speed-up to "
+                "decidability on the fleet's closest book to real money, "
+                "costing zero expectancy. `scripts/ceiling.py` names it; what "
+                "it does NOT say is whether her SIGNAL can fill those slots.",
+        "why_open": "the ceiling is REACHABLE, not promised — the next step is "
+                    "her own census: what refuses the other 4.5 slots, the "
+                    "regime gate, the universe, or no signal at all.",
+        "closes_when": lambda: False,
+    },
+    {
+        "id": "ceiling-capital-inversion",
+        "owner": "OPERATOR",
+        "what": "Capital sits in INVERSE proportion to measured edge: the two "
+                "worst books run at 88-102% of capacity (⚖️ Counterweight "
+                "-1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is "
+                "capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. "
+                "`fleet_allocation` computes the right answer and is ADVISORY "
+                "with consumers on three funding books only.",
+        "why_open": "moving capital between books is an operator call, not a "
+                    "session one — the organ already ranks it honestly (I16).",
+        "closes_when": lambda: False,
+    },
+    {
         "id": "unmeasurable-lever-backlog",
         "owner": "session",
         "what": "30 registered levers still have no QUANTITIES spec — no "

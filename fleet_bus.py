@@ -29,7 +29,7 @@ _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 
 # TWO-WAY guardrails for the brain's L4 stake multipliers (reduce-only
 # until 21-Jul): whatever the brain publishes, a strategy sizes inside
-# [0.5, 1.5] — reductions as before, boosts only on the v3 mirror bars
+# [0.5, 2.0] since (sh) — reductions as before, boosts only on the v3 mirror bars
 # (Wilson LOWER bound + t, full n floor, 3-run streak — bot_learn/
 # brain_stats EXP_*). Neutral 1.0 on any doubt.
 MULT_FLOOR = 0.5
@@ -40,7 +40,14 @@ MULT_FLOOR = 0.5
 # EXP_*). The clamp still bounds whatever arrives; only SHADOW books read
 # mults. Deliberate scope expansion of the documented reduce-only
 # contract, recorded in CLAUDE.md the same day.
-MULT_CEIL = 1.5
+# [2026-08-20 (sh)] 1.5 -> 2.0. The clamp is what a CONSUMER may express, and
+# it was one notch below what the brain can now SAY: `brain_stats` gained a
+# 2.0x ceiling step (post_wr>0.65, Wilson lo>0.60, t>=3.5, n_eff>=30 — above
+# every headline this fleet has re-measured and lost, at-or-below the two that
+# survived). Leaving the clamp at 1.5 would have made that tier emit-and-be-
+# swallowed, which is the registered-but-inert failure with extra steps.
+# SHADOW ONLY: no live bot reads a brain multiplier.
+MULT_CEIL = 2.0
 
 
 def _now_utc(current_time):
@@ -82,7 +89,7 @@ def is_fresh(payload, current_time):
 def stake_multiplier(bot, entry_tag, current_time=None):
     """The brain's L4 per-(bot, enter_tag) stake multiplier — TWO-WAY since
     21-Jul (operator: "brain needs to be able to widen too"), clamped to
-    [MULT_FLOOR, MULT_CEIL] = [0.5, 1.5].
+    [MULT_FLOOR, MULT_CEIL] = [0.5, 2.0] since (sh).
 
     Published by bot_learn.py to bot_state 'brain-stake-mults'. Reduce side
     (0.5/0.75): a tag's negative expectancy clears the trade-count floor AND
@@ -841,7 +848,8 @@ if __name__ == "__main__":
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-swing-dip",
                             _now) == 1.25, "expand mult passes the clamp"
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-big",
-                            _now) == 1.5, "over-ceiling clamps to 1.5"
+                            _now) == MULT_CEIL == 2.0, \
+        "over-ceiling clamps to MULT_CEIL (2.0 since (sh))"
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-bad",
                             _now) == 0.5, "under-floor clamps to 0.5"
     # [2026-07-30 FLEET UNIVERSE] scout accessors: shape, ordering, the

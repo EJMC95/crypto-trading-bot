@@ -47,6 +47,32 @@ jobs:
   # designs or stamp bookkeeping and stay informational rows in the step
   # summary (a red on a deliberate design is the cry-wolf trap the script's
   # own header records). Guarded by tests/autonomy/test_code_currency_wired.py.
+  # [2026-08-20 (sh)] THE CEILING, beside the floors. Operator: "The discussion
+  # of the floor is too often had, where the conversation of how high the
+  # ceiling goes is of little discussion." Every bar this fleet runs on a
+  # schedule asks whether a book is SAFE; this asks how high it could go and
+  # what is in the way. Placed here rather than in an image because it needs no
+  # DB — it reads the two PUBLIC feeds — and because a script only a human
+  # remembers to run is the (gk) shape the go-live grader already had fixed.
+  # INFORMATIONAL BY DESIGN: it promotes nothing, moves nothing, and a red here
+  # would be a red on "this book could be bigger", which is not a defect. The
+  # step summary is the deliverable.
+  ceiling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: How high can each book go, and what is in the way?
+        run: |
+          set -euo pipefail
+          {
+            echo '## 🚀 Ceiling — the mirror of the go-live gate'
+            echo '```'
+            python3 scripts/ceiling.py 2>&1 || echo '(ceiling read failed)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: The guard must still be able to see (negative fixtures)
+        run: python3 scripts/ceiling.py --selftest
+
   code-currency:
     runs-on: ubuntu-latest
     steps:
