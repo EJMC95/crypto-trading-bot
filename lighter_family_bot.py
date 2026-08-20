@@ -832,7 +832,42 @@ class DayTraderGated(Carrier):
         # [2026-07-13] counter-trend stop 2.0x -> 3.5x, matching the freqtrade
         # twin (post-exit replay: the 2.0x stop fired on noise, 77-89% of
         # stop-outs reclaimed entry within 24h).
-        mult = 3.5 if tag in ("bounce_pullback", "range_meanrev") else 2.5
+        # [2026-08-20] `trend_breakout` JOINS THEM at 3.5x — the tag left behind
+        # by that change, and the one whose stop had become the book's largest
+        # losing bucket: `long-trend-breakout_trailing_stop_loss` fires **66
+        # times at 9% win** (-$17.11, median hold 1.9h) against `_roi` n=35 at
+        # **100% win** (+$26.67, 2.4h) on the SAME tag. That split is
+        # outcome-conditioned (I7) and cannot license anything, so it was run as
+        # a COUNTERFACTUAL: her 68 real priced entries held constant, only the
+        # multiplier moved, her rule (ratcheting ATR stop, ROI ladder, 1440m
+        # cap) walked at LAG-1 over Lighter's own candles.
+        #
+        # CALIBRATION GATE first (gx): at the shipped 2.5x the replay reads
+        # +0.042%/trade against her actual +0.250% — gap -0.209pp, inside
+        # tolerance, so the sweep may speak. PAIRED against 2.5x on the same
+        # entries (chronological halves):
+        #     2.0x  +0.091%/trade  t=+1.98   h1 +0.023  h2 +0.158
+        #     3.0x  -0.016%        t=-0.27   h1 +0.102  h2 -0.133
+        #     3.5x  +0.103%        t=+1.11   h1 +0.121  h2 +0.085   <- shipped
+        #     4.0x  +0.041%        t=+0.40   h1 +0.084  h2 -0.002
+        #     5.0x  +0.067%        t=+0.55   h1 +0.210  h2 -0.075
+        # Only 2.0x and 3.5x clear the both-halves floor; 3.0/4.0/5.0 fail it.
+        # Stops fall 27 -> 22 and ROI exits rise 41 -> 46, win 60% -> 68% — the
+        # July mechanism, on the tag that missed it.
+        #
+        # WHY 3.5x AND NOT THE SWEEP'S BEST CELL: the surface is WIGGLY, not a
+        # plateau (2.0 nearly matches 3.5 while 3.0 dips between them), and
+        # picking the maximum of a noisy surface is the `(oe)` artifact. 3.5x is
+        # not a value this sweep discovered — it is the fleet's OWN prior for
+        # this book's sibling tags, and the sweep's job was to check the prior
+        # is not harmful. t=+1.11 is sub-bar and is stated, not dressed up.
+        #
+        # TAG-SPECIFIC, MEASURED, NOT A BLANKET WIDENING: `range_on` was swept
+        # identically and moves the OTHER way — 3.5x reads -0.280%/trade,
+        # t=-2.25, BOTH halves negative (calibration gap +0.031pp). It stays at
+        # 2.5x, which is why this is one name and not a rewrite of the rule.
+        mult = 3.5 if tag in ("bounce_pullback", "range_meanrev",
+                              "trend_breakout") else 2.5
         return min(mult * atr / px, -self.stoploss)
 
     def custom_exit(self, tag, age_min, profit):

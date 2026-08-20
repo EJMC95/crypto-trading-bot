@@ -74,6 +74,85 @@ by construction). Central estimate `S_d = 0.293` ⇒ **47 days to gate**. It nee
 LEVERAGE 1 with no maintenance requirement, so a levered book on it survives
 excursions a real account would not and BOOKS THE RECOVERY. That is the next
 build, not this one.
+## 2026-08-20 (sh) — TWO PARKED IMPROVEMENTS SHIPPED, AND THE ONE THAT MOVED THE OTHER WAY IS WHY THEY WERE WORTH MEASURING
+
+Continuing the operator's *"implement all improvements"* directive. Both items
+here were sitting in `(sf)`'s "measured, not shipped" list.
+
+### 🔮 Georgia — `trend_breakout`'s stop joins the sibling tags at 3.5×ATR
+The tag left behind by the 2026-07-13 change, and the one whose stop had become
+the book's largest losing bucket: `long-trend-breakout_trailing_stop_loss`
+fires **66 times at 9% win** (−$17.11, median hold 1.9h) against `_roi` n=35 at
+**100% win** (+$26.67, 2.4h) on the SAME tag.
+
+That split is **outcome-conditioned (I7)** and licenses nothing — a position
+exits via the ratchet only if it went the wrong way — so it was run as a
+COUNTERFACTUAL: her 68 real priced entries held constant, only the multiplier
+moving, her own rule (ratcheting ATR stop, ROI ladder, 1440m cap) walked at
+LAG-1 over Lighter's own candles.
+
+**CALIBRATION GATE FIRST (gx):** at the shipped 2.5× the replay reads
++0.042%/trade against her actual +0.250% — gap −0.209pp, inside tolerance, so
+the sweep may speak. PAIRED against 2.5× on the same entries:
+
+| mult | Δ %/trade | t | h1 | h2 |
+|---|---|---|---|---|
+| 2.0× | +0.091% | +1.98 | +0.023% | +0.158% |
+| 3.0× | −0.016% | −0.27 | +0.102% | −0.133% |
+| **3.5×** | **+0.103%** | **+1.11** | **+0.121%** | **+0.085%** |
+| 4.0× | +0.041% | +0.40 | +0.084% | −0.002% |
+| 5.0× | +0.067% | +0.55 | +0.210% | −0.075% |
+
+**Only 2.0× and 3.5× clear the both-halves floor**; 3.0/4.0/5.0 fail it. Stops
+fall 27 → 22, ROI exits rise 41 → 46, win 60% → 68% — the July mechanism, on
+the tag that missed it.
+
+**WHY 3.5× AND NOT THE SWEEP'S BEST CELL.** The surface is WIGGLY, not a
+plateau (2.0 nearly matches 3.5 while 3.0 dips between them), and picking the
+maximum of a noisy surface is the `(oe)` artifact. **3.5× is not a value this
+sweep discovered — it is the fleet's own prior for this book's sibling tags,
+and the sweep's job was to check the prior is not harmful.** t=+1.11 is sub-bar
+and is stated, not dressed up.
+
+**AND THE SAME SWEEP REFUSED THE OBVIOUS GENERALISATION.** `range_on` was run
+identically and moves the OTHER way: 3.5× reads **−0.280%/trade, t=−2.25, BOTH
+halves negative** (calibration gap +0.031pp). It stays at 2.5×. That asymmetry
+is the reason this is one tag and not a rewrite of the rule — a blanket
+widening would have been the easy, plausible, wrong change, and nothing in the
+code says one tag measured up while its neighbour measured down. Pinned by
+`tests/autonomy/test_georgia_stop_tags.py`, **4 mutations verified red**
+including "widen everything" and "range_on also widened".
+
+### 🎯 Perp Sniper — the last living book publishing no census at all
+It shipped `caps` and nothing else, so `open_trades: 0` was byte-identical
+between *no listing happened*, *the cooldown ledger suppressed everything* and
+*the cap is full*. Every sibling already follows I18/(lv); this one was exempt
+by omission.
+
+It matters more here than anywhere, because `(qi)` measured this book's
+founding listing thesis **REFUTED** and its supply **DEAD** — no crypto birth on
+this venue in 85 days, Jun–Aug 2026 births = 0. So "quiet" is the EXPECTED
+state, and a census is the only thing that can distinguish a healthy quiet from
+a broken one. `run_snipe_pass` is the single choke point every refusal passes
+through, so it now counts them: `offered / dupe / held / abandoned / capped /
+failed / opened`, plus per-SOURCE supply (`listing / surge / young`) and the
+structural suppressors (`surge_cooldown`, `not_young`, `pending`, `max_open`).
+
+Per-source matters: this book has one dead source and two live ones, and a
+single `opened: 0` cannot tell them apart. `failed` is deliberately its own
+bucket beside `capped` — one means the venue refused us, the other means we
+refused ourselves.
+
+**The arm that makes it a census rather than decoration** is the accounting
+identity: every offered candidate must land in exactly one bucket, so a refusal
+route added later cannot silently vanish. Census stays OPTIONAL (existing
+callers pass none). **5 mutations verified red.**
+
+### Still open, and now for a stated reason rather than a vague one
+🛢️ Garrett's four −10.2% stops (87% of its loss) remain at n=4 — a stop is not
+moved on four observations, and the honest next step is pooling the funding-
+directional family's 15 stop exits, not a bolder read of the same four.
+
 ## 2026-08-20 (sg) — THE REPLAY THAT GATES EVERY GROWTH-RAIL ACTUATOR WAS BLIND TO 39% OF THE TAKER, AND SAID SO ONLY IN A CODE COMMENT
 
 **Operator, 20-Aug:** *"What is with everything measuring and not shipping - we
