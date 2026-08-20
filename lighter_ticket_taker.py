@@ -431,14 +431,30 @@ def fetch_marks_and_funding():
 # PURE DECISION LOGIC (unit-tested offline)
 # ---------------------------------------------------------------------------
 
-def vol_clip(day_range_pct):
+def vol_clip(day_range_pct, risk_usd=None, clip_max=None):
     """Constant-risk clip: RISK_USD / expected adverse move (~half the daily
     range, floored at 0.5%), bounded [CLIP_MIN, CLIP_MAX]. Falls back to
-    CLIP_USD when the book has no range data."""
+    CLIP_USD when the book has no range data.
+
+    [2026-08-20 (sp)] `risk_usd`/`clip_max` exist so the brain's conviction
+    enters this book AS RISK, not as a clip multiplier applied after the fact.
+    (so) multiplied the RESULT, which broke the one property this function
+    exists for: every trade risks the same $1.50, and `CLIP_MAX` is the ceiling
+    that keeps a calm book from taking an oversized position. A post-hoc x6.7
+    bypassed both — worse, because the mult is per-(side, lens) and the clip is
+    per-COIN, the two normalisations FOUGHT: a favoured lens on a wide-range
+    alt got the largest vol_clip AND the largest boost, so the risk-equalising
+    this function does was inverted exactly where it mattered most.
+    Scaling the RISK BUDGET instead is what conviction actually means — risk
+    more on the bucket that has earned it — and the [CLIP_MIN, clip_max] bound
+    still applies afterwards, so the ceiling holds. Defaults keep every other
+    caller (and the replay) byte-identical."""
+    _risk = RISK_USD if risk_usd is None else float(risk_usd)
+    _cmax = CLIP_MAX if clip_max is None else float(clip_max)
     if not day_range_pct or day_range_pct <= 0:
         return CLIP_USD
     adverse = max(day_range_pct / 2.0, 0.5) / 100.0
-    return round(min(CLIP_MAX, max(CLIP_MIN, RISK_USD / adverse)), 2)
+    return round(min(_cmax, max(CLIP_MIN, _risk / adverse)), 2)
 
 
 def book_spread_bps(book):
@@ -2858,10 +2874,20 @@ def main(_ctx=None):
             # brake and the brain's mult is this BOOK's evidence; both are
             # multiplicative and both apply, and the notional cap below still
             # sees the final number.
-            clip, bmult = fleet_bus.brain_clip(
-                BOT_ROW, f"{'long' if is_long else 'short'}-{lens}",
-                round(vol_clip(ranges.get(sym)) * gov, 2))
-            clip = round(clip, 2)
+            # [(sp)] the brain scales the RISK BUDGET and vol_clip converts
+            # risk -> clip exactly as it always has, so constant-risk sizing
+            # survives and CLIP_MAX still binds — see vol_clip's own note.
+            # The ceiling is lifted by BRAIN_GROSS_X (not by the full 6.7x):
+            # this book's cap is 6 slots, so an unlifted ceiling would make the
+            # brain inert on a calm book while a fully-lifted one would put
+            # $3,216 of gross on a $1,000 shadow row.
+            _bm = fleet_bus.brain_mult_multi(
+                [(BOT_ROW, f"{'long' if is_long else 'short'}-{lens}")])
+            clip = round(vol_clip(
+                ranges.get(sym), risk_usd=RISK_USD * _bm,
+                clip_max=CLIP_MAX * getattr(fleet_bus, "BRAIN_GROSS_X", 1.0)
+            ) * gov, 2)
+            bmult = _bm
             size = clip / mark
             ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
                                         "prem_bps", "apr_pct", "gap_pct")}

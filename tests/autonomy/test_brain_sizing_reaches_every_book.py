@@ -238,40 +238,85 @@ def test_the_rails_see_the_sized_clip(name):
     exactly the 15-Jul cap breach, rebuilt.
     """
     tree = _tree(name)
+    assigns = [n for n in ast.walk(tree) if isinstance(n, ast.Assign)]
+
+    def _targets(n):
+        out = set()
+        for tgt in n.targets:
+            if isinstance(tgt, ast.Tuple):
+                # `clip, bmult = brain_clip(...)` — the SIZE is the first
+                # element; `bmult` is the receipt and reaching the rail with
+                # THAT would be a different bug.
+                if tgt.elts and isinstance(tgt.elts[0], ast.Name):
+                    out.add(tgt.elts[0].id)
+            elif isinstance(tgt, ast.Name):
+                out.add(tgt.id)
+        return out
+
     scaled = set()
-    for n in ast.walk(tree):
-        if not isinstance(n, ast.Assign):
-            continue
+    for n in assigns:
         # the value may be a bare call OR the fleet's guarded-import idiom
         # `(fleet_bus.brain_clip(...) if fleet_bus is not None else (base, 1.0))`
         # — an IfExp. The first draft matched only ast.Call and reported 🎯 the
         # sniper as un-scaled while it was correctly wired: a guard that
         # silently misses the idiom half the fleet uses is the (po) class.
-        if not any(_callee(c) in SIZERS for c in ast.walk(n.value)
-                   if isinstance(c, ast.Call)):
-            continue
-        for tgt in n.targets:
-            if isinstance(tgt, ast.Tuple) and tgt.elts:
-                first = tgt.elts[0]
-                if isinstance(first, ast.Name):
-                    scaled.add(first.id)
-            elif isinstance(tgt, ast.Name):
-                scaled.add(tgt.id)
+        if any(_callee(c) in SIZERS for c in ast.walk(n.value)
+               if isinstance(c, ast.Call)):
+            scaled |= _targets(n)
+    # [(sp)] ...and FOLLOW THE TAINT ONE HOP AT A TIME. 🎫 the taker no longer
+    # binds the sized clip directly: the brain's mult goes in as a RISK budget
+    # and comes out of `vol_clip`, so the rail is handed a name two assignments
+    # downstream. Requiring a DIRECT binding made this guard report the taker
+    # as unrailed while it was correctly wired — the same
+    # miss-the-idiom failure as the IfExp above, one refactor later. A
+    # transitive closure over assignments is what the guard actually means:
+    # "does the value the rail sees depend on the brain's number?"
+    # TWO HOPS, NOT A FIXPOINT. Run to convergence the closure swallows the
+    # module: `clip` taints `size`, `size` taints `res`, and eventually
+    # `is_long` and `reason` are "scaled" — at which point the assertion below
+    # passes for anything and the guard means nothing. Two hops is what the
+    # real shape needs (🎫 the taker: `_bm` -> `clip` via `vol_clip`) and it
+    # keeps `open_ntl` — computed FROM the sized clip, but not the value under
+    # test — out of the set.
+    for _ in range(2):
+        for n in assigns:
+            used = {x.id for x in ast.walk(n.value) if isinstance(x, ast.Name)}
+            if used & scaled:
+                scaled |= _targets(n)
     assert scaled, (
         f"{name} never binds a brain-scaled clip to a name — either it does "
         "not size off the brain (test 1 should have caught that) or the "
         "scale is applied somewhere this guard cannot see, which is worse")
-    checked = set()
+    # [(sp)] THE SECOND ARGUMENT ONLY. `notional_ok(deployed, clip)` — and a
+    # SURVIVING mutation showed why the distinction is load-bearing: the taint
+    # closure reaches `open_ntl` too (it is computed FROM the sized clip), so
+    # scanning every argument let 🙏 Avo pass while its rail was handed the
+    # PRE-brain clip. The guard is about the value under test, not about
+    # anything that merely touched it.
+    # EVERY call site, not any. A SURVIVING mutation showed why: (sp) gave 💸
+    # the Farmer a second, post-trim `notional_ok` — so an "any" test stayed
+    # green while the FIRST call was mutated to read the pre-brain clip. One
+    # correct call does not make a rail correct; the weakest one governs.
+    checked = []
     for c in _calls(tree):
         if _callee(c) != ORDER_SENDING[name]:
             continue
-        for a in c.args:
-            if isinstance(a, ast.Name):
-                checked.add(a.id)
-    assert scaled & checked, (
+        # skip a fake/delegating rail defined inside the module's own
+        # selftest — walk the receiver chain to its ROOT, because the shape is
+        # `self._real.notional_ok(...)` and a one-level check misses it.
+        _recv = getattr(c.func, "value", None)
+        while isinstance(_recv, ast.Attribute):
+            _recv = _recv.value
+        if isinstance(_recv, ast.Name) and _recv.id == "self":
+            continue
+        if len(c.args) >= 2 and isinstance(c.args[1], ast.Name):
+            checked.append((c.lineno, c.args[1].id))
+    assert checked, f"{name}: no {ORDER_SENDING[name]} call takes a named clip"
+    unrailed = [(ln, nm) for ln, nm in checked if nm not in scaled]
+    assert not unrailed, (
         f"{name}: the brain scales {sorted(scaled)} but the notional rail is "
-        f"handed {sorted(checked)} — the cap would admit a clip it never "
-        "saw. The multiplier proposes; the rails must dispose.")
+        f"handed an UNSCALED value at {unrailed} — the cap would admit a clip "
+        "it never saw. The multiplier proposes; the rails must dispose.")
 
 
 def test_no_book_reads_the_brain_payload_directly():

@@ -1,8 +1,18 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 21:35 Sydney (11:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-20 22:48 Sydney (12:48Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `allocation-organ-4x-on-carry`  ·  owner: **OPERATOR**
+💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right now (`delta_usd: +13,500` on a $1,000 book, the fleet's only measured claim), and carry runs 12 slots x $300. That is **$14,400 of gross on a $1,000 book** from the allocation organ alone, before the brain says anything — 14.4x equity on a book whose modelled `HEDGE_COST * notional` is calibrated at $300 a position. (sp)'s brain bound is derived from carry's CONSTANTS precisely so it does not double this; it also does not fix it.
+
+_Still open because:_ the organ's 0.25-4.0 clamp is a capital-allocation policy and moving it moves money between books — an operator call (I16), not a session one. What a session CAN do first is measure whether 4.0 on a 12-slot book was ever intended, or whether the clamp was written for a 4-slot one.
+
+### `brain-mult-transition-oscillation`  ·  owner: **session**
+The brain's `t` is computed on DOLLARS (`brain_stats.weighted_bucket` reads `profit_abs`), so a bucket MID-TRANSITION is a mixture of two clip scales: sd inflates against mean and `t` falls on a book whose edge has not moved. Predicted shape: a bucket that clears a rung steps back down a rung within ~10 closes, then climbs again. A uniform scale is invariant, so there is no runaway — this is a transient limit cycle, damped by the 14d decay and the 3-run streak gate.
+
+_Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is stateless; the held rung lives in bot_learn's `mult_streaks`), and rewriting the brain's ladder on the same day 13 consumers were wired to it is the untested-rewrite-of-an-authority the doctrine forbids. It is now MEASURABLE for the first time — every close carries its `brain_mult` — so the next pass tests the prediction against real closes instead of a model.
 
 ### `brain-mults-are-two-opinions-wide`  ·  owner: **session**
 (so) wired every living book to the brain's stake multiplier, including both real-money rows — and on the day it shipped the brain had exactly TWO published opinions across twenty books (taker short-divergence 0.75, Counterweight long 0.75). The plumbing is done; the ORGAN is nearly silent, because a mult needs >=30 era closes AND >=3 consecutive runs and most books never reach the first. The open question is whether those floors are right now that the range is 6.7x either way: a floor calibrated for a 1.5x ceiling is not obviously the floor for a 6.7x one.
@@ -54,15 +64,28 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (56 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si))
+## Shipped today (69 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si))
 
+- `4119336` Merge remote-tracking branch 'origin/main' into claude/fleet-wide-bugs-improvements-64qta3
 - `314f5a3` WIP: brain sizing reaches every book (letter pending)
 - `f835deb` The brain's range reaches 6.7x, either way (si)
 - `98f787a` Regenerate the handoff after the (sh) work (sh)
 - `966abc4` Nineteen designs, one way of judging them — the manifest (sh)
 - `e31648f` The ceiling becomes a measurement, and the brain's training wheel comes off (sh)
 - `f0fba40` The never-recorded class, closed fleet-wide; and I11 finally has teeth (sg)
+- `7217633` Merge PR #174: unchoke the fleet book by book — six improvements shipped, four refuted with numbers (ru–sj)
+- `3730955` Renumber (sf) -> (sj): main took (sf) for the I22 entry while this waited on CI
+- `16766ee` Garrett: three refutations and no knob turned — the stop is right, thinness is wrong, and the real problem is already on the docket (si)
+- `89e1514` Ship two parked improvements: Georgia's stop on the tag left behind, and the Sniper's missing census (sh)
+- `a28fc98` Un-blind the replay that gates every growth-rail actuator: 39% of the taker was structurally unreachable (sg)
+- `e2ab51b` Renumber (sd) -> (sf): main claimed (sd)/(se) concurrently
+- `f62ef32` Four books unchoked individually, each on its own number — and the fifth fix withdrawn (sd)
+- `d071dec` Changelog: four entries at (ru),(rv),(rw),(rx) — fourth renumber after main ran to (rt)
+- `c7f22ab` The class split becomes a published number, the docket deferral that expires, and the evidence saved as a calibration-gated study (ru, rv, rw, rx)
+- `2758677` Merge PR #211: I22 — a book must spend the ecosystem, and two of this session's walls were imaginary (sf)
 - `e34b6a2` The only path to more real money was rigged against ever promoting (sf)
+- `50a051e` (sf) entry; and correct (sc) in place — 1.11x not 3.6x on the full ledger
+- `ef3a682` I22 guard + doctrine: a book must spend the ecosystem (sf)
 - `a173a93` The growth rail could only ever SHRINK the taker's one living lens (sf)
 - `308f6e7` The trend exit joins the rail, and starts recording what its knobs cut (sf)
 - `06d5e6c` The depth gate, driven against the live venue — and a cage I almost added (sf)

@@ -150,6 +150,14 @@ SELFTEST_MODULES = [
     # detection, and the CALIBRATION gate — no reproduction of the observed
     # result, no recommendation, fail-closed when no baseline is supplied.
     "scripts.audit_lever_measurability",
+    # [2026-08-20 (sp)] SELFTEST_MODULES only, and the rule at the head of
+    # ENFORCED_AUDITS is why: this guard's verdict depends on CHANGELOG.md,
+    # which any concurrent session can change without touching code — the
+    # `audit_recurrence` shape exactly. Its negative fixtures run here (five
+    # attribution forms must FIRE, nine role references must stay quiet); the
+    # scan runs in changelog-check.yml, where "is my entry right" is the
+    # actual subject.
+    "scripts.audit_operator_name",
     "scripts.ceiling",
     "fleet_manifest",
     "scripts.session_state",

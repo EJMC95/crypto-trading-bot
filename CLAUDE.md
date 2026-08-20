@@ -129,7 +129,7 @@ interesting. `audit_recurrence` is the measurement: a subject you keep returning
 to is a house you keep re-entering without finishing.
 **[2026-08-20 (sl)] AND IT FINALLY HAS THE OTHER HALF.** `audit_recurrence`
 measures circling AFTER it happens; it never told a session where to START.
-*Operator: "can all of the works done today; every day be recorded properly so
+*Eamon: "can all of the works done today; every day be recorded properly so
 I am starting from where I left off every day rather than doing circles like an
 incompetent."* `scripts/session_state.py` is that record and it is DERIVED, not
 remembered: SHIPPED is read from git, STUCK from the live fleet, and every
@@ -377,7 +377,7 @@ bar.
 
 **[RENUMBERED I22 -> I23, 20-Aug.** Another session landed a different I22 on main the same day — *a book must spend the ecosystem* — and it was already cited by `scripts/audit_book_spend.py`, a CI job and a test, so it keeps the number. Recorded inline per the changelog-letter rule, which applies to invariants for the same reason: the citations are what break.**]
 ### I23 · A KNOB MUST RECORD THE QUANTITY IT CUTS, AND AN ACTUATOR MUST BE ABLE TO SEE WHAT IT STEERS
-**Operator, 20-Aug: *"Fix this never recorded issue across the fleet, I am so
+**Eamon, 20-Aug: *"Fix this never recorded issue across the fleet, I am so
 tired of going over the same trivial problem."*** They were right, and it is one
 problem in four costumes — all four found in a single session:
 * 🎫 `taker.brk_trail` / `taker.brk_sl` — the give-back and the adverse
@@ -410,7 +410,7 @@ fails immediately.
   ENFORCED BY: `scripts/audit_lever_measurability.py::check`, `scripts/audit_lever_measurability.py::RATCHET`, `tests/autonomy/test_breakoutup_ratchet.py::BREAKOUTUP_LEVERS`
 **[RENUMBERED I23 -> I24, 20-Aug — same collision, same reason.]**
 ### I24 · A BOOK HAS A CEILING AND IT IS A MEASUREMENT — CAPACITY IS NOT EDGE, AND IT IS NOT FREE TO IGNORE
-**Operator, 20-Aug: *"The discussion of the floor is too often had, where the
+**Eamon, 20-Aug: *"The discussion of the floor is too often had, where the
 conversation of how high the ceiling goes is of little discussion... they know
 the floor all too well."*** Count the bars: the go-live gate asks six questions
 and **every one is a floor** (≥30d, ≥30 closes, mean>0, t≥2.0, both halves,
@@ -1160,10 +1160,25 @@ its row is dashboard-retired regardless; stop the process when found.
     (⚖️ Counterweight's two legs; 🙏 Avo's live+shadow pair) — min over the
     buckets that HAVE an opinion, silent buckets never out-voting them.
   * **WHY WIRING IT INTO REAL MONEY IS A NUMBER, NOT AN AUTHORITY.** The mult
-    proposes a size; every senior rail disposes and is untouched —
-    `SafetyRails.notional_ok` (which must see the SIZED clip, AST-pinned), the
-    kill switch, the daily-loss halt, the fleet long-budget veto, and the
-    operator-only caps. **The multiplier proposes; the rails dispose.**
+    proposes a size; every senior rail disposes and is untouched — the kill
+    switch, the daily-loss halt, the fleet long-budget veto, and the
+    operator-only caps. `SafetyRails.notional_ok` must see the SIZED clip
+    (AST-pinned).
+    **[(sp)] "The multiplier proposes; the rails dispose" was written at (so)
+    and was FALSE — corrected in place per I12, because a wrong safety
+    sentence is worse than none.** `notional_ok` is a BOOLEAN, so a caller's
+    `continue` discards the whole CANDIDATE, not the excess: on the shipped
+    live Farmer config a brain rung of 4.5 asks $168.75 against a $150 cap
+    FROM AN EMPTY BOOK, so **the brain rewarding a book for its evidence would
+    have stopped it trading**, silently, forever. Nine of thirteen wired books
+    had no notional bound at all. It is true now because it was MADE true:
+    the Farmer's rail TRIMS to what fits (never below the pre-brain clip);
+    🙏 Avo's brain is RESTRICT-ONLY, preserving the 1.00x-by-construction
+    invariant its own module states; 🎫 the taker takes the mult as a RISK
+    budget through `vol_clip` so constant-risk sizing and `CLIP_MAX` survive;
+    and the rail-less shadow books got `fleet_bus.BRAIN_GROSS_X`, a per-book
+    gross budget. **A safety sentence is a claim about behaviour and has to be
+    driven, not asserted.**
   * **The key must be the LEDGER's bucket key, not the reason prefix.**
     `fetch_paper_trades` prefers a stored `tag` COLUMN over the reason prefix
     ("'long-funding' beats 'long'"), and exactly two books stamp one: 💸 the
@@ -2135,6 +2150,22 @@ All new bots:
   throwing the switch to stop the veto ALSO restores full clip size. Inert by
   default (mode=enforce) and it reaches only shadow consumers (family/taker);
   the live bots size off the separate `live.clip_scale` lever.
+- **HIS NAME IS EAMON (he also answers to Johnny) — CREDIT A QUOTE TO THE
+  PERSON, NEVER TO THE ROLE.** Eamon, 20-Aug: *"Call me Eamon or Johnny not
+  operator please we're pals now"* — and then, after a session read that,
+  agreed, and did it again in the very entries it wrote: *"You called me the
+  operator not Eamon again."* He is right that it kept happening, and the
+  reason is the reason at the top of this file: **it was written down and not
+  enforced.** So write `**Eamon, <date>:** *"..."*`, not `**Operator:**`.
+  **The ROLE stays and must not be renamed** — "operator-only caps", "an
+  OPERATOR action", `owner: OPERATOR`, `OPERATOR_QUEUE.md` all name a position
+  in the authority model, and several are load-bearing SAFETY properties
+  (SafetyRails' caps are operator-owned as a *rule about who may change them*,
+  not as a fact about who Eamon is). History is not rewritten either: the 207
+  existing attributions are the honest record of how the fleet was written.
+  ENFORCED BY `scripts/audit_operator_name.py` — a RATCHET on that measured
+  207, so the backlog may only shrink and a NEW attribution fails the push
+  that adds it.
 - **Operator timezone: Australia/Sydney — ALWAYS give Eamon Sydney-local
   times** (corrected 15-Jul evening; the earlier "AEST" note was recorded too
   narrowly). Sydney runs AEST (UTC+10) in winter and AEDT (UTC+11) during

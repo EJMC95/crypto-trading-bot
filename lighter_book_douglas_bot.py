@@ -674,7 +674,11 @@ def main():
                 # _open_position's note for why this is not the cooldown
                 # overlay this book measured and refused.
                 _clip, _bm = (fleet_bus.brain_clip(
-                    bot_id, f"{side}-impulse", CLIP_USD)
+                    bot_id, f"{side}-impulse", CLIP_USD,
+                    deployed_usd=sum(p.get("notional") or 0.0
+                                     for p in positions.values()),
+                    gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                            CLIP_USD))
                     if fleet_bus is not None else (CLIP_USD, 1.0))
                 pos = _open_position(positions, coin, side, mark, a, t0, sig_t,
                                      notional=_clip, brain_mult=_bm)

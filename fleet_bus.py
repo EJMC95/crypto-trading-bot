@@ -97,9 +97,106 @@ def is_fresh(payload, current_time):
         return False
 
 
+#: The brain's mult payload, RESOLVED: parsed, validated, clamped, and the
+#: freshness window pre-computed. Rebuilt only when `_load` actually re-reads
+#: (its `ts` changes), which is at most once per CACHE_SEC.
+_resolved_mults = {"ent": None, "map": {}, "from": None, "until": None}
+
+
+def _resolve_mults(current_time):
+    """({bot: {tag: clamped float}}, valid_from, valid_until) — cached.
+
+    [2026-08-20 (sp)] Eamon: *"Optimise the lookup ... and ensure the brain
+    doesn't cause problems."* Three things, and only one of them is speed:
+
+    **ATOMICITY, which is the one that was actually a bug.** `brain_mult_multi`
+    calls the raw read once per bucket, and each of those called `_load` +
+    `is_fresh` independently. `_load`'s cache expires on a clock, not on a call
+    boundary — so a two-bucket lookup straddling that expiry could take ⚖️
+    Counterweight's LONG leg from one payload and its SHORT leg from the next.
+    One clip, two sources of truth, on the book whose whole design is that its
+    two legs are the same size. Resolving ONCE per call fixes it by
+    construction, and it holds the same way across a per-coin entry loop.
+
+    **JUNK IS NOW "NO OPINION", NOT A 6.7x CUT.** The old path did
+    `max(MULT_FLOOR, min(MULT_CEIL, float(m["mult"])))`, so a payload carrying
+    `-1` — a publisher bug, not a size opinion — clamped to MULT_FLOOR and
+    quietly shrank every clip on that bucket to **0.149x**. Now a value that is
+    non-numeric, NaN, zero or negative is DROPPED, and a dropped bucket is
+    silent (neutral 1.0), matching this module's contract everywhere else: any
+    doubt is 1.0. A legitimately extreme opinion (0.05) still CLAMPS to the
+    floor — that is evidence outside the cage, which is a different thing from
+    corruption.
+
+    **SPEED, third and least.** `is_fresh` parses an ISO-8601 timestamp on
+    every call and was ~60% of the cost of a lookup (measured: 0.93us of
+    1.55us). The window is derived once here and the per-call check becomes two
+    datetime comparisons — so the semantics of `is_fresh` are preserved
+    EXACTLY, including its future-stamp guard, rather than traded away for a
+    memo that could serve a payload up to CACHE_SEC past its own TTL.
+    """
+    _load("brain-stake-mults", current_time)          # populates/refreshes _cache
+    ent = _cache.get("brain-stake-mults")
+    payload = (ent or {}).get("payload")
+    r = _resolved_mults
+    # Keyed on the CACHE ENTRY's identity, not on its timestamp. `_load`
+    # replaces the entry dict wholesale on every re-read, so identity tracks
+    # the payload exactly — and it also tracks a DIRECT poke at `_cache`, which
+    # a timestamp does not: the selftest below writes a stale payload under the
+    # same `_now` object, and a ts-keyed memo happily served the previous
+    # resolution to it. That is not a test artifact; `fleet_regen` and any
+    # future in-process injector do the same thing. The memo holds its own
+    # reference to `ent`, so the id cannot be recycled underneath it.
+    if r["ent"] is not None and r["ent"] is ent:
+        return r["map"], r["from"], r["until"]
+
+    out, frm, until = {}, None, None
+    try:
+        updated = datetime.fromisoformat(
+            str(payload["updated"]).replace("Z", "+00:00"))
+        if updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        frm = updated
+        until = updated + timedelta(seconds=float(payload.get("ttl_sec") or 0))
+    except Exception:                                # noqa: BLE001
+        frm = until = None
+    raw = (payload or {}).get("mults") if isinstance(payload, dict) else None
+    if until is not None and isinstance(raw, dict):
+        for bot, tags in raw.items():
+            if not isinstance(tags, dict):
+                continue
+            clean = {}
+            for tag, rec in tags.items():
+                try:
+                    v = float(rec.get("mult") if isinstance(rec, dict) else rec)
+                except (TypeError, ValueError, AttributeError):
+                    continue
+                if v != v or v <= 0:                 # NaN / zero / negative
+                    continue
+                clean[str(tag)] = max(MULT_FLOOR, min(MULT_CEIL, v))
+            if clean:
+                out[str(bot)] = clean
+    r["ent"], r["map"], r["from"], r["until"] = ent, out, frm, until
+    return out, frm, until
+
+
+def brain_mults(current_time=None):
+    """The whole FRESH mults map, `{bot: {tag: clamped float}}`, or `{}`.
+
+    One resolved read for any consumer that wants more than a single bucket —
+    a monitor, the dashboard, or an organ asking "what is the brain currently
+    saying to anyone?". Empty on a dark, stale or unparseable payload.
+    """
+    m, frm, until = _resolve_mults(current_time)
+    if until is None:
+        return {}
+    now = _now_utc(current_time)
+    return m if frm <= now <= until else {}
+
+
 def stake_multiplier(bot, entry_tag, current_time=None):
     """The brain's L4 per-(bot, enter_tag) stake multiplier — TWO-WAY since
-    21-Jul (operator: "brain needs to be able to widen too"), clamped to
+    21-Jul (Eamon: "brain needs to be able to widen too"), clamped to
     [MULT_FLOOR, MULT_CEIL] = [1/6.7, 6.7] since (sn) — 6.7x either way.
 
     Published by bot_learn.py to bot_state 'brain-stake-mults'. Reduce side
@@ -114,19 +211,10 @@ def stake_multiplier(bot, entry_tag, current_time=None):
     and is CORRECTED IN PLACE (I12): every living book reads this now, real
     money included. See MULT_CEIL's note for why that is a rails question and
     not a clamp question. Prefer `brain_clip`/`brain_clip_multi` at a sizing
-    site — they carry the fail-safe and hand back the mult to STAMP (I22).
+    site — they carry the fail-safe and hand back the mult to STAMP (I23).
     """
-    try:
-        p = _load("brain-stake-mults", current_time)
-        if not p or not is_fresh(p, current_time):
-            return 1.0
-        m = ((p.get("mults") or {}).get(str(bot)) or {}).get(str(entry_tag))
-        if m is None:
-            return 1.0
-        return max(MULT_FLOOR, min(MULT_CEIL, float(m.get("mult", 1.0))))
-    except Exception:
-        return 1.0
-
+    m = brain_mult_raw(bot, entry_tag, current_time)
+    return 1.0 if m is None else m
 
 
 def brain_mult_raw(bot, entry_tag, current_time=None):
@@ -138,20 +226,10 @@ def brain_mult_raw(bot, entry_tag, current_time=None):
     conflation is harmless. It stops being harmless the moment a size spans
     SEVERAL buckets: combined with `min`, a silent bucket would out-vote an
     opining one and the brain's only live opinions would be silently discarded
-    by the arms that have none. So the raw read is a separate owner, and
-    `stake_multiplier` stays exactly as its ~dozen existing callers know it.
+    by the arms that have none.
     """
     try:
-        p = _load("brain-stake-mults", current_time)
-        if not p or not is_fresh(p, current_time):
-            return None
-        m = ((p.get("mults") or {}).get(str(bot)) or {}).get(str(entry_tag))
-        if m is None:
-            return None
-        v = float(m.get("mult", 1.0))
-        if v != v:                                   # NaN
-            return None
-        return max(MULT_FLOOR, min(MULT_CEIL, v))
+        return brain_mults(current_time).get(str(bot), {}).get(str(entry_tag))
     except Exception:                                # noqa: BLE001
         return None
 
@@ -182,14 +260,94 @@ def brain_mult_multi(buckets, current_time=None):
     Fail-safe: any doubt is 1.0.
     """
     try:
-        seen = [m for m in (brain_mult_raw(b, t, current_time)
-                            for b, t in buckets) if m is not None]
+        # ONE resolved snapshot for every bucket in this call — see
+        # `_resolve_mults` for why that is atomicity and not just speed.
+        snap = brain_mults(current_time)
+        seen = [v for v in (snap.get(str(b), {}).get(str(t))
+                            for b, t in buckets) if v is not None]
     except Exception:                                # noqa: BLE001
         return 1.0
     return min(seen) if seen else 1.0
 
 
-def brain_clip_multi(buckets, base_usd, current_time=None):
+#: [2026-08-20 (sp)] THE BOOK-LEVEL GROSS BOUND, as a multiple of a book's OWN
+#: DESIGNED gross (`max_positions x base_clip`). Eamon: *"ensure the brain
+#: doesn't cause problems."*
+#:
+#: THE PROBLEM, measured on the code as (so) shipped it. Several books multiply
+#: the brain's scale on top of scales they already carry, and nothing bounded
+#: the product on a book with no SafetyRails cap:
+#:
+#:    🌾 carry          300 x alloc 4.0 x brain 6.7 x 12 slots = $96,480 gross
+#:    🪁 kelly          250 x brain 6.7 x 4                    =  $6,700
+#:    🧭 cook           240 x brain 6.7 x 4                    =  $6,432
+#:    ⚖️ Counterweight   20 x alloc 4.0 x brain 6.7 x 10 legs   =  $5,360
+#:
+#: — every one of them a **$1,000 paper book**, carry at **96x its own
+#: equity**. That is not an aggressive book, it is a modelling error: the flat
+#: `SLIP_COST * notional` these books charge is calibrated at their real clip
+#: and is fiction at 6.7x it, so the P&L would be optimistic in exactly the
+#: direction that makes a bad book look gradeable.
+#:
+#: WHY 2.0, AND WHY IT IS NOT A RE-CAGING. **The per-POSITION multiplier is
+#: untouched — the brain may still take a single position to 6.7x.** What it
+#: may not do is hold 6.7x in EVERY slot at once, because that is leverage, and
+#: this fleet's own I22 says leverage adds no decidability (it scales mean and
+#: sd alike, so `t` is invariant), multiplies drawdown against the 15% bar, and
+#: is admissible only as the OUTPUT of a volatility target on a book whose
+#: N_eff has been measured — which no book here has. So a book's designed gross
+#: is its intended exposure, and the brain gets to CONCENTRATE it, not inflate
+#: it. A book running one 6.7x position and three empty slots is fully
+#: expressive under this bound; that shape is what conviction actually looks
+#: like.
+#:
+#: NOT FOR REAL MONEY. The two live rows already have a bound and it is
+#: `SafetyRails.notional_ok` with an OPERATOR-SET cap — operator-owned by
+#: design. A second ceiling there would be redundant at best and could
+#: contradict the operator's at worst. This exists for the shadow books, which
+#: have no rail at all.
+BRAIN_GROSS_X = float(os.environ.get("BRAIN_GROSS_X", "2.0"))
+
+
+def brain_gross_cap(max_positions, base_clip_usd, factor=None):
+    """A book's gross budget for the brain: `factor x max_positions x clip`.
+
+    Derived from the book's OWN constants at its OWN call site, so changing a
+    clip or a cap moves the bound with it — a retyped budget is a budget that
+    drifts. Returns None (no bound) on anything unusable.
+
+    **PASS THE BOOK'S OWN MODULE CONSTANTS — the designed cap and the designed
+    clip — NOT a clip another organ has already scaled.** Measured on the live
+    payload the day this shipped, which is why it is stated this strongly: 🌾
+    carry is the fleet's ONLY book with a measured allocation claim, and it
+    sits AT the organ's 4.0 ceiling right now (`delta_usd: +13,500` on a
+    $1,000 book). So its post-allocation base is $1,200 and its gross is
+    already **$14,400 on a $1,000 book** before the brain says a word.
+
+    Budgeting off that base would set the bound at 2 x 12 x $1,200 = $28,800
+    and hand the brain another $24,000 of room on the one book that least
+    needs it. Budgeting off the CONSTANTS sets it at 2 x 12 x $300 = $7,200 —
+    already spent — so the brain gets no room there at all, which is the right
+    answer, while the `max(base, ...)` floor leaves the allocation organ's
+    $14,400 exactly as it was. The bound binds where the danger is and
+    restricts nothing that predates it.
+
+    (The allocation organ's own 4.0 ceiling on a 12-slot $300-clip book is a
+    real finding and it is NOT this function's to fix — it is carried in
+    HANDOFF.md with its numbers.)
+    """
+    try:
+        n, c = float(max_positions), float(base_clip_usd)
+        f = BRAIN_GROSS_X if factor is None else float(factor)
+    except (TypeError, ValueError):
+        return None
+    if not (n > 0 and c > 0 and f > 0):
+        return None
+    return n * c * f
+
+
+def brain_clip_multi(buckets, base_usd, current_time=None,
+                     deployed_usd=None, gross_cap_usd=None):
     """`base_usd` scaled by `brain_mult_multi(buckets)` -> (scaled_usd, mult).
 
     THE ONE CALL SHAPE for every book, so the rule has one owner and each
@@ -209,13 +367,30 @@ def brain_clip_multi(buckets, base_usd, current_time=None):
     unreachable-lever shape with the arrow reversed: not a knob with no reader,
     a READER with no knob.
 
-    WHAT THIS DOES **NOT** DO, and it is the whole reason it is safe to wire
-    into real money: it returns a NUMBER. Every senior rail sits downstream and
-    is untouched — `SafetyRails.notional_ok` still refuses an entry that would
-    breach the operator's cap, the kill switch still kills, the daily-loss halt
-    still halts, and the fleet long-budget veto still vetoes. A brain that
-    wants 6.7x on a book at its notional cap gets refused by the cap, exactly
-    as a 1.0x entry would be. **The multiplier proposes; the rails dispose.**
+    WHAT THIS DOES **NOT** DO: it returns a NUMBER. Every senior rail sits
+    downstream and is untouched — the kill switch still kills, the daily-loss
+    halt still halts, the fleet long-budget veto still vetoes, and
+    `SafetyRails`' caps remain operator-owned.
+
+    **[CORRECTED IN PLACE, (sp), and this is the important one.** (so) said
+    "the multiplier proposes; the rails dispose", meaning a cap would harmlessly
+    refuse an over-size clip. **That was wrong in the consequential direction,
+    and an adversarial audit of the change measured how wrong.** `notional_ok`
+    is a BOOLEAN: the caller's `continue` discards the whole CANDIDATE, not the
+    excess. On the shipped live Farmer config (order_usd $37.50, cap $150) a
+    brain rung of 4.5 asks $168.75 — over the cap FROM AN EMPTY BOOK — so every
+    candidate would be skipped every loop, forever. **The brain rewarding a
+    book for its evidence would have stopped it trading.** And the same rail
+    inverts selection below that point: a 1.0x entry is refused only once the
+    book is FULL, while a 6.7x entry is refused when it is EMPTY.
+    Nine of the thirteen wired books had no notional bound at all, so there the
+    sentence was not merely wrong but vacuous.
+    The claim is true NOW because it was MADE true: the Farmer's rail TRIMS the
+    brain's increase to what fits (never below the pre-brain clip) instead of
+    refusing; 🙏 Avo's brain is restrict-only, preserving the 1.00x-by-
+    construction invariant its own module docstring states; and the shadow
+    books that have no rail got one — `BRAIN_GROSS_X`. A safety sentence is a
+    claim about behaviour, and it has to be driven, not asserted.**
 
     Returns the mult beside the clip so the caller can STAMP it on the row.
     That is I22's receipt rule applied to itself: a term that scales every
@@ -235,12 +410,58 @@ def brain_clip_multi(buckets, base_usd, current_time=None):
         return base, 1.0
     if not (m > 0) or m != m:                    # NaN-safe
         return base, 1.0
-    return base * m, m
+    want = base * m
+    # [(sp)] THE BOOK-LEVEL GROSS BOUND. See BRAIN_GROSS_X for the measurement
+    # and the I22 argument. Two properties make this a bound and not a cage:
+    #
+    #   1. IT NEVER RETURNS LESS THAN `base`. With the brain neutral, reducing,
+    #      dark or stale, the caller's behaviour is BYTE-IDENTICAL to a caller
+    #      that never passed these arguments. A safety argument that quietly
+    #      shrinks a book when the safety condition is not even active is a
+    #      step back wearing a safety costume, and this cannot do that.
+    #   2. IT IS PER-BOOK, NOT PER-POSITION. A single 6.7x position is
+    #      untouched while the book has room; what runs out is the book's
+    #      budget, which is the honest thing to run out of.
+    #
+    # **[CORRECTED IN PLACE, same day, and the first version was WRONG — I3.**
+    # The first draft bounded the brain's INCREASE against
+    # `cap - deployed - base`, which is algebraically `min(want, cap-deployed)`
+    # — so the FIRST position could take the entire budget and every later one
+    # still got its full `base` on top. Driven against carry's real constants
+    # through this real accessor: advertised cap $7,200, per-position sizes
+    # `[7200, 1200 x 11]`, **actual gross $20,400** — 2.8x the cap it
+    # advertised. A bound asserted only on its own arithmetic and never on the
+    # SEQUENCE it is supposed to bound is the "check that inspects nothing"
+    # rule ((po)) wearing a unit test. The selftest below now drives the whole
+    # 12-slot sequence and asserts the TOTAL.
+    #
+    # THE HONEST BOUND, stated as arithmetic rather than as a round number:
+    # one position may reach `cap - deployed`, and the remaining `N-1` still
+    # take `base`, so total gross <= `cap + (N-1) * base`. With `cap` set by
+    # `brain_gross_cap` to `X * N * base`, that is `(X + 1 - 1/N) * N * base`
+    # — about 2.9x the book's no-brain gross at X=2, N=12. Not 2x. Saying 2x
+    # here and shipping 2.9x is how a bound becomes folklore.
+    #
+    # Absent/unusable arguments mean NO BOUND — every existing caller and the
+    # two real-money rows (bounded by the operator's SafetyRails cap instead)
+    # are unaffected.
+    try:
+        if want > base and deployed_usd is not None and gross_cap_usd is not None:
+            room = float(gross_cap_usd) - float(deployed_usd)
+            if room != room:                                     # NaN
+                raise ValueError
+            want = max(base, min(want, room))
+    except (TypeError, ValueError):
+        want = base * m
+    return want, (want / base if base else m)
 
 
-def brain_clip(bot, entry_tag, base_usd, current_time=None):
+def brain_clip(bot, entry_tag, base_usd, current_time=None,
+               deployed_usd=None, gross_cap_usd=None):
     """The single-bucket case of `brain_clip_multi` -> (scaled_usd, mult)."""
-    return brain_clip_multi([(bot, entry_tag)], base_usd, current_time)
+    return brain_clip_multi([(bot, entry_tag)], base_usd, current_time,
+                            deployed_usd=deployed_usd,
+                            gross_cap_usd=gross_cap_usd)
 
 
 def allocation_scale(bot, current_time=None):
@@ -1024,6 +1245,74 @@ if __name__ == "__main__":
         "an unusable base is returned UNCHANGED, never coerced"
     assert brain_clip_multi([(_b, "long-swing-dip"), (_b, "long-deep")],
                             80.0, _now) == (20.0, 0.25)
+
+    # [(sp)] THE BOOK-LEVEL GROSS BOUND. The property that makes it a bound and
+    # not a cage is asserted FIRST: with the brain neutral or REDUCING, passing
+    # the bound must change nothing at all.
+    assert brain_gross_cap(4, 250.0) == 4 * 250.0 * BRAIN_GROSS_X
+    assert brain_gross_cap(0, 250.0) is None and brain_gross_cap(4, 0) is None
+    assert brain_gross_cap(4, "x") is None and brain_gross_cap(None, 1) is None
+    assert brain_clip(_b, "nope", 80.0, _now,
+                      deployed_usd=1e9, gross_cap_usd=1.0) == (80.0, 1.0), \
+        "a NEUTRAL brain must be unaffected by the bound — no silent shrink"
+    assert brain_clip(_b, "long-deep", 80.0, _now,
+                      deployed_usd=1e9, gross_cap_usd=1.0) == (20.0, 0.25), \
+        "a REDUCING brain must be unaffected by the bound"
+    # ...and it never returns less than the unscaled clip, however full.
+    _u, _mm = brain_clip(_b, "long-swing-dip", 80.0, _now,
+                         deployed_usd=1e9, gross_cap_usd=1.0)
+    assert _u == 80.0 and _mm == 1.0, (_u, _mm)
+    # room for the whole increase -> the full 1.25x lands
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now,
+                      deployed_usd=0.0, gross_cap_usd=1000.0) == (100.0, 1.25)
+    # room for HALF the increase -> exactly half of it
+    _u, _mm = brain_clip(_b, "long-swing-dip", 80.0, _now,
+                         deployed_usd=0.0, gross_cap_usd=90.0)
+    assert abs(_u - 90.0) < 1e-9 and abs(_mm - 90.0 / 80.0) < 1e-9, (_u, _mm)
+    # the returned mult is the EFFECTIVE one, so the (I23) receipt records what
+    # was applied rather than what was wanted — a stamp of 1.25 on a trimmed
+    # clip would send the next reader looking for a 25% position that is not
+    # there.
+    assert abs(_mm - 1.125) < 1e-9, _mm
+    # one argument alone is not a bound (both or neither)
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now,
+                      deployed_usd=0.0) == (100.0, 1.25)
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now,
+                      gross_cap_usd=90.0) == (100.0, 1.25)
+    # junk bound -> no bound, never a refusal
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now,
+                      deployed_usd="x", gross_cap_usd=90.0) == (100.0, 1.25)
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now,
+                      deployed_usd=float("nan"),
+                      gross_cap_usd=90.0) == (100.0, 1.25)
+    # THE MEASURED CASE, DRIVEN AS A SEQUENCE — which is the only way a gross
+    # bound can be tested at all. The first version of this bound passed a
+    # per-call arithmetic assertion and let carry reach $20,400 against an
+    # advertised $7,200, because nothing walked the 12 slots. A bound asserted
+    # only on one call is not asserted.
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": {
+        "updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
+        "mults": {"c": {"long": {"mult": 6.7}, "short": {"mult": 6.7}}}}}
+    _N, _BASE = 12, 300.0 * 4.0                       # carry x allocation 4.0
+    _cap = brain_gross_cap(_N, _BASE)
+    assert _cap == _N * _BASE * BRAIN_GROSS_X, _cap
+    _dep, _sizes = 0.0, []
+    for _ in range(_N):
+        _u, _ = brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now,
+                                 deployed_usd=_dep, gross_cap_usd=_cap)
+        _sizes.append(_u)
+        _dep += _u
+    # every position is at least the unscaled clip (no silent shrink)...
+    assert min(_sizes) >= _BASE - 1e-9, _sizes
+    # ...and the TOTAL respects the stated worst case `cap + (N-1)*base`.
+    assert _dep <= _cap + (_N - 1) * _BASE + 1e-6, (_dep, _cap)
+    assert _dep <= 40800.0 + 1e-6, _dep
+    # the unbounded call is what it is bounding AGAINST — assert the contrast,
+    # or a bound that happens to be inert reads as a bound that works.
+    _un = sum(brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now)[0]
+              for _ in range(_N))
+    assert _un > _dep, (_un, _dep)
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
     _cache["brain-stake-mults"] = {"ts": _now, "payload": dict(
         _mults, updated="2020-01-01T00:00:00+00:00")}
     assert brain_mult_raw(_b, "long-swing-dip", _now) is None, "stale -> None"
@@ -1032,6 +1321,67 @@ if __name__ == "__main__":
     _cache["brain-stake-mults"] = {"ts": _now, "payload": None}
     assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (80.0, 1.0), \
         "a DARK brain must never resize a book"
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
+
+    # [2026-08-20 (sp)] THE RESOLVER: atomicity, junk handling, and the memo.
+    # JUNK IS NEUTRAL, NOT A 6.7x CUT. The old path clamped whatever arrived,
+    # so a publisher bug writing -1 or 0 shrank that bucket to MULT_FLOOR
+    # (0.149x) on every entry, silently. A corrupt value is not a size opinion.
+    _junk = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
+             "mults": {"j": {"neg": {"mult": -1.0},
+                             "zero": {"mult": 0.0},
+                             "nan": {"mult": float("nan")},
+                             "text": {"mult": "big"},
+                             "nomult": {"note": "no mult key"},
+                             "listy": [1, 2, 3],
+                             "tiny": {"mult": 0.001},     # REAL, clamps
+                             "huge": {"mult": 900.0},     # REAL, clamps
+                             "ok": {"mult": 1.25}},
+                       "bad-book": "not-a-dict"}}
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": _junk}
+    for _bad in ("neg", "zero", "nan", "text", "nomult", "listy"):
+        assert brain_mult_raw("j", _bad, _now) is None, _bad
+        assert brain_clip("j", _bad, 80.0, _now) == (80.0, 1.0), _bad
+    assert brain_mult_raw("j", "tiny", _now) == MULT_FLOOR, "extreme still clamps"
+    assert brain_mult_raw("j", "huge", _now) == MULT_CEIL, "extreme still clamps"
+    assert brain_mult_raw("j", "ok", _now) == 1.25
+    assert brain_mult_raw("bad-book", "ok", _now) is None, "non-dict book"
+    # ...and a junk bucket beside a real one must not drag the pair down: the
+    # multi rule takes the min over buckets that HAVE an opinion, and junk has
+    # none.
+    assert brain_mult_multi([("j", "ok"), ("j", "neg")], _now) == 1.25
+
+    # the whole-map accessor, and its emptiness contracts
+    _all = brain_mults(_now)
+    assert set(_all) == {"j"} and set(_all["j"]) == {"tiny", "huge", "ok"}, _all
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": dict(
+        _junk, updated="2020-01-01T00:00:00+00:00")}
+    assert brain_mults(_now) == {}, "stale -> empty map"
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": dict(
+        _junk, updated="not-a-timestamp")}
+    assert brain_mults(_now) == {}, "unparseable -> empty map"
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": None}
+    assert brain_mults(_now) == {}, "dark -> empty map"
+
+    # ATOMICITY: one call must see ONE payload. Swap the cache entry from
+    # inside the bucket iteration; the resolved snapshot is taken before the
+    # first lookup, so both buckets come from the payload that was current
+    # when the call began.
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": _junk}
+
+    class _Swapping(list):
+        def __iter__(self):
+            for _i, _b in enumerate(list.__iter__(self)):
+                if _i == 1:
+                    _cache["brain-stake-mults"] = {
+                        "ts": _now, "payload": {
+                            "updated": _now.isoformat(timespec="seconds"),
+                            "ttl_sec": 26000,
+                            "mults": {"j": {"ok": {"mult": 0.5}}}}}
+                yield _b
+
+    assert brain_mult_multi(_Swapping([("j", "ok"), ("j", "ok")]), _now) == 1.25, \
+        "a mid-call cache refresh must not mix two payloads into one clip"
     _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
     # [2026-07-30 FLEET UNIVERSE] scout accessors: shape, ordering, the
     # volume floor, delist exclusion, and the fail-safe EMPTY that every

@@ -777,9 +777,17 @@ def main():
         _alloc = _bmult = 1.0
         if not _is_live and fleet_bus is not None:
             _alloc = fleet_bus.allocation_scale(bot_id) or 1.0
-            _bmult = fleet_bus.brain_mult_multi(
-                [(bot_id, "long"), (bot_id, "short")])
-            _target = ctx.order_usd(ORDER_USD, own=True) * _alloc * _bmult
+            _base = ctx.order_usd(ORDER_USD, own=True) * _alloc
+            # [(sp)] the BOOK-LEVEL GROSS BOUND on the product. Both legs of
+            # every pair draw on ONE budget — `K * 2` legs is this book's real
+            # position count, and using K alone would let the bound be breached
+            # by exactly the factor that makes it a spread book. Trims only the
+            # brain's increase, so a neutral or reducing brain is unaffected.
+            _target, _bmult = fleet_bus.brain_clip_multi(
+                [(bot_id, "long"), (bot_id, "short")], _base,
+                deployed_usd=sum(float(m.get("notional") or 0.0)
+                                 for m in meta.values()),
+                gross_cap_usd=fleet_bus.brain_gross_cap(K * 2, ORDER_USD))
             if abs(_target - order_usd) > 1e-9:
                 log.info("allocation %.2fx x brain %.2fx: clip %.2f -> %.2f",
                          _alloc, _bmult, order_usd, _target)

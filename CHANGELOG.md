@@ -1,3 +1,182 @@
+## 2026-08-20 (sp) — THE SAFETY SENTENCE (so) SHIPPED WAS FALSE, AND THE FAILURE IT HID WAS A BOOK SILENCED BY ITS OWN GOOD GRADE
+
+**Eamon:** *"Optimise the lookup and return and ensure the brain doesn't cause
+problems."* / *"You called me the operator not Eamon again."*
+
+`(so)` wired the brain's multiplier into every living book, both real-money
+rows included, and justified it in one sentence: **"the multiplier proposes;
+the rails dispose."** An adversarial audit of that change — five lenses over
+the sizing sites, every finding sent to a refuter that had to reproduce the
+mechanism from the code or kill it — measured the sentence.
+
+**It was false, and false in the consequential direction.**
+
+`SafetyRails.notional_ok` returns a **BOOLEAN**. The caller's `continue`
+discards the whole CANDIDATE, not the excess. So:
+
+* 💸 **the LIVE Farmer**, on its shipped config (`order_usd $37.50`, cap
+  `$150`, conviction OFF): a brain rung of **4.5 asks $168.75** — over the cap
+  **from an EMPTY book**. Every ranked candidate takes the skip, every loop,
+  indefinitely. **The brain rewarding this book for its evidence would have
+  stopped it trading**, logging one line per coin and nothing else. Below that
+  point the same rail INVERTS selection: a 1.0x entry is refused only when the
+  book is FULL; a 6.7x entry is refused when it is EMPTY, and the coins refused
+  first are the highest-conviction ones.
+* 🙏 **the LIVE Avo arm** broke an invariant its own module states —
+  *"gross notional can never exceed account equity — the book is 1.00x by
+  construction and no lever reaches past it."* At the live equity (~$63, clip
+  ~$15.70, cap $200) a rung of 6.39 puts two slots at $99.98 = **3.19x
+  equity**, with a −10% stop underneath.
+* 🙏 **Avo's REDUCE side was a silent retirement.** The min-clip floor is $5
+  against a $15.70 clip, so rungs of 1/4.5 ($3.49) and 1/6.7 ($2.34) sent
+  EVERY entry to `continue`. Zero trades for as long as the brain holds the
+  reduce, while the row publishes `status: online` and `clip_usd: 15.70` —
+  byte-identical to "no signals today", and **self-locking**, because a book
+  that stops trading stops producing the closes that would lift the reduce.
+* **Nine of the thirteen wired books had no notional bound at all**, so there
+  the sentence was not merely wrong, it was vacuous — the multiplier both
+  proposed and disposed.
+
+### THE SENTENCE IS TRUE NOW BECAUSE IT WAS MADE TRUE
+
+* **💸 the Farmer's rail TRIMS instead of refusing.** An over-cap clip becomes
+  the largest that fits, derived from the rail's own `max_notional`, and
+  **never below the pre-brain clip** — so with the brain neutral, reducing,
+  dark or stale the block is byte-identical to before, and an unscaled clip
+  that does not fit is still refused exactly as it was. The operator's cap is
+  untouched and still senior: it decides HOW MUCH; it no longer decides
+  WHETHER.
+* **🙏 Avo's brain is RESTRICT-ONLY**, the same `min(1.0, ...)` shape its
+  `live.clip_scale` lever already has and for the same reason: expanding a
+  real-money book past its own equity is a LEVERAGE decision, and I22 says
+  leverage adds no decidability and is admissible only as the output of a
+  measured vol target this book does not have. Refusals are COUNTED and
+  published (`brain_expand_refused`).
+* **🙏 Avo's reduce floors at `MIN_CLIP_USD`** — the smallest size the venue
+  takes — instead of skipping, and only when the pre-brain stake was itself
+  tradeable. Published as `brain_floored`. **A reduce makes a book smaller; it
+  does not retire it.**
+* **🎫 the taker takes conviction as a RISK BUDGET, not a clip multiplier.**
+  `(so)` multiplied `vol_clip`'s RESULT, which destroyed the one property that
+  function exists for. Worse, the mult is per-(side, lens) while the clip is
+  per-COIN, so the two normalisations FOUGHT: a favoured lens on a wide-range
+  alt got the largest `vol_clip` AND the largest boost — the risk-equalising
+  inverted exactly where it mattered. Now the brain scales `RISK_USD` and
+  `vol_clip` converts risk to clip as it always has, so constant-risk sizing
+  survives and `CLIP_MAX` still binds.
+* **The rail-less shadow books got a bound: `fleet_bus.BRAIN_GROSS_X`.**
+
+### THE BOUND I SHIPPED FIRST DID NOT BOUND — CAUGHT THE SAME DAY
+
+Measured worst cases before it, every one of them a **$1,000 paper book**:
+
+| book | gross at every term's max |
+|---|---|
+| 🌾 carry | `300 x alloc 4.0 x brain 6.7 x 12` = **$96,480** (96x equity) |
+| 🪁 kelly | $6,700 · 🧭 cook $6,432 · ⚖️ Counterweight $5,360 · 🎫 taker $3,216 |
+
+The first `BRAIN_GROSS_X` bounded the brain's *increase* against
+`cap − deployed − base`, which is algebraically `min(want, cap − deployed)` —
+so the FIRST position could take the entire budget and every later one still
+got its full base on top. **Driven through the real accessor with carry's real
+constants: advertised cap $7,200, per-position `[7200, 1200 x 11]`, actual
+gross $20,400 — 2.8x the cap it advertised.** My selftest had asserted the
+per-call arithmetic and never walked the SEQUENCE the bound is supposed to
+bound: `(po)`'s "a check that inspects nothing" wearing a unit test. The
+selftest now drives all 12 slots and asserts the TOTAL, against the
+**stated** worst case `cap + (N−1)·base` — not against a round 2x, because
+saying 2x and shipping 2.9x is how a bound becomes folklore.
+
+**And the budget is derived from each book's CONSTANTS, not from a clip
+another organ already scaled.** Measured on the live payload: 🌾 carry is the
+fleet's only book with an allocation claim and it sits **AT the organ's 4.0
+ceiling right now** (`delta_usd: +13,500`), so its gross is already **$14,400
+on a $1,000 book** before the brain speaks. Budgeting off that base would have
+handed the brain another $24k of room on the book that least needs it.
+Budgeting off the constants leaves the allocation organ's behaviour exactly as
+it was and gives the brain no room there at all — the bound binds where the
+danger is and restricts nothing that predates it. **(The allocation organ's
+own 4.0 on a 12-slot $300-clip book is a real finding and is CARRIED, not
+silently fixed here.)**
+
+### THE LOOKUP: 2.3x FASTER, AND THE SPEED IS THE LEAST OF IT
+
+`_resolve_mults` resolves the payload ONCE — parsed, validated, clamped,
+freshness window pre-computed — and memoises on the cache ENTRY's identity
+(not its timestamp: a direct `_cache` poke reuses the timestamp object, and a
+ts-keyed memo served a stale payload to the selftest that proved it).
+
+1. **ATOMICITY, which was a real bug.** `brain_mult_multi` called the raw read
+   once per bucket and `_load`'s cache expires on a clock, not a call boundary
+   — so a two-bucket lookup straddling that expiry could take ⚖️
+   Counterweight's LONG leg from one payload and its SHORT leg from the next.
+   One clip, two sources of truth, on the book whose entire design is that its
+   two legs are the same size. Pinned by a selftest that swaps the cache mid-
+   iteration.
+2. **JUNK IS NOW "NO OPINION", NOT A 6.7x CUT.** The old path clamped whatever
+   arrived, so a publisher bug writing `-1` or `0` became `MULT_FLOOR` and
+   quietly shrank that bucket to **0.149x** on every entry. Non-numeric, NaN,
+   zero and negative are now DROPPED (neutral 1.0); a legitimately extreme
+   `0.05` still clamps, because evidence outside the cage is not corruption.
+3. **Speed.** `is_fresh` parsed an ISO-8601 timestamp on every call — 0.93us
+   of a 1.55us lookup. The window is derived once; `is_fresh`'s exact
+   semantics, future-stamp guard included, are preserved rather than traded
+   for a memo that could serve a payload past its own TTL.
+   `brain_mult_raw` 1.55 → **0.67us**, `brain_clip_multi(2)` 3.57 → **1.45us**.
+
+### HIS NAME IS EAMON
+
+*"Call me Eamon or Johnny not operator please we're pals now"* — said once,
+agreed to, and then broken **in the entries written immediately afterwards**.
+He noticed: *"You called me the operator not Eamon again."*
+
+He is right that it kept happening and the reason is this file's own opening
+section: **it was written down and not enforced.** Nine attributions fixed in
+`(sk)`–`(so)` and CLAUDE.md; the rule recorded; and
+`scripts/audit_operator_name.py` now fails the build on a NEW quote credited to
+a job title. It is deliberately narrow — an ATTRIBUTION HEADER introducing a
+quote — and leaves the ROLE completely alone (`operator-only caps`,
+`an OPERATOR action`, `owner: OPERATOR`, `OPERATOR_QUEUE.md`), because several
+of those are load-bearing SAFETY properties and renaming them would make the
+doctrine worse. A RATCHET on the measured 207 historical attributions: history
+is the honest record of how the fleet was written and is not rewritten; the
+backlog may only shrink.
+
+### WHAT WAS REFUTED
+
+The refuter pass killed 7 of 13 findings, and one refutation is worth more
+than the finding it killed: *"the brain has no feedback on the quantity it
+controls, because `pnl_pct` is clip-invariant"* is **wrong** —
+`brain_stats.weighted_bucket` computes `mean_w/sd_w/t` from `profit_abs`,
+i.e. **DOLLARS**. So the brain does see the size it set. A uniform scale
+leaves `t` unchanged (mean and sd both scale), so there is no runaway; but a
+bucket MID-TRANSITION is a mixture of two scales, which inflates sd against
+mean and pushes `t` DOWN on a book whose edge has not moved. That is a
+mechanical oscillation between adjacent rungs, it is transient (14-day decay,
+plus the 3-run streak gate damps it), and **it is now measurable for the first
+time** because every close carries its `brain_mult`. CARRIED with the
+arithmetic rather than fixed by rewriting the brain's publisher on the same
+day thirteen consumers were wired to it.
+
+**Mutations verified RED (16 this pass):** the taker's rail sees a constant ·
+avo's rail sees the pre-brain clip · the Farmer's FIRST rail call sees it ·
+the Farmer's POST-TRIM call sees it · the sniper's rail sees it · avo's expand
+refusal removed · avo's floor made unconditional · the Farmer's trim fires on
+a neutral brain · the taker drops the brain from its risk budget · `vol_clip`
+loses its ceiling · carry budgets off the scaled base · Counterweight budgets
+K instead of K·2 · the gross bound reverts to its 20,400 form · the bound
+drops its no-shrink floor · a new quote attributed to "operator" · a role
+reference (must stay quiet — and does).
+
+Two of those guards were themselves wrong first and are recorded that way: the
+rail guard needed a two-hop taint closure (a fixpoint swallowed the module
+until `is_long` counted as "scaled") and had to check EVERY rail call rather
+than any (the Farmer's second, post-trim call kept it green while the first
+was mutated).
+
+**Suite:** green except the two pre-existing `lighter-sdk` environment failures
+verified to reproduce on clean `main`.
+
 ## 2026-08-20 (so) — THE BRAIN'S ONLY TWO LIVE OPINIONS WERE ADDRESSED TO THE TWO BOOKS THAT COULD NOT HEAR THEM — one of them for 91 consecutive runs
 
 **Eamon:** *"Implement into live and other bots without it."*
@@ -35,15 +214,23 @@ included:
 👩🙏🔮 the family books (already wired; unchanged).
 
 **WHY WIRING IT INTO REAL MONEY IS A NUMBER, NOT AN AUTHORITY.** The accessor
-returns a float. Every senior rail is downstream and untouched:
-`SafetyRails.notional_ok` still refuses a clip over the operator's cap, the kill
-switch still kills, the daily-loss halt still halts, the ruin gate still
-refuses, the fleet long-budget veto still vetoes, and SafetyRails' caps remain
-operator-only. **The multiplier proposes; the rails dispose** — and
+returns a float. Every senior rail is downstream and untouched: the kill switch
+still kills, the daily-loss halt still halts, the ruin gate still refuses, the
+fleet long-budget veto still vetoes, and SafetyRails' caps remain operator-only.
 `test_the_rails_see_the_sized_clip` proves by AST that the variable the brain
-assigns is the variable the cap is handed, on all four order-sending books. A
-6.7x clip admitted against a 1x cap check is the 15-Jul breach rebuilt; it
+assigns is the variable the cap is handed, on all four order-sending books — a
+6.7x clip admitted against a 1x cap check is the 15-Jul breach rebuilt, and it
 cannot ship now without reddening the build.
+
+**[CORRECTED IN PLACE by `(sp)`, and this paragraph originally ended with
+"the multiplier proposes; the rails dispose", which was FALSE.** An adversarial
+audit of this very change measured it: `notional_ok` is a BOOLEAN, so the
+caller's `continue` discards the whole CANDIDATE rather than the excess. On the
+shipped live Farmer config a brain rung of 4.5 asks $168.75 against a $150 cap
+FROM AN EMPTY BOOK — every candidate skipped, every loop, forever. **The brain
+rewarding a book for its evidence would have stopped it trading.** Nine of the
+thirteen wired books had no notional bound at all. `(sp)` makes the sentence
+true instead of deleting it; see that entry.**]
 
 **AT SHIP IT MOVES EXACTLY TWO BOOKS, AND THAT IS THE HONEST WAY TO LAND IT.**
 The brain has no published opinion on either Farmer arm, on 🙏 Avo, or on any
@@ -571,7 +758,7 @@ side quietly weaker there than everywhere else. Both ends come from the bus now.
 
 **[RENUMBERED (sh) -> (sm), 20-Aug.** main took (sh) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
 
-**Operator: "The discussion of the floor is too often had, where the
+**Eamon: "The discussion of the floor is too often had, where the
 conversation of how high the ceiling goes is of little discussion... they know
 the floor all too well."** / **"training wheels need to go off and they need to
 start growing and learning with the brain that has every loss we've had or win
@@ -642,7 +829,7 @@ It promotes nothing and moves nothing. Like `golive_readiness`, it publishes.
 
 ### AND THE SYNERGY PIECE: NINETEEN DESIGNS, ONE WAY OF JUDGING THEM
 
-**Operator: "we are tasked to create multiple strategy bots, who get
+**Eamon: "we are tasked to create multiple strategy bots, who get
 complimented and enhanced by instruments that let them fly to the ceiling if
 they wish to... so they can achieve their designated different designs. We need
 synergy."**
@@ -722,7 +909,7 @@ lever's cage and was left alone — the `(ow)` blanket-replace lesson.
 
 **[RENUMBERED (sg) -> (sl), 20-Aug.** main took (sg) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
 
-**Operator, three asks in one message:** *"Fix this never recorded issue across
+**Eamon, three asks in one message:** *"Fix this never recorded issue across
 the fleet, I am so tired of going over the same trivial problem."* / *"And fix
 everything else I've said too"* / *"can all of the works done today; every day be
 recorded properly so I am starting from where I left off every day rather than
@@ -817,7 +1004,7 @@ selftests are registered.
 
 **[RENUMBERED (sf) -> (sk), 20-Aug.** main took (sf) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
 
-**Operator, this session: *"do not continue on a risk and constraint and choking
+**Eamon, this session: *"do not continue on a risk and constraint and choking
 of everything basis ... focus on where each bot can enter exit and operate
 better"* / *"being overly risk adverse and overly constraining and restrictive
 clearly doesn't work so do the opposite"* / *"if you can work out why they are
@@ -1004,7 +1191,7 @@ instead of a session.
 ### 🎫 AND THE ONE THE FLEET'S OWN AUDIT FOUND: THE GROWTH RAIL COULD ONLY EVER SHRINK THE TAKER'S ONE LIVING LENS
 
 A nine-book per-book audit ran behind this pass, every finding attacked by two
-adversarial lenses. Its first result is the operator's complaint located in the
+adversarial lenses. Its first result is Eamon's complaint located in the
 actuator, and I verified the mechanism myself before acting on it because it is
 arithmetic rather than statistics.
 
@@ -1044,7 +1231,7 @@ every place that could re-introduce it: the tuner's own `SWEEP_HOLD` loses its
 and truncating them was my error, caught by the incubator's own selftest).
 
 **WHAT THIS DOES NOT CLAIM.** It is not a widening — the values return to what
-the operator configured. And it is not sold as alpha: restoring 24h → 48h
+Eamon configured. And it is not sold as alpha: restoring 24h → 48h
 measures +0.22pp to +0.57pp/trade on the book's own closes and **loses to a
 same-coin random-start placebo (P=0.45–0.88)**, i.e. most of it is exposure
 rather than edge. The claim is that **an unevidenced restriction is reversed**,

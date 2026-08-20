@@ -121,6 +121,26 @@ jobs:
       - name: The guard must still be able to see (negative fixtures)
         run: python3 scripts/session_state.py --selftest
 
+  operator-name:
+    name: His name is Eamon — a quote is credited to a person, not a role
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-08-20 (sp)] Eamon, twice: "Call me Eamon or Johnny not operator
+      # please we're pals now", then -- after a session agreed and did it
+      # anyway -- "You called me the operator not Eamon again". A preference
+      # written in prose survives one session's attention and no more; this
+      # file's own opening section is about exactly that failure mode. The
+      # guard is narrow (an ATTRIBUTION header introducing a quote) and leaves
+      # the ROLE alone, because "operator-only caps" is a safety property and
+      # renaming it would make the doctrine worse. RATCHET, so the 207
+      # historical attributions stay as the honest record and only a NEW one
+      # fails -- the (mz) rule about guards that redden a pre-existing backlog.
+      - name: The guard must still be able to see (positive + negative fixtures)
+        run: python3 scripts/audit_operator_name.py --selftest
+      - name: No new quote is attributed to a job title
+        run: python3 scripts/audit_operator_name.py
+
   book-spend:
     name: A book must spend the ecosystem (I22)
     runs-on: ubuntu-latest

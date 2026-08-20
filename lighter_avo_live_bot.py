@@ -443,6 +443,7 @@ def main(_ctx=None, once=False):
         locked_until = 0.0
         fleet_long_veto = False
         brain_gated_tags = []
+        brain_expand_refused = brain_floored = 0
         coin_vetoed = {}
         live_scale = 1.0
 
@@ -518,6 +519,16 @@ def main(_ctx=None, once=False):
                         if locked_until else None),
                     "fleet_long_veto": fleet_long_veto,
                     "brain_gated": brain_gated_tags,
+                    # [(sp)] the brain's two REFUSED sizings. `expand_refused`
+                    # counts entries where the brain wanted this REAL-MONEY
+                    # book bigger and was held at 1.0x (restrict-only, see the
+                    # entry site); `floored` counts reduces that would have
+                    # fallen under MIN_CLIP_USD and were floored to it instead
+                    # of silently skipping the trade. Both are ZERO on a
+                    # neutral brain, so a non-zero here always means something
+                    # happened.
+                    "brain_expand_refused": brain_expand_refused,
+                    "brain_floored": brain_floored,
                     "coin_veto": {c: coin_vetoed[c]
                                   for c in sorted(coin_vetoed)},
                     "live_clip_scale": live_scale,
@@ -758,6 +769,11 @@ def main(_ctx=None, once=False):
 
         locked_until = entries_locked(closed_win, t0, baseline)
         brain_gated_tags = []
+        # [(sp)] the two brain-sizing refusals, PUBLISHED. Neither is silent:
+        # a refused expand and a floored reduce are both decisions this book
+        # made about real money, and a decision nobody can see is the class
+        # (so) was written to close.
+        brain_expand_refused = brain_floored = 0
         cycle_admitted = 0
 
         # ---- manage venue truth: every held position, every cycle ----------
@@ -922,11 +938,48 @@ def main(_ctx=None, once=False):
                 # across BOTH rows — the same pair, the same `ledger_tag`
                 # identity and the same fail-safe as the regime gate above, so
                 # a gate and a size can never disagree about which bucket this
-                # trade is in. Applied BEFORE the min-clip floor and before the
-                # notional rail on purpose: a reduced stake that falls under
-                # MIN_CLIP_USD should not be sent at all, and an increased one
-                # must be admitted against the cap it will actually fill.
+                # trade is in.
+                #
+                # [2026-08-20 (sp)] TWO CORRECTIONS, both to (so), both found
+                # by driving the arithmetic against this book's REAL numbers
+                # rather than reading the code.
+                #
+                # (1) **RESTRICT-ONLY, like every other lever that reaches this
+                # book.** This module's own `_clip_scale_now` docstring states
+                # the invariant: *"with clip = equity/max_open and stake_mult
+                # <= 1.0, gross notional can never exceed account equity — the
+                # book is 1.00x by construction and no lever reaches past it."*
+                # (so) broke that silently. At the modelled live equity (~$63,
+                # clip ~$15.70, cap $200) a brain rung of 6.39 puts TWO slots
+                # at $99.98 = $199.96 gross = **3.19x equity** on a book
+                # documented as 1.00x, with a -10% stop underneath it. Expanding
+                # a real-money book past its own equity is a LEVERAGE decision,
+                # and I22 is explicit that leverage adds no decidability and is
+                # admissible only as the output of a measured vol target, which
+                # this book does not have. So the brain may SHRINK Avo and not
+                # grow it — the same `min(1.0, ...)` shape as `live.clip_scale`,
+                # and the same reason. Its expand side is an operator/gate
+                # decision, not a bus read. 💸 the Farmer keeps BOTH directions:
+                # it has a real notional cap and, since (sp), a rail that TRIMS.
+                #
+                # (2) **A REDUCE MUST MAKE THE BOOK SMALLER, NOT RETIRE IT.**
+                # The floor below is $5 against a $15.70 clip, so any rung at
+                # or under 1/3.2 sent every entry to `continue` — the deep
+                # rungs 1/4.5 ($3.49) and 1/6.7 ($2.34) BOTH do. That is a
+                # 100% halt: zero entries for as long as the brain holds the
+                # reduce, while the row keeps publishing `status: online` and
+                # `clip_usd: 15.70`. Byte-identical to "no signals today", and
+                # self-locking — a book that stops trading stops producing the
+                # closes that would lift the reduce. Now it floors at
+                # MIN_CLIP_USD, the smallest size the venue will take, and SAYS
+                # SO on the row.
                 stake, bmult = brain_clip_for((BOT_ROW, SHADOW_ROW), tag, stake)
+                if bmult > 1.0:
+                    stake, bmult = clip * S.stake_mult(tag, bars), 1.0
+                    brain_expand_refused += 1
+                if stake < MIN_CLIP_USD <= clip * S.stake_mult(tag, bars):
+                    brain_floored += 1
+                    stake = MIN_CLIP_USD
                 if stake < MIN_CLIP_USD:
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)

@@ -602,7 +602,11 @@ def main():
                     # asset whose cash flow has proved out, and less of the one
                     # that has not, is lesson 1 with a measurement behind it.
                     _clip, _bm = (fleet_bus.brain_clip(
-                        bot_id, f"{side}-cashflow", CLIP_USD)
+                        bot_id, f"{side}-cashflow", CLIP_USD,
+                        deployed_usd=sum(p.get("notional") or 0.0
+                                         for p in positions.values()),
+                        gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                                CLIP_USD))
                         if fleet_bus is not None else (CLIP_USD, 1.0))
                     _open_position(positions, c, side, _clip, t0, apr)
                     positions[c]["brain_mult"] = _bm

@@ -539,6 +539,21 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
         pass
 
 
+def _deployed(positions):
+    """This book's currently-deployed gross, for the (sp) brain gross bound."""
+    return sum(float(p.get("notional") or 0.0) for p in positions.values())
+
+
+#: [(sp)] TWO FAMILIES, ONE BUDGET. kelly is the only wired book whose sleeves
+#: run different clips, so its designed gross is the SUM of the two rather than
+#: one `cap x clip` — computed here so the bound moves with either sleeve's
+#: config instead of being retyped as a number that drifts. Both sleeves draw
+#: on it, which is correct: they share one $1,000 book.
+_GROSS_CAP = ((CLIP_USD * MAX_POSITIONS + DIP_CLIP_USD * DIP_MAX_POSITIONS)
+              * getattr(fleet_bus, "BRAIN_GROSS_X", 2.0)
+              if fleet_bus is not None else None)
+
+
 def _open_mirror(positions, coin, dev_bps, bv, t0, ref, notional=None,
                  brain_mult=1.0):
     """Open one mirror position at MY side's book-walked VWAP. SIGNATURE IS
@@ -853,9 +868,11 @@ def main():
             # a VWAP and my slip gate is what keeps a big clip out of a thin
             # coin. Fail-CLOSED: no re-walk, no entry.
             _side = mirror_side(dev_bps)
-            _clip, _bm = (fleet_bus.brain_clip(bot_id, f"{_side}-snap",
-                                               CLIP_USD)
-                          if fleet_bus is not None else (CLIP_USD, 1.0))
+            _clip, _bm = (fleet_bus.brain_clip(
+                bot_id, f"{_side}-snap", CLIP_USD,
+                deployed_usd=_deployed(positions),
+                gross_cap_usd=_GROSS_CAP)
+                if fleet_bus is not None else (CLIP_USD, 1.0))
             bv_m = bv
             if _bm != 1.0:
                 try:
@@ -911,10 +928,11 @@ def main():
                 # (`short-dip`) — this is the sleeve admitted on an operator
                 # override of the I16 floor at n=13, so it is exactly the one
                 # whose size should follow its record as the record arrives.
-                _dclip, _dbm = (fleet_bus.brain_clip(bot_id, "short-dip",
-                                                     DIP_CLIP_USD)
-                                if fleet_bus is not None
-                                else (DIP_CLIP_USD, 1.0))
+                _dclip, _dbm = (fleet_bus.brain_clip(
+                    bot_id, "short-dip", DIP_CLIP_USD,
+                    deployed_usd=_deployed(positions),
+                    gross_cap_usd=_GROSS_CAP)
+                    if fleet_bus is not None else (DIP_CLIP_USD, 1.0))
                 try:
                     if not ctx.supports(sym):
                         continue

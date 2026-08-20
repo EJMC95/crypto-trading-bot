@@ -1454,10 +1454,24 @@ def main():
             # different numbers. A per-side clip would price one and enter the
             # other. `min` over the sides is the same rule ⚖️ takes for the
             # same reason — see fleet_bus.brain_mult_multi.
-            _bmult = (fleet_bus.brain_mult_multi(
-                          [(bot_id, "short"), (bot_id, "long")])
-                      if fleet_bus is not None else 1.0)
-            _notional = NOTIONAL * _alloc * _bmult
+            # [(sp)] ...and the BOOK-LEVEL GROSS BOUND on the product. This
+            # book is the measured worst case of the whole (so) change:
+            # 300 x alloc 4.0 x brain 6.7 x 12 slots = **$96,480 gross on a
+            # $1,000 paper book**, 96x its own equity. Delta-neutral or not,
+            # its modelled `HEDGE_COST * notional` is calibrated at $300 and is
+            # fiction at $8,040 — the P&L would be optimistic in exactly the
+            # direction that makes a bad book look gradeable. The bound trims
+            # only the brain's INCREASE (fleet_bus.brain_clip_multi), so with a
+            # neutral or reducing brain this line is byte-identical to (so).
+            _base = NOTIONAL * _alloc
+            _notional, _bmult = (
+                fleet_bus.brain_clip_multi(
+                    [(bot_id, "short"), (bot_id, "long")], _base,
+                    deployed_usd=sum(float(p.get("notional") or 0.0)
+                                     for p in positions.values()),
+                    gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                            NOTIONAL))
+                if fleet_bus is not None else (_base, 1.0))
             _probe = {"left": DEPTH_PROBE_BUDGET, "used": 0}
             _depth_memo = {}
             _depth_recs = []

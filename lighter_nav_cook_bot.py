@@ -588,9 +588,13 @@ def main():
             # standing between it and a thin coin, so pricing a 2x clip off
             # the 1x walk would understate both. Fail-CLOSED — no re-walk, no
             # entry.
-            _clip, _bm = (fleet_bus.brain_clip(bot_id, "%s-navband" % side,
-                                               CLIP_USD)
-                          if fleet_bus is not None else (CLIP_USD, 1.0))
+            _clip, _bm = (fleet_bus.brain_clip(
+                bot_id, "%s-navband" % side, CLIP_USD,
+                deployed_usd=sum(p.get("notional") or 0.0
+                                 for p in positions.values()),
+                gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                        CLIP_USD))
+                if fleet_bus is not None else (CLIP_USD, 1.0))
             bv_e = bv
             if _bm != 1.0:
                 try:

@@ -85,6 +85,51 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "allocation-organ-4x-on-carry",
+        "owner": "OPERATOR",
+        "what": "💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right "
+                "now (`delta_usd: +13,500` on a $1,000 book, the fleet's only "
+                "measured claim), and carry runs 12 slots x $300. That is "
+                "**$14,400 of gross on a $1,000 book** from the allocation "
+                "organ alone, before the brain says anything — 14.4x equity on "
+                "a book whose modelled `HEDGE_COST * notional` is calibrated at "
+                "$300 a position. (sp)'s brain bound is derived from carry's "
+                "CONSTANTS precisely so it does not double this; it also does "
+                "not fix it.",
+        "why_open": "the organ's 0.25-4.0 clamp is a capital-allocation policy "
+                    "and moving it moves money between books — an operator "
+                    "call (I16), not a session one. What a session CAN do "
+                    "first is measure whether 4.0 on a 12-slot book was ever "
+                    "intended, or whether the clamp was written for a 4-slot "
+                    "one.",
+        # closes when the clamp is re-decided (either bound moves) or carry's
+        # slot count and clip stop multiplying out past its own equity.
+        "closes_when": lambda: not _has("fleet_bus.py",
+                                        "ALLOC_SCALE_CEIL = 4.0"),
+    },
+    {
+        "id": "brain-mult-transition-oscillation",
+        "owner": "session",
+        "what": "The brain's `t` is computed on DOLLARS "
+                "(`brain_stats.weighted_bucket` reads `profit_abs`), so a "
+                "bucket MID-TRANSITION is a mixture of two clip scales: sd "
+                "inflates against mean and `t` falls on a book whose edge has "
+                "not moved. Predicted shape: a bucket that clears a rung steps "
+                "back down a rung within ~10 closes, then climbs again. A "
+                "uniform scale is invariant, so there is no runaway — this is "
+                "a transient limit cycle, damped by the 14d decay and the "
+                "3-run streak gate.",
+        "why_open": "the fix is hysteresis in the PUBLISHER (`qualify_v3` is "
+                    "stateless; the held rung lives in bot_learn's "
+                    "`mult_streaks`), and rewriting the brain's ladder on the "
+                    "same day 13 consumers were wired to it is the untested-"
+                    "rewrite-of-an-authority the doctrine forbids. It is now "
+                    "MEASURABLE for the first time — every close carries its "
+                    "`brain_mult` — so the next pass tests the prediction "
+                    "against real closes instead of a model.",
+        "closes_when": lambda: _has("brain_stats.py", "HYSTERESIS"),
+    },
+    {
         "id": "brain-mults-are-two-opinions-wide",
         "owner": "session",
         "what": "(so) wired every living book to the brain's stake multiplier, "

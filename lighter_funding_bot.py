@@ -3043,6 +3043,7 @@ def main():
                 # one place it is most expensive. Caught by reading the
                 # publisher, not the consumer.
                 bmult = 1.0
+                _clip_prebrain = clip
                 if not VARIANT and fleet_bus is not None:
                     clip, bmult = fleet_bus.brain_clip(
                         bot_id,
@@ -3055,9 +3056,55 @@ def main():
                     open_ntl = _open_notional(pos, meta, open_now, order_usd)
                     # cap check sees the CONVICTION clip, not the flat one — a
                     # bigger clip must be admitted against the cap it will fill.
+                    #
+                    # [2026-08-20 (sp)] THE RAIL TRIMS THE BRAIN'S INCREASE
+                    # RATHER THAN REFUSING THE TRADE — and this is a CORRECTION
+                    # of what (so) claimed one commit earlier. That entry said
+                    # "the multiplier proposes; the rails dispose", meaning the
+                    # cap would harmlessly refuse an over-size clip. It does
+                    # not: `notional_ok` is a BOOLEAN, so the `continue` below
+                    # discards the WHOLE CANDIDATE, not the excess.
+                    #
+                    # MEASURED on the shipped live config (order_usd $37.50,
+                    # cap $150, conviction OFF): a brain rung of 4.5 asks for
+                    # $168.75 and 6.7 asks for $251.25 — both over the cap FROM
+                    # AN EMPTY BOOK. Every ranked candidate would take this
+                    # `continue`, every loop, forever. **The brain rewarding
+                    # this book for its evidence would have stopped it trading
+                    # altogether**, logging one skip line per coin and nothing
+                    # else. A rail that turns "size this down" into "never
+                    # trade again" is not a safety property, and the direction
+                    # of the failure — a book silenced by its own good grade —
+                    # is the worst one available.
+                    #
+                    # The trim NEVER goes below the pre-brain clip, so with the
+                    # brain neutral, reducing, dark or stale this block is
+                    # byte-identical to what it was: an un-scaled clip that
+                    # does not fit is still refused, exactly as before. The
+                    # operator's cap is untouched and still senior — it decides
+                    # HOW MUCH; it no longer decides WHETHER.
                     if not ctx.rails.notional_ok(open_ntl, clip):
-                        log.info("%s NOTIONAL_CAP_SKIP", coin)
-                        continue
+                        _room = max(0.0, float(ctx.rails.max_notional or 0.0)
+                                    - float(open_ntl))
+                        if clip > _clip_prebrain and _room >= _clip_prebrain:
+                            _trimmed = min(clip, _room)
+                            log.info("%s BRAIN_CLIP_TRIMMED $%.2f -> $%.2f "
+                                     "(cap $%s, deployed $%.2f)",
+                                     coin, clip, _trimmed,
+                                     ctx.rails.max_notional, open_ntl)
+                            clip = _trimmed
+                            bmult = (clip / _clip_prebrain
+                                     if _clip_prebrain else bmult)
+                            size = round(clip / px, 6)
+                        else:
+                            log.info("%s NOTIONAL_CAP_SKIP", coin)
+                            continue
+                        if not ctx.rails.notional_ok(open_ntl, clip):
+                            # belt and braces: the trim is derived from the
+                            # rail's own numbers, so this cannot fire — and if
+                            # it ever does, the rail wins, not the arithmetic.
+                            log.info("%s NOTIONAL_CAP_SKIP (post-trim)", coin)
+                            continue
                     # [2026-08-19 (qz)] THE RUIN GATE. The venue publishes the
                     # liquidation price of every position and this loop has
                     # read it since (no); until now nothing REFUSED on it, so
