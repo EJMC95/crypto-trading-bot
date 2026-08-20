@@ -1,9 +1,9 @@
 round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,disp_home,disp_away,value_side,value_ev_pct
-Round 25,2026-08-20 19:50:00,Melbourne Storm,Penrith Panthers,0.3966,0.3182,0.0784,4,3.05,1.4,0.0167,0.0,Melbourne Storm,20.963
-Round 25,2026-08-21 18:00:00,Canberra Raiders,Brisbane Broncos,0.651,0.7194,-0.0684,4,1.35,3.65,0.0189,0.0735,Brisbane Broncos,27.385
-Round 25,2026-08-21 20:00:00,Dolphins,Parramatta Eels,0.7982,0.7619,0.0363,4,1.25,4.1,0.004,0.025,Dolphins,-0.225
-Round 25,2026-08-22 15:00:00,Newcastle Knights,Manly-Warringah Sea Eagles,0.5413,0.6603,-0.119,4,1.46,2.88,0.0139,0.0286,Manly-Warringah Sea Eagles,32.1056
-Round 25,2026-08-22 17:30:00,South Sydney Rabbitohs,New Zealand Warriors,0.4619,0.3827,0.0792,4,2.5,1.58,0.0,0.0194,South Sydney Rabbitohs,15.475
-Round 25,2026-08-22 19:35:00,St George Illawarra Dragons,Canterbury-Bankstown Bulldogs,0.3948,0.3605,0.0343,4,2.75,1.5,0.0476,0.0135,St George Illawarra Dragons,8.57
-Round 25,2026-08-23 14:00:00,Gold Coast Titans,Cronulla-Sutherland Sharks,0.2847,0.3584,-0.0737,4,2.75,1.5,0.0377,0.0135,Cronulla-Sutherland Sharks,7.295
-Round 25,2026-08-23 16:05:00,Sydney Roosters,Wests Tigers,0.8417,0.897,-0.0553,4,1.07,10.5,0.0094,0.1351,Wests Tigers,66.215
+Round 25,2026-08-20 19:50:00,Melbourne Storm,Penrith Panthers,0.4071,0.3184,0.0887,4,3.0,1.42,0.0084,0.0143,Melbourne Storm,22.13
+Round 25,2026-08-21 18:00:00,Canberra Raiders,Brisbane Broncos,0.6557,0.7292,-0.0735,4,1.3,3.55,0.0,0.0143,Brisbane Broncos,22.2265
+Round 25,2026-08-21 20:00:00,Dolphins,Parramatta Eels,0.7884,0.7619,0.0265,4,1.25,4.0,0.0,0.0,Dolphins,-1.45
+Round 25,2026-08-22 15:00:00,Newcastle Knights,Manly-Warringah Sea Eagles,0.5295,0.6576,-0.1281,4,1.46,2.85,0.0104,0.027,Manly-Warringah Sea Eagles,34.0925
+Round 25,2026-08-22 17:30:00,South Sydney Rabbitohs,New Zealand Warriors,0.4562,0.3853,0.0709,4,2.5,1.6,0.0142,0.0323,South Sydney Rabbitohs,14.05
+Round 25,2026-08-22 19:35:00,St George Illawarra Dragons,Canterbury-Bankstown Bulldogs,0.3766,0.3584,0.0182,4,2.75,1.5,0.0377,0.0135,St George Illawarra Dragons,3.565
+Round 25,2026-08-23 14:00:00,Gold Coast Titans,Cronulla-Sutherland Sharks,0.2799,0.3605,-0.0806,4,2.75,1.5,0.0476,0.0135,Cronulla-Sutherland Sharks,8.015
+Round 25,2026-08-23 16:05:00,Sydney Roosters,Wests Tigers,0.8495,0.8887,-0.0392,4,1.07,11.0,0.0047,0.2941,Wests Tigers,65.55

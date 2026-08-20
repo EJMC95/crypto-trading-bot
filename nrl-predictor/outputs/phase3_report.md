@@ -1,6 +1,6 @@
 # Phase 3 report — Poisson + GBM vs Elo and the closing line
 
-_Generated 2026-08-18. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
+_Generated 2026-08-20. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
 
 ## Overall 2015–2025 (Brier / log loss)
 
@@ -47,13 +47,13 @@ _Generated 2026-08-18. Walk-forward 2015–2025; Poisson refits before every rou
 
 | round    | date                | venue                  | home                        | away                          |   p_home_elo |   p_home_poisson |   p_home_gbm |   p_home_blend |   exp_margin_home |   exp_total_points |
 |:---------|:--------------------|:-----------------------|:----------------------------|:------------------------------|-------------:|-----------------:|-------------:|---------------:|------------------:|-------------------:|
-| Round 25 | 2026-08-20 19:50:00 | AAMI Park              | Melbourne Storm             | Penrith Panthers              |       0.463  |           0.4413 |       0.5378 |         0.3966 |              -2.5 |               46.8 |
-| Round 25 | 2026-08-21 18:00:00 | GIO Stadium            | Canberra Raiders            | Brisbane Broncos              |       0.6663 |           0.5214 |       0.7775 |         0.651  |               0.9 |               46.7 |
-| Round 25 | 2026-08-21 20:00:00 | Suncorp Stadium        | Dolphins                    | Parramatta Eels               |       0.7656 |           0.6271 |       0.6697 |         0.7982 |               5.3 |               49.6 |
-| Round 25 | 2026-08-22 15:00:00 | McDonald Jones Stadium | Newcastle Knights           | Manly-Warringah Sea Eagles    |       0.6222 |           0.4603 |       0.5296 |         0.5413 |              -1.6 |               48   |
-| Round 25 | 2026-08-22 17:30:00 | Accor Stadium          | South Sydney Rabbitohs      | New Zealand Warriors          |       0.4638 |           0.4964 |       0.4747 |         0.4619 |              -0.1 |               46.8 |
-| Round 25 | 2026-08-22 19:35:00 | Allianz Stadium        | St George Illawarra Dragons | Canterbury-Bankstown Bulldogs |       0.4238 |           0.4587 |       0.4728 |         0.3948 |              -1.6 |               45.3 |
-| Round 25 | 2026-08-23 14:00:00 | Cbus Super Stadium     | Gold Coast Titans           | Cronulla-Sutherland Sharks    |       0.3254 |           0.4352 |       0.4344 |         0.2847 |              -2.7 |               47.7 |
-| Round 25 | 2026-08-23 16:05:00 | Allianz Stadium        | Sydney Roosters             | Wests Tigers                  |       0.8415 |           0.6299 |       0.7639 |         0.8417 |               5.6 |               49.1 |
+| Round 25 | 2026-08-20 19:50:00 | AAMI Park              | Melbourne Storm             | Penrith Panthers              |       0.463  |           0.4413 |       0.5378 |         0.4071 |              -2.5 |               46.8 |
+| Round 25 | 2026-08-21 18:00:00 | GIO Stadium            | Canberra Raiders            | Brisbane Broncos              |       0.6663 |           0.5214 |       0.7775 |         0.6557 |               0.9 |               46.7 |
+| Round 25 | 2026-08-21 20:00:00 | Suncorp Stadium        | Dolphins                    | Parramatta Eels               |       0.7656 |           0.627  |       0.6697 |         0.7884 |               5.3 |               49.6 |
+| Round 25 | 2026-08-22 15:00:00 | McDonald Jones Stadium | Newcastle Knights           | Manly-Warringah Sea Eagles    |       0.6222 |           0.4603 |       0.5296 |         0.5295 |              -1.6 |               48   |
+| Round 25 | 2026-08-22 17:30:00 | Accor Stadium          | South Sydney Rabbitohs      | New Zealand Warriors          |       0.4638 |           0.4964 |       0.4747 |         0.4562 |              -0.1 |               46.8 |
+| Round 25 | 2026-08-22 19:35:00 | Allianz Stadium        | St George Illawarra Dragons | Canterbury-Bankstown Bulldogs |       0.4238 |           0.4587 |       0.4728 |         0.3766 |              -1.6 |               45.3 |
+| Round 25 | 2026-08-23 14:00:00 | Cbus Super Stadium     | Gold Coast Titans           | Cronulla-Sutherland Sharks    |       0.3254 |           0.4332 |       0.4344 |         0.2799 |              -2.7 |               47.7 |
+| Round 25 | 2026-08-23 16:05:00 | Allianz Stadium        | Sydney Roosters             | Wests Tigers                  |       0.8415 |           0.6299 |       0.7639 |         0.8495 |               5.6 |               49.1 |
 
 _Margin/total expectations come from the tier-2 Monte Carlo; the blend is a logistic stack of Elo+Poisson with weights learned on 2010–2014 only. GBM is reported but not blended (no pre-2015 out-of-sample output to learn a weight from) — revisit when lineup/weather features land in Phase 5._

@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-08-18T08:09:45+00:00",
+ "generated_at": "2026-08-20T00:37:31+00:00",
  "source": "nrl-predictor",
  "disclaimer": "Paper-track model output. Not betting advice.",
  "round": "Round 25",
@@ -13,7 +13,7 @@
    "p_home_elo": 0.463,
    "p_home_poisson": 0.4413,
    "p_home_gbm": 0.5378,
-   "p_home_blend": 0.3966,
+   "p_home_blend": 0.4071,
    "exp_margin_home": -2.5,
    "exp_total_points": 46.8
   },
@@ -26,7 +26,7 @@
    "p_home_elo": 0.6663,
    "p_home_poisson": 0.5214,
    "p_home_gbm": 0.7775,
-   "p_home_blend": 0.651,
+   "p_home_blend": 0.6557,
    "exp_margin_home": 0.9,
    "exp_total_points": 46.7
   },
@@ -37,9 +37,9 @@
    "home": "Dolphins",
    "away": "Parramatta Eels",
    "p_home_elo": 0.7656,
-   "p_home_poisson": 0.6271,
+   "p_home_poisson": 0.627,
    "p_home_gbm": 0.6697,
-   "p_home_blend": 0.7982,
+   "p_home_blend": 0.7884,
    "exp_margin_home": 5.3,
    "exp_total_points": 49.6
   },
@@ -52,7 +52,7 @@
    "p_home_elo": 0.6222,
    "p_home_poisson": 0.4603,
    "p_home_gbm": 0.5296,
-   "p_home_blend": 0.5413,
+   "p_home_blend": 0.5295,
    "exp_margin_home": -1.6,
    "exp_total_points": 48.0
   },
@@ -65,7 +65,7 @@
    "p_home_elo": 0.4638,
    "p_home_poisson": 0.4964,
    "p_home_gbm": 0.4747,
-   "p_home_blend": 0.4619,
+   "p_home_blend": 0.4562,
    "exp_margin_home": -0.1,
    "exp_total_points": 46.8
   },
@@ -78,7 +78,7 @@
    "p_home_elo": 0.4238,
    "p_home_poisson": 0.4587,
    "p_home_gbm": 0.4728,
-   "p_home_blend": 0.3948,
+   "p_home_blend": 0.3766,
    "exp_margin_home": -1.6,
    "exp_total_points": 45.3
   },
@@ -89,9 +89,9 @@
    "home": "Gold Coast Titans",
    "away": "Cronulla-Sutherland Sharks",
    "p_home_elo": 0.3254,
-   "p_home_poisson": 0.4352,
+   "p_home_poisson": 0.4332,
    "p_home_gbm": 0.4344,
-   "p_home_blend": 0.2847,
+   "p_home_blend": 0.2799,
    "exp_margin_home": -2.7,
    "exp_total_points": 47.7
   },
@@ -104,7 +104,7 @@
    "p_home_elo": 0.8415,
    "p_home_poisson": 0.6299,
    "p_home_gbm": 0.7639,
-   "p_home_blend": 0.8417,
+   "p_home_blend": 0.8495,
    "exp_margin_home": 5.6,
    "exp_total_points": 49.1
   }
@@ -115,128 +115,128 @@
    "date": "2026-08-20 19:50:00",
    "home": "Melbourne Storm",
    "away": "Penrith Panthers",
-   "p_home_blend": 0.3966,
-   "market_p_home": 0.3182,
-   "edge_home": 0.0784,
+   "p_home_blend": 0.4071,
+   "market_p_home": 0.3184,
+   "edge_home": 0.0887,
    "books": 4,
-   "best_odds_home": 3.05,
-   "best_odds_away": 1.4,
-   "disp_home": 0.0167,
-   "disp_away": 0.0,
+   "best_odds_home": 3.0,
+   "best_odds_away": 1.42,
+   "disp_home": 0.0084,
+   "disp_away": 0.0143,
    "value_side": "Melbourne Storm",
-   "value_ev_pct": 20.963
+   "value_ev_pct": 22.13
   },
   {
    "round": "Round 25",
    "date": "2026-08-21 18:00:00",
    "home": "Canberra Raiders",
    "away": "Brisbane Broncos",
-   "p_home_blend": 0.651,
-   "market_p_home": 0.7194,
-   "edge_home": -0.0684,
+   "p_home_blend": 0.6557,
+   "market_p_home": 0.7292,
+   "edge_home": -0.0735,
    "books": 4,
-   "best_odds_home": 1.35,
-   "best_odds_away": 3.65,
-   "disp_home": 0.0189,
-   "disp_away": 0.0735,
+   "best_odds_home": 1.3,
+   "best_odds_away": 3.55,
+   "disp_home": 0.0,
+   "disp_away": 0.0143,
    "value_side": "Brisbane Broncos",
-   "value_ev_pct": 27.385
+   "value_ev_pct": 22.2265
   },
   {
    "round": "Round 25",
    "date": "2026-08-21 20:00:00",
    "home": "Dolphins",
    "away": "Parramatta Eels",
-   "p_home_blend": 0.7982,
+   "p_home_blend": 0.7884,
    "market_p_home": 0.7619,
-   "edge_home": 0.0363,
+   "edge_home": 0.0265,
    "books": 4,
    "best_odds_home": 1.25,
-   "best_odds_away": 4.1,
-   "disp_home": 0.004,
-   "disp_away": 0.025,
+   "best_odds_away": 4.0,
+   "disp_home": 0.0,
+   "disp_away": 0.0,
    "value_side": "Dolphins",
-   "value_ev_pct": -0.225
+   "value_ev_pct": -1.45
   },
   {
    "round": "Round 25",
    "date": "2026-08-22 15:00:00",
    "home": "Newcastle Knights",
    "away": "Manly-Warringah Sea Eagles",
-   "p_home_blend": 0.5413,
-   "market_p_home": 0.6603,
-   "edge_home": -0.119,
+   "p_home_blend": 0.5295,
+   "market_p_home": 0.6576,
+   "edge_home": -0.1281,
    "books": 4,
    "best_odds_home": 1.46,
-   "best_odds_away": 2.88,
-   "disp_home": 0.0139,
-   "disp_away": 0.0286,
+   "best_odds_away": 2.85,
+   "disp_home": 0.0104,
+   "disp_away": 0.027,
    "value_side": "Manly-Warringah Sea Eagles",
-   "value_ev_pct": 32.1056
+   "value_ev_pct": 34.0925
   },
   {
    "round": "Round 25",
    "date": "2026-08-22 17:30:00",
    "home": "South Sydney Rabbitohs",
    "away": "New Zealand Warriors",
-   "p_home_blend": 0.4619,
-   "market_p_home": 0.3827,
-   "edge_home": 0.0792,
+   "p_home_blend": 0.4562,
+   "market_p_home": 0.3853,
+   "edge_home": 0.0709,
    "books": 4,
    "best_odds_home": 2.5,
-   "best_odds_away": 1.58,
-   "disp_home": 0.0,
-   "disp_away": 0.0194,
+   "best_odds_away": 1.6,
+   "disp_home": 0.0142,
+   "disp_away": 0.0323,
    "value_side": "South Sydney Rabbitohs",
-   "value_ev_pct": 15.475
+   "value_ev_pct": 14.05
   },
   {
    "round": "Round 25",
    "date": "2026-08-22 19:35:00",
    "home": "St George Illawarra Dragons",
    "away": "Canterbury-Bankstown Bulldogs",
-   "p_home_blend": 0.3948,
-   "market_p_home": 0.3605,
-   "edge_home": 0.0343,
+   "p_home_blend": 0.3766,
+   "market_p_home": 0.3584,
+   "edge_home": 0.0182,
    "books": 4,
    "best_odds_home": 2.75,
    "best_odds_away": 1.5,
-   "disp_home": 0.0476,
+   "disp_home": 0.0377,
    "disp_away": 0.0135,
    "value_side": "St George Illawarra Dragons",
-   "value_ev_pct": 8.57
+   "value_ev_pct": 3.565
   },
   {
    "round": "Round 25",
    "date": "2026-08-23 14:00:00",
    "home": "Gold Coast Titans",
    "away": "Cronulla-Sutherland Sharks",
-   "p_home_blend": 0.2847,
-   "market_p_home": 0.3584,
-   "edge_home": -0.0737,
+   "p_home_blend": 0.2799,
+   "market_p_home": 0.3605,
+   "edge_home": -0.0806,
    "books": 4,
    "best_odds_home": 2.75,
    "best_odds_away": 1.5,
-   "disp_home": 0.0377,
+   "disp_home": 0.0476,
    "disp_away": 0.0135,
    "value_side": "Cronulla-Sutherland Sharks",
-   "value_ev_pct": 7.295
+   "value_ev_pct": 8.015
   },
   {
    "round": "Round 25",
    "date": "2026-08-23 16:05:00",
    "home": "Sydney Roosters",
    "away": "Wests Tigers",
-   "p_home_blend": 0.8417,
-   "market_p_home": 0.897,
-   "edge_home": -0.0553,
+   "p_home_blend": 0.8495,
+   "market_p_home": 0.8887,
+   "edge_home": -0.0392,
    "books": 4,
    "best_odds_home": 1.07,
-   "best_odds_away": 10.5,
-   "disp_home": 0.0094,
-   "disp_away": 0.1351,
+   "best_odds_away": 11.0,
+   "disp_home": 0.0047,
+   "disp_away": 0.2941,
    "value_side": "Wests Tigers",
-   "value_ev_pct": 66.215
+   "value_ev_pct": 65.55
   }
  ],
  "props": [
@@ -677,11 +677,11 @@
    "team": "Gold Coast Titans",
    "player": "Jaylan De Groot",
    "position": "W",
-   "exp_tries": 0.66,
-   "p_ats": 0.481,
-   "fair_price": 2.08,
+   "exp_tries": 0.65,
+   "p_ats": 0.479,
+   "fair_price": 2.09,
    "p_2plus": 0.14,
-   "fair_2plus": 7.1,
+   "fair_2plus": 7.2,
    "vs_opp": "1t/1g"
   },
   {
@@ -690,10 +690,10 @@
    "player": "Lachlan Ilias",
    "position": "HB",
    "exp_tries": 0.46,
-   "p_ats": 0.369,
-   "fair_price": 2.71,
-   "p_2plus": 0.079,
-   "fair_2plus": 12.7,
+   "p_ats": 0.368,
+   "fair_price": 2.72,
+   "p_2plus": 0.078,
+   "fair_2plus": 12.8,
    "vs_opp": "3t/5g"
   },
   {
@@ -702,10 +702,10 @@
    "player": "Phillip Sami",
    "position": "W",
    "exp_tries": 0.43,
-   "p_ats": 0.351,
-   "fair_price": 2.85,
+   "p_ats": 0.35,
+   "fair_price": 2.86,
    "p_2plus": 0.07,
-   "fair_2plus": 14.2,
+   "fair_2plus": 14.3,
    "vs_opp": "1t/7g"
   },
   {
@@ -714,7 +714,7 @@
    "player": "Ronaldo Mulitalo",
    "position": "W",
    "exp_tries": 0.69,
-   "p_ats": 0.498,
+   "p_ats": 0.497,
    "fair_price": 2.01,
    "p_2plus": 0.152,
    "fair_2plus": 6.6,
@@ -726,10 +726,10 @@
    "player": "Sione Katoa",
    "position": "W",
    "exp_tries": 0.54,
-   "p_ats": 0.416,
-   "fair_price": 2.4,
-   "p_2plus": 0.102,
-   "fair_2plus": 9.8,
+   "p_ats": 0.415,
+   "fair_price": 2.41,
+   "p_2plus": 0.101,
+   "fair_2plus": 9.9,
    "vs_opp": "7t/9g"
   },
   {
@@ -738,10 +738,10 @@
    "player": "Nicho Hynes",
    "position": "HB",
    "exp_tries": 0.51,
-   "p_ats": 0.398,
-   "fair_price": 2.51,
+   "p_ats": 0.397,
+   "fair_price": 2.52,
    "p_2plus": 0.092,
-   "fair_2plus": 10.8,
+   "fair_2plus": 10.9,
    "vs_opp": "7t/8g"
   },
   {
@@ -824,11 +824,11 @@
    "n_legs": 6,
    "tier": "longshot",
    "legs": "['away_win', 'ats 28465', 'ats 24765', 'ats 2282', 'total over 42.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5366, 0.4986, 0.416, 0.2746, 0.561, 0.2947]",
-   "p_joint": 0.0287,
-   "fair_price": 34.87,
-   "p_independent": 0.0051,
-   "correlation_lift": 5.678
+   "leg_probs": "[0.5368, 0.4973, 0.4167, 0.2724, 0.5578, 0.2928]",
+   "p_joint": 0.0286,
+   "fair_price": 34.94,
+   "p_independent": 0.0049,
+   "correlation_lift": 5.783
   },
   {
    "match": "Canberra Raiders v Brisbane Broncos",
@@ -932,11 +932,11 @@
    "n_legs": 4,
    "tier": "longshot",
    "legs": "['away_win', 'tries2+ 28465', 'ats 24765', 'total over 50.5']",
-   "leg_probs": "[0.5366, 0.1512, 0.416, 0.3706]",
-   "p_joint": 0.0349,
-   "fair_price": 28.69,
-   "p_independent": 0.0125,
-   "correlation_lift": 2.788
+   "leg_probs": "[0.5368, 0.1504, 0.4167, 0.3667]",
+   "p_joint": 0.035,
+   "fair_price": 28.54,
+   "p_independent": 0.0123,
+   "correlation_lift": 2.84
   },
   {
    "match": "St George Illawarra Dragons v Canterbury-Bankstown Bulldogs",
@@ -1016,11 +1016,11 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['margin_band CRO 13 60', 'ats 28465', 'ats 24765', 'total over 42.5']",
-   "leg_probs": "[0.2555, 0.4986, 0.416, 0.561]",
-   "p_joint": 0.0715,
-   "fair_price": 13.99,
-   "p_independent": 0.0297,
-   "correlation_lift": 2.404
+   "leg_probs": "[0.2516, 0.4973, 0.4167, 0.5578]",
+   "p_joint": 0.0697,
+   "fair_price": 14.36,
+   "p_independent": 0.0291,
+   "correlation_lift": 2.395
   },
   {
    "match": "Dolphins v Parramatta Eels",
@@ -1124,11 +1124,11 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['away_win', 'ats 28465', 'ats 24765', 'total over 42.5']",
-   "leg_probs": "[0.5366, 0.4986, 0.416, 0.561]",
-   "p_joint": 0.1127,
-   "fair_price": 8.87,
-   "p_independent": 0.0624,
-   "correlation_lift": 1.805
+   "leg_probs": "[0.5368, 0.4973, 0.4167, 0.5578]",
+   "p_joint": 0.114,
+   "fair_price": 8.77,
+   "p_independent": 0.0621,
+   "correlation_lift": 1.838
   },
   {
    "match": "St George Illawarra Dragons v Canterbury-Bankstown Bulldogs",
@@ -1227,6 +1227,18 @@
    "correlation_lift": 1.477
   },
   {
+   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
+   "combo": "Cronulla-Sutherland Sharks win \u00d7 ATS Ronaldo Mulitalo \u00d7 total over 50.5",
+   "n_legs": 3,
+   "tier": "big",
+   "legs": "['away_win', 'ats 28465', 'total over 50.5']",
+   "leg_probs": "[0.5368, 0.4973, 0.3667]",
+   "p_joint": 0.1439,
+   "fair_price": 6.95,
+   "p_independent": 0.0979,
+   "correlation_lift": 1.47
+  },
+  {
    "match": "Canberra Raiders v Brisbane Broncos",
    "combo": "Brisbane Broncos win \u00d7 ATS Josiah Karapani \u00d7 total over 50.5",
    "n_legs": 3,
@@ -1249,18 +1261,6 @@
    "fair_price": 7.22,
    "p_independent": 0.095,
    "correlation_lift": 1.458
-  },
-  {
-   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
-   "combo": "Cronulla-Sutherland Sharks win \u00d7 ATS Ronaldo Mulitalo \u00d7 total over 50.5",
-   "n_legs": 3,
-   "tier": "big",
-   "legs": "['away_win', 'ats 28465', 'total over 50.5']",
-   "leg_probs": "[0.5366, 0.4986, 0.3706]",
-   "p_joint": 0.143,
-   "fair_price": 6.99,
-   "p_independent": 0.0991,
-   "correlation_lift": 1.443
   },
   {
    "match": "South Sydney Rabbitohs v New Zealand Warriors",
@@ -1328,11 +1328,11 @@
    "n_legs": 2,
    "tier": "big",
    "legs": "['away_win', 'tries2+ 28465']",
-   "leg_probs": "[0.5366, 0.1512]",
+   "leg_probs": "[0.5368, 0.1504]",
    "p_joint": 0.1132,
-   "fair_price": 8.83,
-   "p_independent": 0.0811,
-   "correlation_lift": 1.396
+   "fair_price": 8.84,
+   "p_independent": 0.0807,
+   "correlation_lift": 1.402
   },
   {
    "match": "South Sydney Rabbitohs v New Zealand Warriors",
@@ -1424,23 +1424,35 @@
    "n_legs": 3,
    "tier": "big",
    "legs": "['away_win', 'ats 28465', 'ats 24765']",
-   "leg_probs": "[0.5366, 0.4986, 0.416]",
-   "p_joint": 0.1535,
-   "fair_price": 6.52,
-   "p_independent": 0.1113,
-   "correlation_lift": 1.379
+   "leg_probs": "[0.5368, 0.4973, 0.4167]",
+   "p_joint": 0.1538,
+   "fair_price": 6.5,
+   "p_independent": 0.1112,
+   "correlation_lift": 1.382
   },
   {
-   "match": "South Sydney Rabbitohs v New Zealand Warriors",
-   "combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 total over 50.5",
+   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
+   "combo": "Cronulla-Sutherland Sharks win \u00d7 ATS Ronaldo Mulitalo \u00d7 match tries over 7.5",
    "n_legs": 3,
-   "tier": "big",
-   "legs": "['away_win', 'ats 35142', 'total over 50.5']",
-   "leg_probs": "[0.473, 0.62, 0.3788]",
-   "p_joint": 0.1526,
-   "fair_price": 6.55,
-   "p_independent": 0.1111,
-   "correlation_lift": 1.373
+   "tier": "value",
+   "legs": "['away_win', 'ats 28465', 'tries_total over 7.5']",
+   "leg_probs": "[0.5368, 0.4973, 0.5565]",
+   "p_joint": 0.2045,
+   "fair_price": 4.89,
+   "p_independent": 0.1486,
+   "correlation_lift": 1.377
+  },
+  {
+   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
+   "combo": "Cronulla-Sutherland Sharks win \u00d7 ATS Ronaldo Mulitalo \u00d7 total over 42.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['away_win', 'ats 28465', 'total over 42.5']",
+   "leg_probs": "[0.5368, 0.4973, 0.5578]",
+   "p_joint": 0.2048,
+   "fair_price": 4.88,
+   "p_independent": 0.1489,
+   "correlation_lift": 1.375
   },
   {
    "match": "Canberra Raiders v Brisbane Broncos",
@@ -1455,16 +1467,16 @@
    "correlation_lift": 1.373
   },
   {
-   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
-   "combo": "Cronulla-Sutherland Sharks win \u00d7 ATS Ronaldo Mulitalo \u00d7 match tries over 7.5",
+   "match": "South Sydney Rabbitohs v New Zealand Warriors",
+   "combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 total over 50.5",
    "n_legs": 3,
-   "tier": "value",
-   "legs": "['away_win', 'ats 28465', 'tries_total over 7.5']",
-   "leg_probs": "[0.5366, 0.4986, 0.5589]",
-   "p_joint": 0.2039,
-   "fair_price": 4.9,
-   "p_independent": 0.1495,
-   "correlation_lift": 1.364
+   "tier": "big",
+   "legs": "['away_win', 'ats 35142', 'total over 50.5']",
+   "leg_probs": "[0.473, 0.62, 0.3788]",
+   "p_joint": 0.1526,
+   "fair_price": 6.55,
+   "p_independent": 0.1111,
+   "correlation_lift": 1.373
   },
   {
    "match": "Sydney Roosters v Wests Tigers",
@@ -1477,18 +1489,6 @@
    "fair_price": 5.35,
    "p_independent": 0.1371,
    "correlation_lift": 1.364
-  },
-  {
-   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
-   "combo": "Cronulla-Sutherland Sharks win \u00d7 ATS Ronaldo Mulitalo \u00d7 total over 42.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['away_win', 'ats 28465', 'total over 42.5']",
-   "leg_probs": "[0.5366, 0.4986, 0.561]",
-   "p_joint": 0.2046,
-   "fair_price": 4.89,
-   "p_independent": 0.1501,
-   "correlation_lift": 1.363
   },
   {
    "match": "Newcastle Knights v Manly-Warringah Sea Eagles",
@@ -1616,11 +1616,11 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['away_win', 'ats 28465', 'ats 37323', 'total over 42.5']",
-   "leg_probs": "[0.5366, 0.4986, 0.48, 0.561]",
-   "p_joint": 0.0963,
-   "fair_price": 10.38,
-   "p_independent": 0.072,
-   "correlation_lift": 1.337
+   "leg_probs": "[0.5368, 0.4973, 0.4795, 0.5578]",
+   "p_joint": 0.0954,
+   "fair_price": 10.49,
+   "p_independent": 0.0714,
+   "correlation_lift": 1.336
   },
   {
    "match": "St George Illawarra Dragons v Canterbury-Bankstown Bulldogs",
@@ -1647,18 +1647,6 @@
    "correlation_lift": 1.334
   },
   {
-   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
-   "combo": "Cronulla-Sutherland Sharks by 13+ \u00d7 ATS Ronaldo Mulitalo",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['margin_band CRO 13 60', 'ats 28465']",
-   "leg_probs": "[0.2555, 0.4986]",
-   "p_joint": 0.1687,
-   "fair_price": 5.93,
-   "p_independent": 0.1274,
-   "correlation_lift": 1.325
-  },
-  {
    "match": "South Sydney Rabbitohs v New Zealand Warriors",
    "combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 match tries over 7.5",
    "n_legs": 3,
@@ -1669,6 +1657,18 @@
    "fair_price": 4.55,
    "p_independent": 0.1665,
    "correlation_lift": 1.321
+  },
+  {
+   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
+   "combo": "Cronulla-Sutherland Sharks by 13+ \u00d7 ATS Ronaldo Mulitalo",
+   "n_legs": 2,
+   "tier": "big",
+   "legs": "['margin_band CRO 13 60', 'ats 28465']",
+   "leg_probs": "[0.2516, 0.4973]",
+   "p_joint": 0.165,
+   "fair_price": 6.06,
+   "p_independent": 0.1251,
+   "correlation_lift": 1.318
   },
   {
    "match": "South Sydney Rabbitohs v New Zealand Warriors",
@@ -1916,10 +1916,10 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['line CRO -2.5', 'ats 28465']",
-   "leg_probs": "[0.4882, 0.4986]",
-   "p_joint": 0.2929,
-   "fair_price": 3.41,
-   "p_independent": 0.2434,
+   "leg_probs": "[0.4888, 0.4973]",
+   "p_joint": 0.2924,
+   "fair_price": 3.42,
+   "p_independent": 0.2431,
    "correlation_lift": 1.203
   },
   {
@@ -2043,18 +2043,6 @@
    "correlation_lift": 0.996
   },
   {
-   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
-   "combo": "ATS Ronaldo Mulitalo \u00d7 ATS Jaylan De Groot",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['ats 28465', 'ats 37323']",
-   "leg_probs": "[0.4986, 0.48]",
-   "p_joint": 0.2382,
-   "fair_price": 4.2,
-   "p_independent": 0.2393,
-   "correlation_lift": 0.995
-  },
-  {
    "match": "Sydney Roosters v Wests Tigers",
    "combo": "ATS Mark Nawaqanitawase \u00d7 ATS Jeral Skelton",
    "n_legs": 2,
@@ -2065,6 +2053,18 @@
    "fair_price": 3.59,
    "p_independent": 0.2802,
    "correlation_lift": 0.994
+  },
+  {
+   "match": "Gold Coast Titans v Cronulla-Sutherland Sharks",
+   "combo": "ATS Ronaldo Mulitalo \u00d7 ATS Jaylan De Groot",
+   "n_legs": 2,
+   "tier": "value",
+   "legs": "['ats 28465', 'ats 37323']",
+   "leg_probs": "[0.4973, 0.4795]",
+   "p_joint": 0.2359,
+   "fair_price": 4.24,
+   "p_independent": 0.2384,
+   "correlation_lift": 0.989
   }
  ],
  "signals": [
@@ -2075,9 +2075,9 @@
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 10.1,
-    "temp_c": 13.4,
+    "precip_prob": 2,
+    "wind_kmh": 11.5,
+    "temp_c": 13.5,
     "forecast_hour": "2026-08-20T19:00"
    },
    "weather_try_mult": 1.0,
@@ -2098,9 +2098,9 @@
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 13,
-    "wind_kmh": 10.6,
-    "temp_c": 11.5,
+    "precip_prob": 0,
+    "wind_kmh": 12.8,
+    "temp_c": 10.8,
     "forecast_hour": "2026-08-21T18:00"
    },
    "weather_try_mult": 1.0,
@@ -2165,11 +2165,6 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "Manly-Warringah Sea Eagles: Tom Trbojevic named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "Newcastle Knights news: Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com"
     }
    ]
   },
@@ -2187,11 +2182,6 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "New Zealand Warriors: Luke Hanson named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "South Sydney Rabbitohs news: Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com"
     }
    ]
   },
@@ -2214,11 +2204,6 @@
      "severity": "info",
      "kind": "news",
      "text": "St George Illawarra Dragons news: Dragons\u2019 puzzling switch following setback; Tigers gun ruled out \u2014 Late Mail - Fox Sports"
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "St George Illawarra Dragons news: Dragons v Wests Tigers: Dragons stick solid; Luai sidelined - NRL.com"
     }
    ]
   },
@@ -2229,14 +2214,14 @@
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 65,
-    "wind_kmh": 11.7,
-    "temp_c": 21.0,
+    "precip_prob": 73,
+    "wind_kmh": 10.1,
+    "temp_c": 20.2,
     "forecast_hour": "2026-08-23T14:00"
    },
-   "weather_try_mult": 0.973,
+   "weather_try_mult": 0.969,
    "baseline_total": 47.7,
-   "adjusted_total": 46.4,
+   "adjusted_total": 46.2,
    "flags": [
     {
      "severity": "warn",
@@ -2261,7 +2246,7 @@
     {
      "severity": "info",
      "kind": "weather",
-     "text": "65% rain / 0.0mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
+     "text": "73% rain / 0.0mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
     }
    ]
   },
@@ -2271,10 +2256,10 @@
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.3,
-    "precip_prob": 20,
-    "wind_kmh": 12.0,
-    "temp_c": 17.4,
+    "precip_mm": 0.1,
+    "precip_prob": 4,
+    "wind_kmh": 12.5,
+    "temp_c": 16.8,
     "forecast_hour": "2026-08-23T16:00"
    },
    "weather_try_mult": 1.0,

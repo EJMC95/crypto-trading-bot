@@ -1,8 +1,8 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1223,
-  "fair_price": 8.18,
+  "p_joint": 0.1226,
+  "fair_price": 8.16,
   "legs": [
    "Sydney Roosters to win",
    "Dolphins to win",
@@ -12,8 +12,8 @@
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0397,
-  "fair_price": 25.21,
+  "p_joint": 0.0396,
+  "fair_price": 25.22,
   "legs": [
    "Sydney Roosters win & Mark Nawaqanitawase try",
    "Dolphins win & Jack Bostock try",

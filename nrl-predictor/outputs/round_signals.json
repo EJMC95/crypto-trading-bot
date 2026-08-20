@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 25,
- "scanned_at": "2026-08-18T08:07:19+00:00",
+ "scanned_at": "2026-08-20T00:33:49+00:00",
  "games": [
   {
    "home": "Melbourne Storm",
@@ -322,9 +322,9 @@
    ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 10.1,
-    "temp_c": 13.4,
+    "precip_prob": 2,
+    "wind_kmh": 11.5,
+    "temp_c": 13.5,
     "forecast_hour": "2026-08-20T19:00"
    },
    "news": [],
@@ -660,9 +660,9 @@
    ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 13,
-    "wind_kmh": 10.6,
-    "temp_c": 11.5,
+    "precip_prob": 0,
+    "wind_kmh": 12.8,
+    "temp_c": 10.8,
     "forecast_hour": "2026-08-21T18:00"
    },
    "news": [],
@@ -998,7 +998,17 @@
    ],
    "weather": null,
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Sea Eagles v Dolphins: Faulalo returns; Stone back on deck - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxONWY0aVpLeVlDVHEtejNKdUt2dGVFOE1MNTlKQUtRV25Rb0s3TTJxNFdIOUliVnZ0YzJvLVVkUkNSZXpHQ0stLTJVQjBZekRPTWg0dzZGWUY5WjRQOTNoRU5tenRBejFIWXpBQWxacGxlTWU4NGE4c2VmOGxtUlJtSEphdldJeERIcG1LNGtmcVRGNU5CeVhyRlFR?oc=5",
+     "published": "Fri, 14 Aug 2026 06:34:02 GMT"
+    }
+   ],
    "news_away": []
   },
   {
@@ -1320,17 +1330,7 @@
    ],
    "weather": null,
    "news": [],
-   "news_home": [
-    {
-     "headline": "Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com",
-     "flags": [
-      "out"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxNQ3FfN1M3X2JmcEk4VDZBNUxoZlZzaWJ5SUFOUDZKSzlFMGQtbm1uMDdNLXpmVGh3QmF6SEVPcjNYRDRSQTBoQ0R2WVZLQllLdWdrYTd3YVk1TV9Fd3V2LTJfUE82bllDSTFFdGhidXF2c09HUW0xeTUtTzAzem8xS0p6X3hYcnJJcHo3OHg2aXVhZnJTZXBn?oc=5",
-     "published": "Fri, 24 Jul 2026 07:00:00 GMT"
-    }
-   ],
+   "news_home": [],
    "news_away": []
   },
   {
@@ -1652,17 +1652,7 @@
    ],
    "weather": null,
    "news": [],
-   "news_home": [
-    {
-     "headline": "Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com",
-     "flags": [
-      "out"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNR3VXN2lUTXhpam83Qnp0elBKcG5IU3JwY1pISFU2LUdoWWNYcUJmeUIxZnIyT1JGOG14UDloeXNieTVJSE5vQlZmcUZQVE1FX3pHTHlLdGNremZBYk1faHZLUGRnOWdGX0pYZXhfMzNwbDJ5Zm1wckJsQ2NNZzNBMXJyN3psbHJxdVdkUmIxdHdpakxt?oc=5",
-     "published": "Fri, 24 Jul 2026 07:00:00 GMT"
-    }
-   ],
+   "news_home": [],
    "news_away": [
     {
      "headline": "Bulldogs v Warriors: Crichton returns; Webster sticks solid - NRL.com",
@@ -2002,16 +1992,7 @@
      ],
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMipAJBVV95cUxNdFhFV0lpcGUtY2dqXzQ0RzRyUU14NU5XWVE0NnYwakZWMU9uQzNTczFfeklOcXRYY01uZ1lZV1dpSnllSHRTRkhWYnZYRVlFblNjV0pYdzBFZXFfZFZSQi1nTXJxSXJIbGhkcWJ6TmJlV3RxVDJCSXRMX3lIbUtFNUFWdlQ3Q09KLUZ5SGtIbXZLUjJTWHFlZnJqdmhIVWE5MkNhUERqeTVnSnhpOXVUbWRjb3BqR3JpbFBWRE9sWEJENk1JVlpKbkZ4X3kxUXpFZ0V1Y1NsTmRWYmpEOW00MWZLM3oxNGR0YVpfdU0xX2NHOENkeGRPbXpzbElKak9oSFJiZ3pMYWZ6TnJTT0c5Wjd6VGNEUkVlR3psbDZ6Yl9lSGty0gGkAkFVX3lxTE10WEVXSWlwZS1jZ2pfNDRHNHJRTXg1TldZUTQ2djBqRlYxT25DM1NzMV96SU5xdFhjTW5nWVlXV2lKeWVIdFNGSFZidlhFWUVuU2NXSlh3MEVlcV9kVlJCLWdNcnFJckhsaGRxYnpOYmVXdHFUMkJJdExfeUhtS0U1QVZ2VDdDT0otRnlIa0htdktSMlNYcWVmcmp2aEhVYTkyQ2FQRGp5NWdKeGk5dVRtZGNvcGpHcmlsUFZET2xYQkQ2TUlWWkpuRnhfeTFRekVnRXVjU2xOZFZiakQ5bTQxZkszejE0ZHRhWl91TTFfY0c4Q2R4ZE9tenNsSUpqT2hIUmJnekxhZnpOclNPRzlaN3pUY0RSRWVHemxsNnpiX2VIa3I?oc=5",
-     "published": "Wed, 12 Aug 2026 03:55:39 GMT"
-    },
-    {
-     "headline": "Dragons v Wests Tigers: Dragons stick solid; Luai sidelined - NRL.com",
-     "flags": [
-      "out"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxPQlRwX1RHM2k3aXdwUFpvS0JUOVZzZ1M3WUxtRUVDaHVKSnc3ZzBUX0RDbGdLeG1OUnJoTmNjSXByLUhHYWJ2OUFDOVBNdGxwQ3FpOEttYUxfUExoUE42eENldXRHWVE5T1lISS1rV2N5cEszeDc1d0o3Z3hLUmVyLWVGa1FucnVaSEtlVDlYYTJibFJI?oc=5",
-     "published": "Sat, 04 Jul 2026 07:00:00 GMT"
+     "published": "Sun, 16 Aug 2026 04:44:56 GMT"
     }
    ],
    "news_away": []
@@ -2335,24 +2316,14 @@
    ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 65,
-    "wind_kmh": 11.7,
-    "temp_c": 21.0,
+    "precip_prob": 73,
+    "wind_kmh": 10.1,
+    "temp_c": 20.2,
     "forecast_hour": "2026-08-23T14:00"
    },
    "news": [],
    "news_home": [],
-   "news_away": [
-    {
-     "headline": "Cowboys v Sharks: Nanai returns; McInnes back on deck - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOeUhVSDh0b2Z5LVY0TWZ5cGRIZ1ZxaFltTWUydXlaUjBNZXAtdnNQYjVLQmVEbTZDX0VZOGxpSHAtRXJpR0h4c2ZmWGpuMVdTOWhfQnlNcXJaMkl1QmlLbkI4eXBVWDQya3VzZGtlcVFXZHpJQXA5YjdoWTk3R3NuU3J0d0J2LUJhVnQ0SjdFWXp5QQ?oc=5",
-     "published": "Fri, 24 Apr 2026 07:00:00 GMT"
-    }
-   ]
+   "news_away": []
   },
   {
    "home": "Sydney Roosters",
@@ -2672,14 +2643,24 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.3,
-    "precip_prob": 20,
-    "wind_kmh": 12.0,
-    "temp_c": 17.4,
+    "precip_mm": 0.1,
+    "precip_prob": 4,
+    "wind_kmh": 12.5,
+    "temp_c": 16.8,
     "forecast_hour": "2026-08-23T16:00"
    },
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Roosters v Wests Tigers: Teddy returns; Doueihi set for surgery - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMinwFBVV95cUxOallMRWpCMVowdkxFOHNWUVhIbEYtbUV4OWRIWlJrczhlMjNsYWJxWm53cVhveHNVV1RfMzkwV1o0VWlnZ2xkdUFzcHpXZ3hDNV9jbDA3RDZta2dKeWNmZTl4VTN0cmFoQ055c2NNdTYwMTZGLU1RQVdyMjVMakdkOGx1ZlFVY04xZXlKVWViUTk4QVJjRGpacl83Wm16dUE?oc=5",
+     "published": "Tue, 18 Aug 2026 08:01:41 GMT"
+    }
+   ],
    "news_away": [
     {
      "headline": "Roosters v Wests Tigers: Teddy returns; Doueihi set for surgery - NRL.com",
