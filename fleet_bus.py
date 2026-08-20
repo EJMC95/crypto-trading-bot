@@ -391,7 +391,7 @@ def long_symbol_blocked(base, current_time=None):
 
 
 def market_margins(sym=None, current_time=None):
-    """[2026-08-20 (sd)] The venue's OWN margin surface, per market.
+    """[2026-08-20 (se)] The venue's OWN margin surface, per market.
 
     Returns `{sym: {"max_lev": float, "imf_bps": float, "mmf_bps": float}}`, or
     a single market's dict when `sym` is given, or `None`/`{}` when the scout is
@@ -429,7 +429,7 @@ def market_margins(sym=None, current_time=None):
 
 
 def max_leverage(sym, default=1.0, current_time=None):
-    """[2026-08-20 (sd)] The venue's max leverage for one market, or `default`.
+    """[2026-08-20 (se)] The venue's max leverage for one market, or `default`.
 
     `default=1.0` is deliberate and load-bearing: an unreadable margin means the
     caller gets UNLEVERED sizing, never a guess. Raising the default would turn

@@ -200,7 +200,7 @@ def book_stats(books, min_qvol):
                                    and not isinstance(b.get("strategy_index"),
                                                       bool)
                                    else None),
-                # [2026-08-20 (sd)] THE VENUE'S MARGIN SURFACE — the third time
+                # [2026-08-20 (se)] THE VENUE'S MARGIN SURFACE — the third time
                 # this exact story has repeated on this endpoint, after
                 # `created_at` and `strategy_index`: it is on every row of a
                 # response this organ already fetches, and the whole fleet threw
@@ -602,7 +602,7 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # the field over any list, stated as a number.
         "classes": {s: v["strategy_index"] for s, v in stats.items()
                     if v.get("strategy_index") is not None},
-        # [2026-08-20 (sd)] THE LEVERAGE SURFACE, published for the first time.
+        # [2026-08-20 (se)] THE LEVERAGE SURFACE, published for the first time.
         # OPERATOR MANDATE: *"you have not set the bots up in any way that we
         # could ever really even use leverage ... we should be running this
         # mandate and doctrine on building bots that can utilize every aspect of

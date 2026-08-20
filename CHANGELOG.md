@@ -1,4 +1,8 @@
-## 2026-08-20 (sd) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
+## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
+
+[Renumbered (sd) -> (se): main took (sd) for the nav-cook leverage entry while
+this was in flight — the fourth letter collision on this branch tonight. 5 code
+citations moved, counted per file.]
 
 **Operator: *"everything you have put forward that is unreachable is because its
 one construct, one set of tradeables, one set of entry and exits which havent
@@ -57,6 +61,32 @@ book's sizing changes on this commit. A test walks the AST of every
 `market_margins`, so the first consumer has to announce itself deliberately and
 bring its own measured pass and its own ruin arithmetic rather than arriving
 quietly.
+
+**AND IT IMMEDIATELY EARNED ITSELF — a ruin table shipped hours earlier omits the
+maintenance margin entirely.** `(sd)`, merged on `main` while this branch was in
+flight, ships **3× on 🧭 nav-cook** with a liquidation column computed as
+`liq@ = 1/L`. That is the distance to ZERO equity, not to liquidation: the venue
+closes a position out at its **maintenance margin**, so the true distance is
+`1/L − mmf`. The correction needs the very field this entry publishes — and
+`mmf` is **not a constant**, it ranges **200 to 1200 bps across nav-cook's own
+markets**:
+
+| L | (sd) table `liq@` | TRUE worst-market `liq@` | 5% stop still first? |
+|---:|---:|---:|---|
+| **3 (shipped)** | 33.3% | **21.3%** (KAITO) | **YES — safe** |
+| 5 (its "ceiling") | 20.0% | 8.0% (KAITO) | yes |
+| 8 | 12.5% | **0.5%** (KAITO) | **NO — liquidates first** |
+| 12 | 8.3% | **−3.7%** (KAITO) | **NO — unreachable** |
+
+**THE SHIPPED CONFIGURATION IS SAFE and this does not question it** — at 3× the
+worst market needs a 21.3% adverse move against a 5% stop. What does not survive
+is that entry's claim that *"the stop fires before liquidation at EVERY level to
+12×"*: it fails on KAITO (mmf 12%) from 8×, and on H100 (mmf 6%) at 12×. The
+hazard is therefore not today's book — it is the next session raising the lever
+on that table's authority. Two independent sessions reached leverage the same
+night, one sizing it and one giving the fleet sight of the limits; the sizing
+arrived first and could not see them. That is the argument for this field,
+written by events rather than by me.
 
 **THE ARITHMETIC THIS DOES NOT WAIVE, stated because it is design input and will
 otherwise be mistaken for a promise:** leverage `k` multiplies per-trade mean AND

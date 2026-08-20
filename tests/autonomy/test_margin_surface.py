@@ -1,4 +1,4 @@
-"""[2026-08-20 (sd)] THE FLEET COULD NOT SEE LEVERAGE, SO IT NEVER USED ANY.
+"""[2026-08-20 (se)] THE FLEET COULD NOT SEE LEVERAGE, SO IT NEVER USED ANY.
 
 Operator mandate, 2026-08-20: *"you have not set the bots up in any way that we
 could ever really even use leverage ... we should be running this mandate and
