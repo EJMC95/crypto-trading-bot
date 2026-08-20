@@ -81,6 +81,25 @@ jobs:
       - name: The guard must still be able to see (negative fixtures)
         run: python3 scripts/audit_recurrence.py --selftest
 
+  book-spend:
+    name: A book must spend the ecosystem (I22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-08-20] I22's teeth. days-to-gate = (2/S_d)^2 and S_d^2 is ADDITIVE
+      # across independent sleeves, so one construct is one term in that sum and
+      # a single-sleeve book earns a DECISION more slowly by the square — the
+      # arithmetic behind every I17 retirement this fleet has made. Scoped to
+      # BIRTHS: a book born on or after I22 publishes what it spends of the
+      # ecosystem; the 19 books that predate it are GRANDFATHERED with reasons,
+      # so the guard governs new work instead of shouting about history.
+      # The selftest runs FIRST and offline: the live arm needs the public feed,
+      # and a network wobble must never be able to masquerade as a pass.
+      - name: The guard must still be able to see (negative fixtures)
+        run: python3 scripts/audit_book_spend.py --selftest
+      - name: Every post-I22 book publishes its spend census
+        run: python3 scripts/audit_book_spend.py
+
   lever-bounds:
     name: Every lever cage fits the value its consumer runs
     runs-on: ubuntu-latest

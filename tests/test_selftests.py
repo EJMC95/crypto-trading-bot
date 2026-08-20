@@ -78,6 +78,13 @@ SELFTEST_MODULES = [
     # tests/autonomy/test_winners_docket.py carries the mutation-verified
     # structural pins (5 of 5 red).
     "scripts.winners_docket",
+    # [2026-08-20 I22] the BOOK SPEND census. SELFTEST_MODULES and deliberately
+    # NOT ENFORCED_AUDITS, the same reason as winners_docket directly above: its
+    # live arm reads the public /pnl.json, which moves with every publish and no
+    # code change, and a network wobble must never be able to read as a pass.
+    # The --selftest is offline and pure. The live scan runs in CI, in
+    # changelog-check.yml's `book-spend` job, with the selftest ahead of it.
+    "scripts.audit_book_spend",
     # [2026-07-28] breakout-quality study: --selftest is offline-green &
     # stdlib-only (verified `python -m scripts.analyze_breakout_quality
     # --selftest` on a bare interpreter); registering it here fixes the
