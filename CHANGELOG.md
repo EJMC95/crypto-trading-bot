@@ -1,3 +1,106 @@
+## 2026-08-19 (rs) — FEWER GUARDS, MORE ROOM: the taker gets the fix instead of my exemption, the Navigator stops being flagged for trading, and the organ that asks "does this book have room to grow" can finally see 8 books it had never heard of — one of them REAL MONEY
+
+**Operator: *"Fix, open the horizons, give them room to breathe and grow. Not so
+much nervous parenting."*** Read as a correction to my own posture, and it was
+the right correction: my previous pass answered a true finding with a
+SUPPRESSION and answered a fast book with a PERMANENT WARNING. Both are undone
+here, and the fix each was standing in for is shipped instead.
+
+**1 — THE TAKER GETS THE LADDER; MY EXEMPTION IS DELETED.** `(rq)` established
+that the `STAGGER_OK` entry I added was silencing a TRUE positive: the shadow
+Ticket Taker — the control arm every go-live rests on — carried a bare
+`( sleep 210` with no early run, so a merge burst could starve it of its first
+run entirely, and its row is held to a **900s** bar that a 1034s burst exceeds.
+I kept the suppression and named PR #192 as the owner of the real fix. Fifteen
+hours later that PR was still open on a stale base. **So the four lines shipped
+here** — `sleep 20; run once; sleep 190;` then the unchanged loop, so every
+later run still lands at t=210/510/810 and exactly one run is added — and
+`STAGGER_OK` is now **EMPTY**, with a note saying it should stay that way.
+Verified the honest way: the audit exits 0 and the taker's row reads
+`20s / 300s / 0m / mitigated`, i.e. **the ladder is carrying it, not a
+declaration**. `bash -n` clean. If #192 lands later the same block is already
+correct and the conflict is trivial. *An exemption silences the guard; a ladder
+removes the condition.*
+
+**2 — THE NAVIGATOR STOPS BEING FLAGGED FOR TRADING.** I set 🧭 nav-cook's
+`OVERTRADE_LIMIT` to 20 from its DESIGN ("4h hold x 4 slots") and then, when the
+tape showed **55.9 closes/day**, argued the permanent warning was a true
+positive worth keeping. That is the nervous reading. A threshold that is always
+on is not a signal — it is the `(gl)` cry-wolf shape, and it trains the operator
+to ignore the chip. **20 → 120**, ~2x its observed normal, so the card flags a
+real DOUBLING. The genuine question underneath — 56/day against a founding study
+that chose 4h *"for decidability at ~1.5 closes/day"*, with no re-entry cooldown
+where its sibling 🪁 band-kelly has one — is recorded in `(rq)` and belongs to
+the nav-cook session. It does not belong in a permanently lit warning.
+
+**3 — 🌱 AGRONOMY WAS BLIND TO 8 OF 18 LIVING BOOKS, INCLUDING A REAL-MONEY
+ROW.** This is the one that actually matters for "room to grow", because
+`fleet_agronomy` is the organ whose entire question is *"does this plant have
+light and water"* — and measured against the live feed it covered **10 of 18
+rows**. Invisible to it: the whole BOOKS/BAND/NAV cohort born 13–19 Aug
+(band-garrett, band-kelly, book-douglas, book-grimes, book-hull, book-kiyosaki,
+nav-cook) and **`freqtrade-avo-maria-lighter` — the LIVE book**. Worse than
+absence: it still specced `lighter-ticket-taker-lighter`, the live arm 🙏 Avo
+REPLACED on 13-Aug `(ma)`, so the standing scan described a book that no longer
+trades and said nothing about the one holding real money. That is `(ci)`/`(ma)`
+exactly — *a standing audit rule that names a retired bot sends every future
+audit to check the wrong file* — landing on the organ meant to notice a starved
+book. **All 8 now specced (23 → 31).** The seven shadow books share an
+`_envonly()` shape whose `levers=()` is the TRUE statement about them, not a
+placeholder: the growth rail cannot move one knob on any of them, deliberately
+(the Garrett choice), and now the organ can SAY so. Knob floors are MEASURED
+(counted env-read module constants: 6/9/8/8/8/6, and 35 for Garrett because it
+is a variant instance of the Farmer's module and none of those 35 is reachable
+from it). 🙏 Avo's spec records what was verified rather than assumed: it sizes
+off its OWN `live.avo.clip_scale`, **not** the shared `live.clip_scale`, so the
+board moving the Farmer's dial cannot resize it.
+
+**SAID PLAINLY BEFORE ANYONE READS THIS AS MORE THAN IT IS: THIS ORGAN DOES
+NOT RUN.** `fleet_agronomy` has been DECLARED not-wired since 2026-07-22 — its
+own docstring says *"not in run_all.sh, has no COPY in any Dockerfile, and has
+no consumer... a thermometer sitting on the bench — run it by hand"* — and I
+confirmed it against the live bus rather than the docstring: `fleet-agronomy`
+is **ABSENT from /bus.json's 30 keys**, i.e. it has never published. So what
+this pass bought is a thermometer that is ACCURATE WHEN SOMEONE READS IT, not
+a new signal arriving anywhere. Wiring it is the review decision its own header
+reserves (loop + COPY + `--publish` together), and it is NOT taken here.
+**And one fidelity note that falls straight out of running it by hand:** a
+spec with `guards=()` reads **`clear`** on the guards check, so a book with
+guards I had not declared would publish reassurance it had not earned — the
+"green-but-empty" shape this organ's own doctrine names. Caught on 🪁
+band-kelly, which really does carry two persisted re-entry guards (a 2h dip
+cooldown and the ghost's condition-based non-convergence embargo, the exact
+`duration_h=None` case the `Guard` docstring cites), so it now gets a FULL
+spec instead of the env-only shape. The remaining six env-only books declare
+`guards=()` because that is what their source says; if any of them gains one,
+its spec is where it belongs.
+
+**AND THE CLASS IS CLOSED, not the instance.**
+`tests/autonomy/test_agronomy_coverage.py` diffs the organ against
+`fleet_books.ROW_ENTRY` — the maintained row→module registry a book joins at
+birth — so a new book cannot go unscanned quietly again; absence must be a
+DECLARED exemption with a reason (retired 🎸 Barnesy and 🧙 Schwager, plus
+`market-context` which is a publisher and not a book). A third test asserts
+every real-money row is present AND `live=True`, because a live book specced as
+shadow is graded by the wrong standard. **4 of 4 mutations verified red** with
+the control green on both sides: a book vanishing from the organ, the live row
+vanishing, the live row demoted to `live=False`, and a stale exemption naming a
+row that does not exist.
+
+**WHAT I DID NOT DO, and why it is the honest next step rather than a
+widening.** The real "horizon" on both mirror books is not the max hold — that
+bound is INERT, never reached (band-kelly median 0.09h against a 2h cap;
+nav-cook 24/24 exits before 4h). It is the **`converged` exit**, which closes as
+soon as the basis narrows: 6 of band-kelly's 7 snap trades exited `conv` for
+−$13.97 while its single non-conv exit made **+$13.17**, and all 24 of
+nav-cook's closes are `converged` for −$5.71. So "let them run" points squarely
+at loosening convergence — and it is not free. band-kelly's conv bar is the
+GHOST'S OWN constant, and the founding claim IS the negation of a ledger that
+embeds those exits, so moving it does not widen the book, it voids the evidence
+(I19). nav-cook's is un-measurable from this repo at all: its founding study
+shipped prose with no script. **The measurable version — replay band-kelly's own
+tape at a series of conv bars through its existing study harness — is real work
+with a real answer, and it is the next thing worth doing on these books.**
 ## 2026-08-19 (rr) — 👩 mum v2's CENSUS SAYS *WHY* NOTHING OPENED AND COULD NOT SAY *HOW FAR AWAY* IT WAS — the one reading that would have caught v1 in hours instead of five weeks
 
 [Renumbered (rq) -> (rr) at merge time. A concurrent session took (rq) for its

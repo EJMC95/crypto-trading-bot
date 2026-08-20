@@ -173,7 +173,21 @@ done &
 # lighter_shadow is the correct value AND the safe one: this container hosts the
 # SHADOW book — the control arm and the only evidence a go-live can rest on. The
 # LIVE arm is a separate service (Dockerfile.tickettaker) and sets its own.
-( sleep 210
+# [2026-08-19] THE (ou) BOOT LADDER, the last holdout. A BARE stagger restarts
+# from zero on every deploy, so a burst of merges closer together than 210s
+# starves this organ of its FIRST RUN entirely — measured 19-Aug at 17 minutes
+# unbroken, past the 900s bar its own row is held to (pnl_dashboard's
+# VARIANT_STALE_SECONDS, which fleet_watchdog_svc pages on). The shadow Taker
+# is the CONTROL ARM every go-live rests on, so "it quietly stopped trading and
+# every liveness contract still read green" is the worst possible shape for it.
+# Run once at t=20, then sleep the REMAINING 190 so every later run lands
+# exactly where it always did (t=210, 510, 810...) — one added run, no cadence
+# change. Deliberately not the staleness-gated variant golive_readiness uses:
+# that organ loops every 21600s so an unconditional boot run is ~30x its
+# frequency; this one loops every 300s, so it is ~1x.
+( sleep 20
+  TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true
+  sleep 190
   while true; do
     TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true
     sleep 300
