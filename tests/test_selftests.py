@@ -403,6 +403,23 @@ ENFORCED_AUDITS = [
     "scripts/audit_citation_drift.py",
 ]
 GUARD_ONLY_AUDITS = [
+    # [2026-08-20] 🎯 the SNIPER EXIT-SHAPE counterfactual. Registered HERE and
+    # not in SELFTEST_EXCLUDE, deliberately, and the reason is a naming
+    # accident worth stating because it applies to every dated study: a
+    # `study_*_2026-08-20.py` filename contains HYPHENS, so it is not a legal
+    # python module name and `python -m` — the only route SELFTEST_MODULES has
+    # — cannot reach it. The three dated studies already in SELFTEST_EXCLUDE
+    # were excluded for a DIFFERENT reason (their selftests need cached tape).
+    # This one's `--selftest` is offline and pure — no network, no DB, no
+    # cache: 15 groups of synthetic bars with known answers, including the two
+    # that decide whether the instrument may speak at all (LAG-1 entry-bar
+    # exclusion, and the calibration gate REFUSING). It is path-invoked here so
+    # it actually runs, because a selftest nobody runs is the exact shape this
+    # file exists to prevent. Only `--selftest` runs: the full study needs the
+    # venue's 1m tape and the dashboard ledger, and its verdict (the harness
+    # CANNOT calibrate against this book at 1m — see its header) is a finding
+    # to re-run, never to re-argue from prose.
+    "scripts/study_sniper_exit_shape_2026-08-20.py",
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can
     # change BEHAVIOUR, not merely whether a value is inside it. Its bare run
     # exits 1 on 5 open findings (live.funding.enter_apr's hi sits below the

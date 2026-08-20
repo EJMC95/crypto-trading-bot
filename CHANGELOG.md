@@ -209,6 +209,198 @@ does not discharge.
 **Era:** this changes which trades the book takes, so the 24 pre-fix closes are a
 different policy. The book is 1 day old and the sample is worth ~$5.71 — the
 cheapest possible moment to take the reset.
+
+## 2026-08-20 (sd) — THE SNIPER NEVER HAD THE POTENCY IT IS BEING ASKED TO RECOVER: one memecoin was 157% of the predecessor's lifetime P&L, the exit ladder everyone remembers as the earner COST money on it, and the successor's entries sit at the 50th percentile of random — every candidate refused, and the two dead sources that hid for 86 and 66 days are now visible
+
+*(Renumbered (sa) -> (sd) at push time. `main` took `(sa)` mid-flight for
+the nav-cook confirm-window entry, which is merged and cited, so by the
+convention's own tiebreak the CITED entry keeps the letter and this one
+moves. In-tree citations were repointed in the same commit, enumerated
+UNCAPPED and reconciled by count ((qz)) rather than sampled through head.)*
+
+**Operator ask:** *"Listing sniper — let's look back to the days its p n l was
+biggest in the fleet — strip back whatever has caused it to have 'erectile
+dysfunction' and going back to giving it a hard on."* The premise is measurably
+false in a way that is worth more than the fix would have been, so the answer is
+a **refusal with evidence** (the operator's own growth rule: *"anything that sets
+us back we disregard"* bans banking a change that costs expectancy; it never
+waives the measurement). Full working: `STUDY_SNIPER_EXIT_SHAPE_2026-08-20.md`.
+
+**⚠️ THE CALIBRATION GATE FAILED, AND THAT IS REPORTED FIRST BECAUSE IT GOVERNS
+EVERYTHING BELOW.** `scripts/study_sniper_exit_shape_2026-08-20.py` cannot
+reproduce this book's own ledger — replayed +0.230%/trade vs matched ledger
+−0.104%, gap **+0.334pp** against a 0.15pp tolerance, one-sided (94% of error
+mass optimistic), **0 of 6 price/slippage bases calibrate** — so `run_sweep()`
+returns `{"refused": True, "cells": []}` rather than caveating ((gx)). The cause
+was diagnosed, not assumed: the bot decides on a **60s-polled orderbook mid**, a
+quantity the candle API does not carry at any resolution (NZDUSD's print stale by
+65bps; MRNA's mid 1.3% below its own minute's close), and a spread-based
+correction was refuted (corr=0.26). **The bias envelope is 3.2× the book's entire
+mean**, so no sweep number here arms anything. The verdict rests on the four
+instruments that need no calibration: the exit-free rank test, the matched-random
+null, the oracle-ceiling-vs-MDE arithmetic, and the supply census.
+
+**1 · WHAT EARNED THE MONEY WAS A COIN, NOT A MECHANISM.** 🎯 the retired Launch
+Sniper made +$206.38 over 366 closes; **ANSEM/USDT alone was +$325.01 = 157% of
+lifetime**, the single best row **96.9%**, and **ex-ANSEM the book is −$118.63
+over 363 closes**. Top-3 = 157.5% — worse than 🧙 Schwager, retired at (po) for
+exactly this at 112%. **And the convex exit is not the earner: it cost −$126.29
+on ANSEM** versus the all-or-nothing rule it replaced (ANSEM reached the 5× gate
+anyway), the **trail fired 4 times and is 0-for-4 at −$33.11**, and the far TP
+fired **once in 361 episodes**. The book was also mostly trading nothing: **321 of
+366 closes (87.7%) are baseline-reseed artifacts** at t=−6.33, 25 positions in 12
+seconds at the tightest — a disease the living book's 17-Jul SEED GUARD already
+cures. The decline began **2-Jul, ~62h BEFORE** the throttle that gets blamed for
+it; the throttle worked (−$117.87/t=−2.74 → +$51.36/t=0.72); the 17-Jul
+LIGHTER-ONLY guard stopped a **break-even** book.
+
+**2 · THE SUCCESSOR'S BINDING CONSTRAINT IS THE ENTRY, AND IT IS NOT A LEVER.**
+🎯 `lighter-perp-sniper-lshadow` reads 33 closes / −$0.79 / t=−0.12 with **32 of
+33 exiting `max_hold`** — and a matched-random null expects **32.26**. The +15%
+TP is a near-dead branch (median 6h MFE **+0.81%**; 17 of 33 never reach +1%;
+P(≥1 tp | null)=0.258). **The exit-free paired rank test settles it**: each real
+entry ranked against 300 matched-random minutes on the same coin and window sits
+at percentile **0.484 / 0.517 / 0.500 / 0.511 / 0.515** at 0.25/1/3/6/12h, and
+`surge` — the only living source — reads **0.429 at the shipped hold, worse than
+random**. The entries select **volatility** (range 4.878% vs 2.845%, P=0.009) and
+**not direction** (P=0.406). A zero-edge entry produces this ledger exactly, so
+there is no entry edge for any exit to harvest — (qu)'s 🙏 avo finding by another
+road.
+
+**3 · THE ANSEM SHAPE REPLAYED HERE IS BYTE-IDENTICAL TO A BARE TIMER.** Δ =
+**$0.00** at 24h, 48h and 72h; zero ladder/trail/far-TP fires. On this book's own
+72h excursions: ≥+50% (the trail arm) **0 of 32**, ≥+100% (the partial) **0 of
+32**, ≥+400% (the far TP) **0 of 32** — against **8 of the predecessor's 366
+closes ≥+100% and one +400%**. **The supply, not the exit rule, is the whole
+difference** (I7 in its purest form). And the trail family's apparent edge *is*
+the harness error: drop the six rows the calibration proved unpriceable and best
+trail goes +1.015% → **+0.059% (t=+0.04)**, best ladder → **−0.038%**.
+
+**4 · BOTH DIRECTIONS REFUSED WITH NUMBERS.** Tightening: every TP below 5% is
+negative, tp=1% is the worst cell in the sweep, "a +3% TP that fires often" fires
+9 of 32 and loses, and **not one cell beats matched-random** (best P=0.560).
+Widening: the only monotone gain is *hold longer*, grid-edge unbounded, where at
+72h the **content-free timer beats every bracketed rule** while refusing 14 of 32
+entries — (hl) denominator shrinkage, which I19 forbids banking. **Multiplicity
+kills the remainder: 0 of 367 cells survive BH at FDR 0.05** (smallest p=0.0478
+vs a rank-1 critical value of **0.000136**, off by 351×), and a time-shift placebo
+shows the search alone manufactures ~+0.57pp on entries known to have no edge.
+
+**5 · A PARTIAL SCALE-OUT IS UNSHIPPABLE HERE ANYWAY, AND THE REASON IS NEW.**
+No partial-close primitive exists at any of three broker layers; `trade_id` would
+UPSERT leg 2 over leg 1 (**the exact defect the predecessor already paid to
+fix**); `entry_ts.pop` destroys the runner's clock. Worst: **two ledger rows
+sharing `opened_at` are byte-indistinguishable from a duplicate writer**, so the
+first partial leg sets `integrity.two_writers = true` — permanently blocking
+READY and starting a **false operator page every cycle**, re-introducing exactly
+the sticky page (ih) was built to remove.
+
+**6 · THE NUMBER THAT SETTLES IT — A NEW UNDECIDABILITY CLASS, *UNDECIDABLE BY
+CEILING*.** A perfect-hindsight exit selling at the exact 6h high yields
+**+1.80pp/trade** of excess over a matched-random null. The book's own published
+`mde80_pct` is **2.114%/trade**. **The entire distance between the shipped rule
+and omniscience is smaller than the smallest effect this book could ever prove.**
+Beside I17's slow clock and (po)'s fat tail, this is a ceiling below the floor.
+Corroborated on the only living source: at its own effect size (+0.312%/trade,
+t=+1.19, n=147) reaching t=2.0 needs **415 closes ≈ 2.7–3.2 years** at the
+measured 10.8–12.9 crypto surge admissions/30d. A longer hold makes it worse —
+19 closes instead of 33 raises `mde80` to ~2.79% and widens the unbridgeable gap
+from 0.31pp to 0.99pp. **A longer hold buys a bigger unprovable claim.**
+
+**7 · WHAT SHIPPED: THE PER-SOURCE CENSUS (I18 / (lv)) — the fix that would have
+caught this months ago.** `extra.sources.{listing,surge,young}` now publishes a
+per-source funnel: a `scan` liveness verdict FIRST (I1 — `dark`/`stale`/`error`/
+`off`/`fresh`, so a dead scout never publishes an all-zero funnel that reads like
+a live scan finding nothing), then one counter per gate stage. The funnel is
+filled **by the admission functions themselves**, one counter per gate, so it
+cannot drift from the gate the way a re-implemented census would ((hj): a second
+copy of a rule is a second rule) — and the stage ORDER is the gate order, so a
+reader names the killing gate as the first zero without opening the file.
+**Measured the day it shipped, and the reason it is not tidiness:** the `listing`
+source has had **ZERO crypto supply for 86 days** (last crypto births CTR/RAIL
+25-May; Jun–Aug 2026 = 0) and the `young` source has been **EMPTY for 66 days**
+(0 admissible today), while `extra` published `watching: 212` and nothing per
+source — `admitted: 0` byte-identical between "quiet" and "structurally
+impossible", the condition that hid 🎸 Barnesy's `extreme` sleeve for 8 days.
+Publish-only: admission is byte-identical with `census=None`, and a test asserts
+structurally that no decision in the file reads a counter. **Pinned by
+`tests/autonomy/test_sniper_source_census.py`, 9 mutations verified RED.**
+
+**8 · THE (lk) SCREEN EXCLUDES THE COHORT THAT CARRIES THE VENUE'S TAIL —
+DECLARED, NOT CHANGED.** The screen tests `strategy_index == 2`; **the venue
+files every memecoin debut under `strategy_index = 7`**, so **ANSEM is listed on
+Lighter today and is screened out of both surge and young.** Unblocking is
+REFUSED on current evidence: class-7 surge reads **−0.840%/trade @6h** (negative
+at every hold), and the debut cell is n=9 with **top-1 (CAP) = 132% of the
+total** and −0.42%/trade ex-best — (po) undecidable-by-tail. It motivates a
+hypothesis; it arms nothing. Recorded so the next session does not "discover" it
+and ship it.
+
+**9 · THE VENUE HAS NO ANSEM, AND ITS TAIL CANNOT BE TAKEN LONG.** Venue-wide
+180d, 229 books, **31,744 book-days**: ≥+50%/72h 0.40%, ≥+100% 0.05%, **≥+300%
+ZERO**; max observed anywhere +186.8%. The tail that exists is in the crypto
+debut cohort (25× lift) and **a long cannot harvest it** — mean close return
+−2.66% at 24h and −8.30% at 168h, and **"let winners run" is strictly worse at
+every hold** (24h −3.82%/t=−4.02; 168h −7.14%/t=−9.47). Also refused
+pre-emptively: **loosening the surge bar is measured pure turnover** — two looser
+triggers give 5,284/30d and 8,848/30d of supply at −0.038% and −0.050%/trade,
+collapsing onto the null (−0.058%). A 400–800× supply increase delivers zero
+expectancy.
+
+**10 · ESCALATED, NOT TAKEN — the I17 keep-or-retire call.** The published
+horizon verdict is already **`unreachable`** ("more of the same closes cannot
+flip mean/t/halves"), the I16 allocation claim is **0.000** and capital is
+already at the 25% probe floor, and **85% of the ledger was taken under a policy
+the book no longer runs** (the (lk) screen removed the class supplying 27 of 33
+closes; in-era n=5). The measurement recommends **RETIRE**. Every prior
+retirement in this fleet ((if), (jh), (lo), (mr), (nf), (pm), (po)) was an
+operator decision, so this one is escalated with its numbers rather than taken.
+**Do not resolve it by lowering a bar or re-fitting a window.** The revival
+tripwire is free from the scout's `ages_d` and now visible in the census:
+**≥2 crypto births/month for 2 consecutive months** re-opens *measurement*, never
+a build off this study.
+
+**11 · A MUTATION HARNESS THAT REPORTED A FALSE GREEN, recorded because it is
+this repo's own doctrine biting.** One mutation (funnel stage REORDER) first read
+GREEN. It was not a vacuous test — CPython validates a `.pyc` on **(mtime,
+size)**, the mutation swapped two equal-length strings, and the mutate/revert
+writes landed inside one mtime tick, so **pytest imported stale bytecode and
+"verified" the reverted source**. Exactly *"a check that inspects nothing reports
+clean, and clean reads as evidence"* ((po)), in a new costume. The harness now
+busts `__pycache__` around every write, and the test derives its stage order from
+the funnel the module itself builds rather than a retyped list — a retyped
+constant is a constant that drifts, and this one would have drifted into blaming
+the wrong gate. **Equal-length mutations are the dangerous ones; assume a false
+green until the cache is cleared.**
+
+**12 · A SEPARATE FINDING, MEASURED WHILE VERIFYING THE CLASS CLAIM ABOVE —
+REPORTED, NOT SHIPPED, BECAUSE IT IS A DIFFERENT HOUSE (I11).** Checking "ANSEM
+is screened out" against the venue rather than trusting it, I found the
+DARK-SCOUT FALLBACK has drifted from the venue. `fleet_bus.is_crypto` resolves
+in three tiers — override, then the scout's published `classes`, then
+`NONCRYPTO_BASES` — and the third exists precisely so *"an organ outage must not
+silently re-admit 41 equities to a funding-rank book"*. Measured against the
+venue's own `strategy_index` today: **8 of 101 active non-crypto books are
+missing from that fallback** — `AXTI, CASHCAT, KIOXIA, KORU, MRNA, SOXS, US10Y,
+WDC` (idx 5×3, 6×2, 7×3), all recent listings. With a live scout the screen is
+correct; **with a dark or stale scout every crypto-screened book in the fleet
+fails OPEN on those eight** — 🌾 carry, 🏦 Rich Dad, 🪁 band-kelly, 🎫 the Taker
+and this book among them. (The ANSEM claim itself VERIFIED: venue class 7, and
+present in `NONCRYPTO_BASES`, so it is screened out on both tiers.)
+**Not fixed here on purpose**: `is_crypto` is a SHARED owner reaching books this
+pass did not measure, and the (fz) precedent — six books changed in one pass,
+six follow-up entries repairing it — is the argument against bolting it on. The
+real fix is also not eight hardcoded names but a DRIFT GUARD that fails when the
+fallback and the venue disagree, and that needs a design call about live-venue
+fetches in CI. **Owner: this repo, next pass.**
+
+**Deploy:** `lighter_perp_sniper.py` is on the auto-deploy path
+(`perp-sniper-shadow`); **no live marker — this is a $1k shadow book with zero
+real money**, so the (mm) push-both-ways rule does not apply. Verify by
+`extra.build` + `extra.build_n` against the psniper COPY set, then read
+`extra.sources` on the row. **Era NOT reset**: the census changes no trade and is
+publish-only, so it is not a bracket change and the (hc) rule does not fire.
+
 ## 2026-08-20 (rz) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
 
 *(Renumbered (rc) -> (rf) -> (rh) -> (rz) at push time — the EIGHTH collision this

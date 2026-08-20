@@ -234,8 +234,42 @@ def _class_ok(sym):
         return True
 
 
+# [2026-08-20 (sd)] THE PER-SOURCE CENSUS — I18/(lv)'s "a sleeve that opens
+# nothing must publish its OWN census at its OWN bar".
+#
+# MEASURED THE DAY THIS SHIPPED, and it is why the guard exists rather than a
+# tidiness argument: this book's `listing` source has had ZERO crypto supply
+# for 86 days (last crypto birth CTR/RAIL 25-May) and its `young` source has
+# been EMPTY for 66 days (0 admissible today: the venue files memecoin debuts
+# under strategy_index 7, which the (lk) crypto screen excludes, and the class-2
+# birth rate is 0.00/30d). Both were dead the whole time behind an `extra`
+# payload that published `watching: 212` and nothing per source — so
+# `opened: 0` was byte-identical between "quiet" and "structurally impossible",
+# the exact condition that hid 🎸 Barnesy's `extreme` sleeve for 8 days.
+#
+# The funnel is filled BY THE ADMISSION FUNCTIONS THEMSELVES, one counter per
+# gate stage, so it cannot drift from the gate the way a re-implemented census
+# would ((hj): a second copy of a rule is a second rule). Publish-only: no
+# counter is read by any decision in this file, and admission is byte-identical
+# with `census=None`.
+def _new_funnel(census, stages):
+    """Zero a per-source funnel dict in `census` (or a throwaway) and return it.
+
+    `stages` are the gate stages in the order the admission function applies
+    them; every stage counts the candidates that REACHED it and passed. So a
+    source dies at the first stage whose count is 0, and the reader can name
+    which gate killed it without reading this file.
+    """
+    cen = census if census is not None else {}
+    for k in stages:
+        cen[k] = 0
+    cen["admitted"] = 0
+    cen["capped"] = False
+    return cen
+
+
 def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
-                     class_ok=None):
+                     class_ok=None, census=None):
     """Books the scout reports as volume-SURGING, as snipe candidates.
 
     [2026-07-30 THE SNIPER'S POPULATION PROBLEM] This bot's event — a brand-new
@@ -255,22 +289,44 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
     """
     out = []
     class_ok = _class_ok if class_ok is None else class_ok
+    cen = _new_funnel(census, ("offered", "parsed", "ratio_ok", "fresh",
+                              "class_ok"))
     try:
         rows = sorted(surges or [],
                       key=lambda r: -float(r.get("ratio") or 0.0))
     except (TypeError, ValueError, AttributeError):
         return out
+    cen["offered"] = len(rows)
     for r in rows:
-        if len(out) >= int(limit):
-            break
         try:
             sym = str(r.get("sym") or "").strip().upper()
             ratio = float(r.get("ratio") or 0.0)
         except (TypeError, ValueError, AttributeError):
             continue
-        if sym and sym not in already and ratio >= float(mult) \
-                and class_ok(sym):        # [(lk)] crypto perps only
-            out.append(sym)
+        if not sym:
+            continue
+        cen["parsed"] += 1
+        # The admission predicate below is the SAME test as the original
+        # single-expression `if`, split one stage per line so the census
+        # counts the real gate rather than a second copy of it ((hj)).
+        if ratio < float(mult):
+            continue
+        cen["ratio_ok"] += 1
+        if sym in already:
+            continue
+        cen["fresh"] += 1
+        if not class_ok(sym):             # [(lk)] crypto perps only
+            continue
+        cen["class_ok"] += 1
+        # Cap the ADMISSION, never the count: the loop runs to the end so a
+        # capped pass still reports how much supply it turned away. Rows are
+        # ratio-sorted, so the first `limit` survivors are exactly the ones
+        # the pre-census `break` admitted.
+        if len(out) >= int(limit):
+            cen["capped"] = True
+            continue
+        out.append(sym)
+    cen["admitted"] = len(out)
     return out
 
 
@@ -343,7 +399,7 @@ def restore_entry_meta(saved_meta):
 
 
 def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
-                     class_ok=None):
+                     class_ok=None, census=None):
     """Books still inside their DEBUT REGIME, as snipe candidates.
 
     [2026-07-30 THE SCOPE FIX] `new_listings` is a market-set DIFF: a symbol
@@ -363,6 +419,8 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
     """
     rows = []
     class_ok = _class_ok if class_ok is None else class_ok
+    cen = _new_funnel(census, ("scanned", "age_ok", "fresh", "class_ok",
+                               "vol_ok"))
     for sym, n in (bar_counts or {}).items():
         # `str(sym)` alone is too permissive — a None key coerces to the
         # string "NONE" and becomes a tradable-looking candidate. Caught by
@@ -374,19 +432,35 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
         except (TypeError, ValueError):
             continue
         s = sym.strip().upper()
-        if not s or s in (already or set()) or bars > int(max_bars):
+        if not s:
             continue
+        cen["scanned"] += 1
+        # Same admission test as the original combined `if`, one stage per
+        # line so the funnel counts the real gate ((hj)). Age first, then
+        # dedup: the ORDER decides only which bucket a doubly-refused symbol
+        # lands in, never whether it is admitted.
+        if bars > int(max_bars):
+            continue
+        cen["age_ok"] += 1
+        if s in (already or set()):
+            continue
+        cen["fresh"] += 1
         if not class_ok(s):               # [(lk)] crypto perps only
             continue
+        cen["class_ok"] += 1
         try:
             vol = float((vols or {}).get(s, 0.0) or 0.0)
         except (TypeError, ValueError):
             vol = 0.0
         if vol < float(min_vol_m):
             continue
+        cen["vol_ok"] += 1
         rows.append((bars, -vol, s))
     rows.sort()
-    return [s for _, _, s in rows[:int(limit)]]
+    out = [s for _, _, s in rows[:int(limit)]]
+    cen["admitted"] = len(out)
+    cen["capped"] = len(rows) > len(out)
+    return out
 
 
 # [2026-08-04] ADMISSION SOURCES — the three routes into this book. Every
@@ -891,6 +965,16 @@ def main():
                 log.info("%s: inactive past the give-up window — dropped from "
                          "pending (never sniped)", sym)
         fresh = [s for s in new_listings if s not in pending]
+        # [(sd)] the listing funnel. Deliberately SHORTER than the other two —
+        # this source has no class screen and no volume floor ((lk) left it
+        # open on purpose), so `offered` and `fresh` ARE its whole gate, and
+        # publishing stages it does not have would overstate the filtering.
+        # `scan: "fresh"` unconditionally: unlike surge/young this source reads
+        # the venue market list this loop already fetched, not the scout, so it
+        # cannot be dark without the loop having already restarted above.
+        _listing_cen = {"scan": "fresh", "offered": len(new_listings),
+                        "fresh": len(fresh), "pending": len(pending),
+                        "admitted": len(fresh), "capped": False}
         if fresh:
             anns = ctx.venue.announcements()
             for sym in fresh:
@@ -914,19 +998,29 @@ def main():
             log.info("levers applied %s", _lv)
         _surge = []
         _surge_ratios = {}      # [(ne)] always bound, even on a dark scout
+        # [(sd)] the census STARTS at its liveness verdict, before any count,
+        # so a dark or stale scout publishes `scan: "dark"/"stale"` instead of
+        # an all-zero funnel that reads exactly like a live scan finding
+        # nothing (I1 — liveness before semantics).
+        _surge_cen = {"scan": "off" if SURGE_MULT <= 0 else "dark"}
         if SURGE_MULT > 0 and fleet_bus is not None:
             try:
                 _sp = fleet_bus._load("lighter-market", None) or {}
                 if fleet_bus.is_fresh(_sp, None):
+                    _surge_cen["scan"] = "fresh"
                     _live_done = active_done(surge_done, now.timestamp())
                     _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
-                                              _live_done | set(pending))
+                                              _live_done | set(pending),
+                                              census=_surge_cen)
                     # [(ne)] the ratio each surge candidate carried at
                     # admission — telemetry for the close, keyed like
                     # _src_map. [(nn)] module-level: see surge_ratio_map.
                     _surge_ratios = surge_ratio_map(_sp.get("vol_surges"))
+                else:
+                    _surge_cen["scan"] = "stale"
             except Exception:  # noqa: BLE001
                 _surge = []
+                _surge_cen["scan"] = "error"
             if _surge:
                 log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
                          SURGE_MULT, ", ".join(_surge))
@@ -938,6 +1032,7 @@ def main():
         # is recorded in `not_young` FOREVER (books get older, never younger),
         # so the probe cost decays to zero once the venue has been walked.
         _young = []
+        _young_cen = {"scan": "off" if YOUNG_MAX_BARS <= 0 else "dark"}
         if YOUNG_MAX_BARS > 0:
             # [2026-07-30] probe ONLY what the scout could not tell us. Once
             # `ages_d` is flowing this list is empty and the candle probes stop
@@ -987,10 +1082,17 @@ def main():
             # candle per day, so the two units are directly comparable).
             _age_src = ({s: a for s, a in _ages.items()
                          if s not in not_young} or bar_counts)
+            # [(sd)] WHICH age source answered is part of the census: the
+            # scout's exact `ages_d` and the 4/loop candle-probe cache are
+            # different instruments, and a funnel read off the fallback means
+            # something weaker than one read off the venue's own created_at.
+            _young_cen["scan"] = "fresh" if _ages else (
+                "probe" if bar_counts else "dark")
             _young = young_candidates(_age_src, YOUNG_MAX_BARS, _vols,
                                       YOUNG_MIN_VOL_M,
                                       active_done(surge_done, now.timestamp())
-                                      | set(pending), YOUNG_MAX_PER_LOOP)
+                                      | set(pending), YOUNG_MAX_PER_LOOP,
+                                      census=_young_cen)
             if _young:
                 log.info("YOUNG-BOOK CANDIDATES (<=%d daily bars): %s",
                          YOUNG_MAX_BARS,
@@ -1161,6 +1263,20 @@ def main():
                                  # this book (it was sym_uncovered before).
                                  "held": {c: ("L" if DIRECTION_LONG else "S")
                                           for c in _held_syms},
+                                 # [2026-08-20 (sd)] THE PER-SOURCE CENSUS —
+                                 # see _new_funnel(). `watching`/`pending`
+                                 # above are book-wide, so until now nothing
+                                 # in this payload could say WHICH of the
+                                 # three sources supplied a pass, or why one
+                                 # supplied nothing. Two of them had supplied
+                                 # nothing for 86 and 66 days respectively and
+                                 # the row looked identical throughout. Read
+                                 # `scan` FIRST (I1), then the first stage
+                                 # whose count is 0 — that is the gate that
+                                 # killed the source. Publish-only.
+                                 "sources": {"listing": _listing_cen,
+                                             "surge": _surge_cen,
+                                             "young": _young_cen},
                                  # [2026-07-30 (go)] the EFFECTIVE gate this
                                  # loop is running. Three of the six books that
                                  # gained levers in (fz) never published one, so
