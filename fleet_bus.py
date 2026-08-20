@@ -914,6 +914,62 @@ def scout_funding(current_time=None):
         return {}
 
 
+def scout_prem_outliers(current_time=None):
+    """[{sym, prem_bps, vol_m}, ...] — the scout's venue-wide premium outliers,
+    the same rows the dislocation family's entry gate is measured against.
+    `[]` on any doubt, matching every sibling here.
+
+    [2026-08-20] WHY THIS EXISTS, and it is not a widening. A book that trades
+    a PREMIUM BAND resolves its universe by VOLUME first, so a dislocation on a
+    coin below its volume floor never enters the scan and cannot appear in its
+    census at all. `{in_band: 1}` is then byte-identical between "the band is
+    quiet" and "the band is busy with names I do not scan" — the exact `(lv)`
+    ambiguity I18 exists to remove, arriving one layer earlier than usual
+    (the universe filter, not the entry gate).
+
+    MEASURED on 🧭 nav-cook the day this shipped: over 23.9h its [45,60)bps
+    band produced **252 confirmed in-band events and the book could trade 3**.
+    The other 249 were H100 ($0.02M), UNITREE/CXMT/MRNA/ANSEM (class 7,
+    pre-IPO) and USDKRW ($0.02M) — every one refused by a screen the book
+    MEASURED and should keep. The book was not stalled; it was correctly
+    refusing a supply that had rotated, and nothing it published could say so.
+
+    READ-ONLY and REPORT-ONLY by construction: this returns what the scout
+    already computed, and its consumer must use it for the census only. It
+    must never widen a gate — the coins it names are excluded ON PURPOSE.
+
+    NOTE the scout hard-caps this list at 8 entries, so it is a view of the
+    most extreme outliers, not the whole cross-section. A consumer must not
+    read an absence here as "no dislocation".
+    """
+    try:
+        p = _load("lighter-market", current_time)
+        if not p or not is_fresh(p, current_time):
+            return []
+        rows = p.get("prem_outliers")
+        if not isinstance(rows, list):
+            return []
+        out = []
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            sym = r.get("sym")
+            if sym is None:
+                continue
+            rec = {"sym": str(sym)}
+            for src, dst in (("prem_bps", "prem_bps"), ("vol_m", "vol_m")):
+                try:
+                    rec[dst] = float(r.get(src))
+                except (TypeError, ValueError):
+                    rec[dst] = None
+            if rec.get("prem_bps") is None:
+                continue          # a row with no premium says nothing
+            out.append(rec)
+        return out
+    except Exception:
+        return []
+
+
 def venue_stress_bps(current_time=None):
     """The scout's venue premium stress in bps, or None when unreadable.
 

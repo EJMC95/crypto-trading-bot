@@ -1,3 +1,83 @@
+## 2026-08-20 (sq) — "FIX THE STALE BOTS": NEITHER STALLED BOOK WAS BROKEN, AND THE REAL DEFECT WAS THAT NOTHING THEY PUBLISHED COULD SAY SO
+
+**Operator, 20-Aug: "Fix the stale bots."** Two books had visibly stopped. The
+fix is not to either book's gates — **both are correctly refusing supply their
+own MEASURED screens exclude** — it is that establishing that took a manual
+tape replay, because no field in either payload could distinguish "the band is
+quiet" from "the band is busy with names I cannot trade". That is (lv)/I18
+arriving one layer earlier than usual: at the UNIVERSE FILTER, not the entry
+gate.
+
+**FIRST, LIVENESS (I1): no row is stale.** All 19 rows publish at `age_sec`
+17–290s. Every process is alive. What stopped is BOOKS, and the two are found
+by comparing each book's silence to ITS OWN measured close rate:
+
+| book | since last close | own rate | expected gap | |
+|---|---:|---:|---:|---|
+| 🧭 nav-cook | **20.9h** | 58.6/day | 0.4h | **51× expected** |
+| 🌾 carry | **191.7h** | 3.1/day | 7.7h | **25× expected** |
+
+### 🧭 nav-cook — the band rotated into names it screens out, and its census could not show it
+**Measured on the scout's own 23.9h tape:** the [45,60)bps band produced **252
+confirmed in-band events, of which this book could trade THREE.** The other
+**249 (99%)** were refused by its two measured screens — **H100 alone was 174
+of them at $0.02M volume**, and UNITREE/CXMT/MRNA/ANSEM are class 7 (pre-IPO).
+Both screens should stay: `(qq)` measured the fleet's own fills at a mean
+17.49bps and p90 **398bps** below $0.1M, and pre-IPO is the band's only
+NEGATIVE class (−0.165%, n=45).
+
+**The defect is that none of this was visible.** `resolve_universe` filters by
+VOLUME *before* the scan, so a sub-floor dislocation never enters `census` at
+all — `in_band: 0` was byte-identical between a quiet band and a busy one full
+of ineligible names. Fixed: `fleet_bus.scout_prem_outliers()` (a supported
+accessor beside `scout_universe`/`scout_funding`, `[]` on any doubt) plus
+`scan.offuniverse` = `{in_band, thin, preipo, other, top[]}`. **REPORT-ONLY and
+AST-pinned as such** — it names coins the book refuses ON PURPOSE, so wiring it
+to a gate would silently widen two measured screens; a mutation adding a call
+inside `cook_exit` reddens.
+
+**A HYPOTHESIS I HAD TO KILL FIRST, because it was wrong and would have shipped
+a real loosening.** The bot requires **7 CONSECUTIVE** in-band loops
+(`pend.pop()` on every out-of-band branch) while the study required only
+in-band at **t−600s AND now** — two ENDPOINT checks that tolerate wandering in
+between. Same class as `(sa)`, on the SHAPE rather than the DURATION, and it
+looked like the whole answer. **Measured on the same tape: the continuous
+requirement costs 5.3%** (266 → 252 admissions). Nowhere near a 51× stall. The
+predicate difference is real and is NOT the cause; loosening it would have been
+a widening bought on a wrong diagnosis.
+
+### 🌾 carry — its supply was non-crypto, and the screen that removed it was right
+**Its last five closes are WTI, SKHYNIXUSD, SPCX, WTI, WTI — every one
+non-crypto — and its last close is 12-Aug, the day BEFORE the `(lk)` crypto-only
+screen shipped.** The screen took the book's entire working supply, and at the
+20% TRUE bar the venue's crypto population is ~3 coins: census `cold 211/228`,
+`eligible 0`.
+
+**NO CODE CHANGE, and its census is already adequate** — `noncrypto` is counted
+LAST (after apr/vol/persist), so it is reachable and reads 0 because no hot coin
+is currently non-crypto; the bucket's own comment says it exists to show "the
+screen's live bite". And `(ru)`'s class split, live since this morning, already
+publishes the verdict: **`on_class n=1 −$0.49` vs `off_class n=9 −$14.96
+(t=−4.01)`** — 9 of 10 era closes are instruments it no longer admits. This is
+the I17 decidability question with a **pre-registered operator date of
+2026-08-30** already in `DECIDED_UNTIL`. Deciding it early is the `(hs)`/`(ia)`
+trap; tuning it is the I17 "never another tuning pass" failure.
+
+### The suite claim I have been making is WRONG, in the favourable direction
+I reported "4 pre-existing failures, identical on clean HEAD — missing numpy
+plus two genuinely pre-existing". **All four were ONE environmental cause:
+`numpy` absent from this session's container.** Proven: with numpy installed,
+pre-merge main `2758677` runs the FULL suite at **0 failures**, and so does
+merged main. `test_margin_truth`'s `assert 0 == 'cross'` was a downstream
+degradation of the same absence, not a real defect. **The suite is 100% green
+and always was.** Recorded because I asserted the weaker claim twice, including
+in a PR body.
+
+**6 mutations verified red**, one of which found a real bug in my own helper
+before it shipped: `str(None)` is `"NONE"` — truthy — so a junk scout row was
+being counted as a coin. The arm that caught it is the one feeding the helper
+deliberate junk.
+
 ## 2026-08-20 (sp) — THE SAFETY SENTENCE (so) SHIPPED WAS FALSE, AND THE FAILURE IT HID WAS A BOOK SILENCED BY ITS OWN GOOD GRADE
 
 **Eamon:** *"Optimise the lookup and return and ensure the brain doesn't cause
