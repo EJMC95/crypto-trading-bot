@@ -74,6 +74,77 @@ by construction). Central estimate `S_d = 0.293` ⇒ **47 days to gate**. It nee
 LEVERAGE 1 with no maintenance requirement, so a levered book on it survives
 excursions a real account would not and BOOKS THE RECOVERY. That is the next
 build, not this one.
+## 2026-08-20 (si) — 🛢️ GARRETT'S STOP IS RIGHT, ITS THINNESS THEORY IS WRONG, AND ITS REAL PROBLEM IS ALREADY ON THE DOCKET — three refutations, no knob turned
+
+`(sh)` closed with *"the honest next step is pooling the funding-directional
+family's 15 stop exits"*. Done in the same session, because a stated next step
+that waits for another day is exactly the rot the operator is objecting to.
+**Nothing shipped here** — and that is the finding, arrived at with numbers
+rather than caution.
+
+### 1. The stop is CORRECT — refuted at the pooled sample
+Garrett's five `short_stop` exits are **87% of its entire loss** (−$12.58 of
+−$15.56), which reads like a stop firing on noise. It is not. Pooled across all
+three books sharing the constant (🛢️ Garrett 5 · 💸 Farmer shadow 9 · 💸 Farmer
+LIVE 2 = **16 stop exits**), asked the same question that moved 🔮 Georgia's
+sibling tags in July — *after the stop, did price come back?*
+
+| horizon | got back to entry | median BEST move vs entry |
+|---|---|---|
+| 24h | **1 of 9 = 11%** | **−4.93%** |
+| 72h | 4 of 11 = 36% | −4.39% |
+| 168h | 6 of 12 = 50% | +2.50% |
+
+**The July precedent moved a stop on 77–89% reclaim within 24h. This is 11%.**
+At their BEST point in the 24h after being stopped, these positions are still
+~5% underwater — they do not snap back, they keep going. The median loss booked
+is −10.02%, i.e. the stop fires exactly where it is set and the move continues.
+Same question, same method, opposite answer — which is why the question was
+worth asking on this book rather than generalising Georgia's result to it.
+
+**Structural note that made this the only admissible action anyway:**
+`HARD_STOP` is a SHARED module constant read by the LIVE Farmer and by the
+judge's A/B control arm. `(ci)` restored both arms to 0.10 precisely so the
+paired promotion bar varies only the xp candidate. Moving the code default
+would touch real money AND re-confound the fleet's only path to `live.funding.*`.
+Garrett takes a per-service env, so it *could* have had its own — the blocker
+was evidential, and now it is answered: don't.
+
+### 2. The thin-tier theory is REFUTED by its own ledger
+Garrett trades the **[$100k, $2M)** band, so "thin coins move violently" is the
+obvious explanation. Measured: the stopped coins are the **HIGHER**-volume ones
+— median **$0.92M** against **$0.56M** for everything it did not stop out of.
+The five stops are VVV, ADA, ZRO, GRASS, LINK; the untouched positions are the
+genuinely tiny non-crypto books (CTR, SKY, ZK, CXMT, GRAM, NATGAS), every one of
+which closed inside ±$0.15. Raising its floor would have removed the flat trades
+and kept the losing ones.
+
+### 3. What is actually wrong is not a parameter
+Split by instrument class:
+
+| class | n | total | mean %/trade | t | stops | win |
+|---|---:|---:|---:|---:|---:|---:|
+| **crypto** | 24 | **−$14.08** | **−2.114%** | **−2.17** | 5 | 42% |
+| non-crypto | 4 | +$0.05 | +0.170% | +0.66 | 0 | 50% |
+
+The book's whole loss is its crypto arm at **t=−2.17**. **A crypto screen is
+NOT the response** — it would delete the only population this book has a real
+sample of and leave n=4 behind, which is the `(hs)`/`(ia)` trap in its purest
+form: making a book look better by removing its evidence.
+
+**And the fleet already knows.** `golive-readiness` grades it n=27, t=−1.83,
+mean −1.460%, halves −1.58/−9.79, horizon verdict **`unreachable`** — *"more of
+the same closes cannot flip mean/t/halves"*. Its era is **6.2 days old** (born
+13-Aug). So this is an I17 keep-or-retire call on a young book, owned by the
+OPERATOR, already visible in the payload that exists to surface exactly this.
+The correct action from a session is to sharpen the attribution and leave the
+decision where it belongs, not to invent a parameter change so the pass has
+something to show.
+
+**Three refusals, each with the number that produced it.** Per the standing
+rule, a refusal with evidence satisfies the growth mandate; a silent omission
+does not.
+
 ## 2026-08-20 (sh) — TWO PARKED IMPROVEMENTS SHIPPED, AND THE ONE THAT MOVED THE OTHER WAY IS WHY THEY WERE WORTH MEASURING
 
 Continuing the operator's *"implement all improvements"* directive. Both items
