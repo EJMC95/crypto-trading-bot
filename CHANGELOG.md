@@ -759,6 +759,324 @@ missing local `numpy`/`pandas`, now installed; that correction matters because
 those two had been quoted as "known pre-existing" for two sessions.
 
 
+## 2026-08-20 (rx) — THE STUDY SAVED YESTERDAY COULD NOT PRODUCE ITS OWN TABLE: a calibration anchored to a LIVE feed decays within the hour, and a decaying gate gets loosened until it passes
+
+`(ru)` saved the class-split evidence as a study so its numbers could be re-run
+rather than re-argued. **Run an hour later it refused everything**, and both
+causes were the harness's, not a real drift:
+
+| anchor | published | the harness read | why |
+|---|---|---|---|
+| ⚖️ Counterweight | 70 / +$5.32 | 72 / +$5.40 | the book TRADED TWICE MORE |
+| 🎸 Barnes | 0 / 9 | 54 / 14 | the book was RETIRED `(pm)` and left `/pnl.json`, so `retired_sleeves` found no payload, dropped nothing, and graded the dead `xsect` sleeve's 49 closes |
+
+**An anchor is a HISTORICAL FACT and the feeds are LIVE.** So everything the
+anchor depends on is now pinned — `CALIB_AS_OF` cuts the ledger at the instant
+the numbers were measured, and `CALIB_SLEEVES` declares the sleeve state as of
+that instant rather than fetching it from a publisher that no longer exists.
+**The cut is keyed on the CLOSE**, because that is when a row enters the ledger
+the grader reads; the selftest carries a STRADDLER (opened before, closed after)
+so the basis is pinned and not merely chosen. Calibration is frozen; the report
+still runs on everything.
+
+**Barnes surfaced the same defect on the REPORT side, and it gets I1 rather than
+a fix.** A book with no `/pnl.json` row has unreadable sleeve state, so grading
+it is guesswork — it is now NAMED on its own line (*"ABSENT: retired or dark,
+NOT graded"*) instead of silently graded or silently dropped. `{n: 68}` on a
+retired book and `{n: 9}` on a live one are byte-identical to a reader who does
+not know the publisher is gone.
+
+**THE MUTATION RUN IS THE ENTRY.** Six rounds, and every survivor taught
+something the first draft had wrong:
+
+1. *"calibrate runs on the LIVE pass"* survived because that line sat in the
+   network-only shell. Fixed STRUCTURALLY, not by testing it: `assemble` now
+   RUNS the calibration and returns a verdict instead of handing its input out,
+   so the shell can only print and the mutation lands in tested code.
+2. *"tolerance loosened to 100.0"* survived — because my own tolerance fixture
+   **derived its gap from `CALIB_TOL_USD`**, so it widened along with the
+   constant it was pinning. A fixture that scales with the thing it guards
+   asserts nothing. Now a literal 2-cent gap, plus a direct pin on the constant.
+3. *"an anchor's published total edited"* survived for the same reason one level
+   up: every fixture was BUILT from `PUBLISHED`, so editing an anchor moved the
+   fixture with it and re-baselined the gate in silence. The three anchors, the
+   as-of and the sleeve state are now restated as LITERALS in the selftest.
+
+**5 of 5 red on the final run**, including all three survivors. The general
+shape, which is the part worth keeping: **a guard whose fixture is computed from
+the thing it guards is a guard that agrees with any change.** That is the
+self-reference sibling of `(gx)`'s calibration rule, and it survived three
+rounds of my own mutation testing before the third round caught it.
+
+Live: calibration PASSES on all three anchors, the table prints, and 🌾 carry is
+the one book still flagged REMOVED POPULATION. Registered in `SELFTEST_MODULES`
+`(ru)`; read-only, promotes nothing.
+## 2026-08-20 (rw) — BOTH OF MY OWN P&L RECOMMENDATIONS DIED IN MEASUREMENT: 🎯 the Sniper's "missing" bracket exists and cannot reach, and 🎫 the Taker's "open" entry lever shipped on 31-Jul
+
+**[RENUMBERED (pm) -> (pq) at push time — a parallel session had published a different `(pm)` on main (the 🎸 Barnes retirement); the cited entry keeps the letter.]**
+
+`(ru)`'s report closed with five forward items. Two were actionable, both on
+books sitting on the I17 docket — so they were **measured, not shipped**, which
+keeps the operator's keep-or-retire call informed rather than pre-empted. Neither
+survived, and the refusals are the deliverable (I19, and `(hl)`'s 25-of-30
+precedent).
+
+**1 · 🎯 THE SNIPER HAS A BRACKET. My report said it had none, and that was a bad
+grep, not a measurement.** `+15%` take-profit / `−10%` stop / 6h hold, bare
+module literals already declared in `HARDCODED_EXITS`. I grepped `^TP_|^SL_` and
+the constants are named `TAKE_PROFIT_PCT`/`STOP_LOSS_PCT`; the harness read them
+correctly the moment it was pointed at the book, which is the argument for
+running the tool instead of reading the file.
+
+**The corrected finding is sharper than the wrong one.** The bracket exists and
+is unreachable at its own horizon — over 29 closes the realised move is median
+**1.25%**, p90 5.18%, largest ever 10.68%, and the take-profit has been reached
+**0 times**, the stop **once**. That is why every close reads `max_hold`: not an
+absent bracket, an arithmetically dead one.
+
+**2 · AND THE SWEEP CANNOT SAY WHAT TO REPLACE IT WITH — the calibration gate
+refuses.** `study_exit_sweep` replays the shipped rule at −0.918%/trade against a
+ledger of −1.219%: a **+0.301pp gap outside the 0.25pp tolerance**, so every
+recommendation is WITHHELD. The class split is the interesting part and it
+**refuted my own hypothesis**: I expected the tokenised non-crypto names
+(QQQ/META/USDKRW/WHEAT) to break a candle walk through closed underlying
+markets. The opposite — **non-crypto CALIBRATES at +0.032pp** while the 3 crypto
+trades miss by +1.738pp, and candle coverage is a full 6 bars per hold window in
+both classes, so there is no data gap to blame.
+
+**So the only subset this harness can calibrate is the population `(lk)` screened
+off on 13-Aug.** The Sniper's exit question is answerable only on trades the book
+has stopped taking — which is `(ru)`'s class-split finding arriving a second
+time, on a different instrument, about the same book. A grid-edge winner did
+appear (96h max-hold, +4.591%/trade) and is recorded UNBOUNDED and unbankable:
+top of the grid, behind a failed gate, the exact shape `(gx)` warns of.
+
+**3 · 🎫 THE TAKER'S "ATTACK ENTRY SELECTIVITY" WAS ALREADY DONE, TWO WEEKS AGO.**
+The 23-Jul root cause names the mechanism — the divergence SIGNAL grades
+forward-positive at n>11k and realised P&L is eaten by EXECUTION on wide-quote
+books — and the surviving instrument is the quoted-spread gate. The volume floor
+was rejected at n=37 `(study_div_vol_floor)` and re-rejected at n=99
+`(study_taker_spread_gate)`. `TT_SPREAD_GATE_BPS` has shipped at **20** since
+`(hr)`, which also fixed the arm that GRADES the book running ungated while the
+live arm was gated. **The 32% hit rate in `(ru)` is therefore a POST-gate
+number**, and the honest open follow-up is the one that study named for itself:
+re-run once the divergence ledger grows and the live arm has recorded spread.
+
+**ONE PUBLISHER GAP CHECKED AND CLEARED rather than reported.** The sweep skipped
+9 of 29 closes for a missing `side` — the `(kf)` inversion class. Every such row
+opened **≤3-Aug** and every row from **5-Aug** carries it: the 4-Aug
+source-stamped tag fixed it, so this is drained history, not a live defect. Worth
+recording because "9 rows have no side" reads like a defect until you check the
+dates, and `(kf)` is a real enough hazard to deserve the check.
+
+**NOTHING SHIPPED TO A BOT, deliberately.** Both books are on the docket, and I17
+says a docketed book is a keep-or-retire call and *"never another tuning pass"*.
+Measuring is not tuning: what this buys is that the 🎯 Sniper item in
+`OPERATOR_QUEUE.md` can now say its exit question has been asked and cannot be
+answered on the population it still trades — which is evidence for the decision
+rather than a reason to defer it again. Report corrected in place;
+`(ru)`'s forward list no longer recommends either move.
+## 2026-08-20 (rv) — TWO OF THE SEVEN DOCKET ITEMS WERE ALREADY DECIDED BY THE OPERATOR, WITH DATES, AND THE DOCKET RE-ASKED EVERY PUBLISH: the deferral that expires
+
+Continuing `(ru)`'s decomposition into the surface it feeds. The decision docket
+is the fleet's I17 queue, and its entire job is to be acted on. Measured on the
+live payload — **7 matured items, and 2 of them were not open questions**:
+
+| book | docket said | actually |
+|---|---|---|
+| 🌾 `perps-funding-carry` | `unreachable`, 8.4d, decide | **DECIDED-WAIT 5-Aug**, ride to ~30-Aug (OPERATOR_QUEUE item 2) |
+| ⚖️ `perps-funding-spread` | `unreachable`, 10.5d, decide | **~28-Aug**, pre-registered in `(jg)`'s own revert criterion, carried in CLAUDE.md |
+
+**29% of the docket was noise**, because it can see a VERDICT and cannot see a
+DECISION — the cry-wolf failure `(gl)` names and `(lh)` re-learned: *a detector
+that flags everything trains the operator to ignore it.* And it is worse than
+ordinary noise here: both deferred books have a live keep-or-retire question
+underneath, so training the reader to skip them is training them to skip the two
+that matter most on the day the dates arrive.
+
+**`DECIDED_UNTIL` + `decided_until()`, and three properties keep it a DEFERRAL
+rather than a silencer** — a table that could hide a book is a worse defect than
+the noise it fixes:
+1. **It EXPIRES.** Past its date the book returns carrying `decision_overdue`
+   and an `asks` that says a date was set and has passed — *louder* than the
+   verdict it replaced.
+2. **The clock survives underneath it.** `seen` is written BEFORE the deferral
+   check, so a returning book's `days_held` is honest rather than restarted.
+3. **Fail toward ESCALATION.** An unreadable date defers nothing. Every other
+   fail-safe in this file leans toward silence because the cost of a false alarm
+   is attention; here the cost of silence is a book nobody decides, so the
+   direction inverts — stated in place so the asymmetry is not read as a slip.
+
+Each entry names the date, the reason, AND where the decision is recorded; the
+selftest asserts that last part, because an entry that cannot be traced to an
+operator act is not a decision, and this table would become the way to hide a
+book.
+
+**THE SELFTEST CAUGHT THE FEATURE BEING INERT ON ITS FIRST RUN.** `parse_stamp`
+returns a **naive** datetime for a bare `"2026-08-30"` and an **aware** one for a
+full stamp, so `cur < due` raised `TypeError` — straight into the fail-open
+guard, which dutifully escalated. Every entry read "not deferred": the table
+would have looked configured and deferred nothing, the registered-but-inert
+shape I18 exists for, inside the guard written to prevent noise. Normalised
+explicitly, with the incident recorded at the line.
+
+**IT ALSO MADE A DELIBERATELY-NOT-LOAD-BEARING CHOICE LOAD-BEARING.** `(lu)`
+counts `batch_n` over `seen` (every stuck book) rather than `docket` (the
+matured ones) and its own comment says the two are equivalent today, the
+distinction "NOT load-bearing", kept only in case maturity ever varies per book.
+The deferral is the first thing to make them differ — a deferred book is in
+`seen` and not in `docket` — so `batch_n` stays correct at 9 while the docket
+reads 8, exactly as that comment predicted. Both historical regression fixtures
+in `test_decision_docket.py` move by one and now assert the distinction rather
+than the coincidence.
+
+**THE DOCKET, LIVE, AFTER THE CHANGE: 7 → 5**, and the two that left are the two
+with recorded dates. **7 of 7 mutations verified red** (deferral never expires ·
+expired deferral returns quietly · deferring restarts the clock · unreadable date
+defers instead of escalating · naive/aware normalisation dropped · double suffix
+strip `(hc)` · an entry omits where the decision is recorded).
+
+**AND THE FIVE THAT REMAIN ARE NOW BRIEFED** — `OPERATOR_QUEUE.md` gains the
+per-book evidence with lettered options, and `(pk)`'s class split changed three
+of them: 🎯 the Sniper's `unreachable` is computed on a sample **79% of which it
+can no longer enter** (on what it can, +$2.21/n=6 — undecidable, not
+unreachable); 🎸 Barnes has **zero** closes under its current policy and 0 of 225
+coins eligible; 🏛️ Turnbull needs an effect **42× larger than it shows** before
+its own sample could detect it. One of the five is not an I17 question at all —
+💸 the LIVE Farmer is flat, not losing, and "keep-or-retire" mis-frames a
+real-money book earning 3c/day whose exit surface is already measured out.
+
+Publish-only and read-only: no trade, no lever, no era, no bar ⇒ **main-only**
+under `(mm)`. Deciding stays the operator's act and the `(hn)` routing table does
+not move.
+## 2026-08-20 (ru) — FOUR DOCKET VERDICTS ARE COMPUTED ON POPULATIONS THEIR BOOKS NO LONGER ADMIT, AND THE GRADER WOULD NOT SAY SO: the class split becomes a published number
+
+**[RECONCILED at push time: a PARALLEL SESSION shipped `(pk)` and `(pm)` on main while this branch was open. Their `(pk)` publishes the 🎯 Sniper's whole-gate `crypto_only: False` — the case this entry's three-valued design already handles, and it lands as "both", correctly unflagged. Their `(pm)` RETIRED 🎸 Barnes on the same evidence this measured. Neither changes a number here; both are named so the table below is read as the state at measurement, not a claim about now.]**
+
+**[SUPERSEDED IN PART, 20-Aug — the OPERATOR_QUEUE brief this entry shipped is DROPPED and not re-applied.** Three days passed while this branch waited on review, and `(qk)`'s fleet-wide audit produced a better slate on 19-Aug: it quantifies ⚖️ Counterweight as *unflippable* (t≥2 needs ~4,300 closes ≈ 5.1 years; even 20 consecutive +1% closes reach only t=+0.70), reads 💸 the LIVE Farmer at era n=85 / t=0.29, and carries the reframe this entry did not have — **the venue is in a measured liquidity drought** ((qa): alt volume halving every 9.4 weeks, 44 weeks running), so several books are **STARVED, NOT EDGELESS**. That distinction changes what a low `t` means here and it is the senior reading. Adding a second, staler I17 brief to the one surface whose job is to be acted on would be the cry-wolf failure `(gl)` names, so it was not added. **What survives is the CODE** — the published split, the deferral and the saved study — none of which was on main, and all of which makes the *next* such slate cheaper to build.]**
+
+**Found by a fleet-wide P&L decomposition** (operator: *"deep analysis on
+increasing pnl of each bot"*), driving this module's own `era_rows` over the
+live ledger so every number is the one the bars are actually computed on.
+
+`(pf)` measured this for two books and named the right response in its own
+words — *"REPORT the class split beside the pooled grade, do not re-cut the
+sample"* — then shipped the DECLARATION (`caps.crypto_only`) and left the
+report. So the split stayed **derivable** and the decision-docket item an
+operator acts on still showed the pooled number alone. Both `(pf)`'s review and
+this one re-derived it by hand from the raw ledger. Measured, era-scoped:
+
+| book | pooled (what the docket shows) | still-tradeable |
+|---|---|---|
+| ⚖️ `perps-funding-spread` | n=91 **−$31.16** | n=70 **+$5.32** |
+| 🎯 `lighter-perp-sniper` | n=29 **−$3.08** | n=6 **+$2.21** |
+| 🌾 `perps-funding-carry` | n=10 −$15.45 | n=1 −$0.49 |
+| 🎸 `band-barnes` | n=9 −$1.45 | n=0 |
+
+**Two of the four read POSITIVE on the population they can still enter**, and
+all four have been sitting on the docket as `unreachable` for 8.7–10.5 days
+asking for a keep-or-retire call. That is an I17 decision offered on a policy
+the book no longer runs.
+
+This is the defect the cluster-`t` publish closed one field over, and its
+argument transfers verbatim: **a number a decision depends on must be READABLE,
+not recomputable.**
+
+**SHIPPED — `class_split`, reported, never a bar.** `BAR_NAMES` is untouched,
+`grade()` never sees it, and no sample or era moves: `(pf)` ruled the era stays
+put (CLAUDE.md calls a universe change ordinary tuning, and a narrowing is that
+act mirrored), so this reports beside the pooled grade exactly as `(jg)`/`(ki)`
+did on ⚖️ Counterweight. It rides on the book payload, on the **docket item**,
+and on the CLI line. `published_class_screen` becomes the ONE owner of "what
+screen does this book publish" — `audit_book_overlap.living_gates` reads the
+same field for a different question, and imports rather than copying `(hj)`, in
+the direction `audit_ledger_integrity` already established.
+
+Three-valued throughout, and the third value did real work: **`None` withheld a
+finding I had already half-written.** ⚖️ Counterweight publishes no screen, so
+it correctly got the split with no flag — which sent me to read the code instead
+of asserting, and the code says the crypto screen covers the scout TOP-UP and
+deliberately **not** the configured core (*"it is the backtested list … those
+names are never dropped"*). An unpublished screen may neither manufacture a
+finding nor erase one `(ph)`, and here it stopped a wrong one.
+
+**AND ⚖️ COUNTERWEIGHT WAS THE LAST BOOK PRINTING `UNPUBLISHED`, MISSED TWICE
+FOR ONE STRUCTURAL REASON.** `(pf)` declared the retrofitted carry books and
+`(pj)` finished "the last three" — but both worked from
+`audit_book_overlap.living_gates`, which only sees books publishing an
+`enter_apr`. A cross-sectional book has none, so it could never appear in the
+list of the unpublished. **A detector's roster is part of the detector.** Its
+declaration is now `crypto_only_now()`, **DERIVED from both entry paths** —
+`all(is_crypto(c) for c in COINS)` conjoined with the `(ki)` top-up screen — so
+it is `True` today (30 names, every one crypto; and all 16 off-class names it
+has ever traded arrived by top-up) and flips to `False` on its own the moment a
+non-crypto name enters `FUNDSPREAD_COINS`. Verified both ways. A hardcoded
+`True` would be the literal `(pj)`'s own guard exists to catch.
+
+**Publish-only on both files — changes no trade, no lever, no era ⇒ main-only
+under `(mm)`.** The grader promotes nothing by construction; Counterweight's
+change is one caps field.
+
+Verified: **8/8 mutations red** (screen inverted, non-bool screen truthy, each
+publish shape dropped, raising classifier guessed, clean book publishing nothing
+instead of `off_class.n=0`, a finding fired on an UNPUBLISHED screen, empty
+split instead of `None`); selftest, `audit_image_imports` (the new `fleet_bus`
+import into a SHIPPED file — COPY present), `audit_doctrine_enforcement`,
+`audit_undefined_names`, `audit_deploy_coverage` all green; full suite carries
+the same 3 pre-existing failures as a clean tree and no new ones. **And the
+consumer was tested against a payload its publisher built `(hj)`**: the real
+`era_rows → class_split → book_payload` path over the live ledger reproduces
+`(pf)`/`(nk)`'s three independently published splits **exactly** — that
+calibration is what licenses the rest of the table.
+
+**WHAT WAS DELIBERATELY NOT DONE, because it is already measured.** The
+decomposition put the funding cohort's biggest single leak at the `flip` exit
+(🌾 carry: 9 of 10 in-era closes, 0% win; 💸 Farmer shadow `short_flip` −$15.81
+at 39.5% win) and two sibling books have measured a grace fix that works
+(🏦 Rich Dad `(mf)` +$26.88→+$42.09; 🧮 Hull `(ny)` t=+3.92). **Porting it is
+REFUTED on the Farmer's own cell** — `STUDY_FUNDING_LIFECYCLE_2026-08-15.md` §2,
+calibration passed both ways, zero of 48 cells beat shipped, *"grace is a cell
+property, not a doctrine"* — and re-running it would be the circle `(hn)` names.
+Recorded here so the next decomposition does not rediscover the same leak and
+reach for the same refuted fix.
+
+**ADDENDUM 17-Aug — the report this entry came from was AUDITED CLAIM-BY-CLAIM,
+and two of my own numbers were wrong in the same way.** 114 of 116 numeric claims
+reproduced from source; the two that did not were both **quoted from a doc
+snapshot instead of the live payload** — the exact anti-drift failure `(ph)`
+confessed to the same morning, committed twice in one report by the session that
+had just read `(ph)`:
+
+1. *"⚖️ Counterweight's 91 closes are ~28 independent decisions"* — lifted from a
+   code comment in `book_payload`. The LIVE cluster reads **26 batches, n_eff
+   39.6** (largest batch 12 legs). The comment was right when written; the sample
+   moved.
+2. *"📐 Grimes's replay gate opened on 16-Aug (keltner t=+0.53), scan reads
+   `signal 0`"* — taken from CLAUDE.md's `(oe)` headline. **Both halves are now
+   false**: all three setups read CLOSED (keltner n=129 **t=−0.37**, failtest
+   n=369 t=−1.43, pullback n=136 t=−0.93) and the scan reads **`signal 1, gated
+   1`** — the book found a setup and its own gate refused it. That is `(om)`'s
+   fixed-universe gate working as designed, and `gate_drift` reads
+   `ungraded: []`, so the hazard `(om)` published is not materialising.
+
+**CLAUDE.md's 📐 Grimes row is CORRECTED IN PLACE per I12** — it led with *"THE
+GATE HAS OPENED"* as a bold headline while the live state is the opposite, which
+is a doctrine that no longer describes the system, i.e. a defect rather than
+history.
+
+A third correction went the other way, and is worth recording because the
+*correction* was the error: a first pass called 🧘 Douglas's 3.29×/3.73× stop
+overshoot unremarkable against "243 fleet-wide stop exits, median 1.16×, 35 above
+1.5×". That pooled **retired books' ledgers** into a claim about how the current
+fleet's stops fill. Against the right control group — **67 stop exits across the
+three other LIVING books that declare a stop** — the median is **1.09×** and the
+worst in the whole set is **1.72×**, so Douglas really is outside it and the
+original finding stands. `(nm)`'s venue-tape root cause was never in doubt; only
+my framing of it was.
+
+**The transferable lesson, and it is the one this fleet keeps paying for:** a
+number in a doc is a measurement's *fossil*. Re-run the source before quoting it,
+including — especially — when the source is this repo's own doctrine.
 ## 2026-08-20 (rt) — THE HORIZON QUESTION CANNOT BE ANSWERED BACKWARDS ON THIS BOOK, AND THE REASON IS A NUMBER: a 1.9-MINUTE MEDIAN HOLD AGAINST A 1-MINUTE CANDLE. So 🪁 band-kelly now measures it FORWARD.
 
 **Operator: *"open the horizons, give them room to breathe and grow."*** `(rs)`
