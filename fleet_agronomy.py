@@ -322,6 +322,18 @@ def _pm(row, lens):
              f"fleet_proprioception cannot grade")
 
 
+
+def _envonly(row, module, knob_floor, note):
+    """[2026-08-19] The BOOKS-cohort shape: config is ENV-ONLY, no tuning lane
+    (the Garrett choice — a variant/book with no lane keeps a single-policy
+    (hm) clock by construction). `levers=()` is the TRUE statement about them,
+    not a placeholder: the growth rail cannot move one knob on any of these
+    books, deliberately. Recorded so the organ can SAY that, which it could
+    not do while it had never heard of them."""
+    return BookSpec(row, module, knob_floor=knob_floor,
+                    expects=("fleet-risk", "coin-vetoes"), note=note)
+
+
 BOOKS = {b.row: b for b in [
     # ---- REAL MONEY --------------------------------------------------------
     BookSpec(
@@ -353,6 +365,22 @@ BOOKS = {b.row: b for b in [
         note="🎫 Ticket Taker LIVE, divergence-only. apply_tuning() returns {} "
              "on lighter_live by design — every entry bar, TP, SL, hold and "
              "cooldown on a real-money book is operator-env-only"),
+    # [2026-08-19] 🙏 AVO MARIA LIVE — the organ was BLIND to a REAL-MONEY row.
+    # It still specced `lighter-ticket-taker-lighter` while 🙏 Avo took that
+    # live slot on 13-Aug ((ma)), so the standing scan described a book that no
+    # longer trades and said nothing about the one that does — the (ci)/(ma)
+    # class ("a standing audit rule that names a retired bot sends every future
+    # audit to check the wrong file"), on the surface where it costs most.
+    BookSpec(
+        "freqtrade-avo-maria-lighter", "lighter_avo_live_bot.py", live=True,
+        state_key="freqtrade-avo-maria-lighter:live", knob_floor=5,
+        levers=("live.avo.clip_scale",),
+        expects=("fleet-risk", "coin-vetoes"),
+        note="🙏 Avo Maria LIVE. Sizes off its OWN `live.avo.clip_scale`, NOT "
+             "the shared `live.clip_scale` — a deliberate split so the board "
+             "moving the Farmer's dial cannot resize this book. Strategy is "
+             "imported from lighter_family_bot, so BOTH files are live "
+             "surface. Entry/exit constants are operator-env-only."),
     # ---- SHADOW ------------------------------------------------------------
     BookSpec(
         "perps-funding-lighter-lshadow", "lighter_funding_bot.py",
@@ -437,6 +465,39 @@ BOOKS = {b.row: b for b in [
     _pm("pm-abbott-lshadow", "scalp"),
     _pm("pm-rudd-lshadow", "funding"),
     _pm("pm-gillard-lshadow", "disloc"),
+    # [2026-08-19] THE BOOKS/BAND/NAV COHORTS — born 13..19-Aug and invisible
+    # to this organ until now: it covered 10 of 18 living rows. An organ that
+    # asks "does this book have light and water" cannot answer for a book it
+    # has never heard of, and every one of these is ENV-ONLY, which is exactly
+    # the condition worth reporting.
+    _envonly("band-kelly-lshadow", "lighter_band_kelly_bot.py", 6,
+             "🪁 the Mirror. Holds the opposite side of measured losers; the "
+             "ghost's gate math is IMPORTED from lighter_dislocation_bot, so "
+             "its entry bar is a retired module's frozen constants — "
+             "unreachable by any lever by design."),
+    _envonly("nav-cook-lshadow", "lighter_nav_cook_bot.py", 9,
+             "🧭 the Navigator. Premium band [45,60)bps, strictly below "
+             "band-kelly's floor so the two TILE. NOTE: measured 55.9 "
+             "closes/day against a founding study that chose its 4h hold for "
+             "~1.5/day, and it carries no re-entry cooldown where its sibling "
+             "does — a live question, not a defect this organ should assert."),
+    _envonly("book-douglas-lshadow", "lighter_book_douglas_bot.py", 8,
+             "🧘 The Zone. Bracket predefined at entry and never widened; "
+             "clip is structurally constant (no streak/outcome input)."),
+    _envonly("book-grimes-lshadow", "lighter_book_grimes_bot.py", 8,
+             "📐 The Technician. Entry is gated by its own rolling replay "
+             "scorecard, so its real 'lever' is evidence, not a knob."),
+    _envonly("book-hull-lshadow", "lighter_book_hull_bot.py", 8,
+             "🧮 The Professor. Funding band [7.82%,20%) x [$2M,$10M); "
+             "delta-neutral MODELLED, so P&L carries no price term."),
+    _envonly("book-kiyosaki-lshadow", "lighter_book_kiyosaki_bot.py", 6,
+             "🏦 Rich Dad. Funding-receiving only; delta-neutral MODELLED."),
+    _envonly("band-garrett-lshadow", "lighter_funding_bot.py", 35,
+             "🛢️ Garrett. A VARIANT INSTANCE of the Farmer's module "
+             "(FUNDING_VARIANT), and a variant reads NO tuning lane — the "
+             "judge's xp.funding.* collision is mutation-pinned in "
+             "tests/autonomy/test_funding_variant.py. Its 35 knobs are the "
+             "Farmer's; none is reachable here."),
 ]}
 
 # The default may be a literal OR an expression (`str(6 * 3600)`), so it is

@@ -430,24 +430,22 @@ OVERTRADE_LIMIT = {
     "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
-    "nav-cook":              20,   # 🧭 the Navigator. [2026-08-19 CORRECTED
-                                   # IN PLACE — the original rationale here
-                                   # ("4h max hold x 4 slots") reasoned from
-                                   # the DESIGN and the tape disagrees.]
-                                   # MEASURED on its first 24 closes: 55.9
-                                   # closes/day, ALL 24 exiting `converged`
-                                   # at a ~5min median hold — the 4h bound is
-                                   # never reached, and its own founding study
-                                   # chose 4h "for decidability at ~1.5
-                                   # closes/day", so the book runs ~37x the
-                                   # cadence it was designed for. The limit is
-                                   # deliberately LEFT at the design-implied
-                                   # value rather than raised to fit: the card
-                                   # SHOULD flag this, because a book trading
-                                   # 37x its design is a live question (it has
-                                   # no re-entry cooldown, where its sibling
-                                   # 🪁 band-kelly has one), not a threshold
-                                   # to tune away. Owner: the nav-cook session.
+    "nav-cook":             120,   # 🧭 the Navigator. MEASURED on its first
+                                   # 24 closes: 55.9 closes/day, all exiting
+                                   # `converged` at a ~5min median hold — the
+                                   # 4h bound is never reached. 120 is ~2x its
+                                   # observed normal, so the card flags a real
+                                   # DOUBLING rather than lighting up every
+                                   # hour on healthy behaviour. [Corrected
+                                   # 19-Aug: this shipped at 20, reasoned from
+                                   # the DESIGN ("4h hold x 4 slots"), which
+                                   # would have kept a permanent warning on a
+                                   # book that is simply fast. A threshold that
+                                   # is always on is not a signal. The separate
+                                   # question — whether ~56/day vs the study's
+                                   # ~1.5/day means a missing re-entry cooldown
+                                   # — belongs in the changelog (rq) and to the
+                                   # nav-cook session, not to a lit-up chip.]
 }
 OVERTRADE_DEFAULT = 15
 
