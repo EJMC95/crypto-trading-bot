@@ -56,7 +56,18 @@ a **0.5× long**, which cannot happen at any price — a position smaller than t
 equity backing it can never reach the requirement. Both were my fixture
 arithmetic, not the code; both are now computed in the test and stated in it.
 
-12 tests, **5 mutations red** (the breach comparison loosened, the harsh default
+**CI CAUGHT A REAL GAP AND THE FIX WAS TESTS, NOT A LOWER FLOOR.** The first
+push breached `paper_broker.py`'s coverage floor — **94.9% against 97%** — because
+~200 new lines arrived with 12 tests that missed six paths. The floor exists
+precisely so a real-money-adjacent surface only ratchets UP, so six more tests
+went in rather than a floor edit: the bps converter, a `MarginSpec` passed
+straight to `set_margins`, `check()` SHORT-CIRCUITING once liquidated (it must
+not re-charge the liquidation fee every loop — verified by asserting `fees` is
+unchanged across five further calls), a malformed snapshot leaving the account
+untouched, junk margin rows skipped on restore while good ones survive, and
+`can_open` refusing zero size/price. Back to **98.9%**.
+
+18 tests, **5 mutations red** (the breach comparison loosened, the harsh default
 replaced with a free one, `UNKNOWN_MARGIN` softened, the liquidated bit dropped
 on restore, and the per-market `mmf` replaced with one assumed rate — the exact
 defect the class exists to prevent). `paper_broker` selftest green; the base

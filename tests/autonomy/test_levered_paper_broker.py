@@ -211,3 +211,63 @@ def test_risk_extra_publishes_the_numbers_a_reader_would_otherwise_re_derive():
     assert x["liquidated"] is False
     flat = _b().risk_extra()
     assert flat["dist_to_liq_frac"] is None, "flat is None, never a fake 0 or 1"
+
+
+# --- 5 · the paths a first draft leaves uncovered, each a real behaviour ----
+def test_from_bps_and_repr_are_the_venue_facing_surface():
+    """The venue quotes basis points; every construction site should go through
+    one converter rather than each caller dividing by 10,000 itself."""
+    m = MarginSpec.from_bps(500, 300)
+    assert m.imf == pytest.approx(0.05) and m.mmf == pytest.approx(0.03)
+    assert "0.0500" in repr(m) and "0.0300" in repr(m), (
+        "repr must show the fractions a reader is reasoning about")
+
+
+def test_set_margins_accepts_a_MarginSpec_directly():
+    """Callers holding specs already must not be forced back through a bps dict."""
+    b = LeveredPaperBroker(start_equity=1000.0, fee_bps=0.0)
+    b.set_margins({"BTC": MarginSpec(0.05, 0.03)})
+    assert b.spec("BTC").mmf == pytest.approx(0.03)
+
+
+def test_check_short_circuits_once_liquidated():
+    """A liquidated account must not re-run the breach path (and re-charge the
+    fee) on every subsequent loop."""
+    b = _b()
+    b.open("BTC", True, 30.0, 100.0)
+    b.mark("BTC", 60.0)
+    assert b.check() is True
+    fees_after_first = b.fees
+    for _ in range(5):
+        assert b.check() is True
+    assert b.fees == fees_after_first, "the liquidation fee is charged ONCE"
+    assert len(b.liquidation_events) == 1
+
+
+def test_restore_state_refuses_a_malformed_snapshot():
+    """Inherited contract: a bad snapshot leaves the account untouched rather
+    than half-applied."""
+    b = _b()
+    b.open("BTC", True, 1.0, 100.0)
+    before = b.to_state()
+    assert b.restore_state({"garbage": True}) is False
+    assert b.to_state() == before, "a refused restore must change nothing"
+
+
+def test_restore_skips_junk_margin_rows_but_keeps_the_good_ones():
+    b = LeveredPaperBroker(start_equity=1000.0, fee_bps=0.0)
+    ok = b.restore_state({"start": 1000.0, "realized": 0.0, "fees": 0.0,
+                          "pos": {}, "marks": {},
+                          "margins": {"BTC": [0.05, 0.03],
+                                      "JUNK": ["x", None],
+                                      "SHORT": [0.05]}})
+    assert ok is True
+    assert b.spec("BTC").mmf == pytest.approx(0.03)
+    assert b.spec("JUNK") is UNKNOWN_MARGIN, "unparseable -> harsh default"
+    assert b.spec("SHORT") is UNKNOWN_MARGIN, "truncated -> harsh default"
+
+
+def test_can_open_refuses_junk_and_a_dead_account():
+    b = _b()
+    assert b.can_open("BTC", 0, 100.0) is False
+    assert b.can_open("BTC", 1.0, 0) is False
