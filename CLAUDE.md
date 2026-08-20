@@ -324,6 +324,45 @@ promotion**: the docket is read-only, junior to the go-live gate, and a
 directional survivor still owes the (hm) random-entry null before anything
 ACTS on it.
   ENFORCED BY: `scripts/winners_docket.py::bh_survivors`, `tests/autonomy/test_winners_docket.py::test_outcome_conditioned_exits_never_reach_the_referee`
+
+### I22 · A BOOK MUST SPEND THE ECOSYSTEM, AND ITS SPEND IS A PUBLISHED NUMBER — ONE CONSTRUCT ON A NARROW SLICE AT 1x IS NOT A SLOW WINNER, IT IS A SAMPLE THE GATE CANNOT GRADE
+**Operator, 20-Aug:** *"everything you have put forward that is unreachable is
+because its one construct, one set of tradeables, one set of entry and exits
+which havent been explored properly, you have not set the bots up in any way
+that we could ever really even use leverage."* **The diagnosis is arithmetic and
+it has one equation.** With `t = S_d*sqrt(T)`, **days-to-gate = (2/S_d)^2**, and
+for independent sleeves **`S_d^2 = SUM S_i^2` — decidability velocity is
+ADDITIVE. One construct is one term in that sum**, so a single-sleeve book does
+not merely earn less, it earns a DECISION more slowly by the square. Every I17
+retirement is that arithmetic collecting: 🌊 9 buys/0 sells in 22d · 📊 17.2
+closes/yr · 🧙 ~719 closes = 40 MONTHS because 1 trade of 298 was half the P&L ·
+🎸 0 of 9 episodes independent of its parent. Measured 20-Aug: the venue carries
+**212 active markets across 5 asset classes** ($2,186M/day crypto, **41
+non-crypto at $163.8M/day — the ONLY on-venue source of a non-falling-BTC
+regime**, item 18), **zero fees**, leverage 3-20x on 176 of them. **The fleet's
+widest book scans 18, and every book runs at 1x notional** — not by decision but
+because until (se) nothing in the tree could READ the venue's margin fractions.
+**But width is not the claim, and this is NOT a licence to mint wider books.**
+Market count is not bet count: 8 crypto markets are **1.35** independent bets
+(mean pairwise corr +0.545), 8 cross-class are **4.81** (+0.095) — while
+`fleet_risk` publishes `long_effective_n` as `1/HHI` over DISTINCT SYMBOLS and so
+reports 9.0 for 9 correlated longs, overstating independence ~5x inside the organ
+whose own docstring warns that *"23 open longs that are all crypto beta is ~one
+trade, and nothing said so."* And **leverage adds NO `S_d`** — it multiplies mean
+and sd alike so `t` is INVARIANT (six studies, six rejections); it multiplies
+dollars and DRAWDOWN against the 15% bar, and is admissible only as an OUTPUT of
+a volatility target on a book whose `N_eff` has been MEASURED. So before a row is
+minted the design **PUBLISHES ITS SPEND** — `markets_scanned` · `n_eff` of the
+positions it will actually hold (correlation-aware, never a symbol count) ·
+`sides` · `gross_x` at its vol target · and its measured `S_d` with the implied
+days-to-gate — in the changelog entry AND in the book's own `extra.spend`, every
+loop. **A design whose days-to-gate exceeds 60 is a STUDY, not a book**: it may
+run as an instrument but it does not get a row, a clock, capital or a slot of the
+enforced fleet budget. **Refusals count as compliance** — a census reading "40
+markets, N_eff 1.4, one side, 1x, 187 days to gate" is this invariant WORKING,
+and the answer is to redesign or decline, never to widen the tape or lower the
+bar.
+  ENFORCED BY: `scripts/audit_book_spend.py::birth_census`, `scripts/audit_book_spend.py::MAX_DAYS_TO_GATE`
 <!-- INVARIANTS:END -->
 
 
