@@ -458,6 +458,20 @@ def _save_state(state):
     shout here stops the NEXT cause of the same shape being invisible.
     """
     saved = []
+    # [2026-08-20 (rs)] STAMP THE BLOB, NOT JUST THE COLUMN. `save_state` writes
+    # the time to the bot_state `updated_at` COLUMN, but `fetch_states` — the
+    # batch read every organ uses — selects only `(bot, state)`. So the payload
+    # `fleet_immune.brain_amnesia` receives carried NO timestamp at all, `bt`
+    # was always None, and I2's declared enforcement returned [] forever. The
+    # detector's other half is fixed in fleet_immune; this is what gives it
+    # something to read. Cheap, additive, and it makes the skew computable from
+    # any consumer of the blob rather than only from a DB column read.
+    try:
+        from datetime import datetime, timezone
+        state["updated"] = datetime.now(timezone.utc).isoformat(
+            timespec="seconds")
+    except Exception:                                # noqa: BLE001
+        pass
     try:
         import bot_pnl_store as store
         if store.save_state("learning-brain", state):

@@ -694,13 +694,28 @@ def _selftest():
     with mock.patch(__name__ + "._lget",
                     fake_lget({1: tape(400), 2: tape(100)})), \
             mock.patch.object(store, "load_state", lambda k: {}), \
+            mock.patch.object(store, "load_state_checked",
+                              lambda k: (True, {})), \
             mock.patch.object(store, "save_state",
                               lambda k, p: published.update(p)), \
             mock.patch.object(store, "save_history", lambda k, p: None), \
             mock.patch(__name__ + ".UNIVERSE", ["BTC", "ZEC", "GHOST"]), \
             mock.patch(__name__ + ".time", mock.Mock(time=lambda: now,
                                                      sleep=lambda s: None)):
-        sys.exit(store.organ_main('regime-oracle', main))
+        # [2026-08-20 (rs)] `sys.exit(store.organ_main(...))` — the production
+        # __main__ line, copy-pasted into the selftest. It raised SystemExit(0)
+        # and KILLED THE PROCESS HERE, so every assertion below never ran and
+        # the final "selftest OK" line never printed — while
+        # `tests/test_selftests.py`, which checks only the EXIT CODE, marked the
+        # module PASSING. A green selftest that stops a third of the way in is
+        # the "a named test could be vacuous" caveat realised: every coverage,
+        # staleness, dark-venue and per-asset contract below was dead.
+        # Run the organ, keep the process, assert.
+        _rc = store.organ_main('regime-oracle', main)
+    assert _rc == 0, f"organ_main faulted in the selftest: rc={_rc}"
+    assert published, (
+        "main() published NOTHING — the fixture no longer drives the organ, so "
+        "every assertion below would be checking a stale dict")
     cov = published["coverage"]
     assert "BTC" in published["pairs"], "a healthy book must still publish"
     assert "ZEC" not in published["pairs"], "a 100-bar book must NOT be graded"
@@ -722,6 +737,8 @@ def _selftest():
                     fake_lget({1: tape(400),
                                2: tape(400, end_day=today - 40 * DAY)})), \
             mock.patch.object(store, "load_state", lambda k: {}), \
+            mock.patch.object(store, "load_state_checked",
+                              lambda k: (True, {})), \
             mock.patch.object(store, "save_state",
                               lambda k, p: published.update(p)), \
             mock.patch.object(store, "save_history", lambda k, p: None), \
@@ -748,6 +765,8 @@ def _selftest():
         raise OSError("venue dark")
     with mock.patch(__name__ + "._lget", _boom), \
             mock.patch.object(store, "load_state", lambda k: {}), \
+            mock.patch.object(store, "load_state_checked",
+                              lambda k: (True, {})), \
             mock.patch.object(store, "save_state",
                               lambda k, p: saved.append(p)):
         main()

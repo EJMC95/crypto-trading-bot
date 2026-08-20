@@ -899,8 +899,34 @@ def brain_amnesia(brain_state, vitals_state, max_skew_s=None):
     b, v = (brain_state or {}), (vitals_state or {})
     bt = _parse_ts(b.get("updated") or b.get("updated_at"))
     vt = _parse_ts(v.get("updated") or v.get("updated_at"))
-    if bt is None or vt is None:
-        return []
+    # [2026-08-20 (rs)] A BLIND DETECTOR MUST SAY SO — it may not read as
+    # "healthy". This returned [] whenever either stamp was unreadable, and the
+    # brain's memory payload NEVER carried one: `save_state` records the time in
+    # the bot_state `updated_at` COLUMN while `fetch_states` selects only
+    # `(bot, state)`, so `bt` was None on every real cycle and I2's declared
+    # enforcement returned [] forever, silently. `audit_doctrine_enforcement`
+    # stayed green because the NAME resolves — precisely the "a named test could
+    # be vacuous" caveat at the top of CLAUDE.md, realised.
+    #
+    # Fail-safe QUIET stays right where the silence is genuinely uninformative
+    # (nothing to compare against, or no memory row yet). But vitals PRESENT and
+    # readable while the memory carries no stamp at all is not a transient — it
+    # is this guard unable to do its job, and reporting nothing there is exactly
+    # how it hid.
+    if vt is None:
+        return []                      # nothing to compare against — quiet
+    if bt is None:
+        if not b:
+            return []                  # no memory row yet — a booting brain
+        return [{"organ": "learning-brain",
+                 "detail": ("BRAIN AMNESIA CHECK IS BLIND — `learning-brain` "
+                            "carries no `updated` stamp inside its state blob, "
+                            "so the memory-vs-vitals skew cannot be computed "
+                            "and I2's enforcement is inert. bot_learn stamps it "
+                            "in `_save_state`; a payload without one is a "
+                            "container running pre-(rs) code. This is NOT a "
+                            "claim that the brain is amnesiac — it is a claim "
+                            "that nothing can currently tell.")}]
     skew = vt - bt
     if skew <= skew_max:
         return []
@@ -1568,10 +1594,23 @@ def _selftest():
     assert brain_amnesia({"runs": 337, "updated": "2026-07-31T13:00:00+00:00"},
                          {"run": 338, "updated": _ok_t}) == [], \
         "an hour of skew is a slow cycle, not a failed write"
-    # FAIL-SAFE QUIET: missing keys / unreadable stamps never fire
+    # [2026-08-20 (rs)] FAIL-SAFE QUIET, WHERE THE SILENCE IS INFORMATIVE — and
+    # NOT where it is the guard failing to work. This loop used to include
+    # `{"updated": "nope"}` as a must-stay-quiet case, i.e. it certified the very
+    # blindness that made I2's enforcement inert: the brain's blob carries no
+    # usable stamp on any real cycle, so `bt` was always None and this returned
+    # [] forever. Quiet is still correct for a booting brain (no memory row) and
+    # for nothing to compare against (dark vitals); a memory row that EXISTS but
+    # carries no readable stamp is now REPORTED as blind.
     for _a, _b in (({}, _vit), (_mem, {}), (None, None),
-                   ({"updated": "nope"}, _vit), (_mem, {"updated": None})):
+                   (_mem, {"updated": None})):
         assert brain_amnesia(_a, _b) == [], (_a, _b)
+    for _blind in ({"updated": "nope"}, {"runs": 337}):
+        _d = brain_amnesia(_blind, _vit)
+        assert _d and "BLIND" in _d[0]["detail"], \
+            f"a memory row with no readable stamp must report blindness: {_blind}"
+    # ...and the blind report must NOT claim amnesia — it claims unknowability
+    assert "NOT a claim that the brain is amnesiac" in _d[0]["detail"]
     # wired, and its key is FETCHED — without that it is dead code (the (hh)
     # lesson, which this file already learned once)
     _src_run = _ins2.getsource(run_once)
