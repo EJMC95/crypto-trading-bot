@@ -124,7 +124,7 @@ EXIT_BPS = float(os.environ.get("COOK_EXIT_BPS", "30"))
 HORIZON_PLATEAU_S = (1800, 3600, 7200, 14400, 28800)   # all measured positive
 MAX_HOLD_S = float(os.environ.get("COOK_MAX_HOLD_S", str(4 * 3600)))
 HARD_STOP = float(os.environ.get("COOK_HARD_STOP", "0.05"))
-# [2026-08-20 (sc)] CLIP $80 -> $240 — LEVERAGE, MEASURED AND PRICED.
+# [2026-08-20 (sd)] CLIP $80 -> $240 — LEVERAGE, MEASURED AND PRICED.
 # In this fleet "leverage" is deployed notional / equity (there is no leverage
 # knob and that is deliberate — see leverage-measured-and-rejected-five-times),
 # so raising the clip IS the lever. Six prior rejections all levered books with

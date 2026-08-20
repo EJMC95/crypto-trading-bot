@@ -1,3 +1,75 @@
+## 2026-08-20 (sd) — LEVERAGE, MEASURED AND SHIPPED ON THE ONE BOOK WHERE THE QUESTION IS WELL-POSED — and the mutation round that licensed the book was VOID
+
+*(Renumbered (sc) -> (sd) at push time — ⚖️ Counterweight's entry took `(sc)` on `main` while this branch was unmerged, so the merged entry keeps the letter and this one moves. The in-tree references were rewritten in the same commit: `(ri)`'s correction note and `mutate.py`'s and `.gitignore`'s comments, reconciled by COUNT not by a capped grep.)*
+
+**Operator: *"im sick of negative, restrict only, kill everything else... create
+bots we can trade, leverage and function well and have something to be proud
+of."*** Fair, and largely landed. Three asks, all three run.
+
+**1 · LEVERAGE — the first "yes, and here is how much" in this fleet.** Six
+prior rejections all levered books with ~ZERO measured edge, where leverage is
+pure variance amplification and the answer is correctly no. 🧭 nav-cook is the
+first book where the question is well-posed: a reproducible **+0.373%/trade at
+t=+2.61** `(sb)`, a HARD 5% PRICE stop, mean-reverting exposure. Measured on its
+own 226-trade series (sd 2.147%/trade), sized in the only lever this fleet has
+(deployed notional — there is no leverage knob and that is deliberate):
+
+| L | gross expo | liq @ | stop @ | 35d return | maxDD | 15% bar |
+|---:|---:|---:|---:|---:|---:|---|
+| 1 | 32% | 100.0% | 5.0% | +6.94% | −1.89% | PASS |
+| **3 (shipped)** | 96% | 33.3% | 5.0% | **+22.06%** | **−5.60%** | PASS |
+| 5 (ceiling) | 160% | 20.0% | 5.0% | +38.94% | −9.22% | PASS |
+| 8 | 256% | 12.5% | 5.0% | +67.89% | −14.46% | at the bar |
+| 12 | 384% | 8.3% | 5.0% | +114.09% | −21.13% | **FAIL** |
+
+**THE STOP FIRES BEFORE LIQUIDATION AT EVERY LEVEL TO 12×** — liquidation is not
+the binding constraint here, the drawdown bar is. Kelly on the measured
+distribution is **8.10×**, half-Kelly 4.05×; **3× ships BELOW half-Kelly on
+purpose**, because Kelly on an ESTIMATED edge is fragile (a 2× overestimate of
+the mean turns half-Kelly into full-Kelly) and this rests on n=226 in ONE
+35-day window whose live ledger has not yet confirmed it. Clip $80 → $240,
+env-tunable, pinned two ways in the selftest (implied maxDD < 15%; gross ≤ the
+measured 5× ceiling). **I19 price, stated: 3× the exposure and 3× the drawdown
+for the SAME per-trade expectancy — this buys $ throughput, not edge.**
+
+**2 · THE UNMINED SIGNAL FAMILIES — swept, both refuted, fast.** The scout
+publishes far more than the two signals mined so far. Density check first:
+`oi_moves` 8% and `vol_surges` 0.6% are too sparse; `funding_divergence` and
+`tickets` are 100%.
+* **Cross-venue funding divergence** (a DIFFERENT question from the funding
+  LEVEL `(qq)` priced to zero — "does Lighter disagree with the market, and does
+  price resolve it?"): 6 gap bands × 5 horizons, BOTH directions. Nothing. FOLLOW
+  is negative almost everywhere ([20,50) reads −0.099% at **t=−3.51**); the only
+  positive cell is [500,inf) at n=38–83, t≤0.99. MIRROR is negative too.
+* **The scout's ticket feature space** (193k rows, 4 lenses, never swept): at 30m
+  holds **every lens, both directions, reads t=−4.0 to −6.5**. Both sides
+  negative is not signal, it is FRICTION — and that is the most robust single
+  fact in the week's measurements. The one persistent structure (divergence-long
+  loses monotonically, −0.070 → −0.522%, t=−4.10..−2.35) is **already what the
+  live taker trades**, its live arm being divergence-SHORT-only since 17-Jul.
+
+**3 · AND THE ROUND THAT LICENSED THE BOOK WAS VOID.** `(ri)` claims "8
+mutations verified RED". **It was not.** `-t "tests/test_selftests.py -k
+nav_cook"` reached `mutate.py` as ONE argv element (`mutate.py:104` passed
+`selector` unsplit), so pytest read the whole string as a filename, exited
+non-zero, and the harness printed **`baseline: RED`** — which makes every
+mutation look killed. **The harness printed the warning and I read a grep of its
+output instead of the warning.** Same class as `(qg)`, which built this harness
+precisely because the round-was-void failure had already bitten five times.
+Re-run at the parametrized id: **9 of 9 killed, baseline AND restore green** —
+and the re-run found **one genuine SURVIVOR**: the measured-drawdown constant
+was a bare literal a single edit could defeat, the same "a bar can be fixed by
+editing the bar" shape `(sa)` closed by deriving the confirm window. Fixed and
+re-verified. `(ri)` is corrected in place.
+
+**THE CLASS IS CLOSED, NOT JUST THE INSTANCE:** `mutate.py` now `shlex.split`s
+the selector, so the natural `-t "path -k name"` form works instead of silently
+poisoning the baseline. Verified — the exact string that produced the false red
+now reads `baseline: GREEN` and kills correctly.
+
+Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
+split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
+live since `(rj)`.
 ## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT IS GRADED 3.6× WORSE THAN IT PERFORMS: the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
 
 [Renumbered (sa) -> (sb) -> (sc): main took (sa) for nav-cook's gate fix, then
@@ -1405,7 +1477,7 @@ impossible" (I18/`(lv)`); exit ladder with the **price stop SENIOR to every
 data-dependent rule** so a dark reference cannot trap a losing position
 (`(nm)`); `save_state` result never discarded (I4); `(gr)` price telemetry on
 every close; closes tagged `<side>-navband_<exit>` so the brain and the winners'
-docket grade it alone. **8 mutations verified RED**, incl. the half-open
+docket grade it alone. **[CORRECTED IN PLACE 20-Aug (sd): that round was VOID and this claim was FALSE.** `-t "tests/test_selftests.py -k nav_cook"` reaches `mutate.py` as ONE argv element (`mutate.py:104` passes `selector` unsplit), so pytest read the whole string as a filename, exited non-zero, and the harness printed `baseline: RED` — which makes EVERY mutation look killed. The harness said so explicitly and I read a grep of its output instead of its warning. Re-run at `tests/test_selftests.py::test_module_selftest[lighter_nav_cook_bot]`: **9 of 9 killed with baseline and restore both green**, after ONE genuine SURVIVOR was found and fixed — the measured-drawdown constant was a bare literal a single edit could defeat.]** ~~8 mutations verified RED~~, incl. the half-open
 ceiling, the mirror side, the stop, the class screen both directions, and the
 horizon pin.
 
