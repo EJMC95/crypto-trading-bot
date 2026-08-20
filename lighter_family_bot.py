@@ -115,15 +115,42 @@ def brain_stake_mult(bot_id, tag):
     """The brain's TWO-WAY per-(bot, tag) stake multiplier for an entry
     (reduce-only until 21-Jul), looked up under EXACTLY the identity this
     book's ledger rows carry (bot_id row name + ledger_tag). fleet_bus owns
-    the fail-safe contract (fresh payload only, clamp [0.5, 2.0]
-    since (sh) — the brain's ceiling step; was [0.5, 1.5]; neutral
-    1.0 on any doubt); the guard here only covers an image built without
-    fleet_bus.py."""
+    the fail-safe contract (fresh payload only, clamped to
+    [fleet_bus.MULT_FLOOR, fleet_bus.MULT_CEIL] — 6.7x either way since (si);
+    the bounds are NOT restated here, because a retyped constant is a constant
+    that drifts and this docstring had already gone stale twice, reading
+    "[0.5, 1.5]" after (sh) and "[0.5, 2.0]" after (si); neutral 1.0 on any
+    doubt). The guard here only covers an image built without fleet_bus.py."""
     try:
         import fleet_bus
         return float(fleet_bus.stake_multiplier(bot_id, ledger_tag(tag)))
     except Exception:  # noqa: BLE001
         return 1.0
+
+
+def brain_clip_for(rows, tag, base_usd):
+    """`base_usd` scaled by the brain across SEVERAL rows -> (usd, mult).
+
+    [2026-08-20 (sj)] For a book that runs a LIVE arm beside a shadow control
+    arm. `brain_entry_gated` has consulted both rows since (ma) — this is the
+    sizing half of the same idea, and it uses the same `ledger_tag` identity so
+    a gate and a size can never disagree about which bucket a trade is in.
+
+    The composition rule (min over the rows that HAVE an opinion; a silent row
+    never blocks) lives in `fleet_bus.brain_mult_multi`, deliberately, because
+    ⚖️ Counterweight needs the identical rule for a different reason and two
+    copies would be two rules. What that means here: a thin live arm with no
+    record of its own is sized by its designed control arm (I14 — the record
+    decides, and where there is no record the proxy speaks), while a reduce
+    from EITHER arm is always heard.
+
+    Fail-safe `(base_usd, 1.0)`, incl. an image built without fleet_bus.py."""
+    try:
+        import fleet_bus
+        return fleet_bus.brain_clip_multi(
+            [(r, ledger_tag(tag)) for r in rows], base_usd)
+    except Exception:  # noqa: BLE001
+        return base_usd, 1.0
 
 
 def brain_entry_gated(bot_id, tag):

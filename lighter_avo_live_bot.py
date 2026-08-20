@@ -57,10 +57,23 @@ own stake_mult and the board's live.clip_scale lever, capped by the hard
 notional rail. Protections' drawdown denominator is the live baseline, not
 the shadow's $1,000 (20% of a paper grand would never bind on a $63 book).
 
-WHAT THE LIVE ARM DELIBERATELY DOES NOT DO: read brain stake-mults (doctrine:
-no live bot sizes off the brain), read fleet_allocation (real money never
-reads it — AST-pinned in tests/autonomy/test_allocation_consumer.py), or
-consume any tuning lane of its own (env-only config, the Garrett/Kiyosaki
+[2026-08-20 (sj)] THE LIVE ARM NOW SIZES OFF THE BRAIN. Eamon: "Implement
+into live and other bots without it." This paragraph used to open "WHAT THE
+LIVE ARM DELIBERATELY DOES NOT DO: read brain stake-mults (doctrine: no live
+bot sizes off the brain)", and that clause is CORRECTED IN PLACE per I12
+rather than left standing as history — a doctrine line that no longer
+describes the system is a defect, and this one described a training wheel.
+What replaces it is a rails argument, not a weaker rule: the mult returns a
+NUMBER, and `rails.notional_ok` below still refuses it, the kill switch still
+kills, the daily-loss halt still halts and SafetyRails' caps remain
+operator-only. The multiplier proposes; the rails dispose. It reads BOTH rows
+(live + its shadow control arm) under `ledger_tag`, exactly as the regime gate
+five lines from the sizing site already did — an arm with n=3 of its own
+cannot earn an opinion, and its designed control arm can (I14).
+
+WHAT THE LIVE ARM STILL DELIBERATELY DOES NOT DO: read fleet_allocation (real
+money never reads it — AST-pinned in tests/autonomy/test_allocation_consumer.py)
+or consume any tuning lane of its own (env-only config, the Garrett/Kiyosaki
 rule — a single-policy (hm) clock by construction). Restrict-only reads it
 KEEPS: the fleet long-budget veto + per-symbol cap (it is a directional LONG
 book), the brain's regime entry gate (restrict-only, fail-open), and the
@@ -80,7 +93,8 @@ import fleet_tuning as tuning
 from lighter_family_bot import (
     STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE,
     regime_inputs_for, btc_regime_up, btc_tide_up, noncrypto_regimes,
-    noncrypto_entry_blocked, brain_entry_gated, ledger_reason, ledger_tag,
+    noncrypto_entry_blocked, brain_entry_gated, brain_clip_for,
+    ledger_reason, ledger_tag,
     symcap_state, symcap_blocked, _interval_ms, MOMO_TIDE_GATE,
     NONCRYPTO_EFFECTIVE,
 )
@@ -595,7 +609,11 @@ def main(_ctx=None, once=False):
                     entry_price=entry or None, exit_price=exit_px or None,
                     side="long", shadow=False,
                     extra={"policy": _policy(), "fill_measured": measured,
-                           "fill_src": why, "clip": m.get("clip")})
+                           "fill_src": why, "clip": m.get("clip"),
+                           # [(sj)] I22 receipt: the brain scale this REAL
+                           # stake was sized at. `clip` is base x strategy
+                           # stake_mult x brain and cannot be decomposed.
+                           "brain_mult": m.get("brain_mult")})
             except Exception:  # noqa: BLE001
                 pass
 
@@ -900,6 +918,15 @@ def main(_ctx=None, once=False):
                     brain_gated_tags.append(f"{sym}:{ledger_tag(tag)}")
                     continue
                 stake = clip * S.stake_mult(tag, bars)
+                # [2026-08-20 (sj)] ...and the brain's per-tag scale on top,
+                # across BOTH rows — the same pair, the same `ledger_tag`
+                # identity and the same fail-safe as the regime gate above, so
+                # a gate and a size can never disagree about which bucket this
+                # trade is in. Applied BEFORE the min-clip floor and before the
+                # notional rail on purpose: a reduced stake that falls under
+                # MIN_CLIP_USD should not be sent at all, and an increased one
+                # must be admitted against the cap it will actually fill.
+                stake, bmult = brain_clip_for((BOT_ROW, SHADOW_ROW), tag, stake)
                 if stake < MIN_CLIP_USD:
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
@@ -930,6 +957,10 @@ def main(_ctx=None, once=False):
                     pass
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
+                             # [(sj)] I22 receipt, carried on the durable
+                             # position record so it survives a restart and
+                             # reaches the close row.
+                             "brain_mult": round(bmult, 4),
                              "clip": round(stake, 2), "last_px": px}
                 pos[sym] = {"size": size, "entry": fpx or px}
                 cycle_admitted += 1
@@ -937,6 +968,7 @@ def main(_ctx=None, once=False):
                 cycle_sym[base] = cycle_sym.get(base, 0) + 1
                 _PRINT(f"[avo-live] {iso(t_now)} OPEN {sym} long "
                        f"${stake:.2f} @ {fpx or px:.6g} [{tag}]"
+                       f"{'' if bmult == 1.0 else f' brain {bmult:.2f}x'}"
                        f"{'' if meas else ' (entry UNMEASURED)'}")
 
         # ---- publish + persist ---------------------------------------------

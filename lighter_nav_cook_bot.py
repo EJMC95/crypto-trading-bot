@@ -389,6 +389,8 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
             side=pos["side"],
             entry_price=pos.get("entry"), exit_price=exit_px,
             extra={"dev_entry_bps": pos.get("dev_entry_bps"),
+                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "dev_exit_bps": (round(dev_now, 1)
                                     if dev_now is not None else None),
                    "ghost_side": pos.get("ghost_side"),
@@ -399,16 +401,24 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
         print("[%s] ledger write failed for %s: %s" % (now_iso(), coin, exc))
 
 
-def _open(positions, coin, dev_bps, bv, t0, cls=None):
+def _open(positions, coin, dev_bps, bv, t0, cls=None, notional=None,
+          brain_mult=1.0):
     """Open the mirror leg. Entry price is the REAL side's VWAP for my clip —
-    a long pays the ask walk, a short earns the bid walk."""
+    a long pays the ask walk, a short earns the bid walk.
+
+    [(sj)] `bv` must be the book view walked for `notional`, not for the flat
+    clip: the whole point of this entry price is that it pays the walk, so a
+    brain-scaled clip priced off the base clip's VWAP would book a fill the
+    venue never offered. The caller re-walks; this asserts nothing it cannot
+    see, which is why the caller's re-walk is fail-CLOSED."""
     side = mirror_side(dev_bps)
     px = bv["buy_vwap"] if side == "long" else bv["sell_vwap"]
     if not px or px <= 0:
         return False
     positions[coin] = {
         "coin": coin, "side": side, "entry": px, "last_px": px,
-        "notional": CLIP_USD, "t0": t0,
+        "notional": CLIP_USD if notional is None else float(notional),
+        "brain_mult": brain_mult, "t0": t0,
         "dev_entry_bps": round(dev_bps, 1),
         "ghost_side": ghost_side(dev_bps),
         "cls": cls,
@@ -476,6 +486,13 @@ def main():
         census = {"scanned": len(universe), "ref_blind": 0 if ref else 1,
                   "no_book": 0, "held": 0, "in_band": 0, "below_band": 0,
                   "above_band": 0, "preipo": 0, "confirming": 0,
+                  # [(sj)] a candidate the brain resized and whose book could
+                  # not then be re-walked at the sized clip. Its own bucket
+                  # because "we could not price the SIZE" is a different
+                  # refusal from "the venue has no book" and from "too thin" —
+                  # collapsing it into either makes a brain-scale problem read
+                  # as a venue problem for as long as it lasts.
+                  "resize_blind": 0,
                   "slip": 0, "capped": 0, "opened": 0}
 
         for coin in universe:
@@ -550,16 +567,37 @@ def main():
                 census["capped"] += 1
                 continue
             side = mirror_side(dev_bps)
-            slip = (bv.get("buy_slip_bps") if side == "long"
-                    else bv.get("sell_slip_bps"))
+            # [2026-08-20 (sj)] the brain sizes this entry, keyed on the SAME
+            # `<side>-navband` _close publishes. A resized clip must be
+            # RE-WALKED before it is priced or gated: this book's entry is a
+            # VWAP through the real book and its slip gate is the one thing
+            # standing between it and a thin coin, so pricing a 2x clip off
+            # the 1x walk would understate both. Fail-CLOSED — no re-walk, no
+            # entry.
+            _clip, _bm = (fleet_bus.brain_clip(bot_id, "%s-navband" % side,
+                                               CLIP_USD)
+                          if fleet_bus is not None else (CLIP_USD, 1.0))
+            bv_e = bv
+            if _bm != 1.0:
+                try:
+                    bv_e = ghost.book_view(ctx, coin, _clip)
+                except Exception:  # noqa: BLE001
+                    bv_e = None
+                if not bv_e:
+                    census["resize_blind"] += 1
+                    continue
+            slip = (bv_e.get("buy_slip_bps") if side == "long"
+                    else bv_e.get("sell_slip_bps"))
             if slip is None or slip > MAX_ENTRY_SLIP_BPS:
                 census["slip"] += 1
                 continue
-            if _open(positions, coin, dev_bps, bv, t0, cls=cls):
+            if _open(positions, coin, dev_bps, bv_e, t0, cls=cls,
+                     notional=_clip, brain_mult=_bm):
                 census["opened"] += 1
                 pend.pop(coin, None)
-                print("[%s] OPEN %s %s dev %+.1fbps clip $%.0f"
-                      % (now_iso(), coin, side, dev_bps, CLIP_USD))
+                print("[%s] OPEN %s %s dev %+.1fbps clip $%.0f%s"
+                      % (now_iso(), coin, side, dev_bps, _clip,
+                         "" if _bm == 1.0 else " (brain %.2fx)" % _bm))
 
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())
         equity = START_EQUITY + realized + open_pnl

@@ -45,6 +45,13 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import bot_pnl_store as store
+# [2026-08-20 (sj)] the brain's sizing accessor. UNGUARDED, deliberately, and
+# the Dockerfile gains the COPY in the same commit: every import in this file
+# is unguarded on purpose (a missing module is a boot crash-loop, not a silent
+# degrade), and `audit_image_imports.py` is what verifies the claim. Both
+# images that carry this file — Dockerfile.tickettaker and Dockerfile.freqtrade
+# — now COPY fleet_bus.py.
+import fleet_bus
 import funding_basis
 from paper_broker import PaperBroker
 # [2026-07-17] The fill read is SHARED with the live Funding Farmer now
@@ -1493,7 +1500,7 @@ def _close_extra(m):
     # a position that never saw a mark (a legacy row, or one closed on its
     # first cycle), and absent is UNKNOWN — a grader must not read a missing
     # give_back as zero, which is why these are omitted rather than defaulted.
-    for _k in ("peak_ret", "give_back", "mae_ret"):
+    for _k in ("peak_ret", "give_back", "mae_ret", "brain_mult"):
         _v = m.get(_k)
         if isinstance(_v, (int, float)) and not isinstance(_v, bool):
             out[_k] = round(float(_v), 6)
@@ -2839,7 +2846,22 @@ def main(_ctx=None):
             is_long = t.get("side", "long") != "short"
             if is_long and long_budget_full:
                 continue          # L2 veto: fleet long budget is full
-            clip = round(vol_clip(ranges.get(sym)) * gov, 2)
+            # [2026-08-20 (sj)] THE BRAIN SIZES THIS ENTRY, per (side, lens).
+            # This book is the reason the wiring exists: on the morning it
+            # shipped the brain's entire published opinion across the fleet was
+            # two mults, and one of them was THIS row's `short-divergence` at
+            # 0.75 (n=78, t=-1.43), held for 11 consecutive runs into a
+            # consumer that did not exist. The lens is the natural bucket —
+            # the taker already grades, vetoes and tunes per lens, and sizing
+            # was the one lens-shaped decision still taken flat.
+            # ORDER MATTERS: the governor (`gov`) is the FLEET's drawdown
+            # brake and the brain's mult is this BOOK's evidence; both are
+            # multiplicative and both apply, and the notional cap below still
+            # sees the final number.
+            clip, bmult = fleet_bus.brain_clip(
+                BOT_ROW, f"{'long' if is_long else 'short'}-{lens}",
+                round(vol_clip(ranges.get(sym)) * gov, 2))
+            clip = round(clip, 2)
             size = clip / mark
             ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
                                         "prem_bps", "apr_pct", "gap_pct")}
@@ -2963,6 +2985,12 @@ def main(_ctx=None):
             pos[sym] = {"size": size if is_long else -size, "entry": entry_px}
             meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,
                          "entry": entry_px,
+                         # [(sj)] I22 receipt — the brain scale in force when
+                         # this clip was set. `clip` alone cannot say whether a
+                         # small position was a calm book (vol_clip), a fleet
+                         # drawdown (gov) or the brain, and those are three
+                         # different findings.
+                         "brain_mult": bmult,
                          "accrued_to": iso(t_now), "funding_paid": 0.0,
                          "evidence": ev,
                          # [2026-07-22 FLAP FIX] the bars priced at entry
@@ -2972,7 +3000,8 @@ def main(_ctx=None):
             opened_lenses.add(lens)
             print(f"[ticket-taker] {iso(t_now)} OPEN "
                   f"{'long' if is_long else 'SHORT'} {sym} ({lens}) "
-                  f"${clip} @ {entry_px} (range {round(ranges.get(sym) or 0, 1)}%) "
+                  f"${clip}{'' if bmult == 1.0 else f' (brain {bmult:.2f}x)'}"
+                  f" @ {entry_px} (range {round(ranges.get(sym) or 0, 1)}%) "
                   f"evidence={ev}")
 
     # [(dv)] persist the up-regime cache for the next run-once boot — same gate

@@ -49,7 +49,15 @@ MULT_FLOOR = 1.0 / 6.7
 # every headline this fleet has re-measured and lost, at-or-below the two that
 # survived). Leaving the clamp at 1.5 would have made that tier emit-and-be-
 # swallowed, which is the registered-but-inert failure with extra steps.
-# SHADOW ONLY: no live bot reads a brain multiplier.
+# [2026-08-20 (sj)] "SHADOW ONLY: no live bot reads a brain multiplier" stood
+# here and is CORRECTED IN PLACE per I12 — it no longer describes the fleet.
+# Eamon: "Implement into live and other bots without it." Both real-money rows
+# read the brain now, and the sentence that made that sound forbidden was the
+# doctrine half of the same training wheel (sh) took off the number. What
+# replaces it is not a weaker rule, it is a DIFFERENT one, and it is the reason
+# this is safe: the multiplier PROPOSES a size, and every senior rail still
+# DISPOSES — SafetyRails.notional_ok, the kill switch, the daily-loss halt and
+# the fleet long-budget veto all sit downstream, untouched and operator-owned.
 MULT_CEIL = 6.7
 
 
@@ -100,8 +108,13 @@ def stake_multiplier(bot, entry_tag, current_time=None):
     (1.25/1.5): the v3 MIRROR bars only (brain_stats.EXP_* — Wilson lower
     bound, t >= +2.0/+2.5, full n floor, no family-praise inheritance, no
     urgent fast-path; kill switches BRAIN_MULT_ENGINE=v2 /
-    BRAIN_MULT_EXPAND=off zero it). SHADOW books only — no live bot reads
-    mults. Neutral 1.0 on any doubt.
+    BRAIN_MULT_EXPAND=off zero it). Neutral 1.0 on any doubt.
+
+    [2026-08-20 (sj)] "SHADOW books only — no live bot reads mults" was here
+    and is CORRECTED IN PLACE (I12): every living book reads this now, real
+    money included. See MULT_CEIL's note for why that is a rails question and
+    not a clamp question. Prefer `brain_clip`/`brain_clip_multi` at a sizing
+    site — they carry the fail-safe and hand back the mult to STAMP (I22).
     """
     try:
         p = _load("brain-stake-mults", current_time)
@@ -113,6 +126,121 @@ def stake_multiplier(bot, entry_tag, current_time=None):
         return max(MULT_FLOOR, min(MULT_CEIL, float(m.get("mult", 1.0))))
     except Exception:
         return 1.0
+
+
+
+def brain_mult_raw(bot, entry_tag, current_time=None):
+    """The brain's clamped mult for ONE bucket, or **None when it has no
+    opinion** — the distinction `stake_multiplier` cannot express.
+
+    `stake_multiplier` returns 1.0 for "absent" and for "exactly 1.0" alike.
+    For a single bucket those mean the same thing (do not resize) and the
+    conflation is harmless. It stops being harmless the moment a size spans
+    SEVERAL buckets: combined with `min`, a silent bucket would out-vote an
+    opining one and the brain's only live opinions would be silently discarded
+    by the arms that have none. So the raw read is a separate owner, and
+    `stake_multiplier` stays exactly as its ~dozen existing callers know it.
+    """
+    try:
+        p = _load("brain-stake-mults", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None
+        m = ((p.get("mults") or {}).get(str(bot)) or {}).get(str(entry_tag))
+        if m is None:
+            return None
+        v = float(m.get("mult", 1.0))
+        if v != v:                                   # NaN
+            return None
+        return max(MULT_FLOOR, min(MULT_CEIL, v))
+    except Exception:                                # noqa: BLE001
+        return None
+
+
+def brain_mult_multi(buckets, current_time=None):
+    """ONE multiplier for a size that spans one or more (row, tag) buckets.
+
+    **RULE: the MINIMUM over the buckets that HAVE an opinion; 1.0 when none
+    does.** Two shapes in this fleet need it and both are the same shape:
+
+    * ⚖️ Counterweight takes ONE clip and opens a long leg AND a short leg
+      with it. The brain buckets those closes separately (`long`, `short`), so
+      a per-side mult would size the two legs differently and the book would
+      stop being dollar-neutral — it would quietly become a directional book
+      wearing a spread book's name. One clip, one scale.
+    * 🙏 Avo's LIVE arm has n=3 of its own and a designed shadow control arm
+      beside it. `brain_entry_gated` already consults BOTH rows three lines
+      above the sizing site; this reads the same pair.
+
+    Why `min` and not a mean: a reduce is heard from ANY bucket (restrict-
+    biased, which is what a size that spans several records should be), while
+    an expand needs every bucket that has spoken to agree. A SILENT bucket
+    never blocks an expansion — that is the whole reason `brain_mult_raw`
+    exists, and it is what lets the live arm size off its control arm's
+    evidence when its own record is too thin to have any (I14: the record
+    decides, and where there is no record the designed proxy speaks).
+
+    Fail-safe: any doubt is 1.0.
+    """
+    try:
+        seen = [m for m in (brain_mult_raw(b, t, current_time)
+                            for b, t in buckets) if m is not None]
+    except Exception:                                # noqa: BLE001
+        return 1.0
+    return min(seen) if seen else 1.0
+
+
+def brain_clip_multi(buckets, base_usd, current_time=None):
+    """`base_usd` scaled by `brain_mult_multi(buckets)` -> (scaled_usd, mult).
+
+    THE ONE CALL SHAPE for every book, so the rule has one owner and each
+    book's wiring is a single line at its own sizing site.
+
+    [2026-08-20 (sj)] **Eamon: "Implement into live and other bots without
+    it."** Until today the brain's sizing reached only the family books, the
+    freqtrade strategies and the Parliament — thirteen books, BOTH real-money
+    rows among them, sized off a constant while the organ holding every close
+    this fleet has ever made had nothing to say to them. And it was not
+    hypothetical: measured on the live payload the morning this shipped, the
+    brain's ENTIRE published opinion was two mults —
+    `lighter-ticket-taker-lshadow|short-divergence 0.75` (streak 11) and
+    `perps-funding-spread-lshadow|long 0.75` (streak **91**) — and *neither
+    book could hear it*. Ninety-one consecutive runs of an organ asking one
+    book to take less risk, into a consumer that did not exist. That is I18's
+    unreachable-lever shape with the arrow reversed: not a knob with no reader,
+    a READER with no knob.
+
+    WHAT THIS DOES **NOT** DO, and it is the whole reason it is safe to wire
+    into real money: it returns a NUMBER. Every senior rail sits downstream and
+    is untouched — `SafetyRails.notional_ok` still refuses an entry that would
+    breach the operator's cap, the kill switch still kills, the daily-loss halt
+    still halts, and the fleet long-budget veto still vetoes. A brain that
+    wants 6.7x on a book at its notional cap gets refused by the cap, exactly
+    as a 1.0x entry would be. **The multiplier proposes; the rails dispose.**
+
+    Returns the mult beside the clip so the caller can STAMP it on the row.
+    That is I22's receipt rule applied to itself: a term that scales every
+    stake must record what it applied, or the next session reconstructs it from
+    candles like every other unrecorded knob.
+
+    Fail-safe: any doubt returns `(base_usd, 1.0)` — a dark brain, a stale
+    payload or a junk value must never resize a book.
+    """
+    try:
+        base = float(base_usd)
+    except (TypeError, ValueError):
+        return base_usd, 1.0
+    try:
+        m = float(brain_mult_multi(buckets, current_time))
+    except Exception:                                            # noqa: BLE001
+        return base, 1.0
+    if not (m > 0) or m != m:                    # NaN-safe
+        return base, 1.0
+    return base * m, m
+
+
+def brain_clip(bot, entry_tag, base_usd, current_time=None):
+    """The single-bucket case of `brain_clip_multi` -> (scaled_usd, mult)."""
+    return brain_clip_multi([(bot, entry_tag)], base_usd, current_time)
 
 
 def allocation_scale(bot, current_time=None):
@@ -870,6 +998,41 @@ if __name__ == "__main__":
     assert abs(MULT_FLOOR * MULT_CEIL - 1.0) < 1e-12, (MULT_FLOOR, MULT_CEIL)
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-bad",
                             _now) == MULT_FLOOR, "under-floor clamps"
+
+    # [2026-08-20 (sj)] brain_mult_raw / brain_mult_multi / brain_clip: the
+    # accessors every book's sizing site now calls. The property that carries
+    # the whole design is the SILENT bucket — it must not out-vote an opining
+    # one, because that is precisely the case both real users of the multi
+    # form are (⚖️'s untraded side, 🙏's thin live arm).
+    assert brain_mult_raw("freqtrade-avo-maria-lshadow", "long-swing-dip",
+                          _now) == 1.25, "raw returns the clamped value"
+    assert brain_mult_raw("freqtrade-avo-maria-lshadow", "nope", _now) is None, \
+        "no opinion is None, NOT 1.0 — the distinction the multi rule needs"
+    assert brain_mult_raw("no-such-book", "long", _now) is None, "absent row"
+    _b = "freqtrade-avo-maria-lshadow"
+    assert brain_mult_multi([(_b, "long-swing-dip"), (_b, "nope")],
+                            _now) == 1.25, \
+        "a SILENT bucket must not flatten an opining one to 1.0"
+    assert brain_mult_multi([(_b, "long-swing-dip"), (_b, "long-deep")],
+                            _now) == 0.25, "restrict wins over expand"
+    assert brain_mult_multi([(_b, "nope"), (_b, "nope2")], _now) == 1.0, \
+        "nobody has an opinion -> neutral"
+    assert brain_mult_multi([], _now) == 1.0, "no buckets -> neutral"
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (100.0, 1.25)
+    assert brain_clip(_b, "nope", 80.0, _now) == (80.0, 1.0), "silent -> base"
+    assert brain_clip(_b, "long-swing-dip", None, _now) == (None, 1.0), \
+        "an unusable base is returned UNCHANGED, never coerced"
+    assert brain_clip_multi([(_b, "long-swing-dip"), (_b, "long-deep")],
+                            80.0, _now) == (20.0, 0.25)
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": dict(
+        _mults, updated="2020-01-01T00:00:00+00:00")}
+    assert brain_mult_raw(_b, "long-swing-dip", _now) is None, "stale -> None"
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (80.0, 1.0), \
+        "a stale brain must never resize a book"
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": None}
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (80.0, 1.0), \
+        "a DARK brain must never resize a book"
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
     # [2026-07-30 FLEET UNIVERSE] scout accessors: shape, ordering, the
     # volume floor, delist exclusion, and the fail-safe EMPTY that every
     # caller must read as "keep my configured list".

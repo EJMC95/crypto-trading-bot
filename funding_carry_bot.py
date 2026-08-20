@@ -1375,6 +1375,10 @@ def main():
                                "accrued": round(pos.get("accrued") or 0.0, 4),
                                "fees": round(pos.get("fees") or 0.0, 4),
                                "notional": pos.get("notional"),
+                               # [(sj)] I22 receipts: the two independent
+                               # scales this stake was sized by.
+                               "alloc_scale": pos.get("alloc_scale"),
+                               "brain_mult": pos.get("brain_mult"),
                                "held_h": round(held_h, 2)},
                         venue=venue_tag, shadow=shadow_tag)
                 except Exception:
@@ -1436,7 +1440,24 @@ def main():
             # so it is per-LOOP rather than per-call.
             _alloc = (fleet_bus.allocation_scale(bot_id)
                       if fleet_bus is not None else None) or 1.0
-            _notional = NOTIONAL * _alloc
+            # [2026-08-20 (sj)] the brain's scale, ON TOP of the allocation
+            # organ's — two different questions, deliberately composed. The
+            # allocation organ asks "how much of the fleet's capital does this
+            # BOOK deserve?"; the brain asks "how has this book's own
+            # (side, exit) evidence been going?" — and this book is the one
+            # whose sided flips lose (-$17.32) while its decay_paid family
+            # earns (+$71.42), so it is exactly the shape a per-side scale can
+            # act on.
+            # ONE notional for the whole loop, taken over BOTH sides: the
+            # depth probe below prices the clip it is admitting, and the (sf)
+            # census contract forbids the census and the gate pricing
+            # different numbers. A per-side clip would price one and enter the
+            # other. `min` over the sides is the same rule ⚖️ takes for the
+            # same reason — see fleet_bus.brain_mult_multi.
+            _bmult = (fleet_bus.brain_mult_multi(
+                          [(bot_id, "short"), (bot_id, "long")])
+                      if fleet_bus is not None else 1.0)
+            _notional = NOTIONAL * _alloc * _bmult
             _probe = {"left": DEPTH_PROBE_BUDGET, "used": 0}
             _depth_memo = {}
             _depth_recs = []
@@ -1523,6 +1544,14 @@ def main():
                         "accrued": 0.0,
                         "fees": perp_open_cost + HEDGE_COST * _notional,
                         "entry_apr": apr,
+                        # [(sj)] I22 receipt — the two scales that produced
+                        # this notional, recorded SEPARATELY. Multiplied
+                        # together they are unattributable, and this book
+                        # already carries the allocation organ's scale, so a
+                        # single blended number would make the next reader
+                        # guess which organ moved.
+                        "alloc_scale": round(_alloc, 4),
+                        "brain_mult": round(_bmult, 4),
                     }
                     print(f"[{now_iso()}] OPEN {coin} {side} ${_notional:.0f} "
                           f"| funding {apr:+.1%} APR "

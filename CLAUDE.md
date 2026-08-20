@@ -1101,13 +1101,40 @@ its row is dashboard-retired regardless; stop the process when found.
   Wilson LOWER bound, t ≥ +2.0/+2.5, full n floor only, no family-praise
   inheritance, no urgent fast-path — `brain_stats.EXP_*`; same 3-run streak
   gate). Expand is v3-ONLY (`BRAIN_MULT_ENGINE=v2` zeroes it) with its own
-  kill switch `BRAIN_MULT_EXPAND=off`; consumers clamp [0.5, **1.5**]
-  (`fleet_bus.MULT_CEIL` — was 1.0; deliberate documented-contract scope
-  expansion, CHANGELOG (bh)). Payload stamps `mode: two-way|reduce-only`.
-  Consumers: `lighter_family_bot.py` at entry (keyed `<bot_id>` +
-  `long-<tag hyphenated>`, 15-Jul) and the freqtrade strategies'
-  `custom_stake_amount` — both via `fleet_bus.py`; SHADOW books only, no
-  live bot reads mults.
+  kill switch `BRAIN_MULT_EXPAND=off`. Payload stamps `mode: two-way|reduce-only`.
+  **[19/20-Aug (sh)/(si)/(sj)] THE RANGE IS 6.7x EITHER WAY AND EVERY LIVING
+  BOOK NOW READS IT — REAL MONEY INCLUDED.** This block said *"consumers clamp
+  [0.5, 1.5] … SHADOW books only, no live bot reads mults"*; both halves are
+  CORRECTED IN PLACE per I12, because neither describes the fleet.
+  * **The clamp** is `[fleet_bus.MULT_FLOOR, fleet_bus.MULT_CEIL]` = **[1/6.7,
+    6.7]** (Eamon, 20-Aug: *"The brain needs to be able to go to 6.7x
+    specifically either way now"*). The floor is DERIVED from the ceiling, so
+    "either way" is true by construction; the bounds are deliberately not
+    restated in any consumer's prose, because a retyped constant drifts and
+    this one already had, twice.
+  * **The consumers** are every living book, via one owner:
+    `fleet_bus.brain_clip(bot, tag, base_usd) -> (usd, mult)`, or
+    `brain_clip_multi(buckets, base_usd)` where one clip spans several buckets
+    (⚖️ Counterweight's two legs; 🙏 Avo's live+shadow pair) — min over the
+    buckets that HAVE an opinion, silent buckets never out-voting them.
+  * **WHY WIRING IT INTO REAL MONEY IS A NUMBER, NOT AN AUTHORITY.** The mult
+    proposes a size; every senior rail disposes and is untouched —
+    `SafetyRails.notional_ok` (which must see the SIZED clip, AST-pinned), the
+    kill switch, the daily-loss halt, the fleet long-budget veto, and the
+    operator-only caps. **The multiplier proposes; the rails dispose.**
+  * **The key must be the LEDGER's bucket key, not the reason prefix.**
+    `fetch_paper_trades` prefers a stored `tag` COLUMN over the reason prefix
+    ("'long-funding' beats 'long'"), and exactly two books stamp one: 💸 the
+    Farmer (`<side>-funding`) and 🧭 cook (`<side>-navband`). Looking a mult
+    up under the wrong one returns 1.0 forever, silently — it was caught on
+    the real-money row before it shipped.
+  * **Declared exceptions, each with a reason:** funding VARIANTS (🛢️ Garrett
+    — the (nb) rule: env-only config means env-only SIZE, and a capital scale
+    already made its study cell unreproducible once), and ⚖️ Counterweight's
+    LIVE arm (clip PINNED at `GOLIVE_ORDER_USD` per (ia)).
+  Enforced fleet-wide by `tests/autonomy/test_brain_sizing_reaches_every_book.py`
+  (a roster test, so a NEW book cannot ship deaf) and
+  `tests/autonomy/test_brain_ceiling_step.py`.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
 - `signal-bus`, `regime-oracle`, `market-pulse` — published context (funding

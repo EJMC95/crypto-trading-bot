@@ -613,6 +613,8 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
                    "sl_frac": pos.get("sl_frac"),
                    "tp_frac": pos.get("tp_frac"),
                    "notional": pos.get("notional"),
+                   # [(sj)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "spread_bps_entry": pos.get("spread_bps_entry"),
                    "spread_bps_exit": spread_exit,
                    "held_h": round(held_h, 2)})
@@ -621,7 +623,7 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
 
 
 def _open_position(positions, setup, coin, side, mark, sl, tp, hold_bars,
-                   t0, signal_t):
+                   t0, signal_t, notional=None, brain_mult=1.0):
     """Open one modelled position at mark with the setup's own bracket.
     One bet per coin across setups. Unpriceable mark refuses."""
     if any(p["coin"] == coin for p in positions.values()):
@@ -629,13 +631,18 @@ def _open_position(positions, setup, coin, side, mark, sl, tp, hold_bars,
     if not mark or mark <= 0 or not sl or sl <= 0:
         return None
     key = f"{setup}:{coin}"
+    # [(sj)] `notional` defaults to the book's own clip, so every existing
+    # caller (and the selftest fixtures) size exactly as before; the brain's
+    # scale arrives as an argument rather than by reaching into module state.
+    ntl = CLIP_USD if notional is None else float(notional)
     positions[key] = {"coin": coin, "setup": setup, "side": side,
-                      "notional": CLIP_USD, "opened_ts": t0,
+                      "notional": ntl, "opened_ts": t0,
                       "entry_mark": mark, "last_mark": mark,
                       "sl_frac": sl, "tp_frac": tp,
                       "max_hold_h": hold_bars * BAR_SEC / 3600.0,
                       "signal_t": signal_t,
-                      "fees": SLIP_COST * CLIP_USD}
+                      "brain_mult": brain_mult,
+                      "fees": SLIP_COST * ntl}
     return positions[key]
 
 
@@ -974,8 +981,19 @@ def main():
                     # ((nm)) entry priced on the live book, not the
                     # boot-frozen funding mark.
                     mark = fresh_mid(ctx.venue, coin) or 0.0
+                    # [2026-08-20 (sj)] the brain sizes this entry, keyed on
+                    # the SAME `<side>-<setup>` record_close publishes. This
+                    # book is the one the multiplier fits best: it runs a
+                    # ROSTER, so the brain grades each setup separately and
+                    # can back keltner while shrinking failtest — the gate
+                    # decides WHETHER a setup may trade, the brain decides how
+                    # much, and the two are different questions.
+                    _clip, _bm = (fleet_bus.brain_clip(
+                        bot_id, f"{side}-{s}", CLIP_USD)
+                        if fleet_bus is not None else (CLIP_USD, 1.0))
                     pos = _open_position(positions, s, coin, side, mark,
-                                         sl, tp, hold, t0, bars[i][0])
+                                         sl, tp, hold, t0, bars[i][0],
+                                         notional=_clip, brain_mult=_bm)
                     if pos is None:
                         acted[akey] = bars[i][0]
                         unpriceable += 1
@@ -984,13 +1002,19 @@ def main():
                     acted[akey] = bars[i][0]
                     held_coins.add(coin)
                     opened += 1
+                    # [(sj)] this print sat AFTER the `break` below and was
+                    # unreachable — the book has never logged an open in its
+                    # life, which is the (I22) never-recorded class in its
+                    # cheapest form. Moved above the break, where it runs.
+                    print(f"[{now_iso()}] OPEN {s}:{coin} {side} "
+                          f"${_clip:.0f}"
+                          f"{'' if _bm == 1.0 else f' (brain {_bm:.2f}x)'}"
+                          f" @ {mark} | sl {sl:.2%} tp "
+                          f"{tp:.2%} hold {hold} bars")
                     break               # ((mh)) one bet per coin: the pass
                                         # is done — a second setup firing on
                                         # the same coin was misfiled as
                                         # `unpriceable` in the census
-                    print(f"[{now_iso()}] OPEN {s}:{coin} {side} "
-                          f"${CLIP_USD:.0f} @ {mark} | sl {sl:.2%} tp "
-                          f"{tp:.2%} hold {hold} bars")
                 if fired:
                     census["signal"] += 1
                 else:

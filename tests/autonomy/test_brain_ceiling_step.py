@@ -155,66 +155,51 @@ def test_the_top_rung_ships_inert_and_that_is_the_point():
         assert book_t < top_t, book_t
 
 
-def test_no_live_book_reads_a_brain_multiplier():
-    """The whole reason raising this ceiling is shippable: the blast radius is
-    PAPER. If a real-money module ever sizes off the brain, this tier doubles a
-    live clip and it needs a live lane and a bound author instead.
+def test_the_live_books_DO_size_off_the_brain_now():
+    """[2026-08-20 (sj)] CORRECTED IN PLACE (I12) — THIS TEST USED TO ASSERT
+    THE OPPOSITE, and leaving it standing would have been worse than deleting
+    it, because it PASSED VACUOUSLY against the new wiring.
 
-    TWO WRONG DRAFTS BEFORE THIS ONE, and both errors are worth keeping:
+    It was `test_no_live_book_reads_a_brain_multiplier`, and it worked by
+    deriving the set of functions that call `fleet_bus.stake_multiplier` and
+    refusing them to the two real-money modules. When (sj) wired the live books
+    through `brain_clip` — which reaches the payload via `brain_mult_raw`, not
+    `stake_multiplier` — the derivation simply stopped seeing them. A green
+    run then meant nothing at all, which is this repo's own "a check that
+    inspects nothing reports clean" rule landing on the check itself.
+
+    Eamon: *"Implement into live and other bots without it."* So the contract
+    is inverted: the live books MUST reach the brain, and what keeps that safe
+    moved from a prohibition to a rails argument, proven in
+    `tests/autonomy/test_brain_sizing_reaches_every_book.py` — the multiplier
+    proposes, `SafetyRails.notional_ok` disposes, and the sized clip is the one
+    the cap sees.
+
+    TWO WRONG DRAFTS OF THE OLD TEST, KEPT because both mistakes are general:
 
       1. Scanning for any call named `stake_mult` fired on 🙏 Avo's LIVE arm,
          which calls `S.stake_mult(tag, bars)` — the STRATEGY's own method, a
          constant `1.0` (`SwingDip.stake_mult`). **A name is not a data flow.**
       2. Following the whole import graph fired too: the live book imports
          `lighter_family_bot`, and that module calls `fleet_bus.stake_multiplier`
-         at line 123 — inside `brain_stake_mult`, a function the live book
-         **does not import and never calls**. **Importing a module is not
-         executing its lines.**
-
-    What is asserted instead is exact: the live module must neither call the
-    accessor itself nor IMPORT any name that wraps it. `brain_entry_gated` is
-    imported and is fine — that is the brain's regime GATE, restrict-only and
-    declared in the module's own header.
+         inside `brain_stake_mult`, a function the live book **did not import
+         and never called**. **Importing a module is not executing its lines.**
     """
     import ast
     import pathlib as _pl
     root = _pl.Path(__file__).resolve().parents[2]
-    #: functions that reach `fleet_bus.stake_multiplier`, derived rather than
-    #: hand-listed so a new wrapper cannot arrive unnoticed
-    wrappers = set()
-    for path in root.glob("*.py"):
-        try:
-            tree = ast.parse(path.read_text())
-        except SyntaxError:
-            continue
-        for fn in ast.walk(tree):
-            if not isinstance(fn, ast.FunctionDef):
-                continue
-            if any(getattr(c.func, "attr", "") == "stake_multiplier"
-                   for c in ast.walk(fn) if isinstance(c, ast.Call)):
-                wrappers.add(fn.name)
-    assert "brain_stake_mult" in wrappers and "stake_multiplier" not in wrappers, (
-        f"the wrapper scan found {sorted(wrappers)} — if it stops finding "
-        "brain_stake_mult it is blind and its silence means nothing")
-
-    offenders = []
+    sizers = {"brain_clip", "brain_clip_multi", "brain_clip_for",
+              "brain_mult_multi", "brain_stake_mult", "stake_multiplier"}
     for name in ("lighter_funding_bot.py", "lighter_avo_live_bot.py"):
-        path = root / name
-        if not path.exists():
-            continue
-        tree = ast.parse(path.read_text())
-        for n in ast.walk(tree):
-            if isinstance(n, ast.Call) and (
-                    getattr(n.func, "attr", "") == "stake_multiplier"
-                    or getattr(n.func, "id", "") in wrappers):
-                offenders.append(f"{name}:{n.lineno} calls it")
-            if isinstance(n, ast.ImportFrom):
-                for al in n.names:
-                    if al.name in wrappers:
-                        offenders.append(f"{name}:{n.lineno} imports {al.name}")
-    assert not offenders, (
-        "a REAL-MONEY module reaches the brain's stake multipliers, so this "
-        f"2.0x tier would double a live clip: {offenders}")
+        tree = ast.parse((root / name).read_text())
+        hits = [n.lineno for n in ast.walk(tree)
+                if isinstance(n, ast.Call)
+                and (getattr(n.func, "attr", "") in sizers
+                     or getattr(n.func, "id", "") in sizers)]
+        assert hits, (
+            f"{name} no longer sizes off the brain. If that is deliberate it "
+            "is a doctrine change and belongs in CLAUDE.md with a measured "
+            "reason — not a quietly reverted line.")
 
 
 def test_every_consumer_reads_BOTH_ends_from_the_bus():
@@ -244,19 +229,52 @@ def test_every_consumer_reads_BOTH_ends_from_the_bus():
             # The first draft required MULT_CEIL on the SAME line and a
             # SURVIVING mutation walked straight past it: the Parliament
             # aliases the ceiling into `_ceil` a line earlier, so the literal
-            # never appears in the clamp itself. Scope to files that reference
-            # the ceiling AT ALL, then flag any `max(<number>, min(...))` —
-            # the shape of a clamp whose two ends come from different places.
-            if "MULT_CEIL" not in path.read_text():
-                continue
+            # never appears in the clamp itself.
+            # [(sj)] The second draft over-corrected — it flagged ANY
+            # `max(<number>, min(...))` in a file that so much as MENTIONS the
+            # ceiling, and the day `lighter_family_bot` gained a docstring
+            # reference it reported three unrelated clamps (a funding-based
+            # size, a max_open bound, a clip_scale read). A guard that fires on
+            # unrelated code is a guard the next reader silences. So: resolve
+            # the file's LOCAL ALIASES of the ceiling first, then require the
+            # `min` end to actually BE the bus ceiling. That keeps the
+            # Parliament's `_ceil` in scope — the mutation that motivated the
+            # loosening — and drops the false positives.
+            # [(sj)] BOTH ends are resolved through local aliases, not just
+            # the ceiling. A THIRD surviving mutation found that gap: with the
+            # ceiling alias handled, `_floor = getattr(fleet_bus,
+            # "MULT_FLOOR", 0.3)` -> `_floor = 0.3` walked straight past,
+            # because the clamp itself then reads `max(_floor, min(_ceil, x))`
+            # — two NAMES, no literal in sight, and the guard only ever looked
+            # for a literal. Aliasing a hardcoded floor is the same defect with
+            # one more line in it.
+            def _alias(const_name):
+                out = {const_name}
+                for a in ast.walk(tree):
+                    if not isinstance(a, ast.Assign):
+                        continue
+                    if const_name in ast.unparse(a.value):
+                        for tgt in a.targets:
+                            if isinstance(tgt, ast.Name):
+                                out.add(tgt.id)
+                return out
+
+            ceil_names, floor_names = _alias("MULT_CEIL"), _alias("MULT_FLOOR")
             if not (len(node.args) == 2
                     and isinstance(node.args[1], ast.Call)
-                    and getattr(node.args[1].func, "id", "") == "min"):
+                    and getattr(node.args[1].func, "id", "") == "min"
+                    and node.args[1].args):
+                continue
+            upper = ast.unparse(node.args[1].args[0])
+            if not any(c == upper or c == upper.split(".")[-1]
+                       for c in ceil_names):
                 continue
             first = node.args[0]
-            if isinstance(first, ast.Constant) and isinstance(
-                    first.value, (int, float)):
-                offenders.append(f"{path.name}:{node.lineno}: {txt[:70]}")
+            lower = ast.unparse(first)
+            if any(f == lower or f == lower.split(".")[-1]
+                   for f in floor_names):
+                continue                      # both ends come from the bus
+            offenders.append(f"{path.name}:{node.lineno}: {txt[:70]}")
     assert not offenders, (
         "a consumer clamps the brain's multiplier with a bus CEILING and a "
         f"hardcoded FLOOR — the range is not 'either way' there: {offenders}")
