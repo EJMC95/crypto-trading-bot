@@ -347,7 +347,7 @@ def brain_gross_cap(max_positions, base_clip_usd, factor=None):
 
 
 def brain_clip_multi(buckets, base_usd, current_time=None,
-                     deployed_usd=None, gross_cap_usd=None):
+                     deployed_usd=None, gross_cap_usd=None, slots=1):
     """`base_usd` scaled by `brain_mult_multi(buckets)` -> (scaled_usd, mult).
 
     THE ONE CALL SHAPE for every book, so the rule has one owner and each
@@ -447,7 +447,24 @@ def brain_clip_multi(buckets, base_usd, current_time=None,
     # are unaffected.
     try:
         if want > base and deployed_usd is not None and gross_cap_usd is not None:
-            room = float(gross_cap_usd) - float(deployed_usd)
+            # `slots` — HOW MANY POSITIONS THIS ONE CLIP WILL SIZE. Most books
+            # size per-candidate and re-read their deployed total each time, so
+            # slots=1 is right for them. Two do NOT: 🌾 carry hoists ONE
+            # `_notional` above its census (the (sk) depth probe has to price
+            # the clip it is admitting) and ⚖️ Counterweight rebinds ONE
+            # `order_usd` at the top of its loop for every leg of the
+            # rebalance. For those the bound was evaluated ONCE and applied N
+            # times, which is not a bound at all.
+            #
+            # **[FOUND BY THE AUDIT, DRIVEN NOT READ.** With carry's real
+            # constants: cap $7,200, one loop from an EMPTY book sizes the clip
+            # at $7,200 and then opens up to TWELVE positions at it —
+            # **$86,400**, against the $96,480 the bound was introduced to
+            # prevent. It bought almost nothing. The first version of this
+            # bound failed on the SEQUENCE; this one failed on the CALL
+            # PATTERN, and both failures are the same mistake: testing the
+            # arithmetic of one call instead of the behaviour of the loop.**
+            room = (float(gross_cap_usd) - float(deployed_usd)) / max(1, int(slots))
             if room != room:                                     # NaN
                 raise ValueError
             want = max(base, min(want, room))
@@ -457,11 +474,11 @@ def brain_clip_multi(buckets, base_usd, current_time=None,
 
 
 def brain_clip(bot, entry_tag, base_usd, current_time=None,
-               deployed_usd=None, gross_cap_usd=None):
+               deployed_usd=None, gross_cap_usd=None, slots=1):
     """The single-bucket case of `brain_clip_multi` -> (scaled_usd, mult)."""
     return brain_clip_multi([(bot, entry_tag)], base_usd, current_time,
                             deployed_usd=deployed_usd,
-                            gross_cap_usd=gross_cap_usd)
+                            gross_cap_usd=gross_cap_usd, slots=slots)
 
 
 def allocation_scale(bot, current_time=None):
@@ -1312,6 +1329,34 @@ if __name__ == "__main__":
     _un = sum(brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now)[0]
               for _ in range(_N))
     assert _un > _dep, (_un, _dep)
+
+    # ...AND THE PER-LOOP CALL PATTERN, which is a different failure. 🌾 carry
+    # and ⚖️ Counterweight size ONE clip per loop and apply it to every entry
+    # that loop opens, so a bound that reads `deployed` once and is then used N
+    # times is not a bound: driven with carry's real constants it sized $7,200
+    # from an EMPTY book and opened twelve at it — **$86,400**, against the
+    # $96,480 it was introduced to prevent. `slots` is what makes the per-call
+    # bound a per-LOOP bound.
+    _free = _N
+    _clip1, _ = brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now,
+                                 deployed_usd=0.0, gross_cap_usd=_cap,
+                                 slots=_free)
+    assert _clip1 * _free <= _cap + 1e-6 or _clip1 == _BASE, (_clip1, _cap)
+    # slots=1 (the default, and what a per-CANDIDATE book wants) is unchanged
+    assert brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now,
+                            deployed_usd=0.0, gross_cap_usd=_cap) == \
+        brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now,
+                         deployed_usd=0.0, gross_cap_usd=_cap, slots=1)
+    # a junk or zero slot count must not divide by zero or widen the bound
+    for _bad in (0, -3, None, "x"):
+        _u, _ = brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now,
+                                 deployed_usd=0.0, gross_cap_usd=_cap,
+                                 slots=_bad)
+        assert _u <= _cap + 1e-6, (_bad, _u)
+    # and the no-shrink floor survives `slots`: a full book still gets `base`
+    _u, _ = brain_clip_multi([("c", "long"), ("c", "short")], _BASE, _now,
+                             deployed_usd=1e9, gross_cap_usd=_cap, slots=_N)
+    assert _u == _BASE, _u
     _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
     _cache["brain-stake-mults"] = {"ts": _now, "payload": dict(
         _mults, updated="2020-01-01T00:00:00+00:00")}

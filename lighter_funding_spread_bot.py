@@ -775,6 +775,21 @@ def main():
         # receipt below is always well-formed — a missing name here would
         # NameError inside the entry loop, i.e. telemetry taking down trading.
         _alloc = _bmult = 1.0
+        # [(sp)] THE BRAIN MAY ONLY MOVE THIS CLIP WHILE THE BOOK IS FLAT.
+        # This book is DOLLAR-NEUTRAL and its rebalance keeps held legs
+        # (`if c in meta: continue`), so a clip that changes mid-life leaves
+        # generations of legs at different sizes. Measured by the audit: one
+        # mult step from 1.0 to 6.7 replacing a single short leg leaves shorts
+        # at 4x$20 + $536 against longs at 5x$20 — **$570 of net directional
+        # delta on a book that models zero price exposure.** The (sp) gross
+        # bound caps the magnitude and cannot fix the ASYMMETRY, because the
+        # asymmetry is between generations, not between sides.
+        # Gating on flatness is exact: every leg of a generation is then sized
+        # by one number. The ALLOCATION organ is deliberately NOT gated here —
+        # it has rebound this clip every loop since (jr) and narrowing that is
+        # a separate change with a separate owner; what this refuses to do is
+        # make a pre-existing asymmetry 6.7x wider.
+        _brain_ok = not meta
         if not _is_live and fleet_bus is not None:
             _alloc = fleet_bus.allocation_scale(bot_id) or 1.0
             _base = ctx.order_usd(ORDER_USD, own=True) * _alloc
@@ -783,11 +798,14 @@ def main():
             # position count, and using K alone would let the bound be breached
             # by exactly the factor that makes it a spread book. Trims only the
             # brain's increase, so a neutral or reducing brain is unaffected.
-            _target, _bmult = fleet_bus.brain_clip_multi(
+            _target, _bmult = (fleet_bus.brain_clip_multi(
                 [(bot_id, "long"), (bot_id, "short")], _base,
                 deployed_usd=sum(float(m.get("notional") or 0.0)
                                  for m in meta.values()),
-                gross_cap_usd=fleet_bus.brain_gross_cap(K * 2, ORDER_USD))
+                gross_cap_usd=fleet_bus.brain_gross_cap(K * 2, ORDER_USD),
+                # one `order_usd` sizes every leg of the rebalance below, so
+                # the bound has to know it is sizing 2K of them at once.
+                slots=K * 2) if _brain_ok else (_base, 1.0))
             if abs(_target - order_usd) > 1e-9:
                 log.info("allocation %.2fx x brain %.2fx: clip %.2f -> %.2f",
                          _alloc, _bmult, order_usd, _target)

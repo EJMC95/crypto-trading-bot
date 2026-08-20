@@ -321,3 +321,75 @@ def test_the_gross_table_would_actually_fail_on_an_unbounded_book():
     assert pre_sp > 1.2 * eq, (
         "the bar no longer rejects the pre-(sp) taker, so it is not testing "
         f"anything: ${pre_sp:,.0f} vs {1.2 * eq:,.0f}")
+
+
+# --------------------------------------------------------------------------
+# 6. THE CALL PATTERN, not just the call — the second way a bound fails
+# --------------------------------------------------------------------------
+def test_the_two_per_loop_books_declare_how_many_slots_one_clip_sizes():
+    """🌾 carry and ⚖️ Counterweight size ONE clip per loop and apply it to
+    every entry that loop opens (carry hoists `_notional` above its census so
+    the (sk) depth probe can price the clip it admits; Counterweight rebinds
+    one `order_usd` for every leg of the rebalance). A bound that reads
+    `deployed` once and is then used N times is not a bound.
+
+    MEASURED: with carry's real constants the first version sized $7,200 from
+    an EMPTY book and opened twelve at it — **$86,400** against the $96,480 it
+    was introduced to prevent. It bought almost nothing.
+    """
+    carry = _src("funding_carry_bot.py")
+    assert "slots=max(1, MAX_POSITIONS - len(positions))" in carry, (
+        "carry must tell the bound how many entries this clip will size")
+    cw = _src("lighter_funding_spread_bot.py")
+    assert "slots=K * 2)" in cw, (
+        "Counterweight sizes 2K legs from one order_usd")
+
+
+def test_the_per_loop_bound_actually_holds_over_a_whole_fill():
+    """Driven, not read: fill every slot of a book in ONE loop at the brain's
+    ceiling and assert the total respects the budget."""
+    import datetime as dt
+    import importlib
+    import sys
+    sys.path.insert(0, str(ROOT))
+    fb = importlib.import_module("fleet_bus")
+    now = dt.datetime.now(dt.timezone.utc)
+    fb._cache["brain-stake-mults"] = {"ts": now, "payload": {
+        "updated": now.isoformat(timespec="seconds"), "ttl_sec": 26000,
+        "mults": {"c": {"long": {"mult": fb.MULT_CEIL},
+                        "short": {"mult": fb.MULT_CEIL}}}}}
+    try:
+        for const, n, alloc in ((300.0, 12, 1.0), (300.0, 12, 4.0), (20.0, 10, 1.0)):
+            cap = fb.brain_gross_cap(n, const)
+            base = const * alloc
+            clip, _ = fb.brain_clip_multi([("c", "long"), ("c", "short")], base,
+                                          deployed_usd=0.0, gross_cap_usd=cap,
+                                          slots=n)
+            gross = clip * n
+            # either the whole loop fits inside the budget, or the bound had no
+            # room at all and every position is the un-scaled clip (no shrink).
+            assert gross <= cap + 1e-6 or clip == base, (const, alloc, gross, cap)
+            # and it never exceeds what the book would have deployed unbrained
+            assert gross <= max(cap, base * n) + 1e-6, (const, alloc, gross)
+    finally:
+        fb._cache.pop("brain-stake-mults", None)
+        fb._resolved_mults.update({"ent": None, "map": {},
+                                   "from": None, "until": None})
+
+
+def test_counterweight_only_lets_the_brain_move_its_clip_while_flat():
+    """A dollar-neutral book whose rebalance KEEPS held legs cannot take a new
+    clip mid-life without leaving generations at different sizes. Measured:
+    one step from 1.0 to 6.7 replacing a single short leg leaves $570 of net
+    directional delta on a book that models zero price exposure. The gross
+    bound caps the magnitude and cannot fix the asymmetry, because the
+    asymmetry is between GENERATIONS, not between sides."""
+    cw = _src("lighter_funding_spread_bot.py")
+    assert "_brain_ok = not meta" in cw
+    assert "slots=K * 2) if _brain_ok else (_base, 1.0))" in cw, (
+        "the flatness gate must sit on the BRAIN's contribution")
+    # ...and NOT on the allocation organ's, which predates this and has its
+    # own owner — narrowing it here would be restricting something (sp) did
+    # not introduce.
+    i = cw.index("_alloc = fleet_bus.allocation_scale(bot_id)")
+    assert "_brain_ok" not in cw[i:i + 120]
