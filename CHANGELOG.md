@@ -1,3 +1,80 @@
+## 2026-08-20 (sf) — I22 SHIPS: A BOOK MUST SPEND THE ECOSYSTEM, AND TWO OF THE WALLS THIS SESSION HIT WERE IMAGINARY — a wrong API path and an untested query parameter
+
+**Operator, 20-Aug:** *"im over the constant brick wall you put up that nothing
+works, the rulebook that chokes everything until it cant move. lets find a way to
+see where the light is pointed and drive towards that"* / *"we should be running
+this mandate and doctrine on building bots that can utilize every aspect of the
+ecosystem we are currently working on."*
+
+**THE INVARIANT (I22), and it is arithmetic rather than exhortation.** With
+`t = S_d*sqrt(T)`, **days-to-gate = (2/S_d)^2**, and for independent sleeves
+`S_d^2 = SUM S_i^2`. **Decidability velocity is ADDITIVE — one construct is one
+term in that sum**, so a single-sleeve book does not merely earn less, it earns a
+DECISION more slowly by the square. That is every I17 retirement this fleet has
+made, collecting: 🌊 9 buys/0 sells in 22d · 📊 17.2 closes/yr · 🧙 ~719 closes =
+40 months · 🎸 0 of 9 episodes independent of its parent. **The operator's
+diagnosis was right and it has an equation.**
+
+Enforced by `scripts/audit_book_spend.py`: a book born on or after today
+publishes `extra.spend` — `markets_scanned` · `n_eff` (correlation-aware, never a
+symbol count) · `sides` · `gross_x` · `days_to_gate_obs` — and **a design whose
+days-to-gate exceeds 60 is a STUDY, not a book.** Scoped to BIRTHS on purpose:
+requiring it of all 19 existing rows would redden the build over history and
+teach everyone to route around the guard, so the pre-I22 books sit in a
+`GRANDFATHERED` map that carries a REASON each (the `BORN_DARK_OK` idiom).
+Fail-CLOSED on the feed. Selftest runs FIRST and offline in CI so a network
+wobble can never masquerade as a pass.
+
+**WIDTH IS NOT THE CLAIM, and the invariant says so in its own text** — market
+count is not bet count: 8 crypto markets are **1.35** independent bets (mean
+pairwise corr +0.545), 8 cross-class are **4.81**. `fleet_risk` publishes
+`long_effective_n` as `1/HHI` over DISTINCT SYMBOLS and so reports 9.0 for 9
+correlated longs, **overstating independence ~5x inside the organ whose own
+docstring warns that "23 open longs that are all crypto beta is ~one trade, and
+nothing said so."** And leverage adds **no** `S_d` — it multiplies mean and sd
+alike, so `t` is invariant; it multiplies dollars and drawdown, and is admissible
+only as an OUTPUT of a vol target on a book whose `N_eff` has been measured.
+
+**AND NOW THE PART WORTH MORE THAN THE INVARIANT.** The operator's word was
+*wall*. Two of the walls this session hit were **mine, and both were imaginary**:
+
+* **`/api/v1/candlesticks` returns 403 — because THAT PATH DOES NOT EXIST.**
+  `/api/v1/candles` returns **200** with full OHLC, verified this pass. I reported
+  the 403 as an environment block, tested it from two egress paths, and designed
+  the 👩 mum autopsy around *not having price history*. The endpoint was there the
+  whole time under a different name. That false constraint has already suppressed
+  at least one price-path study.
+* **`/trades.json` "caps at 500 rows" — it does not.** `?bot=<id>&limit=5000`
+  returns the full ledger (141 for 🔮 georgia, 120 for ⚖️ Counterweight). I wrote
+  the cap into `(sc)` as a declared limitation **instead of testing the query
+  parameter**, and measured a real-money-adjacent claim on 27 rows when 120 were
+  available.
+
+**The consequence is recorded in `(sc)`, corrected in place per I12: that entry's
+"3.6x" was an artifact of the 27-row RECENT window; on the full 120 the fix is
+worth 1.11x** (price-only −1.433%/trade t=−1.91 vs funding-inclusive −1.292%
+t=−1.84), the code fix stands unchanged, and its argument that ⚖️ Counterweight
+faced retirement on a materially wrong number **does not**.
+
+**THE LESSON, which is the operator's point in a form I can act on: a constraint
+I have not tested is not a constraint, it is an assumption — and this fleet's own
+doctrine already says empty output is not a negative result ((po)) without ever
+extending it to "a 403 is not a closed door" or "a default page size is not a
+cap".** Both walls were load-bearing in my reasoning within an hour of being
+invented. Before declaring any limit, probe it: try the other path, pass the
+parameter, read the API surface.
+
+Also landed this pass: the venue's margin surface is LIVE on the bus (212 markets
+— `20x:21, 15x:24, 10x:88`), and the full-ecosystem design completed — winner
+⚓ `nav-flinders-lshadow`, per-market sigma-normalised dislocation across all
+classes, sized by vol target, **ledgering one PORTFOLIO EPISODE per UTC day so
+the gate's iid per-close `t` IS the book's honest daily `t`** (`cluster == iid`
+by construction). Central estimate `S_d = 0.293` ⇒ **47 days to gate**. It needs a
+`LeveredPaperBroker` with modelled liquidation first — `paper_broker.py` is
+LEVERAGE 1 with no maintenance requirement, so a levered book on it survives
+excursions a real account would not and BOOKS THE RECOVERY. That is the next
+build, not this one.
+
 ## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
 
 [Renumbered (sd) -> (se): main took (sd) for the nav-cook leverage entry while
@@ -184,7 +261,31 @@ Files: `lighter_nav_cook_bot.py` (clip + pins), `scripts/mutate.py` (selector
 split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
 
-## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT IS GRADED 3.6× WORSE THAN IT PERFORMS: the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
+## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT'S GRADE WAS ON THE WRONG BASIS — worth 1.11×, NOT the 3.6× this entry first claimed (CORRECTED IN PLACE): the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
+
+**[CORRECTED IN PLACE 2026-08-20, per I12 — THE HEADLINE NUMBER WAS WRONG AND THE
+CONCLUSION IT SUPPORTED DOES NOT HOLD.]** This entry measured on 27 closes and
+said the cap forced it: *"/trades.json caps at 500 rows, so these 27 are a recent
+subset."* **The cap does not bind — `?bot=<id>&limit=5000` returns all 120.** I
+declared a limitation instead of testing the query parameter, and the 27 rows
+were not a random subset but the most RECENT window, where funding happened to
+dominate. On the full ledger:
+
+| basis | n | mean/trade | t | win |
+|---|---:|---:|---:|---:|
+| price-only (what the gate grades) | 120 | **−1.433%** | −1.91 | 48.3% |
+| funding-inclusive (the fix) | 120 | **−1.292%** | −1.84 | 50.0% |
+
+**Worth 1.11×, not 3.6×.** The median implied clip is also $19.85 across the full
+ledger, not the $5.00 the 27-row window suggested — so that assumption was
+window-specific too. **THE CODE FIX STANDS AND IS UNCHANGED**: `pnl_pct` and
+`pnl_abs` genuinely were on different bases (price return matched `pnl_pct` on
+27 of 27 rows; the fix is structural, not a magnitude claim). **What does NOT
+stand is this entry's argument that ⚖️ Counterweight faced retirement on a number
+that was materially wrong.** At −1.29% vs −1.43% the verdict is the same book
+either way, and the ~28-Aug keep-or-retire call is untouched by this. The
+correction is recorded rather than quietly amended because the original framing
+reached the operator.
 
 [Renumbered (sa) -> (sb) -> (sc): main took (sa) for nav-cook's gate fix, then
 (sb) for nav-cook's founding-claim reproduction, both while this was in flight.
