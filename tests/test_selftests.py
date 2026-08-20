@@ -391,6 +391,16 @@ ENFORCED_AUDITS = [
     # by the rule at the head of this list — the corruption it catches is
     # content, and a content defect must be catchable before a push.
     "scripts/audit_conflict_markers.py",
+    # [2026-08-19 (rz)] Citation DRIFT — the blind spot `audit_changelog_letters`
+    # declares in its own docstring: it checks that a letter RESOLVES, never
+    # that it resolves to the entry the citation was written against. On 19-Aug
+    # a renumber left seven citations of the ruin-gate entry pointing at another
+    # session's unrelated one, across `lighter_funding_bot.py` and
+    # `venues/safety.py` — the live Farmer and SafetyRails — through a commit, a
+    # push and a green CI run. Registered here, not only in the workflow,
+    # because it needs the suite job's `fetch-depth: 0`: it reads history via
+    # git blame, and at depth 1 it would verify nothing while reporting clean.
+    "scripts/audit_citation_drift.py",
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can

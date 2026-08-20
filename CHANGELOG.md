@@ -1,3 +1,140 @@
+## 2026-08-20 (rz) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
+
+*(Renumbered (rc) -> (rf) -> (rh) -> (rz) at push time — the EIGHTH collision this
+branch has taken (the count itself was wrong at "sixth" one revision ago and is
+corrected here rather than left to compound), and the reason is worth one line rather than a shrug: this branch has
+been unmerged across a day in which several sessions each appended to the same
+file, so every rebase finds its letter taken. Theirs is merged and cited;
+mine moves, by the convention's own tiebreak. The citation sweep behind this
+move was UNCAPPED and reconciled by count — 5 references to `(rc)` in the tree,
+4 mine and rewritten, 1 (`STUDY_DISLOCATION_BAND_2026-08-19.md`) belonging to
+the merged entry and deliberately left. That is the discipline `(ra)` bought.)*
+
+Two things, both carried out of `(ra)`/`(rb)`: the one open defect class I had
+recorded but not closed, and a red `main` I caused myself.
+
+**1. THE BLIND SPOT, CLOSED — `scripts/audit_citation_drift.py`.**
+`audit_changelog_letters.dangling_code_citations` appends a finding only
+`if letter not in known`, so it asks *does this letter resolve?* and never *does
+it resolve to the entry it was written against?* On 19-Aug that gap cost
+real-money surface: a `head -40` over 48 matches dropped every citation in
+`lighter_funding_bot.py` and `venues/safety.py`, seven references to the
+ruin-gate entry stayed on `(ql)` after it became `(qz)`, and the implementation
+and its own test cited DIFFERENT ENTRIES through a commit, a push and a green CI
+run.
+
+**The signal is evidence, not a heuristic.** A citation is written against
+whatever the letter meant at that moment — so `git blame` the line, read that
+letter's TITLE as of the introducing commit, and compare it with the title it
+carries now. Nothing about topic or intent is guessed.
+
+**MEASURED IN BOTH DIRECTIONS BEFORE IT WAS BUILT**, which is the only reason to
+trust it: replayed at the defect commit `41a9167` it **fires and exits 1**,
+names the file, quotes both meanings and prints `-> repoint to (qq)`; on the
+current tree it verifies **950 of 995** citations and finds **zero**. Zero false
+positives on ~1,000 real citations is what lets a guard survive in a busy repo.
+
+**THREE CANDIDATE DESIGNS WERE MEASURED AND TWO REJECTED, which is the useful
+part.** (i) *Keyword overlap* between the citation line and the entry body
+flagged 6 of 7 real sites but **3 false positives on the current tree**, because
+this codebase SHOUTS in English and `DECLARED`/`BOOK`/`ENTRY` read as
+distinctive tokens. (ii) *Forward-walking* to the first commit where an absent
+letter appears looked like a strict improvement — it lifted the real incident to
+7 of 7 — and was **rejected on its own measurement**: it immediately produced a
+false positive at `tests/autonomy/test_payload_contracts.py:922`, where a
+citation of `(kq)` is correct today and merely passed through a window in which
+`(kq)` briefly meant `🔭 GATE HORIZON` before that became `(ks)`. **A forward
+walk is a guess about intent; the blame-commit read is evidence.** So the 35
+letter-not-yet-written cases are SKIPPED and the count is PUBLISHED, because a
+run that verified nothing must never read like a run that found nothing.
+
+Two more properties, both learned the hard way today: it uses git's **own `^`
+boundary marker** rather than stripping it — in this working clone 215 of 374
+lines in `venues/safety.py` are beyond the graft, and stripping the caret
+converts *"I cannot see where this came from"* into *"it came from the graft
+commit"* and then reads a title there as if it were evidence. And it **imports**
+`code_citations` / `HEADER` / `same_entry` from the letters guard rather than
+re-implementing them — `code_citations` was split out for exactly this, so the
+tokenizer, the entry grammar and the calibrated 0.6 title-similarity threshold
+each keep ONE owner. Registered in `ENFORCED_AUDITS`, which is load-bearing: it
+needs the suite job's `fetch-depth: 0`, and at depth 1 it would verify nothing
+while reporting clean.
+
+**2. `main` WENT RED ON THE MERGE, AND THE ORGAN IT NAMED HAD STOPPED TRADING.**
+`audit_boot_stagger` failed on `lighter_ticket_taker` — run `32222272921`,
+1 failed / 1949 passed. **I checked whether it was mine rather than assuming:**
+at `ba0a962` (immediately before the merge) the same guard reads OK; with the
+merge it FAILS. Mine.
+
+But the guard was not reporting a bookkeeping artifact. The taker still carried a
+bare `( sleep 210`, which the `(ou)` boot-ladder sweep had missed — it is one of
+only two such holdouts in 18 blocks — and a bare stagger **restarts from zero on
+every deploy**. Measured: deploys arrived closer together than 210s for
+**17 minutes without a break**, past the 15 min its consumers tolerate. So the
+shadow Ticket Taker — the control arm a go-live would rest on — silently stopped
+trading for the whole burst, and nothing reported it, because *an organ that
+never reaches its first run is not sick and every liveness contract reads fine.*
+That is the same class `(pi)` found on the real-money grader, on a different
+organ, surfaced only because my own merge finally pushed the burst past the bar.
+
+Fixed with the sweep's own shape — `sleep 20; run once; sleep 190;` then the
+unchanged loop — so **every subsequent run lands exactly where it did before**
+(t=210, 510, 810…) and only one run is added at t=20. Deliberately NOT the
+staleness-gated variant `golive_readiness` uses: that organ loops every 21600s
+and grades every book off a 20k-row ledger fetch, so an unconditional boot run
+is ~30x its frequency; this one already loops every 300s, so it is ~1x. **The
+cost is stated rather than buried**: during a burst the taker now evaluates
+entries once per deploy instead of not at all, so an entry's timing within a
+burst can shift earlier — exposure is unchanged, still bounded by `TT_MAX_OPEN`
+and by ticket supply. SHADOW ONLY; the LIVE arm is a separate service with its
+own stagger.
+
+
+**RECONCILED WITH `(rg)` AND `(rs)` — AND `(rg)`'s ARGUMENT IS REFUTED, so the
+note I wrote yesterday calling it "right" is CORRECTED IN PLACE per I12.**
+
+Two other sessions hit this same red suite. `(rg)` answered it by DECLARING
+`lighter_ticket_taker` in `STAGGER_OK`, arguing the guard's 15-min reading is a
+PROXY over a 65-min real contract (`fleet_risk.STALE_ROW_SEC=3900`), so no
+consumer was misled — and I preserved that argument beside my fix as correct.
+**It is not correct.** `lighter-ticket-taker-lshadow` is named explicitly in
+`pnl_dashboard.VARIANT_STALE_SECONDS` at **900s**, the dashboard stamps `stale`
+on the row from that number, and `fleet_watchdog_svc` pages on exactly that
+field. The burst was **1020s**. So a REAL contract was breached and a page was
+owed, not merely a proxy tripped; `fleet_risk`'s 3900s is a second, laxer
+reader, never the binding one. `(rs)` independently shipped the same boot
+ladder with the right bar, and this branch's `run_all.sh` now carries the
+correction beside the fix rather than the refuted premise.
+
+**Three sessions converged on deleting the exemption, and the reason I gave for
+it survives because it is measurable rather than rhetorical:** with the ladder
+in place the entry is dormant either way, but revert the ladder with the entry
+PRESENT and the guard exits **0** — with it GONE it exits **1**. Its only
+remaining power was to hide the re-introduction of a fixed defect, which is the
+`DRIFT_OK` hole in another costume.
+
+**AND THE GUARD'S FIRST REAL FIRING WAS A FALSE POSITIVE, which fixed it.**
+Run mid-merge it flagged `session_commit.py:169`, because `now` came from
+`git show HEAD:CHANGELOG.md` — the file BEFORE the conflict was resolved — so
+it judged a citation against a letter the resolution had already moved. `now`
+is the WORKING TREE from `(rz)` on: the question is whether a citation still
+means what it meant *as the file stands*, and the file that matters is the one
+about to be committed, which is precisely what a pre-push guard exists to
+judge. Fallback to HEAD when the working copy is unreadable, so the arm
+degrades rather than vanishes.
+
+**Re-controlled on the real tree, and it took three attempts — each one naming
+a class boundary I had not stated.** (1) Editing the citation line itself
+proved nothing: that makes it UNCOMMITTED, which is skipped by design, and a
+line being written now cannot have drifted. (2) Deleting the letter entirely
+proved nothing either: that is the DANGLING case, which
+`audit_changelog_letters` owns, and this guard correctly counted it
+`skipped_unresolved` rather than claiming it. (3) The real shape — a letter
+that STILL EXISTS and now carries a different entry, with the committed
+citation untouched — fires, names the file, and quotes both meanings. The two
+guards partition the space cleanly: one owns *resolves to nothing*, the other
+owns *resolves to the wrong thing*, and neither claims the other's finding.
+
 ## 2026-08-20 (ry) — FOUR DECLARED ENFORCEMENTS WERE INERT, HARVESTED FROM A STALE PR THAT COULD NEVER MERGE — including a fleet-wide death recorder that has never recorded a death
 
 [Renumbered (rs) -> (ry) at rebase time: main took (rs) for PR #204 while this

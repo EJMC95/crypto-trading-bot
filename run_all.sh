@@ -185,6 +185,26 @@ done &
 # change. Deliberately not the staleness-gated variant golive_readiness uses:
 # that organ loops every 21600s so an unconditional boot run is ~30x its
 # frequency; this one loops every 300s, so it is ~1x.
+#
+# THE COST, stated rather than buried: during a burst the taker now evaluates
+# entries once per deploy instead of not at all. Exposure is unchanged —
+# entries stay bounded by TT_MAX_OPEN and by ticket supply — but the timing of
+# an entry within a burst can shift earlier. That is the trade the fleet
+# already accepted for sixteen other organs. SHADOW ONLY: the LIVE arm is a
+# separate service (Dockerfile.tickettaker) with its own stagger.
+#
+# [(rz)] A CORRECTION, because two sessions fixed this independently and only
+# one of them had the right bar. `(rg)` argued the 15-min guard reading was a
+# PROXY over a 65-min real contract (`fleet_risk.STALE_ROW_SEC=3900`), and on
+# that basis declared the organ exempt instead of fixing it. That is WRONG:
+# `lighter-ticket-taker-lshadow` is named explicitly in `pnl_dashboard`'s
+# `VARIANT_STALE_SECONDS` at **900s**, the dashboard stamps `stale` on the row
+# from it, and `fleet_watchdog_svc` pages on exactly that field. The 17-minute
+# burst is 1020s — so a REAL contract was breached and a page was owed, not
+# merely a proxy tripped. fleet_risk's 3900s is a second, laxer reader; the
+# binding one is the 900s pager. The exemption is deleted and this is the
+# reason.
+
 ( sleep 20
   TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true
   sleep 190

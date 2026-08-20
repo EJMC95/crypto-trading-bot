@@ -233,18 +233,20 @@ def next_letter(text, paths=()):
     return next_free(claimed, start=succ(tip) if tip else "a")
 
 
-def dangling_code_citations(paths, known):
-    """-> [(path, lineno, letter)] for changelog citations in tracked python
-    COMMENTS/STRINGS that resolve to no header. See 2026-08-06 entry lc.
+def code_citations(paths):
+    """-> [(path, lineno, letter)] for EVERY changelog citation in tracked
+    python comments/strings, resolving or not.
+
+    [2026-08-19 (rz)] Split out of `dangling_code_citations` so the extraction
+    rule has ONE owner and two consumers: that function (does the letter
+    resolve to anything?) and `scripts/audit_citation_drift.py` (does it still
+    resolve to the SAME ENTRY it was written against?). A second copy of this
+    tokenizer would be a second rule, and the two would drift — the class this
+    repo names in "A SECOND COPY OF A RULE IS A SECOND RULE".
 
     Tokenized rather than regexed over raw source: only comments and string
     literals can carry a citation, and source is full of same-shaped
-    identifiers. A citation that resolves to nothing is a reader sent nowhere.
-
-    NOTE ON THIS DOCSTRING: it deliberately writes letters in prose form and
-    never in either citation form, so text ABOUT the class cannot be flagged
-    AS the class — the self-reference trap this fleet has paid for before.
-    That is why this file needs no exemption from its own guard."""
+    identifiers."""
     import io
     import tokenize
     out = []
@@ -259,9 +261,23 @@ def dangling_code_citations(paths, known):
                 continue
             for letter in (CITE_DATED.findall(tok.string)
                            + CITE_TICKED.findall(tok.string)):
-                if letter not in known:
-                    out.append((p, tok.start[0], letter))
+                out.append((p, tok.start[0], letter))
     return out
+
+
+def dangling_code_citations(paths, known):
+    """-> [(path, lineno, letter)] for changelog citations in tracked python
+    COMMENTS/STRINGS that resolve to no header. See 2026-08-06 entry lc.
+
+    Tokenized rather than regexed over raw source: only comments and string
+    literals can carry a citation, and source is full of same-shaped
+    identifiers. A citation that resolves to nothing is a reader sent nowhere.
+
+    NOTE ON THIS DOCSTRING: it deliberately writes letters in prose form and
+    never in either citation form, so text ABOUT the class cannot be flagged
+    AS the class — the self-reference trap this fleet has paid for before.
+    That is why this file needs no exemption from its own guard."""
+    return [(p, n, l) for p, n, l in code_citations(paths) if l not in known]
 
 
 #: [2026-08-16 (nq)] An entry that declares itself CORRECTED IN PLACE. The

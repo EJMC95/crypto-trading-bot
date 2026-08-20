@@ -123,6 +123,12 @@ STAGGER_OK: dict[str, str] = {}
 #: positive — deleted the same day the real fix landed, the (ou) boot
 #: ladder in run_all.sh. An exemption here silences the guard; a ladder
 #: removes the condition. Prefer the ladder every time.
+#:
+#: [(rz)] MEASURED, from the other session that reached this independently:
+#: with the ladder in place the entry is dormant either way, but revert the
+#: ladder with the entry PRESENT and this guard exits 0 — with it GONE it
+#: exits 1. So its only remaining power was to hide the re-introduction of a
+#: fixed defect, which is the `DRIFT_OK` hole in another costume.
 
 
 
