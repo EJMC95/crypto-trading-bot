@@ -441,7 +441,7 @@ def fresh_mid(ctx, coin):
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
                   reason, shadow, notional=None):
-    # [2026-08-20 (sb)] pnl_pct WAS PRICE-ONLY ON A FUNDING BOOK, AND THE GO-LIVE
+    # [2026-08-20 (sc)] pnl_pct WAS PRICE-ONLY ON A FUNDING BOOK, AND THE GO-LIVE
     # GATE GRADES ON pnl_pct. The caller computes `total = price_pnl + accr`, so
     # `pnl_abs` has always carried funding while this percentage discarded it —
     # the two fields were on DIFFERENT BASES, and the bar that decides real money
@@ -827,7 +827,7 @@ def main():
                     ent = broker.pos.get(c)
                     meta[c] = {"is_short": is_short,
                                "entry": (ent[1] if ent else px),
-                               # [2026-08-20 (sb)] THE POSITION'S OWN NOTIONAL,
+                               # [2026-08-20 (sc)] THE POSITION'S OWN NOTIONAL,
                                # stamped at entry. `order_usd` moves mid-life
                                # (the allocation scale rewrites it at the top of
                                # the loop), so the clip in force at CLOSE is not

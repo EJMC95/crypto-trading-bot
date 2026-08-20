@@ -1,4 +1,4 @@
-"""[2026-08-20 (sb)] A FUNDING BOOK WAS GRADED ON ITS PRICE RETURN ALONE.
+"""[2026-08-20 (sc)] A FUNDING BOOK WAS GRADED ON ITS PRICE RETURN ALONE.
 
 ⚖️ Counterweight's caller computes `total = price_pnl + accr`, so `pnl_abs` has
 always carried funding — while `pnl_pct`, the field the GO-LIVE GATE grades on
@@ -66,7 +66,7 @@ def test_a_losing_price_move_with_bigger_funding_reads_POSITIVE(monkeypatch):
 
 
 def test_no_notional_degrades_to_price_only_rather_than_inventing_one(monkeypatch):
-    """A position restored from a pre-(sb) payload carries no notional. It must
+    """A position restored from a pre-(sc) payload carries no notional. It must
     fall back to the price basis, NOT be re-based off the CURRENT clip — which
     may not be the clip it was opened at (the allocation scale rewrites
     order_usd mid-life). I8: unknown degrades to the old honest value, never to

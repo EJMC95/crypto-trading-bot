@@ -436,6 +436,17 @@ SELFTEST_EXCLUDE = {
     # unregistered in f6d7a2a and turned this rot-guard red on main; declaring
     # it is the pattern (a silent omission is what the guard exists to catch).
     "scripts/audit_secret_leak.py",
+    # [2026-08-20 (sb)] 🧭 nav-cook's FOUNDING harness. Excluded from
+    # SELFTEST_MODULES for a MECHANICAL reason, not a discretionary one: the
+    # filename carries a hyphenated date, so `"scripts.study_dislocation_band_
+    # 2026-08-19"` is not an importable module name — an entry there collects
+    # ZERO tests and reports green, which is precisely what it did on the first
+    # attempt ((po): a check that inspects nothing reports clean). It IS
+    # enforced, by path, in tests/autonomy/test_dislocation_band_study.py —
+    # which runs the same `_selftest` plus four structural tests. This
+    # exemption is narrowed to the ONE rule it must dodge; if that file is
+    # deleted, nothing covers the harness and this line is a lie.
+    "scripts/study_dislocation_band_2026-08-19.py",
     # Research backtest: needs historical market data / network, not a unit test.
     "scripts/backtest_georgia_short_sleeve.py",
     # [2026-08-16 (om)] 📐 Grimes's GATE-FIX study. `--selftest` is
