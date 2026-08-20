@@ -558,7 +558,19 @@ NONCRYPTO_BASES = {s.strip().upper() for s in os.environ.get(
     "BYD,HYUNDAIUSD,MINIMAX,POPMART,SAMSUNGUSD,SKHY,SKHYNIXUSD,SMIC,TENCENT,"
     "XIAOMI,"
     # 7=pre-IPO / private
-    "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE").split(",")
+    "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE,"
+    # [2026-08-20 (se)] THE EIGHT THIS LIST HAD DRIFTED BY, measured against
+    # the venue's own `strategy_index` the same way (ki) measured the original
+    # 41: of 101 active non-crypto books, EIGHT were absent from this fallback.
+    # With a live scout the screen was right (tier 2 answers); with a DARK or
+    # STALE scout every crypto-screened book in the fleet — 🌾 carry, 🏦 Rich
+    # Dad, 🪁 band-kelly, 🎫 the Taker, 🎯 the sniper — failed OPEN on these
+    # eight, which is precisely the "an organ outage must not silently
+    # re-admit equities to a funding-rank book" contract this tier exists to
+    # keep. All eight are RECENT listings, which is the drift mechanism: the
+    # list is reconciled by hand and the venue lists weekly.
+    # 5=US equities · 6=Asian equities · 7=exotic
+    "AXTI,SOXS,WDC,KIOXIA,KORU,CASHCAT,MRNA,US10Y").split(",")
     if s.strip()}
 
 
@@ -667,6 +679,88 @@ def is_crypto(sym, current_time=None):
     if idx is not None:
         return idx == CRYPTO_STRATEGY_INDEX
     return s not in NONCRYPTO_BASES
+
+
+#: [2026-08-20 (se)] Class-7 books that are NOT priced here. `strategy_index 7`
+#: is the venue's grab-bag, and its members do not share an answer to the
+#: question `venue_priced` asks: ANSEM and CASHCAT are crypto-native tokens
+#: whose ONLY market is this book, while ANTHROPIC, OPENAI, SPCX and UNITREE
+#: are wrappers around companies priced in private rounds, and US10Y is a bond
+#: yield with no spot market at all. The venue publishes no field that splits
+#: them, so this is a declared list — kept SMALL and auditable for exactly that
+#: reason, and biased toward the safe side: a class-7 name absent from here is
+#: treated as venue-priced, which is the direction that admits a new memecoin
+#: debut rather than silently starving the source that exists to trade one.
+EXOTIC_EXTERNALLY_PRICED = {s.strip().upper() for s in os.environ.get(
+    "FLEET_EXOTIC_EXTERNAL",
+    # tokenised pre-IPO / private equity — a real company, priced elsewhere
+    "ANTHROPIC,OPENAI,SPCX,UNITREE,CXMT,ZHIPU,FOLKS,"
+    # listed equities the venue happens to file under 7
+    "MRNA,ADI,"
+    # not an instrument with a spot market at all
+    "US10Y").split(",") if s.strip()}
+
+#: Venue classes whose instruments are always priced somewhere far deeper than
+#: this venue: commodities, FX, US equities, Asian equities.
+EXTERNALLY_PRICED_CLASSES = {3, 4, 5, 6}
+
+#: The crypto-native class-7 names that `NONCRYPTO_BASES` carries. That list
+#: answers "is this class 2", so it correctly excludes them — but `venue_priced`
+#: asks a different question and must NOT inherit that exclusion when the scout
+#: is dark. Kept as the explicit complement rather than derived, because the
+#: venue's class-7 membership is only knowable from the live field; the
+#: selftest pins that this set stays disjoint from EXOTIC_EXTERNALLY_PRICED and
+#: that every member actually appears in NONCRYPTO_BASES, so a name added to
+#: one list and forgotten in the other turns the build red instead of silently
+#: re-imposing the screen.
+_VENUE_PRICED_EXOTICS = {"ANSEM", "CAP", "CASHCAT"}
+
+
+def venue_priced(sym, current_time=None):
+    """Is THIS VENUE where `sym` is priced?  [2026-08-20 (se)]
+
+    A DIFFERENT question from `is_crypto`, and the one the (lk) instrument-class
+    screen was really asking. That screen's argument was never about class — it
+    was that *"a surge-long on USDKRW/BOTZ is a timer-held drift bet on an
+    instrument whose venue volume surge is its UNDERLYING's market event,
+    already priced where the underlying trades"*. That turns on whether a DEEP
+    PRIMARY MARKET exists elsewhere, not on `strategy_index == 2`.
+
+    The distinction is load-bearing because the venue files crypto-native
+    memecoin debuts under **class 7**, beside tokenised pre-IPO equity. Asking
+    `is_crypto` therefore refuses ANSEM and CASHCAT — the exact cohort a debut
+    sniper exists to trade — while a book like 🌾 carry, which wants "is this a
+    crypto FUNDING signal", is right to keep asking `is_crypto`. Both questions
+    are legitimate; they are not the same question, and (se) measured the cost
+    of conflating them at a source that sat at ZERO admissible candidates for
+    66 days while its cohort arrived at ~1.7-2.0 births/30d throughout.
+
+    Order of authority mirrors `is_crypto`: the fleet's declared override, then
+    the venue's own class, then the dark-scout fallback. Fail-OPEN on an
+    unknown symbol, for the same reason `is_crypto` does — the venue lists new
+    books constantly and a closed default silently starves a source.
+    """
+    try:
+        s = str(sym or "").strip().upper().split("/")[0]
+    except Exception:      # noqa: BLE001
+        return True
+    if not s:
+        return True
+    # The fleet's deliberate disagreements with the venue apply here too: PAXG
+    # is a metal price, and a metal is priced far from this book.
+    if s in NONCRYPTO_OVERRIDE:
+        return False
+    if s in EXOTIC_EXTERNALLY_PRICED:
+        return False
+    idx = _venue_class(s, current_time)
+    if idx is not None:
+        return idx not in EXTERNALLY_PRICED_CLASSES
+    # Dark/stale scout: fall back to the same list `is_crypto` uses, MINUS the
+    # class-7 venue-priced names it (correctly, for its own question) carries.
+    # Without this subtraction a dark scout would refuse ANSEM/CASHCAT here as
+    # well, and the fallback would silently re-impose the very screen this
+    # function exists to replace.
+    return s not in (NONCRYPTO_BASES - _VENUE_PRICED_EXOTICS)
 
 
 def crypto_only(symbols):

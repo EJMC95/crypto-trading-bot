@@ -605,7 +605,18 @@ TRADFI_BASES = {s.strip().upper() for s in os.environ.get(
     "XIAOMI,"
     "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE,"
     "WTI,BRENTOIL,NATGAS,USOIL,XAU,XAG,XCU,XPD,XPT,PAXG,WHEAT,CORN,"
-    "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH").split(",") if s.strip()}
+    "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH,"
+    # [2026-08-20 (se)] THE EIGHT THIS LIST HAD DRIFTED BY — the (kt) shape
+    # again, two weeks later, and found the same way: measured against the
+    # venue's own `strategy_index`, 8 of 101 active non-crypto books were
+    # absent from BOTH this list and `fleet_bus.NONCRYPTO_BASES`. All eight
+    # are recent listings, which is the mechanism — the venue lists weekly and
+    # both lists are reconciled by hand. `test_taker_tradfi_parity` pins the
+    # two EQUAL, so this edit and the fleet_bus one are a single change; and
+    # `scripts/audit_noncrypto_fallback.py` now measures the drift against the
+    # venue directly, so the NEXT recurrence is found by a guard rather than
+    # by a test noticing after the fact.
+    "AXTI,SOXS,WDC,KIOXIA,KORU,CASHCAT,MRNA,US10Y").split(",") if s.strip()}
 
 
 def _is_crypto(sym):

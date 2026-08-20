@@ -1,3 +1,127 @@
+## 2026-08-20 (se) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
+
+**Operator:** *"bring the sniper back to life and make it do its intended job"*,
+then — while this was being measured — *"just don't continue if it's going to be
+negative, restrictive and choking of the bot ... I did not start this fleet with
+the intention of slowly taking away more food and sunlight each day from it."*
+**This entry is the opposite of a screen: it is the one change in this whole
+investigation that gives the book supply back.** Full working:
+`STUDY_SNIPER_DEBUT_DIRECTION_2026-08-20.md`.
+
+**1 · THE CORRECTION THAT REFRAMES `(qi)` AND `(sd)`, made in place per I12.**
+Both reported this book's debut supply as dead — *"ZERO crypto births for 86
+days"*. That is true of `strategy_index == 2` and **FALSE of the cohort this
+book trades**: on the venue-priced axis, births have not stopped in any month
+measured — **1.67–2.00 per 30 days**, CAP (Jun), ANSEM (Jul), CASHCAT (Aug).
+Every one is class 7 and every one was refused. The figure was not bad
+arithmetic; it was the wrong question, and it sent two prior passes hunting for
+a fix in the exit rule.
+
+**2 · THE DEFECT.** `(lk)` put ONE class screen on the surge AND young sources
+on evidence that was almost entirely surge's: non-crypto surge −$5.01 over 13
+closes versus non-crypto **young −$1.19 over TWO**. The young leg rested on
+**n=2**. And `is_crypto` asks `strategy_index == 2`, while the venue files
+crypto-native memecoin debuts under **class 7** — the same 12-member grab-bag
+holding tokenised pre-IPO equity (ANTHROPIC, OPENAI, SPCX), oddly-filed listed
+equities (MRNA, ADI) and a bond yield (US10Y). **Measured live the day this
+shipped: the young cohort was 7 books, five of them zero-volume ghosts, and the
+only two with real turnover — CASHCAT $0.45M and UNITREE $0.84M — were the only
+two the screen refused.** The source was not quiet; it was structurally unable
+to admit anything, and the `(sd)` census is what made that legible.
+
+**3 · WHAT REPLACES IT: `fleet_bus.venue_priced`, the axis (lk) was really
+arguing.** (lk)'s own words are *"already priced where the underlying trades"* —
+which turns on whether a deep primary market exists ELSEWHERE, not on a class
+integer. A crypto-native token's only market IS this book, so its debut is
+genuine price discovery; a tokenised equity is a wrapper around a price set far
+deeper. **The half of (lk) this keeps is now BETTER evidenced than the half it
+drops:** shorting an externally-priced debut measures **−0.457%/trade at
+t=−2.38**, the ONLY significant cell in the study. Surge is **untouched** —
+`(sd)` measured class-7 surge at −0.840%/trade, negative at every hold, so the
+two sources now ask two questions and a test pins that they are not the same
+function.
+
+**Live gate, end to end, before and after:**
+`OLD is_crypto: scanned=210 age_ok=8 fresh=8 class_ok=0 vol_ok=0 -> []`
+`NEW venue_priced: scanned=210 age_ok=8 fresh=8 class_ok=2 vol_ok=1 -> [CASHCAT]`
+
+**4 · THE EXPECTANCY PRICE, STATED (I19), AND WHAT IT BUYS.** The admitted cell
+measures **−0.174%/trade at t=−0.52** on the shipped bracket — indistinguishable
+from zero, **−3.5 cents per trade on a $20 clip, ~−$0.17/month** at the measured
+birth rate. **It is bought as DECIDABILITY, not as edge, and this entry says so
+rather than dressing it up:** a source at zero admissions produces zero evidence
+and can never be graded or retired on its own record. I17 makes exactly this
+argument for capital ("a book cannot earn evidence with no capital"); this is the
+supply form of it.
+
+**5 · THE DIRECTION FLIP: MEASURED, AND REFUSED BY ITS OWN NULL.** Four
+independent measurements say debuts bleed, and the young-window cells agree —
+LONG venue-priced is negative at every hold (−0.174/−0.012/−0.276/−0.622) while
+SHORT reads **+1.369%/t=1.33 at 72h and +1.513%/t=1.31 at 168h**, both halves
+positive, concentration **15–16%**, edge surviving ex-top-1. It is the
+best-behaved cell in the whole investigation **and it still does not ship**,
+because the (hm) null kills it: random entry minutes in the same window on the
+same books read **null p50 +1.687% / +1.856% against observed +1.369% / +1.513%
+— P(random ≥ observed) = 0.573 and 0.577.** A coin flip on the timing beats the
+sniper. That is `(sd)`'s "the entry carries no information" reproduced on the
+young cohort in BOTH directions. The (hl) control agrees: at 168h the
+content-free timer (+2.430%) beats the bracket (+1.513%). Recorded with the
+numbers so no future session re-proposes it from the +1.5% alone.
+
+**6 · THE VOLUME FLOOR: REFUSED ON A LIMIT OF THE INSTRUMENT, NOT THE TAPE.**
+$0.25M -> $0.10M looks like a free 1.5× in supply and a better mean
+(−0.174% -> −0.049%). It is not: the harness's slippage tiers are a **step
+function at $0.1M** (17.49bps below, 2.52bps above), so a $0.11M book is charged
+like a $10M one — and the books the lower floor admits sit exactly in the band
+the model cannot price. At (qq)'s measured thin-book cost their round trip is
+~30–95bps, **larger than the 0.125pp apparent gain**. Floor unchanged. Dropping
+it to zero is separately refused at −0.451%/trade — that is where the ghosts are.
+
+**7 · THE `(sd)` FOLLOW-UP, CLOSED, AND IT HAD A SECOND INSTANCE NEARER REAL
+MONEY.** `fleet_bus.NONCRYPTO_BASES` had drifted by **8 of 101** active
+non-crypto books (AXTI, CASHCAT, KIOXIA, KORU, MRNA, SOXS, US10Y, WDC — all
+recent listings), so with a dark or stale scout every crypto-screened book in the
+fleet failed OPEN on them. Fixing it immediately turned `main` red on
+`test_taker_tradfi_parity`: 🎫 the Taker's LOCAL `TRADFI_BASES` — kept local on
+purpose to keep fleet_bus out of the lean live image — had the **same eight
+missing**, and its own guard calls that list *"the ONLY thing standing between
+the real-money book and a short on a tokenised equity"*. Both synced, parity
+restored at 109 = 109. **`scripts/audit_noncrypto_fallback.py` now measures the
+drift against the venue in BOTH directions** (missing, and names the venue now
+calls crypto), excludes the declared PAXG override from both, and **FAILS rather
+than passing when it cannot reach the venue** — a guard that no-ops offline
+would report clean, which is the `(po)` shape. 3 mutations verified red.
+
+**8 · GUARDS.** `tests/autonomy/test_sniper_young_supply.py`, **8 mutations
+verified RED** — and two of them were caught only because the first pass of the
+tests was VACUOUS, which is worth recording: (a) removing ANTHROPIC from the
+exotic list left every test green, because with a dark scout the fallback
+refuses it anyway — the test never exercised the LIVE-scout path, where class 7
+is not in `EXTERNALLY_PRICED_CLASSES` and it would have been ADMITTED; fixed by
+monkeypatching `_venue_class` so the live path is actually driven. (b) renaming
+the published key to `young_axis_hidden` left a substring check green, because
+it CONTAINS `young_axis` — *"a page-wide substring scan is not a structural
+claim"*, exactly as this file already warns. Both now match the key form.
+
+**9 · A CONCURRENCY NOTE, because it nearly cost another session's work.**
+Repointing citations after a letter collision, a blanket
+`(sb) -> (se)` across the tree caught **nav-cook's** citation in the shared
+`tests/test_selftests.py` and silently repointed it at my entry. Found by
+reading every hit rather than trusting the count, and reverted. **A shared file
+needs per-hit review, not a global replace** — the `(qz)` lesson one step
+further on: it is not enough to enumerate uncapped, you must also confirm each
+hit is YOURS.
+
+**Deploy:** `perp-sniper-shadow` auto-deploys on push. `lighter_ticket_taker.py`
+is main-only and deliberately so — the Taker's live arm was replaced by 🙏 Avo
+on the real-money slot at `(ma)`, this change is restrict-only (it can only
+REFUSE entries), and a live redeploy would wipe memory-only halts for no
+measured gain. Verify by `extra.build`/`build_n` then read `extra.sources.young`
+and `extra.caps.young_axis` on the row. **Era NOT reset for the census; the
+young screen changes which trades the book takes, so its 33 closes are a
+different policy — but the source it changes has contributed ZERO of them, so
+there is nothing in the sample to invalidate. Declared rather than assumed.**
+
 ## 2026-08-20 (sc) — ⚖️ COUNTERWEIGHT IS GRADED 3.6× WORSE THAN IT PERFORMS: the go-live gate reads a percentage that throws away the funding, on a FUNDING book, eleven days before its keep-or-retire call
 
 [Renumbered (sa) -> (sb) -> (sc): main took (sa) for nav-cook's gate fix, then

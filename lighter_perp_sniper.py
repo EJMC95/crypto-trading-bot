@@ -225,11 +225,68 @@ ALLOW_NONCRYPTO = os.environ.get("SNIPER_ALLOW_NONCRYPTO", "").strip().lower() \
 
 
 def _class_ok(sym):
-    """May `sym` enter via the surge/young sources? Crypto perps only."""
+    """May `sym` enter via the SURGE source? Crypto perps only.
+
+    [(se)] Scope narrowed from "surge/young" to SURGE. The young source now
+    asks `_young_class_ok` — a different question, for a measured reason; see
+    below. Nothing about the surge screen changed: its evidence (non-crypto
+    surge −$5.01/13, and (sd)'s class-7 surge at −0.840%/trade @6h, negative at
+    every hold) is unaffected and it stays crypto-only.
+    """
     if ALLOW_NONCRYPTO or fleet_bus is None:
         return True
     try:
         return bool(fleet_bus.is_crypto(sym))
+    except Exception:      # noqa: BLE001 — class lookup must never stop a scan
+        return True
+
+
+# [2026-08-20 (se)] THE YOUNG SOURCE ASKS A DIFFERENT QUESTION — and this is
+# the change that gives this book its supply back, not another screen.
+#
+# THE DEFECT, measured. (lk) applied ONE screen to both sources on evidence
+# that was almost entirely SURGE's: non-crypto surge −$5.01 over 13 closes
+# versus non-crypto **young −$1.19 over TWO**. The young leg rested on n=2.
+# `is_crypto` asks `strategy_index == 2`, and **the venue files crypto-native
+# memecoin debuts under class 7** — the same grab-bag that holds tokenised
+# pre-IPO equity. So the screen refused exactly the cohort a debut sniper
+# exists to trade.
+#
+# THE COST, measured 20-Aug: the young source published `admitted: 0` for
+# **66 consecutive days**. Its live supply on that day was SEVEN books, of
+# which five were zero-volume ghosts (AXTI/WDC/SOXS/KORU/KIOXIA — tokenised
+# equities that never traded an hour) and the only two with real turnover were
+# CASHCAT ($0.45M) and UNITREE ($0.84M), both class 7, both refused. The book
+# was not quiet; it was structurally unable to admit anything.
+#
+# AND THE SUPPLY WAS NEVER DEAD. `(qi)`/`(sd)` reported "ZERO crypto births for
+# 86 days", which is true of `strategy_index == 2` and FALSE of the cohort this
+# book trades: on the venue-priced axis, births run **1.67-2.00/30d and have
+# not stopped in any month measured** — CAP (Jun), ANSEM (Jul), CASHCAT (Aug).
+# Corrected in place per I12 rather than left standing.
+#
+# WHAT REPLACES IT: `fleet_bus.venue_priced` — the axis the (lk) argument was
+# really making ("already priced where the underlying trades"). It admits
+# crypto-native books INCLUDING class-7 memecoins, and still refuses tokenised
+# equity/FX/commodity/pre-IPO. That exclusion is now BETTER evidenced than it
+# was: (se) measured shorting an externally-priced debut at −0.714%/trade,
+# **t=−2.04** — the only significant cell in the study — so the half of (lk)
+# this keeps is the half the tape supports.
+# Reversible independently of the surge screen: SNIPER_YOUNG_ALLOW_ANY=1.
+YOUNG_ALLOW_ANY = os.environ.get("SNIPER_YOUNG_ALLOW_ANY", "").strip().lower() \
+    in ("1", "on", "true", "yes")
+
+
+def _young_class_ok(sym):
+    """May `sym` enter via the YOUNG source? Books PRICED ON THIS VENUE.
+
+    Fail-OPEN on a missing/raising fleet_bus, exactly as `_class_ok` does — a
+    classification outage must never be what stops a debut scan.
+    """
+    if YOUNG_ALLOW_ANY or ALLOW_NONCRYPTO or fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.venue_priced(sym))
     except Exception:      # noqa: BLE001 — class lookup must never stop a scan
         return True
 
@@ -418,7 +475,11 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
     cannot dedup it), and bounded by `limit`.
     """
     rows = []
-    class_ok = _class_ok if class_ok is None else class_ok
+    # [(se)] the YOUNG screen, not the surge one — `_young_class_ok` asks
+    # "is this priced on this venue", which admits the class-7 memecoin debuts
+    # `is_crypto` refuses. An explicit `class_ok=` still overrides, which is
+    # what the tests drive.
+    class_ok = _young_class_ok if class_ok is None else class_ok
     cen = _new_funnel(census, ("scanned", "age_ok", "fresh", "class_ok",
                                "vol_ok"))
     for sym, n in (bar_counts or {}).items():
@@ -445,7 +506,7 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
         if s in (already or set()):
             continue
         cen["fresh"] += 1
-        if not class_ok(s):               # [(lk)] crypto perps only
+        if not class_ok(s):               # [(se)] priced on THIS venue
             continue
         cen["class_ok"] += 1
         try:
@@ -1341,11 +1402,30 @@ def main():
                                           # tracks a reversal:
                                           "class_screen": {
                                               "surge": not ALLOW_NONCRYPTO,
-                                              "young": not ALLOW_NONCRYPTO,
+                                              "young": not (ALLOW_NONCRYPTO
+                                                            or YOUNG_ALLOW_ANY),
                                               # structural, not a default —
                                               # see the (lk) block: n=1,
                                               # unmeasured, founding thesis.
-                                              "listing": False}}})
+                                              "listing": False},
+                                          # [(se)] WHICH QUESTION each screen
+                                          # asks. `surge: is_crypto` and
+                                          # `young: venue_priced` are DIFFERENT
+                                          # gates and a payload saying only
+                                          # "screened: true" for both cannot
+                                          # tell them apart — which is how a
+                                          # screen justified on n=2 sat on the
+                                          # wrong axis for 66 days. Publishing
+                                          # the axis makes the next reader able
+                                          # to ask the question this book could
+                                          # not be asked.
+                                          "young_axis": (
+                                              "any" if (ALLOW_NONCRYPTO
+                                                        or YOUNG_ALLOW_ANY)
+                                              else "venue_priced"),
+                                          "surge_axis": (
+                                              "any" if ALLOW_NONCRYPTO
+                                              else "is_crypto")}})
         except Exception as e:  # noqa: BLE001
             # Never let telemetry kill the trading loop — but never let it fail
             # in silence either: a bare `except: pass` here is what hid the
