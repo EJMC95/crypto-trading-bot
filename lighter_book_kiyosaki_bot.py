@@ -139,7 +139,18 @@ PERSIST_H = 6.0                 # hot >= this long before entry (parent's bar)
 FLIP_GRACE_H = 6.0              # a liability must persist before it is sold
 MAX_HOLD_H = 14 * 24            # recycle capital (parent's bar)
 DELIST_GIVEUP_H = 24.0          # coin absent from the map this long -> close
-MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "2e6"))
+#: [2026-08-20] 2e6 -> 1e6, CORRECTED IN PLACE per I12. This floor was
+#: inherited verbatim from 🌾 carry at birth (13-Aug) and carry MOVED IT on
+#: 18-Aug `(px)` after measuring its own cell: a 34.9-day ladder took cell
+#: occupancy 5.73% -> 13.42% and the qualifying population 3 -> 6 coins, all
+#: crypto, inside the `(it)` cage. This book enters the SAME cell on the same
+#: venue and was simply left behind — an inherited constant whose own source
+#: has since moved is not an independent choice, it is a stale copy. Measured
+#: consequence of being left behind: 7 days alive, ZERO trades, census
+#: `cold 209/228`. The gate this book adds on top (payback velocity,
+#: ~21.9% TRUE) is unchanged and still binds ABOVE carry's 20% floor, so this
+#: admits nothing the 21-Jul sweep did not validate (I19, restrict-preserving).
+MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "1e6"))
 
 # ---- lesson 2: capacity (cash flow only, so clip == exposure to costs) ------
 CLIP_USD = float(os.environ.get("RICHDAD_CLIP_USD", "80"))

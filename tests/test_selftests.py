@@ -85,6 +85,12 @@ SELFTEST_MODULES = [
     # The --selftest is offline and pure. The live scan runs in CI, in
     # changelog-check.yml's `book-spend` job, with the selftest ahead of it.
     "scripts.audit_book_spend",
+    # [2026-08-20 (ru)] the docket class-split evidence. --selftest is offline
+    # and pure (the split, the sleeve-tag round-trip, and the calibration gate's
+    # fail-closed arms); the SCAN needs the public feeds, so only the fixture
+    # runs here. Registered in the same commit that adds the script, per this
+    # guard's own rule — a --selftest nobody runs is the shape it prevents.
+    "scripts.study_docket_class_split_2026-08-17",
     # [2026-07-28] breakout-quality study: --selftest is offline-green &
     # stdlib-only (verified `python -m scripts.analyze_breakout_quality
     # --selftest` on a bare interpreter); registering it here fixes the

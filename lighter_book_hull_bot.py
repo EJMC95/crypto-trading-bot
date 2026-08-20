@@ -191,7 +191,19 @@ HOURS_PER_YEAR = 24.0 * 365.0
 
 # ---- rule 5: margin prudence ------------------------------------------------
 CLIP_USD = float(os.environ.get("HULL_CLIP_USD", "80"))
-MAX_POSITIONS = int(os.environ.get("HULL_MAX_POSITIONS", "4"))
+#: [2026-08-20] 4 -> 6. This book's OWN declared binding bar is CLOSES, not
+#: `t` — `(ny)` measured 6.0 closes/30d and ~5 months to the 30-close gate from
+#: a standing start, and unlike 🧙 Schwager it needs TIME rather than a better
+#: statistic. Measured today: it is AT its cap (held 4 of 4) with **11 books
+#: in-band and liquid** (census: scanned 228, below_band 106, above_band 21,
+#: thin 90), so the cap — not the gate — is what rations its evidence. Raising
+#: it raises closes/30d roughly in proportion, which is I17 decidability
+#: bought directly. It is NOT a risk widening in the expectancy sense (I19):
+#: per-trade % is invariant to how many positions are held, the book is
+#: delta-neutral MODELLED (P&L is accrued - fees, no price term), and 6 x $80
+#: = $480 of a $1,000 shadow book stays inside the same gross envelope its
+#: siblings run. The entry gate, band and exits are untouched.
+MAX_POSITIONS = int(os.environ.get("HULL_MAX_POSITIONS", "6"))
 
 # ---- rule 2: the no-arbitrage band ------------------------------------------
 # modelled friction, declared: 15bps per side on both legs of the modelled
