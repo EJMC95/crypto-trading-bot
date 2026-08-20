@@ -92,6 +92,32 @@ PROBE_FLOOR = float(os.environ.get("ALLOC_PROBE_FLOOR", "0.25"))
 # Books below this many closes are UNDECIDED — they get the probe floor and no
 # more, whatever their mean looks like.
 MIN_N = int(os.environ.get("ALLOC_MIN_N", "20"))
+
+#: [2026-08-20 (sh)] HOW HARD EVIDENCE TILTS THE SPLIT — and why it is a TILT
+#: rather than the whole split.
+#:
+#: The original rule was `share = claim / total_claim`, which is WINNER-TAKE-ALL
+#: whenever claims are sparse, because every unclaimed book contributes 0 to
+#: both sides. Measured on the live payload the day this shipped: ONE book held
+#: a claim of 0.0015 and took **$13,366 of $19,000**, two books held 78% of the
+#: fleet's capital, and **17 of 19 books were cut to the 25% probe floor** —
+#: including SIX with positive measured means (👩 mum +4.66%/trade, 🙏 avo
+#: +1.09%, its live twin +0.82%, 🏛️ albanese +0.28%, 💸 the Farmer's shadow
+#: +0.14% on n=195, 📊 georgia +0.12% on n=141).
+#:
+#: That is not conservatism, it is STARVATION, and it is self-fulfilling: a book
+#: held at the floor accumulates evidence more slowly, so its bound stays wide,
+#: so it stays at the floor. I17 already names the principle — *"a book cannot
+#: earn evidence with no capital"* — and the split was violating it while the
+#: floor was busy honouring it.
+#:
+#: So the FLAT allocation is the prior and evidence tilts it: the best-evidenced
+#: book earns `1 + TILT` times an unclaimed book's weight, and nothing is
+#: starved because a rival has a claim. At the default a claimant gets 2x the
+#: weight of a book with no opinion — a real, bounded reward for evidence.
+#: Set to 0 for a pure flat split; the old winner-take-all is NOT reachable by
+#: any setting, deliberately.
+CLAIM_TILT = float(os.environ.get("ALLOC_CLAIM_TILT", "1.0"))
 BOOK_USD = float(os.environ.get("ALLOC_BOOK_USD", "1000"))
 
 # Class membership is by the SIGNAL the book trades, not by its name. Funding
@@ -219,11 +245,22 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
     base = book_usd * max(0.0, min(1.0, floor))
     surplus = total - base * len(bots)
     cl = claims(books)
-    tot_claim = sum(cl.values())
+    # [(sh)] EVIDENCE TILTS THE FLAT SPLIT; IT DOES NOT REPLACE IT. Weights are
+    # `1 + TILT * (claim / best_claim)`, so a book with no opinion still carries
+    # weight 1 and cannot be defunded by a rival's claim. With no claims
+    # anywhere every weight is 1 and this is EXACTLY the flat allocation, which
+    # is the promise the docstring above already made and the old
+    # `claim / total_claim` kept only in the degenerate all-zero case.
+    best = max(cl.values()) if cl else 0.0
+    if best > 0:
+        w = {b: 1.0 + CLAIM_TILT * (cl[b] / best) for b in bots}
+    else:
+        w = {b: 1.0 for b in bots}
+    tot_w = sum(w.values())
     out = {}
     for b in bots:
         n = len([p for p in (books[b] or []) if p is not None])
-        share = (cl[b] / tot_claim) if tot_claim > 0 else (1.0 / len(bots))
+        share = w[b] / tot_w if tot_w > 0 else (1.0 / len(bots))
         target = base + surplus * share
         # [2026-08-05 (kc)] THE EVIDENCE RECORD. `mean` and `se` were computed
         # one line inside `lower_bound` and thrown away, so two books failing

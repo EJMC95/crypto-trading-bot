@@ -113,13 +113,57 @@ def test_kill_switch_reaches_the_consumer(monkeypatch):
 
 
 def test_scale_is_clamped_both_ends(monkeypatch):
-    # a lone claimed book among many probes concentrates the whole surplus
+    """The CLAMP, exercised directly on `target_usd`.
+
+    [(sh)] This used to reach 4.0 by way of "a lone claimed book among many
+    probes concentrates the whole surplus" — i.e. it depended on the
+    winner-take-all split, which `(sh)` removed because it was starving 17 of
+    19 books to the probe floor. The clamp itself is unchanged and still worth
+    pinning, so it is now driven from the payload value rather than from a
+    distribution artifact: that is what this test was always named for, and it
+    no longer breaks when the SPLIT is re-tuned.
+    """
+    books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
+                              for i in range(20)})
+    p = _payload(monkeypatch, books, era=_ERA_OK)
+    carry, loser = "perps-funding-carry-lshadow", "perps-funding-spread-lshadow"
+    p["books"][carry]["target_usd"] = 99_000.0        # 99x flat
+    p["books"][loser]["target_usd"] = 1.0             # 0.001x flat
+    assert fleet_bus.allocation_scale(carry) == 4.0, "upper clamp must bind"
+    assert fleet_bus.allocation_scale(loser) == 0.25, "lower clamp must bind"
+
+
+def test_no_book_is_starved_by_a_rivals_claim(monkeypatch):
+    """[(sh)] THE STARVATION THIS FIX EXISTS TO END.
+
+    Under `share = claim / total_claim` a single book holding a claim of 0.0015
+    took $13,366 of $19,000 and cut **17 of 19 books to the 25% probe floor** —
+    six of them with POSITIVE measured means (👩 mum +4.66%/trade, 🙏 avo
+    +1.09%, 🏛️ albanese +0.28%, 💸 the Farmer's shadow +0.14% on n=195,
+    📊 georgia +0.12% on n=141). That is self-fulfilling: a book held at the
+    floor earns evidence more slowly, so its bound stays wide, so it stays at
+    the floor — while I17 says in as many words that *"a book cannot earn
+    evidence with no capital"*.
+
+    Evidence must still WIN — the claimed book outranks the rest — but it must
+    not be able to take the food off every other table.
+    """
     books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
                               for i in range(20)})
     _payload(monkeypatch, books, era=_ERA_OK)
-    s = fleet_bus.allocation_scale("perps-funding-carry-lshadow")
-    assert s == 4.0, f"cap must bind at 4.0, got {s}"
-    assert fleet_bus.allocation_scale("perps-funding-spread-lshadow") >= 0.25
+    carry = "perps-funding-carry-lshadow"
+    others = [b for b in books if b != carry]
+    scales = {b: fleet_bus.allocation_scale(b) for b in others}
+    at_floor = [b for b, v in scales.items() if v <= 0.25]
+    assert not at_floor, (
+        f"{len(at_floor)} book(s) starved to the probe floor by another "
+        f"book's claim: {sorted(at_floor)[:4]}")
+    assert min(scales.values()) > 0.5, (
+        f"claimless books fell to {min(scales.values())}x — a book that has "
+        f"simply not been measured yet must still be fed enough to earn "
+        f"evidence (I17)")
+    assert fleet_bus.allocation_scale(carry) > max(scales.values()), \
+        "evidence must still rank first — this is a TILT, not an equaliser"
 
 
 # --------------------------------------------------------------------------
@@ -143,8 +187,14 @@ def test_a_thin_era_cannot_grow_a_book_past_flat(monkeypatch):
     carry = "perps-funding-carry-lshadow"
 
     p = _payload(monkeypatch, books, era=_ERA_OK)
-    assert fleet_bus.allocation_scale(carry) == 4.0, \
-        "control arm: with a positive era claim the book still earns 4.0x"
+    # [(sh)] was `== 4.0`, which only the winner-take-all split could produce.
+    # The INVARIANT is "a positive era claim lets the book grow PAST FLAT";
+    # the exact multiple is a property of the split and must not be pinned
+    # here, or re-tuning the split reddens a test that is not about it.
+    ranked_scale = fleet_bus.allocation_scale(carry)
+    assert ranked_scale > 1.0, \
+        f"control arm: a positive era claim must grow the book past flat, " \
+        f"got {ranked_scale}x"
     ranked = p["books"][carry]["target_usd"]
 
     # `claim_era: None` is exactly what the live organ published for carry on
@@ -183,10 +233,15 @@ def test_the_cap_never_shrinks_a_book_below_its_probe_floor(monkeypatch):
                               for i in range(20)})
     loser = "perps-funding-spread-lshadow"
     with_era = _payload(monkeypatch, books, era={loser: 0.5})
-    assert fleet_bus.allocation_scale(loser) == 0.25
+    # [(sh)] was pinned at 0.25 — the value the STARVATION produced. The
+    # invariant is that the era gate is restrict-only: a scale at or below flat
+    # is never touched by it, whatever the split hands the book.
+    scale_with = fleet_bus.allocation_scale(loser)
+    assert scale_with <= 1.0 and scale_with >= 0.25
     assert with_era["books"][loser]["claim_era"] == 0.5
     _payload(monkeypatch, books)                 # era says nothing at all
-    assert fleet_bus.allocation_scale(loser) == 0.25
+    assert fleet_bus.allocation_scale(loser) == scale_with, \
+        "a dark or thin era must leave a sub-flat scale exactly where it was"
 
 
 def test_junk_era_claims_decline_the_expansion(monkeypatch):

@@ -1,3 +1,105 @@
+## 2026-08-20 (sh) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
+
+**Operator:** *"Keep the books, fix your arithmetic to everything you want to
+retire and start using an approach where instead of finding a way to kill
+something you find a way to feed it, let it exercise, give it sunlight."*
+
+He was right, and the bias was not a posture — it was **two measured defects in
+the fleet's own instruments**, both of which I had been quoting as evidence.
+
+**1 · THE ALLOCATION SPLIT WAS WINNER-TAKE-ALL.** `share = claim / total_claim`
+gives every unclaimed book a share of exactly ZERO. Measured on the live payload:
+ONE book (🌾 carry, claim **0.0015**) took **$13,366 of $19,000**, two books held
+**78%** of fleet capital, and **17 of 19 books were cut to the 25% probe floor** —
+including **six with POSITIVE measured means**: 👩 mum **+4.66%/trade**, 🙏 avo
+**+1.09%**, its live twin +0.82%, 🏛️ albanese +0.28%, 💸 the Farmer's shadow
++0.14% on n=195, 📊 georgia +0.12% on n=141. And it is **self-fulfilling**: a book
+held at the floor accumulates evidence more slowly, so its bound stays wide, so it
+stays at the floor. **I17's own words are "a book cannot earn evidence with no
+capital" — and the organ that cites them was doing exactly that.**
+**FIXED:** the flat split is the PRIOR and evidence TILTS it —
+`w = 1 + CLAIM_TILT * (claim / best_claim)`, default tilt 1.0, so the
+best-evidenced book earns 2x an unclaimed book's weight and **nothing is starved
+because a rival has a claim**. With no claims anywhere every weight is 1 and the
+result is EXACTLY the flat allocation, which is the promise the docstring already
+made and the old rule kept only in the degenerate all-zero case. Total is still
+conserved; the probe floor is still the hard minimum. **Measured after: 0 of 19 at
+the floor (was 17), starved books go 0.25x -> 0.96x — nearly 4x more capital
+each — and carry still ranks first at 1.66x.** Evidence still wins; it just
+stops taking the food off every other table.
+
+**2 · `unreachable` HAD NO POWER GATE, AND IT IS A DOCKET VERDICT.** It fired on
+`mean <= 0` **alone, at ANY n**, with the reason *"more of the same closes cannot
+flip mean/t/halves"* — a claim that is simply FALSE on a thin sample: at n=10 with
+a wide SE, a mean of −0.155% is entirely consistent with a true mean of **+2%**.
+Because `unreachable` sits in `DOCKET_VERDICTS`, the pipeline ran
+**`mean <= 0` (any n) -> `unreachable` -> I17 keep-or-retire docket -> retire**.
+Measured: 🌾 carry — the fleet's best-evidenced book — carried `unreachable` on
+**n=10**.
+**FIXED:** the verdict now requires the one-sided **UPPER** bound
+`mean + 1.28*se` to sit at or below zero — the sample must actually have
+**EXCLUDED** a positive mean. A book that is merely thin gets the new verdict
+**`underpowered`**, which is **deliberately NOT in `DOCKET_VERDICTS`**, and it
+publishes **`n_req_decide`**: how many closes would settle the sign. `stats()`
+now publishes `se_pct`, which it had been computing inside `t` and throwing away
+— which is precisely why the horizon could only ever ask *"is the mean
+negative?"* and never *"is it negative beyond noise?"*.
+
+**THE GATE DISCRIMINATES — that is the point, and it is pinned in both
+directions.** Re-run across the fleet: **3 books stay `unreachable`** because
+their samples genuinely exclude a positive mean (🛢️ Garrett upper **−0.439%**,
+⚖️ Counterweight **−0.592%**, 🌾 carry **−0.111%**), and **4 come off the
+conveyor** (🧘 Douglas upper +0.121%, needs ~59 closes; 🎫 the Taker +0.131%,
+~136; 💸 the Farmer's shadow +0.185%; 🎯 the sniper +0.814%). A blown drawdown
+stays `unreachable` at any n — it cannot un-blow, so power is irrelevant there,
+and only the MEAN branch is gated.
+
+**3 · ONE STANDARD OF EVIDENCE IN BOTH DIRECTIONS.** `HORIZON_Z` is the same
+**1.28** that `fleet_allocation.Z_LOWER` uses for I16's lower bound, and a test
+pins them equal. A fleet that doubts a book at one z and feeds it at another
+drifts toward whichever is stricter — which is the drift that produced this
+entry.
+
+**4 · I17 IS AMENDED, AND MY OWN RETIRE RECOMMENDATION IS WITHDRAWN.** The
+standing rule is now: when a book is not performing, **the first question is what
+is STARVING it** — supply, capital, a screen asking the wrong question, a gate it
+cannot reach — **and the answer is to FEED it**. Retirement requires a MEASURED
+exclusion (an upper bound at or below zero, or a supply that does not exist),
+never a thin sample and never a verdict computed on a starved one. **A refusal to
+retire on insufficient evidence is a correct outcome of I17, not an evasion of
+it.** Concretely: `(sf)` escalated a keep-or-retire call on 🎯 the sniper citing
+horizon `unreachable` and claim 0.000 — **neither number survives its own fix**
+(its upper bound is +0.814%, and 0.000 was the split's floor, which read 0.000
+for *every book in the fleet* including one at +4.66%/trade). Withdrawn in place.
+What remains true is the honest limit, unchanged: the sniper's entries carry no
+measurable directional information and its `mde80` (2.114%/trade) exceeds the
+entire perfect-hindsight ceiling (+1.80pp), so the right expectation is a book
+that is CHEAP and OBSERVABLE — not one about to earn.
+
+**GUARDS.** `tests/autonomy/test_horizon_power_gate.py` (7 tests) and a new
+anti-starvation test in `test_allocation_consumer.py`. **9 mutations verified
+RED**, covering both directions: removing the power gate, putting `underpowered`
+back on the docket, making the gate stop discriminating, treating an
+unmeasurable SE as an exclusion (I6), diverging the two z's, dropping
+`n_req_decide`, restoring winner-take-all, zeroing the tilt, and removing the
+scale clamp.
+
+**Three existing allocation tests were pinning the STARVATION as their
+mechanism** — one's own comment read *"a lone claimed book among many probes
+concentrates the whole surplus"* — and asserted `== 4.0` / `== 0.25`, values only
+winner-take-all could produce. They are rewritten to pin the INVARIANT (the clamp
+binds; the era gate is restrict-only; a positive era claim grows a book past
+flat) rather than the artifact, so re-tuning the split no longer reddens a test
+that is not about it. The clamp is now exercised directly on `target_usd`, which
+is what it was always named for.
+
+**Consumers, stated:** `fleet_bus.allocation_scale` feeds three funding SHADOW
+books' entry sizing, so this changes paper position sizes today — 17 books get
+~4x the capital they had. **Real money never reads it** (AST-pinned in
+`test_allocation_consumer.py`), and `FLEET_ALLOCATION_MODE=advisory` reverts every
+consumer to its env default at the accessor. Era NOT reset anywhere: no book's
+trading RULE changed.
+
 ## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
 
 [Renumbered (sd) -> (se): main took (sd) for the nav-cook leverage entry while

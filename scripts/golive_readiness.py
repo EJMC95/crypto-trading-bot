@@ -924,7 +924,12 @@ def stats(rows, book_usd=None):
         dd = min(dd, eq - peak)
     wins = sum(1 for x in pct if x > 0)
     realised = sum(r[1] or 0 for r in rows)
+    # [2026-08-20 (sh)] `se_pct` — computed one line above inside `t` and then
+    # thrown away, which is why the horizon could only ask "is the mean
+    # negative?" and never "is it negative BEYOND NOISE?". Published so a
+    # verdict can be power-aware. Reported, never a bar.
     out.update(days=days, mean_pct=mean, t=t, h1=h1, h2=h2,
+               se_pct=(sd / math.sqrt(n)) if n > 1 and sd > 0 else None,
                # [2026-08-06 (kw)] The cluster-robust read of `t`, beside it.
                # REPORTED, NEVER A BAR: `BAR_NAMES` is the published contract
                # and `grade()` is byte-unchanged, exactly as (kg) did with
@@ -1275,6 +1280,11 @@ HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 # A verdict can flip on one trade, so a single reading is noise. The book must
 # hold a stuck verdict for DOCKET_DAYS, and the clock RESETS the moment the
 # verdict changes — a book that recovers leaves the docket and starts over.
+#: [2026-08-20 (sh)] The one-sided z the horizon uses to ask whether a negative
+#: mean is negative BEYOND NOISE. Same 1.28 (90%) that `fleet_allocation`'s I16
+#: lower bound uses, deliberately: the fleet should apply one standard of
+#: evidence whether it is deciding to FEED a book or to doubt one.
+HORIZON_Z = float(os.environ.get("GOLIVE_HORIZON_Z", "1.28"))
 DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: Verdicts that mean "not on a path to the gate at the current trajectory".
 #: `no_rate` is deliberately NOT here unconditionally — a newborn book is
@@ -1283,6 +1293,11 @@ DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: joins only once the book has HAD its window and still cannot produce a rate
 #: (see `_docket_stuck`), which is I17's own wording — "still undecidable at
 #: the floor after its window".
+#: [2026-08-20 (sh)] `underpowered` is DELIBERATELY ABSENT from this tuple, and
+#: that absence is the whole point of the verdict. A book whose mean is negative
+#: but whose sample cannot EXCLUDE a positive mean has not been measured to
+#: fail — it has not been measured. Docketing it starts a keep-or-retire clock
+#: on noise, and the clock is what reaches the operator.
 DOCKET_VERDICTS = ("unreachable", "undecidable")
 #: [(lf)] THE CLOCKS LIVE IN THEIR OWN KEY, and that is a correctness choice
 #: rather than tidiness. `save_state` replaces a payload WHOLESALE, so while the
@@ -1500,10 +1515,68 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     out["rate_cpd"] = _fin(rate, 2)
 
     mean = s.get("mean_pct")
+
+    # [2026-08-20 (sh)] THE MEAN BAR IS POWER-GATED NOW, and this is a
+    # CORRECTNESS fix rather than a softening.
+    #
+    # This branch used to declare `unreachable` — "more of the same closes
+    # cannot flip mean/t/halves" — on `mean <= 0` ALONE, at ANY n. That claim
+    # is simply FALSE on a thin sample: with n=10 and a wide SE, a mean of
+    # −0.155% is entirely consistent with a true mean of +2%, and more closes
+    # can absolutely flip it. Measured the day this shipped, 🌾 carry — the
+    # fleet's best-evidenced book — carried `unreachable` on **n=10**.
+    #
+    # It matters because `unreachable` is in DOCKET_VERDICTS: it starts I17's
+    # keep-or-retire clock. So the pipeline read `mean <= 0 on any n` ->
+    # unreachable -> docket -> retire, and a book could be routed toward
+    # retirement by nothing more than noise on ten trades.
+    #
+    # The honest test is whether the data EXCLUDES a positive mean: the
+    # one-sided UPPER bound `mean + z*se` at the same z=1.28 the fleet already
+    # uses for I16's lower bound. Upper bound still above zero => the book is
+    # UNDERPOWERED, not unreachable; it needs closes, not a verdict. Only when
+    # the upper bound sits at or below zero has the sample actually ruled a
+    # positive mean out.
+    se = s.get("se_pct")
+    upper = (mean + HORIZON_Z * se) if (mean is not None and se) else None
+    # Has the SAMPLE excluded a positive mean? An unmeasurable SE (n<2, zero
+    # dispersion) is NOT an exclusion — absence of evidence never promotes a
+    # book toward the docket (I6).
+    mean_excluded = upper is not None and upper <= 0
+    if not bars["mean"] and not mean_excluded and bars["maxdd"]:
+        # Enough closes to DECIDE the sign, at the current mean and dispersion:
+        # se must fall below |mean|/z, and se scales as 1/sqrt(n).
+        n_dec = None
+        try:
+            if mean < 0:
+                n_dec = int(math.ceil(n * (HORIZON_Z * se / abs(mean)) ** 2))
+        except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+            n_dec = None
+        out.update(
+            verdict="underpowered",
+            n_req_decide=n_dec,
+            why=(f"mean {100 * mean:+.3f}% is below the bar but its upper "
+                 f"bound {100 * upper:+.3f}% is still ABOVE zero — this sample "
+                 f"has not excluded a positive mean, so more closes CAN flip "
+                 f"it. Needs ~{n_dec} closes to decide the sign"
+                 if n_dec else
+                 f"mean {100 * mean:+.3f}% is below the bar but its upper "
+                 f"bound is still above zero — not yet decidable"))
+        if rate and rate > 0 and n_dec and n_dec > n:
+            out["eta_days"] = _fin((n_dec - n) / rate, 1)
+        return out
+
+    # Genuinely unreachable: the sample has EXCLUDED a positive mean, or the
+    # in-era drawdown is blown (which cannot un-blow at any n).
     if not bars["mean"] or not bars["maxdd"]:
         parts = []
         if not bars["mean"]:
-            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
+            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
+                         f"{100 * upper:+.3f}% <= 0 — the sample has EXCLUDED "
+                         "a positive mean, so more of the same closes cannot "
+                         "flip mean/t/halves"
+                         if upper is not None else
+                         f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
                          "same closes cannot flip mean/t/halves")
         if not bars["maxdd"]:
             dd = s.get("max_dd_frac")
