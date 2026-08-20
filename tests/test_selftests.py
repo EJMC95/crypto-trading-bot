@@ -137,6 +137,9 @@ SELFTEST_MODULES = [
     # detection, and the CALIBRATION gate — no reproduction of the observed
     # result, no recommendation, fail-closed when no baseline is supplied.
     "scripts.study_exit_sweep",
+    "scripts.study_stop_reclaim",
+    "scripts.study_trail_sweep",
+    "scripts.study_depth_vs_volume",
     # [2026-07-30 (hf)] LEDGER INTEGRITY — is a book's ledger ONE book's record?
     # --selftest is fully offline and pins the discrimination that makes the
     # detector usable rather than alarming: sequential holds on one symbol are
