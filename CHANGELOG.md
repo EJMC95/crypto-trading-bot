@@ -1,3 +1,78 @@
+## 2026-08-20 (rt) — THE HORIZON QUESTION CANNOT BE ANSWERED BACKWARDS ON THIS BOOK, AND THE REASON IS A NUMBER: a 1.9-MINUTE MEDIAN HOLD AGAINST A 1-MINUTE CANDLE. So 🪁 band-kelly now measures it FORWARD.
+
+**Operator: *"open the horizons, give them room to breathe and grow."*** `(rs)`
+named the real constraint on both mirror books — not the max hold, which is
+INERT (band-kelly's median is 0.09h against a 2h cap), but the **`converged`
+exit**, which closes the moment the basis narrows: 6 of band-kelly's 7 snap
+trades exited `conv` for **−$13.97** while the ONE that escaped convergence made
+**+$13.17**. This pass tried to measure it and **REFUSED, twice, with the
+mechanism** — then built the instrument that can.
+
+**REFUSAL 1 — THE CONV BAR IS UNSWEEPABLE: THIS VENUE STORES NO INDEX HISTORY.**
+The exit fires on |mark/index − 1|, so moving the bar needs the RESIDUAL path.
+Candles carry price only. (The 1m/5m candles do expose a second OHLC set —
+uppercase `O/H/L/C` — and I checked rather than hoped: they are **identical
+duplicates** of the lowercase fields, not an index series.) The only stored
+residual is the scout's `prem_outliers`, hard-capped at 8 entries per snapshot,
+which `(qw)` already ruled too lossy to audit this book. Independent confirmation
+from a second direction.
+
+**REFUSAL 2 — AND HOLDING-LONGER IS NOT MEASURABLE EITHER, WHICH I DID NOT
+EXPECT.** P&L needs only PRICE, and 1-minute candles reach back **45+ days**,
+covering the ghost's whole 13-Jul→4-Aug ledger — so I built
+`scripts/study_band_kelly_horizon_2026-08-20.py`: anchor the level on the
+ledger's own realised % (so the founding cell reproduces EXACTLY, by
+construction) and let candles supply only the incremental move past the exit.
+It refuses.
+* The LEVEL gate (candle close vs the ledger's own fill) reads median **27.8
+  bps**, p90 152.8 — the ghost traded THIN books (KAITO ~$0.42M/day) where a
+  book-walked VWAP and a last-trade close genuinely differ.
+* **I did not raise that tolerance to get a number** — widening until a number
+  appears is chasing the artifact. I replaced it with the gate that tests what
+  the harness actually CLAIMS: a RATIO. Does the candle path reproduce the
+  ghost's OWN realised move over its OWN hold? **It does not**: correlation
+  **+0.807**, median error **41.4 bps** against an effect size of ~40 bps, and
+  the mean move disagrees in **SIGN** (candles −14.0 bps vs ledger +7.1 bps).
+* **THE MECHANISM, measured, so nobody re-attempts this:** the ghost's median
+  hold is **1.9 MINUTES**. Entry and exit land inside the same 1-minute bar, so
+  the "path" is one close. Worked example — two APEX trades the ledger records
+  at **−235.1 bps** and **+217.6 bps** both reconstruct to **0.0 bps**. Where
+  the hold is long enough the harness is excellent (KAITO 8.4 min: −511.5 vs
+  −508.2; 9.3 min: −147.7 vs −148.0), which is what proves the failure is
+  RESOLUTION, not a bug. *The signal and the measurement noise are the same
+  size, because the book trades faster than the venue records.*
+
+**SO THE ONLY INSTRUMENT AT THE RIGHT TIMESCALE AND THE RIGHT BASIS IS THE BOOK
+ITSELF** — it already reads the venue's own order book every 90 seconds. 🪁
+band-kelly now keeps watching each coin AFTER it closes and records what
+holding on WOULD have paid: `+15m / +30m / +1h / +2h`, mirror-side signed,
+sampled from its own `book_view` mids, published every loop as
+`extra.holdwatch` with **n beside every mean** so a thin cell reads as thin
+(I15). By ~mid-Sep the grade has a MEASURED answer to "should this book hold
+longer" instead of an argument.
+
+**IT CHANGES NO TRADE, AND THAT IS PINNED RATHER THAN PROMISED.** An AST test
+walks the eight functions that actually decide (`mirror_side`, `ghost_side`,
+`mirror_exit`, `dip_exit`, `dip_ghost_takes`, `_open_mirror`, `_open_dip`,
+`_price_pnl`) and fails if ANY of them so much as names the watch — because a
+decision function reading its own counterfactual is a book trading a number it
+invented. The decider set is asserted total, so a renamed function cannot slip
+out of the check. Bounded (`HOLDWATCH_MAX`, pruned at 2x the longest horizon)
+and persisted, so it neither grows without limit nor resets every deploy.
+**6 of 6 mutations verified red**, control green both sides: mirror sign
+flipped, a sampled horizon re-firing, the SUM published as a MEAN, the watch
+lost on restart, the aggregate never published, and a decider peeking at the
+counterfactual.
+
+**WHAT THIS DOES NOT DO, stated so the next reader does not over-read it.** It
+does not widen anything. band-kelly's exits are the GHOST'S OWN constants and
+the founding claim is the negation of a ledger that embeds them, so holding
+longer remains a NEW POLICY with a fresh (hm) clock — an operator decision
+priced through I19, and now one that will have evidence behind it. The
+`(hm)` clock is untouched: no gate, clip, side or exit byte moved.
+`nav-cook`'s version of this question stays unanswerable for a further reason
+that is not mine to fix — its founding study shipped prose with no script.
+
 ## 2026-08-19 (rs) — FEWER GUARDS, MORE ROOM: the taker gets the fix instead of my exemption, the Navigator stops being flagged for trading, and the organ that asks "does this book have room to grow" can finally see 8 books it had never heard of — one of them REAL MONEY
 
 **Operator: *"Fix, open the horizons, give them room to breathe and grow. Not so

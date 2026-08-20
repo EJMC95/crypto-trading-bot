@@ -207,6 +207,40 @@ ALLOW_NONCRYPTO = os.environ.get(
     "KELLY_ALLOW_NONCRYPTO", "").strip().lower() in ("1", "true", "yes")
 
 SAMPLE_N = 20                              # rolling published sample (I15)
+
+# ---- HOLD-WATCH: the horizon question, instrumented FORWARD ------------------
+# [2026-08-20, operator: "open the horizons, give them room to breathe and
+# grow."] The book exits when the ghost would have — overwhelmingly `conv`, the
+# moment the basis narrows — so the live question is whether holding LONGER
+# earns. It cannot be answered backwards: this venue stores no index history
+# (so the conv BAR cannot be swept) and its finest candle is 1 MINUTE against a
+# ghost whose median hold is 1.9 minutes, so entry and exit land in the same
+# bar and half the trades reconstruct to a 0.0bps move — measured, with the
+# harness that refused, in scripts/study_band_kelly_horizon_2026-08-20.py.
+# The ONLY instrument at the right timescale and the right basis is this book:
+# it already reads the venue's book every 90s. So after each close it keeps
+# watching the coin and records what holding on WOULD have paid. Telemetry
+# ONLY — no position is opened, held or closed differently because of it; the
+# aggregate publishes so the ~mid-Sep grade has a measured answer instead of a
+# guess, and any future widening still owes the I19 price.
+HOLD_HORIZONS_S = (900.0, 1800.0, 3600.0, 7200.0)   # +15m, +30m, +1h, +2h
+HOLDWATCH_MAX = 64                          # bounded: never an unpruned map
+
+
+def holdwatch_extra(side, exit_px, px):
+    """What ONE more step of holding would have added, in %, on the mirror's
+    own side. Pure: no clock, no state. None when unpriceable."""
+    if not exit_px or not px or exit_px <= 0 or px <= 0:
+        return None
+    sign = 1.0 if side == "long" else -1.0
+    return 100.0 * sign * (px / exit_px - 1.0)
+
+
+def holdwatch_due(rec, now_ts):
+    """Horizons that have elapsed for `rec` and are not yet sampled."""
+    done = set(rec.get("done") or ())
+    return [h for h in HOLD_HORIZONS_S
+            if h not in done and now_ts >= rec.get("exit_ts", 0.0) + h]
 STATE_PRUNE_S = 2 * 86400
 
 # The measured roster — published every loop so the premise stays visible.
@@ -402,7 +436,7 @@ def sample_block(recent):
 
 
 def build_state(positions, recent, pend, noconv, enter_bps_eff, last_ts,
-                now=None, dip_cd=None):
+                now=None, dip_cd=None, holdwatch=None, hw_stats=None):
     """The persistence blob — ONE builder. `pend` is the ghost's confirm
     counter, `noconv` its non-convergence embargo; both are the ghost's own
     memory, so a restart cannot re-enter an event the ghost had retired.
@@ -410,11 +444,30 @@ def build_state(positions, recent, pend, noconv, enter_bps_eff, last_ts,
     return {"positions": positions, "recent": recent, "pend": pend,
             "noconv": noconv, "enter_bps_eff": enter_bps_eff,
             "dip_cd": dict(dip_cd or {}),
+            "holdwatch": list(holdwatch or []),
+            "hw_stats": dict(hw_stats or {}),
             "last_ts": last_ts,
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, recent, open_pnl, realized, enter_bps_eff):
+def holdwatch_block(hw_stats):
+    """Published every loop: mean EXTRA % the mirror would have earned by
+    holding on past its own exit, per horizon. REPORTED, never a bar — and
+    n is published beside every mean so a thin cell reads as thin (I15)."""
+    out = {"note": "extra %/trade from holding PAST the ghost's exit; "
+                   "telemetry only, no position differs because of it",
+           "horizons_s": list(HOLD_HORIZONS_S)}
+    for h in HOLD_HORIZONS_S:
+        b = (hw_stats or {}).get(str(int(h))) or {}
+        n = int(b.get("n") or 0)
+        out[f"+{int(h // 60)}m"] = {
+            "n": n,
+            "mean_pct": round(b["sum"] / n, 4) if n else None}
+    return out
+
+
+def build_extra(census, positions, recent, open_pnl, realized, enter_bps_eff,
+                hw_stats=None):
     """The published `extra` — ONE builder ((hj))."""
     return {
         "mode": "dry-run",
@@ -449,6 +502,7 @@ def build_extra(census, positions, recent, open_pnl, realized, enter_bps_eff):
         "scan": census,
         "roster": MIRROR_ROSTER,
         "sample": sample_block(recent),
+        "holdwatch": holdwatch_block(hw_stats),
     }
 
 
@@ -565,6 +619,8 @@ def main():
     pend = {}            # coin -> ghost confirm counter (CONFIRM_LOOPS)
     noconv = {}          # coin -> ts of ghost maxhold (embargo till basis clears)
     dip_cd = {}          # coin -> ts of last dipfade entry/exit (cooldown)
+    holdwatch = []       # closed positions still being watched (see above)
+    hw_stats = {}        # horizon -> {n, sum} of the extra-hold counterfactual
     enter_bps_eff = ghost.ENTER_BPS
     try:
         _saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
@@ -579,6 +635,11 @@ def main():
             if isinstance(_saved.get("noconv"), dict):
                 noconv = {str(k): float(v) for k, v in _saved["noconv"].items()
                           if isinstance(v, (int, float))}
+            if isinstance(_saved.get("holdwatch"), list):
+                holdwatch = _saved["holdwatch"][-HOLDWATCH_MAX:]
+            if isinstance(_saved.get("hw_stats"), dict):
+                hw_stats = {str(k): v for k, v in _saved["hw_stats"].items()
+                            if isinstance(v, dict)}
             if isinstance(_saved.get("dip_cd"), dict):
                 dip_cd = {str(k): float(v) for k, v in _saved["dip_cd"].items()
                           if isinstance(v, (int, float))}
@@ -637,6 +698,7 @@ def main():
                   "embargoed": 0, "ghost_slip": 0, "my_slip": 0,
                   "capped": 0, "opened": 0}
         devs_this_loop = []
+        mids_this_loop = {}
 
         for coin in universe:
             try:
@@ -648,6 +710,8 @@ def main():
                 bv = None
             r = (ref or {}).get(coin)
             dev_bps = None
+            if bv is not None:
+                mids_this_loop[coin] = bv["mid"]
             if bv is not None and r:
                 dev_bps = (bv["mid"] / r - 1.0) * 1e4
                 devs_this_loop.append(dev_bps)
@@ -709,6 +773,11 @@ def main():
                 if held.get("family") == "dip":
                     dip_cd[coin] = t0            # taker-shape re-entry cooldown
                 _close(bot_id, coin, held, reason, my_px, pnl, dev_now=dev_bps)
+                # keep watching this coin: what would holding on have paid?
+                holdwatch.append({"coin": coin, "side": held["side"],
+                                  "exit_px": my_px, "exit_ts": t0,
+                                  "family": held.get("family") or "snap",
+                                  "done": []})
                 print(f"[{now_iso()}] CLOSE {coin} {held['side']} after "
                       f"{held_h:.2f}h [{reason}] pnl {pnl:+.2f} | dev "
                       f"{dev_bps if dev_bps is None else round(dev_bps, 1)} | "
@@ -830,6 +899,24 @@ def main():
         # zeroed counters drop; a coin the loop could not SEE keeps its
         # counter (the ghost's own behavior — a blind loop is not a quiet
         # one). Age-capped so a delisted coin cannot hold a slot forever.
+        # ---- hold-watch sampling (telemetry only, changes no position) ----
+        for _rec in list(holdwatch):
+            _px = mids_this_loop.get(_rec.get("coin"))
+            for _h in holdwatch_due(_rec, t0):
+                if _px is None:
+                    break          # unpriceable this loop; try again next one
+                _x = holdwatch_extra(_rec.get("side"), _rec.get("exit_px"), _px)
+                if _x is None:
+                    break
+                _b = hw_stats.setdefault(str(int(_h)), {"n": 0, "sum": 0.0})
+                _b["n"] += 1
+                _b["sum"] += _x
+                _rec.setdefault("done", []).append(_h)
+        holdwatch = [r for r in holdwatch
+                     if len(r.get("done") or ()) < len(HOLD_HORIZONS_S)
+                     and t0 - r.get("exit_ts", 0.0) < max(HOLD_HORIZONS_S) * 2]
+        holdwatch = holdwatch[-HOLDWATCH_MAX:]
+
         pend = {c: n for c, n in pend.items() if n > 0}
         if len(pend) > 3 * ghost.UNIVERSE_N:
             pend = {}
@@ -864,7 +951,7 @@ def main():
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())
         equity = START_EQUITY + realized + open_pnl
         extra = build_extra(census, positions, recent, open_pnl, realized,
-                            enter_bps_eff)
+                            enter_bps_eff, hw_stats=hw_stats)
         try:
             store.publish(
                 bot_id, status="online", equity=equity,
@@ -880,7 +967,7 @@ def main():
         try:
             store.save_state(bot_id, build_state(
                 positions, recent, pend, noconv, enter_bps_eff, last_ts, t0,
-                dip_cd=dip_cd))
+                dip_cd=dip_cd, holdwatch=holdwatch, hw_stats=hw_stats))
         except Exception:  # noqa: BLE001
             pass
         last_ts = t0
@@ -1001,6 +1088,28 @@ def _selftest():
     st_f = fresh_scout({"updated": "2000-01-01T00:00:00+00:00",
                         "ttl_sec": 900}, 4102444800.0)
     assert st_f is None                                # stale scout = None
+
+    # 5b) HOLD-WATCH — the forward horizon instrument.
+    assert abs(holdwatch_extra("long", 100.0, 101.0) - 1.0) < 1e-9
+    assert abs(holdwatch_extra("short", 100.0, 101.0) + 1.0) < 1e-9
+    assert abs(holdwatch_extra("short", 100.0, 99.0) - 1.0) < 1e-9
+    assert holdwatch_extra("long", 0.0, 101.0) is None
+    assert holdwatch_extra("long", 100.0, None) is None
+    rec = {"exit_ts": 1000.0, "done": []}
+    assert holdwatch_due(rec, 1000.0) == []
+    assert holdwatch_due(rec, 1900.0) == [900.0]
+    rec["done"] = [900.0]
+    assert holdwatch_due(rec, 1900.0) == [], "a sampled horizon must not re-fire"
+    assert holdwatch_due(rec, 8200.0) == [1800.0, 3600.0, 7200.0]
+    hb = holdwatch_block({"900": {"n": 2, "sum": 3.0}})
+    assert hb["+15m"]["n"] == 2 and abs(hb["+15m"]["mean_pct"] - 1.5) < 1e-9
+    assert hb["+30m"]["n"] == 0 and hb["+30m"]["mean_pct"] is None
+    assert list(hb["horizons_s"]) == list(HOLD_HORIZONS_S)
+    _st = build_state({}, [], {}, {}, 60.0, 0.0, now=1.0,
+                      holdwatch=[{"coin": "X"}], hw_stats={"900": {"n": 1, "sum": 2.0}})
+    assert _st["holdwatch"] and _st["hw_stats"], "the watch must survive a restart"
+    assert "holdwatch" in build_extra({}, {}, [], 0.0, 0.0, 60.0,
+                                      hw_stats={"900": {"n": 1, "sum": 0.5}})
 
     # 6) Publish/state builders: contracts a consumer reads.
     ex = build_extra({"scanned": 1}, ps, [], 0.5, -0.25, 61.0)

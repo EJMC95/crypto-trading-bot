@@ -273,3 +273,45 @@ def test_venue_refusal_is_loud():
     raises = [n for n in ast.walk(fn) if isinstance(n, ast.Raise)]
     assert any("SystemExit" in ast.dump(r) for r in raises), (
         "main() must refuse a foreign VENUE with a loud SystemExit")
+
+def test_the_hold_watch_is_TELEMETRY_and_can_never_move_a_trade():
+    """[2026-08-20] The horizon instrument records what holding LONGER would
+    have paid, so the ~mid-Sep grade has a measured answer instead of a guess.
+    Its whole safety rests on one property: it is READ-ONLY with respect to
+    trading. If a decision function ever consults it, the book starts trading
+    its own counterfactual — so pin it by AST, over the functions that actually
+    decide, rather than by reading the code and trusting it."""
+    import ast as _ast
+    tree = _ast.parse((ROOT / "lighter_band_kelly_bot.py").read_text())
+    deciders = {"mirror_side", "ghost_side", "mirror_exit", "dip_exit",
+                "dip_ghost_takes", "_open_mirror", "_open_dip", "_price_pnl"}
+    banned = {"holdwatch", "hw_stats", "holdwatch_extra", "holdwatch_due",
+              "holdwatch_block", "HOLD_HORIZONS_S"}
+    seen = set()
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.FunctionDef) and node.name in deciders:
+            seen.add(node.name)
+            for sub in _ast.walk(node):
+                nm = None
+                if isinstance(sub, _ast.Name):
+                    nm = sub.id
+                elif isinstance(sub, _ast.Attribute):
+                    nm = sub.attr
+                assert nm not in banned, (
+                    f"{node.name}() references {nm!r} — a decision function "
+                    "must not read the hold-watch; that would make the book "
+                    "trade its own counterfactual")
+    assert seen == deciders, f"decider set drifted: missing {deciders - seen}"
+
+
+def test_the_hold_watch_is_bounded_and_survives_a_restart():
+    """Unbounded growth in a persisted map is how a state blob becomes the
+    thing that breaks the publish (I5's neighbour). And a watch that does not
+    survive a restart silently resets its sample every deploy."""
+    import lighter_band_kelly_bot as k
+    assert isinstance(k.HOLDWATCH_MAX, int) and 0 < k.HOLDWATCH_MAX <= 512
+    st = k.build_state({}, [], {}, {}, 60.0, 0.0, now=1.0,
+                       holdwatch=[{"coin": "X"}],
+                       hw_stats={"900": {"n": 1, "sum": 2.0}})
+    assert st["holdwatch"] == [{"coin": "X"}]
+    assert st["hw_stats"] == {"900": {"n": 1, "sum": 2.0}}
