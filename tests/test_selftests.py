@@ -136,6 +136,8 @@ SELFTEST_MODULES = [
     # "delete the stop" artifact its own first real run produced, grid-edge
     # detection, and the CALIBRATION gate — no reproduction of the observed
     # result, no recommendation, fail-closed when no baseline is supplied.
+    "scripts.audit_lever_measurability",
+    "scripts.session_state",
     "scripts.study_exit_sweep",
     "scripts.study_stop_reclaim",
     "scripts.study_trail_sweep",

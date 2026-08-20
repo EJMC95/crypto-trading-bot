@@ -127,7 +127,18 @@ a changelog that reads like progress. **State at the end of every pass what is
 carried, and start the next pass from that list** — not from whatever is most
 interesting. `audit_recurrence` is the measurement: a subject you keep returning
 to is a house you keep re-entering without finishing.
-  ENFORCED BY: `scripts/audit_recurrence.py::audit`, `scripts/audit_recurrence.py::MAX_ENTRIES`
+**[2026-08-20 (sg)] AND IT FINALLY HAS THE OTHER HALF.** `audit_recurrence`
+measures circling AFTER it happens; it never told a session where to START.
+*Operator: "can all of the works done today; every day be recorded properly so
+I am starting from where I left off every day rather than doing circles like an
+incompetent."* `scripts/session_state.py` is that record and it is DERIVED, not
+remembered: SHIPPED is read from git, STUCK from the live fleet, and every
+CARRIED row carries a `closes_when` **predicate evaluated against the repo** —
+so a finished item is reported CLOSE THIS and reddens CI, and an unfinished one
+cannot be dropped without deleting a row somebody has to justify. `HANDOFF.md`
+is its output. **Read it first; regenerate it last.** The CHANGELOG stays the
+long-form history — it is a fine record and a hopeless handoff.
+  ENFORCED BY: `scripts/audit_recurrence.py::audit`, `scripts/audit_recurrence.py::MAX_ENTRIES`, `scripts/session_state.py::carried_status`, `scripts/session_state.py::CARRIED`
 
 ### I12 · DOCTRINE IS LIVE OR IT IS ARCHAEOLOGY
 **Operator, 31-Jul:** *"we can't refer back to a doctrine that was established at
@@ -324,6 +335,38 @@ promotion**: the docket is read-only, junior to the go-live gate, and a
 directional survivor still owes the (hm) random-entry null before anything
 ACTS on it.
   ENFORCED BY: `scripts/winners_docket.py::bh_survivors`, `tests/autonomy/test_winners_docket.py::test_outcome_conditioned_exits_never_reach_the_referee`
+### I22 · A KNOB MUST RECORD THE QUANTITY IT CUTS, AND AN ACTUATOR MUST BE ABLE TO SEE WHAT IT STEERS
+**Operator, 20-Aug: *"Fix this never recorded issue across the fleet, I am so
+tired of going over the same trivial problem."*** They were right, and it is one
+problem in four costumes — all four found in a single session:
+* 🎫 `taker.brk_trail` / `taker.brk_sl` — the give-back and the adverse
+  excursion each lever cuts lived in memory and died at close, so two widenings
+  were WITHHELD while a harness reconstructed from hourly candles what the bot
+  already knew to the loop;
+* 🌾 carry's turnover floor — a stand-in for a cost DECLARED unmeasured and
+  left that way for weeks, gating the fleet's best-evidenced book to
+  `eligible: 0` of 228 scanned;
+* 🎫 `brk_range` / `max_hold_h` — steered by a tuner whose replay cannot fill
+  the lens, so restrict enacted at delta `$0.00` for free while expand could
+  never clear `MARGIN_HALF`: a **one-way ratchet**, and it had walked both to
+  their tightest setting;
+* 💸 the judge's paired bar — compared two arms running different ENTRY
+  policies, a 0.161pp handicap against a 0.50pp margin, and zero promotions to
+  real money in five weeks on the fleet's only path to more of it.
+
+**The single shape: the thing that decides is not measuring the thing it decides
+about.** Fixing instances is the circle; the class closes two ways. (1) Every
+registered lever needs a recorded quantity — a `QUANTITIES` spec naming the
+source and field — or a declaration with a reason and an owner. Measured the day
+this shipped: **45 of 64 levers had neither**, and **15 of the 21 book levers
+steered books that no longer trade.** (2) An actuator may not move a knob its
+own gate cannot observe; where it structurally cannot, the cage's restrictive
+end is pinned at the operator default so the blind path can only ever be
+neutral, never tightening. Both are RATCHETS, not bars — a guard that reddens
+the build on a pre-existing backlog gets exempted within a day and then guards
+nothing ((mz)'s lesson) — so the backlog may only shrink and a NEW instance
+fails immediately.
+  ENFORCED BY: `scripts/audit_lever_measurability.py::check`, `scripts/audit_lever_measurability.py::RATCHET`, `tests/autonomy/test_breakoutup_ratchet.py::BREAKOUTUP_LEVERS`
 <!-- INVARIANTS:END -->
 
 

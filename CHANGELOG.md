@@ -1,3 +1,96 @@
+## 2026-08-20 (sg) — THE NEVER-RECORDED CLASS, CLOSED FLEET-WIDE: 45 of 64 levers could not be measured, 15 steered books that no longer exist, and I11 finally has enforcement
+
+**Operator, three asks in one message:** *"Fix this never recorded issue across
+the fleet, I am so tired of going over the same trivial problem."* / *"And fix
+everything else I've said too"* / *"can all of the works done today; every day be
+recorded properly so I am starting from where I left off every day rather than
+doing circles like an incompetent."*
+
+All three are the same complaint from different angles: **the fleet keeps
+re-deriving things it never wrote down.**
+
+### 1 · THE CLASS, NAMED — I22
+
+`(sf)` found four defects in one session and I fixed them one at a time. They
+are one defect:
+
+| | the shape |
+|---|---|
+| 🎫 `taker.brk_trail` / `brk_sl` | the give-back and adverse excursion each lever cuts lived in memory and **died at close** — two widenings WITHHELD while a harness reconstructed from hourly candles what the bot knew to the loop |
+| 🌾 carry's turnover floor | a stand-in for a cost **declared unmeasured** and left that way for weeks, gating the best-evidenced book to `eligible: 0` of 228 |
+| 🎫 `brk_range` / `max_hold_h` | steered by a tuner whose replay **cannot fill the lens**: restrict enacts at delta `$0.00` for free, expand can never clear `MARGIN_HALF` — a one-way ratchet, already at both tightest ends |
+| 💸 the judge's paired bar | compared two arms on **different entry policies** — 0.161pp handicap against a 0.50pp margin, zero promotions in five weeks |
+
+**The thing that decides is not measuring the thing it decides about.** Fixing
+instances is the circle. I22 names it, and `scripts/audit_lever_measurability.py`
+enforces it.
+
+### 2 · AND MEASURED FLEET-WIDE, WHICH IS THE PART THAT WAS NEVER DONE
+
+    64 registered levers
+    19 with a QUANTITIES spec       <- can be profiled at all
+    30 with none, undeclared        <- the backlog
+    15 steering a RETIRED book      <- worse than unmeasurable: pure noise
+
+**Fifteen of the twenty-one `lighter-books` levers point at books that no longer
+trade** — every `barnes.*`, `disloc.*`, `index.*` and `trend.*`. The registry had
+become a museum, and every organ reasoning about headroom was reasoning over it.
+All fifteen are now DECLARED with the single env var that would revive their
+book (kept rather than deleted: a retirement reversible in one variable, whose
+book returns without its levers, is the registered-but-inert failure arriving by
+the back door). **That count is now ZERO**, so the ratchet fails on the *next*
+dead lever instead of hiding it among fifteen.
+
+**BOTH ARMS ARE RATCHETS, NOT BARS**, and that is deliberate: `(mz)` already
+learned that a guard reddening the build on a pre-existing backlog gets a
+blanket exemption within a day and then guards nothing. The pile may only
+shrink; a NEW instance fails on the push that adds it.
+
+Stated against my own guard: it checks a measurement path EXISTS, not that
+anyone walked it. A spec pointing at a field nothing writes still reads
+measurable here — `audit_lever_authority --measure` grades that.
+
+### 3 · I11 FINALLY HAS ENFORCEMENT — AND IT IS DERIVED, NOT REMEMBERED
+
+I11 has said the right thing since 31-Jul — *"State at the end of every pass what
+is carried, and start the next pass from that list"* — and was **the one
+invariant with no executable enforcement**, so it was observed by memory and
+therefore not at all. `audit_recurrence` measures circling *after* it happens; it
+never told a session where to START.
+
+`scripts/session_state.py` → `HANDOFF.md`. Almost nothing in it is typed:
+
+* **SHIPPED** is read from git — commits since local midnight (Sydney), with the
+  changelog letters they carry.
+* **CARRIED** is the one hand-written list, and every row carries a
+  `closes_when` **predicate evaluated against the repo**. A finished item is
+  reported **CLOSE THIS** and reddens CI; an unfinished one cannot be dropped
+  without deleting a row somebody has to justify. **The list cannot rot in
+  either direction** — which is the failure mode of every to-do list this repo
+  has tried.
+* Each row names its **owner**: `session` (just do it) or `OPERATOR` (a decision
+  this repo may not make). An operator item that reads like session work is how
+  a decision gets silently re-litigated instead of made.
+
+A predicate that RAISES degrades to open and labels itself. A broken check that
+silently finishes work would be the worst thing this file could produce, and it
+is the `(po)` inspects-nothing failure aimed squarely at the list that decides
+what happens next.
+
+The CHANGELOG stays the long-form history — it is a fine record and a hopeless
+handoff.
+
+### VERIFICATION
+
+Eight mutations verified red across the two guards — **and three SURVIVED first
+and were closed**: an unmapped lever prefix was silently skipped rather than
+failing (a whole new book's levers could have entered the backlog under the
+ratchet); the shipped list could return a hard-coded empty list and pass, because
+the test asserted only its SHAPE and "nothing shipped" is indistinguishable from
+a quiet day; and the render could drop the owner label entirely. Both new jobs
+are wired into `changelog-check.yml` with their negative fixtures, and both
+selftests are registered.
+
 ## 2026-08-20 (sf) — 🌾 THE FLEET'S BEST BOOK WAS IDLE AT 0 OF 12 SLOTS BEHIND A GATE THAT MEASURED THE WRONG THING: turnover is not fill cost, and on an $80 clip it is not even correlated with it
 
 **Operator, this session: *"do not continue on a risk and constraint and choking
