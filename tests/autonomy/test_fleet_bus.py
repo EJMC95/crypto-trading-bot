@@ -50,10 +50,20 @@ def test_stake_multiplier_reads_the_published_value():
     assert fleet_bus.stake_multiplier("freqtrade-mum", "long-momo", NOW) == 0.7
 
 
-def test_stake_multiplier_clamps_below_half_to_floor():
+def test_stake_multiplier_clamps_below_the_floor():
+    """[(si)] the floor is 1/6.7, not 0.5 — 6.7x either way. A cut BELOW the
+    floor still clamps, and a cut inside the new range now passes where it
+    used to be flattened to 0.5, which is the whole point of the deeper rungs:
+    the brain could always SEE the difference between a bad tag and a
+    catastrophic one and had no way to say it."""
     _prime("brain-stake-mults", _fresh(
-        mults={"b": {"t": {"mult": 0.1}}}))
-    assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_FLOOR == 0.5
+        mults={"b": {"t": {"mult": 0.001}}}))
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_FLOOR
+    _prime("brain-stake-mults", _fresh(
+        mults={"b": {"t": {"mult": 0.25}}}))
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == 0.25, (
+        "a cut inside the new range was flattened — the floor is clamping "
+        "work the brain is now allowed to do")
 
 
 def test_stake_multiplier_clamps_above_one_to_ceiling():
@@ -69,12 +79,14 @@ def test_stake_multiplier_clamps_above_one_to_ceiling():
     _prime("brain-stake-mults", _fresh(
         mults={"b": {"t": {"mult": fleet_bus.MULT_CEIL}}}))
     assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_CEIL
-    assert fleet_bus.MULT_CEIL == 2.0, (
-        "the ceiling moved without this contract being re-read — (sh) set it "
-        "to 2.0 to match brain_stats' new top tier; a change here must say why")
+    assert fleet_bus.MULT_CEIL == 6.7, (
+        "the ceiling moved without this contract being re-read — (si) set it "
+        "to 6.7 at Eamon's explicit ask; a change here must say why")
+    assert abs(fleet_bus.MULT_FLOOR * fleet_bus.MULT_CEIL - 1.0) < 1e-12, (
+        "6.7x EITHER WAY: the floor must stay the ceiling's reciprocal")
     _prime("brain-stake-mults", _fresh(
         mults={"b": {"t": {"mult": 9.0}}}))
-    assert fleet_bus.stake_multiplier("b", "t", NOW) == 2.0, "over-ceiling clamps"
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == 6.7, "over-ceiling clamps"
     _prime("brain-stake-mults", _fresh(
         mults={"b": {"t": {"mult": 1.25}}}))
     assert fleet_bus.stake_multiplier("b", "t", NOW) == 1.25, "expand step passes"

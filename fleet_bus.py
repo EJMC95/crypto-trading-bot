@@ -32,7 +32,10 @@ _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 # [0.5, 2.0] since (sh) — reductions as before, boosts only on the v3 mirror bars
 # (Wilson LOWER bound + t, full n floor, 3-run streak — bot_learn/
 # brain_stats EXP_*). Neutral 1.0 on any doubt.
-MULT_FLOOR = 0.5
+# [2026-08-20 (si)] 6.7x EITHER WAY (Eamon, explicitly). The floor is DERIVED
+# from the ceiling rather than typed, so "either way" is true by construction
+# and the next move needs one edit, not two that can drift apart.
+MULT_FLOOR = 1.0 / 6.7
 # [2026-07-21 TWO-WAY MULTS — operator: "brain needs to be able to widen
 # too"] Ceiling raised 1.0 -> 1.5: the brain may now publish EXPAND mults
 # (1.25/1.5) for tags proving out on the v3 mirror bars (Wilson LOWER
@@ -47,7 +50,7 @@ MULT_FLOOR = 0.5
 # survived). Leaving the clamp at 1.5 would have made that tier emit-and-be-
 # swallowed, which is the registered-but-inert failure with extra steps.
 # SHADOW ONLY: no live bot reads a brain multiplier.
-MULT_CEIL = 2.0
+MULT_CEIL = 6.7
 
 
 def _now_utc(current_time):
@@ -89,7 +92,7 @@ def is_fresh(payload, current_time):
 def stake_multiplier(bot, entry_tag, current_time=None):
     """The brain's L4 per-(bot, enter_tag) stake multiplier — TWO-WAY since
     21-Jul (operator: "brain needs to be able to widen too"), clamped to
-    [MULT_FLOOR, MULT_CEIL] = [0.5, 2.0] since (sh).
+    [MULT_FLOOR, MULT_CEIL] = [1/6.7, 6.7] since (si) — 6.7x either way.
 
     Published by bot_learn.py to bot_state 'brain-stake-mults'. Reduce side
     (0.5/0.75): a tag's negative expectancy clears the trade-count floor AND
@@ -842,16 +845,31 @@ if __name__ == "__main__":
     _mults = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
               "mults": {"freqtrade-avo-maria-lshadow":
                         {"long-swing-dip": {"mult": 1.25},
+                         # [(si)] 2.0 and 0.25 are now INSIDE the range, so
+                         # they no longer test the clamp — they test that the
+                         # clamp stopped flattening them, which is the change.
+                         # The clamp itself needs values outside 6.7x either
+                         # way.
+                         "long-deep": {"mult": 0.25},
+                         "long-huge": {"mult": 99.0},
                          "long-big": {"mult": 2.0},
-                         "long-bad": {"mult": 0.25}}}}
+                         "long-bad": {"mult": 0.0001}}}}
     _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-swing-dip",
                             _now) == 1.25, "expand mult passes the clamp"
+    assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-huge",
+                            _now) == MULT_CEIL == 6.7, \
+        "over-ceiling clamps to MULT_CEIL (6.7 since (si))"
+    # …and the two the clamp USED to flatten now pass through untouched
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-big",
-                            _now) == MULT_CEIL == 2.0, \
-        "over-ceiling clamps to MULT_CEIL (2.0 since (sh))"
+                            _now) == 2.0, "2.0x was flattened by the old ceiling"
+    assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-deep",
+                            _now) == 0.25, "0.25x was flattened by the old floor"
+    # [(si)] 6.7x EITHER WAY — the floor is the ceiling's reciprocal, derived
+    # rather than typed, so the two can never drift apart.
+    assert abs(MULT_FLOOR * MULT_CEIL - 1.0) < 1e-12, (MULT_FLOOR, MULT_CEIL)
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-bad",
-                            _now) == 0.5, "under-floor clamps to 0.5"
+                            _now) == MULT_FLOOR, "under-floor clamps"
     # [2026-07-30 FLEET UNIVERSE] scout accessors: shape, ordering, the
     # volume floor, delist exclusion, and the fail-safe EMPTY that every
     # caller must read as "keep my configured list".

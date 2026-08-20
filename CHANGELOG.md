@@ -1,3 +1,63 @@
+## 2026-08-20 (si) — THE BRAIN'S RANGE REACHES 6.7x, EITHER WAY: it could always SEE the difference between a bad tag and a catastrophic one, and had no way to say it
+
+**Eamon, explicitly: "The brain needs to be able to go to 6.7x specifically
+either way now."** Done, in both directions, with the floor DERIVED from the
+ceiling so "either way" is true by construction rather than by two numbers that
+can drift apart.
+
+### THE LADDER, AND WHY IT IS DATA NOW
+
+    expand   1.25   1.5   2.0   3.0   4.5   6.7
+    reduce   0.75   0.5   1/3   1/4.5  1/6.7
+    clamp    [1/6.7, 6.7]        MULT_FLOOR = 1.0 / MULT_CEIL
+
+The rungs above 2.0x and below 0.5x are a TABLE rather than another six
+if-blocks, for one reason: the ladder must be walked **strongest-bar first** or
+a tag that clears 6.7x is silently handed 1.25x, and an ordering bug in a
+hand-written chain is invisible. As data, "monotone in strictness" and "checked
+strongest-first" are one assertion each, and both are pinned. Every existing
+rung keeps its exact bars; the new ones are strictly harder on all four axes
+(post_wr, Wilson bound, `t`, and the decayed-evidence floor).
+
+### WHAT IT IMMEDIATELY CHANGED — ON THE PROTECTIVE SIDE, WHICH I DID NOT EXPECT
+
+The brain's own selftest fixtures moved, and the movement is the point:
+
+    an ordinary bleeder      t= -9.16  n_eff 37.3   was 0.5x  ->  now 1/3
+    a catastrophic bleeder   t=-13.95  n_eff 46.0   was 0.5x  ->  now 1/4.5
+
+**Before today both got exactly HALF.** The brain could see that one was far
+worse than the other and had no vocabulary for it. Now the worse one is cut
+deeper — and that relationship is asserted, because if the two ever collapse
+back to one value the ladder has stopped discriminating and the range is
+decoration. Neither reaches 1/6.7: n_eff 37 and 46 fall short of the 60 that
+rung requires, which is the evidence floor doing its job rather than a bug.
+
+### WHAT REACHING THE TOP WOULD COST, SAID OUT LOUD
+
+Only the FAMILY books and the Parliament consume a brain multiplier — 🌾 carry,
+🎫 the taker and ⚖️ Counterweight do not, and **no live bot does** (verified in
+`(sh)`, not quoted). For a family book that is $50 × 5 slots = $250 gross at
+1.0x and **$1,675 on a $1,000 book at 6.7x, about 1.7× equity**. The Parliament
+re-checks its own `MAX_NOTIONAL` against the REAL multiplied clip, so it is
+already guarded. And the drawdown bar interacts directly: %-drawdown scales with
+the stake, so a book above **15/6.7 = 2.24%** measured maxDD would breach the
+15% go-live bar at full size. Neither of those is a reason not to have the
+range — they are what the range MEANS, and they belong written beside it.
+
+### AND IT SHIPS INERT, WHICH IS WHAT A CEILING IS
+
+The top rung needs **t ≥ 8.0 on n_eff ≥ 80**. This fleet's best measured book in
+its whole history is 🧮 Hull at t=+3.92 on n=50, with 🌾 carry at t=3.10 on
+n=101. Nothing is remotely close, and nothing moves today. That is the
+difference between a ceiling and a setting: it is where evidence COULD take a
+book, not a value anybody chose.
+
+One asymmetry found and closed on the way: 🏛️ the Parliament read its CEILING
+from the bus and had its floor **hardcoded at 0.3**, so those books would have
+been able to express the raise and not the matching cut — the brain's protective
+side quietly weaker there than everywhere else. Both ends come from the bus now.
+
 ## 2026-08-20 (sh) — THE CEILING BECOMES A MEASUREMENT: six bars asked "don't be bad", none asked how high, and capital sat in INVERSE proportion to measured edge
 
 **Operator: "The discussion of the floor is too often had, where the

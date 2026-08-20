@@ -108,14 +108,51 @@ def test_each_axis_alone_keeps_a_book_off_the_top_step(weaken):
             and d["t"] >= B.EXP_HARD_T) or weaken.get("t") or weaken.get("n_eff")
 
 
-def test_the_top_step_is_checked_BEFORE_the_one_below():
-    """Order matters: checked weakest-first, a book that clears 2.0x would be
-    handed 1.5x and the tier would be dead on arrival."""
-    import inspect
-    src = inspect.getsource(B)
-    i_max, i_hard = src.index("return 2.0, ev"), src.index("return 1.5, ev")
-    assert i_max < i_hard, (
-        "the 1.5x branch is evaluated first, so nothing can ever reach 2.0x")
+def test_the_ladders_are_walked_STRONGEST_BAR_FIRST():
+    """Order matters: walked weakest-first, a tag that clears the top rung
+    would be handed the bottom one and the whole range would be dead on
+    arrival. [(si)] Asserted on the TABLES rather than on source positions —
+    the rungs above 2.0x and below 0.5x are data now, and ordering is a
+    property of the data."""
+    ups = [r[0] for r in B.EXPAND_LADDER]
+    assert ups == sorted(ups, reverse=True), ups
+    downs = [r[0] for r in B.REDUCE_LADDER]
+    assert downs == sorted(downs), downs
+    # and every bar tightens as the rung gets stronger, on every axis
+    for i in range(len(B.EXPAND_LADDER) - 1):
+        a, b_ = B.EXPAND_LADDER[i], B.EXPAND_LADDER[i + 1]
+        assert a[1] > b_[1] and a[2] > b_[2] and a[3] > b_[3] and a[4] > b_[4], (a, b_)
+    for i in range(len(B.REDUCE_LADDER) - 1):
+        a, b_ = B.REDUCE_LADDER[i], B.REDUCE_LADDER[i + 1]
+        assert a[1] < b_[1] and a[2] < b_[2] and a[3] < b_[3] and a[4] > b_[4], (a, b_)
+
+
+def test_the_range_reaches_6_7x_EITHER_WAY():
+    """Eamon, explicitly: "The brain needs to be able to go to 6.7x
+    specifically either way now." Both ends, and the floor DERIVED from the
+    ceiling so "either way" is true by construction rather than by two numbers
+    that can drift apart."""
+    import fleet_bus as _F
+    assert B.EXPAND_LADDER[0][0] == 6.7, B.EXPAND_LADDER[0]
+    assert abs(B.REDUCE_LADDER[0][0] - 1.0 / 6.7) < 1e-12, B.REDUCE_LADDER[0]
+    assert _F.MULT_CEIL == 6.7
+    assert abs(_F.MULT_FLOOR * _F.MULT_CEIL - 1.0) < 1e-12, (
+        "the floor is not the ceiling's reciprocal — 'either way' is no longer "
+        f"true: [{_F.MULT_FLOOR}, {_F.MULT_CEIL}]")
+    # the clamp can express both ends, and still binds beyond them
+    assert max(_F.MULT_FLOOR, min(_F.MULT_CEIL, 6.7)) == 6.7
+    assert max(_F.MULT_FLOOR, min(_F.MULT_CEIL, 99.0)) == 6.7
+    assert max(_F.MULT_FLOOR, min(_F.MULT_CEIL, 0.001)) == _F.MULT_FLOOR
+
+
+def test_the_top_rung_ships_inert_and_that_is_the_point():
+    """A ceiling is where evidence COULD take a book, not a value anybody set.
+    The top rung needs t>=8.0 on n_eff>=80; this fleet's best measured book is
+    🧮 Hull at t=+3.92 on n=50 and 🌾 carry at t=3.10 on n=101."""
+    top_t, top_n = B.EXPAND_LADDER[0][3], B.EXPAND_LADDER[0][4]
+    assert top_t >= 8.0 and top_n >= 80
+    for book_t in (3.92, 3.10, 2.65, 1.88):        # the fleet's best, measured
+        assert book_t < top_t, book_t
 
 
 def test_no_live_book_reads_a_brain_multiplier():
@@ -178,3 +215,48 @@ def test_no_live_book_reads_a_brain_multiplier():
     assert not offenders, (
         "a REAL-MONEY module reaches the brain's stake multipliers, so this "
         f"2.0x tier would double a live clip: {offenders}")
+
+
+def test_every_consumer_reads_BOTH_ends_from_the_bus():
+    """Caught by a SURVIVING mutation. 🏛️ the Parliament read its CEILING from
+    `fleet_bus` and had its floor hardcoded at 0.3 — so when the range went to
+    6.7x either way, those books could have expressed the raise and not the
+    matching cut, making the brain's PROTECTIVE side quietly weaker there than
+    everywhere else. An asymmetric clamp is the worst kind: it is invisible
+    until the day it matters, and the day it matters is a losing one.
+    """
+    import ast
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    offenders = []
+    for path in list(root.glob("*.py")) + list((root / "parliament").glob("*.py")):
+        try:
+            tree = ast.parse(path.read_text())
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            # a `min(<ceil>, x)` paired with a `max(<literal>, ...)` is the
+            # shape: the ceiling comes from the bus and the floor does not
+            if not (isinstance(node, ast.Call)
+                    and getattr(node.func, "id", "") == "max"):
+                continue
+            txt = ast.unparse(node)
+            # The first draft required MULT_CEIL on the SAME line and a
+            # SURVIVING mutation walked straight past it: the Parliament
+            # aliases the ceiling into `_ceil` a line earlier, so the literal
+            # never appears in the clamp itself. Scope to files that reference
+            # the ceiling AT ALL, then flag any `max(<number>, min(...))` —
+            # the shape of a clamp whose two ends come from different places.
+            if "MULT_CEIL" not in path.read_text():
+                continue
+            if not (len(node.args) == 2
+                    and isinstance(node.args[1], ast.Call)
+                    and getattr(node.args[1].func, "id", "") == "min"):
+                continue
+            first = node.args[0]
+            if isinstance(first, ast.Constant) and isinstance(
+                    first.value, (int, float)):
+                offenders.append(f"{path.name}:{node.lineno}: {txt[:70]}")
+    assert not offenders, (
+        "a consumer clamps the brain's multiplier with a bus CEILING and a "
+        f"hardcoded FLOOR — the range is not 'either way' there: {offenders}")
