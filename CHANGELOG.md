@@ -212,7 +212,57 @@ done and the number that supports it; where risk is real, publish it on the row
 instead of re-litigating it. Declared UNENFORCED — tone cannot be checked by a
 static guard, and a guard that tried would be the same mistake in a new costume.
 
-Pinned by `tests/autonomy/test_avo_cap_slots.py` (45 tests). Selftest unchanged
+### The basket was ONE BET, and the cause was the scan order
+
+With gross_x at 5x the leverage is not the exposure — the BASKET it multiplies
+is. Measured on the held book: **QQQ/SPY/NVDA = N_eff 1.18, rho +0.775.** Three
+names, one bet, five times over.
+
+**THE CAUSE IS STRUCTURAL, not luck.** The entry loop scanned
+`list(COINS) + list(NONCRYPTO_UNIVERSE)` IN LIST ORDER and took the first
+qualifying signal, so 29 crypto names got first refusal on every slot and the
+diversifiers sat last in line by construction. That is `(hl)`'s finding on 📊
+Index Rider reaching a second book, word for word: *"the entry loop iterates
+SYMBOLS in order with incumbents holding slots, it would starve the LAST-listed
+diversifiers and RAISE correlation."*
+
+**THE FIX IS THE SCAN ORDER, NOT THE ENTRY PATH.** `diversified_order` offers
+the candidate that most reduces the held basket's correlation first. Every gate,
+veto, cap and sizing rule is untouched — for any SINGLE candidate the real-money
+entry path is byte-identical — so this changes WHICH qualifying signal fills a
+slot and never whether one is taken. **It therefore costs no expectancy**, which
+is what makes it different from every "more trades" candidate `(hl)` refuted.
+
+Driven against the live tape: the scan now offers **WTI first instead of BTC**,
+and that one position takes the basket from **N_eff 1.18 -> 2.87** (rho +0.775
+-> +0.132). 2.4x the effective diversification, free.
+
+**IT COSTS NOTHING AT THE VENUE**: `CandleCache` is one governed fetch per
+(coin, tf) per CLOSED candle shared across books, and the entry loop already
+called `cache.get` for these symbols — the correlations ride bars we had.
+
+`extra.leverage` now also publishes `n_eff` / `basket_rho` / `vol_target_here`,
+so "five held names" and "one held bet" stop being the same byte-string — which
+is how the book sat at N_eff 1.18 with nobody able to ask.
+
+FAIL-SAFE IS THE CONTRACT: an unmeasurable pair returns **None, never 0.0** —
+zero would read as *perfectly diversifying* and would both jump that name to the
+front of the queue and inflate N_eff, crediting independence nobody measured.
+Dark returns, an empty book, or junk return the list UNCHANGED, i.e. exactly
+today's behaviour. An enhancement is never a dependency.
+
+**TWO DEFECTS IN MY OWN TESTS, both found by the mutation harness:**
+* **M2 SURVIVED**: deleting the `CORR_MIN_OVERLAP` floor passed everything,
+  because my short-overlap case used CONSTANT values and the variance guard
+  rejected it instead — so nothing tested the floor. Closed with a short-but-
+  VARYING pair, the case where only the floor can refuse.
+* **M5 NEVER RAN** — the mutation text did not match the source, and the harness
+  said so rather than reporting a pass. A mutation that does not execute is not
+  a pass; the arithmetic it should have covered (`n/(1+(n-1)*rho)` must DIVIDE,
+  or three copies of one trade read as three independent bets) is now pinned.
+Round now **7/7 killed**.
+
+Pinned by `tests/autonomy/test_avo_cap_slots.py` (45 tests) and `tests/autonomy/test_avo_diversification.py` (18 tests, 7/7 mutations). Selftest unchanged
 and green at the default — this moves no order until `AVO_GROSS_X` is set.
 
 ## 2026-08-20 (sq) — "FIX THE STALE BOTS": NEITHER STALLED BOOK WAS BROKEN, AND THE REAL DEFECT WAS THAT NOTHING THEY PUBLISHED COULD SAY SO
