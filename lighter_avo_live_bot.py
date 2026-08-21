@@ -258,6 +258,125 @@ def cap_slots(clip, cap, slots):
     return max(0, min(n, int(k // c)))
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-21 (sr)] DIVERSIFICATION — Eamon: "diversify and addition is great",
+# "i want this bot to find a way so leverage can be used".
+#
+# THE MEASUREMENT that motivates all of it (Lighter's own 200d daily tape,
+# N_eff = n/(1+(n-1)*mean_pairwise_rho) over a 5-position hold):
+#     5 crypto majors                rho +0.845  N_eff 1.14
+#     QQQ,SPY,NVDA,TSLA,IWM          rho +0.661  N_eff 1.37   <- what it held
+#     one per asset class            rho +0.155  N_eff 3.09
+# A basket of 3 US index proxies is ~ONE BET. The SAME leverage over a spread
+# basket carries far less joint-stop risk, and spreading costs NO expectancy —
+# it changes WHICH qualifying signal fills a slot, never whether one is taken.
+#
+# WHY THE BOOK CONCENTRATED, and it is structural rather than bad luck: the
+# entry loop scans `list(COINS) + list(NONCRYPTO_UNIVERSE)` IN LIST ORDER and
+# takes the first qualifying signal, so 29 crypto names get first refusal on
+# every slot and the diversifiers are last in line by construction. That is
+# exactly the (hl) finding on 📊 Index Rider — *"the entry loop iterates SYMBOLS
+# in order with incumbents holding slots, it would starve the LAST-listed
+# diversifiers and RAISE correlation"* — reaching a second book.
+#
+# THE FIX IS THE SCAN ORDER, NOT THE ENTRY PATH. Every gate, veto, cap and
+# sizing rule below is untouched; only the sequence in which candidates are
+# offered changes. That keeps the real-money entry path byte-identical in
+# behaviour for any single candidate, which is the whole point.
+#
+# IT COSTS NOTHING AT THE VENUE: `CandleCache` is one governed fetch per
+# (coin, tf) per CLOSED candle shared across books, and the entry loop already
+# calls `cache.get` for these symbols, so the correlations ride bars we have.
+CORR_MIN_OVERLAP = 30      # bars of shared history before a pair is measurable
+CORR_LOOKBACK = 180        # bars used per symbol
+
+
+def _bar_returns(bars, n=CORR_LOOKBACK):
+    """{bar_ts: simple return} from the newest `n` bars. {} when unusable —
+    never a partial series a correlation could be computed off."""
+    if not bars:
+        return {}
+    ts, cs = bars.get("t") or [], bars.get("c") or []
+    if len(ts) != len(cs) or len(cs) < CORR_MIN_OVERLAP + 1:
+        return {}
+    out = {}
+    for i in range(max(1, len(cs) - n), len(cs)):
+        prev = cs[i - 1]
+        try:
+            if prev:
+                out[ts[i]] = float(cs[i]) / float(prev) - 1.0
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
+    return out
+
+
+def _pair_corr(a, b):
+    """Pearson correlation over the SHARED timestamps. None when the overlap is
+    too short or either leg is flat — unknown, never 0.0, which would read as
+    'perfectly diversifying' and is the one error that would buy leverage."""
+    days = sorted(set(a) & set(b))
+    if len(days) < CORR_MIN_OVERLAP:
+        return None
+    xs = [a[d] for d in days]
+    ys = [b[d] for d in days]
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    vx = sum((v - mx) ** 2 for v in xs)
+    vy = sum((v - my) ** 2 for v in ys)
+    if vx <= 0 or vy <= 0:
+        return None
+    cov = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
+    return cov / ((vx ** 0.5) * (vy ** 0.5))
+
+
+def basket_n_eff(rets, names):
+    """(N_eff, mean_rho) for a basket — the correlation-aware count of
+    INDEPENDENT bets (I22: market count is not bet count). (None, None) when
+    nothing is measurable, so a dark read is never credited as independence."""
+    names = [n for n in names if rets.get(n)]
+    if len(names) < 2:
+        return (float(len(names)) if names else None), None
+    cs = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            c = _pair_corr(rets[names[i]], rets[names[j]])
+            if c is not None:
+                cs.append(c)
+    if not cs:
+        return None, None
+    rho = sum(cs) / len(cs)
+    n = len(names)
+    denom = 1.0 + (n - 1) * rho
+    return (n / denom if denom > 0 else float(n)), rho
+
+
+def diversified_order(universe, held, rets):
+    """`universe` reordered so the candidate that most REDUCES the held
+    basket's correlation is offered first.
+
+    FAIL-SAFE IS THE WHOLE CONTRACT: anything unmeasurable keeps its original
+    relative position and sorts AFTER the measured ones, and an empty/held-less
+    /dark read returns the list unchanged — i.e. exactly today's behaviour. A
+    correlation we could not measure must never jump a name up the queue.
+    """
+    try:
+        held = [h for h in (held or []) if rets.get(h)]
+        if not held or not universe:
+            return list(universe)
+        scored = []
+        for i, sym in enumerate(universe):
+            r = rets.get(sym)
+            cs = [c for h in held
+                  if (c := _pair_corr(r, rets[h])) is not None] if r else []
+            # unmeasured -> (1, original index): after every measured name,
+            # original order preserved among themselves.
+            scored.append(((0, sum(cs) / len(cs), i) if cs else (1, 0.0, i), sym))
+        scored.sort(key=lambda kv: kv[0])
+        return [s for _, s in scored]
+    except Exception:  # noqa: BLE001 — ordering is an enhancement, never a dependency
+        return list(universe)
+
+
 LIVE_CLIP_LEVER = "live.avo.clip_scale"
 
 
@@ -571,6 +690,9 @@ def main(_ctx=None, once=False):
         notional_cap_skips = 0
         coin_vetoed = {}
         live_scale = 1.0
+        # [(sr)] None, not 1.0 — the halt/kill paths publish before the scan
+        # computes these, and "not measured yet" must not read as "one bet".
+        held_n_eff = held_rho = None
 
         def _persist_day(dse, day):
             state["day_start"] = {"day": day, "equity": dse}
@@ -663,6 +785,17 @@ def main(_ctx=None, once=False):
                     "deployed_at_full": (round(_eff_clip * S.max_open, 2)
                                          if _eff_clip else None),
                     "all_slots_stop_pct": round(gross_x() * abs(float(S.stoploss)), 4),
+                    # [(sr)] THE HELD BASKET'S MEASURED INDEPENDENCE. n_eff ~1
+                    # means the slots are one bet wearing five names and the
+                    # leverage above is riding a single position; n_eff near the
+                    # slot count means it is genuinely spread. `vol_target_here`
+                    # is what THIS basket's independence would support — the gap
+                    # to `set` is the risk being taken, published not argued.
+                    "n_eff": (round(held_n_eff, 3) if held_n_eff else None),
+                    "basket_rho": (round(held_rho, 3) if held_rho is not None
+                                   else None),
+                    "vol_target_here": (vol_target_gross_x(held_n_eff)
+                                        if held_n_eff else None),
                     # worst maintenance-margin fraction across the books this
                     # universe trades (NVDA/WTI/XCU = 300bps), measured off the
                     # venue's own orderBookDetails 21-Aug. Read per book, never
@@ -1054,8 +1187,23 @@ def main(_ctx=None, once=False):
                       and not halt_blind
                       and clip is not None and clip >= MIN_CLIP_USD
                       and t0 >= locked_until)
+        # [(sr)] Returns for everything we might hold or take, off bars the
+        # cache already holds (one governed fetch per closed candle, shared).
+        # Built even when entries are shut, because `n_eff` describes the HELD
+        # basket and the row must report it every loop, not only on scan days.
+        _rets = {}
+        for _s in set(list(pos) + list(universe)):
+            try:
+                _rets[_s] = _bar_returns(cache.get(_s, S.tf))
+            except Exception:  # noqa: BLE001 — telemetry never breaks the loop
+                _rets[_s] = {}
+        held_n_eff, held_rho = basket_n_eff(_rets, list(pos))
+
         if entries_ok:
-            for sym in universe:
+            # THE ONLY BEHAVIOURAL CHANGE: the sequence candidates are offered
+            # in. Every gate, veto, cap and sizing rule below is untouched, so
+            # for any SINGLE candidate this path is byte-identical to before.
+            for sym in diversified_order(universe, list(pos), _rets):
                 if len(pos) >= S.max_open:
                     break
                 if sym in pos or sym in meta:
