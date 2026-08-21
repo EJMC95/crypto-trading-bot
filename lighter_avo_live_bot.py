@@ -137,12 +137,109 @@ def parse_ts(s):
     return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
 
 
+#: [2026-08-21 (sr)] GROSS LEVERAGE. Eamon, 21-Aug: *"increase clip size,
+#: whatever we can do to let this fly, training wheels off, lets make it so avo
+#: can use leverage to its advantage"* — on the same day he funded the book from
+#: $62.93 to $230.70.
+#:
+#: `clip = equity * GROSS_X / max_open`, so at full occupancy the book's
+#: deployed notional is exactly `GROSS_X * equity`. GROSS_X = 1.0 reproduces the
+#: previous behaviour byte-for-byte, so this is inert until it is set.
+#:
+#: WHAT LEVERAGE DOES AND DOES NOT BUY, stated because I22 is emphatic and this
+#: is the seventh time the fleet has been asked: it multiplies mean and sd
+#: ALIKE, so `t` is INVARIANT — leverage moves NO book closer to the go-live
+#: gate, and six prior studies rejected it on exactly that ground. What it does
+#: move is DOLLARS and DRAWDOWN, together, in both directions. It is admissible
+#: here on the one route I22 leaves open — as the OUTPUT of a drawdown budget
+#: rather than an appetite — and the ceiling below is that budget.
+#: Parsed defensively AT IMPORT: a bare `float(os.environ[...])` here raises
+#: ValueError on a typo and takes the REAL-MONEY book down before `main()` runs
+#: — the module-level crash `gross_x()`'s own NaN handling can never reach.
+#: Caught by feeding the ladder "abc" while writing this. Unparseable degrades
+#: to 1.0 (today's behaviour), never to a guess.
+try:
+    GROSS_X = float(os.environ.get("AVO_GROSS_X", "1.0"))
+except (TypeError, ValueError):
+    GROSS_X = 1.0
+
+#: THE CEILING IS DERIVED, NOT CHOSEN — and it is derived from this book's OWN
+#: two numbers, so it re-derives if either moves instead of going stale.
+#:
+#: Every slot carries `S.stoploss` (-10%). This book's held names are QQQ/SPY/
+#: NVDA — US equity beta, so `N_eff` is ~ONE BET (I22: 8 crypto markets measure
+#: 1.35 independent bets; three index names are worse). "Every slot stops in the
+#: same move" is therefore the CENTRAL case for this book, not the tail, and the
+#: budget must be sized against it rather than against an independence the book
+#: does not have.
+#:
+#: All-slots-stop costs `GROSS_X * |stoploss|` of equity. The go-live gate FAILS
+#: a book whose max drawdown exceeds 15% — the bar that governs this book's own
+#: promotion — so `GROSS_X * 0.10 <= 0.15` gives **1.5x**. Above it the book is
+#: leveraged out of the gate it is trying to pass, which is not "flying", it is
+#: the (gv) stop-vs-gate defect bought deliberately.
+#:
+#: Clamped at the CONSUMER, never trusted from env: an out-of-cage value is a
+#: bug, not authority (the registry-cage rule).
+GROSS_X_MAX = round(0.15 / abs(float(S.stoploss)), 4)
+
+
+def gross_x():
+    """The effective, clamped gross multiplier. Floors at 1.0 — this lever
+    exists to deploy idle balance, and shrinking the clip is the live clip
+    scale's job (`_clip_scale_now`), which stays restrict-only and senior."""
+    try:
+        g = float(GROSS_X)
+    except (TypeError, ValueError):
+        return 1.0
+    if g != g or g in (float("inf"), float("-inf")):   # NaN / inf
+        return 1.0
+    return max(1.0, min(GROSS_X_MAX, g))
+
+
 def clip_usd(equity):
-    """Per-entry clip sized to the ACTUAL balance: equity / slots. None when
-    equity is unreadable — a live book does not size off a guess."""
+    """Per-entry clip sized to the ACTUAL balance: equity * gross_x / slots.
+    None when equity is unreadable — a live book does not size off a guess."""
     if equity is None or equity <= 0:
         return None
-    return equity / float(S.max_open)
+    return equity * gross_x() / float(S.max_open)
+
+
+def cap_slots(clip, cap, slots):
+    """How many of `slots` the operator's notional cap can still FUND once every
+    slot is sized at `clip` — i.e. the steady state, not today's occupancy.
+
+    [2026-08-21 (sr)] A DEPOSIT CAN BUY FEWER BETS, SILENTLY. Eamon added
+    $167.76 to 🙏 Avo; equity $62.93 -> $230.70 and `clip = equity/max_open`
+    re-sized every FUTURE entry $15.73 -> $57.68, exactly as designed. But
+    `FREQTRADE_AVO_MARIA_MAX_NOTIONAL` is a FIXED DOLLAR figure and stayed at
+    $200, and admission is `open_notional + add <= cap`: 3 slots x $57.68 =
+    $173.02 fits, the 4th needs $230.70 and is refused. The book settles at
+    3 of 4 and **$57.68 of the new balance is never deployed**.
+
+    It is invisible three ways, which is why this is published rather than
+    merely fixed: (1) `open_trades` reads 3 of a declared `max_open` 4 exactly
+    as it does on a quiet day; (2) the refusal is DELAYED — held positions are
+    priced at their OWN entry clip ((hl) `open_notional`), so while the three
+    legacy $7.68 positions live a 4th entry still fits and the wall only
+    arrives as they roll over; (3) a clip-vs-cap mismatch has no natural
+    trigger — nothing fires, so nothing is counted. A standing arithmetic
+    census is the only shape that can report a constraint that has not bitten
+    YET. Same class as the carried `farmer-cap-collapses-slots-under-conviction`
+    item, reached from the other direction: there a bigger CLIP collapses
+    slots, here a bigger BALANCE does.
+
+    Reported, never enforced — SafetyRails caps are operator-only, so this
+    names the constraint and the operator moves it (I8: name the object that
+    can be acted on). None when either input is unknown, never a guess.
+    """
+    try:
+        c, k, n = float(clip), float(cap), int(slots)
+    except (TypeError, ValueError):
+        return None
+    if not (c > 0) or not (k > 0) or n <= 0:
+        return None
+    return max(0, min(n, int(k // c)))
 
 
 LIVE_CLIP_LEVER = "live.avo.clip_scale"
@@ -174,10 +271,21 @@ def _clip_scale_now():
     sizing, never another book's verdict.
 
     RESTRICT-ONLY, and that is structural rather than a policy: the clamp is
-    min(1.0, ...), so this lever can only ever SHRINK Avo's clip. With
-    clip = equity/max_open and stake_mult <= 1.0, gross notional can never
-    exceed account equity — the book is 1.00x by construction and no lever
-    reaches past it. The registry cage (hi = 1.0) mirrors this exactly."""
+    min(1.0, ...), so this lever can only ever SHRINK Avo's clip. The registry
+    cage (hi = 1.0) mirrors this exactly.
+
+    [2026-08-21 (sr)] CORRECTED IN PLACE per I12 — this paragraph used to end
+    *"gross notional can never exceed account equity — the book is 1.00x by
+    construction and no lever reaches past it"*, and `AVO_GROSS_X` makes that
+    FALSE. A safety sentence is a claim about behaviour ((sp)'s lesson), so it
+    is restated rather than left to rot:
+      * THIS lever is still restrict-only and still cannot reach past 1.0x. That
+        half was never about the clip formula; it is the `min(1.0, ...)` clamp.
+      * The book is NO LONGER 1.00x by construction. Gross at full occupancy is
+        `GROSS_X * equity`, bounded by `GROSS_X_MAX` (a drawdown budget derived
+        from this book's own stop and the 15% gate bar — see GROSS_X), and then
+        by the operator-only SafetyRails notional cap, which is senior to both
+        and is what actually refuses the order."""
     try:
         import fleet_tuning as tuning
         return max(0.25, min(1.0, float(
@@ -444,6 +552,7 @@ def main(_ctx=None, once=False):
         fleet_long_veto = False
         brain_gated_tags = []
         brain_expand_refused = brain_floored = 0
+        notional_cap_skips = 0
         coin_vetoed = {}
         live_scale = 1.0
 
@@ -495,6 +604,10 @@ def main(_ctx=None, once=False):
                          status="online", extra_extra=None):
             pnl = (eq - base_eq - cap_adj) \
                 if (eq is not None and base_eq is not None) else None
+            # [(sr)] ONE effective clip, read by both `clip_usd` and `cap_slots`
+            # — the cap census must describe the clip the row publishes, and a
+            # second copy of this expression is how the two drift apart.
+            _eff_clip = ((clip_usd(eq) or 0.0) * _clip_scale_now()) if eq else None
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
                 "strategy": "SwingDipV1 (live slot swap 13-Aug)",
@@ -505,8 +618,22 @@ def main(_ctx=None, once=False):
                 # off the row was shown the unscaled number (correct only
                 # while the board holds the lever at 1.0). Same clamped read
                 # as the entry path; fail-open 1.0 keeps a dark rail honest.
-                "clip_usd": (round((clip_usd(eq) or 0.0) * _clip_scale_now(),
-                             2) if eq else None),
+                "clip_usd": (round(_eff_clip, 2) if _eff_clip else None),
+                # [(sr)] how many of `max_open` the CAP can fund once every slot
+                # sits at this clip. `cap_slots < max_open` means the operator's
+                # fixed-dollar cap — not the signal — is what holds this book
+                # below its declared capacity, and it is the ONLY field that
+                # says so before the refusal happens. See cap_slots().
+                "cap_slots": cap_slots(_eff_clip, rails.max_notional,
+                                       S.max_open),
+                # [(sr)] the book's gross leverage, PUBLISHED — the effective
+                # multiplier and the drawdown-derived ceiling it is clamped to.
+                # A book running above 1x must say so on its own row: every
+                # downstream grader (maxDD, the allocation claim, the ceiling)
+                # reads dollars, and dollars now carry a multiplier that is not
+                # visible anywhere else.
+                "gross_x": round(gross_x(), 4),
+                "gross_x_max": GROSS_X_MAX,
                 "held": {c: (meta.get(c) or {}).get("tag")
                          for c in live_pos},
                 "policy": _policy(),
@@ -529,6 +656,10 @@ def main(_ctx=None, once=False):
                     # happened.
                     "brain_expand_refused": brain_expand_refused,
                     "brain_floored": brain_floored,
+                    # [(sr)] entries the notional cap actually refused this
+                    # loop. Zero on a book whose cap has room, so non-zero
+                    # always means the cap turned a signal away.
+                    "notional_cap_skips": notional_cap_skips,
                     "coin_veto": {c: coin_vetoed[c]
                                   for c in sorted(coin_vetoed)},
                     "live_clip_scale": live_scale,
@@ -774,6 +905,7 @@ def main(_ctx=None, once=False):
         # made about real money, and a decision nobody can see is the class
         # (so) was written to close.
         brain_expand_refused = brain_floored = 0
+        notional_cap_skips = 0
         cycle_admitted = 0
 
         # ---- manage venue truth: every held position, every cycle ----------
@@ -984,6 +1116,10 @@ def main(_ctx=None, once=False):
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
                 if not rails.notional_ok(open_ntl, stake):
+                    # [(sr)] counted, not just logged — a log line dies with the
+                    # container and no organ reads it. `cap_slots` below says the
+                    # cap WILL bite; this says it DID.
+                    notional_cap_skips += 1
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} NOTIONAL_CAP_SKIP "
                            f"(deployed ${open_ntl:.2f} + ${stake:.2f} > cap "
                            f"${rails.max_notional})")
