@@ -72,6 +72,30 @@ def test_a_flat_leg_reports_none_not_a_correlation():
     assert A._pair_corr(flat, moving) is None
 
 
+def test_the_overlap_floor_is_what_rejects_a_short_but_VARYING_pair():
+    """CAUGHT BY MUTATION M2 of the (sr) round, which SURVIVED the first suite.
+    Deleting the `CORR_MIN_OVERLAP` guard passed every test I had written,
+    because my short-overlap case used constant values and the VARIANCE guard
+    happened to reject it instead. So nothing actually tested the floor.
+
+    A handful of shared bars can produce a large, meaningless correlation — the
+    classic small-sample artifact — and on this book a spurious -1 would rocket
+    a name to the front of the entry queue. This pair VARIES, so the variance
+    guard passes it and only the overlap floor can refuse it."""
+    n = A.CORR_MIN_OVERLAP - 1
+    a = {i: (0.02 if i % 2 else -0.015) for i in range(n)}
+    b = {i: (-0.02 if i % 2 else 0.015) for i in range(n)}
+    assert len(set(a.values())) > 1 and len(set(b.values())) > 1, \
+        "this pair must VARY, or the variance guard rejects it and the floor "\
+        "is untested — the exact hole M2 exposed"
+    assert A._pair_corr(a, b) is None, \
+        f"a {n}-bar overlap is below CORR_MIN_OVERLAP and must be unmeasurable"
+    # and one bar more is enough to measure
+    a[n] = 0.02
+    b[n] = -0.02
+    assert A._pair_corr(a, b) is not None
+
+
 def test_correlation_recovers_the_obvious_cases():
     r = _synth({"A": _walk(160, UP), "B": _walk(160, UP),
                 "C": _walk(160, [-x for x in UP])})
@@ -105,6 +129,20 @@ def test_n_eff_reports_none_when_nothing_is_measurable():
     """A dark read must never be credited as independence."""
     assert A.basket_n_eff({}, ["A", "B"]) == (None, None)
     assert A.basket_n_eff({"A": {}, "B": {}}, ["A", "B"]) == (None, None)
+
+
+def test_n_eff_actually_divides_by_the_correlation_term():
+    """Pins the arithmetic itself, not just its direction. `n/(1+(n-1)*rho)`
+    must DIVIDE — returning a bare `n` would report 3 independent bets for
+    three copies of the same trade, which is the overstatement I22 names in
+    `fleet_risk` (1/HHI over distinct symbols reporting 9.0 for 9 correlated
+    longs). Mutation M5 of the (sr) round never ran; this is what it should
+    have covered."""
+    same = _synth({k: _walk(160, UP, 0.002, i)
+                   for i, k in enumerate(("A", "B", "C"), 1)})
+    ne, rho = A.basket_n_eff(same, ["A", "B", "C"])
+    assert ne == pytest.approx(3.0 / (1.0 + 2.0 * rho), abs=1e-6)
+    assert ne < 3.0, "correlated names must NOT read as n independent bets"
 
 
 def test_the_vol_target_follows_the_measured_basket():
