@@ -923,7 +923,17 @@ STRATEGIES = [
                     style="oversold-1h"),
     MomoBreakout("freqtrade-dad", tf="4h", stoploss=-0.12, max_open=4,
                  style="momo-breakout-4h"),
-    SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=4,
+    # [21-Aug (sr)] 4 -> 5, MEASURED not guessed (Eamon: "size it to 6 slots").
+    # This literal is LIVE clip geometry (clip = equity * gross_x / max_open),
+    # so adding slots divides the same gross budget into smaller pieces. Both
+    # arms' own ledgers say the book is SIGNAL-limited, not slot-limited:
+    # concurrent-hold time is avg 2.24 live / 2.41 shadow, the live arm sits at
+    # its 4-slot ceiling 21.7% of the time (real starvation), and the SHADOW —
+    # which has run at 6 all along — reached 5 for 4.5% of its life and
+    # **6 never, in 17 episodes**. So the 5th slot is reachable supply and the
+    # 6th is a permanently empty divisor that would cost ~28% of deployed
+    # capital ($181 -> $130 expected). 5 captures the reachable slot and stops.
+    SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=5,
              style="swing-dip-4h"),
     DayTraderGated("freqtrade-georgia", tf="15m", stoploss=-0.05, max_open=5,
                    style="daytrader-15m"),

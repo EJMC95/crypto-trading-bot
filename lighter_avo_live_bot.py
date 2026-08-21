@@ -1206,7 +1206,12 @@ def _selftest():
     # identity, a name check stays green against a hand-rolled copy).
     assert S is next(x for x in fam.STRATEGIES if x.bot == BOT), \
         "S must BE lighter_family_bot's configured instance"
-    assert S.max_open == 4 and abs(S.stoploss - (-0.10)) < 1e-9
+    # [(sr)] 4 -> 5 slots, measured (see the registry comment in
+    # lighter_family_bot). The STOP pin stays -0.10 and is now doubly
+    # load-bearing: GROSS_X_MAX is DERIVED from it (0.15/|stoploss|), so a stop
+    # widened without re-reading that derivation silently raises the leverage
+    # ceiling on a real-money book.
+    assert S.max_open == 5 and abs(S.stoploss - (-0.10)) < 1e-9
 
     captured = {"paper": [], "orders": [], "state": {}, "published": [],
                 "halts": []}
@@ -1352,8 +1357,16 @@ def _selftest():
         coin, is_long, size = v.opens[0]
         assert is_long is True
         stake = size * _mk_bars("dip")["c"][-1]
-        assert abs(stake - 62.80 / 4) < 1.0, \
-            f"clip must be equity/max_open (~15.70), got {stake:.2f}"
+        # [(sr)] READ the geometry, never retype it — this asserted `62.80 / 4`
+        # and broke the moment the slot count moved, which is the "a retyped
+        # constant is a constant that drifts" rule landing on the test itself.
+        # Now it derives from the same two sources the bot sizes off, so it
+        # follows a deliberate slot/leverage change and still fails a wrong one.
+        _want = 62.80 * gross_x() / S.max_open
+        assert abs(stake - _want) < 1.0, \
+            (f"clip must be equity * gross_x / max_open "
+             f"(~{_want:.2f} at {S.max_open} slots, {gross_x()}x), "
+             f"got {stake:.2f}")
         _pub = captured["published"][-1][1]
         ev = _pub["extra"]["entry_vetoes"]
         assert ev["coin_veto"] == {} and ev["fleet_long_veto"] is False

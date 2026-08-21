@@ -19,16 +19,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import lighter_family_bot as fam  # noqa: E402
 
 
-def test_the_declared_avo_literal_is_live_surface_and_stays_4():
+def test_the_declared_avo_literal_is_live_surface_and_stays_5():
     """The live bot divides real equity by this number. A casual literal
-    edit here would double live slots and halve the live clip on a real
+    edit here would add live slots and shrink the live clip on a real
     account — the exact (ne) kill-class. The shadow step rides the env
-    override, never this line."""
+    override, never this line.
+
+    [21-Aug (sr)] PIN MOVED 4 -> 5, deliberately and with the measurement in
+    the registry comment: both arms are SIGNAL-limited (avg 2.24/2.41
+    concurrent), the live arm sits at its ceiling 21.7% of the time, and the
+    shadow reached 5 but never 6 in 17 episodes. The guard's PURPOSE is
+    unchanged — it still fails an unexplained edit, which is what makes moving
+    it a decision somebody has to justify rather than a diff nobody notices."""
     avo = [s for s in fam.STRATEGIES if s.bot == "freqtrade-avo-maria"]
     assert len(avo) == 1
-    assert avo[0].max_open == 4, (
+    assert avo[0].max_open == 5, (
         "the SwingDip avo literal moved — that is LIVE clip geometry "
-        "(equity/max_open); shadow capacity belongs to "
+        "(equity * gross_x / max_open); shadow capacity belongs to "
         "FAMILY_SHADOW_MAX_OPEN_OVERRIDES, applied in main() only")
 
 
@@ -39,7 +46,7 @@ def test_import_does_not_apply_the_override():
     service."""
     for s in fam.STRATEGIES:
         if s.bot == "freqtrade-avo-maria":
-            assert s.max_open == 4
+            assert s.max_open == 5
 
 
 def test_override_parser_defaults_to_the_measured_avo_step():

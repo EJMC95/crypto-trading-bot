@@ -108,6 +108,56 @@ The restrict-only half still holds; the 1.00x half is replaced by the real bound
    exactly: a lever registered, documented, published and INERT. Closed by tests
    that drive the clip at 1.25/1.4/1.5; round now **5/5 killed**.
 
+### Slots 4 → 5: the ask was 6, and the book's own ledger refused it
+
+**Eamon: *"size it to 6 slots, configure for leverage."*** Measured before
+shipping, and the measurement INVERTED the request — recorded because a refusal
+with evidence is a valid output and this one cost 28% of working capital.
+
+Occupancy by TIME HELD, swept off both arms' own episode ledgers:
+
+| concurrent | live arm (4 slots) | shadow arm (**6 slots**) |
+|---|---|---|
+| 4 held | **21.7%** | 32.0% |
+| 5 held | — (capped) | 4.5% |
+| 6 held | — | **never** |
+| avg held | **2.24** | **2.41** |
+
+**The shadow has run at 6 slots all along and has never filled more than 5 in
+17 episodes.** So this book is SIGNAL-limited at ~2.4 concurrent, not
+slot-limited — and because `clip = equity * gross_x / max_open`, adding slots
+divides one fixed gross budget into smaller pieces that mostly sit unused:
+
+```
+4 slots  clip $80.74  avg deployed 2.24 x 80.74 = $181
+5 slots  clip $64.59  avg deployed 2.41 x 64.59 = $156
+6 slots  clip $53.83  avg deployed 2.41 x 53.83 = $130   <- 28% LESS
+```
+
+**Slot count cannot add dollars — it can only slice them.** Total gross is
+bounded at `GROSS_X_MAX * equity` by the 15% drawdown bar, and that bound is
+INDEPENDENT of `max_open` (all-slots-stop costs `max_open * (equity*g/max_open)
+* |stop|` = `equity * g * |stop|`). The only lever that adds deployed dollars is
+`gross_x`, which is why it exists and why it is capped by a measurement.
+
+**Shipped 5** (Eamon's call on the numbers): it captures the 5th slot the shadow
+demonstrably reaches, and stops short of a 6th that has never once occurred and
+would be a permanently empty divisor. The live arm sitting at its ceiling 21.7%
+of the time is real starvation, so this is not a no-op. Live geometry now:
+**clip $64.59 · gross $322.97 = 1.40x equity · worst-case DD 14.0% · cap_slots
+5 of 5.** Era NOT reset — capacity is ordinary tuning per (hc).
+
+Three retyped constants fell out and are fixed rather than re-pinned: the
+selftest asserted `62.80 / 4` (now derives `62.80 * gross_x() / S.max_open`
+from the same sources the bot sizes off), and `test_family_shadow_capacity`'s
+literal pin moved 4 → 5 with the measurement attached — the guard's purpose is
+unchanged, so an UNEXPLAINED edit still fails, which is what makes moving it a
+decision somebody has to justify. `pnl_dashboard`'s Avo blurb still read
+*"shadow $50 × 4 slots; LIVE clips = equity÷4"* and is corrected in place (I12).
+The `-0.10` stop pin is now DOUBLY load-bearing and says so: `GROSS_X_MAX` is
+derived from it, so widening the stop without re-reading that derivation would
+silently raise the leverage ceiling on a real-money book.
+
 Pinned by `tests/autonomy/test_avo_cap_slots.py` (42 tests). Selftest unchanged
 and green at the default — this moves no order until `AVO_GROSS_X` is set.
 
