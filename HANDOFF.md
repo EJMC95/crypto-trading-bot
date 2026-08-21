@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-21 19:02 Sydney (09:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-21 19:36 Sydney (09:36Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,12 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (55 commit(s), entries (rt), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp), (sq), (sr))
+## Shipped today (59 commit(s), entries (rt), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp), (sq), (sr))
 
+- `70ac1e6` [deploy-live-taker] Avo: diversified scan order, published N_eff, 5x leverage (sr)
+- `dee1139` Close the (sr) diversification mutation survivor + the mutation that never ran
+- `b55c703` Avo: diversified scan order + published N_eff (sr, pre-mutation)
+- `1c1bcb7` Regenerate the handoff after the 5x leverage pass (sr)
 - `0554bb7` [deploy-live-taker] Avo leverage 5x, and the diversification finding that earns it (sr)
 - `5f54383` Regenerate the handoff after the (sr) Avo work
 - `fb724f5` [deploy-live-taker] Avo 4 -> 5 slots: the ask was 6, the ledger refused it (sr)
