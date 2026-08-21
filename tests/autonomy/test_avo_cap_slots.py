@@ -190,6 +190,32 @@ def test_gross_x_of_one_reproduces_the_pre_leverage_clip_exactly():
     assert A.clip_usd(eq) == pytest.approx(eq / A.S.max_open)
 
 
+@pytest.mark.parametrize("g", [1.25, 1.4, 1.5])
+def test_the_multiplier_actually_REACHES_the_clip(g, monkeypatch):
+    """THE HEADLINE FEATURE, AND MY SUITE DID NOT TEST IT.
+
+    Mutation M4 of the (sr) round — deleting `gross_x()` from `clip_usd`, i.e.
+    leverage configured and silently never applied — SURVIVED five tests. Every
+    existing case pinned the gross_x=1.0 default, where the mutant and the real
+    code are identical by construction, so nothing exercised the one line the
+    whole feature lives on. The (sp) shape exactly: a lever that is registered,
+    documented, published and INERT.
+    """
+    monkeypatch.setattr(A, "GROSS_X", g)
+    eq = LIVE_EQUITY_AFTER
+    assert A.clip_usd(eq) == pytest.approx(eq * g / A.S.max_open)
+    assert A.clip_usd(eq) > eq / A.S.max_open, \
+        "a gross_x above 1.0 must produce a BIGGER clip, or it does nothing"
+
+
+def test_leverage_reaches_the_published_row_too(monkeypatch):
+    """And the deployed gross must equal GROSS_X * equity at full occupancy —
+    the claim the drawdown budget is derived from."""
+    monkeypatch.setattr(A, "GROSS_X", 1.4)
+    eq = LIVE_EQUITY_AFTER
+    assert A.clip_usd(eq) * A.S.max_open == pytest.approx(1.4 * eq)
+
+
 def test_the_row_publishes_the_leverage_it_is_running_at():
     """Dollars now carry a multiplier. Every downstream grader — maxDD, the
     allocation claim, the ceiling — reads dollars, so a book above 1x that does
