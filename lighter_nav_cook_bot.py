@@ -376,7 +376,11 @@ def offuniverse_census(rows, universe, lo_bps, hi_bps, min_vol_m,
         out["in_band"] += 1
         vol = r.get("vol_m")
         vol = float(vol) if isinstance(vol, (int, float)) else None
-        cls = class_of(sym) if class_of else None
+        try:
+            cls = class_of(sym) if class_of else None
+        except Exception:      # noqa: BLE001
+            cls = None         # unknown class -> falls through to thin/other,
+                               # never raises out of a REPORTING helper
         if cls in excluded:
             out["preipo"] += 1
             why = "preipo"
@@ -682,16 +686,31 @@ def main():
         # I18: the OFF-UNIVERSE band view. Fail-safe — a dark bus yields [] and
         # the block reports zeros rather than vanishing, because a MISSING block
         # would reintroduce the very ambiguity it exists to remove.
+        # [2026-08-21] THE WHOLE BLOCK IS INSIDE THE TRY, not just the fetch.
+        # Shipped 20-Aug with only the `scout_prem_outliers()` call guarded —
+        # but `class_of` below calls `fleet_bus.venue_class()`, which does I/O,
+        # and it sat OUTSIDE. A REPORTING block must never be able to take a
+        # trading loop down, and this one could: nav-cook stopped publishing at
+        # the deploy that carried it and was dark for 11.5h while every other
+        # service in the same run stayed fresh. Whatever the proximate throw,
+        # the shape was mine — a census is worth exactly zero trades, so it
+        # gets zero authority to interrupt one.
         try:
             _rows = (fleet_bus.scout_prem_outliers()
                      if fleet_bus is not None else [])
-        except Exception:      # noqa: BLE001
-            _rows = []
-        _offuni = offuniverse_census(
-            _rows, universe, GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
-            class_of=((lambda s: fleet_bus.venue_class(s))
-                      if (fleet_bus is not None and not ALLOW_PREIPO) else None),
-            excluded=tuple(EXCLUDED_CLASSES))
+            _offuni = offuniverse_census(
+                _rows, universe, GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                class_of=((lambda s: fleet_bus.venue_class(s))
+                          if (fleet_bus is not None and not ALLOW_PREIPO)
+                          else None),
+                excluded=tuple(EXCLUDED_CLASSES))
+        except Exception as _exc:      # noqa: BLE001
+            # Zeros, never absent: a MISSING block reintroduces the ambiguity
+            # this exists to remove, so it reports "I could not look" instead.
+            print("[%s] offuniverse census failed (reporting only, book "
+                  "unaffected): %s" % (now_iso(), _exc))
+            _offuni = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0,
+                       "top": [], "error": True}
 
         equity = START_EQUITY + realized + open_pnl
         try:
@@ -885,6 +904,20 @@ def _selftest():
                               MIN_VOL_M)["in_band"] == 0
     assert offuniverse_census([{"junk": 1}, 7, None], [], GATE_LO_BPS,
                               GATE_HI_BPS, MIN_VOL_M)["in_band"] == 0
+
+    # A REPORTING HELPER MAY NEVER RAISE. [2026-08-21] The 20-Aug ship guarded
+    # only the bus FETCH; `class_of` does I/O and sat outside it, so a census
+    # could interrupt a trading loop. nav-cook went dark for 11.5h at that
+    # deploy while all 18 other services in the same run stayed fresh. This
+    # arm drives the exact path: a class_of that throws must degrade the coin
+    # to "unknown", never propagate.
+    def _boom(_s):
+        raise RuntimeError("venue_class exploded")
+    _r = offuniverse_census([{"sym": "AAA", "prem_bps": 50.0, "vol_m": 9.0}],
+                            [], GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                            class_of=_boom, excluded=(7,))
+    assert _r["in_band"] == 1 and _r["other"] == 1, (
+        "a throwing class_of must degrade to unknown, not raise: %r" % (_r,))
 
     # REPORT-ONLY, structurally. This block names coins the book refuses ON
     # PURPOSE; if it ever reached a gate it would become a widening of two

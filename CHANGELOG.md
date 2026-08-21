@@ -1,3 +1,63 @@
+## 2026-08-21 (ss) — I TOOK 🧭 nav-cook DOWN FOR 11.5 HOURS WITH A REPORTING BLOCK, AND THE ROW SAID `online` THE WHOLE TIME
+
+`(sq)` shipped an off-universe census so a stalled book could explain itself.
+**It stalled the book.** nav-cook's last publish is the deploy that carried it;
+it was dark for **11.5h** (`age_sec 41500`) while **all 18 other services in the
+same deploy run stayed fresh** (9–239s). One service changed in that run and it
+was the one I edited.
+
+### The defect, and it is a shape not a typo
+I guarded the bus FETCH and not the WORK:
+
+```python
+try:
+    _rows = fleet_bus.scout_prem_outliers()   # guarded
+except Exception:
+    _rows = []
+_offuni = offuniverse_census(                 # NOT guarded
+    _rows, universe, ...,
+    class_of=lambda s: fleet_bus.venue_class(s))   # ...and this does I/O
+```
+
+`class_of` calls `fleet_bus.venue_class()`, which loads a bus key. It sat
+outside the try, inside the trading loop, with `restartPolicy=always` turning
+any throw into a crash-loop that publishes nothing.
+
+**A REPORTING BLOCK MAY NEVER INTERRUPT A TRADING LOOP.** A census is worth
+exactly zero trades, so it gets zero authority to stop one. Both halves fixed:
+the whole block is inside the try with a zeros-plus-`error: true` fallback
+(zeros, never ABSENT — a missing block reintroduces the ambiguity it exists to
+remove), and `class_of` failures degrade the coin to unknown INSIDE the helper.
+Pinned by an arm that drives a throwing `class_of`; mutation-verified red.
+
+### THE PART THAT SHOULD HAVE CAUGHT IT, AND DID NOT
+**The row published `status: "online"` for 11.5 hours while the process was
+dead.** `status` is written by the publisher, so it describes the last loop that
+RAN, not the process — the I1 shape exactly: a frozen row and a healthy one are
+byte-identical if you read anything but the clock. What actually surfaced it was
+`audit_code_currency`, which printed
+`[ROW STALE 11.5h — the verdict describes its LAST publish, not a running
+process (I1)]` beside its verdict. **That annotation is the only reason this was
+found**, and it was found by a currency audit, not by anything watching liveness.
+
+That is worth stating plainly: the fleet's staleness detection did not page. The
+row looked online, the deploy log said `OK: 'nav-cook-shadow' deployed`, and CI
+was green. **Three green signals and a dead book.**
+
+### What I got wrong in diagnosis, recorded because it nearly sent me elsewhere
+`audit_code_currency` reported nav-cook `BEHIND-OWN 1` on `c7003d444` — the
+commit BEFORE mine — which reads as "my code never landed". It is consistent
+with the opposite: the stamp describes the last SUCCESSFUL PUBLISH, so a
+container that crashes on boot leaves the PREVIOUS build's stamp standing
+forever. **A build stamp is a receipt for the last publish, not for the running
+image**, and on a crash-looping service those two diverge permanently. I nearly
+concluded the deploy had failed.
+
+I also verified the code imports and runs clean locally before blaming it —
+which it does. Local `--selftest` cannot reach this: the throw needs a live bus,
+and the selftest has none. That is the gap the new arm closes by injecting the
+failure instead of waiting for it.
+
 ## 2026-08-21 (sr) — EAMON FUNDED 🙏 AVO 3.7x AND THE CAP WOULD HAVE TURNED THAT INTO FEWER BETS; PLUS LEVERAGE, ON A DRAWDOWN BUDGET RATHER THAN AN APPETITE
 
 **Eamon, 21-Aug:** *"avo marias equity increase... maximise what we can do with
