@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-20 23:02 Sydney (13:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-21 15:20 Sydney (05:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,17 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (71 commit(s), entries (ro), (rp), (rq), (rr), (rs), (rt), (ry), (rz), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp))
+## Shipped today (51 commit(s), entries (rt), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp), (sq), (sr))
 
+- `fc9ada7` Credit (sq)'s quote to Eamon, not the role — the ratchet was red on main
+- `0365707` [deploy-live-taker] Avo: cap census + leverage on a derived drawdown budget (sr)
+- `f5b89dc` Close the (sr) mutation survivor: nothing tested that leverage reaches the clip
+- `bf45934` Avo: the cap census the deposit needed, and leverage on a derived drawdown budget (sr)
+- `91f52fc` Fix the stale bots: neither was broken, and nothing they published could say so (sq)
+- `c7003d4` Merge PR #213: the gross bound failed a second way — the call pattern, not the call (sp)
+- `15b5809` The gross bound failed a SECOND way: the call pattern, not the call (sp)
+- `30c5cae` [deploy-live] Merge PR #210: the brain reaches every book, and the rails now trim instead of refusing (sk–sp)
+- `f9d6387` Correct the live numbers against the live rows, and name the sharper finding (sp)
 - `7f34d28` Close the class the rail guard could not see: worst-case gross per book (sp)
 - `78ffde3` The rails now actually dispose: trim, not refuse — and the brain's lookup is atomic (sp)
 - `4119336` Merge remote-tracking branch 'origin/main' into claude/fleet-wide-bugs-improvements-64qta3
@@ -113,35 +122,6 @@ _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~1
 - `85fb26b` nav-cook's founding claim reproduces (n=226, +0.373%, t=+2.61), the conflicting replay is explained as a confirm-convention difference, and the harness is finally committed (sb)
 - `44c7703` a funding book was graded on its price return alone: Counterweight reads 3.6x worse than it performs (sb)
 - `1bd0644` Daily review (ro): nav-cook shipped a gate 3.3x looser than the one it was graded on
-- `ace5112` Close the citation-drift blind spot, and refute the consumer bar my own note called right (rz)
-- `547257e` merge origin/main: (rh)->(rz), and REFUTE the bar my own note called right
-- `12d27ba` Merge PR #205: four declared enforcements were inert — the organ death recorder, I2's amnesia check, I10's gate key, and 39 dead assertions (ry)
-- `4596e50` renumber the (rs) changelog entry to (ry) (letter taken on main mid-flight)
-- `155f9c2` renumber (rs) -> (ry) in code citations: main took the letter for PR #204 mid-flight
-- `341bdba` test fixture: compute timestamps rather than reuse a date the era tables own (rs)
-- `053e8e5` pin the four inert enforcements with tests: 8 mutations, all red (rs)
-- `64e1207` four declared enforcements were inert: the organ death recorder, I2's amnesia check, I10's real-money gate key, and 39 dead assertions (rs)
-- `676a90a` Merge PR #206: the horizon measured forward — band-kelly's hold-watch, after two refusals with the mechanism (rt)
-- `aa3b943` The horizon question cannot be answered backwards on this book (1.9-min median hold vs a 1-min candle), so band-kelly now measures it forward (rt)
-- `84cc04e` Merge PR #204: fewer guards, more room — the ladder replaces my exemption, and agronomy sees every living book (rs)
-- `321aec1` agronomy fidelity: band-kelly declares its two real guards, and (rs) states plainly that this organ does not run
-- `55be410` merge origin/main: keep both changelog stacks — (rs) atop main's newest
-- `f3c50f3` Fewer guards, more room: the taker gets the ladder instead of my exemption, the Navigator stops being flagged for trading, agronomy sees 8 books it never knew — one real money (rs)
-- `3629035` Merge PR #203: mum v2's gate-reachability gauge — her card can now say how far the market is from her bar (rr)
-- `a175da8` Merge remote-tracking branch 'origin/main' into claude/todays-work-review-6y8tua
-- `74fbf2b` Merge PR #202: self-verification corrections — a guard exemption justified by a margin that does not exist (rq)
-- `07fe4a9` mum v2's census could not say how far the market was from her bar — the reachability gauge (rq)
-- `f7ffa27` merge origin/main: keep both changelog stacks — (rq) atop mum's un-retirement (ro)/(rp)
-- `be95ebb` A verification sweep over my own claims found three false ones — the worst a guard exemption justified by a margin that does not exist (rq)
-- `d6be57f` Merge PR #201: mum v2's control arm — atomic pairing kills the legacy contamination, and it now survives a redeploy (rp)
-- `5f83a16` mum v2's first live payload indicted her own control arm: legacy contamination + no durability (rp)
-- `18fb3eb` Merge PR #200: 👩 mum is ALIVE as v2 — the clock was the disease, and she now carries her own control arm (ro)
-- `f5675e2` The I20 claim, stated at its real strength (ro)
-- `98cdee5` The autopsy is re-runnable, and it corrects my own carry figure (ro)
-- `9382f34` 👩 mum IS ALIVE as v2: the operator's reversal, and the autopsy says the disease was THE CLOCK (ro)
-- `d6cc2c6` WIP mum v2 — pre-mutation checkpoint
-- `05dc610` Merge PR #199: one-shot tape fetcher for the mum-v2 founding study (deleted at the v2 merge)
-- `71d29a6` One-shot tape fetcher for the mum-v2 founding study (runs on this branch only; deleted before merge per the (lr) rule)
 
 ## How this file stays honest
 
