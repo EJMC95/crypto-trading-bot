@@ -1,3 +1,116 @@
+## 2026-08-21 (sr) — EAMON FUNDED 🙏 AVO 3.7x AND THE CAP WOULD HAVE TURNED THAT INTO FEWER BETS; PLUS LEVERAGE, ON A DRAWDOWN BUDGET RATHER THAN AN APPETITE
+
+**Eamon, 21-Aug:** *"avo marias equity increase... maximise what we can do with
+this bot with this new p n l"* → *"i just added money to it"* → *"it should now
+have 231 dollars"* → *"change cap to 230, increase clip size, whatever we can do
+to let this fly, training wheels off, lets make it so avo can use leverage to
+its advantage."*
+
+**THE FLEET HANDLED THE DEPOSIT CORRECTLY, END TO END — that is the first
+finding and it is worth as much as the defect.** The sequence, measured on the
+live row rather than reasoned about:
+
+* **The venue credits `collateral` BEFORE `total_asset_value`.** At 04:00:07Z
+  the row published `collateral 231.07` and `equity 62.93` **from the same
+  account payload** — a real divergence, not a stale read, because
+  `margin_state_from` and `account_value()` call `_account_payload()` at
+  slightly different moments and the credit landed between them. Confirmed
+  against the venue's own public API (`/api/v1/account?by=index`), where the
+  identity `total == collateral + sum(upnl)` closes to **1e-6**.
+* **The equity guard then did exactly what it was built to do.** `REJECT #1
+  (continuity) — equity moved $+167.77 vs book-implied $+0.01`, three times, and
+  the cash-move escape correctly stayed OFF: it requires `|sum(upnl)| > tol` and
+  this book's upnl was **$0.374 against a $1.00 tolerance**, the case the
+  guard's own docstring predicts and routes to the collateral-stable rebase.
+* **The rebase booked the money as CAPITAL, not profit.** `capital_adjust
+  167.76`, `initial_equity` unmoved at `62.795571`, `pnl_abs 0.14`. Had it
+  landed in P&L the row would have read **+267%** and poisoned the go-live
+  grade, the allocation claim and the brain's stats. It did not.
+* **Cost of the correctness: ~15 minutes equity-blind** (`equity: None`,
+  `clip: None`, no new entries; exits and stops unaffected, by design).
+
+**I RAISED A FALSE ALARM MID-INVESTIGATION AND IT IS RECORDED HERE, NOT BURIED.**
+Reading the rebase path I concluded the capital move would compute as
+`collateral_now − collateral_at_last_accept = 0` and the deposit would print as
+profit. Wrong: I had misread `entries_match`, whose PRIMARY branch checks
+position ENTRY PRICES and whose collateral-delta branch is only the fallback for
+a baseline with no stored entries. The live payload settled it in one read. **The
+lesson is the standing one — a code-reading is a hypothesis, and the payload is
+the record (I14).**
+
+### The real defect: a deposit can buy FEWER bets, silently
+
+`clip = equity / max_open`, so the deposit re-sized every future entry
+**$15.73 → $57.68** — correct and automatic. But
+`FREQTRADE_AVO_MARIA_MAX_NOTIONAL` is a **fixed dollar figure** and admission is
+`open_notional + add <= cap`:
+
+```
+3 slots x $57.68 = $173.02  <= $200  OK
+4th slot        = $230.70   >  $200  REFUSED
+```
+
+The book settles at **3 of 4 and $57.68 of the new balance is never deployed.**
+Invisible three ways: `open_trades` reads 3 of a declared 4 exactly as on a quiet
+day; the refusal is **DELAYED**, because `open_notional` prices held positions at
+their OWN entry clip ((hl)) so the three legacy $7.68 positions hide the wall
+until they roll; and **nothing fires**, so a counter can never report it — only
+standing arithmetic can say a constraint will bite before it does.
+
+`cap_slots(clip, cap, slots)` is that arithmetic, published on the row beside a
+`notional_cap_skips` counter (the census says it WILL bite; the counter says it
+DID). Reported, never enforced — SafetyRails caps are operator-only, so its job
+is to name the constraint (I8), not move it. **Same class as the carried
+`farmer-cap-collapses-slots-under-conviction` item, reached from the other
+direction: there a bigger CLIP collapses slots, here a bigger BALANCE does.**
+
+### Leverage: admitted, on the one route I22 leaves open
+
+`AVO_GROSS_X` makes `clip = equity * GROSS_X / max_open`, so gross at full
+occupancy is exactly `GROSS_X * equity`. **Default 1.0 — inert until set.**
+
+**The ceiling is DERIVED from this book's own two numbers, not chosen.** Every
+slot carries `S.stoploss` (−10%), and the held names are QQQ/SPY/NVDA — US
+equity beta, `N_eff` ~ONE BET — so *every slot stops in the same move* is the
+**central case for this book, not the tail**. All-slots-stop costs
+`GROSS_X * |stoploss|` of equity, and the go-live gate fails a book above 15%
+maxDD, so `GROSS_X_MAX = 0.15 / |stoploss|` = **1.5x**. Above it the book is
+leveraged out of the gate it is trying to pass — the (gv) stop-vs-gate defect,
+bought deliberately. **Shipped at 1.4x (14% worst case), strictly inside the bar
+rather than exactly on it**, which is the difference (gv) already paid for once.
+
+**Stated plainly, because I22 is emphatic and this is the seventh ask: leverage
+moves NO book closer to the gate.** It multiplies mean and sd alike, so `t` is
+invariant — six prior studies rejected it on exactly that ground. What it moves
+is dollars and drawdown, together, both ways. On 🙏 Avo specifically, (qu)
+measured the entry as having **no edge** (matched-random beats it at 4h/8h/12h),
+so 1.4x multiplies a number near zero. **What it does buy is that the balance is
+DEPLOYED rather than idle, and that Eamon's own pre-registered revert criterion
+— ≥+1.649%/trade over the next 50 closes — resolves at 1.4x the size.** The
+`(qu)` criterion is untouched and still governs.
+
+Corrected in place per I12: `_clip_scale_now`'s docstring claimed *"gross
+notional can never exceed account equity — the book is 1.00x by construction"*.
+That is now FALSE and a wrong safety sentence is worse than none ((sp)'s lesson).
+The restrict-only half still holds; the 1.00x half is replaced by the real bound.
+
+### Two defects found in my own work, both by driving it rather than reading it
+
+1. **`GROSS_X = float(os.environ.get(...))` at MODULE level.** A typo'd env var
+   raises `ValueError` at **import** and takes the real-money book down before
+   `main()` runs — a failure `gross_x()`'s own NaN handling can never reach,
+   because the module never finishes loading. Found by feeding the ladder
+   `"abc"`. Now parsed defensively; unparseable degrades to 1.0.
+2. **A MUTATION SURVIVOR ON THE HEADLINE FEATURE.** Deleting `gross_x()` from
+   `clip_usd` — leverage configured, published, and silently never applied —
+   **passed five tests**, because every case pinned the `gross_x=1.0` default
+   where mutant and real code are identical by construction. The (sp) shape
+   exactly: a lever registered, documented, published and INERT. Closed by tests
+   that drive the clip at 1.25/1.4/1.5; round now **5/5 killed**.
+
+Pinned by `tests/autonomy/test_avo_cap_slots.py` (42 tests). Selftest unchanged
+and green at the default — this moves no order until `AVO_GROSS_X` is set.
+
 ## 2026-08-20 (sq) — "FIX THE STALE BOTS": NEITHER STALLED BOOK WAS BROKEN, AND THE REAL DEFECT WAS THAT NOTHING THEY PUBLISHED COULD SAY SO
 
 **Operator, 20-Aug: "Fix the stale bots."** Two books had visibly stopped. The
