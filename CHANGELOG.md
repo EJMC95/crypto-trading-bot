@@ -113,7 +113,7 @@ and green at the default — this moves no order until `AVO_GROSS_X` is set.
 
 ## 2026-08-20 (sq) — "FIX THE STALE BOTS": NEITHER STALLED BOOK WAS BROKEN, AND THE REAL DEFECT WAS THAT NOTHING THEY PUBLISHED COULD SAY SO
 
-**Operator, 20-Aug: "Fix the stale bots."** Two books had visibly stopped. The
+**Eamon, 20-Aug: "Fix the stale bots."** Two books had visibly stopped. The
 fix is not to either book's gates — **both are correctly refusing supply their
 own MEASURED screens exclude** — it is that establishing that took a manual
 tape replay, because no field in either payload could distinguish "the band is
