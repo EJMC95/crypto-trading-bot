@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-21 15:52 Sydney (05:52Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-21 19:02 Sydney (09:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (53 commit(s), entries (rt), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp), (sq), (sr))
+## Shipped today (55 commit(s), entries (rt), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp), (sq), (sr))
 
+- `0554bb7` [deploy-live-taker] Avo leverage 5x, and the diversification finding that earns it (sr)
+- `5f54383` Regenerate the handoff after the (sr) Avo work
 - `fb724f5` [deploy-live-taker] Avo 4 -> 5 slots: the ask was 6, the ledger refused it (sr)
 - `79c80e9` Doctrine + handoff: Avo funded 3.7x, levered 1.4x on a derived drawdown budget (sr)
 - `fc9ada7` Credit (sq)'s quote to Eamon, not the role — the ratchet was red on main
