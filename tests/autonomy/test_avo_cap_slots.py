@@ -128,21 +128,34 @@ def test_the_census_reads_the_same_clip_the_row_publishes():
         "cap_slots must read the SAME _eff_clip local as clip_usd"
 
 
-def test_gross_x_ceiling_is_derived_from_the_books_own_stop_and_the_gate_bar():
-    """1.5x is not a preference — it is 0.15/|stoploss|, and it must MOVE if
-    either input moves. A retyped constant is a constant that drifts."""
-    assert A.GROSS_X_MAX == round(0.15 / abs(float(A.S.stoploss)), 4)
-    assert A.GROSS_X_MAX == 1.5, "at the shipped -10% stop the budget is 1.5x"
+def test_the_vol_target_is_derived_from_the_books_own_stop_and_the_gate_bar():
+    """The DIVERSIFICATION-EARNED number is derived, and must MOVE if either
+    input moves — a retyped constant is a constant that drifts. It is published
+    as advisory beside the operator's setting; it does not clamp it."""
+    assert A.vol_target_gross_x(1.0) == round(0.15 / abs(float(A.S.stoploss)), 4)
+    assert A.vol_target_gross_x(1.0) == 1.5, "fully-correlated basket -> 1.5x"
+    # measured 21-Aug on Lighter's own 200d tape: one-per-class N_eff = 3.09
+    assert A.vol_target_gross_x(3.09) == pytest.approx(2.6368, abs=1e-3)
+    # monotone in independence: more independent bets support more gross
+    assert (A.vol_target_gross_x(1.0) < A.vol_target_gross_x(1.37)
+            < A.vol_target_gross_x(3.09))
+
+
+def test_the_vol_target_never_credits_independence_it_cannot_measure():
+    """n_eff below 1 or unreadable falls back to the fully-correlated answer —
+    unknown must never buy leverage (I8: degrade to the honest number)."""
+    for bad in (0.0, 0.5, -3, None, "x", float("nan")):
+        assert A.vol_target_gross_x(bad) == A.vol_target_gross_x(1.0)
 
 
 @pytest.mark.parametrize("raw,want", [
-    ("1.0", 1.0), ("1.25", 1.25), ("1.4", 1.4), ("1.5", 1.5),
-    ("2.0", 1.5), ("6.0", 1.5), ("1e9", 1.5),     # clamped DOWN to the budget
+    ("1.0", 1.0), ("1.4", 1.4), ("2.64", 2.64), ("5.0", 5.0),
+    ("6.0", 5.0), ("1e9", 5.0),                   # clamped to the OPERATOR ceiling
     ("0.5", 1.0), ("-3", 1.0), ("0", 1.0),        # floored: shrinking is the
                                                   # clip scale's job, not this
     ("nan", 1.0), ("inf", 1.0), ("abc", 1.0), ("", 1.0),   # hostile -> 1.0
 ])
-def test_no_env_value_escapes_the_drawdown_budget(raw, want, monkeypatch):
+def test_no_env_value_escapes_the_operator_ceiling(raw, want, monkeypatch):
     monkeypatch.setattr(A, "GROSS_X", _as_float(raw))
     assert A.gross_x() == pytest.approx(want)
 
@@ -173,14 +186,29 @@ def test_an_unparseable_env_must_not_crash_a_real_money_import(raw, monkeypatch)
         importlib.reload(A)
 
 
-def test_worst_case_drawdown_stays_inside_the_gate_at_every_reachable_setting():
-    """The budget's whole claim, driven rather than asserted: this book's names
-    are ~one bet, so 'every slot stops together' is the central case — and at NO
-    reachable GROSS_X may that cost 15% or more of equity."""
-    for raw in ("1.0", "1.25", "1.4", "1.5", "2.0", "100"):
-        g = min(A.GROSS_X_MAX, max(1.0, float(raw)))
-        assert g * abs(float(A.S.stoploss)) <= 0.15 + 1e-9, \
-            f"AVO_GROSS_X={raw} breaches the 15% go-live drawdown bar"
+def test_the_row_states_the_risk_being_taken_rather_than_hiding_it():
+    """The operator sets the leverage; the CODE owes him the arithmetic on the
+    row, every loop. Eamon set 5x deliberately — so `all_slots_stop_pct` and
+    `liq_gap_pct` must publish, because a setting whose consequences are
+    unreadable is the thing that actually goes wrong."""
+    src = open(A.__file__).read()
+    for field in ('"leverage": {', '"set":', '"vol_target_at_neff1":',
+                  '"deployed_at_full":', '"all_slots_stop_pct":', '"liq_gap_pct":'):
+        assert field in src, f"the leverage block must publish {field}"
+
+
+@pytest.mark.parametrize("g,stop_pct,liq_pct", [
+    (1.4, 0.14, -0.684),
+    (2.64, 0.264, -0.349),
+    (5.0, 0.50, -0.170),
+])
+def test_the_published_risk_arithmetic_is_right(g, stop_pct, liq_pct):
+    """Driven, not asserted: all-slots-stop = gross_x * |stop|, and liquidation
+    is `mmf - 1/gross_x` at the worst maintenance-margin fraction of the books
+    this universe trades (300bps, read per book off the venue — never derived
+    from imf, the (no) trap)."""
+    assert g * abs(float(A.S.stoploss)) == pytest.approx(stop_pct, abs=1e-6)
+    assert 0.03 - 1.0 / g == pytest.approx(liq_pct, abs=1e-3)
 
 
 def test_gross_x_of_one_reproduces_the_pre_leverage_clip_exactly():

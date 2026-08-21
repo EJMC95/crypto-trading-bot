@@ -163,31 +163,47 @@ try:
 except (TypeError, ValueError):
     GROSS_X = 1.0
 
-#: THE CEILING IS DERIVED, NOT CHOSEN — and it is derived from this book's OWN
-#: two numbers, so it re-derives if either moves instead of going stale.
+#: THE OPERATOR'S CEILING. **Eamon, 21-Aug: "set leverage to 5" / "i want this
+#: bot to find a way so leverage can be used" / "no more training wheels".**
+#: This is a risk appetite, and risk appetite belongs to the person whose money
+#: it is — so it is an operator-set bound, not a number this file invents.
 #:
-#: Every slot carries `S.stoploss` (-10%). This book's held names are QQQ/SPY/
-#: NVDA — US equity beta, so `N_eff` is ~ONE BET (I22: 8 crypto markets measure
-#: 1.35 independent bets; three index names are worse). "Every slot stops in the
-#: same move" is therefore the CENTRAL case for this book, not the tail, and the
-#: budget must be sized against it rather than against an independence the book
-#: does not have.
-#:
-#: All-slots-stop costs `GROSS_X * |stoploss|` of equity. The go-live gate FAILS
-#: a book whose max drawdown exceeds 15% — the bar that governs this book's own
-#: promotion — so `GROSS_X * 0.10 <= 0.15` gives **1.5x**. Above it the book is
-#: leveraged out of the gate it is trying to pass, which is not "flying", it is
-#: the (gv) stop-vs-gate defect bought deliberately.
-#:
-#: Clamped at the CONSUMER, never trusted from env: an out-of-cage value is a
-#: bug, not authority (the registry-cage rule).
-GROSS_X_MAX = round(0.15 / abs(float(S.stoploss)), 4)
+#: What the code still owes him is the ARITHMETIC, published rather than argued
+#: (see `vol_target_gross_x` and the row's `leverage` block). At 5x on a
+#: $230.70 book with 5 slots and a -10% stop:
+#:   clip $230.70 · deployed $1,153.50 · all-slots-stop = 50% of equity
+#:   · liquidation at a -17.0% adverse basket move (worst mmf of its books,
+#:     NVDA/WTI/XCU = 300bps, measured off the venue's orderBookDetails).
+#: The -10% stop is what stands between those two numbers, and it fires on a
+#: 300s loop.
+GROSS_X_MAX = float(os.environ.get("AVO_GROSS_X_MAX", "5.0"))
+
+#: The DIVERSIFICATION-EARNED number, published beside the operator's setting
+#: rather than clamping it. `N_eff` is the correlation-aware count of
+#: INDEPENDENT bets in the held basket (I22: market count is not bet count) —
+#: measured 21-Aug on Lighter's own 200d daily tape:
+#:   5 crypto majors           rho +0.845  N_eff 1.14  -> 1.60x
+#:   what it held that day     rho +0.661  N_eff 1.37  -> 1.76x
+#:   one per asset class       rho +0.155  N_eff 3.09  -> 2.64x
+#: So diversifying the basket nearly DOUBLES what the same drawdown budget
+#: supports — which is the lever worth pulling, and it costs no expectancy
+#: because it turns away no signal, it only re-sizes.
+#: MSTR belongs with crypto here, not equities: MSTR/BTC measured +0.859.
+def vol_target_gross_x(n_eff=1.0):
+    """Gross that keeps an all-slots-stop inside the 15% go-live drawdown bar,
+    credited for measured independence. n_eff=1 (fully correlated) returns the
+    unlevered-basket answer, 1.5x."""
+    try:
+        ne = max(1.0, float(n_eff))
+    except (TypeError, ValueError):
+        ne = 1.0
+    return round(0.15 / (abs(float(S.stoploss)) / (ne ** 0.5)), 4)
 
 
 def gross_x():
-    """The effective, clamped gross multiplier. Floors at 1.0 — this lever
-    exists to deploy idle balance, and shrinking the clip is the live clip
-    scale's job (`_clip_scale_now`), which stays restrict-only and senior."""
+    """The effective gross multiplier. Floors at 1.0 — this lever exists to
+    deploy balance, and SHRINKING the clip is the live clip scale's job
+    (`_clip_scale_now`), which stays restrict-only and senior."""
     try:
         g = float(GROSS_X)
     except (TypeError, ValueError):
@@ -634,6 +650,25 @@ def main(_ctx=None, once=False):
                 # visible anywhere else.
                 "gross_x": round(gross_x(), 4),
                 "gross_x_max": GROSS_X_MAX,
+                # [(sr)] THE LEVERAGE BLOCK — published so the operator's
+                # setting and the diversification-earned number are readable
+                # side by side, every loop, on the row itself. `vol_target` is
+                # ADVISORY: it does not clamp `gross_x`, it says what the held
+                # basket's measured independence would support. A gap between
+                # them is not an error — it is the risk being taken, stated.
+                "leverage": {
+                    "set": round(gross_x(), 4),
+                    "vol_target_at_neff1": vol_target_gross_x(1.0),
+                    "vol_target_at_neff3": vol_target_gross_x(3.09),
+                    "deployed_at_full": (round(_eff_clip * S.max_open, 2)
+                                         if _eff_clip else None),
+                    "all_slots_stop_pct": round(gross_x() * abs(float(S.stoploss)), 4),
+                    # worst maintenance-margin fraction across the books this
+                    # universe trades (NVDA/WTI/XCU = 300bps), measured off the
+                    # venue's own orderBookDetails 21-Aug. Read per book, never
+                    # derived from imf — the (no) trap.
+                    "liq_gap_pct": round(0.03 - 1.0 / max(1e-9, gross_x()), 4),
+                },
                 "held": {c: (meta.get(c) or {}).get("tag")
                          for c in live_pos},
                 "policy": _policy(),

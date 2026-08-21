@@ -158,7 +158,61 @@ The `-0.10` stop pin is now DOUBLY load-bearing and says so: `GROSS_X_MAX` is
 derived from it, so widening the stop without re-reading that derivation would
 silently raise the leverage ceiling on a real-money book.
 
-Pinned by `tests/autonomy/test_avo_cap_slots.py` (42 tests). Selftest unchanged
+### Leverage set to 5x, and the doctrine Eamon asked for
+
+**Eamon, 21-Aug: "set leverage to 5" / "i want this bot to find a way so
+leverage can be used" / "no more training wheels".** Done, and the arithmetic is
+PUBLISHED on the row rather than argued in a message.
+
+`GROSS_X_MAX` changes from a code-derived 1.5 to an OPERATOR-SET ceiling
+(`AVO_GROSS_X_MAX`, 5.0). Risk appetite belongs to the person whose money it is;
+what the code owes him is the number, every loop. Live at 5x:
+
+```
+clip $230.70 x 5 slots = $1,153.50 deployed = 5.00x equity
+all-slots-stop  = 50% of equity      (the -10% stop, on a 300s loop)
+liquidation     = -17.0% adverse basket move
+                  (worst mmf of its books NVDA/WTI/XCU = 300bps, read PER BOOK
+                   off orderBookDetails — never derived from imf, the (no) trap)
+```
+
+`extra.leverage` now publishes `{set, vol_target_at_neff1, vol_target_at_neff3,
+deployed_at_full, all_slots_stop_pct, liq_gap_pct}` every loop. The vol target is
+ADVISORY beside the setting, not a clamp — a gap between them is not an error, it
+is the risk being taken, stated.
+
+**AND THE DIVERSIFICATION FINDING, which is the part worth keeping.** Measured on
+Lighter's own 200d daily tape, `N_eff = n/(1+(n-1)*rho)` for a 5-position hold:
+
+| basket | mean rho | N_eff | supports |
+|---|---|---|---|
+| 5 crypto majors | +0.845 | 1.14 | 1.60x |
+| what it held that day (QQQ/SPY/NVDA+) | +0.661 | 1.37 | 1.76x |
+| the 5 it has actually traded | +0.593 | 1.48 | 1.83x |
+| one per asset class | +0.155 | **3.09** | **2.64x** |
+
+**Diversifying the basket nearly DOUBLES what the same drawdown budget supports,
+and it costs no expectancy because it turns away no signal — it only re-sizes.**
+Two label errors were found and fixed in the class map: **MSTR/BTC = +0.859** (a
+bitcoin proxy wearing an equity label) and **WTI/XCU = -0.392** (genuinely
+offsetting, so they are different classes). Correcting both lifts the GUARANTEED
+worst-case floor under a one-per-class rule from 1.39 to **3.09**.
+
+Also measured and refused as the wrong tool: a per-class POSITION CAP. At 2/class
+it guarantees only N_eff 1.43 (1.79x) and it turns away real signal on a book
+that only averages 2.4 concurrent positions. Sizing off measured N_eff dominates
+it on both axes — strictly more leverage, strictly fewer refused trades.
+
+**DOCTRINE ADDED at Eamon's instruction** (`CLAUDE.md`, "BUILD IT. A SETTLED
+FINDING IS REPORTED ONCE"): skepticism points at OUR OWN work — mutation tests,
+adversarial verification, driving the payload — and never at his goals. A closed
+measurement belongs in the entry that measured it, once; re-stating it at him
+after he has decided is friction wearing rigour's clothes. Lead with what CAN be
+done and the number that supports it; where risk is real, publish it on the row
+instead of re-litigating it. Declared UNENFORCED — tone cannot be checked by a
+static guard, and a guard that tried would be the same mistake in a new costume.
+
+Pinned by `tests/autonomy/test_avo_cap_slots.py` (45 tests). Selftest unchanged
 and green at the default — this moves no order until `AVO_GROSS_X` is set.
 
 ## 2026-08-20 (sq) — "FIX THE STALE BOTS": NEITHER STALLED BOOK WAS BROKEN, AND THE REAL DEFECT WAS THAT NOTHING THEY PUBLISHED COULD SAY SO

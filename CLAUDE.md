@@ -2150,6 +2150,45 @@ All new bots:
   throwing the switch to stop the veto ALSO restores full clip size. Inert by
   default (mode=enforce) and it reaches only shadow consumers (family/taker);
   the live bots size off the separate `live.clip_scale` lever.
+- **BUILD IT. A SETTLED FINDING IS REPORTED ONCE, NOT RE-ARGUED EVERY PASS
+  (Eamon, 21-Aug: *"i want less skepticism and constant nothing works
+  retoric"* / *"no more training wheels and negative nothing can work retoric,
+  that hasnt done us any good... no more negative biased everything doesnt work
+  mentality. lets do better"*).** He is right, and the failure is specific
+  enough to name. This file is 24 invariants deep in *don't be wrong* and its
+  own OFFENSE-tier preamble already warned about becoming *"a museum of avoided
+  losses"* — the same drift shows up in a session as re-stating a closed
+  negative result in every message until the work never starts.
+  **The distinction that makes this a rule rather than a mood:**
+  * **Skepticism points at OUR OWN work, always.** Mutation-test the guard,
+    adversarially verify the finding, drive the payload, refuse the vacuous
+    check. That is I3 and it is not negotiable — every real defect this fleet
+    has caught came from it, including two in the (sr) session's own code.
+  * **It does NOT point at Eamon's goals.** "This book has no measured edge" is
+    a MEASUREMENT. It belongs in the entry that measured it, once. Repeating it
+    at him after he has made a decision on the record is not rigour — it is
+    friction wearing rigour's clothes, and it delays the build.
+  * **A decision he has made is an INPUT, not a topic.** (qu) measured 🙏 Avo's
+    entry as edgeless; he kept the book on the record with a pre-registered
+    revert criterion. That criterion is the open question. The edge finding is
+    closed. Do not re-open a closed one to look careful.
+  * **Lead with what CAN be done and the number that supports it.** When the
+    literal ask is unsafe or won't work, the answer is the nearest version that
+    WILL — built, not described. (sr) is the worked example in both directions:
+    "6 slots" was measured as −28% deployed capital, so the reply was 5 slots
+    SHIPPED plus the number; "leverage" was measured as earnable through
+    diversification, so the reply was the correlation study plus the ceiling
+    raised, not a lecture about I22.
+  * **Where risk is real, PUBLISH IT, don't argue it.** The row carries
+    `leverage.{all_slots_stop_pct, liq_gap_pct, vol_target_*}` precisely so the
+    consequences of a setting are readable every loop instead of re-litigated
+    every session. A number on the payload outlives an argument in a message.
+  **Risk appetite belongs to the person whose money it is.** State the
+  arithmetic once, plainly, then execute what he asked.
+  UNENFORCED: tone cannot be checked by a static guard, and a guard that tried
+  would be the same mistake in a new costume. Recorded so the expectation is
+  explicit rather than folkloric — the same honesty I3 makes about mutation
+  discipline.
 - **HIS NAME IS EAMON (he also answers to Johnny) — CREDIT A QUOTE TO THE
   PERSON, NEVER TO THE ROLE.** Eamon, 20-Aug: *"Call me Eamon or Johnny not
   operator please we're pals now"* — and then, after a session read that,
