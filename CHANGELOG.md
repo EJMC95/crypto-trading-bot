@@ -1,3 +1,119 @@
+## 2026-08-22 (sv) — 🔮 GEORGIA'S RATE LIMITER WAS CUTTING HER BEST TRADES: 75% OF HER P&L SITS ON THE ENTRY THE CAP REFUSES
+
+**Eamon, 22-Aug:** *"Real money we're talking here / I'm a bit disappointed —
+all the work we did on p n L only for it to be worse"*.
+
+He was right, and the numbers are his: live realised **peaked at +$9.50 on
+1-Aug and sits at +$1.47**; with open marks 💸 the Farmer is **−$4.24**, the
+live fleet **−$4.15**. `(st)` and `(su)` shipped instruments and refusals and
+moved none of it. His call, asked directly, was **leave the Farmer and work the
+winner instead** — so this entry is the winner.
+
+### The winner is 🔮 georgia and the only thing she lacks is closes
+
+The live go-live gate, today: **`READY: []`**. She is the closest book in the
+fleet — **5 of 6 bars, failing only `t` (1.48 against 2.0)**, n=163,
++0.163%/trade, both halves positive, maxDD inside the bar. Every other bar she
+already clears. So her distance to real money is a COUNT, and anything that
+cuts her closes for no quality reason is cutting the arrival date.
+
+For contrast, and it is why this is where the session went: the real-money
+Farmer's own horizon organ reads **`unreachable`** — *"mean −0.160% ≤ 0, more
+of the same closes cannot flip mean/t/halves"*.
+
+### Two explanations measured and refused before the third was found
+
+* **NOT signal-starved.** Driving the SHIPPED `DayTraderGated.signals` over the
+  venue's own 15m tape (23 coins × 1400 bars): **597 entry signals in 14.6 days
+  = 40.9/day** against her 4.53 opens/day.
+* **NOT a gate and NOT a regression.** The fleet long budget is 12 of 20 with
+  the light green and nothing at the symbol cap; the brain has no mult, no gate
+  and no action on her; `parse_candles` drops the forming bar and the cache's
+  `next_due` is one interval after the next close, so she is not skipping
+  candles. Her signal rate went **1–29/day through 7–18 Aug and 107/164/154 on
+  19/20/21 Aug** as the tape started trending, and her opens tracked it 1–6/day
+  → 10–17/day. **The surge is the market.** The StoplossGuard locks her 8.2% of
+  her life (37 fires in 39.9 days) — real, and not the constraint.
+* **AND THE 11x CEILING CLAIM IS RETIRED, corrected in place.** The carried row
+  read *"83.5 days at 0.5 of 5 slots, 7.6 days at full occupancy"*. Her mean
+  hold is **2.6h**, so occupancy = closes/day × 2.6/24 and five slots need ~46
+  opens/day against a 40.9/day signal ceiling. **Full occupancy is unreachable
+  by construction and was never the lever.** She is flat 68.4% of the time
+  because she exits in under three hours, not because anything refuses her.
+
+### The finding: rank her entries within their own clock hour
+
+    entry #1 of the hour   n=127   +0.023%/trade   t=+0.21   $ +3.95
+    entry #2 of the hour   n= 36   +0.656%/trade   t=+2.20   $+11.90
+
+**75% of her realised P&L is on 22% of her trades, and they are the ones
+`MAX_ENTRIES_PER_HOUR = 2` is closest to refusing.** She hit the cap in 34
+hours.
+
+**SIX SPLITS, ALL THE SAME SIGN** — this is not the trending burst and not a
+tag-mix artifact:
+
+| split | delta (#2+ minus #1) |
+|---|---|
+| surge days (≥19-Aug) | **+0.608pp** |
+| everything before them | **+0.390pp** |
+| first half of her life | **+0.480pp** |
+| second half | **+0.756pp** |
+| within `trend_breakout` | **+0.614pp** |
+| within `range_on` | **+0.738pp** |
+
+Both chronological halves positive is the (I19) bar for an expand-direction
+change, met on her OWN ledger — the record, which outranks any proxy (I14).
+
+**The mechanism is a REGIME MARKER, not an ordering effect, and that is why it
+should generalise.** A second entry inside one hour means several coins fired
+at once, which is what a real trending burst looks like — and `trend_breakout`
+exists to catch exactly that. She does not RANK candidates; she walks
+`b.coins` in list order, so #1 vs #2 carries no quality ordering of its own.
+
+### Shipped: 2 → 3, and the quantity the knob cuts
+
+`MAX_ENTRIES_PER_HOUR` **2 → 3** (`GEORGIA_MAX_ENTRIES_PER_HOUR` reverts it
+without a deploy).
+
+**Why 3 and not unlimited — the honest limit: the cap censored its own
+evidence.** Rank 3 has **n=1** in her entire life *because the cap is 2*, so
+everything above rank 2 is extrapolation. One step generates the sample that
+grades the next one.
+
+**So `entry_rank` now rides every close** (I23 — a knob must record the
+quantity it cuts). This step was decided by RECONSTRUCTING the rank from open
+timestamps; the next one will be a query. A book with no throttle publishes
+**no rank at all** rather than a fabricated 1 (I8).
+
+**NOT an era reset**: a rate limiter is capacity, and capacity is ordinary
+tuning ((hc)). Resetting her era would discard the 163 closes this change
+exists to add to — on the book whose only failing bar is the one that needs
+them. Blast radius is exactly one living row: `DayTraderGated` is georgia plus
+the RETIRED `crypto-intraday-15m`, and a test pins that.
+
+Evidence saved as `scripts/study_georgia_entry_rank_2026-08-22.py` — it
+recomputes all six controls from the public ledger and prefers `extra.entry_rank`
+over its own reconstruction as soon as stamped rows exist.
+`tests/autonomy/test_georgia_throttle.py`, **7 of 7 mutations verified RED**.
+
+### Recorded, because the first version of it was wrong
+
+The selftest fixture I wrote for the study made #1 and #2+ have **identical
+means**, so the delta was exactly 0.0 and `assert d is not None` would have
+passed on a statistic that proved nothing. It failed on `d > 0`, which is the
+only reason I looked. A fixture with no signal in it is a check that inspects
+nothing.
+
+### What was NOT done, and why it is the next question
+
+Her median hold is **1.9h against a 1440m cap**, and this entry raises her
+COUNT. Nobody has asked whether letting winners run raises her MEAN instead —
+`long-trend-breakout_roi` books **+$36.29 over n=46** while
+`_trailing_stop_loss` books **−$23.98 over n=73** on the same tag. That is
+outcome-conditioned (I7) and cannot license anything on its own; it is the
+counterfactual the next pass should run through her own replay.
+
 ## 2026-08-22 (su) — 💸 THE FARMER'S "POOR DECISIONS" ARE NOT A KNOB, AND THE FIX I ALMOST SHIPPED TO REAL MONEY WAS MEASURED ON A POPULATION THE BOOK REFUSES
 
 **Eamon, 22-Aug:** *"fix farmers entry and exits as it's made poor decisions,

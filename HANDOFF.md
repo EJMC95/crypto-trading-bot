@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-22 11:14 Sydney (01:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-22 12:00 Sydney (02:00Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -45,9 +45,9 @@ bull_exit() hands the breakout TREND exit the reversion arm's MAX_HOLD_H. A rule
 _Still open because:_ splitting it decouples the arm from a lever the rail actively moves, and the only evidence for 48h->96h died to leave-one-symbol-out (+0.78pp -> +0.07pp ex-HYPE).
 
 ### `ceiling-slots-georgia`  ·  owner: **session**
-🔮 georgia is 310 closes from t=2.0 — 83.5 DAYS at today's 0.5 of 5 slots, 7.6 days at full occupancy. An 11x speed-up to decidability on the fleet's closest book to real money, costing zero expectancy. `scripts/ceiling.py` names it; what it does NOT say is whether her SIGNAL can fill those slots.
+**(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 days at full occupancy — an 11x speed-up'. Measured: her mean hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE slots need ~46 opens/day. Her signal supplies 40.9/day at best. **Full occupancy is unreachable by construction, and it was never the lever — CLOSES are.** She is flat 68.4% of the time not because something refuses her but because she exits in under 3 hours. (sv) took the one gate that cut closes for no quality reason (the 2/h throttle, +0.633pp in favour of the entry it refused, six splits) from 2 -> 3.
 
-_Still open because:_ the ceiling is REACHABLE, not promised — the next step is her own census: what refuses the other 4.5 slots, the regime gate, the universe, or no signal at all.
+_Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. The OTHER half is untouched: her median hold is 1.9h against a 1440m cap, and nobody has asked whether letting winners run raises her mean instead of her count.
 
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
@@ -79,8 +79,9 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (2 commit(s), entries (st), (su))
+## Shipped today (3 commit(s), entries (st), (su))
 
+- `8b1af4f` Carry what (st) and (su) found but could not close, and regenerate the handoff
 - `240f317` 💸 The Farmer's poor decisions are not a knob — and the replay was measuring the wrong books (su)
 - `63d4171` 🙏 Avo's row can finally say why it did not trade: the census, on both arms (st)
 

@@ -249,15 +249,29 @@ CARRIED = [
     {
         "id": "ceiling-slots-georgia",
         "owner": "session",
-        "what": "🔮 georgia is 310 closes from t=2.0 — 83.5 DAYS at today's 0.5 "
-                "of 5 slots, 7.6 days at full occupancy. An 11x speed-up to "
-                "decidability on the fleet's closest book to real money, "
-                "costing zero expectancy. `scripts/ceiling.py` names it; what "
-                "it does NOT say is whether her SIGNAL can fill those slots.",
-        "why_open": "the ceiling is REACHABLE, not promised — the next step is "
-                    "her own census: what refuses the other 4.5 slots, the "
-                    "regime gate, the universe, or no signal at all.",
-        "closes_when": lambda: False,
+        "what": "**(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE "
+                "HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 "
+                "days at full occupancy — an 11x speed-up'. Measured: her mean "
+                "hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE "
+                "slots need ~46 opens/day. Her signal supplies 40.9/day at "
+                "best. **Full occupancy is unreachable by construction, and it "
+                "was never the lever — CLOSES are.** She is flat 68.4% of the "
+                "time not because something refuses her but because she exits "
+                "in under 3 hours. (sv) took the one gate that cut closes for "
+                "no quality reason (the 2/h throttle, +0.633pp in favour of the "
+                "entry it refused, six splits) from 2 -> 3.",
+        "why_open": "the step is DELIBERATELY one notch: rank 3 has n=1 in her "
+                    "whole life because the cap was 2, so everything above it "
+                    "is extrapolation. `entry_rank` now rides every close, so "
+                    "the next step is graded from a query — re-run "
+                    "`scripts/study_georgia_entry_rank_2026-08-22.py` once "
+                    "rank-3 rows exist and take 3 -> 4 only if it holds. The "
+                    "OTHER half is untouched: her median hold is 1.9h against a "
+                    "1440m cap, and nobody has asked whether letting winners "
+                    "run raises her mean instead of her count.",
+        # closes when the next throttle decision has been taken on rank-3 data
+        "closes_when": lambda: _has(
+            "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
     },
     {
         "id": "ceiling-capital-inversion",

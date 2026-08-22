@@ -832,7 +832,41 @@ class DayTraderGated(Carrier):
     min_bars = 70
     BAND_PCT_ON = 0.015
     BAND_PCT_OFF = 0.020
-    MAX_ENTRIES_PER_HOUR = 2            # confirm_trade_entry throttle
+    # [2026-08-22 (sv)] 2 -> 3, AND THE LEDGER SAYS THE ENTRY IT WAS REFUSING
+    # IS HER BEST ONE.
+    #
+    # 🔮 georgia is the fleet's closest book to the gate — 5 of 6 bars, failing
+    # only `t` (1.48 against 2.0) — so the ONLY thing standing between her and
+    # real money is CLOSES, and this rate limiter is the one gate that cuts
+    # them for no quality reason. Ranking her 163 real entries by their
+    # position within their own clock hour:
+    #
+    #     entry #1 of the hour   n=127   +0.023%/trade   t=+0.21   $ +3.95
+    #     entry #2 of the hour   n= 36   +0.656%/trade   t=+2.20   $+11.90
+    #
+    # **75% of her realised P&L is on 22% of her trades, and they are the ones
+    # the cap is closest to refusing.** She reached the 2/h cap in 34 hours.
+    #
+    # SIX SPLITS, ALL THE SAME SIGN — this is not the 19-21 Aug trending burst
+    # and not a tag-mix artifact: surge days +0.608pp / before them +0.390pp;
+    # first half of her life +0.480pp / second half +0.756pp; within
+    # trend_breakout +0.614pp, within range_on +0.738pp. Both chronological
+    # halves positive is the (I19) bar for an expand-direction change, met on
+    # her OWN ledger, which is the record and outranks any proxy (I14).
+    #
+    # WHY 3 AND NOT UNLIMITED, stated because it is the honest limit: the cap
+    # has CENSORED its own evidence. Rank 3 has n=1 in her whole life *because
+    # the cap is 2*, so everything above rank 2 is extrapolation. One step
+    # generates the rank-3 sample that grades the next one, and `entry_rank`
+    # below is recorded from this commit so that grade is a query rather than
+    # another reconstruction (I23 — a knob must record the quantity it cuts).
+    #
+    # NOT an era reset: a rate limiter is capacity, and capacity is ordinary
+    # tuning ((hc)). Resetting her era would discard the 163 closes this change
+    # exists to add to. Scope: DayTraderGated is georgia + the RETIRED
+    # crypto-intraday-15m, so this moves exactly one living book.
+    MAX_ENTRIES_PER_HOUR = int(os.environ.get(
+        "GEORGIA_MAX_ENTRIES_PER_HOUR", "3"))
 
     def signals(self, bars, extra):
         c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
@@ -1143,7 +1177,7 @@ class Book:
         self.guard_until = 0.0    # StoplossGuard / MaxDrawdown book-wide lock
         self.fund_realized = 0.0
         self.last_sig_ts = {}     # coin -> last closed-candle ts acted on
-        self.throttle = {"bucket": None, "n": 0}
+        self.throttle = {"bucket": None, "n": 0, "last_rank": None}
         self.n_closed = self.n_wins = 0
         # [2026-08-19 (ro)] 👩 mum v2's CONTROL ARM and census. Present on every
         # Book (cheap, additive) but only POPULATED for a carrier that declares
@@ -1286,7 +1320,14 @@ class Book:
         return False
 
     def throttle_ok(self, now):
+        """[(sv)] ...and it RECORDS the rank it granted. The throttle's whole
+        job is to cut entries-per-hour, and until now nothing wrote down which
+        entry an entry was — so the question "is the marginal entry any good?"
+        needed a reconstruction from timestamps instead of a query (I23).
+        `last_rank` is the granted rank (1-based); None when this book has no
+        throttle at all, so a non-DayTrader book never publishes a fake 1."""
         if not isinstance(self.s, DayTraderGated):
+            self.throttle["last_rank"] = None
             return True
         bucket = int(now // 3600)
         if self.throttle["bucket"] != bucket:
@@ -1294,6 +1335,7 @@ class Book:
         if self.throttle["n"] >= self.s.MAX_ENTRIES_PER_HOUR:
             return False
         self.throttle["n"] += 1
+        self.throttle["last_rank"] = self.throttle["n"]
         return True
 
     # -- trade lifecycle --------------------------------------------------------
@@ -1375,6 +1417,13 @@ class Book:
                 # asked of a book near real money. Telemetry only; no gate,
                 # entry, exit or size moves.
                 side="long",
+                # [(sv)] the throttle's own governing quantity, on the row. The
+                # (sv) step from 2 -> 3 was decided by RECONSTRUCTING this from
+                # open timestamps; recording it makes the next decision a query
+                # (I23), and makes rank 3 — the sample the old cap censored —
+                # gradeable the moment it exists.
+                extra=({"entry_rank": m["entry_rank"]}
+                       if m.get("entry_rank") is not None else None),
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass
@@ -1957,7 +2006,11 @@ def main():
                     dist = b.s.atr_stop_dist(tag, bars, entry_px)
                     stop_px = entry_px * (1 - dist)
                 _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
-                         "accrued": 0.0, "stop_px": stop_px}
+                         "accrued": 0.0, "stop_px": stop_px,
+                         # [(sv)] which entry of its clock hour this was — the
+                         # quantity `MAX_ENTRIES_PER_HOUR` cuts. None on books
+                         # with no throttle.
+                         "entry_rank": b.throttle.get("last_rank")}
                 # [2026-08-19 (ro)] draw this trade's PLACEBO: a random OTHER
                 # coin from the same universe, marked at this same instant.
                 # Drawn from marks already fetched this cycle, so it costs no
