@@ -187,6 +187,36 @@ DISAGREE with reality and reddens the build. `audit_live_roster` is OK today and
 would not be. They are named individually in the carried row instead, so the
 distinction survives the session rather than living in my head.
 
+**[EXECUTING — Eamon, 22-Aug: *"Full permission for you to swap farmer and
+Georgia"*.] AND THE PLAN CHANGED FOR THE BETTER WHEN I HAD TO ACTUALLY DO IT.**
+The runbook said *create `georgia-live`, move the keys*. Building the provisioner
+made the flaw obvious: **moving keys means READING them**, and (ml) measured that
+even a redacted `railway variables` echo survived only by column-width luck. So
+`trail-blazer-live` is CONVERTED IN PLACE instead — which is the fleet's own
+precedent anyway (🎫 the Taker took 🌊 Tide Rider's slot on the same
+service/keys/sub-account, 17-Jul; service names here have never matched their
+books). It buys two things a new service cannot: **no credential is ever read,
+copied or transported**, and **"two processes on one sub-account" becomes
+structurally unreachable** — there is only ever ONE service holding those keys,
+so the failure where the Farmer flattens georgia's positions cannot be reached by
+any ordering mistake.
+
+**THE ORDERING IS NOW A GUARD, NOT A RUNBOOK LINE.** The Farmer's four real
+shorts (BTC/ETH/SOL/XAU — I22's "one bet wearing four names", live-verified at
+`N_eff` 1.389) must be FLAT before its container is replaced, or they are
+stranded with no manager, no stop and no exit. `georgia-takes-the-slot.yml`
+REFUSES to run until the live row's own receipt says so: `extra.retired` present
+(the guard is deployed and it retired deliberately, not merely happens to hold
+nothing) AND zero open AND the row fresh (I1 — a stale row cannot prove it is
+flat NOW). **Driven through all seven branches before being trusted**, using the
+python extracted FROM the workflow rather than a retype: today's real feed
+refuses (no guard yet) · retired-but-holding refuses · receipt says 0 while the
+ROW says 2 refuses · flat-but-27h-stale refuses · row ABSENT refuses (an absent
+row could equally mean the dashboard hid it early, so absence is never a licence)
+· unparseable feed refuses · retired-and-flat PASSES. That last one is the half
+that matters: an empty result is not a negative result until the check has been
+seen to produce a positive one ((po)).
+
 **Still with Eamon, and it is the whole of what remains:** the sub-account has
 not moved. No session in this container has a Railway CLI, and the ORDER is the
 safety property. `session_state.py` carries the three acts.
