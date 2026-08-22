@@ -104,7 +104,9 @@ live in `paper_trades`, not in the summary row.
   undeclared reader still fails, and a stale declaration fails too.
 * **`GEORGIA_GOLIVE_RUNBOOK.md` rewritten for the swap** — three ordered operator
   acts, the receipt to wait for, and the leverage table with the two numbers that
-  are not appetite: **3.0x is the last setting inside the gate's 15% maxDD bar**,
+  are not appetite: **2.8x is the last setting strictly INSIDE the gate's 15%
+  maxDD bar** (3.0x sits exactly ON it, and the gate is `maxDD < 15%` — the
+  (gv) 📊 Index Rider trap, which is why (sr) shipped 🙏 Avo at 1.4 not 1.5),
   and **above 9.09x her −5% stop cannot fire before liquidation at the venue's
   measured 600bps worst maintenance margin** — a dead stop is a broken rail, not
   a risk preference. The 10x ceiling Eamon set stands and is published.
