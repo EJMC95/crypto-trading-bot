@@ -115,7 +115,7 @@ live in `paper_trades`, not in the summary row.
   goes stale on every slot swap and then sends every future audit to the wrong
   file. The live pair is now 🙏 Avo + 🔮 georgia and they are the SAME FILE.
 
-**Mutation-verified, 10/10 red:** the shadow twin named in the retired set · a
+**Mutation-verified, 14/14 red:** the shadow twin named in the retired set · a
 dark bus resurrecting the live arm · the latch moved before the day roll · the
 flatten mislabelled `daily_loss` · a living arm publishing the retired block ·
 the judge's stand-down moved after the growth promoter · the mode guard demoted
@@ -150,6 +150,26 @@ listed nine files and the changelog was not among them, i.e. by the practice thi
 repo already has (*"then READ BACK what actually landed"*). A receipt you have to
 read carefully is a weaker guard than a flag that cannot lose a file, so the flag
 is now `action="extend"` and both spellings accumulate.
+
+**AND THE SWEEP FOUND A DEFECT I WAS ABOUT TO CREATE, ON HIS PHONE.** A retired
+arm holds its halt PERMANENTLY — that is how it flattens and stays flat — so the
+hourly watchdog would have listed the real-money row under **"halted (daily-loss
+rule)"** for the rest of its life. Two costs, and the second is the one that
+matters: Eamon is pointed at a rule that never fired, and **a line that is always
+present is one that gets skimmed past when a real daily-loss halt lands beside
+it**. `fleet_watchdog_svc.evaluate` now splits on the row's own `extra.retired`
+— the field the publisher stamps precisely so `halted` stops being
+byte-identical between the two states. Three outcomes, each chosen rather than
+defaulted: a retired FLAT arm rides the **context line** (visible, no warning —
+I8, there is nothing to act on, and a row that silently vanished from the
+watchdog is how a book stops being watched); a retired arm **still holding**
+warns, because `open > 0` means positions are held by a book that will never
+manage them again; and a malformed `retired` block degrades to the OLD warning
+rather than making the row disappear. Driven against all four payload shapes,
+4/4 mutations red. **The first draft invented a fourth return channel (`notes`)
+that `evaluate` does not have** — caught by the name being unbound, which is
+luck rather than a test, so there is now a test that the contract is exactly
+`(problems, warnings, snapshot)`.
 
 **"UPDATE AND SYNC EVERYWHERE" — WHAT THAT ACTUALLY MEANS HERE, because half
 of it must NOT be done yet.** Sweeping the tree for the retired row turns up two

@@ -260,3 +260,84 @@ def test_the_judge_fails_OPEN_on_a_dark_bus_and_says_why():
     src = (ROOT / "experiment_judge.py").read_text()
     assert "_bus = None" in src
     assert "if _bus is not None and _bus.live_arm_retired(LIVE_BOT):" in src
+
+
+# ---- 5  the watchdog does not misattribute the halt ------------------------
+#
+# A retired arm holds its halt PERMANENTLY by design — that is how it flattens
+# and stays flat. So without this the row joins the hourly "halted (daily-loss
+# rule)" line for the rest of its life, and that costs twice: the operator is
+# pointed at a rule that never fired, and a line that is always present is one
+# that gets skimmed past when a REAL daily-loss halt lands beside it.
+
+@pytest.fixture
+def wd():
+    import fleet_watchdog_svc as m
+    return m
+
+
+def _feed(*rows):
+    return {"meta": {"freshest_update_age_sec": 30}, "bots": list(rows)}
+
+
+def _row(bot, status="halted", retired=None):
+    extra = {} if retired is None else {"retired": retired}
+    return {"bot": bot, "status": status, "extra": extra}
+
+
+RET_FLAT = {"since": "2026-08-22", "open": 0, "why": "x", "override": "y"}
+RET_HELD = dict(RET_FLAT, open=3)
+
+
+def test_a_real_daily_loss_halt_still_warns_and_still_says_daily_loss(wd):
+    """The half that must not regress. Splitting the retired rows out is only
+    safe if the rule that pages for a genuine halt is untouched."""
+    _p, warn, _s = wd.evaluate(_feed(_row("some-book")))
+    assert any("halted (daily-loss rule): some-book" in w for w in warn)
+
+
+def test_a_retired_FLAT_arm_is_context_not_a_warning(wd):
+    """No action to take (I8), so it must not stand in the warning list — but
+    it must still be VISIBLE, because a retired row silently vanishing from the
+    watchdog is how a book stops being watched."""
+    _p, warn, snap = wd.evaluate(_feed(_row(LIVE, retired=RET_FLAT)))
+    assert not [w for w in warn if "halted" in w or "RETIRED" in w], warn
+    assert f"retired={LIVE}" in snap, snap
+
+
+def test_a_retired_arm_STILL_HOLDING_is_a_warning(wd):
+    """`open` is the flatten's own receipt. Non-zero means the retirement has
+    not finished unwinding, and those positions are held by a book that will
+    never manage them again — the one state here worth interrupting for."""
+    _p, warn, _s = wd.evaluate(_feed(_row(LIVE, retired=RET_HELD)))
+    hits = [w for w in warn if "RETIRED but still holding" in w]
+    assert hits and "(3 open)" in hits[0], warn
+
+
+def test_the_two_are_never_conflated(wd):
+    """Both in one feed: the daily-loss line names ONLY the genuine halt."""
+    _p, warn, snap = wd.evaluate(
+        _feed(_row("some-book"), _row(LIVE, retired=RET_FLAT)))
+    line = next(w for w in warn if "daily-loss rule" in w)
+    assert "some-book" in line and LIVE not in line, line
+    assert f"retired={LIVE}" in snap
+
+
+@pytest.mark.parametrize("junk", [None, "words", [], 0, {"open": None}])
+def test_a_malformed_retired_block_degrades_to_the_old_behaviour(wd, junk):
+    """Three-valued like every other declaration here. A junk payload must not
+    make a row DISAPPEAR from the watchdog — the safe degrade is back to the
+    ordinary halted warning, which is visible."""
+    _p, warn, _s = wd.evaluate(_feed(_row(LIVE, retired=junk)))
+    if isinstance(junk, dict):        # a dict with no usable `open` is retired
+        assert not [w for w in warn if "daily-loss" in w]
+    else:                             # anything else is not a retired block
+        assert any(LIVE in w and "daily-loss" in w for w in warn), warn
+
+
+def test_evaluate_still_returns_exactly_three_things(wd):
+    """The contract every caller unpacks. The first draft of this change
+    invented a fourth channel (`notes`) that does not exist — caught by the
+    module failing to define it, which is luck, not a test."""
+    out = wd.evaluate(_feed(_row("some-book")))
+    assert isinstance(out, tuple) and len(out) == 3
