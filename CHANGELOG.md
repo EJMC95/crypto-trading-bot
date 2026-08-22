@@ -1,3 +1,42 @@
+## 2026-08-22 (sw) — I SHIPPED TWO SELFTESTS AND WIRED NEITHER INTO CI, AND THE ROT-GUARD CAUGHT IT
+
+CI on #215 went red on `test_no_unregistered_selftest`:
+
+    scripts/study_farmer_gate_minvol_2026-08-22.py
+    scripts/study_georgia_entry_rank_2026-08-22.py
+
+That guard exists for exactly this — *"a new selftest added but never wired
+into CI would pass locally when run by hand and silently never run again"* —
+and it fired on the two studies `(su)` and `(sv)` rest their decisions on.
+
+**Registered by PATH, and actually ENFORCED, not merely excluded.** Both
+filenames carry a hyphenated date, so `"scripts.study_georgia_entry_rank_
+2026-08-22"` is not an importable module name: an entry in `SELFTEST_MODULES`
+collects ZERO tests and reports green — the trap already documented at
+`study_dislocation_band_2026-08-19` ((po): a check that inspects nothing
+reports clean). `tests/autonomy/test_2026_08_22_studies.py` loads both by path
+and runs each `_selftest`, following the `(sb)` precedent, plus the two
+structural checks that matter:
+
+* the Farmer study must keep **REFUSING an unknown volume** — a data gap
+  becoming a free pass is what would drift it back to the rank-universe it
+  exists to correct;
+* the georgia study must keep **preferring a stamped `entry_rank`** over its
+  own reconstruction, or the I23 fix it motivated is inert.
+
+**5 of 5 mutations verified RED** — including one that first SKIPPED because I
+aimed it at the wrong file (`vol24` lives in the harness, not the study). A
+mutation that never ran is not a mutation that passed; re-aimed and killed.
+
+**AND A CORRECTION TO `(st)`/`(su)`/`(sv)`, per I12.** Those entries and #215's
+body reported three failures as *"pre-existing on `e05b046`"*, and #215 went
+further and called `test_margin_truth` *"a genuine logic break"*. **CI says
+2313 passed, 1 failed** — all three are GREEN on the runner. They fail only in
+this container, on a different `lighter` SDK build. The stash-against-HEAD check
+was sound about them not being mine and wrong about them being real; the honest
+statement is that they are an artifact of one environment, and the runner is the
+authority.
+
 ## 2026-08-22 (sv) — 🔮 GEORGIA'S RATE LIMITER WAS CUTTING HER BEST TRADES: 75% OF HER P&L SITS ON THE ENTRY THE CAP REFUSES
 
 **Eamon, 22-Aug:** *"Real money we're talking here / I'm a bit disappointed —
