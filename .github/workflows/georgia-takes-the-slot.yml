@@ -139,6 +139,53 @@ jobs:
           if [ "$ok" != 1 ]; then echo "::error::$SVC railway up failed x3"; exit 1; fi
           echo "::endgroup::"
 
-          echo "Converted. VERIFY BY THE ROW, not by this run:"
-          echo "  freqtrade-georgia-lighter on /pnl.json, extra.build + build_n"
-          echo "  matching the local prediction, and extra.leverage.set=${GROSS_X}."
+          echo "::endgroup::"
+
+      - name: Prove it by the ROW, not by the green run
+        env:
+          GROSS_X: ${{ inputs.gross_x }}
+        run: |
+          set -uo pipefail
+          # WHY THE ENV VAR IS THE RIGHT LEVER HERE, established from a
+          # population rather than an absence ((hu)): this fleet does slot
+          # swaps two ways — a per-service config-as-code toml (how 🙏 Avo took
+          # the Taker's slot: railway.tickettaker.toml repoints dockerfilePath)
+          # or the RAILWAY_DOCKERFILE_PATH env (how every provisioned service
+          # since (lr) is built). All TEN railway*.toml files were enumerated
+          # and not one builds Dockerfile.fundinglighter, while
+          # trail-blazer-live demonstrably runs it — so its image path cannot
+          # be coming from a toml. If that reasoning is wrong, THIS step is
+          # where it shows up, which is the point of having it.
+          for i in $(seq 1 20); do
+            curl -fsS --max-time 45 \
+              https://pnl-dashboard-production-858c.up.railway.app/pnl.json \
+              -o feed.json 2>/dev/null || true
+            if python3 - <<'PY'
+          import json, sys
+          try:
+              d = json.load(open("feed.json"))
+          except Exception:
+              sys.exit(1)
+          rows = d if isinstance(d, list) else (d.get("bots") or [])
+          r = next((x for x in rows
+                    if x.get("bot") == "freqtrade-georgia-lighter"), None)
+          if not r:
+              sys.exit(1)
+          e = r.get("extra") or {}
+          print(f"row live: status={r.get('status')} equity={r.get('equity')} "
+                f"build={e.get('build')}/{e.get('build_n')} "
+                f"svc={e.get('svc')} leverage={e.get('leverage')}")
+          sys.exit(0)
+          PY
+            then
+              echo "GEORGIA IS PUBLISHING — the swap landed."; exit 0
+            fi
+            echo "waiting for the row ($i/20)"; sleep 30
+          done
+          echo "::error::freqtrade-georgia-lighter never appeared after 10 min."
+          echo "::error::The container did not become georgia. Most likely the"
+          echo "::error::service has a config-as-code file overriding"
+          echo "::error::RAILWAY_DOCKERFILE_PATH — check trail-blazer-live's"
+          echo "::error::'Railway Config File' setting in the UI and clear it or"
+          echo "::error::point it at a toml building Dockerfile.avolive."
+          exit 1
