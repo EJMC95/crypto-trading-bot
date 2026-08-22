@@ -196,9 +196,25 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Commit explicit paths from a shared worktree, safely.")
     ap.add_argument("-m", "--message", help="commit message")
-    ap.add_argument("--shared", nargs="*", default=[],
+    # [2026-08-22 (ta)] `action="extend"`, NOT the default store.
+    #
+    # MEASURED, on this tool, in the session that added this line: with
+    # `nargs="*"` and the default store action, a SECOND `--shared` flag
+    # silently REPLACES the first, so
+    #     --shared CHANGELOG.md --shared CLAUDE.md
+    # committed CLAUDE.md and dropped the changelog entry entirely — no error,
+    # no warning, exit 0. This tool's whole reason to exist is that work does
+    # not silently go missing in a shared worktree, and its own argument parser
+    # was a way for work to silently go missing.
+    #
+    # The read-back caught it (the printed stat listed 9 files and the
+    # changelog was not among them), which is the guard working — but a receipt
+    # you have to read carefully is a worse guard than a flag that cannot lose
+    # a file. Both spellings now work: repeated flags accumulate, and several
+    # paths after one flag still work as documented.
+    ap.add_argument("--shared", nargs="*", default=[], action="extend",
                     help=f"explicitly include a shared doctrine file "
-                         f"({', '.join(SHARED_DOCTRINE)})")
+                         f"({', '.join(SHARED_DOCTRINE)}); repeatable")
     ap.add_argument("--dry-run", action="store_true",
                     help="show what would be committed, commit nothing")
     ap.add_argument("--selftest", action="store_true")

@@ -126,6 +126,16 @@ made them. The rule I broke is this file's own: **look at the target before you
 overwrite it** — a mutation harness that restores from a snapshot must restore
 from THAT snapshot, never from HEAD, when HEAD is not what you started from.
 
+**AND THE TOOL THAT EXISTS SO WORK IS NOT SILENTLY LOST WAS LOSING WORK.** This
+entry nearly did not ship: `session_commit.py --shared CHANGELOG.md --shared
+CLAUDE.md` committed CLAUDE.md and **dropped the changelog entirely** — exit 0,
+no warning. `--shared` used `nargs="*"` with argparse's default store action, so
+a second flag REPLACES the first. It was caught only because the read-back's stat
+listed nine files and the changelog was not among them, i.e. by the practice this
+repo already has (*"then READ BACK what actually landed"*). A receipt you have to
+read carefully is a weaker guard than a flag that cannot lose a file, so the flag
+is now `action="extend"` and both spellings accumulate.
+
 **Still with Eamon, and it is the whole of what remains:** the sub-account has
 not moved. No session in this container has a Railway CLI, and the ORDER is the
 safety property. `session_state.py` carries the three acts.
