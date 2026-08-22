@@ -151,6 +151,22 @@ repo already has (*"then READ BACK what actually landed"*). A receipt you have t
 read carefully is a weaker guard than a flag that cannot lose a file, so the flag
 is now `action="extend"` and both spellings accumulate.
 
+**"UPDATE AND SYNC EVERYWHERE" — WHAT THAT ACTUALLY MEANS HERE, because half
+of it must NOT be done yet.** Sweeping the tree for the retired row turns up two
+different kinds of reference and they have opposite deadlines. **Claims about
+INTENT** can be written now, and were: `fleet_manifest` marks the Farmer's live
+arm retired (its `flies_when` is rewritten to say the honest thing — a book whose
+only winning exit cannot be reached more often has no ceiling to raise) and 🔮
+georgia's live row gets its own design, whose `floor` is the sentence that
+matters: *she went live without passing the gate, so the drawdown arithmetic is
+the whole guardrail.* **Declarations that FOLLOW THE FEED must not** —
+`fleet_books.DECLARED_LIVE`, `LIVE_DEPLOY`, `deploy_live_verify`'s service→row
+map and `EVBOARD_LIVE_ROWS`/`PROP_LIVE_ROWS` are tripwires checked against the
+live payload ((mo)), so editing them before the sub-account moves makes them
+DISAGREE with reality and reddens the build. `audit_live_roster` is OK today and
+would not be. They are named individually in the carried row instead, so the
+distinction survives the session rather than living in my head.
+
 **Still with Eamon, and it is the whole of what remains:** the sub-account has
 not moved. No session in this container has a Railway CLI, and the ORDER is the
 safety property. `session_state.py` carries the three acts.
