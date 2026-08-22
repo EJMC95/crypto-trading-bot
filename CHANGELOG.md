@@ -1,3 +1,158 @@
+## 2026-08-22 (su) — 💸 THE FARMER'S "POOR DECISIONS" ARE NOT A KNOB, AND THE FIX I ALMOST SHIPPED TO REAL MONEY WAS MEASURED ON A POPULATION THE BOOK REFUSES
+
+**Eamon, 22-Aug:** *"fix farmers entry and exits as it's made poor decisions,
+recently to be specific"*.
+
+He is right that it turned over. Live: July **+$9.05** (mean +0.62%/trade) ->
+August **−$7.58** (−0.39%), second half of August **−$5.95 / 13 closes /
+−1.53%/trade**. Shadow: Jul +$17.84 -> Aug **−$19.34**, Aug-b −2.18%/trade at
+**t=−2.61**. Four gates, twelve exit variants and one harness defect later, the
+answer is that **no setting of either knob fixes it, and I can now prove that on
+the population the book actually trades — which nothing in this fleet could do
+before today.**
+
+### 1. It is not a funding book. Measured twice, independently.
+
+Decomposing every close carrying prices into price and residual: **August live
+mean −0.390% = price −0.408% + funding +0.018%.** Real settled accruals on live
+trades run **$0.0015–$0.018 on a $30 clip**. At `ENTER_APR` 0.05 and the
+measured ~6h median hold the maximum collectable is `5% × 6/8760` = **0.0034%**.
+The replay agrees from the other side: over 30 days at the shipped gate the
+funding column is **$1.15 across 145 trades** while price is −$2.90.
+
+**💸 the Funding Farmer is a directional short book with a rounding-error
+funding kicker**, and no field on its row said so.
+
+### 2. The gate sits BELOW the venue's resting default — and that is not the defect it looks like
+
+Measured over **147,879 hourly settled rows × 212 markets × 30d**: **37.78% of
+all coin-hours sit at exactly 0.0012%/hr = 10.512% TRUE APR** (the venue's
+resting default) and 36.76% at 3.504% — **74.5% of the venue rests on two
+constants**. A 5% bar admits **55.24% of every coin-hour on the venue**.
+Reconstructing each live trade's entry APR from the venue's own settled tape:
+**77.2% of the live book's entries fired at EXACTLY 10.512%**, the idle rate.
+
+`lighter_funding_bot.py` has carried that finding in a comment since 17-Jul,
+together with a sweep table making 0.05 the WORST of four values and 0.20 the
+best (+$22.51), and a deferral: *"re-derive the gate when paired decision/fill
+prices exist on THIS book"*. **That precondition is now met** —
+`impl_shortfall.order_slip.live` reads **33 real fills, all `trades(tx)`,
+`echoed_decision: 0`, slip 0.13bps** — so I re-derived it. At 25 markets / 150d
+/ 0.13bps the answer looked emphatic: gate **0.40 = +$14.95, both halves
+positive, maxDD −$13.15**, against the live 0.05 at −$0.20 and h2 −20.89.
+Slip-robust at 0.13 / 0.86 / 5.0 bps. I was one commit from shipping it to a
+real-money row.
+
+### 3. THE HARNESS WAS REPLAYING A POPULATION THE BOOK REFUSES, AND THAT IS THE REAL FINDING
+
+At universe **50** the same sweep INVERTS: 0.20 goes +$4.24 -> **−$63.87** and
+the live 0.05 goes −$5.11 -> **+$6.65**. Isolating the variables, it is the
+UNIVERSE, not the window.
+
+Why: `backtest_funding_lighter` selects **top N by rank**; the live bot selects
+by an **absolute floor**, `MIN_VOL = $10M/day`. Measured on the venue 22-Aug:
+**only 11 of 212 active markets clear $10M.** The 25th-ranked market trades
+$2.59M and markets 26–50 are ALL between $1.1M and $2.5M — so **14 of the
+canonical top-25 and 39 of the top-50 sit below the live book's own floor.**
+Every gate verdict this harness has printed, including the table quoted at
+`ENTER_APR` in the live bot's source, was measured on books the live book
+mostly cannot enter.
+
+**Fixed.** `fetch_candles(..., with_volume=True)` keeps the quote volume the
+loader was throwing away, and `vol24()` reconstructs trailing 24h quote volume
+per market per hour off the candle tape — the point-in-time volume `(ny)`
+recorded as *"not reconstructable"* (true of the orderBookDetails snapshot,
+false of the tape, which pages back 438 days). Volume is **opt-in**: seven
+scripts import `fetch_candles` and unpack it directly, so an unconditional
+tuple would have bound `(ohlc, vol)` to `cand` in every one and replayed
+nonsense — I made that change before catching it. Cache schema bumped so a
+pre-volume cache is refetched rather than silently answering "no market ever
+cleared the floor".
+
+### 4. On the honest population, the shipped gate is the BEST value — and the calibration gate is what says so
+
+`scripts/study_farmer_gate_minvol_2026-08-22.py`, 250d, 59 markets, **51,391
+eligible coin-hours (16.91%)**:
+
+| gate | P&L | n | mean%/t | maxDD | h1 | h2 |
+|---|---|---|---|---|---|---|
+| **0.05 (shipped)** | **+$23.81** | 1643 | **+0.058** | −31.82 | −13.00 | +36.23 |
+| 0.08 | −$16.51 | 1447 | −0.046 | −40.13 | −21.93 | +4.74 |
+| 0.12 | −$39.10 | 517 | −0.303 | −41.45 | −33.31 | −6.12 |
+| 0.20 | −$27.73 | 394 | −0.281 | −30.20 | −22.62 | −5.44 |
+| 0.40 | −$16.77 | 223 | −0.301 | −17.22 | −14.33 | −2.78 |
+
+**And the calibration gate ((gx)) PASSES for the first time**: the min-vol
+replay at the shipped gate reads **+0.058%/trade against the live book's
+realised +0.131%** — a 0.073pp gap against a 0.60pp tolerance. This harness has
+never reproduced this book before; unfiltered it reads −0.003%/trade.
+
+On the **last 30 and 60 days** every gate loses and **0.05 is the least bad**
+(−0.050%/trade vs −1.110% at 0.40). So the recent losses are a REGIME, not a
+misconfiguration, and every direction the obvious fix points is worse.
+
+**The instrument fix is the deliverable here: it prevented a real-money
+change.** A refusal with evidence satisfies the growth rule.
+
+### 5. The exits: twelve variants, same answer
+
+Sweeping `MAX_HOLD_H` / `TAKE_PROFIT` / `HARD_STOP` on the same honest
+population: at 250d, `hold 8h` (+$22.28, halves **+7.73/+14.09**), `hold 12h`
+and `sl 15%` are the only variants clearing BOTH HALVES — which the shipped
+config does not. At 60d every one of them is WORSE than shipped (hold 8h
+−$12.14 vs −$4.32). A knob whose sign depends on the window is not an edge.
+**Refused.**
+
+**The sibling books' flip-grace fix does NOT transfer, and this is I14's shape
+again.** 🌾 carry, 🏦 Rich Dad and 🧮 Hull all added a flip grace (6h/6h/24h) on
+measurement; the Farmer has none — `flipped` fires the instant apr crosses
+zero. But on THIS book the young flips are the profitable ones: flips under 12h
+read **+0.19%/trade** (n=36 live, n=45 shadow) and the entire burn is in flips
+held **>12h** (live n=11, −22.9 points of a −19.8 total). A grace would delay
+exactly the good ones. Stated at its real strength: that is a LEDGER
+measurement plus an inference, not a replayed counterfactual.
+
+### 6. What shipped: the number that says four positions are one bet
+
+Measured on the live holdings — BTC/ETH/SOL/XAU, **all short** — through the
+fleet's own correlation code: **N_eff 1.389, mean rho +0.627**; the crypto leg
+alone (BTC/ETH/SOL) **N_eff 1.11, rho +0.851**. The row published
+`open_trades: 4` and `margin.n: 4` and nothing that could tell four bets from
+one. August is what that costs: **SOL −$2.69, BTC −$2.00, XAU −$1.97, ETH
+−$1.30** — every leg losing in the same fortnight because they were one short
+position wearing four names into a rally.
+
+This is exactly `(sr)`'s finding at 🙏 Avo (N_eff 1.18 on QQQ/SPY/NVDA), on the
+fleet's OTHER real-money row, undiagnosed. `extra.basket` now publishes
+`{n, n_eff, rho, measured}` every loop. **Reported, never a gate** — `(sr)`
+earned leverage on Avo by measuring independence first; this book has no such
+measurement, so the number goes on the row and acting on it is a separate,
+measured decision.
+
+The math moved to **`fleet_bus`**, which is now its ONE owner (COPY'd into both
+images already, so no new dependency and no born-dark risk); 🙏 Avo delegates to
+it. A second copy of a rule is a second rule ((hj)).
+
+### Recorded because they are the instructive part
+
+* **A green run with no output is not a pass.** My first `fleet_bus` edit landed
+  the new functions *inside* the `__main__` block, which dedented it — so the
+  selftest assertions became **dead code after a `return`** and the whole
+  selftest stopped printing. `python3 fleet_bus.py` exited **0**. It was caught
+  only by asking why a passing selftest printed nothing, which is this file's
+  own *"empty output is not a negative result"* rule biting on me.
+* **`entry_apr` is NOT missing.** I was about to "fix" the ledger's
+  never-recorded entry rate — 1 of 136 rows carries it — before checking:
+  the stamp shipped 19-Aug and works; only positions opened since carry it. The
+  class is closed and was closed before I got here.
+
+`tests` — `lighter_funding_bot --selftest` gains `_selftest_basket` (identical /
+flat-leg / dark-venue / dark-BUS / empty / cached / evicted / **forming-bar
+look-ahead**), **6 of 6 mutations verified RED**; `fleet_bus`'s own selftest
+gains the correlation cases, verified to bite. Two of those six mutations
+survived the first round — an untested look-ahead guard and an untested dark-bus
+path — and both were holes in MY test, not in the code.
+
 ## 2026-08-22 (st) — "AVO HASN'T TRADED IN FAR TOO LONG": IT IS HELD-STARVED AND GATE-REFUSED, NOT SIGNAL-STARVED — and the real-money row could not say so
 
 **Eamon, 22-Aug:** *"Avo Maria hasn't traded in far too long / please deep dive"*.

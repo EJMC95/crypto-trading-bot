@@ -89,6 +89,7 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 import funding_basis
+import fleet_bus as _bus            # [(su)] the ONE owner of the basket math
 import fleet_tuning as tuning
 from lighter_family_bot import (
     STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE,
@@ -287,67 +288,18 @@ def cap_slots(clip, cap, slots):
 # IT COSTS NOTHING AT THE VENUE: `CandleCache` is one governed fetch per
 # (coin, tf) per CLOSED candle shared across books, and the entry loop already
 # calls `cache.get` for these symbols, so the correlations ride bars we have.
-CORR_MIN_OVERLAP = 30      # bars of shared history before a pair is measurable
-CORR_LOOKBACK = 180        # bars used per symbol
-
-
-def _bar_returns(bars, n=CORR_LOOKBACK):
-    """{bar_ts: simple return} from the newest `n` bars. {} when unusable —
-    never a partial series a correlation could be computed off."""
-    if not bars:
-        return {}
-    ts, cs = bars.get("t") or [], bars.get("c") or []
-    if len(ts) != len(cs) or len(cs) < CORR_MIN_OVERLAP + 1:
-        return {}
-    out = {}
-    for i in range(max(1, len(cs) - n), len(cs)):
-        prev = cs[i - 1]
-        try:
-            if prev:
-                out[ts[i]] = float(cs[i]) / float(prev) - 1.0
-        except (TypeError, ValueError, ZeroDivisionError):
-            continue
-    return out
-
-
-def _pair_corr(a, b):
-    """Pearson correlation over the SHARED timestamps. None when the overlap is
-    too short or either leg is flat — unknown, never 0.0, which would read as
-    'perfectly diversifying' and is the one error that would buy leverage."""
-    days = sorted(set(a) & set(b))
-    if len(days) < CORR_MIN_OVERLAP:
-        return None
-    xs = [a[d] for d in days]
-    ys = [b[d] for d in days]
-    n = len(xs)
-    mx, my = sum(xs) / n, sum(ys) / n
-    vx = sum((v - mx) ** 2 for v in xs)
-    vy = sum((v - my) ** 2 for v in ys)
-    if vx <= 0 or vy <= 0:
-        return None
-    cov = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
-    return cov / ((vx ** 0.5) * (vy ** 0.5))
-
-
-def basket_n_eff(rets, names):
-    """(N_eff, mean_rho) for a basket — the correlation-aware count of
-    INDEPENDENT bets (I22: market count is not bet count). (None, None) when
-    nothing is measurable, so a dark read is never credited as independence."""
-    names = [n for n in names if rets.get(n)]
-    if len(names) < 2:
-        return (float(len(names)) if names else None), None
-    cs = []
-    for i in range(len(names)):
-        for j in range(i + 1, len(names)):
-            c = _pair_corr(rets[names[i]], rets[names[j]])
-            if c is not None:
-                cs.append(c)
-    if not cs:
-        return None, None
-    rho = sum(cs) / len(cs)
-    n = len(names)
-    denom = 1.0 + (n - 1) * rho
-    return (n / denom if denom > 0 else float(n)), rho
+# [2026-08-22 (su)] THE MATH MOVED TO `fleet_bus`, WHICH IS NOW ITS ONE OWNER.
+# 💸 the LIVE Funding Farmer needed exactly this measurement (it holds
+# BTC/ETH/SOL/XAU at N_eff 1.389, its crypto leg at 1.11) and a second copy of
+# a rule is a second rule ((hj)). `fleet_bus` is COPY'd into both images, so
+# both real-money rows now compute independence the same way, once. These names
+# stay as thin aliases: the (sr) tests and `diversified_order` below bind them,
+# and re-pointing every call site on the same day would be churn, not clarity.
+CORR_MIN_OVERLAP = _bus.CORR_MIN_OVERLAP
+CORR_LOOKBACK = _bus.CORR_LOOKBACK
+_bar_returns = _bus.bar_returns
+_pair_corr = _bus.pair_corr
+basket_n_eff = _bus.basket_n_eff
 
 
 def diversified_order(universe, held, rets):

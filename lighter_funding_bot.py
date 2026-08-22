@@ -276,6 +276,12 @@ restore_hot_since = funding_basis.restore_hot_since
 # restrict-only means worst case is FEWER entries, never more exposure.]
 VOL_FILTER = os.environ.get("FUNDING_VOL_FILTER", "on").strip().lower() in ("on", "1", "true")
 VOL_FILTER_WIN_H = int(os.environ.get("FUNDING_VOL_FILTER_WIN_H", "336"))   # 14d, = the study
+# [(su)] hourly bars per leg behind the published basket independence. DERIVED
+# from the owner rather than retyped — a retyped constant is a constant that
+# drifts, and this fleet has paid for that twice. The literal is only the
+# fallback for an image without fleet_bus, where `_basket_block` returns None
+# anyway and the value is never used.
+NEFF_LOOKBACK_H = 180
 VOL_FILTER_MIN_H = 72          # rets needed before a vol is trusted (= the study)
 VOL_FILTER_MIN_XS = 8          # cross-section floor below which the filter is inert (= the study)
 VOL_FILTER_UNIVERSE_MAX = int(os.environ.get("FUNDING_VOL_FILTER_UNIVERSE_MAX", "40"))
@@ -429,6 +435,9 @@ try:
     import fleet_bus
 except Exception:  # noqa: BLE001
     fleet_bus = None
+else:
+    # [(su)] see NEFF_LOOKBACK_H above — derive, never retype.
+    NEFF_LOOKBACK_H = int(getattr(fleet_bus, "CORR_LOOKBACK", NEFF_LOOKBACK_H))
 
 _ENV_BARS = {"enter_apr": ENTER_APR, "scan_enter": SCAN_ENTER,
              "take_profit": TAKE_PROFIT, "max_hold_h": MAX_HOLD_H,
@@ -1180,6 +1189,82 @@ def _candle_features(ctx, coin):
     feats = {"vol": vol, "ret_mom": ret_mom}
     _feat_cache[coin] = (last_closed, feats)
     return feats
+
+
+# ---- basket independence ----------------------------------------------------
+# [2026-08-22 (su)] "FOUR POSITIONS" AND "ONE BET" WERE THE SAME BYTE-STRING ON
+# THE FLEET'S OTHER REAL-MONEY ROW.
+#
+# Measured 22-Aug on this book's live holdings — BTC/ETH/SOL/XAU, all SHORT —
+# using the fleet's own correlation owner: **N_eff 1.389, mean rho +0.627**,
+# and the crypto leg alone (BTC/ETH/SOL) **N_eff 1.11, rho +0.851**. Three
+# names, one bet. The row published `open_trades: 4` and `margin.n: 4` and
+# nothing that could distinguish four bets from one, which is I22's whole
+# point: market count is not bet count.
+#
+# WHAT IT COST, from this book's own August ledger: SOL -$2.69, BTC -$2.00,
+# XAU -$1.97, ETH -$1.30 — every position losing in the same fortnight,
+# because they were one short position wearing four names into a rally.
+#
+# REPORTED, NEVER A GATE. Nothing here refuses an entry or resizes a clip:
+# `(sr)` earned leverage on 🙏 Avo by MEASURING independence first, and this
+# book has no such measurement yet. The number goes on the row so the question
+# can be asked; acting on it is a separate, measured decision.
+#
+# Cache keyed on the last CLOSED hour, exactly like `_feat_cache` / `_vf_cache`
+# above, and scoped to the HELD set (<= MAX_OPEN coins), so it rides the same
+# hourly candle budget those two already pay.
+_neff_cache = {}   # coin -> (last_closed_hour, {bar_ts: return})
+
+
+def _basket_block(ctx, held):
+    """{'n_eff', 'rho', 'n', 'measured'} for the held basket, or None.
+
+    None — never a fabricated 1.0 — whenever the venue cannot answer or fewer
+    than two legs are measurable: "unknown independence" and "one bet" must not
+    render identically, and a 0.0 correlation would read as PERFECT
+    diversification, the one error that would justify more size (the fleet_bus
+    contract this delegates to)."""
+    if fleet_bus is None or not held:
+        return None
+    now = time.time()
+    last_closed = int(now // 3600) * 3600 - 3600
+    rets = {}
+    for coin in sorted(held):
+        hit = _neff_cache.get(coin)
+        if hit and hit[0] == last_closed:
+            rets[coin] = hit[1]
+            continue
+        try:
+            rows = ctx.venue.candles(
+                coin, "1h", int((now - (NEFF_LOOKBACK_H + 4) * 3600) * 1000),
+                int(now * 1000))
+        except Exception:  # noqa: BLE001 — telemetry never breaks a trading loop
+            continue
+        bars = []
+        for c in rows or []:
+            try:
+                t_s, cl = int(c["t"]) // 1000, float(c["c"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if t_s <= last_closed:            # drop the forming bar
+                bars.append((t_s, cl))
+        bars.sort()
+        r = fleet_bus.bar_returns({"t": [b[0] for b in bars],
+                                   "c": [b[1] for b in bars]})
+        _neff_cache[coin] = (last_closed, r)
+        rets[coin] = r
+    for stale in [c for c in _neff_cache if c not in held]:
+        _neff_cache.pop(stale, None)
+    try:
+        n_eff, rho = fleet_bus.basket_n_eff(rets, list(held))
+    except Exception:  # noqa: BLE001
+        return None
+    if n_eff is None:
+        return None
+    return {"n": len(held), "n_eff": round(n_eff, 3),
+            "rho": (round(rho, 3) if rho is not None else None),
+            "measured": sum(1 for c in held if rets.get(c))}
 
 
 # ---- 🧪 vol-character filter helpers (see the VOL_FILTER block above) -------
@@ -3382,6 +3467,9 @@ def main():
                        # telemetry read may never raise into a real-money
                        # trading loop.
                        "margin": _margin_block(ctx, set(meta) | set(pos)),
+                       # [(su)] I22 — is this four bets or one? See
+                       # `_basket_block`. None when unmeasurable, never 1.0.
+                       "basket": _basket_block(ctx, set(meta) | set(pos)),
                        # [(qz)] The ruin gate's BITE, on the row rather than
                        # in container logs alone. `0` published every loop is
                        # the point: an omitted key is byte-identical between
@@ -3788,6 +3876,83 @@ def _selftest_scan_receipts():
     assert len(p3["slope"]["ratios"]) == RECEIPTS_CAP, "slope list capped"
     assert len(p3["conviction"]["raws"]) == RECEIPTS_CAP, "conv list capped"
     print("lighter_funding_bot _selftest_scan_receipts OK")
+
+
+def _selftest_basket():
+    """[(su)] The basket-independence block, driven through the REAL venue
+    seam — a fake `ctx.venue.candles` returning real-shaped rows, never a
+    hand-written return value for `_basket_block` itself ((hj))."""
+    class _V:
+        def __init__(self, series, forming=None):
+            self.series = series
+            self.forming = forming or {}
+            self.calls = []
+
+        def candles(self, coin, tf, start_ms, end_ms):
+            self.calls.append((coin, tf))
+            if coin not in self.series:
+                raise RuntimeError("no such market")
+            now_h = int(time.time() // 3600) * 3600
+            # bars BACK from two hours ago, so none is the forming bar...
+            rows = [{"t": (now_h - (n + 2) * 3600) * 1000, "c": c}
+                    for n, c in enumerate(reversed(self.series[coin]))]
+            # ...unless the fixture asks for one, which is how the look-ahead
+            # guard gets TESTED rather than merely written.
+            if coin in self.forming:
+                rows.append({"t": now_h * 1000, "c": self.forming[coin]})
+            return rows
+
+    class _C:
+        def __init__(self, v):
+            self.venue = v
+
+    _neff_cache.clear()
+    n = 120
+    up = [100.0 * (1.0 + 0.01 * (1 if i % 2 else -1)) + i for i in range(n)]
+    ctx = _C(_V({"A": list(up), "B": list(up), "C": [100.0] * n}))
+    b = _basket_block(ctx, {"A", "B"})
+    assert b and abs(b["n_eff"] - 1.0) < 1e-6 and abs(b["rho"] - 1.0) < 1e-6, b
+    assert b["n"] == 2 and b["measured"] == 2, b
+    # a FLAT leg is unmeasurable — it must not be credited as diversification
+    _neff_cache.clear()
+    b2 = _basket_block(_C(_V({"A": list(up), "C": [100.0] * n})), {"A", "C"})
+    assert b2 is None, f"an unmeasurable pair must be None, never a number: {b2}"
+    # THE FORMING BAR IS DROPPED. Two legs identical on every CLOSED bar and
+    # divergent on the current (still-forming) one: rho is exactly 1.0 iff the
+    # forming bar never entered the series. Reading it would be a look-ahead —
+    # the same defect `_candle_features` above was fixed for in July.
+    _neff_cache.clear()
+    fb = _basket_block(_C(_V({"A": list(up), "B": list(up)},
+                            forming={"A": 500.0, "B": 1.0})), {"A", "B"})
+    assert fb and abs(fb["rho"] - 1.0) < 1e-9, \
+        f"the forming bar leaked into the correlation: {fb}"
+    # a dark venue publishes NOTHING rather than a confident 1.0x
+    _neff_cache.clear()
+    assert _basket_block(_C(_V({})), {"A", "B"}) is None
+    assert _basket_block(ctx, set()) is None, "an empty book has no basket"
+    # ...and so does a dark BUS: an image without fleet_bus must publish no
+    # basket at all, never a fabricated one-bet-per-name default.
+    global fleet_bus
+    _saved_bus, fleet_bus = fleet_bus, None
+    try:
+        _neff_cache.clear()
+        assert _basket_block(ctx, {"A", "B"}) is None, \
+            "a dark fleet_bus must publish NO basket, not a default"
+    finally:
+        fleet_bus = _saved_bus
+    # the hourly cache really caches: a second call re-fetches nothing
+    _neff_cache.clear()
+    v = _V({"A": list(up), "B": list(up)})
+    c2 = _C(v)
+    _basket_block(c2, {"A", "B"})
+    first = len(v.calls)
+    _basket_block(c2, {"A", "B"})
+    assert len(v.calls) == first, "the basket read is not cached per closed hour"
+    # a coin that left the book is evicted, not carried forever
+    _basket_block(c2, {"A"})
+    assert "B" not in _neff_cache, "a closed leg must be evicted from the cache"
+    _neff_cache.clear()
+    print("  basket independence: identical/flat-leg/dark/empty/cached/evict OK")
 
 
 def _selftest_scan_census():
@@ -4491,6 +4656,7 @@ if __name__ == "__main__":
         _selftest_entry_admission()
         _selftest_scan_receipts()
         _selftest_scan_census()
+        _selftest_basket()
         sys.exit(0)
     try:
         _supervised()
