@@ -240,3 +240,258 @@ def test_the_ceiling_is_ten_and_is_a_ceiling_not_a_setting():
         with loaded(book) as m:
             assert m.GROSS_X_MAX == 10.0
             assert m.GROSS_X == 1.0 and m.gross_x() == 1.0
+
+
+# ---- 12  [(sz)] THE BOOT SMOKE --------------------------------------------
+#
+# Everything above reads the module. This DRIVES it: one full cycle of the real
+# `main()` as 🔮 georgia, through the real entry path, against a stub venue.
+#
+# It exists because `--selftest` cannot cover her. That suite is SwingDip-shaped
+# — 4h dip bars, `dip_in_uptrend` tags — so under georgia it exercises the
+# generic machinery and then fails on its own fixture. The honest fix was to
+# make `--selftest` REFUSE a non-Avo book (a suite that runs 3 of 13 checks and
+# exits 0 reports clean having inspected almost nothing), and that refusal is
+# only defensible if the coverage it points at actually exists. This is it.
+#
+# THE FAILURE IT IS AIMED AT is the one that costs real money: georgia's
+# service booting and managing 🙏 AVO'S row, state key and positions. Nothing
+# above could catch that, because every check above reads a constant — this is
+# the only place the identity has to survive contact with the loop.
+
+@contextlib.contextmanager
+def _driven(m):
+    """Stub the venue-facing surface of `m` and hand back the capture box.
+
+    Patches are made on the MODULE OBJECTS (`bot_pnl_store`, `venues.marks`)
+    and restored on the way out, because those are shared with every other test
+    in the session — a leaked `store.publish` stub would silently swallow
+    another module's writes."""
+    import bot_pnl_store as store
+    from venues import marks
+
+    box = {"paper": [], "orders": [], "state": {}, "published": [],
+           "printed": []}
+
+    N = 240
+    c = [100.0 * (1.004 ** i) for i in range(N)]
+    c[-1] = c[-2] * 1.03                    # break the 20-bar high -> breakout
+    h = [x * 1.005 for x in c]
+    h[-1] = c[-1] * 1.001
+    bars = {"t": list(range(N)), "o": c, "h": h,
+            "l": [x * 0.995 for x in c], "c": c, "v": [1.0] * N}
+
+    class _Cache:
+        def __init__(self, venue):
+            pass
+
+        def get(self, coin, tf):
+            return bars
+
+    class _Venue:
+        def __init__(self):
+            self.opens, self.closes, self.pos = [], [], {}
+
+        def supports(self, coin):
+            return coin in ("BTC", "ETH")
+
+        def account_value(self):
+            return 200.0
+
+        def pop_capital_moves(self):
+            return []
+
+        def positions(self):
+            return dict(self.pos)
+
+        def funding_map(self):
+            return {}
+
+        def candles(self, coin, interval, start_ms, end_ms):
+            return []
+
+        def market_open(self, coin, is_long, size):
+            self.opens.append((coin, is_long, size))
+            self.pos[coin] = {"size": size, "entry": c[-1]}
+            return {"client_order_index": 1}
+
+        def market_close(self, coin):
+            self.closes.append(coin)
+            self.pos.pop(coin, None)
+            return {"client_order_index": 2}
+
+    class _Rails:
+        live = True
+        max_notional = 1000.0
+
+        def kill_check(self):
+            return False
+
+        def daily_loss_hit(self, ds, eq):
+            return False
+
+        def confirm_daily_loss(self, ds, eq, lim, rd, delay_s=0):
+            return True, eq
+
+        def notional_ok(self, open_ntl, add):
+            return (open_ntl + add) <= self.max_notional + 1e-9
+
+    saved_store = {k: getattr(store, k, None) for k in (
+        "heartbeat", "claim_writer", "snapshot_equity", "publish_paper_trade",
+        "publish_venue_order", "publish", "save_state", "load_state",
+        "load_state_checked", "save_daily_halt", "load_daily_halt",
+        "set_status", "fetch_paper_aggregate", "service_name")}
+    saved_mark = marks.fresh_mid
+    saved_mod = {k: getattr(m, k) for k in (
+        "CandleCache", "btc_regime_up", "btc_tide_up", "noncrypto_regimes",
+        "_PRINT")}
+
+    store.heartbeat = lambda bot: None
+    store.claim_writer = lambda bot, now=None: (True, None)
+    store.snapshot_equity = \
+        lambda bot, eq, open_trades=None, realized=None: True
+    store.publish_paper_trade = \
+        lambda bot, **kw: box["paper"].append((bot, kw))
+    store.publish_venue_order = \
+        lambda bot, **kw: box["orders"].append((bot, kw))
+    store.publish = lambda bot, **kw: box["published"].append((bot, kw))
+    store.save_state = \
+        lambda k, v: box["state"].__setitem__(k, v) or True
+    store.load_state = lambda k: box["state"].get(k)
+    store.load_state_checked = lambda k: (True, box["state"].get(k))
+    store.save_daily_halt = lambda bot, day, eq=None: True
+    store.load_daily_halt = lambda bot, day: None
+    store.set_status = lambda bot, st: None
+    store.fetch_paper_aggregate = lambda bot: None
+    store.service_name = lambda: "boot-smoke"
+    marks.fresh_mid = lambda venue, coin: c[-1]
+    m.CandleCache = _Cache
+    m.btc_regime_up = lambda cache: True
+    m.btc_tide_up = lambda cache: True
+    m.noncrypto_regimes = lambda: {}
+    m._PRINT = lambda *a, **k: box["printed"].append(" ".join(str(x)
+                                                             for x in a))
+    try:
+        box["venue"], box["rails"] = _Venue(), _Rails()
+        yield box
+    finally:
+        for k, v in saved_store.items():
+            if v is not None:
+                setattr(store, k, v)
+        marks.fresh_mid = saved_mark
+        for k, v in saved_mod.items():
+            setattr(m, k, v)
+
+
+def test_georgia_boots_and_completes_a_cycle_as_HERSELF():
+    """One real cycle. She must publish to HER row, restore HER state key, and
+    never touch Avo's — the whole point of the variant host, driven rather than
+    asserted about a constant."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+
+        rows = [b for b, _ in box["published"]]
+        assert rows and set(rows) == {"freqtrade-georgia-lighter"}, rows
+        assert not any("avo" in r for r in rows), rows
+        assert not any("avo" in k for k in box["state"]), list(box["state"])
+        assert "freqtrade-georgia-lighter:live" in box["state"]
+
+        pub = box["published"][-1][1]
+        pol = pub["extra"]["policy"]
+        assert pol["strategy"] == "daytrader-15m", pol
+        assert pol["venue"] == "lighter_live"
+
+
+def test_georgia_sizes_off_HER_geometry_not_avos():
+    """`clip = equity * gross_x / max_open`. The number is hers because
+    `S.max_open` is hers — this drives it rather than trusting the formula,
+    which is how a variant host silently trades the wrong book's size."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            assert box["venue"].opens, "georgia's breakout must open"
+            _coin, is_long, size = box["venue"].opens[0]
+            assert is_long is True
+            want = 200.0 * m.gross_x() / m.S.max_open
+            got = size * box["venue"].pos[_coin]["entry"]
+            assert abs(got - want) < 1.0, (got, want, m.gross_x(), m.S.max_open)
+
+        ordr = box["orders"][0]
+        assert ordr[0] == "freqtrade-georgia-lighter", ordr[0]
+        assert ordr[1]["shadow"] is False
+
+
+def test_her_cycle_publishes_the_leverage_and_scan_blocks():
+    """The two censuses a levered live book is read by. `(sr)`/`(sy)` put the
+    liquidation arithmetic on the row so a setting's consequences are readable
+    every loop instead of re-argued; `(st)` put the scan verdicts there so
+    `open: 0` is never byte-identical between "quiet" and "shut"."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        extra = box["published"][-1][1]["extra"]
+        lev = extra["leverage"]
+        assert lev["set"] == 5.0
+        # UNIT: these are FRACTIONS despite the `_pct` suffix, which is (sr)'s
+        # convention and is pinned here because I got it wrong writing this
+        # test. 0.25 = a 25% book-level loss if all five slots stop together.
+        assert lev["all_slots_stop_pct"] == 0.25, lev
+        assert "scan" in extra and extra["scan"]
+
+    # The same setting on 🙏 Avo costs TWICE as much, because her stop is twice
+    # as wide. Both in one test so "5x" can never read as one number again.
+    with loaded(AVO_GROSS_X="5") as a:
+        with _driven(a) as box:
+            a.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        assert box["published"][-1][1]["extra"]["leverage"][
+            "all_slots_stop_pct"] == 0.50
+
+
+def test_the_boot_gate_names_HER_cap_env_not_avos():
+    """I8 on the one instruction a real-money service prints as it refuses to
+    start. This message named `FREQTRADE_AVO_MARIA_MAX_NOTIONAL` verbatim, so
+    georgia's operator would have been sent to set another book's cap."""
+    with loaded("freqtrade-georgia") as m:
+        with _driven(m) as box:
+            box["rails"].max_notional = None
+            with pytest.raises(SystemExit) as e:
+                m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                       once=True)
+        assert "FREQTRADE_GEORGIA_MAX_NOTIONAL" in str(e.value), str(e.value)
+        assert "AVO" not in str(e.value), str(e.value)
+
+
+def test_selftest_REFUSES_a_non_avo_book_rather_than_half_running():
+    """The refusal the test above exists to justify. `--selftest` is
+    SwingDip-shaped; under georgia it would run a handful of generic checks and
+    then die on its own fixture. A suite that inspects almost nothing and exits
+    0 is the "a check that inspects nothing reports clean" trap — so it exits
+    NON-ZERO and names where her coverage actually lives.
+
+    Driven as a subprocess because the thing under test is the process's exit
+    code, and an in-process `SystemExit` catch would prove something weaker."""
+    import subprocess
+    env = dict(os.environ, FAMILY_LIVE_BOOK="freqtrade-georgia")
+    env.pop("DATABASE_URL", None)
+    p = subprocess.run(
+        [sys.executable, "lighter_avo_live_bot.py", "--selftest"],
+        cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=120)
+    assert p.returncode != 0, p.stdout[-2000:]
+    out = p.stdout + p.stderr
+    assert "test_variant_host" in out, out[-2000:]
+
+    # ...and the Avo path it protects is UNCHANGED: the same command with no
+    # book set must still run the real suite green. Without this half, the
+    # refusal above is satisfiable by breaking --selftest for everybody.
+    env2 = dict(os.environ)
+    env2.pop("FAMILY_LIVE_BOOK", None)
+    env2.pop("DATABASE_URL", None)
+    q = subprocess.run(
+        [sys.executable, "lighter_avo_live_bot.py", "--selftest"],
+        cwd=str(ROOT), env=env2, capture_output=True, text=True, timeout=300)
+    assert q.returncode == 0, (q.stdout[-3000:], q.stderr[-2000:])

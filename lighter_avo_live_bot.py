@@ -101,7 +101,7 @@ from lighter_family_bot import (
 )
 from venues import marks
 from venues.safety import (
-    SafetyRails, open_notional, capital_adjusted_day_start)
+    SafetyRails, open_notional, capital_adjusted_day_start, env_prefix)
 from venues.fills import read_fill, measured_from_reason
 
 # ---------------------------------------------------------------------------
@@ -648,8 +648,12 @@ def main(_ctx=None, once=False):
         except Exception:  # noqa: BLE001
             pass
         raise SystemExit(
-            "lighter_live requires an explicit per-bot notional cap "
-            "(FREQTRADE_AVO_MARIA_MAX_NOTIONAL) — refusing to start.")
+            # [(sz)] DERIVED, not typed. This named Avo's cap env verbatim, so
+            # under 🔮 georgia the one instruction the operator gets at boot
+            # would have sent them to set the WRONG book's cap — I8, on the
+            # message a real-money service prints as it refuses to start.
+            f"lighter_live requires an explicit per-bot notional cap "
+            f"({env_prefix(BOT)}_MAX_NOTIONAL) — refusing to start.")
 
     cache = CandleCache(venue)
     universe = [c for c in (list(COINS) + list(NONCRYPTO_UNIVERSE))
@@ -1644,6 +1648,24 @@ def _supervised():
 def _selftest():
     import lighter_family_bot as fam
 
+    # [(sz)] THIS SUITE IS SwingDip-SHAPED, and says so rather than half-running.
+    # Its thirteen scenarios feed 4h dip bars and `dip_in_uptrend` tags, so under
+    # 🔮 georgia (DayTraderGated, 15m) they exercise the generic machinery and
+    # then fail at "dip signal must open" — a failure about the FIXTURE, not the
+    # book. Refusing is the honest form: a suite that ran three of its thirteen
+    # checks and exited 0 would report clean having inspected almost nothing,
+    # which is the exact trap this repo has paid for.
+    #
+    # georgia's coverage is real and lives elsewhere:
+    #   tests/autonomy/test_variant_host.py — identity, env namespacing, the
+    #   refusal on an unknown book, the leverage/liquidation arithmetic, and a
+    #   BOOT SMOKE that drives this same main() one cycle as her.
+    if BOT != "freqtrade-avo-maria":
+        raise SystemExit(
+            f"--selftest is the 🙏 Avo SwingDip scenario suite; {BOT} is "
+            f"covered by tests/autonomy/test_variant_host.py. Run it without "
+            f"FAMILY_LIVE_BOOK set, or run pytest for the variant.")
+
     print("Running Avo LIVE self-test (stub venue)...\n")
 
     # The single most load-bearing fact: the strategy object IS the family
@@ -1652,11 +1674,22 @@ def _selftest():
     assert S is next(x for x in fam.STRATEGIES if x.bot == BOT), \
         "S must BE lighter_family_bot's configured instance"
     # [(sr)] 4 -> 5 slots, measured (see the registry comment in
-    # lighter_family_bot). The STOP pin stays -0.10 and is now doubly
-    # load-bearing: GROSS_X_MAX is DERIVED from it (0.15/|stoploss|), so a stop
-    # widened without re-reading that derivation silently raises the leverage
-    # ceiling on a real-money book.
-    assert S.max_open == 5 and abs(S.stoploss - (-0.10)) < 1e-9
+    # lighter_family_bot). The STOP pin is doubly load-bearing: the whole
+    # leverage layer derives from it — `vol_target_gross_x` (0.15/|stoploss|)
+    # and `stop_reachable`'s ceiling (1/(|stoploss|+mmf)) — so a stop widened
+    # without re-reading those silently changes what a leverage setting MEANS
+    # on a real-money book.
+    #
+    # [(sz)] PER BOOK, now that this module is a variant host. Written as a
+    # table rather than `whatever S says`, which would be vacuous: each book is
+    # pinned to its OWN known geometry, and a book added to `_BOOKS` without an
+    # entry here fails rather than running unpinned.
+    _EXPECT = {"freqtrade-avo-maria": (5, -0.10),
+               "freqtrade-georgia": (5, -0.05)}
+    assert BOT in _EXPECT, f"{BOT} is live-capable but has no geometry pin"
+    _slots, _stop = _EXPECT[BOT]
+    assert S.max_open == _slots and abs(S.stoploss - _stop) < 1e-9, \
+        f"{BOT} geometry moved: slots {S.max_open} stop {S.stoploss}"
 
     captured = {"paper": [], "orders": [], "state": {}, "published": [],
                 "halts": []}

@@ -1,3 +1,70 @@
+## 2026-08-22 (sz) — THE VARIANT HOST HAD NEVER BEEN DRIVEN AS 🔮 GEORGIA, AND ITS SELFTEST WAS ABOUT TO REPORT CLEAN ON THREE OF THIRTEEN CHECKS
+
+`(sx)` made `lighter_avo_live_bot.py` a variant host and `(sy)` raised both
+books' ceiling to 10x. Twenty of the twenty-one tests behind those two entries
+**read the module** — a constant, a derived bound, an env name. Not one of them
+ever **ran georgia through `main()`**, and that is the only place the identity
+has to survive contact with the loop.
+
+**What I found when I finally ran it.** `FAMILY_LIVE_BOOK=freqtrade-georgia
+python3 lighter_avo_live_bot.py --selftest` boots her correctly —
+`daytrader-15m tf=15m stop=-5% slots=5`, state restored, day anchor set — and
+then dies on `assert len(v.opens) >= 1, "dip signal on live equity must open"`,
+because that suite feeds **4h SwingDip dip bars** to a **15m DayTraderGated**
+book. A failure about the FIXTURE, not the book. The tempting fix — skip the
+SwingDip-shaped scenarios under a non-Avo book — is the one this repo has
+already paid for: a suite that runs 3 of its 13 checks and exits 0 **reports
+clean having inspected almost nothing**, and clean reads as evidence ((po)).
+
+So `--selftest` now **REFUSES** a non-Avo book, names where her coverage lives,
+and exits non-zero. A refusal is only honest if the thing it points at exists,
+which is the rest of this entry.
+
+**THE BOOT SMOKE (`tests/autonomy/test_variant_host.py`, +5 tests → 25).**
+One full cycle of the real `main()` as georgia, real entry path, stub venue,
+synthetic bars that trip her own `trend_breakout`:
+* she publishes to **`freqtrade-georgia-lighter` and nothing else**, restores
+  **her** state key, and no `avo` string appears in either — the failure this
+  is aimed at is her service managing 🙏 Avo's REAL POSITIONS, and no
+  constant-reading test can catch it;
+* she **sizes off her own geometry** — `equity × gross_x / max_open`, driven
+  through the order rather than trusted from the formula;
+* her row carries the `leverage` and `scan` blocks, with `all_slots_stop_pct`
+  **0.25 at 5x against 🙏 Avo's 0.50 at the same setting**, both asserted in one
+  test so "5x" can never read as one number again. (These fields are FRACTIONS
+  despite the `_pct` suffix — (sr)'s convention, pinned here because I asserted
+  25.0 and the test caught me.)
+
+**TWO REAL DEFECTS, both only reachable by driving it.**
+1. **The boot gate named the wrong book's env.** `lighter_live requires an
+   explicit per-bot notional cap (FREQTRADE_AVO_MARIA_MAX_NOTIONAL)` was a
+   LITERAL. It is the single instruction a real-money service prints as it
+   refuses to start, and under georgia it would have sent the operator to set
+   **another book's cap** — I8, on the one line that has to name something
+   findable. Now `env_prefix(BOT)`, so it reads `FREQTRADE_GEORGIA_MAX_NOTIONAL`.
+2. **The geometry pin was Avo-only.** `assert S.max_open == 5 and S.stoploss ==
+   -0.10` fails on georgia by construction, so the variant could never run the
+   suite at all. Replaced by a per-book `_EXPECT` table — deliberately a table
+   and not `whatever S says`, which would be vacuous — and a book added to
+   `_BOOKS` without an entry now FAILS rather than running unpinned. That pin is
+   load-bearing twice over: `vol_target_gross_x` (0.15/|stoploss|) and
+   `stop_reachable` (1/(|stoploss|+mmf)) both derive from the stop, so widening
+   it silently changes what a leverage setting MEANS on real money.
+
+**Mutation-verified, 7/7 red:** identity degrading to Avo · the boot-gate
+message reverted to the literal · `all_slots_stop_pct` off a fixed 0.10 stop ·
+`STATE_KEY` hardcoded to Avo's row · the clip dropping `gross_x()` (silently
+un-levering a levered book) · the clip pinned at Avo's old 4 slots · the
+selftest refusal removed. The refusal test also asserts the **Avo path still
+runs green**, because without that half it is satisfiable by breaking
+`--selftest` for everybody.
+
+**Carried into the next pass:** Eamon, 22-Aug — *"just replace farmer with
+georgia as weve done so many times before"* / *"thats easier, once your metrics
+and paramters are finished obviously"*. The metrics are finished; the swap is
+next, and it supersedes the new-sub-account plan `GEORGIA_GOLIVE_RUNBOOK.md`
+was written for.
+
 ## 2026-08-22 (sy) — 10x ON BOTH LIVE BOOKS, AND THE NUMBER THAT IS NOT ABOUT APPETITE: ABOVE 6.25x 🙏 AVO'S STOP CANNOT FIRE
 
 **Eamon, 22-Aug: "let avo go up to 10x, and georgia also".** Done — `GROSS_X_MAX`
