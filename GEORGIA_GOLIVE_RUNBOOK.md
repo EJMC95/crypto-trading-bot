@@ -104,11 +104,16 @@ is **600bps**, measured, not assumed.
 
 | `GROSS_X` | all-slots-stop | liquidation gap | stop can fire? |
 |---|---|---|---|
-| 1.0 | 5% | −94% | yes |
-| **3.0** | **15%** | −27.3% | yes — the last setting **inside the go-live gate's 15% maxDD bar** |
-| **5.0** | 25% | −14.0% | yes — Eamon's stated setting |
+| 1.0 | 5% | −94.0% | yes |
+| **2.8** | **14%** | −29.7% | yes — **strictly inside the gate's 15% maxDD bar**, the (sr) choice |
+| 3.0 | 15% | −27.3% | yes — but **exactly ON the bar**, not inside it: the gate is `maxDD < 15%`, so an all-slots stop makes her ineligible at the same instant it fires ((gv)'s 📊 Index Rider trap). This is why `(sr)` shipped 🙏 Avo at 1.4 and not 1.5 |
+| **5.0** | 25% | −14.0% | yes — Eamon's stated setting; above the gate bar, deliberately |
 | 9.09 | 45.5% | −5.0% | **the last setting at which the protective stop fires at all** |
 | **10.0** | 50% | −4.0% | **NO — the venue liquidates first and the stop is dead code** |
+
+`all_slots_stop = GROSS_X × |stoploss|` and `liquidation gap = 1/GROSS_X − mmf`,
+both published on the row every loop (`leverage.all_slots_stop_pct`,
+`leverage.liq_gap_pct`) as FRACTIONS.
 
 The ceiling `AVO_GROSS_X_MAX` / `GEORGIA_GROSS_X_MAX` is **10.0** per Eamon,
 22-Aug (*"let avo go up to 10x, and georgia also"*). It is a **ceiling**, not a
