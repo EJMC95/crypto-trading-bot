@@ -249,6 +249,26 @@ The math moved to **`fleet_bus`**, which is now its ONE owner (COPY'd into both
 images already, so no new dependency and no born-dark risk); 🙏 Avo delegates to
 it. A second copy of a rule is a second rule ((hj)).
 
+**[CORRECTED IN PLACE, same day — the obvious next move was measured and
+REFUSED, and it belongs here rather than in a later entry that would read as
+progress.]** N_eff 1.389 invites a same-side concentration cap: stop the book
+holding a 4th copy of a bet it already has. `run(max_same_side=...)` models it
+and `--conc` sweeps it on the honest population. **The sign flips on the
+window**, so it is not shippable:
+
+| cap | 250d | 60d | 30d |
+|---|---|---|---|
+| SHIPPED (none) | **+$23.81** | −$4.32 | −$1.83 |
+| max 3 per side | −$14.92 | −$2.65 | +$2.85 |
+| max 1 per side | −$16.79 | **+$5.52** (both halves +) | +$3.83 |
+
+At 60d a 1-per-side cap is +$9.84 against shipped with both halves positive and
+maxDD −$5.11 vs −$17.08; over 250d the same cap costs **−$40.60**. One
+consistent thing across every window: **maxDD improves as the cap tightens** —
+which is the direction a book failing on drawdown would want, and this one is
+not failing on drawdown. So: refused, with the instrument kept, because the next
+session should not have to rediscover that the cap's sign is a window choice.
+
 ### Recorded because they are the instructive part
 
 * **A green run with no output is not a pass.** My first `fleet_bus` edit landed

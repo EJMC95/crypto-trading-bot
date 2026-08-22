@@ -204,6 +204,33 @@ def show_exits(title, rows):
               f"{r['h1']:8.2f} {r['h2']:8.2f}  {both}{d}")
 
 
+def conc_sweep(mk, t0, t1, floor, gate):
+    """[(su)] THE CONCENTRATION CAP — the one costly thing (su) measured and did
+    NOT refute.
+
+    The live book holds BTC/ETH/SOL/XAU **all short** at N_eff 1.389 (crypto leg
+    1.11, rho +0.851): one bet wearing four names. That is structural, not bad
+    luck — positive funding is far more common than negative, so the book shorts
+    the payer every time and ends up net-short crypto beta by construction.
+    August is the bill: SOL -$2.69, BTC -$2.00, XAU -$1.97, ETH -$1.30, every
+    leg losing in the same fortnight.
+
+    The cap costs NO expectancy per trade — it turns away nothing the gate
+    admitted, it declines the Nth copy of a bet already held (the (sr) logic at
+    🙏 Avo, where the same reasoning was worth N_eff 1.18 -> 2.87 for free)."""
+    ok = minvol_entry_ok(mk, floor)
+    rows = []
+    for cap in (None, 4, 3, 2, 1):
+        half = t0 + (t1 - t0) // 2
+        r = H.run(mk, gate, t0, t1, entry_ok=ok, max_same_side=cap)
+        r["h1"] = H.run(mk, gate, t0, half, entry_ok=ok, max_same_side=cap)["pnl"]
+        r["h2"] = H.run(mk, gate, half, t1, entry_ok=ok, max_same_side=cap)["pnl"]
+        r["label"] = "SHIPPED (no cap)" if cap is None else f"max {cap} per side"
+        r["mean_pct"] = (100.0 * r["pnl"] / (r["n"] * H.ORDER_USD)) if r["n"] else 0.0
+        rows.append(r)
+    return rows
+
+
 def _selftest():
     """The harness's own hooks, driven — never a hand-written fixture ((hj))."""
     # vol24: sums the trailing 24 hourly bars, UNKNOWN below the coverage floor
@@ -237,6 +264,11 @@ def _selftest():
         pass
     assert (H.MAX_HOLD_H, H.TAKE_PROFIT, H.HARD_STOP) == _before, \
         "exit_sweep left a harness global moved"
+    import inspect as _i
+    _src = _i.getsource(H.run)
+    assert "max_same_side=None" in _src, "the cap must default to OFF"
+    assert 'q["short"] == _want_short' in _src, \
+        "the cap must count SAME-DIRECTION holds, not all holds"
     assert 'd.get("schema") != CACHE_SCHEMA' in inspect.getsource(H.load)
     print("study_farmer_gate_minvol self-test: OK")
 
@@ -254,6 +286,8 @@ def main():
     ap.add_argument("--exits", action="store_true",
                     help="sweep the EXIT knobs at the shipped gate instead")
     ap.add_argument("--gate", type=float, default=0.05)
+    ap.add_argument("--conc", action="store_true",
+                    help="sweep the same-side concentration cap")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -280,6 +314,11 @@ def main():
               "Widen --universe or --days; a sweep on this is noise. **")
         return
 
+    if a.conc:
+        show_exits(f"SAME-SIDE CONCENTRATION CAP at gate {a.gate:.2f}, MIN_VOL "
+                   f"${a.min_vol/1e6:.0f}M, {a.days}d — deltas vs SHIPPED",
+                   conc_sweep(mk, t0, t1, a.min_vol, a.gate))
+        return
     if a.exits:
         show_exits(f"EXIT KNOBS at the shipped gate {a.gate:.2f}, MIN_VOL "
                    f"${a.min_vol/1e6:.0f}M, {a.days}d — deltas vs SHIPPED",

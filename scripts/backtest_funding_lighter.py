@@ -464,7 +464,7 @@ def _in_restart_window(t, restarts_per_day, window_h=1.0):
 
 
 def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
-        decay_persist_h=0):
+        decay_persist_h=0, max_same_side=None):
     """Replay the live bot's rules over [t0,t1). Returns a result dict.
 
     entry_ok: optional (sym, hour_ts) -> bool predicate consulted ONLY at the
@@ -472,6 +472,14 @@ def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
     reproduces the unfiltered behaviour exactly — position management, funding
     accrual and every exit path are never filtered, so an open position is
     always managed even if its coin later fails the predicate.
+
+    max_same_side: [2026-08-22 (su) CONCENTRATION hook] refuse an entry that
+    would take the count of SAME-DIRECTION open positions above this. None
+    (default) reproduces the unfiltered behaviour exactly. Modelled because the
+    live book is structurally always net-short — positive funding is far more
+    common than negative, so it shorts the payer every time and its four
+    "positions" measured N_eff 1.389 (crypto leg 1.11). Entry-side only: an
+    open position is always managed, exactly like `entry_ok`.
 
     decay_persist_h: [2026-07-30 DECAY-EXIT STUDY hook] the cold exit fires
     only after the rate has read decayed (|apr| < exit_apr) for MORE than
@@ -563,7 +571,12 @@ def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
                 hot[sym] = hot.get(sym) or t
             else:
                 hot[sym] = None
-            if (len(pos) < MAX_OPEN and hot.get(sym)
+            _side_full = False
+            if max_same_side is not None:
+                _want_short = apr > 0
+                _side_full = sum(1 for q in pos.values()
+                                 if q["short"] == _want_short) >= max_same_side
+            if (len(pos) < MAX_OPEN and hot.get(sym) and not _side_full
                     and (t - hot[sym]) / 3600.0 >= PERSIST_H
                     and t >= cool.get(sym, 0)
                     and (entry_ok is None or entry_ok(sym, t))):
