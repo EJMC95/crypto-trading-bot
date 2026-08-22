@@ -91,7 +91,36 @@ LEVER_BOOK = {
 
 #: Levers with no path to measurement, DECLARED. An entry is a decision with a
 #: reason — never a snooze — and the list may only shrink (see RATCHET below).
-UNMEASURABLE_OK = {}
+UNMEASURABLE_OK = {
+    # [2026-08-22 (sx)] 🔮 georgia's live clip arm, registered ahead of her
+    # funding. Declared rather than counted against the ratchet, because a
+    # NEW lever must be measurable or declared THE SAME DAY (I23) — and the
+    # honest answer here is that a SIZE MULTIPLIER has no gated quantity.
+    #
+    # Every MEASURABLE spec in `QUANTITIES` profiles a lever against the
+    # distribution of a TAPE variable it thresholds (funding apr, range_pos,
+    # chg_pct). A clip scale thresholds nothing: it multiplies notional. The
+    # quantity it cuts — the clip actually used — IS recorded, on every close
+    # row (`extra.clip`, stamped from the position's entry meta), so this is
+    # not the never-recorded class I23 exists to close. What is missing is a
+    # tape-side distribution to profile it against, and inventing one would be
+    # a spec pointing at a field nothing writes, which this guard's own header
+    # names as the failure that "still reads as measurable".
+    #
+    # Its two siblings — `live.clip_scale` (💸 Farmer) and `live.avo.clip_scale`
+    # (🙏 Avo) — are the same shape and sit in the ratchet's backlog of 30.
+    # Draining all three the same way is a one-line change once someone decides
+    # this reasoning is right; adding a fourth silently is what the ratchet
+    # exists to stop.
+    #
+    # OWNER: session — fold the two siblings in here (backlog 30 -> 28) on the
+    # next pass that touches this guard, or replace all three with a real spec
+    # if a profiling basis for a size multiplier is ever found.
+    "live.georgia.clip_scale":
+        "size multiplier, gates no tape quantity; the clip it cuts IS recorded "
+        "on every close (extra.clip). Siblings live.clip_scale / "
+        "live.avo.clip_scale are the same shape. Owner: session.",
+}
 
 #: Levers steering a RETIRED book, DECLARED. KEPT rather than deleted because
 #: every one of these retirements is reversible by a single env var — flipping

@@ -1,3 +1,109 @@
+## 2026-08-22 (sx) — 🔮 GEORGIA GETS A LIVE ARM AS A VARIANT, NOT A COPY — AND 5x MEANS HALF AS MUCH ON HER AS IT DOES ON 🙏 AVO
+
+**Eamon, 22-Aug:** *"get georgia ready to go live on a new sub account ill
+deposit into later today prepared for 5x leverage"*.
+
+### The live runner is a VARIANT HOST now
+
+`lighter_avo_live_bot.py` is parameterised by `FAMILY_LIVE_BOOK`, the 🛢️ Garrett
+rule ((lp)): **one proven machine, every success instrument inherited free**
+rather than 1,800 lines re-earned and eventually drifting. What a copy would
+have had to rebuild: claim_writer + standby, the latched daily halt, the
+capital-adjust equity guard, the venue-truth reconciler, the notional cap and
+`cap_slots` census, `diversified_order`, the (st) scan census, the MTM equity
+series, real-fill telemetry, the fail-closed per-asset regime gate, and the
+brain's restrict-only sizing.
+
+**The variant is the book and everything derives from it.** `S` is still taken
+from the family REGISTRY by identity, so live and shadow cannot drift. Env vars
+carry a per-book prefix (`AVO_*` / `GEORGIA_*`) so two live services on one
+image can never read each other's sizing. **The default is unchanged: a service
+with no `FAMILY_LIVE_BOOK` is byte-identical to yesterday's Avo**, and
+`test_variant_host.py` pins that name by name across all seven `AVO_*` envs —
+that is the whole safety property of this change on a real-money book.
+
+### 5x is EARNED on georgia in a way it is not on Avo
+
+Her stop is **−5%**, half Avo's. The leverage layer was already written against
+`S.stoploss` and `S.max_open`, so it re-derives with no edit:
+
+| | 🔮 georgia (−5%) | 🙏 Avo (−10%) |
+|---|---|---|
+| all-slots-stop at 5x | **25%** | 50% |
+| gross the 15% maxDD bar allows at `N_eff` 1 | **3.00x** | 1.50x |
+| …at her basket today (BTC/AAVE/LINK, `N_eff` 1.457) | **3.62x** | — |
+| …after a diversified fill (+WTI, +IWM → `N_eff` 3.390) | **5.52x** | — |
+
+So **5x sits inside her own drawdown budget once the basket spreads**, and it
+spreads by inheritance: `diversified_order` offers WTI before BTC, measured
+against live tape. Avo's 5x exceeds her derived bound at every measured
+`N_eff`; georgia's does not. That is the number the ask turns on and it is
+favourable.
+
+### The gate, stated plainly
+
+**She is not through it.** `READY: []`; georgia is **5 of 6 bars, failing only
+`t` (1.48 against 2.0)**, n=163, +0.163%/trade. Go-live is an explicit operator
+act and always has been — this entry ships the ARM, inert, not the decision.
+`(sv)` raised her throughput 2 → 3/hour, so at her recent rate the remaining
+~135 closes is ~10 days rather than the ~33 her lifetime rate implies.
+
+### Wired, and what is deliberately NOT
+
+* `live.georgia.clip_scale` **registered** in `fleet_tuning` ahead of her
+  funding — `get_lever` returns the env default for an UNREGISTERED name, so a
+  live book whose arm does not exist has a dial nothing can turn, which is the
+  reverse of registered-but-inert and just as silent. Cage `hi` 1.0: the
+  consumer is restrict-only, and authority the consumer discards is not
+  authority.
+* Mapped in `evidence_board.LIVE_CLIP_LEVERS`, but **NOT added to
+  `LIVE_ROWS`** — the 17-Jul rule is that a row belongs there iff it is live
+  AND consuming. `EVBOARD_LIVE_ROWS` adds her the day she is funded.
+* The deploy rule is written and **left COMMENTED with its own marker,
+  `[deploy-live-georgia]`**, because the service does not exist yet and the
+  resolve step fails on an unresolvable name. Two live books sharing an image
+  must still deploy one at a time, or every georgia fix restarts Avo — and a
+  restart wipes memory-only halts.
+* **No new Dockerfile.** `Dockerfile.avolive` already carries the whole import
+  graph; georgia is env, not an image.
+* `FREQTRADE_GEORGIA_MAX_NOTIONAL` derives automatically from
+  `venues.safety.env_prefix`, and boot REFUSES without it.
+
+### The failure this forbids, and the two it caught
+
+An unknown or typo'd `FAMILY_LIVE_BOOK` must **REFUSE**, never degrade to Avo —
+georgia's service would otherwise publish to Avo's row, restore Avo's state key
+and manage Avo's REAL POSITIONS. I8's "unknown never degrades to a guess", where
+the guess is another book's money.
+
+**Two defects found while writing the tests, both mine:**
+
+1. **A blank `FAMILY_LIVE_BOOK` fell back to Avo.** `os.environ.get(k, default)
+   .strip() or default` treats set-but-empty as unset — on georgia's service
+   that is exactly the money-losing case. ABSENT now means Avo; SET-BUT-BLANK
+   refuses.
+2. **The first draft of the test helper handed back the WRONG module.**
+   Restoring the environment needs a second `reload`, and doing it in a
+   `finally` before returning meant every assertion ran against a module already
+   reset to defaults. It went GREEN on Avo — the one book whose values are the
+   defaults — which is precisely the shape that would have let a georgia
+   regression through.
+
+`tests/autonomy/test_variant_host.py`, **6 of 6 mutations verified RED**,
+including both of the above.
+
+### The ratchet caught me too, and the declaration is the honest one
+
+`audit_lever_measurability` went red: 31 unmeasurable levers against a ratchet
+of 30, because I added one (I23 — a NEW instance fails immediately). Declared in
+`UNMEASURABLE_OK` rather than counted, with the real reason: **a size multiplier
+gates no tape quantity.** Every `QUANTITIES` spec profiles a lever against the
+distribution of a variable it thresholds; a clip scale thresholds nothing. The
+quantity it cuts — the clip actually used — IS recorded on every close row
+(`extra.clip`), so this is not the never-recorded class. Its two siblings
+(`live.clip_scale`, `live.avo.clip_scale`) are the same shape and sit in the
+backlog of 30; folding them in is one line and an owner is named.
+
 ## 2026-08-22 (sw) — I SHIPPED TWO SELFTESTS AND WIRED NEITHER INTO CI, AND THE ROT-GUARD CAUGHT IT
 
 CI on #215 went red on `test_no_unregistered_selftest`:

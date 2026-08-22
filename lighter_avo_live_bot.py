@@ -104,24 +104,77 @@ from venues.safety import (
     SafetyRails, open_notional, capital_adjusted_day_start)
 from venues.fills import read_fill, measured_from_reason
 
-BOT = "freqtrade-avo-maria"
+# ---------------------------------------------------------------------------
+# [2026-08-22 (sx)] THIS MODULE IS NOW A VARIANT HOST, and 🔮 georgia is the
+# second instance. **Eamon, 22-Aug: "get georgia ready to go live on a new sub
+# account ill deposit into later today prepared for 5x leverage".**
+#
+# NOT A NEW FILE — the 🛢️ Garrett rule ((lp)): one proven machine, every success
+# instrument inherited free rather than re-implemented at 1,800 lines. What a
+# copy would have had to re-earn, and would eventually drift on: claim_writer +
+# standby, the latched daily halt, the capital-adjust equity guard, the venue-
+# truth reconciler, the notional cap + `cap_slots` census, `diversified_order`,
+# the (st) scan census, the MTM equity series, real-fill telemetry, the
+# per-asset regime gate and the brain's restrict-only sizing.
+#
+# THE VARIANT IS THE BOOK, and everything else derives from it:
+#   * `S` is still taken from the family REGISTRY by identity, so the live and
+#     shadow arms of WHICHEVER book cannot drift;
+#   * the whole leverage layer is already written against `S.stoploss` and
+#     `S.max_open`, so it re-derives with no edit — georgia's -5% stop makes
+#     `vol_target_gross_x(1)` read 3.0x where Avo's -10% reads 1.5x, and an
+#     all-slots-stop at 5x costs her 25% against Avo's 50%;
+#   * env vars carry a PER-BOOK PREFIX. Every existing `AVO_*` name resolves
+#     exactly as before — that is the whole safety property of this change on a
+#     real-money book, and `test_variant_host.py` pins it name by name.
+#
+# The default is unchanged, so a service with no `FAMILY_LIVE_BOOK` set is
+# byte-identical to yesterday's Avo.
+_BOOKS = {
+    # book id -> (env prefix, live clip lever)
+    "freqtrade-avo-maria": ("AVO", "live.avo.clip_scale"),
+    "freqtrade-georgia": ("GEORGIA", "live.georgia.clip_scale"),
+}
+# ABSENT means Avo (today's behaviour, unchanged). SET-BUT-BLANK does NOT:
+# `FAMILY_LIVE_BOOK=""` on georgia's service is a deploy typo, and silently
+# resolving it to Avo would point her process at Avo's row, state key and live
+# positions. Caught by `test_variant_host` on the "  " case while writing it.
+_raw_book = os.environ.get("FAMILY_LIVE_BOOK")
+BOT = "freqtrade-avo-maria" if _raw_book is None else _raw_book.strip()
+if BOT not in _BOOKS:
+    # An unknown book must not fall back to Avo — that would point georgia's
+    # service at Avo's row, its state key and its real positions. Refuse.
+    raise SystemExit(
+        f"FAMILY_LIVE_BOOK={BOT!r} is not a live-capable book. "
+        f"Known: {sorted(_BOOKS)}. A typo must never degrade to another "
+        f"book's identity — it would trade the wrong row's positions.")
+_PFX, LIVE_CLIP_LEVER = _BOOKS[BOT]
+
 BOT_ROW = BOT + "-lighter"            # the LIVE row (venue_variant admits it)
 SHADOW_ROW = BOT + "-lshadow"         # the control arm (family-lighter-shadow)
 STATE_KEY = BOT_ROW + ":live"
 
-#: The configured SwingDip instance (from the family REGISTRY, `STRATEGIES`) — tf=4h, stoploss=-0.10, max_open=4,
+
+def _env(name, default):
+    """`AVO_X` for Avo, `GEORGIA_X` for georgia — one namespace per book, so
+    two live services on one image can never read each other's sizing."""
+    return os.environ.get(f"{_PFX}_{name}", default)
+
+
+#: The configured strategy instance (from the family REGISTRY, `STRATEGIES`) —
+#: SwingDip tf=4h stop=-10% for Avo, DayTraderGated tf=15m stop=-5% for georgia;
 #: roi ladder, protections — taken from the family bot's OWN registry so the
 #: two arms cannot drift. Identity (S is the registry object) is selftested.
 S = next(s for s in STRATEGIES if s.bot == BOT)
 
-LOOP_SECONDS = int(os.environ.get("AVO_LOOP_SECONDS", "300"))
-DAILY_LOSS_LIMIT = float(os.environ.get("AVO_DAILY_LOSS", "0.10"))
-DELIST_GIVEUP_H = float(os.environ.get("AVO_DELIST_GIVEUP_H", "6"))
+LOOP_SECONDS = int(_env("LOOP_SECONDS", "300"))
+DAILY_LOSS_LIMIT = float(_env("DAILY_LOSS", "0.10"))
+DELIST_GIVEUP_H = float(_env("DELIST_GIVEUP_H", "6"))
 #: Below this clip the book is dust — skip entries rather than spray sub-$5
 #: orders on a real venue.
-MIN_CLIP_USD = float(os.environ.get("AVO_MIN_CLIP_USD", "5"))
+MIN_CLIP_USD = float(_env("MIN_CLIP_USD", "5"))
 #: Coin-quality veto freshness (mirrors the taker's read of `coin-vetoes`).
-QUALITY_VETO_TTL_S = float(os.environ.get("AVO_QUALITY_VETO_TTL_S", "5400"))
+QUALITY_VETO_TTL_S = float(_env("QUALITY_VETO_TTL_S", "5400"))
 
 _PRINT = print  # selftest capture point
 
@@ -160,7 +213,7 @@ def parse_ts(s):
 #: Caught by feeding the ladder "abc" while writing this. Unparseable degrades
 #: to 1.0 (today's behaviour), never to a guess.
 try:
-    GROSS_X = float(os.environ.get("AVO_GROSS_X", "1.0"))
+    GROSS_X = float(_env("GROSS_X", "1.0"))
 except (TypeError, ValueError):
     GROSS_X = 1.0
 
@@ -177,7 +230,7 @@ except (TypeError, ValueError):
 #:     NVDA/WTI/XCU = 300bps, measured off the venue's orderBookDetails).
 #: The -10% stop is what stands between those two numbers, and it fires on a
 #: 300s loop.
-GROSS_X_MAX = float(os.environ.get("AVO_GROSS_X_MAX", "5.0"))
+GROSS_X_MAX = float(_env("GROSS_X_MAX", "5.0"))
 
 #: The DIVERSIFICATION-EARNED number, published beside the operator's setting
 #: rather than clamping it. `N_eff` is the correlation-aware count of
@@ -329,9 +382,6 @@ def diversified_order(universe, held, rets):
         return list(universe)
 
 
-LIVE_CLIP_LEVER = "live.avo.clip_scale"
-
-
 def _clip_scale_now():
     """[(mz)] The clamped live clip scale the entry path applies, re-read at
     publish time so the row's clip_usd is the EFFECTIVE entry clip whichever
@@ -478,10 +528,13 @@ def main(_ctx=None, once=False):
     # shadow writer here would be two writers of one graded ledger — the (hp)
     # class this fleet has already paid for once.
     if _ctx is None:
-        mode = os.environ.get("AVO_VENUE", "").strip()
+        mode = _env("VENUE", "").strip()
         if mode != "lighter_live":
             raise SystemExit(
-                "AVO_VENUE must be EXACTLY 'lighter_live' (got "
+                # [(sx)] the ACTUAL env name for THIS book — I8: a guard whose
+                # output is an instruction must name something the operator can
+                # find, and `GEORGIA_VENUE` is not `AVO_VENUE`.
+                f"{_PFX}_VENUE must be EXACTLY 'lighter_live' (got "
                 f"{mode!r}). This file is the live arm only — the shadow "
                 "book runs in family-lighter-shadow, and a second shadow "
                 "writer would pool the graded ledger (one book, one writer).")

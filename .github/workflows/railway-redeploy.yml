@@ -465,6 +465,27 @@ jobs:
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"
               echo "-> live-taker marker: including tide-rider-lighter-live (REAL MONEY)"
             fi
+            # [2026-08-22 (sx)] 🔮 georgia's live arm. SAME IMAGE, SAME FILE SET
+            # — lighter_avo_live_bot.py is a VARIANT HOST now, so georgia's
+            # service runs the identical container with FAMILY_LIVE_BOOK=
+            # freqtrade-georgia and her own GEORGIA_* env + sub-account.
+            #
+            # Its OWN marker, deliberately: `[deploy-live-georgia]`. Two live
+            # books that share an image must still be deployable one at a time,
+            # or every georgia fix restarts Avo (and a restart wipes
+            # memory-only halts — see the flatten-halt-redeploy incident).
+            # `[deploy-live]` still takes both, which is what live_all means.
+            #
+            # The service does not exist until Eamon creates it; the resolve
+            # step reports an unresolvable name as an ::error:: and fails, so
+            # this rule stays commented until then — a warn-only rule is not a
+            # guard ((gl)), and a red build on a service nobody has made yet is
+            # noise. UNCOMMENT WITH THE SERVICE, in the same commit.
+            # if echo "$changed" | grep -qE "$taker_files" \
+            #    && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-georgia]'; }; then
+            #   svcs="${svcs:+$svcs,}georgia-live"
+            #   echo "-> live-georgia marker: including georgia-live (REAL MONEY)"
+            # fi
             # [2026-07-30 (hi)] THE EXPERIMENT'S TWO ARMS MUST DEPLOY TOGETHER.
             # `funding-farmer-shadow` — the CONTROL arm of the promotion pipeline
             # — appeared nowhere in this workflow, only in a comment inside

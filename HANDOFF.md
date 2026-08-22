@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-22 12:00 Sydney (02:00Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-22 12:44 Sydney (02:44Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -79,8 +79,11 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (3 commit(s), entries (st), (su))
+## Shipped today (6 commit(s), entries (st), (su), (sv), (sw))
 
+- `9e5c60b` Wire the two 22-Aug studies into CI — the rot-guard caught my omission (sw)
+- `b071d4a` Keep the concentration instrument, and record why the cap was refused (su)
+- `cfc70bb` 🔮 Georgia's rate limiter was cutting her best trades (sv)
 - `8b1af4f` Carry what (st) and (su) found but could not close, and regenerate the handoff
 - `240f317` 💸 The Farmer's poor decisions are not a knob — and the replay was measuring the wrong books (su)
 - `63d4171` 🙏 Avo's row can finally say why it did not trade: the census, on both arms (st)

@@ -345,6 +345,22 @@ LEVERS = {
         "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
         "note": "🙏 Avo live clip multiplier, restrict-only; 1.0 = equity/slots",
         "env_default": 1.0},
+    # [2026-08-22 (sx)] 🔮 georgia's own arm, registered AHEAD of her live row.
+    # Same shape and same cage as Avo's for the same reason: the consumer is
+    # the SAME code (`lighter_avo_live_bot._clip_scale_now`, now a variant
+    # host) and clamps to min(1.0, ...), so a cage above 1.0 would register
+    # authority the consumer silently discards.
+    #
+    # Registered before she is funded ON PURPOSE: `fleet_tuning.get_lever`
+    # returns the env default for an UNREGISTERED name, so a live book whose
+    # arm does not exist has a dial nothing can turn — the reverse of the
+    # registered-but-inert failure and just as silent. This costs nothing
+    # while she is unfunded (nothing writes it) and means the protection is
+    # already there on the first real order.
+    "live.georgia.clip_scale": {
+        "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
+        "note": "🔮 georgia live clip multiplier, restrict-only; 1.0 = equity/slots",
+        "env_default": 1.0},
     # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
     # money). The experiment judge runs ONE candidate at a time here; while
     # a candidate runs, the twin is an experiment arm, not a control arm.
