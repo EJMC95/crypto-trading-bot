@@ -115,11 +115,24 @@ live in `paper_trades`, not in the summary row.
   goes stale on every slot swap and then sends every future audit to the wrong
   file. The live pair is now 🙏 Avo + 🔮 georgia and they are the SAME FILE.
 
-**Mutation-verified, 7/7 red:** the shadow twin named in the retired set · a
+**Mutation-verified, 10/10 red:** the shadow twin named in the retired set · a
 dark bus resurrecting the live arm · the latch moved before the day roll · the
 flatten mislabelled `daily_loss` · a living arm publishing the retired block ·
 the judge's stand-down moved after the growth promoter · the mode guard demoted
-below the override. Plus 1/1 on the margin guard (an undeclared reader).
+below the override · a THROWING bus swallowed as "not retired" · the override
+reachable only through the bus (so a dark bus would make a retired real-money
+arm UNRESURRECTABLE) · the table keyed by base name instead of row, which would
+make 🛢️ Garrett inherit the Farmer's retirement. Plus 1/1 on the margin guard.
+
+**AND THE DECISION FUNCTION IS DRIVEN, NOT GREPPED.** The first draft proved the
+dark-bus rule by finding `if fleet_bus is None: return True` in the source, which
+is the "a check that inspects nothing" shape wearing a different hat — it passes
+against code that is never called. The module imports cleanly, so those are now
+real calls across seven (row, mode) pairs with the bus removed, broken, and
+overridden. Two of the three extra mutations above are cases the greps could not
+have seen. What stays structural is only the ORDER inside `main()` — driving that
+would mean adding a test-only injection point to a 4,700-line real-money file,
+which is a worse trade than an AST check on line numbers.
 
 **One self-inflicted loss, recorded because the record is the point:** mid-pass I
 ran `git checkout -- lighter_funding_bot.py` to revert a mutation and destroyed

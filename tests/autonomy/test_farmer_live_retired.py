@@ -101,20 +101,74 @@ def test_a_shadow_process_never_retires_whatever_the_row_says():
     assert ast.unparse(first.body[0]).endswith("False")
 
 
-def test_a_dark_bus_stands_a_live_arm_DOWN_not_up():
-    """Deliberately the opposite of every other bus read in the fleet. Dark ⇒
-    neutral elsewhere, because the cost is a missed shadow trade; here the cost
-    of failing OPEN is a retired real-money book resurrecting itself on an
-    import error."""
-    src = _bot_src()
-    i = src.index("def live_arm_retired(")
-    body = src[i:i + 2500]
-    assert "if fleet_bus is None:\n        return True" in body, \
-        "a dark bus must keep a retired live arm retired"
-    # ...and the override still works with no bus, or the escape hatch depends
-    # on the very thing that is broken.
-    assert body.index("FARMER_LIVE_RETIRED_OVERRIDE in") < \
-        body.index("if fleet_bus is None:")
+# The tests below IMPORT the real module and CALL the real function. The
+# structural checks above are about ORDER inside `main()`, which cannot be
+# driven without adding a test-only injection point to a 4,700-line real-money
+# file — but the decision function itself has no such excuse, and a source-grep
+# standing in for a call is the "a check that inspects nothing" shape.
+@pytest.fixture(scope="module")
+def bot():
+    import lighter_funding_bot as m
+    return m
+
+
+@pytest.mark.parametrize("row,mode,expect", [
+    # the retired arm, in the only mode where real money is at stake
+    ("perps-funding-lighter-lighter", "lighter_live", True),
+    # ...the SAME row in any other mode is NOT retired: the shadow/paper
+    # process must keep running whatever the table says
+    ("perps-funding-lighter-lighter", "lighter_shadow", False),
+    ("perps-funding-lighter-lighter", "hl_paper", False),
+    ("perps-funding-lighter-lighter", "", False),
+    # the control arm, untouched
+    ("perps-funding-lighter-lshadow", "lighter_shadow", False),
+    ("perps-funding-lighter-lshadow", "lighter_live", False),
+    # 🛢️ Garrett is a VARIANT of this same module. If it were ever funded, it
+    # must not inherit the Farmer's retirement — the table is keyed by ROW.
+    ("band-garrett-lshadow", "lighter_live", False),
+])
+def test_the_decision_function_driven(bot, row, mode, expect):
+    assert bot.live_arm_retired(row, mode) is expect
+
+
+def test_a_dark_bus_stands_a_live_arm_DOWN_not_up(bot, monkeypatch):
+    """DRIVEN, with the bus actually removed.
+
+    Deliberately the opposite of every other bus read in the fleet: dark ⇒
+    neutral elsewhere, because the cost there is a missed shadow trade, while
+    here the cost of failing OPEN is a retired REAL-MONEY book resurrecting
+    itself on an import error."""
+    monkeypatch.setattr(bot, "fleet_bus", None)
+    assert bot.live_arm_retired("perps-funding-lighter-lighter",
+                                "lighter_live") is True
+    # ...and it still cannot touch a shadow arm, because the mode guard runs
+    # first — a dark bus must not idle the control arm.
+    assert bot.live_arm_retired("perps-funding-lighter-lshadow",
+                                "lighter_shadow") is False
+    assert bot.live_arm_retired("band-garrett-lshadow",
+                                "lighter_shadow") is False
+
+
+def test_a_THROWING_bus_also_stands_it_down(bot, monkeypatch):
+    """Not the same case as a missing one: an installed-but-broken bus raises
+    rather than being None, and an unguarded call would crash the live loop —
+    which `main()`'s own except would swallow into "keep trading"."""
+    class _Broken:
+        def live_arm_retired(self, row):
+            raise RuntimeError("payload unreadable")
+    monkeypatch.setattr(bot, "fleet_bus", _Broken())
+    assert bot.live_arm_retired("perps-funding-lighter-lighter",
+                                "lighter_live") is True
+
+
+def test_the_override_reaches_the_bot_with_no_bus_at_all(bot, monkeypatch):
+    """The escape hatch must not depend on the thing that is broken. If the
+    override only worked through the bus, a dark bus would make a retired
+    real-money arm UNRESURRECTABLE."""
+    monkeypatch.setattr(bot, "fleet_bus", None)
+    monkeypatch.setattr(bot, "FARMER_LIVE_RETIRED_OVERRIDE", "run")
+    assert bot.live_arm_retired("perps-funding-lighter-lighter",
+                                "lighter_live") is False
 
 
 # ---- 3  the latch, the flatten and the receipt ------------------------------
