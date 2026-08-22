@@ -1,3 +1,135 @@
+## 2026-08-22 (ta) — 💸 THE FARMER'S LIVE ARM IS RETIRED AND 🔮 GEORGIA TAKES THE SUB-ACCOUNT — THE FIRST RETIREMENT THAT HAD TO FLATTEN REAL MONEY RATHER THAN FREEZE PAPER
+
+**Eamon, 22-Aug: *"just replace farmer with georgia as weve done so many times
+before"* / *"thats easier, once your metrics and paramters are finished
+obviously"* / *"update and sync everywhere afterwards obviously"*.**
+
+The precedent he means is real and this follows it exactly: 🎫 the Ticket Taker
+took 🌊 Tide Rider's live row on the same service/keys/sub-account (17-Jul), and
+🙏 Avo took the Taker's ((ma)).
+
+**THE CALL IS THE FLEET'S OWN GRADER'S, not an opinion about a bad week.**
+`golive-readiness`, 21-Aug 22:31Z:
+
+| row | n | mean/trade | t | halves | horizon |
+|---|---|---|---|---|---|
+| 💸 `perps-funding-lighter-lighter` **(REAL MONEY)** | 91 | **−0.160%** | −0.88 | +2.51 / **−7.65** | **unreachable** |
+| 💸 `perps-funding-lighter-lshadow` | 161 | **−0.195%** | −0.95 | +5.71 / **−18.32** | **unreachable** |
+| 🔮 `freqtrade-georgia-lshadow` | 151 | **+0.171%** | 1.48 | **+5.65 / +10.08** | on_track |
+
+Both Farmer arms agree in SIGN and in VERDICT, and `unreachable` is the grader's
+own phrase — *"mean ≤ 0, more of the same closes cannot flip mean/t/halves"*.
+That is the (mr)/(nf) red-stop class landing on the real-money row, and (su)
+had already measured why a knob cannot fix it (every gate 0.05→0.60 and twelve
+exit variants lose on the population the book can actually trade).
+
+**AND THE BAR GEORGIA FAILS, ONCE, PLAINLY: `t` = 1.48 against 2.0.** She passes
+window, closes, mean, both halves and maxDD. She has not passed the gate. Go-live
+is an explicit operator act and this is Eamon's, on the record; what the code owes
+him is the arithmetic, published on the row every loop rather than re-argued.
+
+### THREE THINGS THIS RETIREMENT DOES THAT NO PRIOR ONE DID
+
+**1 · IT FLATTENS.** Every previous retirement froze PAPER positions. This arm
+held **four real directional legs**, and a live position with no manager has no
+stop and no exit — freezing would have been strictly worse than closing. Rather
+than write a second idle loop beside real money, the guard latches the book's
+OWN daily-halt path, which already flattens, retries until flat, blocks entries
+and heart-beats ((pq)/(pr)/the 16-Jul retry fix). One machine, not a second one.
+Ordering is what makes that reuse work and is pinned in both directions: the
+latch sits AFTER the day roll (which sets `halted_today = False` by
+construction, so an earlier latch would be silently undone once every UTC day
+and the book would trade for a full day) and BEFORE the halt block that does the
+work. Closes book **`long_retired` / `short_retired`**, never `daily_loss` —
+I23, on the last four trades a real-money book will ever take: mislabelling them
+would put phantom daily-loss rows in the ledger every grader and exit-attribution
+study reads.
+
+**2 · IT IS ROW-SCOPED INSIDE A TWO-ARM MODULE.** One file runs both arms, so
+the 🌊/📊/🧙 idle-the-whole-process shape would have silenced the SHADOW twin —
+the control arm, still accruing, costing nothing. The (mr) rule: declare once,
+derive the roster. The shadow arm keeps trading and `test_the_SHADOW_twin_keeps_trading`
+is the first test in the file for a reason.
+
+**3 · THE FACT HAS ONE OWNER, ACROSS TWO IMAGES.** The 🧪 experiment judge —
+whose entire job is promoting `live.funding.*` onto this exact row — runs in
+`freqtrade-bots`, which does not and must not carry a real-money trading module,
+so it cannot import the bot. The declaration therefore lives in
+`fleet_bus.RETIRED_LIVE_ARMS`, which is in both images already. **The judge now
+stands down out loud** (`phase="stood_down"`, naming the successor and the
+override) instead of silently never promoting: its paired bar needs `live ≥ 10`
+closes, so a flat arm silences it CORRECTLY and INVISIBLY, `promote: false`
+reading identically for *"no candidate cleared"* and *"there is no arm left"*
+(I18). **Returning IS the release** — promoted levers are TTL'd and kept alive
+by re-assertion, so not asserting is how the rail was designed to revert, with
+no second code path to get wrong. Measured at the retirement: **ZERO `live.*`
+levers open**, so nothing was stranded.
+
+**THE DARK-BUS RULE IS OPPOSITE IN THE TWO READERS, ON PURPOSE.** The BOT stands
+a live arm DOWN when it cannot read whether it is still commissioned — the
+inverse of every other bus read in this fleet, because everywhere else the cost
+of failing closed is a missed shadow trade and here the cost of failing OPEN is
+a retired real-money book resurrecting itself on an import error. The JUDGE fails
+OPEN, because the paired bar's own `live ≥ 10` floor already blocks a promotion
+onto a flat arm, and failing closed there would stop the fleet's only path to
+more real money on an import error. Both are stated where they are written.
+
+### THE RECEIPT, AND WHY TWO HALVES ARE DEFERRED
+
+`status="halted"` is byte-identical between *lost 5% today* and *retired 22-Aug*
+(I1/I18), so the row publishes `extra.retired.{since, why, open, override}`.
+**`open` is the number of positions still held, and `open == 0` is the ONLY
+signal that says the keys may safely move** — two processes must never hold one
+sub-account, or the Farmer reads georgia's positions as untracked and can flatten
+them.
+
+That is also why `RETIRED_ROWS` (hide) and `LEGACY_BOTS` (prune) are
+**deliberately NOT in this commit**, against the standing both-halves rule.
+`/pnl.json` is filtered by the dashboard's roster ((ml)), so hiding the row first
+blinds the exact feed the flatten is verified on. The deferral is not an omission:
+it is a `session_state.py` CARRIED row with a repo-evaluated `closes_when`, so it
+reddens CI if forgotten. Ledgers are kept either way — the 136 real-money closes
+live in `paper_trades`, not in the summary row.
+
+### ALSO IN THIS PASS
+
+* **The margin-surface guard fired and was RIGHT.** `test_it_is_published_but_consumed_by_no_book_yet`
+  went red on CI because (sy) made the live runner read `fleet_bus.market_margins()`.
+  Its own message asked for exactly this: *"then this test updates to name the
+  consumer deliberately."* It now declares the reader with its reason **and keeps
+  the ban that mattered** — a new test proves neither `clip_usd` nor `gross_x`
+  nor `vol_target_gross_x` can see the margin, because a margin-derived clip lets
+  a thin market's generous leverage buy a bigger bet, which is backwards. A book
+  may know how close the cliff is; it may not use the cliff to pick the bet. An
+  undeclared reader still fails, and a stale declaration fails too.
+* **`GEORGIA_GOLIVE_RUNBOOK.md` rewritten for the swap** — three ordered operator
+  acts, the receipt to wait for, and the leverage table with the two numbers that
+  are not appetite: **3.0x is the last setting inside the gate's 15% maxDD bar**,
+  and **above 9.09x her −5% stop cannot fire before liquidation at the venue's
+  measured 600bps worst maintenance margin** — a dead stop is a broken rail, not
+  a risk preference. The 10x ceiling Eamon set stands and is published.
+* **CLAUDE.md audit-scope rule corrected for the THIRD time**, and this time with
+  the mechanism rather than just the fact: a rule keyed to a LIST of live bots
+  goes stale on every slot swap and then sends every future audit to the wrong
+  file. The live pair is now 🙏 Avo + 🔮 georgia and they are the SAME FILE.
+
+**Mutation-verified, 7/7 red:** the shadow twin named in the retired set · a
+dark bus resurrecting the live arm · the latch moved before the day roll · the
+flatten mislabelled `daily_loss` · a living arm publishing the retired block ·
+the judge's stand-down moved after the growth promoter · the mode guard demoted
+below the override. Plus 1/1 on the margin guard (an undeclared reader).
+
+**One self-inflicted loss, recorded because the record is the point:** mid-pass I
+ran `git checkout -- lighter_funding_bot.py` to revert a mutation and destroyed
+my own uncommitted retirement edits with it. Re-applied from the scripts that
+made them. The rule I broke is this file's own: **look at the target before you
+overwrite it** — a mutation harness that restores from a snapshot must restore
+from THAT snapshot, never from HEAD, when HEAD is not what you started from.
+
+**Still with Eamon, and it is the whole of what remains:** the sub-account has
+not moved. No session in this container has a Railway CLI, and the ORDER is the
+safety property. `session_state.py` carries the three acts.
+
 ## 2026-08-22 (sz) — THE VARIANT HOST HAD NEVER BEEN DRIVEN AS 🔮 GEORGIA, AND ITS SELFTEST WAS ABOUT TO REPORT CLEAN ON THREE OF THIRTEEN CHECKS
 
 `(sx)` made `lighter_avo_live_bot.py` a variant host and `(sy)` raised both
