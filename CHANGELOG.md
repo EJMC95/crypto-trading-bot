@@ -1,3 +1,63 @@
+## 2026-08-22 (sy) — 10x ON BOTH LIVE BOOKS, AND THE NUMBER THAT IS NOT ABOUT APPETITE: ABOVE 6.25x 🙏 AVO'S STOP CANNOT FIRE
+
+**Eamon, 22-Aug: "let avo go up to 10x, and georgia also".** Done — `GROSS_X_MAX`
+is 10.0 on both. It is a CEILING, not a setting: `GROSS_X` still defaults to 1.0,
+so raising it levers nothing by itself.
+
+### The arithmetic he is owed, and one line of it is new
+
+Liquidation arrives at `1/G - mmf`. The protective stop fires at `|stoploss|`.
+So above **`G = 1/(|stoploss| + mmf)`** the venue liquidates FIRST and **the
+stop is dead code** — not "riskier", *unable to fire*. Nobody had asked.
+
+| gross | liquidation move | 🔮 georgia (−5%) | 🙏 Avo (−10%) |
+|---|---|---|---|
+| 5x | −14.0% | fires | fires |
+| 7x | −8.3% | fires | **DEAD** |
+| 9x | −5.1% | fires | **DEAD** |
+| **10x** | **−4.0%** | **DEAD** | **DEAD** |
+
+**Stop dies above: 🔮 georgia 9.09x · 🙏 Avo 6.25x.** At 10x both liquidate on a
+**4.0%** adverse move — on baskets measuring `N_eff` 1.2–1.5, where
+all-slots-together is the central case rather than a tail.
+
+**Not clamped.** Risk appetite belongs to the person whose money it is, and this
+is stated once. What changed is that the row now publishes `stop_reachable` and
+`stop_dead_above` every loop, so a dead stop is READABLE instead of discovered.
+
+### The live defect this surfaced: the row was advertising twice the margin it has
+
+`(sr)` computed `liq_gap_pct` from a **hardcoded 0.03**, sourced from a
+hand-check of NVDA/WTI/XCU. Measured 22-Aug across the books these arms
+ACTUALLY trade, the worst maintenance-margin fraction is **600bps** — IWM and
+MSTR on 🙏 Avo's non-crypto set, ADA/DOT/AVAX/LINK once 🔮 georgia's crypto set
+is included.
+
+**So the real-money row has been publishing a liquidation gap twice as far away
+as it is: −17% at 5x, where the truth is −14%.** And the data was already on the
+bus — `(se)` put the venue's whole margin surface there and nothing read it,
+which is the registered-but-inert shape with a liquidation on the end of it.
+
+Fixed: `worst_mmf(universe)` reads `fleet_bus.market_margins()`, inheriting that
+accessor's fail-CLOSED contract verbatim — an unreadable margin returns **None**
+and the row publishes nothing rather than a number. A fabricated liquidation
+distance on a levered real-money book is the one field that must never be
+guessed (I8), and `(se)`'s own docstring says why: *"the cost of a wrong default
+is a LIQUIDATION, which is an unrecoverable loss of the whole book"*.
+
+### Pinned
+
+`tests/autonomy/test_variant_host.py` grows five tests; **8 of 8 mutations
+verified RED**, including the hardcoded-300bps regression, an unknown mmf
+fabricating a distance, an unknown mmf claiming the stop is fine, the ceiling
+formula dropping its `mmf` term (which would read 10x as safe), and the sign
+flip. `test_avo_cap_slots`' ceiling cases now TRACK `GROSS_X_MAX` instead of
+restating it — a retyped constant is a constant that drifts — with the value
+itself asserted once, in one place, so a silent revert is visible.
+
+`GEORGIA_GOLIVE_RUNBOOK.md` carries the table and names the highest settings
+that keep each stop alive: **9x georgia, 6x Avo**.
+
 ## 2026-08-22 (sx) — 🔮 GEORGIA GETS A LIVE ARM AS A VARIANT, NOT A COPY — AND 5x MEANS HALF AS MUCH ON HER AS IT DOES ON 🙏 AVO
 
 **Eamon, 22-Aug:** *"get georgia ready to go live on a new sub account ill

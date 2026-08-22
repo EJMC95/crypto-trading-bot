@@ -15,6 +15,43 @@ recent rate the remaining ~135 closes is **~10 days**; at her lifetime rate it
 is ~33. Go-live has always been an explicit operator act — the arm below is
 built so the decision is a switch, not a project.
 
+## Leverage — and the one number that is not about appetite
+
+**Eamon, 22-Aug: "let avo go up to 10x, and georgia also".** The ceiling is
+10.0 on both. `GROSS_X` is what each service actually runs; the ceiling only
+says how high it may be set.
+
+**THE STOP HAS A CEILING OF ITS OWN.** Liquidation arrives at `1/G - mmf`; the
+protective stop fires at `|stoploss|`. Above `G = 1/(|stoploss| + mmf)` the
+venue liquidates FIRST and the stop is dead code — it cannot fire. Measured
+22-Aug off the venue's own margin surface, worst maintenance margin across each
+book's universe is **600bps** (IWM/MSTR; ADA/DOT/AVAX/LINK):
+
+| gross | liquidation move | 🔮 georgia stop −5% | 🙏 Avo stop −10% |
+|---|---|---|---|
+| 5x | −14.0% | fires | fires |
+| 6x | −10.7% | fires | fires |
+| 7x | −8.3% | fires | **DEAD** |
+| 9x | −5.1% | fires | **DEAD** |
+| **10x** | **−4.0%** | **DEAD** | **DEAD** |
+
+**Stop dies above: 🔮 georgia 9.09x · 🙏 Avo 6.25x.**
+
+At 10x both books liquidate on a **4.0%** adverse move, on baskets measuring
+`N_eff` 1.2–1.5 — one bet wearing several names, so all-slots-together is the
+central case, not a tail.
+
+This is not a clamp. The row now publishes `leverage.stop_reachable` and
+`leverage.stop_dead_above` every loop, so a dead stop is visible rather than
+discovered. If you want the stop to keep working, the highest settings are
+**9x on georgia** and **6x on Avo**.
+
+**A defect this surfaced, now fixed:** `liq_gap_pct` was computed off a
+hardcoded 300bps and the venue's real worst is 600bps — Avo's row has been
+advertising a liquidation gap **twice as far away as it is** (−17% at 5x where
+the truth is −14%). It reads the venue's own surface now, and publishes
+`None` rather than a guess when that read fails.
+
 ## What 5x means on her
 
 Her stop is **−5%**, half 🙏 Avo's, so the same multiplier is half the drawdown.

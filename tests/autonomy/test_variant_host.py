@@ -177,3 +177,66 @@ def test_her_clip_lever_is_registered():
             assert cage["hi"] == 1.0, \
                 "the consumer is restrict-only; hi>1 is inert authority"
             assert cage["lane"] == "lighter-live"
+
+
+# ---- 8-11  [(sy)] the liquidation arithmetic ------------------------------
+
+def test_the_maintenance_margin_is_READ_not_hardcoded():
+    """`(sr)` published `liq_gap_pct` off a literal 0.03. The venue's real
+    worst across these books' own universes is 0.06 — IWM/MSTR on Avo's
+    non-crypto set, ADA/DOT/AVAX/LINK once georgia's crypto set is in — so the
+    row advertised a liquidation gap TWICE as far away as it was. The data was
+    already on the bus ((se)) and nothing read it."""
+    src = (ROOT / "lighter_avo_live_bot.py").read_text()
+    assert "0.03 - 1.0 / max(1e-9, gross_x())" not in src, \
+        "the hardcoded 300bps is back"
+    assert "fleet_bus.market_margins()" in src, "the venue's surface is unread"
+
+
+def test_an_unreadable_margin_publishes_NOTHING_rather_than_a_guess():
+    """`market_margins` is fail-CLOSED because the cost of a wrong default is a
+    liquidation. A fabricated distance on a levered real-money row is the one
+    number that must never be invented (I8)."""
+    with loaded() as m:
+        assert m.worst_mmf([]) is None
+        assert m.liq_gap_pct(None) is None
+        assert m.stop_reachable(None) == (None, None)
+
+
+@pytest.mark.parametrize("book,stop,ceiling", [
+    ("freqtrade-avo-maria", 0.10, 6.25),
+    ("freqtrade-georgia", 0.05, 9.09),
+])
+def test_the_stop_has_a_gross_ceiling_of_its_own(book, stop, ceiling):
+    """THE NUMBER THAT DECIDES WHAT 10x MEANS. Liquidation arrives at
+    `1/G - mmf`, the stop fires at `|stoploss|` — so above
+    `G = 1/(|stoploss| + mmf)` the venue liquidates FIRST and the protective
+    stop is dead code. Not a risk-appetite question: a stop that cannot fire is
+    a broken rail, and it was invisible until now."""
+    with loaded(book) as m:
+        assert abs(abs(float(m.S.stoploss)) - stop) < 1e-9
+        ok, ceil = m.stop_reachable(0.06, gross=10.0)
+        assert ok is False, "at 10x this stop cannot fire before liquidation"
+        assert abs(ceil - ceiling) < 0.01, (ceil, ceiling)
+        below, _ = m.stop_reachable(0.06, gross=ceiling - 0.5)
+        assert below is True, "just under the ceiling the stop must still fire"
+
+
+def test_liq_gap_matches_the_closed_form_and_keeps_its_sign():
+    """`x = 1/G - mmf`, published NEGATIVE (the direction that hurts a long
+    book), matching (sr)'s convention so the field's meaning did not silently
+    flip when its source did."""
+    with loaded() as m:
+        assert m.liq_gap_pct(0.06, gross=5.0) == -0.14
+        assert m.liq_gap_pct(0.06, gross=10.0) == -0.04
+        assert m.liq_gap_pct(0.06, gross=0) is None
+
+
+def test_the_ceiling_is_ten_and_is_a_ceiling_not_a_setting():
+    """Eamon, 22-Aug: "let avo go up to 10x, and georgia also". GROSS_X_MAX is
+    the bound; GROSS_X is what a service runs, and it still defaults to 1.0 —
+    raising the ceiling must not lever an unconfigured book."""
+    for book in ("freqtrade-avo-maria", "freqtrade-georgia"):
+        with loaded(book) as m:
+            assert m.GROSS_X_MAX == 10.0
+            assert m.GROSS_X == 1.0 and m.gross_x() == 1.0

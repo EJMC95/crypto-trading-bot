@@ -148,16 +148,31 @@ def test_the_vol_target_never_credits_independence_it_cannot_measure():
         assert A.vol_target_gross_x(bad) == A.vol_target_gross_x(1.0)
 
 
+# [2026-08-22 (sy)] the OPERATOR ceiling is 10.0 — **Eamon: "let avo go up to
+# 10x, and georgia also"**. The cases below track `GROSS_X_MAX` rather than
+# restating it, so the next move of that bound cannot leave this test asserting
+# a number the module no longer runs (a retyped constant is a constant that
+# drifts). What is pinned is the BEHAVIOUR: values above the ceiling clamp to
+# it, values below 1.0 floor to 1.0, hostile input degrades to 1.0.
 @pytest.mark.parametrize("raw,want", [
-    ("1.0", 1.0), ("1.4", 1.4), ("2.64", 2.64), ("5.0", 5.0),
-    ("6.0", 5.0), ("1e9", 5.0),                   # clamped to the OPERATOR ceiling
+    ("1.0", 1.0), ("1.4", 1.4), ("2.64", 2.64), ("5.0", 5.0), ("10.0", 10.0),
+    ("11.0", None), ("1e9", None),                # clamped to the OPERATOR ceiling
     ("0.5", 1.0), ("-3", 1.0), ("0", 1.0),        # floored: shrinking is the
                                                   # clip scale's job, not this
     ("nan", 1.0), ("inf", 1.0), ("abc", 1.0), ("", 1.0),   # hostile -> 1.0
 ])
 def test_no_env_value_escapes_the_operator_ceiling(raw, want, monkeypatch):
     monkeypatch.setattr(A, "GROSS_X", _as_float(raw))
-    assert A.gross_x() == pytest.approx(want)
+    expect = A.GROSS_X_MAX if want is None else want
+    assert A.gross_x() == pytest.approx(expect)
+
+
+def test_the_operator_ceiling_is_ten():
+    """Stated once, here, so a silent revert is visible. **Eamon, 22-Aug: "let
+    avo go up to 10x, and georgia also".** It is a CEILING: `GROSS_X` still
+    defaults to 1.0, so raising it levers nothing on its own."""
+    assert A.GROSS_X_MAX == 10.0
+    assert A.GROSS_X == 1.0
 
 
 def _as_float(raw):

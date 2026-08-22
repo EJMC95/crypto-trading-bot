@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-22 12:44 Sydney (02:44Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-22 12:51 Sydney (02:51Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -79,8 +79,9 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (6 commit(s), entries (st), (su), (sv), (sw))
+## Shipped today (7 commit(s), entries (st), (su), (sv), (sw), (sx))
 
+- `44fe87f` 🔮 Georgia's live arm, as a variant of the proven runner (sx)
 - `9e5c60b` Wire the two 22-Aug studies into CI — the rot-guard caught my omission (sw)
 - `b071d4a` Keep the concentration instrument, and record why the cap was refused (su)
 - `cfc70bb` 🔮 Georgia's rate limiter was cutting her best trades (sv)

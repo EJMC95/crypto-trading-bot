@@ -222,15 +222,31 @@ except (TypeError, ValueError):
 #: This is a risk appetite, and risk appetite belongs to the person whose money
 #: it is — so it is an operator-set bound, not a number this file invents.
 #:
-#: What the code still owes him is the ARITHMETIC, published rather than argued
-#: (see `vol_target_gross_x` and the row's `leverage` block). At 5x on a
-#: $230.70 book with 5 slots and a -10% stop:
-#:   clip $230.70 · deployed $1,153.50 · all-slots-stop = 50% of equity
-#:   · liquidation at a -17.0% adverse basket move (worst mmf of its books,
-#:     NVDA/WTI/XCU = 300bps, measured off the venue's orderBookDetails).
-#: The -10% stop is what stands between those two numbers, and it fires on a
-#: 300s loop.
-GROSS_X_MAX = float(_env("GROSS_X_MAX", "5.0"))
+#: **Eamon, 22-Aug: "let avo go up to 10x, and georgia also"** — so the ceiling
+#: is 10.0. It is a CEILING, not a setting: `GROSS_X` is what each service runs.
+#:
+#: What the code owes him is the ARITHMETIC, published rather than argued (see
+#: `vol_target_gross_x`, `liq_gap_pct`, `stop_reachable` and the row's
+#: `leverage` block). Two of those numbers are new, and one of them changes
+#: what 10x means:
+#:
+#: THE STOP HAS A CEILING OF ITS OWN. Liquidation arrives at `1/G - mmf`; the
+#: protective stop fires at `|stoploss|`. Above `G = 1/(|stoploss| + mmf)` the
+#: venue liquidates FIRST and the stop is dead code. At the venue's REAL worst
+#: maintenance margin — **600bps**, measured 22-Aug across each book's own
+#: universe (IWM/MSTR; ADA/DOT/AVAX/LINK), not the 300bps `(sr)` hardcoded:
+#:     🙏 Avo   (-10% stop):  stop dead above **6.25x**
+#:     🔮 georgia (-5% stop): stop dead above **9.09x**
+#: At 10x both books liquidate on a **4.0%** adverse move, on baskets measuring
+#: `N_eff` 1.2-1.5 — one bet wearing several names, so that is the central
+#: case rather than a tail.
+#:
+#: This ceiling is deliberately NOT a clamp on that: risk appetite belongs to
+#: the person whose money it is, and the row now publishes `stop_reachable`
+#: and `stop_dead_above` every loop so the consequence is readable rather than
+#: discovered. A dead stop is a fact about the configuration, not an opinion
+#: about it.
+GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
 #: The DIVERSIFICATION-EARNED number, published beside the operator's setting
 #: rather than clamping it. `N_eff` is the correlation-aware count of
@@ -243,6 +259,75 @@ GROSS_X_MAX = float(_env("GROSS_X_MAX", "5.0"))
 #: supports — which is the lever worth pulling, and it costs no expectancy
 #: because it turns away no signal, it only re-sizes.
 #: MSTR belongs with crypto here, not equities: MSTR/BTC measured +0.859.
+def worst_mmf(universe):
+    """Worst (highest) maintenance-margin fraction across `universe`, or None.
+
+    [2026-08-22 (sy)] THIS WAS A HARDCODED 0.03 AND THE VENUE SAYS 0.06.
+    `(sr)` published `liq_gap_pct` off a literal 300bps sourced from a
+    hand-check of NVDA/WTI/XCU, and the real worst across the books these two
+    live arms actually trade is **600bps** — IWM and MSTR on 🙏 Avo's
+    non-crypto set, ADA/DOT/AVAX/LINK once 🔮 georgia's crypto set is included.
+    So the row has been publishing a liquidation gap TWICE as far away as it
+    is: -17% at 5x where the truth is -14%.
+
+    The data was already on the bus — `(se)` put the venue's whole margin
+    surface there and nothing read it. Fail-CLOSED, inheriting
+    `fleet_bus.market_margins`' contract verbatim: an unreadable margin returns
+    **None**, and a caller that cannot read one must treat the book as if no
+    leverage were available. The cost of a wrong default here is a
+    liquidation, which is unrecoverable — so absence is never "no limit"."""
+    try:
+        import fleet_bus
+        rows = fleet_bus.market_margins()
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(rows, dict):
+        return None
+    seen = []
+    for sym in universe or ():
+        row = rows.get(sym)
+        try:
+            bps = float((row or {}).get("mmf_bps"))
+        except (TypeError, ValueError):
+            continue
+        if bps > 0:
+            seen.append(bps / 10000.0)
+    return max(seen) if seen else None
+
+
+def liq_gap_pct(mmf, gross=None):
+    """The signed adverse move that liquidates, or None when mmf is unknown.
+
+    Liquidation when equity falls to maintenance: `1 - G*x = mmf*G`, so the
+    move is `x = 1/G - mmf`. Published NEGATIVE (the direction that hurts a
+    long book), matching `(sr)`'s convention."""
+    if mmf is None:
+        return None
+    g = gross_x() if gross is None else gross
+    if not g or g <= 0:
+        return None
+    return round(mmf - 1.0 / g, 4)
+
+
+def stop_reachable(mmf, gross=None):
+    """Does the book's own protective stop fire BEFORE the venue liquidates?
+
+    [(sy)] THE QUESTION NOBODY HAD ASKED, and it is not a risk-appetite one —
+    above a certain gross the stop is dead code, because liquidation arrives
+    first. It has a closed form: the stop is reachable while
+    `|stoploss| < 1/G - mmf`, i.e. up to `G = 1 / (|stoploss| + mmf)`.
+
+    At the venue's real 600bps that ceiling is **6.25x for 🙏 Avo** (-10% stop)
+    and **9.09x for 🔮 georgia** (-5% stop). Reported, never a gate — it does
+    not clamp anything; it makes a dead stop visible instead of silent."""
+    if mmf is None:
+        return None, None
+    sl = abs(float(S.stoploss))
+    ceiling = round(1.0 / (sl + mmf), 2)
+    g = gross_x() if gross is None else gross
+    return (sl < (1.0 / g - mmf)) if g and g > 0 else None, ceiling
+
+
 def vol_target_gross_x(n_eff=1.0):
     """Gross that keeps an all-slots-stop inside the 15% go-live drawdown bar,
     credited for measured independence. n_eff=1 (fully correlated) returns the
@@ -824,6 +909,10 @@ def main(_ctx=None, once=False):
             # — the cap census must describe the clip the row publishes, and a
             # second copy of this expression is how the two drift apart.
             _eff_clip = ((clip_usd(eq) or 0.0) * _clip_scale_now()) if eq else None
+            # [(sy)] the venue's real margin surface for THIS book's universe,
+            # read once per publish and shared by the three fields below.
+            _mmf = worst_mmf(universe)
+            _stop_ok, _stop_ceiling = stop_reachable(_mmf)
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
                 "strategy": "SwingDipV1 (live slot swap 13-Aug)",
@@ -874,11 +963,20 @@ def main(_ctx=None, once=False):
                                    else None),
                     "vol_target_here": (vol_target_gross_x(held_n_eff)
                                         if held_n_eff else None),
-                    # worst maintenance-margin fraction across the books this
-                    # universe trades (NVDA/WTI/XCU = 300bps), measured off the
-                    # venue's own orderBookDetails 21-Aug. Read per book, never
-                    # derived from imf — the (no) trap.
-                    "liq_gap_pct": round(0.03 - 1.0 / max(1e-9, gross_x()), 4),
+                    # [(sy)] READ FROM THE VENUE, not a literal. The worst
+                    # maintenance-margin fraction across the books this
+                    # universe actually trades — 600bps, not the 300bps (sr)
+                    # hardcoded — off the scout's own margin surface. None
+                    # when unreadable: a fabricated liquidation distance on a
+                    # levered real-money row is the one number that must never
+                    # be guessed.
+                    "mmf": (round(_mmf, 4) if _mmf is not None else None),
+                    "liq_gap_pct": liq_gap_pct(_mmf),
+                    # Does the book's own stop still fire before the venue
+                    # liquidates? Above `stop_dead_above` it does not, and the
+                    # protective stop is dead code. Reported, never a gate.
+                    "stop_reachable": _stop_ok,
+                    "stop_dead_above": _stop_ceiling,
                 },
                 "held": {c: (meta.get(c) or {}).get("tag")
                          for c in live_pos},
