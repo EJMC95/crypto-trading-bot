@@ -119,6 +119,11 @@ _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
                        # False` below), so this entry is what makes Avo's
                        # arm real rather than silently inert.
                        "live.avo.": "evidence-board",
+                       # [2026-08-22 (tb)] 🔮 georgia's arm, for the same
+                       # reason and found the same way: (sx) registered
+                       # `live.georgia.clip_scale` in LEVERS and stopped there,
+                       # so it was unwritable by ANY author until this line.
+                       "live.georgia.": "evidence-board",
                        "live.funding.": "experiment-judge"}
 
 

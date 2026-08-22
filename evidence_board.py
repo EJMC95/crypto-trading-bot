@@ -504,7 +504,11 @@ PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
 # is still the defect; so is moving a book the grade cannot see.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "perps-funding-lighter-lighter,freqtrade-avo-maria-lighter").split(",")
+    # [2026-08-22 (tb)] 💸 the Farmer's live row is retired ((ta)) and 🔮
+    # georgia took its sub-account, so the cohort follows the money. A retired
+    # row here is not merely stale: `test_live_clip_cohort` treats it as a
+    # defect, because the board would keep sizing a book that cannot trade.
+    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter").split(",")
     if s.strip()}
 # Per-row ARM: the lever each live row actually reads. The Farmer keeps
 # `live.clip_scale` — renaming a lever a real-money consumer is reading today

@@ -23,6 +23,11 @@ import sys
 
 # Dead pre-rename names. Edit here if more legacy keys ever need pruning.
 LEGACY_BOTS = [
+    # [2026-08-22 (ta)/(tb)] 💸 the Farmer's LIVE arm — the prune half of
+    # the retirement. The LEDGER is untouched (136 real-money closes live
+    # in paper_trades); this only removes the frozen summary row so it
+    # cannot go stale and page after georgia took the service.
+    "perps-funding-lighter-lighter",
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
     # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the

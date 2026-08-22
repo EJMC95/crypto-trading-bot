@@ -381,6 +381,25 @@ BOOKS = {b.row: b for b in [
              "moving the Farmer's dial cannot resize this book. Strategy is "
              "imported from lighter_family_bot, so BOTH files are live "
              "surface. Entry/exit constants are operator-env-only."),
+    # [2026-08-22 (tb)] 🔮 georgia LIVE — the (ta) slot swap. Registering her
+    # row in fleet_books.ROW_ENTRY without a spec here is the omission this
+    # organ's own guard exists to refuse: it would leave the newest REAL-MONEY
+    # book unscanned by the organ that asks whether a book has room to grow.
+    # Same shared runner as 🙏 Avo (a variant host since (sx)), so the live
+    # surface is BOTH files; her arm is her own, for the same reason Avo's is.
+    BookSpec(
+        "freqtrade-georgia-lighter", "lighter_avo_live_bot.py", live=True,
+        state_key="freqtrade-georgia-lighter:live", knob_floor=5,
+        levers=("live.georgia.clip_scale",),
+        expects=("fleet-risk", "coin-vetoes"),
+        note="🔮 Georgia LIVE, on the sub-account 💸 the Farmer gave up (ta). "
+             "Sizes off her OWN `live.georgia.clip_scale`, never the shared "
+             "dial — the (nj) split, so the board moving one live book cannot "
+             "resize the other. Strategy (DayTraderGated) is imported from "
+             "lighter_family_bot, so BOTH files are live surface. Went live at "
+             "5 of 6 go-live bars, failing only t=1.48 — an explicit operator "
+             "act, not a gate pass, which is why the drawdown arithmetic on "
+             "her row is the guardrail."),
     # ---- SHADOW ------------------------------------------------------------
     BookSpec(
         "perps-funding-lighter-lshadow", "lighter_funding_bot.py",

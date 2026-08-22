@@ -1,3 +1,120 @@
+## 2026-08-22 (tb) — THE SWAP EXECUTED: 💸 THE FARMER FLATTENED FOUR REAL SHORTS AND 🔮 GEORGIA TOOK THE SUB-ACCOUNT — PLUS THE ELEVEN REGISTRIES THAT EACH DECLARE "WHO IS LIVE"
+
+**Eamon, 22-Aug: *"Full permission for you to swap farmer and Georgia"*.**
+
+**IT WORKED FIRST TIME, ON REAL MONEY.** The retirement guard reached
+`trail-blazer-live`, latched the halt, and the book flattened:
+
+    perps-funding-lighter-lighter  st=halted  eq=$186.52
+      build=a0d0914e4549/16   <- matched the local prediction exactly
+      RETIRED since 2026-08-22  open=0   <- the four BTC/ETH/SOL/XAU shorts, closed
+
+`open == 0` is the receipt the whole design turns on. The stamp was predicted
+against the FUNDING image's own COPY set rather than the repo tree — the (fd)
+trap, where a repo-side `build_compute` reads 17 files and that image carries 16
+because it never COPYs `lighter_family_bot.py`. Both predictions (farmer
+`a0d0914e4549/16`, avolive `29430997f6c5/17`) matched their images' live counts
+before either deploy, which is what made "STAMP-OK" mean something.
+
+**🙏 AVO RODE ALONG, AND SHE NEEDED TO.** Her live row was still running
+pre-(sy) code: it published `liq_gap=-0.17` off the **hardcoded 300bps** while
+the venue's real worst across her universe is 600bps — a 5x-levered real-money
+book advertising liquidation **21% further away than it was** — and her
+container still capped at `GROSS_X_MAX = 5.0`, so *"let avo go up to 10x"* was
+not in effect at all. Now `liq_gap=-0.14`, `stop_reachable=True`, ceiling 10.
+
+### THE PLAN CHANGED WHEN I BUILT IT, AND THE NEW ONE IS STRICTLY SAFER
+
+`GEORGIA_GOLIVE_RUNBOOK.md` said *create `georgia-live`, move the keys*. Writing
+that provisioner made the flaw plain: **moving keys means READING them**, and
+(ml) measured that even a redacted `railway variables` echo survived only by
+column-width luck. So `trail-blazer-live` is **CONVERTED IN PLACE** — the fleet's
+own precedent (🎫 the Taker took 🌊 Tide Rider's slot on the same
+service/keys/sub-account, 17-Jul; service names here have never matched their
+books). Two properties a new service could not buy: **no credential is ever
+read, copied or transported**, and **"two processes on one sub-account" becomes
+structurally unreachable** — there is only ever ONE service holding those keys,
+so the failure where the Farmer flattens georgia's positions cannot be reached
+by any ordering mistake.
+
+**THE ORDERING IS A GUARD, NOT A RUNBOOK LINE.** `georgia-takes-the-slot.yml`
+refuses to run until the live row proves it is flat — `extra.retired` present
+AND zero open AND the row fresh (I1: a stale row cannot prove it is flat NOW).
+**Driven through all seven branches before it was trusted**, using the python
+extracted FROM the workflow rather than a retype: today's real feed refuses (no
+guard yet) · retired-but-holding refuses · receipt says 0 while the ROW says 2
+refuses · flat-but-27h-stale refuses · row ABSENT refuses (absence is never a
+licence — the dashboard could equally have hidden it early) · unparseable feed
+refuses · retired-and-flat PASSES. That last case is the half that matters ((po)).
+
+**WHY THE ENV VAR IS THE RIGHT LEVER, from a population rather than an absence
+(I6).** This fleet swaps slots two ways: a per-service config-as-code toml (how
+🙏 Avo took the Taker's slot — `railway.tickettaker.toml` repoints
+`dockerfilePath`) or `RAILWAY_DOCKERFILE_PATH`. All TEN `railway*.toml` files
+were enumerated and **not one builds `Dockerfile.fundinglighter`**, while
+`trail-blazer-live` demonstrably runs it — so its image path cannot come from a
+toml. If that reasoning is wrong, the workflow's own readback step is where it
+shows up, which is why that step exists.
+
+### "UPDATE AND SYNC EVERYWHERE" — ELEVEN REGISTRIES, AND A DRY RUN THAT PAID FOR ITSELF
+
+The Farmer's row stops publishing the moment georgia takes the service and goes
+STALE at **15 minutes** (`VARIANT_STALE_SECONDS`), which the watchdog raises as
+a PROBLEM and pages. So the follow-up had to be ready to push inside that
+window — and discovering a broken anchor under that clock is the worst possible
+moment. **The whole patch was therefore dry-run against a clean `git archive`
+checkout first, and it caught SIX real breaks that would each have landed
+mid-window:**
+
+* `_marker_logic_selftest` pins that `[deploy-live-farmer]` exists — the rewiring
+  removed it. The marker gate's whole case table encoded the OLD live pair, so
+  it was rewritten for the new one: 🙏 Avo and 🔮 georgia **share one image**, so
+  the marker is the only thing separating them, and "one book at a time" is now
+  the assertion rather than bookkeeping. The Farmer's old marker is pinned to
+  move **nothing live** — if that ever returns a service, the retirement has
+  been undone by a routing edit rather than by a decision.
+* **`live.georgia.clip_scale` was REGISTERED AND UNWRITABLE** — a defect in my
+  own (sx): the lever went into `LEVERS` and its prefix never went into
+  `_LIVE_PREFIX_OWNERS`, so `_author_may_write` fell through to `return False`
+  and no author could move it. The registered-but-inert failure (I18), which is
+  exactly what the comment beside `live.avo.` warns about, found by the guard on
+  the pass that made the row live.
+* `fleet_proprioception` and `evidence_board` each carry a live cohort and are
+  pinned to AGREE; `evidence_review`'s twin assertion named the retired pair;
+  `fleet_agronomy` refused to let a REAL-MONEY row be registered with no
+  BookSpec — *"a silent omission is how a real-money row went unscanned while a
+  retired one was still specced"*.
+* **`PAIRED_ARMS` is now empty, and that is a finding rather than a deletion.**
+  The pair it protected was the Farmer's live/shadow A/B; retiring the live arm
+  ended the experiment. Keeping the entry would assert a pairing between
+  georgia's live service and the Farmer's shadow — not stale but WRONG. The
+  MECHANISM stays verified: `arm_pairing_orphans` takes its pairs as an argument
+  and both it and `test_arm_pairing_drift` drive a synthetic pair, so an empty
+  registry cannot make those guards vacuously green. The empty case is pinned to
+  the DECLARATION, so a future pair must bring its routing back with it.
+
+**AND ONE OF MY OWN, caught by the same dry run:** the fixture pair was set by
+assigning `adc.PAIRED_ARMS` directly, which **leaked into the next test in the
+file** — it then asserted the workflow routes `fixture-ctrl-svc` and failed,
+reading exactly like a real routing break. `monkeypatch` restores on teardown.
+Module-global mutation in a test is a defect even when the assertion passes.
+
+**Config:** `GEORGIA_GROSS_X=5.0`, `FREQTRADE_GEORGIA_MAX_NOTIONAL=5000`
+(Eamon's call; the cap is a backstop and `GROSS_X` is the control). Eamon added
+equity to that sub-account this morning and it was still settling at swap time —
+she sizes off live equity every loop, so she picks it up with no edit. **Her
+`diversified_order` has real material**: the family universe defaults to all ten
+non-crypto names, so she can spread as 🙏 Avo does (QQQ/SPY/NVDA) instead of
+holding one crypto bet five times at 5x.
+
+**STATED ONCE, PLAINLY, AND NOT RE-ARGUED: georgia has NOT passed the go-live
+gate.** She is 5 of 6 bars — window, closes, mean, both halves, maxDD — failing
+only `t` (1.48 against 2.0). Going live is an explicit operator act and this is
+Eamon's, on the record. What the code owes him is the arithmetic, published on
+her row every loop: at her −5% stop, **2.8x is the last setting strictly inside
+the gate's 15% drawdown bar** and **above 9.09x her stop cannot fire before
+liquidation** at the venue's measured 600bps. 5x sits between those, knowingly.
+
 ## 2026-08-22 (ta) — 💸 THE FARMER'S LIVE ARM IS RETIRED AND 🔮 GEORGIA TAKES THE SUB-ACCOUNT — THE FIRST RETIREMENT THAT HAD TO FLATTEN REAL MONEY RATHER THAN FREEZE PAPER
 
 **Eamon, 22-Aug: *"just replace farmer with georgia as weve done so many times

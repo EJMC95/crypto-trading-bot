@@ -97,7 +97,12 @@ ROW_ENTRY = {
     "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
     "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
     "perps-funding-carry-lshadow": "funding_carry_bot.py",
+    # [2026-08-22 (ta)/(tb)] 💸 the Farmer's live row is RETIRED, and its entry
+    # stays mapped for the same reason the Taker's did through (ma): an old
+    # container's last stamped publishes must resolve rather than read
+    # UNMAPPED. 🔮 georgia now runs on that service.
     "perps-funding-lighter-lighter": "lighter_funding_bot.py",
+    "freqtrade-georgia-lighter": "lighter_avo_live_bot.py",
     "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
     "perps-funding-spread-lshadow": "lighter_funding_spread_bot.py",
     "pm-abbott-lshadow": "parliament_main.py",
@@ -114,6 +119,10 @@ ROW_ENTRY = {
 #: cost it four false ACTION items.
 MARKER_GATED = {
     "perps-funding-lighter-lighter": ("[deploy-live-farmer]", "[deploy-live]"),
+    # [(tb)] 🔮 georgia's live row — the service kept its gate through the swap
+    # but gained its OWN marker, because she and 🙏 Avo share one image and a
+    # single marker would restart both books on every fix to either.
+    "freqtrade-georgia-lighter": ("[deploy-live-georgia]", "[deploy-live]"),
     "lighter-ticket-taker-lighter": ("[deploy-live-taker]", "[deploy-live]"),
     # [2026-08-13 (ma)] the slot's new occupant deploys behind the SAME
     # marker (the service kept its gate through the swap).
@@ -152,8 +161,12 @@ NON_BOT_ROWS = {}
 #: with it. Reading order for any consumer that CAN reach the feed:
 #: `live_rows_from_feed(doc)` first, this only as the fallback.
 DECLARED_LIVE = (
-    "perps-funding-lighter-lighter",   # 💸 Funding Farmer
     "freqtrade-avo-maria-lighter",     # 🙏 Avo Maria — (ma) slot swap, 13-Aug
+    # [2026-08-22 (tb)] 🔮 georgia — the (ta) slot swap. She runs on
+    # `trail-blazer-live`, the service 💸 the Farmer gave up: it was converted
+    # in place rather than replaced, so no API key was ever read or moved.
+    # Service names in this fleet have never matched their books.
+    "freqtrade-georgia-lighter",
 )
 
 

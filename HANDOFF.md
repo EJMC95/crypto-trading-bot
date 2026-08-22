@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-22 13:34 Sydney (03:34Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-22 14:13 Sydney (04:13Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -79,8 +79,13 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (15 commit(s), entries (st), (su), (sv), (sw), (sx), (sy), (sz), (ta))
+## Shipped today (20 commit(s), entries (st), (su), (sv), (sw), (sx), (sy), (sz), (ta))
 
+- `afad3f2` The slot swap proves itself by the row, not by a green run (ta)
+- `46f0ee6` Retire the Farmer's live arm; georgia takes the sub-account (st-ta)
+- `aabb658` The slot swap converts the service in place — no key is ever read (ta)
+- `35ba047` A retired arm is not a daily-loss halt — don't say so hourly forever (ta)
+- `107a856` Sync the claims about intent; leave the feed-following tripwires alone (ta)
 - `29bac3b` Drive the retirement decision instead of grepping for it — 3 more mutations (ta)
 - `d0ddc90` Record the drawdown-bar correction in the entry too (ta)
 - `3639d26` 3.0x is ON georgia's drawdown bar, not inside it — the (gv) trap (ta)

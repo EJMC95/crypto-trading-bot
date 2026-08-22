@@ -162,7 +162,10 @@ LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))
 # divergent defaults is not a shared roster.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "perps-funding-lighter-lighter,freqtrade-avo-maria-lighter").split(",")
+    # [2026-08-22 (tb)] follows the money with the board's cohort — the two
+    # organs are pinned to agree by test_live_clip_arms, so this default and
+    # evidence_board's are one decision recorded twice on purpose.
+    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter").split(",")
     if s.strip()}
 
 # [2026-07-30 THE SHADOW BOOKS LEARN — operator: "grow into what works"]

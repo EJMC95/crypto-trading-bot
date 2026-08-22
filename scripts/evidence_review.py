@@ -1648,7 +1648,12 @@ def selftest():
     # doubles as the suffix-only-rewrite regression check (its base contains
     # "-lighter", the case a global replace mangles); the second twin tracks
     # the live slot's CURRENT occupant ((ma): taker -> avo, 13-Aug).
-    assert "perps-funding-lighter-lshadow" in LIVE_TWINS
+    # [(tb)] was `perps-funding-lighter-lshadow` — the twin of a live row that
+    # retired at (ta). The PROPERTY being pinned is the suffix rewrite (a bare
+    # str.replace on the Farmer's row produced `perps-funding-lshadow-lshadow`,
+    # see the note above), so it is re-pinned on a CURRENT live row.
+    assert "freqtrade-georgia-lshadow" in LIVE_TWINS
+    assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
     assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
     assert not (LIVE_TWINS & set(LIVE_ROWS)), "twins must be distinct from live rows"
 

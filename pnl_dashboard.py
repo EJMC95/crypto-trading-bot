@@ -168,7 +168,21 @@ DASH_PASS = os.environ.get("DASH_PASS", "")
 # names only. Operator side: stop the 4 family Railway services (ONLY_BOT
 # mum/dad/avo-maria/georgia); the main container drops its 4 spot bots on
 # this deploy.
-RETIRED_ROWS = {"perps-donchian-breakout",
+RETIRED_ROWS = {
+                # [2026-08-22 (ta)/(tb)] 💸 the Funding Farmer's LIVE arm.
+                # Horizon `unreachable` on BOTH arms at the fleet's own grader
+                # (live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65).
+                # 🔮 georgia took the sub-account by converting the SAME
+                # service in place, so leaving this row visible would
+                # DOUBLE-COUNT the same real money — the identical reason
+                # `crypto-trend-daily-lighter` had to be retired when 🎫 the
+                # Taker took its slot (17-Jul). Hidden only AFTER the flatten
+                # published `extra.retired.open == 0`, because /pnl.json is
+                # filtered by this very set and hiding it earlier blinds the
+                # feed the flatten is verified on.
+                # Its SHADOW twin is NOT retired and keeps trading.
+                "perps-funding-lighter-lighter",
+                "perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 # [2026-08-15 (nf)] THE RED-STOP SLATE — seven I17 calls made

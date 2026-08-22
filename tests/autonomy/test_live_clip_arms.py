@@ -26,7 +26,8 @@ import evidence_board as eb        # noqa: E402
 import fleet_proprioception as fp  # noqa: E402
 
 AVO = "freqtrade-avo-maria-lighter"
-FARMER = "perps-funding-lighter-lighter"
+FARMER = "perps-funding-lighter-lighter"   # RETIRED live arm (ta)
+GEORGIA = "freqtrade-georgia-lighter"      # took its sub-account (ta)
 
 
 def test_every_live_clip_arm_routes_to_the_clip_rule():
@@ -42,7 +43,12 @@ def test_every_live_clip_arm_routes_to_the_clip_rule():
 def test_the_two_organs_agree_on_who_is_live_by_default():
     """A shared kill switch with divergent defaults is not a shared roster."""
     assert fp.LIVE_ROWS == eb.LIVE_ROWS, (fp.LIVE_ROWS, eb.LIVE_ROWS)
-    assert {FARMER, AVO} <= fp.LIVE_ROWS
+    # [2026-08-22 (tb)] the cohort follows the MONEY, not the history: 💸 the
+    # Farmer's live arm retired at (ta) and 🔮 georgia took its sub-account.
+    # Both halves are asserted — a retired row must be GONE, not merely joined
+    # by its successor, or the board keeps sizing a book that cannot trade.
+    assert {GEORGIA, AVO} <= fp.LIVE_ROWS
+    assert FARMER not in fp.LIVE_ROWS and FARMER not in eb.LIVE_ROWS
 
 
 def _prop(verdicts):
