@@ -1,13 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-08-22 12:51 Sydney (02:51Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-22 13:27 Sydney (03:27Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
-### `farmer-is-not-a-funding-book`  ·  owner: **OPERATOR**
-💸 the LIVE Funding Farmer's funding leg is a rounding error and its four positions are one bet. Measured (su): August mean -0.390%/trade = price -0.408% + funding **+0.018%**; real accruals $0.0015-$0.018 on a $30 clip; held basket BTC/ETH/SOL/XAU at **N_eff 1.389**, crypto leg 1.11 (rho +0.851). Every gate from 0.05 to 0.60 and twelve exit variants were swept on the population the book can actually trade: on the last 30 and 60 days EVERY one loses and the SHIPPED gate is the least bad. So this is not a knob.
+### `farmer-live-swap-operator-steps`  ·  owner: **OPERATOR**
+💸 the Farmer's LIVE arm is retired in code (ta) and 🔮 georgia's live arm is built, boot-smoked and deploy-routed — but the SUB-ACCOUNT has not moved. Three acts only Eamon can perform, IN THIS ORDER: (1) deploy the guard to `trail-blazer-live` with a `[deploy-live-farmer]` marker and wait for `extra.retired.open == 0` on the row — that is the flatten finishing, and it is the ONLY safe moment to move keys; (2) create the `georgia-live` service from Dockerfile.avolive and move the Lighter API keys + sub-account env onto it, adding FAMILY_LIVE_BOOK=freqtrade-georgia, GEORGIA_VENUE=lighter_live, FREQTRADE_GEORGIA_MAX_NOTIONAL and GEORGIA_GROSS_X; (3) uncomment the `[deploy-live-georgia]` rule in railway-redeploy.yml IN THE SAME COMMIT as the service. Full detail: GEORGIA_GOLIVE_RUNBOOK.md.
 
-_Still open because:_ the honest options are a redesign (it is a directional short book — grade it against the (hm) random-entry null and size it on measured independence, as (sr) did for 🙏 Avo) or an I17 keep-or-retire call. Both are Eamon's, on a REAL-MONEY row, and neither is a session's to take. What a session can do next is the random-entry null on its own ledger — the number that decides which.
+_Still open because:_ no session in this container has a Railway CLI, and two processes must never hold one sub-account at once — the Farmer would read georgia's positions as untracked and could flatten them. The ORDER is the safety property, not the individual steps.
 
 ### `funding-studies-inherit-the-rank-universe`  ·  owner: **session**
 (su) found `backtest_funding_lighter` selects its universe by RANK while the live bot filters on an absolute $10M/day floor only 11 of 212 markets clear — so its verdicts were measured on books the book refuses, and the gate table it produced INVERTS between universe 25 and 50. The loader now carries volume and `study_farmer_gate_minvol_2026-08-22` replays the honest population. **Four other scripts reuse that loader and have not been re-derived**: study_farmer_take_profit, backtest_farmer_breadth_lighter, backtest_funding_persistence and backtest_xsect_funding_lighter.
@@ -79,8 +79,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (7 commit(s), entries (st), (su), (sv), (sw), (sx))
+## Shipped today (9 commit(s), entries (st), (su), (sv), (sw), (sx), (sy), (sz))
 
+- `71aeacf` Drive georgia through main() — the variant host was never run as her (sz)
+- `a12ce6f` 10x ceiling on both live books — and above 6.25x Avo's stop cannot fire (sy)
 - `44fe87f` 🔮 Georgia's live arm, as a variant of the proven runner (sx)
 - `9e5c60b` Wire the two 22-Aug studies into CI — the rot-guard caught my omission (sw)
 - `b071d4a` Keep the concentration instrument, and record why the cap was refused (su)

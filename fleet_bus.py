@@ -35,6 +35,57 @@ _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 # [2026-08-20 (sn)] 6.7x EITHER WAY (Eamon, explicitly). The floor is DERIVED
 # from the ceiling rather than typed, so "either way" is true by construction
 # and the next move needs one edit, not two that can drift apart.
+#: [2026-08-22 (ta)] LIVE ARMS THAT NO LONGER TRADE REAL MONEY.
+#:
+#: **Eamon, 22-Aug: "just replace farmer with georgia as weve done so many
+#: times before".** DECLARED HERE, not in the bot, because two processes in two
+#: IMAGES have to agree about it and they cannot import each other: 💸 the
+#: Farmer's live arm runs in `trail-blazer-live` off `Dockerfile.fundinglighter`
+#: and the 🧪 experiment judge runs in `freqtrade-bots`, which does not (and
+#: must not) carry a real-money trading module. `fleet_bus` is in both images
+#: already, so this is the one place both can read.
+#:
+#: The judge is the consumer that matters: its whole job is promoting
+#: `live.funding.*` levers onto this exact row, and its paired bar needs
+#: `live >= 10` closes — so a flat arm silences it CORRECTLY but INVISIBLY,
+#: `{promotions: 0}` reading identically for "no candidate cleared" and "there
+#: is no live arm to promote onto" (I18). It stands down out loud instead.
+#: Measured at the retirement: ZERO `live.*` levers open, so nothing is
+#: stranded by this.
+#:
+#: THE OVERRIDE IS PARSED IDENTICALLY BY EVERY READER — the `BRAIN_MULT_ENGINE`
+#: rule, where a detector and its subject disagreeing about one env var is how
+#: a kill switch goes silent. Resurrecting the arm therefore means setting the
+#: override on BOTH services; that is stated in the retirement entry rather
+#: than hidden, because a half-set override is a book trading with no judge.
+RETIRED_LIVE_ARMS = {
+    "perps-funding-lighter-lighter": {
+        "since": "2026-08-22",
+        "entry": "(ta)",
+        "override": "FARMER_LIVE_RETIRED_OVERRIDE",
+        "successor": "freqtrade-georgia-lighter",
+        "why": "horizon `unreachable` on BOTH arms at the fleet's own grader "
+               "(live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65; "
+               "shadow n=161 mean -0.195% t=-0.95 halves +5.71/-18.32). "
+               "The shadow twin keeps trading as the control arm.",
+    },
+}
+
+
+def live_arm_retired(row):
+    """True when `row` is a live arm the fleet has retired.
+
+    Fail-safe direction is KEEP TRADING: an unknown row is not retired, so a
+    typo here can never silence a living book. The dangerous direction — a
+    retired arm reading as live — needs the row to be spelled exactly right in
+    the table above, which is the direction a mistake is loud in."""
+    spec = RETIRED_LIVE_ARMS.get(row)
+    if not spec:
+        return False
+    return os.environ.get(spec["override"], "").strip().lower() \
+        not in ("run", "1", "true")
+
+
 MULT_FLOOR = 1.0 / 6.7
 # [2026-07-21 TWO-WAY MULTS — operator: "brain needs to be able to widen
 # too"] Ceiling raised 1.0 -> 1.5: the brain may now publish EXPAND mults

@@ -1,143 +1,144 @@
-# 🔮 georgia — live-arm runbook
+# 🔮 GEORGIA TAKES 💸 THE FARMER'S SUB-ACCOUNT — the operator runbook
 
-_Written 2026-08-22 (sx). The code is ready and INERT. Nothing below has been
-done; every step is Eamon's._
+**Eamon, 22-Aug:** *"just replace farmer with georgia as weve done so many times
+before"* / *"thats easier, once your metrics and paramters are finished
+obviously"* / *"update and sync everywhere afterwards obviously"*.
 
-## Where the gate stands
+This supersedes the new-sub-account plan this file carried before. The swap is
+cheaper and it is the fleet's own precedent: 🎫 the Ticket Taker took 🌊 Tide
+Rider's live row on the same service/keys/sub-account (17-Jul), and 🙏 Avo took
+the Taker's (13-Aug (ma)).
 
-She is **5 of 6 go-live bars, failing only `t` (1.48 against the 2.0 bar)** —
-n=163, +0.163%/trade, both halves positive, maxDD inside the bar, window and
-close-count already clear. `golive_readiness` publishes `READY: []` for the
-whole fleet today.
+---
 
-`(sv)` raised her entries-per-hour cap 2 → 3 on measured evidence, so at her
-recent rate the remaining ~135 closes is **~10 days**; at her lifetime rate it
-is ~33. Go-live has always been an explicit operator act — the arm below is
-built so the decision is a switch, not a project.
+## Why — the fleet's own grader, not an opinion about a bad week
 
-## Leverage — and the one number that is not about appetite
+`golive-readiness`, published 21-Aug 22:31Z:
 
-**Eamon, 22-Aug: "let avo go up to 10x, and georgia also".** The ceiling is
-10.0 on both. `GROSS_X` is what each service actually runs; the ceiling only
-says how high it may be set.
+| row | n | mean/trade | t | halves | maxDD | horizon |
+|---|---|---|---|---|---|---|
+| 💸 `perps-funding-lighter-lighter` **(LIVE)** | 91 | **−0.160%** | −0.88 | +2.51 / **−7.65** | pass | **unreachable** |
+| 💸 `perps-funding-lighter-lshadow` | 161 | **−0.195%** | −0.95 | +5.71 / **−18.32** | pass | **unreachable** |
+| 🔮 `freqtrade-georgia-lshadow` | 151 | **+0.171%** | 1.48 | **+5.65 / +10.08** | pass | on_track |
 
-**THE STOP HAS A CEILING OF ITS OWN.** Liquidation arrives at `1/G - mmf`; the
-protective stop fires at `|stoploss|`. Above `G = 1/(|stoploss| + mmf)` the
-venue liquidates FIRST and the stop is dead code — it cannot fire. Measured
-22-Aug off the venue's own margin surface, worst maintenance margin across each
-book's universe is **600bps** (IWM/MSTR; ADA/DOT/AVAX/LINK):
+Both Farmer arms agree in sign **and** in verdict. `unreachable` is the grader's
+own phrase for *"mean ≤ 0 — more of the same closes cannot flip mean/t/halves"*,
+and it is the (mr)/(nf) red-stop class landing on the real-money row.
 
-| gross | liquidation move | 🔮 georgia stop −5% | 🙏 Avo stop −10% |
-|---|---|---|---|
-| 5x | −14.0% | fires | fires |
-| 6x | −10.7% | fires | fires |
-| 7x | −8.3% | fires | **DEAD** |
-| 9x | −5.1% | fires | **DEAD** |
-| **10x** | **−4.0%** | **DEAD** | **DEAD** |
+**STATE THE BAR PLAINLY, ONCE: georgia has NOT passed the go-live gate.** She is
+5 of 6 — window, closes, mean, halves and maxDD all pass; **`t` reads 1.48
+against a 2.0 bar**. Go-live is an explicit operator act and this is Eamon's,
+made on the record. What the code owes him is the arithmetic, published every
+loop on the row, which is what `leverage` and `scan` are for.
 
-**Stop dies above: 🔮 georgia 9.09x · 🙏 Avo 6.25x.**
+---
 
-At 10x both books liquidate on a **4.0%** adverse move, on baskets measuring
-`N_eff` 1.2–1.5 — one bet wearing several names, so all-slots-together is the
-central case, not a tail.
+## The order is the safety property
 
-This is not a clamp. The row now publishes `leverage.stop_reachable` and
-`leverage.stop_dead_above` every loop, so a dead stop is visible rather than
-discovered. If you want the stop to keep working, the highest settings are
-**9x on georgia** and **6x on Avo**.
+Two processes must never hold one sub-account. If georgia boots while the Farmer
+still runs there, the Farmer reads her positions as untracked and can flatten
+them, and her equity guard reads his fills as unexplained capital.
 
-**A defect this surfaced, now fixed:** `liq_gap_pct` was computed off a
-hardcoded 300bps and the venue's real worst is 600bps — Avo's row has been
-advertising a liquidation gap **twice as far away as it is** (−17% at 5x where
-the truth is −14%). It reads the venue's own surface now, and publishes
-`None` rather than a guess when that read fails.
+### 1 · Retire the Farmer's live arm and let it flatten
 
-## What 5x means on her
+```
+git commit -m "... [deploy-live-farmer]"      # marker in the SUBJECT, never the body
+git push
+```
 
-Her stop is **−5%**, half 🙏 Avo's, so the same multiplier is half the drawdown.
-Nothing here is hand-typed: the leverage layer reads `S.stoploss`.
+The guard is already in the code. On the first loop after the deploy the live
+arm latches its own daily-halt path, which **flattens every held coin, retries
+until flat, blocks entries and keeps heart-beating**. The shadow twin is
+untouched and keeps trading — it is the control arm.
 
-| | 🔮 georgia | 🙏 Avo |
+**WAIT FOR THE RECEIPT.** On `/pnl.json`:
+
+```
+perps-funding-lighter-lighter  status=halted  extra.retired.open == 0
+```
+
+`extra.retired.open` is the number of positions still held. **`open == 0` is the
+only signal that it is safe to move the keys.** Verify `extra.build` /
+`extra.build_n` changed too — a green workflow run has never meant a container
+took the deploy.
+
+Closes are booked `long_retired` / `short_retired`, not `daily_loss`, so the
+ledger says what actually happened.
+
+### 2 · Create `georgia-live` and move the sub-account
+
+Service `georgia-live`, image **`Dockerfile.avolive`** (the same image 🙏 Avo
+runs — `lighter_avo_live_bot.py` is a variant host since (sx), so this is one
+container with a different book selected by env).
+
+Move from `trail-blazer-live`, do not copy: the Lighter API key / secret /
+account index for that sub-account, so exactly one service holds them.
+
+Then set:
+
+| var | value | note |
 |---|---|---|
-| all-slots-stop at 5x | **25%** | 50% |
-| gross the 15% maxDD bar allows at `N_eff` 1 | **3.00x** | 1.50x |
-| …at her basket today (`N_eff` 1.457) | **3.62x** | — |
-| …after a diversified fill (`N_eff` 3.390) | **5.52x** | — |
+| `FAMILY_LIVE_BOOK` | `freqtrade-georgia` | **must be exactly this.** Absent ⇒ Avo. Set-but-blank ⇒ the process REFUSES to start (a typo must never point georgia's service at Avo's row, state key and real positions) |
+| `GEORGIA_VENUE` | `lighter_live` | the only accepted value; anything else refuses |
+| `FREQTRADE_GEORGIA_MAX_NOTIONAL` | `deposit × GEORGIA_GROSS_X` | hard boot gate — the process will not start without it, and the refusal message names this exact variable |
+| `GEORGIA_GROSS_X` | see the table below | defaults to **1.0**, so an unset value is unlevered, never a guess |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | **a reference, never a pasted literal** ((kb)) |
 
-**5x is inside her own drawdown budget once the basket spreads**, and it spreads
-by inheritance — `diversified_order` offers WTI before BTC. Below `N_eff` 2.78
-she is above budget; the row publishes `leverage.vol_target_here` every loop so
-that is readable rather than argued.
+At the Farmer's current equity (**$186.86**, 21-Aug) and 5 slots:
+`clip = equity × GROSS_X / 5`.
 
-## Step 1 — create the Railway service
+### 3 · Uncomment the deploy rule, in the same commit as the service
 
-Name it `georgia-live`. Same image as Avo's live arm (`Dockerfile.avolive`) —
-the runner is a variant host, so **no new Dockerfile and no new build**.
+`.github/workflows/railway-redeploy.yml` carries georgia's `[deploy-live-georgia]`
+rule commented out, because the resolve step fails on a service that does not
+exist. Uncomment it **with** the service — a rule for a missing service is a red
+build, and a missing rule is a book that never receives a fix.
 
-## Step 2 — the sub-account
+---
 
-The sub-account IS `LIGHTER_ACCOUNT_INDEX`. Set it to the new account index on
-this service only. Its keys are its own; nothing is shared with Avo's service.
+## What `GEORGIA_GROSS_X` buys, and the two numbers that are not appetite
 
-    LIGHTER_API_PRIVATE_KEY      <the sub-account's key>
-    LIGHTER_ACCOUNT_INDEX        <the new sub-account index>
-    LIGHTER_API_KEY_INDEX        <as issued>
-    DATABASE_URL                 ${{Postgres.DATABASE_URL}}   # a REFERENCE, never a literal ((kb))
+Her stop is **−5%** (half Avo's), so the same multiplier means half the
+book-level risk — and the venue's worst maintenance margin across her universe
+is **600bps**, measured, not assumed.
 
-## Step 3 — identity and sizing
+| `GROSS_X` | all-slots-stop | liquidation gap | stop can fire? |
+|---|---|---|---|
+| 1.0 | 5% | −94% | yes |
+| **3.0** | **15%** | −27.3% | yes — the last setting **inside the go-live gate's 15% maxDD bar** |
+| **5.0** | 25% | −14.0% | yes — Eamon's stated setting |
+| 9.09 | 45.5% | −5.0% | **the last setting at which the protective stop fires at all** |
+| **10.0** | 50% | −4.0% | **NO — the venue liquidates first and the stop is dead code** |
 
-    FAMILY_LIVE_BOOK             freqtrade-georgia
-    GEORGIA_VENUE                lighter_live      # exact string or it refuses to boot
-    GEORGIA_GROSS_X              5
-    GEORGIA_GROSS_X_MAX          5
-    FREQTRADE_GEORGIA_MAX_NOTIONAL   <see step 4>
-    REAL_MONEY_KILL              DISARMED_I_UNDERSTAND   # exact token or SafetyRails refuses
+The ceiling `AVO_GROSS_X_MAX` / `GEORGIA_GROSS_X_MAX` is **10.0** per Eamon,
+22-Aug (*"let avo go up to 10x, and georgia also"*). It is a **ceiling**, not a
+setting. The one line above that is not a matter of appetite is the last row:
+above 9.09x her `-5%` stop cannot execute before liquidation, so it stops being
+a rail. The row publishes `leverage.stop_reachable` and
+`leverage.stop_dead_above` every loop so this is readable rather than argued.
 
-A typo in `FAMILY_LIVE_BOOK` — including a blank value — **refuses to boot**
-rather than falling back to Avo. That matters: the fallback would have pointed
-this service at Avo's row, state key and live positions.
+Leverage moves her **no closer to the gate** — it multiplies mean and sd alike,
+so `t` is invariant (I22, seven prior rejections). It moves dollars and drawdown,
+together, in both directions.
 
-## Step 4 — size the notional cap to the deposit
+---
 
-`clip = equity × gross_x ÷ 5 slots`, and all five slots must fit under the cap
-or the book silently settles below capacity (the `(sr)` defect that cost 🙏 Avo
-a slot). So:
+## After it is live
 
-    FREQTRADE_GEORGIA_MAX_NOTIONAL  =  deposit × 5   (+ a few % of headroom)
-
-e.g. a **$250** deposit → clip $250, gross $1,250 → set the cap to **$1,300**.
-The row publishes `cap_slots`; if it reads below 5, the cap is what is holding
-her down, not the signal.
-
-## Step 5 — deploy
-
-Uncomment the `[deploy-live-georgia]` block in
-`.github/workflows/railway-redeploy.yml` **in the same commit that creates the
-service** (a rule naming a service that does not exist fails the resolve step).
-It has its own marker on purpose: two live books share this image, and every
-georgia fix would otherwise restart Avo — a restart wipes memory-only halts.
-
-Verify the deploy landed by the row's `extra.build` + `extra.build_n`, never by
-a green run.
-
-## Step 6 — the day she is funded
-
-    EVBOARD_LIVE_ROWS  perps-funding-lighter-lighter,freqtrade-avo-maria-lighter,freqtrade-georgia-lighter
-
-That switches the evidence board's live-clip arm on for her. The lever
-(`live.georgia.clip_scale`) is already registered and restrict-only.
-
-## What to read on the row
-
-* `scan` — the (st) census: why nothing opened, with the RSI gauge and idle clocks
-* `cap_slots` — below 5 means the cap, not the signal, is the constraint
-* `leverage.{set, n_eff, basket_rho, vol_target_here, all_slots_stop_pct}` —
-  `set` above `vol_target_here` is the risk being taken, stated
-* `entry_vetoes` — every gate that can stop her, including the brain and the
-  fleet long budget
-
-## Not done, and deliberately
-
-The go-live gate holds her closed at `t=1.48`. This runbook builds the arm; it
-does not open the gate, and nothing here should be read as saying she has
-passed it.
+* **Add her to the evidence board's live set** — `EVBOARD_LIVE_ROWS` on
+  `freqtrade-bots`: `perps-funding-lighter-lighter,freqtrade-avo-maria-lighter,freqtrade-georgia-lighter`
+  (drop the Farmer once its row is pruned). `live.georgia.clip_scale` is already
+  registered and mapped; the board acts on `LIVE_ROWS` alone.
+* **Hide + prune the Farmer's live row** — `RETIRED_ROWS` in `pnl_dashboard.py`
+  and `LEGACY_BOTS` in `cleanup_legacy_bots.py`, **after** `open == 0` is
+  confirmed. Doing it before blinds the very feed the flatten is verified on
+  (`/pnl.json` is filtered by the dashboard's roster). Ledgers are kept either
+  way — the 136 real-money closes live in `paper_trades`.
+* **The 🧪 judge has already stood down** — it publishes
+  `phase="stood_down"` naming the retirement rather than silently never
+  promoting. Zero `live.*` levers were open at the retirement, so nothing was
+  stranded.
+* **Resurrecting the Farmer** needs `FARMER_LIVE_RETIRED_OVERRIDE=run` on
+  **both** `trail-blazer-live` and `freqtrade-bots` — the bot and the judge read
+  one declaration (`fleet_bus.RETIRED_LIVE_ARMS`) and parse the override
+  identically. A half-set override is a live book with no judge.

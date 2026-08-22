@@ -56,6 +56,16 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import fleet_tuning as tuning
 
+# [(ta)] the fleet's declaration of which LIVE ARMS are retired. Soft import
+# for the same reason every other organ's is: a judge that cannot import the
+# bus must keep judging, not crash. Dark bus ⇒ no stand-down ⇒ the paired bar's
+# own `live >= 10` floor still blocks every promotion onto a flat arm, so the
+# fail-open direction here costs visibility, never safety.
+try:
+    import fleet_bus as _bus
+except Exception:  # noqa: BLE001
+    _bus = None
+
 try:
     import fleet_proposals as fprop      # organ proposal channel (optional)
 except Exception:  # noqa: BLE001
@@ -1726,6 +1736,38 @@ def run_once():
               f"candidate={payload['candidate']} "
               f"{kw.get('note') or ''}", flush=True)
         return payload
+
+    # [2026-08-22 (ta)] THE LIVE ARM IS RETIRED — STAND DOWN, OUT LOUD.
+    #
+    # This judge exists to promote `live.funding.*` bars onto ONE row, and 💸
+    # the Farmer's live arm was retired 22-Aug so 🔮 georgia could take the
+    # sub-account. Its paired bar needs `live >= 10` closes in the window, so a
+    # flat arm silences the pipeline CORRECTLY and INVISIBLY — `promote: false`
+    # would read identically for "no candidate cleared the bar" and "there is
+    # no live arm left to promote onto". That is the (I18) ambiguity a
+    # component owes its own census for.
+    #
+    # RETURNING IS THE RELEASE. Promoted levers are TTL'd and are kept alive by
+    # this cycle re-asserting them; not asserting is how the rail was designed
+    # to revert ("expiry = env defaults"), so a stand-down cleans up after
+    # itself with no second code path to get wrong. Measured at the
+    # retirement: ZERO `live.*` levers open, so nothing had to.
+    #
+    # Placed AFTER the state read and the release-request consumption (both
+    # safe, and the latter only ever RELEASES) and BEFORE any evaluation, so
+    # the judge writes a phase and touches nothing else.
+    if _bus is not None and _bus.live_arm_retired(LIVE_BOT):
+        _spec = (getattr(_bus, "RETIRED_LIVE_ARMS", {}) or {}).get(LIVE_BOT, {})
+        return save(phase="stood_down",
+                    note=(f"live arm {LIVE_BOT} retired "
+                          f"{_spec.get('since', '?')} {_spec.get('entry', '')}"
+                          f" -> {_spec.get('successor', '?')}; not promoting, "
+                          f"and not re-asserting (TTL reverts any open lever). "
+                          f"Resurrect with "
+                          f"{_spec.get('override', '?')}=run on BOTH this "
+                          f"service and the live one."),
+                    last_eval={"promote": False, "why": "live arm retired",
+                               "retired": dict(_spec, row=LIVE_BOT)})
 
     # [2026-07-28 §3c] the growth-lever pair runs its own self-contained
     # promoter EVERY cycle, whatever the serial queue is doing (it is

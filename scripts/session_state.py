@@ -85,29 +85,35 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
-        "id": "farmer-is-not-a-funding-book",
+        "id": "farmer-live-swap-operator-steps",
         "owner": "OPERATOR",
-        "what": "💸 the LIVE Funding Farmer's funding leg is a rounding error "
-                "and its four positions are one bet. Measured (su): August "
-                "mean -0.390%/trade = price -0.408% + funding **+0.018%**; "
-                "real accruals $0.0015-$0.018 on a $30 clip; held basket "
-                "BTC/ETH/SOL/XAU at **N_eff 1.389**, crypto leg 1.11 "
-                "(rho +0.851). Every gate from 0.05 to 0.60 and twelve exit "
-                "variants were swept on the population the book can actually "
-                "trade: on the last 30 and 60 days EVERY one loses and the "
-                "SHIPPED gate is the least bad. So this is not a knob.",
-        "why_open": "the honest options are a redesign (it is a directional "
-                    "short book — grade it against the (hm) random-entry null "
-                    "and size it on measured independence, as (sr) did for 🙏 "
-                    "Avo) or an I17 keep-or-retire call. Both are Eamon's, on "
-                    "a REAL-MONEY row, and neither is a session's to take. "
-                    "What a session can do next is the random-entry null on "
-                    "its own ledger — the number that decides which.",
-        # closes when the book either learns to size on the independence it now
-        # publishes, or is retired like every other undecidable row.
+        "what": "💸 the Farmer's LIVE arm is retired in code (ta) and 🔮 "
+                "georgia's live arm is built, boot-smoked and deploy-routed — "
+                "but the SUB-ACCOUNT has not moved. Three acts only Eamon can "
+                "perform, IN THIS ORDER: (1) deploy the guard to "
+                "`trail-blazer-live` with a `[deploy-live-farmer]` marker and "
+                "wait for `extra.retired.open == 0` on the row — that is the "
+                "flatten finishing, and it is the ONLY safe moment to move "
+                "keys; (2) create the `georgia-live` service from "
+                "Dockerfile.avolive and move the Lighter API keys + "
+                "sub-account env onto it, adding FAMILY_LIVE_BOOK="
+                "freqtrade-georgia, GEORGIA_VENUE=lighter_live, "
+                "FREQTRADE_GEORGIA_MAX_NOTIONAL and GEORGIA_GROSS_X; "
+                "(3) uncomment the `[deploy-live-georgia]` rule in "
+                "railway-redeploy.yml IN THE SAME COMMIT as the service. "
+                "Full detail: GEORGIA_GOLIVE_RUNBOOK.md.",
+        "why_open": "no session in this container has a Railway CLI, and two "
+                    "processes must never hold one sub-account at once — the "
+                    "Farmer would read georgia's positions as untracked and "
+                    "could flatten them. The ORDER is the safety property, "
+                    "not the individual steps.",
+        # closes when the deploy rule is live, which is the last of the three
+        # and cannot be done without the first two.
         "closes_when": lambda: (
-            _has("lighter_funding_bot.py", "FARMER_RETIRED_OVERRIDE")
-            or _has("lighter_funding_bot.py", "basket_scale")),
+            _has(".github/workflows/railway-redeploy.yml",
+                 'svcs="${svcs:+$svcs,}georgia-live"')
+            and not _has(".github/workflows/railway-redeploy.yml",
+                         '#   svcs="${svcs:+$svcs,}georgia-live"')),
     },
     {
         "id": "funding-studies-inherit-the-rank-universe",

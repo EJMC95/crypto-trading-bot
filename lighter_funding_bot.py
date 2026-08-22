@@ -335,6 +335,77 @@ VOL_FILTER_UNIVERSE_MAX = int(os.environ.get("FUNDING_VOL_FILTER_UNIVERSE_MAX", 
 HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-fitted; the Lighter counter-evidence was WITHDRAWN 22-Jul (above)
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-22 (ta)] THE LIVE ARM IS RETIRED — 🔮 georgia takes the sub-account.
+#
+# **Eamon, 22-Aug: "just replace farmer with georgia as weve done so many times
+# before".** The precedent he means is real and this follows it exactly: 🎫 the
+# Ticket Taker took 🌊 Tide Rider's live row on the same service/keys/sub-
+# account (17-Jul), and 🙏 Avo took the Taker's (13-Aug (ma)).
+#
+# THE EVIDENCE, from the fleet's OWN published grader (`golive-readiness`,
+# 21-Aug 22:31Z) rather than from an opinion about a bad week:
+#     LIVE   `perps-funding-lighter-lighter`  n=91  mean -0.160%/trade
+#            t=-0.88  halves +2.51/-7.65  -> horizon **unreachable**
+#     SHADOW `perps-funding-lighter-lshadow` n=161 mean -0.195%/trade
+#            t=-0.95  halves +5.71/-18.32 -> horizon **unreachable**
+# Both arms agree in sign AND in verdict, and `unreachable` is the grader's own
+# words for it: *"mean <= 0 — more of the same closes cannot flip mean/t/
+# halves"*. That is the (mr)/(nf) red-stop class landing on the REAL-MONEY row.
+# What replaces it is the fleet's closest book to the gate: 🔮 georgia, 5 of 6
+# bars, both halves positive (+5.65/+10.08), failing only `t` (1.48 < 2.0).
+#
+# **THIS IS ROW-SCOPED, NOT PROCESS-SCOPED.** One module runs BOTH arms, so the
+# 🌊/📊 idle-the-whole-process shape would silence the shadow twin — which is
+# the control arm and costs nothing to keep. The (mr) rule: declare the
+# retirement once, derive the roster.
+#
+# **AND IT FLATTENS, because this one holds REAL POSITIONS.** Every prior
+# retirement froze PAPER positions; four live directional legs with no manager
+# have no stop and no exit, which is strictly worse than closing them. Rather
+# than write a new idle loop next to real money, the guard latches the book's
+# OWN daily-halt path — already proven, already retried every loop until flat,
+# already heartbeating so a retired row reads `halted` instead of DEAD ((pq),
+# (pr), the 16-Jul retry fix). One machine, not a second one.
+#
+# Reversible: FARMER_LIVE_RETIRED_OVERRIDE=run (on BOTH this service and the
+# 🧪 judge's, which reads the same declaration — see fleet_bus).
+FARMER_LIVE_RETIRED_OVERRIDE = os.environ.get(
+    "FARMER_LIVE_RETIRED_OVERRIDE", "").strip().lower()
+
+
+def live_arm_retired(bot_id, mode):
+    """True when THIS process is a retired live arm.
+
+    THE SET LIVES IN `fleet_bus.RETIRED_LIVE_ARMS`, not here — the 🧪 judge has
+    to agree with this bot about it and runs in a different image, and a second
+    copy of a rule is a second rule. This function is only the two guards the
+    bus cannot supply, because they are facts about the PROCESS:
+
+    * `mode` — real money is at stake only in `lighter_live`, so an unknown or
+      mis-set VENUE cannot retire a shadow arm. Fail-safe toward keeping a
+      PAPER book alive, which is the harmless direction.
+    * a DARK BUS — a live arm that cannot read whether it is still commissioned
+      **stands down**. This is deliberately the opposite default from every
+      other bus read in the fleet (dark => neutral, keep going): everywhere
+      else the cost of failing closed is a missed opportunity, and here the
+      cost of failing OPEN is a retired real-money book resurrecting itself on
+      an import error. Scoped to `lighter_live` above, so it can never touch a
+      shadow book. The operator override is the escape hatch and works with or
+      without the bus.
+    """
+    if mode != "lighter_live":
+        return False
+    if FARMER_LIVE_RETIRED_OVERRIDE in ("run", "1", "true"):
+        return False
+    if fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.live_arm_retired(bot_id))
+    except Exception:  # noqa: BLE001
+        return True
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
 # [2026-07-21] repeat-stop escalation (the LIT lesson: 5 of 7 fleet stops
 # were the same coin, re-selected by the entry gate after every 12h
@@ -2439,6 +2510,17 @@ def main():
                             "blocked" if _rhalt else
                             "not halted; entries re-enabled")
 
+        # [(ta)] RETIRED LIVE ARM — latch the halt so the day roll cannot clear
+        # it. Placed AFTER the roll and BEFORE the halt block on purpose: the
+        # roll sets `halted_today = False` by construction ((pr)), so latching
+        # earlier would be silently undone once a day and the book would trade
+        # again for a whole UTC day. The halt block below then does the work —
+        # flatten-retry until flat, heartbeat, no entries — which is why this
+        # is four lines and not a second idle loop beside real money.
+        if live_arm_retired(bot_id, ctx.mode):
+            halted_today = True
+            halt_blind = False        # not ignorance; a decision
+
         # kill switch (live) — flatten every held coin and halt on arm.
         if not dry_run and ctx.rails.kill_check():
             log.error("REAL_MONEY_KILL armed mid-run — flatten + halt.")
@@ -2503,7 +2585,15 @@ def main():
             # book is flat; the kill-switch path already retries per loop, so
             # skip when the kill switch just flattened this same loop.
             if not dry_run and not ctx.rails.kill_check():
-                _flatten_all("daily_loss")
+                # [(ta)] THE REASON IS THE RECORD. These closes are a
+                # RETIREMENT, not a daily-loss stop, and mislabelling them
+                # would put four phantom `daily_loss` rows in the ledger every
+                # grader and exit-attribution study reads — the exact "a knob
+                # must record the quantity it cuts" failure (I23), on the last
+                # four trades a real-money book will ever book.
+                _flatten_all("retired"
+                             if live_arm_retired(bot_id, ctx.mode)
+                             else "daily_loss")
             # [2026-07-11 HALT HEARTBEAT] keep the dashboard row fresh while
             # halted — the early `continue` skipped the publish below, so a
             # halted bot looked DEAD (stale row) instead of HALTED.
@@ -2523,6 +2613,19 @@ def main():
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": ctx.mode, "venue": ctx.mode,
                            "style": "directional-funding",
+                           # [(ta)] I1/I18: `halted` is byte-identical between
+                           # "lost 5% today" and "retired 22-Aug", and those
+                           # need different actions. `open` is what says the
+                           # flatten finished, so the retirement is falsifiable
+                           # from the row instead of from a deploy log.
+                           **({"retired": {
+                               "since": "2026-08-22",
+                               "why": "live arm retired (ta) — horizon "
+                                      "unreachable on BOTH arms; georgia "
+                                      "takes the sub-account",
+                               "open": len(meta),
+                               "override": "FARMER_LIVE_RETIRED_OVERRIDE=run"}}
+                              if live_arm_retired(bot_id, ctx.mode) else {}),
                            "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                     for c in meta}})
                 # [2026-08-04] the MTM series must not skip halted days — a
