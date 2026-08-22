@@ -1,8 +1,18 @@
 # HANDOFF — start here
 
-_Generated 2026-08-21 19:36 Sydney (09:36Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-22 11:14 Sydney (01:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `farmer-is-not-a-funding-book`  ·  owner: **OPERATOR**
+💸 the LIVE Funding Farmer's funding leg is a rounding error and its four positions are one bet. Measured (su): August mean -0.390%/trade = price -0.408% + funding **+0.018%**; real accruals $0.0015-$0.018 on a $30 clip; held basket BTC/ETH/SOL/XAU at **N_eff 1.389**, crypto leg 1.11 (rho +0.851). Every gate from 0.05 to 0.60 and twelve exit variants were swept on the population the book can actually trade: on the last 30 and 60 days EVERY one loses and the SHIPPED gate is the least bad. So this is not a knob.
+
+_Still open because:_ the honest options are a redesign (it is a directional short book — grade it against the (hm) random-entry null and size it on measured independence, as (sr) did for 🙏 Avo) or an I17 keep-or-retire call. Both are Eamon's, on a REAL-MONEY row, and neither is a session's to take. What a session can do next is the random-entry null on its own ledger — the number that decides which.
+
+### `funding-studies-inherit-the-rank-universe`  ·  owner: **session**
+(su) found `backtest_funding_lighter` selects its universe by RANK while the live bot filters on an absolute $10M/day floor only 11 of 212 markets clear — so its verdicts were measured on books the book refuses, and the gate table it produced INVERTS between universe 25 and 50. The loader now carries volume and `study_farmer_gate_minvol_2026-08-22` replays the honest population. **Four other scripts reuse that loader and have not been re-derived**: study_farmer_take_profit, backtest_farmer_breadth_lighter, backtest_funding_persistence and backtest_xsect_funding_lighter.
+
+_Still open because:_ each cites its own verdict in a header that other work reads as settled ('do not re-test what a script header rejects'), so re-running them is not optional tidying — it is checking whether four standing refusals were measured on the wrong books. Cheap now that the tape carries volume; nobody has done it.
 
 ### `farmer-cap-collapses-slots-under-conviction`  ·  owner: **OPERATOR**
 💸 the LIVE Farmer's notional cap turns a bigger clip into FEWER BETS. Live-verified: clip $30, cap $150, 5 slots, equity $194.28 — at brain 1.0x it holds 5 positions for $150 gross; at 2.0x it holds TWO ($120); at 3.0x it holds ONE ($90). Gross FALLS as conviction rises, on a funding book whose edge is breadth. (sp)'s trim fixes the outright halt at 6.7x; it cannot fix this, because a fixed cap and a bigger clip are arithmetically the same constraint.
@@ -69,67 +79,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (59 commit(s), entries (rt), (sb), (sc), (sd), (se), (sf), (sg), (sh), (si), (sp), (sq), (sr))
+## Shipped today (2 commit(s), entries (st), (su))
 
-- `70ac1e6` [deploy-live-taker] Avo: diversified scan order, published N_eff, 5x leverage (sr)
-- `dee1139` Close the (sr) diversification mutation survivor + the mutation that never ran
-- `b55c703` Avo: diversified scan order + published N_eff (sr, pre-mutation)
-- `1c1bcb7` Regenerate the handoff after the 5x leverage pass (sr)
-- `0554bb7` [deploy-live-taker] Avo leverage 5x, and the diversification finding that earns it (sr)
-- `5f54383` Regenerate the handoff after the (sr) Avo work
-- `fb724f5` [deploy-live-taker] Avo 4 -> 5 slots: the ask was 6, the ledger refused it (sr)
-- `79c80e9` Doctrine + handoff: Avo funded 3.7x, levered 1.4x on a derived drawdown budget (sr)
-- `fc9ada7` Credit (sq)'s quote to Eamon, not the role — the ratchet was red on main
-- `0365707` [deploy-live-taker] Avo: cap census + leverage on a derived drawdown budget (sr)
-- `f5b89dc` Close the (sr) mutation survivor: nothing tested that leverage reaches the clip
-- `bf45934` Avo: the cap census the deposit needed, and leverage on a derived drawdown budget (sr)
-- `91f52fc` Fix the stale bots: neither was broken, and nothing they published could say so (sq)
-- `c7003d4` Merge PR #213: the gross bound failed a second way — the call pattern, not the call (sp)
-- `15b5809` The gross bound failed a SECOND way: the call pattern, not the call (sp)
-- `30c5cae` [deploy-live] Merge PR #210: the brain reaches every book, and the rails now trim instead of refusing (sk–sp)
-- `f9d6387` Correct the live numbers against the live rows, and name the sharper finding (sp)
-- `7f34d28` Close the class the rail guard could not see: worst-case gross per book (sp)
-- `78ffde3` The rails now actually dispose: trim, not refuse — and the brain's lookup is atomic (sp)
-- `4119336` Merge remote-tracking branch 'origin/main' into claude/fleet-wide-bugs-improvements-64qta3
-- `314f5a3` WIP: brain sizing reaches every book (letter pending)
-- `f835deb` The brain's range reaches 6.7x, either way (si)
-- `98f787a` Regenerate the handoff after the (sh) work (sh)
-- `966abc4` Nineteen designs, one way of judging them — the manifest (sh)
-- `e31648f` The ceiling becomes a measurement, and the brain's training wheel comes off (sh)
-- `f0fba40` The never-recorded class, closed fleet-wide; and I11 finally has teeth (sg)
-- `7217633` Merge PR #174: unchoke the fleet book by book — six improvements shipped, four refuted with numbers (ru–sj)
-- `3730955` Renumber (sf) -> (sj): main took (sf) for the I22 entry while this waited on CI
-- `16766ee` Garrett: three refutations and no knob turned — the stop is right, thinness is wrong, and the real problem is already on the docket (si)
-- `89e1514` Ship two parked improvements: Georgia's stop on the tag left behind, and the Sniper's missing census (sh)
-- `a28fc98` Un-blind the replay that gates every growth-rail actuator: 39% of the taker was structurally unreachable (sg)
-- `e2ab51b` Renumber (sd) -> (sf): main claimed (sd)/(se) concurrently
-- `f62ef32` Four books unchoked individually, each on its own number — and the fifth fix withdrawn (sd)
-- `d071dec` Changelog: four entries at (ru),(rv),(rw),(rx) — fourth renumber after main ran to (rt)
-- `c7f22ab` The class split becomes a published number, the docket deferral that expires, and the evidence saved as a calibration-gated study (ru, rv, rw, rx)
-- `2758677` Merge PR #211: I22 — a book must spend the ecosystem, and two of this session's walls were imaginary (sf)
-- `e34b6a2` The only path to more real money was rigged against ever promoting (sf)
-- `50a051e` (sf) entry; and correct (sc) in place — 1.11x not 3.6x on the full ledger
-- `ef3a682` I22 guard + doctrine: a book must spend the ecosystem (sf)
-- `a173a93` The growth rail could only ever SHRINK the taker's one living lens (sf)
-- `308f6e7` The trend exit joins the rail, and starts recording what its knobs cut (sf)
-- `06d5e6c` The depth gate, driven against the live venue — and a cage I almost added (sf)
-- `b643738` Widening carry's gate broke the guard that watches for shared supply (sf)
-- `4bed760` Carry was idle at 0 of 12 behind a gate measuring the wrong thing (sf)
-- `95650c5` Three instruments for asking a book where it can win, not where it can break (sf)
-- `931fe7c` Merge PR #209: the fleet could not SEE leverage — publish the venue's margin surface, fail-closed to unlevered (se)
-- `842622f` renumber (sd) -> (se) and record the ruin-table finding the margin surface caught (se)
-- `7a05635` record the mutation survivor the margin test earned (sd)
-- `36a4820` the margin test was grading its own arithmetic, not the publisher's — drive build_snapshot (sd)
-- `a579b5d` the fleet could not see leverage: publish the venue's margin surface, fail-closed to unlevered (sd)
-- `3551501` Ignore scripts/.*.pkl tape caches — the existing wildcard is .json only, so a 58MB pickle slipped into git add (sc)
-- `96cdaa1` Leverage measured and shipped on nav-cook (clip $80->$240, below half-Kelly); two unmined signal families swept and refuted; the void mutation round corrected and mutate.py hardened (sc)
-- `5d859b9` Close the surviving mutation: the measured-drawdown constant is pinned against itself (pre-mutation)
-- `a1f18d4` nav-cook clip $80 -> $240: leverage measured on the book's own 226-trade series, sized below half-Kelly, pinned against the 15% drawdown bar (pre-mutation)
-- `9a07d02` Merge PR #208: ⚖️ Counterweight was graded on its price return alone — 3.6× worse than it performs (sc)
-- `a0b2c03` Merge remote-tracking branch 'origin/main' into claude/todays-work-review-6y8tua
-- `85fb26b` nav-cook's founding claim reproduces (n=226, +0.373%, t=+2.61), the conflicting replay is explained as a confirm-convention difference, and the harness is finally committed (sb)
-- `44c7703` a funding book was graded on its price return alone: Counterweight reads 3.6x worse than it performs (sb)
-- `1bd0644` Daily review (ro): nav-cook shipped a gate 3.3x looser than the one it was graded on
+- `240f317` 💸 The Farmer's poor decisions are not a knob — and the replay was measuring the wrong books (su)
+- `63d4171` 🙏 Avo's row can finally say why it did not trade: the census, on both arms (st)
 
 ## How this file stays honest
 

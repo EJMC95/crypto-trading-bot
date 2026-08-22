@@ -85,6 +85,53 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "farmer-is-not-a-funding-book",
+        "owner": "OPERATOR",
+        "what": "💸 the LIVE Funding Farmer's funding leg is a rounding error "
+                "and its four positions are one bet. Measured (su): August "
+                "mean -0.390%/trade = price -0.408% + funding **+0.018%**; "
+                "real accruals $0.0015-$0.018 on a $30 clip; held basket "
+                "BTC/ETH/SOL/XAU at **N_eff 1.389**, crypto leg 1.11 "
+                "(rho +0.851). Every gate from 0.05 to 0.60 and twelve exit "
+                "variants were swept on the population the book can actually "
+                "trade: on the last 30 and 60 days EVERY one loses and the "
+                "SHIPPED gate is the least bad. So this is not a knob.",
+        "why_open": "the honest options are a redesign (it is a directional "
+                    "short book — grade it against the (hm) random-entry null "
+                    "and size it on measured independence, as (sr) did for 🙏 "
+                    "Avo) or an I17 keep-or-retire call. Both are Eamon's, on "
+                    "a REAL-MONEY row, and neither is a session's to take. "
+                    "What a session can do next is the random-entry null on "
+                    "its own ledger — the number that decides which.",
+        # closes when the book either learns to size on the independence it now
+        # publishes, or is retired like every other undecidable row.
+        "closes_when": lambda: (
+            _has("lighter_funding_bot.py", "FARMER_RETIRED_OVERRIDE")
+            or _has("lighter_funding_bot.py", "basket_scale")),
+    },
+    {
+        "id": "funding-studies-inherit-the-rank-universe",
+        "owner": "session",
+        "what": "(su) found `backtest_funding_lighter` selects its universe by "
+                "RANK while the live bot filters on an absolute $10M/day floor "
+                "only 11 of 212 markets clear — so its verdicts were measured "
+                "on books the book refuses, and the gate table it produced "
+                "INVERTS between universe 25 and 50. The loader now carries "
+                "volume and `study_farmer_gate_minvol_2026-08-22` replays the "
+                "honest population. **Four other scripts reuse that loader and "
+                "have not been re-derived**: study_farmer_take_profit, "
+                "backtest_farmer_breadth_lighter, backtest_funding_persistence "
+                "and backtest_xsect_funding_lighter.",
+        "why_open": "each cites its own verdict in a header that other work "
+                    "reads as settled ('do not re-test what a script header "
+                    "rejects'), so re-running them is not optional tidying — "
+                    "it is checking whether four standing refusals were "
+                    "measured on the wrong books. Cheap now that the tape "
+                    "carries volume; nobody has done it.",
+        "closes_when": lambda: _has(
+            "scripts/study_farmer_take_profit.py", "minvol_entry_ok"),
+    },
+    {
         "id": "farmer-cap-collapses-slots-under-conviction",
         "owner": "OPERATOR",
         "what": "💸 the LIVE Farmer's notional cap turns a bigger clip into "
