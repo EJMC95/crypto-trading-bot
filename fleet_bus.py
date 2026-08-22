@@ -35,6 +35,57 @@ _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 # [2026-08-20 (sn)] 6.7x EITHER WAY (Eamon, explicitly). The floor is DERIVED
 # from the ceiling rather than typed, so "either way" is true by construction
 # and the next move needs one edit, not two that can drift apart.
+#: [2026-08-22 (ta)] LIVE ARMS THAT NO LONGER TRADE REAL MONEY.
+#:
+#: **Eamon, 22-Aug: "just replace farmer with georgia as weve done so many
+#: times before".** DECLARED HERE, not in the bot, because two processes in two
+#: IMAGES have to agree about it and they cannot import each other: 💸 the
+#: Farmer's live arm runs in `trail-blazer-live` off `Dockerfile.fundinglighter`
+#: and the 🧪 experiment judge runs in `freqtrade-bots`, which does not (and
+#: must not) carry a real-money trading module. `fleet_bus` is in both images
+#: already, so this is the one place both can read.
+#:
+#: The judge is the consumer that matters: its whole job is promoting
+#: `live.funding.*` levers onto this exact row, and its paired bar needs
+#: `live >= 10` closes — so a flat arm silences it CORRECTLY but INVISIBLY,
+#: `{promotions: 0}` reading identically for "no candidate cleared" and "there
+#: is no live arm to promote onto" (I18). It stands down out loud instead.
+#: Measured at the retirement: ZERO `live.*` levers open, so nothing is
+#: stranded by this.
+#:
+#: THE OVERRIDE IS PARSED IDENTICALLY BY EVERY READER — the `BRAIN_MULT_ENGINE`
+#: rule, where a detector and its subject disagreeing about one env var is how
+#: a kill switch goes silent. Resurrecting the arm therefore means setting the
+#: override on BOTH services; that is stated in the retirement entry rather
+#: than hidden, because a half-set override is a book trading with no judge.
+RETIRED_LIVE_ARMS = {
+    "perps-funding-lighter-lighter": {
+        "since": "2026-08-22",
+        "entry": "(ta)",
+        "override": "FARMER_LIVE_RETIRED_OVERRIDE",
+        "successor": "freqtrade-georgia-lighter",
+        "why": "horizon `unreachable` on BOTH arms at the fleet's own grader "
+               "(live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65; "
+               "shadow n=161 mean -0.195% t=-0.95 halves +5.71/-18.32). "
+               "The shadow twin keeps trading as the control arm.",
+    },
+}
+
+
+def live_arm_retired(row):
+    """True when `row` is a live arm the fleet has retired.
+
+    Fail-safe direction is KEEP TRADING: an unknown row is not retired, so a
+    typo here can never silence a living book. The dangerous direction — a
+    retired arm reading as live — needs the row to be spelled exactly right in
+    the table above, which is the direction a mistake is loud in."""
+    spec = RETIRED_LIVE_ARMS.get(row)
+    if not spec:
+        return False
+    return os.environ.get(spec["override"], "").strip().lower() \
+        not in ("run", "1", "true")
+
+
 MULT_FLOOR = 1.0 / 6.7
 # [2026-07-21 TWO-WAY MULTS — operator: "brain needs to be able to widen
 # too"] Ceiling raised 1.0 -> 1.5: the brain may now publish EXPAND mults
@@ -1165,6 +1216,89 @@ def crypto_only(symbols):
         return list(symbols or [])
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-22 (su)] BASKET INDEPENDENCE — I22's "market count is not bet count",
+# with ONE owner.
+#
+# `(sr)` measured 🙏 Avo holding QQQ/SPY/NVDA at N_eff 1.18 and shipped these
+# three functions inside `lighter_avo_live_bot`. The very next measurement
+# found 💸 the LIVE Funding Farmer holding BTC/ETH/SOL/XAU at **N_eff 1.389
+# (mean rho +0.627)** — and its crypto leg alone at **N_eff 1.11, rho +0.851**:
+# three names, one bet, on the fleet's other real-money row, publishing
+# `open_trades: 4` with no independence number anywhere. August is what that
+# costs — SOL -$2.69, BTC -$2.00, XAU -$1.97, ETH -$1.30, all four losing
+# together because they were one position wearing four names.
+#
+# The second book could have had a COPY of the math. It lives here instead
+# because a second copy of a rule is a second rule ((hj)) — and `fleet_bus` is
+# already COPY'd into both images (Dockerfile.avolive, Dockerfile.fundinglighter),
+# so this costs neither a new dependency nor a born-dark risk.
+#
+# CONTRACT, unchanged from (sr) and load-bearing: anything unmeasurable is
+# **None**, never 0.0. A zero correlation reads as "perfectly diversifying" and
+# is the one error that would BUY leverage.
+CORR_MIN_OVERLAP = 30      # bars of shared history before a pair is measurable
+CORR_LOOKBACK = 180        # bars used per symbol
+
+
+def bar_returns(bars, n=CORR_LOOKBACK):
+    """{bar_ts: simple return} from the newest `n` bars. {} when unusable —
+    never a partial series a correlation could be computed off."""
+    if not bars:
+        return {}
+    ts, cs = bars.get("t") or [], bars.get("c") or []
+    if len(ts) != len(cs) or len(cs) < CORR_MIN_OVERLAP + 1:
+        return {}
+    out = {}
+    for i in range(max(1, len(cs) - n), len(cs)):
+        prev = cs[i - 1]
+        try:
+            if prev:
+                out[ts[i]] = float(cs[i]) / float(prev) - 1.0
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
+    return out
+
+
+def pair_corr(a, b):
+    """Pearson correlation over the SHARED timestamps. None when the overlap is
+    too short or either leg is flat — unknown, never 0.0."""
+    days = sorted(set(a) & set(b))
+    if len(days) < CORR_MIN_OVERLAP:
+        return None
+    xs = [a[d] for d in days]
+    ys = [b[d] for d in days]
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    vx = sum((v - mx) ** 2 for v in xs)
+    vy = sum((v - my) ** 2 for v in ys)
+    if vx <= 0 or vy <= 0:
+        return None
+    cov = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
+    return cov / ((vx ** 0.5) * (vy ** 0.5))
+
+
+def basket_n_eff(rets, names):
+    """(N_eff, mean_rho) for a basket — the correlation-aware count of
+    INDEPENDENT bets. (None, None) when nothing is measurable, so a dark read
+    is never credited as independence."""
+    names = [n for n in names if rets.get(n)]
+    if len(names) < 2:
+        return (float(len(names)) if names else None), None
+    cs = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            c = pair_corr(rets[names[i]], rets[names[j]])
+            if c is not None:
+                cs.append(c)
+    if not cs:
+        return None, None
+    rho = sum(cs) / len(cs)
+    n = len(names)
+    denom = 1.0 + (n - 1) * rho
+    return (n / denom if denom > 0 else float(n)), rho
+
+
 if __name__ == "__main__":
     # offline selftest: prime the cache directly, exercise the fail-safe
     # contract (no DB touched)
@@ -1525,8 +1659,29 @@ if __name__ == "__main__":
     assert scout_universe(current_time=_now) == [] and scout_funding(_now) == {}
     assert venue_stress_bps(_now) is None
 
+    # ---- (su) basket independence -----------------------------------------
+    _ts = list(range(100))
+    _a = {t: (0.01 if t % 2 else -0.01) for t in _ts}
+    _b = dict(_a)                                              # identical
+    _c = {t: -v for t, v in _a.items()}                         # mirrored
+    assert pair_corr({1: 0.01, 2: -0.01}, {1: 0.01, 2: -0.01}) is None, \
+        "2 bars is under the overlap floor"
+    assert abs(pair_corr(_a, _b) - 1.0) < 1e-9
+    assert abs(pair_corr(_a, _c) + 1.0) < 1e-9
+    assert pair_corr(_a, {t: 0.0 for t in _ts}) is None, \
+        "a flat leg is UNKNOWN, never 0.0 — 0.0 would read as perfect diversification"
+    _n, _rho = basket_n_eff({"x": _a, "y": _b}, ["x", "y"])
+    assert abs(_n - 1.0) < 1e-9 and abs(_rho - 1.0) < 1e-9, \
+        "two identical legs are ONE bet"
+    assert basket_n_eff({"x": _a}, ["x"]) == (1.0, None)
+    assert basket_n_eff({}, ["x"]) == (None, None), \
+        "a dark read is never credited as independence"
+    assert bar_returns({"t": [1, 2], "c": [1.0, 1.1]}) == {}, \
+        "a series under the overlap floor yields NO returns"
+
     print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent; "
           "long_symbol_blocked enforce/advisory/cap0/stale/absent; "
           "entry_regime_gated act+off/no-tag/no-bot/risk-on/stale-oracle/"
           "advisory/stale-brain/absent; "
-          "oracle_asset_regimes fresh/junk-skip/stale/no-pairs/absent)")
+          "oracle_asset_regimes fresh/junk-skip/stale/no-pairs/absent; "
+          "basket n_eff identical/mirrored/flat-leg/single/dark)")

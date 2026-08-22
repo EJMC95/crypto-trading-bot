@@ -751,12 +751,42 @@ class MomoBreakout(Carrier):
 
 
 class SwingDip(Carrier):
-    """SwingDipV1 — RSI/BB dip-in-uptrend (validated on 1d)."""
+    """SwingDipV1 — RSI/BB dip-in-uptrend (validated on 1d).
+
+    [2026-08-22 (st)] IT PUBLISHES A CENSUS NOW, and this is the book that
+    most needed one: 🙏 avo is the fleet's REAL-MONEY directional row, and
+    when Eamon asked why it had not traded in days NOTHING on either arm
+    could answer. `census = True` appeared exactly ONCE in this module
+    (👩 mum v2) — the rule I18 states was written for a shadow book and
+    never applied to the row holding actual money.
+
+    MEASURED before the flag was set, by driving THIS function over the
+    venue's own 4h tape for its 23 listed coins (the (hj) rule: drive the
+    publisher, never a hand-written copy of it):
+
+      * the signal is NOT starved — 65 ENTER fires in 15 days, 119 in 30;
+      * since the book's last trade, 5 fires: **3 on coins it already
+        holds** (SPY x2, NVDA — correctly skipped, it cannot pyramid) and
+        **2 on IWM**, which `noncrypto_entry_blocked` refuses because the
+        oracle cannot grade it (172 bars < its 203 floor) — fail-closed and
+        working as designed, and completely invisible;
+      * 43 of 65 fires are non-crypto, and 12 of those (IWM 6, XCU 6) are on
+        books with NO oracle verdict, i.e. structurally unreachable today;
+      * 24 of 65 (37%) land on the three coins already held.
+
+    So the honest answer is "held-starved and gate-refused, not signal-
+    starved" — and not one of those five numbers was readable from the row.
+    RSI_MAX is a class attribute rather than a literal inside signals() so
+    the (rr) gauge has a bar to measure against; the comparison itself is
+    unchanged.
+    """
     roi = {0: 0.20, 5760: 0.12, 11520: 0.06, 20160: 0.0}
     protections = {"cooldown_candles": 1,
                    "slguard": {"lookback": 20, "trades": 2, "stop": 5},
                    "maxdd": {"lookback": 40, "trades": 4, "dd": 0.20, "stop": 5}}
     min_bars = 230
+    census = True                       # publishes why nothing opened (I18)
+    RSI_MAX = 42.0                      # the shipped bar, named for the gauge
 
     def signals(self, bars, extra):
         c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
@@ -776,10 +806,17 @@ class SwingDip(Carrier):
             return None
         band = max(rng_hi - rng_lo, 1e-9)
         sell_zone = rng_hi - 0.15 * band
-        enter = (e50[i] > e200[i] and rsi[i] < 42 and c[i] < bb_lo and v[i] > 0)
+        enter = (e50[i] > e200[i] and rsi[i] < self.RSI_MAX
+                 and c[i] < bb_lo and v[i] > 0)
         exit_ = ((rsi[i] > 65 or c[i] >= sell_zone) and v[i] > 0)
+        # [(st)] DIAGNOSTICS, additive — the gauge and the per-conjunct census
+        # read the SHIPPED rule's own numbers rather than recomputing them
+        # somewhere else (a second copy of a rule is a second rule, (hj)).
+        # Reported, never a gate: `enter` above is unchanged.
         return {"enter": "dip_in_uptrend" if enter else None,
-                "exit": exit_, "exit_reason": "sell_into_strength"}
+                "exit": exit_, "exit_reason": "sell_into_strength",
+                "rsi": rsi[i], "uptrend": e50[i] > e200[i],
+                "bb_dist_pct": (100.0 * (c[i] / bb_lo - 1.0)) if bb_lo else None}
 
     def stake_mult(self, tag, bars):
         return 0.5 if pulse_panic() else 1.0
@@ -795,7 +832,41 @@ class DayTraderGated(Carrier):
     min_bars = 70
     BAND_PCT_ON = 0.015
     BAND_PCT_OFF = 0.020
-    MAX_ENTRIES_PER_HOUR = 2            # confirm_trade_entry throttle
+    # [2026-08-22 (sv)] 2 -> 3, AND THE LEDGER SAYS THE ENTRY IT WAS REFUSING
+    # IS HER BEST ONE.
+    #
+    # 🔮 georgia is the fleet's closest book to the gate — 5 of 6 bars, failing
+    # only `t` (1.48 against 2.0) — so the ONLY thing standing between her and
+    # real money is CLOSES, and this rate limiter is the one gate that cuts
+    # them for no quality reason. Ranking her 163 real entries by their
+    # position within their own clock hour:
+    #
+    #     entry #1 of the hour   n=127   +0.023%/trade   t=+0.21   $ +3.95
+    #     entry #2 of the hour   n= 36   +0.656%/trade   t=+2.20   $+11.90
+    #
+    # **75% of her realised P&L is on 22% of her trades, and they are the ones
+    # the cap is closest to refusing.** She reached the 2/h cap in 34 hours.
+    #
+    # SIX SPLITS, ALL THE SAME SIGN — this is not the 19-21 Aug trending burst
+    # and not a tag-mix artifact: surge days +0.608pp / before them +0.390pp;
+    # first half of her life +0.480pp / second half +0.756pp; within
+    # trend_breakout +0.614pp, within range_on +0.738pp. Both chronological
+    # halves positive is the (I19) bar for an expand-direction change, met on
+    # her OWN ledger, which is the record and outranks any proxy (I14).
+    #
+    # WHY 3 AND NOT UNLIMITED, stated because it is the honest limit: the cap
+    # has CENSORED its own evidence. Rank 3 has n=1 in her whole life *because
+    # the cap is 2*, so everything above rank 2 is extrapolation. One step
+    # generates the rank-3 sample that grades the next one, and `entry_rank`
+    # below is recorded from this commit so that grade is a query rather than
+    # another reconstruction (I23 — a knob must record the quantity it cuts).
+    #
+    # NOT an era reset: a rate limiter is capacity, and capacity is ordinary
+    # tuning ((hc)). Resetting her era would discard the 163 closes this change
+    # exists to add to. Scope: DayTraderGated is georgia + the RETIRED
+    # crypto-intraday-15m, so this moves exactly one living book.
+    MAX_ENTRIES_PER_HOUR = int(os.environ.get(
+        "GEORGIA_MAX_ENTRIES_PER_HOUR", "3"))
 
     def signals(self, bars, extra):
         c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
@@ -1106,7 +1177,7 @@ class Book:
         self.guard_until = 0.0    # StoplossGuard / MaxDrawdown book-wide lock
         self.fund_realized = 0.0
         self.last_sig_ts = {}     # coin -> last closed-candle ts acted on
-        self.throttle = {"bucket": None, "n": 0}
+        self.throttle = {"bucket": None, "n": 0, "last_rank": None}
         self.n_closed = self.n_wins = 0
         # [2026-08-19 (ro)] 👩 mum v2's CONTROL ARM and census. Present on every
         # Book (cheap, additive) but only POPULATED for a carrier that declares
@@ -1249,7 +1320,14 @@ class Book:
         return False
 
     def throttle_ok(self, now):
+        """[(sv)] ...and it RECORDS the rank it granted. The throttle's whole
+        job is to cut entries-per-hour, and until now nothing wrote down which
+        entry an entry was — so the question "is the marginal entry any good?"
+        needed a reconstruction from timestamps instead of a query (I23).
+        `last_rank` is the granted rank (1-based); None when this book has no
+        throttle at all, so a non-DayTrader book never publishes a fake 1."""
         if not isinstance(self.s, DayTraderGated):
+            self.throttle["last_rank"] = None
             return True
         bucket = int(now // 3600)
         if self.throttle["bucket"] != bucket:
@@ -1257,6 +1335,7 @@ class Book:
         if self.throttle["n"] >= self.s.MAX_ENTRIES_PER_HOUR:
             return False
         self.throttle["n"] += 1
+        self.throttle["last_rank"] = self.throttle["n"]
         return True
 
     # -- trade lifecycle --------------------------------------------------------
@@ -1338,6 +1417,13 @@ class Book:
                 # asked of a book near real money. Telemetry only; no gate,
                 # entry, exit or size moves.
                 side="long",
+                # [(sv)] the throttle's own governing quantity, on the row. The
+                # (sv) step from 2 -> 3 was decided by RECONSTRUCTING this from
+                # open timestamps; recording it makes the next decision a query
+                # (I23), and makes rank 3 — the sample the old cap censored —
+                # gradeable the moment it exists.
+                extra=({"entry_rank": m["entry_rank"]}
+                       if m.get("entry_rank") is not None else None),
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass
@@ -1698,9 +1784,21 @@ def main():
             locked = b.entries_locked(t0, tf_s)
             # [(ro)] census: mutually-exclusive per-coin outcomes for THIS
             # cycle, so a quiet row can name its own binding constraint.
+            # [(st)] FIVE REFUSALS WERE UNCOUNTED, and one of them is the
+            # answer to "why has 🙏 avo not traded": `noncrypto_entry_blocked`
+            # logged and returned with no counter, so a book refused by the
+            # fail-closed per-asset gate looked byte-identical to a book with
+            # no signal. `stale_candle` splits the OTHER half of that
+            # ambiguity — between two 4h closes `sig` is None for every coin,
+            # so every coin was booked `no_signal` on a loop where the rule
+            # was never evaluated at all. That is the I1 liveness trap living
+            # INSIDE the instrument built to close it.
             b.scan = {"scanned": 0, "held": 0, "no_bars": 0, "no_px": 0,
-                      "no_signal": 0, "locked": 0, "capped": 0, "cooldown": 0,
-                      "vetoed": 0, "opened": 0}
+                      "no_signal": 0, "stale_candle": 0, "locked": 0,
+                      "capped": 0, "cooldown": 0, "vetoed": 0,
+                      "noncrypto_ungated": 0, "budget_headroom": 0,
+                      "symcap": 0, "throttled": 0, "brain_gate": 0,
+                      "opened": 0}
 
             for coin in b.coins:
                 bars = cache.get(coin, b.s.tf)
@@ -1825,6 +1923,9 @@ def main():
                 if not px:
                     b.scan["no_px"] += 1
                     continue
+                if not new_candle:
+                    b.scan["stale_candle"] += 1
+                    continue      # rule not evaluated this loop — not a verdict
                 if not sig or not sig.get("enter"):
                     b.scan["no_signal"] += 1
                     continue
@@ -1835,6 +1936,13 @@ def main():
                 # their own LONG-window — binding for every strategy,
                 # including the ones that never read the regime extras
                 if noncrypto_entry_blocked(coin, _r_up):
+                    b.scan["noncrypto_ungated"] += 1
+                    # the NAMES, deduped — "3 refused" does not tell the
+                    # operator that IWM/XCU can never enter until the oracle
+                    # has 203 bars, and that is the actionable half.
+                    _u = b.scan.setdefault("ungated_syms", [])
+                    if coin not in _u:
+                        _u.append(coin)
                     log.info("%s %s entry SKIPPED — non-crypto book outside "
                              "its own LONG-window (per-asset gate, D5)",
                              b.bot_id, coin)
@@ -1844,6 +1952,7 @@ def main():
                     continue      # L2: fleet directional-long budget is full
                 if (fleet_long_headroom is not None
                         and cycle_admitted >= fleet_long_headroom):
+                    b.scan["budget_headroom"] += 1
                     log.info("%s %s entry SKIPPED — in-cycle budget headroom "
                              "used (%d admitted this cycle)", b.bot_id, coin,
                              cycle_admitted)
@@ -1852,6 +1961,7 @@ def main():
                     b.scan["capped"] += 1
                     continue
                 if symcap_blocked(fleet_symcap, coin, cycle_sym):
+                    b.scan["symcap"] += 1
                     log.info("%s %s entry SKIPPED — fleet per-symbol cap %d "
                              "reached on %s (fleet-wide incl. this cycle)",
                              b.bot_id, coin, fleet_symcap[0], coin)
@@ -1860,6 +1970,7 @@ def main():
                     b.scan["cooldown"] += 1
                     continue
                 if not b.throttle_ok(t0):
+                    b.scan["throttled"] += 1
                     log.info("%s %s entry throttled (max %d/h)", b.bot_id, coin,
                              DayTraderGated.MAX_ENTRIES_PER_HOUR)
                     continue
@@ -1869,6 +1980,7 @@ def main():
                 # oracle reads risk-off and the finding stands. Everything
                 # else (exits, other tags, sizing) untouched; fail-safe open.
                 if brain_entry_gated(b.bot_id, tag):
+                    b.scan["brain_gate"] += 1
                     log.info("%s %s entry SKIPPED — brain regime_gate on %s "
                              "(risk-off now; lifts when regime turns or the "
                              "finding retires)",
@@ -1894,7 +2006,11 @@ def main():
                     dist = b.s.atr_stop_dist(tag, bars, entry_px)
                     stop_px = entry_px * (1 - dist)
                 _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
-                         "accrued": 0.0, "stop_px": stop_px}
+                         "accrued": 0.0, "stop_px": stop_px,
+                         # [(sv)] which entry of its clock hour this was — the
+                         # quantity `MAX_ENTRIES_PER_HOUR` cuts. None on books
+                         # with no throttle.
+                         "entry_rank": b.throttle.get("last_rank")}
                 # [2026-08-19 (ro)] draw this trade's PLACEBO: a random OTHER
                 # coin from the same universe, marked at this same instant.
                 # Drawn from marks already fetched this cycle, so it costs no

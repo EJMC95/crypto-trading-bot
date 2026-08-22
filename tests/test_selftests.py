@@ -464,6 +464,29 @@ SELFTEST_EXCLUDE = {
     # unregistered in f6d7a2a and turned this rot-guard red on main; declaring
     # it is the pattern (a silent omission is what the guard exists to catch).
     "scripts/audit_secret_leak.py",
+    # [2026-08-22 (sw)] THE TWO 22-Aug STUDIES, excluded for the same
+    # MECHANICAL reason as the (sb) entry directly below and enforced the same
+    # way — their filenames carry a hyphenated date, so a
+    # `"scripts.study_georgia_entry_rank_2026-08-22"` entry in SELFTEST_MODULES
+    # is not an importable module name, collects ZERO tests and reports green.
+    #
+    # Both `--selftest`s are offline and pure (no network, no cached tape, no
+    # DB), so neither is exempt from RUNNING — only from being imported by
+    # dotted name. `tests/autonomy/test_2026_08_22_studies.py` loads both by
+    # PATH, runs each `_selftest`, and adds the two structural checks that
+    # matter: the Farmer study must keep REFUSING an unknown volume (a data gap
+    # becoming a free pass is what would drift it back to the rank-universe it
+    # exists to correct), and the georgia study must keep preferring a stamped
+    # `entry_rank` over its own reconstruction (or the I23 fix it motivated is
+    # inert). If that file is deleted, nothing covers either study and these
+    # two lines are a lie.
+    #
+    # Each carries a decision that was ACTED ON: the first is why 💸 the
+    # Farmer's gate was NOT moved (on the honest population the shipped 0.05 is
+    # the best of seven; on the rank universe 0.40 looks like +$14.95), and the
+    # second is why 🔮 georgia's throttle went 2 -> 3.
+    "scripts/study_farmer_gate_minvol_2026-08-22.py",
+    "scripts/study_georgia_entry_rank_2026-08-22.py",
     # [2026-08-20 (sb)] 🧭 nav-cook's FOUNDING harness. Excluded from
     # SELFTEST_MODULES for a MECHANICAL reason, not a discretionary one: the
     # filename carries a hyphenated date, so `"scripts.study_dislocation_band_

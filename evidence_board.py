@@ -513,7 +513,15 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
 # lever, which is the pre-(nj) behaviour and is fail-safe rather than silent.
 FARMER_ROW = "perps-funding-lighter-lighter"
 LIVE_CLIP_LEVERS = {FARMER_ROW: "live.clip_scale",
-                    "freqtrade-avo-maria-lighter": "live.avo.clip_scale"}
+                    "freqtrade-avo-maria-lighter": "live.avo.clip_scale",
+                    # [(sx)] 🔮 georgia's arm, mapped ahead of her funding.
+                    # This map only says WHICH lever a row would use; the
+                    # board still acts on `LIVE_ROWS` alone, and she is
+                    # deliberately NOT in it until she is actually live and
+                    # consuming — the 17-Jul rule ("a row belongs there iff it
+                    # is live AND consumes the lever"). Add her via
+                    # EVBOARD_LIVE_ROWS on the day she is funded.
+                    "freqtrade-georgia-lighter": "live.georgia.clip_scale"}
 
 
 def live_clip_lever(bot):

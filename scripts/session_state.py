@@ -85,6 +85,67 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "farmer-live-swap-operator-steps",
+        "owner": "OPERATOR",
+        "what": "💸 the Farmer's LIVE arm is retired in code (ta) and 🔮 "
+                "georgia's live arm is built, boot-smoked and deploy-routed — "
+                "but the SUB-ACCOUNT has not moved. Three acts only Eamon can "
+                "perform, IN THIS ORDER: (1) deploy the guard to "
+                "`trail-blazer-live` with a `[deploy-live-farmer]` marker and "
+                "wait for `extra.retired.open == 0` on the row — that is the "
+                "flatten finishing, and it is the ONLY safe moment to move "
+                "keys; (2) create the `georgia-live` service from "
+                "Dockerfile.avolive and move the Lighter API keys + "
+                "sub-account env onto it, adding FAMILY_LIVE_BOOK="
+                "freqtrade-georgia, GEORGIA_VENUE=lighter_live, "
+                "FREQTRADE_GEORGIA_MAX_NOTIONAL and GEORGIA_GROSS_X; "
+                "(3) uncomment the `[deploy-live-georgia]` rule in "
+                "railway-redeploy.yml IN THE SAME COMMIT as the service. "
+                "THE FOUR DECLARATIONS THAT FOLLOW THE FEED and must move "
+                "with it, not before it (each is a tripwire checked AGAINST "
+                "the live payload, so editing early fails the build): "
+                "`fleet_books.DECLARED_LIVE`, `fleet_books.LIVE_DEPLOY`, "
+                "`deploy_live_verify`'s service->row map, and "
+                "`EVBOARD_LIVE_ROWS` + `PROP_LIVE_ROWS` on freqtrade-bots. "
+                "Then hide + prune the Farmer's row once "
+                "`extra.retired.open == 0`. "
+                "Full detail: GEORGIA_GOLIVE_RUNBOOK.md.",
+        "why_open": "no session in this container has a Railway CLI, and two "
+                    "processes must never hold one sub-account at once — the "
+                    "Farmer would read georgia's positions as untracked and "
+                    "could flatten them. The ORDER is the safety property, "
+                    "not the individual steps.",
+        # closes when the deploy rule is live, which is the last of the three
+        # and cannot be done without the first two.
+        "closes_when": lambda: (
+            _has(".github/workflows/railway-redeploy.yml",
+                 'svcs="${svcs:+$svcs,}georgia-live"')
+            and not _has(".github/workflows/railway-redeploy.yml",
+                         '#   svcs="${svcs:+$svcs,}georgia-live"')),
+    },
+    {
+        "id": "funding-studies-inherit-the-rank-universe",
+        "owner": "session",
+        "what": "(su) found `backtest_funding_lighter` selects its universe by "
+                "RANK while the live bot filters on an absolute $10M/day floor "
+                "only 11 of 212 markets clear — so its verdicts were measured "
+                "on books the book refuses, and the gate table it produced "
+                "INVERTS between universe 25 and 50. The loader now carries "
+                "volume and `study_farmer_gate_minvol_2026-08-22` replays the "
+                "honest population. **Four other scripts reuse that loader and "
+                "have not been re-derived**: study_farmer_take_profit, "
+                "backtest_farmer_breadth_lighter, backtest_funding_persistence "
+                "and backtest_xsect_funding_lighter.",
+        "why_open": "each cites its own verdict in a header that other work "
+                    "reads as settled ('do not re-test what a script header "
+                    "rejects'), so re-running them is not optional tidying — "
+                    "it is checking whether four standing refusals were "
+                    "measured on the wrong books. Cheap now that the tape "
+                    "carries volume; nobody has done it.",
+        "closes_when": lambda: _has(
+            "scripts/study_farmer_take_profit.py", "minvol_entry_ok"),
+    },
+    {
         "id": "farmer-cap-collapses-slots-under-conviction",
         "owner": "OPERATOR",
         "what": "💸 the LIVE Farmer's notional cap turns a bigger clip into "
@@ -202,15 +263,29 @@ CARRIED = [
     {
         "id": "ceiling-slots-georgia",
         "owner": "session",
-        "what": "🔮 georgia is 310 closes from t=2.0 — 83.5 DAYS at today's 0.5 "
-                "of 5 slots, 7.6 days at full occupancy. An 11x speed-up to "
-                "decidability on the fleet's closest book to real money, "
-                "costing zero expectancy. `scripts/ceiling.py` names it; what "
-                "it does NOT say is whether her SIGNAL can fill those slots.",
-        "why_open": "the ceiling is REACHABLE, not promised — the next step is "
-                    "her own census: what refuses the other 4.5 slots, the "
-                    "regime gate, the universe, or no signal at all.",
-        "closes_when": lambda: False,
+        "what": "**(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE "
+                "HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 "
+                "days at full occupancy — an 11x speed-up'. Measured: her mean "
+                "hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE "
+                "slots need ~46 opens/day. Her signal supplies 40.9/day at "
+                "best. **Full occupancy is unreachable by construction, and it "
+                "was never the lever — CLOSES are.** She is flat 68.4% of the "
+                "time not because something refuses her but because she exits "
+                "in under 3 hours. (sv) took the one gate that cut closes for "
+                "no quality reason (the 2/h throttle, +0.633pp in favour of the "
+                "entry it refused, six splits) from 2 -> 3.",
+        "why_open": "the step is DELIBERATELY one notch: rank 3 has n=1 in her "
+                    "whole life because the cap was 2, so everything above it "
+                    "is extrapolation. `entry_rank` now rides every close, so "
+                    "the next step is graded from a query — re-run "
+                    "`scripts/study_georgia_entry_rank_2026-08-22.py` once "
+                    "rank-3 rows exist and take 3 -> 4 only if it holds. The "
+                    "OTHER half is untouched: her median hold is 1.9h against a "
+                    "1440m cap, and nobody has asked whether letting winners "
+                    "run raises her mean instead of her count.",
+        # closes when the next throttle decision has been taken on rank-3 data
+        "closes_when": lambda: _has(
+            "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
     },
     {
         "id": "ceiling-capital-inversion",

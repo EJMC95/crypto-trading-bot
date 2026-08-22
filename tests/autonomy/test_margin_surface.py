@@ -112,27 +112,87 @@ def test_a_zero_or_junk_margin_is_dropped_not_published(monkeypatch):
     assert fb.max_leverage("TINY") == 3.0, "the healthy market is unaffected"
 
 
-def test_it_is_published_but_consumed_by_no_book_yet():
-    """The declared scope: this pass gives the fleet SIGHT of leverage, it does
-    not spend it. If a book starts sizing on this, that is a design decision
-    that owes its own measured pass — and this test is where it announces
-    itself rather than arriving silently."""
+#: [2026-08-22 (sy)/(ta)] BOOKS THAT MAY READ THE MARGIN SURFACE, and why.
+#:
+#: This test used to forbid EVERY reader, and that was right while the surface
+#: was sight-only. `(sy)` is the design decision its own message asked for: 🙏
+#: Avo and 🔮 georgia run levered on the shared live runner, so the distance to
+#: liquidation stopped being a curiosity and became a rail — `(sr)` had been
+#: publishing `liq_gap_pct` off a HARDCODED 300bps while the venue's real worst
+#: across those books' own universes is 600bps, i.e. the row advertised a
+#: liquidation twice as far away as it was.
+#:
+#: THE BAN THAT SURVIVES IS THE ONE THAT MATTERED. Reading the margin to
+#: PUBLISH ruin distance is the opposite of sizing on it: the second test below
+#: pins that neither `clip_usd` nor `gross_x` — the two functions that decide
+#: how many dollars go on the venue — can see the margin at all. So a book may
+#: know how close the cliff is; it may not use the cliff to choose the clip.
+#: An undeclared reader still fails, exactly as before.
+DECLARED_MARGIN_READERS = {
+    "lighter_avo_live_bot.py":
+        "(sy) publishes liq_gap_pct / stop_reachable / stop_dead_above off the "
+        "venue's real mmf for 🙏 Avo and 🔮 georgia. READ-ONLY: it reports the "
+        "consequences of a leverage setting, it never chooses one.",
+}
+
+
+def _margin_readers():
     import ast
-    consumers = []
-    for py in ROOT.glob("lighter_*.py"):
+    found = {}
+    for py in sorted(ROOT.glob("lighter_*.py")):
         try:
             tree = ast.parse(py.read_text())
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr in (
-                    "max_leverage", "market_margins"):
-                consumers.append(py.name)
-            elif isinstance(node, ast.Name) and node.id in (
-                    "max_leverage", "market_margins"):
-                consumers.append(py.name)
-    assert not consumers, (
-        f"{sorted(set(consumers))} now size on the margin surface. That is a "
-        "book-level design decision: it needs its own measured pass and its own "
-        "ruin arithmetic (distance to the 12% maintenance margin), then this "
-        "test updates to name the consumer deliberately.")
+            hit = ((isinstance(node, ast.Attribute)
+                    and node.attr in ("max_leverage", "market_margins"))
+                   or (isinstance(node, ast.Name)
+                       and node.id in ("max_leverage", "market_margins")))
+            if hit:
+                found.setdefault(py.name, 0)
+                found[py.name] += 1
+    return found
+
+
+def test_only_declared_books_read_the_margin_surface():
+    """The announce-itself property, unchanged in force. A NEW reader is a
+    book-level design decision that owes its own measured pass and its own ruin
+    arithmetic, and it has to say so here rather than arrive silently."""
+    undeclared = sorted(set(_margin_readers()) - set(DECLARED_MARGIN_READERS))
+    assert not undeclared, (
+        f"{undeclared} now read the margin surface. Declare each in "
+        "DECLARED_MARGIN_READERS with what it does with the number — and if it "
+        "SIZES on it, that needs its own measured pass first (distance to the "
+        "maintenance margin is an unrecoverable loss, not a drawdown).")
+    # ...and the declaration is not decorative: a book that stops reading it
+    # should lose its entry rather than leave a stale permission standing.
+    stale = sorted(set(DECLARED_MARGIN_READERS) - set(_margin_readers()))
+    assert not stale, f"{stale} no longer read it — drop the declaration"
+
+
+def test_a_declared_reader_still_may_not_SIZE_on_the_margin():
+    """The real safety property. `clip_usd` and `gross_x` are the two functions
+    that decide how many dollars reach the venue; neither may see the margin.
+
+    Why this is the line and not "no reading at all": a margin-derived CLIP
+    would let a thin market's generous leverage buy a bigger bet, which is
+    precisely backwards — the venue's willingness to lend is not evidence, and
+    (sy)'s ceiling is derived from the STOP and the drawdown bar instead. The
+    margin's only job is to say how far the cliff is."""
+    import ast
+    src = (ROOT / "lighter_avo_live_bot.py").read_text()
+    tree = ast.parse(src)
+    banned = {"market_margins", "max_leverage", "worst_mmf"}
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef) or fn.name not in (
+                "clip_usd", "gross_x", "vol_target_gross_x"):
+            continue
+        for node in ast.walk(fn):
+            name = (node.attr if isinstance(node, ast.Attribute)
+                    else node.id if isinstance(node, ast.Name) else None)
+            assert name not in banned, (
+                f"{fn.name}() now sizes off {name} — a margin-derived clip "
+                "lets the venue's lending appetite pick the bet size. The "
+                "leverage ceiling is derived from the STOP and the 15% "
+                "drawdown bar ((sy)); the margin only reports ruin distance.")

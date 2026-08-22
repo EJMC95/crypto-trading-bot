@@ -89,6 +89,7 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 import funding_basis
+import fleet_bus as _bus            # [(su)] the ONE owner of the basket math
 import fleet_tuning as tuning
 from lighter_family_bot import (
     STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE,
@@ -100,27 +101,80 @@ from lighter_family_bot import (
 )
 from venues import marks
 from venues.safety import (
-    SafetyRails, open_notional, capital_adjusted_day_start)
+    SafetyRails, open_notional, capital_adjusted_day_start, env_prefix)
 from venues.fills import read_fill, measured_from_reason
 
-BOT = "freqtrade-avo-maria"
+# ---------------------------------------------------------------------------
+# [2026-08-22 (sx)] THIS MODULE IS NOW A VARIANT HOST, and 🔮 georgia is the
+# second instance. **Eamon, 22-Aug: "get georgia ready to go live on a new sub
+# account ill deposit into later today prepared for 5x leverage".**
+#
+# NOT A NEW FILE — the 🛢️ Garrett rule ((lp)): one proven machine, every success
+# instrument inherited free rather than re-implemented at 1,800 lines. What a
+# copy would have had to re-earn, and would eventually drift on: claim_writer +
+# standby, the latched daily halt, the capital-adjust equity guard, the venue-
+# truth reconciler, the notional cap + `cap_slots` census, `diversified_order`,
+# the (st) scan census, the MTM equity series, real-fill telemetry, the
+# per-asset regime gate and the brain's restrict-only sizing.
+#
+# THE VARIANT IS THE BOOK, and everything else derives from it:
+#   * `S` is still taken from the family REGISTRY by identity, so the live and
+#     shadow arms of WHICHEVER book cannot drift;
+#   * the whole leverage layer is already written against `S.stoploss` and
+#     `S.max_open`, so it re-derives with no edit — georgia's -5% stop makes
+#     `vol_target_gross_x(1)` read 3.0x where Avo's -10% reads 1.5x, and an
+#     all-slots-stop at 5x costs her 25% against Avo's 50%;
+#   * env vars carry a PER-BOOK PREFIX. Every existing `AVO_*` name resolves
+#     exactly as before — that is the whole safety property of this change on a
+#     real-money book, and `test_variant_host.py` pins it name by name.
+#
+# The default is unchanged, so a service with no `FAMILY_LIVE_BOOK` set is
+# byte-identical to yesterday's Avo.
+_BOOKS = {
+    # book id -> (env prefix, live clip lever)
+    "freqtrade-avo-maria": ("AVO", "live.avo.clip_scale"),
+    "freqtrade-georgia": ("GEORGIA", "live.georgia.clip_scale"),
+}
+# ABSENT means Avo (today's behaviour, unchanged). SET-BUT-BLANK does NOT:
+# `FAMILY_LIVE_BOOK=""` on georgia's service is a deploy typo, and silently
+# resolving it to Avo would point her process at Avo's row, state key and live
+# positions. Caught by `test_variant_host` on the "  " case while writing it.
+_raw_book = os.environ.get("FAMILY_LIVE_BOOK")
+BOT = "freqtrade-avo-maria" if _raw_book is None else _raw_book.strip()
+if BOT not in _BOOKS:
+    # An unknown book must not fall back to Avo — that would point georgia's
+    # service at Avo's row, its state key and its real positions. Refuse.
+    raise SystemExit(
+        f"FAMILY_LIVE_BOOK={BOT!r} is not a live-capable book. "
+        f"Known: {sorted(_BOOKS)}. A typo must never degrade to another "
+        f"book's identity — it would trade the wrong row's positions.")
+_PFX, LIVE_CLIP_LEVER = _BOOKS[BOT]
+
 BOT_ROW = BOT + "-lighter"            # the LIVE row (venue_variant admits it)
 SHADOW_ROW = BOT + "-lshadow"         # the control arm (family-lighter-shadow)
 STATE_KEY = BOT_ROW + ":live"
 
-#: The configured SwingDip instance (from the family REGISTRY, `STRATEGIES`) — tf=4h, stoploss=-0.10, max_open=4,
+
+def _env(name, default):
+    """`AVO_X` for Avo, `GEORGIA_X` for georgia — one namespace per book, so
+    two live services on one image can never read each other's sizing."""
+    return os.environ.get(f"{_PFX}_{name}", default)
+
+
+#: The configured strategy instance (from the family REGISTRY, `STRATEGIES`) —
+#: SwingDip tf=4h stop=-10% for Avo, DayTraderGated tf=15m stop=-5% for georgia;
 #: roi ladder, protections — taken from the family bot's OWN registry so the
 #: two arms cannot drift. Identity (S is the registry object) is selftested.
 S = next(s for s in STRATEGIES if s.bot == BOT)
 
-LOOP_SECONDS = int(os.environ.get("AVO_LOOP_SECONDS", "300"))
-DAILY_LOSS_LIMIT = float(os.environ.get("AVO_DAILY_LOSS", "0.10"))
-DELIST_GIVEUP_H = float(os.environ.get("AVO_DELIST_GIVEUP_H", "6"))
+LOOP_SECONDS = int(_env("LOOP_SECONDS", "300"))
+DAILY_LOSS_LIMIT = float(_env("DAILY_LOSS", "0.10"))
+DELIST_GIVEUP_H = float(_env("DELIST_GIVEUP_H", "6"))
 #: Below this clip the book is dust — skip entries rather than spray sub-$5
 #: orders on a real venue.
-MIN_CLIP_USD = float(os.environ.get("AVO_MIN_CLIP_USD", "5"))
+MIN_CLIP_USD = float(_env("MIN_CLIP_USD", "5"))
 #: Coin-quality veto freshness (mirrors the taker's read of `coin-vetoes`).
-QUALITY_VETO_TTL_S = float(os.environ.get("AVO_QUALITY_VETO_TTL_S", "5400"))
+QUALITY_VETO_TTL_S = float(_env("QUALITY_VETO_TTL_S", "5400"))
 
 _PRINT = print  # selftest capture point
 
@@ -159,7 +213,7 @@ def parse_ts(s):
 #: Caught by feeding the ladder "abc" while writing this. Unparseable degrades
 #: to 1.0 (today's behaviour), never to a guess.
 try:
-    GROSS_X = float(os.environ.get("AVO_GROSS_X", "1.0"))
+    GROSS_X = float(_env("GROSS_X", "1.0"))
 except (TypeError, ValueError):
     GROSS_X = 1.0
 
@@ -168,15 +222,31 @@ except (TypeError, ValueError):
 #: This is a risk appetite, and risk appetite belongs to the person whose money
 #: it is — so it is an operator-set bound, not a number this file invents.
 #:
-#: What the code still owes him is the ARITHMETIC, published rather than argued
-#: (see `vol_target_gross_x` and the row's `leverage` block). At 5x on a
-#: $230.70 book with 5 slots and a -10% stop:
-#:   clip $230.70 · deployed $1,153.50 · all-slots-stop = 50% of equity
-#:   · liquidation at a -17.0% adverse basket move (worst mmf of its books,
-#:     NVDA/WTI/XCU = 300bps, measured off the venue's orderBookDetails).
-#: The -10% stop is what stands between those two numbers, and it fires on a
-#: 300s loop.
-GROSS_X_MAX = float(os.environ.get("AVO_GROSS_X_MAX", "5.0"))
+#: **Eamon, 22-Aug: "let avo go up to 10x, and georgia also"** — so the ceiling
+#: is 10.0. It is a CEILING, not a setting: `GROSS_X` is what each service runs.
+#:
+#: What the code owes him is the ARITHMETIC, published rather than argued (see
+#: `vol_target_gross_x`, `liq_gap_pct`, `stop_reachable` and the row's
+#: `leverage` block). Two of those numbers are new, and one of them changes
+#: what 10x means:
+#:
+#: THE STOP HAS A CEILING OF ITS OWN. Liquidation arrives at `1/G - mmf`; the
+#: protective stop fires at `|stoploss|`. Above `G = 1/(|stoploss| + mmf)` the
+#: venue liquidates FIRST and the stop is dead code. At the venue's REAL worst
+#: maintenance margin — **600bps**, measured 22-Aug across each book's own
+#: universe (IWM/MSTR; ADA/DOT/AVAX/LINK), not the 300bps `(sr)` hardcoded:
+#:     🙏 Avo   (-10% stop):  stop dead above **6.25x**
+#:     🔮 georgia (-5% stop): stop dead above **9.09x**
+#: At 10x both books liquidate on a **4.0%** adverse move, on baskets measuring
+#: `N_eff` 1.2-1.5 — one bet wearing several names, so that is the central
+#: case rather than a tail.
+#:
+#: This ceiling is deliberately NOT a clamp on that: risk appetite belongs to
+#: the person whose money it is, and the row now publishes `stop_reachable`
+#: and `stop_dead_above` every loop so the consequence is readable rather than
+#: discovered. A dead stop is a fact about the configuration, not an opinion
+#: about it.
+GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
 #: The DIVERSIFICATION-EARNED number, published beside the operator's setting
 #: rather than clamping it. `N_eff` is the correlation-aware count of
@@ -189,6 +259,75 @@ GROSS_X_MAX = float(os.environ.get("AVO_GROSS_X_MAX", "5.0"))
 #: supports — which is the lever worth pulling, and it costs no expectancy
 #: because it turns away no signal, it only re-sizes.
 #: MSTR belongs with crypto here, not equities: MSTR/BTC measured +0.859.
+def worst_mmf(universe):
+    """Worst (highest) maintenance-margin fraction across `universe`, or None.
+
+    [2026-08-22 (sy)] THIS WAS A HARDCODED 0.03 AND THE VENUE SAYS 0.06.
+    `(sr)` published `liq_gap_pct` off a literal 300bps sourced from a
+    hand-check of NVDA/WTI/XCU, and the real worst across the books these two
+    live arms actually trade is **600bps** — IWM and MSTR on 🙏 Avo's
+    non-crypto set, ADA/DOT/AVAX/LINK once 🔮 georgia's crypto set is included.
+    So the row has been publishing a liquidation gap TWICE as far away as it
+    is: -17% at 5x where the truth is -14%.
+
+    The data was already on the bus — `(se)` put the venue's whole margin
+    surface there and nothing read it. Fail-CLOSED, inheriting
+    `fleet_bus.market_margins`' contract verbatim: an unreadable margin returns
+    **None**, and a caller that cannot read one must treat the book as if no
+    leverage were available. The cost of a wrong default here is a
+    liquidation, which is unrecoverable — so absence is never "no limit"."""
+    try:
+        import fleet_bus
+        rows = fleet_bus.market_margins()
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(rows, dict):
+        return None
+    seen = []
+    for sym in universe or ():
+        row = rows.get(sym)
+        try:
+            bps = float((row or {}).get("mmf_bps"))
+        except (TypeError, ValueError):
+            continue
+        if bps > 0:
+            seen.append(bps / 10000.0)
+    return max(seen) if seen else None
+
+
+def liq_gap_pct(mmf, gross=None):
+    """The signed adverse move that liquidates, or None when mmf is unknown.
+
+    Liquidation when equity falls to maintenance: `1 - G*x = mmf*G`, so the
+    move is `x = 1/G - mmf`. Published NEGATIVE (the direction that hurts a
+    long book), matching `(sr)`'s convention."""
+    if mmf is None:
+        return None
+    g = gross_x() if gross is None else gross
+    if not g or g <= 0:
+        return None
+    return round(mmf - 1.0 / g, 4)
+
+
+def stop_reachable(mmf, gross=None):
+    """Does the book's own protective stop fire BEFORE the venue liquidates?
+
+    [(sy)] THE QUESTION NOBODY HAD ASKED, and it is not a risk-appetite one —
+    above a certain gross the stop is dead code, because liquidation arrives
+    first. It has a closed form: the stop is reachable while
+    `|stoploss| < 1/G - mmf`, i.e. up to `G = 1 / (|stoploss| + mmf)`.
+
+    At the venue's real 600bps that ceiling is **6.25x for 🙏 Avo** (-10% stop)
+    and **9.09x for 🔮 georgia** (-5% stop). Reported, never a gate — it does
+    not clamp anything; it makes a dead stop visible instead of silent."""
+    if mmf is None:
+        return None, None
+    sl = abs(float(S.stoploss))
+    ceiling = round(1.0 / (sl + mmf), 2)
+    g = gross_x() if gross is None else gross
+    return (sl < (1.0 / g - mmf)) if g and g > 0 else None, ceiling
+
+
 def vol_target_gross_x(n_eff=1.0):
     """Gross that keeps an all-slots-stop inside the 15% go-live drawdown bar,
     credited for measured independence. n_eff=1 (fully correlated) returns the
@@ -287,67 +426,18 @@ def cap_slots(clip, cap, slots):
 # IT COSTS NOTHING AT THE VENUE: `CandleCache` is one governed fetch per
 # (coin, tf) per CLOSED candle shared across books, and the entry loop already
 # calls `cache.get` for these symbols, so the correlations ride bars we have.
-CORR_MIN_OVERLAP = 30      # bars of shared history before a pair is measurable
-CORR_LOOKBACK = 180        # bars used per symbol
-
-
-def _bar_returns(bars, n=CORR_LOOKBACK):
-    """{bar_ts: simple return} from the newest `n` bars. {} when unusable —
-    never a partial series a correlation could be computed off."""
-    if not bars:
-        return {}
-    ts, cs = bars.get("t") or [], bars.get("c") or []
-    if len(ts) != len(cs) or len(cs) < CORR_MIN_OVERLAP + 1:
-        return {}
-    out = {}
-    for i in range(max(1, len(cs) - n), len(cs)):
-        prev = cs[i - 1]
-        try:
-            if prev:
-                out[ts[i]] = float(cs[i]) / float(prev) - 1.0
-        except (TypeError, ValueError, ZeroDivisionError):
-            continue
-    return out
-
-
-def _pair_corr(a, b):
-    """Pearson correlation over the SHARED timestamps. None when the overlap is
-    too short or either leg is flat — unknown, never 0.0, which would read as
-    'perfectly diversifying' and is the one error that would buy leverage."""
-    days = sorted(set(a) & set(b))
-    if len(days) < CORR_MIN_OVERLAP:
-        return None
-    xs = [a[d] for d in days]
-    ys = [b[d] for d in days]
-    n = len(xs)
-    mx, my = sum(xs) / n, sum(ys) / n
-    vx = sum((v - mx) ** 2 for v in xs)
-    vy = sum((v - my) ** 2 for v in ys)
-    if vx <= 0 or vy <= 0:
-        return None
-    cov = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
-    return cov / ((vx ** 0.5) * (vy ** 0.5))
-
-
-def basket_n_eff(rets, names):
-    """(N_eff, mean_rho) for a basket — the correlation-aware count of
-    INDEPENDENT bets (I22: market count is not bet count). (None, None) when
-    nothing is measurable, so a dark read is never credited as independence."""
-    names = [n for n in names if rets.get(n)]
-    if len(names) < 2:
-        return (float(len(names)) if names else None), None
-    cs = []
-    for i in range(len(names)):
-        for j in range(i + 1, len(names)):
-            c = _pair_corr(rets[names[i]], rets[names[j]])
-            if c is not None:
-                cs.append(c)
-    if not cs:
-        return None, None
-    rho = sum(cs) / len(cs)
-    n = len(names)
-    denom = 1.0 + (n - 1) * rho
-    return (n / denom if denom > 0 else float(n)), rho
+# [2026-08-22 (su)] THE MATH MOVED TO `fleet_bus`, WHICH IS NOW ITS ONE OWNER.
+# 💸 the LIVE Funding Farmer needed exactly this measurement (it holds
+# BTC/ETH/SOL/XAU at N_eff 1.389, its crypto leg at 1.11) and a second copy of
+# a rule is a second rule ((hj)). `fleet_bus` is COPY'd into both images, so
+# both real-money rows now compute independence the same way, once. These names
+# stay as thin aliases: the (sr) tests and `diversified_order` below bind them,
+# and re-pointing every call site on the same day would be churn, not clarity.
+CORR_MIN_OVERLAP = _bus.CORR_MIN_OVERLAP
+CORR_LOOKBACK = _bus.CORR_LOOKBACK
+_bar_returns = _bus.bar_returns
+_pair_corr = _bus.pair_corr
+basket_n_eff = _bus.basket_n_eff
 
 
 def diversified_order(universe, held, rets):
@@ -375,9 +465,6 @@ def diversified_order(universe, held, rets):
         return [s for _, s in scored]
     except Exception:  # noqa: BLE001 — ordering is an enhancement, never a dependency
         return list(universe)
-
-
-LIVE_CLIP_LEVER = "live.avo.clip_scale"
 
 
 def _clip_scale_now():
@@ -438,6 +525,55 @@ def roi_exit_due(age_min, profit):
     return rung is not None and profit >= S.roi[rung]
 
 
+def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
+                ungraded, entries_shut, last_open_ts, last_close_ts, t_now):
+    """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
+    directional row.
+
+    🙏 avo published `open_trades: 3` and nothing else for its entire life, so
+    when Eamon asked why it had not traded in days the row could not answer and
+    neither could the shadow: `census = True` existed in this fleet exactly
+    ONCE, on a $1,000 paper book (👩 mum v2), and never on the row holding real
+    money. Everything below is REPORTED — nothing here gates a trade.
+
+    WHAT THE ANSWER TURNED OUT TO BE, measured 22-Aug by driving the shipped
+    `SwingDip.signals` over the venue's own 4h tape (65 fires / 15 days across
+    23 coins): the book is **held-starved and gate-refused, not signal-
+    starved**. 24 of 65 fires landed on the three coins it already holds, and
+    12 more on IWM/XCU — non-crypto books the oracle cannot grade (172 and 194
+    bars against its 203 floor), which `noncrypto_entry_blocked` refuses
+    fail-closed. Both are correct behaviour. Neither was visible.
+
+    `ungraded` is the (om) `gate_drift` shape: names this book will scan and
+    can never enter until the oracle has enough history. Absent readings are
+    ABSENT, never zero — a fabricated `rsi_min: 0.0` would read as a coin
+    sitting AT the bar, the loudest possible signal from no data (I8).
+    """
+    counts = {}
+    for sym in universe:
+        counts[verdicts.get(str(sym), "not_evaluated")] = counts.get(
+            verdicts.get(str(sym), "not_evaluated"), 0) + 1
+    out = {"universe": len(universe), "held": len(held),
+           "verdicts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+    if entries_shut:
+        out["entries_shut"] = entries_shut
+    if ungraded:
+        out["ungraded"] = sorted(ungraded)
+    vals = sorted(v for v in rsi_readings.values()
+                  if isinstance(v, (int, float)))
+    if vals and rsi_bar:
+        out["rsi_bar"] = rsi_bar
+        out["rsi_min"] = round(vals[0], 1)
+        out["rsi_med"] = round(vals[len(vals) // 2], 1)
+        out["rsi_read"] = len(vals)
+        out["near_bar"] = sum(1 for v in vals if v < rsi_bar + 8)
+    for key, ts in (("idle_open_h", last_open_ts),
+                    ("idle_close_h", last_close_ts)):
+        if ts:
+            out[key] = round(max(0.0, (t_now - float(ts))) / 3600.0, 2)
+    return out
+
+
 def entries_locked(closed, t_now, baseline):
     """The family Book's protections (slguard + maxdd) on THIS arm's own
     closes, with the drawdown denominator the LIVE baseline instead of the
@@ -477,10 +613,13 @@ def main(_ctx=None, once=False):
     # shadow writer here would be two writers of one graded ledger — the (hp)
     # class this fleet has already paid for once.
     if _ctx is None:
-        mode = os.environ.get("AVO_VENUE", "").strip()
+        mode = _env("VENUE", "").strip()
         if mode != "lighter_live":
             raise SystemExit(
-                "AVO_VENUE must be EXACTLY 'lighter_live' (got "
+                # [(sx)] the ACTUAL env name for THIS book — I8: a guard whose
+                # output is an instruction must name something the operator can
+                # find, and `GEORGIA_VENUE` is not `AVO_VENUE`.
+                f"{_PFX}_VENUE must be EXACTLY 'lighter_live' (got "
                 f"{mode!r}). This file is the live arm only — the shadow "
                 "book runs in family-lighter-shadow, and a second shadow "
                 "writer would pool the graded ledger (one book, one writer).")
@@ -509,8 +648,12 @@ def main(_ctx=None, once=False):
         except Exception:  # noqa: BLE001
             pass
         raise SystemExit(
-            "lighter_live requires an explicit per-bot notional cap "
-            "(FREQTRADE_AVO_MARIA_MAX_NOTIONAL) — refusing to start.")
+            # [(sz)] DERIVED, not typed. This named Avo's cap env verbatim, so
+            # under 🔮 georgia the one instruction the operator gets at boot
+            # would have sent them to set the WRONG book's cap — I8, on the
+            # message a real-money service prints as it refuses to start.
+            f"lighter_live requires an explicit per-bot notional cap "
+            f"({env_prefix(BOT)}_MAX_NOTIONAL) — refusing to start.")
 
     cache = CandleCache(venue)
     universe = [c for c in (list(COINS) + list(NONCRYPTO_UNIVERSE))
@@ -597,6 +740,18 @@ def main(_ctx=None, once=False):
         cooldown = {str(k): float(v)
                     for k, v in (state.get("cooldown") or {}).items()}
         last_sig_ts = dict(state.get("last_sig_ts") or {})
+        # [(st)] THE CENSUS'S DURABLE HALF. Kept across loops (and restored
+        # across restarts) because this book decides on a 4h candle and
+        # publishes every 90s: a per-CYCLE census would read "nothing
+        # evaluated" on ~159 of every 160 loops, which is exactly the silence
+        # it exists to break. `last_open_ts` is a one-element list so the
+        # entry loop's closure can write it.
+        scan_verdict = {str(k): str(v)
+                        for k, v in (state.get("scan_verdict") or {}).items()}
+        last_rsi = {str(k): float(v)
+                    for k, v in (state.get("last_rsi") or {}).items()
+                    if isinstance(v, (int, float))}
+        last_open_ts = [float(state.get("last_open_ts") or 0.0)]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
@@ -690,6 +845,14 @@ def main(_ctx=None, once=False):
         notional_cap_skips = 0
         coin_vetoed = {}
         live_scale = 1.0
+        # [(st)] NOT scan_verdict / last_rsi / last_open_ts / closed_win: this
+        # block runs AFTER the state restore above, so defaulting them here
+        # would blank the restored census (and the close window `entries_locked`
+        # reads) on every single cycle. The earliest publish site is below the
+        # restore, so they are always bound by the time the helper can run.
+        cycle_verdict = {}
+        entries_shut = None
+        nc_verdicts = {}
         # [(sr)] None, not 1.0 — the halt/kill paths publish before the scan
         # computes these, and "not measured yet" must not read as "one bet".
         held_n_eff = held_rho = None
@@ -702,6 +865,10 @@ def main(_ctx=None, once=False):
                 "initial_equity": baseline, "meta": meta,
                 "closed": closed_win[-200:], "cooldown": cooldown,
                 "last_sig_ts": last_sig_ts, "last_accrue": t0,
+                # [(st)] the census survives a restart, or every deploy would
+                # blank the one instrument that says why the book is quiet.
+                "scan_verdict": scan_verdict, "last_rsi": last_rsi,
+                "last_open_ts": last_open_ts[0],
                 "capital_adjust": {"total": round(capital_adjust, 2)}})
             ok = store.save_state(STATE_KEY, state)
             if ok is False:
@@ -746,6 +913,10 @@ def main(_ctx=None, once=False):
             # — the cap census must describe the clip the row publishes, and a
             # second copy of this expression is how the two drift apart.
             _eff_clip = ((clip_usd(eq) or 0.0) * _clip_scale_now()) if eq else None
+            # [(sy)] the venue's real margin surface for THIS book's universe,
+            # read once per publish and shared by the three fields below.
+            _mmf = worst_mmf(universe)
+            _stop_ok, _stop_ceiling = stop_reachable(_mmf)
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
                 "strategy": "SwingDipV1 (live slot swap 13-Aug)",
@@ -796,11 +967,20 @@ def main(_ctx=None, once=False):
                                    else None),
                     "vol_target_here": (vol_target_gross_x(held_n_eff)
                                         if held_n_eff else None),
-                    # worst maintenance-margin fraction across the books this
-                    # universe trades (NVDA/WTI/XCU = 300bps), measured off the
-                    # venue's own orderBookDetails 21-Aug. Read per book, never
-                    # derived from imf — the (no) trap.
-                    "liq_gap_pct": round(0.03 - 1.0 / max(1e-9, gross_x()), 4),
+                    # [(sy)] READ FROM THE VENUE, not a literal. The worst
+                    # maintenance-margin fraction across the books this
+                    # universe actually trades — 600bps, not the 300bps (sr)
+                    # hardcoded — off the scout's own margin surface. None
+                    # when unreadable: a fabricated liquidation distance on a
+                    # levered real-money row is the one number that must never
+                    # be guessed.
+                    "mmf": (round(_mmf, 4) if _mmf is not None else None),
+                    "liq_gap_pct": liq_gap_pct(_mmf),
+                    # Does the book's own stop still fire before the venue
+                    # liquidates? Above `stop_dead_above` it does not, and the
+                    # protective stop is dead code. Reported, never a gate.
+                    "stop_reachable": _stop_ok,
+                    "stop_dead_above": _stop_ceiling,
                 },
                 "held": {c: (meta.get(c) or {}).get("tag")
                          for c in live_pos},
@@ -843,6 +1023,20 @@ def main(_ctx=None, once=False):
                 # venue could not answer: an unreadable margin state must not
                 # publish as a confident 1.0x.
                 "margin": _margin_block(live_pos),
+                # [(st)] THE CENSUS — see scan_census(). The answer to "why
+                # has this book not traded", on the row, every loop.
+                "scan": scan_census(
+                    scan_verdict, last_rsi, getattr(S, "RSI_MAX", None),
+                    universe, live_pos,
+                    # UNKNOWN, not "everything": an empty verdict map means the
+                    # oracle was not read this cycle (the halt paths publish
+                    # before it is), and listing every non-crypto name as
+                    # ungraded off a dark read is the guess I8 forbids.
+                    ([c for c in universe
+                      if c in NONCRYPTO_EFFECTIVE and c not in nc_verdicts]
+                     if nc_verdicts else None),
+                    entries_shut, last_open_ts[0],
+                    (closed_win[-1].get("ts") if closed_win else None), t0),
             }
             payload.update(extra_extra or {})
             try:
@@ -1067,6 +1261,17 @@ def main(_ctx=None, once=False):
             pass
 
         locked_until = entries_locked(closed_win, t0, baseline)
+        # [(st)] this cycle's verdicts, folded into the durable per-symbol map
+        # at the bottom of the loop. Cycle-local so a coin the loop never
+        # reached keeps its PREVIOUS verdict instead of being silently reset.
+        cycle_verdict = {}
+
+        def _verdict(sym, why, sig=None):
+            """Record WHY `sym` did not become a trade this cycle. Telemetry
+            only — it is called beside an existing `continue`, never instead of
+            one, so no control flow depends on it."""
+            cycle_verdict[str(sym)] = why
+
         brain_gated_tags = []
         # [(sp)] the two brain-sizing refusals, PUBLISHED. Neither is silent:
         # a refused expand and a floored reduce are both decisions this book
@@ -1187,6 +1392,17 @@ def main(_ctx=None, once=False):
                       and not halt_blind
                       and clip is not None and clip >= MIN_CLIP_USD
                       and t0 >= locked_until)
+        # [(st)] WHEN THE WHOLE SCAN IS SHUT, say which precondition shut it.
+        # `entries_ok` is five ANDed terms and a False was previously
+        # indistinguishable from a universe with no signal — the same
+        # ambiguity one level up from the per-coin census below.
+        entries_shut = None if entries_ok else (
+            "positions_unreadable" if not pos_readable else
+            "equity_unreadable" if equity is None else
+            "halt_unreadable" if halt_blind else
+            "clip_unreadable" if clip is None else
+            "clip_below_min" if clip < MIN_CLIP_USD else
+            "protections_locked")
         # [(sr)] Returns for everything we might hold or take, off bars the
         # cache already holds (one governed fetch per closed candle, shared).
         # Built even when entries are shut, because `n_eff` describes the HELD
@@ -1203,15 +1419,27 @@ def main(_ctx=None, once=False):
             # THE ONLY BEHAVIOURAL CHANGE: the sequence candidates are offered
             # in. Every gate, veto, cap and sizing rule below is untouched, so
             # for any SINGLE candidate this path is byte-identical to before.
+            #
+            # [2026-08-22 (st)] AND THE CENSUS. `_verdict(sym, why)` stamps the
+            # reason this candidate did not become a trade — it is pure
+            # telemetry beside each existing `continue`, never a new one. See
+            # `scan_census()` for why the verdicts are kept PER SYMBOL rather
+            # than counted per cycle.
             for sym in diversified_order(universe, list(pos), _rets):
                 if len(pos) >= S.max_open:
+                    for _rest in universe:
+                        if _rest not in pos and _rest not in meta:
+                            _verdict(_rest, "slots_full")
                     break
                 if sym in pos or sym in meta:
+                    _verdict(sym, "held")
                     continue
                 if t0 < cooldown.get(sym, 0.0):
+                    _verdict(sym, "cooldown")
                     continue
                 bars = cache.get(sym, S.tf)
                 if not bars or not bars.get("t"):
+                    _verdict(sym, "no_bars")
                     continue
                 sig_ts = bars["t"][-1]
                 if last_sig_ts.get(sym) == sig_ts:
@@ -1222,21 +1450,41 @@ def main(_ctx=None, once=False):
                     extra["btc_tide_up"] = t_up
                 sig = S.signals(bars, extra)
                 last_sig_ts[sym] = sig_ts
+                # [(st)] the gauge: the SHIPPED rule's own rsi, kept per coin so
+                # the row can say how FAR the market is from the bar, not only
+                # that it did not clear it ((rr)'s reading, at this book).
+                if sig and isinstance(sig.get("rsi"), (int, float)):
+                    last_rsi[sym] = float(sig["rsi"])
                 if not sig or not sig.get("enter"):
+                    _verdict(sym, "no_signal" if sig else "no_read",
+                             sig=sig)
                     continue
                 px = marks.fresh_mid(venue, sym)
                 if not px:
+                    _verdict(sym, "no_mark")
                     continue
                 if noncrypto_entry_blocked(sym, r_up):
+                    # THE REFUSAL THAT WAS INVISIBLE. Measured 22-Aug: both
+                    # post-drought IWM signals died here, because the oracle
+                    # cannot grade IWM (172 bars < its 203 floor) and the gate
+                    # is fail-CLOSED. Working exactly as designed — and
+                    # byte-identical to "no signal" on every reading of the row.
+                    _verdict(sym, "noncrypto_ungated"
+                             if sym not in (nc_verdicts or {})
+                             else "noncrypto_not_long")
                     continue                      # fail-closed per-asset gate
                 if fleet_long_veto:
+                    _verdict(sym, "fleet_long_veto")
                     continue
                 if fleet_headroom is not None and \
                         cycle_admitted >= fleet_headroom:
+                    _verdict(sym, "budget_headroom")
                     continue
                 if symcap_blocked(fleet_symcap, sym, cycle_sym):
+                    _verdict(sym, "symcap")
                     continue
                 if sym.split("/")[0] in coin_vetoed or sym in coin_vetoed:
+                    _verdict(sym, "coin_veto")
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} entry SKIPPED — "
                            f"coin veto: {coin_vetoed.get(sym) or coin_vetoed.get(sym.split('/')[0])}")
                     continue
@@ -1246,6 +1494,7 @@ def main(_ctx=None, once=False):
                     if brain_entry_gated(gate_row, tag):
                         gated = True
                 if gated:
+                    _verdict(sym, "brain_gate")
                     brain_gated_tags.append(f"{sym}:{ledger_tag(tag)}")
                     continue
                 stake = clip * S.stake_mult(tag, bars)
@@ -1296,9 +1545,11 @@ def main(_ctx=None, once=False):
                     brain_floored += 1
                     stake = MIN_CLIP_USD
                 if stake < MIN_CLIP_USD:
+                    _verdict(sym, "clip_below_min")
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
                 if not rails.notional_ok(open_ntl, stake):
+                    _verdict(sym, "notional_cap")
                     # [(sr)] counted, not just logged — a log line dies with the
                     # container and no organ reads it. `cap_slots` below says the
                     # cap WILL bite; this says it DID.
@@ -1309,10 +1560,12 @@ def main(_ctx=None, once=False):
                     continue
                 size = round(stake / px, 6)
                 if size <= 0:
+                    _verdict(sym, "size_rounds_to_zero")
                     continue
                 try:
                     res = venue.market_open(sym, True, size)
                 except Exception as e:  # noqa: BLE001
+                    _verdict(sym, "venue_reject")
                     _PRINT(f"[avo-live] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
                 fpx, meas, src = _real_fill(sym, is_ask=False, fallback=px,
@@ -1335,6 +1588,8 @@ def main(_ctx=None, once=False):
                              "brain_mult": round(bmult, 4),
                              "clip": round(stake, 2), "last_px": px}
                 pos[sym] = {"size": size, "entry": fpx or px}
+                _verdict(sym, "opened")
+                last_open_ts[0] = t0
                 cycle_admitted += 1
                 base = sym.split("/")[0]
                 cycle_sym[base] = cycle_sym.get(base, 0) + 1
@@ -1342,6 +1597,17 @@ def main(_ctx=None, once=False):
                        f"${stake:.2f} @ {fpx or px:.6g} [{tag}]"
                        f"{'' if bmult == 1.0 else f' brain {bmult:.2f}x'}"
                        f"{'' if meas else ' (entry UNMEASURED)'}")
+
+        # [(st)] fold this cycle's verdicts into the durable map. A coin the
+        # loop never reached (the candle had not rolled) keeps its previous
+        # verdict rather than being reset to nothing — the census describes the
+        # last EVALUATION of each coin, which is the only reading that means
+        # anything on a 4h book publishing every 90 seconds.
+        scan_verdict.update(cycle_verdict)
+        for _gone in [k for k in scan_verdict if k not in universe]:
+            scan_verdict.pop(_gone, None)          # coin left the universe
+        for _gone in [k for k in last_rsi if k not in universe]:
+            last_rsi.pop(_gone, None)
 
         # ---- publish + persist ---------------------------------------------
         _publish_row(equity, baseline, capital_adjust, pos, stats)
@@ -1382,6 +1648,24 @@ def _supervised():
 def _selftest():
     import lighter_family_bot as fam
 
+    # [(sz)] THIS SUITE IS SwingDip-SHAPED, and says so rather than half-running.
+    # Its thirteen scenarios feed 4h dip bars and `dip_in_uptrend` tags, so under
+    # 🔮 georgia (DayTraderGated, 15m) they exercise the generic machinery and
+    # then fail at "dip signal must open" — a failure about the FIXTURE, not the
+    # book. Refusing is the honest form: a suite that ran three of its thirteen
+    # checks and exited 0 would report clean having inspected almost nothing,
+    # which is the exact trap this repo has paid for.
+    #
+    # georgia's coverage is real and lives elsewhere:
+    #   tests/autonomy/test_variant_host.py — identity, env namespacing, the
+    #   refusal on an unknown book, the leverage/liquidation arithmetic, and a
+    #   BOOT SMOKE that drives this same main() one cycle as her.
+    if BOT != "freqtrade-avo-maria":
+        raise SystemExit(
+            f"--selftest is the 🙏 Avo SwingDip scenario suite; {BOT} is "
+            f"covered by tests/autonomy/test_variant_host.py. Run it without "
+            f"FAMILY_LIVE_BOOK set, or run pytest for the variant.")
+
     print("Running Avo LIVE self-test (stub venue)...\n")
 
     # The single most load-bearing fact: the strategy object IS the family
@@ -1390,11 +1674,22 @@ def _selftest():
     assert S is next(x for x in fam.STRATEGIES if x.bot == BOT), \
         "S must BE lighter_family_bot's configured instance"
     # [(sr)] 4 -> 5 slots, measured (see the registry comment in
-    # lighter_family_bot). The STOP pin stays -0.10 and is now doubly
-    # load-bearing: GROSS_X_MAX is DERIVED from it (0.15/|stoploss|), so a stop
-    # widened without re-reading that derivation silently raises the leverage
-    # ceiling on a real-money book.
-    assert S.max_open == 5 and abs(S.stoploss - (-0.10)) < 1e-9
+    # lighter_family_bot). The STOP pin is doubly load-bearing: the whole
+    # leverage layer derives from it — `vol_target_gross_x` (0.15/|stoploss|)
+    # and `stop_reachable`'s ceiling (1/(|stoploss|+mmf)) — so a stop widened
+    # without re-reading those silently changes what a leverage setting MEANS
+    # on a real-money book.
+    #
+    # [(sz)] PER BOOK, now that this module is a variant host. Written as a
+    # table rather than `whatever S says`, which would be vacuous: each book is
+    # pinned to its OWN known geometry, and a book added to `_BOOKS` without an
+    # entry here fails rather than running unpinned.
+    _EXPECT = {"freqtrade-avo-maria": (5, -0.10),
+               "freqtrade-georgia": (5, -0.05)}
+    assert BOT in _EXPECT, f"{BOT} is live-capable but has no geometry pin"
+    _slots, _stop = _EXPECT[BOT]
+    assert S.max_open == _slots and abs(S.stoploss - _stop) < 1e-9, \
+        f"{BOT} geometry moved: slots {S.max_open} stop {S.stoploss}"
 
     captured = {"paper": [], "orders": [], "state": {}, "published": [],
                 "halts": []}

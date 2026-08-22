@@ -57,15 +57,35 @@ DESIGN = {
                  "measured winner and the sided flips are the measured loss.",
     },
     "perps-funding-lighter-lighter": {
-        "emoji": "💸", "name": "Funding Farmer (LIVE)",
-        "design": "The fleet's real money. Take the venue's most extreme "
+        "emoji": "💸", "name": "Funding Farmer (LIVE ARM RETIRED 22-Aug)",
+        "design": "WAS the fleet's real money — take the venue's most extreme "
                   "funding directionally on the receiving side and bank the "
-                  "reversion.",
-        "flies_when": "its take-profit fires more often — that exit is 100% "
-                      "win on both arms and everything else is drag. Its "
-                      "returns INVERT past 24h ((sk)).",
-        "floor": "real money: the judge is the only writer of live.funding.*, "
-                 "and SafetyRails is senior to every lever.",
+                  "reversion. RETIRED (ta): horizon `unreachable` on BOTH arms, "
+                  "and 🔮 georgia takes the sub-account.",
+        "flies_when": "nothing does, and that is the finding. Its take-profit "
+                      "exit is 100% win on both arms while everything else is "
+                      "drag ((sk)), and (su) then measured that no gate from "
+                      "0.05 to 0.60 and no exit of twelve turns the rest "
+                      "positive on the population the book can actually trade. "
+                      "A book whose only winning exit cannot be reached more "
+                      "often has no ceiling to raise.",
+        "floor": "the SHADOW twin is not retired and must keep trading — it is "
+                 "the control arm, and silencing it was the one expensive way "
+                 "to get this retirement wrong.",
+    },
+    "freqtrade-georgia-lighter": {
+        "emoji": "🔮", "name": "Georgia (LIVE)",
+        "design": "The fleet's real money from 22-Aug (ta): the same intraday "
+                  "15m three-tag book as the shadow arm, on the sub-account 💸 "
+                  "the Farmer gave up, running the shared variant host.",
+        "flies_when": "its shadow twin's `t` finally clears 2.0 and the live "
+                      "ledger agrees. It went live at 5 of 6 bars — the "
+                      "missing one is `t` = 1.48 — so what it needs is CLOSES "
+                      "at the same mean, not a better idea.",
+        "floor": "it went live WITHOUT passing the gate, on Eamon's explicit "
+                 "call, so the drawdown arithmetic is the whole guardrail: "
+                 "above 9.09x its -5% stop cannot fire before liquidation, and "
+                 "that is a broken rail rather than a risk preference.",
     },
     "perps-funding-lighter-lshadow": {
         "emoji": "💸", "name": "Funding Farmer (shadow twin)",

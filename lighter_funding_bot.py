@@ -276,6 +276,12 @@ restore_hot_since = funding_basis.restore_hot_since
 # restrict-only means worst case is FEWER entries, never more exposure.]
 VOL_FILTER = os.environ.get("FUNDING_VOL_FILTER", "on").strip().lower() in ("on", "1", "true")
 VOL_FILTER_WIN_H = int(os.environ.get("FUNDING_VOL_FILTER_WIN_H", "336"))   # 14d, = the study
+# [(su)] hourly bars per leg behind the published basket independence. DERIVED
+# from the owner rather than retyped — a retyped constant is a constant that
+# drifts, and this fleet has paid for that twice. The literal is only the
+# fallback for an image without fleet_bus, where `_basket_block` returns None
+# anyway and the value is never used.
+NEFF_LOOKBACK_H = 180
 VOL_FILTER_MIN_H = 72          # rets needed before a vol is trusted (= the study)
 VOL_FILTER_MIN_XS = 8          # cross-section floor below which the filter is inert (= the study)
 VOL_FILTER_UNIVERSE_MAX = int(os.environ.get("FUNDING_VOL_FILTER_UNIVERSE_MAX", "40"))
@@ -329,6 +335,77 @@ VOL_FILTER_UNIVERSE_MAX = int(os.environ.get("FUNDING_VOL_FILTER_UNIVERSE_MAX", 
 HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-fitted; the Lighter counter-evidence was WITHDRAWN 22-Jul (above)
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-22 (ta)] THE LIVE ARM IS RETIRED — 🔮 georgia takes the sub-account.
+#
+# **Eamon, 22-Aug: "just replace farmer with georgia as weve done so many times
+# before".** The precedent he means is real and this follows it exactly: 🎫 the
+# Ticket Taker took 🌊 Tide Rider's live row on the same service/keys/sub-
+# account (17-Jul), and 🙏 Avo took the Taker's (13-Aug (ma)).
+#
+# THE EVIDENCE, from the fleet's OWN published grader (`golive-readiness`,
+# 21-Aug 22:31Z) rather than from an opinion about a bad week:
+#     LIVE   `perps-funding-lighter-lighter`  n=91  mean -0.160%/trade
+#            t=-0.88  halves +2.51/-7.65  -> horizon **unreachable**
+#     SHADOW `perps-funding-lighter-lshadow` n=161 mean -0.195%/trade
+#            t=-0.95  halves +5.71/-18.32 -> horizon **unreachable**
+# Both arms agree in sign AND in verdict, and `unreachable` is the grader's own
+# words for it: *"mean <= 0 — more of the same closes cannot flip mean/t/
+# halves"*. That is the (mr)/(nf) red-stop class landing on the REAL-MONEY row.
+# What replaces it is the fleet's closest book to the gate: 🔮 georgia, 5 of 6
+# bars, both halves positive (+5.65/+10.08), failing only `t` (1.48 < 2.0).
+#
+# **THIS IS ROW-SCOPED, NOT PROCESS-SCOPED.** One module runs BOTH arms, so the
+# 🌊/📊 idle-the-whole-process shape would silence the shadow twin — which is
+# the control arm and costs nothing to keep. The (mr) rule: declare the
+# retirement once, derive the roster.
+#
+# **AND IT FLATTENS, because this one holds REAL POSITIONS.** Every prior
+# retirement froze PAPER positions; four live directional legs with no manager
+# have no stop and no exit, which is strictly worse than closing them. Rather
+# than write a new idle loop next to real money, the guard latches the book's
+# OWN daily-halt path — already proven, already retried every loop until flat,
+# already heartbeating so a retired row reads `halted` instead of DEAD ((pq),
+# (pr), the 16-Jul retry fix). One machine, not a second one.
+#
+# Reversible: FARMER_LIVE_RETIRED_OVERRIDE=run (on BOTH this service and the
+# 🧪 judge's, which reads the same declaration — see fleet_bus).
+FARMER_LIVE_RETIRED_OVERRIDE = os.environ.get(
+    "FARMER_LIVE_RETIRED_OVERRIDE", "").strip().lower()
+
+
+def live_arm_retired(bot_id, mode):
+    """True when THIS process is a retired live arm.
+
+    THE SET LIVES IN `fleet_bus.RETIRED_LIVE_ARMS`, not here — the 🧪 judge has
+    to agree with this bot about it and runs in a different image, and a second
+    copy of a rule is a second rule. This function is only the two guards the
+    bus cannot supply, because they are facts about the PROCESS:
+
+    * `mode` — real money is at stake only in `lighter_live`, so an unknown or
+      mis-set VENUE cannot retire a shadow arm. Fail-safe toward keeping a
+      PAPER book alive, which is the harmless direction.
+    * a DARK BUS — a live arm that cannot read whether it is still commissioned
+      **stands down**. This is deliberately the opposite default from every
+      other bus read in the fleet (dark => neutral, keep going): everywhere
+      else the cost of failing closed is a missed opportunity, and here the
+      cost of failing OPEN is a retired real-money book resurrecting itself on
+      an import error. Scoped to `lighter_live` above, so it can never touch a
+      shadow book. The operator override is the escape hatch and works with or
+      without the bus.
+    """
+    if mode != "lighter_live":
+        return False
+    if FARMER_LIVE_RETIRED_OVERRIDE in ("run", "1", "true"):
+        return False
+    if fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.live_arm_retired(bot_id))
+    except Exception:  # noqa: BLE001
+        return True
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
 # [2026-07-21] repeat-stop escalation (the LIT lesson: 5 of 7 fleet stops
 # were the same coin, re-selected by the entry gate after every 12h
@@ -429,6 +506,9 @@ try:
     import fleet_bus
 except Exception:  # noqa: BLE001
     fleet_bus = None
+else:
+    # [(su)] see NEFF_LOOKBACK_H above — derive, never retype.
+    NEFF_LOOKBACK_H = int(getattr(fleet_bus, "CORR_LOOKBACK", NEFF_LOOKBACK_H))
 
 _ENV_BARS = {"enter_apr": ENTER_APR, "scan_enter": SCAN_ENTER,
              "take_profit": TAKE_PROFIT, "max_hold_h": MAX_HOLD_H,
@@ -1180,6 +1260,82 @@ def _candle_features(ctx, coin):
     feats = {"vol": vol, "ret_mom": ret_mom}
     _feat_cache[coin] = (last_closed, feats)
     return feats
+
+
+# ---- basket independence ----------------------------------------------------
+# [2026-08-22 (su)] "FOUR POSITIONS" AND "ONE BET" WERE THE SAME BYTE-STRING ON
+# THE FLEET'S OTHER REAL-MONEY ROW.
+#
+# Measured 22-Aug on this book's live holdings — BTC/ETH/SOL/XAU, all SHORT —
+# using the fleet's own correlation owner: **N_eff 1.389, mean rho +0.627**,
+# and the crypto leg alone (BTC/ETH/SOL) **N_eff 1.11, rho +0.851**. Three
+# names, one bet. The row published `open_trades: 4` and `margin.n: 4` and
+# nothing that could distinguish four bets from one, which is I22's whole
+# point: market count is not bet count.
+#
+# WHAT IT COST, from this book's own August ledger: SOL -$2.69, BTC -$2.00,
+# XAU -$1.97, ETH -$1.30 — every position losing in the same fortnight,
+# because they were one short position wearing four names into a rally.
+#
+# REPORTED, NEVER A GATE. Nothing here refuses an entry or resizes a clip:
+# `(sr)` earned leverage on 🙏 Avo by MEASURING independence first, and this
+# book has no such measurement yet. The number goes on the row so the question
+# can be asked; acting on it is a separate, measured decision.
+#
+# Cache keyed on the last CLOSED hour, exactly like `_feat_cache` / `_vf_cache`
+# above, and scoped to the HELD set (<= MAX_OPEN coins), so it rides the same
+# hourly candle budget those two already pay.
+_neff_cache = {}   # coin -> (last_closed_hour, {bar_ts: return})
+
+
+def _basket_block(ctx, held):
+    """{'n_eff', 'rho', 'n', 'measured'} for the held basket, or None.
+
+    None — never a fabricated 1.0 — whenever the venue cannot answer or fewer
+    than two legs are measurable: "unknown independence" and "one bet" must not
+    render identically, and a 0.0 correlation would read as PERFECT
+    diversification, the one error that would justify more size (the fleet_bus
+    contract this delegates to)."""
+    if fleet_bus is None or not held:
+        return None
+    now = time.time()
+    last_closed = int(now // 3600) * 3600 - 3600
+    rets = {}
+    for coin in sorted(held):
+        hit = _neff_cache.get(coin)
+        if hit and hit[0] == last_closed:
+            rets[coin] = hit[1]
+            continue
+        try:
+            rows = ctx.venue.candles(
+                coin, "1h", int((now - (NEFF_LOOKBACK_H + 4) * 3600) * 1000),
+                int(now * 1000))
+        except Exception:  # noqa: BLE001 — telemetry never breaks a trading loop
+            continue
+        bars = []
+        for c in rows or []:
+            try:
+                t_s, cl = int(c["t"]) // 1000, float(c["c"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if t_s <= last_closed:            # drop the forming bar
+                bars.append((t_s, cl))
+        bars.sort()
+        r = fleet_bus.bar_returns({"t": [b[0] for b in bars],
+                                   "c": [b[1] for b in bars]})
+        _neff_cache[coin] = (last_closed, r)
+        rets[coin] = r
+    for stale in [c for c in _neff_cache if c not in held]:
+        _neff_cache.pop(stale, None)
+    try:
+        n_eff, rho = fleet_bus.basket_n_eff(rets, list(held))
+    except Exception:  # noqa: BLE001
+        return None
+    if n_eff is None:
+        return None
+    return {"n": len(held), "n_eff": round(n_eff, 3),
+            "rho": (round(rho, 3) if rho is not None else None),
+            "measured": sum(1 for c in held if rets.get(c))}
 
 
 # ---- 🧪 vol-character filter helpers (see the VOL_FILTER block above) -------
@@ -2354,6 +2510,17 @@ def main():
                             "blocked" if _rhalt else
                             "not halted; entries re-enabled")
 
+        # [(ta)] RETIRED LIVE ARM — latch the halt so the day roll cannot clear
+        # it. Placed AFTER the roll and BEFORE the halt block on purpose: the
+        # roll sets `halted_today = False` by construction ((pr)), so latching
+        # earlier would be silently undone once a day and the book would trade
+        # again for a whole UTC day. The halt block below then does the work —
+        # flatten-retry until flat, heartbeat, no entries — which is why this
+        # is four lines and not a second idle loop beside real money.
+        if live_arm_retired(bot_id, ctx.mode):
+            halted_today = True
+            halt_blind = False        # not ignorance; a decision
+
         # kill switch (live) — flatten every held coin and halt on arm.
         if not dry_run and ctx.rails.kill_check():
             log.error("REAL_MONEY_KILL armed mid-run — flatten + halt.")
@@ -2418,7 +2585,15 @@ def main():
             # book is flat; the kill-switch path already retries per loop, so
             # skip when the kill switch just flattened this same loop.
             if not dry_run and not ctx.rails.kill_check():
-                _flatten_all("daily_loss")
+                # [(ta)] THE REASON IS THE RECORD. These closes are a
+                # RETIREMENT, not a daily-loss stop, and mislabelling them
+                # would put four phantom `daily_loss` rows in the ledger every
+                # grader and exit-attribution study reads — the exact "a knob
+                # must record the quantity it cuts" failure (I23), on the last
+                # four trades a real-money book will ever book.
+                _flatten_all("retired"
+                             if live_arm_retired(bot_id, ctx.mode)
+                             else "daily_loss")
             # [2026-07-11 HALT HEARTBEAT] keep the dashboard row fresh while
             # halted — the early `continue` skipped the publish below, so a
             # halted bot looked DEAD (stale row) instead of HALTED.
@@ -2438,6 +2613,19 @@ def main():
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": ctx.mode, "venue": ctx.mode,
                            "style": "directional-funding",
+                           # [(ta)] I1/I18: `halted` is byte-identical between
+                           # "lost 5% today" and "retired 22-Aug", and those
+                           # need different actions. `open` is what says the
+                           # flatten finished, so the retirement is falsifiable
+                           # from the row instead of from a deploy log.
+                           **({"retired": {
+                               "since": "2026-08-22",
+                               "why": "live arm retired (ta) — horizon "
+                                      "unreachable on BOTH arms; georgia "
+                                      "takes the sub-account",
+                               "open": len(meta),
+                               "override": "FARMER_LIVE_RETIRED_OVERRIDE=run"}}
+                              if live_arm_retired(bot_id, ctx.mode) else {}),
                            "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                     for c in meta}})
                 # [2026-08-04] the MTM series must not skip halted days — a
@@ -3382,6 +3570,9 @@ def main():
                        # telemetry read may never raise into a real-money
                        # trading loop.
                        "margin": _margin_block(ctx, set(meta) | set(pos)),
+                       # [(su)] I22 — is this four bets or one? See
+                       # `_basket_block`. None when unmeasurable, never 1.0.
+                       "basket": _basket_block(ctx, set(meta) | set(pos)),
                        # [(qz)] The ruin gate's BITE, on the row rather than
                        # in container logs alone. `0` published every loop is
                        # the point: an omitted key is byte-identical between
@@ -3788,6 +3979,83 @@ def _selftest_scan_receipts():
     assert len(p3["slope"]["ratios"]) == RECEIPTS_CAP, "slope list capped"
     assert len(p3["conviction"]["raws"]) == RECEIPTS_CAP, "conv list capped"
     print("lighter_funding_bot _selftest_scan_receipts OK")
+
+
+def _selftest_basket():
+    """[(su)] The basket-independence block, driven through the REAL venue
+    seam — a fake `ctx.venue.candles` returning real-shaped rows, never a
+    hand-written return value for `_basket_block` itself ((hj))."""
+    class _V:
+        def __init__(self, series, forming=None):
+            self.series = series
+            self.forming = forming or {}
+            self.calls = []
+
+        def candles(self, coin, tf, start_ms, end_ms):
+            self.calls.append((coin, tf))
+            if coin not in self.series:
+                raise RuntimeError("no such market")
+            now_h = int(time.time() // 3600) * 3600
+            # bars BACK from two hours ago, so none is the forming bar...
+            rows = [{"t": (now_h - (n + 2) * 3600) * 1000, "c": c}
+                    for n, c in enumerate(reversed(self.series[coin]))]
+            # ...unless the fixture asks for one, which is how the look-ahead
+            # guard gets TESTED rather than merely written.
+            if coin in self.forming:
+                rows.append({"t": now_h * 1000, "c": self.forming[coin]})
+            return rows
+
+    class _C:
+        def __init__(self, v):
+            self.venue = v
+
+    _neff_cache.clear()
+    n = 120
+    up = [100.0 * (1.0 + 0.01 * (1 if i % 2 else -1)) + i for i in range(n)]
+    ctx = _C(_V({"A": list(up), "B": list(up), "C": [100.0] * n}))
+    b = _basket_block(ctx, {"A", "B"})
+    assert b and abs(b["n_eff"] - 1.0) < 1e-6 and abs(b["rho"] - 1.0) < 1e-6, b
+    assert b["n"] == 2 and b["measured"] == 2, b
+    # a FLAT leg is unmeasurable — it must not be credited as diversification
+    _neff_cache.clear()
+    b2 = _basket_block(_C(_V({"A": list(up), "C": [100.0] * n})), {"A", "C"})
+    assert b2 is None, f"an unmeasurable pair must be None, never a number: {b2}"
+    # THE FORMING BAR IS DROPPED. Two legs identical on every CLOSED bar and
+    # divergent on the current (still-forming) one: rho is exactly 1.0 iff the
+    # forming bar never entered the series. Reading it would be a look-ahead —
+    # the same defect `_candle_features` above was fixed for in July.
+    _neff_cache.clear()
+    fb = _basket_block(_C(_V({"A": list(up), "B": list(up)},
+                            forming={"A": 500.0, "B": 1.0})), {"A", "B"})
+    assert fb and abs(fb["rho"] - 1.0) < 1e-9, \
+        f"the forming bar leaked into the correlation: {fb}"
+    # a dark venue publishes NOTHING rather than a confident 1.0x
+    _neff_cache.clear()
+    assert _basket_block(_C(_V({})), {"A", "B"}) is None
+    assert _basket_block(ctx, set()) is None, "an empty book has no basket"
+    # ...and so does a dark BUS: an image without fleet_bus must publish no
+    # basket at all, never a fabricated one-bet-per-name default.
+    global fleet_bus
+    _saved_bus, fleet_bus = fleet_bus, None
+    try:
+        _neff_cache.clear()
+        assert _basket_block(ctx, {"A", "B"}) is None, \
+            "a dark fleet_bus must publish NO basket, not a default"
+    finally:
+        fleet_bus = _saved_bus
+    # the hourly cache really caches: a second call re-fetches nothing
+    _neff_cache.clear()
+    v = _V({"A": list(up), "B": list(up)})
+    c2 = _C(v)
+    _basket_block(c2, {"A", "B"})
+    first = len(v.calls)
+    _basket_block(c2, {"A", "B"})
+    assert len(v.calls) == first, "the basket read is not cached per closed hour"
+    # a coin that left the book is evicted, not carried forever
+    _basket_block(c2, {"A"})
+    assert "B" not in _neff_cache, "a closed leg must be evicted from the cache"
+    _neff_cache.clear()
+    print("  basket independence: identical/flat-leg/dark/empty/cached/evict OK")
 
 
 def _selftest_scan_census():
@@ -4491,6 +4759,7 @@ if __name__ == "__main__":
         _selftest_entry_admission()
         _selftest_scan_receipts()
         _selftest_scan_census()
+        _selftest_basket()
         sys.exit(0)
     try:
         _supervised()

@@ -170,13 +170,48 @@ def evaluate(data):
     # surface as a warning instead (visible, not paged).
     off = sorted(b.get("bot", "?") for b in bots
                  if b.get("status") not in (None, "online", "halted", "paper"))
-    halted = sorted(b.get("bot", "?") for b in bots if b.get("status") == "halted")
+    # [2026-08-22 (ta)] A RETIRED ARM IS NOT A DAILY-LOSS HALT, AND SAYING SO
+    # HOURLY FOREVER IS HOW A WARNING STOPS BEING READ.
+    #
+    # A retired live arm holds its halt permanently by design (it is how the
+    # book flattens and stays flat), so without this it joins the daily-loss
+    # line on every run, for the rest of the row's life, misattributing its own
+    # cause. Two costs, and the second is the real one: the operator is told to
+    # look at a rule that did not fire, and a line that is always present is a
+    # line nobody reads when a REAL daily-loss halt lands beside it.
+    #
+    # Split on the row's own `extra.retired`, which the publisher stamps
+    # precisely so `halted` stops being byte-identical between the two states
+    # (I1/I18). Retired rows are reported as a NOTE, not a warning: there is no
+    # action to take, and I8 says a detector's output must name something the
+    # operator can act on. Still SHOWN, though — a retired row silently
+    # vanishing from the watchdog is how a book stops being watched.
+    def _retired(b):
+        e = b.get("extra")
+        return isinstance(e, dict) and isinstance(e.get("retired"), dict)
+
+    halted_rows = [b for b in bots if b.get("status") == "halted"]
+    halted = sorted(b.get("bot", "?") for b in halted_rows if not _retired(b))
+    retired = sorted(b.get("bot", "?") for b in halted_rows if _retired(b))
+    # `open` is the flatten's own receipt: non-zero means the retirement has
+    # NOT finished unwinding, and on a real-money arm that is worth a warning
+    # rather than a note — those positions are held by a book that will never
+    # manage them again.
+    unflat = sorted(
+        f"{b.get('bot', '?')} ({b['extra']['retired'].get('open')} open)"
+        for b in halted_rows
+        if _retired(b) and (b["extra"]["retired"].get("open") or 0) > 0)
     if stale:
         problems.append("STALE: " + ", ".join(stale))
     if off:
         problems.append("NOT ONLINE: " + ", ".join(off))
     if halted:
         warnings.append("halted (daily-loss rule): " + ", ".join(halted))
+    if unflat:
+        warnings.append("RETIRED but still holding (flatten unfinished): "
+                        + ", ".join(unflat))
+    # `retired` itself is carried on the SNAPSHOT line below, not here — see
+    # the note above. A standing warning is one nobody reads.
     # [2026-07-29 audit R5] a live bot's DEGRADED boot (':live' state read
     # failed: entries blocked, save suppressed, exits still running) was
     # log-only — the row said "online" and only container logs said why. The
@@ -285,7 +320,15 @@ def evaluate(data):
             big.append(f"{b.get('bot')} ({v:+.1f})")
     if big:
         warnings.append("daily P&L below " + str(loss_floor) + ": " + ", ".join(big))
-    snapshot = f"bots={len(bots)} open_positions={opens} freshest={meta.get('freshest_update_age_sec')}s"
+    snapshot = (f"bots={len(bots)} open_positions={opens} "
+                f"freshest={meta.get('freshest_update_age_sec')}s")
+    # [(ta)] retired arms ride the CONTEXT line, never the warning list: there
+    # is nothing to act on, and a line that is always present is one that gets
+    # skimmed past when a real warning lands beside it. Visible, not paged, and
+    # not a third return channel — `evaluate` returns
+    # (problems, warnings, snapshot) and every caller unpacks exactly that.
+    if retired:
+        snapshot += " retired=" + ",".join(retired)
     return problems, warnings, snapshot
 
 
