@@ -438,6 +438,55 @@ def roi_exit_due(age_min, profit):
     return rung is not None and profit >= S.roi[rung]
 
 
+def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
+                ungraded, entries_shut, last_open_ts, last_close_ts, t_now):
+    """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
+    directional row.
+
+    🙏 avo published `open_trades: 3` and nothing else for its entire life, so
+    when Eamon asked why it had not traded in days the row could not answer and
+    neither could the shadow: `census = True` existed in this fleet exactly
+    ONCE, on a $1,000 paper book (👩 mum v2), and never on the row holding real
+    money. Everything below is REPORTED — nothing here gates a trade.
+
+    WHAT THE ANSWER TURNED OUT TO BE, measured 22-Aug by driving the shipped
+    `SwingDip.signals` over the venue's own 4h tape (65 fires / 15 days across
+    23 coins): the book is **held-starved and gate-refused, not signal-
+    starved**. 24 of 65 fires landed on the three coins it already holds, and
+    12 more on IWM/XCU — non-crypto books the oracle cannot grade (172 and 194
+    bars against its 203 floor), which `noncrypto_entry_blocked` refuses
+    fail-closed. Both are correct behaviour. Neither was visible.
+
+    `ungraded` is the (om) `gate_drift` shape: names this book will scan and
+    can never enter until the oracle has enough history. Absent readings are
+    ABSENT, never zero — a fabricated `rsi_min: 0.0` would read as a coin
+    sitting AT the bar, the loudest possible signal from no data (I8).
+    """
+    counts = {}
+    for sym in universe:
+        counts[verdicts.get(str(sym), "not_evaluated")] = counts.get(
+            verdicts.get(str(sym), "not_evaluated"), 0) + 1
+    out = {"universe": len(universe), "held": len(held),
+           "verdicts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+    if entries_shut:
+        out["entries_shut"] = entries_shut
+    if ungraded:
+        out["ungraded"] = sorted(ungraded)
+    vals = sorted(v for v in rsi_readings.values()
+                  if isinstance(v, (int, float)))
+    if vals and rsi_bar:
+        out["rsi_bar"] = rsi_bar
+        out["rsi_min"] = round(vals[0], 1)
+        out["rsi_med"] = round(vals[len(vals) // 2], 1)
+        out["rsi_read"] = len(vals)
+        out["near_bar"] = sum(1 for v in vals if v < rsi_bar + 8)
+    for key, ts in (("idle_open_h", last_open_ts),
+                    ("idle_close_h", last_close_ts)):
+        if ts:
+            out[key] = round(max(0.0, (t_now - float(ts))) / 3600.0, 2)
+    return out
+
+
 def entries_locked(closed, t_now, baseline):
     """The family Book's protections (slguard + maxdd) on THIS arm's own
     closes, with the drawdown denominator the LIVE baseline instead of the
@@ -597,6 +646,18 @@ def main(_ctx=None, once=False):
         cooldown = {str(k): float(v)
                     for k, v in (state.get("cooldown") or {}).items()}
         last_sig_ts = dict(state.get("last_sig_ts") or {})
+        # [(st)] THE CENSUS'S DURABLE HALF. Kept across loops (and restored
+        # across restarts) because this book decides on a 4h candle and
+        # publishes every 90s: a per-CYCLE census would read "nothing
+        # evaluated" on ~159 of every 160 loops, which is exactly the silence
+        # it exists to break. `last_open_ts` is a one-element list so the
+        # entry loop's closure can write it.
+        scan_verdict = {str(k): str(v)
+                        for k, v in (state.get("scan_verdict") or {}).items()}
+        last_rsi = {str(k): float(v)
+                    for k, v in (state.get("last_rsi") or {}).items()
+                    if isinstance(v, (int, float))}
+        last_open_ts = [float(state.get("last_open_ts") or 0.0)]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
@@ -690,6 +751,14 @@ def main(_ctx=None, once=False):
         notional_cap_skips = 0
         coin_vetoed = {}
         live_scale = 1.0
+        # [(st)] NOT scan_verdict / last_rsi / last_open_ts / closed_win: this
+        # block runs AFTER the state restore above, so defaulting them here
+        # would blank the restored census (and the close window `entries_locked`
+        # reads) on every single cycle. The earliest publish site is below the
+        # restore, so they are always bound by the time the helper can run.
+        cycle_verdict = {}
+        entries_shut = None
+        nc_verdicts = {}
         # [(sr)] None, not 1.0 — the halt/kill paths publish before the scan
         # computes these, and "not measured yet" must not read as "one bet".
         held_n_eff = held_rho = None
@@ -702,6 +771,10 @@ def main(_ctx=None, once=False):
                 "initial_equity": baseline, "meta": meta,
                 "closed": closed_win[-200:], "cooldown": cooldown,
                 "last_sig_ts": last_sig_ts, "last_accrue": t0,
+                # [(st)] the census survives a restart, or every deploy would
+                # blank the one instrument that says why the book is quiet.
+                "scan_verdict": scan_verdict, "last_rsi": last_rsi,
+                "last_open_ts": last_open_ts[0],
                 "capital_adjust": {"total": round(capital_adjust, 2)}})
             ok = store.save_state(STATE_KEY, state)
             if ok is False:
@@ -843,6 +916,20 @@ def main(_ctx=None, once=False):
                 # venue could not answer: an unreadable margin state must not
                 # publish as a confident 1.0x.
                 "margin": _margin_block(live_pos),
+                # [(st)] THE CENSUS — see scan_census(). The answer to "why
+                # has this book not traded", on the row, every loop.
+                "scan": scan_census(
+                    scan_verdict, last_rsi, getattr(S, "RSI_MAX", None),
+                    universe, live_pos,
+                    # UNKNOWN, not "everything": an empty verdict map means the
+                    # oracle was not read this cycle (the halt paths publish
+                    # before it is), and listing every non-crypto name as
+                    # ungraded off a dark read is the guess I8 forbids.
+                    ([c for c in universe
+                      if c in NONCRYPTO_EFFECTIVE and c not in nc_verdicts]
+                     if nc_verdicts else None),
+                    entries_shut, last_open_ts[0],
+                    (closed_win[-1].get("ts") if closed_win else None), t0),
             }
             payload.update(extra_extra or {})
             try:
@@ -1067,6 +1154,17 @@ def main(_ctx=None, once=False):
             pass
 
         locked_until = entries_locked(closed_win, t0, baseline)
+        # [(st)] this cycle's verdicts, folded into the durable per-symbol map
+        # at the bottom of the loop. Cycle-local so a coin the loop never
+        # reached keeps its PREVIOUS verdict instead of being silently reset.
+        cycle_verdict = {}
+
+        def _verdict(sym, why, sig=None):
+            """Record WHY `sym` did not become a trade this cycle. Telemetry
+            only — it is called beside an existing `continue`, never instead of
+            one, so no control flow depends on it."""
+            cycle_verdict[str(sym)] = why
+
         brain_gated_tags = []
         # [(sp)] the two brain-sizing refusals, PUBLISHED. Neither is silent:
         # a refused expand and a floored reduce are both decisions this book
@@ -1187,6 +1285,17 @@ def main(_ctx=None, once=False):
                       and not halt_blind
                       and clip is not None and clip >= MIN_CLIP_USD
                       and t0 >= locked_until)
+        # [(st)] WHEN THE WHOLE SCAN IS SHUT, say which precondition shut it.
+        # `entries_ok` is five ANDed terms and a False was previously
+        # indistinguishable from a universe with no signal — the same
+        # ambiguity one level up from the per-coin census below.
+        entries_shut = None if entries_ok else (
+            "positions_unreadable" if not pos_readable else
+            "equity_unreadable" if equity is None else
+            "halt_unreadable" if halt_blind else
+            "clip_unreadable" if clip is None else
+            "clip_below_min" if clip < MIN_CLIP_USD else
+            "protections_locked")
         # [(sr)] Returns for everything we might hold or take, off bars the
         # cache already holds (one governed fetch per closed candle, shared).
         # Built even when entries are shut, because `n_eff` describes the HELD
@@ -1203,15 +1312,27 @@ def main(_ctx=None, once=False):
             # THE ONLY BEHAVIOURAL CHANGE: the sequence candidates are offered
             # in. Every gate, veto, cap and sizing rule below is untouched, so
             # for any SINGLE candidate this path is byte-identical to before.
+            #
+            # [2026-08-22 (st)] AND THE CENSUS. `_verdict(sym, why)` stamps the
+            # reason this candidate did not become a trade — it is pure
+            # telemetry beside each existing `continue`, never a new one. See
+            # `scan_census()` for why the verdicts are kept PER SYMBOL rather
+            # than counted per cycle.
             for sym in diversified_order(universe, list(pos), _rets):
                 if len(pos) >= S.max_open:
+                    for _rest in universe:
+                        if _rest not in pos and _rest not in meta:
+                            _verdict(_rest, "slots_full")
                     break
                 if sym in pos or sym in meta:
+                    _verdict(sym, "held")
                     continue
                 if t0 < cooldown.get(sym, 0.0):
+                    _verdict(sym, "cooldown")
                     continue
                 bars = cache.get(sym, S.tf)
                 if not bars or not bars.get("t"):
+                    _verdict(sym, "no_bars")
                     continue
                 sig_ts = bars["t"][-1]
                 if last_sig_ts.get(sym) == sig_ts:
@@ -1222,21 +1343,41 @@ def main(_ctx=None, once=False):
                     extra["btc_tide_up"] = t_up
                 sig = S.signals(bars, extra)
                 last_sig_ts[sym] = sig_ts
+                # [(st)] the gauge: the SHIPPED rule's own rsi, kept per coin so
+                # the row can say how FAR the market is from the bar, not only
+                # that it did not clear it ((rr)'s reading, at this book).
+                if sig and isinstance(sig.get("rsi"), (int, float)):
+                    last_rsi[sym] = float(sig["rsi"])
                 if not sig or not sig.get("enter"):
+                    _verdict(sym, "no_signal" if sig else "no_read",
+                             sig=sig)
                     continue
                 px = marks.fresh_mid(venue, sym)
                 if not px:
+                    _verdict(sym, "no_mark")
                     continue
                 if noncrypto_entry_blocked(sym, r_up):
+                    # THE REFUSAL THAT WAS INVISIBLE. Measured 22-Aug: both
+                    # post-drought IWM signals died here, because the oracle
+                    # cannot grade IWM (172 bars < its 203 floor) and the gate
+                    # is fail-CLOSED. Working exactly as designed — and
+                    # byte-identical to "no signal" on every reading of the row.
+                    _verdict(sym, "noncrypto_ungated"
+                             if sym not in (nc_verdicts or {})
+                             else "noncrypto_not_long")
                     continue                      # fail-closed per-asset gate
                 if fleet_long_veto:
+                    _verdict(sym, "fleet_long_veto")
                     continue
                 if fleet_headroom is not None and \
                         cycle_admitted >= fleet_headroom:
+                    _verdict(sym, "budget_headroom")
                     continue
                 if symcap_blocked(fleet_symcap, sym, cycle_sym):
+                    _verdict(sym, "symcap")
                     continue
                 if sym.split("/")[0] in coin_vetoed or sym in coin_vetoed:
+                    _verdict(sym, "coin_veto")
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} entry SKIPPED — "
                            f"coin veto: {coin_vetoed.get(sym) or coin_vetoed.get(sym.split('/')[0])}")
                     continue
@@ -1246,6 +1387,7 @@ def main(_ctx=None, once=False):
                     if brain_entry_gated(gate_row, tag):
                         gated = True
                 if gated:
+                    _verdict(sym, "brain_gate")
                     brain_gated_tags.append(f"{sym}:{ledger_tag(tag)}")
                     continue
                 stake = clip * S.stake_mult(tag, bars)
@@ -1296,9 +1438,11 @@ def main(_ctx=None, once=False):
                     brain_floored += 1
                     stake = MIN_CLIP_USD
                 if stake < MIN_CLIP_USD:
+                    _verdict(sym, "clip_below_min")
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
                 if not rails.notional_ok(open_ntl, stake):
+                    _verdict(sym, "notional_cap")
                     # [(sr)] counted, not just logged — a log line dies with the
                     # container and no organ reads it. `cap_slots` below says the
                     # cap WILL bite; this says it DID.
@@ -1309,10 +1453,12 @@ def main(_ctx=None, once=False):
                     continue
                 size = round(stake / px, 6)
                 if size <= 0:
+                    _verdict(sym, "size_rounds_to_zero")
                     continue
                 try:
                     res = venue.market_open(sym, True, size)
                 except Exception as e:  # noqa: BLE001
+                    _verdict(sym, "venue_reject")
                     _PRINT(f"[avo-live] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
                 fpx, meas, src = _real_fill(sym, is_ask=False, fallback=px,
@@ -1335,6 +1481,8 @@ def main(_ctx=None, once=False):
                              "brain_mult": round(bmult, 4),
                              "clip": round(stake, 2), "last_px": px}
                 pos[sym] = {"size": size, "entry": fpx or px}
+                _verdict(sym, "opened")
+                last_open_ts[0] = t0
                 cycle_admitted += 1
                 base = sym.split("/")[0]
                 cycle_sym[base] = cycle_sym.get(base, 0) + 1
@@ -1342,6 +1490,17 @@ def main(_ctx=None, once=False):
                        f"${stake:.2f} @ {fpx or px:.6g} [{tag}]"
                        f"{'' if bmult == 1.0 else f' brain {bmult:.2f}x'}"
                        f"{'' if meas else ' (entry UNMEASURED)'}")
+
+        # [(st)] fold this cycle's verdicts into the durable map. A coin the
+        # loop never reached (the candle had not rolled) keeps its previous
+        # verdict rather than being reset to nothing — the census describes the
+        # last EVALUATION of each coin, which is the only reading that means
+        # anything on a 4h book publishing every 90 seconds.
+        scan_verdict.update(cycle_verdict)
+        for _gone in [k for k in scan_verdict if k not in universe]:
+            scan_verdict.pop(_gone, None)          # coin left the universe
+        for _gone in [k for k in last_rsi if k not in universe]:
+            last_rsi.pop(_gone, None)
 
         # ---- publish + persist ---------------------------------------------
         _publish_row(equity, baseline, capital_adjust, pos, stats)

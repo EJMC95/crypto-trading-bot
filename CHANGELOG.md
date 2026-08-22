@@ -1,3 +1,99 @@
+## 2026-08-22 (st) — "AVO HASN'T TRADED IN FAR TOO LONG": IT IS HELD-STARVED AND GATE-REFUSED, NOT SIGNAL-STARVED — and the real-money row could not say so
+
+**Eamon, 22-Aug:** *"Avo Maria hasn't traded in far too long / please deep dive"*.
+
+The deep dive took hours. It should have taken five seconds, and the reason it
+did not is the finding: **🙏 avo — the fleet's real-money directional row —
+published nothing that could answer the question.** `census = True` appears
+exactly ONCE in `lighter_family_bot` (👩 mum v2, a $1,000 paper book), and the
+LIVE arm had no census at all: **eleven `continue`s in its entry loop, not one
+of them counted.** I18 was written for a shadow book and never applied to the
+row holding actual money.
+
+### What the answer is, measured
+
+Driving the SHIPPED `SwingDip.signals` over the venue's own 4h tape for its 23
+listed coins (the (hj) rule — drive the publisher, never a hand-written copy):
+
+* **The signal is NOT starved.** 65 ENTER fires in 15 days; 119 in 30 days
+  (2.87% of coin-bars). The book opened nothing for 2.35 days anyway.
+* **Of the 5 fires since its last trade: 3 were on coins it already holds**
+  (SPY ×2, NVDA — correctly skipped, it cannot pyramid) and **2 on IWM**,
+  refused by `noncrypto_entry_blocked` because the oracle cannot grade IWM
+  (**172 bars against its 203 floor**). Fail-closed, working exactly as
+  designed, and completely invisible.
+* Structurally: **24 of 65 fires (37%) land on the three coins already held**,
+  and **12 more (IWM 6, XCU 6) on books with no oracle verdict** — unreachable
+  until they accumulate history (~31 and ~9 more days; WTI ~18).
+* The market is the other half: driving the census live gives **`rsi_med` 78.1
+  against a bar of 42** — the median coin in its universe is deeply overbought.
+  Only 3 of 23 sit within 8 points of the bar. This book buys dips; there are
+  no dips.
+
+So: **held-starved and gate-refused, on a tape with no dips in it.** Every one
+of those readings was byte-identical to "quiet market" on the row.
+
+### What shipped — instrumentation only, zero trades changed
+
+* `scan_census()` on the LIVE arm: a verdict stamped at **all thirteen** entry
+  refusals, the (rr) RSI gauge (`rsi_bar/min/med/read/near_bar`), the (om)
+  `ungraded` list (names this book scans and can never enter), `entries_shut`
+  (which of the five ANDed preconditions closed the whole scan), and
+  `idle_open_h`/`idle_close_h` — the number Eamon actually asked for.
+* `census = True` + `RSI_MAX = 42.0` on `SwingDip`, so BOTH arms publish. The
+  diagnostics come from the shipped rule's own numbers; `enter` is unchanged
+  and an AST test pins the four conjuncts.
+* **Five refusals in the SHADOW loop were uncounted**, and one of them is the
+  answer above: `noncrypto_entry_blocked` logged and returned with no counter.
+  Also `throttled`, `symcap`, `budget_headroom`, `brain_gate`.
+* **`stale_candle` splits the other half of the ambiguity.** Between two 4h
+  closes `sig` is None for every coin, so every coin was booked `no_signal` on
+  a loop where the rule was never evaluated — **the I1 liveness trap living
+  INSIDE the instrument built to close it.**
+* The live census is DURABLE (persisted per-symbol, restored at boot): a
+  4h book publishing every 90s would otherwise read "nothing evaluated" on
+  ~159 of every 160 loops, and a deploy would blank it exactly when someone is
+  looking.
+
+### Two defects caught in review of this change, both recorded because they are
+### the interesting part
+
+1. **The loop's "loop-scope defaults" block runs AFTER the state restore.**
+   Adding `scan_verdict = {}` there — the obvious place — blanks the restored
+   census every cycle, and the same block would have blanked `closed_win`,
+   the window `entries_locked` reads, **silently unlocking protections on a
+   real-money book.** Pinned by `test_the_loop_defaults_do_not_clobber_the_restored_census`.
+2. **`ungraded` must be UNKNOWN, not "everything".** The halt paths publish
+   before `nc_verdicts` is assigned, so an empty map means "the oracle was not
+   read", and listing every non-crypto name off a dark read accuses the gate of
+   refusing books it never saw (I8). It is `None` → the field is absent.
+
+### The durable half
+
+`test_every_refusal_in_the_live_entry_loop_stamps_a_verdict` walks the entry
+loop's AST and fails on a `continue` with no `_verdict` beside it. Counting
+today's thirteen refusals fixes today's instance; **this fixes the class** — the
+next refusal someone adds to the real-money entry loop cannot be silent the way
+`noncrypto_entry_blocked` was. One exemption, declared: the same-candle skip is
+not a refusal, it is "the rule was not evaluated".
+
+`tests/autonomy/test_avo_census.py` — 11 tests, **11 of 11 mutations verified
+RED**, including the defaults-clobber and the dark-oracle guess.
+
+### What did NOT change, and why
+
+**Nothing about what avo trades.** (qu) measured this entry cell exit-free
+(1,156 signals / 475d / 23 coins) and found no edge at any horizon; Eamon kept
+the book on the record with a **pre-registered 50-close revert criterion**.
+Changing the entry, the hold or the ROI ladder now would reset the policy era
+and destroy the very sample that criterion is measured on. The census is what
+makes the wait legible; it is not a licence to re-open a closed decision.
+
+Declared, not fixed: median hold is **5.2 days** and the ROI ladder's terminal
+rung sits at **20160 min = 14 days**, so a position that never rallies holds a
+slot ~indefinitely. That interacts with the 37%-of-signal-on-held-coins number
+above, and it is the (qu) revert criterion's business, not this pass's.
+
 ## 2026-08-21 (ss) — I TOOK 🧭 nav-cook DOWN FOR 11.5 HOURS WITH A REPORTING BLOCK, AND THE ROW SAID `online` THE WHOLE TIME
 
 `(sq)` shipped an off-universe census so a stalled book could explain itself.
