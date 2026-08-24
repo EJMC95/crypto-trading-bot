@@ -1,9 +1,9 @@
 round,date,venue,home,away,p_home_elo,p_home_poisson,p_home_gbm,p_home_blend,exp_margin_home,exp_total_points
-Round 25,2026-08-20 19:50:00,AAMI Park,Melbourne Storm,Penrith Panthers,0.463,0.4413,0.5378,0.4071,-2.5,46.8
-Round 25,2026-08-21 18:00:00,GIO Stadium,Canberra Raiders,Brisbane Broncos,0.6663,0.5214,0.7775,0.6557,0.9,46.7
-Round 25,2026-08-21 20:00:00,Suncorp Stadium,Dolphins,Parramatta Eels,0.7656,0.627,0.6697,0.7884,5.3,49.6
-Round 25,2026-08-22 15:00:00,McDonald Jones Stadium,Newcastle Knights,Manly-Warringah Sea Eagles,0.6222,0.4603,0.5296,0.5295,-1.6,48.0
-Round 25,2026-08-22 17:30:00,Accor Stadium,South Sydney Rabbitohs,New Zealand Warriors,0.4638,0.4964,0.4747,0.4562,-0.1,46.8
-Round 25,2026-08-22 19:35:00,Allianz Stadium,St George Illawarra Dragons,Canterbury-Bankstown Bulldogs,0.4238,0.4587,0.4728,0.3766,-1.6,45.3
-Round 25,2026-08-23 14:00:00,Cbus Super Stadium,Gold Coast Titans,Cronulla-Sutherland Sharks,0.3254,0.4332,0.4344,0.2799,-2.7,47.7
-Round 25,2026-08-23 16:05:00,Allianz Stadium,Sydney Roosters,Wests Tigers,0.8415,0.6299,0.7639,0.8495,5.6,49.1
+Round 26,2026-08-27 19:50:00,Suncorp Stadium,Brisbane Broncos,Melbourne Storm,0.4919,0.4889,0.4078,0.4442,-0.4,47.7
+Round 26,2026-08-28 18:00:00,4 Pines Park,Manly-Warringah Sea Eagles,St George Illawarra Dragons,0.7593,0.6747,0.7192,0.8056,7.3,47.3
+Round 26,2026-08-28 20:00:00,CommBank Stadium,Penrith Panthers,Canterbury-Bankstown Bulldogs,0.7366,0.6534,0.76,0.7868,6.5,45.2
+Round 26,2026-08-29 15:00:00,Cbus Super Stadium,Gold Coast Titans,South Sydney Rabbitohs,0.4209,0.4551,0.4754,0.3753,-1.8,48.2
+Round 26,2026-08-29 17:30:00,Allianz Stadium,Sydney Roosters,Dolphins,0.6194,0.5197,0.5513,0.5751,0.9,49.0
+Round 26,2026-08-29 19:35:00,Queensland Country Bank Stadium,North Queensland Cowboys,Wests Tigers,0.7236,0.5702,0.6951,0.7235,3.1,49.8
+Round 26,2026-08-30 14:00:00,Go Media Stadium,New Zealand Warriors,Newcastle Knights,0.7222,0.5971,0.6229,0.7176,4.1,47.6
+Round 26,2026-08-30 16:05:00,CommBank Stadium,Parramatta Eels,Cronulla-Sutherland Sharks,0.3821,0.4469,0.4971,0.327,-2.3,48.1
