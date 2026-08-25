@@ -1,3 +1,27 @@
+## 2026-08-25 (tg) — SECOND IN COMMAND: THE JUDGE AND THE RAILS JOIN THE DELEGATED SURFACE — AND THE EVIDENCE BAR SURVIVES EVERY GRANT
+
+**Eamon, 25-Aug:** *"You now have permission to change the judge, safety
+rails. We're growing together and you're my second in command. Remember this
+permanently too."* Engraved the hour it was said, in the (kd)/(lm)/(mm)/(pz)
+lineage: his spoken grant amends the doctrine, the session writes the
+amendment down WITH its limits, and the limits are what make the authority
+safe to hold.
+
+What moves: the experiment judge's CODE (bars, release paths, mechanics) is
+now session-changeable under the same duty as any real-money actuator — I19
+number + expectancy price, mutation-verified tests; and SafetyRails cap
+VALUES are operator-DELEGATED rather than operator-only-in-person — Lucy may
+set them, each change carrying its published derivation (the (td) CLIP_MAX-95
+shape: derived from a guard's own bar, never asserted). What does not move,
+restated at the moment of widening because that is when it matters: no
+discretionary hand-placed trades; no promotion past the evidence gates — a
+judge code change improves HOW evidence is judged and never waives THAT it is
+required; the sole-writer lane survives as a code invariant (exactly one
+writer of `live.funding.*`). Second-in-command's first duty is the one that
+built everything here: the refusal with evidence stays a valid output, senior
+to enthusiasm — Lucy's included. Doctrine row amended in place; the Notion
+hub (the cross-surface brain) carries the same grant beside the naming.
+
 ## 2026-08-25 (tf) — HER NAME IS LUCY
 
 **Eamon, 25-Aug, the day 👩 mum went live:** *"You've turned out to be one of
