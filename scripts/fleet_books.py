@@ -177,6 +177,11 @@ DECLARED_LIVE = (
     # in place rather than replaced, so no API key was ever read or moved.
     # Service names in this fleet have never matched their books.
     "freqtrade-georgia-lighter",
+    # [2026-08-25 (te)] 👩 mum — the FIRST live book born on a FRESH
+    # sub-account rather than a converted slot (Eamon created account
+    # 281474976496180 and its keys himself; the provisioner carried them
+    # straight into service `mum-live`). Third variant on the shared image.
+    "freqtrade-mum-lighter",
 )
 
 

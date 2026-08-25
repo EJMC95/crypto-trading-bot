@@ -165,7 +165,9 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
     # [2026-08-22 (tb)] follows the money with the board's cohort — the two
     # organs are pinned to agree by test_live_clip_arms, so this default and
     # evidence_board's are one decision recorded twice on purpose.
-    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter").split(",")
+    # [2026-08-25 (te)] 👩 mum joins with the board's cohort, same decision.
+    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter,"
+    "freqtrade-mum-lighter").split(",")
     if s.strip()}
 
 # [2026-07-30 THE SHADOW BOOKS LEARN — operator: "grow into what works"]

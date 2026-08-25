@@ -545,6 +545,9 @@ LIVE_CADENCE_SEC = {
     # [2026-08-13 (ma)] 🎫 Ticket Taker's live row RETIRED with the Avo slot
     # swap; 🙏 Avo Maria took the sub-account. Same 300s loop → same limit.
     "freqtrade-avo-maria-lighter":   1200,
+    # [2026-08-25 (te)] 👩 mum — live, own sub-account, 300s loop. Added WITH
+    # the launch (the (tb) lesson: this dict learns the hard way otherwise).
+    "freqtrade-mum-lighter":         1200,
 }
 # Any live row NOT named above is still watched, at a deliberately slack bar —
 # an unknown cadence earns a late page, never no page.

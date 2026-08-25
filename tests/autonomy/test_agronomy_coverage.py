@@ -47,13 +47,6 @@ AGRONOMY_COVERAGE_OK = {
         "NOT A BOOK — a market-data publisher. It holds no position, has no "
         "entry rule and no lever surface, so every one of this organ's six "
         "checks is undefined for it (the ROSTER_NON_BOOKS shape (kx)).",
-    "freqtrade-mum-lighter":
-        "👩 mum's live row, PRE-MAPPED 25-Aug ahead of provision (the (jb) "
-        "gate) — the service does not exist yet, so there are no growing "
-        "conditions to scan. Her BookSpec lands with the activation "
-        "(MUM_GOLIVE_RUNBOOK.md step 4), and this exemption is DELETED in "
-        "that same commit: a live row hiding behind it is exactly the "
-        "unscanned-real-money failure the guard names.",
 }
 
 

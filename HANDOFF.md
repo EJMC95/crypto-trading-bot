@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-25 19:17 Sydney (09:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-25 19:39 Sydney (09:39Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,8 +74,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (4 commit(s), entries (tc))
+## Shipped today (6 commit(s), entries (tc), (td), (te))
 
+- `c31f98c` Mum goes live: the deploy rule activates with the service, keys never touch the repo (te)
+- `2d48f0d` Regenerate the handoff after (td)
 - `567c18e` Manual trades attested out of the bots' P&L; the taker's budget doubles under a guard-derived ceiling (td) [deploy-live]
 - `4627aa8` The weekly review: what the week banked, where the money is, what broke (tc)
 - `f27d4de` Mum v2 goes live-capable; the live host finally calls custom_exit (tc) [deploy-live-georgia]

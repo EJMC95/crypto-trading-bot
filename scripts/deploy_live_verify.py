@@ -75,6 +75,8 @@ LIVE_SERVICES = {
     # [2026-08-13 (ma)] the slot's THIRD occupant: 🙏 Avo Maria's row, same
     # service, same marker gate.
     "tide-rider-lighter-live": ("freqtrade-avo-maria-lighter", "[deploy-live-taker]"),
+    # [2026-08-25 (te)] 👩 mum — fresh sub-account, own service, own marker.
+    "mum-live": ("freqtrade-mum-lighter", "[deploy-live-mum]"),
 }
 
 # Bounded foreground polling — a CLI a human sits in front of, never a wakeup

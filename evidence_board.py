@@ -508,7 +508,10 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
     # georgia took its sub-account, so the cohort follows the money. A retired
     # row here is not merely stale: `test_live_clip_cohort` treats it as a
     # defect, because the board would keep sizing a book that cannot trade.
-    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter").split(",")
+    # [2026-08-25 (te)] 👩 mum joins — live on her own sub-account, consuming
+    # `live.mum.clip_scale` through the variant host's `_clip_scale_now`.
+    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter,"
+    "freqtrade-mum-lighter").split(",")
     if s.strip()}
 # Per-row ARM: the lever each live row actually reads. The Farmer keeps
 # `live.clip_scale` — renaming a lever a real-money consumer is reading today

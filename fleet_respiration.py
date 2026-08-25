@@ -77,6 +77,10 @@ LIVE_BREATHS = {
     # [2026-08-13 (ma)] 🎫 Taker's live row RETIRED with the Avo slot swap;
     # 🙏 Avo Maria breathes on the same sub-account at the same 300s loop.
     "freqtrade-avo-maria-lighter": 1800,
+    # [2026-08-25 (te)] 👩 mum — live on her own sub-account, same 300s loop.
+    # Added WITH the launch, not after a red selftest: the (tb) swap taught
+    # this dict that it learns of a new live book the hard way otherwise.
+    "freqtrade-mum-lighter": 1800,
 }
 HYPOXIA_SPO2 = float(os.environ.get("RESP_HYPOXIA_SPO2", "0.7"))   # <70% sat = hypoxic
 
