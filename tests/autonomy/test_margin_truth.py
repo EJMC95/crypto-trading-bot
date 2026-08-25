@@ -110,7 +110,16 @@ def test_leverage_is_gross_over_equity():
                                  equity="197.52"))
     assert st["gross"] == 225.0
     assert st["leverage"] == pytest.approx(225.0 / 197.52, rel=1e-4)
-    assert st["mode"] == "cross"
+    # [2026-08-25] SDK-aware, like its sibling test above: without the
+    # `lighter` SDK the name map is deliberately EMPTY and the mode degrades
+    # to the raw code (I8) — asserting "cross" unconditionally made this test
+    # red in any container without the SDK while the code behaved exactly as
+    # designed.
+    try:
+        import lighter  # noqa: F401
+        assert st["mode"] == "cross"
+    except ImportError:
+        assert st["mode"] == 0, st
     assert st["n"] == 2
 
 

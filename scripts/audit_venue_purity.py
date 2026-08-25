@@ -1239,11 +1239,19 @@ def _selftest():
     assert len(_f2) == 1 and "shiny_new_bot.py" in _f2[0], _f2
     # nothing cited -> nothing fails (history is advisory, not red)
     assert backtest_failures(_off, {}) == []
-    # the LIVE roster is DERIVED and contains the real live pair's surface
-    assert "lighter_funding_bot.py" in _LIVE_BOTS
+    # the LIVE roster is DERIVED and contains the real live pair's surface.
+    # [2026-08-25] lighter_funding_bot.py moved to the NOT-live assertion: the
+    # Farmer's live arm retired (ta)/(tb) and this pin — written when it was
+    # the live pair — kept asserting the OLD roster against a derivation that
+    # had correctly moved on. The pin rotted, not the derivation.
+    assert "lighter_avo_live_bot.py" in _LIVE_BOTS, (
+        "the variant host runs both live books — it must rank as LIVE")
     assert "lighter_family_bot.py" in _LIVE_BOTS, (
-        "Avo's strategy module is live surface — the derived roster must "
-        "carry it")
+        "the live books' strategy module is live surface — the derived "
+        "roster must carry it")
+    assert "lighter_funding_bot.py" not in _LIVE_BOTS, (
+        "the Farmer's live arm is retired — its file must not rank "
+        "citations as LIVE money")
     assert "lighter_trend_bot.py" not in _LIVE_BOTS, (
         "the retired trend bot must not rank citations as LIVE money")
 

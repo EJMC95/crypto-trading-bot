@@ -1188,8 +1188,17 @@ def _selftest():
     except ImportError:      # not in this image — the guard is best-effort
         pass
 
-    LIVE = "perps-funding-lighter-lighter"
-    TWIN = "perps-funding-lighter-lshadow"
+    # [2026-08-25] the Farmer's live row — this fixture's original subject —
+    # is retired+pruned ((ta)/(tb)), and LIVE_ROWS now holds NO funding-named
+    # row at all, so a fixture keyed to any real row returns `recorded`
+    # forever and this selftest went red on main. The MECHANISM is what is
+    # under test, so it is driven on a SYNTHETIC funding pair added to
+    # LIVE_ROWS for the fixture's duration (discarded below). The structural
+    # fact this exposed stands on its own: the live-funding grading lane has
+    # ZERO members until a funding book goes live again.
+    LIVE = "fixture-funding-lighter"
+    TWIN = "fixture-funding-lshadow"
+    LIVE_ROWS.add(LIVE)
 
     def lt(bot, off_h, pct):
         return {"bot": bot, "profit_ratio": pct, "close_ts": _iso(t0 + off_h * 3600)}
@@ -1253,6 +1262,7 @@ def _selftest():
     glf = grade_live(dict(ep_lv, group="live-funding"),
                      [lt("not-live", 2, 9.9)], group="live-funding")
     assert glf["status"] == "recorded" and glf["n_during"] == 0, glf
+    LIVE_ROWS.discard(LIVE)      # the synthetic fixture row leaves the roster
 
     # verdicts: floors + directions. Two negative taker episodes past the $
     # bar -> HURTING; two positive -> HELPING; one -> neutral (floor).

@@ -538,7 +538,10 @@ def evaluate_evidence(quality):
 # last publish carried no venue: both are louder, different failures, and
 # neither is quieter than the old dict's silent skip.
 LIVE_CADENCE_SEC = {
-    "perps-funding-lighter-lighter": 1200,    # 💸 Funding Farmer — 300s loop
+    # [2026-08-25] 💸 Farmer's live row RETIRED+PRUNED ((ta)/(tb)); 🔮 georgia
+    # runs that sub-account at the same 300s loop → same limit. Found by this
+    # module's own selftest going red on main after the prune.
+    "freqtrade-georgia-lighter":     1200,
     # [2026-08-13 (ma)] 🎫 Ticket Taker's live row RETIRED with the Avo slot
     # swap; 🙏 Avo Maria took the sub-account. Same 300s loop → same limit.
     "freqtrade-avo-maria-lighter":   1200,

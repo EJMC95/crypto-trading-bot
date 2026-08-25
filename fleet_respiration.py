@@ -69,7 +69,11 @@ OXYGEN_FEEDS = {
 # the dashboard's own cadence record for both rows is VARIANT_STALE_SECONDS
 # (pnl_dashboard.py:405).
 LIVE_BREATHS = {
-    "perps-funding-lighter-lighter": 1800,   # 💸 Funding Farmer — 300s loop
+    # [2026-08-25] 💸 Farmer's live row RETIRED+PRUNED with the (ta)/(tb)
+    # slot swap; 🔮 georgia breathes on that sub-account at the same 300s
+    # loop. Found by this module's own selftest going red on main after the
+    # prune — the swap's hide+prune half landed without this dict.
+    "freqtrade-georgia-lighter": 1800,
     # [2026-08-13 (ma)] 🎫 Taker's live row RETIRED with the Avo slot swap;
     # 🙏 Avo Maria breathes on the same sub-account at the same 300s loop.
     "freqtrade-avo-maria-lighter": 1800,
