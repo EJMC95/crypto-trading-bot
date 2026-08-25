@@ -102,6 +102,9 @@ from lighter_family_bot import (
     # carrier class the entry_rank stamp keys on — imported, never re-typed:
     # these are the numbers a go-live verdict is judged on.
     DayTraderGated, control_draw, control_settle, control_block,
+    # [(ti)] the ONE policy-stamp builder, shared with the shadow host so
+    # judge v2's parity precheck compares like with like.
+    policy_stamp,
 )
 from venues import marks
 from venues.safety import (
@@ -1361,12 +1364,20 @@ def main(_ctx=None, once=False):
 
         def _policy():
             """The stamp golive_readiness keys eras on — the RULES in force,
-            not capacity levers ((jf): capacity is ordinary tuning)."""
-            return {"strategy": S.style, "venue": "lighter_live",
-                    "stoploss": S.stoploss, "roi": {str(k): v
-                                                    for k, v in S.roi.items()},
-                    "sides": ["long"], "brain_gate": "row+shadow",
-                    "coin_veto": True}
+            not capacity levers ((jf): capacity is ordinary tuning).
+
+            [(ti)] Built via the ONE builder shared with the shadow host
+            (`policy_stamp`) so judge v2's parity precheck compares like with
+            like — this host's scan is correlation-ordered
+            (`diversified_order`), stated in the stamp, where the shadow
+            scans in list order: a REAL entry-policy divergence the pairs
+            must name rather than average over. ERA-SAFE by construction:
+            the gate's boundary extractor (`stamp_state`) reads only
+            POLICY_SIG_FIELDS and requires a `lenses` key these stamps
+            deliberately lack, so family stamps are structurally invisible
+            to `stamped_policy_boundary` and adding a field moves no era."""
+            return {**policy_stamp(S, "lighter_live", "diversified"),
+                    "brain_gate": "row+shadow", "coin_veto": True}
 
         def _flatten_all(why):
             """Emergency flatten reads the VENUE, not meta — an untracked

@@ -55,6 +55,14 @@ try:
 except Exception:  # noqa: BLE001
     tuning = None
 
+# [(ti)] the judge's phase vocabulary — IMPORTED so this validator and its
+# publisher can never disagree about it again (the (tb) erasure's structural
+# closure). Soft: a dark bus validates nothing rather than crashing the organ.
+try:
+    import fleet_bus as _fb
+except Exception:  # noqa: BLE001
+    _fb = None
+
 KEY = "fleet-immune"
 TTL_SEC = int(os.environ.get("IMMUNE_TTL_SEC", "2400"))       # 40 min
 MAX_ALERT_AGE_H = float(os.environ.get("IMMUNE_MAX_ALERT_AGE_H", "24"))
@@ -379,18 +387,27 @@ def organ_invariants(states, now):
 
     xp = states.get("xp-judge") or {}
     if _fresh(xp, now):
-        ph = xp.get("phase")
-        # [2026-08-25] "stood_down" joined the known phases at (ta) — the
-        # judge deliberately publishes it when its live arm is retired
-        # (fleet_bus.RETIRED_LIVE_ARMS), instead of silently never promoting.
-        # This whitelist predated that phase, so the immune organ flagged the
-        # DELIBERATE census SICK and fleet_regen clobbered it back to "idle"
-        # every pass — erasing the (ta) I18 census and starving
-        # impl_shortfall's `_xp_running` read. An organ's own vocabulary
-        # change must reach the organ that polices its vocabulary.
-        if ph is not None and ph not in ("idle", "running", "promoted",
-                                         "stood_down"):
-            sick("xp-judge", f"unknown phase {ph!r}")
+        # [2026-08-25 (ti)] THE VOCABULARY IS IMPORTED, NEVER RE-TYPED — the
+        # (tb) incident's structural closure: this organ's inline phase tuple
+        # lagged the judge's (ta) vocabulary change and ERASED a deliberate
+        # census. One constant in fleet_bus, imported by publisher and
+        # validator alike, means there is no second list to forget; a future
+        # phase addition that skips fleet_bus reddens the JUDGE'S own
+        # selftest (subset assert) rather than being flagged sick here.
+        # Fail-open on a dark bus (a validator that cannot read the
+        # vocabulary validates nothing, exactly like every soft import).
+        _vocab = tuple(getattr(_fb, "XP_JUDGE_PHASES", ()) or ()) if _fb \
+            else ()
+        if _vocab:
+            ph = xp.get("phase")
+            if ph is not None and ph not in _vocab:
+                sick("xp-judge", f"unknown phase {ph!r}")
+            # v2.0: the per-pair map speaks the same vocabulary.
+            for _pid, _p in sorted((xp.get("pairs") or {}).items()):
+                _pph = (_p or {}).get("phase") if isinstance(_p, dict) \
+                    else None
+                if _pph is not None and _pph not in _vocab:
+                    sick("xp-judge", f"pair {_pid}: unknown phase {_pph!r}")
 
     # [2026-07-30 (hh)] A LEDGER THAT IS NOT ONE BOOK'S RECORD. This is the
     # purest ALIVE-BUT-SICK shape in the fleet: the row is fresh, in-TTL and

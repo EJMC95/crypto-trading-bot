@@ -1107,6 +1107,31 @@ def live_strategies():
 # ---------------------------------------------------------------------------
 # Per-book runtime (one ShadowBroker + protections + ledger per family bot)
 
+def policy_stamp(strategy, venue, scan_order):
+    """[(ti)] THE ONE BUILDER of the (jf) policy stamp, shared by BOTH arms.
+
+    Judge v2's fairness precheck (P1) compares the two arms' stamps on the
+    pair's `policy_fields` — and a signature each host builds for itself is
+    how the F1 handicap class survives: the live host runs `diversified_order`
+    (correlation-aware candidate ordering) and this shadow host does NOT, a
+    real entry-policy divergence that a spec-side field list would never
+    carry. Deriving the stamp HERE, with `scan_order` an explicit argument
+    each host must answer, makes that divergence visible in the stamps
+    themselves: the pairs publish `unjudgeable:policy_mismatch` naming
+    `scan_order` instead of computing a biased gap. Closing the divergence
+    (porting the ordering, or declaring it out of a pair's fields) is a
+    separate measured act — never a silent default.
+    """
+    return {
+        "strategy": strategy.style,
+        "venue": venue,
+        "stoploss": strategy.stoploss,
+        "roi": {str(k): v for k, v in strategy.roi.items()},
+        "sides": ["long"],
+        "scan_order": scan_order,
+    }
+
+
 def control_draw(strategy, pool_coins, coin, mark_of):
     """[(th)] The (ro) placebo DRAW, factored to ONE owner for both arms.
 
@@ -1465,8 +1490,15 @@ class Book:
                 # open timestamps; recording it makes the next decision a query
                 # (I23), and makes rank 3 — the sample the old cap censored —
                 # gradeable the moment it exists.
-                extra=({"entry_rank": m["entry_rank"]}
-                       if m.get("entry_rank") is not None else None),
+                # [(ti)] the (jf) policy stamp, via the ONE builder shared
+                # with the live host — judge v2's fairness precheck reads
+                # BOTH arms' stamps, and until this line the shadow stamped
+                # nothing, which made every family pair honestly unjudgeable.
+                # This host scans in list order (no diversified_order).
+                extra={**({"entry_rank": m["entry_rank"]}
+                          if m.get("entry_rank") is not None else {}),
+                       "policy": policy_stamp(self.s, "lighter_shadow",
+                                                  "list")},
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass

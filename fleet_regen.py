@@ -50,7 +50,11 @@ MAX_SNAPSHOT_AGE_H = float(os.environ.get("REGEN_MAX_SNAP_AGE_H", "24"))
 # to a SAFE baseline used only when no clean history snapshot exists. The
 # baseline is the organ's "resting state" — the same place it starts cold.
 REPAIRABLE = {
-    "xp-judge": {"phase": "idle"},          # phase machine -> back to idle
+    # [(ti)] v2.0: the baseline carries the (empty) pairs map so a
+    # from-baseline repair does not hand v2 a shape its migration then
+    # re-derives; history-first restore is unchanged and remains the path
+    # that preserves a real pairs census.
+    "xp-judge": {"phase": "idle", "pairs": {}},
     "scout-tuner": {},                       # stateless-ish; empty restart
     # [2026-07-22] gapscout-census removed: Gap Scout retired 17-Jul, so there
     # is no publisher to regenerate a snapshot from — a dead organ is not
