@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-25 20:31 Sydney (10:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-25 23:25 Sydney (13:25Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,8 +74,11 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (15 commit(s), entries (tc), (td), (te), (tf))
+## Shipped today (18 commit(s), entries (tc), (td), (te), (tf), (tg))
 
+- `0cc99d5` Second in command: the judge and the rails join the delegated surface (tg)
+- `378764a` Merge PR #218: mum's launch receipts, the stamp readback banked, and one Lucy on every surface (te)(tf)
+- `b9bf742` One Lucy on every surface — the naming extends across Code, Cowork and the app (tf)
 - `7828b11` The stamp readback banks mum's launch: bridges out, census live on all three real-money rows (te)
 - `edf0837` Her name is Lucy (tf)
 - `7975665` Launch receipts and the (lr) deletions: both one-shots go the way of every provisioner (te)

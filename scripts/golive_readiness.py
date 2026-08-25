@@ -876,6 +876,21 @@ def drop_retired_sleeves(rows, retired, tag_of=None):
     return kept, dropped
 
 
+def is_phantom_close(r):
+    """[2026-08-25 (th)] True for a ledger row that is a halt/flatten EVENT
+    wearing a close's shape: exactly $0.00 P&L with NO entry price. The
+    signature — never the reason string (a real forced-flatten loss keys the
+    same reason and must stay in the sample) and never timestamp inversion
+    (verified to hit a real economic close). Fail-open: anything unparseable
+    is NOT a phantom — this filter must never be able to silently shrink a
+    graded sample beyond its exact signature."""
+    try:
+        return (float(r.get("profit_abs") or 0.0) == 0.0
+                and r.get("open_rate") is None)
+    except (TypeError, ValueError):
+        return False
+
+
 def era_rows(bot, rows, parse=None, detail=False):
     """(era_scoped, all_time, era_iso) — THE SINGLE OWNER of "which of a book's
     trades describe the book as it runs today".
@@ -3053,6 +3068,20 @@ def main():
               "clean-looking 'READY: none' over zero rows is the one output "
               "this grader must never produce.", file=sys.stderr)
         return 2
+    # [2026-08-25 (th)] THE PHANTOM SIGNATURE — a $0.00 close with NO entry
+    # price is a halt/flatten EVENT, not a trade (avo carried 9 of 13, five
+    # with closed_at before opened_at, one on a coin the book cannot hold).
+    # Excluded by SIGNATURE, never by reason string — georgia's TRX −$3.87
+    # `daily_loss` is a REAL forced-flatten loss and stays in the sample.
+    # Belt to the write-site tag (`extra.non_economic`); measured effect:
+    # georgia n 46→42, mean +0.1535%→+0.1681%, t unchanged 0.680 — the era
+    # is NOT invalidated (no P&L value moves; this is hygiene, not an
+    # accounting-basis change).
+    _phantoms = sum(1 for r in rows if is_phantom_close(r))
+    if _phantoms:
+        rows = [r for r in rows if not is_phantom_close(r)]
+        print(f"(phantom closes excluded by signature: {_phantoms} — "
+              f"$0.00 with no entry price)")
     books = {}
     for r in rows:
         bot = str(r.get("bot"))
