@@ -288,8 +288,9 @@ def _selftest():
     br2 = read_breaths(states_lm, ages_ok, now)
     spo2b, hyp2 = saturation(br2)
     assert "lighter-market" in hyp2 and spo2b < 1.0
-    # total weight = 3+1+1+1 (feeds) + 2+2 (live) = 10; lighter-market=3 stale
-    assert abs(spo2b - 0.7) < 1e-9, spo2b
+    # total weight = 3+1+1+1 (feeds) + 2+2+2 (live: avo, georgia, mum (te))
+    # = 12; lighter-market=3 stale -> 9/12
+    assert abs(spo2b - 0.75) < 1e-9, spo2b
 
     # a venue-wide asphyxiation: every Lighter feed + both live bots dark
     dead = {f: {"updated": _iso(now - 99999)} for f in OXYGEN_FEEDS}

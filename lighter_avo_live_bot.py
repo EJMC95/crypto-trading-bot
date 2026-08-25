@@ -738,6 +738,10 @@ def main(_ctx=None, once=False):
     # thing that clears it (see the read site in the loop).
     halted_today = False
     _halt_day = None
+    # [(te)] I22 spend census: the last MEASURED basket n_eff, carried across
+    # cycles so the halt paths (which publish before the scan re-measures) can
+    # report the last known value instead of nothing. None until first measured.
+    spend_n_eff = None
 
     while True:
         t0 = time.time()
@@ -797,6 +801,14 @@ def main(_ctx=None, once=False):
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
+        # [(te)] the arm's own birth instant, persisted — the I22 spend
+        # census's days-to-gate FLOOR derives from it ((ks): every ETA a
+        # floor). An arm restored without one adopts NOW, which overstates
+        # the floor slightly — the fail-closed direction.
+        born_ts = float(state.get("born_ts") or 0.0)
+        if not born_ts:
+            born_ts = t0
+            state["born_ts"] = born_ts
         day_state = state.get("day_start") or {}
         day_start_equity = (day_state.get("equity")
                            if day_state.get("day") == cur_day else None)
@@ -1066,6 +1078,32 @@ def main(_ctx=None, once=False):
                 # published — 0.0 must be visibly "none attested", never
                 # byte-identical to "the field does not exist" (I18).
                 "manual_pnl_usd": round(MANUAL_PNL_USD, 2),
+                # [(te)] THE I22 SPEND CENSUS, published every loop —
+                # audit_book_spend's first real test was this host's own two
+                # variants born after the 20-Aug cutoff. n_eff is the last
+                # MEASURED correlation-aware basket count (1.0 for an empty
+                # book — zero-to-one bet; never the raw symbol count, which
+                # the guard itself rejects as gaming). days_to_gate_obs is a
+                # FLOOR ((ks)): the 30d window remaining from the arm's own
+                # birth; the close-rate term tightens it once the arm has a
+                # rate worth quoting.
+                "spend": {
+                    "markets_scanned": len(universe),
+                    "markets_held": len(live_pos or {}),
+                    # unmeasured degrades to 1.0 — "assume ONE bet", the
+                    # conservative direction for a leverage census (never
+                    # diversification credit that was not measured; the same
+                    # degrade the vol target takes).
+                    "n_eff": (round(float(held_n_eff), 3)
+                              if isinstance(held_n_eff, (int, float))
+                              else (round(float(spend_n_eff), 3)
+                                    if isinstance(spend_n_eff, (int, float))
+                                    else 1.0)),
+                    "sides": "long",
+                    "gross_x": gross_x(),
+                    "days_to_gate_obs": round(
+                        max(0.0, 30.0 - (t0 - born_ts) / 86400.0), 1),
+                },
                 "initial_equity": base_eq,
                 # [2026-08-16 (no)] THE VENUE'S OWN MARGIN TRUTH. Until now
                 # "what leverage is this book at, and how close is it to a
@@ -1478,6 +1516,8 @@ def main(_ctx=None, once=False):
             except Exception:  # noqa: BLE001 — telemetry never breaks the loop
                 _rets[_s] = {}
         held_n_eff, held_rho = basket_n_eff(_rets, list(pos))
+        if isinstance(held_n_eff, (int, float)):
+            spend_n_eff = held_n_eff          # [(te)] carried for the census
 
         if entries_ok:
             # THE ONLY BEHAVIOURAL CHANGE: the sequence candidates are offered

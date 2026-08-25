@@ -545,6 +545,14 @@ def test_mum_boots_and_completes_a_cycle_as_HERSELF():
         ordr = box["orders"][0]
         assert ordr[0] == "freqtrade-mum-lighter", ordr[0]
         assert ordr[1]["shadow"] is False
+        # [(te)] the I22 spend census, complete on every publish — the guard's
+        # first real test was this host's own variants, and it fired.
+        spend = pub["extra"]["spend"]
+        for f in ("markets_scanned", "n_eff", "sides", "gross_x",
+                  "days_to_gate_obs"):
+            assert spend.get(f) is not None, (f, spend)
+        assert spend["sides"] == "long"
+        assert 0.0 <= spend["days_to_gate_obs"] <= 30.0, spend
 
 
 def test_manual_pnl_attestation_reaches_the_row_and_only_the_row():

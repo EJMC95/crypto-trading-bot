@@ -69,6 +69,23 @@ GRANDFATHERED = {
     "nav-cook-lshadow": "born 19-Aug (ri), one day before I22",
     "pm-albanese-lshadow": "pre-I22 parliament",
     "pm-turnbull-lshadow": "pre-I22 parliament",
+    # [2026-08-25 (te)] DEPLOY-LATENCY BRIDGES, not birth exemptions — the
+    # census is BUILT (the variant host publishes `extra.spend` every loop
+    # since (te)) and reaches these rows on the [deploy-live] merge. This
+    # guard fires against the LIVE feed, so between the commit and the
+    # container the truth is "shipped, not yet serving". REMOVE BOTH on the
+    # post-merge stamp readback (owner: session, same day): a grandfather
+    # entry mutes the census HONESTY checks too, so leaving them here after
+    # the deploy would exempt exactly the two books the guard was built for.
+    # (This job had in fact been red on main since 22-Aug — georgia's live
+    # row was born the same day the guard was wired and nobody pushed over
+    # the weekend to see it.)
+    "freqtrade-georgia-lighter":
+        "census shipped in the host at (te); deploy-latency bridge — remove "
+        "on stamp readback",
+    "freqtrade-mum-lighter":
+        "census shipped in the host at (te); deploy-latency bridge — remove "
+        "on stamp readback",
 }
 
 #: A book may exceed MAX_DAYS_TO_GATE only with a reason, an OWNER and a DATE.
