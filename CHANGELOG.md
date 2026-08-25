@@ -1,3 +1,53 @@
+## 2026-08-25 (te) — 👩 MUM GOES LIVE: EAMON HANDS THE SUB-ACCOUNT KEYS AND THE PROVISIONER CARRIES THEM STRAIGHT INTO RAILWAY — THE CREDENTIALS TOUCH THE REPO AT NO POINT
+
+**Eamon, 25-Aug:** *"Here are all the details you need to make mum v2 live —
+full permission to populate wherever necessary — no rebuttals please."* He
+performed the runbook's step 1 himself (fresh sub-account, fresh API key) and
+handed the account index, key index and private key. No rebuttal: she ships.
+
+**THE MECHANICS, and the one rule held throughout: the private key never
+enters the repository.** `mum-live-provision.yml` is a faithful copy of the
+nav-cook provisioner (the (lr)/(mk)/(ri) lineage with every (ml) postmortem
+fix — no `grep -q` pipelines under pipefail, no variables read-back echo, logs
+carry variable NAMES only) extended for a REAL-MONEY service: the credentials
+arrive as `workflow_dispatch` INPUTS at run time and flow directly into
+`railway variables --set`. The service is `mum-live`, image
+`Dockerfile.avolive`, `FAMILY_LIVE_BOOK=freqtrade-mum`,
+`MUM_VENUE=lighter_live`, `FREQTRADE_MUM_MAX_NOTIONAL=1000` (a ceiling — the
+`cap_slots` census reports if it ever binds, the (sr) instrument),
+`MUM_GROSS_X=1.0` per the leverage program's own line ("mum launches at 1.0
+and earns notches on her control arm's verdict" — raising it is one Railway
+env against a published notch table), `DATABASE_URL` as the reference form
+((kb)), and — stated plainly because it is the operator's rail —
+`REAL_MONEY_KILL=DISARMED_I_UNDERSTAND`, set as part of executing Eamon's
+explicit go-live order: SafetyRails arms the kill by default and a live order
+that leaves it armed is a book that flattens itself at boot. The deploy rule
+`[deploy-live-mum]` is ACTIVATED in the same commit as the service (the
+runbook's own step 3), with `fleet_books.MARKER_GATED` and the marker-logic
+case table extended — three books now share one image, so one-at-a-time has
+three ways to be wrong and the selftest drives all of them.
+
+**THE SELFTEST CAUGHT ITS OWN EXTRACTION GOING STALE, which is worth
+recording:** `_extract_live_marker_block` closed at the `fi` after
+`trail-blazer-live`, so mum's rule — added after georgia's — silently fell
+OUTSIDE the block under test, and the missing-needle check refused to vouch
+rather than passing vacuously ((po): a check that inspects nothing must not
+report clean). The sentinel now closes at the LAST live rule.
+
+**A TRANSCRIPTION CALL, recorded because it was close:** the pasted keys
+render with hyphens at line ends, which reads as soft wrapping — but the
+second private-key line is only 16 characters and still ends in a hyphen,
+and a renderer breaks lines AT real hyphens, not mid-short-line. The hyphens
+are characters of Lighter's segmented key format; the key is passed verbatim.
+If the signer refuses it, the fallback is a hyphen-stripped redispatch, and
+the row appearing on /pnl.json is the only receipt either way ((iw)/(fd):
+verify by `extra.build`+`build_n` against the avolive COPY set, never a green
+run). The feed-following registries (DECLARED_LIVE, the board/proprioception
+cohort defaults, deploy_live_verify, agronomy BookSpec, respiration,
+market-context, CLAUDE.md audit scope) move in the commit AFTER the row
+proves itself live, per the runbook's step 4; the provisioner is deleted in
+that same commit (the (lr) rule).
+
 ## 2026-08-25 (td) — THE "LOSSES" WERE EAMON'S MANUAL TRADES, ATTESTED OUT OF THE BOTS' P&L — AND THE FLEET'S BEST SIGNAL GETS A 2x RISK BUDGET, WITH ITS CEILING DERIVED FROM THE GUARD THAT REFUSED MY FIRST DRAFT
 
 **Eamon, 25-Aug:** *"the losses come from manual trades I made (have learned my

@@ -50,6 +50,14 @@ loop.
 
 ## What only Eamon can do, in order
 
+**[2026-08-25 (te) — EXECUTED.** Eamon performed step 1 (sub-account
+`281474976496180`, API key index 8) and handed the credentials with *"full
+permission to populate wherever necessary"*. Steps 2–3 were then executed by
+the one-shot `mum-live-provision` dispatch (the (lr)/(mk)/(ri) pattern —
+credentials travel as run-time inputs straight into Railway variables, never
+through the repo) and the deploy rule was activated in the same commit. The
+sections below are kept as the record of what the provisioner did.]**
+
 ### 1 · Create the sub-account and its keys
 
 In the Lighter UI: new sub-account, deposit, create an API key/secret for it.

@@ -133,6 +133,10 @@ MARKER_GATED = {
     # [2026-08-13 (ma)] the slot's new occupant deploys behind the SAME
     # marker (the service kept its gate through the swap).
     "freqtrade-avo-maria-lighter": ("[deploy-live-taker]", "[deploy-live]"),
+    # [2026-08-25 (te)] 👩 mum's live row — her OWN marker, third book on the
+    # shared image; service `mum-live`, fresh sub-account (Eamon's launch
+    # order, MUM_GOLIVE_RUNBOOK.md).
+    "freqtrade-mum-lighter": ("[deploy-live-mum]", "[deploy-live]"),
     # [2026-08-03] `funding-farmer-shadow` holds ZERO real money and yet is
     # marker-gated, which looks wrong and is not. `(hi)` joined the two arms'
     # deploy CLOCK on purpose: the shadow is the judge's CONTROL arm, and the

@@ -495,13 +495,13 @@ jobs:
               echo "-> live-georgia marker: including trail-blazer-live (REAL MONEY, runs georgia)"
             fi
             # 👩 mum's live arm — same image/file set, own marker so three
-            # live books deploy one at a time. UNCOMMENT WITH THE SERVICE,
-            # same commit ((sx)->(tb) pattern; MUM_GOLIVE_RUNBOOK.md).
-            #if echo "$changed" | grep -qE "$taker_files" \
-            #   && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-mum]'; }; then
-            #  svcs="${svcs:+$svcs,}mum-live"
-            #  echo "-> live-mum marker: including mum-live (REAL MONEY)"
-            #fi
+            # live books deploy one at a time. ACTIVATED 25-Aug with the
+            # service (provisioned by one-shot dispatch, Eamon's launch order).
+            if echo "$changed" | grep -qE "$taker_files" \
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-mum]'; }; then
+              svcs="${svcs:+$svcs,}mum-live"
+              echo "-> live-mum marker: including mum-live (REAL MONEY, runs mum)"
+            fi
             # [2026-07-30 (hi)] THE EXPERIMENT'S TWO ARMS MUST DEPLOY TOGETHER.
             # `funding-farmer-shadow` — the CONTROL arm of the promotion pipeline
             # — appeared nowhere in this workflow, only in a comment inside
