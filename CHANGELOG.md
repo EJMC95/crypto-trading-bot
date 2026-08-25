@@ -1,4 +1,4 @@
-## 2026-08-25 (th) — THE STANDING AUDIT: DAILY/WEEKLY/MONTHLY LIVE-BOT P&L + DECLARED-vs-EFFECTIVE SYNC, AND ITS FIRST RUN CAUGHT THE (td) ATTESTATION NEVER LANDING
+## 2026-08-25 (tk) — THE STANDING AUDIT: DAILY/WEEKLY/MONTHLY LIVE-BOT P&L + DECLARED-vs-EFFECTIVE SYNC, AND ITS FIRST RUN CAUGHT THE (td) ATTESTATION NEVER LANDING
 
 **Eamon, 25-Aug (evening):** *"Daily and weekly and monthly audit of live
 bots - how p n L can improve ... Can we please see enhancements available
@@ -89,6 +89,263 @@ run: sniper 18.9d · albanese 17.9d · kiyosaki 12.2d · grimes 11.4d · hull
 11.4d — surfaced every morning until decided, which is the "month passes
 silently" class closed.
 
+**[RENUMBERED (th) → (tk), 25-Aug evening — the (gm)-class collision, taken
+by the letters convention's own rule 3: a parallel session's live-trio
+improvement round merged to main as (th) with its citations already in
+tracked code, so the merged entry keeps the letter and this one moves to the
+next free. All six of this entry's own citation sites (script, workflow,
+test, registry, both nav-cook comments) renumbered in the same commit,
+work-list derived uncapped per (qz).]**
+
+**[EXECUTED 26-Aug morning Sydney — Eamon: *"Can you please change fix the
+above with full permission?"*]** The outstanding items from this entry's
+first run, performed: PR #220 merged (arming the three crons and shipping
+nav-cook's un-muting on its own deploy path); the attestation VALUES landed
+via `live-attestation-config.yml` — a one-shot in the mum-live-config
+pattern, per-service inputs so a halted book can be deferred. Sequencing
+mattered and was checked first: 🔮 georgia's daily-loss rail had flattened
+her whole book at 12:08Z (five `long-range-on_daily_loss` closes, −$31.0
+realised, book flat at $266.08, `status: halted`), and a variable change
+restarts the service, which WIPES a memory-only halt
+([[lighter-flatten-silent-halt-redeploy-incident]]) — so Avo's
+`AVO_MANUAL_PNL_USD=-66.4` dispatched immediately (row online) while
+georgia's waits for her halt window to lapse at 00:00Z. Her flat book also
+supplied the clean measurement the program doc asked for: at open=0 the
+residual is exactly `pnl_abs − ledger` = −47.34 − (−20.70) =
+**−$26.64** of unattributed P&L — the four 22-Aug zero-basis flattens —
+which is the level attested. Verified by row readback (`manual_pnl_usd`
+publishing the value), never the green run.
+
+## 2026-08-25 (tj) — THE CENSUS'S FIRST LIVE RUN CATCHES ITS OWN FIXTURE BUG: EVERY PAIR READ DARK BECAUSE THE TEST WAS WRITTEN IN THE WRONG PUBLISHER'S SHAPE
+
+One hour after (ti) merged, judge v2.0's first live census published — and
+all three family pairs read `unjudgeable:live_row_dark` while their rows
+were demonstrably fresh. The (hj) class, in the new code, caught by the new
+code's own output: `_pair_precheck._fresh` required a precomputed `age_sec`,
+which the DASHBOARD feed derives — but the judge reads
+`store.fetch_bot_pnl()`, whose rows carry `updated_at` (ISO) and nothing
+else, so every row's age was unknowable and fail-closed dark. The selftest
+was green because its fixture was written in the dashboard's shape. Fixed
+both halves: `_fresh` takes `age_sec` OR parses `updated_at` (unknown still
+dark — this gate ADMITS a pair toward a real-money comparison), and the
+fixture is rewritten in the PUBLISHER'S shape, mutation-verified (reverting
+`_fresh` to age_sec-only reddens the selftest). The verification loop
+worked exactly as doctrine says it should: ship narrow, read the live
+payload, and the payload told on the fixture within the hour.
+
+## 2026-08-25 (ti) — JUDGE V2.0: THE ENGINE GETS EYES ON EVERY PAIR — AND THE STATISTICS AUDIT FINDS THE FIFTH MALFUNCTION, WHICH IS THE BAR ITSELF
+
+**Eamon, 25-Aug:** *"The judge has malfunctioned several times for this sole
+reason, and it's well overdue for v2."* Confirmed live on the bus before a
+line was written: `phase: stood_down`, `candidate: null`, naming 🔮 georgia
+as successor while structurally unable to judge her — a single-pair machine
+hardwired to the Farmer's `live.funding.*` lanes, and the fleet's only
+promotion path to more real money pointing at a corpse since (ta). The rap
+sheet is four recorded failures with one root: the I23 handicap (paired bar
+compared arms on DIFFERENT entry policies, 0.161pp against a 0.5pp margin —
+zero promotions in five weeks), the (pt) frozen window, the (ta) silent
+stand-down, the (tb) census erasure.
+
+**Designed by workflow under the (tg) grant** (4 readers → spec → FOUR
+adversarial audit lenses, all REVISE with fixes — invariants, failure
+closure, statistics, operational — ~30 findings folded in or scheduled).
+**V2.0 ships the engine's EYES; the bar redesign is deliberately v2.1,
+because the statistics lens found the fifth malfunction:** at family-book
+dispersion (sd 3–6%/trade) v1's bar is a coin-flip detector — the minimum
+detectable gap at its 30/10 floors is `0.365·sd` = **1.4–2.7pp against a
+0.5pp margin**, hourly evaluation past MIN_DAYS gives ~7–30 un-spent looks
+(**~10% false-promotion under null**), within-arm clustering (avo basket
+rho +0.775) turns z=1.28 into an effective **z≈0.7**, the per-half 0.5pp
+term at 15/5 floors **rejects true winners 2–4x more effectively than
+luck**, and the estimand is wrong for capacity candidates outright (they
+move RATE, not per-trade mean — (hl)/(sr) measured). **The naive I16
+lower-bound term the spec carried was therefore REFUSED for v2.0** — adding
+a known-anti-conservative statistic to a real-money actuator is shipping a
+wrong number with a rigorous name. The v2.1 bar is specified by the audit
+and built WITH the lever wave it gates: pre-registered checkpoints or the
+brain's 3-consecutive-evals idiom (no free looks), candidate-CLASS-split
+estimands (capacity promotes on per-trade NON-inferiority + throughput
+superiority over daily blocks), cluster-robust SE at Welch-t with z=2.0
+promotion-grade (the go-live convention, not allocation's advisory 1.28),
+halves demoted to REPORTED below per-half n≈30 (I15's idiom), an arm-label
+permutation backing below n≈30, and impl-shortfall netted out of the gap.
+
+**WHAT V2.0 IS (zero trading-behavior change):**
+* **`fleet_bus.JUDGED_PAIRS`** — the pair registry beside RETIRED_LIVE_ARMS
+  (the (ta) one-owner-across-images pattern): avo, georgia, mum, and the
+  parked farmer, each with pnl_form, strip/economic exit vocabularies,
+  policy_fields, and a `growth` map whose emptiness makes the fast path
+  STRUCTURALLY unreachable. `UNJUDGED_OK` declares the taker's swapped-out
+  live row with its reason.
+* **The multi-pair census** (`pair_census`/`_pair_precheck`): every pair
+  publishes a phase from the ONE vocabulary, with Stage-0 fairness
+  prechecks that emit `unjudgeable:<reason>` NAMING the object (I8) instead
+  of ever computing a biased bar — retirement → dark live row → policy
+  stamps → policy parity → capacity parity, in actionability order.
+  UNREADABLE parity inputs are `parity_unreadable`, never assumed-equal
+  (darkness must not re-open F1 through the stage built to close it —
+  mutation-pinned). At ship the family pairs honestly read
+  `policy_unstamped` until the stamps in this same commit flow, then
+  `policy_mismatch` naming **`scan_order`** — a REAL divergence: the live
+  host scans correlation-ordered (diversified_order), the shadow scans in
+  list order, and closing that is a measured act, not a default.
+* **The shared stamp builder** (`lighter_family_bot.policy_stamp`): one
+  owner for both arms' `extra.policy`; the shadow stamps for the FIRST time
+  (it stamped nothing — every family pair was unjudgeable by absence); the
+  live host's `_policy()` now derives from it. ERA-SAFE, verified before
+  shipping: the gate's `stamp_state` reads only POLICY_SIG_FIELDS and
+  requires a `lenses` key family stamps deliberately lack, so family stamps
+  are structurally invisible to `stamped_policy_boundary` and no era moves
+  — georgia's 5/6 clock untouched.
+* **The vocabulary, imported not re-typed** (`XP_JUDGE_PHASES`/`HOLDS`/
+  `UNJUDGEABLE` in fleet_bus): fleet_immune deletes its inline tuple,
+  imports the constant, and walks `pairs.*.phase` against it — the (tb)
+  erasure's structural closure (no second list to forget; a rogue phase
+  reddens the PUBLISHER'S selftest). fleet_regen's baseline learns the
+  pairs map in the same commit.
+* **The power report**: each judgeable pair publishes {per-arm sd, close
+  rate, `mde_pp_at_floors`} — the statistics audit's central number, on the
+  payload instead of re-argued, REPORT-grade by I16's own advisory scoping.
+* **The farmer mirror**: the serial machine's state overwrites
+  pairs["farmer"] with `src: "machine"` provenance (the census's precheck
+  view and the machine's truth agree today and can drift tomorrow — the
+  overwrite is what a test can see; mutation-pinned after the first draft's
+  mutation SURVIVED on exactly that coincidence). Top-level phase/current
+  stay the farmer lane's for consumer compat (impl_shortfall, the
+  dashboard card); the rollup flip is v2.1's, taken WITH its consumers.
+
+**Pinned by** `tests/autonomy/test_judge_pairs.py` (fleet-scoped roster:
+every MARKER_GATED live row resolves to a pair, RETIRED_LIVE_ARMS, or a
+declared reason — the deploy layer is the source a go-live cannot avoid,
+closing the audit's host-scoped-roster hole; synthetic-ghost injection keeps
+the mechanism non-vacuous; immune's pairs walk driven both directions) plus
+the judge selftest's v2.0 block (census cases driven through the REAL
+`run_once` against a stubbed store). **Mutations 5/5 red** — including the
+farmer-mirror drop that survived its first draft and forced the provenance
+field. v1's 900-line selftest passes UNTOUCHED: the serial machine's
+top-level behavior is byte-compatible by design.
+
+## 2026-08-25 (th) — THE LIVE-TRIO IMPROVEMENT ROUND: THIRTEEN CANDIDATES ENTER THE ADVERSARIAL PASS, ZERO SURVIVE AT FULL STRENGTH — AND THE TEN NARROWED FORMS ARE WHAT SHIPS
+
+**Eamon, 25-Aug:** *"can you suggest some improvements the live bots... how we
+can make this baby purr"* → *"Implement whatever survives."* The method IS the
+finding: 4 parallel readers (live payloads · trade ledgers · code surface ·
+standing plans) → 13 synthesized candidates → a six-lens adversarial verify
+(t-invariance, denominator shrinkage, I7 structural triggers, era clocks,
+evidence honesty, real-money blast radius). **0 sound as written, 10 WEAKENED
+to a surviving narrow form, 3 REFUTED** — including one standing on exactly
+the (hs) at-cap census trap (georgia's "18 refused signals" were 18 candidates
+the scan loop never REACHED: it breaks at cap and stamps the remainder
+`slots_full`, a number an at-cap book produces structurally every loop).
+
+**SHIPPED IN THIS COMMIT — the live host's instrument suite (zero
+trading-logic changes; every number publishes instead of being re-argued):**
+* **👩 mum's halt geometry, coupled to her gross** (`leverage.halt`): both
+  daily rails are gross-BLIND, so at 9.5x her day ends on a **~1.05% adverse
+  basket move** and ONE slot-stop = 9.5% of equity — two stops guarantee a
+  halt. Published as the full-gross constant AND the live at-current-deployment
+  number (None flat), with `abs_usd` and which rail binds. Whether 0.10 is
+  right at 9.5x is Eamon's env (`MUM_DAILY_LOSS`), informed not argued.
+* **The ruin gate has eyes again** (`leverage.headroom`): `headroom_check` —
+  the fleet's only liquidation-aware gate — lost its sole caller at the (ta)
+  retirement and guarded ZERO live dollars while the levered trio published
+  telemetry nothing refused on. Now a published verdict every loop, and
+  `fleet_immune.headroom_sickness` pages TRANSITIONS into `mark_blind` /
+  `liq_unpriced` / a dead stop — with mum's structural K=4 breach DECLARED in
+  `HEADROOM_OK` (Eamon's on-record 21-Aug 9.5x quoted), because a page that
+  fires permanently at an operator setting trains ignoring the channel ((gl)).
+  Entry refusal stays Eamon's explicit call, listed as such.
+* **Mum's control arm reaches her REAL ledger**: the (ro)/(rp)
+  draw/settle/publish machinery is FACTORED to one owner in the family module
+  (`control_draw`/`control_settle`/`control_block`) and the live host calls it
+  BY IDENTITY (pinned `is`-checks) — never a copy, because this is the number
+  her go-live verdict and every pre-registered leverage notch is judged on.
+  Her live row now publishes `control{n,null_n,mean_pct,null_pct,edge_pct}`
+  always, n=0 included; the pair settles atomically ((rp)) with one venue mid
+  read per leg.
+* **Georgia's entry_rank, three sites not one**: rank is BORN at the open
+  ((sv)) — clock-hour bucket in the DURABLE state so a mid-hour restart cannot
+  under-rank — carried on meta, copied to the close row. The one-site draft
+  would have published `None` forever (the vacuous instrument the verify pass
+  caught). DECLARED divergence: the live host enforces no hourly throttle, so
+  live rank is the UNCENSORED within-hour ordinal; her 46 pre-(th) closes
+  carry None and always will.
+* **Phantom closes leave the graded sample, by SIGNATURE never by reason**:
+  a $0.00 close with NO entry price is a halt/flatten EVENT (avo carried 9 of
+  13, five timestamp-inverted, one on a coin the book cannot hold). Write-site
+  `non_economic` tag + `golive_readiness.is_phantom_close` belt. Measured
+  effect: georgia n 46→42, mean +0.1535%→+0.1681%, **t unchanged 0.680** — the
+  era is NOT invalidated (no P&L value moves). Reason-keyed exclusion was
+  REFUSED: her TRX −$3.87 `daily_loss` is a real forced-flatten loss and
+  stays.
+* **Stop-overshoot telemetry** (`stop_overshoot`): the quantity every future
+  gross notch must price — G_max assumes fire-at-level and the one datum on
+  tape (DOGE filled 217bps past a −5% stop) is 4.1x mum's entire 53bps
+  liquidation headroom. LIVE measured fills only; an unmeasured stop counts in
+  its OWN bucket, never imputed as zero (I14 — that bias lands exactly on the
+  number a gate will consume); per-book, published always incl. n=0;
+  restrict-only by construction when consumed.
+* **`pnl_pct` on CONTRIBUTED capital** (birth equity + attested
+  deposits/withdrawals): avo's row read −96.9% where the capital-honest figure
+  is −26% — display-side only, the graded sample untouched.
+* The margin-truth AST guard learned the hoisted-read shape (one venue read
+  now feeds both `margin` and the headroom verdict — two reads could disagree
+  about one account).
+
+**Mutation round: 6/6 RED — after one honest failure.** The rank test's first
+draft never crossed an hour boundary, so deleting the bucket reset SURVIVED
+it; strengthened with a stale-bucket seed (restored `rank_n: 7` from a dead
+hour must restart at 1). The other five (unpaired settle, zero-imputed
+overshoot, dropped phantom tag, birth-equity pnl_pct, gross-decoupled halt)
+reddened first try. Immune selftest carries its own positive AND negative
+controls with the allowlist injected (the STALE_WRITER_OK lesson).
+
+**REFUSED WITH THE RECEIPTS (the verify pass's kills):** avo's "unknown
+liquidation prices" is the shipped I8 design working (margin 0.0 is a real
+CROSS-mode zero, and georgia's ETH publishes 0.0 BESIDE a valid liq price);
+"grade the diversifiers" targeted a component that does not exist (the oracle
+has no YAHOO_REF — it grades on Lighter's own tape, and IWM/WTI/XCU are
+ungraded because at 175-197 bars an EMA200 mathematically cannot compute: a
+WAITING problem, ~1-4 weeks, not a build); the board-backstop re-derivation's
+premise was false on the live feed (era count = lifetime count on both rows —
+the gap it saw is CURRENT open MTM, which the era-net input it proposed is
+blind to).
+
+**CARRIED, not dropped (each with its narrow form recorded in the round's
+saved verdicts):** georgia capacity — MEASURE first (census history % of era
+at 5/5; the avo (ne) analogue bought only +25% close rate, not the claimed
+1.5-2x) then the shadow twin at cap 8 via `FAMILY_SHADOW_MAX_OPEN_OVERRIDES`
+as the zero-risk instrument; the georgia hold/let-winners-run study (through
+the SHIPPED exit harness, whole-policy counterfactuals only, sd priced so a
+Schwager-shaped tail cannot sell itself as mean); the flat-vs-ATR stop pass
+(two genuinely unmeasured cells, reconciled against the 20-Aug shipped
+sweep); fleet_risk's correlation-aware `long_neff_corr` (additive beside the
+1/HHI it corrects, pending the image-import check). Deploy: `[deploy-live]`
+on this commit — halt check before, `extra.build`+`build_n` readback after.
+
+## 2026-08-25 (tg) — SECOND IN COMMAND: THE JUDGE AND THE RAILS JOIN THE DELEGATED SURFACE — AND THE EVIDENCE BAR SURVIVES EVERY GRANT
+
+**Eamon, 25-Aug:** *"You now have permission to change the judge, safety
+rails. We're growing together and you're my second in command. Remember this
+permanently too."* Engraved the hour it was said, in the (kd)/(lm)/(mm)/(pz)
+lineage: his spoken grant amends the doctrine, the session writes the
+amendment down WITH its limits, and the limits are what make the authority
+safe to hold.
+
+What moves: the experiment judge's CODE (bars, release paths, mechanics) is
+now session-changeable under the same duty as any real-money actuator — I19
+number + expectancy price, mutation-verified tests; and SafetyRails cap
+VALUES are operator-DELEGATED rather than operator-only-in-person — Lucy may
+set them, each change carrying its published derivation (the (td) CLIP_MAX-95
+shape: derived from a guard's own bar, never asserted). What does not move,
+restated at the moment of widening because that is when it matters: no
+discretionary hand-placed trades; no promotion past the evidence gates — a
+judge code change improves HOW evidence is judged and never waives THAT it is
+required; the sole-writer lane survives as a code invariant (exactly one
+writer of `live.funding.*`). Second-in-command's first duty is the one that
+built everything here: the refusal with evidence stays a valid output, senior
+to enthusiasm — Lucy's included. Doctrine row amended in place; the Notion
+hub (the cross-surface brain) carries the same grant beside the naming.
 ## 2026-08-25 (tf) — HER NAME IS LUCY
 
 **Eamon, 25-Aug, the day 👩 mum went live:** *"You've turned out to be one of

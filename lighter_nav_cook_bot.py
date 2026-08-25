@@ -403,7 +403,7 @@ def build_extra(census, positions, recent, open_pnl, realized,
                 offuniverse=None):
     """The published `extra` — ONE builder ((hj)).
 
-    [25-Aug (th)] `offuniverse` joins the SIGNATURE. (sq) shipped the census
+    [25-Aug (tk)] `offuniverse` joins the SIGNATURE. (sq) shipped the census
     and threaded it into the publish CALL (`offuniverse=_offuni`) without
     adding the parameter here, so every publish raised TypeError, the
     handler printed one log line, and the bot traded on MUTE — the row froze
@@ -934,7 +934,7 @@ def _selftest():
     assert _r["in_band"] == 1 and _r["other"] == 1, (
         "a throwing class_of must degrade to unknown, not raise: %r" % (_r,))
 
-    # THE PUBLISH CALL SHAPE, driven end-to-end. [25-Aug (th)] (sq) threaded
+    # THE PUBLISH CALL SHAPE, driven end-to-end. [25-Aug (tk)] (sq) threaded
     # `offuniverse=_offuni` into the publish CALL without adding the
     # parameter to build_extra's SIGNATURE, so every publish raised
     # TypeError, the loop's own handler printed one line, and the bot traded

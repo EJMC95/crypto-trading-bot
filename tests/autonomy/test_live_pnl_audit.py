@@ -1,5 +1,5 @@
 """The live P&L audit must fail closed, key on the feed's own fields, and
-stay WIRED — pins for scripts/live_pnl_audit.py + live-pnl-audit.yml (th).
+stay WIRED — pins for scripts/live_pnl_audit.py + live-pnl-audit.yml (tk).
 
 INCIDENT CLASS. Eamon, 25-Aug: "instances where a month has passed without
 something being implemented." The audit exists to end that class, so these

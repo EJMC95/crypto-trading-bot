@@ -1576,6 +1576,263 @@ def consume_release_request(req, phase, current, now):
     return "release", None
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-25 (ti)] JUDGE V2.0 — THE MULTI-PAIR CENSUS.
+#
+# Eamon: *"The judge has malfunctioned several times for this sole reason,
+# and it's well overdue for v2."* The sole reason, measured across four
+# recorded failures (the I23 0.161pp handicap · the (pt) frozen window · the
+# (ta) silent stand-down · the (tb) census erasure) and confirmed live on the
+# bus: a SINGLE-pair machine hardwired to the Farmer's lanes, stood down
+# since (ta) naming a successor it structurally could not judge.
+#
+# v2.0 ships the ENGINE'S EYES: every live/shadow twin in
+# fleet_bus.JUDGED_PAIRS gets a per-pair published state with FAIRNESS
+# PRECHECKS that emit `unjudgeable:<reason>` (naming the object, I8) instead
+# of ever computing a biased bar — the F1 closure made structural. The
+# farmer lane's serial candidate machine below is UNCHANGED and mirrors into
+# pairs["farmer"]; family pairs run no candidates yet (their xp.<book>.*
+# lever wave is v2.1, one registry entry away, and arrives as its own
+# measured act) — so v2.0's blast radius on trading is ZERO while every
+# pair's judgeability becomes a readable, wake-conditioned fact.
+# Top-level phase/current stay the farmer lane's for consumer compatibility
+# (impl_shortfall, the dashboard card); the rollup flip is v2.1's, taken
+# WITH its consumers.
+
+def _latest_policy_stamp(rows, bot, look=30):
+    """(stamp_dict|None, stamped_n, total_n) over the bot's newest `look`
+    ledger closes. None = the arm does not stamp yet — an ABSENCE, reported
+    as `policy_unstamped`, never guessed at ((kk): an absence is not a
+    change; I6: it is only evidence once the other arm shows the mechanism
+    works)."""
+    mine = [r for r in rows or [] if str(r.get("bot")) == bot]
+    mine = mine[-look:]
+    stamped = [r for r in mine
+               if isinstance((r.get("extra") or {}).get("policy"), dict)]
+    latest = (stamped[-1]["extra"]["policy"] if stamped else None)
+    return latest, len(stamped), len(mine)
+
+
+def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
+    """Stage-0 fairness for ONE pair -> a publishable pair state dict.
+
+    Ordered by ACTIONABILITY (the (gl)/I8 rule — the reason the operator
+    sees decides what they do next): retirement > dark live row > pnl_form >
+    policy stamps > policy parity > capacity parity > idle. Every
+    unjudgeable state names its object and carries `wake_when`; UNREADABLE
+    parity inputs are `parity_unreadable`, never assumed-equal — darkness
+    must not re-open the F1 handicap through the stage built to close it."""
+    live_bot, shadow_bot = pspec["live_bot"], pspec["shadow_bot"]
+    st = {"live_bot": live_bot, "shadow_bot": shadow_bot,
+          "pnl_form": pspec["pnl_form"], "candidate": None, "hold": None}
+
+    def _un(reason, detail, wake):
+        st.update(phase="unjudgeable",
+                  unjudgeable={"reason": reason, "detail": detail,
+                               "wake_when": wake})
+        return st
+
+    if _bus is not None and _bus.live_arm_retired(live_bot):
+        spec = (getattr(_bus, "RETIRED_LIVE_ARMS", {}) or {}).get(live_bot, {})
+        st.update(phase="stood_down",
+                  stood_down={
+                      "why": f"live arm retired {spec.get('since', '?')} "
+                             f"{spec.get('entry', '')}",
+                      "wake_when": f"{spec.get('override', '?')}=run on both "
+                                   f"services (and the parked candidate "
+                                   f"queue resumes at its head)",
+                      "successor": spec.get("successor")})
+        return st
+    live_row = next((r for r in bot_rows or []
+                     if str(r.get("bot")) == live_bot), None)
+    shadow_row = next((r for r in bot_rows or []
+                       if str(r.get("bot")) == shadow_bot), None)
+
+    def _fresh(row):
+        # [(tj)] the REAL publisher (`fetch_bot_pnl`) carries `updated_at`
+        # (ISO), never a precomputed `age_sec` — the first live census read
+        # every row dark because this required the dashboard feed's derived
+        # field. The (hj) class, caught by the census's own first run within
+        # the hour: a consumer is tested against the payload its publisher
+        # builds, and the selftest now drives the `updated_at`-only shape
+        # FIRST. Unknown age stays dark (fail-closed — this gate ADMITS a
+        # pair toward a real-money comparison).
+        if not isinstance(row, dict):
+            return False
+        try:
+            age = row.get("age_sec")
+            if age is None:
+                ts = parse_ts(row.get("updated_at") or row.get("updated"))
+                if ts is None:
+                    return False
+                age = now_ts() - ts
+            return float(age) <= 3 * float(row.get("ttl_sec") or 900)
+        except (TypeError, ValueError):
+            return False
+
+    if not _fresh(live_row):
+        return _un("live_row_dark",
+                   f"{live_bot} absent or stale in bot_pnl — a registry "
+                   f"entry must never outlive its row (the audit-scope "
+                   f"lesson: a rule keyed to a list goes stale on every "
+                   f"slot swap)",
+                   "the live row publishes fresh again")
+    # P1 — policy parity, from the arms' OWN close stamps (the shared
+    # policy_stamp builder is the one source; a spec-side field list would
+    # miss exactly the live-only divergences F1 is made of).
+    lp, ln, lt = _latest_policy_stamp(rows, live_bot)
+    sp, sn, stn = _latest_policy_stamp(rows, shadow_bot)
+    st["stamps"] = {"live": f"{ln}/{lt}", "shadow": f"{sn}/{stn}"}
+    if lp is None or sp is None:
+        which = []
+        if lp is None:
+            which.append(f"{live_bot} ({pspec['host_file']})")
+        if sp is None:
+            which.append(f"{shadow_bot} (lighter_family_bot.py)")
+        return _un("policy_unstamped",
+                   f"no policy stamp on the newest closes of: "
+                   f"{', '.join(which)}",
+                   "both arms' closes carry the shared policy_stamp "
+                   "(ships with this build; wakes on the first stamped "
+                   "close each side)")
+    diffs = [f for f in pspec["policy_fields"]
+             if lp.get(f) != sp.get(f) and f != "venue"]
+    if diffs:
+        return _un("policy_mismatch",
+                   f"arms diverge on {diffs}: live="
+                   f"{ {f: lp.get(f) for f in diffs} } shadow="
+                   f"{ {f: sp.get(f) for f in diffs} }",
+                   "the divergence is ported across or declared out of "
+                   "this pair's policy_fields — a measured act, never a "
+                   "silent default")
+    # P3 — capacity parity off the rows' own published caps (I1-fresh).
+    lmo = (live_row.get("extra") or {}).get("max_open")
+    smo = ((shadow_row or {}).get("extra") or {}).get("max_open")
+    if lmo is None or smo is None:
+        return _un("parity_unreadable",
+                   f"max_open unreadable (live={lmo} shadow={smo}) — "
+                   f"assumed-equal would re-open the F1 handicap through "
+                   f"the stage built to close it",
+                   "both rows publish extra.max_open fresh")
+    if lmo != smo:
+        return _un("capacity_mismatch",
+                   f"live max_open {lmo} vs shadow {smo} — a capacity "
+                   f"delta biases the paired bar unless it IS the "
+                   f"receipted candidate",
+                   "the caps match, or the delta becomes this pair's "
+                   "first receipted candidate")
+    st.update(phase="idle",
+              note="judgeable; no candidate in this pair's queue "
+                   f"({pspec['xp_prefix']}*) — the lever wave is v2.1",
+              # [(ti)] THE POWER REPORT — the statistics audit's central
+              # finding, published instead of re-argued: at v1's 30/10
+              # floors the minimum detectable per-trade gap is
+              # 1.28*sd*sqrt(1/30+1/10) = 0.365*sd, so at family-book
+              # dispersion (sd 3-6%) the 0.5pp margin was a coin-flip
+              # detector. REPORT ONLY (I16's own advisory scoping — an
+              # actuator-grade bar is v2.1's, class-split by candidate and
+              # cluster-robust); a pair whose MDE dwarfs the margin is
+              # visible here before anyone spends a 7-day window on it.
+              power=_pair_power(rows, live_bot, shadow_bot, pspec, now))
+    return st
+
+
+def _pair_power(rows, live_bot, shadow_bot, pspec, now, window_d=14.0):
+    """{sd_pct, closes_per_day, n} per arm + mde_pp at the v1 floors, over
+    the trailing window's ECONOMIC closes (strip_exits removed — the same
+    strip the bar itself will take). None fields where the sample cannot
+    say; never raises."""
+    try:
+        import math
+        cutoff = now - window_d * 86400.0
+        out = {}
+        strips = tuple(pspec.get("strip_exits") or ())
+        sds = []
+        for label, bot in (("live", live_bot), ("shadow", shadow_bot)):
+            pts = []
+            for r in rows or []:
+                if str(r.get("bot")) != bot:
+                    continue
+                if any(s in str(r.get("exit_reason") or "") for s in strips):
+                    continue
+                try:
+                    ts = parse_ts(r.get("close_ts"))
+                    if ts is None or ts < cutoff:
+                        continue
+                    p = r.get("profit_ratio")
+                    if p is None:
+                        continue
+                    pts.append(float(p) * 100.0)
+                except Exception:  # noqa: BLE001
+                    continue
+            n = len(pts)
+            sd = None
+            if n >= 5:
+                m = sum(pts) / n
+                sd = math.sqrt(sum((x - m) ** 2 for x in pts) / (n - 1))
+                sds.append(sd)
+            out[label] = {"n": n, "sd_pct": (round(sd, 3) if sd else None),
+                          "closes_per_day": round(n / window_d, 2)}
+        if sds:
+            pooled = max(sds)
+            out["mde_pp_at_floors"] = round(
+                1.28 * pooled * math.sqrt(1 / 30 + 1 / 10), 3)
+            out["margin_pp"] = MARGIN_PP
+        return out
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def pair_census(rows, bot_rows, now):
+    """Every JUDGED_PAIRS entry -> its published state. The farmer entry is
+    OVERWRITTEN by the serial machine's own state in save() — the machine
+    is senior for the lane it actually runs."""
+    out = {}
+    for pid, pspec in (getattr(_bus, "JUDGED_PAIRS", {}) or {}).items():
+        try:
+            out[pid] = _pair_precheck(pid, pspec, rows, bot_rows, now)
+        except Exception as e:  # noqa: BLE001
+            out[pid] = {"phase": "unjudgeable",
+                        "unjudgeable": {"reason": "parity_unreadable",
+                                        "detail": f"census error: {e!r}",
+                                        "wake_when": "the census computes"}}
+    return out
+
+
+def _farmer_pair_entry(payload):
+    """Mirror the serial machine's top-level state into pairs['farmer'] —
+    one machine, two views, no second copy of the rule: everything here is
+    DERIVED from the payload the machine just built."""
+    hold = None
+    if payload.get("phase") == "running":
+        le = payload.get("last_eval") or {}
+        if le.get("arm_drift"):
+            hold = "arm_drift"
+        elif le.get("arm_skew"):
+            hold = "arm_skew"
+        elif payload.get("assert_fail_notified"):
+            hold = "assert_fail"
+        elif str(le.get("why") or "").startswith(("floors", "h1", "h2")):
+            hold = "floors"
+    entry = {"phase": payload.get("phase"),
+             "candidate": payload.get("candidate"), "hold": hold,
+             "live_bot": LIVE_BOT, "shadow_bot": SHADOW_BOT,
+             "pnl_form": "funding",
+             # provenance: THIS entry is the serial machine's own state, not
+             # the census's precheck view — the machine is senior for the
+             # lane it runs, and a reader (or a test) can tell which view
+             # it is holding.
+             "src": "machine"}
+    if payload.get("phase") == "stood_down":
+        le = payload.get("last_eval") or {}
+        spec = (le.get("retired") or {})
+        entry["stood_down"] = {
+            "why": le.get("why"),
+            "wake_when": f"{spec.get('override', '?')}=run on both services",
+            "successor": spec.get("successor")}
+    return entry
+
+
 def run_once():
     now = now_ts()
     # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
@@ -1660,6 +1917,15 @@ def run_once():
             return          # state just changed wholesale; resume next cycle
     rows = store.fetch_paper_trades(limit=4000)
     have_ledger = bool(rows)
+    # [(ti)] v2.0: the multi-pair census — every registered twin's
+    # judgeability, precheck-verdicted and wake-conditioned, computed once
+    # per cycle and attached to every save() below. Guarded like every
+    # optional read: a dark fetch censuses nothing (the farmer mirror still
+    # publishes from the machine's own state).
+    try:
+        _census = pair_census(rows, store.fetch_bot_pnl() or [], now)
+    except Exception:  # noqa: BLE001
+        _census = {}
     # [2026-07-28] ONE drift snapshot per cycle, shared by the growth step and
     # the running phase — the drift check and the numbers it gates must never
     # describe different moments (the 17-Jul same-snapshot doctrine).
@@ -1722,6 +1988,17 @@ def run_once():
                    "growth_reach": kw.get("growth_reach",
                                           st.get("growth_reach")),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
+        # [(ti)] v2.0 pairs map: the census, with the farmer entry
+        # OVERWRITTEN by this machine's own just-built state (the machine is
+        # senior for the lane it runs). Top-level phase/current stay the
+        # farmer lane's for consumer compat; the pairs map is the truth a
+        # v2.1 rollup flip will promote, WITH its consumers.
+        try:
+            _pairs = dict(_census)
+            _pairs["farmer"] = _farmer_pair_entry(payload)
+            payload["pairs"] = _pairs
+        except Exception:  # noqa: BLE001
+            payload["pairs"] = {}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
             try:
@@ -2742,10 +3019,119 @@ def _selftest():
                           None, t0, 28 * day)
     assert c is None and not r, "nothing untried, nothing aged -> exhausted"
 
+    # ---- [(ti)] v2.0: the multi-pair census + the imported vocabulary ------
+    assert _bus is not None, "selftest requires fleet_bus (same image)"
+    _VOC = _bus.XP_JUDGE_PHASES
+    # every phase this module can emit is IN the imported vocabulary — the
+    # (tb) inversion: a new phase that skips fleet_bus reddens THIS build,
+    # instead of being erased by the validator downstream.
+    for _p in ("idle", "running", "promoted", "stood_down", "unjudgeable"):
+        assert _p in _VOC, _p
+    assert set(_bus.XP_JUDGE_UNJUDGEABLE) >= {
+        "policy_unstamped", "policy_mismatch", "capacity_mismatch",
+        "parity_unreadable", "live_row_dark"}
+
+    _psp = dict(_bus.JUDGED_PAIRS["georgia"])
+    _stamp = {"strategy": "daytrader-15m", "venue": "lighter_live",
+              "stoploss": -0.05, "roi": {"0": 0.02}, "sides": ["long"],
+              "scan_order": "diversified"}
+    _sstamp = dict(_stamp, venue="lighter_shadow", scan_order="list")
+
+    def _led(bot, pol):
+        return {"bot": bot, "extra": ({"policy": pol} if pol else {})}
+
+    def _row(bot, max_open=5, age=60):
+        # [(tj)] the PUBLISHER'S shape: fetch_bot_pnl carries `updated_at`
+        # (ISO), never a derived age_sec — the first live census read every
+        # row dark because the fixture here was written in the dashboard
+        # feed's shape instead ((hj)). Driven as the publisher builds it.
+        return {"bot": bot, "updated_at": iso(t0 - age), "ttl_sec": 900,
+                "extra": {"max_open": max_open}}
+
+    _lb, _sb = _psp["live_bot"], _psp["shadow_bot"]
+    # dark live row -> live_row_dark (a registry entry must not outlive its
+    # row: the audit-scope stale-list class, made a named ageable state)
+    _v = _pair_precheck("georgia", _psp, [], [], t0)
+    assert _v["phase"] == "unjudgeable" and \
+        _v["unjudgeable"]["reason"] == "live_row_dark", _v
+    # unstamped arms -> policy_unstamped NAMING the stamper files
+    _v = _pair_precheck("georgia", _psp, [_led(_lb, None), _led(_sb, None)],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "policy_unstamped", _v
+    assert "lighter_family_bot.py" in _v["unjudgeable"]["detail"], _v
+    # stamped but diverging on scan_order -> policy_mismatch NAMING the field
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _sstamp)],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "policy_mismatch", _v
+    assert "scan_order" in _v["unjudgeable"]["detail"], _v
+    # matched policy, capacity 5 vs 6 -> capacity_mismatch (the (ne) delta)
+    _match = dict(_sstamp, scan_order="diversified")
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _match)],
+                        [_row(_lb, 5), _row(_sb, 6)], t0)
+    assert _v["unjudgeable"]["reason"] == "capacity_mismatch", _v
+    # UNREADABLE capacity is parity_unreadable, NEVER assumed-equal —
+    # darkness must not re-open the F1 handicap through the stage built to
+    # close it (mutation: default the None to "equal" => this reddens)
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _match)],
+                        [_row(_lb, 5), _row(_sb, None)], t0)
+    assert _v["unjudgeable"]["reason"] == "parity_unreadable", _v
+    # the negative control: everything matched -> IDLE, judgeable, no
+    # candidate (a census that flags everything trains ignoring it)
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _match)],
+                        [_row(_lb, 5), _row(_sb, 5)], t0)
+    assert _v["phase"] == "idle", _v
+    # retired live arm -> stood_down with wake_when + successor
+    _fsp = dict(_bus.JUDGED_PAIRS["farmer"])
+    _v = _pair_precheck("farmer", _fsp, [], [], t0)
+    assert _v["phase"] == "stood_down", _v
+    assert "run" in _v["stood_down"]["wake_when"], _v
+    # the pairs map reaches the SAVED payload with the farmer mirrored —
+    # driven through the REAL run_once against a stubbed store (mutations:
+    # drop the payload attach, or the farmer overwrite => this reddens)
+    _saved = {}
+    _sv = {k: getattr(store, k, None) for k in (
+        "load_state_checked", "load_state", "save_state",
+        "fetch_paper_trades", "fetch_bot_pnl", "save_history")}
+    store.load_state_checked = lambda k: (True, {})
+    store.load_state = lambda k: None
+    store.save_state = lambda k, v: _saved.__setitem__(k, v) or True
+    store.fetch_paper_trades = lambda limit=4000: []
+    store.fetch_bot_pnl = lambda: []
+    store.save_history = lambda k, v: True
+    try:
+        run_once()
+    finally:
+        for _k, _fn in _sv.items():
+            if _fn is not None:
+                setattr(store, _k, _fn)
+    _pl = _saved.get(KEY) or {}
+    assert set(_pl.get("pairs") or {}) == set(_bus.JUDGED_PAIRS), \
+        sorted(_pl.get("pairs") or {})
+    assert _pl["pairs"]["farmer"]["phase"] == _pl["phase"], _pl["pairs"]
+    # ...and the farmer entry is the MACHINE'S state, not the census's
+    # precheck view — the two agree while stood_down, so provenance is what
+    # makes the overwrite testable (mutation: drop the overwrite => red)
+    assert _pl["pairs"]["farmer"].get("src") == "machine", _pl["pairs"]
+    for _pid, _pe in _pl["pairs"].items():
+        assert _pe.get("phase") in _VOC, (_pid, _pe)
+
+    # the farmer mirror derives holds from the machine's own payload
+    _fe = _farmer_pair_entry({"phase": "running", "candidate": "x",
+                              "last_eval": {"arm_skew": True}})
+    assert _fe["hold"] == "arm_skew", _fe
+    _fe = _farmer_pair_entry({"phase": "running", "candidate": "x",
+                              "last_eval": {"why": "floors: shadow 3/30"}})
+    assert _fe["hold"] == "floors", _fe
+
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, proprioception early-fade, registry mapping, "
           "arm-skew receipt gate, per-half floors, relative+rolling fade, "
-          "asserted-write guard)")
+          "asserted-write guard; v2.0 census: vocab imported, dark/unstamped/"
+          "mismatch/capacity/unreadable/idle/stood_down + farmer mirror)")
 
 
 def _selftest_growth():

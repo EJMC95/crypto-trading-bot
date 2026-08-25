@@ -1107,22 +1107,89 @@ def live_strategies():
 # ---------------------------------------------------------------------------
 # Per-book runtime (one ShadowBroker + protections + ledger per family bot)
 
-def _control_extra(b):
-    """[(ro)] 👩 mum v2's own random-entry null, published every loop.
+def policy_stamp(strategy, venue, scan_order):
+    """[(ti)] THE ONE BUILDER of the (jf) policy stamp, shared by BOTH arms.
 
-    ALWAYS PRESENT for a control-arm book, including at n=0 — an omitted key
-    is byte-identical between "no closes yet" and "the arm is not running"
-    ((lv)/I18), and this is the number her whole revival will be judged on.
-    `edge_pct` is the only figure that matters at day 30: her mean per trade
-    MINUS what a coin flip on the same clock earned.
+    Judge v2's fairness precheck (P1) compares the two arms' stamps on the
+    pair's `policy_fields` — and a signature each host builds for itself is
+    how the F1 handicap class survives: the live host runs `diversified_order`
+    (correlation-aware candidate ordering) and this shadow host does NOT, a
+    real entry-policy divergence that a spec-side field list would never
+    carry. Deriving the stamp HERE, with `scan_order` an explicit argument
+    each host must answer, makes that divergence visible in the stamps
+    themselves: the pairs publish `unjudgeable:policy_mismatch` naming
+    `scan_order` instead of computing a biased gap. Closing the divergence
+    (porting the ordering, or declaring it out of a pair's fields) is a
+    separate measured act — never a silent default.
     """
-    if not getattr(b.s, "control_arm", False):
+    return {
+        "strategy": strategy.style,
+        "venue": venue,
+        "stoploss": strategy.stoploss,
+        "roi": {str(k): v for k, v in strategy.roi.items()},
+        "sides": ["long"],
+        "scan_order": scan_order,
+    }
+
+
+def control_draw(strategy, pool_coins, coin, mark_of):
+    """[(th)] The (ro) placebo DRAW, factored to ONE owner for both arms.
+
+    The live variant host reuses this by IDENTITY — (hj): a second copy of a
+    rule is a second rule, and this is the number a go-live verdict and any
+    leverage notch will be judged on. `mark_of` is `coin -> price-or-None`
+    (the shadow arm passes `last_mark.get`; the live host passes a venue mid
+    reader) so the coin is drawn FIRST and only IT is priced — a venue-read
+    implementation costs one call, never len(universe). Returns the meta
+    fields for the null leg, or {} (no pool / not a control arm / unpriceable
+    draw / any error). Never raises: a control arm that can break a trading
+    loop is worse than no control arm."""
+    try:
+        if not getattr(strategy, "control_arm", False):
+            return {}
+        pool = [c for c in pool_coins if c != coin]
+        if not pool:
+            return {}
+        nc = random.choice(pool)
+        px = mark_of(nc)
+        if not px or float(px) <= 0:
+            return {}
+        return {"null_pair": nc, "null_entry": float(px)}
+    except Exception:  # noqa: BLE001
         return {}
-    c = b.ctrl
-    mean = (c["sum"] / c["n"] * 100.0) if c["n"] else None
-    null = (c["null_sum"] / c["null_n"] * 100.0) if c["null_n"] else None
+
+
+def control_settle(strategy, ctrl, m, total, notional, null_px):
+    """[(th)] The (rp) ATOMIC pair settle, factored to one owner.
+
+    Both legs accumulate or neither — an unpaired observation cannot be
+    differenced against anything, so dropping it is the honest statistic.
+    `null_px` is the placebo coin's mark at the real close's instant; None/0
+    drops the pair. Mutates `ctrl` in place. Never raises."""
+    try:
+        _ne = m.get("null_entry")
+        if (getattr(strategy, "control_arm", False) and notional
+                and m.get("null_pair") and _ne and null_px
+                and float(_ne) > 0):
+            ctrl["n"] += 1
+            ctrl["sum"] += total / notional
+            ctrl["null_n"] += 1
+            ctrl["null_sum"] += (float(null_px) - float(_ne)) / float(_ne)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def control_block(strategy, ctrl):
+    """[(th)] The published `control` payload, factored to one owner —
+    ALWAYS present for a control-arm book, including at n=0 ((lv)/I18: an
+    omitted key is byte-identical between "no closes yet" and "the arm is
+    not running"). {} for every other book, so no other payload moves."""
+    if not getattr(strategy, "control_arm", False):
+        return {}
+    mean = (ctrl["sum"] / ctrl["n"] * 100.0) if ctrl["n"] else None
+    null = (ctrl["null_sum"] / ctrl["null_n"] * 100.0) if ctrl["null_n"] else None
     return {"control": {
-        "n": c["n"], "null_n": c["null_n"],
+        "n": ctrl["n"], "null_n": ctrl["null_n"],
         "mean_pct": round(mean, 4) if mean is not None else None,
         "null_pct": round(null, 4) if null is not None else None,
         "edge_pct": (round(mean - null, 4)
@@ -1130,6 +1197,13 @@ def _control_extra(b):
         "basis": "matched-window random-coin placebo, same open/close instants "
                  "((hm): a directional book is graded against a random-entry "
                  "null, never against zero)"}}
+
+
+def _control_extra(b):
+    """[(ro)] 👩 mum v2's own random-entry null, published every loop.
+    Thin wrapper since (th): the rule lives in `control_block`, shared with
+    the live variant host by identity."""
+    return control_block(b.s, b.ctrl)
 
 
 def _census_extra(b):
@@ -1365,17 +1439,11 @@ class Book:
         # excludes every legacy close for free, and keeps the comparison
         # PAIRED — an unpaired observation cannot be differenced against
         # anything, so dropping it is the honest statistic, not a loss.
-        try:
-            _np, _ne = m.get("null_pair"), m.get("null_entry")
-            _npx = self.last_mark.get(_np) if _np else None
-            if (getattr(self.s, "control_arm", False) and notional
-                    and _np and _ne and _npx and float(_ne) > 0):
-                self.ctrl["n"] += 1
-                self.ctrl["sum"] += total / notional
-                self.ctrl["null_n"] += 1
-                self.ctrl["null_sum"] += (float(_npx) - float(_ne)) / float(_ne)
-        except Exception:  # noqa: BLE001
-            pass
+        # [(th)] settle via the ONE owner — shared with the live host by
+        # identity, so the two arms cannot drift on the judged statistic.
+        _np = m.get("null_pair")
+        control_settle(self.s, self.ctrl, m, total, notional,
+                       self.last_mark.get(_np) if _np else None)
         pct = total / notional if notional else total / STAKE_USD
         self.n_closed += 1
         self.n_wins += 1 if total > 0 else 0
@@ -1422,8 +1490,15 @@ class Book:
                 # open timestamps; recording it makes the next decision a query
                 # (I23), and makes rank 3 — the sample the old cap censored —
                 # gradeable the moment it exists.
-                extra=({"entry_rank": m["entry_rank"]}
-                       if m.get("entry_rank") is not None else None),
+                # [(ti)] the (jf) policy stamp, via the ONE builder shared
+                # with the live host — judge v2's fairness precheck reads
+                # BOTH arms' stamps, and until this line the shadow stamped
+                # nothing, which made every family pair honestly unjudgeable.
+                # This host scans in list order (no diversified_order).
+                extra={**({"entry_rank": m["entry_rank"]}
+                          if m.get("entry_rank") is not None else {}),
+                       "policy": policy_stamp(self.s, "lighter_shadow",
+                                                  "list")},
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass
@@ -2014,16 +2089,10 @@ def main():
                 # [2026-08-19 (ro)] draw this trade's PLACEBO: a random OTHER
                 # coin from the same universe, marked at this same instant.
                 # Drawn from marks already fetched this cycle, so it costs no
-                # extra venue call.
-                if getattr(b.s, "control_arm", False):
-                    try:
-                        _pool = [c for c in b.last_mark if c != coin]
-                        if _pool:
-                            _nc = random.choice(_pool)
-                            _meta["null_pair"] = _nc
-                            _meta["null_entry"] = b.last_mark[_nc]
-                    except Exception:  # noqa: BLE001
-                        pass
+                # extra venue call. [(th)] via the ONE owner, shared with the
+                # live host by identity.
+                _meta.update(control_draw(
+                    b.s, list(b.last_mark), coin, b.last_mark.get))
                 b.meta[coin] = _meta
                 b.scan["opened"] += 1
                 cycle_admitted += 1

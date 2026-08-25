@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-25 20:31 Sydney (10:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-26 00:29 Sydney (14:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,23 +74,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (15 commit(s), entries (tc), (td), (te), (tf))
+## Shipped today (0 commit(s))
 
-- `7828b11` The stamp readback banks mum's launch: bridges out, census live on all three real-money rows (te)
-- `edf0837` Her name is Lucy (tf)
-- `7975665` Launch receipts and the (lr) deletions: both one-shots go the way of every provisioner (te)
-- `143bf45` Merge PR #217: weekly review, mum v2 LIVE on her own sub-account, the missing custom_exit, the swap's red-main discharge (tc)(td)(te) [deploy-live]
-- `c10fc6b` The I22 census reaches the live host — the guard's first real catch was its own two variants (te)
-- `460e6b9` The signer refutes the hyphen call; Eamon's launch config ships; the disarm is his button (te)
-- `646d567` One-shot variables-only config for mum-live (deleted at activation)
-- `7ec551a` The feed-followers, staged on the branch: mum declared in every live registry (te)
-- `2b95ea9` One-shot provisioner for mum-live (registered from main so dispatch resolves; deleted at activation)
-- `c31f98c` Mum goes live: the deploy rule activates with the service, keys never touch the repo (te)
-- `2d48f0d` Regenerate the handoff after (td)
-- `567c18e` Manual trades attested out of the bots' P&L; the taker's budget doubles under a guard-derived ceiling (td) [deploy-live]
-- `4627aa8` The weekly review: what the week banked, where the money is, what broke (tc)
-- `f27d4de` Mum v2 goes live-capable; the live host finally calls custom_exit (tc) [deploy-live-georgia]
-- `9a5bd65` The swap's aftermath: six red tests, two blind organs, one erased census (tc)
+_Nothing yet today._
+
 
 ## How this file stays honest
 

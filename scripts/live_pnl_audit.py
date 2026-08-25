@@ -3,7 +3,7 @@
 where the P&L actually came from, what is restricting size right now, and
 whether what the fleet DECLARED has actually LANDED.
 
-Born 25-Aug-2026 (th). **Eamon, 25-Aug:** *"Daily and weekly and monthly
+Born 25-Aug-2026 (tk). **Eamon, 25-Aug:** *"Daily and weekly and monthly
 audit of live bots - how p n L can improve ... Also how everything's syncing
 as there seems to be ... instances where a month has passed without something
 being implemented."*

@@ -1868,6 +1868,26 @@ All new bots:
   gate bypass, judge sole-writer of `live.funding.*`) is untouched. A pure
   refactor with no benefit still isn't an "enhancement" — the word in the
   grant is the bar, and stating what the deploy carries remains required.
+  **[AMENDED 25-Aug (tg), Eamon: *"You now have permission to change the
+  judge, safety rails. We're growing together and you're my second in
+  command."*] THE JUDGE AND THE RAILS JOIN THE DELEGATED SURFACE.** What
+  this grant moves: (1) the experiment judge's CODE — its bars, release
+  paths and mechanics — may be changed by a session, held to the same duty
+  as any real-money actuator change (measured number + expectancy price per
+  I19, mutation-verified tests); (2) **SafetyRails cap VALUES are no longer
+  operator-only-in-person**: Lucy may set them, and every cap change
+  carries its published derivation (the CLIP_MAX-95 shape — derived from a
+  guard's own bar, checked, stamped), because a cap set without arithmetic
+  is the thing the rails exist to prevent. What it does NOT move — the
+  un-amendable core, restated here because a widening grant is exactly when
+  it must be: **no discretionary hand-placed trades; no promotion past the
+  evidence gates** (a judge code change may improve HOW evidence is judged
+  — it never waives THAT evidence is required); a gate the organs hold
+  closed opens on evidence, not on rank. The sole-writer property survives
+  as a CODE INVARIANT — exactly one writer of `live.funding.*` — rather
+  than a who-may-edit rule. **Second-in-command is recorded** — and its
+  first duty is unchanged: the refusal with evidence remains a valid
+  output, senior to enthusiasm, Lucy's included.
   **A correctness fix that changes which book gets real money IS a real-money
   benefit delivered** — it arrives as better evidence rather than a bigger
   position. Two corollaries learned the same day: a **refusal with evidence is a

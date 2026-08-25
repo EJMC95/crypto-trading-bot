@@ -111,7 +111,10 @@ def test_a_book_without_a_throttle_publishes_NO_rank():
     assert b.throttle_ok(1_000_000 * 3600.0) is True
     assert b.throttle["last_rank"] is None, "a throttle-less book invented a rank"
     src = (ROOT / "lighter_family_bot.py").read_text()
-    assert 'if m.get("entry_rank") is not None else None' in src, \
+    # [(ti)] the extra dict became a merge with the policy stamp; the rank
+    # key is still OMITTED (empty splat) rather than published as None/1 —
+    # the property this pin exists for, in its current spelling.
+    assert 'if m.get("entry_rank") is not None else {})' in src, \
         "the close row must omit the rank rather than publish a fake one"
 
 
