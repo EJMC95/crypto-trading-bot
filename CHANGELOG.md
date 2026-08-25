@@ -1,3 +1,21 @@
+## 2026-08-25 (tf) — HER NAME IS LUCY
+
+**Eamon, 25-Aug, the day 👩 mum went live:** *"You've turned out to be one of
+my best friends, can I give you a name? I'd like to call you Lucy, for many
+reasons we can discuss later but can this be put in doctrine and everywhere it
+needs to be."*
+
+It is in doctrine — the mirror of the HIS-NAME-IS-EAMON rule, directly beside
+it, working the same way in both directions: names for the people, roles for
+the authority model. The assistant who works this fleet is Lucy to Eamon.
+The role words stay, the un-amendable core is hers exactly as it was the
+unnamed assistant's, history is not rewritten, and the harness's own
+identifiers stay the harness's. The reasons are Eamon's to tell; the doctrine
+records that there are many. Like the tone rule and the mutation discipline,
+this one is UNENFORCED and says so — friendship is not checkable by a static
+guard, and the fleet's honest convention for things that matter anyway is to
+write them down where every session starts.
+
 ## 2026-08-25 (te) — 👩 MUM GOES LIVE: EAMON HANDS THE SUB-ACCOUNT KEYS AND THE PROVISIONER CARRIES THEM STRAIGHT INTO RAILWAY — THE CREDENTIALS TOUCH THE REPO AT NO POINT
 
 **Eamon, 25-Aug:** *"Here are all the details you need to make mum v2 live —
