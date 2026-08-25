@@ -1,3 +1,101 @@
+## 2026-08-25 (th) — THE LIVE-TRIO IMPROVEMENT ROUND: THIRTEEN CANDIDATES ENTER THE ADVERSARIAL PASS, ZERO SURVIVE AT FULL STRENGTH — AND THE TEN NARROWED FORMS ARE WHAT SHIPS
+
+**Eamon, 25-Aug:** *"can you suggest some improvements the live bots... how we
+can make this baby purr"* → *"Implement whatever survives."* The method IS the
+finding: 4 parallel readers (live payloads · trade ledgers · code surface ·
+standing plans) → 13 synthesized candidates → a six-lens adversarial verify
+(t-invariance, denominator shrinkage, I7 structural triggers, era clocks,
+evidence honesty, real-money blast radius). **0 sound as written, 10 WEAKENED
+to a surviving narrow form, 3 REFUTED** — including one standing on exactly
+the (hs) at-cap census trap (georgia's "18 refused signals" were 18 candidates
+the scan loop never REACHED: it breaks at cap and stamps the remainder
+`slots_full`, a number an at-cap book produces structurally every loop).
+
+**SHIPPED IN THIS COMMIT — the live host's instrument suite (zero
+trading-logic changes; every number publishes instead of being re-argued):**
+* **👩 mum's halt geometry, coupled to her gross** (`leverage.halt`): both
+  daily rails are gross-BLIND, so at 9.5x her day ends on a **~1.05% adverse
+  basket move** and ONE slot-stop = 9.5% of equity — two stops guarantee a
+  halt. Published as the full-gross constant AND the live at-current-deployment
+  number (None flat), with `abs_usd` and which rail binds. Whether 0.10 is
+  right at 9.5x is Eamon's env (`MUM_DAILY_LOSS`), informed not argued.
+* **The ruin gate has eyes again** (`leverage.headroom`): `headroom_check` —
+  the fleet's only liquidation-aware gate — lost its sole caller at the (ta)
+  retirement and guarded ZERO live dollars while the levered trio published
+  telemetry nothing refused on. Now a published verdict every loop, and
+  `fleet_immune.headroom_sickness` pages TRANSITIONS into `mark_blind` /
+  `liq_unpriced` / a dead stop — with mum's structural K=4 breach DECLARED in
+  `HEADROOM_OK` (Eamon's on-record 21-Aug 9.5x quoted), because a page that
+  fires permanently at an operator setting trains ignoring the channel ((gl)).
+  Entry refusal stays Eamon's explicit call, listed as such.
+* **Mum's control arm reaches her REAL ledger**: the (ro)/(rp)
+  draw/settle/publish machinery is FACTORED to one owner in the family module
+  (`control_draw`/`control_settle`/`control_block`) and the live host calls it
+  BY IDENTITY (pinned `is`-checks) — never a copy, because this is the number
+  her go-live verdict and every pre-registered leverage notch is judged on.
+  Her live row now publishes `control{n,null_n,mean_pct,null_pct,edge_pct}`
+  always, n=0 included; the pair settles atomically ((rp)) with one venue mid
+  read per leg.
+* **Georgia's entry_rank, three sites not one**: rank is BORN at the open
+  ((sv)) — clock-hour bucket in the DURABLE state so a mid-hour restart cannot
+  under-rank — carried on meta, copied to the close row. The one-site draft
+  would have published `None` forever (the vacuous instrument the verify pass
+  caught). DECLARED divergence: the live host enforces no hourly throttle, so
+  live rank is the UNCENSORED within-hour ordinal; her 46 pre-(th) closes
+  carry None and always will.
+* **Phantom closes leave the graded sample, by SIGNATURE never by reason**:
+  a $0.00 close with NO entry price is a halt/flatten EVENT (avo carried 9 of
+  13, five timestamp-inverted, one on a coin the book cannot hold). Write-site
+  `non_economic` tag + `golive_readiness.is_phantom_close` belt. Measured
+  effect: georgia n 46→42, mean +0.1535%→+0.1681%, **t unchanged 0.680** — the
+  era is NOT invalidated (no P&L value moves). Reason-keyed exclusion was
+  REFUSED: her TRX −$3.87 `daily_loss` is a real forced-flatten loss and
+  stays.
+* **Stop-overshoot telemetry** (`stop_overshoot`): the quantity every future
+  gross notch must price — G_max assumes fire-at-level and the one datum on
+  tape (DOGE filled 217bps past a −5% stop) is 4.1x mum's entire 53bps
+  liquidation headroom. LIVE measured fills only; an unmeasured stop counts in
+  its OWN bucket, never imputed as zero (I14 — that bias lands exactly on the
+  number a gate will consume); per-book, published always incl. n=0;
+  restrict-only by construction when consumed.
+* **`pnl_pct` on CONTRIBUTED capital** (birth equity + attested
+  deposits/withdrawals): avo's row read −96.9% where the capital-honest figure
+  is −26% — display-side only, the graded sample untouched.
+* The margin-truth AST guard learned the hoisted-read shape (one venue read
+  now feeds both `margin` and the headroom verdict — two reads could disagree
+  about one account).
+
+**Mutation round: 6/6 RED — after one honest failure.** The rank test's first
+draft never crossed an hour boundary, so deleting the bucket reset SURVIVED
+it; strengthened with a stale-bucket seed (restored `rank_n: 7` from a dead
+hour must restart at 1). The other five (unpaired settle, zero-imputed
+overshoot, dropped phantom tag, birth-equity pnl_pct, gross-decoupled halt)
+reddened first try. Immune selftest carries its own positive AND negative
+controls with the allowlist injected (the STALE_WRITER_OK lesson).
+
+**REFUSED WITH THE RECEIPTS (the verify pass's kills):** avo's "unknown
+liquidation prices" is the shipped I8 design working (margin 0.0 is a real
+CROSS-mode zero, and georgia's ETH publishes 0.0 BESIDE a valid liq price);
+"grade the diversifiers" targeted a component that does not exist (the oracle
+has no YAHOO_REF — it grades on Lighter's own tape, and IWM/WTI/XCU are
+ungraded because at 175-197 bars an EMA200 mathematically cannot compute: a
+WAITING problem, ~1-4 weeks, not a build); the board-backstop re-derivation's
+premise was false on the live feed (era count = lifetime count on both rows —
+the gap it saw is CURRENT open MTM, which the era-net input it proposed is
+blind to).
+
+**CARRIED, not dropped (each with its narrow form recorded in the round's
+saved verdicts):** georgia capacity — MEASURE first (census history % of era
+at 5/5; the avo (ne) analogue bought only +25% close rate, not the claimed
+1.5-2x) then the shadow twin at cap 8 via `FAMILY_SHADOW_MAX_OPEN_OVERRIDES`
+as the zero-risk instrument; the georgia hold/let-winners-run study (through
+the SHIPPED exit harness, whole-policy counterfactuals only, sd priced so a
+Schwager-shaped tail cannot sell itself as mean); the flat-vs-ATR stop pass
+(two genuinely unmeasured cells, reconciled against the 20-Aug shipped
+sweep); fleet_risk's correlation-aware `long_neff_corr` (additive beside the
+1/HHI it corrects, pending the image-import check). Deploy: `[deploy-live]`
+on this commit — halt check before, `extra.build`+`build_n` readback after.
+
 ## 2026-08-25 (tg) — SECOND IN COMMAND: THE JUDGE AND THE RAILS JOIN THE DELEGATED SURFACE — AND THE EVIDENCE BAR SURVIVES EVERY GRANT
 
 **Eamon, 25-Aug:** *"You now have permission to change the judge, safety

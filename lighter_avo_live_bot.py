@@ -98,6 +98,10 @@ from lighter_family_bot import (
     ledger_reason, ledger_tag,
     symcap_state, symcap_blocked, _interval_ms, MOMO_TIDE_GATE,
     NONCRYPTO_EFFECTIVE,
+    # [(th)] the control arm's ONE owner (draw/settle/publish) + the throttle
+    # carrier class the entry_rank stamp keys on — imported, never re-typed:
+    # these are the numbers a go-live verdict is judged on.
+    DayTraderGated, control_draw, control_settle, control_block,
 )
 from venues import marks
 from venues.safety import (
@@ -910,6 +914,16 @@ def main(_ctx=None, once=False):
         # [(sr)] None, not 1.0 — the halt/kill paths publish before the scan
         # computes these, and "not measured yet" must not read as "one bet".
         held_n_eff = held_rho = None
+        # [(th)] durable instruments, living IN the state dict so a restart
+        # cannot blank them: the control arm's paired accumulator ((rp) — the
+        # number 👩 mum's revival is judged on) and the stop-overshoot record
+        # (the quantity every future gross notch must price: G_max assumes
+        # fire-at-level, and georgia's DOGE stop filled 217bps past its level
+        # — 4.1x mum's entire 53bps liquidation headroom).
+        ctrl = state.setdefault(
+            "ctrl", {"n": 0, "sum": 0.0, "null_n": 0, "null_sum": 0.0})
+        ov = state.setdefault(
+            "overshoot", {"n": 0, "unmeasured_n": 0, "vals": []})
 
         def _persist_day(dse, day):
             state["day_start"] = {"day": day, "equity": dse}
@@ -966,6 +980,34 @@ def main(_ctx=None, once=False):
             # else (leverage, margin, drawdown arithmetic all unchanged).
             pnl = (eq - base_eq - cap_adj - MANUAL_PNL_USD) \
                 if (eq is not None and base_eq is not None) else None
+            # [(th)] CONTRIBUTED capital — the honest pnl_pct denominator:
+            # birth equity plus every attested deposit/withdrawal since. Avo's
+            # row read −96.9% on the birth-equity basis while the
+            # capital-honest figure is −26%, because the $167.76 deposit grew
+            # the capital and the old basis never saw it.
+            _contrib = (base_eq + cap_adj) if base_eq is not None else None
+            # [(th)] the venue margin state, read ONCE and shared by the
+            # `margin` block and the headroom verdict below.
+            _mstate = _margin_block(live_pos)
+            try:
+                _hd_ok, _hd_why = rails.headroom_check(
+                    _mstate, abs(float(S.stoploss)))
+            except Exception:  # noqa: BLE001
+                _hd_ok, _hd_why = None, "error"
+            _hd_gap = None
+            if isinstance(_mstate, dict):
+                _near = _mstate.get("nearest_liq")
+                if isinstance(_near, dict):
+                    try:
+                        _d = float(_near.get("dist_frac"))
+                        if _d == _d and _d > 0:
+                            _hd_gap = round(_d / abs(float(S.stoploss)), 2)
+                    except (TypeError, ValueError):
+                        pass
+            try:
+                _open_ntl = open_notional(live_pos, meta, len(live_pos), 0.0)
+            except Exception:  # noqa: BLE001
+                _open_ntl = None
             # [(sr)] ONE effective clip, read by both `clip_usd` and `cap_slots`
             # — the cap census must describe the clip the row publishes, and a
             # second copy of this expression is how the two drift apart.
@@ -1042,6 +1084,42 @@ def main(_ctx=None, once=False):
                     # protective stop is dead code. Reported, never a gate.
                     "stop_reachable": _stop_ok,
                     "stop_dead_above": _stop_ceiling,
+                    # [(th)] THE RUIN GATE'S VERDICT, published — the fleet's
+                    # only liquidation-aware gate guarded zero live dollars
+                    # after the (ta) retirement of its sole caller, while the
+                    # levered trio published telemetry nothing refused on.
+                    # VERDICT ONLY, never a gate here: at Eamon's on-record
+                    # 9.5x mum's gap is 1.13 stop-widths against the K=4 bar,
+                    # so `too_close` is structural at his setting and refusing
+                    # on it would re-litigate a decision made on the record.
+                    # fleet_immune pages TRANSITIONS into the non-structural
+                    # conditions; entry refusal stays Eamon's explicit call.
+                    "headroom": {"ok": _hd_ok, "reason": _hd_why,
+                                 "gap_stop_widths": _hd_gap},
+                    # [(th)] THE DAILY HALT'S GEOMETRY, coupled to the gross —
+                    # both rails are gross-BLIND (a fraction of equity and a
+                    # fixed $), so at 9.5x the day ends on a ~1.05% adverse
+                    # basket move and TWO slot-stops guarantee a halt. The
+                    # constant (at full gross) and the live number (at current
+                    # deployment) both publish, so neither overstates; whether
+                    # the setting is right at this gross is Eamon's env
+                    # decision ({PFX}_DAILY_LOSS), informed not argued.
+                    "halt": {
+                        "daily_loss_frac": DAILY_LOSS_LIMIT,
+                        "abs_usd": getattr(rails, "max_daily_loss", None),
+                        "basket_move_at_full_gross_pct": round(
+                            DAILY_LOSS_LIMIT / gross_x(), 4),
+                        "basket_move_now_pct": (
+                            round(DAILY_LOSS_LIMIT * eq / _open_ntl, 4)
+                            if (eq and _open_ntl) else None),
+                        "binding": ("abs" if (
+                            day_start_equity
+                            and getattr(rails, "max_daily_loss", None)
+                            is not None
+                            and rails.max_daily_loss
+                            < DAILY_LOSS_LIMIT * day_start_equity)
+                            else "pct"),
+                    },
                 },
                 "held": {c: (meta.get(c) or {}).get("tag")
                          for c in live_pos},
@@ -1113,7 +1191,29 @@ def main(_ctx=None, once=False):
                 # position and this fleet read none of them. `None` when the
                 # venue could not answer: an unreadable margin state must not
                 # publish as a confident 1.0x.
-                "margin": _margin_block(live_pos),
+                "margin": _mstate,
+                # [(th)] the control arm's paired null — via the ONE owner
+                # (family's control_block, by identity), ALWAYS present for a
+                # control-arm book incl. n=0; {} for avo/georgia so their
+                # payloads do not move. 👩 mum's go-live verdict and every
+                # pre-registered leverage notch read THIS, from her own
+                # real-money ledger, instead of a differently-supplied twin.
+                **control_block(S, ctrl),
+                # [(th)] stop overshoot — LIVE measured fills only, per-book,
+                # published always so quiet (n=0) and dark are never the same
+                # byte-string. p90 enters any future gross ceiling only
+                # additively in the denominator (restrict-only by
+                # construction); no gate may consume it below a declared n
+                # floor.
+                "stop_overshoot": {
+                    "n": int(ov.get("n") or 0),
+                    "unmeasured_n": int(ov.get("unmeasured_n") or 0),
+                    "p90_bps": (sorted(ov["vals"])[
+                        max(0, int(round(0.9 * len(ov["vals"]))) - 1)]
+                        if ov.get("vals") else None),
+                    "worst_bps": (max(ov["vals"]) if ov.get("vals")
+                                  else None),
+                },
                 # [(st)] THE CENSUS — see scan_census(). The answer to "why
                 # has this book not traded", on the row, every loop.
                 "scan": scan_census(
@@ -1135,8 +1235,12 @@ def main(_ctx=None, once=False):
                     BOT_ROW, status=status,
                     equity=(round(eq, 2) if eq is not None else None),
                     pnl_abs=(round(pnl, 2) if pnl is not None else None),
-                    pnl_pct=(round(pnl / base_eq, 6)
-                             if (pnl is not None and base_eq) else None),
+                    # [(th)] denominated on CONTRIBUTED capital (birth equity
+                    # + attested deposits/withdrawals) — display-side only,
+                    # the graded per-trade sample is untouched.
+                    pnl_pct=(round(pnl / _contrib, 6)
+                             if (pnl is not None and _contrib
+                                 and _contrib > 0) else None),
                     open_trades=len(live_pos),
                     closed_trades=st["closed"], wins=st["wins"],
                     losses=st["closed"] - st["wins"],
@@ -1183,6 +1287,42 @@ def main(_ctx=None, once=False):
             stats["closed"] += 1
             stats["wins"] += 1 if total > 0 else 0
             was_stop = "stop" in reason
+            # [(th)] the control pair settles through the ONE owner (family's
+            # control_settle, by identity), at the real close's instant — one
+            # venue mid read for the placebo coin, both legs or neither ((rp)).
+            _np = m.get("null_pair")
+            control_settle(S, ctrl, m, total, notional or 0.0,
+                           marks.fresh_mid(venue, _np) if _np else None)
+            # [(th)] STOP OVERSHOOT — the quantity every future gross notch
+            # must price. G_max = 1/(|stop|+mmf) assumes the stop fires AT its
+            # level; the honest ceiling divides by (|stop|+overshoot+mmf), and
+            # the one datum on tape (DOGE −7.17% on a −5% stop, 217bps past)
+            # exceeds mum's whole 53bps liquidation headroom 4.1x. MEASURED
+            # fills only — an unmeasured fill imputed as zero overshoot would
+            # bias the exact number a real-money gate will consume, so those
+            # count in their own bucket instead (I14).
+            _ob = None
+            if was_stop and entry:
+                if measured and exit_px:
+                    try:
+                        _si = entry * (1.0 + float(S.stoploss))
+                        _obv = (_si - exit_px) / _si * 1e4
+                        if _obv == _obv and abs(_obv) != float("inf"):
+                            _ob = round(_obv, 1)
+                            ov["n"] = int(ov.get("n") or 0) + 1
+                            ov["vals"] = (ov.get("vals") or [])[-49:] + [_ob]
+                    except Exception:  # noqa: BLE001
+                        _ob = None
+                else:
+                    ov["unmeasured_n"] = int(ov.get("unmeasured_n") or 0) + 1
+            # [(th)] the phantom signature — a $0.00 close with NO entry price
+            # is a halt/flatten EVENT, not a trade (avo carried 9 of them,
+            # five with closed_at before opened_at; one on a coin the book
+            # cannot even hold). Tagged at the write site so graders can
+            # exclude by SIGNATURE, never by reason string — georgia's TRX
+            # −$3.87 daily_loss is a REAL forced-flatten loss and must stay
+            # in the sample.
+            _phantom = (float(total) == 0.0 and not entry)
             tf_s = _interval_ms(S.tf) / 1000.0
             closed_win.append({"ts": time.time(), "pnl": total, "pct": pct,
                                "stop": was_stop, "pair": sym})
@@ -1208,7 +1348,14 @@ def main(_ctx=None, once=False):
                            # [(so)] I22 receipt: the brain scale this REAL
                            # stake was sized at. `clip` is base x strategy
                            # stake_mult x brain and cannot be decomposed.
-                           "brain_mult": m.get("brain_mult")})
+                           "brain_mult": m.get("brain_mult"),
+                           # [(th)] the open-site stamps, copied not computed:
+                           # rank is born at the OPEN ((sv)); the pre-(th) 46
+                           # georgia closes carry None and always will.
+                           "entry_rank": m.get("entry_rank"),
+                           **({"non_economic": True} if _phantom else {}),
+                           **({"stop_overshoot_bps": _ob}
+                              if _ob is not None else {})})
             except Exception:  # noqa: BLE001
                 pass
 
@@ -1691,6 +1838,29 @@ def main(_ctx=None, once=False):
                              # reaches the close row.
                              "brain_mult": round(bmult, 4),
                              "clip": round(stake, 2), "last_px": px}
+                # [(th)] entry_rank, born at the OPEN like the shadow's (sv)
+                # stamp — the close can only copy what the open recorded. The
+                # clock-hour bucket lives in the durable state so a mid-hour
+                # restart cannot under-rank. DECLARED PORT DIVERGENCE: this
+                # host enforces NO hourly throttle (the shadow's
+                # MAX_ENTRIES_PER_HOUR censors its ranks), so live rank is the
+                # UNCENSORED within-hour ordinal — a rank study must read the
+                # two arms accordingly. Non-DayTrader books stamp None, never
+                # a fake 1 ((sv)).
+                if isinstance(S, DayTraderGated):
+                    _hb = int(t0 // 3600)
+                    if state.get("rank_bucket") != _hb:
+                        state["rank_bucket"], state["rank_n"] = _hb, 0
+                    state["rank_n"] = int(state.get("rank_n") or 0) + 1
+                    meta[sym]["entry_rank"] = state["rank_n"]
+                else:
+                    meta[sym]["entry_rank"] = None
+                # [(th)] the control arm's placebo, drawn through the ONE
+                # owner (family's control_draw, by identity): the coin first,
+                # then one venue mid read for it alone. {} for every
+                # non-control book, so avo/georgia meta is unchanged.
+                meta[sym].update(control_draw(
+                    S, universe, sym, lambda c: marks.fresh_mid(venue, c)))
                 pos[sym] = {"size": size, "entry": fpx or px}
                 _verdict(sym, "opened")
                 last_open_ts[0] = t0

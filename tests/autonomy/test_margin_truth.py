@@ -232,16 +232,30 @@ def _calls_margin_block(path):
                   for n in ast.walk(tree))
     called = any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                  and n.func.id == "_margin_block" for n in ast.walk(tree))
-    # the call's value must land under a "margin" key of a dict literal
+    # the call's value must land under a "margin" key of a dict literal —
+    # either directly, or [(th)] through a name assigned from the call (the
+    # variant host hoists the read to `_mstate` so the SAME venue state feeds
+    # both the `margin` block and the headroom verdict; two reads could
+    # disagree about one account). The name set is built first so a "margin"
+    # key holding an unrelated name still fails.
+    assigned = set()
+    for n in ast.walk(tree):
+        if (isinstance(n, ast.Assign) and isinstance(n.value, ast.Call)
+                and isinstance(n.value.func, ast.Name)
+                and n.value.func.id == "_margin_block"):
+            assigned.update(t.id for t in n.targets
+                            if isinstance(t, ast.Name))
     published = False
     for n in ast.walk(tree):
         if not isinstance(n, ast.Dict):
             continue
         for k, v in zip(n.keys, n.values):
-            if (isinstance(k, ast.Constant) and k.value == "margin"
-                    and isinstance(v, ast.Call)
-                    and isinstance(v.func, ast.Name)
+            if not (isinstance(k, ast.Constant) and k.value == "margin"):
+                continue
+            if (isinstance(v, ast.Call) and isinstance(v.func, ast.Name)
                     and v.func.id == "_margin_block"):
+                published = True
+            if isinstance(v, ast.Name) and v.id in assigned:
                 published = True
     return defined, called, published
 

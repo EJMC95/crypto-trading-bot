@@ -383,9 +383,13 @@ def _driven(m, tape="breakout"):
     class _Rails:
         live = True
         max_notional = 1000.0
+        max_daily_loss = 30.0
 
         def kill_check(self):
             return False
+
+        def headroom_check(self, margin_state, stop_frac):
+            return True, "flat"
 
         def daily_loss_hit(self, ds, eq):
             return False
@@ -690,3 +694,181 @@ def test_selftest_REFUSES_a_non_avo_book_rather_than_half_running():
         [sys.executable, "lighter_avo_live_bot.py", "--selftest"],
         cwd=str(ROOT), env=env2, capture_output=True, text=True, timeout=300)
     assert q.returncode == 0, (q.stdout[-3000:], q.stderr[-2000:])
+
+
+# ---- [(th)] the improvement round's pins ----------------------------------
+# Ten weakened candidates survived the adversarial pass; these drive the ones
+# that ship in the live host. Every pin runs the REAL main() against the
+# publisher its consumers read ((hj): never a hand-written fixture).
+
+def test_entry_rank_is_born_at_the_open_and_reaches_the_close():
+    """Three sites or it is vacuous: rank computed at the OPEN (clock-hour
+    bucket in the DURABLE state, so a mid-hour restart cannot under-rank),
+    carried on meta, copied to the close row. The one-site draft stamped only
+    the close and would have published None forever — the exact vacuous
+    instrument the verify pass caught. DECLARED divergence, pinned by name:
+    the live host enforces no hourly throttle, so live rank is the UNCENSORED
+    within-hour ordinal."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            # a STALE bucket from a previous hour, restored at boot: without
+            # the reset, ranks continue from 7 and the first open stamps 8 —
+            # the mutation that survived this test's first draft.
+            box["state"]["freqtrade-georgia-lighter:live"] = {
+                "rank_bucket": 0, "rank_n": 7}
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            st = box["state"]["freqtrade-georgia-lighter:live"]
+            metas = st["meta"]
+            assert box["venue"].opens, "the breakout tape must open"
+            ranks = sorted(v.get("entry_rank") for v in metas.values())
+            assert ranks == list(range(1, len(metas) + 1)), metas
+            assert st.get("rank_n") == len(metas), st.get("rank_n")
+            # kill-flatten the second cycle: every close row must carry the
+            # rank its OPEN recorded.
+            box["rails"].kill_check = lambda: True
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        assert box["paper"], "the kill flatten must book real closes"
+        got = {kw["pair"]: kw["extra"].get("entry_rank")
+               for _b, kw in box["paper"]}
+        assert sorted(got.values()) == list(range(1, len(got) + 1)), got
+        # real closes with a real entry price are NEVER phantom-tagged
+        assert all("non_economic" not in kw["extra"]
+                   for _b, kw in box["paper"]), box["paper"]
+
+
+def test_mum_control_pair_settles_through_the_one_owner():
+    """The (rp) atomic pair on the LIVE host: the open draws the placebo (one
+    venue mid), the close settles both legs or neither, and the row publishes
+    `control` ALWAYS — n=0 included — from her own real-money ledger. Also
+    pins the identity rule ((hj)): the live host's control machinery IS the
+    family module's objects, never a re-typed copy, because this is the
+    number her go-live verdict and every leverage notch will be judged on.
+    And mum has no throttle carrier, so her rank stamps None — never a fake
+    1 ((sv))."""
+    import lighter_family_bot as fam
+    with loaded("freqtrade-mum", MUM_GROSS_X="9.5") as m:
+        assert m.control_draw is fam.control_draw
+        assert m.control_settle is fam.control_settle
+        assert m.control_block is fam.control_block
+        with _driven(m, tape="oversold") as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            st = box["state"]["freqtrade-mum-lighter:live"]
+            assert st["meta"], "the oversold tape must open"
+            n_opened = len(st["meta"])
+            for v in st["meta"].values():
+                assert v.get("entry_rank") is None, v
+                assert v.get("null_pair") and v.get("null_entry"), v
+            # BEFORE any close: the block is already on the row at n=0 —
+            # "no closes yet" must never be byte-identical to "not running"
+            first = box["published"][0][1]["extra"]["control"]
+            assert first["n"] == 0 and first["null_n"] == 0, first
+            box["rails"].kill_check = lambda: True
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        ctrl = box["published"][-1][1]["extra"]["control"]
+        assert ctrl["n"] == ctrl["null_n"] == n_opened, ctrl
+        assert ctrl["mean_pct"] is not None
+        assert ctrl["null_pct"] is not None
+        assert ctrl["edge_pct"] is not None
+
+
+def test_a_non_control_book_payload_does_not_move():
+    """{} for avo/georgia — the control block must not appear on books that
+    run no control arm, or every grader learns a phantom key."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        assert "control" not in box["published"][-1][1]["extra"]
+
+
+def test_the_halt_geometry_and_ruin_verdict_are_on_the_row():
+    """(th): both daily rails are gross-BLIND, so the row now publishes the
+    COUPLED number — at mum's 9.5x the day ends on a ~1.05% adverse basket
+    move — beside the ruin gate's verdict, every loop. A number on the
+    payload outlives an argument in a message."""
+    with loaded("freqtrade-mum", MUM_GROSS_X="9.5") as m:
+        with _driven(m, tape="oversold") as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        extra = box["published"][-1][1]["extra"]
+        lev = extra["leverage"]
+        halt = lev["halt"]
+        assert halt["daily_loss_frac"] == 0.10
+        assert halt["abs_usd"] == 30.0
+        assert halt["basket_move_at_full_gross_pct"] == round(0.10 / 9.5, 4)
+        # stub day-start 200: abs $30 > pct $20, so the pct rail binds
+        assert halt["binding"] == "pct", halt
+        hd = lev["headroom"]
+        assert set(hd) == {"ok", "reason", "gap_stop_widths"}, hd
+        ov = extra["stop_overshoot"]
+        assert ov == {"n": 0, "unmeasured_n": 0, "p90_bps": None,
+                      "worst_bps": None}, ov
+
+
+def test_an_unmeasured_stop_fill_counts_in_its_own_bucket_never_zero():
+    """I14: an unmeasured fill imputed as zero overshoot would bias — in the
+    optimistic direction — the exact number a future gross ceiling consumes.
+    The stub venue measures nothing, so a driven stop close must land in
+    `unmeasured_n`, leave n=0/p90=None, and stamp no per-close bps."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            st = box["state"]["freqtrade-georgia-lighter:live"]
+            assert st["meta"], "the breakout tape must open"
+            coin = next(iter(st["meta"]))
+            # raise the recorded entry so the flat stop fires on cycle 2
+            st["meta"][coin]["entry"] = st["meta"][coin]["entry"] * 1.10
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        stops = [kw for _b, kw in box["paper"] if "stop" in kw["reason"]]
+        assert stops, [kw["reason"] for _b, kw in box["paper"]]
+        assert all("stop_overshoot_bps" not in kw["extra"]
+                   for kw in stops), stops
+        ov = box["published"][-1][1]["extra"]["stop_overshoot"]
+        assert ov["unmeasured_n"] >= 1 and ov["n"] == 0, ov
+        assert ov["p90_bps"] is None, ov
+
+
+def test_a_zero_dollar_no_entry_close_is_tagged_non_economic():
+    """The phantom signature at the write site: $0.00 AND no entry price —
+    never the reason string, which a REAL forced-flatten loss shares."""
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            st = box["state"]["freqtrade-georgia-lighter:live"]
+            assert st["meta"]
+            coin = next(iter(st["meta"]))
+            st["meta"][coin]["entry"] = 0.0        # a meta with no fill data
+            box["rails"].kill_check = lambda: True
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        ph = [kw for _b, kw in box["paper"]
+              if kw["extra"].get("non_economic")]
+        assert len(ph) == 1 and ph[0]["pair"] == coin, box["paper"]
+        assert ph[0]["pnl_abs"] == 0.0 and ph[0]["entry_price"] is None
+        # ...and the coin with real fill data in the same flatten is NOT
+        others = [kw for _b, kw in box["paper"]
+                  if not kw["extra"].get("non_economic")]
+        assert all(kw["entry_price"] for kw in others), others
+
+
+def test_pnl_pct_is_denominated_on_contributed_capital():
+    """avo's row read −96.9% where the capital-honest figure is −26%: the
+    $167.76 deposit grew the capital and the birth-equity basis never saw
+    it. Display-side only — the graded per-trade sample is untouched."""
+    with loaded(AVO_GROSS_X="5") as m:
+        with _driven(m) as box:
+            box["state"]["freqtrade-avo-maria-lighter:live"] = {
+                "initial_equity": 50.0,
+                "capital_adjust": {"total": 100.0}}
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        pub = box["published"][-1][1]
+        assert pub["pnl_abs"] == 50.0, pub          # 200 − 50 − 100
+        assert pub["pnl_pct"] == round(50.0 / 150.0, 6), pub
