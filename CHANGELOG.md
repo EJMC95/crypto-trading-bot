@@ -57,7 +57,22 @@ me to disarm I understand and let her first trade go!"* She boots, scans and
 publishes with the switch armed; his flip to the token is her first trade.
 The row appearing healthy on /pnl.json is the only receipt ((iw)/(fd):
 verify by `extra.build`+`build_n` against the avolive COPY set, never a green
-run). The feed-following registries (DECLARED_LIVE, the board/proprioception
+run).
+
+**THE RECEIPT, read:** `freqtrade-mum-lighter` published healthy at ~09:52Z —
+`status: halted` (the ARMED switch, exactly as designed), **equity $300.00**
+(Eamon's deposit landed AND the corrected key authenticates — account_value
+is a signed venue read), build `83f42b3d02e5/17` byte-equal to the local
+prediction, `gross_x 9.5`, `cap 3000`, `clip 712.50`. PR #217 merged
+(143bf45, `[deploy-live]` in the subject) rolling the census/custom_exit/
+attestation build `feb27e5d0318/17` to all three live services; the operator
+was handed the mum-live Variables link and the flip to
+`DISARMED_I_UNDERSTAND` is his first-trade act. Both one-shot workflows are
+DELETED in this commit (the (lr) rule) and both runs' logs were deleted the
+moment their outputs were read — GitHub echoes step env into run logs, so
+the key had appeared there; noted to Eamon that rotating it at leisure is
+cheap now that only Railway holds it. The two GRANDFATHERED deploy-latency
+bridges come out on the stamp readback. The feed-following registries (DECLARED_LIVE, the board/proprioception
 cohort defaults, deploy_live_verify, agronomy BookSpec, respiration,
 market-context, CLAUDE.md audit scope) move in the commit AFTER the row
 proves itself live, per the runbook's step 4; the provisioner is deleted in
