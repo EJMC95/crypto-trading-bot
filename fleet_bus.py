@@ -86,6 +86,138 @@ def live_arm_retired(row):
         not in ("run", "1", "true")
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-25 (ti)] JUDGE V2 — THE PAIR REGISTRY AND THE PHASE VOCABULARY,
+# single-owned here because the judge (freqtrade-bots) and the live hosts
+# (avolive / fundinglighter images) cannot import each other and BOTH must
+# agree about what is judged and what the states mean (the RETIRED_LIVE_ARMS
+# pattern, one table up).
+#
+# Eamon, 25-Aug: *"The judge has malfunctioned several times for this sole
+# reason, and it's well overdue for v2."* The sole reason, confirmed on the
+# bus: a SINGLE-pair machine hardwired to the Farmer's funding lanes, stood
+# down since (ta) with a successor it structurally cannot judge. v2 judges
+# every live/shadow twin from THIS registry; a pair whose live_bot is None or
+# retired is stood_down BY CONSTRUCTION.
+#
+# `policy_fields` is each pair's (jf) era signature — the fields whose change
+# resets a comparison window. `strip_exits` are exit-reason FAMILIES excluded
+# from BOTH arms of the paired sample before any count (forced flattens and
+# legacy marks are halt events, not candidate outcomes; counts publish so the
+# reduction is visible). `economic_exits` is the CLOSED vocabulary of exit
+# families the paired bar may count — a close matching neither set makes the
+# pair `unjudgeable:unknown_exit_reason` NAMING the novel string (fail-loud
+# on novelty: this fleet mints new exit reasons constantly, and a silent
+# default in either direction re-opens the F1 contamination class).
+# `growth` empty = the fast path is STRUCTURALLY unreachable for the pair,
+# not merely flagged off.
+JUDGED_PAIRS = {
+    "avo": {
+        "live_bot": "freqtrade-avo-maria-lighter",
+        "shadow_bot": "freqtrade-avo-maria-lshadow",
+        "xp_prefix": "xp.avo.",
+        "live_names": (),
+        "live_service": "tide-rider-lighter-live",
+        "shadow_service": "family-lighter-shadow",
+        "pnl_form": "price",
+        "strip_exits": ("daily_loss", "kill_switch", "v1_legacy"),
+        "economic_exits": ("roi", "stop", "custom", "signal", "exit",
+                           "bounce_take", "range_top", "max_hold", "trade",
+                           "delisted", "trend_breakdown", "flip"),
+        "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
+                          "scan_order"),
+        "growth": {},
+        "control_role": "load_bearing",
+        "host_file": "lighter_avo_live_bot.py",
+    },
+    "georgia": {
+        "live_bot": "freqtrade-georgia-lighter",
+        "shadow_bot": "freqtrade-georgia-lshadow",
+        "xp_prefix": "xp.georgia.",
+        "live_names": (),
+        "live_service": "georgia-live",
+        "shadow_service": "family-lighter-shadow",
+        "pnl_form": "price",
+        "strip_exits": ("daily_loss", "kill_switch", "v1_legacy"),
+        "economic_exits": ("roi", "stop", "custom", "signal", "exit",
+                           "bounce_take", "range_top", "max_hold", "trade",
+                           "delisted", "trend_breakdown", "flip"),
+        "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
+                          "scan_order"),
+        "growth": {},
+        "control_role": "load_bearing",
+        "host_file": "lighter_avo_live_bot.py",
+    },
+    "mum": {
+        "live_bot": "freqtrade-mum-lighter",
+        "shadow_bot": "freqtrade-mum-lshadow",
+        "xp_prefix": "xp.mum.",
+        "live_names": (),
+        "live_service": "mum-live",
+        "shadow_service": "family-lighter-shadow",
+        "pnl_form": "price",
+        "strip_exits": ("daily_loss", "kill_switch", "v1_legacy"),
+        "economic_exits": ("roi", "stop", "custom", "signal", "exit",
+                           "bounce_take", "range_top", "max_hold", "trade",
+                           "delisted", "trend_breakdown", "flip"),
+        "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
+                          "scan_order"),
+        "growth": {},
+        "control_role": "load_bearing",
+        "host_file": "lighter_avo_live_bot.py",
+    },
+    # The Farmer pair, parked: its live arm is in RETIRED_LIVE_ARMS above, so
+    # v2 stands it down by construction with the wake condition published.
+    # Its xp.funding./live.funding. surface stays REGISTERED (deleting it
+    # would orphan the (na) registrations and silently moot Hull's pre-named
+    # ~4-Sep min-vol-2e6 overlap decision); the six static CANDIDATES park
+    # behind the judgeable-pair admission gate — no slot burns into a dead
+    # pair.
+    "farmer": {
+        "live_bot": "perps-funding-lighter-lighter",
+        "shadow_bot": "perps-funding-lighter-lshadow",
+        "xp_prefix": "xp.funding.",
+        "live_names": (),
+        "live_service": "trail-blazer-live",
+        "shadow_service": "funding-farmer-shadow",
+        "pnl_form": "funding",
+        "strip_exits": ("long_retired", "short_retired", "daily_loss"),
+        "economic_exits": ("decay_paid", "flip", "bleed", "max_hold",
+                           "stop", "trade", "exit"),
+        "policy_fields": ("venue", "enter_apr", "sides"),
+        "growth": {},
+        "control_role": "independent",
+        "host_file": "lighter_funding_bot.py",
+    },
+}
+
+#: Live-capable books DELIBERATELY outside the judge, each with a reason —
+#: the BORN_DARK_OK idiom. The roster test additionally injects a synthetic
+#: entry so the mechanism is under test whatever this dict holds.
+UNJUDGED_OK = {
+    "lighter-ticket-taker-lighter":
+        "live arm stood down 13-Aug (ma) — its sub-account moved to 🙏 Avo; "
+        "the shadow arm keeps grading, and there is no live account to "
+        "promote onto. Re-pairs if the taker ever gets a live slot again.",
+}
+
+#: THE PHASE VOCABULARY — one constant, imported by the judge (publisher),
+#: fleet_immune (validator) and fleet_regen (restorer). F4's structural
+#: closure: there is no second list to forget, and the judge's own selftest
+#: asserts its published phases are a subset of THIS constant, so a new phase
+#: string fails the PUBLISHER'S build instead of being erased downstream.
+XP_JUDGE_PHASES = ("idle", "running", "promoted", "stood_down", "unjudgeable")
+#: Running-state HOLD annotations (published state, never buried in
+#: last_eval — the count alone is what hides a stall, I18/(sa)).
+XP_JUDGE_HOLDS = ("arm_skew", "arm_drift", "floors", "assert_fail")
+#: UNJUDGEABLE reasons — Stage-0 fairness prechecks emit these INSTEAD of a
+#: biased bar. Every reason names the object the operator can act on (I8).
+XP_JUDGE_UNJUDGEABLE = (
+    "policy_unstamped", "policy_mismatch", "capacity_mismatch",
+    "parity_unreadable", "no_live_arm", "live_row_dark",
+    "pnl_form_mismatch", "unknown_exit_reason")
+
+
 MULT_FLOOR = 1.0 / 6.7
 # [2026-07-21 TWO-WAY MULTS — operator: "brain needs to be able to widen
 # too"] Ceiling raised 1.0 -> 1.5: the brain may now publish EXPAND mults

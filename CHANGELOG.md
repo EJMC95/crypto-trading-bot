@@ -1,3 +1,95 @@
+## 2026-08-25 (ti) — JUDGE V2.0: THE ENGINE GETS EYES ON EVERY PAIR — AND THE STATISTICS AUDIT FINDS THE FIFTH MALFUNCTION, WHICH IS THE BAR ITSELF
+
+**Eamon, 25-Aug:** *"The judge has malfunctioned several times for this sole
+reason, and it's well overdue for v2."* Confirmed live on the bus before a
+line was written: `phase: stood_down`, `candidate: null`, naming 🔮 georgia
+as successor while structurally unable to judge her — a single-pair machine
+hardwired to the Farmer's `live.funding.*` lanes, and the fleet's only
+promotion path to more real money pointing at a corpse since (ta). The rap
+sheet is four recorded failures with one root: the I23 handicap (paired bar
+compared arms on DIFFERENT entry policies, 0.161pp against a 0.5pp margin —
+zero promotions in five weeks), the (pt) frozen window, the (ta) silent
+stand-down, the (tb) census erasure.
+
+**Designed by workflow under the (tg) grant** (4 readers → spec → FOUR
+adversarial audit lenses, all REVISE with fixes — invariants, failure
+closure, statistics, operational — ~30 findings folded in or scheduled).
+**V2.0 ships the engine's EYES; the bar redesign is deliberately v2.1,
+because the statistics lens found the fifth malfunction:** at family-book
+dispersion (sd 3–6%/trade) v1's bar is a coin-flip detector — the minimum
+detectable gap at its 30/10 floors is `0.365·sd` = **1.4–2.7pp against a
+0.5pp margin**, hourly evaluation past MIN_DAYS gives ~7–30 un-spent looks
+(**~10% false-promotion under null**), within-arm clustering (avo basket
+rho +0.775) turns z=1.28 into an effective **z≈0.7**, the per-half 0.5pp
+term at 15/5 floors **rejects true winners 2–4x more effectively than
+luck**, and the estimand is wrong for capacity candidates outright (they
+move RATE, not per-trade mean — (hl)/(sr) measured). **The naive I16
+lower-bound term the spec carried was therefore REFUSED for v2.0** — adding
+a known-anti-conservative statistic to a real-money actuator is shipping a
+wrong number with a rigorous name. The v2.1 bar is specified by the audit
+and built WITH the lever wave it gates: pre-registered checkpoints or the
+brain's 3-consecutive-evals idiom (no free looks), candidate-CLASS-split
+estimands (capacity promotes on per-trade NON-inferiority + throughput
+superiority over daily blocks), cluster-robust SE at Welch-t with z=2.0
+promotion-grade (the go-live convention, not allocation's advisory 1.28),
+halves demoted to REPORTED below per-half n≈30 (I15's idiom), an arm-label
+permutation backing below n≈30, and impl-shortfall netted out of the gap.
+
+**WHAT V2.0 IS (zero trading-behavior change):**
+* **`fleet_bus.JUDGED_PAIRS`** — the pair registry beside RETIRED_LIVE_ARMS
+  (the (ta) one-owner-across-images pattern): avo, georgia, mum, and the
+  parked farmer, each with pnl_form, strip/economic exit vocabularies,
+  policy_fields, and a `growth` map whose emptiness makes the fast path
+  STRUCTURALLY unreachable. `UNJUDGED_OK` declares the taker's swapped-out
+  live row with its reason.
+* **The multi-pair census** (`pair_census`/`_pair_precheck`): every pair
+  publishes a phase from the ONE vocabulary, with Stage-0 fairness
+  prechecks that emit `unjudgeable:<reason>` NAMING the object (I8) instead
+  of ever computing a biased bar — retirement → dark live row → policy
+  stamps → policy parity → capacity parity, in actionability order.
+  UNREADABLE parity inputs are `parity_unreadable`, never assumed-equal
+  (darkness must not re-open F1 through the stage built to close it —
+  mutation-pinned). At ship the family pairs honestly read
+  `policy_unstamped` until the stamps in this same commit flow, then
+  `policy_mismatch` naming **`scan_order`** — a REAL divergence: the live
+  host scans correlation-ordered (diversified_order), the shadow scans in
+  list order, and closing that is a measured act, not a default.
+* **The shared stamp builder** (`lighter_family_bot.policy_stamp`): one
+  owner for both arms' `extra.policy`; the shadow stamps for the FIRST time
+  (it stamped nothing — every family pair was unjudgeable by absence); the
+  live host's `_policy()` now derives from it. ERA-SAFE, verified before
+  shipping: the gate's `stamp_state` reads only POLICY_SIG_FIELDS and
+  requires a `lenses` key family stamps deliberately lack, so family stamps
+  are structurally invisible to `stamped_policy_boundary` and no era moves
+  — georgia's 5/6 clock untouched.
+* **The vocabulary, imported not re-typed** (`XP_JUDGE_PHASES`/`HOLDS`/
+  `UNJUDGEABLE` in fleet_bus): fleet_immune deletes its inline tuple,
+  imports the constant, and walks `pairs.*.phase` against it — the (tb)
+  erasure's structural closure (no second list to forget; a rogue phase
+  reddens the PUBLISHER'S selftest). fleet_regen's baseline learns the
+  pairs map in the same commit.
+* **The power report**: each judgeable pair publishes {per-arm sd, close
+  rate, `mde_pp_at_floors`} — the statistics audit's central number, on the
+  payload instead of re-argued, REPORT-grade by I16's own advisory scoping.
+* **The farmer mirror**: the serial machine's state overwrites
+  pairs["farmer"] with `src: "machine"` provenance (the census's precheck
+  view and the machine's truth agree today and can drift tomorrow — the
+  overwrite is what a test can see; mutation-pinned after the first draft's
+  mutation SURVIVED on exactly that coincidence). Top-level phase/current
+  stay the farmer lane's for consumer compat (impl_shortfall, the
+  dashboard card); the rollup flip is v2.1's, taken WITH its consumers.
+
+**Pinned by** `tests/autonomy/test_judge_pairs.py` (fleet-scoped roster:
+every MARKER_GATED live row resolves to a pair, RETIRED_LIVE_ARMS, or a
+declared reason — the deploy layer is the source a go-live cannot avoid,
+closing the audit's host-scoped-roster hole; synthetic-ghost injection keeps
+the mechanism non-vacuous; immune's pairs walk driven both directions) plus
+the judge selftest's v2.0 block (census cases driven through the REAL
+`run_once` against a stubbed store). **Mutations 5/5 red** — including the
+farmer-mirror drop that survived its first draft and forced the provenance
+field. v1's 900-line selftest passes UNTOUCHED: the serial machine's
+top-level behavior is byte-compatible by design.
+
 ## 2026-08-25 (th) — THE LIVE-TRIO IMPROVEMENT ROUND: THIRTEEN CANDIDATES ENTER THE ADVERSARIAL PASS, ZERO SURVIVE AT FULL STRENGTH — AND THE TEN NARROWED FORMS ARE WHAT SHIPS
 
 **Eamon, 25-Aug:** *"can you suggest some improvements the live bots... how we
