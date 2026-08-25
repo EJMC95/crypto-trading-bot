@@ -96,6 +96,28 @@ market-context, CLAUDE.md audit scope) move in the commit AFTER the row
 proves itself live, per the runbook's step 4; the provisioner is deleted in
 that same commit (the (lr) rule).
 
+**THE STAMP READBACK, done and banked (this commit):** merge run 582 started
+09:55:00Z; the served feed flipped avo+georgia to **`feb27e5d0318/17`** by
+10:13:50Z and mum by **10:15:21Z**, all three publishing `extra.spend` —
+avo `n_eff 1.2 · 2/23 held · 5.0x`, georgia `1.239 · 5/23 · 5.0x`, mum
+`1.0 · 0/23 · 9.5x` (the nothing-held conservative degrade doing exactly
+what (te) shipped), `days_to_gate_obs 30.0` on all three (the window floor —
+every arm's post-launch clock starts full). The two GRANDFATHERED bridges
+are REMOVED on that receipt as their own comment demanded, and
+`audit_book_spend` runs green against the LIVE feed with them gone (20
+living rows) plus selftest. Mum's disarm SURVIVED the redeploy (an env var,
+not memory — the flip Eamon performed persists by construction); she reads
+`online`, $300.00, 0 open / 0 closed, waiting on her first `rsi<25` signal.
+**One finding from the readback, benign and named:** `closed_trades` on the
+row DROPPED across the restart (avo 31→13, georgia 53→46) — the in-process
+counter drifts UP whenever a close is re-booked (a restart restoring stale
+meta, a manual-intervention reconciliation) because the ledger UPSERTS on
+`PRIMARY KEY (bot, trade_id)` while `stats["closed"] += 1` runs
+unconditionally; every boot re-seeds from `fetch_paper_aggregate` and
+corrects it. Display-only: the graded LEDGER never double-counted (I14 —
+the record decides), verified by georgia's full in-feed ledger matching her
+re-seeded count exactly (46 = 46).
+
 ## 2026-08-25 (td) — THE "LOSSES" WERE EAMON'S MANUAL TRADES, ATTESTED OUT OF THE BOTS' P&L — AND THE FLEET'S BEST SIGNAL GETS A 2x RISK BUDGET, WITH ITS CEILING DERIVED FROM THE GUARD THAT REFUSED MY FIRST DRAFT
 
 **Eamon, 25-Aug:** *"the losses come from manual trades I made (have learned my

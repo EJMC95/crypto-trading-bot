@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-25 19:57 Sydney (09:57Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-25 20:23 Sydney (10:23Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,8 +74,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (12 commit(s), entries (tc), (td), (te))
+## Shipped today (14 commit(s), entries (tc), (td), (te), (tf))
 
+- `edf0837` Her name is Lucy (tf)
+- `7975665` Launch receipts and the (lr) deletions: both one-shots go the way of every provisioner (te)
 - `143bf45` Merge PR #217: weekly review, mum v2 LIVE on her own sub-account, the missing custom_exit, the swap's red-main discharge (tc)(td)(te) [deploy-live]
 - `c10fc6b` The I22 census reaches the live host — the guard's first real catch was its own two variants (te)
 - `460e6b9` The signer refutes the hyphen call; Eamon's launch config ships; the disarm is his button (te)
