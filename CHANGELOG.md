@@ -105,16 +105,23 @@ via `live-attestation-config.yml` — a one-shot in the mum-live-config
 pattern, per-service inputs so a halted book can be deferred. Sequencing
 mattered and was checked first: 🔮 georgia's daily-loss rail had flattened
 her whole book at 12:08Z (five `long-range-on_daily_loss` closes, −$31.0
-realised, book flat at $266.08, `status: halted`), and a variable change
-restarts the service, which WIPES a memory-only halt
-([[lighter-flatten-silent-halt-redeploy-incident]]) — so Avo's
-`AVO_MANUAL_PNL_USD=-66.4` dispatched immediately (row online) while
-georgia's waits for her halt window to lapse at 00:00Z. Her flat book also
+realised, book flat at $266.08, `status: halted`), and the old hazard was
+that a variable change restarts the service and a restart wiped a
+memory-only halt ([[lighter-flatten-silent-halt-redeploy-incident]]). The
+wait-for-00:00Z plan this paragraph first recorded was OVERTAKEN before it
+ran (corrected in place, I12): PR #219's improvement round had already made
+her halt (pq)-DURABLE — "survives the restart by design" — and the 13:44Z
+trio redeploy had already proven it empirically (her row still read
+`halted` seven hours later), so both values dispatched immediately. Her flat book also
 supplied the clean measurement the program doc asked for: at open=0 the
 residual is exactly `pnl_abs − ledger` = −47.34 − (−20.70) =
 **−$26.64** of unattributed P&L — the four 22-Aug zero-basis flattens —
 which is the level attested. Verified by row readback (`manual_pnl_usd`
-publishing the value), never the green run.
+publishing the value), never the green run — and the readbacks all landed:
+Avo's row flipped to **+$7.67** (bot truth, positive), georgia's reads
+**−$20.70** = exactly her own ledger, 🧭 nav-cook republished at age 66s on
+the new build with the off-universe census live after 4.7 days mute. The
+one-shot is deleted in this commit per the (lr) rule.
 
 ## 2026-08-25 (tj) — THE CENSUS'S FIRST LIVE RUN CATCHES ITS OWN FIXTURE BUG: EVERY PAIR READ DARK BECAUSE THE TEST WAS WRITTEN IN THE WRONG PUBLISHER'S SHAPE
 
