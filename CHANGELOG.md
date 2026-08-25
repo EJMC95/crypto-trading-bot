@@ -1,3 +1,20 @@
+## 2026-08-25 (tj) — THE CENSUS'S FIRST LIVE RUN CATCHES ITS OWN FIXTURE BUG: EVERY PAIR READ DARK BECAUSE THE TEST WAS WRITTEN IN THE WRONG PUBLISHER'S SHAPE
+
+One hour after (ti) merged, judge v2.0's first live census published — and
+all three family pairs read `unjudgeable:live_row_dark` while their rows
+were demonstrably fresh. The (hj) class, in the new code, caught by the new
+code's own output: `_pair_precheck._fresh` required a precomputed `age_sec`,
+which the DASHBOARD feed derives — but the judge reads
+`store.fetch_bot_pnl()`, whose rows carry `updated_at` (ISO) and nothing
+else, so every row's age was unknowable and fail-closed dark. The selftest
+was green because its fixture was written in the dashboard's shape. Fixed
+both halves: `_fresh` takes `age_sec` OR parses `updated_at` (unknown still
+dark — this gate ADMITS a pair toward a real-money comparison), and the
+fixture is rewritten in the PUBLISHER'S shape, mutation-verified (reverting
+`_fresh` to age_sec-only reddens the selftest). The verification loop
+worked exactly as doctrine says it should: ship narrow, read the live
+payload, and the payload told on the fixture within the hour.
+
 ## 2026-08-25 (ti) — JUDGE V2.0: THE ENGINE GETS EYES ON EVERY PAIR — AND THE STATISTICS AUDIT FINDS THE FIFTH MALFUNCTION, WHICH IS THE BAR ITSELF
 
 **Eamon, 25-Aug:** *"The judge has malfunctioned several times for this sole

@@ -1649,12 +1649,23 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                        if str(r.get("bot")) == shadow_bot), None)
 
     def _fresh(row):
+        # [(tj)] the REAL publisher (`fetch_bot_pnl`) carries `updated_at`
+        # (ISO), never a precomputed `age_sec` — the first live census read
+        # every row dark because this required the dashboard feed's derived
+        # field. The (hj) class, caught by the census's own first run within
+        # the hour: a consumer is tested against the payload its publisher
+        # builds, and the selftest now drives the `updated_at`-only shape
+        # FIRST. Unknown age stays dark (fail-closed — this gate ADMITS a
+        # pair toward a real-money comparison).
         if not isinstance(row, dict):
             return False
         try:
             age = row.get("age_sec")
             if age is None:
-                return False
+                ts = parse_ts(row.get("updated_at") or row.get("updated"))
+                if ts is None:
+                    return False
+                age = now_ts() - ts
             return float(age) <= 3 * float(row.get("ttl_sec") or 900)
         except (TypeError, ValueError):
             return False
@@ -3030,7 +3041,11 @@ def _selftest():
         return {"bot": bot, "extra": ({"policy": pol} if pol else {})}
 
     def _row(bot, max_open=5, age=60):
-        return {"bot": bot, "age_sec": age, "ttl_sec": 900,
+        # [(tj)] the PUBLISHER'S shape: fetch_bot_pnl carries `updated_at`
+        # (ISO), never a derived age_sec — the first live census read every
+        # row dark because the fixture here was written in the dashboard
+        # feed's shape instead ((hj)). Driven as the publisher builds it.
+        return {"bot": bot, "updated_at": iso(t0 - age), "ttl_sec": 900,
                 "extra": {"max_open": max_open}}
 
     _lb, _sb = _psp["live_bot"], _psp["shadow_bot"]
