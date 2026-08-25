@@ -159,11 +159,17 @@ a ceiling, not a setting. Leverage moves her **no closer to the gate** — it
 multiplies mean and sd alike, so `t` is invariant (I22). It moves dollars and
 drawdown, together, in both directions.
 
-**A sizing suggestion, not a rule:** her book is one v2 entry old. At
-`MUM_GROSS_X=1.0` a $500 deposit runs $125 clips — already 2.5× her shadow's
-$50 — and every close she books grades the SAME hypothesis whatever the
-multiplier, so starting at 1.0 and raising it after the control arm has an
-answer costs nothing but patience.
+**[25-Aug (te) — THE SHIPPED CONFIG, Eamon's call: "She will start with 300
+so maximise her leverage."** `MUM_GROSS_X=9.5` — the highest setting at which
+her stop still fires (death at exactly 10.0x) — cap $3,000, kill switch
+ARMED so the disarm token is his own first-trade act. At $300: clip
+$712.50 × 4 slots = $2,850 gross at full, all-slots-stop 38% ($114),
+liquidation 0.53% behind the stop on a correlated basket — every number
+published on the row each loop.]
+
+**The earlier sizing suggestion, kept for the record:** at `MUM_GROSS_X=1.0`
+every close grades the same hypothesis at lower stakes; the control arm's
+verdict is multiplier-invariant either way.
 
 ---
 

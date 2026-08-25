@@ -34,13 +34,28 @@ OUTSIDE the block under test, and the missing-needle check refused to vouch
 rather than passing vacuously ((po): a check that inspects nothing must not
 report clean). The sentinel now closes at the LAST live rule.
 
-**A TRANSCRIPTION CALL, recorded because it was close:** the pasted keys
-render with hyphens at line ends, which reads as soft wrapping — but the
-second private-key line is only 16 characters and still ends in a hyphen,
-and a renderer breaks lines AT real hyphens, not mid-short-line. The hyphens
-are characters of Lighter's segmented key format; the key is passed verbatim.
-If the signer refuses it, the fallback is a hyphen-stripped redispatch, and
-the row appearing on /pnl.json is the only receipt either way ((iw)/(fd):
+**A TRANSCRIPTION CALL, MADE, REFUTED BY THE SIGNER, AND CORRECTED IN PLACE
+(I12):** the pasted keys render with hyphens at line ends. I reasoned from
+line-break positions that the hyphens were real characters of a segmented key
+format and passed the key verbatim — and the venue's own signer answered
+with the ground truth: `encoding/hex: invalid byte: U+002D '-'`, three crash
+loops deep in mum-live's first container, `status: error` on the row within
+four minutes of boot. The hyphens were display hyphenation after all; the
+key is pure 80-hex. The declared fallback executed exactly as pre-registered:
+a variables-only one-shot (`mum-live-config.yml` — no checkout, no `railway
+up`, because the deployed IMAGE was right and only the env was wrong) set the
+stripped key, and the same dispatch carried Eamon's launch config, which
+arrived between the two passes: **$300 deposit · `MUM_GROSS_X=9.5`** (his
+"maximise her leverage": the highest setting at which her −4% stop still
+fires before liquidation — stop-death is at exactly 10.0x; at 9.5x the
+all-slots-stop is 38% of equity and liquidation sits 0.53% behind the stop,
+published on the row every loop) · **cap $3,000** (backstop above the $2,850
+gross target so the cap never silently starves slots, the (sr) lesson) · and
+**`REAL_MONEY_KILL=ARMED`** — flipped back from the provisioner's disarm
+because Eamon asked for the button himself: *"send me a link to when you want
+me to disarm I understand and let her first trade go!"* She boots, scans and
+publishes with the switch armed; his flip to the token is her first trade.
+The row appearing healthy on /pnl.json is the only receipt ((iw)/(fd):
 verify by `extra.build`+`build_n` against the avolive COPY set, never a green
 run). The feed-following registries (DECLARED_LIVE, the board/proprioception
 cohort defaults, deploy_live_verify, agronomy BookSpec, respiration,
