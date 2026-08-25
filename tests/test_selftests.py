@@ -70,6 +70,13 @@ SELFTEST_MODULES = [
     # 18-Aug, and the first one voided a round on 19-Aug in the session that
     # wrote this.
     "scripts.mutate",
+    # [2026-08-25 (tk)] the LIVE P&L + SYNC AUDIT. --selftest is offline and
+    # pure (a fixture payload in the dashboard's own shape; no network, no
+    # git, no DB — the network path is main()'s, not selftest()'s), so it
+    # belongs here and not in SELFTEST_EXCLUDE. Registered in the round that
+    # added the tool, caught by this very guard on the PR's first CI run —
+    # the "selftest nobody runs" shape, prevented by its own detector.
+    "scripts.live_pnl_audit",
     # [2026-08-18 (qd)/I21] the WINNERS' DOCKET. SELFTEST_MODULES and
     # deliberately NOT ENFORCED_AUDITS, per this file's own rule: its verdict
     # reads the live ledger, which moves with every close and no code change.
