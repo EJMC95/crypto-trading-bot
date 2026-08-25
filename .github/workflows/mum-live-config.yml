@@ -1,0 +1,94 @@
+# One-shot VARIABLES-ONLY config for mum-live — DELETE AFTER USE (the (lr)
+# rule). [2026-08-25 (te)] No checkout, no `railway up`: the deployed image is
+# already the right tree; a variable change makes Railway redeploy it with the
+# new env. Exists because the provisioner's first pass carried the key with
+# display hyphens and the signer refused them (encoding/hex: U+002D), and
+# because Eamon's launch config arrived after the first pass ($300 deposit,
+# maximise leverage, kill switch ARMED so the disarm is HIS act).
+# Credential inputs flow straight into `railway variables --set` and are never
+# echoed — logs carry names only. Also prints the service's dashboard URL so
+# the operator gets a direct link to the variables page for the disarm.
+name: Configure mum-live
+on:
+  workflow_dispatch:
+    inputs:
+      api_private_key:
+        description: "Lighter API private key (pure hex; env only — never in the repo)"
+        required: false
+        default: ""
+        type: string
+      gross_x:
+        description: "MUM_GROSS_X"
+        required: false
+        default: ""
+        type: string
+      max_notional:
+        description: "FREQTRADE_MUM_MAX_NOTIONAL"
+        required: false
+        default: ""
+        type: string
+      kill:
+        description: "REAL_MONEY_KILL value (ARMED blocks orders; the disarm token lets her trade)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Set variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IN_PRIVKEY: ${{ inputs.api_private_key }}
+          IN_GROSS: ${{ inputs.gross_x }}
+          IN_CAP: ${{ inputs.max_notional }}
+          IN_KILL: ${{ inputs.kill }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          SVC="mum-live"
+          args=()
+          [ -n "${IN_PRIVKEY:-}" ] && args+=(--set "LIGHTER_API_PRIVATE_KEY=${IN_PRIVKEY}")
+          [ -n "${IN_GROSS:-}" ]   && args+=(--set "MUM_GROSS_X=${IN_GROSS}")
+          [ -n "${IN_CAP:-}" ]     && args+=(--set "FREQTRADE_MUM_MAX_NOTIONAL=${IN_CAP}")
+          [ -n "${IN_KILL:-}" ]    && args+=(--set "REAL_MONEY_KILL=${IN_KILL}")
+          if [ "${#args[@]}" -eq 0 ]; then
+            echo "::error::no inputs given — nothing to set"; exit 1
+          fi
+          echo "::group::$SVC — set variables (names only in this log)"
+          railway variables --service "$SVC" "${args[@]}" \
+            || { echo "::error::$SVC variable set failed"; exit 1; }
+          echo "variables applied; Railway redeploys the existing image with the new env"
+          echo "::endgroup::"
+          echo "::group::$SVC — dashboard link for the operator"
+          railway status --json > /tmp/status.json || true
+          cat > /tmp/link.py <<'PYEOF'
+          import json, sys
+          svc_name, path = sys.argv[1], sys.argv[2]
+          try:
+              d = json.load(open(path))
+          except Exception as e:
+              print("could not parse railway status:", e); raise SystemExit(0)
+          pid = d.get("id") or (d.get("project") or {}).get("id")
+          def walk(o):
+              if isinstance(o, dict):
+                  if o.get("name") == svc_name and o.get("id"):
+                      yield o["id"]
+                  for v in o.values():
+                      yield from walk(v)
+              elif isinstance(o, list):
+                  for v in o:
+                      yield from walk(v)
+          sids = list(walk(d))
+          if pid and sids:
+              print(f"DASHBOARD: https://railway.app/project/{pid}/service/{sids[0]}/variables")
+          else:
+              print("ids not found; open railway.app -> project -> mum-live -> Variables")
+          PYEOF
+          python3 /tmp/link.py "$SVC" /tmp/status.json || true
+          echo "::endgroup::"
