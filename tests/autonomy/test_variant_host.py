@@ -547,6 +547,47 @@ def test_mum_boots_and_completes_a_cycle_as_HERSELF():
         assert ordr[1]["shadow"] is False
 
 
+def test_manual_pnl_attestation_reaches_the_row_and_only_the_row():
+    """[2026-08-25 (td)] Eamon's manual trades flowed into 🙏 Avo's published
+    P&L (venue equity cannot tell his fills from the bot's), so the board cut
+    her clip 0.75x for losses that were never hers. `<PFX>_MANUAL_PNL_USD`
+    attests the manual total and holds it OUT of pnl_abs — per-book (a mum
+    attestation must not move Avo), a LEVEL (idempotent), garbage -> 0.0, and
+    ALWAYS published so 0.0 is visible rather than absent."""
+    # per-book namespacing + garbage degrade
+    with loaded(MUM_MANUAL_PNL_USD="-50") as m:
+        assert m.MANUAL_PNL_USD == 0.0, "mum's attestation leaked into Avo"
+    with loaded(AVO_MANUAL_PNL_USD="abc") as m:
+        assert m.MANUAL_PNL_USD == 0.0
+    with loaded(AVO_MANUAL_PNL_USD="nan") as m:
+        assert m.MANUAL_PNL_USD == 0.0
+    # the fold, driven through a real cycle: published pnl_abs excludes the
+    # attested manual total, while equity stays venue truth
+    with loaded(AVO_MANUAL_PNL_USD="-66.4") as m:
+        assert m.MANUAL_PNL_USD == -66.4
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        pub = box["published"][-1][1]
+        ex = pub["extra"]
+        assert ex["manual_pnl_usd"] == -66.4
+        # equity 200, no baseline in fresh state -> baseline adopts equity,
+        # so pnl reads -cap_adj - manual = +66.4 relative fold; the exact
+        # value depends on the adopt path — assert the FOLD, not the level:
+        # a zero-attestation run of the same fixture must differ by 66.4.
+        pnl_with = pub["pnl_abs"]
+    with loaded() as m0:
+        with _driven(m0) as box0:
+            m0.main(_ctx={"venue": box0["venue"], "rails": box0["rails"]},
+                    once=True)
+        pub0 = box0["published"][-1][1]
+        assert pub0["extra"]["manual_pnl_usd"] == 0.0, \
+            "zero must be published, not omitted"
+        if pnl_with is not None and pub0["pnl_abs"] is not None:
+            assert abs((pnl_with - pub0["pnl_abs"]) - 66.4) < 0.02, \
+                (pnl_with, pub0["pnl_abs"])
+
+
 def test_custom_exit_fires_on_the_LIVE_arm():
     """[2026-08-25] THE HOST NEVER CALLED S.custom_exit. The family loop has
     called it duck-typed since (ro) (stop -> roi -> custom_exit -> signal);

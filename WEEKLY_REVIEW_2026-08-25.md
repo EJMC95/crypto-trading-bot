@@ -90,8 +90,10 @@ lose, georgia's stop-widening refuted by the calibrated replay.
    ALL breakoutup — while deploying a **median $21 clip, ~16% of its own
    book**. It is also the only book the allocation organ's claim licenses to
    expand (target $6,208 vs $1,000) and the only book `on_track` for the gate
-   (eta ~27d). The clip cage and slot cap are the binding levers; widening
-   either is a shadow-lane act with I19 evidence already in hand.
+   (eta ~27d). **EXECUTED 25-Aug ((td))**: risk budget 1.5 → 3.0, clip
+   ceiling derived from the sizing-safety guard's own 1.2x funding bar ($95 —
+   the guard refused a first draft at $160, correctly). The next notch grades
+   on the new closes.
 2. **The pre-registered winners are CONFIRMING — one of them.** The (qd)
    winners' docket registered two candidates on 18-Aug. Taker `exit:hold`
    fresh sample: **n=10, +5.86%/trade, t=3.38, +$42.87 — 90% of the taker's
@@ -256,12 +258,15 @@ by the regen wipes — recoverability from state history is a carried check.
    The watchdog is paging STALE correctly. It needs a redeploy — its
    auto-deploy rule is ACTIVE, so the next push touching its files
    resurrects it; failing that, a manual `railway up`.
-2. **🙏 avo live's ledger disagrees with the venue by ~$63.** Paid-in
-   ($62.80 + $317.76) minus equity ($317.77) = **−$62.79 real**, while her
-   paper ledger reads +$0.51 — and the gap hides in daily-halt flatten closes
-   booked at $0.00 on 23/24-Aug. The venue number is truth; the LEDGER is
-   under-recording real losses, which silently flatters every grade computed
-   from it. This is the top real-money audit item carried out of this review.
+2. **🙏 avo live's ~$63 gap — RESOLVED 25-Aug ((td), corrected in place per
+   I12).** The cause was operator information no payload could contain:
+   Eamon's own manual trades on the sub-account. The venue told the truth
+   about the ACCOUNT, the ledger told the truth about the BOT, and `pnl_abs`
+   attributed his fills to her — cutting her clip 0.75× via the board's
+   backstop and tripping her daily halts with losses that were never hers.
+   Fixed by the `<PFX>_MANUAL_PNL_USD` attestation (held out of published
+   P&L, always on the row); he sets the env, the board recomputes, her clip
+   comes back.
 3. **The fleet's immune system was erasing an honest census — FIXED.** The
    judge publishes `phase="stood_down"` since (ta); `fleet_immune`'s phase
    whitelist predated the word, flagged it SICK, and `fleet_regen` clobbered
@@ -278,9 +283,12 @@ by the regen wipes — recoverability from state history is a carried check.
 
 ## 8 · Carried forward (beyond HANDOFF.md's standing 15)
 
-* **Avo live ledger audit (§7.2)** — top real-money item.
+* ~~Avo live ledger audit (§7.2)~~ — **RESOLVED (td)**: Eamon's manual
+  trades, attested out via `<PFX>_MANUAL_PNL_USD`; he sets the env value.
 * **nav-cook restart + postmortem of the second freeze (§7.1).**
-* **Taker sizing decision (§2.1)** and **board backstop re-derivation (§2.3)**.
+* ~~Taker sizing (§2.1)~~ — **EXECUTED (td)** at 2x; next notch grades on
+  the new closes. **Board backstop re-derivation (§2.3)** still open
+  (era-scoped attributed P&L — LEVERAGE_PROGRAM Phase 3).
 * **⚖️ Counterweight keep-or-retire lands ~28-Aug** — decide it on its date.
 * **Judge lane for the current live pair (§6)** — the promotion pipeline's
   revival is a design item: what is the paired bar when the live book's twin

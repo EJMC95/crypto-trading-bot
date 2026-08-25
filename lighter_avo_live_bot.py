@@ -258,6 +258,32 @@ except (TypeError, ValueError):
 #: about it.
 GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
+#: [2026-08-25 (td)] OPERATOR-ATTESTED MANUAL-TRADE P&L. **Eamon, 25-Aug: "the
+#: losses come from manual trades I made (have learned my lesson and will let
+#: the bots do their thing lol)".** His manual fills on 🙏 Avo's sub-account
+#: flowed straight into the row's `pnl_abs` (equity is venue truth and the
+#: guard cannot tell his fills from the bot's), so the row read −$62.79 while
+#: the BOT's own record was positive — and the evidence board's restrict
+#: backstop cut her clip to 0.75x for losses that were never hers. This env is
+#: the attestation: the cumulative net P&L of MANUAL trading on this
+#: sub-account, held OUT of the bot's published P&L. A LEVEL, not an
+#: increment — idempotent across restarts by construction; update it only if
+#: manual trading ever happens again. Published on the row (`manual_pnl_usd`)
+#: so the attribution is the record, never a silent adjustment (I23).
+#: DECLARED LIMIT: it does NOT reach the daily-loss day anchor — a cumulative
+#: level cannot say WHICH day the manual trades hit, so a same-day manual
+#: loss can still trip the bot's daily rail (it did, 23/24-Aug). That residue
+#: is accepted: the rail failing SAFE on ambiguous losses is the right
+#: direction, and the fix is not trading manually on the bot's account.
+#: Unparseable/non-finite degrades to 0.0 — never a guess.
+try:
+    MANUAL_PNL_USD = float(_env("MANUAL_PNL_USD", "0") or 0.0)
+except (TypeError, ValueError):
+    MANUAL_PNL_USD = 0.0
+if MANUAL_PNL_USD != MANUAL_PNL_USD or \
+        MANUAL_PNL_USD in (float("inf"), float("-inf")):
+    MANUAL_PNL_USD = 0.0
+
 #: The DIVERSIFICATION-EARNED number, published beside the operator's setting
 #: rather than clamping it. `N_eff` is the correlation-aware count of
 #: INDEPENDENT bets in the held basket (I22: market count is not bet count) —
@@ -923,7 +949,10 @@ def main(_ctx=None, once=False):
 
         def _publish_row(eq, base_eq, cap_adj, live_pos, st,
                          status="online", extra_extra=None):
-            pnl = (eq - base_eq - cap_adj) \
+            # [(td)] manual trades are held OUT of the bot's P&L — the row
+            # grades the BOT's record; equity stays venue truth everywhere
+            # else (leverage, margin, drawdown arithmetic all unchanged).
+            pnl = (eq - base_eq - cap_adj - MANUAL_PNL_USD) \
                 if (eq is not None and base_eq is not None) else None
             # [(sr)] ONE effective clip, read by both `clip_usd` and `cap_slots`
             # — the cap census must describe the clip the row publishes, and a
@@ -1033,6 +1062,10 @@ def main(_ctx=None, once=False):
                     "live_clip_scale": live_scale,
                 },
                 "capital_adjust": round(cap_adj, 2),
+                # [(td)] the operator's manual-trade attestation, always
+                # published — 0.0 must be visibly "none attested", never
+                # byte-identical to "the field does not exist" (I18).
+                "manual_pnl_usd": round(MANUAL_PNL_USD, 2),
                 "initial_equity": base_eq,
                 # [2026-08-16 (no)] THE VENUE'S OWN MARGIN TRUTH. Until now
                 # "what leverage is this book at, and how close is it to a

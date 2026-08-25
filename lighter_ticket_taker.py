@@ -188,9 +188,30 @@ MAX_OPEN = int(os.environ.get("TT_MAX_OPEN", "6"))
 # Size so every position risks ~the same dollars: expected adverse move ~ half
 # the daily range, clip = RISK_USD / adverse, bounded. The brain still grades
 # per-lens on pnl_pct (per-clip), so sizing doesn't distort lens grading.
-RISK_USD = float(os.environ.get("TT_RISK_USD", "1.5"))
+# [2026-08-25 (td)] RISK_USD 1.5 -> 3.0 and CLIP_MAX 80 -> 95 — the weekly
+# review's #1 win-more item, executed under Eamon's "bigger bets" directive.
+# The evidence (I19), all on this book's OWN ledger: era long-breakoutup
+# +1.99%/trade t=2.52 (the brain's ONLY expand, 1.25x); the (qd)
+# pre-registered exit:hold follow-through CONFIRMING at n=10 +5.86%/t t=3.38;
+# the allocation organ's era claim licenses 4.0x (target $6,208 vs $1,000)
+# with NO consumer — while the book deployed a median $21 clip, ~16% of its
+# own equity, at 6/6 slots. The step is 2x on the risk budget, not the 4x
+# the claim licenses, per (sv): one notch generates the sample that grades
+# the next. Expectancy price: ZERO — sizing is %-invariant, entries
+# unchanged, capacity per (hc) so the era clock does not reset. Drawdown
+# arithmetic at the new caps: all-slots-stop 6 x $95 x 3% = $17.10 = 1.6%
+# of the book (15% bar); worst-case gross 6 x $95 = $570 = 0.54x equity —
+# unlevered, and see CLIP_MAX below for why 95 and not more.
+RISK_USD = float(os.environ.get("TT_RISK_USD", "3.0"))
 CLIP_MIN = float(os.environ.get("TT_CLIP_MIN", "20"))
-CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "80"))
+# CLIP_MAX is DERIVED from the fleet's own funding bar, not picked: the
+# sizing-safety guard (test_brain_live_sizing_safety) requires worst-case
+# gross — CLIP_MAX x BRAIN_GROSS_X (2.0) x MAX_OPEN (6) — to stay inside
+# 1.2x the book's $1,000 capital, because fill/slippage terms calibrated at
+# the designed clip become fiction above what the book could fund. $95 is
+# the largest ceiling strictly inside that bar ($95 x 2 x 6 = $1,140 <
+# $1,200); a first draft shipped 160 and the guard correctly refused it.
+CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "95"))
 TAKE_PROFIT = float(os.environ.get("TT_TP", "0.04"))       # +4%
 STOP_LOSS = float(os.environ.get("TT_SL", "-0.03"))        # -3%
 MAX_HOLD_H = float(os.environ.get("TT_MAX_HOLD_H", "48"))
@@ -3261,9 +3282,11 @@ def selftest():
     # constant-risk sizing: calm books size up, wild books size down, bounded
     assert vol_clip(None) == CLIP_USD, "no range data -> fallback clip"
     assert vol_clip(2.0) == CLIP_MAX, "calm 2%-range book hits the cap"
-    assert abs(vol_clip(6.0) - 50.0) < 1e-9, "6% range -> $50 (1.5/3%)"
-    assert abs(vol_clip(10.0) - 30.0) < 1e-9, "10% range -> $30"
-    assert vol_clip(30.0) == CLIP_MIN, "wild book floors at CLIP_MIN"
+    # [(td)] pins updated with RISK_USD 1.5 -> 3.0: the formula is unchanged
+    # (risk / half-range), only the budget doubled.
+    assert abs(vol_clip(10.0) - 60.0) < 1e-9, "10% range -> $60 (3.0/5%)"
+    assert abs(vol_clip(20.0) - 30.0) < 1e-9, "20% range -> $30"
+    assert vol_clip(60.0) == CLIP_MIN, "wild book floors at CLIP_MIN"
 
     # [2026-07-17 RUN-ONCE KILL SEMANTICS] the boot gate: the cap refuses, the
     # kill switch must NOT (it has to reach the flatten). The negative fixture
@@ -4194,7 +4217,7 @@ def _selftest_live():
         v = _StubVenue(equity=1000.0, fills={"AAA": 100.5})
         r = _StubRails(max_notional=150.0)
         main(_ctx={"venue": v, "rails": r, "broker": None})
-        assert v.opens == [("AAA", False, 0.5)], v.opens        # $50 clip @ 100
+        assert v.opens == [("AAA", False, 1.0)], v.opens  # $100 clip @ 100 ((td) 3.0/3%)
         assert len(captured["orders"]) == 1, captured["orders"]
         _o = captured["orders"][0][1]
         assert _o["shadow"] is False and _o["side"] == "sell"
@@ -4252,7 +4275,7 @@ def _selftest_live():
             v = _StubVenue(equity=1000.0, fills={"AAA": 100.5})
             main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
                        "broker": None})
-            assert v.opens == [("AAA", False, 0.5)], v.opens
+            assert v.opens == [("AAA", False, 1.0)], v.opens   # (td) $100 clip
         finally:
             globals()["BULL_MODE"] = _bm_was
 
@@ -4537,7 +4560,8 @@ def _selftest_live():
         #   0.0400  restored entry fee on the held long (1 @ 100)
         # + 0.0832  funding, TRUE 8h basis (1 * 104 * 1e-4 * 8)
         # + 0.0416  close fee at the EXIT price 104, not the entry
-        # + 0.0200  entry fee on the new divergence short (50/104 @ 104)
+        # + 0.0400  entry fee on the new divergence short (100/104 @ 104 —
+        #           (td) doubled the risk budget, so the clip is $100 now)
         _pub = captured["published"][-1][1]
         assert _pub["extra"]["venue"] == "lighter_shadow"
         # [2026-07-24 (df)] the heartbeat emits the process's OWN bull-mode read
@@ -4548,9 +4572,9 @@ def _selftest_live():
         # None in this shadow-path test) but the KEY must always be present.
         assert _pub["extra"]["max_open"] == MAX_OPEN
         assert "cap_usd" in _pub["extra"] and _pub["extra"]["cap_usd"] is None
-        assert abs(b2.fees - 0.1848) < 1e-4, b2.fees
+        assert abs(b2.fees - 0.2048) < 1e-4, b2.fees
         # THE basis detector: with the 8x bug the funding leg alone was 0.6656
-        # and this total would be 0.7672. This assertion is what fails if
+        # and this total would be 0.7872. This assertion is what fails if
         # anyone ever routes this accrual around funding_basis again.
         assert abs(b2.fees - 0.7672) > 1e-2, "8x funding over-accrual is BACK"
         # and it still takes new tickets (the entry pass survived the refactor)

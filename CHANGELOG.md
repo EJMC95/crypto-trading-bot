@@ -1,3 +1,66 @@
+## 2026-08-25 (td) — THE "LOSSES" WERE EAMON'S MANUAL TRADES, ATTESTED OUT OF THE BOTS' P&L — AND THE FLEET'S BEST SIGNAL GETS A 2x RISK BUDGET, WITH ITS CEILING DERIVED FROM THE GUARD THAT REFUSED MY FIRST DRAFT
+
+**Eamon, 25-Aug:** *"the losses come from manual trades I made (have learned my
+lesson and will let the bots do their thing lol) ... the major focus to be on
+increasing p n l fleet wide — enhancing the bots so they are leverage-able ...
+More opportunities, higher leverage; bigger bets ... Each bot must have its own
+arms and scanners and abilities that all get help from organs."*
+
+**THE ATTESTATION CLOSES (tc)'s TOP CARRIED ITEM — and the diagnosis flips.**
+The review carried "🙏 Avo's ledger disagrees with the venue by ~$63" as a
+telemetry audit. The cause was OPERATOR INFORMATION no payload could contain:
+Eamon's own manual fills on the sub-account. That re-reads everything: venue
+equity told the truth about the ACCOUNT, the bot's ledger told the truth about
+the BOT, and `pnl_abs = equity − baseline − adjust` attributed his trades to
+her — so the row read **−$62.79 while the bot's own record was positive**, the
+evidence board's restrict backstop cut her clip to **0.75x for losses that
+were never hers**, and his same-day manual losses are what tripped her 23/24-Aug
+daily-loss halts (the rail cannot tell whose loss it is — failing SAFE on
+ambiguous losses, working as designed). The fix is `<PFX>_MANUAL_PNL_USD` — an
+operator-attested LEVEL (idempotent by construction), held out of the published
+P&L only, ALWAYS published on the row (`manual_pnl_usd`, 0.0 visible rather
+than absent, I18/I23). DECLARED LIMIT: it cannot reach the daily day-anchor (a
+cumulative level has no dates), so same-day manual trading can still trip the
+rail — the durable fix is the one Eamon named himself. Suggested values in
+LEVERAGE_PROGRAM_2026-08-25.md; the board's backstop recomputes on its next
+cycle once the env lands, restoring her clip. Driven by
+`test_manual_pnl_attestation_reaches_the_row_and_only_the_row` (per-book
+namespacing, garbage→0.0, the fold asserted as a DIFFERENCE between two driven
+cycles so the baseline-adopt path cannot fake it).
+
+**🎫 THE TAKER'S RISK BUDGET DOUBLES — the review's #1 win-more item, executed
+under the directive.** `TT_RISK_USD` 1.5 → **3.0**, on this book's own ledger:
+era `long-breakoutup` +1.99%/trade t=2.52 (the brain's only expand), the (qd)
+pre-registered `exit:hold` follow-through confirming at n=10/+5.86%/t=3.38,
+the allocation organ's era claim licensing 4.0x with no consumer — while the
+book deployed a median **$21 clip, ~16% of its own equity, at 6/6 slots**. 2x
+not 4x, per (sv): one notch generates the sample that grades the next.
+Expectancy price ZERO (sizing is %-invariant; entries unchanged; capacity per
+(hc), no era reset). **AND THE CEILING IS DERIVED, NOT PICKED — because the
+guard refused my first draft.** I shipped `TT_CLIP_MAX` 160 and
+`test_brain_live_sizing_safety` went red: worst-case gross (CLIP_MAX × the
+brain's 2.0 gross × 6 slots) would reach **1.92x the book's own capital**, and
+a book that cannot fund its own worst case is mis-modelled — its fill terms
+become fiction in the direction that makes a bad book look gradeable. The
+largest ceiling strictly inside the 1.2x funding bar is **$95**
+($95×2×6=$1,140<$1,200), so that is the value, with the derivation in the
+constant's own comment. All-slots-stop at the new caps: 6×$95×3% = **1.6%** of
+the book. Five stale pins updated with the arithmetic re-derived leg by leg
+(the live selftest's fee total decomposes exactly: the new short's clip
+doubled, so its entry fee did — 0.2048, not a drift).
+
+**THE WEEK'S PROGRAM IS WRITTEN DOWN AND PHASED** —
+`LEVERAGE_PROGRAM_2026-08-25.md`: Phase 1 the fleet-wide leverage-readiness
+table (N_eff / vol-target / stop-death / $-per-notch on every living book,
+DECIDABILITY as the ceiling where the claim is not positive); Phase 2 per-book
+gross plumbing for shadows in claim order; Phase 3 the synchronicity spine
+(judge successor lane on the family twins, board backstop onto era-scoped
+attributed P&L, brain floors recalibrated for the 6.7x range, allocation
+consumers, nav-cook restart); Phase 4 live gross as operator notches with the
+arithmetic published; Phase 5 each book's own arms/thesis/census at its earned
+deploy. What it refuses, once: leverage on books with no positive claim, swept
+maxima, raised bars, turnover bought with expectancy.
+
 ## 2026-08-25 (tc) — THE WEEKLY REVIEW SHIPS 👩 MUM'S LAUNCH PREP AND FINDS THE LIVE HOST NEVER CALLED custom_exit — 🔮 GEORGIA'S REAL-MONEY ARM RAN WITHOUT HER OWN EXITS FOR THREE DAYS
 
 **Eamon, 25-Aug:** *"Full review of the last week — improvements, where we can
