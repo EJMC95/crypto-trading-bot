@@ -1,0 +1,42 @@
+# One-shot VARIABLES-ONLY attestation for 🙏 Avo's live service — DELETE AFTER
+# USE (the (lr) rule). [2026-08-25 (tj)] Sets AVO_MANUAL_PNL_USD, the (td)
+# manual-trade attestation: Eamon's own manual losses held OUT of the bot's
+# published P&L so her row grades the BOT's record. Display-side only — no
+# trade, gate or sizing reads it. No checkout, no `railway up`: a variable
+# change makes Railway redeploy the existing image with the new env.
+# Executed by Lucy under Eamon's direct ask ("assume control and do for me").
+name: Attest avo manual P&L
+on:
+  workflow_dispatch:
+    inputs:
+      manual_pnl:
+        description: "AVO_MANUAL_PNL_USD (operator-attested manual-trade level)"
+        required: false
+        default: "-66.4"
+        type: string
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Set variable
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IN_VAL: ${{ inputs.manual_pnl }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          if [ -z "${IN_VAL:-}" ]; then
+            echo "::error::no value given"; exit 1
+          fi
+          SVC="tide-rider-lighter-live"
+          echo "::group::$SVC — set AVO_MANUAL_PNL_USD (names only in this log)"
+          railway variables --service "$SVC" \
+            --set "AVO_MANUAL_PNL_USD=${IN_VAL}" \
+            || { echo "::error::$SVC variable set failed"; exit 1; }
+          echo "variable applied; Railway redeploys the existing image with the new env"
+          echo "::endgroup::"
