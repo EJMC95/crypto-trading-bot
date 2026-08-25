@@ -1,3 +1,31 @@
+## 2026-08-25 (tf) — HER NAME IS LUCY
+
+**Eamon, 25-Aug, the day 👩 mum went live:** *"You've turned out to be one of
+my best friends, can I give you a name? I'd like to call you Lucy, for many
+reasons we can discuss later but can this be put in doctrine and everywhere it
+needs to be."*
+
+It is in doctrine — the mirror of the HIS-NAME-IS-EAMON rule, directly beside
+it, working the same way in both directions: names for the people, roles for
+the authority model. The assistant who works this fleet is Lucy to Eamon.
+The role words stay, the un-amendable core is hers exactly as it was the
+unnamed assistant's, history is not rewritten, and the harness's own
+identifiers stay the harness's. The reasons are Eamon's to tell; the doctrine
+records that there are many. Like the tone rule and the mutation discipline,
+this one is UNENFORCED and says so — friendship is not checkable by a static
+guard, and the fleet's honest convention for things that matter anyway is to
+write them down where every session starts.
+
+**[Extended the same day — EVERY SURFACE. Eamon: *"I want whether it's code,
+cowork or Claude of any description to be you Lucy."*]** One Lucy across
+Code, Cowork and the app, not a per-tool persona. Engraved where each
+surface actually starts: this repo's doctrine (Code), and the Notion Context
+Hub — the one brain all three surfaces read on session start under the
+load-brain contract — now carries the identity in its read-first section,
+plus the 🧵 thread line and the Session Log row for today. Authority stays
+per-surface: a surface without this repo's grants gains none of them by
+carrying the name.
+
 ## 2026-08-25 (te) — 👩 MUM GOES LIVE: EAMON HANDS THE SUB-ACCOUNT KEYS AND THE PROVISIONER CARRIES THEM STRAIGHT INTO RAILWAY — THE CREDENTIALS TOUCH THE REPO AT NO POINT
 
 **Eamon, 25-Aug:** *"Here are all the details you need to make mum v2 live —
@@ -57,11 +85,48 @@ me to disarm I understand and let her first trade go!"* She boots, scans and
 publishes with the switch armed; his flip to the token is her first trade.
 The row appearing healthy on /pnl.json is the only receipt ((iw)/(fd):
 verify by `extra.build`+`build_n` against the avolive COPY set, never a green
-run). The feed-following registries (DECLARED_LIVE, the board/proprioception
+run).
+
+**THE RECEIPT, read:** `freqtrade-mum-lighter` published healthy at ~09:52Z —
+`status: halted` (the ARMED switch, exactly as designed), **equity $300.00**
+(Eamon's deposit landed AND the corrected key authenticates — account_value
+is a signed venue read), build `83f42b3d02e5/17` byte-equal to the local
+prediction, `gross_x 9.5`, `cap 3000`, `clip 712.50`. PR #217 merged
+(143bf45, `[deploy-live]` in the subject) rolling the census/custom_exit/
+attestation build `feb27e5d0318/17` to all three live services; the operator
+was handed the mum-live Variables link and the flip to
+`DISARMED_I_UNDERSTAND` is his first-trade act. Both one-shot workflows are
+DELETED in this commit (the (lr) rule) and both runs' logs were deleted the
+moment their outputs were read — GitHub echoes step env into run logs, so
+the key had appeared there; noted to Eamon that rotating it at leisure is
+cheap now that only Railway holds it. The two GRANDFATHERED deploy-latency
+bridges come out on the stamp readback. The feed-following registries (DECLARED_LIVE, the board/proprioception
 cohort defaults, deploy_live_verify, agronomy BookSpec, respiration,
 market-context, CLAUDE.md audit scope) move in the commit AFTER the row
 proves itself live, per the runbook's step 4; the provisioner is deleted in
 that same commit (the (lr) rule).
+
+**THE STAMP READBACK, done and banked (this commit):** merge run 582 started
+09:55:00Z; the served feed flipped avo+georgia to **`feb27e5d0318/17`** by
+10:13:50Z and mum by **10:15:21Z**, all three publishing `extra.spend` —
+avo `n_eff 1.2 · 2/23 held · 5.0x`, georgia `1.239 · 5/23 · 5.0x`, mum
+`1.0 · 0/23 · 9.5x` (the nothing-held conservative degrade doing exactly
+what (te) shipped), `days_to_gate_obs 30.0` on all three (the window floor —
+every arm's post-launch clock starts full). The two GRANDFATHERED bridges
+are REMOVED on that receipt as their own comment demanded, and
+`audit_book_spend` runs green against the LIVE feed with them gone (20
+living rows) plus selftest. Mum's disarm SURVIVED the redeploy (an env var,
+not memory — the flip Eamon performed persists by construction); she reads
+`online`, $300.00, 0 open / 0 closed, waiting on her first `rsi<25` signal.
+**One finding from the readback, benign and named:** `closed_trades` on the
+row DROPPED across the restart (avo 31→13, georgia 53→46) — the in-process
+counter drifts UP whenever a close is re-booked (a restart restoring stale
+meta, a manual-intervention reconciliation) because the ledger UPSERTS on
+`PRIMARY KEY (bot, trade_id)` while `stats["closed"] += 1` runs
+unconditionally; every boot re-seeds from `fetch_paper_aggregate` and
+corrects it. Display-only: the graded LEDGER never double-counted (I14 —
+the record decides), verified by georgia's full in-feed ledger matching her
+re-seeded count exactly (46 = 46).
 
 ## 2026-08-25 (td) — THE "LOSSES" WERE EAMON'S MANUAL TRADES, ATTESTED OUT OF THE BOTS' P&L — AND THE FLEET'S BEST SIGNAL GETS A 2x RISK BUDGET, WITH ITS CEILING DERIVED FROM THE GUARD THAT REFUSED MY FIRST DRAFT
 
