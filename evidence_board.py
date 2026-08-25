@@ -525,7 +525,13 @@ LIVE_CLIP_LEVERS = {FARMER_ROW: "live.clip_scale",
                     # consuming — the 17-Jul rule ("a row belongs there iff it
                     # is live AND consumes the lever"). Add her via
                     # EVBOARD_LIVE_ROWS on the day she is funded.
-                    "freqtrade-georgia-lighter": "live.georgia.clip_scale"}
+                    "freqtrade-georgia-lighter": "live.georgia.clip_scale",
+                    # [2026-08-25] 👩 mum's arm, mapped ahead of her funding —
+                    # the (sx) pattern verbatim: the map says WHICH lever, the
+                    # board acts on LIVE_ROWS alone, and she joins that via
+                    # EVBOARD_LIVE_ROWS only on the day she is live and
+                    # consuming. Runbook: MUM_GOLIVE_RUNBOOK.md.
+                    "freqtrade-mum-lighter": "live.mum.clip_scale"}
 
 
 def live_clip_lever(bot):

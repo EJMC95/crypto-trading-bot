@@ -282,7 +282,11 @@ _FAMILY_REASONS = {
 # :545 DayTraderGated cd4; carriers wired at :635-647), applied on EVERY close
 # (:778 `self.cooldown[coin] = now + cooldown_candles * tf_s`), not just stops.
 _FAMILY_COOLDOWN_H = {
-    "freqtrade-mum-lshadow": 24.0,           # TrendMomo   1d  x1
+    # [2026-08-25] 2.0, was 24.0 — the 24.0 described mum v1 (TrendMomo 1d x1),
+    # retired (rd) and revived as v2 (ro): OversoldRebound 1h, cooldown_candles
+    # 2 => 2h. A spec describing a book's previous self misprofiles her by 12x
+    # in the organ that asks whether she has room to grow — the (sl)/I23 class.
+    "freqtrade-mum-lshadow": 2.0,            # OversoldRebound 1h x2
     "freqtrade-dad-lshadow": 4.0,            # MomoBreakout 4h x1
     "freqtrade-avo-maria-lshadow": 4.0,      # SwingDip    4h  x1
     "freqtrade-georgia-lshadow": 1.0,        # DayTrader  15m  x4

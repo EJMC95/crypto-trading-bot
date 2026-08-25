@@ -103,6 +103,12 @@ ROW_ENTRY = {
     # UNMAPPED. 🔮 georgia now runs on that service.
     "perps-funding-lighter-lighter": "lighter_funding_bot.py",
     "freqtrade-georgia-lighter": "lighter_avo_live_bot.py",
+    # [2026-08-25] 👩 mum's live row, mapped PRE-provision per the (jb) gate —
+    # the day her service exists and stamps its first publish, currency must
+    # resolve it rather than fail on an unmapped row. NOT in DECLARED_LIVE:
+    # that set follows the FEED (audit_live_roster), and moves only when the
+    # row actually publishes venue=lighter_live. Runbook: MUM_GOLIVE_RUNBOOK.md.
+    "freqtrade-mum-lighter": "lighter_avo_live_bot.py",
     "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
     "perps-funding-spread-lshadow": "lighter_funding_spread_bot.py",
     "pm-abbott-lshadow": "parliament_main.py",

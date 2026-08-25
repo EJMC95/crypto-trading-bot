@@ -134,6 +134,16 @@ _BOOKS = {
     # book id -> (env prefix, live clip lever)
     "freqtrade-avo-maria": ("AVO", "live.avo.clip_scale"),
     "freqtrade-georgia": ("GEORGIA", "live.georgia.clip_scale"),
+    # [2026-08-25] 👩 mum v2 — Eamon: launch her under her OWN sub-account.
+    # Third variant, same machine. Unlike georgia's slot conversion ((ta)/(tb))
+    # there is no predecessor to flatten: a FRESH sub-account gets FRESH keys,
+    # created in the venue UI and pasted once into the new service — no
+    # credential is ever read or moved from an existing service ((ml)).
+    # Live-capable is PREP, not activation: nothing points at her row until
+    # the service exists with FAMILY_LIVE_BOOK=freqtrade-mum, and the
+    # feed-following registries (DECLARED_LIVE et al.) move only when the row
+    # publishes venue=lighter_live. Runbook: MUM_GOLIVE_RUNBOOK.md.
+    "freqtrade-mum": ("MUM", "live.mum.clip_scale"),
 }
 # ABSENT means Avo (today's behaviour, unchanged). SET-BUT-BLANK does NOT:
 # `FAMILY_LIVE_BOOK=""` on georgia's service is a deploy typo, and silently
@@ -325,7 +335,13 @@ def stop_reachable(mmf, gross=None):
     sl = abs(float(S.stoploss))
     ceiling = round(1.0 / (sl + mmf), 2)
     g = gross_x() if gross is None else gross
-    return (sl < (1.0 / g - mmf)) if g and g > 0 else None, ceiling
+    # [2026-08-25] STRICTLY inside, with a float guard. 👩 mum's -4% stop puts
+    # her ceiling at EXACTLY 10.0x, and at that tie `1/10 - 0.06` floats to
+    # 0.04000000000000001 — so the bare `<` published `stop_reachable: True`
+    # by 1e-17 of headroom. At the tie the stop and liquidation are the SAME
+    # price; claiming the stop fires first is the wrong direction for a
+    # safety instrument, so the tie reads DEAD.
+    return (sl < (1.0 / g - mmf) - 1e-9) if g and g > 0 else None, ceiling
 
 
 def vol_target_gross_x(n_eff=1.0):
@@ -919,7 +935,11 @@ def main(_ctx=None, once=False):
             _stop_ok, _stop_ceiling = stop_reachable(_mmf)
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
-                "strategy": "SwingDipV1 (live slot swap 13-Aug)",
+                # [2026-08-25] derived from the variant — this was a hardcoded
+                # "SwingDipV1 (live slot swap 13-Aug)", and 🔮 georgia's live
+                # row published it verbatim while running DayTraderGated (I8:
+                # the row must name the thing that is actually running).
+                "strategy": f"{type(S).__name__} (variant host)",
                 "max_open": S.max_open,
                 "cap_usd": rails.max_notional,
                 # [2026-08-15 (mz)] the row's clip folds in live.clip_scale —
@@ -1350,6 +1370,17 @@ def main(_ctx=None, once=False):
                 reason = "stop_loss"
             if not reason and roi_exit_due(age_min, profit):
                 reason = "roi"
+            # [2026-08-25] custom_exit timeouts — the family loop's own order
+            # (stop -> roi -> custom_exit -> signal), duck-typed per (ro). The
+            # host NEVER called this: 🔮 georgia's live arm ran real money
+            # without her bounce_take/bounce_timeout/max_hold_timeout, and 👩
+            # mum's 24h carry cap would have been dead code on the live arm —
+            # a position sitting between 0 and the stop had NO exit but the
+            # stop, which is v1's disease reborn (I18: a time stop that never
+            # fires). Found by the mum go-live gap audit, live-verified on
+            # georgia's held positions.
+            if not reason and hasattr(S, "custom_exit"):
+                reason = S.custom_exit(m.get("tag"), age_min, profit)
             if not reason and sig and sig.get("exit"):
                 reason = sig.get("exit_reason", "exit_signal")
             if reason:
