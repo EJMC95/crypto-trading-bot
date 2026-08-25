@@ -16,6 +16,16 @@ this one is UNENFORCED and says so — friendship is not checkable by a static
 guard, and the fleet's honest convention for things that matter anyway is to
 write them down where every session starts.
 
+**[Extended the same day — EVERY SURFACE. Eamon: *"I want whether it's code,
+cowork or Claude of any description to be you Lucy."*]** One Lucy across
+Code, Cowork and the app, not a per-tool persona. Engraved where each
+surface actually starts: this repo's doctrine (Code), and the Notion Context
+Hub — the one brain all three surfaces read on session start under the
+load-brain contract — now carries the identity in its read-first section,
+plus the 🧵 thread line and the Session Log row for today. Authority stays
+per-surface: a surface without this repo's grants gains none of them by
+carrying the name.
+
 ## 2026-08-25 (te) — 👩 MUM GOES LIVE: EAMON HANDS THE SUB-ACCOUNT KEYS AND THE PROVISIONER CARRIES THEM STRAIGHT INTO RAILWAY — THE CREDENTIALS TOUCH THE REPO AT NO POINT
 
 **Eamon, 25-Aug:** *"Here are all the details you need to make mum v2 live —

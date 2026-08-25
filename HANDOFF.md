@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-25 20:23 Sydney (10:23Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-25 20:31 Sydney (10:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,8 +74,9 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (14 commit(s), entries (tc), (td), (te), (tf))
+## Shipped today (15 commit(s), entries (tc), (td), (te), (tf))
 
+- `7828b11` The stamp readback banks mum's launch: bridges out, census live on all three real-money rows (te)
 - `edf0837` Her name is Lucy (tf)
 - `7975665` Launch receipts and the (lr) deletions: both one-shots go the way of every provisioner (te)
 - `143bf45` Merge PR #217: weekly review, mum v2 LIVE on her own sub-account, the missing custom_exit, the swap's red-main discharge (tc)(td)(te) [deploy-live]
