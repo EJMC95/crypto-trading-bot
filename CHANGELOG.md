@@ -1,3 +1,117 @@
+## 2026-08-25 (tc) — THE WEEKLY REVIEW SHIPS 👩 MUM'S LAUNCH PREP AND FINDS THE LIVE HOST NEVER CALLED custom_exit — 🔮 GEORGIA'S REAL-MONEY ARM RAN WITHOUT HER OWN EXITS FOR THREE DAYS
+
+**Eamon, 25-Aug:** *"Full review of the last week — improvements, where we can
+win more, less focus on risk more on profit, get mum v2 ready to launch under a
+sub account — please don't rebut me on it — fleet/organ/incubator/everything
+review."* The review is `WEEKLY_REVIEW_2026-08-25.md`; this entry is what the
+review pass CHANGED, because a review that only describes is half a pass.
+
+**👩 MUM V2 IS LIVE-CAPABLE — the third variant on the proven runner, prepped
+to the last operator act.** No rebuttal, and the bar stated once: her v2 era
+has ZERO closes (7 all-time = 3 v1 + 4 `v1_legacy` flattens, all excluded by
+era-keys-on-the-OPEN; window floor opens 18-Sep) — going live is Eamon's
+explicit act against the gate, the georgia precedent exactly. Shipped:
+`_BOOKS["freqtrade-mum"]` (unknown/blank still REFUSES); `live.mum.clip_scale`
+registered AND its prefix in `_LIVE_PREFIX_OWNERS` in the same commit — the
+(tb) registered-but-unwritable trap applied forward instead of re-learned;
+`ROW_ENTRY` pre-mapped per (jb); the board's `LIVE_CLIP_LEVERS` arm pre-mapped
+per (sx); the `[deploy-live-mum]` rule staged commented; a full `main()` boot
+smoke AS her (oversold tape → her cell opens on her row, her state key, her
+4-slot geometry); `MUM_GOLIVE_RUNBOOK.md` with her table — **3.7x is the last
+setting strictly inside the 15% bar, and her −4% stop's death ceiling lands at
+EXACTLY the 10x cap** (`1/(0.04+0.06) = 10.0`). That tie exposed a real
+defect: at G=10.0 the float arithmetic (`1/10 − 0.06 = 0.04000000000000001`)
+published `stop_reachable: true` by 1e-17 — a safety instrument claiming a
+dead stop is alive. The comparison now reads a tie as DEAD (−1e-9 guard).
+Fresh sub-account means FRESH KEYS pasted once — no credential is ever read
+from an existing service, the property (tb)'s plan change bought, free here.
+
+**THE GAP AUDIT'S HEADLINE IS NOT MUM'S — THE VARIANT HOST NEVER CALLED
+`S.custom_exit`.** The family loop has called it duck-typed since (ro)
+(stop → roi → custom_exit → signal), precisely because "a time stop that
+never fires is I18"; the live runner checked stop, roi and signal only. So
+👩 mum's 24h carry cap would have been DEAD CODE on the arm holding real
+money — v1's disease, a position between 0 and the stop with no exit at all,
+reborn at launch — and **🔮 georgia's live arm has been managing real
+positions since (tb) without her `bounce_take`/`bounce_timeout`/
+`max_hold_timeout`**. Fixed in the family's own order, pinned by a driven
+test (a restored position aged past the cap at −1% — no stop, no roi rung,
+no signal — must close by the time cap alone, on both books), mutation RED.
+Two siblings from the same audit: the live payload's `strategy` field was a
+hardcoded `"SwingDipV1 (live slot swap 13-Aug)"` — georgia's row publishes
+that lie today; now derived from the variant (I8) — and
+`deploy_live_verify.LIVE_SERVICES` still mapped `trail-blazer-live` to the
+Farmer's row and marker three days after (tb): the THIRTEENTH "who is live"
+registry, two beyond (tb)'s eleven. DECLARED, not fixed: her live arm runs
+the fixed −5% stop while her shadow trails an ATR ratchet — a live/shadow
+policy drift that gets its own measured pass, never a rushed rewrite. And the
+control arm lives only in the family shadow loop — mum's runbook points at
+the shadow twin's `extra.control` until the port lands (runbook §5), because
+porting a paired accumulator into a real-money host does not ride a review
+commit ((fz): ship narrow).
+
+**MAIN WAS RED ON SIX TESTS — the (ta)/(tb) hide+prune landed without five
+downstream syncs, all discharged here (I11):** `fleet_respiration.LIVE_BREATHS`
+and `market_context.LIVE_CADENCE_SEC` still named the pruned Farmer row (each
+module's own selftest said exactly what to do); `fleet_proprioception`'s
+selftest fixture graded a retired row and now drives a SYNTHETIC funding pair
+— which exposed the structural fact rather than papering it: **the
+live-funding grading lane has ZERO members until a funding book goes live
+again** (`grade_live` selects `"funding" in b` over LIVE_ROWS = avo+georgia).
+`audit_venue_purity`'s selftest pinned the OLD roster against a derivation
+that had correctly moved on (the pin rotted, not the code — it now asserts
+the Farmer's file is NOT live surface); `test_retirement_consistency` carried
+its own hardcoded live pair and now DERIVES from `fleet_books.DECLARED_LIVE`
+(the twelve-places rot, in the test about retirement consistency); and
+`test_margin_truth`'s mode assertion is SDK-aware like its sibling (without
+the `lighter` SDK the mode deliberately degrades to the raw code).
+
+**THE FLEET'S IMMUNE SYSTEM WAS ERASING AN HONEST CENSUS.** The judge
+publishes `phase="stood_down"` since (ta); `fleet_immune`'s phase whitelist
+predated the word, flagged the DELIBERATE census `unknown phase`, and
+`fleet_regen` (REPAIRABLE baseline `{"phase":"idle"}`) clobbered it back to
+"idle" every pass — the live bus payload IS that restore
+(`_regen: safe-baseline, restored 07:30:15Z`), each wipe destroying the
+judge's done/verdicts/growth memory and starving `impl_shortfall._xp_running`.
+One-line fix plus the negative control (a fresh stood_down payload must be
+QUIET), mutation-verified: reverting the whitelist reddens the selftest with
+exactly the original message. An organ's vocabulary change must reach the
+organ that polices its vocabulary. Recoverability of the judge's pre-22-Aug
+memory from state history is carried.
+
+**HOUSEKEEPING WITH TEETH:** `live.mum.clip_scale` joined
+`audit_lever_measurability.UNMEASURABLE_OK` DECLARED (extra.clip records the
+cut), and that entry's own standing owner note — "fold the two siblings in on
+the next pass that touches this guard" — was executed: `live.avo.clip_scale` +
+`live.clip_scale` folded, **ratchet 30 → 28**, so the pass that added a lever
+SHRANK the backlog. `fleet_agronomy._FAMILY_COOLDOWN_H` still described mum
+v1 (24h, "TrendMomo 1d") — corrected to v2's 2h (OversoldRebound 1h × 2), a
+12x misprofile in the organ that asks whether she has room to grow. Her
+live-row agronomy BookSpec is a DECLARED omission (`AGRONOMY_COVERAGE_OK`)
+deleted by the activation commit. The `farmer-live-swap-operator-steps`
+carried row is DELETED with its justification in place: it was SPENT (the
+swap executed 22-Aug) and its `closes_when` watched for a `georgia-live`
+service the (tb) in-place conversion made permanently unreachable — a
+carried row that can never close is the I11 mechanism silently broken. Full
+suite 2,409 passed / 0 failed — including the six that were red on main.
+
+**THE REVIEW'S OWN VERDICTS, one line each (the document has the numbers):**
+week realised −$33.49 over 590 shadow closes; live pair −$100.32 net of
+deposits ($893.67 vs $993.99 paid in), most of it open marks at 5x — and 🙏
+Avo's ledger disagrees with the venue by ~$63 (daily-halt flattens booked at
+$0.00), the top carried real-money audit. The strongest signal in the fleet
+is 🎫 taker `long-breakoutup` (era t=2.52; the (qd) pre-registered `exit:hold`
+follow-through CONFIRMS on its fresh sample — n=10, +5.86%/trade, t=3.38,
+90% of the taker's week — n at the MIN_N floor, stated) deploying a median
+$21 clip, ~16% of its own book. 🧭 nav-cook is down twice over (publisher
+frozen 20-Aug, loop stopped 23-Aug — the (ss) class recurring; watchdog
+paging correctly). The promotion pipeline is structurally dead end-to-end
+(stood-down judge, sterile funding lane since ~29-Jul, best candidate ever
+stranded at queue head) — now HONEST on the bus instead of erased. ⚖️
+Counterweight's pre-registered keep-or-retire lands ~28-Aug: three days.
+
+
+
 ## 2026-08-22 (tb) — THE SWAP EXECUTED: 💸 THE FARMER FLATTENED FOUR REAL SHORTS AND 🔮 GEORGIA TOOK THE SUB-ACCOUNT — PLUS THE ELEVEN REGISTRIES THAT EACH DECLARE "WHO IS LIVE"
 
 **Eamon, 22-Aug: *"Full permission for you to swap farmer and Georgia"*.**

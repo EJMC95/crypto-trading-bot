@@ -1,13 +1,8 @@
 # HANDOFF — start here
 
-_Generated 2026-08-22 14:13 Sydney (04:13Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-25 18:52 Sydney (08:52Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
-
-### `farmer-live-swap-operator-steps`  ·  owner: **OPERATOR**
-💸 the Farmer's LIVE arm is retired in code (ta) and 🔮 georgia's live arm is built, boot-smoked and deploy-routed — but the SUB-ACCOUNT has not moved. Three acts only Eamon can perform, IN THIS ORDER: (1) deploy the guard to `trail-blazer-live` with a `[deploy-live-farmer]` marker and wait for `extra.retired.open == 0` on the row — that is the flatten finishing, and it is the ONLY safe moment to move keys; (2) create the `georgia-live` service from Dockerfile.avolive and move the Lighter API keys + sub-account env onto it, adding FAMILY_LIVE_BOOK=freqtrade-georgia, GEORGIA_VENUE=lighter_live, FREQTRADE_GEORGIA_MAX_NOTIONAL and GEORGIA_GROSS_X; (3) uncomment the `[deploy-live-georgia]` rule in railway-redeploy.yml IN THE SAME COMMIT as the service. THE FOUR DECLARATIONS THAT FOLLOW THE FEED and must move with it, not before it (each is a tripwire checked AGAINST the live payload, so editing early fails the build): `fleet_books.DECLARED_LIVE`, `fleet_books.LIVE_DEPLOY`, `deploy_live_verify`'s service->row map, and `EVBOARD_LIVE_ROWS` + `PROP_LIVE_ROWS` on freqtrade-bots. Then hide + prune the Farmer's row once `extra.retired.open == 0`. Full detail: GEORGIA_GOLIVE_RUNBOOK.md.
-
-_Still open because:_ no session in this container has a Railway CLI, and two processes must never hold one sub-account at once — the Farmer would read georgia's positions as untracked and could flatten them. The ORDER is the safety property, not the individual steps.
 
 ### `funding-studies-inherit-the-rank-universe`  ·  owner: **session**
 (su) found `backtest_funding_lighter` selects its universe by RANK while the live bot filters on an absolute $10M/day floor only 11 of 212 markets clear — so its verdicts were measured on books the book refuses, and the gate table it produced INVERTS between universe 25 and 50. The loader now carries volume and `study_farmer_gate_minvol_2026-08-22` replays the honest population. **Four other scripts reuse that loader and have not been re-derived**: study_farmer_take_profit, backtest_farmer_breadth_lighter, backtest_funding_persistence and backtest_xsect_funding_lighter.
@@ -79,28 +74,10 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (20 commit(s), entries (st), (su), (sv), (sw), (sx), (sy), (sz), (ta))
+## Shipped today (0 commit(s))
 
-- `afad3f2` The slot swap proves itself by the row, not by a green run (ta)
-- `46f0ee6` Retire the Farmer's live arm; georgia takes the sub-account (st-ta)
-- `aabb658` The slot swap converts the service in place — no key is ever read (ta)
-- `35ba047` A retired arm is not a daily-loss halt — don't say so hourly forever (ta)
-- `107a856` Sync the claims about intent; leave the feed-following tripwires alone (ta)
-- `29bac3b` Drive the retirement decision instead of grepping for it — 3 more mutations (ta)
-- `d0ddc90` Record the drawdown-bar correction in the entry too (ta)
-- `3639d26` 3.0x is ON georgia's drawdown bar, not inside it — the (gv) trap (ta)
-- `d078e90` A --shared flag that silently drops a file, in the tool built against silent loss (ta)
-- `d1e2412` The (ta) changelog entry — dropped by a repeated --shared flag
-- `417a214` Retire the Farmer's live arm — georgia takes the sub-account (ta)
-- `71aeacf` Drive georgia through main() — the variant host was never run as her (sz)
-- `a12ce6f` 10x ceiling on both live books — and above 6.25x Avo's stop cannot fire (sy)
-- `44fe87f` 🔮 Georgia's live arm, as a variant of the proven runner (sx)
-- `9e5c60b` Wire the two 22-Aug studies into CI — the rot-guard caught my omission (sw)
-- `b071d4a` Keep the concentration instrument, and record why the cap was refused (su)
-- `cfc70bb` 🔮 Georgia's rate limiter was cutting her best trades (sv)
-- `8b1af4f` Carry what (st) and (su) found but could not close, and regenerate the handoff
-- `240f317` 💸 The Farmer's poor decisions are not a knob — and the replay was measuring the wrong books (su)
-- `63d4171` 🙏 Avo's row can finally say why it did not trade: the census, on both arms (st)
+_Nothing yet today._
+
 
 ## How this file stays honest
 
