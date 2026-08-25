@@ -135,7 +135,11 @@ JUDGED_PAIRS = {
         "shadow_bot": "freqtrade-georgia-lshadow",
         "xp_prefix": "xp.georgia.",
         "live_names": (),
-        "live_service": "georgia-live",
+        # [(tl)] CORRECTED from "georgia-live": she runs the Farmer's old
+        # service since the (ta) slot swap — service names lie, and this
+        # registry lied for a day until aiming a real one-shot at it forced
+        # the check. The audit-scope lesson's registry twin.
+        "live_service": "trail-blazer-live",
         "shadow_service": "family-lighter-shadow",
         "pnl_form": "price",
         "strip_exits": ("daily_loss", "kill_switch", "v1_legacy"),
@@ -178,7 +182,10 @@ JUDGED_PAIRS = {
         "shadow_bot": "perps-funding-lighter-lshadow",
         "xp_prefix": "xp.funding.",
         "live_names": (),
-        "live_service": "trail-blazer-live",
+        # [(tl)] None: the retired arm HAS no service — trail-blazer-live
+        # hosts 🔮 georgia since the (ta) swap, and a registry naming one
+        # service for two books is how a one-shot lands on the wrong row.
+        "live_service": None,
         "shadow_service": "funding-farmer-shadow",
         "pnl_form": "funding",
         "strip_exits": ("long_retired", "short_retired", "daily_loss"),

@@ -1,3 +1,29 @@
+## 2026-08-25 (tl) — GEORGIA'S MANUAL TRADES ATTESTED ON EAMON'S CONFIRMATION — AND AIMING THE ONE-SHOT CAUGHT THE PAIR REGISTRY LYING ABOUT HER SERVICE
+
+**Eamon, 25-Aug (night): "do the same for georgia please <3"** — confirming
+the (tk) audit's measured residual (four zero-basis 22-Aug flatten closes,
+ETH/ZEC/BTC/HYPE ≈ −$26.4: his manual trading, not hers). Executed by the
+(lr) one-shot pattern against `trail-blazer-live`, deleted after use, and
+READ BACK on the row: `manual_pnl_usd: -26.4`, published P&L
+**−$47.34 → −$20.94** (her bot-only record), `status: halted` THROUGH the
+variable-change restart — the (pq) durable halt's third live proof today.
+
+**THE CHECK BEFORE AIMING PAID:** (ti)'s day-old JUDGED_PAIRS registry said
+georgia's live service is `georgia-live`; the deploy registry's truth is
+`trail-blazer-live` (the (ta) slot swap — service names lie). Corrected in
+place, and the farmer pair's `live_service` goes to **None** — a retired arm
+has no service, and a registry naming ONE service for TWO books is exactly
+how a one-shot lands on the wrong row. The audit-scope lesson (a rule keyed
+to a list goes stale on every slot swap) now has its registry twin, caught
+the first time a real action consulted the field.
+
+Also this hour, recorded for the handoff: 🙏 avo's attestation was found
+ALREADY LANDED by the parallel (tk) session's standing audit (its first run
+caught the (td) value never reaching the container and fixed it) — the
+duplicate one-shot this session had registered was deleted unfired. Two
+sessions converging on the same gap and the payload arbitrating is the
+system working; the standing audit owns this class now.
+
 ## 2026-08-25 (tk) — THE STANDING AUDIT: DAILY/WEEKLY/MONTHLY LIVE-BOT P&L + DECLARED-vs-EFFECTIVE SYNC, AND ITS FIRST RUN CAUGHT THE (td) ATTESTATION NEVER LANDING
 
 **Eamon, 25-Aug (evening):** *"Daily and weekly and monthly audit of live

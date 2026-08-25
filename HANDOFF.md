@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-26 00:29 Sydney (14:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-26 07:28 Sydney (21:28Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,10 +74,17 @@ _Still open because:_ unmeasured; the per-book audit was still running.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (0 commit(s))
+## Shipped today (9 commit(s), entries (tj), (tk))
 
-_Nothing yet today._
-
+- `e5535a4` One-shot attestation for georgia's manual P&L (registered from main; deleted after use)
+- `b9515b6` The duplicate attestation one-shot goes the way of every provisioner — the (tk) session already executed it
+- `fc24edf` One-shot attestation workflow for avo's manual P&L (registered from main so dispatch resolves; deleted after use)
+- `2db5b3a` The attestation one-shot goes the way of every provisioner; the (tk) record carries its receipts (tk)
+- `1ebbb75` Merge PR #220: the standing live-bot audit, nav-cook un-muted, the attestation one-shot registered (tk)
+- `30dba6a` One-shot attestation config + the (tk) execution record: Eamon's full-permission morning (tk)
+- `b63035a` Merge origin/main: (ti)/(tj) in; the standing-audit entry renumbers (th)->(tk) on the merged entry's seniority
+- `7e85c73` Merge PR #222: the census's freshness reads the publisher's shape (tj)
+- `9d8876d` The census's first live run catches its own fixture bug — freshness now reads the publisher's shape (tj)
 
 ## How this file stays honest
 
