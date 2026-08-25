@@ -1,0 +1,72 @@
+# One-shot VARIABLES-ONLY config: the (td) manual-P&L attestations — DELETE
+# AFTER USE (the (lr) rule). [2026-08-25 (tk)] The attestation CODE shipped
+# with (td) and its VALUES never reached the containers; the standing audit's
+# first run caught the gap and Eamon's morning grant ("fix the above with full
+# permission") executes it. No checkout, no `railway up`: both live images
+# already run the attestation code — a variable change makes Railway redeploy
+# the existing image with the new env (the mum-live-config mechanics).
+#
+# TWO DISCIPLINES, from the incidents they answer:
+#   * HALT CHECK before dispatching a service ((pz) mechanics /
+#     [[lighter-flatten-silent-halt-redeploy-incident]]): the variable change
+#     RESTARTS the service and a restart wipes a memory-only daily-loss halt.
+#     Each service has its own optional input precisely so a halted book can
+#     be deferred — dispatch it only when its row's status is not "halted".
+#   * Names-only logging ((ml)): values never echo, even these (they are
+#     published on the rows anyway, but the habit is the guard).
+#
+# Verify by the ROW readback, never the green run: the row must publish
+# `manual_pnl_usd` equal to what was set.
+name: Configure live attestations
+on:
+  workflow_dispatch:
+    inputs:
+      avo_manual:
+        description: "AVO_MANUAL_PNL_USD on tide-rider-lighter-live (blank = skip)"
+        required: false
+        default: ""
+        type: string
+      georgia_manual:
+        description: "GEORGIA_MANUAL_PNL_USD on trail-blazer-live (blank = skip; check her row is not halted first)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Set attestation variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IN_AVO: ${{ inputs.avo_manual }}
+          IN_GEORGIA: ${{ inputs.georgia_manual }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          did=0
+          if [ -n "${IN_AVO:-}" ]; then
+            echo "::group::tide-rider-lighter-live — set AVO_MANUAL_PNL_USD (name only in this log)"
+            railway variables --service "tide-rider-lighter-live" \
+              --set "AVO_MANUAL_PNL_USD=${IN_AVO}" \
+              || { echo "::error::avo variable set failed"; exit 1; }
+            echo "applied; Railway redeploys the existing image with the new env"
+            echo "::endgroup::"
+            did=1
+          fi
+          if [ -n "${IN_GEORGIA:-}" ]; then
+            echo "::group::trail-blazer-live — set GEORGIA_MANUAL_PNL_USD (name only in this log)"
+            railway variables --service "trail-blazer-live" \
+              --set "GEORGIA_MANUAL_PNL_USD=${IN_GEORGIA}" \
+              || { echo "::error::georgia variable set failed"; exit 1; }
+            echo "applied; Railway redeploys the existing image with the new env"
+            echo "::endgroup::"
+            did=1
+          fi
+          if [ "$did" = "0" ]; then
+            echo "::error::no inputs given — nothing to set"; exit 1
+          fi
