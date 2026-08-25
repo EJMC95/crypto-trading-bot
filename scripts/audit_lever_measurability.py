@@ -107,19 +107,28 @@ UNMEASURABLE_OK = {
     # a spec pointing at a field nothing writes, which this guard's own header
     # names as the failure that "still reads as measurable".
     #
-    # Its two siblings — `live.clip_scale` (💸 Farmer) and `live.avo.clip_scale`
-    # (🙏 Avo) — are the same shape and sit in the ratchet's backlog of 30.
-    # Draining all three the same way is a one-line change once someone decides
-    # this reasoning is right; adding a fourth silently is what the ratchet
-    # exists to stop.
-    #
-    # OWNER: session — fold the two siblings in here (backlog 30 -> 28) on the
-    # next pass that touches this guard, or replace all three with a real spec
-    # if a profiling basis for a size multiplier is ever found.
+    # [2026-08-25] THE SIBLINGS ARE FOLDED IN — the standing owner note above
+    # this entry said "fold the two siblings in here (backlog 30 -> 28) on the
+    # next pass that touches this guard", and the pass that registered 👩 mum's
+    # arm (`live.mum.clip_scale`, the fourth of this shape) is that pass. All
+    # four share one consumer (`lighter_avo_live_bot._clip_scale_now` for the
+    # variants; the Farmer's shared dial for `live.clip_scale`) and all four
+    # record the quantity they cut on every close (`extra.clip`). The ratchet
+    # dropped 30 -> 28 with the fold, so this declaration BOUGHT backlog
+    # rather than spending it.
     "live.georgia.clip_scale":
         "size multiplier, gates no tape quantity; the clip it cuts IS recorded "
-        "on every close (extra.clip). Siblings live.clip_scale / "
-        "live.avo.clip_scale are the same shape. Owner: session.",
+        "on every close (extra.clip). Owner: session.",
+    "live.avo.clip_scale":
+        "size multiplier, same shape as live.georgia.clip_scale; extra.clip "
+        "records the cut on every close. Owner: session.",
+    "live.clip_scale":
+        "the Farmer's shared dial, same shape; extra.clip records the cut. "
+        "Owner: session.",
+    "live.mum.clip_scale":
+        "👩 mum's arm ([2026-08-25], registered ahead of her live row); same "
+        "shape, same shared consumer, extra.clip records the cut. "
+        "Owner: session.",
 }
 
 #: Levers steering a RETIRED book, DECLARED. KEPT rather than deleted because
@@ -165,7 +174,10 @@ DEAD_LEVER_OK = {
 #: THE RATCHET. Recorded on the day the guard shipped, from its own run. These
 #: may be LOWERED freely and may never be raised: raising one is how a class
 #: that is supposed to be draining quietly grows instead.
-RATCHET = {"unmeasurable": 30, "dead": 0}
+# [2026-08-25] 30 -> 28: live.avo.clip_scale + live.clip_scale folded into
+# UNMEASURABLE_OK per that entry's own standing owner note, on the pass that
+# added live.mum.clip_scale (declared, not backlogged).
+RATCHET = {"unmeasurable": 28, "dead": 0}
 
 
 def _quantities():

@@ -131,14 +131,17 @@ def test_the_taker_scales_risk_not_the_clip():
     import sys
     sys.path.insert(0, str(ROOT))
     tt = importlib.import_module("lighter_ticket_taker")
-    # the default path is untouched
-    assert tt.vol_clip(6.0) == pytest.approx(tt.RISK_USD / 0.03, abs=0.01)
+    # the default path is untouched — checked in the UNBOUND region: [(td)]
+    # doubled the risk budget, so 6% range now lands on the cap and the
+    # formula is visible only where the ceiling does not bind (10% range).
+    assert tt.vol_clip(10.0) == pytest.approx(tt.RISK_USD / 0.05, abs=0.01)
     assert tt.vol_clip(2.0) == tt.CLIP_MAX, "a calm book still hits the cap"
-    assert tt.vol_clip(30.0) == tt.CLIP_MIN
+    assert tt.vol_clip(60.0) == tt.CLIP_MIN
     assert tt.vol_clip(None) == tt.CLIP_USD
     # a doubled risk budget doubles the clip — where the ceiling allows
-    assert tt.vol_clip(10.0, risk_usd=tt.RISK_USD * 2) == pytest.approx(
-        2 * tt.vol_clip(10.0), abs=0.02)
+    # (20% range: $30 base, $60 doubled, both under the $95 cap)
+    assert tt.vol_clip(20.0, risk_usd=tt.RISK_USD * 2) == pytest.approx(
+        2 * tt.vol_clip(20.0), abs=0.02)
     # ...and the CEILING still binds, which is the property (so) destroyed
     assert tt.vol_clip(10.0, risk_usd=tt.RISK_USD * 1000) == tt.CLIP_MAX
     assert tt.vol_clip(10.0, risk_usd=tt.RISK_USD * 1000,

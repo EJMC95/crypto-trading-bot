@@ -134,6 +134,16 @@ _BOOKS = {
     # book id -> (env prefix, live clip lever)
     "freqtrade-avo-maria": ("AVO", "live.avo.clip_scale"),
     "freqtrade-georgia": ("GEORGIA", "live.georgia.clip_scale"),
+    # [2026-08-25] 👩 mum v2 — Eamon: launch her under her OWN sub-account.
+    # Third variant, same machine. Unlike georgia's slot conversion ((ta)/(tb))
+    # there is no predecessor to flatten: a FRESH sub-account gets FRESH keys,
+    # created in the venue UI and pasted once into the new service — no
+    # credential is ever read or moved from an existing service ((ml)).
+    # Live-capable is PREP, not activation: nothing points at her row until
+    # the service exists with FAMILY_LIVE_BOOK=freqtrade-mum, and the
+    # feed-following registries (DECLARED_LIVE et al.) move only when the row
+    # publishes venue=lighter_live. Runbook: MUM_GOLIVE_RUNBOOK.md.
+    "freqtrade-mum": ("MUM", "live.mum.clip_scale"),
 }
 # ABSENT means Avo (today's behaviour, unchanged). SET-BUT-BLANK does NOT:
 # `FAMILY_LIVE_BOOK=""` on georgia's service is a deploy typo, and silently
@@ -248,6 +258,32 @@ except (TypeError, ValueError):
 #: about it.
 GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
+#: [2026-08-25 (td)] OPERATOR-ATTESTED MANUAL-TRADE P&L. **Eamon, 25-Aug: "the
+#: losses come from manual trades I made (have learned my lesson and will let
+#: the bots do their thing lol)".** His manual fills on 🙏 Avo's sub-account
+#: flowed straight into the row's `pnl_abs` (equity is venue truth and the
+#: guard cannot tell his fills from the bot's), so the row read −$62.79 while
+#: the BOT's own record was positive — and the evidence board's restrict
+#: backstop cut her clip to 0.75x for losses that were never hers. This env is
+#: the attestation: the cumulative net P&L of MANUAL trading on this
+#: sub-account, held OUT of the bot's published P&L. A LEVEL, not an
+#: increment — idempotent across restarts by construction; update it only if
+#: manual trading ever happens again. Published on the row (`manual_pnl_usd`)
+#: so the attribution is the record, never a silent adjustment (I23).
+#: DECLARED LIMIT: it does NOT reach the daily-loss day anchor — a cumulative
+#: level cannot say WHICH day the manual trades hit, so a same-day manual
+#: loss can still trip the bot's daily rail (it did, 23/24-Aug). That residue
+#: is accepted: the rail failing SAFE on ambiguous losses is the right
+#: direction, and the fix is not trading manually on the bot's account.
+#: Unparseable/non-finite degrades to 0.0 — never a guess.
+try:
+    MANUAL_PNL_USD = float(_env("MANUAL_PNL_USD", "0") or 0.0)
+except (TypeError, ValueError):
+    MANUAL_PNL_USD = 0.0
+if MANUAL_PNL_USD != MANUAL_PNL_USD or \
+        MANUAL_PNL_USD in (float("inf"), float("-inf")):
+    MANUAL_PNL_USD = 0.0
+
 #: The DIVERSIFICATION-EARNED number, published beside the operator's setting
 #: rather than clamping it. `N_eff` is the correlation-aware count of
 #: INDEPENDENT bets in the held basket (I22: market count is not bet count) —
@@ -325,7 +361,13 @@ def stop_reachable(mmf, gross=None):
     sl = abs(float(S.stoploss))
     ceiling = round(1.0 / (sl + mmf), 2)
     g = gross_x() if gross is None else gross
-    return (sl < (1.0 / g - mmf)) if g and g > 0 else None, ceiling
+    # [2026-08-25] STRICTLY inside, with a float guard. 👩 mum's -4% stop puts
+    # her ceiling at EXACTLY 10.0x, and at that tie `1/10 - 0.06` floats to
+    # 0.04000000000000001 — so the bare `<` published `stop_reachable: True`
+    # by 1e-17 of headroom. At the tie the stop and liquidation are the SAME
+    # price; claiming the stop fires first is the wrong direction for a
+    # safety instrument, so the tie reads DEAD.
+    return (sl < (1.0 / g - mmf) - 1e-9) if g and g > 0 else None, ceiling
 
 
 def vol_target_gross_x(n_eff=1.0):
@@ -696,6 +738,10 @@ def main(_ctx=None, once=False):
     # thing that clears it (see the read site in the loop).
     halted_today = False
     _halt_day = None
+    # [(te)] I22 spend census: the last MEASURED basket n_eff, carried across
+    # cycles so the halt paths (which publish before the scan re-measures) can
+    # report the last known value instead of nothing. None until first measured.
+    spend_n_eff = None
 
     while True:
         t0 = time.time()
@@ -755,6 +801,14 @@ def main(_ctx=None, once=False):
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
+        # [(te)] the arm's own birth instant, persisted — the I22 spend
+        # census's days-to-gate FLOOR derives from it ((ks): every ETA a
+        # floor). An arm restored without one adopts NOW, which overstates
+        # the floor slightly — the fail-closed direction.
+        born_ts = float(state.get("born_ts") or 0.0)
+        if not born_ts:
+            born_ts = t0
+            state["born_ts"] = born_ts
         day_state = state.get("day_start") or {}
         day_start_equity = (day_state.get("equity")
                            if day_state.get("day") == cur_day else None)
@@ -907,7 +961,10 @@ def main(_ctx=None, once=False):
 
         def _publish_row(eq, base_eq, cap_adj, live_pos, st,
                          status="online", extra_extra=None):
-            pnl = (eq - base_eq - cap_adj) \
+            # [(td)] manual trades are held OUT of the bot's P&L — the row
+            # grades the BOT's record; equity stays venue truth everywhere
+            # else (leverage, margin, drawdown arithmetic all unchanged).
+            pnl = (eq - base_eq - cap_adj - MANUAL_PNL_USD) \
                 if (eq is not None and base_eq is not None) else None
             # [(sr)] ONE effective clip, read by both `clip_usd` and `cap_slots`
             # — the cap census must describe the clip the row publishes, and a
@@ -919,7 +976,11 @@ def main(_ctx=None, once=False):
             _stop_ok, _stop_ceiling = stop_reachable(_mmf)
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
-                "strategy": "SwingDipV1 (live slot swap 13-Aug)",
+                # [2026-08-25] derived from the variant — this was a hardcoded
+                # "SwingDipV1 (live slot swap 13-Aug)", and 🔮 georgia's live
+                # row published it verbatim while running DayTraderGated (I8:
+                # the row must name the thing that is actually running).
+                "strategy": f"{type(S).__name__} (variant host)",
                 "max_open": S.max_open,
                 "cap_usd": rails.max_notional,
                 # [2026-08-15 (mz)] the row's clip folds in live.clip_scale —
@@ -1013,6 +1074,36 @@ def main(_ctx=None, once=False):
                     "live_clip_scale": live_scale,
                 },
                 "capital_adjust": round(cap_adj, 2),
+                # [(td)] the operator's manual-trade attestation, always
+                # published — 0.0 must be visibly "none attested", never
+                # byte-identical to "the field does not exist" (I18).
+                "manual_pnl_usd": round(MANUAL_PNL_USD, 2),
+                # [(te)] THE I22 SPEND CENSUS, published every loop —
+                # audit_book_spend's first real test was this host's own two
+                # variants born after the 20-Aug cutoff. n_eff is the last
+                # MEASURED correlation-aware basket count (1.0 for an empty
+                # book — zero-to-one bet; never the raw symbol count, which
+                # the guard itself rejects as gaming). days_to_gate_obs is a
+                # FLOOR ((ks)): the 30d window remaining from the arm's own
+                # birth; the close-rate term tightens it once the arm has a
+                # rate worth quoting.
+                "spend": {
+                    "markets_scanned": len(universe),
+                    "markets_held": len(live_pos or {}),
+                    # unmeasured degrades to 1.0 — "assume ONE bet", the
+                    # conservative direction for a leverage census (never
+                    # diversification credit that was not measured; the same
+                    # degrade the vol target takes).
+                    "n_eff": (round(float(held_n_eff), 3)
+                              if isinstance(held_n_eff, (int, float))
+                              else (round(float(spend_n_eff), 3)
+                                    if isinstance(spend_n_eff, (int, float))
+                                    else 1.0)),
+                    "sides": "long",
+                    "gross_x": gross_x(),
+                    "days_to_gate_obs": round(
+                        max(0.0, 30.0 - (t0 - born_ts) / 86400.0), 1),
+                },
                 "initial_equity": base_eq,
                 # [2026-08-16 (no)] THE VENUE'S OWN MARGIN TRUTH. Until now
                 # "what leverage is this book at, and how close is it to a
@@ -1350,6 +1441,17 @@ def main(_ctx=None, once=False):
                 reason = "stop_loss"
             if not reason and roi_exit_due(age_min, profit):
                 reason = "roi"
+            # [2026-08-25] custom_exit timeouts — the family loop's own order
+            # (stop -> roi -> custom_exit -> signal), duck-typed per (ro). The
+            # host NEVER called this: 🔮 georgia's live arm ran real money
+            # without her bounce_take/bounce_timeout/max_hold_timeout, and 👩
+            # mum's 24h carry cap would have been dead code on the live arm —
+            # a position sitting between 0 and the stop had NO exit but the
+            # stop, which is v1's disease reborn (I18: a time stop that never
+            # fires). Found by the mum go-live gap audit, live-verified on
+            # georgia's held positions.
+            if not reason and hasattr(S, "custom_exit"):
+                reason = S.custom_exit(m.get("tag"), age_min, profit)
             if not reason and sig and sig.get("exit"):
                 reason = sig.get("exit_reason", "exit_signal")
             if reason:
@@ -1414,6 +1516,8 @@ def main(_ctx=None, once=False):
             except Exception:  # noqa: BLE001 — telemetry never breaks the loop
                 _rets[_s] = {}
         held_n_eff, held_rho = basket_n_eff(_rets, list(pos))
+        if isinstance(held_n_eff, (int, float)):
+            spend_n_eff = held_n_eff          # [(te)] carried for the census
 
         if entries_ok:
             # THE ONLY BEHAVIOURAL CHANGE: the sequence candidates are offered

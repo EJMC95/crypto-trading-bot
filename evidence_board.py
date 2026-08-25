@@ -508,7 +508,10 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
     # georgia took its sub-account, so the cohort follows the money. A retired
     # row here is not merely stale: `test_live_clip_cohort` treats it as a
     # defect, because the board would keep sizing a book that cannot trade.
-    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter").split(",")
+    # [2026-08-25 (te)] 👩 mum joins — live on her own sub-account, consuming
+    # `live.mum.clip_scale` through the variant host's `_clip_scale_now`.
+    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter,"
+    "freqtrade-mum-lighter").split(",")
     if s.strip()}
 # Per-row ARM: the lever each live row actually reads. The Farmer keeps
 # `live.clip_scale` — renaming a lever a real-money consumer is reading today
@@ -525,7 +528,13 @@ LIVE_CLIP_LEVERS = {FARMER_ROW: "live.clip_scale",
                     # consuming — the 17-Jul rule ("a row belongs there iff it
                     # is live AND consumes the lever"). Add her via
                     # EVBOARD_LIVE_ROWS on the day she is funded.
-                    "freqtrade-georgia-lighter": "live.georgia.clip_scale"}
+                    "freqtrade-georgia-lighter": "live.georgia.clip_scale",
+                    # [2026-08-25] 👩 mum's arm, mapped ahead of her funding —
+                    # the (sx) pattern verbatim: the map says WHICH lever, the
+                    # board acts on LIVE_ROWS alone, and she joins that via
+                    # EVBOARD_LIVE_ROWS only on the day she is live and
+                    # consuming. Runbook: MUM_GOLIVE_RUNBOOK.md.
+                    "freqtrade-mum-lighter": "live.mum.clip_scale"}
 
 
 def live_clip_lever(bot):

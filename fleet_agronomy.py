@@ -282,7 +282,11 @@ _FAMILY_REASONS = {
 # :545 DayTraderGated cd4; carriers wired at :635-647), applied on EVERY close
 # (:778 `self.cooldown[coin] = now + cooldown_candles * tf_s`), not just stops.
 _FAMILY_COOLDOWN_H = {
-    "freqtrade-mum-lshadow": 24.0,           # TrendMomo   1d  x1
+    # [2026-08-25] 2.0, was 24.0 — the 24.0 described mum v1 (TrendMomo 1d x1),
+    # retired (rd) and revived as v2 (ro): OversoldRebound 1h, cooldown_candles
+    # 2 => 2h. A spec describing a book's previous self misprofiles her by 12x
+    # in the organ that asks whether she has room to grow — the (sl)/I23 class.
+    "freqtrade-mum-lshadow": 2.0,            # OversoldRebound 1h x2
     "freqtrade-dad-lshadow": 4.0,            # MomoBreakout 4h x1
     "freqtrade-avo-maria-lshadow": 4.0,      # SwingDip    4h  x1
     "freqtrade-georgia-lshadow": 1.0,        # DayTrader  15m  x4
@@ -400,6 +404,23 @@ BOOKS = {b.row: b for b in [
              "5 of 6 go-live bars, failing only t=1.48 — an explicit operator "
              "act, not a gate pass, which is why the drawdown arithmetic on "
              "her row is the guardrail."),
+    # [2026-08-25 (te)] 👩 mum LIVE — the first live book born on a FRESH
+    # sub-account rather than a converted slot. Third variant on the shared
+    # runner; her v2 era had ZERO closes at launch (window floor 18-Sep), so
+    # going live is Eamon's explicit act with the control arm as the verdict
+    # instrument — stated on the row, not re-argued here.
+    BookSpec(
+        "freqtrade-mum-lighter", "lighter_avo_live_bot.py", live=True,
+        state_key="freqtrade-mum-lighter:live", knob_floor=4,
+        levers=("live.mum.clip_scale",),
+        expects=("fleet-risk", "coin-vetoes"),
+        note="👩 Mum LIVE on her own sub-account (te). Sizes off her OWN "
+             "`live.mum.clip_scale` (restrict-only, the (nj) split). Strategy "
+             "(OversoldRebound, 1h, -4% stop, 24h cap) imported from "
+             "lighter_family_bot, so BOTH files are live surface. Launched at "
+             "MUM_GROSS_X=1.0 per the leverage program — notches are earned "
+             "on her control arm's verdict, published on the shadow twin "
+             "until the host port lands."),
     # ---- SHADOW ------------------------------------------------------------
     BookSpec(
         "perps-funding-lighter-lshadow", "lighter_funding_bot.py",

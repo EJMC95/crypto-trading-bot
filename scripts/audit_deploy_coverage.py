@@ -823,24 +823,29 @@ def main():
 
 def _extract_live_marker_block():
     """The decide step's OPT-IN live-bot marker logic, lifted verbatim from the
-    workflow: the lines from `msgs="$(git log ...` through the fi that closes the
-    trail-blazer-live (Farmer) block. Returns the raw lines (list). Raises if the
-    gate is missing/unclosed — a real-money deploy gate that vanished must not
-    read as 'nothing to test'."""
+    workflow: the lines from `msgs="$(git log ...` through the fi that closes
+    the LAST live rule (👩 mum's, `mum-live`, since (te)). Returns the raw
+    lines (list). Raises if the gate is missing/unclosed — a real-money deploy
+    gate that vanished must not read as 'nothing to test'.
+
+    [(te)] The closing sentinel used to be `trail-blazer-live`, and adding
+    mum's rule AFTER georgia's silently fell outside the extracted block — the
+    selftest's own missing-needle check is what caught it, which is exactly
+    the 'refusing to vouch' arm doing its job."""
     lines = _read(WORKFLOW).splitlines()
     try:
         start = next(i for i, l in enumerate(lines) if 'msgs="$(git log' in l)
     except StopIteration:
         raise AssertionError("live-bot marker block not found (no `msgs=$(git log` "
                              "line) — the opt-in real-money deploy gate may be gone")
-    block, seen_farmer = [], False
+    block, seen_last = [], False
     for l in lines[start:]:
         block.append(l)
-        if "trail-blazer-live" in l:
-            seen_farmer = True
-        if seen_farmer and l.strip() == "fi":
+        if "mum-live" in l:
+            seen_last = True
+        if seen_last and l.strip() == "fi":
             return block
-    raise AssertionError("live-bot marker block never closed (no Farmer `fi`)")
+    raise AssertionError("live-bot marker block never closed (no mum `fi`)")
 
 
 def _marker_logic_selftest():
@@ -864,8 +869,12 @@ def _marker_logic_selftest():
     # has no live arm any more. The two real-money markers are the taker's
     # (🙏 Avo) and georgia's, and they gate DIFFERENT SERVICES OFF THE SAME
     # IMAGE — which is precisely why one-at-a-time still has to be provable.
-    for needle in ("[deploy-live-taker]", "[deploy-live-georgia]", "[deploy-live]",
-                   "tide-rider-lighter-live", "trail-blazer-live", "live_all"):
+    # [(te)] 👩 mum joins the live cohort: three books, one image, three
+    # markers — one-at-a-time now has three ways to be wrong.
+    for needle in ("[deploy-live-taker]", "[deploy-live-georgia]",
+                   "[deploy-live-mum]", "[deploy-live]",
+                   "tide-rider-lighter-live", "trail-blazer-live", "mum-live",
+                   "live_all"):
         assert needle in joined, f"marker gate missing {needle!r} — refusing to vouch"
     indent = min(len(l) - len(l.lstrip()) for l in block if l.strip())
     body = [l[indent:] if len(l) >= indent else l for l in block]
@@ -889,9 +898,10 @@ def _marker_logic_selftest():
     # moves SHADOW services only, and its old marker is now inert for live.
     T = "tide-rider-lighter-live"      # 🙏 Avo Maria
     G = "trail-blazer-live"            # 🔮 georgia — same service, new book (ta)
+    M = "mum-live"                     # 👩 mum — third book, own service (te)
     cases = [
         # HAZARD — an unmarked push must NEVER deploy a real-money book, and
-        # this is sharper than before: one file now feeds TWO live services.
+        # this is sharper than before: one file now feeds THREE live services.
         ("lighter_avo_live_bot.py", "tweak the shared runner", ""),
         ("lighter_family_bot.py", "strategy tweak", ""),
         ("venues/safety.py", "rails tweak", ""),
@@ -900,9 +910,11 @@ def _marker_logic_selftest():
         ("lighter_avo_live_bot.py", "ship [deploy-live-taker]", T),
         ("lighter_avo_live_bot.py", "ship [deploy-live-georgia]", G),
         ("lighter_family_bot.py", "georgia only [deploy-live-georgia]", G),
-        # ...and [deploy-live] still takes both, deliberately
-        ("lighter_avo_live_bot.py", "both [deploy-live]", f"{T},{G}"),
-        ("venues/safety.py", "shared [deploy-live]", f"{T},{G}"),
+        ("lighter_avo_live_bot.py", "ship [deploy-live-mum]", M),
+        ("lighter_family_bot.py", "mum only [deploy-live-mum]", M),
+        # ...and [deploy-live] still takes all three, deliberately
+        ("lighter_avo_live_bot.py", "all [deploy-live]", f"{T},{G},{M}"),
+        ("venues/safety.py", "shared [deploy-live]", f"{T},{G},{M}"),
         # THE FARMER HAS NO LIVE ARM. Its old marker must move NOTHING live —
         # if this ever returns a service, the retirement has been undone by a
         # routing edit rather than by a decision.

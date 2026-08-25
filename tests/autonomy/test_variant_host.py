@@ -107,8 +107,12 @@ def test_a_georgia_env_does_not_leak_into_avo():
 
 def test_an_unknown_book_REFUSES_rather_than_becoming_avo():
     """A typo must not point georgia's service at Avo's row, state key and
-    live positions. This is the one failure that trades another book's money."""
-    for bad in ("freqtrade-georgi", "georgia", "freqtrade-mum", "  "):
+    live positions. This is the one failure that trades another book's money.
+
+    [2026-08-25] "freqtrade-mum" moved OUT of this list the day she became
+    live-capable (Eamon's launch call) — "freqtrade-mums" and "mum" keep the
+    typo shapes covered."""
+    for bad in ("freqtrade-georgi", "georgia", "freqtrade-mums", "mum", "  "):
         with pytest.raises(SystemExit):
             with loaded(bad):
                 pass
@@ -151,6 +155,43 @@ def test_5x_means_something_different_on_georgia_and_the_code_knows_it():
         assert abs(a.vol_target_gross_x(1.0) - 1.5) < 1e-6
 
 
+# ---- 6b  👩 mum — the third variant (2026-08-25, Eamon's launch call) -----
+
+def test_mum_resolves_to_her_own_identity():
+    with loaded("freqtrade-mum") as m:
+        assert m.BOT_ROW == "freqtrade-mum-lighter"
+        assert m.SHADOW_ROW == "freqtrade-mum-lshadow"
+        assert m.STATE_KEY == "freqtrade-mum-lighter:live"
+        assert m._PFX == "MUM"
+        assert m.LIVE_CLIP_LEVER == "live.mum.clip_scale"
+        import lighter_family_bot as fam
+        assert m.S is next(s for s in fam.STRATEGIES
+                           if s.bot == "freqtrade-mum")
+        assert m.S.tf == "1h" and m.S.max_open == 4
+        assert abs(float(m.S.stoploss) + 0.04) < 1e-9
+        assert m.S.style == "oversold-1h"
+
+
+def test_a_mum_env_does_not_leak_into_avo():
+    """Three live services now run this image. The namespaces must not bleed."""
+    with loaded(MUM_GROSS_X="5", MUM_LOOP_SECONDS="7") as m:
+        assert m.GROSS_X == 1.0 and m.LOOP_SECONDS == 300
+
+
+def test_5x_on_mum_is_a_20pct_all_slots_stop_and_the_bar_allows_3_75():
+    """Her stop is -4%: the tightest of the three variants, so the same
+    multiplier is the SMALLEST book-level risk in the family —
+        all-slots-stop at 5x : mum 20% | georgia 25% | avo 50%
+        gross the 15% bar allows at N_eff 1: mum 3.75x | georgia 3.0x | avo 1.5x
+    Nothing hand-typed for her — the leverage layer reads `S.stoploss`."""
+    with loaded("freqtrade-mum", MUM_GROSS_X="5", MUM_GROSS_X_MAX="5") as m:
+        assert m.gross_x() == 5.0
+        assert abs(m.gross_x() * abs(float(m.S.stoploss)) - 0.20) < 1e-9
+        assert abs(m.vol_target_gross_x(1.0) - 3.75) < 1e-6
+        # the clip is the balance split across HER four slots
+        assert abs(m.clip_usd(500.0) - 500.0 * 5.0 / 4.0) < 1e-9
+
+
 def test_georgia_cannot_boot_without_her_own_venue_env():
     """`GEORGIA_VENUE`, not `AVO_VENUE` — and the refusal must SAY so, or the
     operator is sent to fix the wrong variable (I8)."""
@@ -170,13 +211,19 @@ def test_her_clip_lever_is_registered():
     name, so a live book whose arm does not exist has a dial nothing can turn
     — silent, and the reverse of registered-but-inert."""
     import fleet_tuning as ft
-    for book in ("freqtrade-avo-maria", "freqtrade-georgia"):
+    for book in ("freqtrade-avo-maria", "freqtrade-georgia", "freqtrade-mum"):
         with loaded(book) as m:
             assert m.LIVE_CLIP_LEVER in ft.LEVERS, m.LIVE_CLIP_LEVER
             cage = ft.LEVERS[m.LIVE_CLIP_LEVER]
             assert cage["hi"] == 1.0, \
                 "the consumer is restrict-only; hi>1 is inert authority"
             assert cage["lane"] == "lighter-live"
+            # [(tb)'s lesson, applied forward] registered AND writable: the
+            # lever's prefix must be in _LIVE_PREFIX_OWNERS or no author can
+            # ever move it — registered-but-inert with extra steps.
+            assert any(m.LIVE_CLIP_LEVER == p or m.LIVE_CLIP_LEVER.startswith(p)
+                       for p in ft._LIVE_PREFIX_OWNERS), \
+                f"{m.LIVE_CLIP_LEVER} is unwritable: no _LIVE_PREFIX_OWNERS entry"
 
 
 # ---- 8-11  [(sy)] the liquidation arithmetic ------------------------------
@@ -206,6 +253,10 @@ def test_an_unreadable_margin_publishes_NOTHING_rather_than_a_guess():
 @pytest.mark.parametrize("book,stop,ceiling", [
     ("freqtrade-avo-maria", 0.10, 6.25),
     ("freqtrade-georgia", 0.05, 9.09),
+    # 👩 mum's -4% stop puts her ceiling at EXACTLY the operator's 10x cap:
+    # 1/(0.04+0.06) = 10.0 — at 10x her stop is already dead code, so her
+    # runbook's "reachable" range is strictly below the ceiling.
+    ("freqtrade-mum", 0.04, 10.0),
 ])
 def test_the_stop_has_a_gross_ceiling_of_its_own(book, stop, ceiling):
     """THE NUMBER THAT DECIDES WHAT 10x MEANS. Liquidation arrives at
@@ -236,7 +287,7 @@ def test_the_ceiling_is_ten_and_is_a_ceiling_not_a_setting():
     """Eamon, 22-Aug: "let avo go up to 10x, and georgia also". GROSS_X_MAX is
     the bound; GROSS_X is what a service runs, and it still defaults to 1.0 —
     raising the ceiling must not lever an unconfigured book."""
-    for book in ("freqtrade-avo-maria", "freqtrade-georgia"):
+    for book in ("freqtrade-avo-maria", "freqtrade-georgia", "freqtrade-mum"):
         with loaded(book) as m:
             assert m.GROSS_X_MAX == 10.0
             assert m.GROSS_X == 1.0 and m.gross_x() == 1.0
@@ -260,13 +311,18 @@ def test_the_ceiling_is_ten_and_is_a_ceiling_not_a_setting():
 # the only place the identity has to survive contact with the loop.
 
 @contextlib.contextmanager
-def _driven(m):
+def _driven(m, tape="breakout"):
     """Stub the venue-facing surface of `m` and hand back the capture box.
 
     Patches are made on the MODULE OBJECTS (`bot_pnl_store`, `venues.marks`)
     and restored on the way out, because those are shared with every other test
     in the session — a leaked `store.publish` stub would silently swallow
-    another module's writes."""
+    another module's writes.
+
+    `tape` picks the fixture market: "breakout" (rising, breaks the 20-bar
+    high — what georgia's DayTrader and Avo's SwingDip machinery expects) or
+    "oversold" (monotone fall — RSI(14) pinned low and e50 < e200, the cell
+    👩 mum's OversoldRebound enters)."""
     import bot_pnl_store as store
     from venues import marks
 
@@ -274,10 +330,14 @@ def _driven(m):
            "printed": []}
 
     N = 240
-    c = [100.0 * (1.004 ** i) for i in range(N)]
-    c[-1] = c[-2] * 1.03                    # break the 20-bar high -> breakout
-    h = [x * 1.005 for x in c]
-    h[-1] = c[-1] * 1.001
+    if tape == "oversold":
+        c = [100.0 * (0.998 ** i) for i in range(N)]
+        h = [x * 1.002 for x in c]
+    else:
+        c = [100.0 * (1.004 ** i) for i in range(N)]
+        c[-1] = c[-2] * 1.03                # break the 20-bar high -> breakout
+        h = [x * 1.005 for x in c]
+        h[-1] = c[-1] * 1.001
     bars = {"t": list(range(N)), "o": c, "h": h,
             "l": [x * 0.995 for x in c], "c": c, "v": [1.0] * N}
 
@@ -452,6 +512,131 @@ def test_her_cycle_publishes_the_leverage_and_scan_blocks():
             "all_slots_stop_pct"] == 0.50
 
 
+def test_mum_boots_and_completes_a_cycle_as_HERSELF():
+    """[(sz)'s lesson, applied to the third variant before it costs money.]
+    One real cycle of `main()` as 👩 mum against an oversold tape: she must
+    publish to HER row, restore HER state key, open on HER cell
+    (`oversold-rebound`) and size off HER geometry (4 slots), never Avo's or
+    georgia's. Every check above reads a constant — this is where her
+    identity survives contact with the loop."""
+    with loaded("freqtrade-mum", MUM_GROSS_X="2") as m:
+        with _driven(m, tape="oversold") as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+
+        rows = [b for b, _ in box["published"]]
+        assert rows and set(rows) == {"freqtrade-mum-lighter"}, rows
+        assert not any("avo" in r or "georgia" in r for r in rows), rows
+        assert not any("avo" in k or "georgia" in k for k in box["state"]), \
+            list(box["state"])
+        assert "freqtrade-mum-lighter:live" in box["state"]
+
+        assert box["venue"].opens, "mum's oversold entry must open"
+        _coin, is_long, size = box["venue"].opens[0]
+        assert is_long is True
+        want = 200.0 * m.gross_x() / m.S.max_open       # HER four slots
+        got = size * box["venue"].pos[_coin]["entry"]
+        assert abs(got - want) < 1.0, (got, want, m.gross_x(), m.S.max_open)
+
+        pub = box["published"][-1][1]
+        pol = pub["extra"]["policy"]
+        assert pol["strategy"] == "oversold-1h", pol
+        assert pol["venue"] == "lighter_live"
+        ordr = box["orders"][0]
+        assert ordr[0] == "freqtrade-mum-lighter", ordr[0]
+        assert ordr[1]["shadow"] is False
+        # [(te)] the I22 spend census, complete on every publish — the guard's
+        # first real test was this host's own variants, and it fired.
+        spend = pub["extra"]["spend"]
+        for f in ("markets_scanned", "n_eff", "sides", "gross_x",
+                  "days_to_gate_obs"):
+            assert spend.get(f) is not None, (f, spend)
+        assert spend["sides"] == "long"
+        assert 0.0 <= spend["days_to_gate_obs"] <= 30.0, spend
+
+
+def test_manual_pnl_attestation_reaches_the_row_and_only_the_row():
+    """[2026-08-25 (td)] Eamon's manual trades flowed into 🙏 Avo's published
+    P&L (venue equity cannot tell his fills from the bot's), so the board cut
+    her clip 0.75x for losses that were never hers. `<PFX>_MANUAL_PNL_USD`
+    attests the manual total and holds it OUT of pnl_abs — per-book (a mum
+    attestation must not move Avo), a LEVEL (idempotent), garbage -> 0.0, and
+    ALWAYS published so 0.0 is visible rather than absent."""
+    # per-book namespacing + garbage degrade
+    with loaded(MUM_MANUAL_PNL_USD="-50") as m:
+        assert m.MANUAL_PNL_USD == 0.0, "mum's attestation leaked into Avo"
+    with loaded(AVO_MANUAL_PNL_USD="abc") as m:
+        assert m.MANUAL_PNL_USD == 0.0
+    with loaded(AVO_MANUAL_PNL_USD="nan") as m:
+        assert m.MANUAL_PNL_USD == 0.0
+    # the fold, driven through a real cycle: published pnl_abs excludes the
+    # attested manual total, while equity stays venue truth
+    with loaded(AVO_MANUAL_PNL_USD="-66.4") as m:
+        assert m.MANUAL_PNL_USD == -66.4
+        with _driven(m) as box:
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+        pub = box["published"][-1][1]
+        ex = pub["extra"]
+        assert ex["manual_pnl_usd"] == -66.4
+        # equity 200, no baseline in fresh state -> baseline adopts equity,
+        # so pnl reads -cap_adj - manual = +66.4 relative fold; the exact
+        # value depends on the adopt path — assert the FOLD, not the level:
+        # a zero-attestation run of the same fixture must differ by 66.4.
+        pnl_with = pub["pnl_abs"]
+    with loaded() as m0:
+        with _driven(m0) as box0:
+            m0.main(_ctx={"venue": box0["venue"], "rails": box0["rails"]},
+                    once=True)
+        pub0 = box0["published"][-1][1]
+        assert pub0["extra"]["manual_pnl_usd"] == 0.0, \
+            "zero must be published, not omitted"
+        if pnl_with is not None and pub0["pnl_abs"] is not None:
+            assert abs((pnl_with - pub0["pnl_abs"]) - 66.4) < 0.02, \
+                (pnl_with, pub0["pnl_abs"])
+
+
+def test_custom_exit_fires_on_the_LIVE_arm():
+    """[2026-08-25] THE HOST NEVER CALLED S.custom_exit. The family loop has
+    called it duck-typed since (ro) (stop -> roi -> custom_exit -> signal);
+    the live runner checked stop, roi and signal only — so 🔮 georgia's live
+    arm ran real money without her bounce_take/bounce_timeout/max_hold_timeout,
+    and 👩 mum's 24h carry cap would have been dead code on her live arm: a
+    position sitting between 0 and the stop had NO exit at all, which is v1's
+    disease (a month-long hold) reborn on the arm that holds real money.
+
+    Driven, not asserted: a restored position aged past the cap at −1% (no
+    stop, no roi rung, no exit signal) must close by the time cap alone."""
+    import time as _t
+    last = 100.0 * (0.998 ** 239)          # the oversold tape's final close
+    with loaded("freqtrade-mum") as m:
+        with _driven(m, tape="oversold") as box:
+            box["state"]["freqtrade-mum-lighter:live"] = {
+                "meta": {"BTC": {"entry": last * 1.0101,
+                                 "opened_ts": _t.time() - 25 * 3600.0,
+                                 "tag": "oversold-rebound"}}}
+            box["venue"].pos["BTC"] = {"size": 0.5, "entry": last * 1.0101}
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            assert "BTC" in box["venue"].closes, box["venue"].closes
+        reasons = [str(kw.get("reason")) for _, kw in box["paper"]]
+        assert any("max_hold" in r for r in reasons), reasons
+
+    last = 100.0 * (1.004 ** 238) * 1.03   # the breakout tape's final close
+    with loaded("freqtrade-georgia") as g:
+        with _driven(g) as box:
+            box["state"]["freqtrade-georgia-lighter:live"] = {
+                "meta": {"ETH": {"entry": last * 1.0101,
+                                 "opened_ts": _t.time() - 25 * 3600.0,
+                                 "tag": "range_on"}}}
+            box["venue"].pos["ETH"] = {"size": 0.1, "entry": last * 1.0101}
+            g.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                   once=True)
+            assert "ETH" in box["venue"].closes, box["venue"].closes
+        reasons = [str(kw.get("reason")) for _, kw in box["paper"]]
+        assert any("max_hold_timeout" in r for r in reasons), reasons
+
+
 def test_the_boot_gate_names_HER_cap_env_not_avos():
     """I8 on the one instruction a real-money service prints as it refuses to
     start. This message named `FREQTRADE_AVO_MARIA_MAX_NOTIONAL` verbatim, so
@@ -464,6 +649,16 @@ def test_the_boot_gate_names_HER_cap_env_not_avos():
                        once=True)
         assert "FREQTRADE_GEORGIA_MAX_NOTIONAL" in str(e.value), str(e.value)
         assert "AVO" not in str(e.value), str(e.value)
+    # ...and 👩 mum's refusal names HER cap, for the same I8 reason.
+    with loaded("freqtrade-mum") as m:
+        with _driven(m, tape="oversold") as box:
+            box["rails"].max_notional = None
+            with pytest.raises(SystemExit) as e:
+                m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
+                       once=True)
+        assert "FREQTRADE_MUM_MAX_NOTIONAL" in str(e.value), str(e.value)
+        assert "AVO" not in str(e.value) and "GEORGIA" not in str(e.value), \
+            str(e.value)
 
 
 def test_selftest_REFUSES_a_non_avo_book_rather_than_half_running():

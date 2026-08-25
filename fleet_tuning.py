@@ -124,6 +124,10 @@ _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
                        # `live.georgia.clip_scale` in LEVERS and stopped there,
                        # so it was unwritable by ANY author until this line.
                        "live.georgia.": "evidence-board",
+                       # [2026-08-25] 👩 mum's arm, registered WITH its lever
+                       # in one commit — the (tb) lesson applied forward
+                       # instead of re-learned.
+                       "live.mum.": "evidence-board",
                        "live.funding.": "experiment-judge"}
 
 
@@ -365,6 +369,19 @@ LEVERS = {
     "live.georgia.clip_scale": {
         "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
         "note": "🔮 georgia live clip multiplier, restrict-only; 1.0 = equity/slots",
+        "env_default": 1.0},
+    # [2026-08-25] 👩 mum's own arm, registered AHEAD of her live row — the
+    # same pre-registration georgia's got at (sx), for the same reason: an
+    # unregistered name silently returns the env default, so a live book
+    # whose arm does not exist has a dial nothing can turn. Same cage as her
+    # siblings' because the consumer is the SAME restrict-only code
+    # (`lighter_avo_live_bot._clip_scale_now`, min(1.0, ...)). Its prefix is
+    # in `_LIVE_PREFIX_OWNERS` in the SAME commit — (tb) measured that
+    # registering the lever and stopping there leaves it unwritable by any
+    # author, the registered-but-inert failure with extra steps.
+    "live.mum.clip_scale": {
+        "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
+        "note": "👩 mum live clip multiplier, restrict-only; 1.0 = equity/slots",
         "env_default": 1.0},
     # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
     # money). The experiment judge runs ONE candidate at a time here; while

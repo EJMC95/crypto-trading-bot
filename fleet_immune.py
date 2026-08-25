@@ -380,7 +380,16 @@ def organ_invariants(states, now):
     xp = states.get("xp-judge") or {}
     if _fresh(xp, now):
         ph = xp.get("phase")
-        if ph is not None and ph not in ("idle", "running", "promoted"):
+        # [2026-08-25] "stood_down" joined the known phases at (ta) — the
+        # judge deliberately publishes it when its live arm is retired
+        # (fleet_bus.RETIRED_LIVE_ARMS), instead of silently never promoting.
+        # This whitelist predated that phase, so the immune organ flagged the
+        # DELIBERATE census SICK and fleet_regen clobbered it back to "idle"
+        # every pass — erasing the (ta) I18 census and starving
+        # impl_shortfall's `_xp_running` read. An organ's own vocabulary
+        # change must reach the organ that polices its vocabulary.
+        if ph is not None and ph not in ("idle", "running", "promoted",
+                                         "stood_down"):
             sick("xp-judge", f"unknown phase {ph!r}")
 
     # [2026-07-30 (hh)] A LEDGER THAT IS NOT ONE BOOK'S RECORD. This is the
@@ -1332,6 +1341,14 @@ def _selftest():
     assert organs == {"lighter-market", "brain-lens-forward",
                       "regime-oracle", "xp-judge",
                       "fleet-proprioception", "golive-readiness"}, organs
+    # [2026-08-25] the DELIBERATE phase is QUIET: (ta)'s stood_down census was
+    # flagged sick by this very check, and fleet_regen then clobbered the
+    # judge's honest "my live arm is retired" back to "idle" every pass —
+    # erasing an I18 census with the fleet's own immune system. This negative
+    # control keeps that from returning.
+    _sd = organ_invariants({"xp-judge": {"updated": fresh, "ttl_sec": 10800,
+                                         "phase": "stood_down"}}, now)
+    assert not [i for i in _sd if i["organ"] == "xp-judge"], _sd
     _gl = [i["detail"] for i in inv if i["organ"] == "golive-readiness"]
     assert len(_gl) == 1, f"only the compromised book may be flagged: {_gl}"
     assert "dup-book" in _gl[0] and "TWO WRITERS" in _gl[0], _gl

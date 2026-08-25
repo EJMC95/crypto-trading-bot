@@ -84,45 +84,16 @@ def _has(path, needle):
 # "OPERATOR" = it needs a decision this repo may not make.
 # ---------------------------------------------------------------------------
 CARRIED = [
-    {
-        "id": "farmer-live-swap-operator-steps",
-        "owner": "OPERATOR",
-        "what": "💸 the Farmer's LIVE arm is retired in code (ta) and 🔮 "
-                "georgia's live arm is built, boot-smoked and deploy-routed — "
-                "but the SUB-ACCOUNT has not moved. Three acts only Eamon can "
-                "perform, IN THIS ORDER: (1) deploy the guard to "
-                "`trail-blazer-live` with a `[deploy-live-farmer]` marker and "
-                "wait for `extra.retired.open == 0` on the row — that is the "
-                "flatten finishing, and it is the ONLY safe moment to move "
-                "keys; (2) create the `georgia-live` service from "
-                "Dockerfile.avolive and move the Lighter API keys + "
-                "sub-account env onto it, adding FAMILY_LIVE_BOOK="
-                "freqtrade-georgia, GEORGIA_VENUE=lighter_live, "
-                "FREQTRADE_GEORGIA_MAX_NOTIONAL and GEORGIA_GROSS_X; "
-                "(3) uncomment the `[deploy-live-georgia]` rule in "
-                "railway-redeploy.yml IN THE SAME COMMIT as the service. "
-                "THE FOUR DECLARATIONS THAT FOLLOW THE FEED and must move "
-                "with it, not before it (each is a tripwire checked AGAINST "
-                "the live payload, so editing early fails the build): "
-                "`fleet_books.DECLARED_LIVE`, `fleet_books.LIVE_DEPLOY`, "
-                "`deploy_live_verify`'s service->row map, and "
-                "`EVBOARD_LIVE_ROWS` + `PROP_LIVE_ROWS` on freqtrade-bots. "
-                "Then hide + prune the Farmer's row once "
-                "`extra.retired.open == 0`. "
-                "Full detail: GEORGIA_GOLIVE_RUNBOOK.md.",
-        "why_open": "no session in this container has a Railway CLI, and two "
-                    "processes must never hold one sub-account at once — the "
-                    "Farmer would read georgia's positions as untracked and "
-                    "could flatten them. The ORDER is the safety property, "
-                    "not the individual steps.",
-        # closes when the deploy rule is live, which is the last of the three
-        # and cannot be done without the first two.
-        "closes_when": lambda: (
-            _has(".github/workflows/railway-redeploy.yml",
-                 'svcs="${svcs:+$svcs,}georgia-live"')
-            and not _has(".github/workflows/railway-redeploy.yml",
-                         '#   svcs="${svcs:+$svcs,}georgia-live"')),
-    },
+    # [2026-08-25 (tc)] `farmer-live-swap-operator-steps` DELETED — spent, and
+    # its closes_when could never fire: it watched for a `georgia-live` service
+    # while the (tb) plan change converted `trail-blazer-live` IN PLACE (so no
+    # credential was ever read), and the swap EXECUTED 22-Aug with the flatten
+    # receipt read (`open == 0`), the row hidden + pruned, and the registries
+    # synced ((tb) + the (tc) sweep that caught the three it missed:
+    # deploy_live_verify's service->row map, respiration's LIVE_BREATHS,
+    # market_context's LIVE_CADENCE_SEC). The row's own text also named two
+    # registries that never existed (`fleet_books.LIVE_DEPLOY`,
+    # `PROP_LIVE_ROWS`) — corrected in MUM_GOLIVE_RUNBOOK.md's activation list.
     {
         "id": "funding-studies-inherit-the-rank-universe",
         "owner": "session",

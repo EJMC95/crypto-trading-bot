@@ -2437,6 +2437,16 @@ All new bots:
   guard) · the `live.*` lever consumers. `lighter_funding_bot.py` stays in scope
   as a SHADOW book (and as 🛢️ Garrett's host), and its live guard is real-money
   surface until the sub-account has actually moved.]**
+  **[25-Aug (te): the live set is now a TRIO — 👩 mum joins 🙏 Avo Maria and
+  🔮 georgia, live on a FRESH sub-account of her own (the first not to inherit
+  a slot; Eamon created the account and keys, the provisioner populated the
+  `mum-live` service). ALL THREE are the same variant host, so the real-money
+  surface is unchanged in shape and grows by nothing: `lighter_avo_live_bot.py`
+  · `lighter_family_bot.py` · `venues/` · the `live.*` lever consumers. What
+  DOES change: three books share one image, so the marker discipline
+  ([deploy-live-taker] / [deploy-live-georgia] / [deploy-live-mum], and
+  [deploy-live] for all three) is now the only thing keeping a fix to one book
+  from restarting the other two.]**
 
 
 ## Doctrine: Claude is the judgment layer, never the polling layer (added 28-Jul-2026)
