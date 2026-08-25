@@ -1,3 +1,94 @@
+## 2026-08-25 (th) — THE STANDING AUDIT: DAILY/WEEKLY/MONTHLY LIVE-BOT P&L + DECLARED-vs-EFFECTIVE SYNC, AND ITS FIRST RUN CAUGHT THE (td) ATTESTATION NEVER LANDING
+
+**Eamon, 25-Aug (evening):** *"Daily and weekly and monthly audit of live
+bots - how p n L can improve ... Can we please see enhancements available
+with the last weeks data? Also how everything's syncing as there seems to be
+... instances where a month has passed without something being implemented."*
+
+**THE SYNC HALF IS THE LOAD-BEARING ASK, and the day supplied its worked
+example.** The (td) manual-trade attestation shipped its CODE this morning
+and its VALUE never reached the container: at 10:56Z the live row still
+published `manual_pnl_usd: 0.0` while carrying **nine** zero-basis
+`long_daily_loss` flatten closes (BRENTOIL/BTC/CASHCAT/ETH/HYPE/LIT/SOL/ZEC/
+ZRO — Eamon's manual positions, booked at 0.0 because the bot cannot attest
+a basis it never had, I8), so 🙏 Avo's −$60.86 kept reading as the bot's and
+the evidence board's backstop kept `live.avo.clip_scale` at **0.75** for
+losses that were never hers. 🔮 georgia carries the same signature (4
+zero-basis flattens, 22-Aug, ETH/ZEC/BTC/HYPE ≈ −$26.4 by residual) — her
+attestation value is Eamon's to confirm, the gap is measurable either way.
+A declared-but-unlanded change is invisible BECAUSE everything is green —
+the same class as (iw)'s stale reader and (ml)'s serving-output rule, now
+with a standing detector instead of a per-incident hunt.
+
+**`scripts/live_pnl_audit.py` + `.github/workflows/live-pnl-audit.yml`** —
+advisory by construction (reads the public feeds, moves no lever), fail-
+CLOSED on a dark feed ((jc): exit 2, never a vacuous green), three UTC crons
+serving Sydney mornings, RED findings land in ONE rolling issue (label
+`live-pnl-audit`, the fleet-watchdog pattern, closes itself on recovery) and
+fail the run — never a warning on a passing run ((gl)/(hj)). What a run
+reads, feed-fields first: every row's `age_sec` before any semantics (I1 —
+🧭 nav-cook sat FROZEN 108.6h behind `status:"online"` and would have been
+RED here on day one); live membership by the row's own `extra.venue ==
+"lighter_live"` (a curated name list has named a retired bot three times);
+per-live-row ATTRIBUTION `pnl_abs = manual attested + bot ledger + named
+residual` with the attestation-gap detector on the real signature
+(zero-basis `*_daily_loss` at pnl 0.0 + `manual_pnl_usd` 0.0); the window
+P&L table per book; the governors restricting live size in their own words
+(`live.*.clip_scale` levers + the fleet governor, including the
+carried-while-abstaining state); docket asks aged from `days_held`; the
+trades-feed truncation signature ((qz): a result equal to its own limit);
+and a build-stamp spread across the LIVE TRIO ONLY — the first draft
+compared the whole fleet and read 13 "laggards" on a converged one, which is
+(fd)'s per-image file-set trap caught by this entry's own guard discipline.
+Pinned by `tests/autonomy/test_live_pnl_audit.py` (14 tests; fixture rows
+trimmed VERBATIM from the real 25-Aug feed per the payload-contract rule;
+**6/6 mutations red**, one of which — flatten-ignores-basis — survived the
+first round and forced the discriminating fixture case, exactly the I3
+mechanism working).
+
+**THE WEEK'S NUMBERS THE AUDIT NOW AUTOMATES, from its own first run
+(18→25 Aug, honest window — the 500-row default was truncation-flagged and
+re-pulled at 5000):** fleet realised **−$38.46**; earners 🎫 taker +$43.65
+(n=45, +2.10%/t) · 👩 mum-shadow +$15.86 (of which +$15.63 is the v1-legacy
+flatten, NOT v2 evidence — v2's own record is ~1 close) · 🔮 georgia
+live+shadow +$20.23; bleeders 🧘 douglas −$38.41 (t=−2.59) · 🪁 kelly
+−$24.84 (n=205 churn) · 🛢️ garrett −$24.37 (t=−2.82, era t=−2.96, now
+docket-bound). Live trio combined `pnl_abs` **−$100.46**, of which ≈−$92.8
+is manual/unattributed and the bots' own is ≈−$7.7 (georgia realised +$10.26
+against ≈−$23.5 open MTM at 5x; avo bot ≈+$5.5 incl. open; mum 0 — healthy,
+waiting on her rsi<25 bar, `near_bar: 1`). Go-live pipeline per the horizon
+organ: 🎫 taker on_track ~21-Sep · 🙏 avo-live on_track ~mid-Oct · both
+georgia arms undecidable on t at current variance (t 0.69/0.60, needs
+~323/775d — her lever is MEAN, not n: `range_top` closed 24 breakout trades
+for +$2.19 while `roi` took +$21.01 on 4, the winners-run measurement named
+in HANDOFF). Allocation's two claims (carry, taker) are POOLED-sample;
+era-scoped claims fleet-wide: **zero** (`n_with_era_claim: 0` both classes).
+
+**Executed same-session under the standing grants:** 🧭 nav-cook redeploy
+dispatched (run 583, `railway up` from main), **and the ROW READBACK — not
+the green run, per (gl) — found the real disease: the bot was not dead, it
+was MUTE.** The fresh container boots, scans every ~2 min, holds equity
+$994.18 — and every publish raises `build_extra() got an unexpected keyword
+argument 'offuniverse'`, is caught by the loop's own handler, prints one log
+line nobody reads, and the row stays frozen. (sq) shipped the off-universe
+census and threaded `offuniverse=_offuni` into the publish CALL without
+adding the parameter to `build_extra`'s SIGNATURE — so the freeze dates from
+that deploy, (ss)'s census guard protected the TRADING loop but not the
+VOICE, and a repeating swallowed warning is I4's one-shot-warning class in a
+new costume. **Fixed in place**: the signature gains `offuniverse=None`
+(None degrades to the zeros-with-error shape — absent is the ambiguity the
+census exists to remove), the row now publishes the census, and the bot's
+own selftest drives `build_extra` with the LOOP'S exact keyword shape so a
+call/signature drift fails offline instead of on the row (mutation-verified:
+reverting the signature reddens the selftest — the incident replayed). Ships
+to the container on this branch's merge (nav-cook auto-deploys on its own
+file). The audit's first standing REDs: the two attestation values (Eamon's
+numbers to set — `AVO_MANUAL_PNL_USD≈-66.4` per the program doc, georgia's
+≈−26.4 residual to confirm) and any row still frozen. Docket ages at first
+run: sniper 18.9d · albanese 17.9d · kiyosaki 12.2d · grimes 11.4d · hull
+11.4d — surfaced every morning until decided, which is the "month passes
+silently" class closed.
+
 ## 2026-08-25 (tf) — HER NAME IS LUCY
 
 **Eamon, 25-Aug, the day 👩 mum went live:** *"You've turned out to be one of

@@ -399,8 +399,22 @@ def offuniverse_census(rows, universe, lo_bps, hi_bps, min_vol_m,
     return out
 
 
-def build_extra(census, positions, recent, open_pnl, realized):
-    """The published `extra` — ONE builder ((hj))."""
+def build_extra(census, positions, recent, open_pnl, realized,
+                offuniverse=None):
+    """The published `extra` — ONE builder ((hj)).
+
+    [25-Aug (th)] `offuniverse` joins the SIGNATURE. (sq) shipped the census
+    and threaded it into the publish CALL (`offuniverse=_offuni`) without
+    adding the parameter here, so every publish raised TypeError, the
+    handler printed one log line, and the bot traded on MUTE — the row froze
+    4.5 days behind `status:"online"` while the process was healthy. The
+    selftest now drives this builder with the loop's exact call shape so a
+    signature/call drift fails offline instead of silencing the row. None
+    degrades to the zeros-with-error shape — absent is the ambiguity the
+    census exists to remove ((sq))."""
+    if offuniverse is None:
+        offuniverse = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0,
+                       "top": [], "error": True}
     return {
         "mode": "dry-run",
         "venue": "lighter",
@@ -432,6 +446,7 @@ def build_extra(census, positions, recent, open_pnl, realized):
                           % GATE_HI_BPS,
         },
         "scan": census,
+        "offuniverse": offuniverse,
         "sample": sample_block(recent),
         "thesis": {
             "cell": "dislocation mirror, residual band [%.0f,%.0f) bps"
@@ -918,6 +933,24 @@ def _selftest():
                             class_of=_boom, excluded=(7,))
     assert _r["in_band"] == 1 and _r["other"] == 1, (
         "a throwing class_of must degrade to unknown, not raise: %r" % (_r,))
+
+    # THE PUBLISH CALL SHAPE, driven end-to-end. [25-Aug (th)] (sq) threaded
+    # `offuniverse=_offuni` into the publish CALL without adding the
+    # parameter to build_extra's SIGNATURE, so every publish raised
+    # TypeError, the loop's own handler printed one line, and the bot traded
+    # MUTE for 4.5 days behind status:"online" — a consumer tested against a
+    # payload its publisher never built ((hj)), in reverse. This drives the
+    # builder with the LOOP'S exact keyword shape; a future drift between
+    # call and signature fails here, offline, instead of on the row.
+    _extra = build_extra({"scanned": 0}, {}, [], 0.0, 0.0, offuniverse=_o)
+    assert _extra["offuniverse"] is _o, \
+        "the census must reach the row verbatim"
+    _extra_dark = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)
+    assert _extra_dark["offuniverse"].get("error") is True and \
+        _extra_dark["offuniverse"]["in_band"] == 0, (
+        "no census given must publish the zeros-with-error shape — absent "
+        "is the ambiguity the block exists to remove: %r"
+        % (_extra_dark["offuniverse"],))
 
     # REPORT-ONLY, structurally. This block names coins the book refuses ON
     # PURPOSE; if it ever reached a gate it would become a widening of two
