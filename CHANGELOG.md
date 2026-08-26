@@ -1,4 +1,4 @@
-## 2026-08-26 (ui) — MAIN WENT RED BY THE CLOCK: A FIXTURE ANCHORED TO A FROZEN INSTANT PASSED THE HOUR IT WAS WRITTEN AND ROTTED ORGAN BY ORGAN — 0 FAILURES AT 13:1xZ, 11 AT 14:4xZ, AND 11 FOREVER
+## 2026-08-26 (ui) — MAIN WENT RED BY THE CLOCK: A FIXTURE ANCHORED TO A FROZEN INSTANT PASSED THE HOUR IT WAS WRITTEN AND ROTTED ORGAN BY ORGAN — 0 FAILURES AT 13:13Z, 11 AT 21:48Z, AND 11 FOREVER
 
 Found chasing an unexplained failure in a full-suite run, and it is not mine —
 but it is on main, it is permanent, and it would have been every future
@@ -17,10 +17,21 @@ time stayed inside the shortest TTL, and then went stale one organ at a time.
 
 | run | failures |
 |---|---|
-| full suite, 13:1xZ | **0** |
-| full suite, 14:1xZ | **5** |
-| full suite, 14:4xZ | **11** |
+| full suite, 13:13Z (fixture 1.2h old) | **0** |
+| full suite, 14:02Z (2.0h) | **0** |
+| full suite, **21:42Z** (9.7h) | **5** |
+| full suite, **21:48Z** (9.8h) | **11** |
 | this file alone, any time after | **11** |
+
+**[CORRECTED IN PLACE, minutes after this entry was written.** The first draft
+quoted the last two rows as *"14:1xZ"* and *"14:4xZ"*. Those times were
+INFERRED from the wake-notification stamps I happened to be looking at, not
+measured — the session had been idle ~7.5h between the 14:02Z run and the next
+one, and I did not notice. The real times come from the run artifacts' own
+mtimes and are above. **The finding is unchanged and slightly stronger** — the
+fixture survived 2.0h and had rotted by 9.7h — but two numbers in a published
+entry were asserted rather than read, which is the thing this file exists to
+stop. Read the clock; do not infer it from what is on screen.]**
 
 **BISECTED, not assumed:** `acef2aa~1` → **0 failures**, `acef2aa` → **11**.
 CI passed that commit only because CI ran inside the window; `tests.yml` runs
