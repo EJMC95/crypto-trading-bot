@@ -1,3 +1,127 @@
+## 2026-08-26 (tw) — THE SNIPER WAS ON THE WRONG SIDE OF ITS OWN THESIS: a perp lists AFTER the spot hype, and the debut it was buying is measurably a fade
+
+**Operator:** *"let listing sniper fly like it used to."*
+
+It used to fly as `listing_sniper.py`, sniping SPOT listings across **~100
+CEXes**, where a fresh listing is a buying event and LONG is the trade. This
+book snipes **PERP** listings on **one** venue — and a perp lists *after* the
+spot hype. Measured on the venue's own tape those are opposite trades, and the
+successor inherited the predecessor's side and never had it questioned.
+
+### The measurement
+
+45 venue-priced books, every hour of each book's own first 21 days
+(**n=23,102**), LONG, unconditional — no invented signal, no slice:
+
+| age band | 6h | 24h |
+|---|---|---|
+| 0-7d | **-0.125%** (t=-2.47) | **-0.317%** (t=-2.99) |
+| 8-21d | **-0.083%** (t=-2.70) | **-0.436%** (t=-7.47) |
+| 22-40d | -0.005% | -0.094% |
+| 41-60d | +0.019% | +0.147% |
+| 61-90d | +0.029% | +0.090% |
+
+Jackknifed by coin the sign holds at every young band (24h: [-9.27,-1.35] and
+[-10.03,-6.48]). **A book's first 21 days on this venue fade; its later life
+does not.** The `young` and `listing` sources both target exactly that band,
+and both were LONG.
+
+**THE FALLING-TAPE OBJECTION IS ANSWERED, NOT WAVED OFF.** Item 18 says this
+venue's whole tape is one falling-BTC regime, so a short wins on almost
+anything by construction — which would make this finding worthless. Three
+controls, all **paired within coin** so market drift cannot produce them:
+
+* young − the coin's OWN whole tape: **-0.488pp/24h, t=-2.27, 33 of 45 coins**
+* young − the coin's OWN mature band: **-0.617pp/24h, t=-2.20, 32 of 45**
+* and the decisive one — **the IDENTICAL bracket on the SAME 45 coins at ages
+  61-120d returns -0.022% / -0.048% / +0.080% at 6h/24h/72h, every t below
+  1.0.** The mature control is FLAT. The return is an age effect, not beta.
+
+Through the book's REAL bracket ((ml): a mean says nothing about what a
+tp/sl/timer books), SHORT on 0-21d, with the **stop checked BEFORE the target
+inside each bar** so the convention is the conservative one:
+
+| hold | mean/trade | by-coin t | sl rate |
+|---|---|---|---|
+| 6h | +0.132% | **+2.69** | 3.4% |
+| 24h | **+0.671%** | **+4.22** | 12.2% |
+| 72h | +1.690% | +4.51 | 24.1% |
+
+By-coin `t` is the honest unit — hours inside one coin overlap heavily, so the
+pooled `t` (+2.31/+6.71/+11.42) is inflated by construction and is reported
+only so the gap is visible.
+
+### Shipped
+
+* **`listing` and `young` flip to SHORT**, at a **24h** hold. They are the two
+  sources that target the faded band.
+* **`surge` is untouched.** It is a volume event on a mostly-MATURE book — the
+  flat control above — and its own `(ts)` evidence (0 of 367 exit cells survive
+  BH at FDR 0.05) is unaffected. Applying one source's evidence to another's
+  cell is the `(lk)` error this book has already paid for once.
+* **Young volume floor 0.25 -> 0.20**, which admits **ANSEM ($0.228M/day)** —
+  the only venue-priced book in 120 days the old floor refused while having
+  real turnover. It stays at TWICE the $0.1M step where the fleet's slippage
+  model changes tier, which is exactly why `(tt)` refused $0.10M; that refusal
+  is unchanged.
+* The `held` payload map now reads each position's side **off its own source**
+  instead of a module constant. It was about to report every short as a long to
+  `fleet_risk`'s exposure view — the organ that decides whether the fleet is
+  one-sided.
+* `dir_by_src` / `hold_h_by_src` / `dir_pinned` publish every loop: a single
+  `dir` scalar cannot describe a two-sided book, and the scalar stays only for
+  older readers.
+
+### Refused, with numbers, so no future session re-proposes them
+
+* **72h measured BEST (+1.690%, by-coin t=+4.51) and is NOT taken.** It is the
+  EDGE of the tested grid, and `(hl)`/`(ts)` are explicit that a grid-edge
+  winner is reported unbounded, never shipped as a value. 24h is the plateau
+  interior — the 🧭 nav-cook precedent.
+* **The young WINDOW stays 21 days.** Widening it was the obvious way to buy
+  supply and the tape refuses it: the fade is gone by 22-40d (-0.094%/24h) and
+  reverses by 41-60d, so a wider window buys trades by diluting the very effect
+  being traded.
+* **An earlier pass of my own is withdrawn rather than tuned.** It compared a
+  "youngest eighth of the band" slice against a random null and returned
+  **opposite signs on the same window at an identical n of 2,859** (-0.246% one
+  way, +0.180% the other). The slice was my invention, not the bot's rule; it
+  is dropped, and every number above is the plain unconditional one.
+
+### And the honest limit, which is the operator's decision, not a lever
+
+**The reason this book stopped flying is that its hunting ground was removed.**
+Venue-priced crypto births per month on Lighter, counted from the venue's own
+`created_at`: **13, 19, 12, 6, 4, 2, 7, 9, 4, 1, 6, 1, 1, 1** (Jul-25 -> Aug-26).
+Of the last 120 days' NINE venue-priced births, only three have any turnover at
+all today — CASHCAT $1.11M, ANSEM $0.228M, CAP $0.027M — and **zero class-2
+books are younger than 21 days**. The predecessor hunted ~100 exchanges; the
+successor hunts one venue that now lists **one** crypto book a month, down
+13-19x. No screen, bracket, side or lever recovers that. What this entry buys
+is that when a listing *does* arrive, the book is finally on the side the tape
+pays.
+
+**Era NOT reset, declared rather than assumed:** the two sources whose side
+flips have contributed at most 1 of the book's 36 closes (`listing` is n=1
+lifetime, `young` admitted nothing for 66 days), and every close is
+side-and-source stamped (`short-young_max_hold` vs `long-young_max_hold`), so
+the brain and the docket bucket the old and new policies separately without a
+reset discarding 36 closes of still-valid `surge` evidence.
+
+Instrument: `scripts/study_sniper_debut_fade_2026-08-26.py` (`--all`). Pinned
+by `tests/autonomy/test_sniper_per_source_side.py`, **10 mutations verified
+RED**.
+
+**A MERGE HAZARD CAUGHT BY ANOTHER SESSION'S TEST, worth recording.** `(so)`
+landed brain sizing on this book while this branch was open, keyed
+`entry_tag(DIRECTION_LONG, src)`. With a per-source side that asks the brain
+for `long-young` while `close_reason` writes `short-young` — a lookup that
+returns 1.0 forever in silence, which is precisely the failure `entry_tag`'s
+own docstring names. The sizing site now keys off `side_is_long(src)`. The test
+that caught it asserted the literal string `entry_tag(DIRECTION_LONG`, i.e. a
+retyped key standing in for the invariant; it is now an AST check that the side
+expression at the SIZING site is identical to the one at the OPEN site.
+
 ## 2026-08-20 (tv) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
 
 *[RENUMBERED (si) -> (tv): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
