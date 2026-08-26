@@ -98,6 +98,17 @@ SELFTEST_MODULES = [
     # runs here. Registered in the same commit that adds the script, per this
     # guard's own rule — a --selftest nobody runs is the shape it prevents.
     "scripts.study_docket_class_split_2026-08-17",
+    # [2026-08-26] the stuck-vs-slow discriminator. INHERITED from main — the
+    # script shipped in 27529e2 without a registry entry, so this guard was RED
+    # on main itself and on every branch that rebased onto it. Registered here
+    # rather than left for its author because a guard that cannot stay green is
+    # one the next session learns to route around ((gl)), and the fix is one
+    # line. SELFTEST_MODULES and deliberately not ENFORCED_AUDITS, for this
+    # file's standing reason: the --selftest is offline and pure (verdicts over
+    # real publisher rows, plus the stale/halted/fail-closed arms) while the
+    # SCAN reads the live feed, which moves with every publish and no code
+    # change.
+    "scripts.audit_stuck_vs_slow",
     # [2026-07-28] breakout-quality study: --selftest is offline-green &
     # stdlib-only (verified `python -m scripts.analyze_breakout_quality
     # --selftest` on a bare interpreter); registering it here fixes the
