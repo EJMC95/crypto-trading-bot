@@ -1,3 +1,48 @@
+## 2026-08-26 (tr) — MUM'S BAR WIDENS TO EXACTLY WHAT WAS MEASURED: RSI_MAX 25 → 30, THE "RESCUE" TIERS REFUSED WITH THEIR NUMBERS, REFEREE-CONFIRMED
+
+The other half of Eamon's directive — *"tweak mum v2 so she doesnt miss
+anything too good"* — shipped the measured way. Four candidate cells, bars
+PRE-REGISTERED (the study script committed to the branch before any result
+existed), graded exit-free vs matched-random on her own 23-symbol universe
+(~460d of Lighter 1h tape), then through her REAL bracket, then adversarially
+refereed with independent code and a HARDER regime-conditional null:
+
+* **C3 (rsi [25,30) x NOT-uptrend): ADMIT — the one survivor.** Exit-free
+  h12 excess +0.156%, t_cl +2.25, P=0.001 (n=2,296 episodes, 1,382 coin-day
+  clusters); under her real bracket **+0.104%/trade, t=+2.38, t_cl=+1.99,
+  BOTH halves positive, trailing-120d +0.150%** (crypto-only stronger:
+  +0.121%/t=2.27, trailing +0.312%/t_cl=2.67). Survived the referee's
+  regime-conditional null (+0.119%/t_cl 1.73 — the edge is the RSI band, not
+  the regime), coin jackknife (worst drop keeps t_cl 1.68), month jackknife,
+  coin-week clustering (t RISES to 2.41), Bonferroni over the study's test
+  count. Supply: **~3-4x her current rate** (4.03 eps/day trailing-30d, 2.37
+  crypto) — "more trades" delivered as trades that PAY, +0.104%/trade being
+  the I19 price paid IN expectancy rather than with it.
+* **C1 (rsi<20 x uptrend — the literal "too good to miss" tier): REFUSED.**
+  Trailing-negative at every horizon; the tape's answer is that a deep-oversold
+  print in an UPTREND is worth LESS than what the filter blocks above it.
+  **C2 (rsi 20-25 x uptrend): REFUSED** (flat, best cell P=0.19; and a
+  measured 31.2% co-hold channel with 🙏 avo — the I20 separator stays).
+  This week's three "missed" entries (TRX 23.4, TSLA 22.8, WTI 21.9) all sat
+  in these refused cells: **the filter was right about every one of them.**
+  **C4 (rsi 30-42): REFUSED — DECAYED**, trailing t_cl −2.6..−3.0 and the
+  referee's boundary sweep shows the decay deepening (−3.09 at 90d); its 16
+  eps/day is the (hl) turnover trap by the book.
+* Uptrend exclusion, bracket, slots, era: all UNCHANGED (entry-bar notch =
+  ordinary tuning, the carry ENTER_APR precedent (hc); her sample was n=1
+  regardless). The gauge test's fixture moved to bar-relative offsets.
+
+**Three watch items ride the ship, from the referee:** (1) her onboard
+control arm (extra.control) is the live falsification of the widened cell —
+read it at the first ~30 closes; (2) the 24h max-hold tail is currently a
+drag (max_hold exits −1.11%/trade; the surviving edge lives ≤12h where the
+roi ladder banks 70% of exits) — if the control corroborates, a max-hold
+tightening toward 12h is the NEXT measured candidate, not tonight's; (3)
+full-sample h1 is thin (+0.050) — early green is not more than the trailing
+window already supports. Study: `STUDY_MUM_SUPPLY_2026-08-26.md` +
+`scripts/study_mum_supply_2026-08-26.py` (pre-registered, seeded).
+Deployed [deploy-live-mum]; shadow rides the family auto-deploy.
+
 ## 2026-08-26 (tq) — EAMON'S RISK-UP: LEVERAGE TO THE HONEST CEILINGS, THE SCALED CAP GOES LIVE, AND EVERY VALUE CARRIES ITS ARITHMETIC
 
 **Eamon, 26-Aug (afternoon): "adjust to whatever enables more trades and less
