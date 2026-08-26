@@ -584,6 +584,110 @@ Found by reading the deployed payload's own census against what the code can
 reach — the same route as `(ua)`, and the third time in two days that a
 published counter said what the run could not have produced.
 
+## 2026-08-27 (uj) — FOUR BOOKS TUNED ON THEIR OWN LEDGERS, NO RETIREMENTS — AND THE PIPELINE CARD I SHIPPED GREEN YESTERDAY WAS A TIME BOMB
+
+**Eamon, 26-Aug:** *"Don't retire anything, use data we have and have access
+to, to loosen or tighten, widen or shorten, give a broader horizon or keep it
+camped next to the waterfall."* Six clusters were diagnosed against their own
+ledgers; four moves shipped, three books were told to hold, and every refusal
+carries the number that refused it.
+
+### THE MOVES
+
+* **⚖️ Counterweight — `FUNDSPREAD_UNIVERSE_N` 30 → 40.** The lever was
+  **STRUCTURALLY INERT** at its default: the configured core is 30 names, so
+  `len(out) >= width` on the first pass and the scout top-up added ZERO — the
+  book's own file said so (*"INERT TODAY AND DELIBERATELY SHIPPED ANYWAY"*),
+  and the live row proved it (`universe: 25` behind `universe_n: 30`). 31 is
+  the first width that admits anything; supply exhausts at 36, so 40 is the
+  whole reachable move rather than a rung on a ladder. Adds 10 crypto names,
+  tradeable cross-section 25 → 35. **ZERO cost per trade by construction** —
+  gross is `2*K*clip` and K, clip, leg count (10), cadence (24h) and hold are
+  all untouched; it changes only WHICH names fill the same 10 slots, so it
+  cannot be turnover bought with expectancy (I19). Measured: carry received
+  75.3% → 171.4%/yr over the same legs; price sd +45%; **carry/noise +57%**;
+  days-to-|t|=2 ~35 years → ~14. **The honest limit, stated: 14 years is still
+  not decidable.** WHY THIS IS NOT THE (jg) REVERT RETURNING — that revert
+  moved K AND the universe together and its loss window IS the non-crypto
+  window; the confound is closed IN CODE (`resolve_universe` crypto-screens the
+  top-up since (ki)), so width 40 cannot re-admit SOXL. **K stays 5, and that
+  is now MEASURED rather than inherited**: at the widened universe the
+  carry/noise ratio reads K=3 0.02463 · **K=5 0.02791** · K=8 0.02680 ·
+  K=12 0.02012 — an un-confounded refutation of the K=8 re-widen that happens
+  to vindicate (jg) on evidence the revert itself did not have.
+* **🧮 Hull — `MIN_VOL` 2e6 → 1e6 AND `MAX_POSITIONS` 6 → 10, as a PAIR.**
+  Costs 8%/trade, buys **+51% total dollars** (6.5 → 12.0 closes/30d, t
+  +2.18 → +2.58, $ALL/30d +$1.90 → +$2.86, both halves positive) — not
+  denominator shrinkage, because total dollars rise. Plateau interior, not a
+  grid edge (cap 10/12/14 all ≥ +$2.86; 12 peaks but 10 keeps gross at $800 of
+  a $1,000 book). **Both halves refused alone, with numbers**: the floor at cap
+  6 is a STEP BACK (+$1.90 → +$1.66); the cap alone is provably INERT (6/8/9/
+  10/12/14/16 byte-identical, because supply and cap sit at parity). Entry-only
+  — `carry_exit` reads no volume, so the six open positions are untouched.
+* **🏦 Rich Dad — `PAYBACK_MAX_H` 120 → 48**, the value 🌾 carry independently
+  runs. RESTRICT-direction: payback sets the EFFECTIVE entry bar at
+  `RT*8760/payback_h`, so 120h admitted at ~21.9% TRUE — the loosest bar in the
+  cohort — and 48h tightens it to ~54.8%. Costs 8 closes/30d, buys **+125%
+  dollars and the book's only claim** (mean +0.0145 → +0.1630, t +0.26 →
+  +2.00, h2 NEGATIVE → both halves positive). Broad plateau (42h +$2.52 · 48h
+  +$2.70 · 54h +$2.62), monotone away.
+* **🧭 Cook — DECOUPLED, NOT WIDENED, and the reason is a hazard nobody had
+  declared.** Cook resolved its universe from `lighter_dislocation_bot.
+  UNIVERSE_N` — and **🪁 band-kelly reads the same constant**, so widening it
+  for Cook would have silently widened a book whose measured verdict is
+  explicitly NO CHANGE, 6.9 days into a 30-day window. Two books on one knob,
+  and nothing said so. Cook now owns `COOK_UNIVERSE_N`, defaulting to the
+  ghost's 40 — **byte-identical behaviour today, driven and compared**. The
+  widening is a separate, later, evidence-backed act; this is its prerequisite.
+  Note also that the registered `disloc.universe_n` cannot reach EITHER book:
+  it is applied by the retired dislocation bot's own `apply_tuning`, which
+  never runs. Registered, caged, and structurally unreachable — an I18 instance.
+
+### HELD, WITH THE NUMBER THAT HELD THEM
+📐 **Grimes — KEEP TIGHT.** Its gate is correctly shut: every widening is
+negative in dollars AND against the random-entry bar (pullback −0.325%,
+failtest −0.330%, keltner −0.527% per trade at the $80 clip), and **no lever
+reaches it** — zero `grimes.*` in the registry, no `apply_tuning` in the file.
+A refusal with evidence is the output. 🪁 **Kelly — NO CHANGE**: its binding
+constraint is the ghost's frozen `EXIT_BPS` conv exit (204 of 220 closes,
+−0.183%/trade at t=−3.38), whose only consumer is retired; a policy move today
+forfeits 6.9d of a 30d window. 🔮 **georgia — NO CHANGE on the throttle**: the
+rank-3 sample is n=3 and one of those three is a broken stop.
+
+### AND A DEFECT OF MY OWN, FOUND BY THE SAME PASS
+`tests/autonomy/test_pipeline_card.py` shipped GREEN yesterday and was RED this
+morning on a change that had nothing to do with it. `NOW` was a frozen literal
+(`2026-08-26 12:00Z`) stamping every fixture's `updated`, while the card checks
+freshness against the real wall clock — so 11 tests believed a payload was
+fresh while the card correctly called it *"dark or stale"*. **A time bomb is
+worse than a failing test**: green in the run that ships it, red in someone
+else's, which is how a suite trains people to ignore a file — the
+warning-is-not-a-guard cost ((gl)) arriving by a calendar instead. `NOW` is
+relative now; the tests that need staleness still age their payload explicitly,
+which is the honest way to test it. It also removes a hardcoded canonical era
+date for free.
+
+`test_book_levers`' `UNIVERSE_N == 30` pin moved WITH ITS REASON — the escape
+that test's own comment provides for a documented change, as against a silent
+revert. And `audit_lever_bounds`' drift arm caught the registry/consumer gap
+within minutes of the bot default moving, which is exactly the job it was
+built for.
+
+**Mutations: 14/14 · 24/26 · 19/19 · 27/30** — 84 of 89, the shortfalls being
+proven-equivalent mutants excluded rather than faked. Two survivors are worth
+recording because they were defects in the TESTS, not the code: a ticker
+dropped from an overlap declaration survived a substring check (*"a page-wide
+substring scan is not a structural claim"*, landing on a guard written the same
+hour — fixed by making the sets DATA the prose interpolates), and four of five
+Hull survivors sat on the CAP half of the pair, the half whose entire
+justification is that it converts the extra supply into extra trades.
+
+**I20 DECLARED, not discovered later**: the widened Counterweight top-up admits
+names 🌾 carry holds on the same side. The live overlap audit reports 11% of
+positions duplicated across books while `fleet_allocation` counts each book's
+claim as independent evidence — informational (exit 0), and the correction is
+now published rather than implied.
+
 ## 2026-08-26 (tu) — THE DAILY REVIEW COUNTED 13 HALT EVENTS AS REAL-MONEY TRADES — AND THE FILTER THAT FIXED IT READ A JSONB KEY NOTHING HAS EVER WRITTEN
 
 Two commits from an earlier pass today, held unpushed, reviewed before

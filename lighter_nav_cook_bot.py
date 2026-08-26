@@ -152,6 +152,40 @@ MAX_POSITIONS = int(os.environ.get("COOK_MAX_POSITIONS", "4"))
 MAX_ENTRY_SLIP_BPS = float(os.environ.get("COOK_MAX_SLIP_BPS", "30"))
 MIN_VOL_M = float(os.environ.get("COOK_MIN_VOL_M", "0.5"))
 
+# [2026-08-26] THE UNIVERSE WIDTH IS THIS BOOK'S OWN KNOB NOW — a DECOUPLING,
+# not a widening, and the default is chosen so that today's behaviour does not
+# move by one byte.
+#
+# THE COUPLING THAT WAS HERE: `resolve_universe` passed `ghost.UNIVERSE_N` —
+# the RETIRED dislocation module's constant (`lighter_dislocation_bot.py`,
+# `DISLOC_UNIVERSE_N`, default 40). **`lighter_band_kelly_bot` reads the SAME
+# constant**, so moving it to change THIS book's width would silently have
+# changed 🪁 band-kelly's too: two books, one knob, and nothing in either file
+# said so. band-kelly is 6.9 days into a 30-day (hm) window with a measured
+# verdict of NO CHANGE, and a policy move there forfeits the whole sample — so
+# the shared constant was a live hazard, not a tidiness question.
+#
+# band-kelly KEEPS reading `ghost.UNIVERSE_N`, deliberately: its whole claim is
+# "the ghost's own rules, sign-flipped", it imports the ghost's config
+# wholesale, and its own tests pin that import identity. It is not this file's
+# to change. What this line buys is that Cook's width is now independently
+# movable WITHOUT touching band-kelly.
+#
+# NOT A WIDENING, AND NOT AN INVITATION TO ONE. The value is the ghost's
+# current 40, so the resolved universe is byte-identical to the pre-decoupling
+# path (driven and compared in `tests/autonomy/test_cook_universe_decoupled.py`
+# and in `_selftest` below). Cook is days into its own 30-day window on a
+# founding claim of n=216/+0.367%/trade; a width change is a SEPARATE, LATER,
+# evidence-backed act (I19 — a widening is paid for in expectancy) and this is
+# only its prerequisite.
+#
+# NOTE the registered lever `disloc.universe_n` reaches NEITHER book: it is
+# applied by the retired ghost's own `apply_tuning`, which never runs because
+# that bot is idled — registered, caged, and structurally unreachable (I18's
+# "a lever with no reader" in its purest form). So the env var below is the
+# only reachable control on this width, which is why it must be Cook's own.
+UNIVERSE_N = int(os.environ.get("COOK_UNIVERSE_N", "40"))
+
 # Load-bearing, not cosmetic: `(qq)` measured the fleet's own fills at a MEAN
 # 17.49 bps and a p90 of 398 bps below $0.1M. This band lives in non-crypto
 # books, which are the fat-tail end of that distribution.
@@ -284,8 +318,12 @@ def resolve_universe(held):
     `(hk)`: a coin leaving the list keeps its exit, its stop and its clock.
     The scan is UNSCREENED — the class screen applies at the ENTRY SITE only,
     because the residual distribution the band is measured against is the
-    unscreened one."""
-    out = list(ghost.resolve_universe(list(ghost.COINS), ghost.UNIVERSE_N,
+    unscreened one.
+
+    The RESOLVER is the ghost's (one owner, never a second copy of the rule);
+    the WIDTH is this book's own `UNIVERSE_N`, because `ghost.UNIVERSE_N` is
+    shared with 🪁 band-kelly — see the constant's own note."""
+    out = list(ghost.resolve_universe(list(ghost.COINS), UNIVERSE_N,
                                       MIN_VOL_M))
     have = set(out)
     for c in held or ():
@@ -436,7 +474,13 @@ def build_extra(census, positions, recent, open_pnl, realized,
             "gross_max_usd": CLIP_USD * MAX_POSITIONS,
             "max_entry_slip_bps": MAX_ENTRY_SLIP_BPS,
             "min_vol_m": MIN_VOL_M,
-            "universe_n": ghost.UNIVERSE_N,
+            # TWO NUMBERS, NOT ONE SHARED CONSTANT. `universe_n` is THIS
+            # book's width; `ghost_universe_n` is the retired ghost's constant
+            # that 🪁 band-kelly still resolves against. They are equal today
+            # by choice, and the row is where a future divergence becomes
+            # visible instead of being inferred from two source files.
+            "universe_n": UNIVERSE_N,
+            "ghost_universe_n": ghost.UNIVERSE_N,
             "confirm_loops": CONFIRM_LOOPS,
             "confirm_s": CONFIRM_LOOPS * LOOP_SECONDS,
             "study_confirm_s": STUDY_CONFIRM_S,
@@ -965,6 +1009,69 @@ def _selftest():
             assert "offuniverse_census" not in _calls, (
                 "%s must never consult the off-universe census — it is a "
                 "REPORT, and its coins are excluded by measurement" % _fn.name)
+
+    # ---------------------------------------------------------------- (2026-08-26)
+    # THE UNIVERSE WIDTH IS DECOUPLED FROM 🪁 band-kelly'S. Driven, not
+    # asserted from the source text: `resolve_universe` is called with a
+    # RECORDING stand-in for the ghost's resolver, so the width it actually
+    # passes is observed. At the env default that width must equal the ghost's
+    # own constant (byte-identical behaviour — the whole point of the change),
+    # and moving Cook's knob must move THAT number while leaving the ghost's
+    # constant — the one band-kelly resolves against — untouched.
+    _seen, _vol = [], []
+
+    def _rec(configured, width, min_vol_m, current_time=None):
+        _seen.append(width)
+        _vol.append(min_vol_m)
+        return ["AAA", "BBB"]
+
+    _real_resolve = ghost.resolve_universe
+    _ghost_before = ghost.UNIVERSE_N
+    _cook_before = UNIVERSE_N
+    try:
+        ghost.resolve_universe = _rec
+        assert resolve_universe([]) == ["AAA", "BBB"]
+        assert _seen == [_cook_before], _seen
+        assert _cook_before == _ghost_before, (
+            "the shipped default must be the ghost's own value or the "
+            "decoupling silently CHANGED the book: cook=%r ghost=%r"
+            % (_cook_before, _ghost_before))
+        # THE WIDTH IS NOT THE ONLY ARGUMENT ON THE LINE THAT WAS REWRITTEN.
+        # `MIN_VOL_M` is load-bearing — (qq) measured the fleet's own fills at
+        # a MEAN 17.49bps / p90 398bps below $0.1M against a band whose edge
+        # is ~37bps — and a stub that merely ACCEPTS the floor cannot see it
+        # zeroed. Recorded and compared, so it can.
+        assert _vol == [MIN_VOL_M] and MIN_VOL_M > 0.0, (
+            "the resolve site must hand over this book's own volume floor: "
+            "passed=%r MIN_VOL_M=%r" % (_vol, MIN_VOL_M))
+        globals()["UNIVERSE_N"] = _cook_before + 25
+        resolve_universe([])
+        assert _seen[-1] == _cook_before + 25, (
+            "COOK_UNIVERSE_N must reach the resolve site: %r" % (_seen,))
+        assert ghost.UNIVERSE_N == _ghost_before, (
+            "moving Cook's width must NOT move the ghost's constant — "
+            "band-kelly resolves against it")
+        # AND THE ROW IS READ WHILE THE KNOB IS MOVED. Checking caps only at
+        # the DEFAULT cannot distinguish "Cook's width" from "the shared
+        # constant" — the two are equal by choice, so the field would look
+        # right today and lie the moment Cook moves. Measured: with the
+        # default-only check, re-pointing `universe_n` at `ghost.UNIVERSE_N`
+        # survived this selftest.
+        _moved = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)["caps"]
+        assert _moved["universe_n"] == _cook_before + 25, (
+            "caps.universe_n must FOLLOW this book's knob, not restate the "
+            "shared constant: %r" % (_moved["universe_n"],))
+        assert _moved["ghost_universe_n"] == _ghost_before, (
+            "caps.ghost_universe_n must stay the GHOST's number: %r"
+            % (_moved["ghost_universe_n"],))
+    finally:
+        globals()["UNIVERSE_N"] = _cook_before
+        ghost.resolve_universe = _real_resolve
+    # ...and both numbers reach the row, so a future divergence is readable
+    # rather than inferred from two source files.
+    _caps = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)["caps"]
+    assert _caps["universe_n"] == UNIVERSE_N, _caps
+    assert _caps["ghost_universe_n"] == ghost.UNIVERSE_N, _caps
 
     print("nav-cook selftest OK")
 

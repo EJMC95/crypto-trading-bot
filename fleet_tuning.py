@@ -733,8 +733,20 @@ LEVERS = {
     "fundspread.universe_n": {
         # [2026-08-04] default 60 -> 30 with fundspread.k: width 30 == the
         # 30-name hand list both validations ranked, so no scout book is added.
+        # [2026-08-27 (uc)] 30 -> 40, IN SYNC WITH THE CONSUMER. At 30 this
+        # lever was STRUCTURALLY INERT — the core is 30 names, so
+        # `len(out) >= width` on the first pass and the scout top-up added
+        # ZERO; the book's own file said so ("INERT TODAY AND DELIBERATELY
+        # SHIPPED ANYWAY"). 31 is the first value that does anything and supply
+        # exhausts at 36, so this is the whole reachable move, not a step on a
+        # ladder. The (jg) revert of 60 -> 30 does NOT refute it: that evidence
+        # window IS the non-crypto window, and the confound is closed in code —
+        # `resolve_universe` crypto-screens the top-up since (ki).
+        # A registry that misdescribes the running value is worse than none:
+        # every organ reasoning about headroom reasons from THIS number, which
+        # is why `audit_lever_bounds`' drift arm caught the gap within minutes.
         "kind": "int", "lo": 20, "hi": 90, "lane": "lighter-books",
-        "note": "Counterweight scout-universe width; env default 30", "env_default": 30, "step": 10},
+        "note": "Counterweight scout-universe width; env default 40", "env_default": 40, "step": 10},
     "disloc.enter_pct": {
         # Snap Back's gate was a FIXED 150bps against a measured median
         # residual of 3.8bps — ~40x the middle of its own signal, which is
