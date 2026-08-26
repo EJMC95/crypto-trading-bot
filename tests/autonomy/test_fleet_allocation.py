@@ -14,9 +14,14 @@ The two failure classes these tests exist to prevent:
   * AN ORGAN THAT INVENTS AN OPINION — with no measured claim anywhere the
     output must be EXACTLY the flat allocation, not a plausible-looking split.
 """
+import ast
+import pathlib
+
 import pytest
 
 import fleet_allocation as alloc
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.autonomy
 
@@ -121,6 +126,64 @@ class TestTheContract:
         assert "- 'fleet_allocation.py'" in wf, "no push path -> never deploys"
         assert "fleet_allocation\\.py$" in wf, "not in the service grep"
         assert "fleet_allocation.py --publish" in (root / "run_all.sh").read_text()
+
+
+def test_the_era_headline_counts_a_field_that_exists_by_then():
+    """`n_with_era_claim` must be computed AFTER the era twins are filled.
+
+    [2026-08-26] THE DEFECT. `build()` computes `by_class` — including
+    `n_with_era_claim` — and the era twin is filled later, in `run_once`,
+    because it needs the ledger rows and the era owner's import. `build` cannot
+    know it, so it sets every `claim_era` to None first ((lx)). The counter
+    therefore ran over a column that was None on every book by construction,
+    and could only ever report ZERO whatever the data said.
+
+    Measured live: `freqtrade-avo-maria-lighter` published
+    `claim_era: 0.000174` — a real positive era-scoped claim — beside a
+    headline reading `n_with_era_claim: 0`. The payload contradicted itself.
+
+    Two halves pinned: the aggregator counts era claims when they are present,
+    and `run_once` recomputes the headline after filling them.
+    """
+    # --- half one: the aggregator itself can count an era claim -------------
+    books = {"a": [0.03, 0.01, 0.02, 0.04] * 5, "b": [-0.02, -0.01] * 10}
+    rows = alloc.allocate(books, book_usd=1000.0)
+    before = alloc.class_totals(rows, books)
+    assert sum(c["n_with_era_claim"] for c in before.values()) == 0, \
+        "fixture must start with no era claims, or it proves nothing"
+    alloc.set_era_twin(rows["a"], 12, 0.004)
+    after = alloc.class_totals(rows, books)
+    assert sum(c["n_with_era_claim"] for c in after.values()) == 1, \
+        "the aggregator does not see a filled era twin"
+
+    # --- half two: run_once recomputes it AFTER the fill --------------------
+    # Structural, because the ordering IS the defect — an aggregator that works
+    # in isolation is exactly what shipped, and it still published zero.
+    src = (ROOT / "fleet_allocation.py").read_text()
+    tree = ast.parse(src)
+    fn = [f for f in ast.walk(tree)
+          if isinstance(f, ast.FunctionDef) and f.name == "run_once"][0]
+    fill_line = None
+    recompute_line = None
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Call) and getattr(node.func, "id", "")
+                == "set_era_twin"):
+            fill_line = max(fill_line or 0, node.lineno)
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                # NOTE the quote form: `ast.unparse` emits SINGLE quotes,
+                # so matching on `["by_class"]` finds nothing and this fails
+                # for the wrong reason. Match the KEY, not a spelling.
+                if (isinstance(t, ast.Subscript)
+                        and "by_class" in ast.unparse(t)):
+                    recompute_line = max(recompute_line or 0, node.lineno)
+    assert fill_line, "run_once no longer fills the era twin"
+    assert recompute_line, (
+        "run_once never recomputes by_class — the headline is whatever "
+        "build() computed before any claim_era existed, i.e. always zero")
+    assert recompute_line > fill_line, (
+        f"by_class is recomputed at line {recompute_line} but the era twins "
+        f"are filled at {fill_line} — the counter still precedes its data")
 
 
 class TestTheEvidenceRecordIsPublished:

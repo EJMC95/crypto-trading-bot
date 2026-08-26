@@ -446,7 +446,37 @@ is side+source stamped). Instrument:
 `scripts/study_sniper_debut_fade_2026-08-26.py`. Pinned by
 `tests/autonomy/test_sniper_per_source_side.py`.
 
-## 2026-08-20 (ua) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
+## 2026-08-20 (ua) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample — and the era headline that motivated it could never have moved
+
+**CORRECTED IN PLACE per I12, 26-Aug, after the fix deployed and the live
+payload contradicted this entry's own headline.** This entry said the change
+would take era claims *"0 → 1"*, and quoted `n_with_era_claim: 0` as evidence
+that *"not 'no book qualified' but 'no book could'"*. **The cliff was a real
+cause and its removal worked — but that counter could never have moved
+regardless, because it counts a field that does not exist yet when it runs.**
+
+`build()` computes `by_class`, including `n_with_era_claim`, and the era twin is
+filled afterwards in `run_once` — it needs the ledger rows and the era owner's
+import, so `build` sets every `claim_era` to `None` first ((lx)). The counter
+therefore ran over a column that was `None` on every book **by construction**.
+Measured on the live payload after this shipped: `freqtrade-avo-maria-lighter`
+published `claim_era: 0.000174` — a real, positive, era-scoped claim — beside a
+headline reading `n_with_era_claim: 0`. **The payload contradicted itself in the
+field a reader checks first**, and the zero I cited as a finding was an artifact
+of ordering, not of the data.
+
+`run_once` now recomputes `by_class` after filling the era twins. Pinned by
+`tests/autonomy/test_fleet_allocation.py::test_the_era_headline_counts_a_field_that_exists_by_then`
+— both halves, because an aggregator that works in isolation is exactly what
+shipped: it counted correctly and still published zero. 3 mutations verified RED
+(remove the recompute; move it BEFORE the fill; stop counting).
+
+**What the deployed payload actually shows**, now that the arithmetic is live:
+pooled claims went **2 → 4**, not the 2 → 3 this entry predicted (🙏 avo shadow,
+🌾 carry, 🎫 the Taker, and 🙏 avo's live twin), and one book holds a positive
+era-scoped claim. The direction of every number here stands; the headline that
+was supposed to report it did not.
+
 
 *[RENUMBERED (si) -> (ua): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
