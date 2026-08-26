@@ -821,8 +821,13 @@ def test_an_unmeasured_stop_fill_counts_in_its_own_bucket_never_zero():
             st = box["state"]["freqtrade-georgia-lighter:live"]
             assert st["meta"], "the breakout tape must open"
             coin = next(iter(st["meta"]))
-            # raise the recorded entry so the flat stop fires on cycle 2
+            # [2026-08-26] force a stop on cycle 2 under BOTH stop semantics:
+            # a ratcheted stop_px above the mark fires the trailing stop when
+            # bars are present, and the inflated entry fires the fixed
+            # backstop when they are not — either lands a "stop" reason, which
+            # is all this test is about (the unmeasured-fill bucket).
             st["meta"][coin]["entry"] = st["meta"][coin]["entry"] * 1.10
+            st["meta"][coin]["stop_px"] = st["meta"][coin]["entry"]
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
         stops = [kw for _b, kw in box["paper"] if "stop" in kw["reason"]]
