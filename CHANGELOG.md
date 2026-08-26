@@ -1,3 +1,109 @@
+## 2026-08-26 (tt) — THE WINNERS' DOCKET CROWNED A PROVEN WINNER ON THE WINDOW THAT GENERATED THE HYPOTHESIS: I21's follow-through half was prose, and it failed on the first bucket that ever reached it
+
+Found by the daily review, three days after the registration it broke.
+
+**[PUBLISHED 26-Aug; MEASURED 21-Aug — and the verdict has MOVED since, so it
+is corrected in place per I12 rather than shipped as it stood.]** This work was
+committed on 21-Aug and sat unpushed for five days; it is published today with
+two corrections, both marked below. **The letter is (tt), not the (sq) the
+original commits carried** — (sq) was taken on main the day before by *"FIX THE
+STALE BOTS"* (20-Aug), which is cited three times from `lighter_nav_cook_bot.py`
+and so keeps the letter under the collision rule. Renumbered at all three sites
+(this header, the I21 block in CLAUDE.md, and the section comment in
+`winners_docket.py`).
+
+**THE CORRECTION THAT MATTERS, and it argues FOR this guard rather than
+against it:** the taker's pre-registered follow-through has since **CONFIRMED**.
+`(tc)`/`(td)` graded it on 25-Aug at **n=10, +5.86%/trade, t=3.38** — one close
+past the MIN_N floor this entry was written to defend — and doubled
+`TT_RISK_USD` 1.5 → 3.0 on that basis. So the paragraphs below that read *"NOT
+YET DECIDABLE ... ONE CLOSE SHORT"* and *"PROVEN WINNING: none"* describe
+**21-Aug**, not today. They are kept as the measurement that motivated the fix,
+each flagged in place. Note what actually happened in the gap: **a human ran
+this exact split by hand, twice, because no instrument would.** That is the
+case for shipping it, not a reason to drop it.
+
+**I21, in its own words:** the two buckets held only by the multiplicity
+referee are *"PRE-REGISTERED for single-hypothesis follow-through from 18-Aug:
+graded on closes AFTER registration, t≥2 on the fresh sample alone, **never by
+re-mining the window that generated them**."* `scripts/winners_docket.py` had
+no idea a registration existed. So on 21-Aug it printed:
+
+```
+PROVEN WINNING (survives the referee):
+  lighter-ticket-taker-lshadow [exit:hold] n=62 mean=+1.554% t=3.53 p=0.0004 $+63.82
+```
+
+**Fifty-three of those 62 closes ARE the hypothesis.** That is the re-mining
+I21 forbids, printed by the one instrument in the fleet whose whole job is to
+say a thing is proven — and it is the line a promotion would have quoted.
+
+### WHAT THE PRE-REGISTERED TEST ACTUALLY SAYS
+
+Split at the (qd) registration commit (`aa2b02f`, 18-Aug 11:29:15Z). The
+pre-window reproduces the registration **exactly** — n=53, t=2.65, +0.836% —
+which is what licenses the split:
+
+| bucket | pooled (what it printed) | pre-registration | **FRESH (the only admissible sample)** |
+|---|---|---|---|
+| 🎫 taker `exit:hold` | n=62 t=**3.53** +1.554% | n=53 t=2.65 +0.836% | **n=9 t=+2.99 +5.786% $+39.35** |
+| 🙏 avo `book:*` | n=14 t=1.48 +1.013% | n=12 t=2.31 +1.313% | **n=2 t=−0.19 −0.787%** |
+
+**🎫 the taker is NOT YET DECIDABLE, and it is ONE CLOSE SHORT** *(as of
+21-Aug — it took that close and CONFIRMED at n=10/t=3.38 on 25-Aug, `(tc)`)*. Its fresh t
+clears the bar; its fresh **n=9 is below the MIN_N=10 floor**, and I21 is
+explicit that the floor — not BH — is what stops a short consistent streak
+outranking evidence (I16). "Undecided, one close away" and "PROVEN WINNING" are
+materially different statements about a book, and only the second was on offer.
+
+**Two caveats only the fresh split can see, both load-bearing:**
+* **The mixture changed.** All 9 fresh closes are ONE tag, `long-breakoutup` —
+  while the registered bucket was the `hold` exit family across the taker. The
+  docket separately lists `tag:long-breakoutup` at t=1.36, so what is
+  "confirming" the exit-family hypothesis is one lens having a good run.
+* **They are not 9 independent draws.** 6 of the 9 closed inside a single UTC
+  day (3 close-days total; five of them within ~9h on 20-Aug) — the (ky)/(kw)
+  clustering shape, on a book that holds several positions into one move.
+  Concentration itself is fine (top-1 = 34.8%, ex-best t=+2.91): the problem is
+  the calendar, not one trade.
+
+**🙏 avo is the same defect mirrored, and the more instructive half:** pooling
+*props a registration up*. Its pooled t=1.48 already sits BELOW its own
+registration t=2.31, and its 2 fresh closes read **−0.787%**. Re-mining hid a
+forward sample that is not supporting the claim.
+
+### THE FIX
+
+* `PRE_REGISTERED` declares each registration with its **at-registration**
+  statistics — a commitment, deliberately not re-derived from today's ledger.
+* A pre-registered bucket is **removed from the PROVEN list** but **stays in the
+  BH count `m`**, so holding it back never loosens another bucket's threshold.
+* It is decided in its own section on the fresh sample alone:
+  `confirmed` (n≥MIN_N and t≥2) / `not_confirmed` / `undecided`, and the report
+  prints the pooled reading labelled **NOT the test** beside a
+  `<- would have been crowned PROVEN on the re-mined window` marker, so the
+  defect is visible rather than merely absent.
+* `days` and `tag_share` publish beside the fresh verdict — the two readings
+  that decided today's call.
+
+Live output read `PROVEN WINNING: none` on 21-Aug *(today the taker's
+follow-through section reads CONFIRMED — see the correction above; 🙏 avo's
+remains undecided)*. **Nothing about either book
+changed; what changed is that the docket can no longer say a thing it has not
+measured.** 7 tests, **4/4 mutations verified RED** via `scripts/mutate.py`
+(strip the PRE_REGISTERED filter · defeat the MIN_N floor · make `fresh` the
+whole pooled window · defeat the t-bar). Full suite green.
+
+**THE TRANSFERABLE HALF — and it is this file's own opening claim landing on
+the file itself: a defense that lives only in prose is a defense that has not
+been written.** I21 declared its enforcement as `bh_survivors` plus the
+outcome-conditioned-exit test; both exist, both are correct, and **neither
+touches the follow-through rule**, which is precisely the caveat at the top of
+CLAUDE.md — *a green run verifies that a declared enforcement EXISTS, not that
+it covers what the doctrine says.* Same shape as (gk) (a rule nobody ran) and
+(iz) (a declared enforcement that was inert). I21 corrected in place; the two
+new artifacts are named in its ENFORCED BY line.
+
 ## 2026-08-26 (ts) — THE PAIR CENSUS WAS SCORING EACH ARM'S **OLDEST** 30 CLOSES: GEORGIA'S SHADOW STAMPED AT 09:22Z AND STILL READ `0/30` AT 09:43Z
 
 Judge v2.0's census ((ti)) publishes `xp_judge.pairs.<pair>.stamps` so a pair's

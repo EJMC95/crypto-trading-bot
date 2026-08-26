@@ -140,3 +140,106 @@ def test_phantom_closes_never_reach_the_referee():
                    enter_tag="long")
     assert len(wd.era_scoped_rows([scratch])["bk2"]) == 1, \
         "a real scratch close was dropped — the filter exceeded its signature"
+# --------------------------------------------------------------- [I21] (tt)
+# THE PRE-REGISTERED FOLLOW-THROUGH. I21 says a bucket held only by the
+# multiplicity referee is "graded on closes AFTER registration, t>=2 on the
+# fresh sample alone, never by re-mining the window that generated them" —
+# and until 21-Aug nothing enforced it. Measured that morning: 🎫 taker
+# `exit:hold` reached n=62 pooled (t=3.53, p=0.0004) and the docket printed
+# it under PROVEN WINNING, three days after registering it at n=53. The
+# fresh sample was n=9 — above the t-bar, below the MIN_N floor, i.e. NOT
+# YET DECIDABLE. These pin the difference between those two statements.
+
+#: a zero-variance list has an undefined t, so every fixture below needs
+#: spread — the first draft used [0.02]*30 and graded p=0.5 (sd=0).
+def _spread(mean, n, jitter=0.005):
+    return [mean + (jitter if i % 2 else -jitter) + jitter * (i % 3) / 3
+            for i in range(n)]
+
+
+def _prereg_bucket(pre, post, key=("bot-pr", "exit", "hold")):
+    """Build a bucket registered at T0+... with `pre`/`post` pct lists."""
+    rows = [_row(p, i, "long_hold") for i, p in enumerate(pre)]          # T0+0h..
+    rows += [_row(p, 24 * 30 + i, "long_hold") for i, p in enumerate(post)]
+    since = (T0 + timedelta(hours=len(pre))).isoformat()
+    wd.PRE_REGISTERED[key] = dict(since=since, n=len(pre), t=9.9,
+                                  mean_pct=1.0, source="test")
+    return key, rows, since
+
+
+def _drop(key):
+    wd.PRE_REGISTERED.pop(key, None)
+
+
+def test_a_pre_registered_bucket_is_never_crowned_on_the_pooled_window():
+    """The exact 21-Aug defect: pooled clears BH, so it printed PROVEN."""
+    key, rows, _ = _prereg_bucket(_spread(0.02, 30), _spread(0.02, 5))
+    try:
+        graded = wd.grade_buckets({key: rows})
+        assert graded[key]["p"] < 0.001, "fixture must clear BH pooled"
+        txt, winners = wd.report(graded)
+        assert key not in winners, "a re-mined window may not crown a winner"
+        assert "PROVEN WINNING: none" in txt
+        assert "PRE-REGISTERED FOLLOW-THROUGH" in txt
+        assert "would have been crowned PROVEN" in txt, \
+            "the report must SAY the pooled window would have crowned it"
+    finally:
+        _drop(key)
+
+
+def test_the_fresh_sample_is_only_closes_after_registration():
+    key, rows, _ = _prereg_bucket(_spread(0.02, 30), _spread(-0.01, 4))
+    try:
+        ft = wd.grade_buckets({key: rows})[key]["prereg"]
+        assert ft["n"] == 4, ft
+        assert ft["mean_pct"] < 0, "the fresh closes are the LOSERS here"
+    finally:
+        _drop(key)
+
+
+def test_a_fresh_sample_below_the_floor_is_undecided_however_good_its_t():
+    """n=9 at t=2.99 was the real reading. Below MIN_N it decides NOTHING."""
+    key, rows, _ = _prereg_bucket(_spread(0.02, 30), _spread(0.05, 9))
+    try:
+        ft = wd.grade_buckets({key: rows})[key]["prereg"]
+        assert ft["n"] == 9 and ft["n"] < wd.MIN_N
+        assert ft["t"] >= 2.0, "fixture must clear the t-bar so the FLOOR is what bites"
+        assert ft["verdict"] == "undecided", ft
+    finally:
+        _drop(key)
+
+
+def test_a_fresh_sample_at_the_floor_can_confirm_and_can_refuse():
+    key, rows, _ = _prereg_bucket(_spread(0.02, 30), _spread(0.025, 12))
+    try:
+        ft = wd.grade_buckets({key: rows})[key]["prereg"]
+        assert ft["n"] >= wd.MIN_N and ft["verdict"] == "confirmed", ft
+    finally:
+        _drop(key)
+    key, rows, _ = _prereg_bucket(_spread(0.02, 30), [0.02, -0.03] * 6)
+    try:
+        ft = wd.grade_buckets({key: rows})[key]["prereg"]
+        assert ft["n"] >= wd.MIN_N and ft["verdict"] == "not_confirmed", ft
+    finally:
+        _drop(key)
+
+
+def test_the_two_live_registrations_are_declared_with_their_record():
+    """A registration is a COMMITMENT — the at-registration stats are the
+    record and must survive in the table, not be re-derived from today."""
+    taker = wd.PRE_REGISTERED[("lighter-ticket-taker-lshadow", "exit", "hold")]
+    assert taker["n"] == 53 and taker["t"] == 2.65, taker
+    avo = wd.PRE_REGISTERED[("freqtrade-avo-maria-lshadow", "book", "*")]
+    assert avo["n"] == 12 and avo["t"] == 2.31, avo
+    for r in wd.PRE_REGISTERED.values():
+        assert r["since"].startswith("2026-08-18"), r
+
+
+def test_a_pre_registered_bucket_is_not_double_reported_as_on_its_way():
+    """It has its own section; listing it twice invites quoting the pooled t."""
+    key, rows, _ = _prereg_bucket(_spread(0.01, 30), _spread(0.01, 3))
+    try:
+        txt, _w = wd.report(wd.grade_buckets({key: rows}))
+        assert txt.count(f"{key[0]} [{key[1]}:{key[2]}]") == 1, txt
+    finally:
+        _drop(key)

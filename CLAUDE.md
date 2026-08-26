@@ -403,7 +403,33 @@ never by re-mining the window that generated them. **A discovery is not a
 promotion**: the docket is read-only, junior to the go-live gate, and a
 directional survivor still owes the (hm) random-entry null before anything
 ACTS on it.
-  ENFORCED BY: `scripts/winners_docket.py::bh_survivors`, `tests/autonomy/test_winners_docket.py::test_outcome_conditioned_exits_never_reach_the_referee`
+**[21-Aug, published 26-Aug (tt)] THE FOLLOW-THROUGH HALF WAS WRITTEN AND UNENFORCED, AND IT
+FAILED ON THE FIRST BUCKET THAT REACHED IT — corrected in place per I12.** The
+sentence above ("never by re-mining the window that generated them") was prose
+against a docket that had no idea a registration existed. Measured 21-Aug,
+three days in: 🎫 taker `exit:hold` hit **n=62 pooled, t=3.53, p=0.0004** and
+the docket printed it under **PROVEN WINNING** — over a window whose first 53
+closes ARE the hypothesis. Its FRESH sample was **n=9, t=+2.99**: above the
+t-bar, below the MIN_N floor, so the honest verdict was **not yet decidable, one
+close short** — **[CORRECTED IN PLACE 26-Aug per I12: it took that close.
+`(tc)`/`(td)` graded the same follow-through on 25-Aug at **n=10, +5.86%/trade,
+t=3.38** — CONFIRMED — and doubled `TT_RISK_USD` 1.5 → 3.0 on it. The n=9
+reading below is the 21-Aug measurement that motivated this guard, not the
+book's state today. Note the gap it names: a human ran this split BY HAND,
+twice, because no instrument would — which is the argument for the guard, not
+against it.]** The caveats only the fresh split can see were load-bearing
+(9 of 9 one tag `long-breakoutup`, so a different MIXTURE from the registered
+one; 6 of 9 closing inside a single UTC day, so not 9 independent draws). The
+sibling moved the other way and shows the same defect mirrored: 🙏 avo pooled
+t=1.48 against its registration's t=2.31, its 2 fresh closes reading **t=−0.19**
+— pooling was PROPPING UP a registration the forward sample is not supporting.
+`PRE_REGISTERED` now declares each registration with its at-registration
+statistics (a commitment, not a re-derivation), such a bucket is **removed from
+the PROVEN list** while staying in the BH count `m` (so it never loosens another
+bucket's threshold), and it is decided in its own section on the fresh sample
+alone. **The general shape, and it is the (gk)/(iz) shape again: a defense that
+lives only in prose is a defense that has not been written.**
+  ENFORCED BY: `scripts/winners_docket.py::bh_survivors`, `scripts/winners_docket.py::PRE_REGISTERED`, `scripts/winners_docket.py::followthrough`, `tests/autonomy/test_winners_docket.py::test_outcome_conditioned_exits_never_reach_the_referee`, `tests/autonomy/test_winners_docket.py::test_a_pre_registered_bucket_is_never_crowned_on_the_pooled_window`
 
 ### I22 · A BOOK MUST SPEND THE ECOSYSTEM, AND ITS SPEND IS A PUBLISHED NUMBER — ONE CONSTRUCT ON A NARROW SLICE AT 1x IS NOT A SLOW WINNER, IT IS A SAMPLE THE GATE CANNOT GRADE
 **Operator, 20-Aug:** *"everything you have put forward that is unreachable is
