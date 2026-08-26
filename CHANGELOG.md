@@ -178,6 +178,215 @@ CLAUDE.md — *a green run verifies that a declared enforcement EXISTS, not that
 it covers what the doctrine says.* Same shape as (gk) (a rule nobody ran) and
 (iz) (a declared enforcement that was inert). I21 corrected in place; the two
 new artifacts are named in its ENFORCED BY line.
+## 2026-08-26 (uc) — THE HATCHERY AUTOPSY: WHY THE INCUBATOR HAS NEVER PRODUCED A GAMETE — AND THE MECHANISM I PUBLISHED FOR IT WAS REFUTED BY MY OWN REFEREE BEFORE IT COULD BE BUILT ON
+
+**Eamon, 26-Aug:** *"All the inventions we've made haven't produced, im
+concerned about the incubators efficacy — it hasnt produced a thing, or if it
+has, no new bot has appeared on the pnl dashboard."* Then, later the same
+session: *"I think a lot of the time we've thought it's stuck it's slow"*,
+*"don't retire anything, use data we have ... to loosen or tighten, widen or
+shorten"*, and *"unclip georgias wings and let her fly"*.
+
+**THE MOST IMPORTANT THING IN THIS ENTRY IS A CORRECTION, SO IT LEADS.** The
+first pass produced a confident, numbered, file:line-cited mechanism for the
+incubator's sterility. An adversarial referee **REFUTED IT** by driving it
+against the COMMITTED code, and the refutation is recorded here at least as
+prominently as the finding, because the error is the more transferable half.
+
+### WHAT WAS CLAIMED, AND WHY IT WAS WRONG
+
+**Claimed:** two *independent* exclusions of the `breakoutup` lens — `evaluate()`
+passes no `up_resolver` to `rp.replay`, AND `_marked`/`_pnl_usd` filter to
+`set(LENS_GENE)` whose four keys lack `breakoutup` — producing an **$84.23**
+gap and `h1 > 0` in **0 of 1519** genotypes.
+
+**Refuted**, one minimal winning crypto LONG breakout driven through the real
+`rp.replay` + real `_marked` against `git show HEAD:strategy_incubator.py`:
+
+| coverage | bucket | fitness | closes |
+|---|---|---|---|
+| no `up_resolver` (what HEAD runs) | `{'breakout': 2.46}` | **+$2.46** | 1 |
+| with `up_resolver` (what the tuner runs) | `{'breakoutup': 2.46}` | **$0.00** | 0 |
+
+Without a resolver the relabel never fires, so those trades score as plain
+`breakout` — **a `LENS_GENE` key**. The P&L was INCLUDED. The two "exclusions"
+are **mutually exclusive, not independent**: only one can be in force, and the
+one in force was the harmless one. **Passing the resolver ALONE would have made
+the score strictly worse** — the opposite of the repair the headline implied.
+
+Three supporting pillars fell with it:
+* **`BULL_MODE` is `False`**, so `_up` never reaches admission — a resolver
+  changes the **label only**. The claim that breakout is inert without a
+  resolver came from a DOCSTRING, not from driving it; driven at HEAD with no
+  resolver, breakout reads taken 8 / closed 3 / net −$5.01.
+* **The $84.23 gap is not like-for-like** — the tuner's `baseline_net` is
+  closed-only across FIVE lenses; the incubator's `net` is mark-inclusive
+  across FOUR. Three differences billed to one cause; the tuner's own docstring
+  sizes the metric-basis term alone at **$41.57** on one tape.
+* **"0 of 1519" is a boundary artifact.** Same code, same source, varying only
+  the tape end: drop 0 snaps → `h1>0` **0**; drop 3 → **420**; drop 8 → **0**.
+  `mid = len(tape)//2` moves one snapshot and ~420 near-identical joint-space
+  genotypes flip together. That is **n=1 wearing n=1519**, and "lowering the bar
+  to $0.00 buys nothing" is false at three of eight measured windows.
+
+**WHAT SURVIVES, verified independently:** the CONCLUSION — *the incubator's
+fitness is not the taker's book* — holds, and is strengthened by a route
+neither pass named: **three ENACTED taker levers are live right now**
+(`taker.tp` 0.03 vs default 0.04, `taker.brk_range` 0.93 vs 0.95,
+`taker.momo_chg` 6.0 vs 5.0), so the "default genome" is not the running taker
+either. `TRADE_SWING`/`HALF_MARGIN`/`EDGE_MARGIN` = $3.50/$3.50/$7.00 exact;
+`evaluate()` does call `rp.replay` bare at 661/663/664 while the tuner passes a
+resolver; `default_net` = −29.42 − 32.60 = **−$62.02** arithmetically sound.
+
+**THE REAL COVERAGE→P&L MECHANISM, found by the referee and UNMEASURED by
+anyone:** in `lighter_ticket_replay` the per-snapshot dedup
+`if lens in opened_lenses: continue` (~:315) runs **BEFORE** the relabel
+(~:345), so with a resolver two crypto breakouts open in one snapshot where one
+opened before (driven: `taken={'breakout':1}` blind vs `{'breakoutup':2}`,
+closed_net +$2.46 vs +$4.92). Coverage therefore changes WHICH TRADES the
+replayed book takes and how slots are rationed against `divergence`, the losing
+lens. Whether that ordering is a replay bug or a deliberate simplification is
+UNRESOLVED and tracked, not fixed here.
+
+**Why the fitness change ships anyway:** the incubator PLACES NO TRADES. It
+scores genotypes and its champion is consumed by nothing (`genotype_to_levers`
+is complete, safety-railed, and never called outside a selftest). Blast radius
+is a dashboard chip. Shipping a measurement change into a component with no
+actuator is the cheapest place in the fleet to be wrong, and the current
+measurement is definitively not the tuner's. **The champion→lever door stays
+SHUT** — wiring it in the same pass that changes the fitness basis would
+auto-enact genotypes selected under a rule we have now twice failed to
+characterise correctly. **No bar was moved**, and note the justification
+CHANGED: not "lowering them buys nothing" (refuted) but because the half bar's
+behaviour is a boundary artifact, and moving a bar to chase an artifact is how
+a fleet fools itself. Predictions are pre-registered in
+`PREREG_INCUBATOR_FITNESS_2026-08-26.md`, **revision 2**, written before any
+production cycle ran under the fix, and it carries the refutation rather than
+quietly swapping its hypothesis.
+
+### STUCK IS NOT SLOW — EAMON'S CALL, MEASURED, AND IT SAVED TWO BOOKS
+
+*`{closed: 0}` is byte-identical between a book that CANNOT trade and one that
+has not finished a trade yet* — I1 at book scale. **The discriminator is not
+closes, it is OCCUPANCY.** A book holding at its own cap is DEPLOYED and nothing
+is refusing it. Measured on the live fleet:
+
+| book | open/cap | closes | state |
+|---|---|---|---|
+| 🧮 book-hull | **6/6** | 0 | **SLOW** — full, deployed, holding |
+| 🏦 book-kiyosaki | **6/6** | 0 | **SLOW** — full, deployed, holding |
+| 📐 book-grimes | 0/2 | 0 | REFUSING — its own gate scored all 3 setups negative |
+| 🧭 nav-cook | 0/4 | 3 | REFUSING — 40 of 40 candidates below its band |
+
+The decision docket was asking for Hull and Kiyosaki to be RETIRED as
+`zero_ledger`. They are the two books in the fleet with their capital most
+fully deployed. `scripts/audit_stuck_vs_slow.py` makes the distinction
+mechanical, and flags a docket row whose book is merely SLOW — a retirement
+about to be made for the wrong reason. **Declared limit:** it reads a single
+loop's census, which cannot separate "quiet right now" from "always quiet";
+four books (georgia-shadow, ⚖️ Counterweight, albanese, turnbull) publish NO
+census at all, so for them the question is currently unanswerable — that gap is
+itself the finding (I18).
+
+### A LIVE ACTUATOR WAS WIDENING CAPACITY ON A SAMPLE THE GATE REFUSES
+
+`fleet_tuning` carried `carry.max_positions` raised by the evidence board with
+the reason *"SATURATED at 18/12, MTM +$63.11"*. Two faults, both now closed:
+* **WRONG SAMPLE.** `book_mtm_pnl` reads `pnl_abs` — **ALL-TIME**. 🌾 carry's
+  ERA-scoped record is n=13, mean **−0.218%/trade, t=−4.82**, and ~$13 of the
+  all-time accrual is recorded PHANTOM. The (hc) era precondition sits in front
+  of the six gate bars and **never reached this actuator**.
+* **THE TRIGGER FIRES ON A DRAINING BOOK.** `open_n >= cap` is also true when
+  the cap ratcheted DOWN under open positions — carry held 18 against 12 and
+  cannot enter at all (`len(positions) < MAX_POSITIONS`). Meanwhile its census
+  reads `eligible: 0`: it was granted room it has no supply to use (I18).
+
+The board now clears three restrict-only terms — era-scoped profit (the gate
+IMPORTED, never re-derived), `open == cap` rather than `>=`, and demonstrated
+supply — each fail-CLOSED. **Declared consequence:** ⚖️ Counterweight's
+`fundspread.k` becomes unreachable by this branch (its cap counts PAIRS while
+`open_trades` counts LEGS, so `open == cap` cannot hold) — recorded rather than
+papered over.
+
+### GEORGIA: HER WINGS WERE ALREADY UNCLIPPED WHERE THE MONEY IS
+
+Asked to *"unclip georgias wings and let her fly"*, the measurements refused
+three dials and found a fourth nobody had declared:
+* **Slot cap does not bind.** Time-weighted occupancy from her own ledger:
+  shadow at cap **0.6%** of the time (mean 0.56 of 5, flat 66.3%), live **5.0%**
+  (mean 0.90 of 5). Raising slots does nothing.
+* **The hourly throttle is INERT on the shadow.** 156 active hours over 44 days
+  distribute `{1: 108h, 2: 44h, 3: 4h}` — **not one hour ever wanted a fourth**,
+  so `GEORGIA_MAX_ENTRIES_PER_HOUR` 3→4 yields ZERO entries. Refused with the
+  number rather than moved for the look of it.
+* **The LIVE arm has no throttle at all** — a DECLARED port divergence
+  (`lighter_avo_live_bot.py`: *"this host enforces NO hourly throttle ... live
+  rank is the UNCENSORED within-hour ordinal"*). There is nothing to unclip.
+* **AND THAT IS AN UNDECLARED POLICY DIVERGENCE THE JUDGE CANNOT SEE.** The
+  arms are at/over 3 entries/hour in **2.6%** (shadow) vs **19.2%** (live) of
+  active hours, live reaching NINE in one hour — so one arm is rank-censored
+  and the other is not, while her own ledger shows rank position is NOT neutral:
+  **rank 1 = −0.443%/trade (n=24) vs rank 2 = +0.828% (n=9)**. A paired bar
+  across those arms compares different populations — the F1 handicap class judge
+  v2 exists to close. `scan_order` is waived on measurement (immaterial at
+  0.6%/5.0%); the THROTTLE is measured MATERIAL and must block until aligned or
+  waived on its own evidence.
+* **The largest lever anyone has found on her is ENTRY POSITION**, not
+  throughput: a 1.27pp spread against a book whose whole mean is +0.095%. It has
+  WIDENED since last measured (+0.023%/+0.656% then). n=24/9 — hypothesis-grade,
+  stated as such, and owed its own pre-registered study.
+
+### THE PRE-REGISTERED "WINNER" IS REFUTED, AND THE REFUTATION IS THE RESULT
+
+🎫 the taker's `exit:hold`, pre-registered 18-Aug, graded on fresh closes:
+**n=13, +4.770%/trade, naive t=+3.18** — and it is **NOT PROVEN**, on three
+independent grounds. **The bucket was RE-SPECIFIED**: discovery was a six-lens
+mixture (`long-breakoutup` 23, `short-divergence` 14, `long-dip` 9,
+`long-divergence` 6, `long-breakout` 4, `long-momentum` 2); the follow-through
+is **13 of 13 `long-breakoutup`**, the rest having stopped trading. Same label,
+different population. **One correlated day is 73.3% of the return** (20-Aug,
+5 closes, BTC/ETH/ZEC/LINK/BNB all long — one market move at N_eff≈1); drop it
+and t falls to **+1.62**. And k=5 day-clusters means **df=4**, where the
+two-sided 95% critical value is **2.776** against a measured cluster t of +2.51.
+The sibling registration, 🙏 avo shadow book-level, reads **n=6, −0.455%,
+t=−0.40**. Both recorded as refuted; neither date slid. **The grading pipeline
+was calibrated first** — it reproduces the daily review's phantom-close count
+exactly (13 rows: avo 9, georgia 4) via identity-imported
+`golive_readiness.is_phantom_close`, the positive control that licenses every
+other number in this entry.
+
+### ALSO SHIPPED
+
+* **The pipeline card** (`pnl_dashboard.py`) — the production pipe made legible
+  at a glance, leading with the promotion pairs and sorting every blocker by WHO
+  CAN CLEAR IT (a wire / a decision / the clock), each pair surfacing its own
+  published `wake_when`. Reporting only: grades nothing, promotes nothing,
+  writes no lever, adds no data source. A dark key renders **unknown**, never a
+  zero or a green — the load-bearing test renders the card twice, once with a
+  genuine `ready: []` and once with the key absent, and requires the outputs to
+  DIFFER.
+* **The incubator publishes its FUNNEL** — per-gate counts plus the champion's
+  failing-bar reason, which until now existed only in a stdout print. An
+  operator reading `elite: []` could not tell whether the population died at a
+  gate or the surface was negative; answering that took a code run today.
+* **Second-order, diagnosed not fixed:** the joint sweep's in-cage subspace is
+  2.54% of the research space and CONTIGUOUS under the mixed-radix odometer, so
+  **107 of 152 cycles per orbit produce zero enactable genotypes** (~4.5 days at
+  hourly cadence) — and production's cursor sits in a dead stretch now.
+
+### THE TRANSFERABLE LESSON
+
+Three findings this session were the same shape — **the thing that decides was
+not looking at the thing it decides about** (I23 beyond levers): a fitness
+function that scored a different book, an actuator reading all-time where the
+gate reads era, and a pre-registered bucket whose population changed under its
+label. And the day's own headline fell to ONE technique: **driving a single
+minimal case through the real functions against the COMMITTED code** — not the
+worktree, and not the docstring. Two of three refutations were claims asserted
+from comments; the third was a boundary artifact that only appeared when the
+referee varied an input nobody thought was an input. **When a count is
+suspiciously absolute (0 of N, 100% of N), perturb an incidental input and see
+if it moves.**
 
 ## 2026-08-26 (ts) — THE PAIR CENSUS WAS SCORING EACH ARM'S **OLDEST** 30 CLOSES: GEORGIA'S SHADOW STAMPED AT 09:22Z AND STILL READ `0/30` AT 09:43Z
 
