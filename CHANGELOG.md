@@ -1,3 +1,65 @@
+## 2026-08-26 (ts) — THE PAIR CENSUS WAS SCORING EACH ARM'S **OLDEST** 30 CLOSES: GEORGIA'S SHADOW STAMPED AT 09:22Z AND STILL READ `0/30` AT 09:43Z
+
+Judge v2.0's census ((ti)) publishes `xp_judge.pairs.<pair>.stamps` so a pair's
+judgeability is a readable fact instead of a silence. On its second live day it
+read **georgia shadow `0/30`, `phase=unjudgeable, reason=policy_unstamped`** —
+while the ledger showed `freqtrade-georgia-lshadow`'s newest close (LINK, closed
+**09:22:44Z**) carrying `extra.policy`, on a container `audit_code_currency`
+confirms CURRENT at HEAD. Twenty-one minutes, one row, and the census could not
+see it.
+
+**Not window semantics — an ORDERING bug, and the counter was reporting the
+opposite end of the ledger.** `_latest_policy_stamp` took `mine[-look:]` and
+`stamped[-1]`, which is the newest `look` only if rows arrive OLDEST-first. The
+real publisher is `store.fetch_paper_trades` → `ORDER BY closed_at DESC NULLS
+LAST`. So the census scored each arm's **oldest 30** closes and called the
+**oldest** stamp "latest". Reproduced against the live feed, which is the whole
+proof:
+
+| rows as the publisher hands them (DESC) | same rows, ascending |
+|---|---|
+| georgia shadow **0/30**, stamp `None` | georgia shadow **1/30**, stamp FOUND |
+| georgia live 30/30 | georgia live 30/30 |
+
+**Why it hid, and why the live arm looked fine:** every one of georgia's live
+rows is stamped, so `30/30` is true at BOTH ends of the window and the live
+counter could not expose the direction. Only an arm that has *just started*
+stamping can — and the shadow arm's first stamped close was that morning's LINK.
+This is the **(tj) class in the ordering dimension**: (tj) fixed the census
+fixture's field shape after it read every row dark, and the fixture it left
+behind still built **one undated row per bot**, where a newest-vs-oldest slice is
+unobservable by construction. A fixture that cannot distinguish the two ends of a
+window cannot test a window.
+
+**THE FIX ORDERS THE WINDOW ITSELF** rather than inheriting the caller's order —
+`_close_rank` mirrors the publisher's own `DESC NULLS LAST` (an unparseable
+`closed_at` degrades to the NULLS-LAST bucket, never a raise: `parse_ts` throws
+on junk), so the answer is the same however the rows were fetched. Fixture
+rebuilt in the publisher's shape (dated rows, many per bot) plus five regression
+cases: the incident itself, order-independence across permutations (so this
+cannot be "fixed" by flipping the slice to suit one caller), **newest-stamp-wins
+with two stamped closes** (the parity check compares the returned dict — hand it
+a stale stamp and a policy the arm has already left is what gets checked), the
+window still ROLLING (a stamp older than `look` does NOT count — the negative
+control), and NULLS-LAST (enough undated rows would otherwise fill the window and
+hide a real stamp). **5/5 mutations verified RED**, two of them survivors from
+the first round that were defects in my own tests.
+
+**WHAT THE CENSUS SAYS NOW, run against the live feed — the counter tells the
+truth, and the truth is a different finding:** georgia advances past the false
+`policy_unstamped` to **`policy_mismatch` on `scan_order` (live `diversified` vs
+shadow `list`)** — a REAL arm divergence, which is exactly the F1 handicap the
+census exists to surface, and it is left standing for a measured act rather than
+silently defaulted. **avo shadow `0/N` and mum `0/0` live are HONEST**: avo's
+shadow arm has taken no close since the stamping build deployed, and mum's live
+arm has no closes at all. They clear on their own next close, no fix owed.
+
+**BLAST RADIUS: ZERO on trading.** The census is published state; it moves no
+lever, promotes nothing, and the v2.1 bar design is untouched. What it cost was
+**visibility** — the one pair whose shadow arm had started stamping was reported
+as an arm that stamps nothing, which is the byte-identical-silence failure I1
+names, on the instrument built to end exactly that.
+
 ## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE OF ITS OWN THESIS: a perp lists AFTER the spot hype, and the debut it was buying is measurably a fade
 
 **Eamon, 26-Aug:** *"let listing sniper fly like it used to."*
