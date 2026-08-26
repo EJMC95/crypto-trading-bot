@@ -1,3 +1,43 @@
+## 2026-08-26 (tn) — AVO'S TWO FIXED-DOLLAR RAILS WERE STILL SIZED FOR THE $60 BOOK: CAP 1200 → 1700, DAILY-LOSS BACKSTOP 6 → 32, BOTH DERIVED AND READ BACK
+
+The same optimisation pass found 🙏 avo — the winning arm Eamon flagged this
+morning — held down by TWO instances of the fixed-dollar-vs-grown-equity
+class in one service, while contributed capital grew 6.1x to $380.56:
+
+* **`FREQTRADE_AVO_MARIA_MAX_NOTIONAL` 1200 → 1700.** At equity $319.6 her
+  clip is $319.6 (= equity: gross 5.0 over 5 slots), so `cap_slots =
+  int(1200 // 319.6) = 3 of 5` — flat-redeploy steady state **$959 = 3.0x
+  equity against the on-record 5.0x**, 40% of designed gross silently
+  undeliverable. The (sr) delayed-refusal shape exactly:
+  `notional_cap_skips` still 0 only because the 4 held positions opened at
+  smaller clips ($753 held + $319.6 next fits under $1,200); the wall
+  arrives as they roll. Derivation (published per (tg)): cap = equity x
+  gross_x = $1,598 (= the row's own `deployed_at_full`) x1.064 headroom =
+  $1,700, holding 5 slots until equity $340. **Expectancy price: zero** —
+  per-trade % is clip-invariant ((hl)); the cap cannot raise leverage
+  (gross_x_max env-pinned at Eamon's on-record 5.0; all_slots_stop 0.50;
+  model liq gap −14% at venue-worst mmf 600bps, the stop fires first below
+  6.25x; headroom's `liq_unpriced` verdict is publish-only per (th) and is
+  stated, not waived). Adversarially re-verified — independent re-derivation
+  reproduced every number.
+* **`LIGHTER_MAX_DAILY_LOSS` 6 → 32.** The abs daily rail was $6 = 10% of
+  the PRE-deposit equity, never moved: 1.88% of today's book, tripping on a
+  0.79% adverse basket move at current gross and **0.375% at the full
+  deployment the cap fix enables** — a structural noise-halt that flattens
+  everything at the worst moment and blocks entries for the rest of the UTC
+  day. $32 = parity with the designed 10% pct rail (0.10 x 319.6 = $31.96),
+  which becomes the binding rail again; the abs stays as its backstop. The
+  host enforces BOTH (`breach = pct OR rails.daily_loss_hit`), so this
+  loosens the accidental rail to the declared one — not the declared one at
+  all.
+
+Executed by the (lr) one-shot pattern (`avo-cap-parity.yml`, one variables
+call so the service restarts once, deleted after use), read back on the
+row. Era untouched — capacity, (hc). The durable fix (a cap that SCALES
+with equity — third instance of this class after (sr) and the farmer-cap
+HANDOFF row) is a rails build with tests across the shared live image, left
+as a named decision in HANDOFF rather than smuggled into an env flip.
+
 ## 2026-08-26 (tm) — GEORGIA'S LIVE ARM WAS NOT RUNNING HER OWN EXIT POLICY: THE BREAKOUT VETO AND THE TRAILING RATCHET LAND ON THE LIVE HOST, AND MUM'S CENSUS NAMES THE UPTREND BLOCK
 
 **Eamon, 26-Aug (morning): "explore real money bot optimisations - mum v2

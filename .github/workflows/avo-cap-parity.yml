@@ -1,0 +1,60 @@
+# One-shot VARIABLES-ONLY parity fix for 🙏 avo's live service — DELETE AFTER
+# USE (the (lr) rule). [2026-08-26 (tn)] Two fixed-dollar rails were still
+# sized for the ~$60 pre-deposit book while contributed capital grew 6.1x to
+# $380.56 (equity $319.6 at derivation):
+#   FREQTRADE_AVO_MARIA_MAX_NOTIONAL 1200 -> 1700
+#     cap = equity 319.6 x gross_x 5.0 = $1,598 (= the row's own
+#     deployed_at_full) x1.064 headroom -> $1,700; restores cap_slots 3 -> 5.
+#     The cap CANNOT raise leverage: gross_x_max is env-pinned at Eamon's
+#     on-record 5.0 — this only funds slots 4-5 of a gross he already set.
+#   LIGHTER_MAX_DAILY_LOSS 6 -> 32
+#     parity with the pct rail (0.10 x 319.6 = $31.96): $6 was 10% of the
+#     PRE-deposit equity, never moved — 1.88% of today's, tripping on a
+#     0.375% adverse basket move at full deployment. $32 returns the abs rail
+#     to being the backstop; the designed 10% pct rail binds again.
+# One `railway variables` call so the service restarts ONCE. Service is
+# tide-rider-lighter-live (the 13-Aug slot swap; service names lie). Safe:
+# the (pq) daily halt is store-backed and none is active; positions restore
+# from durable state. Names only in logs ((ml): never echo resolved values).
+name: Avo cap + halt parity
+on:
+  workflow_dispatch:
+    inputs:
+      cap:
+        description: "FREQTRADE_AVO_MARIA_MAX_NOTIONAL"
+        required: false
+        default: "1700"
+        type: string
+      daily_loss:
+        description: "LIGHTER_MAX_DAILY_LOSS (abs backstop, parity with the 10% pct rail)"
+        required: false
+        default: "32"
+        type: string
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Set variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IN_CAP: ${{ inputs.cap }}
+          IN_DL: ${{ inputs.daily_loss }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          if [ -z "${IN_CAP:-}" ] || [ -z "${IN_DL:-}" ]; then
+            echo "::error::missing value"; exit 1
+          fi
+          SVC="tide-rider-lighter-live"
+          echo "::group::$SVC — set cap + daily-loss (names only in this log)"
+          railway variables --service "$SVC" \
+            --set "FREQTRADE_AVO_MARIA_MAX_NOTIONAL=${IN_CAP}" \
+            --set "LIGHTER_MAX_DAILY_LOSS=${IN_DL}" \
+            || { echo "::error::$SVC variable set failed"; exit 1; }
+          echo "variables applied; Railway redeploys the existing image with the new env"
+          echo "::endgroup::"
