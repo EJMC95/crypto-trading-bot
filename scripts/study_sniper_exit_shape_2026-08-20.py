@@ -518,19 +518,26 @@ def cluster_t(v, groups):
     MAX_OPEN=4 concurrent), so the independence the plain t assumes is not
     available; the default cluster is the entry CALENDAR DAY. Reduces exactly
     to the plain t when every observation is its own cluster (selftest-pinned).
+
+    [2026-08-26] DELEGATES to `golive_readiness.cluster_se` — the ONE owner,
+    now reachable with an arbitrary cluster key. This was a hand-rolled copy of
+    the same estimator, and it had drifted where it counts: on a near-cancelling
+    sample whose honest iid t is 1.94 it returned **t = 2.38e+16**, because the
+    owner carries the `(kg)` degenerate-t guard (`se_cr < se_iid * 1e-6`) and
+    this had only `var <= 0`.
     """
     n = len(v)
     if n < 2 or len(set(groups)) < 2:
         return None, len(set(groups))
-    mean = sum(v) / n
-    sums = {}
-    for x, g in zip(v, groups):
-        sums[g] = sums.get(g, 0.0) + (x - mean)
-    G = len(sums)
-    var = sum(s * s for s in sums.values()) / (n * n) * (G / (G - 1.0))
-    if var <= 0:
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import golive_readiness as _GR
+    except Exception:                                     # noqa: BLE001
+        return None, len(set(groups))   # no owner -> no number, never a guess
+    se, G, _mx = _GR.cluster_se(list(v), list(groups))
+    if se is None or not (se > 0):
         return None, G
-    return mean / math.sqrt(var), G
+    return (sum(v) / n) / se, G
 
 
 def max_drawdown_pct(pnls, start=PAPER_START):

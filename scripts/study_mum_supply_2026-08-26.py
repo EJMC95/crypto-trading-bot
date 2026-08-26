@@ -191,20 +191,33 @@ def fetch_1h(sym, mid):
 
 def cluster_t(xs, keys):
     """Cluster-sandwich t of mean(xs), clusters = distinct keys.
-    Same estimator as golive_readiness.cluster_stats, generalised to an
-    arbitrary cluster key (coin-day here vs its batched-close key)."""
+
+    [2026-08-26] DELEGATES to `golive_readiness.cluster_se`, which is now
+    reachable with an ARBITRARY cluster key. This docstring used to say "same
+    estimator as golive_readiness.cluster_stats, generalised to an arbitrary
+    cluster key" — accurate about the intent, and the copy had already drifted
+    in the direction that matters. MEASURED on a near-cancelling sample whose
+    honest iid t is 1.94: this copy returned **t = 2.38e+16** while the owner
+    returned None, because the owner carries the `(kg)` degenerate-t guard and
+    the copy carried only `se > 0`. Not a contrived shape here — the guard
+    fires when a cluster's demeaned values cancel, which is the DESIGN of a
+    delta-neutral basket.
+
+    The owner returns None where this returned nan; both are "not computable",
+    and callers here already branch on a non-finite value.
+    """
+    try:
+        sys.path.insert(0, HERE)
+        import golive_readiness as _GR
+    except Exception:                                     # noqa: BLE001
+        return float("nan"), 0        # no owner -> no number, never a guess
     n = len(xs)
     if n < 2:
         return float("nan"), 0
-    xbar = sum(xs) / n
-    groups = {}
-    for x, k in zip(xs, keys):
-        groups.setdefault(k, []).append(x - xbar)
-    G = len(groups)
-    if G < 2:
+    se, G, _mx = _GR.cluster_se(list(xs), list(keys))
+    if se is None or not (se > 0):
         return float("nan"), G
-    se = math.sqrt(G / (G - 1) * sum(sum(g) ** 2 for g in groups.values())) / n
-    return (xbar / se if se > 0 else float("nan")), G
+    return (sum(xs) / n) / se, G
 
 
 def iid_t(xs):
