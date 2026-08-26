@@ -1,6 +1,6 @@
 ## 2026-08-26 (tw) — THE SNIPER WAS ON THE WRONG SIDE OF ITS OWN THESIS: a perp lists AFTER the spot hype, and the debut it was buying is measurably a fade
 
-**Operator:** *"let listing sniper fly like it used to."*
+**Eamon, 26-Aug:** *"let listing sniper fly like it used to."*
 
 It used to fly as `listing_sniper.py`, sniping SPOT listings across **~100
 CEXes**, where a fresh listing is a buying event and LONG is the trade. This
@@ -126,7 +126,7 @@ expression at the SIZING site is identical to the one at the OPEN site.
 
 *[RENUMBERED (si) -> (tv): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
-**Operator:** *"If everything is 0.000 then you've missed something and you've
+**Eamon, 20-Aug:** *"If everything is 0.000 then you've missed something and you've
 got something wrong. Find out why and fix it. This whole fleet 0 business needs
 to change and whatever is causing this disease needs to be killed, not the fleet
 or its endless possibilities for success."*
@@ -275,7 +275,7 @@ this container (`test_funding_variant`, `test_margin_truth`) are the absent
 
 *[RENUMBERED (sh) -> (tu): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
-**Operator:** *"Keep the books, fix your arithmetic to everything you want to
+**Eamon, 20-Aug:** *"Keep the books, fix your arithmetic to everything you want to
 retire and start using an approach where instead of finding a way to kill
 something you find a way to feed it, let it exercise, give it sunlight."*
 
@@ -4478,7 +4478,7 @@ in-tree citation was repointed per file and reconciled by count ((qz)), and
 each hit was confirmed to be MINE before rewriting — a blanket replace on a
 shared file already caught another session's citation once today.)*
 
-**Operator:** *"bring the sniper back to life and make it do its intended job"*,
+**Eamon, 20-Aug:** *"bring the sniper back to life and make it do its intended job"*,
 then — while this was being measured — *"just don't continue if it's going to be
 negative, restrictive and choking of the bot ... I did not start this fleet with
 the intention of slowly taking away more food and sunlight each day from it."*
@@ -4602,7 +4602,7 @@ there is nothing in the sample to invalidate. Declared rather than assumed.**
 
 *(Renumbered (sd) -> (sf) -> **(sj)** before merge. `main` took (sd) for the leverage entry and (se) for the margin-surface one while this was being written; then, while this branch waited on CI, it took (sf) too for the I22 entry. The letter that is already on `main` keeps it — neither is cited from tracked code, so the tie-break is which one a reader of `main` would already be relying on. All four citation sites were enumerated with a COUNT first, per the truncated-search rule; every one was inside this file.)*
 
-**Operator, 20-Aug:** *"it is clear that the bots are too restricted, entry and
+**Eamon, 20-Aug:** *"it is clear that the bots are too restricted, entry and
 exits are completely off, its as if they all share the same metrics and
 parameters which is false and ive never asked or it. individually look at where
 each bot is being choked, where its entry could be better, how it could exit
@@ -4987,7 +4987,7 @@ convention's own tiebreak the CITED entry keeps the letter and this one
 moves. In-tree citations were repointed in the same commit, enumerated
 UNCAPPED and reconciled by count ((qz)) rather than sampled through head.)*
 
-**Operator ask:** *"Listing sniper — let's look back to the days its p n l was
+**Eamon, 20-Aug:** *"Listing sniper — let's look back to the days its p n l was
 biggest in the fleet — strip back whatever has caused it to have 'erectile
 dysfunction' and going back to giving it a hard on."* The premise is measurably
 false in a way that is worth more than the fix would have been, so the answer is
