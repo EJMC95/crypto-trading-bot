@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-26 07:28 Sydney (21:28Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-26 11:30 Sydney (01:30Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -42,7 +42,7 @@ _Still open because:_ splitting it decouples the arm from a lever the rail activ
 ### `ceiling-slots-georgia`  ·  owner: **session**
 **(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 days at full occupancy — an 11x speed-up'. Measured: her mean hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE slots need ~46 opens/day. Her signal supplies 40.9/day at best. **Full occupancy is unreachable by construction, and it was never the lever — CLOSES are.** She is flat 68.4% of the time not because something refuses her but because she exits in under 3 hours. (sv) took the one gate that cut closes for no quality reason (the 2/h throttle, +0.633pp in favour of the entry it refused, six splits) from 2 -> 3.
 
-_Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. The OTHER half is untouched: her median hold is 1.9h against a 1440m cap, and nobody has asked whether letting winners run raises her mean instead of her count.
+_Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. [26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, crash-dominated — decides NOTHING either way; 3 of the six (sv) controls have flipped negative, so the 3->4 step is REFUSED on current data and 3->2 reversion equally unsupported. The OTHER half is now MEASURED AND CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 paired, both intrabar conventions) put every widening below the harness's own +0.246pp calibration error, roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees between conventions, and the 1440m max_hold fired 0 of 207 closes ever — exits are a dead dial on this book; the mean lever is ENTRY quality (rank1 +0.023% vs rank2 +0.656% on her own ledger).
 
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
@@ -65,17 +65,26 @@ The LIVE taker's short-divergence stop reads +28pp reclaim excess and +2.10% hel
 _Still open because:_ real-money row: measure and hand over, never hand-set.
 
 ### `georgia-t-bar`  ·  owner: **session**
-🔮 georgia is 5 of 6 go-live bars, failing only t (1.11 < 2.0) — the fleet's closest book to the gate. Its trailing stop is NOT the leak (reclaim 74% vs placebo 75%). Where its t comes from is the open question: raise the mean, cut the variance, or raise n.
+🔮 georgia is 5 of 6 go-live bars, failing only t. [MEASURED 26-Aug (tm) pass]: the weak t is ONE real 3-leg flash-crash batch (22-Aug 05:11Z: XRP -16.4/NEAR -19.5/TRX -3.0) = 73.5% of cluster variance — drop those 3 rows and t_cluster reads +2.51. Tail CONTROL cannot clear the bar honestly (at the live arm's own measured -7.17% crash fill for a -5% stop, t_cluster caps at ~1.40), and the stress-metric entry pause is REFUTED on the fleet's own instrument (scout stress read 8.6bps at the 05:00:33 entry vs the taker's 15bps bar; the 11.8 peak came 13 MINUTES after the dump started). Exits are a dead dial (see ceiling-slots-georgia). What remains is ENTRY QUALITY: the crash entry rode a +7.5%-in-50-min parabolic spike, and rank1 entries earn +0.023% vs rank2's +0.656%.
 
-_Still open because:_ unmeasured; the per-book audit was still running.
+_Still open because:_ the one unbuilt candidate with evidence behind it is a parabolic-extension entry veto (price vs its own recent range at entry) — book logic, backtest-first on her own ledger + candles; nobody has run it. The (tm) parity fix means her live grade now accrues under her actual policy, so the live arm's fresh era is the other thing time has to deliver.
+
+### `equity-scaling-cap`  ·  owner: **session**
+THIRD measured instance of the fixed-dollar-vs-grown-equity class in three weeks: (sr) avo's deposit stranding a slot at cap $200, the farmer-cap row above, and 26-Aug avo again at cap_slots 3 of 5 ($639 of on-record gross undeliverable) plus her $6 abs daily rail = 10% of the PRE-deposit equity. The (tn) one-shot fixed today's VALUES (1700/32, derived, read back); the CLASS stays open until SafetyRails can scale: max_notional = max(env_floor, equity x gross_x x 1.05), re-read per boot, EQUITY_SCALED_CAP as the switch.
+
+_Still open because:_ a rails code change across the shared live image of all three trio services — needs mutation-pinned tests and a deliberate marker deploy ((te) discipline), not an env flip; until built, this measurement recurs at the next deposit or equity run-up.
 
 ### `carry-garrett-ranking-collision`  ·  owner: **OPERATOR**
 🌾 carry's measured-depth gate now reaches the whole of 🛢️ Garrett's [0.1M, 2M) band, and Garrett's own (pl) measurement found 6 of 6 of its top-ranked candidates are >=20% APR — so carry is a rival for exactly the supply Garrett ranks first. A RANKING collision; audit_book_overlap's axes (apr x vol x class) cannot express it.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (9 commit(s), entries (tj), (tk))
+## Shipped today (13 commit(s), entries (tj), (tk), (tl), (tm), (tn))
 
+- `0c37554` One-shot cap+halt parity for avo's live service (registered from main; deleted after use) (tn)
+- `2d4444c` [deploy-live-georgia] [deploy-live-mum] Georgia's live arm runs her own exit policy at last — breakout veto + trailing ratchet ported; mum's census names the uptrend block (tm)
+- `77eeef4` The georgia attestation one-shot goes the way of every provisioner (tl)
+- `b90deb5` Georgia's manual P&L attested (-26.4, read back on the row) — and the pair registry's service name corrected by the act of aiming at it (tl)
 - `e5535a4` One-shot attestation for georgia's manual P&L (registered from main; deleted after use)
 - `b9515b6` The duplicate attestation one-shot goes the way of every provisioner — the (tk) session already executed it
 - `fc24edf` One-shot attestation workflow for avo's manual P&L (registered from main so dispatch resolves; deleted after use)

@@ -250,10 +250,20 @@ CARRIED = [
                     "is extrapolation. `entry_rank` now rides every close, so "
                     "the next step is graded from a query — re-run "
                     "`scripts/study_georgia_entry_rank_2026-08-22.py` once "
-                    "rank-3 rows exist and take 3 -> 4 only if it holds. The "
-                    "OTHER half is untouched: her median hold is 1.9h against a "
-                    "1440m cap, and nobody has asked whether letting winners "
-                    "run raises her mean instead of her count.",
+                    "rank-3 rows exist and take 3 -> 4 only if it holds. "
+                    "[26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, "
+                    "crash-dominated — decides NOTHING either way; 3 of the "
+                    "six (sv) controls have flipped negative, so the 3->4 "
+                    "step is REFUSED on current data and 3->2 reversion "
+                    "equally unsupported. The OTHER half is now MEASURED AND "
+                    "CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 "
+                    "paired, both intrabar conventions) put every widening "
+                    "below the harness's own +0.246pp calibration error, "
+                    "roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees "
+                    "between conventions, and the 1440m max_hold fired 0 of "
+                    "207 closes ever — exits are a dead dial on this book; "
+                    "the mean lever is ENTRY quality (rank1 +0.023% vs rank2 "
+                    "+0.656% on her own ledger).",
         # closes when the next throttle decision has been taken on rank-3 data
         "closes_when": lambda: _has(
             "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
@@ -307,13 +317,47 @@ CARRIED = [
     {
         "id": "georgia-t-bar",
         "owner": "session",
-        "what": "🔮 georgia is 5 of 6 go-live bars, failing only t (1.11 < 2.0) "
-                "— the fleet's closest book to the gate. Its trailing stop is "
-                "NOT the leak (reclaim 74% vs placebo 75%). Where its t comes "
-                "from is the open question: raise the mean, cut the variance, "
-                "or raise n.",
-        "why_open": "unmeasured; the per-book audit was still running.",
+        "what": "🔮 georgia is 5 of 6 go-live bars, failing only t. "
+                "[MEASURED 26-Aug (tm) pass]: the weak t is ONE real 3-leg "
+                "flash-crash batch (22-Aug 05:11Z: XRP -16.4/NEAR -19.5/TRX "
+                "-3.0) = 73.5% of cluster variance — drop those 3 rows and "
+                "t_cluster reads +2.51. Tail CONTROL cannot clear the bar "
+                "honestly (at the live arm's own measured -7.17% crash fill "
+                "for a -5% stop, t_cluster caps at ~1.40), and the "
+                "stress-metric entry pause is REFUTED on the fleet's own "
+                "instrument (scout stress read 8.6bps at the 05:00:33 entry "
+                "vs the taker's 15bps bar; the 11.8 peak came 13 MINUTES "
+                "after the dump started). Exits are a dead dial (see "
+                "ceiling-slots-georgia). What remains is ENTRY QUALITY: the "
+                "crash entry rode a +7.5%-in-50-min parabolic spike, and "
+                "rank1 entries earn +0.023% vs rank2's +0.656%.",
+        "why_open": "the one unbuilt candidate with evidence behind it is a "
+                    "parabolic-extension entry veto (price vs its own recent "
+                    "range at entry) — book logic, backtest-first on her own "
+                    "ledger + candles; nobody has run it. The (tm) parity fix "
+                    "means her live grade now accrues under her actual "
+                    "policy, so the live arm's fresh era is the other thing "
+                    "time has to deliver.",
         "closes_when": lambda: False,
+    },
+    {
+        "id": "equity-scaling-cap",
+        "owner": "session",
+        "what": "THIRD measured instance of the fixed-dollar-vs-grown-equity "
+                "class in three weeks: (sr) avo's deposit stranding a slot at "
+                "cap $200, the farmer-cap row above, and 26-Aug avo again at "
+                "cap_slots 3 of 5 ($639 of on-record gross undeliverable) "
+                "plus her $6 abs daily rail = 10% of the PRE-deposit equity. "
+                "The (tn) one-shot fixed today's VALUES (1700/32, derived, "
+                "read back); the CLASS stays open until SafetyRails can "
+                "scale: max_notional = max(env_floor, equity x gross_x x "
+                "1.05), re-read per boot, EQUITY_SCALED_CAP as the switch.",
+        "why_open": "a rails code change across the shared live image of all "
+                    "three trio services — needs mutation-pinned tests and a "
+                    "deliberate marker deploy ((te) discipline), not an env "
+                    "flip; until built, this measurement recurs at the next "
+                    "deposit or equity run-up.",
+        "closes_when": lambda: _has("venues/safety.py", "EQUITY_SCALED_CAP"),
     },
     {
         "id": "carry-garrett-ranking-collision",
