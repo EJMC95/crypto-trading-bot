@@ -996,8 +996,18 @@ def main():
                 # A missing/zero first_seen must NOT default to 0.0 — that is an
                 # age of ~55 years, an instant give-up, i.e. the absorption bug
                 # again. An unknown clock starts NOW.
-                pending[str(k)] = {"first_seen": float(v.get("first_seen") or time.time()),
-                                   "attempts": int(v.get("attempts") or 0)}
+                _rec = {"first_seen": float(v.get("first_seen") or time.time()),
+                        "attempts": int(v.get("attempts") or 0)}
+                # [2026-08-26] and WHICH SOURCE admitted it. A retry that
+                # forgets its source is sided and held by the fallback
+                # (`side_is_long(None)` is LONG, `hold_sec_for(None)` is the
+                # old MAX_HOLD_SEC) — so a `young` symbol, which this book
+                # takes SHORT for 24h, would be retried as a 6h LONG and land
+                # in the ledger under an un-stamped tag. Absent -> absent,
+                # never a guess (I8).
+                if v.get("src") in SOURCE_SIDE:
+                    _rec["src"] = str(v["src"])
+                pending[str(k)] = _rec
             except Exception:  # noqa: BLE001
                 continue
         # [2026-07-30] the surge source's dedup ledger. A DROPPED entry here
@@ -1429,6 +1439,16 @@ def main():
             _src_map.setdefault(_s, "surge")
         for _s in _young:
             _src_map.setdefault(_s, "young")
+        # [2026-08-26] ...and a RETRY keeps the source that admitted it. A
+        # pending symbol no longer in any list this loop (see `_stale_pending`
+        # below) has no live source, and the fallbacks are not neutral: LONG at
+        # the old MAX_HOLD_SEC. `young` is SHORT/24h and `listing` SHORT/24h
+        # since (ua), so an un-sourced retry would take the WRONG SIDE and
+        # stamp an un-parseable tag on the close. Lowest priority — a live
+        # source always wins, so this can only fill a gap, never override.
+        for _s, _rec in pending.items():
+            if _rec.get("src") in SOURCE_SIDE:
+                _src_map.setdefault(_s, _rec["src"])
         # [2026-08-20] THE CENSUS, per SOURCE. A single `opened: 0` cannot tell
         # a dead source from a blocked one, and this book has one of each: the
         # LISTING source is refuted and structurally starved ((qi): no crypto
@@ -1471,12 +1491,55 @@ def main():
                 surge_done[_s] = now.timestamp()
             return ok
 
+        # [2026-08-26] AN ACTIVE PENDING SYMBOL IS OFFERED AGAIN — the third
+        # cause of the same entombment, and the one the first fix missed.
+        #
+        # `run_snipe_pass` owns the bounded give-up, and it only ever sees
+        # symbols in `candidates`. A pending symbol therefore ages out only
+        # while it keeps RE-QUALIFYING for its source. For the LISTING source
+        # that is automatic — `new_listings` is `active - baseline`, and a
+        # pending symbol is by construction not in `baseline`, so it is offered
+        # every loop. **Surge and young are not**: their candidates are
+        # EXISTING markets, so they ARE in `baseline` and `new_listings` never
+        # carries them. A surge that decays or a book that ages past the young
+        # bar therefore stops being offered while still perfectly `active` —
+        # its attempt counter never advances, the give-up inside the pass can
+        # never fire, and it sits in `pending` forever, persisted across
+        # restarts. The prune above does not reach it either: that one is keyed
+        # on leaving `active`.
+        #
+        # MEASURED live the day this shipped, on the deployed row: `pending: 2`
+        # with `scan.offered: 0` and `listing: 0` — two symbols the pass could
+        # not even see, held indefinitely with `gave_up: []`.
+        #
+        # SCOPED TO `active` ON PURPOSE. A pending symbol that has left the
+        # market list is the FLAP case, and not offering it is a deliberate
+        # design (see the prune above): it cannot be sniped while inactive, so
+        # offering it would burn retry budget on an impossible attempt and give
+        # up early on a book whose status is merely flickering around its
+        # debut. That symbol is bounded by the age prune instead. This adds no
+        # rule — it restores to surge/young the same offer contract the listing
+        # source has always had.
+        #
+        # Appended LAST so `_src_map`'s first-wins tie-break is untouched, and
+        # `run_snipe_pass` dedups within a pass via `seen`, so a symbol that
+        # also re-qualified this loop is still tried exactly once.
+        _stale_pending = [s for s in pending
+                          if s in active and s not in new_listings
+                          and s not in _surge and s not in _young]
+        _census["stale_pending"] = len(_stale_pending)
         open_now, _sniped, _abandoned = run_snipe_pass(
-            candidates=new_listings + _surge + _young, pending=pending,
+            candidates=new_listings + _surge + _young + _stale_pending,
+            pending=pending,
             baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
             try_snipe=_try_snipe,
             is_held=lambda s: s in _held_now, census=_census)
+        # ...and every surviving pending record remembers its source, so the
+        # retry above is sided, held and tagged the way its own source says.
+        for _s, _rec in pending.items():
+            if _src_map.get(_s) in SOURCE_SIDE:
+                _rec["src"] = _src_map[_s]
 
         # ----- manage open snipes (TP / SL / max-hold) -----
         held = (broker.szi() if dry_run
@@ -2633,6 +2696,58 @@ def selftest():
     assert "OLDFLAP" not in _base and "YOUNGFLAP" not in _base, (
         f"an inactive market was folded into the baseline — it can never be "
         f"sniped when it re-lists: {_base}")
+
+    # (3b) [2026-08-26] THE ENTOMBED SURGE/YOUNG PENDING. The flap case above
+    # is a LISTING: it leaves `active`, so the age prune bounds it. Surge and
+    # young candidates are EXISTING markets — they sit in `baseline`, so
+    # `new_listings` (= active - baseline) never carries them, and once the
+    # surge decays or the book ages past the young bar they stop being offered
+    # while still perfectly active. Measured live: `pending: 2` with
+    # `scan.offered: 0`. They must still be OFFERED (so the attempt counter
+    # reaches the give-up) and they must keep THEIR OWN SOURCE (so the retry is
+    # sided, held and tagged by the source that admitted them — the fallback is
+    # LONG at the old hold, which is the wrong side for `young`).
+    _stale_bus = _FakeBus({"vol_surges": [{"sym": "SNEW", "ratio": 9.0}],
+                           "vols": {"OLD": 50.0, "SDEAD": 50.0, "YDEAD": 50.0,
+                                    "SNEW": 50.0},
+                           "ages_d": {"OLD": 900.0, "SDEAD": 900.0,
+                                      "YDEAD": 900.0, "SNEW": 900.0}})
+    _stale_mk = {s: {"status": "active"}
+                 for s in ("OLD", "SDEAD", "YDEAD", "SNEW")}
+    _stale_bk = dict(_books,
+                     SDEAD={"bids": [[2.0, 50]], "asks": []},   # one-sided: skip
+                     SNEW={"bids": [[6.0, 50]], "asks": []},    # ditto
+                     YDEAD={"bids": [[3.0, 50]], "asks": [[3.03, 50]]})
+    _now2 = time.time()
+    ven19 = _FakeVenue(_stale_mk, _stale_bk, {})
+    fs19 = _drive(ven19, 1000.0, CLIP,
+                  {"baseline": ["OLD", "SDEAD", "YDEAD", "SNEW"],
+                   "entry_ts": {},
+                   "pending": {"SDEAD": {"first_seen": _now2 - 60,
+                                         "attempts": 3, "src": "surge"},
+                               "YDEAD": {"first_seen": _now2 - 60,
+                                         "attempts": 1, "src": "young"}}},
+                  bus=_stale_bus)
+    _b19 = fs19.saves[-1][1]
+    assert _b19["pending"].get("SDEAD", {}).get("attempts") == 4, (
+        "an active pending symbol that no longer qualifies for its source was "
+        "not offered — its retry clock cannot advance, so the bounded give-up "
+        f"inside run_snipe_pass can never fire: {_b19['pending']}")
+    assert _b19["pending"].get("SDEAD", {}).get("first_seen") == _now2 - 60, (
+        f"the retry offer must not reset the clock: {_b19['pending']}")
+    assert [o[0] for o in ven19.opened] == ["YDEAD"], ven19.opened
+    assert ven19.opened[0][1] is False, (
+        "a retried `young` symbol was taken LONG — the pending record's source "
+        "was dropped, so it fell back to the default side: " f"{ven19.opened}")
+    assert _b19["entry_src"].get("YDEAD") == "young", (
+        f"the retry lost its source stamp, so its close tag is unparseable: "
+        f"{_b19['entry_src']}")
+    # ...and a symbol that goes pending THIS loop must record its source, or
+    # the restore above has nothing to carry and the first retry after a
+    # restart is the wrong side again.
+    assert _b19["pending"].get("SNEW", {}).get("src") == "surge", (
+        "a newly pending symbol did not record which source admitted it: "
+        f"{_b19['pending']}")
 
     # (4) `_announcement_tag` — the label on every NEW LISTING DETECTED line.
     _anns = [{"title": "Scheduled maintenance", "content": ""},

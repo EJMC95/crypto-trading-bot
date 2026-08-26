@@ -1,3 +1,73 @@
+## 2026-08-26 (uc) — THE THIRD ENTOMBMENT: A SURGE/YOUNG SYMBOL THAT STOPS QUALIFYING IS NEVER OFFERED AGAIN, SO ITS GIVE-UP CAN NEVER FIRE — AND A RETRY THAT FORGETS ITS SOURCE TAKES THE WRONG SIDE
+
+`(ub)` fixed two causes of the same entombment on 🎯 the Perp Sniper (the
+cooldown stamped on the OFFER rather than the OPEN; `pending` subtracted from
+the young offer). **This is the third, and it was measured on the deployed row
+rather than reasoned about** — `533a599f117d` published `pending: 2` beside
+`scan.offered: 0`, `listing: 0` and `gave_up: []`. Two symbols the pass could
+not see, held indefinitely.
+
+**THE MECHANISM, and it is a property of WHICH SOURCE admitted the symbol.**
+`run_snipe_pass` owns the bounded give-up (120 attempts / 2h) and only ever
+sees symbols in `candidates`. So a pending symbol ages out only while it keeps
+RE-QUALIFYING for its source:
+
+* **`listing` is immune by construction.** `new_listings` is `active -
+  baseline`, and a pending symbol is by definition not in `baseline`, so it is
+  offered every single loop until it opens or is given up. That is why this
+  stayed invisible for the source everyone reads first.
+* **`surge` and `young` are the opposite.** Their candidates are EXISTING
+  markets — they are already in `baseline`, so `new_listings` never carries
+  them. The moment a surge decays or a book ages past the young bar, the symbol
+  stops being offered **while still perfectly `active`**: attempts never
+  advance, the give-up inside the pass can never fire, and the record is
+  persisted to `bot_state` across every restart.
+
+The one existing prune (`(hd)`-era, at the top of the loop) does not reach it
+either — that one is keyed on leaving `active`, which is the FLAP case.
+
+**SCOPED TO `active` ON PURPOSE, and the scope is load-bearing.** The first
+draft offered every stale pending symbol and reddened the flap selftest
+(`YOUNGFLAP` 7 → 8 attempts). That test is not an obstacle to route around: a
+symbol that has left the market list **cannot be sniped**, so offering it burns
+retry budget on an impossible attempt and gives up early on a book whose status
+is merely flickering around its debut — the 17-Jul absorption bug the whole
+retry design exists to prevent. The narrowed rule leaves that design untouched
+and restores to surge/young exactly the offer contract `listing` has always
+had. **Mutation 2 below is that scope**: dropping `s in active` reddens the
+pre-existing flap test, which is the cleanest evidence the narrowing is right.
+
+**THE SECOND HALF — A RETRY MUST KEEP ITS SOURCE.** `_src_map` is built from
+the three live candidate lists, so a stale pending symbol had **no source**,
+and the fallbacks are not neutral: `side_is_long(None)` is **LONG** and
+`hold_sec_for(None)` is the old `MAX_HOLD_SEC`. Since `(ua)` this book takes
+`young` **SHORT at 24h** and `surge` **LONG at 6h** — so an un-sourced retry
+would have opened a young symbol on the **wrong side**, at the wrong hold, and
+stamped an un-parseable tag on the close. The pending record now carries `src`
+(stamped after each pass, carried through the save/restore, absent → absent and
+never a guess per I8), and `_src_map` falls back to it at **lowest priority**,
+so a live source always wins and this can only fill a gap.
+
+**MEASURED CONSEQUENCE:** none today — this is the give-up path, and its whole
+product is that a stuck record can reach its bound. What it buys is that
+`pending` is now bounded for all three sources instead of one, so the census
+number a reader checks (`pending`) means the same thing whichever source filled
+it. Publishes `scan.stale_pending` so the retry lane is visible rather than
+inferred.
+
+**5 mutations verified RED against a green baseline** (never offer the stale
+set; drop the `active` scope; drop the `_src_map` fallback; never stamp `src`
+after a pass; drop `src` from the restore). Pinned by a new selftest fixture
+driven through `main()` against the real `_FakeVenue`/`_FakeBus` — an active
+symbol that no longer qualifies is offered and its clock advances without
+resetting `first_seen`; a `young` retry is taken SHORT and stamped `young`; a
+symbol that goes pending THIS loop records its source so the restore has
+something to carry.
+
+Found by reading the deployed payload's own census against what the code can
+reach — the same route as `(ua)`, and the third time in two days that a
+published counter said what the run could not have produced.
+
 ## 2026-08-26 (tu) — THE DAILY REVIEW COUNTED 13 HALT EVENTS AS REAL-MONEY TRADES — AND THE FILTER THAT FIXED IT READ A JSONB KEY NOTHING HAS EVER WRITTEN
 
 Two commits from an earlier pass today, held unpushed, reviewed before
