@@ -735,6 +735,38 @@ def joint_space_size(genes):
     return n
 
 
+def explore_stride(size):
+    """A step coprime to `size`, near `size/phi` — the additive-recurrence
+    (golden-ratio) choice.
+
+    [(uc)] WHY A STRIDE AT ALL. `explore_slice` used to walk CONTIGUOUS
+    indices, and the in-cage subspace is contiguous under the same mixed-radix
+    odometer, so a slice either landed inside it or missed it entirely.
+    Measured on the shipped grids: only 5,760 of 226,800 research genotypes
+    (2.54%) are fully in-cage, every enactable index lies in [47167, 179883],
+    and **107 of 152 cycles per orbit produced ZERO enactable genotypes** —
+    about 4.5 days at hourly cadence during which the mechanism added to make
+    gene INTERACTIONS reachable could not contribute a single gamete. The live
+    cursor sat in one of those dead stretches when this was found.
+
+    Coprimality is the whole safety of it: a stride sharing a factor with
+    `size` walks a SUBGROUP and would silently make part of the space
+    unreachable forever — strictly worse than the dead stretches it replaces.
+    With gcd == 1 the walk still visits every index exactly once per period, so
+    coverage is unchanged and only the ORDER moves; each slice is now spread
+    across the whole space, so every cycle carries in-cage and out-of-cage
+    genotypes in roughly their population proportion.
+    """
+    if size <= 2:
+        return 1
+    start = max(1, int(size / 1.618033988749895))
+    for off in range(size):                       # terminates: gcd(1,size)==1
+        cand = ((start + off - 1) % size) + 1     # in [1, size]
+        if math.gcd(cand, size) == 1:
+            return cand
+    return 1
+
+
 def explore_slice(genes, cursor, n):
     """(population, next_cursor, space_size) — the next `n` genotypes of the
     JOINT gene product, walked deterministically from `cursor` and wrapping.
@@ -743,7 +775,13 @@ def explore_slice(genes, cursor, n):
     stable across cycles and processes: the cursor means the same thing next
     hour as it did this hour. `n <= 0` explores nothing (a clean kill switch);
     a space smaller than `n` is returned once, whole, with the cursor advanced
-    modulo the space so coverage keeps its meaning. Pure — selftested."""
+    modulo the space so coverage keeps its meaning. Pure — selftested.
+
+    [(uc)] The walk is STRIDED (see `explore_stride`), not contiguous, so a
+    slice samples the whole space instead of one contiguous block of it. The
+    cursor still means the same thing across cycles — the stride is derived
+    from `size` alone, so an unchanged gene set gives an unchanged sequence.
+    """
     if not genes or n <= 0:
         return [], int(cursor or 0), joint_space_size(genes or {})
     names = sorted(genes)
@@ -751,15 +789,16 @@ def explore_slice(genes, cursor, n):
     size = joint_space_size(genes)
     start = int(cursor or 0) % size
     take = min(n, size)
+    stride = explore_stride(size)
     pop = []
     for k in range(take):
-        idx = (start + k) % size
+        idx = (start + k * stride) % size
         gt, rem = {}, idx
         for name, grid in zip(names, grids):
             gt[name] = grid[rem % len(grid)]
             rem //= len(grid)
         pop.append(gt)
-    return dedupe(pop), (start + take) % size, size
+    return dedupe(pop), (start + take * stride) % size, size
 
 
 def dedupe(pop):
@@ -2231,7 +2270,17 @@ def _selftest():
     # kill switch + empty genes claim nothing and cannot raise
     assert explore_slice(_g2, 0, 0)[0] == []
     assert explore_slice({}, 0, 10)[0] == []
-    assert explore_slice(_g2, None, 2)[1] == 2, "None cursor starts at 0"
+    # [(uc)] a None cursor still means 0 — asserted by EQUIVALENCE now rather
+    # than by the arithmetic `== 2`, which silently pinned the CONTIGUOUS walk
+    # and broke the moment the stride landed. The property was never "the next
+    # cursor is 2"; it was "None is treated as 0", and this says exactly that.
+    assert explore_slice(_g2, None, 2) == explore_slice(_g2, 0, 2), \
+        "None cursor must behave identically to 0"
+    # ...and the walk is STRIDED, not contiguous: on a space of 6 a contiguous
+    # take of 2 would advance the cursor to 2. It must not.
+    _sz6 = joint_space_size(_g2)
+    assert math.gcd(explore_stride(_sz6), _sz6) == 1, "stride must be coprime"
+    assert explore_slice(_g2, 0, 2)[1] == (2 * explore_stride(_sz6)) % _sz6
 
     # [2026-07-29] RESEARCH SPACE — search beyond the cage, but NEVER let an
     # out-of-cage genotype become something a human might act on.
