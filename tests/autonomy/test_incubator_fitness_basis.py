@@ -687,8 +687,17 @@ def test_the_funnel_counts_are_internally_consistent(cycle):
     assert f["elite"] <= f["bars"]["elite_n"]
     assert f["scored"] == f["generated"], "rank() scores the whole population"
     assert f["generated"] > 0
-    assert f["bars"]["min_gt_closes"] == si.MIN_GT_CLOSES
-    assert f["bars"]["half_margin"] == pytest.approx(si.HALF_MARGIN)
+    # EVERY published bar must be the constant the organ actually applies.
+    # `elite_n` was found by a surviving mutation: `<= bars["elite_n"]` above
+    # stays true when the bar is INFLATED, so a payload that misdescribes the
+    # running cap read as healthy — the "a registry that misdescribes the
+    # running value is worse than none" shape, in a diagnostic.
+    assert f["bars"] == {"min_gt_closes": si.MIN_GT_CLOSES,
+                         "half_margin": pytest.approx(si.HALF_MARGIN),
+                         "edge_margin": pytest.approx(si.EDGE_MARGIN),
+                         "min_closes": si.MIN_CLOSES,
+                         "min_tape_hours": pytest.approx(si.MIN_TAPE_HOURS),
+                         "elite_n": si.ELITE_N}, f["bars"]
     # the closes gate must actually BITE on this fixture, or the monotone
     # assertion above is satisfied by a chain of equal numbers and proves
     # nothing about the gates
@@ -725,6 +734,50 @@ def test_the_funnel_is_cumulative_not_a_row_of_independent_counts(monkeypatch,
         "`both_halves_pos` must be counted DOWNSTREAM of the closes gate; it "
         f"did not move with the floor: {lo} vs {hi}")
     assert lo["enactable"] >= hi["enactable"]
+
+
+def test_the_funnel_closes_gate_is_the_same_bar_select_elite_applies(monkeypatch,
+                                                                     tape):
+    """FOUND BY A SURVIVING MUTATION: `>= MIN_GT_CLOSES` -> `> MIN_GT_CLOSES`.
+
+    The funnel's whole job is to say WHERE the population died, and
+    `select_elite` admits at `>=`. An off-by-one at the bar misreports exactly
+    the boundary genotypes — and it can make `elite` exceed `closes_ok`, which
+    breaks the funnel's own monotone claim. The monotone arm above cannot see
+    it, because nothing in this fixture sits ON the default floor of 12.
+
+    So the floor is put ON a value the population actually reaches. The organ
+    is deterministic (it says so: "Deterministic — no RNG"), which is what
+    makes a probe run followed by a measured run a sound comparison, and the
+    probe asserts that determinism rather than assuming it."""
+    runs = []
+    real_rank = si.rank
+
+    def capture(pop, tp, lenses=None, up_resolver=None):
+        out = real_rank(pop, tp, lenses, up_resolver=up_resolver)
+        runs.append([s["closes"] for s in out])
+        return out
+
+    monkeypatch.setattr(si, "rank", capture)
+    _s, probe = run_cycle(monkeypatch, tape)
+    closes = runs[0]
+    assert probe["funnel"]["closes_ok"] == sum(
+        1 for c in closes if c >= si.MIN_GT_CLOSES), (
+        "the funnel's closes count must be the SAME predicate select_elite "
+        f"applies: {probe['funnel']} vs {sorted(closes)}")
+
+    top = max(closes)
+    at_top = closes.count(top)
+    assert at_top >= 1 and top > si.MIN_GT_CLOSES, sorted(closes)
+
+    _s2, measured = run_cycle(monkeypatch, tape, min_gt_closes=top)
+    assert runs[1] == closes, (
+        "the population must be deterministic for this comparison to mean "
+        "anything")
+    assert measured["funnel"]["closes_ok"] == at_top, (
+        f"with the floor set exactly ON the population's own maximum close "
+        f"count ({top}), the funnel must ADMIT those {at_top} genotypes — the "
+        f"bar is `>=`, not `>`; got {measured['funnel']['closes_ok']}")
 
 
 def test_the_funnel_carries_the_champions_failing_bar(cycle):
@@ -799,6 +852,14 @@ def test_a_short_tape_still_publishes_a_funnel(monkeypatch, tape):
     payload = si.run_once()
     assert payload["funnel"]["scored_this_cycle"] is False
     assert payload["funnel"]["why"]
+    # ...and the pre-breeding default must be FAIL-SAFE OPEN, `breakoutup`
+    # included. Found by a surviving mutation: dropping `scored_lens_set` from
+    # that default publishes `breakoutup` under `lenses_vetoed` on every
+    # short-tape cycle — a veto nobody applied, reported as if someone had.
+    assert "breakoutup" in payload["lenses_scored"], payload["lenses_scored"]
+    assert payload["lenses_vetoed"] == [], (
+        "a cycle that scored nothing has vetoed nothing: "
+        f"{payload['lenses_vetoed']}")
 
 
 def test_the_funnel_is_json_safe(cycle):
