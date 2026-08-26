@@ -184,8 +184,8 @@ def removed_entry_headers(diff_text):
     # the DECLARATION the convention already requires ("a renumber is recorded
     # INLINE in the moved entry"), which the sweep does not have and cannot
     # accidentally acquire. Declaration AND structural match, both required, the
-    # same shape as the correction escape below. Measured on the `(uc)` -> `(ue)`
-    # collision this shipped with, where the tool refused a move it required.
+    # same shape as the correction escape below. Measured on the collision
+    # `(ue)` was renumbered by, where the tool refused a move it required.
     moves = renumbered_pairs(diff_text)
     corrected = bool(CORRECTED.search(diff_text or ""))
     out = []
