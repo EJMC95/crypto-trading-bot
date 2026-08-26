@@ -249,6 +249,15 @@ GOLIVE_CONST_OK = {
         "(ia) freshness bound on the CONSUMED golive-readiness payload — how "
         "stale a published verdict may be before the live arm refuses. Not a "
         "bar: the bot reads book['ready'] and re-derives no threshold.",
+    ("evidence_board.py", "GOLIVE_MAX_AGE_S"):
+        "(uc) the SAME shape as the (ia) entry above, one consumer along: the "
+        "board's capacity author now reads the ERA-SCOPED record before it may "
+        "widen a book's cap, and this bounds how stale that payload may be. It "
+        "is not a bar and not a re-declaration — it is literally "
+        "`golive.TTL_SEC`, the grader's own value imported, so it cannot drift "
+        "from the publisher it gates on. The board re-derives NO era and NO "
+        "threshold: it reads the grader's published bars['mean'] and fails "
+        "CLOSED on a dark, stale or bookless payload.",
 }
 
 
