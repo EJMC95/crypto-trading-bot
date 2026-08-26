@@ -166,11 +166,26 @@ def era_scoped_rows(trades):
 
     Row: dict(pct, abs, closed, opened, exit, tag). Buckets are built from
     these, so every bucket inherits the gate's sample definition exactly.
+
+    [2026-08-26 daily review] PHANTOM CLOSES are excluded through the gate's
+    own `is_phantom_close` (identity import — a second copy of that signature
+    would be a second rule, and the two graders would drift apart on the exact
+    rows that matter). The referee was admitting halt/flatten EVENTS as trades
+    on precisely the two REAL-MONEY books: 13 such rows —
+    `freqtrade-avo-maria-lighter` 9, `freqtrade-georgia-lighter` 4 — which put
+    a real-money row on the docket's "ON THEIR WAY" list at n=13/t=1.46 when
+    its true traded n is 4, below the MIN_N floor. Nine $0.00 rows do not just
+    inflate n; they shrink the sample variance, so they bias `t` UPWARD — the
+    referee erred toward calling a real-money book a winner. `golive_readiness`
+    has filtered these since (th) and the docket did not, so the fleet's two
+    graders disagreed about the same real-money ledger.
     """
     by_bot = defaultdict(list)
     for r in trades:
         bot = r.get("bot")
         if not bot or bot in LEGACY_BOTS or r.get("is_open"):
+            continue
+        if gr.is_phantom_close(r):
             continue
         pct = r.get("profit_ratio")
         closed = _parse_ts(r.get("close_ts"))

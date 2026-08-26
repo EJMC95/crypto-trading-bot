@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-26 11:30 Sydney (01:30Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-26 11:34 Sydney (01:34Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -79,8 +79,9 @@ _Still open because:_ a rails code change across the shared live image of all th
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (13 commit(s), entries (tj), (tk), (tl), (tm), (tn))
+## Shipped today (14 commit(s), entries (tj), (tk), (tl), (tm), (tn))
 
+- `f355361` The georgia carried rows record their 26-Aug measurements; the equity-scaling cap becomes a named build decision (tm)
 - `0c37554` One-shot cap+halt parity for avo's live service (registered from main; deleted after use) (tn)
 - `2d4444c` [deploy-live-georgia] [deploy-live-mum] Georgia's live arm runs her own exit policy at last — breakout veto + trailing ratchet ported; mum's census names the uptrend block (tm)
 - `77eeef4` The georgia attestation one-shot goes the way of every provisioner (tl)

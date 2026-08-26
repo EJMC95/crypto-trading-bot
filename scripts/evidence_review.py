@@ -199,9 +199,25 @@ LIVE_ROWS = DECLARED_LIVE
 # row is `perps-funding-lighter-lighter` — two occurrences — so a bare
 # `.replace("-lighter","-lshadow")` yields `perps-funding-lshadow-lshadow`,
 # a row that does not exist, and the real twin sails through the gate scan.
-LIVE_TWINS = frozenset(
-    (r[:-len("-lighter")] + "-lshadow") if r.endswith("-lighter") else r
-    for r in LIVE_ROWS)
+def shadow_twin(row):
+    """The `-lshadow` CONTROL arm of a live row — the ONE owner of that rewrite.
+
+    [2026-08-26 daily review] Made a function because both consumers used to
+    hand-type their shadow arm and BOTH had rotted the moment the live roster
+    changed: `live_shadow_gap`'s shadow defaulted to the FARMER's twin while
+    its live side is `LIVE_ROWS[0]`, so after 💸 the Farmer's live arm retired
+    ((ta)) and 🙏 Avo/🔮 Georgia/👩 mum took the sub-accounts, the review was
+    differencing AVO'S LIVE ARM against THE FARMER'S SHADOW BOOK and printing
+    it as "Farmer live-vs-shadow ... no divergence". A cross-book subtraction
+    cannot detect a live book drifting from its control, and it reported an
+    all-clear while doing it. Deriving the twin makes that unrepresentable.
+    """
+    return (row[:-len("-lighter")] + "-lshadow") if row.endswith("-lighter") else row
+
+
+# The `-lshadow` CONTROL arm of a row that is ALREADY LIVE is not a go-live
+# candidate — see the note above.
+LIVE_TWINS = frozenset(shadow_twin(r) for r in LIVE_ROWS)
 
 # [2026-08-02] The entry file whose build id each graded row stamps, so the
 # review can compare a RUNNING container against the repo. See
@@ -628,10 +644,16 @@ def verify_alerts(cur, errors):
     return verdicts
 
 
-def live_shadow_gap(cur, live=LIVE_ROWS[0], shadow="perps-funding-lighter-lshadow",
-                    days=14):
+def live_shadow_gap(cur, live, shadow=None, days=14):
     """Per-trade pnl_pct gap. Per-trade, NEVER equity — the arms hold different
-    capital ($100 live vs $1,000 shadow), so an equity-% gap compares nothing."""
+    capital ($100 live vs $1,000 shadow), so an equity-% gap compares nothing.
+
+    `shadow` DEFAULTS TO THIS ROW'S OWN TWIN and must never be another book's
+    (see `shadow_twin`) — a cross-book difference is not a divergence signal.
+    """
+    shadow = shadow or shadow_twin(live)
+    if shadow == live:
+        raise ValueError(f"{live}: no distinct shadow twin")
     out = {}
     for role, bot in (("live", live), ("shadow", shadow)):
         cur.execute(f"""SELECT count(*), avg(pnl_pct)
@@ -885,11 +907,22 @@ def scan_new_evidence(cur, errors):
                                  "by books with NO measured claim")
 
     with Section(errors, "live-shadow"):
-        g = live_shadow_gap(cur)
-        items.append(f"📏 Farmer live-vs-shadow per-trade gap {g['gap_pp']:+.3f}pp "
-                     f"(live {g['live_pct']:+.3f}% n={g['live_n']}, "
-                     f"shadow {g['shadow_pct']:+.3f}% n={g['shadow_n']}) — "
-                     f"{'DIVERGING' if abs(g['gap_pp']) >= 2 else 'no divergence'}")
+        # EVERY live row against ITS OWN twin — never a hand-typed pair, and
+        # never row[0] alone: after the (ta)/(tb) swap the fleet has THREE
+        # live books, and a single hardcoded line both compared the wrong
+        # books and left two real-money rows unwatched.
+        for live in DECLARED_LIVE:
+            g = live_shadow_gap(cur, live)
+            if not g["live_n"] or not g["shadow_n"]:
+                items.append(f"📏 {live} live-vs-shadow: insufficient paired "
+                             f"closes (live n={g['live_n']}, "
+                             f"shadow n={g['shadow_n']}) — no verdict")
+                continue
+            items.append(f"📏 {live} live-vs-shadow per-trade gap "
+                         f"{g['gap_pp']:+.3f}pp "
+                         f"(live {g['live_pct']:+.3f}% n={g['live_n']}, "
+                         f"shadow {g['shadow_pct']:+.3f}% n={g['shadow_n']}) — "
+                         f"{'DIVERGING' if abs(g['gap_pp']) >= 2 else 'no divergence'}")
 
     with Section(errors, "arm-drift"):
         # [2026-08-13 (ma)] the Taker pair -> the Avo pair (slot swap). The
@@ -897,16 +930,17 @@ def scan_new_evidence(cur, errors):
         # family container) so their build ids will always differ — that is
         # the (fd) FILE-SET shape, not drift; arm_drift_line's build_n field
         # is what keeps that readable.
+        # [2026-08-26] DERIVED from the live roster, not hand-typed. The old
+        # literal pair list still named the RETIRED Farmer arms and covered
+        # only Avo, so 🔮 Georgia and 👩 mum — both carrying real money since
+        # (tb)/(te) — had no arm-drift check at all.
+        _pairs = [(r, shadow_twin(r)) for r in DECLARED_LIVE]
+        _rows = sorted({x for pair in _pairs for x in pair})
         cur.execute("""SELECT bot, extra->>'build', extra->>'build_n' FROM bot_pnl
-                        WHERE bot IN ('perps-funding-lighter-lighter',
-                                      'perps-funding-lighter-lshadow',
-                                      'freqtrade-avo-maria-lighter',
-                                      'freqtrade-avo-maria-lshadow')""")
+                        WHERE bot = ANY(%s)""", (_rows,))
         b = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
-        for live, shadow, name in (
-                ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow", "Farmer"),
-                ("freqtrade-avo-maria-lighter", "freqtrade-avo-maria-lshadow", "Avo")):
-            items.append(arm_drift_line(name, b.get(live), b.get(shadow)))
+        for live, shadow in _pairs:
+            items.append(arm_drift_line(live, b.get(live), b.get(shadow)))
 
     with Section(errors, "head-drift"):
         # Same rows, different question: is the CONTAINER carrying what has
@@ -1542,6 +1576,61 @@ def selftest():
     assert len(action_items(["📏 Farmer live-vs-shadow DIVERGING"])) == 1
     assert action_items(["🧬 Farmer arms AGREE: live abc vs shadow abc"]) == []
     assert len(action_items(["🧬 Taker arms DIVERGE: live abc vs shadow def"])) == 1
+
+    # ---- [2026-08-26] A LIVE ROW IS DIFFERENCED AGAINST ITS OWN TWIN ------
+    # THE INCIDENT: `live_shadow_gap`'s live side was LIVE_ROWS[0] while its
+    # shadow side was the hardcoded string 'perps-funding-lighter-lshadow'.
+    # When 💸 the Farmer's LIVE arm retired ((ta)) and 🙏 Avo / 🔮 Georgia /
+    # 👩 mum took the sub-accounts, LIVE_ROWS[0] became Avo — so the review
+    # subtracted THE FARMER'S SHADOW BOOK from AVO'S LIVE ARM and published
+    # it as "Farmer live-vs-shadow ... no divergence". The one instrument
+    # meant to catch a live book drifting from its control was comparing two
+    # unrelated books, and its all-clear was structurally unearnable.
+    for _live in DECLARED_LIVE:
+        _tw = shadow_twin(_live)
+        assert _tw != _live and _tw.endswith("-lshadow"), _tw
+        assert _tw.rsplit("-", 1)[0] == _live.rsplit("-", 1)[0], \
+            f"{_live} paired with a DIFFERENT book's shadow: {_tw}"
+    assert shadow_twin("freqtrade-avo-maria-lighter") == \
+        "freqtrade-avo-maria-lshadow"
+    # the (co) suffix trap: replace() is global, and the Farmer's live row
+    # carries '-lighter' TWICE — only the SUFFIX may be rewritten.
+    assert shadow_twin("perps-funding-lighter-lighter") == \
+        "perps-funding-lighter-lshadow"
+    # every live row is watched, not just row[0] — Georgia and mum were unwatched
+    assert len(DECLARED_LIVE) >= 1
+    assert set(LIVE_TWINS) == {shadow_twin(r) for r in DECLARED_LIVE}
+
+    # THE WIRING, not just the helper. Asserting shadow_twin() in isolation
+    # leaves the real defect alive: `live_shadow_gap` could still hardcode a
+    # foreign shadow and every helper assertion above would stay green. (A
+    # mutation round proved exactly that — restoring the hardcoded Farmer
+    # twin passed this selftest until this block existed.) So drive the
+    # function with a recording cursor and read back WHICH BOTS it queried.
+    class _RecCur:
+        def __init__(self):
+            self.seen = []
+
+        def execute(self, _sql, params):
+            self.seen.append(params[0])
+
+        def fetchone(self):
+            return (5, 0.01)
+
+    _rc = _RecCur()
+    live_shadow_gap(_rc, "freqtrade-avo-maria-lighter")
+    assert _rc.seen == ["freqtrade-avo-maria-lighter",
+                        "freqtrade-avo-maria-lshadow"], _rc.seen
+    _rc2 = _RecCur()
+    live_shadow_gap(_rc2, "freqtrade-georgia-lighter")
+    assert _rc2.seen == ["freqtrade-georgia-lighter",
+                         "freqtrade-georgia-lshadow"], _rc2.seen
+    # and a row with no distinct twin must REFUSE rather than self-compare
+    try:
+        live_shadow_gap(_RecCur(), "some-book-lshadow")
+        raise AssertionError("a row with no distinct twin must raise")
+    except ValueError:
+        pass
 
     # ---- [2026-08-02] CONTAINER vs REPO ----------------------------------
     # THE INCIDENT: on 2-Aug both Farmer arms reported `705425a83422` while the
