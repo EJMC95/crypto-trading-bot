@@ -1599,17 +1599,43 @@ def consume_release_request(req, phase, current, now):
 # (impl_shortfall, the dashboard card); the rollup flip is v2.1's, taken
 # WITH its consumers.
 
+def _close_rank(r):
+    """Sort key mirroring the publisher's own `ORDER BY closed_at DESC NULLS
+    LAST` — non-null closes rank above unorderable ones, newest first under
+    `reverse=True`. `parse_ts` RAISES on junk, so an unreadable stamp degrades
+    to the NULLS-LAST bucket rather than taking the reader down."""
+    try:
+        ts = parse_ts(r.get("closed_at"))
+    except (TypeError, ValueError, AttributeError):
+        ts = None
+    return (ts is not None, ts or 0.0)
+
+
 def _latest_policy_stamp(rows, bot, look=30):
     """(stamp_dict|None, stamped_n, total_n) over the bot's newest `look`
     ledger closes. None = the arm does not stamp yet — an ABSENCE, reported
     as `policy_unstamped`, never guessed at ((kk): an absence is not a
     change; I6: it is only evidence once the other arm shows the mechanism
-    works)."""
+    works).
+
+    [(ts)] THE WINDOW IS ORDERED HERE, NOT INHERITED FROM THE CALLER. This
+    read `mine[-look:]` and `stamped[-1]`, which is the newest `look` only
+    when rows arrive OLDEST-first — and the real publisher
+    (`store.fetch_paper_trades`) is `ORDER BY closed_at DESC NULLS LAST`, so
+    the census was scoring each arm's OLDEST 30 closes and calling the
+    OLDEST stamp "latest". MEASURED 26-Aug: georgia's shadow arm published
+    its first stamped close 09:22:44Z and the 09:43:39Z census still read
+    `shadow 0/30`, byte-identical to an arm that stamps nothing, while the
+    live arm read 30/30 because EVERY one of its rows is stamped and the
+    window could not tell. The (tj) class in the ordering dimension: the
+    fixture built ONE row per bot, where a slice direction is unobservable.
+    Sorting here makes the answer independent of how the caller fetched."""
     mine = [r for r in rows or [] if str(r.get("bot")) == bot]
-    mine = mine[-look:]
+    mine.sort(key=_close_rank, reverse=True)
+    mine = mine[:look]
     stamped = [r for r in mine
                if isinstance((r.get("extra") or {}).get("policy"), dict)]
-    latest = (stamped[-1]["extra"]["policy"] if stamped else None)
+    latest = (stamped[0]["extra"]["policy"] if stamped else None)
     return latest, len(stamped), len(mine)
 
 
@@ -3037,8 +3063,15 @@ def _selftest():
               "scan_order": "diversified"}
     _sstamp = dict(_stamp, venue="lighter_shadow", scan_order="list")
 
-    def _led(bot, pol):
-        return {"bot": bot, "extra": ({"policy": pol} if pol else {})}
+    def _led(bot, pol, age=60):
+        # [(ts)] the PUBLISHER'S ORDER, not just its fields: every ledger row
+        # carries `closed_at`, and `fetch_paper_trades` hands them back
+        # `ORDER BY closed_at DESC NULLS LAST`. The pre-(ts) fixture built one
+        # UNDATED row per bot, where a newest-vs-oldest slice is unobservable
+        # by construction — which is how the census shipped reading each arm's
+        # OLDEST 30 closes.
+        return {"bot": bot, "closed_at": iso(t0 - age),
+                "extra": ({"policy": pol} if pol else {})}
 
     def _row(bot, max_open=5, age=60):
         # [(tj)] the PUBLISHER'S shape: fetch_bot_pnl carries `updated_at`
@@ -3059,6 +3092,51 @@ def _selftest():
                         [_row(_lb), _row(_sb)], t0)
     assert _v["unjudgeable"]["reason"] == "policy_unstamped", _v
     assert "lighter_family_bot.py" in _v["unjudgeable"]["detail"], _v
+    # [(ts)] THE INCIDENT: an arm that has JUST started stamping. 30 older
+    # unstamped closes + 1 stamped newest, delivered NEWEST-FIRST exactly as
+    # `fetch_paper_trades` returns them. The shipped `mine[-look:]` scored the
+    # OLDEST 30 and read `0/30` — indistinguishable from an arm that stamps
+    # nothing, which is what held georgia unjudgeable on 26-Aug while its
+    # first stamped close sat in the ledger. (mutation: restore `[-look:]`, or
+    # `stamped[-1]`, => this reddens)
+    _fresh = [_led(_sb, _sstamp, age=1)] + \
+             [_led(_sb, None, age=100 + i) for i in range(30)]
+    _p, _n, _t = _latest_policy_stamp(_fresh, _sb)
+    assert (_n, _t) == (1, 30), (_n, _t)
+    assert _p == _sstamp, _p
+    # ORDER-INDEPENDENT: the same rows any which way give the same answer, so
+    # this cannot be "fixed" by flipping the slice to suit one caller.
+    for _perm in (list(reversed(_fresh)), _fresh[15:] + _fresh[:15]):
+        assert _latest_policy_stamp(_perm, _sb) == (_p, _n, _t), _perm[:1]
+    # "LATEST" MEANS LATEST: with two stamped closes the NEWEST stamp is the
+    # one returned, because `_pair_precheck` compares THIS dict against the
+    # live arm's — hand it the stale one and a policy the arm has already
+    # moved off is what gets parity-checked, which is the F1 handicap the
+    # census exists to close. (mutation: `stamped[-1]` => this reddens)
+    _moved = [_led(_sb, _sstamp, age=1),
+              _led(_sb, dict(_sstamp, scan_order="ancient"), age=900)]
+    assert _latest_policy_stamp(_moved, _sb)[0]["scan_order"] == "list", \
+        _latest_policy_stamp(_moved, _sb)[0]
+    # ...and the window still ROLLS: a stamp older than the newest `look`
+    # closes does NOT count (the negative control — a reader that always finds
+    # the stamp is as useless as one that never does).
+    _old = [_led(_sb, None, age=1 + i) for i in range(30)] + \
+           [_led(_sb, _sstamp, age=500)]
+    assert _latest_policy_stamp(_old, _sb) == (None, 0, 30), \
+        _latest_policy_stamp(_old, _sb)
+    # an unreadable `closed_at` degrades to the NULLS-LAST bucket, never a
+    # raise (parse_ts throws on junk; the census must survive one bad row)
+    _junk = [{"bot": _sb, "closed_at": "not-a-date", "extra": {}},
+             _led(_sb, _sstamp, age=5)]
+    assert _latest_policy_stamp(_junk, _sb)[0] == _sstamp
+    # NULLS **LAST**, mirroring the publisher: undated rows are UNORDERABLE,
+    # never "newest". Sorted the other way a bot with `look` junk rows would
+    # fill the whole window and hide a real stamped close behind rows that
+    # merely have no date. (mutation: `ts is None` in _close_rank => reddens)
+    _dateless = [{"bot": _sb, "closed_at": None, "extra": {}}
+                 for _ in range(30)] + [_led(_sb, _sstamp, age=5)]
+    assert _latest_policy_stamp(_dateless, _sb)[:2] == (_sstamp, 1), \
+        _latest_policy_stamp(_dateless, _sb)[:2]
     # stamped but diverging on scan_order -> policy_mismatch NAMING the field
     _v = _pair_precheck("georgia", _psp,
                         [_led(_lb, _stamp), _led(_sb, _sstamp)],
