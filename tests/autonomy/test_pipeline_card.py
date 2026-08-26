@@ -56,7 +56,34 @@ import golive_readiness as g            # noqa: E402
 import pnl_dashboard as dash            # noqa: E402
 import strategy_incubator as si         # noqa: E402
 
-NOW = datetime(2026, 8, 26, 12, 0, tzinfo=timezone.utc)
+#: [2026-08-26] THE WALL CLOCK, not a frozen instant — and this file's own
+#: `_row()` docstring is where the rule comes from: *"a fixture whose verdicts
+#: depend on what time the suite happens to run is worse than no fixture"*.
+#: That was honoured for the `bot_pnl` rows and NOT for the four bot_state
+#: payloads below, which stamp `updated = NOW` beside a REAL `ttl_sec` while
+#: the card judges freshness against the actual clock.
+#:
+#: MEASURED: frozen at `2026-08-26 12:00Z` this file passed when it was written
+#: and then rotted organ by organ as each TTL expired — 0 failures at 13:1xZ,
+#: 5 at 14:1xZ, **11 at 14:4xZ**, and 11 on every machine and every CI run
+#: thereafter, permanently. Bisected to the commit that introduced it: its
+#: parent is green, it is red. CI passed it only because CI ran inside the
+#: window.
+#:
+#: Every use of NOW here is RELATIVE (-40d, -19.9d, -i hours, -TTL*10s) or means
+#: "the current instant" (`gate_horizon(now=)`, `pair_census`), and no assertion
+#: depends on the literal date — so tracking the clock is the whole fix. A
+#: frozen anchor would also work IF the card's clock were frozen with it; it is
+#: not, and pinning one half of a comparison is what broke this.
+#:
+#: Mutation-verified: restoring the frozen anchor reddens all 11 again, and
+#: `now() - 3h` reddens 3 — so what this pins is AGE, not the literal date.
+#: DECLARED, not fixed: `now() + 3h` stays GREEN, because a future-stamped
+#: payload has a negative age and every `age < ttl` check reads that as fresh.
+#: That is a property of the freshness contract, not of this fixture, and it is
+#: bounded live by whatever clock skew exists between a container and the
+#: reader — named here so it is not rediscovered as a mystery.
+NOW = datetime.now(timezone.utc)
 _T0 = NOW - timedelta(days=40)
 
 
