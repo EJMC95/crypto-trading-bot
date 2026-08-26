@@ -1,4 +1,64 @@
-## 2026-08-27 (uj) — THE LIVE-SHADOW ALERT COULD NOT BE VERIFIED AT ALL: THE 26-AUG PASS FIXED THE EVIDENCE SECTION AND THE HELPER, AND LEFT THE VERIFIER ON THE OLD SIGNATURE
+## 2026-08-27 (uk) — `open 6/6` CANNOT TELL A FULL BOOK FROM A STARVED ONE: 🎫 THE TAKER'S SLOT CAP IS THE ONE LEGAL GO-LIVE ACCELERATOR AND NOTHING COUNTED WHAT IT REFUSED
+
+**Eamon, 27-Aug: *"Get taker ready to go live - it's clearly learned how to get
+up!"*** He is reading a real signal — the `exit:hold` pre-registration CONFIRMED
+this morning on fresh closes alone (n=13, t=+3.18, +4.770%/trade, +$43.53, the
+fleet's first). What follows is the mechanics of actually getting there.
+
+**THE GATE, TODAY**: n=121, window 26.1d, mean +0.629%, **t=1.20**, maxDD 2.8%.
+Two bars fail. The WINDOW bar clears on its own ~29-Aug. The binding bar is `t`,
+projected **16-Oct** at the book's own trajectory (`n_req = n·(T/t)² = 336`).
+
+**THE COUNTERINTUITIVE HALF, and it is the important one: the fastest route to
+go-live is to CHANGE NOTHING about the policy.** `stamped_policy_boundary`
+resets the era on venue/bull/lenses/sides — so "improving" the taker's lenses,
+sides or bracket **restarts the 30-day clock and pushes go-live PAST mid-Oct**.
+(hm)'s rule, in the direction nobody likes: a book being tuned cannot accumulate
+a single-policy sample. Capacity is the ONE exception — `max_open` / clip are
+(hc) ordinary tuning and do NOT reset the era — and since per-trade % is
+clip-invariant, more slots buy more CLOSES at the same per-trade distribution,
+which is exactly what raises `t = mean/sd·√n`.
+
+**SO CAPACITY IS THE ONLY LEGAL ACCELERATOR — AND IT COULD NOT BE MEASURED.**
+Live payload: `open 6`, `max_open 6`, and all six slots held by
+`long-breakoutup`, the book's ONE lens with positive evidence (n=78, t=+2.25,
++1.637%/trade) while `dip` and `divergence` sit vetoed by their own record.
+A book pinned at its cap on its only winning lens is the textbook capacity case
+the daily-review mandate points at.
+
+**But `open 6/6` is BYTE-IDENTICAL between "six tickets existed" and "twenty
+existed and fourteen were refused for want of a slot."** (lv)/I18 in the mirror
+direction — not an arm that opens NOTHING, an arm that is always FULL — and
+I23 exactly: **nobody tuning `TT_MAX_OPEN` could observe the thing they were
+tuning.** Three throttles can bind in that loop and not one was counted:
+`len(pos) >= MAX_OPEN` (which `break`s **silently**), one-new-position-per-lens
+-per-cycle, and never-add-to-a-held-symbol.
+
+**WHAT SHIPS: the measurement, not the slot change.** `extra.slot_census`
+publishes `{offered, slots_full, lens_once, held_sym, opened}` every loop.
+`slots_full > 0` is the only evidence that raising `TT_MAX_OPEN` would buy
+trades this book has already earned; `lens_once > 0` says the per-lens throttle
+is the binder instead and slots would change nothing. REPORTED, NEVER A GATE
+(I15) — it changes no entry. The `break` became a `continue` so the census sees
+every refused ticket rather than stopping at the first; entry behaviour is
+identical, because every subsequent ticket still fails the same full-slot test.
+
+**AND THE SLOT CHANGE IS NOT FREE ANYWAY — the arithmetic is already written
+down and it BINDS.** `CLIP_MAX × BRAIN_GROSS_X(2.0) × MAX_OPEN` must stay
+inside 1.2× the book's $1,000 (`test_brain_live_sizing_safety`, which refused a
+draft at 160 once). Today: $95 × 2 × 6 = **$1,140** against a **$1,200** bar —
+**$60 of headroom**. So `MAX_OPEN` 6 → 8 requires `CLIP_MAX` 95 → **75**, i.e.
+more slots must be paid for in clip size at constant gross. That trade is
+attractive *because* per-trade % is clip-invariant — it buys ~33% more closes
+for zero expectancy — but it directly reverses (td)'s two-day-old `CLIP_MAX`
+80 → 95 raise, so it is Eamon's call, not a session's, and it should be made on
+the census rather than on this paragraph's arithmetic.
+
+**NOT SHIPPED, deliberately**: the slot change itself. A capacity change
+justified by a guess is the thing this census exists to replace — let it run,
+then decide. Taker selftests + the full taker suite green.
+
+## 2026-08-27 (ul) — THE LIVE-SHADOW ALERT COULD NOT BE VERIFIED AT ALL: THE 26-AUG PASS FIXED THE EVIDENCE SECTION AND THE HELPER, AND LEFT THE VERIFIER ON THE OLD SIGNATURE
 
 `(ta)`/`(tb)`/`(te)` took the fleet from one live row to THREE, and the 26-Aug
 pass correctly rewrote `live_shadow_gap` to take an explicit `live` book and
@@ -40,9 +100,10 @@ Found by the daily review's own `payload.errors` — the fail-soft channel doing
 exactly its job. This script ships in no container and runs from the repo, so
 the push is the deploy.
 
-**[LETTER MOVED (ug) -> (uj), 27-Aug.** Three concurrent sessions took (ug),
-(uh) and (ui) on `origin/main` while this entry was being written — the race
-`audit_changelog_letters` exists to catch, and it caught it pre-push. The
+**[LETTER MOVED (ug) -> (uj) -> (ul), 27-Aug.** Three concurrent sessions took (ug),
+(uh) and (ui) on `origin/main` while this entry was being written, and then
+took (uj) too while the follow-up work ran — the race `audit_changelog_letters`
+exists to catch, and it caught BOTH collisions pre-push. The
 cross-branch arm named the collision by title; no tracked code cited either
 entry yet, so this one moved. Recorded inline per the changelog-letter rule.**]
 
