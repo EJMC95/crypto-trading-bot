@@ -388,6 +388,9 @@ def _driven(m, tape="breakout"):
         def kill_check(self):
             return False
 
+        def equity_scale(self, equity, gross):
+            return self.max_notional    # [(to)] interface parity; never scales
+
         def headroom_check(self, margin_state, stop_frac):
             return True, "flat"
 

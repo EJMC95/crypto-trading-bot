@@ -910,6 +910,10 @@ def main(_ctx=None, once=False):
             day_start_equity = equity
             _PRINT(f"[avo-live] {iso(t_now)} day-start equity for {cur_day}: "
                    f"{equity:.2f}")
+        # [2026-08-26 (to)] the opt-in equity-scaled cap re-derives every loop
+        # from the equity just read — inert unless EQUITY_SCALED_CAP is set on
+        # the service; fail-safe on a dark equity read (cap keeps its value).
+        rails.equity_scale(equity, gross_x())
 
         # ---- venue truth: the positions the exits must manage --------------
         try:
@@ -1080,6 +1084,9 @@ def main(_ctx=None, once=False):
                 "strategy": f"{type(S).__name__} (variant host)",
                 "max_open": S.max_open,
                 "cap_usd": rails.max_notional,
+                # [(to)] which rule set it: "env" (the operator's floor) or
+                # "scaled" (equity x gross x 1.05 outgrew the floor).
+                "cap_src": getattr(rails, "cap_src", "env"),
                 # [2026-08-15 (mz)] the row's clip folds in live.clip_scale —
                 # the actual stake is clip * scale, and a reader sizing risk
                 # off the row was shown the unscaled number (correct only
@@ -2114,10 +2121,14 @@ def _selftest():
         def __init__(self, cap=63.0, killed=False):
             self.live = True
             self.max_notional = cap
+            self.cap_src = "env"
             self._killed = killed
 
         def kill_check(self):
             return self._killed
+
+        def equity_scale(self, equity, gross):
+            return self.max_notional        # interface parity; stub never scales
 
         def daily_loss_hit(self, ds, eq):
             return False

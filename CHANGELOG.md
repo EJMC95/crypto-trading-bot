@@ -1,3 +1,77 @@
+## 2026-08-26 (tp) — THE PARABOLIC-EXTENSION ENTRY VETO IS REFUTED-AS-OVERFIT, ADVERSARIALLY CONFIRMED — GEORGIA'S ENTRY-FILTER DIAL CLOSES BESIDE HER DEAD EXIT DIAL
+
+The (tm) pass left ONE buildable candidate on 🔮 georgia's t-bar: an
+entry-time parabolic-extension veto, motivated by the 22-Aug crash entries
+riding a +7.5%/50min run-up. Measured today with the verdict logic
+PRE-REGISTERED (committed to the branch before any result existed, so the
+bars are tamper-evident), then independently re-derived by an adversarial
+referee (own implementation, own seed, 5,000 draws — every number reproduces
+to the third decimal; ledger cache byte-identical to the live feed; LAG-1
+verified at the two boundary entries):
+
+**The premise was real and the rule still fails.** The crash entries WERE
+extended (EXT 5.7–7.1, the tape's top ~8–15%), but extension predicts loss
+NOWHERE else on her 195-close era ledger: the best cell (EXT>=4.5) headlines
+t_iid 0.60 -> 2.36 and its ENTIRE effect is the three crash rows — drop the
+22-Aug day and delta-mean reads +0.00pp, delta-t −0.39, while the vetoed set
+outside the event is +0.190%/trade, **$+10.17 of forgone WINNERS**
+(+0.272%/$+15.03 dropping only the 3 rows — two slices, one conclusion). The
+random-veto null is failed (P=0.108; referee 0.097; forced-kept P=0.0002 —
+the edge over random IS the three rows; conditional on catching the event
+P=0.37 — no skill beyond it). Chronological halves disagree. And the I7 bar
+did its job: the veto refuses **73% of trend_breakout's supply at 4.5, 38%
+even at the extreme EXT>=6 gate** (which misses NEAR anyway) — a partial
+repeal of her best-supplied tag wearing a filter's costume. Her top-10
+most-extended entries EVER are flat-to-positive. No lever is registered and
+none should be. Ten dead cells cost ~$0; a shipped one would have cost real
+expectancy every week — I19's step-back-in-a-growth-costume, caught at the
+study stage.
+
+**What stands after today, on the record:** georgia's t bar is a TAIL-EVENT /
+cluster problem (one batch = 73.5% of cluster variance), not an entry-filter
+problem and not an exit problem (both dials now measured dead). The one open
+entry-side thread is the rank1-vs-rank2 gap (+0.55pp, corr(rank1, EXT) =
+−0.050 — NOT explained by extension), pre-registered for its own study on
+fresh closes once rank-3 stamps accrue. Otherwise her path to the gate is
+her live arm accruing under the (tm)-fixed policy and the shadow grinding
+its ex-tail mean. Study: `STUDY_GEORGIA_EXTENSION_VETO_2026-08-26.md` +
+`scripts/study_georgia_extension_veto_2026-08-26.py` (deterministic, seeded,
+re-runnable).
+
+## 2026-08-26 (to) — THE FIXED-DOLLAR-CAP CLASS CLOSES: EQUITY_SCALED_CAP, OPT-IN, FLOOR-PRESERVING, FAIL-SAFE DARK
+
+Third measured instance in three weeks of the same shape — a FIXED-dollar
+rail on a book whose clip is equity-derived: (sr) Eamon's deposit stranding
+a slot at cap $200; the farmer-cap HANDOFF row (gross FALLING 5->2->1 slots
+as brain conviction rises against a fixed cap); and this morning's (tn) find
+(🙏 avo at cap_slots 3 of 5, $639 of her on-record gross undeliverable,
+beside a $6 daily rail that was 10% of the PRE-deposit equity). (tn) fixed
+the VALUES; per the forward-motion rule a fix closes a CLASS or it is not
+finished, so this is the class:
+
+`SafetyRails.equity_scale(equity, gross)` — called once per loop by the live
+host with its fresh equity read — re-derives the cap as **max(env floor,
+equity x gross x 1.05)** when `EQUITY_SCALED_CAP` is set on the service.
+The operator's explicit cap env stays REQUIRED at live boot and becomes the
+FLOOR: scaling only ever adds headroom in step with real equity, never
+invents a cap where none was set (a capless shadow rail stays capless),
+never undercuts the one that was, and a dark/junk equity read moves NOTHING
+(I4 — an unreadable number must not steer a real-money rail). `cap_src`
+publishes beside `cap_usd` ("env" | "scaled") so the row says which rule is
+binding (I8). OFF — the default everywhere today — is byte-identical to the
+pre-(to) rails, pinned by test.
+
+Expectancy price: zero (per-trade % is clip-invariant, (hl); gross_x_max
+stays the operator's ceiling and this cannot raise it — the cap tracks the
+gross the operator already set, nothing more). Shipped to MAIN ONLY per the
+(mm) rule: behaviour-neutral until a service opts in, so it rides each live
+image's next qualifying deploy; activation is then one env flip per service
+(auto-restart), avo the natural first. Pinned by
+`tests/autonomy/test_equity_scaled_cap.py` (6 tests; 5/5 mutations red).
+The HANDOFF carried row `equity-scaling-cap` is DELETED — its own
+`closes_when` predicate reported CLOSE THIS the moment the switch landed,
+which is `session_state.py` doing exactly what (sl) built it for.
+
 ## 2026-08-26 (tn) — AVO'S TWO FIXED-DOLLAR RAILS WERE STILL SIZED FOR THE $60 BOOK: CAP 1200 → 1700, DAILY-LOSS BACKSTOP 6 → 32, BOTH DERIVED AND READ BACK
 
 The same optimisation pass found 🙏 avo — the winning arm Eamon flagged this
