@@ -331,13 +331,18 @@ CARRIED = [
                 "ceiling-slots-georgia). What remains is ENTRY QUALITY: the "
                 "crash entry rode a +7.5%-in-50-min parabolic spike, and "
                 "rank1 entries earn +0.023% vs rank2's +0.656%.",
-        "why_open": "the one unbuilt candidate with evidence behind it is a "
-                    "parabolic-extension entry veto (price vs its own recent "
-                    "range at entry) — book logic, backtest-first on her own "
-                    "ledger + candles; nobody has run it. The (tm) parity fix "
-                    "means her live grade now accrues under her actual "
-                    "policy, so the live arm's fresh era is the other thing "
-                    "time has to deliver.",
+        "why_open": "[26-Aug (tp)]: the parabolic-extension veto was RUN and "
+                    "REFUTED-AS-OVERFIT, adversarially confirmed — the best "
+                    "cell's whole effect is the three crash rows; ex-crash it "
+                    "forgoes $+10.17 of winners and refuses 73% of "
+                    "trend_breakout's supply (I7); random-veto null P~0.10, "
+                    "forced-kept P=0.0002 / conditional P=0.37. BOTH her "
+                    "dials are now measured dead (exits at (tm), the entry "
+                    "filter at (tp)). What remains: (1) the rank1-vs-rank2 "
+                    "gap (+0.55pp, NOT explained by extension — corr −0.050) "
+                    "gets its own pre-registered study on fresh closes once "
+                    "rank-3 stamps accrue; (2) her live arm accrues under "
+                    "the (tm)-fixed policy — time, not tuning.",
         "closes_when": lambda: False,
     },
     {

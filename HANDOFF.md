@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-26 13:20 Sydney (03:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-26 13:29 Sydney (03:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -67,16 +67,19 @@ _Still open because:_ real-money row: measure and hand over, never hand-set.
 ### `georgia-t-bar`  ·  owner: **session**
 🔮 georgia is 5 of 6 go-live bars, failing only t. [MEASURED 26-Aug (tm) pass]: the weak t is ONE real 3-leg flash-crash batch (22-Aug 05:11Z: XRP -16.4/NEAR -19.5/TRX -3.0) = 73.5% of cluster variance — drop those 3 rows and t_cluster reads +2.51. Tail CONTROL cannot clear the bar honestly (at the live arm's own measured -7.17% crash fill for a -5% stop, t_cluster caps at ~1.40), and the stress-metric entry pause is REFUTED on the fleet's own instrument (scout stress read 8.6bps at the 05:00:33 entry vs the taker's 15bps bar; the 11.8 peak came 13 MINUTES after the dump started). Exits are a dead dial (see ceiling-slots-georgia). What remains is ENTRY QUALITY: the crash entry rode a +7.5%-in-50-min parabolic spike, and rank1 entries earn +0.023% vs rank2's +0.656%.
 
-_Still open because:_ the one unbuilt candidate with evidence behind it is a parabolic-extension entry veto (price vs its own recent range at entry) — book logic, backtest-first on her own ledger + candles; nobody has run it. The (tm) parity fix means her live grade now accrues under her actual policy, so the live arm's fresh era is the other thing time has to deliver.
+_Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
 ### `carry-garrett-ranking-collision`  ·  owner: **OPERATOR**
 🌾 carry's measured-depth gate now reaches the whole of 🛢️ Garrett's [0.1M, 2M) band, and Garrett's own (pl) measurement found 6 of 6 of its top-ranked candidates are >=20% APR — so carry is a rival for exactly the supply Garrett ranks first. A RANKING collision; audit_book_overlap's axes (apr x vol x class) cannot express it.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (25 commit(s), entries (tj), (tk), (tl), (tm), (tn), (to))
+## Shipped today (28 commit(s), entries (tj), (tk), (tl), (tm), (tn), (to))
 
-- `ff22aa2` The fixed-dollar-cap class closes: EQUITY_SCALED_CAP, opt-in, floor-preserving, fail-safe dark (to)
+- `eaf6c4a` The extension-veto study's results: REFUTED-AS-OVERFIT — adversarial referee still to rule (to)
+- `27a9c4d` Pre-registration snapshot: the extension-veto study's verdict bars, committed before any result exists (to)
+- `b9adb9a` The extension-veto study's candle cache joins the ignored set (to)
+- `776438a` The fixed-dollar-cap class closes: EQUITY_SCALED_CAP, opt-in, floor-preserving, fail-safe dark (to)
 - `023bdf6` Merge PR #225: the avo cap+halt one-shot goes the way of every provisioner (tn)
 - `c71c4b8` The avo cap+halt one-shot goes the way of every provisioner — receipts on the row (tn)
 - `c188e13` Merge PR #224: georgia's live exit parity (veto + ratchet), mum's census split, avo cap+halt one-shot (tm, tn)

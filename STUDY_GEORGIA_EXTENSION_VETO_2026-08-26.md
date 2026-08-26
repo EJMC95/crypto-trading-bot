@@ -66,11 +66,18 @@ the XRP "+7.5% in 50min" story — never even produces a headline: best Δt +0.3
   chronological halves DISAGREE (H1 Δ −0.16pp, H2 Δ +0.49pp; the crash is in
   H2). No cell on any metric passes halves.
 * **(b) FAIL — the disqualifying one.** Drop the 22-Aug crash day: Δmean
-  +0.00pp, Δt −0.39. The vetoed set EX-CRASH is **+0.272%/trade, $+15.03**
-  (104 rows) — outside the one event, the veto refuses winners. At EXT≥6 the
-  vetoed-ex-crash set is +0.330%, $+8.00, and that cell doesn't even catch
-  NEAR (5.71 < 6). Headline t_iid +2.36 is three known rows leaving the
-  sample: **REFUTED-AS-OVERFIT by the study's own pre-registered rule.**
+  +0.00pp, Δt −0.39. The vetoed set outside the event refuses WINNERS under
+  either slice — **+0.190%/trade, $+10.17 over 98 rows dropping the whole
+  22-Aug DAY** (the condition-(b) convention: the day's other 6 vetoed
+  closes were mostly winners — DOT +2.24/+2.21, ADA +2.49, AVAX +1.94, AAVE
+  +1.88, LTC −1.05), or +0.272%/trade, $+15.03 over 104 rows dropping only
+  the 3 crash ROWS. [Referee's precision correction, folded in per I12: the
+  first draft carried the row-level figure under the one label "ex-crash";
+  the two exclusions are distinct slices, same sign, same conclusion.] At
+  EXT≥6 the vetoed-ex-crash-day set is still positive, and that cell doesn't
+  even catch NEAR (5.71 < 6). Headline t_iid +2.36 is three known rows
+  leaving the sample: **REFUTED-AS-OVERFIT by the study's own pre-registered
+  rule.**
 * **(c) FAIL.** Random-veto null (2,000 draws of equal count): P = 0.108
   (best anywhere 0.103, R4≥3.5). Ranking by extension never beats vetoing
   the same number of entries at random at the 0.05 bar.
@@ -131,8 +138,19 @@ daily_loss. Corroborates the event reached both arms and that the shadow's
 
 The 22-Aug batch really was a parabolic entry — and it is the ONLY place on
 the ledger where extension predicted loss. A veto tuned to catch it costs
-+$15 of real winners ex-crash, kills 38–73% of her best tag's supply, fails
-the random-veto null, and fails both halves. **Do not build it.** Her t bar
-remains a tail-event problem (73.5% of cluster variance in one batch), not an
-entry-filter problem; the (tm) rank finding stands as separate, unexplained
-by extension.
++$10–15 of real winners outside the event, kills 38–73% of her best tag's
+supply, fails the random-veto null, and fails both halves. **Do not build
+it.** Her t bar remains a tail-event problem (73.5% of cluster variance in
+one batch), not an entry-filter problem; the (tm) rank finding stands as
+separate, unexplained by extension.
+
+**ADVERSARIALLY CONFIRMED (independent referee, same day):** full re-run
+byte-identical; independent re-implementation (own metric code, own stats,
+seed 424242, 5,000 draws) matches to the third decimal, null P 0.097 vs
+0.108 — same side of the bar; ledger cache byte-identical to the live feed;
+LAG-1 verified (2 boundary entries, both sub-second AFTER the close, strict-<
+changes nothing material). The mechanism nailed by forced draws: random
+vetoes FORCED to keep the crash rows read P=0.0002 (the veto's entire edge
+over random IS the three rows); conditional on catching the event, P=0.37
+(no skill beyond it). One precision correction (the ex-crash label above),
+folded in.

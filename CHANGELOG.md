@@ -1,3 +1,43 @@
+## 2026-08-26 (tp) — THE PARABOLIC-EXTENSION ENTRY VETO IS REFUTED-AS-OVERFIT, ADVERSARIALLY CONFIRMED — GEORGIA'S ENTRY-FILTER DIAL CLOSES BESIDE HER DEAD EXIT DIAL
+
+The (tm) pass left ONE buildable candidate on 🔮 georgia's t-bar: an
+entry-time parabolic-extension veto, motivated by the 22-Aug crash entries
+riding a +7.5%/50min run-up. Measured today with the verdict logic
+PRE-REGISTERED (committed to the branch before any result existed, so the
+bars are tamper-evident), then independently re-derived by an adversarial
+referee (own implementation, own seed, 5,000 draws — every number reproduces
+to the third decimal; ledger cache byte-identical to the live feed; LAG-1
+verified at the two boundary entries):
+
+**The premise was real and the rule still fails.** The crash entries WERE
+extended (EXT 5.7–7.1, the tape's top ~8–15%), but extension predicts loss
+NOWHERE else on her 195-close era ledger: the best cell (EXT>=4.5) headlines
+t_iid 0.60 -> 2.36 and its ENTIRE effect is the three crash rows — drop the
+22-Aug day and delta-mean reads +0.00pp, delta-t −0.39, while the vetoed set
+outside the event is +0.190%/trade, **$+10.17 of forgone WINNERS**
+(+0.272%/$+15.03 dropping only the 3 rows — two slices, one conclusion). The
+random-veto null is failed (P=0.108; referee 0.097; forced-kept P=0.0002 —
+the edge over random IS the three rows; conditional on catching the event
+P=0.37 — no skill beyond it). Chronological halves disagree. And the I7 bar
+did its job: the veto refuses **73% of trend_breakout's supply at 4.5, 38%
+even at the extreme EXT>=6 gate** (which misses NEAR anyway) — a partial
+repeal of her best-supplied tag wearing a filter's costume. Her top-10
+most-extended entries EVER are flat-to-positive. No lever is registered and
+none should be. Ten dead cells cost ~$0; a shipped one would have cost real
+expectancy every week — I19's step-back-in-a-growth-costume, caught at the
+study stage.
+
+**What stands after today, on the record:** georgia's t bar is a TAIL-EVENT /
+cluster problem (one batch = 73.5% of cluster variance), not an entry-filter
+problem and not an exit problem (both dials now measured dead). The one open
+entry-side thread is the rank1-vs-rank2 gap (+0.55pp, corr(rank1, EXT) =
+−0.050 — NOT explained by extension), pre-registered for its own study on
+fresh closes once rank-3 stamps accrue. Otherwise her path to the gate is
+her live arm accruing under the (tm)-fixed policy and the shadow grinding
+its ex-tail mean. Study: `STUDY_GEORGIA_EXTENSION_VETO_2026-08-26.md` +
+`scripts/study_georgia_extension_veto_2026-08-26.py` (deterministic, seeded,
+re-runnable).
+
 ## 2026-08-26 (to) — THE FIXED-DOLLAR-CAP CLASS CLOSES: EQUITY_SCALED_CAP, OPT-IN, FLOOR-PRESERVING, FAIL-SAFE DARK
 
 Third measured instance in three weeks of the same shape — a FIXED-dollar
