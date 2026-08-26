@@ -1,3 +1,294 @@
+## 2026-08-26 (uf) — THE `listing` SOURCE HAS NO MEASURED SIDE ON ITS OWN BAND: THE SHORT'S EVIDENCE LIVES IN `young`'s BAND, AND THE t=+4.05 THAT SEEMED TO SUPPORT IT MEASURES SAMPLING DENSITY
+
+`(ua)` flipped 🎯 the Perp Sniper's `listing` source to SHORT@24h and `(ub)`
+corrected the fade that justified it as **76-83% CALENDAR**, keeping the flip on
+the counterfactual. `(ub)` also left one thing unmeasured and said so: the flip
+was carried by a number computed across **both** debut bands. This closes it,
+and the answer is **NEITHER SIDE**.
+
+**THE HEADLINE** — `listing`'s own 0-7d band, through the book's OWN bracket
+(tp+15/sl−10, stop checked before target inside each bar), against a
+**calendar-matched control** (same bracket, same side, same calendar hour, on
+every coin ≥60d mature, excluding the entry coin), by-coin as the honest unit,
+at the shipped 24h hold:
+
+| side | excess | by-coin t |
+|---|---|---|
+| LONG | **−0.036%** | −0.07 |
+| SHORT | **+0.123%** | +0.29 |
+
+SHORT beats LONG by **+0.160pp** at paired t=+0.17 — the widest margin available
+and indistinguishable from noise.
+
+**THREE THINGS SETTLE IT.**
+
+1. **THE SIGN FLIPS WITH HORIZON.** LONG wins at 6h (paired SHORT−LONG −0.310%,
+   t=−0.77) and at 72h (−0.408%, t=−0.26); SHORT wins only at 24h. Two of three
+   horizons favour LONG, no |by-coin t| reaches 0.80, and **the shipped hold is
+   the single cell where the short looks best** — the `(oe)` artifact signature.
+2. **THE RAW SIGNAL DOES NOT SURVIVE THE BRACKET.** Raw-return matched excess at
+   0-7d is **+0.663%** by-coin (t=+0.59); run the identical entries through
+   tp+15/sl−10/24h and it becomes **−0.036%**. The debut band's fat right tail is
+   exactly what a +15% cap and a −10% stop clip (exit mix: `max_hold` 75%, `sl`
+   17%, `tp` 9%). `(ml)`'s doctrine landing on a directional read: **a mean says
+   nothing about what a bracket books**, so "0-7d points LONG" cannot be acted on.
+3. **THE t=+4.05 IS AN OVERLAP ARTIFACT — and this is the transferable half.**
+   Sweeping ONLY the sampling stride at 0-7d, pooled t runs
+   **3.98 / 2.29 / 1.52 / 0.95 / 0.36** at stride 1/3/6/12/24 while the point
+   estimate barely moves and by-coin t holds at 0.62/0.63/0.59/0.53/0.31. The
+   placebo names the mechanism outright: at stride 24 with a 24h hold — i.e.
+   NON-overlapping — pooled SE **0.0730** equals by-coin SE **0.0728**.
+   **Pooled t over overlapping windows measures how densely you sampled, not
+   how big the edge is**, and it is free to quote any number you like by
+   choosing a stride. This fleet already pays for the cluster-robust form on its
+   ledgers (`(kw)`/`(ky)`); this is the same defect in a REPLAY, where the
+   sampling rate is a free parameter the analyst picks.
+
+**THE BEST CASE FOR THE SHIPPED SHORT, AND IT FAILS EVERYTHING.** The LITERAL
+listing trade — one entry per coin at its first bar, 24h, n=**24 coins** —
+reads +0.900%, t=+0.57. Sign test **13/24** positive (binomial p=0.84, a coin
+flip); top 3 coins = **224%** of the total and **ex-top-3 the short LOSES
+−1.276%** (t=−1.09); leave-one-coin-out t ∈ [+0.05, +0.90]; block-bootstrap 95%
+CI **[−2.010%, +4.070%]** with P(mean≤0)=**0.269**.
+
+**WHERE THE SHORT'S EVIDENCE ACTUALLY LIVES.** Same estimator, same bracket,
+same control, 24h, by-coin — **8-21d**: LONG **−0.374% (t=−2.67)**, SHORT
++0.253% (t=+1.47). That band is the **`young`** source's, not `listing`'s. So
+`(ua)`'s flip was correct for the source it was measured on and INHERITED by a
+source whose own band does not support it. Note even there only *"LONG loses"*
+is significant; the short itself is t=+1.47 < 2.
+
+**A STRUCTURAL BONUS THAT SETTLES `(ub)`'s CALENDAR WORRY.** The 11 coins born
+at the venue's opening instant — the ones `(ub)` found carrying the fade —
+**cannot contaminate a matched estimate at all**: no coin on the venue was 60d
+mature during 2025-01-17..24, so all 11 have ZERO control coverage and the
+with/without-launch excess numbers come out **byte-identical**. The raw numbers
+DO move (24h SHORT raw +0.745% → +0.910%) and never reach the matched one. 19 of
+46 entry coins drop out the same way; the matched sample is 27 coins / 735
+entries, control breadth median 27, min 11.
+
+**VALIDATED BEFORE USE, all three passed** — the calibration discipline `(gx)`
+requires: a **positive control** (planting +2.0%/24h on the entry path only
+recovers LONG +1.535% t=+3.12 / SHORT −1.600% t=−3.91; −2.0% recovers the
+mirror, attenuated ~75-88% because the bracket truncates the planted drift), a
+**placebo** (the same estimator on MATURE 61-120d entries returns LONG +0.049%
+t=+0.67, SHORT −0.076% t=−1.07 — zero, as required), and a **reconciliation** to
+`(ub)`'s referee, which reproduces to three decimals on both bands.
+
+**AND ONE FALSE NEGATIVE, CAUGHT BY THE HOUSE RULE.** The first version keyed
+entries on `born + h*3600`, but `born` is not hour-aligned while bars are — it
+selected NOTHING and printed a clean, entirely false, all-zero table. `(po)`:
+**empty output is not a negative result until the check has been seen to produce
+a positive one.** Fixed to walk actual bar timestamps.
+
+**WHAT SHIPS — THE DECLARATION, NOT A FLIP.** `dir_by_src` publishes
+`listing: short` and `young: short` in the same shape while one is measured and
+the other is not, and no reader could tell them apart. `SOURCE_SIDE_BASIS` and
+`extra.dir_basis_by_src` now say which: **`young` = `measured`** (`(sl)`'s
+−0.457%/trade t=−2.38, corroborated on the 8-21d band above); **`listing` =
+`unsupported`**; **`surge` = `unsupported`** (`(sk)` measured its entry at
+percentile 0.429 at the shipped 6h hold — worse than a random minute on the same
+coin). REPORTED, NEVER A GATE (I15) — this changes no trade.
+
+**NOT RE-FLIPPED TO LONG, deliberately**: that side is not supported either, and
+swapping an unsupported side for another unsupported side is motion, not growth.
+`listing` stays SHORT and stays declared hypothesis-grade, which is what it
+already was. Its practical stake is small — `(sk)` measured the source at ZERO
+crypto supply for 86 days — and the point of the measurement is that the next
+session reading `dir_by_src` does not infer evidence that was never there.
+3 mutations verified RED (stop publishing the basis; let `listing` read
+`measured`; drop a source's entry).
+
+## 2026-08-26 (ud) — THE ALLOCATION'S TWO HALVES DO NOT ADD UP: $1,151.66 OF FLEET CAPITAL IS WITHHELD BY THE ERA GATE AND RETURNED TO NOBODY, AND SIXTEEN BOOKS SIT BELOW FLAT TO FUND A BONUS THAT IS REFUSED
+
+**MEASURED on the live payload, not reasoned about** — `fleet-allocation` at
+2026-08-26T13:13:49Z, using the organ's OWN published fields:
+
+```
+sum(target_usd)          19,999.96     ← conserved BY CONSTRUCTION
+sum(scale_effective·usd) 18,848.30     ← what the era gate actually leaves
+withheld                  1,151.66     ← 5.8% of fleet capital, to nobody
+expansion_gated                   3    🙏 avo shadow · 🎫 taker · 🌾 carry
+books below flat                 16    every one at 0.9279x
+```
+
+**THE MECHANISM, and it is an INTERACTION between two decisions that were each
+correct alone.** `(tz)`/`(sm)` made evidence TILT the flat split
+(`w = 1 + TILT·claim/best`) so the best-evidenced book ranks first and nothing
+is starved by a rival's claim — ranked on the **all-time pooled** claim,
+because `(kc)` measured that era-scoping the RANK leaves zero claimants on 15
+of 15 days, i.e. turns the organ off. `(lx)` then gated EXPANSION on the
+**era-scoped** claim, because carry's 0.149%/trade came from a sample 91/101 of
+which predates its own era boundary and a two-writer window cannot quadruple a
+clip.
+
+Both hold. But the tilt is **funded** by every other book and **spent** on a
+field the gate reads differently, so when the gate declines, the surplus the
+tilt already took is returned to no one. The claimant is protected; the
+sixteen books that paid for it are not repaid. **Nothing in the payload said
+so**, because `by_class` publishes only the pre-gate `target_usd`.
+
+`(oy)` is the direct ancestor and the reason this was findable: it published
+the gated outcome PER BOOK precisely because *"a payload must not be
+byte-identical between 'this book will be scaled up 4x' and 'this book will be
+left at flat'"*. That closed the per-book question. The FLEET-level question —
+does the organ's own arithmetic close? — was left underived, and it does not.
+
+**AND THE GATE IS THE STEADY STATE, NOT A BLIP.** All three gated books are at
+a MEASURED era zero, not a `MIN_N` floor artifact: carry `n_era=13`, avo shadow
+`n_era=17`, the taker `n_era=120`, every bound at or below zero. The only
+positive `claim_era` in the fleet belongs to `freqtrade-avo-maria-lighter` — a
+REAL-MONEY row, which by design never reads this accessor.
+
+**WHAT SHIPS: the number, not a redistribution.** `gate_totals()` publishes
+`target_effective_usd` · `withheld_usd` · `n_expansion_gated` · `n_unpriced`,
+per class and at the fleet level, plus `books_below_flat`. Computed AFTER the
+era twins are filled — the `(ua)` ordering defect in a second field, so it is
+pinned rather than assumed. `n_unpriced` is the `(kw)`/I4 receipt: a row whose
+effective scale cannot be computed falls back to its raw target and SAYS so,
+because a dark computation must not be byte-identical to a clean one.
+
+**WHY NOT FIX IT IN THIS PASS — the three candidate rules, recorded so the next
+one starts from the analysis instead of re-deriving it.** This is a sizing
+change on three shadow books, so it is priced (I19) and decided on a published
+number, not shipped inside the pass that found it (`SHIP NARROW`):
+
+1. **Return the refused surplus to flat.** Pin a gated book at flat and re-split
+   the remainder; the fixed point puts every non-era-claimant at exactly 1.0x
+   and nobody above it. Clean, but it FEEDS the sixteen for a reason that is
+   about someone else's gate, which is the `(sm)` starvation defect mirrored.
+2. **Era-scope the tilt WEIGHT** (cap the bonus at 1.0 for any book without a
+   positive `claim_era`), so the tilt is spent on the field the consumer will
+   honour. Arithmetically the cleanest — conserves capital with no iteration —
+   but it is `(kc)`'s rejected proposal wearing a different hat: on a day with
+   no era claimant every weight is 1.0 and the organ says "no opinion". That
+   may in fact be RIGHT (today's alternative is a cost with no benefit), but
+   `(kc)` measured the ranking consequence and this pass has not.
+3. **Publish both targets** (`target_usd` the opinion, `target_effective_usd`
+   the reachable one) and move consumers onto the second. Preserves `(kc)`'s
+   ranking signal AND conserves capital, at the price of changing which field
+   `fleet_bus.allocation_scale` reads — the largest blast radius of the three.
+
+The measurement itself is the deliverable and it is unambiguous: **today the
+tilt has no upside anywhere in the shadow fleet and a −7.2% downside on sixteen
+books.** Under I17 as amended (*"instead of finding a way to kill something you
+find a way to feed it"*) that is the wrong sign, and it is now a number the
+operator can decide on rather than one a session has to derive with a script.
+
+PUBLISH-ONLY: this moves no capital, writes no lever, and changes no book's
+clip. Verified against the LIVE publisher's own payload — `gate_totals` run
+over the deployed `books` map reproduces the hand computation to the cent
+($18,848.30 / $1,151.66), which is the `(hj)` check rather than a fixture that
+agrees with itself. 5 mutations verified RED against a green baseline (never
+count the surplus; read the raw target as effective; swallow an unpriceable
+row; compute the headline before the era fill; stop counting gated books).
+
+**ALSO IN THIS PASS — `session_commit.py` WAS REFUSING THE RENUMBER THE LETTER
+CONVENTION MANDATES.** Shipping this collided on `(uc)`: `origin/main` had
+taken it for *THE HATCHERY AUTOPSY*, which is cited from tracked code
+(`tests/test_review_currency.py:253`) while this branch's sniper entry was
+cited from nowhere — so under the collision rule the cited entry keeps the
+letter and mine moved to `(ue)`. **The tool then refused the commit**, because
+a renumber removes a header under one letter and adds it under another, which
+its `(nx)` deleted-entry guard reads as a destroyed entry.
+
+That guard is right to be suspicious: the `(nx)` incident WAS a letter rename
+(`perl -pi -e 's/(nv)/(nx)/g'` over another session's entry, 90 lines lost),
+and the title is unchanged in **both** cases, so no title comparison can
+separate them. The discriminator is the one the convention already requires —
+*"a renumber is recorded INLINE in the moved entry"*. A legitimate move is
+DECLARED; the sweep is silent by construction and cannot accidentally acquire a
+declaration. `renumbered_pairs()` lands in `audit_changelog_letters` beside
+`CORRECTED` (one owner for changelog-letter semantics, `(hj)`) and
+`session_commit` defers to it, requiring BOTH signals exactly as the correction
+escape does.
+
+**A mutation SURVIVED the first draft of those tests and found a real hole**:
+ignoring WHICH letter the declaration names. Renumber notes live in entry
+bodies forever — main carries `RENUMBERED (sq) -> (tt)` inside `(tt)` — so any
+diff touching CHANGELOG.md can pick up a stale one, and the destination letter
+alone is not the claim. The declared SOURCE must be the letter that actually
+left. 4 mutations verified RED after the fix (excuse any move; ignore the
+source letter; drop the title check; break the arrow forms), and the `(nx)`
+case itself is pinned unchanged — an UNDECLARED letter move is still reported.
+
+## 2026-08-26 (ue) — THE THIRD ENTOMBMENT: A SURGE/YOUNG SYMBOL THAT STOPS QUALIFYING IS NEVER OFFERED AGAIN, SO ITS GIVE-UP CAN NEVER FIRE — AND A RETRY THAT FORGETS ITS SOURCE TAKES THE WRONG SIDE
+
+**RENUMBERED (uc) → (ue) at push time.** `(uc)` was taken on `origin/main`
+by *THE HATCHERY AUTOPSY*, which is cited from tracked code
+(`tests/test_review_currency.py:253`) while this entry was cited from
+nowhere — so under the collision rule the cited entry keeps the letter and
+this one moves. The commit subject and PR #232 still read `(uc)`; `git log`
+is not a reliable letter index, which is why the move is recorded here.
+
+`(ub)` fixed two causes of the same entombment on 🎯 the Perp Sniper (the
+cooldown stamped on the OFFER rather than the OPEN; `pending` subtracted from
+the young offer). **This is the third, and it was measured on the deployed row
+rather than reasoned about** — `533a599f117d` published `pending: 2` beside
+`scan.offered: 0`, `listing: 0` and `gave_up: []`. Two symbols the pass could
+not see, held indefinitely.
+
+**THE MECHANISM, and it is a property of WHICH SOURCE admitted the symbol.**
+`run_snipe_pass` owns the bounded give-up (120 attempts / 2h) and only ever
+sees symbols in `candidates`. So a pending symbol ages out only while it keeps
+RE-QUALIFYING for its source:
+
+* **`listing` is immune by construction.** `new_listings` is `active -
+  baseline`, and a pending symbol is by definition not in `baseline`, so it is
+  offered every single loop until it opens or is given up. That is why this
+  stayed invisible for the source everyone reads first.
+* **`surge` and `young` are the opposite.** Their candidates are EXISTING
+  markets — they are already in `baseline`, so `new_listings` never carries
+  them. The moment a surge decays or a book ages past the young bar, the symbol
+  stops being offered **while still perfectly `active`**: attempts never
+  advance, the give-up inside the pass can never fire, and the record is
+  persisted to `bot_state` across every restart.
+
+The one existing prune (`(hd)`-era, at the top of the loop) does not reach it
+either — that one is keyed on leaving `active`, which is the FLAP case.
+
+**SCOPED TO `active` ON PURPOSE, and the scope is load-bearing.** The first
+draft offered every stale pending symbol and reddened the flap selftest
+(`YOUNGFLAP` 7 → 8 attempts). That test is not an obstacle to route around: a
+symbol that has left the market list **cannot be sniped**, so offering it burns
+retry budget on an impossible attempt and gives up early on a book whose status
+is merely flickering around its debut — the 17-Jul absorption bug the whole
+retry design exists to prevent. The narrowed rule leaves that design untouched
+and restores to surge/young exactly the offer contract `listing` has always
+had. **Mutation 2 below is that scope**: dropping `s in active` reddens the
+pre-existing flap test, which is the cleanest evidence the narrowing is right.
+
+**THE SECOND HALF — A RETRY MUST KEEP ITS SOURCE.** `_src_map` is built from
+the three live candidate lists, so a stale pending symbol had **no source**,
+and the fallbacks are not neutral: `side_is_long(None)` is **LONG** and
+`hold_sec_for(None)` is the old `MAX_HOLD_SEC`. Since `(ub)` this book takes
+`young` **SHORT at 24h** and `surge` **LONG at 6h** — so an un-sourced retry
+would have opened a young symbol on the **wrong side**, at the wrong hold, and
+stamped an un-parseable tag on the close. The pending record now carries `src`
+(stamped after each pass, carried through the save/restore, absent → absent and
+never a guess per I8), and `_src_map` falls back to it at **lowest priority**,
+so a live source always wins and this can only fill a gap.
+
+**MEASURED CONSEQUENCE:** none today — this is the give-up path, and its whole
+product is that a stuck record can reach its bound. What it buys is that
+`pending` is now bounded for all three sources instead of one, so the census
+number a reader checks (`pending`) means the same thing whichever source filled
+it. Publishes `scan.stale_pending` so the retry lane is visible rather than
+inferred.
+
+**5 mutations verified RED against a green baseline** (never offer the stale
+set; drop the `active` scope; drop the `_src_map` fallback; never stamp `src`
+after a pass; drop `src` from the restore). Pinned by a new selftest fixture
+driven through `main()` against the real `_FakeVenue`/`_FakeBus` — an active
+symbol that no longer qualifies is offered and its clock advances without
+resetting `first_seen`; a `young` retry is taken SHORT and stamped `young`; a
+symbol that goes pending THIS loop records its source so the restore has
+something to carry.
+
+Found by reading the deployed payload's own census against what the code can
+reach — the same route as `(ua)`, and the third time in two days that a
+published counter said what the run could not have produced.
+
 ## 2026-08-26 (tu) — THE DAILY REVIEW COUNTED 13 HALT EVENTS AS REAL-MONEY TRADES — AND THE FILTER THAT FIXED IT READ A JSONB KEY NOTHING HAS EVER WRITTEN
 
 Two commits from an earlier pass today, held unpushed, reviewed before
@@ -453,6 +744,20 @@ names, on the instrument built to end exactly that.
 ## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE OF ITS OWN THESIS — and the "debut fade" it was flipped on is 76-83% CALENDAR, corrected in place the same day
 
 **Eamon, 26-Aug:** *"let listing sniper fly like it used to."*
+
+**CORRECTED IN PLACE A SECOND TIME, per I12 — see `(uf)`, which closes the one
+thing this entry left open and says so.** The correction below establishes the
+fade as 76-83% CALENDAR and keeps the flip on the counterfactual; it also notes
+that the flip's number was computed across BOTH debut bands and that
+`listing`'s OWN band was never measured separately. It has been now, with a
+calendar-matched control and the book's own bracket: **on 0-7d NEITHER side is
+supported** (LONG −0.036% t=−0.07, SHORT +0.123% t=+0.29, by-coin), the
+apparent pooled t=+4.05 is a sampling-STRIDE artifact (3.98 → 0.36 as the
+stride goes 1 → 24 while by-coin t holds at ~0.6), and **the short's evidence
+lives in the 8-21d band — `young`'s, not `listing`'s** (LONG −0.374%, t=−2.67).
+The side is NOT re-flipped (LONG is unsupported too) and stays declared
+hypothesis-grade; what changed is that the book now PUBLISHES which of its
+three sides is measured and which is not (`extra.dir_basis_by_src`).
 
 **CORRECTED IN PLACE per I12, hours after shipping, by an adversarial review of
 this entry's own claim (5 independent lenses + a code reviewer + a second

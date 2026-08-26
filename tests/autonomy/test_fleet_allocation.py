@@ -186,6 +186,96 @@ def test_the_era_headline_counts_a_field_that_exists_by_then():
         f"are filled at {fill_line} — the counter still precedes its data")
 
 
+def test_the_gate_publishes_the_capital_it_withholds():
+    """The era gate is not capital-conserving, and the payload must say so.
+
+    [2026-08-26] `target_usd` is conserved BY CONSTRUCTION — the split never
+    proposes spending more, only spending it differently. The era gate ((lx))
+    is not: a book it declines is held at flat, and the surplus the tilt took
+    from every OTHER book to fund that expansion is returned to nobody. So the
+    two published halves of the allocation do not add up.
+
+    `(oy)` published the gated outcome PER BOOK for exactly this reason and
+    left the fleet-level number underived. Measured on the live payload the day
+    this shipped: sum(target_usd) $19,999.96 vs $18,848.30 reachable —
+    **$1,151.66, 5.8% of fleet capital**, with 3 books `expansion_gated` and 16
+    sitting at 0.9279x flat to fund a bonus that was refused.
+
+    Pinned in BOTH directions, because a number that is always positive is not
+    a measurement: a gated book produces a withholding, and an ungated fleet
+    produces exactly zero.
+    """
+    books = {"a": [0.03, 0.01, 0.02, 0.04] * 5, "b": [-0.02, -0.01] * 10,
+             "c": [0.0005, -0.0005] * 10}
+    rows = alloc.allocate(books, book_usd=1000.0)
+    # `a` is the claimant, so the tilt puts it above flat.
+    for b in rows:
+        alloc.set_era_twin(rows[b], None, None)   # writes scale_effective too
+    assert rows["a"]["expansion_gated"], (
+        "fixture must produce a gated claimant, or it proves nothing: "
+        f"{ {b: (rows[b]['target_usd'], rows[b]['scale_effective']) for b in rows} }")
+    g = alloc.gate_totals(list(rows.values()))
+    assert g["n_expansion_gated"] == 1, g
+    assert g["n_unpriced"] == 0, g
+    assert g["withheld_usd"] > 0, (
+        "a declined expansion withholds real capital and the headline read "
+        f"zero: {g}")
+    # ...and it is exactly what the gate refused, not an approximation.
+    refused = rows["a"]["target_usd"] - rows["a"]["current_usd"]
+    assert abs(g["withheld_usd"] - refused) < 0.02, (g, refused)
+
+    # THE OTHER DIRECTION: grant the era claim and the leak must vanish.
+    alloc.set_era_twin(rows["a"], 12, 0.004)
+    g2 = alloc.gate_totals(list(rows.values()))
+    assert g2["n_expansion_gated"] == 0 and g2["withheld_usd"] == 0.0, (
+        "with nothing gated the allocation closes exactly, and a headline that "
+        f"still reports a leak is manufacturing one: {g2}")
+
+
+def test_an_unpriceable_row_is_counted_not_swallowed():
+    """A row whose effective scale cannot be computed falls back to its raw
+    target — and says so. ((kw)/I4: a dark computation must never be
+    byte-identical to a clean one.)"""
+    junk = {"target_usd": 1500.0, "current_usd": None,
+            "scale_effective": None, "expansion_gated": False}
+    g = alloc.gate_totals([junk])
+    assert g["n_unpriced"] == 1, g
+    assert g["withheld_usd"] == 0.0 and g["target_effective_usd"] == 1500.0, (
+        "an unpriceable row must fall back to its raw target rather than "
+        f"reading as $1,500 withheld: {g}")
+
+
+def test_the_fleet_gate_headline_is_computed_after_the_era_fill():
+    """Same ordering constraint as `n_with_era_claim`, same reason.
+
+    [2026-08-26] `scale_effective` and `expansion_gated` are written when
+    `claim_era` becomes known. A fleet-level total computed before that fill
+    would see every book ungated and report a leak of exactly zero — the (ua)
+    defect in a second field, which is why it is pinned rather than assumed.
+    """
+    src = (ROOT / "fleet_allocation.py").read_text()
+    fn = [f for f in ast.walk(ast.parse(src))
+          if isinstance(f, ast.FunctionDef) and f.name == "run_once"][0]
+    fill_line = gate_line = None
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "set_era_twin"):
+            fill_line = max(fill_line or 0, node.lineno)
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                # `ast.unparse` emits SINGLE quotes — match the KEY, never a
+                # spelling (the trap this file already walked into once).
+                if isinstance(t, ast.Subscript) and "'gate'" in ast.unparse(t):
+                    gate_line = min(gate_line or 10**9, node.lineno)
+    assert fill_line, "run_once no longer fills the era twin"
+    assert gate_line, (
+        "run_once never publishes the fleet gate total — the leak the payload "
+        "exists to make readable is underived again")
+    assert gate_line > fill_line, (
+        f"payload['gate'] is set at line {gate_line} but the era twins are "
+        f"filled at {fill_line} — it would report a leak of zero always")
+
+
 class TestTheEvidenceRecordIsPublished:
     """[2026-08-05 (kc)] The payload used to publish {n, claim, class,
     target_usd, current_usd, delta_usd, undecided} and nothing else, so two

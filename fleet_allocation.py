@@ -594,7 +594,74 @@ def class_totals(alloc, books):
             "n_with_era_claim": sum(
                 1 for b in rows if (alloc[b].get("claim_era") or 0) > 0),
         }
+        out[cls].update(gate_totals([alloc[b] for b in rows]))
     return out
+
+
+def gate_totals(recs):
+    """{target_effective_usd, withheld_usd, n_expansion_gated, n_unpriced} for
+    a set of published book rows — what the era gate ACTUALLY leaves on the
+    table, in dollars.
+
+    [2026-08-26] `(oy)` published the gated outcome PER BOOK because a payload
+    must not be byte-identical between "this book will be scaled up 4x" and
+    "this book will be left at flat". That closed the per-book question and
+    left the FLEET-level one open, and the fleet-level one is a different
+    number with a different owner:
+
+    `target_usd` is conserved by construction — the split never proposes
+    spending more, only spending it differently. **The gate is not.** A book
+    the era declines is held at flat, and the surplus the tilt took from every
+    OTHER book to fund that expansion is returned to nobody. So the two halves
+    of the published allocation do not add up, and nothing said so.
+
+    MEASURED on the live payload the day this shipped: `sum(target_usd)` =
+    $19,999.96 against $18,848.30 actually reachable — **$1,151.66, 5.8% of
+    fleet capital, withheld**. Three books were `expansion_gated`
+    (🙏 avo shadow, 🎫 the Taker, 🌾 carry — the fleet's three best-evidenced
+    shadow books, every one of them era-scoped at a MEASURED zero rather than
+    a floor), and the sixteen books with no claim at all sat at **0.9279x**
+    flat: below the prior, to fund a bonus that was refused.
+
+    PUBLISH-ONLY, and deliberately NOT a redistribution. Returning the refused
+    surplus is a real improvement in the FEED direction (I17 as amended) and it
+    is also a sizing change on three shadow books, so it is priced and decided
+    on a published number rather than shipped inside the pass that found it —
+    the (oy) scope, one layer up. The three candidate rules and why none is
+    obviously right are recorded in the changelog entry, so the next pass
+    starts from the analysis instead of re-deriving it.
+
+    `n_unpriced` is the receipt ((kw)/I4): a row whose effective scale could
+    not be computed falls back to its raw target, and a dark computation must
+    not be byte-identical to a clean one.
+    """
+    eff = 0.0
+    gated = unpriced = 0
+    for r in recs:
+        raw = _f(r.get("target_usd"))
+        s = _f(r.get("scale_effective"))
+        base = _f(r.get("current_usd"))
+        if s is None or base is None:
+            unpriced += 1
+            eff += raw or 0.0
+        else:
+            eff += s * base
+        if r.get("expansion_gated"):
+            gated += 1
+    tot = sum((_f(r.get("target_usd")) or 0.0) for r in recs)
+    return {"target_effective_usd": round(eff, 2),
+            "withheld_usd": round(tot - eff, 2),
+            "n_expansion_gated": gated,
+            "n_unpriced": unpriced}
+
+
+def _f(v):
+    """float or None — never a coercion that turns junk into a dollar."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f else None                      # NaN is not a number
 
 
 def build(books, book_usd=BOOK_USD):
@@ -805,6 +872,17 @@ def run_once(publish=False):
     # number could not move, because the count precedes the data. A headline
     # that cannot be non-zero is not a measurement. Corrected in place per I12.
     payload["by_class"] = class_totals(payload["books"], books)
+    # ...and the same number at the FLEET level, for the same reason. `by_class`
+    # splits it funding/directional; the leak is a property of the whole
+    # allocation, and a reader checking whether the organ's own arithmetic
+    # closes should not have to add two dicts together to find out.
+    payload["gate"] = gate_totals(list(payload["books"].values()))
+    payload["gate"]["target_usd"] = round(
+        sum((_f(r.get("target_usd")) or 0.0)
+            for r in payload["books"].values()), 2)
+    payload["gate"]["books_below_flat"] = sum(
+        1 for r in payload["books"].values()
+        if (_f(r.get("scale_effective")) or 1.0) < 1.0)
     # The go-live verdict is IMPORTED, never re-derived here — allocation is a
     # different question and must not become a second gate. Optional by design:
     # that module is the other half of the fleet's grading surface and this
