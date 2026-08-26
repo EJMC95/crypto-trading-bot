@@ -180,8 +180,37 @@ def test_dynamic_keys_come_from_one_owner():
     assert "def entry_tag(" in src
     assert "entry_tag(was_long, src)" in src, \
         "close_reason must compose from entry_tag, not retype it"
-    assert "entry_tag(DIRECTION_LONG" in src, \
-        "the sizing site must call the same composer"
+    # [2026-08-26] This asserted the literal `entry_tag(DIRECTION_LONG`, which
+    # is a retyped string standing in for the real invariant — the exact shape
+    # this file's own docstring warns about ("a retyped key is a key that
+    # drifts"). It broke the moment the sniper's side became PER-SOURCE, and it
+    # broke in the direction of the FIX: the sizing site now passes the same
+    # side the OPEN site passes, where before it passed a module constant that
+    # would have asked the brain for `long-young` while the ledger wrote
+    # `short-young`.
+    #
+    # The invariant, asserted by AST instead of by substring: the side
+    # expression handed to `entry_tag` at the sizing site is IDENTICAL to the
+    # one handed to the broker/venue at the open site. Whatever either becomes,
+    # they move together.
+    tree = ast.parse(src)
+    sides = {"entry_tag": set(), "open": set()}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        callee = _callee(node)
+        if callee == "entry_tag" and len(node.args) >= 1:
+            sides["entry_tag"].add(ast.unparse(node.args[0]))
+        elif callee in ("broker.open", "market_open") and len(node.args) >= 2:
+            sides["open"].add(ast.unparse(node.args[1]))
+    # `close_reason` composes `entry_tag(was_long, src)`, so that parameter name
+    # is expected here alongside the sizing site's real expression.
+    sizing = sides["entry_tag"] - {"was_long"}
+    assert sizing, f"no sizing-site entry_tag call found: {sides}"
+    assert sizing <= sides["open"], (
+        f"the sizing site keys the brain off {sizing} while the position is "
+        f"opened with {sides['open']} — the lookup would ask for a tag the "
+        f"ledger never writes, and return 1.0 forever in silence")
 
     # 🙏 Avo + the family: `ledger_tag` is the one composer, and
     # `brain_clip_for` applies it internally so a caller cannot pass a raw tag.

@@ -89,7 +89,14 @@ YOUNG_MAX_BARS = int(os.environ.get("SNIPER_YOUNG_MAX_BARS", "21"))
 YOUNG_MAX_PER_LOOP = int(os.environ.get("SNIPER_YOUNG_MAX_PER_LOOP", "2"))
 # A young book still has to be TRADABLE — a debut with no turnover is a
 # ghost print, and the sniper's own history is full of one-sided debut books.
-YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.25"))
+# [2026-08-20] 0.25 -> 0.20. MEASURED, not nudged: on the venue's own
+# `orderBookDetails` the only venue-priced book in the last 120 days that this
+# floor refuses while having real turnover is ANSEM at $0.228M/day — the floor
+# was excluding it by $0.022M. 0.20 still sits at TWICE the $0.1M step where
+# the fleet's slippage model changes tier, which is the exact reason (ty)
+# REFUSED the move to $0.10M and that refusal is unchanged: below $0.1M the
+# model cannot price the band it would admit ((qq): mean 17.49bps, p90 398bps).
+YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.20"))
 # Candle probes per loop for unknown books. Small on purpose: the venue REST
 # budget is shared, and the cache is monotone so the cost decays to zero.
 YOUNG_PROBE_BUDGET = int(os.environ.get("SNIPER_YOUNG_PROBE_BUDGET", "4"))
@@ -97,7 +104,196 @@ YOUNG_PROBE_BUDGET = int(os.environ.get("SNIPER_YOUNG_PROBE_BUDGET", "4"))
 # A surge is an EVENT, not a permanent property, so the ledger must forget.
 SURGE_COOLDOWN_H = float(os.environ.get("SNIPER_SURGE_COOLDOWN_H", "168"))
 LOOP_SECONDS = 60          # poll the market list every minute
-DIRECTION_LONG = os.environ.get("SNIPER_DIRECTION", "long").lower() != "short"
+_DIRECTION_ENV = os.environ.get("SNIPER_DIRECTION", "").strip().lower()
+#: The book-wide default side. Unchanged in meaning and in default (long); it
+#: is now the FALLBACK for a source with no declared side, and the pin below
+#: is the one-env revert to a single-sided book.
+DIRECTION_LONG = _DIRECTION_ENV != "short"
+#: True only when the operator has PINNED a side explicitly. A pinned side wins
+#: over every per-source rule — the kill switch for the whole change below.
+DIRECTION_PINNED = _DIRECTION_ENV in ("long", "short")
+if _DIRECTION_ENV and not DIRECTION_PINNED:
+    log.warning("SNIPER_DIRECTION=%r is not 'long' or 'short' — the kill switch"
+                " is NOT armed; per-source sides remain in force",
+                _DIRECTION_ENV)
+
+# [2026-08-20] THE SIDE IS PER-SOURCE, AND THIS IS WHY THE BOOK NEVER FLEW.
+#
+# Operator: *"let listing sniper fly like it used to."* It used to fly as
+# `listing_sniper.py`, sniping SPOT listings across ~100 CEXes — where a fresh
+# listing is a buying event and going LONG is the trade. This book snipes PERP
+# listings on ONE venue, and a perp lists AFTER the spot hype. Measured on this
+# venue's own tape, the two are opposite trades, and the successor kept the
+# predecessor's side.
+#
+# [2026-08-26] THE JUSTIFICATION BELOW WAS REFUTED HOURS AFTER IT SHIPPED, BY AN
+# ADVERSARIAL REVIEW OF THIS COMMENT'S OWN CLAIM. The SIDE FLIP STANDS; the
+# "debut fade" that motivated it does not. Corrected in place per I12 — see
+# CHANGELOG (ub) for the full working. In short:
+#
+#  * The controls were described as "paired within coin so market drift cannot
+#    produce them". FALSE AS WRITTEN: the pairing is within coin but ACROSS
+#    TIME, and this venue's listings CLUSTER (13-19 books/month Jul-Sep 2025,
+#    ~1/month since), so a coin's young band and its mature band are different
+#    calendar windows by construction.
+#  * 11 of the 45 "debuts" share ONE birth instant — the venue's own opening —
+#    and are BTC, ETH, SOL, XRP, DOGE, LINK, AVAX, POL, NEAR, TAO, GRAM:
+#    assets with no debut at all. Outside them the headline cell CHANGES SIGN
+#    (8-21d at 24h: launch batch -1.953%, the other 34 coins +0.056%).
+#  * Coin + calendar-week fixed effects put the age dummy at -0.09..-0.15%/24h
+#    (t=-0.28..-0.47) against a raw -0.56..-0.62%. 76-83% of it is CALENDAR.
+#  * The gradient t-values quoted below are the POOLED column. BY COIN they are
+#    -0.61 / -1.02 / -0.47 / -1.52: 0 of 10 cells reach |t|=2.
+#  * The mature control is flat only in ITS OWN window. The same coins shorted
+#    at the young coins' calendar hours return +0.125%/trade, t=+3.28.
+#
+# WHY THE FLIP IS KEPT ANYWAY — the counterfactual, matched-null excess:
+#    PRIOR    LONG  @ 6h   raw -0.134%   matched-null -0.027% (t=-0.39)
+#    SHIPPED  SHORT @ 24h  raw +0.695%   matched-null +0.157% (t=+0.83)
+# SHORT measures better than LONG on every convention including the
+# market-neutral one (+0.343pp/trade at a fixed hold) — but NEITHER LEG IS
+# DISTINGUISHABLE FROM ZERO. This is a better-pointed coin flip on a $1,000
+# paper book, not a measured edge, and it is not to be cited as one. The 6h
+# short (+0.132%, t=+2.69) is WITHDRAWN outright: matched-null +0.019%,
+# t=+0.34. `listing` enters at age ~0 where the calendar-matched excess is
+# POSITIVE (+0.694%/24h), so its flip is HYPOTHESIS-GRADE ((qi)).
+#
+# The original numbers are left below so the size of the correction is legible.
+#
+# MEASURED, 45 venue-priced books, every hour of each book's own first 21 days
+# (n=23,102 hours), LONG:
+#     age 0-7d    -0.125%/6h  (t=-2.47)   -0.317%/24h (t=-2.99)
+#     age 8-21d   -0.083%/6h  (t=-2.70)   -0.436%/24h (t=-7.47)
+#     age 22-40d  -0.005%/6h              -0.094%/24h
+#     age 41-60d  +0.019%/6h              +0.147%/24h
+#     age 61-90d  +0.029%/6h              +0.090%/24h
+# Jackknifed by coin the sign holds at every young band (24h: [-9.27,-1.35] and
+# [-10.03,-6.48]). A book's first 21 days on this venue FADE; its later life
+# does not. The `young` and `listing` sources both target exactly that band and
+# both were LONG.
+#
+# THE FALLING-TAPE OBJECTION IS ANSWERED, not waved off (item 18 — this venue's
+# whole tape is one falling-BTC regime, so a short wins on almost anything by
+# construction). Two controls, both PAIRED WITHIN COIN so market drift cannot
+# produce them: young minus the coin's OWN whole tape = -0.488pp/24h (t=-2.27,
+# 33 of 45 coins negative); young minus the coin's OWN mature band =
+# -0.617pp/24h (t=-2.20, 32 of 45). And the decisive one — the IDENTICAL
+# bracket run on the SAME 45 coins at ages 61-120d returns
+# -0.022%/-0.048%/+0.080% at 6h/24h/72h, every t below 1.0. **The mature
+# control is flat. The return is an age effect, not beta.**
+#
+# THROUGH THE REAL BRACKET (tp +15%, sl -10%, timer; stop checked BEFORE target
+# inside each bar, so it is the conservative convention), SHORT on 0-21d:
+#     hold  6h   +0.132%/trade   by-coin t=+2.69    sl  3.4%
+#     hold 24h   +0.671%/trade   by-coin t=+4.22    sl 12.2%
+#     hold 72h   +1.690%/trade   by-coin t=+4.51    sl 24.1%
+# By-coin `t` is the conservative unit (hours inside one coin overlap heavily).
+#
+# WHAT IS SHIPPED AND WHAT IS REFUSED:
+#  * `listing` and `young` flip to SHORT. They are the two sources that target
+#    the faded band; `surge` is a volume event on a mostly-MATURE book, its
+#    cell is the flat control above, and it is left alone — its own evidence
+#    ((tx): 0 of 367 exit cells survive BH at FDR 0.05) is untouched by this.
+#  * The hold for those two goes 6h -> 24h. 6h is +0.132% = 13bps gross, which
+#    is inside plausible round-trip slippage on a book at this book's volume
+#    floor; 24h is 67bps and clears it. **72h measured BEST and is deliberately
+#    NOT taken: it is the grid EDGE of what was tested, and (hl)/(tx) is
+#    explicit that a grid-edge winner is reported unbounded, never shipped as a
+#    value.** 24h is the plateau interior — the 🧭 nav-cook precedent.
+#  * The young WINDOW stays 21 days. Widening it was the obvious move and the
+#    tape refuses it: the fade is gone by 22-40d (-0.094%/24h) and reverses by
+#    41-60d, so a wider window buys supply by diluting the very effect being
+#    traded.
+#
+# Unknown source degrades to the book-wide default (LONG, 6h) — the OLD
+# behaviour, never a guess ((ht)). Reverts: `SNIPER_DIRECTION=long` pins the
+# whole book back to one side; `SNIPER_SIDE_<SOURCE>` / `SNIPER_HOLD_H_<SOURCE>`
+# move one source.
+def _side_env(src, dflt):
+    """One source's side, VALIDATED. A typo must not resolve to a side.
+
+    [2026-08-26] `!= "short"` meant `SNIPER_SIDE_YOUNG="shrot"` silently
+    resolved to LONG and then published the junk verbatim in `dir_by_src`, so
+    the payload advertised a side the book was not taking. A lever that fails
+    open on a typo is not a lever. Unknown values fall back to the DECLARED
+    default and say so — never to a guess ((ht)).
+    """
+    raw = os.environ.get(f"SNIPER_SIDE_{src.upper()}", dflt).strip().lower()
+    if raw in ("long", "short"):
+        return raw
+    log.warning("SNIPER_SIDE_%s=%r is not 'long' or 'short' — using the"
+                " declared default %r", src.upper(), raw, dflt)
+    return dflt
+
+
+SOURCE_SIDE = {
+    src: _side_env(src, dflt)
+    for src, dflt in (("listing", "short"), ("surge", "long"),
+                      ("young", "short"))
+}
+#: [2026-08-26] The hold a PINNED side restores. `SNIPER_DIRECTION` is
+#: documented as the one-env revert to the pre-change book, and it short-
+#: circuited the SIDE while leaving the per-source HOLD in force — so
+#: `SNIPER_DIRECTION=long` gave LONG at 24h, a cell that measures 5.3x WORSE
+#: than the LONG-at-6h it claims to restore. A revert that lands somewhere the
+#: book has never been is not a revert. Pinning the side now pins the hold to
+#: the book-wide `MAX_HOLD_SEC` as well.
+SOURCE_HOLD_H = {
+    src: float(os.environ.get(f"SNIPER_HOLD_H_{src.upper()}", dflt))
+    for src, dflt in (("listing", "24"), ("surge", "6"), ("young", "24"))
+}
+
+
+def side_is_long(src):
+    """Is this admission source's side LONG?
+
+    A PINNED `SNIPER_DIRECTION` wins over everything — one env returns the book
+    to single-sided. An unrecognised source falls back to the book-wide
+    default rather than to a guessed side.
+    """
+    if DIRECTION_PINNED:
+        return DIRECTION_LONG
+    return str(SOURCE_SIDE.get(src, "")).strip().lower() != "short" \
+        if src in SOURCE_SIDE else DIRECTION_LONG
+
+
+def _side_letter(coin, sizes, entry_src):
+    """"L"/"S" for the published `held` map — from the POSITION, not the source.
+
+    [2026-08-26] The signed size is the only thing that knows what a position
+    actually is. `entry_src` is a HINT about how it was admitted, it can be
+    absent, and `side_is_long(None)` degrades to LONG — which is the right
+    degrade for OPENING a position and the wrong one for DESCRIBING one.
+
+    Falls back to the source only when no size is available at all, and to the
+    book-wide default after that, so the map never omits a held symbol.
+    """
+    try:
+        sz = sizes.get(coin)
+        if sz is not None and float(sz) != 0.0:
+            return "L" if float(sz) > 0 else "S"
+    except (TypeError, ValueError):
+        pass
+    return "L" if side_is_long(entry_src.get(coin)) else "S"
+
+
+def hold_sec_for(src):
+    """Seconds this source's positions may be held before the timer fires.
+
+    A position whose source is unknown — including one restored from a state
+    blob written before this shipped — gets the book-wide `MAX_HOLD_SEC`. That
+    closes it EARLIER than its own rule would, never later, so the degrade is
+    in the safe direction.
+    """
+    if DIRECTION_PINNED:
+        # A pinned side is the documented revert to the single-sided book, and
+        # that book held for MAX_HOLD_SEC. Pinning the side without the hold
+        # left the revert on LONG@24h — see SOURCE_HOLD_H's note.
+        return float(MAX_HOLD_SEC)
+    try:
+        return float(SOURCE_HOLD_H[src]) * 3600.0
+    except (KeyError, TypeError, ValueError):
+        return float(MAX_HOLD_SEC)
 # [2026-07-17 RETRY FIX] `baseline |= set(new_listings)` used to run
 # UNCONDITIONALLY after the snipe loop, outside every failure path inside it.
 # A listing that skipped (one-sided book, book fetch raised, notional cap,
@@ -225,7 +421,14 @@ ALLOW_NONCRYPTO = os.environ.get("SNIPER_ALLOW_NONCRYPTO", "").strip().lower() \
 
 
 def _class_ok(sym):
-    """May `sym` enter via the surge/young sources? Crypto perps only."""
+    """May `sym` enter via the SURGE source? Crypto perps only.
+
+    [(ty)] Scope narrowed from "surge/young" to SURGE. The young source now
+    asks `_young_class_ok` — a different question, for a measured reason; see
+    below. Nothing about the surge screen changed: its evidence (non-crypto
+    surge −$5.01/13, and (tx)'s class-7 surge at −0.840%/trade @6h, negative at
+    every hold) is unaffected and it stays crypto-only.
+    """
     if ALLOW_NONCRYPTO or fleet_bus is None:
         return True
     try:
@@ -234,8 +437,92 @@ def _class_ok(sym):
         return True
 
 
+# [2026-08-20 (ty)] THE YOUNG SOURCE ASKS A DIFFERENT QUESTION — and this is
+# the change that gives this book its supply back, not another screen.
+#
+# THE DEFECT, measured. (lk) applied ONE screen to both sources on evidence
+# that was almost entirely SURGE's: non-crypto surge −$5.01 over 13 closes
+# versus non-crypto **young −$1.19 over TWO**. The young leg rested on n=2.
+# `is_crypto` asks `strategy_index == 2`, and **the venue files crypto-native
+# memecoin debuts under class 7** — the same grab-bag that holds tokenised
+# pre-IPO equity. So the screen refused exactly the cohort a debut sniper
+# exists to trade.
+#
+# THE COST, measured 20-Aug: the young source published `admitted: 0` for
+# **66 consecutive days**. Its live supply on that day was SEVEN books, of
+# which five were zero-volume ghosts (AXTI/WDC/SOXS/KORU/KIOXIA — tokenised
+# equities that never traded an hour) and the only two with real turnover were
+# CASHCAT ($0.45M) and UNITREE ($0.84M), both class 7, both refused. The book
+# was not quiet; it was structurally unable to admit anything.
+#
+# AND THE SUPPLY WAS NEVER DEAD. `(qi)`/`(tx)` reported "ZERO crypto births for
+# 86 days", which is true of `strategy_index == 2` and FALSE of the cohort this
+# book trades: on the venue-priced axis, births run **1.67-2.00/30d and have
+# not stopped in any month measured** — CAP (Jun), ANSEM (Jul), CASHCAT (Aug).
+# Corrected in place per I12 rather than left standing.
+#
+# WHAT REPLACES IT: `fleet_bus.venue_priced` — the axis the (lk) argument was
+# really making ("already priced where the underlying trades"). It admits
+# crypto-native books INCLUDING class-7 memecoins, and still refuses tokenised
+# equity/FX/commodity/pre-IPO. That exclusion is now BETTER evidenced than it
+# was: (ty) measured shorting an externally-priced debut at −0.714%/trade,
+# **t=−2.04** — the only significant cell in the study — so the half of (lk)
+# this keeps is the half the tape supports.
+# Reversible independently of the surge screen: SNIPER_YOUNG_ALLOW_ANY=1.
+YOUNG_ALLOW_ANY = os.environ.get("SNIPER_YOUNG_ALLOW_ANY", "").strip().lower() \
+    in ("1", "on", "true", "yes")
+
+
+def _young_class_ok(sym):
+    """May `sym` enter via the YOUNG source? Books PRICED ON THIS VENUE.
+
+    Fail-OPEN on a missing/raising fleet_bus, exactly as `_class_ok` does — a
+    classification outage must never be what stops a debut scan.
+    """
+    if YOUNG_ALLOW_ANY or ALLOW_NONCRYPTO or fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.venue_priced(sym))
+    except Exception:      # noqa: BLE001 — class lookup must never stop a scan
+        return True
+
+
+# [2026-08-20 (tx)] THE PER-SOURCE CENSUS — I18/(lv)'s "a sleeve that opens
+# nothing must publish its OWN census at its OWN bar".
+#
+# MEASURED THE DAY THIS SHIPPED, and it is why the guard exists rather than a
+# tidiness argument: this book's `listing` source has had ZERO crypto supply
+# for 86 days (last crypto birth CTR/RAIL 25-May) and its `young` source has
+# been EMPTY for 66 days (0 admissible today: the venue files memecoin debuts
+# under strategy_index 7, which the (lk) crypto screen excludes, and the class-2
+# birth rate is 0.00/30d). Both were dead the whole time behind an `extra`
+# payload that published `watching: 212` and nothing per source — so
+# `opened: 0` was byte-identical between "quiet" and "structurally impossible",
+# the exact condition that hid 🎸 Barnesy's `extreme` sleeve for 8 days.
+#
+# The funnel is filled BY THE ADMISSION FUNCTIONS THEMSELVES, one counter per
+# gate stage, so it cannot drift from the gate the way a re-implemented census
+# would ((hj): a second copy of a rule is a second rule). Publish-only: no
+# counter is read by any decision in this file, and admission is byte-identical
+# with `census=None`.
+def _new_funnel(census, stages):
+    """Zero a per-source funnel dict in `census` (or a throwaway) and return it.
+
+    `stages` are the gate stages in the order the admission function applies
+    them; every stage counts the candidates that REACHED it and passed. So a
+    source dies at the first stage whose count is 0, and the reader can name
+    which gate killed it without reading this file.
+    """
+    cen = census if census is not None else {}
+    for k in stages:
+        cen[k] = 0
+    cen["admitted"] = 0
+    cen["capped"] = False
+    return cen
+
+
 def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
-                     class_ok=None):
+                     class_ok=None, census=None):
     """Books the scout reports as volume-SURGING, as snipe candidates.
 
     [2026-07-30 THE SNIPER'S POPULATION PROBLEM] This bot's event — a brand-new
@@ -255,22 +542,44 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
     """
     out = []
     class_ok = _class_ok if class_ok is None else class_ok
+    cen = _new_funnel(census, ("offered", "parsed", "ratio_ok", "fresh",
+                              "class_ok"))
     try:
         rows = sorted(surges or [],
                       key=lambda r: -float(r.get("ratio") or 0.0))
     except (TypeError, ValueError, AttributeError):
         return out
+    cen["offered"] = len(rows)
     for r in rows:
-        if len(out) >= int(limit):
-            break
         try:
             sym = str(r.get("sym") or "").strip().upper()
             ratio = float(r.get("ratio") or 0.0)
         except (TypeError, ValueError, AttributeError):
             continue
-        if sym and sym not in already and ratio >= float(mult) \
-                and class_ok(sym):        # [(lk)] crypto perps only
-            out.append(sym)
+        if not sym:
+            continue
+        cen["parsed"] += 1
+        # The admission predicate below is the SAME test as the original
+        # single-expression `if`, split one stage per line so the census
+        # counts the real gate rather than a second copy of it ((hj)).
+        if ratio < float(mult):
+            continue
+        cen["ratio_ok"] += 1
+        if sym in already:
+            continue
+        cen["fresh"] += 1
+        if not class_ok(sym):             # [(lk)] crypto perps only
+            continue
+        cen["class_ok"] += 1
+        # Cap the ADMISSION, never the count: the loop runs to the end so a
+        # capped pass still reports how much supply it turned away. Rows are
+        # ratio-sorted, so the first `limit` survivors are exactly the ones
+        # the pre-census `break` admitted.
+        if len(out) >= int(limit):
+            cen["capped"] = True
+            continue
+        out.append(sym)
+    cen["admitted"] = len(out)
     return out
 
 
@@ -343,7 +652,7 @@ def restore_entry_meta(saved_meta):
 
 
 def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
-                     class_ok=None):
+                     class_ok=None, census=None):
     """Books still inside their DEBUT REGIME, as snipe candidates.
 
     [2026-07-30 THE SCOPE FIX] `new_listings` is a market-set DIFF: a symbol
@@ -362,7 +671,13 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
     cannot dedup it), and bounded by `limit`.
     """
     rows = []
-    class_ok = _class_ok if class_ok is None else class_ok
+    # [(ty)] the YOUNG screen, not the surge one — `_young_class_ok` asks
+    # "is this priced on this venue", which admits the class-7 memecoin debuts
+    # `is_crypto` refuses. An explicit `class_ok=` still overrides, which is
+    # what the tests drive.
+    class_ok = _young_class_ok if class_ok is None else class_ok
+    cen = _new_funnel(census, ("scanned", "age_ok", "fresh", "class_ok",
+                               "vol_ok"))
     for sym, n in (bar_counts or {}).items():
         # `str(sym)` alone is too permissive — a None key coerces to the
         # string "NONE" and becomes a tradable-looking candidate. Caught by
@@ -374,19 +689,35 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
         except (TypeError, ValueError):
             continue
         s = sym.strip().upper()
-        if not s or s in (already or set()) or bars > int(max_bars):
+        if not s:
             continue
-        if not class_ok(s):               # [(lk)] crypto perps only
+        cen["scanned"] += 1
+        # Same admission test as the original combined `if`, one stage per
+        # line so the funnel counts the real gate ((hj)). Age first, then
+        # dedup: the ORDER decides only which bucket a doubly-refused symbol
+        # lands in, never whether it is admitted.
+        if bars > int(max_bars):
             continue
+        cen["age_ok"] += 1
+        if s in (already or set()):
+            continue
+        cen["fresh"] += 1
+        if not class_ok(s):               # [(ty)] priced on THIS venue
+            continue
+        cen["class_ok"] += 1
         try:
             vol = float((vols or {}).get(s, 0.0) or 0.0)
         except (TypeError, ValueError):
             vol = 0.0
         if vol < float(min_vol_m):
             continue
+        cen["vol_ok"] += 1
         rows.append((bars, -vol, s))
     rows.sort()
-    return [s for _, _, s in rows[:int(limit)]]
+    out = [s for _, _, s in rows[:int(limit)]]
+    cen["admitted"] = len(out)
+    cen["capped"] = len(rows) > len(out)
+    return out
 
 
 # [2026-08-04] ADMISSION SOURCES — the three routes into this book. Every
@@ -696,11 +1027,14 @@ def main():
                      len(pending), ", ".join(sorted(pending)))
 
     log.info("=" * 64)
-    log.info("Lighter NEW-PERP sniper | venue=%s (%s) | dir=%s | clip $%.0f | "
-             "TP +%.0f%% SL -%.0f%% hold %.0fh | cap %d",
+    log.info("Lighter NEW-PERP sniper | venue=%s (%s) | sides %s | clip $%.0f | "
+             "TP +%.0f%% SL -%.0f%% | cap %d%s",
              ctx.mode, "modelled fills" if dry_run else "SENDS ORDERS",
-             "long" if DIRECTION_LONG else "short", order_usd,
-             TAKE_PROFIT_PCT * 100, STOP_LOSS_PCT * 100, MAX_HOLD_SEC / 3600, max_open)
+             ", ".join(f"{k}={SOURCE_SIDE[k]}@{SOURCE_HOLD_H[k]:.0f}h"
+                       for k in SNIPE_SOURCES), order_usd,
+             TAKE_PROFIT_PCT * 100, STOP_LOSS_PCT * 100, max_open,
+             f" | PINNED {'long' if DIRECTION_LONG else 'short'}"
+             if DIRECTION_PINNED else "")
     log.info("=" * 64)
 
     def record_close(coin, ent_px, ent_ts, exit_px, pnl, was_long, reason,
@@ -798,8 +1132,15 @@ def main():
         # nothing like each other, and until now they were all sized the same.
         # `clip` (not order_usd) is what the cap below must see: a bigger clip
         # has to be admitted against the cap it will actually fill.
-        clip, bmult = (fleet_bus.brain_clip(bot_id, entry_tag(DIRECTION_LONG,
-                                                              src), order_usd)
+        # [2026-08-20 merge] the side comes from the SOURCE, not the module
+        # default. `close_reason` writes `short-young_*` for a young position,
+        # so keying the brain lookup off `DIRECTION_LONG` would ask for
+        # `long-young` — a tag this book never writes. That is precisely the
+        # failure this function's own docstring names: the lookup returns 1.0
+        # forever and nothing says so. One owner for the side, as for the key.
+        clip, bmult = (fleet_bus.brain_clip(bot_id,
+                                            entry_tag(side_is_long(src), src),
+                                            order_usd)
                        if fleet_bus is not None else (order_usd, 1.0))
         size = round(clip / px, 6)
         if size <= 0:
@@ -813,7 +1154,7 @@ def main():
             return False
         if dry_run:
             broker.mark(sym, px)
-            broker.open(sym, DIRECTION_LONG, size, px)
+            broker.open(sym, side_is_long(src), size, px)
             if sym not in broker.pos:
                 log.error("%s: broker.open did not materialise a position — "
                           "staying pending", sym)
@@ -837,7 +1178,7 @@ def main():
                          sym, open_ntl, clip, ctx.rails.max_notional)
                 return False
             try:
-                ctx.venue.market_open(sym, DIRECTION_LONG, size)
+                ctx.venue.market_open(sym, side_is_long(src), size)
                 entry_ts[sym] = now_ts
             except Exception as e:  # noqa: BLE001
                 log.error("snipe order failed %s: %s — staying pending", sym, e)
@@ -863,9 +1204,10 @@ def main():
         if bmult != 1.0:
             entry_meta[sym] = dict(entry_meta.get(sym) or {},
                                    brain_mult=round(bmult, 4))
-        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f%s) [src=%s]",
-                 sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, clip,
-                 "" if bmult == 1.0 else f" brain {bmult:.2f}x", src or "?")
+        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f%s) [src=%s hold=%.0fh]",
+                 sym, "LONG" if side_is_long(src) else "SHORT", px, size, clip,
+                 "" if bmult == 1.0 else f" brain {bmult:.2f}x", src or "?",
+                 hold_sec_for(src) / 3600.0)
         return True
 
     # [2026-07-16 AUDIT FIX] seed W/L from the durable ledger — this bot
@@ -946,6 +1288,16 @@ def main():
                 log.info("%s: inactive past the give-up window — dropped from "
                          "pending (never sniped)", sym)
         fresh = [s for s in new_listings if s not in pending]
+        # [(tx)] the listing funnel. Deliberately SHORTER than the other two —
+        # this source has no class screen and no volume floor ((lk) left it
+        # open on purpose), so `offered` and `fresh` ARE its whole gate, and
+        # publishing stages it does not have would overstate the filtering.
+        # `scan: "fresh"` unconditionally: unlike surge/young this source reads
+        # the venue market list this loop already fetched, not the scout, so it
+        # cannot be dark without the loop having already restarted above.
+        _listing_cen = {"scan": "fresh", "offered": len(new_listings),
+                        "fresh": len(fresh), "pending": len(pending),
+                        "admitted": len(fresh), "capped": False}
         if fresh:
             anns = ctx.venue.announcements()
             for sym in fresh:
@@ -969,30 +1321,39 @@ def main():
             log.info("levers applied %s", _lv)
         _surge = []
         _surge_ratios = {}      # [(ne)] always bound, even on a dark scout
+        # [(tx)] the census STARTS at its liveness verdict, before any count,
+        # so a dark or stale scout publishes `scan: "dark"/"stale"` instead of
+        # an all-zero funnel that reads exactly like a live scan finding
+        # nothing (I1 — liveness before semantics).
+        _surge_cen = {"scan": "off" if SURGE_MULT <= 0 else "dark"}
         if SURGE_MULT > 0 and fleet_bus is not None:
             try:
                 _sp = fleet_bus._load("lighter-market", None) or {}
                 if fleet_bus.is_fresh(_sp, None):
+                    _surge_cen["scan"] = "fresh"
                     _live_done = active_done(surge_done, now.timestamp())
                     _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
-                                              _live_done | set(pending))
+                                              _live_done | set(pending),
+                                              census=_surge_cen)
                     # [(ne)] the ratio each surge candidate carried at
                     # admission — telemetry for the close, keyed like
                     # _src_map. [(nn)] module-level: see surge_ratio_map.
                     _surge_ratios = surge_ratio_map(_sp.get("vol_surges"))
+                else:
+                    _surge_cen["scan"] = "stale"
             except Exception:  # noqa: BLE001
                 _surge = []
+                _surge_cen["scan"] = "error"
             if _surge:
                 log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
                          SURGE_MULT, ", ".join(_surge))
-                for _s in _surge:
-                    surge_done[_s] = now.timestamp()
         # [2026-07-30] THIRD SOURCE — books still inside their debut regime.
         # The candle probe is GOVERNED and MONOTONE: at most YOUNG_PROBE_BUDGET
         # unknown symbols per loop, and a book measured older than the young bar
         # is recorded in `not_young` FOREVER (books get older, never younger),
         # so the probe cost decays to zero once the venue has been walked.
         _young = []
+        _young_cen = {"scan": "off" if YOUNG_MAX_BARS <= 0 else "dark"}
         if YOUNG_MAX_BARS > 0:
             # [2026-07-30] probe ONLY what the scout could not tell us. Once
             # `ages_d` is flowing this list is empty and the candle probes stop
@@ -1042,16 +1403,21 @@ def main():
             # candle per day, so the two units are directly comparable).
             _age_src = ({s: a for s, a in _ages.items()
                          if s not in not_young} or bar_counts)
+            # [(tx)] WHICH age source answered is part of the census: the
+            # scout's exact `ages_d` and the 4/loop candle-probe cache are
+            # different instruments, and a funnel read off the fallback means
+            # something weaker than one read off the venue's own created_at.
+            _young_cen["scan"] = "fresh" if _ages else (
+                "probe" if bar_counts else "dark")
             _young = young_candidates(_age_src, YOUNG_MAX_BARS, _vols,
                                       YOUNG_MIN_VOL_M,
-                                      active_done(surge_done, now.timestamp())
-                                      | set(pending), YOUNG_MAX_PER_LOOP)
+                                      active_done(surge_done, now.timestamp()),
+                                      YOUNG_MAX_PER_LOOP,
+                                      census=_young_cen)
             if _young:
                 log.info("YOUNG-BOOK CANDIDATES (<=%d daily bars): %s",
                          YOUNG_MAX_BARS,
                          ", ".join(f"{s}({bar_counts.get(s)}d)" for s in _young))
-                for _s in _young:
-                    surge_done[_s] = now.timestamp()
         # [2026-08-04] which source ADMITTED each candidate this pass, for the
         # close-tag stamp. Listing wins a tie (candidate order: it is tried
         # first, so it is the source that actually admitted the symbol);
@@ -1076,12 +1442,40 @@ def main():
                    "not_young": len(not_young),
                    "pending": len(pending), "max_open": max_open,
                    "open_before": open_now}
+        # [2026-08-26] THE COOLDOWN IS STAMPED ON THE OPEN, NOT ON THE OFFER.
+        #
+        # `surge_done` is the surge/young dedup ledger and `active_done` reads
+        # it to EXCLUDE symbols from the next candidate list. It was stamped the
+        # moment a symbol was OFFERED — so a candidate that failed to snipe (a
+        # one-sided book with no ask, a full cap, a bad tick) started a 168h
+        # cooldown having never opened, was excluded from every subsequent
+        # `_surge`/`_young` list, and therefore never reached `run_snipe_pass`
+        # again: never retried, and never given up either, because the bounded
+        # give-up lives INSIDE that pass. Entombed.
+        #
+        # The `listing` source was immune throughout — `new_listings` is
+        # `active - baseline`, and `baseline` moves only on an OPEN or a
+        # deliberate give-up — which is exactly why this stayed invisible. A
+        # brand-new perp is the MOST likely book to be one-sided on its first
+        # tick, so this quietly spent the supply `(ty)` had just restored after
+        # 66 days at zero. Found by an adversarial review, not by the tests.
+        #
+        # `pending` is no longer subtracted from the young offer either: a
+        # pending symbol must keep being OFFERED so its attempt counter can
+        # advance to the give-up. `run_snipe_pass` already dedups within a pass
+        # (`seen`) and owns the retry/abandon rule — this restores the same
+        # contract the listing source has always had.
+        def _try_snipe(_s, _n):
+            ok = open_snipe(_s, now.timestamp(), _n, src=_src_map.get(_s))
+            if ok and _src_map.get(_s) in ("surge", "young"):
+                surge_done[_s] = now.timestamp()
+            return ok
+
         open_now, _sniped, _abandoned = run_snipe_pass(
             candidates=new_listings + _surge + _young, pending=pending,
             baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
-            try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n,
-                                              src=_src_map.get(s)),
+            try_snipe=_try_snipe,
             is_held=lambda s: s in _held_now, census=_census)
 
         # ----- manage open snipes (TP / SL / max-hold) -----
@@ -1113,7 +1507,7 @@ def main():
                             " opened before this process started) — starting the"
                             " max-hold clock NOW: it exits %.0fh from this"
                             " sighting, not from its real entry.",
-                            coin, MAX_HOLD_SEC / 3600)
+                            coin, hold_sec_for(entry_src.get(coin)) / 3600)
             try:
                 px = _mid(ctx.venue.orderbook(coin))
             except Exception:  # noqa: BLE001
@@ -1147,7 +1541,7 @@ def main():
                 reason = "tp"
             elif gain <= -STOP_LOSS_PCT:
                 reason = "sl"
-            elif held_sec >= MAX_HOLD_SEC:
+            elif held_sec >= hold_sec_for(entry_src.get(coin)):
                 reason = "max_hold"
             if reason:
                 if dry_run:
@@ -1195,6 +1589,9 @@ def main():
             pub_open = broker.open_count()
             pub_pnl = pub_equity - PAPER_START
             _held_syms = sorted(broker.pos)
+            # [2026-08-26] THE POSITION'S OWN SIGNED SIZE, not its source. See
+            # `_side_letter` below for why the source is the wrong owner.
+            _held_size = {c: broker.pos[c][0] for c in _held_syms}
         else:
             _pos = ctx.venue.positions()
             pub_equity = None
@@ -1208,6 +1605,7 @@ def main():
             # today precisely so a silent sniper can be SEEN. A dashboard row
             # that simply stops updating is the failure this bot keeps having.
             _held_syms = sorted(_pos)
+            _held_size = {c: _pos[c].get("size") for c in _held_syms}
         try:
             store.publish(bot_id, status="online", equity=pub_equity, pnl_abs=pub_pnl,
                           open_trades=pub_open,
@@ -1223,12 +1621,53 @@ def main():
                                  # what the baseline count cannot.
                                  "pending": len(pending),
                                  "gave_up": sorted(_abandoned),
+                                 # [2026-08-20] the book is TWO-SIDED now,
+                                 # so a single `dir` cannot describe it. The
+                                 # scalar stays for older readers (the pinned
+                                 # side, or the book-wide default) and the map
+                                 # beside it is the real answer.
                                  "dir": "long" if DIRECTION_LONG else "short",
+                                 "dir_by_src": dict(SOURCE_SIDE),
+                                 "hold_h_by_src": dict(SOURCE_HOLD_H),
+                                 "dir_pinned": DIRECTION_PINNED,
                                  # [2026-07-15 GAP FIX] position detail so the
                                  # fleet exposure/concentration view can see
                                  # this book (it was sym_uncovered before).
-                                 "held": {c: ("L" if DIRECTION_LONG else "S")
+                                 # [2026-08-26] read the side off the
+                                 # POSITION'S OWN SIGNED SIZE. The first draft
+                                 # read `side_is_long(entry_src.get(c))`, i.e.
+                                 # the SOURCE — and `side_is_long(None)` is
+                                 # True, so any held position whose `entry_src`
+                                 # was lost published "L" whatever side it was
+                                 # really on. That is reachable: a lost order
+                                 # ack, a restart after a failed save_state,
+                                 # the junk-drop whitelist on restore, or any
+                                 # position opened before this shipped. The
+                                 # entry P&L (`was_long = sz > 0`) and
+                                 # `close_reason` both key off the size, so the
+                                 # payload contradicted the ledger for the SAME
+                                 # position. Found by an adversarial review;
+                                 # the guard written with the first draft was
+                                 # VACUOUS against exactly this (a substring
+                                 # check for "side_is_long" that a hard-coded
+                                 # `side_is_long(None)` still satisfies).
+                                 "held": {c: _side_letter(c, _held_size,
+                                                          entry_src)
                                           for c in _held_syms},
+                                 # [2026-08-20 (tx)] THE PER-SOURCE CENSUS —
+                                 # see _new_funnel(). `watching`/`pending`
+                                 # above are book-wide, so until now nothing
+                                 # in this payload could say WHICH of the
+                                 # three sources supplied a pass, or why one
+                                 # supplied nothing. Two of them had supplied
+                                 # nothing for 86 and 66 days respectively and
+                                 # the row looked identical throughout. Read
+                                 # `scan` FIRST (I1), then the first stage
+                                 # whose count is 0 — that is the gate that
+                                 # killed the source. Publish-only.
+                                 "sources": {"listing": _listing_cen,
+                                             "surge": _surge_cen,
+                                             "young": _young_cen},
                                  # [2026-07-30 (go)] the EFFECTIVE gate this
                                  # loop is running. Three of the six books that
                                  # gained levers in (fz) never published one, so
@@ -1297,11 +1736,30 @@ def main():
                                           # tracks a reversal:
                                           "class_screen": {
                                               "surge": not ALLOW_NONCRYPTO,
-                                              "young": not ALLOW_NONCRYPTO,
+                                              "young": not (ALLOW_NONCRYPTO
+                                                            or YOUNG_ALLOW_ANY),
                                               # structural, not a default —
                                               # see the (lk) block: n=1,
                                               # unmeasured, founding thesis.
-                                              "listing": False}}})
+                                              "listing": False},
+                                          # [(ty)] WHICH QUESTION each screen
+                                          # asks. `surge: is_crypto` and
+                                          # `young: venue_priced` are DIFFERENT
+                                          # gates and a payload saying only
+                                          # "screened: true" for both cannot
+                                          # tell them apart — which is how a
+                                          # screen justified on n=2 sat on the
+                                          # wrong axis for 66 days. Publishing
+                                          # the axis makes the next reader able
+                                          # to ask the question this book could
+                                          # not be asked.
+                                          "young_axis": (
+                                              "any" if (ALLOW_NONCRYPTO
+                                                        or YOUNG_ALLOW_ANY)
+                                              else "venue_priced"),
+                                          "surge_axis": (
+                                              "any" if ALLOW_NONCRYPTO
+                                              else "is_crypto")}})
         except Exception as e:  # noqa: BLE001
             # Never let telemetry kill the trading loop — but never let it fail
             # in silence either: a bare `except: pass` here is what hid the
@@ -1660,7 +2118,12 @@ def selftest():
               "G3": {"bids": [[40.0, 5]], "asks": [[40.2, 5]]}}
     _markets = {s: {"status": "active"} for s in ("OLD", "NEW", "G1", "G2", "G3")}
     _state = {"baseline": ["OLD", "G1", "G2", "G3"], "entry_ts": {}, "pending": {}}
-    ven = _FakeVenue(_markets, _books, _held3)
+    # [2026-08-26] G3 is held SHORT. The fixture was all-long, so the `held`
+    # map's short branch was never executed — which is how a map that read the
+    # SOURCE instead of the POSITION shipped, and how the guard written beside
+    # it stayed green against a mutation hard-coding every symbol to "L".
+    _held3_signed = dict(_held3, G3={"size": -1.0, "entry": 40.0})
+    ven = _FakeVenue(_markets, _books, _held3_signed)
     fs = _drive(ven, CAP, CLIP, _state)
 
     # fix 2 — funded modes PERSIST. Was `if dry_run`: the live row read back
@@ -1685,7 +2148,15 @@ def selftest():
     # failure was SILENT, so the fixture asserts the ROW, not an exception.
     assert fs.published, "funded mode published NOTHING — the 17-Jul AttributeError"
     _bot, kw = fs.published[-1]
-    assert kw["extra"]["held"] == {"G1": "L", "G2": "L", "G3": "L"}, kw["extra"]
+    # [2026-08-26] G1-G3 are RESTORED venue positions with NO `entry_src`, so
+    # the source can say nothing about them. G3 is held SHORT and must publish
+    # "S" anyway, because the map reads the POSITION'S OWN SIGNED SIZE. Under
+    # the first draft — `side_is_long(entry_src.get(c))`, and
+    # `side_is_long(None)` is True — G3 published "L" while its own exit P&L
+    # and close tag treated it as a short. That contradiction is the whole
+    # reason this assertion exists in behavioural form rather than as a
+    # substring check for the helper's name.
+    assert kw["extra"]["held"] == {"G1": "L", "G2": "L", "G3": "S"}, kw["extra"]
     assert kw["extra"]["mode"] == "lighter_live" and kw["open_trades"] == 3
     assert kw["equity"] is None and kw["extra"]["pending"] == 1
 
@@ -1763,7 +2234,15 @@ def selftest():
     assert sorted(blob3["entry_ts"]) == ["G1", "NEW"], blob3["entry_ts"]
     _bot3, kw3 = fs3.published[-1]
     assert kw3["equity"] is not None and kw3["open_trades"] == 2, kw3
-    assert kw3["extra"]["held"] == {"G1": "L", "NEW": "L"}, kw3["extra"]
+    # [2026-08-20] NEW came in through the `listing` source, which is SHORT
+    # now, and the held map reads the side off the POSITION's own source rather
+    # than off a module constant — so a two-sided book reports two sides. G1 is
+    # a restored position with no source and keeps the long default.
+    assert kw3["extra"]["held"] == {"G1": "L", "NEW": "S"}, kw3["extra"]
+    assert kw3["extra"]["dir_by_src"] == {"listing": "short", "surge": "long",
+                                          "young": "short"}, kw3["extra"]
+    assert kw3["extra"]["hold_h_by_src"]["young"] == 24.0
+    assert kw3["extra"]["dir_pinned"] is False
     assert ven3.opened == [], "shadow must NEVER send an order to the venue"
 
     # ---- [2026-08-16 (np)] THE SURGE ADMISSION TELEMETRY, END TO END — the

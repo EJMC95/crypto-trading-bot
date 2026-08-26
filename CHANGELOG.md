@@ -60,6 +60,464 @@ lever, promotes nothing, and the v2.1 bar design is untouched. What it cost was
 as an arm that stamps nothing, which is the byte-identical-silence failure I1
 names, on the instrument built to end exactly that.
 
+## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE OF ITS OWN THESIS — and the "debut fade" it was flipped on is 76-83% CALENDAR, corrected in place the same day
+
+**Eamon, 26-Aug:** *"let listing sniper fly like it used to."*
+
+**CORRECTED IN PLACE per I12, hours after shipping, by an adversarial review of
+this entry's own claim (5 independent lenses + a code reviewer + a second
+opinion on every landed objection + a referee who re-ran the load-bearing tests
+himself and passed a calibration gate first). The SIDE FLIP STANDS. The
+JUSTIFICATION DOES NOT. Both halves are below, and the original numbers are
+shown struck rather than deleted so the size of the error is legible.**
+
+### What was claimed, and what is true
+
+The entry claimed a **debut fade**: books newly listed on Lighter drift down in
+their first ~21 days, ~~-0.125%/6h (t=-2.47) at 0-7d and -0.083%/6h (t=-2.70) at
+8-21d; -0.317% and -0.436% (t=-7.47) at 24h~~ — and that three controls "paired
+within coin" proved it an **age** effect rather than the falling tape.
+
+**It is a CALENDAR effect.** The pairing is within coin but **ACROSS TIME**: a
+coin's young band (days 0-21) and its mature band (days 61-120) are different
+calendar windows by construction, and Lighter's listings CLUSTER — 13-19
+crypto books/month in Jul-Sep 2025, ~1/month since. Pairing within coin removes
+the coin's level; it cannot remove the calendar.
+
+* **11 of the 45 "debuts" share ONE birth instant** — the venue's own opening,
+  2025-01-17 07:21:01 — and they are **BTC, ETH, SOL, XRP, DOGE, LINK, AVAX,
+  POL, NEAR, TAO, GRAM**: assets that had no debut at all, whose "first 21 days"
+  is the *exchange's* first 21 days. The 45 coins occupy just **35 distinct
+  birth instants and 25 distinct birth days**; mean pairwise correlation of
+  contemporaneous 24h returns **+0.595** (launch batch +0.777 — 1.25 effective
+  books, not 11).
+* The headline cell does not weaken outside that window, **it changes sign**:
+  8-21d at 24h reads **-1.953% (pooled t=-17.83)** for the launch batch and
+  **+0.056% (pooled t=+0.77)** for the other 34 coins.
+* **Coin + calendar-week fixed effects** on ~130k hourly rows put the age dummy
+  at **-0.09 to -0.15%/24h (t=-0.28 to -0.47)** against a raw -0.56 to -0.62%.
+  **76-83% of the "age" effect is calendar**, on a spec verified to recover
+  planted effects exactly.
+* The "decisive" mature control is flat **only in its own calendar window**. The
+  same mature coins, same bracket, **at the young coins' own calendar hours**
+  return **+0.125%/trade, t=+3.28 (n=17,104)** — not flat, positive,
+  significant. ~~"The mature control is FLAT. The return is an age effect, not
+  beta."~~ **That sentence is withdrawn; it is the one thing the measurement
+  directly contradicts.**
+* Difference-in-differencing the two published controls against the market's own
+  window gap removes 34-43% of each: A **-0.488pp -> -0.317pp (t=-1.51)**,
+  B **-0.617pp -> -0.349pp (t=-1.30)**. Both also **fail Benjamini-Hochberg at
+  FDR 0.05** across the 18 cells the instrument itself computes, and both sit
+  below their own MDE80 (post-hoc power 63% / 64%).
+* **The `t` values quoted for the gradient were the POOLED column** — the one
+  this entry's own instrument calls *"inflated by construction and shown only so
+  the gap is visible"*. By coin they are **-0.61 / -1.02 / -0.47 / -1.52**:
+  **0 of 10 gradient cells reach |t|=2 on the honest unit.** The entry quoted
+  pooled `t` for the gradient and by-coin `t` for the bracket — two standards in
+  one paragraph, the flattering one each time.
+* ~~"Jackknifed by coin the sign holds at every young band (24h: [-9.27,-1.35]
+  and [-10.03,-6.48])"~~ — those are leave-one-out ranges of the **pooled** t.
+  The **by-coin** jackknife is **[-1.73,-0.17]** and **[-2.56,-1.30]**. The
+  robustness check left intact the very inflation it named two sentences later.
+* **39-40% of the young sample can never be controlled** and no amount of data
+  fixes it: the venue had no book older than 60 days in Jan-Feb 2025. **0 of 952
+  launch-batch 24h entries** have a contemporaneous mature control.
+* Against a matched null with measured power (planted effects of -0.25/-0.50/
+  -1.00%/24h are recovered at t=+1.97/+3.11/+5.32), the implied true fade is
+  **~-0.18%/24h and not significant** — **the age effect is at most 40% of what
+  was published, and zero cannot be excluded.**
+
+### The trade stands anyway — and this is the number that decides it
+
+The counterfactual nobody had run. Matched-null excess, same instrument:
+
+| config | raw | **matched-null excess** |
+|---|---|---|
+| **PRIOR — LONG @ 6h** | -0.134%/trade, t=-2.68 | **-0.027%, t=-0.39** |
+| **SHIPPED — SHORT @ 24h** | +0.695%/trade, t=+4.25 | **+0.157%, t=+0.83** |
+| alt — SHORT @ 6h | +0.147%, t=+3.30 | +0.019%, t=+0.34 |
+| alt — LONG @ 24h | -0.707%, t=-4.16 | -0.186%, t=-0.89 |
+
+**SHORT measures better than LONG on every convention including the
+market-neutral one** — the side flip is worth **+0.343pp/trade** at a fixed 24h
+hold, and the whole change **+0.184pp/trade**. It survives genesis removal
+(+0.444%, t=+2.38), point-in-time volume selection (+0.415%), birth-day
+clustering (t=+2.06..+2.65), non-overlapping entries (t=+4.21) and full
+throughput replay (+0.766%, t=+1.39).
+
+**But neither leg is distinguishable from zero.** The honest statement is *"a
+positive residual of ~0.15-0.45%/trade that no independence unit can separate
+from zero"* — a **better-pointed coin flip, not a measured edge**, which is
+exactly what `(tx)` already established about this book (entries at percentile
+0.484-0.517 vs matched random; `mde80` 2.114%/trade exceeding the entire
+perfect-hindsight ceiling). A $1,000 paper book with zero keys is not reverted
+to the configuration that measures WORSE on every convention.
+
+**~~SHORT 6h +0.132%, t=+2.69~~ is withdrawn outright** — birth-cluster
+t=+0.73..+1.37, block-bootstrap p=0.26/0.45, matched-null **+0.019%, t=+0.34**.
+If the 6h hold is ever restored it is unevidenced; no future session may cite it.
+
+The 24h hold is kept: throughput is set by `SURGE_COOLDOWN_H=168`, not by the
+hold, so 24h buys ~2x the `t` per trade at the same trade count — it makes the
+probe decidable faster. **Price, stated: 4x the item-18 regime exposure per
+trade, and the sl rate goes 3.4% -> 12.2%.**
+
+### Three adverse facts that were omitted and are now declared
+
+1. **The evidence contains ZERO books of the kind these sources admit.**
+   `cohort(min_age_d=30)` structurally excludes every debut under 30 days; the
+   cohort's youngest book is **202 days old and 0 of 45 are under 180d**. ANSEM
+   (28d) and CASHCAT (20d) — the only 2026 venue-priced debuts and the only two
+   books `young` can admit today — are excluded, and through the shipped bracket
+   they read SHORT 24h **-3.305%** and **-1.572%**. n=2 settles nothing, but it
+   is not nothing.
+2. **The floor move interacts adversely with the flip.** `YOUNG_MIN_VOL_M`
+   0.25 -> 0.20 was justified as admitting ANSEM — **the single worst book in
+   the data for the trade the same commit shipped**. The move is still
+   defensible as decidability on `(ty)`'s own logic; pairing it with the flip
+   and not saying so was not.
+3. **Recency dose-response decays through the bar**: SHORT 24h by-coin +0.695%
+   (all 45, t=+4.25) -> **+0.377%** (born >=2025-02, t=+1.99) -> **+0.364%**
+   (born >=2025-06, t=+1.32). The same shape this file already flags on 🙏 avo's
+   `rsi<25`.
+4. **The `listing` source has no claim to any of this.** It enters at age ~0,
+   and the calendar-matched 0-7d excess there is **POSITIVE (+0.694%/24h)** —
+   pointing *away* from the short it was given. Its flip inherits a `t` it did
+   not earn and is declared **hypothesis-grade**, the `(qi)` "never arming
+   evidence" precedent this book already carries. 57.9% of the 24h short's P&L
+   comes from entries aged 7-21 days, so whatever this is, it is **not a debut
+   effect** and the entry's original title said otherwise.
+
+### Shipped
+
+* **`listing` and `young` flip to SHORT** at a **24h** hold. `surge` untouched —
+  a volume event on a mostly-mature book, and applying one source's evidence to
+  another's cell is the `(lk)` error this book already paid for.
+* **Young volume floor 0.25 -> 0.20** (see the declared interaction above).
+* `dir_by_src` / `hold_h_by_src` / `dir_pinned` publish every loop.
+
+### Attacks that FAILED — recorded so nobody re-runs them
+
+`_walk` honours LAG-1 (entry at the close of bar *i*, exit scan from *i+1*); the
+stop-before-target convention is correct and **never binds** (0 of 2,390 exits
+had both levels inside the exit bar); the venue returns **no** pre-trading bars,
+so there is no stale-then-jump artifact; the effect is **not** tail-driven
+(Jarque-Bera p=0.79; drop the top 5 coins and it still reads +0.448%, t=+3.00);
+overlap inflates the *pooled* `t` only (non-overlapping stride=hold leaves
+by-coin t=+4.21); and **survivorship runs the WRONG way for the claim** — the 16
+delisted books read **+0.069%** at 0-21d, so excluding the dead flatters the
+trade rather than manufacturing it.
+
+### Four code defects the same review found — all fixed, all mutation-pinned
+
+* **D1 — the `held` map reported a SHORT as a LONG.** It read
+  `side_is_long(entry_src.get(c))`, i.e. the **source**, and
+  `side_is_long(None)` is True — so any held position whose `entry_src` was lost
+  (a lost order ack, a restart after a failed `save_state`, the junk-drop
+  whitelist, or any position opened before the deploy) published `"L"` whatever
+  side it was on, while its own exit P&L and close tag treated it as a short.
+  **The entry's own "Shipped" bullet claimed this map was fixed; it was the
+  defect.** Now `_side_letter` reads the POSITION'S OWN SIGNED SIZE.
+* **D2 — the guard written for D1 was VACUOUS.** It AST-located the dict
+  comprehension and then checked the **substring** `"side_is_long"` — which a
+  map hard-coded to `side_is_long(None)` still satisfies. It named the exact
+  failure it could not detect, and the selftest fixture beside it held only
+  `size: +1.0` positions, so the short branch never executed. **"10 mutations
+  verified RED" did not cover the one that mattered.** The guard is behavioural
+  now and the fixture holds a real short (G3, size -1.0).
+* **D3 — a `young`/`surge` candidate that missed its first snipe was
+  ENTOMBED.** `surge_done` was stamped when a symbol was **offered**, so a
+  candidate that failed to open (a one-sided book with no ask — the *most*
+  likely state for a brand-new perp) started a 168h cooldown, was excluded from
+  every later candidate list, and so never reached `run_snipe_pass` again:
+  never retried, and never given up, because the bounded give-up lives inside
+  that pass. `listing` was immune (`active - baseline`), which is why it hid.
+  **This silently spent the supply `(ty)` restored after 66 days at zero.** The
+  stamp is on the OPEN now, and `pending` is no longer subtracted from the young
+  offer.
+* **D4 — the documented one-env revert landed on the worst cell.**
+  `DIRECTION_PINNED` short-circuited the SIDE and left the per-source HOLD in
+  force, so `SNIPER_DIRECTION=long` gave **LONG @ 24h** — measured -0.707%/trade
+  raw against the -0.134% of the LONG @ 6h it claims to restore. A revert that
+  lands somewhere the book has never been is not a revert. Pinning the side now
+  pins the hold too.
+* **D5 — both side envs failed open on a typo.** `!= "short"` meant
+  `SNIPER_SIDE_YOUNG="shrot"` resolved to LONG and published the junk verbatim
+  in `dir_by_src`; `SNIPER_DIRECTION="lnog"` left the kill switch silently
+  unarmed. Both validate and warn now.
+
+**8 further mutations verified RED**, including the exact one that defeated the
+first round's guard.
+
+### What is still unknown
+
+The residual is **not zero and not proven** (+0.157%/trade, t=+0.83; 4-week
+block bootstrap CI ~[-0.06%, +1.06%]). **39-40% of the young sample is
+permanently uncontrollable.** The forward population is **n=2 coins**, both
+going the wrong way. At achievable throughput (~3.0 trades/coin under the 168h
+cooldown) the book needs roughly **63-93 coins for by-coin t=2.0 — ~9-29 months**
+at the venue's 1.67-2.00 births/30d, and on the launch-free cohort it may not
+converge at all. **Every number here is drawn from one falling-BTC tape, and a
+24h short is hit four times harder by a regime change than the 6h it replaced.**
+
+**Era NOT reset** (the flipped sources contributed <=1 of 36 closes; every close
+is side+source stamped). Instrument:
+`scripts/study_sniper_debut_fade_2026-08-26.py`. Pinned by
+`tests/autonomy/test_sniper_per_source_side.py`.
+
+## 2026-08-20 (ua) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
+
+*[RENUMBERED (si) -> (ua): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+
+**Eamon, 20-Aug:** *"If everything is 0.000 then you've missed something and you've
+got something wrong. Find out why and fix it. This whole fleet 0 business needs
+to change and whatever is causing this disease needs to be killed, not the fleet
+or its endless possibilities for success."*
+
+He was right, and the cause was not where `(tz)` looked. `(tz)` fixed the SPLIT
+(one claim of 0.0015 was taking $13,366 of $19,000 and starving 17 of 19 books
+to the probe floor). This is the CLAIM itself, and it had **three** separate
+defects, measured on the live payload rather than reasoned about:
+
+**1 — A CLIFF WHERE A CONTINUOUS PENALTY ALREADY EXISTED.** `claims()` read
+`lower_bound(pcts) if n >= MIN_N else None` with `MIN_N = 20`, whose own comment
+said *"books below this many closes are UNDECIDED ... whatever their mean looks
+like"*. That is a **second** penalty for a small sample on top of the standard
+error, which already does exactly that job and does it continuously. Measured:
+three living books held a genuinely positive lower bound and published `0.000`
+because of it — 🙏 avo shadow **n=17, mean +1.085%, t=1.92, bound +0.362%**; its
+live twin n=4; 👩 mum n=7.
+
+**2 — AND THE CLIFF LANDED HARDEST ON THE ONLY FIELD A CONSUMER MAY ACT ON.**
+`claim_era` is era-scoped by `(lx)`, so its sample is by construction the
+SMALLER one — and a fixed `n >= 20` on that sample made the organ structurally
+incapable of ever feeding anything. Measured across the live payload: **five**
+books published `claim_era: None` purely from the floor, including 🌾 carry, the
+fleet's top-ranked book (n=101 pooled, **n_era=10**). The headline field
+`n_with_era_claim` has read **0 across the entire fleet, every day since the era
+twin shipped**. Not "no book qualified" — no book *could*.
+
+**3 — THE CRITICAL VALUE WAS THE LARGE-SAMPLE ONE AT EVERY SAMPLE SIZE.** The
+bound was `mean - 1.28*SE` for n=4 and for n=195 alike. 1.28 is the NORMAL
+quantile — the number a t-interval converges to as n grows — so the interval was
+too NARROW on exactly the thin books the cliff was there to protect against. One
+instrument too generous, the other too blunt, and between them a table of zeros.
+
+### The fix — one instrument, derived from the sample, in both directions
+
+* **`t_crit(n)`** — the one-sided Student-t critical value at n-1 df, stdlib
+  only (Lentz continued fraction for the incomplete beta, bisected). 1.533 at
+  n=5, 1.337 at n=17, 1.290 at n=101, 1.2816 in the limit. A thin sample is
+  doubted MORE, by an amount the sample itself determines rather than by a
+  threshold someone picked. Pinned in the selftest **against the published
+  table** at seven df plus the normal limit, and pinned MONOTONE — a future
+  "simplification" back to a constant reddens.
+* **`Z_LOWER` survives as the FLOOR**, not the value, so `ALLOC_Z_LOWER` stays a
+  live lever that can only make the bound STRICTER. A lever whose only reachable
+  direction is "loosen past the evidence" is not a lever, it is a hole (I18).
+* **`MIN_N` 20 -> 10**, and it is a COMPUTABILITY floor now, not a decidability
+  verdict. Why a floor at all: measured in the same pass, a retired book's
+  3-close sample (three near-identical wins, t=33) yields a bound of
+  **+2.97%/trade** with no floor — it would have outranked every living book in
+  the fleet on three trades. The t value widens a thin interval; it cannot
+  repair a variance estimate built from three numbers. **10 is not a new
+  invention** — it is the winners' docket's own luck floor (I21: *"the n>=10
+  floor, not BH, is what stops a consistent 3-close streak from outranking
+  evidence"*), so the fleet's two ranking instruments now agree.
+* **The same instrument doubts a book as feeds one, in CODE.** `(tz)` wrote that
+  claim as two constants that happened to match, which stays green against two
+  independent implementations. `golive_readiness.horizon_crit` now defers to
+  `fleet_allocation.t_crit` and the test pins it **by identity at five sample
+  sizes**. Consequence in the retirement direction: a thin sample gets a WIDER
+  upper bound, so it is *harder* to route onto the I17 docket — the feed
+  direction, and it falls back to `underpowered` (not a docket verdict) if the
+  owner is ever absent from an image.
+
+### The zeros that remain are honest — so they now say something
+
+15 of 19 books published byte-identical `0.0` while their bounds ran from
+**-0.018%** (📊 georgia, 46 closes from a claim) to **-0.668%** (🏛️ albanese).
+Same number, entirely different situations, and the ordering was computed and
+discarded one character before the payload. `claim` KEEPS its meaning — a book
+cannot claim negative capital and it is the field every consumer reads — and
+three fields now ship beside it:
+
+* **`bound_pct`** — the bound before `max(0, .)`.
+* **`crit`** — the critical value this sample was actually judged at, so the
+  claim is reproducible from the payload alone.
+* **`n_req_claim`** — closes needed for this book's own bound to clear zero at
+  its measured mean and dispersion (georgia **187**, albanese **271**, turnbull
+  **586**, the Farmer's shadow **532**). `None` when the mean is negative,
+  because that book does not need closes, it needs a different result. **9 of 19
+  books now publish a distance instead of an undifferentiated zero.**
+
+REPORTED, NEVER RANKED — I15's warning is that a demoted-but-reported statistic
+migrates into an actuator, so `claim` stays the only field the split reads.
+
+### Measured: what it costs and what it buys
+
+`fleet_bus.allocation_scale` is read by exactly three books (🌾 carry, ⚖️
+Counterweight, 💸 the Farmer's shadow arm), so the sizing price is exactly the
+change in THEIR `scale_effective`, both columns computed under the same `(tz)`
+tilt so this isolates the claim arithmetic:
+
+| consumer | before | after |
+|---|---|---|
+| 🌾 carry | 1.0000 | 1.0000 |
+| ⚖️ Counterweight | 0.9594 | **0.9457** |
+| 💸 Farmer shadow | 0.9594 | **0.9457** |
+
+**The whole cost is -1.4% of clip on two paper books** (~$13 of notional each),
+and it is dilution from one more book earning a place at the table, not a
+restriction. **No book loses a claim** — carry 0.001492 -> 0.001481, the
+Farmer's live row 0.000129 -> 0.000112, both still claimants. What it buys:
+
+* **books with an ERA claim: 0 -> 1.** The first in the fleet's history. 🙏 avo
+  shadow reads `claim_era +0.088%` on n_era=14 and `scale_effective` **1.6413**.
+* books with a pooled claim: 2 -> 3.
+* 🌾 carry's `claim_era` goes **None -> 0.0** — from "no opinion" to "measured,
+  and the bound is at or below zero". That is the honest sentence about a book
+  ranked #1 on a pooled sample whose own era says **-0.155%/trade at t=-4.25**,
+  and it was previously unsayable. 🪁 band-kelly likewise.
+* 0 books at the probe floor; total capital conserved to the cent.
+
+**STATED PLAINLY, because it is the uncomfortable half:** the first book this
+feeds is 🙏 avo, whose entry `(qu)` measured as predicting **nothing** exit-free
+and whose good run this file already says *"sits INSIDE the negative record"*.
+Two things make that the right outcome rather than a defect. The instrument is
+honest — that sample supports that bound, and the answer to "avo is unproven" is
+its own pre-registered `(qu)` revert criterion, not a cliff that also zeroed
+carry's era claim and everyone else's. And **avo does not consume
+`allocation_scale`** (it is a family book; the three consumers are all funding
+books), so the 1.64x is advisory today. This change moves no book's sizing
+except the -1.4% above.
+
+### Two defects found by the guards, not by reading
+
+* **A mutation SURVIVED, and it mattered.** Reverting `lower_bound` to the
+  constant left `allocate` still publishing `crit` from its OWN second
+  `t_crit(n)` call — the payload would have advertised a t value it had not
+  used. That is the second-copy-of-a-rule shape ((hj)) inside a single file.
+  `bound_and_crit` now computes both together and is the one owner; the
+  mutation reddens. **9/9 mutations verified RED** across both files.
+* **My own new test caught a crash on the path it exists to serve.** The
+  fail-closed branch formatted `upper` unconditionally and raised `TypeError`
+  when no upper bound could be computed — the (po) shape, where the safe branch
+  is the untested one.
+
+**NOT CHANGED, deliberately:** `claim`'s semantics, the `(tz)` tilt's input (a
+one-day-old split re-aimed on an unmeasured formula in the same week is what
+I19 forbids), and the era gate's seniority. Files: `fleet_allocation.py`,
+`scripts/golive_readiness.py`, `tests/autonomy/test_fleet_allocation.py`,
+`tests/autonomy/test_horizon_power_gate.py`. Full suite green; the two reds in
+this container (`test_funding_variant`, `test_margin_truth`) are the absent
+`lighter` SDK degrading a margin-mode enum to its raw code, are present on
+`origin/main` unchanged, and CI is green there.
+
+## 2026-08-20 (tz) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
+
+*[RENUMBERED (sh) -> (tz): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+
+**Eamon, 20-Aug:** *"Keep the books, fix your arithmetic to everything you want to
+retire and start using an approach where instead of finding a way to kill
+something you find a way to feed it, let it exercise, give it sunlight."*
+
+He was right, and the bias was not a posture — it was **two measured defects in
+the fleet's own instruments**, both of which I had been quoting as evidence.
+
+**1 · THE ALLOCATION SPLIT WAS WINNER-TAKE-ALL.** `share = claim / total_claim`
+gives every unclaimed book a share of exactly ZERO. Measured on the live payload:
+ONE book (🌾 carry, claim **0.0015**) took **$13,366 of $19,000**, two books held
+**78%** of fleet capital, and **17 of 19 books were cut to the 25% probe floor** —
+including **six with POSITIVE measured means**: 👩 mum **+4.66%/trade**, 🙏 avo
+**+1.09%**, its live twin +0.82%, 🏛️ albanese +0.28%, 💸 the Farmer's shadow
++0.14% on n=195, 📊 georgia +0.12% on n=141. And it is **self-fulfilling**: a book
+held at the floor accumulates evidence more slowly, so its bound stays wide, so it
+stays at the floor. **I17's own words are "a book cannot earn evidence with no
+capital" — and the organ that cites them was doing exactly that.**
+**FIXED:** the flat split is the PRIOR and evidence TILTS it —
+`w = 1 + CLAIM_TILT * (claim / best_claim)`, default tilt 1.0, so the
+best-evidenced book earns 2x an unclaimed book's weight and **nothing is starved
+because a rival has a claim**. With no claims anywhere every weight is 1 and the
+result is EXACTLY the flat allocation, which is the promise the docstring already
+made and the old rule kept only in the degenerate all-zero case. Total is still
+conserved; the probe floor is still the hard minimum. **Measured after: 0 of 19 at
+the floor (was 17), starved books go 0.25x -> 0.96x — nearly 4x more capital
+each — and carry still ranks first at 1.66x.** Evidence still wins; it just
+stops taking the food off every other table.
+
+**2 · `unreachable` HAD NO POWER GATE, AND IT IS A DOCKET VERDICT.** It fired on
+`mean <= 0` **alone, at ANY n**, with the reason *"more of the same closes cannot
+flip mean/t/halves"* — a claim that is simply FALSE on a thin sample: at n=10 with
+a wide SE, a mean of −0.155% is entirely consistent with a true mean of **+2%**.
+Because `unreachable` sits in `DOCKET_VERDICTS`, the pipeline ran
+**`mean <= 0` (any n) -> `unreachable` -> I17 keep-or-retire docket -> retire**.
+Measured: 🌾 carry — the fleet's best-evidenced book — carried `unreachable` on
+**n=10**.
+**FIXED:** the verdict now requires the one-sided **UPPER** bound
+`mean + 1.28*se` to sit at or below zero — the sample must actually have
+**EXCLUDED** a positive mean. A book that is merely thin gets the new verdict
+**`underpowered`**, which is **deliberately NOT in `DOCKET_VERDICTS`**, and it
+publishes **`n_req_decide`**: how many closes would settle the sign. `stats()`
+now publishes `se_pct`, which it had been computing inside `t` and throwing away
+— which is precisely why the horizon could only ever ask *"is the mean
+negative?"* and never *"is it negative beyond noise?"*.
+
+**THE GATE DISCRIMINATES — that is the point, and it is pinned in both
+directions.** Re-run across the fleet: **3 books stay `unreachable`** because
+their samples genuinely exclude a positive mean (🛢️ Garrett upper **−0.439%**,
+⚖️ Counterweight **−0.592%**, 🌾 carry **−0.111%**), and **4 come off the
+conveyor** (🧘 Douglas upper +0.121%, needs ~59 closes; 🎫 the Taker +0.131%,
+~136; 💸 the Farmer's shadow +0.185%; 🎯 the sniper +0.814%). A blown drawdown
+stays `unreachable` at any n — it cannot un-blow, so power is irrelevant there,
+and only the MEAN branch is gated.
+
+**3 · ONE STANDARD OF EVIDENCE IN BOTH DIRECTIONS.** `HORIZON_Z` is the same
+**1.28** that `fleet_allocation.Z_LOWER` uses for I16's lower bound, and a test
+pins them equal. A fleet that doubts a book at one z and feeds it at another
+drifts toward whichever is stricter — which is the drift that produced this
+entry.
+
+**4 · I17 IS AMENDED, AND MY OWN RETIRE RECOMMENDATION IS WITHDRAWN.** The
+standing rule is now: when a book is not performing, **the first question is what
+is STARVING it** — supply, capital, a screen asking the wrong question, a gate it
+cannot reach — **and the answer is to FEED it**. Retirement requires a MEASURED
+exclusion (an upper bound at or below zero, or a supply that does not exist),
+never a thin sample and never a verdict computed on a starved one. **A refusal to
+retire on insufficient evidence is a correct outcome of I17, not an evasion of
+it.** Concretely: `(tx)` escalated a keep-or-retire call on 🎯 the sniper citing
+horizon `unreachable` and claim 0.000 — **neither number survives its own fix**
+(its upper bound is +0.814%, and 0.000 was the split's floor, which read 0.000
+for *every book in the fleet* including one at +4.66%/trade). Withdrawn in place.
+What remains true is the honest limit, unchanged: the sniper's entries carry no
+measurable directional information and its `mde80` (2.114%/trade) exceeds the
+entire perfect-hindsight ceiling (+1.80pp), so the right expectation is a book
+that is CHEAP and OBSERVABLE — not one about to earn.
+
+**GUARDS.** `tests/autonomy/test_horizon_power_gate.py` (7 tests) and a new
+anti-starvation test in `test_allocation_consumer.py`. **9 mutations verified
+RED**, covering both directions: removing the power gate, putting `underpowered`
+back on the docket, making the gate stop discriminating, treating an
+unmeasurable SE as an exclusion (I6), diverging the two z's, dropping
+`n_req_decide`, restoring winner-take-all, zeroing the tilt, and removing the
+scale clamp.
+
+**Three existing allocation tests were pinning the STARVATION as their
+mechanism** — one's own comment read *"a lone claimed book among many probes
+concentrates the whole surplus"* — and asserted `== 4.0` / `== 0.25`, values only
+winner-take-all could produce. They are rewritten to pin the INVARIANT (the clamp
+binds; the era gate is restrict-only; a positive era claim grows a book past
+flat) rather than the artifact, so re-tuning the split no longer reddens a test
+that is not about it. The clamp is now exercised directly on `target_usd`, which
+is what it was always named for.
+
+**Consumers, stated:** `fleet_bus.allocation_scale` feeds three funding SHADOW
+books' entry sizing, so this changes paper position sizes today — 17 books get
+~4x the capital they had. **Real money never reads it** (AST-pinned in
+`test_allocation_consumer.py`), and `FLEET_ALLOCATION_MODE=advisory` reverts every
+consumer to its env default at the accessor. Era NOT reset anywhere: no book's
+trading RULE changed.
+
 ## 2026-08-26 (tr) — MUM'S BAR WIDENS TO EXACTLY WHAT WAS MEASURED: RSI_MAX 25 → 30, THE "RESCUE" TIERS REFUSED WITH THEIR NUMBERS, REFEREE-CONFIRMED
 
 The other half of Eamon's directive — *"tweak mum v2 so she doesnt miss
@@ -4150,9 +4608,144 @@ split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
 ## 2026-08-20 (sj) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
 
+## 2026-08-20 (ty) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
+
+*[RENUMBERED (sg) -> (ty): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+
+*(Renumbered (se) -> (ty) at push time — the THIRD collision this branch has
+taken today, and the companion entry moved (sd) -> (tx) with it. `main` took
+(sa)/(sb)/(sc) for nav-cook and Counterweight, then (sd)/(se) for the leverage
+pass, all while this was in flight. Each of those is merged and cited, so by
+the convention's own tiebreak they keep their letters and these move. Every
+in-tree citation was repointed per file and reconciled by count ((qz)), and
+each hit was confirmed to be MINE before rewriting — a blanket replace on a
+shared file already caught another session's citation once today.)*
+
+**Eamon, 20-Aug:** *"bring the sniper back to life and make it do its intended job"*,
+then — while this was being measured — *"just don't continue if it's going to be
+negative, restrictive and choking of the bot ... I did not start this fleet with
+the intention of slowly taking away more food and sunlight each day from it."*
+**This entry is the opposite of a screen: it is the one change in this whole
+investigation that gives the book supply back.** Full working:
+`STUDY_SNIPER_DEBUT_DIRECTION_2026-08-20.md`.
+
+**1 · THE CORRECTION THAT REFRAMES `(qi)` AND `(sd)`, made in place per I12.**
+Both reported this book's debut supply as dead — *"ZERO crypto births for 86
+days"*. That is true of `strategy_index == 2` and **FALSE of the cohort this
+book trades**: on the venue-priced axis, births have not stopped in any month
+measured — **1.67–2.00 per 30 days**, CAP (Jun), ANSEM (Jul), CASHCAT (Aug).
+Every one is class 7 and every one was refused. The figure was not bad
+arithmetic; it was the wrong question, and it sent two prior passes hunting for
+a fix in the exit rule.
+
+**2 · THE DEFECT.** `(lk)` put ONE class screen on the surge AND young sources
+on evidence that was almost entirely surge's: non-crypto surge −$5.01 over 13
+closes versus non-crypto **young −$1.19 over TWO**. The young leg rested on
+**n=2**. And `is_crypto` asks `strategy_index == 2`, while the venue files
+crypto-native memecoin debuts under **class 7** — the same 12-member grab-bag
+holding tokenised pre-IPO equity (ANTHROPIC, OPENAI, SPCX), oddly-filed listed
+equities (MRNA, ADI) and a bond yield (US10Y). **Measured live the day this
+shipped: the young cohort was 7 books, five of them zero-volume ghosts, and the
+only two with real turnover — CASHCAT $0.45M and UNITREE $0.84M — were the only
+two the screen refused.** The source was not quiet; it was structurally unable
+to admit anything, and the `(sd)` census is what made that legible.
+
+**3 · WHAT REPLACES IT: `fleet_bus.venue_priced`, the axis (lk) was really
+arguing.** (lk)'s own words are *"already priced where the underlying trades"* —
+which turns on whether a deep primary market exists ELSEWHERE, not on a class
+integer. A crypto-native token's only market IS this book, so its debut is
+genuine price discovery; a tokenised equity is a wrapper around a price set far
+deeper. **The half of (lk) this keeps is now BETTER evidenced than the half it
+drops:** shorting an externally-priced debut measures **−0.457%/trade at
+t=−2.38**, the ONLY significant cell in the study. Surge is **untouched** —
+`(sd)` measured class-7 surge at −0.840%/trade, negative at every hold, so the
+two sources now ask two questions and a test pins that they are not the same
+function.
+
+**Live gate, end to end, before and after:**
+`OLD is_crypto: scanned=210 age_ok=8 fresh=8 class_ok=0 vol_ok=0 -> []`
+`NEW venue_priced: scanned=210 age_ok=8 fresh=8 class_ok=2 vol_ok=1 -> [CASHCAT]`
+
+**4 · THE EXPECTANCY PRICE, STATED (I19), AND WHAT IT BUYS.** The admitted cell
+measures **−0.174%/trade at t=−0.52** on the shipped bracket — indistinguishable
+from zero, **−3.5 cents per trade on a $20 clip, ~−$0.17/month** at the measured
+birth rate. **It is bought as DECIDABILITY, not as edge, and this entry says so
+rather than dressing it up:** a source at zero admissions produces zero evidence
+and can never be graded or retired on its own record. I17 makes exactly this
+argument for capital ("a book cannot earn evidence with no capital"); this is the
+supply form of it.
+
+**5 · THE DIRECTION FLIP: MEASURED, AND REFUSED BY ITS OWN NULL.** Four
+independent measurements say debuts bleed, and the young-window cells agree —
+LONG venue-priced is negative at every hold (−0.174/−0.012/−0.276/−0.622) while
+SHORT reads **+1.369%/t=1.33 at 72h and +1.513%/t=1.31 at 168h**, both halves
+positive, concentration **15–16%**, edge surviving ex-top-1. It is the
+best-behaved cell in the whole investigation **and it still does not ship**,
+because the (hm) null kills it: random entry minutes in the same window on the
+same books read **null p50 +1.687% / +1.856% against observed +1.369% / +1.513%
+— P(random ≥ observed) = 0.573 and 0.577.** A coin flip on the timing beats the
+sniper. That is `(sd)`'s "the entry carries no information" reproduced on the
+young cohort in BOTH directions. The (hl) control agrees: at 168h the
+content-free timer (+2.430%) beats the bracket (+1.513%). Recorded with the
+numbers so no future session re-proposes it from the +1.5% alone.
+
+**6 · THE VOLUME FLOOR: REFUSED ON A LIMIT OF THE INSTRUMENT, NOT THE TAPE.**
+$0.25M -> $0.10M looks like a free 1.5× in supply and a better mean
+(−0.174% -> −0.049%). It is not: the harness's slippage tiers are a **step
+function at $0.1M** (17.49bps below, 2.52bps above), so a $0.11M book is charged
+like a $10M one — and the books the lower floor admits sit exactly in the band
+the model cannot price. At (qq)'s measured thin-book cost their round trip is
+~30–95bps, **larger than the 0.125pp apparent gain**. Floor unchanged. Dropping
+it to zero is separately refused at −0.451%/trade — that is where the ghosts are.
+
+**7 · THE `(sd)` FOLLOW-UP, CLOSED, AND IT HAD A SECOND INSTANCE NEARER REAL
+MONEY.** `fleet_bus.NONCRYPTO_BASES` had drifted by **8 of 101** active
+non-crypto books (AXTI, CASHCAT, KIOXIA, KORU, MRNA, SOXS, US10Y, WDC — all
+recent listings), so with a dark or stale scout every crypto-screened book in the
+fleet failed OPEN on them. Fixing it immediately turned `main` red on
+`test_taker_tradfi_parity`: 🎫 the Taker's LOCAL `TRADFI_BASES` — kept local on
+purpose to keep fleet_bus out of the lean live image — had the **same eight
+missing**, and its own guard calls that list *"the ONLY thing standing between
+the real-money book and a short on a tokenised equity"*. Both synced, parity
+restored at 109 = 109. **`scripts/audit_noncrypto_fallback.py` now measures the
+drift against the venue in BOTH directions** (missing, and names the venue now
+calls crypto), excludes the declared PAXG override from both, and **FAILS rather
+than passing when it cannot reach the venue** — a guard that no-ops offline
+would report clean, which is the `(po)` shape. 3 mutations verified red.
+
+**8 · GUARDS.** `tests/autonomy/test_sniper_young_supply.py`, **8 mutations
+verified RED** — and two of them were caught only because the first pass of the
+tests was VACUOUS, which is worth recording: (a) removing ANTHROPIC from the
+exotic list left every test green, because with a dark scout the fallback
+refuses it anyway — the test never exercised the LIVE-scout path, where class 7
+is not in `EXTERNALLY_PRICED_CLASSES` and it would have been ADMITTED; fixed by
+monkeypatching `_venue_class` so the live path is actually driven. (b) renaming
+the published key to `young_axis_hidden` left a substring check green, because
+it CONTAINS `young_axis` — *"a page-wide substring scan is not a structural
+claim"*, exactly as this file already warns. Both now match the key form.
+
+**9 · A CONCURRENCY NOTE, because it nearly cost another session's work.**
+Repointing citations after a letter collision, a blanket
+`(sb) -> (se)` across the tree caught **nav-cook's** citation in the shared
+`tests/test_selftests.py` and silently repointed it at my entry. Found by
+reading every hit rather than trusting the count, and reverted. **A shared file
+needs per-hit review, not a global replace** — the `(qz)` lesson one step
+further on: it is not enough to enumerate uncapped, you must also confirm each
+hit is YOURS.
+
+**Deploy:** `perp-sniper-shadow` auto-deploys on push. `lighter_ticket_taker.py`
+is main-only and deliberately so — the Taker's live arm was replaced by 🙏 Avo
+on the real-money slot at `(ma)`, this change is restrict-only (it can only
+REFUSE entries), and a live redeploy would wipe memory-only halts for no
+measured gain. Verify by `extra.build`/`build_n` then read `extra.sources.young`
+and `extra.caps.young_axis` on the row. **Era NOT reset for the census; the
+young screen changes which trades the book takes, so its 33 closes are a
+different policy — but the source it changes has contributed ZERO of them, so
+there is nothing in the sample to invalidate. Declared rather than assumed.**
+
 *(Renumbered (sd) -> (sf) -> **(sj)** before merge. `main` took (sd) for the leverage entry and (se) for the margin-surface one while this was being written; then, while this branch waited on CI, it took (sf) too for the I22 entry. The letter that is already on `main` keeps it — neither is cited from tracked code, so the tie-break is which one a reader of `main` would already be relying on. All four citation sites were enumerated with a COUNT first, per the truncated-search rule; every one was inside this file.)*
 
-**Operator, 20-Aug:** *"it is clear that the bots are too restricted, entry and
+**Eamon, 20-Aug:** *"it is clear that the bots are too restricted, entry and
 exits are completely off, its as if they all share the same metrics and
 parameters which is false and ive never asked or it. individually look at where
 each bot is being choked, where its entry could be better, how it could exit
@@ -4526,6 +5119,200 @@ does not discharge.
 **Era:** this changes which trades the book takes, so the 24 pre-fix closes are a
 different policy. The book is 1 day old and the sample is worth ~$5.71 — the
 cheapest possible moment to take the reset.
+
+## 2026-08-20 (tx) — THE SNIPER NEVER HAD THE POTENCY IT IS BEING ASKED TO RECOVER: one memecoin was 157% of the predecessor's lifetime P&L, the exit ladder everyone remembers as the earner COST money on it, and the successor's entries sit at the 50th percentile of random — every candidate refused, and the two dead sources that hid for 86 and 66 days are now visible
+
+*[RENUMBERED (sf) -> (tx): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+
+*(Renumbered (sa) -> (sd) -> (tx) at push time. `main` took `(sa)` mid-flight for
+the nav-cook confirm-window entry, which is merged and cited, so by the
+convention's own tiebreak the CITED entry keeps the letter and this one
+moves. In-tree citations were repointed in the same commit, enumerated
+UNCAPPED and reconciled by count ((qz)) rather than sampled through head.)*
+
+**Eamon, 20-Aug:** *"Listing sniper — let's look back to the days its p n l was
+biggest in the fleet — strip back whatever has caused it to have 'erectile
+dysfunction' and going back to giving it a hard on."* The premise is measurably
+false in a way that is worth more than the fix would have been, so the answer is
+a **refusal with evidence** (the operator's own growth rule: *"anything that sets
+us back we disregard"* bans banking a change that costs expectancy; it never
+waives the measurement). Full working: `STUDY_SNIPER_EXIT_SHAPE_2026-08-20.md`.
+
+**⚠️ THE CALIBRATION GATE FAILED, AND THAT IS REPORTED FIRST BECAUSE IT GOVERNS
+EVERYTHING BELOW.** `scripts/study_sniper_exit_shape_2026-08-20.py` cannot
+reproduce this book's own ledger — replayed +0.230%/trade vs matched ledger
+−0.104%, gap **+0.334pp** against a 0.15pp tolerance, one-sided (94% of error
+mass optimistic), **0 of 6 price/slippage bases calibrate** — so `run_sweep()`
+returns `{"refused": True, "cells": []}` rather than caveating ((gx)). The cause
+was diagnosed, not assumed: the bot decides on a **60s-polled orderbook mid**, a
+quantity the candle API does not carry at any resolution (NZDUSD's print stale by
+65bps; MRNA's mid 1.3% below its own minute's close), and a spread-based
+correction was refuted (corr=0.26). **The bias envelope is 3.2× the book's entire
+mean**, so no sweep number here arms anything. The verdict rests on the four
+instruments that need no calibration: the exit-free rank test, the matched-random
+null, the oracle-ceiling-vs-MDE arithmetic, and the supply census.
+
+**1 · WHAT EARNED THE MONEY WAS A COIN, NOT A MECHANISM.** 🎯 the retired Launch
+Sniper made +$206.38 over 366 closes; **ANSEM/USDT alone was +$325.01 = 157% of
+lifetime**, the single best row **96.9%**, and **ex-ANSEM the book is −$118.63
+over 363 closes**. Top-3 = 157.5% — worse than 🧙 Schwager, retired at (po) for
+exactly this at 112%. **And the convex exit is not the earner: it cost −$126.29
+on ANSEM** versus the all-or-nothing rule it replaced (ANSEM reached the 5× gate
+anyway), the **trail fired 4 times and is 0-for-4 at −$33.11**, and the far TP
+fired **once in 361 episodes**. The book was also mostly trading nothing: **321 of
+366 closes (87.7%) are baseline-reseed artifacts** at t=−6.33, 25 positions in 12
+seconds at the tightest — a disease the living book's 17-Jul SEED GUARD already
+cures. The decline began **2-Jul, ~62h BEFORE** the throttle that gets blamed for
+it; the throttle worked (−$117.87/t=−2.74 → +$51.36/t=0.72); the 17-Jul
+LIGHTER-ONLY guard stopped a **break-even** book.
+
+**2 · THE SUCCESSOR'S BINDING CONSTRAINT IS THE ENTRY, AND IT IS NOT A LEVER.**
+🎯 `lighter-perp-sniper-lshadow` reads 33 closes / −$0.79 / t=−0.12 with **32 of
+33 exiting `max_hold`** — and a matched-random null expects **32.26**. The +15%
+TP is a near-dead branch (median 6h MFE **+0.81%**; 17 of 33 never reach +1%;
+P(≥1 tp | null)=0.258). **The exit-free paired rank test settles it**: each real
+entry ranked against 300 matched-random minutes on the same coin and window sits
+at percentile **0.484 / 0.517 / 0.500 / 0.511 / 0.515** at 0.25/1/3/6/12h, and
+`surge` — the only living source — reads **0.429 at the shipped hold, worse than
+random**. The entries select **volatility** (range 4.878% vs 2.845%, P=0.009) and
+**not direction** (P=0.406). A zero-edge entry produces this ledger exactly, so
+there is no entry edge for any exit to harvest — (qu)'s 🙏 avo finding by another
+road.
+
+**3 · THE ANSEM SHAPE REPLAYED HERE IS BYTE-IDENTICAL TO A BARE TIMER.** Δ =
+**$0.00** at 24h, 48h and 72h; zero ladder/trail/far-TP fires. On this book's own
+72h excursions: ≥+50% (the trail arm) **0 of 32**, ≥+100% (the partial) **0 of
+32**, ≥+400% (the far TP) **0 of 32** — against **8 of the predecessor's 366
+closes ≥+100% and one +400%**. **The supply, not the exit rule, is the whole
+difference** (I7 in its purest form). And the trail family's apparent edge *is*
+the harness error: drop the six rows the calibration proved unpriceable and best
+trail goes +1.015% → **+0.059% (t=+0.04)**, best ladder → **−0.038%**.
+
+**4 · BOTH DIRECTIONS REFUSED WITH NUMBERS.** Tightening: every TP below 5% is
+negative, tp=1% is the worst cell in the sweep, "a +3% TP that fires often" fires
+9 of 32 and loses, and **not one cell beats matched-random** (best P=0.560).
+Widening: the only monotone gain is *hold longer*, grid-edge unbounded, where at
+72h the **content-free timer beats every bracketed rule** while refusing 14 of 32
+entries — (hl) denominator shrinkage, which I19 forbids banking. **Multiplicity
+kills the remainder: 0 of 367 cells survive BH at FDR 0.05** (smallest p=0.0478
+vs a rank-1 critical value of **0.000136**, off by 351×), and a time-shift placebo
+shows the search alone manufactures ~+0.57pp on entries known to have no edge.
+
+**5 · A PARTIAL SCALE-OUT IS UNSHIPPABLE HERE ANYWAY, AND THE REASON IS NEW.**
+No partial-close primitive exists at any of three broker layers; `trade_id` would
+UPSERT leg 2 over leg 1 (**the exact defect the predecessor already paid to
+fix**); `entry_ts.pop` destroys the runner's clock. Worst: **two ledger rows
+sharing `opened_at` are byte-indistinguishable from a duplicate writer**, so the
+first partial leg sets `integrity.two_writers = true` — permanently blocking
+READY and starting a **false operator page every cycle**, re-introducing exactly
+the sticky page (ih) was built to remove.
+
+**6 · THE NUMBER THAT SETTLES IT — A NEW UNDECIDABILITY CLASS, *UNDECIDABLE BY
+CEILING*.** A perfect-hindsight exit selling at the exact 6h high yields
+**+1.80pp/trade** of excess over a matched-random null. The book's own published
+`mde80_pct` is **2.114%/trade**. **The entire distance between the shipped rule
+and omniscience is smaller than the smallest effect this book could ever prove.**
+Beside I17's slow clock and (po)'s fat tail, this is a ceiling below the floor.
+Corroborated on the only living source: at its own effect size (+0.312%/trade,
+t=+1.19, n=147) reaching t=2.0 needs **415 closes ≈ 2.7–3.2 years** at the
+measured 10.8–12.9 crypto surge admissions/30d. A longer hold makes it worse —
+19 closes instead of 33 raises `mde80` to ~2.79% and widens the unbridgeable gap
+from 0.31pp to 0.99pp. **A longer hold buys a bigger unprovable claim.**
+
+**7 · WHAT SHIPPED: THE PER-SOURCE CENSUS (I18 / (lv)) — the fix that would have
+caught this months ago.** `extra.sources.{listing,surge,young}` now publishes a
+per-source funnel: a `scan` liveness verdict FIRST (I1 — `dark`/`stale`/`error`/
+`off`/`fresh`, so a dead scout never publishes an all-zero funnel that reads like
+a live scan finding nothing), then one counter per gate stage. The funnel is
+filled **by the admission functions themselves**, one counter per gate, so it
+cannot drift from the gate the way a re-implemented census would ((hj): a second
+copy of a rule is a second rule) — and the stage ORDER is the gate order, so a
+reader names the killing gate as the first zero without opening the file.
+**Measured the day it shipped, and the reason it is not tidiness:** the `listing`
+source has had **ZERO crypto supply for 86 days** (last crypto births CTR/RAIL
+25-May; Jun–Aug 2026 = 0) and the `young` source has been **EMPTY for 66 days**
+(0 admissible today), while `extra` published `watching: 212` and nothing per
+source — `admitted: 0` byte-identical between "quiet" and "structurally
+impossible", the condition that hid 🎸 Barnesy's `extreme` sleeve for 8 days.
+Publish-only: admission is byte-identical with `census=None`, and a test asserts
+structurally that no decision in the file reads a counter. **Pinned by
+`tests/autonomy/test_sniper_source_census.py`, 9 mutations verified RED.**
+
+**8 · THE (lk) SCREEN EXCLUDES THE COHORT THAT CARRIES THE VENUE'S TAIL —
+DECLARED, NOT CHANGED.** The screen tests `strategy_index == 2`; **the venue
+files every memecoin debut under `strategy_index = 7`**, so **ANSEM is listed on
+Lighter today and is screened out of both surge and young.** Unblocking is
+REFUSED on current evidence: class-7 surge reads **−0.840%/trade @6h** (negative
+at every hold), and the debut cell is n=9 with **top-1 (CAP) = 132% of the
+total** and −0.42%/trade ex-best — (po) undecidable-by-tail. It motivates a
+hypothesis; it arms nothing. Recorded so the next session does not "discover" it
+and ship it.
+
+**9 · THE VENUE HAS NO ANSEM, AND ITS TAIL CANNOT BE TAKEN LONG.** Venue-wide
+180d, 229 books, **31,744 book-days**: ≥+50%/72h 0.40%, ≥+100% 0.05%, **≥+300%
+ZERO**; max observed anywhere +186.8%. The tail that exists is in the crypto
+debut cohort (25× lift) and **a long cannot harvest it** — mean close return
+−2.66% at 24h and −8.30% at 168h, and **"let winners run" is strictly worse at
+every hold** (24h −3.82%/t=−4.02; 168h −7.14%/t=−9.47). Also refused
+pre-emptively: **loosening the surge bar is measured pure turnover** — two looser
+triggers give 5,284/30d and 8,848/30d of supply at −0.038% and −0.050%/trade,
+collapsing onto the null (−0.058%). A 400–800× supply increase delivers zero
+expectancy.
+
+**10 · ESCALATED, NOT TAKEN — the I17 keep-or-retire call.** The published
+horizon verdict is already **`unreachable`** ("more of the same closes cannot
+flip mean/t/halves"), the I16 allocation claim is **0.000** and capital is
+already at the 25% probe floor, and **85% of the ledger was taken under a policy
+the book no longer runs** (the (lk) screen removed the class supplying 27 of 33
+closes; in-era n=5). The measurement recommends **RETIRE**. Every prior
+retirement in this fleet ((if), (jh), (lo), (mr), (nf), (pm), (po)) was an
+operator decision, so this one is escalated with its numbers rather than taken.
+**Do not resolve it by lowering a bar or re-fitting a window.** The revival
+tripwire is free from the scout's `ages_d` and now visible in the census:
+**≥2 crypto births/month for 2 consecutive months** re-opens *measurement*, never
+a build off this study.
+
+**11 · A MUTATION HARNESS THAT REPORTED A FALSE GREEN, recorded because it is
+this repo's own doctrine biting.** One mutation (funnel stage REORDER) first read
+GREEN. It was not a vacuous test — CPython validates a `.pyc` on **(mtime,
+size)**, the mutation swapped two equal-length strings, and the mutate/revert
+writes landed inside one mtime tick, so **pytest imported stale bytecode and
+"verified" the reverted source**. Exactly *"a check that inspects nothing reports
+clean, and clean reads as evidence"* ((po)), in a new costume. The harness now
+busts `__pycache__` around every write, and the test derives its stage order from
+the funnel the module itself builds rather than a retyped list — a retyped
+constant is a constant that drifts, and this one would have drifted into blaming
+the wrong gate. **Equal-length mutations are the dangerous ones; assume a false
+green until the cache is cleared.**
+
+**12 · A SEPARATE FINDING, MEASURED WHILE VERIFYING THE CLASS CLAIM ABOVE —
+REPORTED, NOT SHIPPED, BECAUSE IT IS A DIFFERENT HOUSE (I11).** Checking "ANSEM
+is screened out" against the venue rather than trusting it, I found the
+DARK-SCOUT FALLBACK has drifted from the venue. `fleet_bus.is_crypto` resolves
+in three tiers — override, then the scout's published `classes`, then
+`NONCRYPTO_BASES` — and the third exists precisely so *"an organ outage must not
+silently re-admit 41 equities to a funding-rank book"*. Measured against the
+venue's own `strategy_index` today: **8 of 101 active non-crypto books are
+missing from that fallback** — `AXTI, CASHCAT, KIOXIA, KORU, MRNA, SOXS, US10Y,
+WDC` (idx 5×3, 6×2, 7×3), all recent listings. With a live scout the screen is
+correct; **with a dark or stale scout every crypto-screened book in the fleet
+fails OPEN on those eight** — 🌾 carry, 🏦 Rich Dad, 🪁 band-kelly, 🎫 the Taker
+and this book among them. (The ANSEM claim itself VERIFIED: venue class 7, and
+present in `NONCRYPTO_BASES`, so it is screened out on both tiers.)
+**Not fixed here on purpose**: `is_crypto` is a SHARED owner reaching books this
+pass did not measure, and the (fz) precedent — six books changed in one pass,
+six follow-up entries repairing it — is the argument against bolting it on. The
+real fix is also not eight hardcoded names but a DRIFT GUARD that fails when the
+fallback and the venue disagree, and that needs a design call about live-venue
+fetches in CI. **Owner: this repo, next pass.**
+
+**Deploy:** `lighter_perp_sniper.py` is on the auto-deploy path
+(`perp-sniper-shadow`); **no live marker — this is a $1k shadow book with zero
+real money**, so the (mm) push-both-ways rule does not apply. Verify by
+`extra.build` + `extra.build_n` against the psniper COPY set, then read
+`extra.sources` on the row. **Era NOT reset**: the census changes no trade and is
+publish-only, so it is not a bracket change and the (hc) rule does not fire.
+
 ## 2026-08-20 (rz) — A CITATION THAT RESOLVES IS NOT A CITATION THAT IS RIGHT: the blind spot `(ra)` could only name is now executable — and the merge that fixed it turned `main` red on an organ that had silently stopped trading
 
 *(Renumbered (rc) -> (rf) -> (rh) -> (rz) at push time — the EIGHTH collision this

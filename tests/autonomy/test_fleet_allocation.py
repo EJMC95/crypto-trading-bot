@@ -139,10 +139,63 @@ class TestTheEvidenceRecordIsPublished:
         r = alloc.allocate({"w": [0.02, 0.01, 0.03, -0.005] * 8},
                            book_usd=1000.0)["w"]
         assert r["mean_pct"] is not None and r["se_pct"] is not None
+        # [2026-08-20] through the PUBLISHED `crit`, not a retyped constant.
+        # The critical value varies with n now, so this test used to hold only
+        # because the module happened to use the same number the test typed —
+        # which is the second-rule shape it was written to forbid. Rebuilding
+        # from the payload alone is the stronger claim, and it is the one a
+        # reader with only /bus.json can actually check.
+        assert r["crit"] is not None, "the payload must say what it judged at"
         assert abs(r["claim"] - max(0.0, r["mean_pct"]
-                                    - alloc.Z_LOWER * r["se_pct"])) < 1e-6, \
-            ("mean_pct/se_pct must describe the SAME sample the claim was "
+                                    - r["crit"] * r["se_pct"])) < 1e-5, \
+            ("mean_pct/se_pct/crit must describe the SAME sample the claim was "
              "ranked on — if they cannot rebuild it, they are a second rule")
+
+    def test_the_critical_value_is_derived_from_the_sample_not_fixed(self):
+        """The cliff's replacement: a thinner sample must be doubted MORE.
+
+        With a constant z this was flat, and the only protection against a
+        lucky 3-close book was a hard n>=20 cliff that also deleted every
+        genuine claim below it (measured: three living books, and FIVE
+        `claim_era: None`s including the fleet's top-ranked book).
+        """
+        thin = alloc.allocate({"a": [0.03, 0.01, 0.02, 0.04] * 3},
+                              book_usd=1000.0)["a"]
+        thick = alloc.allocate({"a": [0.03, 0.01, 0.02, 0.04] * 30},
+                               book_usd=1000.0)["a"]
+        assert thin["crit"] > thick["crit"], (thin["crit"], thick["crit"])
+        assert thick["crit"] >= alloc.Z_LOWER, "the floor must still bind"
+
+    def test_a_floored_claim_still_publishes_its_bound_and_its_distance(self):
+        """`claim: 0.0` was byte-identical for 15 of 19 live books whose bounds
+        ran from -0.02% to -0.64%. The ordering was computed and discarded one
+        character before the payload."""
+        r = alloc.allocate({"a": [0.02, -0.018, 0.021, -0.019, 0.001] * 6},
+                           book_usd=1000.0)["a"]
+        assert r["claim"] == 0.0
+        assert r["bound_pct"] is not None and r["bound_pct"] < 0.0
+        assert r["n_req_claim"] and r["n_req_claim"] > r["n"], \
+            "a positive-mean book below the bar must say how far it has to go"
+        lost = alloc.allocate({"a": [-0.02, -0.01, -0.03, 0.0] * 6},
+                              book_usd=1000.0)["a"]
+        assert lost["n_req_claim"] is None, \
+            "more of a negative sample never reaches a claim — say so"
+
+    def test_the_distance_to_a_claim_honours_the_luck_floor(self):
+        """A book cannot hold a claim below MIN_N however good its arithmetic
+        looks, so a smaller `n_req_claim` would be a lie about what it needs."""
+        r = alloc.allocate({"a": [0.01, 0.02]}, book_usd=1000.0)["a"]
+        assert r["n_req_claim"] == alloc.MIN_N, (r["n_req_claim"], alloc.MIN_N)
+
+    def test_the_luck_floor_is_the_winners_docket_floor(self):
+        """10, and it is doctrine (I21), not a tunable. The t critical value
+        widens a thin interval but cannot repair a variance estimate built from
+        three numbers — measured: a 3-close era sample at t=33 yields a bound of
+        +2.97%/trade, which would outrank every living book in the fleet."""
+        assert alloc.MIN_N >= 10, alloc.MIN_N
+        streak = alloc.allocate({"a": [0.031, 0.030, 0.032]},
+                                book_usd=1000.0)["a"]
+        assert streak["claim"] == 0.0 and streak["undecided_why"] == "below-min-n"
 
     def test_no_opinion_reaches_the_payload_as_none_never_as_zero(self):
         """lower_bound's own rule — 'no opinion' and 'measured zero' must not

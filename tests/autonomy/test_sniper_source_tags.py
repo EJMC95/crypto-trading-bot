@@ -168,8 +168,29 @@ def test_the_source_map_reaches_run_snipe_pass():
     tie — it is tried first, so it is the source that actually admitted the
     symbol) and try_snipe forwards it. Without this, open_snipe's src is
     always None and every tag silently degrades."""
-    assert 'src=_src_map.get(s)' in _SRC, (
-        "try_snipe no longer forwards the admission source")
+    # [2026-08-26] asserted by AST, not by the literal string. This pinned
+    # `'src=_src_map.get(s)'` and broke when the inline lambda became a named
+    # wrapper whose parameter is `_s` — an identical call with a different
+    # variable name. A retyped string standing in for the invariant is the
+    # shape this repo keeps paying for; the invariant is that whatever is
+    # handed to `try_snipe` calls `open_snipe` with `src=` taken from
+    # `_src_map`.
+    import ast as _ast
+    _tree = _ast.parse(_SRC)
+    _forwards = []
+    for _n in _ast.walk(_tree):
+        if not isinstance(_n, _ast.Call):
+            continue
+        _f = _n.func
+        if not (isinstance(_f, _ast.Name) and _f.id == "open_snipe"):
+            continue
+        for _kw in _n.keywords:
+            if _kw.arg == "src":
+                _forwards.append(_ast.unparse(_kw.value))
+    assert _forwards, "nothing calls open_snipe with an explicit src="
+    assert any("_src_map" in _v for _v in _forwards), (
+        "try_snipe no longer forwards the admission source; "
+        f"open_snipe src= arguments seen: {_forwards}")
     i = _SRC.index("_src_map = {")
     block = _SRC[i:i + 400]
     assert '"listing"' in block and "setdefault" in block, block

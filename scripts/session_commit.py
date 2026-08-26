@@ -59,6 +59,7 @@ all came from the ones sharing the main worktree.
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -143,7 +144,44 @@ def removed_entry_headers(diff_text):
     # `+##`, and reporting the minus alone blocks ordinary reshuffles. A guard
     # that fires on the normal case is one the next session learns to bypass,
     # which is how a real deletion then walks through ((gl)).
-    return [h for h in removed if h not in added]
+    still_gone = [h for h in removed if h not in added]
+    if not still_gone:
+        return []
+    # [2026-08-26] AN ENTRY CORRECTED IN PLACE IS NOT A DELETED ONE EITHER, and
+    # this guard was blocking the thing I12 REQUIRES. Correcting an entry edits
+    # its TITLE, so the old header line vanishes and a new one appears — which
+    # this read as a deletion and refused. Two pieces of the repo's own doctrine
+    # were in direct conflict; measured on the (ub) correction, which the tool
+    # refused outright while every entry was still present.
+    #
+    # The exemption borrows `audit_changelog_letters`' OWN predicate rather than
+    # re-deriving it — one owner for "is this an in-place correction", or the
+    # two guards drift exactly where it matters least visibly ((hj)). Both
+    # signals are required there and both are required here: the letter must
+    # survive, the titles must still be recognisably the same entry, AND the
+    # diff must declare the correction. The (nx) incident it exists for is
+    # untouched: a `perl -pi` letter-rename changes the LETTER, so the removed
+    # header finds no same-letter partner and is still reported.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from audit_changelog_letters import CORRECTED, same_entry
+    except Exception:                                    # noqa: BLE001
+        return still_gone            # no predicate -> report, never excuse
+    if not CORRECTED.search(diff_text or ""):
+        return still_gone
+    letter = re.compile(r"^## \S+ \(([a-z]+)\)")
+    by_letter = {}
+    for h in added:
+        m = letter.match(h)
+        if m:
+            by_letter.setdefault(m.group(1), []).append(h)
+    out = []
+    for h in still_gone:
+        m = letter.match(h)
+        twins = by_letter.get(m.group(1), []) if m else []
+        if not any(same_entry(h, t) for t in twins):
+            out.append(h)
+    return out
 
 
 def verify_readback(snap, index=None):
@@ -406,6 +444,35 @@ def selftest():
         "--- a/x\n+++ b/x\n+## 2026-08-16 (nx) — only additions\n") == [], \
         "an ADDED header is not a deletion"
     assert removed_entry_headers("") == [] and removed_entry_headers(None) == []
+
+    # [2026-08-26] AN I12 IN-PLACE CORRECTION IS NOT A DELETION — and the (nx)
+    # incident this guard exists for must still be caught. Both pinned here,
+    # because an exemption nobody tests is how a guard quietly stops guarding.
+    _corr = ("-## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE, and the "
+             "debut it was buying is measurably a fade\n"
+             "+## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE, and the "
+             "debut fade it was flipped on is mostly CALENDAR\n"
+             "+**CORRECTED IN PLACE per I12** after an adversarial review.\n")
+    assert removed_entry_headers(_corr) == [], \
+        "a declared in-place correction of the SAME letter must not read as a deletion"
+    # same edit WITHOUT the declaration -> still reported (both signals required)
+    assert removed_entry_headers(
+        _corr.replace("**CORRECTED IN PLACE per I12**", "just tidying")), \
+        "an undeclared title rewrite must still be reported"
+    # the (nx) incident: a LETTER RENAME over someone else's entry. The removed
+    # header finds no same-letter partner, so the declaration cannot excuse it.
+    assert removed_entry_headers(
+        "-## 2026-08-16 (nv) — THEIR ENTRY, ninety lines of it\n"
+        "+## 2026-08-16 (nx) — THEIR ENTRY, ninety lines of it\n"
+        "+CORRECTED IN PLACE\n") == [
+            "## 2026-08-16 (nv) — THEIR ENTRY, ninety lines of it"], \
+        "a letter-rename must never be excused as a correction — this is (nx)"
+    # two DIFFERENT entries sharing a letter must not excuse each other
+    assert removed_entry_headers(
+        "-## 2026-08-26 (ub) — the sniper was on the wrong side of its thesis\n"
+        "+## 2026-08-26 (ub) — carry's persistence gate moves to twelve hours\n"
+        "+CORRECTED IN PLACE\n"), \
+        "an unrelated entry on the same letter is a race, not a correction"
     assert removed_entry_headers("-## not-a-date (xx) — junk") == [
         "## not-a-date (xx) — junk"], "shape-matched on the header prefix"
     # a MOVED entry appears as both - and + : not a deletion
