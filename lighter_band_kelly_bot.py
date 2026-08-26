@@ -451,6 +451,29 @@ def build_state(positions, recent, pend, noconv, enter_bps_eff, last_ts,
             "saved_ts": float(now if now is not None else time.time())}
 
 
+def holdwatch_accumulate(hw_stats, horizon_s, x):
+    """Fold ONE forward sample into the hold-watch accumulator, in place.
+
+    Pure but for the dict it is handed: no clock, no state, no I/O — so the
+    thing `holdwatch_block` reports on is testable, which it was not while
+    this arithmetic lived inline in the loop. The first mutation round after
+    the dispersion fields shipped proved the point: zeroing the `n2`
+    increment SURVIVED, because nothing outside `main()` could reach it, and
+    a dispersion that silently never accumulates is precisely the field
+    reading `None` forever while looking healthy (I1/I23)."""
+    b = hw_stats.setdefault(str(int(horizon_s)), {"n": 0, "sum": 0.0})
+    b["n"] = int(b.get("n") or 0) + 1
+    b["sum"] = float(b.get("sum") or 0.0) + x
+    # dispersion, on its OWN counter — a bucket restored from before this
+    # field existed has `n` without `sumsq`, and dividing the new sumsq by
+    # the old n would understate sd on the longest-running horizons.
+    b["n2"] = int(b.get("n2") or 0) + 1
+    b["sum2"] = float(b.get("sum2") or 0.0) + x
+    b["sumsq"] = float(b.get("sumsq") or 0.0) + x * x
+    b["wins"] = int(b.get("wins") or 0) + (1 if x > 0 else 0)
+    return b
+
+
 def holdwatch_block(hw_stats):
     """Published every loop: mean EXTRA % the mirror would have earned by
     holding on past its own exit, per horizon. REPORTED, never a bar — and
@@ -998,16 +1021,7 @@ def main():
                 _x = holdwatch_extra(_rec.get("side"), _rec.get("exit_px"), _px)
                 if _x is None:
                     break
-                _b = hw_stats.setdefault(str(int(_h)), {"n": 0, "sum": 0.0})
-                _b["n"] += 1
-                _b["sum"] += _x
-                # dispersion, on its OWN counter — a bucket restored from
-                # before this field existed has `n` without `sumsq`, and
-                # dividing the new sumsq by the old n would understate sd.
-                _b["n2"] = int(_b.get("n2") or 0) + 1
-                _b["sum2"] = float(_b.get("sum2") or 0.0) + _x
-                _b["sumsq"] = float(_b.get("sumsq") or 0.0) + _x * _x
-                _b["wins"] = int(_b.get("wins") or 0) + (1 if _x > 0 else 0)
+                holdwatch_accumulate(hw_stats, _h, _x)
                 _rec.setdefault("done", []).append(_h)
         holdwatch = [r for r in holdwatch
                      if len(r.get("done") or ()) < len(HOLD_HORIZONS_S)
@@ -1251,6 +1265,28 @@ def _selftest():
     assert hb3["n"] == 10 and abs(hb3["mean_pct"] - 2.0) < 1e-9
     assert hb3["n2"] == 4 and abs(hb3["sd_pct"] - 1.7078) < 1e-3, \
         "sd must be over n2, never over n"
+    assert abs(hb3["win_pct"] - 75.0) < 1e-9, \
+        "win_pct is 3 of n2=4, never 3 of n=10 — the mixed-bucket trap"
+    # the ACCUMULATOR itself, reachable because it is no longer inline in the
+    # loop: every sample must move n AND n2, or the dispersion reads None
+    # forever while the mean looks healthy.
+    _acc = {}
+    for _v in (1.0, 2.0, 3.0, -1.0):
+        holdwatch_accumulate(_acc, 900.0, _v)
+    assert _acc["900"]["n"] == 4 and _acc["900"]["n2"] == 4, \
+        "a sample that does not move n2 makes the statistic unreachable"
+    assert abs(_acc["900"]["sum"] - 5.0) < 1e-9
+    assert abs(_acc["900"]["sum2"] - 5.0) < 1e-9
+    assert abs(_acc["900"]["sumsq"] - 15.0) < 1e-9
+    assert _acc["900"]["wins"] == 3, "a negative sample is not a win"
+    _accb = holdwatch_block(_acc)["+15m"]
+    assert abs(_accb["mean_pct"] - 1.25) < 1e-9 and abs(_accb["t"] - 1.46) < 0.02, \
+        "accumulator and reporter must agree end to end"
+    # a LEGACY bucket keeps accumulating without inventing history
+    _leg = {"900": {"n": 6, "sum": 12.0}}
+    holdwatch_accumulate(_leg, 900.0, 2.0)
+    assert _leg["900"]["n"] == 7 and _leg["900"]["n2"] == 1, \
+        "n2 counts only what carries dispersion, never the legacy backlog"
     # zero-variance and single-sample cells decline rather than divide by zero
     assert holdwatch_block({"900": {"n": 1, "sum": 1.0, "n2": 1, "sum2": 1.0,
                                     "sumsq": 1.0, "wins": 1}})["+15m"]["t"] is None
