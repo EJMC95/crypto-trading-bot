@@ -90,6 +90,30 @@ def test_the_walk_is_deterministic_across_processes():
     assert a == b and ca == cb
 
 
+def test_consecutive_slices_concatenate_into_one_sequence():
+    """THE CURSOR MUST RESUME WHERE THE WALK STOPPED, not where a contiguous
+    walk would have.
+
+    Written because a mutation SURVIVED the first round: advancing the cursor
+    by `take` instead of `take * stride` left every other test green. The
+    coverage test above walks slices of ONE, where `k * stride` has k=0 and the
+    stride is therefore unobservable — a fixture that cannot see the thing it
+    is meant to pin.
+
+    The property, stated without reference to the arithmetic: two slices of n
+    taken back to back must equal one slice of 2n from the same cursor. If the
+    cursor advances by the wrong amount the second slice starts in the wrong
+    place, and the space is no longer tiled — some genotypes are re-scored
+    every orbit while others are never reached."""
+    for cur in (0, 1, 7, 23):
+        one, nxt, _ = si.explore_slice(SMALL, cur, 5)
+        two, _, _ = si.explore_slice(SMALL, nxt, 5)
+        both, _, _ = si.explore_slice(SMALL, cur, 10)
+        assert one + two == both, (
+            f"at cursor {cur}: two slices of 5 do not concatenate into one of "
+            "10 — the cursor is not resuming the strided walk")
+
+
 def test_a_slice_returns_no_duplicates_within_itself():
     """take <= size with a coprime stride cannot repeat; if dedupe ever has
     work to do here, the stride is wrong."""
