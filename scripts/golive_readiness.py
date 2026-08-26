@@ -1086,7 +1086,7 @@ def stats(rows, book_usd=None):
         dd = min(dd, eq - peak)
     wins = sum(1 for x in pct if x > 0)
     realised = sum(r[1] or 0 for r in rows)
-    # [2026-08-20 (tu)] `se_pct` — computed one line above inside `t` and then
+    # [2026-08-20 (tz)] `se_pct` — computed one line above inside `t` and then
     # thrown away, which is why the horizon could only ask "is the mean
     # negative?" and never "is it negative BEYOND NOISE?". Published so a
     # verdict can be power-aware. Reported, never a bar.
@@ -1442,7 +1442,7 @@ HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 # A verdict can flip on one trade, so a single reading is noise. The book must
 # hold a stuck verdict for DOCKET_DAYS, and the clock RESETS the moment the
 # verdict changes — a book that recovers leaves the docket and starts over.
-#: [2026-08-20 (tu)] The one-sided bar the horizon uses to ask whether a
+#: [2026-08-20 (tz)] The one-sided bar the horizon uses to ask whether a
 #: negative mean is negative BEYOND NOISE. The SAME standard `fleet_allocation`
 #: applies to feed a book, deliberately: the fleet should not doubt a book on
 #: one bar and feed it on another.
@@ -1487,7 +1487,7 @@ DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: joins only once the book has HAD its window and still cannot produce a rate
 #: (see `_docket_stuck`), which is I17's own wording — "still undecidable at
 #: the floor after its window".
-#: [2026-08-20 (tu)] `underpowered` is DELIBERATELY ABSENT from this tuple, and
+#: [2026-08-20 (tz)] `underpowered` is DELIBERATELY ABSENT from this tuple, and
 #: that absence is the whole point of the verdict. A book whose mean is negative
 #: but whose sample cannot EXCLUDE a positive mean has not been measured to
 #: fail — it has not been measured. Docketing it starts a keep-or-retire clock
@@ -1792,7 +1792,7 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
 
     mean = s.get("mean_pct")
 
-    # [2026-08-20 (tu)] THE MEAN BAR IS POWER-GATED NOW, and this is a
+    # [2026-08-20 (tz)] THE MEAN BAR IS POWER-GATED NOW, and this is a
     # CORRECTNESS fix rather than a softening.
     #
     # This branch used to declare `unreachable` — "more of the same closes

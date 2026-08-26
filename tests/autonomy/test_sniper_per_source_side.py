@@ -140,7 +140,7 @@ def test_the_young_volume_floor_stays_above_the_slippage_models_step(sniper):
     """0.25 -> 0.20 admits ANSEM ($0.228M/day), the only venue-priced book in
     120 days the old floor refused while having real turnover. It stays at
     TWICE the $0.1M step where the fleet's slippage model changes tier —
-    which is exactly why (tt) REFUSED $0.10M, and that refusal is unchanged."""
+    which is exactly why (ty) REFUSED $0.10M, and that refusal is unchanged."""
     assert sniper.YOUNG_MIN_VOL_M == pytest.approx(0.20)
     assert sniper.YOUNG_MIN_VOL_M >= 0.20, \
         "below 0.2 the slippage model cannot price the band this would admit"

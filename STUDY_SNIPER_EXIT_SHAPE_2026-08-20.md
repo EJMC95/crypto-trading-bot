@@ -1,5 +1,5 @@
 # 🎯 THE SNIPER'S "LOST POTENCY" — MEASURED, AND REFUSED
-### 2026-08-20 (ts) · operator ask: *"look back to the days its p n l was biggest in the fleet — strip back whatever has caused it to have 'erectile dysfunction'"*
+### 2026-08-20 (tx) · operator ask: *"look back to the days its p n l was biggest in the fleet — strip back whatever has caused it to have 'erectile dysfunction'"*
 
 ---
 

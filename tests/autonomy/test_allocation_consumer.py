@@ -115,9 +115,9 @@ def test_kill_switch_reaches_the_consumer(monkeypatch):
 def test_scale_is_clamped_both_ends(monkeypatch):
     """The CLAMP, exercised directly on `target_usd`.
 
-    [(tu)] This used to reach 4.0 by way of "a lone claimed book among many
+    [(tz)] This used to reach 4.0 by way of "a lone claimed book among many
     probes concentrates the whole surplus" — i.e. it depended on the
-    winner-take-all split, which `(tu)` removed because it was starving 17 of
+    winner-take-all split, which `(tz)` removed because it was starving 17 of
     19 books to the probe floor. The clamp itself is unchanged and still worth
     pinning, so it is now driven from the payload value rather than from a
     distribution artifact: that is what this test was always named for, and it
@@ -134,7 +134,7 @@ def test_scale_is_clamped_both_ends(monkeypatch):
 
 
 def test_no_book_is_starved_by_a_rivals_claim(monkeypatch):
-    """[(tu)] THE STARVATION THIS FIX EXISTS TO END.
+    """[(tz)] THE STARVATION THIS FIX EXISTS TO END.
 
     Under `share = claim / total_claim` a single book holding a claim of 0.0015
     took $13,366 of $19,000 and cut **17 of 19 books to the 25% probe floor** —
@@ -187,7 +187,7 @@ def test_a_thin_era_cannot_grow_a_book_past_flat(monkeypatch):
     carry = "perps-funding-carry-lshadow"
 
     p = _payload(monkeypatch, books, era=_ERA_OK)
-    # [(tu)] was `== 4.0`, which only the winner-take-all split could produce.
+    # [(tz)] was `== 4.0`, which only the winner-take-all split could produce.
     # The INVARIANT is "a positive era claim lets the book grow PAST FLAT";
     # the exact multiple is a property of the split and must not be pinned
     # here, or re-tuning the split reddens a test that is not about it.
@@ -233,7 +233,7 @@ def test_the_cap_never_shrinks_a_book_below_its_probe_floor(monkeypatch):
                               for i in range(20)})
     loser = "perps-funding-spread-lshadow"
     with_era = _payload(monkeypatch, books, era={loser: 0.5})
-    # [(tu)] was pinned at 0.25 — the value the STARVATION produced. The
+    # [(tz)] was pinned at 0.25 — the value the STARVATION produced. The
     # invariant is that the era gate is restrict-only: a scale at or below flat
     # is never touched by it, whatever the split hands the book.
     scale_with = fleet_bus.allocation_scale(loser)

@@ -70,7 +70,7 @@ def _now():
 def cohort(min_age_d=8, limit=MAX_COINS):
     """Venue-priced books with usable tape, richest first.
 
-    VENUE-PRICED, not `is_crypto`: (tt) established that the venue files
+    VENUE-PRICED, not `is_crypto`: (ty) established that the venue files
     crypto-native memecoin debuts under class 7, and that the axis this book
     cares about is "priced where the underlying trades". Externally-priced
     debuts (tokenised equity/pre-IPO) are a different cohort with a measured

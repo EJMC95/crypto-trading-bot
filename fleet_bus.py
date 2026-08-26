@@ -1233,7 +1233,7 @@ NONCRYPTO_BASES = {s.strip().upper() for s in os.environ.get(
     "XIAOMI,"
     # 7=pre-IPO / private
     "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE,"
-    # [2026-08-20 (tt)] THE EIGHT THIS LIST HAD DRIFTED BY, measured against
+    # [2026-08-20 (ty)] THE EIGHT THIS LIST HAD DRIFTED BY, measured against
     # the venue's own `strategy_index` the same way (ki) measured the original
     # 41: of 101 active non-crypto books, EIGHT were absent from this fallback.
     # With a live scout the screen was right (tier 2 answers); with a DARK or
@@ -1355,7 +1355,7 @@ def is_crypto(sym, current_time=None):
     return s not in NONCRYPTO_BASES
 
 
-#: [2026-08-20 (tt)] Class-7 books that are NOT priced here. `strategy_index 7`
+#: [2026-08-20 (ty)] Class-7 books that are NOT priced here. `strategy_index 7`
 #: is the venue's grab-bag, and its members do not share an answer to the
 #: question `venue_priced` asks: ANSEM and CASHCAT are crypto-native tokens
 #: whose ONLY market is this book, while ANTHROPIC, OPENAI, SPCX and UNITREE
@@ -1391,7 +1391,7 @@ _VENUE_PRICED_EXOTICS = {"ANSEM", "CAP", "CASHCAT"}
 
 
 def venue_priced(sym, current_time=None):
-    """Is THIS VENUE where `sym` is priced?  [2026-08-20 (tt)]
+    """Is THIS VENUE where `sym` is priced?  [2026-08-20 (ty)]
 
     A DIFFERENT question from `is_crypto`, and the one the (lk) instrument-class
     screen was really asking. That screen's argument was never about class — it
@@ -1405,7 +1405,7 @@ def venue_priced(sym, current_time=None):
     `is_crypto` therefore refuses ANSEM and CASHCAT — the exact cohort a debut
     sniper exists to trade — while a book like 🌾 carry, which wants "is this a
     crypto FUNDING signal", is right to keep asking `is_crypto`. Both questions
-    are legitimate; they are not the same question, and (tt) measured the cost
+    are legitimate; they are not the same question, and (ty) measured the cost
     of conflating them at a source that sat at ZERO admissible candidates for
     66 days while its cohort arrived at ~1.7-2.0 births/30d throughout.
 

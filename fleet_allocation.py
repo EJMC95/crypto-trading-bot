@@ -128,7 +128,7 @@ PROBE_FLOOR = float(os.environ.get("ALLOC_PROBE_FLOOR", "0.25"))
 #: outranking evidence"*), so the two instruments that rank books now agree.
 MIN_N = int(os.environ.get("ALLOC_MIN_N", "10"))
 
-#: [2026-08-20 (tu)] HOW HARD EVIDENCE TILTS THE SPLIT — and why it is a TILT
+#: [2026-08-20 (tz)] HOW HARD EVIDENCE TILTS THE SPLIT — and why it is a TILT
 #: rather than the whole split.
 #:
 #: The original rule was `share = claim / total_claim`, which is WINNER-TAKE-ALL
@@ -437,7 +437,7 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
     base = book_usd * max(0.0, min(1.0, floor))
     surplus = total - base * len(bots)
     cl = claims(books)
-    # [(tu)] EVIDENCE TILTS THE FLAT SPLIT; IT DOES NOT REPLACE IT. Weights are
+    # [(tz)] EVIDENCE TILTS THE FLAT SPLIT; IT DOES NOT REPLACE IT. Weights are
     # `1 + TILT * (claim / best_claim)`, so a book with no opinion still carries
     # weight 1 and cannot be defunded by a rival's claim. With no claims
     # anywhere every weight is 1 and this is EXACTLY the flat allocation, which

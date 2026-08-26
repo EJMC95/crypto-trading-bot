@@ -93,7 +93,7 @@ YOUNG_MAX_PER_LOOP = int(os.environ.get("SNIPER_YOUNG_MAX_PER_LOOP", "2"))
 # `orderBookDetails` the only venue-priced book in the last 120 days that this
 # floor refuses while having real turnover is ANSEM at $0.228M/day — the floor
 # was excluding it by $0.022M. 0.20 still sits at TWICE the $0.1M step where
-# the fleet's slippage model changes tier, which is the exact reason (tt)
+# the fleet's slippage model changes tier, which is the exact reason (ty)
 # REFUSED the move to $0.10M and that refusal is unchanged: below $0.1M the
 # model cannot price the band it would admit ((qq): mean 17.49bps, p90 398bps).
 YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.20"))
@@ -155,11 +155,11 @@ DIRECTION_PINNED = _DIRECTION_ENV in ("long", "short")
 #  * `listing` and `young` flip to SHORT. They are the two sources that target
 #    the faded band; `surge` is a volume event on a mostly-MATURE book, its
 #    cell is the flat control above, and it is left alone — its own evidence
-#    ((ts): 0 of 367 exit cells survive BH at FDR 0.05) is untouched by this.
+#    ((tx): 0 of 367 exit cells survive BH at FDR 0.05) is untouched by this.
 #  * The hold for those two goes 6h -> 24h. 6h is +0.132% = 13bps gross, which
 #    is inside plausible round-trip slippage on a book at this book's volume
 #    floor; 24h is 67bps and clears it. **72h measured BEST and is deliberately
-#    NOT taken: it is the grid EDGE of what was tested, and (hl)/(ts) is
+#    NOT taken: it is the grid EDGE of what was tested, and (hl)/(tx) is
 #    explicit that a grid-edge winner is reported unbounded, never shipped as a
 #    value.** 24h is the plateau interior — the 🧭 nav-cook precedent.
 #  * The young WINDOW stays 21 days. Widening it was the obvious move and the
@@ -336,10 +336,10 @@ ALLOW_NONCRYPTO = os.environ.get("SNIPER_ALLOW_NONCRYPTO", "").strip().lower() \
 def _class_ok(sym):
     """May `sym` enter via the SURGE source? Crypto perps only.
 
-    [(tt)] Scope narrowed from "surge/young" to SURGE. The young source now
+    [(ty)] Scope narrowed from "surge/young" to SURGE. The young source now
     asks `_young_class_ok` — a different question, for a measured reason; see
     below. Nothing about the surge screen changed: its evidence (non-crypto
-    surge −$5.01/13, and (ts)'s class-7 surge at −0.840%/trade @6h, negative at
+    surge −$5.01/13, and (tx)'s class-7 surge at −0.840%/trade @6h, negative at
     every hold) is unaffected and it stays crypto-only.
     """
     if ALLOW_NONCRYPTO or fleet_bus is None:
@@ -350,7 +350,7 @@ def _class_ok(sym):
         return True
 
 
-# [2026-08-20 (tt)] THE YOUNG SOURCE ASKS A DIFFERENT QUESTION — and this is
+# [2026-08-20 (ty)] THE YOUNG SOURCE ASKS A DIFFERENT QUESTION — and this is
 # the change that gives this book its supply back, not another screen.
 #
 # THE DEFECT, measured. (lk) applied ONE screen to both sources on evidence
@@ -368,7 +368,7 @@ def _class_ok(sym):
 # CASHCAT ($0.45M) and UNITREE ($0.84M), both class 7, both refused. The book
 # was not quiet; it was structurally unable to admit anything.
 #
-# AND THE SUPPLY WAS NEVER DEAD. `(qi)`/`(ts)` reported "ZERO crypto births for
+# AND THE SUPPLY WAS NEVER DEAD. `(qi)`/`(tx)` reported "ZERO crypto births for
 # 86 days", which is true of `strategy_index == 2` and FALSE of the cohort this
 # book trades: on the venue-priced axis, births run **1.67-2.00/30d and have
 # not stopped in any month measured** — CAP (Jun), ANSEM (Jul), CASHCAT (Aug).
@@ -378,7 +378,7 @@ def _class_ok(sym):
 # really making ("already priced where the underlying trades"). It admits
 # crypto-native books INCLUDING class-7 memecoins, and still refuses tokenised
 # equity/FX/commodity/pre-IPO. That exclusion is now BETTER evidenced than it
-# was: (tt) measured shorting an externally-priced debut at −0.714%/trade,
+# was: (ty) measured shorting an externally-priced debut at −0.714%/trade,
 # **t=−2.04** — the only significant cell in the study — so the half of (lk)
 # this keeps is the half the tape supports.
 # Reversible independently of the surge screen: SNIPER_YOUNG_ALLOW_ANY=1.
@@ -400,7 +400,7 @@ def _young_class_ok(sym):
         return True
 
 
-# [2026-08-20 (ts)] THE PER-SOURCE CENSUS — I18/(lv)'s "a sleeve that opens
+# [2026-08-20 (tx)] THE PER-SOURCE CENSUS — I18/(lv)'s "a sleeve that opens
 # nothing must publish its OWN census at its OWN bar".
 #
 # MEASURED THE DAY THIS SHIPPED, and it is why the guard exists rather than a
@@ -584,7 +584,7 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
     cannot dedup it), and bounded by `limit`.
     """
     rows = []
-    # [(tt)] the YOUNG screen, not the surge one — `_young_class_ok` asks
+    # [(ty)] the YOUNG screen, not the surge one — `_young_class_ok` asks
     # "is this priced on this venue", which admits the class-7 memecoin debuts
     # `is_crypto` refuses. An explicit `class_ok=` still overrides, which is
     # what the tests drive.
@@ -615,7 +615,7 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
         if s in (already or set()):
             continue
         cen["fresh"] += 1
-        if not class_ok(s):               # [(tt)] priced on THIS venue
+        if not class_ok(s):               # [(ty)] priced on THIS venue
             continue
         cen["class_ok"] += 1
         try:
@@ -1201,7 +1201,7 @@ def main():
                 log.info("%s: inactive past the give-up window — dropped from "
                          "pending (never sniped)", sym)
         fresh = [s for s in new_listings if s not in pending]
-        # [(ts)] the listing funnel. Deliberately SHORTER than the other two —
+        # [(tx)] the listing funnel. Deliberately SHORTER than the other two —
         # this source has no class screen and no volume floor ((lk) left it
         # open on purpose), so `offered` and `fresh` ARE its whole gate, and
         # publishing stages it does not have would overstate the filtering.
@@ -1234,7 +1234,7 @@ def main():
             log.info("levers applied %s", _lv)
         _surge = []
         _surge_ratios = {}      # [(ne)] always bound, even on a dark scout
-        # [(ts)] the census STARTS at its liveness verdict, before any count,
+        # [(tx)] the census STARTS at its liveness verdict, before any count,
         # so a dark or stale scout publishes `scan: "dark"/"stale"` instead of
         # an all-zero funnel that reads exactly like a live scan finding
         # nothing (I1 — liveness before semantics).
@@ -1318,7 +1318,7 @@ def main():
             # candle per day, so the two units are directly comparable).
             _age_src = ({s: a for s, a in _ages.items()
                          if s not in not_young} or bar_counts)
-            # [(ts)] WHICH age source answered is part of the census: the
+            # [(tx)] WHICH age source answered is part of the census: the
             # scout's exact `ages_d` and the 4/loop candle-probe cache are
             # different instruments, and a funnel read off the fallback means
             # something weaker than one read off the venue's own created_at.
@@ -1526,7 +1526,7 @@ def main():
                                  "held": {c: ("L" if side_is_long(
                                      entry_src.get(c)) else "S")
                                           for c in _held_syms},
-                                 # [2026-08-20 (ts)] THE PER-SOURCE CENSUS —
+                                 # [2026-08-20 (tx)] THE PER-SOURCE CENSUS —
                                  # see _new_funnel(). `watching`/`pending`
                                  # above are book-wide, so until now nothing
                                  # in this payload could say WHICH of the
@@ -1614,7 +1614,7 @@ def main():
                                               # see the (lk) block: n=1,
                                               # unmeasured, founding thesis.
                                               "listing": False},
-                                          # [(tt)] WHICH QUESTION each screen
+                                          # [(ty)] WHICH QUESTION each screen
                                           # asks. `surge: is_crypto` and
                                           # `young: venue_priced` are DIFFERENT
                                           # gates and a payload saying only
