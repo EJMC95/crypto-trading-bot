@@ -317,6 +317,35 @@ def same_entry(a, b):
         None, str(a or ""), str(b or "")).ratio() >= SAME_ENTRY_RATIO
 
 
+#: [2026-08-26] An entry that declares its own RENUMBER, naming BOTH letters.
+#: The convention's rule 4 already requires the move to be recorded inline in
+#: the moved entry — this is that record, made machine-readable so a guard can
+#: tell a declared move from a silent sweep. Accepts `->`, an arrow, or the
+#: word "to", because three past entries used three of those spellings.
+RENUMBERED = re.compile(
+    r"RENUMBER(?:ED)?\s*\(?([a-z]{1,3})\)?\s*(?:->|→|to)\s*\(?([a-z]{1,3})\)?",
+    re.I)
+
+
+def renumbered_pairs(text):
+    """-> {(from_letter, to_letter)} declared in `text`.
+
+    [2026-08-26] WHY THIS IS NOT AN EXACT-TITLE MATCH, which is the obvious
+    implementation and is UNSAFE. A renumber moves a header from one letter to
+    another with the TITLE UNCHANGED — and so does the `(nx)` incident, where a
+    `perl -pi -e 's/(nv)/(nx)/g'` rewrote ANOTHER session's `(nv)` entry to
+    `(nx)` and destroyed 90 lines. Both look identical to a title comparison.
+
+    The one thing that separates them is that a legitimate renumber is
+    DECLARED, in the moved entry, by a human decision about which entry is
+    cited; the sweep is silent by construction. So the declaration is the
+    discriminator, exactly as `CORRECTED` is for an in-place correction — and
+    like that one it is required TOGETHER with a structural match, never alone.
+    """
+    return {(m.group(1).lower(), m.group(2).lower())
+            for m in RENUMBERED.finditer(str(text or ""))}
+
+
 def corrected_letters(text):
     """-> {letter} whose OWN entry body declares an in-place correction.
 

@@ -1,4 +1,124 @@
-## 2026-08-26 (uc) — THE THIRD ENTOMBMENT: A SURGE/YOUNG SYMBOL THAT STOPS QUALIFYING IS NEVER OFFERED AGAIN, SO ITS GIVE-UP CAN NEVER FIRE — AND A RETRY THAT FORGETS ITS SOURCE TAKES THE WRONG SIDE
+## 2026-08-26 (ud) — THE ALLOCATION'S TWO HALVES DO NOT ADD UP: $1,151.66 OF FLEET CAPITAL IS WITHHELD BY THE ERA GATE AND RETURNED TO NOBODY, AND SIXTEEN BOOKS SIT BELOW FLAT TO FUND A BONUS THAT IS REFUSED
+
+**MEASURED on the live payload, not reasoned about** — `fleet-allocation` at
+2026-08-26T13:13:49Z, using the organ's OWN published fields:
+
+```
+sum(target_usd)          19,999.96     ← conserved BY CONSTRUCTION
+sum(scale_effective·usd) 18,848.30     ← what the era gate actually leaves
+withheld                  1,151.66     ← 5.8% of fleet capital, to nobody
+expansion_gated                   3    🙏 avo shadow · 🎫 taker · 🌾 carry
+books below flat                 16    every one at 0.9279x
+```
+
+**THE MECHANISM, and it is an INTERACTION between two decisions that were each
+correct alone.** `(tz)`/`(sm)` made evidence TILT the flat split
+(`w = 1 + TILT·claim/best`) so the best-evidenced book ranks first and nothing
+is starved by a rival's claim — ranked on the **all-time pooled** claim,
+because `(kc)` measured that era-scoping the RANK leaves zero claimants on 15
+of 15 days, i.e. turns the organ off. `(lx)` then gated EXPANSION on the
+**era-scoped** claim, because carry's 0.149%/trade came from a sample 91/101 of
+which predates its own era boundary and a two-writer window cannot quadruple a
+clip.
+
+Both hold. But the tilt is **funded** by every other book and **spent** on a
+field the gate reads differently, so when the gate declines, the surplus the
+tilt already took is returned to no one. The claimant is protected; the
+sixteen books that paid for it are not repaid. **Nothing in the payload said
+so**, because `by_class` publishes only the pre-gate `target_usd`.
+
+`(oy)` is the direct ancestor and the reason this was findable: it published
+the gated outcome PER BOOK precisely because *"a payload must not be
+byte-identical between 'this book will be scaled up 4x' and 'this book will be
+left at flat'"*. That closed the per-book question. The FLEET-level question —
+does the organ's own arithmetic close? — was left underived, and it does not.
+
+**AND THE GATE IS THE STEADY STATE, NOT A BLIP.** All three gated books are at
+a MEASURED era zero, not a `MIN_N` floor artifact: carry `n_era=13`, avo shadow
+`n_era=17`, the taker `n_era=120`, every bound at or below zero. The only
+positive `claim_era` in the fleet belongs to `freqtrade-avo-maria-lighter` — a
+REAL-MONEY row, which by design never reads this accessor.
+
+**WHAT SHIPS: the number, not a redistribution.** `gate_totals()` publishes
+`target_effective_usd` · `withheld_usd` · `n_expansion_gated` · `n_unpriced`,
+per class and at the fleet level, plus `books_below_flat`. Computed AFTER the
+era twins are filled — the `(ua)` ordering defect in a second field, so it is
+pinned rather than assumed. `n_unpriced` is the `(kw)`/I4 receipt: a row whose
+effective scale cannot be computed falls back to its raw target and SAYS so,
+because a dark computation must not be byte-identical to a clean one.
+
+**WHY NOT FIX IT IN THIS PASS — the three candidate rules, recorded so the next
+one starts from the analysis instead of re-deriving it.** This is a sizing
+change on three shadow books, so it is priced (I19) and decided on a published
+number, not shipped inside the pass that found it (`SHIP NARROW`):
+
+1. **Return the refused surplus to flat.** Pin a gated book at flat and re-split
+   the remainder; the fixed point puts every non-era-claimant at exactly 1.0x
+   and nobody above it. Clean, but it FEEDS the sixteen for a reason that is
+   about someone else's gate, which is the `(sm)` starvation defect mirrored.
+2. **Era-scope the tilt WEIGHT** (cap the bonus at 1.0 for any book without a
+   positive `claim_era`), so the tilt is spent on the field the consumer will
+   honour. Arithmetically the cleanest — conserves capital with no iteration —
+   but it is `(kc)`'s rejected proposal wearing a different hat: on a day with
+   no era claimant every weight is 1.0 and the organ says "no opinion". That
+   may in fact be RIGHT (today's alternative is a cost with no benefit), but
+   `(kc)` measured the ranking consequence and this pass has not.
+3. **Publish both targets** (`target_usd` the opinion, `target_effective_usd`
+   the reachable one) and move consumers onto the second. Preserves `(kc)`'s
+   ranking signal AND conserves capital, at the price of changing which field
+   `fleet_bus.allocation_scale` reads — the largest blast radius of the three.
+
+The measurement itself is the deliverable and it is unambiguous: **today the
+tilt has no upside anywhere in the shadow fleet and a −7.2% downside on sixteen
+books.** Under I17 as amended (*"instead of finding a way to kill something you
+find a way to feed it"*) that is the wrong sign, and it is now a number the
+operator can decide on rather than one a session has to derive with a script.
+
+PUBLISH-ONLY: this moves no capital, writes no lever, and changes no book's
+clip. Verified against the LIVE publisher's own payload — `gate_totals` run
+over the deployed `books` map reproduces the hand computation to the cent
+($18,848.30 / $1,151.66), which is the `(hj)` check rather than a fixture that
+agrees with itself. 5 mutations verified RED against a green baseline (never
+count the surplus; read the raw target as effective; swallow an unpriceable
+row; compute the headline before the era fill; stop counting gated books).
+
+**ALSO IN THIS PASS — `session_commit.py` WAS REFUSING THE RENUMBER THE LETTER
+CONVENTION MANDATES.** Shipping this collided on `(uc)`: `origin/main` had
+taken it for *THE HATCHERY AUTOPSY*, which is cited from tracked code
+(`tests/test_review_currency.py:253`) while this branch's sniper entry was
+cited from nowhere — so under the collision rule the cited entry keeps the
+letter and mine moved to `(ue)`. **The tool then refused the commit**, because
+a renumber removes a header under one letter and adds it under another, which
+its `(nx)` deleted-entry guard reads as a destroyed entry.
+
+That guard is right to be suspicious: the `(nx)` incident WAS a letter rename
+(`perl -pi -e 's/(nv)/(nx)/g'` over another session's entry, 90 lines lost),
+and the title is unchanged in **both** cases, so no title comparison can
+separate them. The discriminator is the one the convention already requires —
+*"a renumber is recorded INLINE in the moved entry"*. A legitimate move is
+DECLARED; the sweep is silent by construction and cannot accidentally acquire a
+declaration. `renumbered_pairs()` lands in `audit_changelog_letters` beside
+`CORRECTED` (one owner for changelog-letter semantics, `(hj)`) and
+`session_commit` defers to it, requiring BOTH signals exactly as the correction
+escape does.
+
+**A mutation SURVIVED the first draft of those tests and found a real hole**:
+ignoring WHICH letter the declaration names. Renumber notes live in entry
+bodies forever — main carries `RENUMBERED (sq) -> (tt)` inside `(tt)` — so any
+diff touching CHANGELOG.md can pick up a stale one, and the destination letter
+alone is not the claim. The declared SOURCE must be the letter that actually
+left. 4 mutations verified RED after the fix (excuse any move; ignore the
+source letter; drop the title check; break the arrow forms), and the `(nx)`
+case itself is pinned unchanged — an UNDECLARED letter move is still reported.
+
+## 2026-08-26 (ue) — THE THIRD ENTOMBMENT: A SURGE/YOUNG SYMBOL THAT STOPS QUALIFYING IS NEVER OFFERED AGAIN, SO ITS GIVE-UP CAN NEVER FIRE — AND A RETRY THAT FORGETS ITS SOURCE TAKES THE WRONG SIDE
+
+**RENUMBERED (uc) → (ue) at push time.** `(uc)` was taken on `origin/main`
+by *THE HATCHERY AUTOPSY*, which is cited from tracked code
+(`tests/test_review_currency.py:253`) while this entry was cited from
+nowhere — so under the collision rule the cited entry keeps the letter and
+this one moves. The commit subject and PR #232 still read `(uc)`; `git log`
+is not a reliable letter index, which is why the move is recorded here.
 
 `(ub)` fixed two causes of the same entombment on 🎯 the Perp Sniper (the
 cooldown stamped on the OFFER rather than the OPEN; `pending` subtracted from
