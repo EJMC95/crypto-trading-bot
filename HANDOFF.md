@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-27 08:07 Sydney (22:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-27 08:39 Sydney (22:39Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,11 +74,48 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (3 commit(s), entries (ug), (ui))
+## Shipped today (40 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj))
 
+- `5b21a24` Four books tuned on their own ledgers, no retirements — and the card I shipped green yesterday was a time bomb (uj)
+- `a8c4929` Georgia publishes her census: one of four books whose row could not answer stuck-vs-slow (uc)
+- `f786461` Kill the stride survivor: a slice of one cannot see a stride (uc)
+- `5fceb7b` The joint sweep was dark for 4.5 days of every orbit: stride the walk, coprime so coverage is untouched (uc)
+- `4b00a89` Merge PR #233: one owner for cluster-robust t (ug), the redistribution refused (uh), main un-redded (ui)
+- `56d2029` Regenerate HANDOFF.md — I11's read-first/regenerate-last half
 - `e62af15` Correct (ui)'s timestamps in place: two of them were inferred, not measured
 - `fc343b8` The redistribution is refused with the number nobody had run; and main's red-by-the-clock fixture is fixed (uh)(ui)
 - `749e689` The cluster-robust t had three implementations, and both copies reproduced the (kg) degeneracy the owner was fixed for (ug)
+- `cced85d` Merge PR #232: sniper entombment (ue) + listing side unsupported (uf) + allocation gate leak (ud)
+- `259f0c5` The listing source has no measured side on its own band — the short's evidence lives in young's (uf)
+- `2c38512` Register scripts/audit_stuck_vs_slow's --selftest — inherited RED from main
+- `36e95c7` Repoint a changelog citation the (uc) -> (ue) renumber left dangling
+- `bc38b72` The allocation's two halves do not add up: $1,151.66 is withheld by the era gate and returned to nobody (ud)
+- `86c88bd` A surge/young pending symbol that stops qualifying is never offered again, so its give-up can never fire (uc)
+- `e8360e5` Close the declared gap: breakoutup's self-veto now reaches the incubator's fitness (uc)
+- `623e6eb` The incubator mutation round: the survivors were test gaps, and the code was right in every one (uc)
+- `814329d` Declare the board's golive freshness bound — the (ia) exception, one consumer along (uc)
+- `98da5f7` The incubator's fitness was not the taker's book — and the mechanism I published for it was REFUTED before it shipped (uc)
+- `27529e2` Stuck is not slow: the discriminator is OCCUPANCY, and the docket was reading two full books as empty ones (uc)
+- `acef2aa` The board stops widening on a sample the gate refuses; the judge sees georgia's real divergence; the pipe becomes legible (uc)
+- `15eafa9` Merge PR #231: the era headline counted a field that did not exist yet (ua)
+- `73723c8` The daily review counted 13 halt EVENTS as real-money trades — and the filter that fixed it read a JSONB key nothing has ever written (tu)
+- `f860e5c` The era headline counted a field that did not exist yet — it could only ever read zero (ua)
+- `093a44e` The winners' docket crowned a PROVEN winner on the window that generated the hypothesis (tt)
+- `63e497e` Merge PR #207: the sniper flies the other way — per-source side, and the fade that justified it corrected in place (tx)(ty)(tz)(ua)(ub)
+- `04b3c94` The debut fade is 76-83% CALENDAR: the side flip stands, its justification is corrected in place, four code defects fixed (ub)
+- `471323a` Merge origin/main — main's (ts) and this branch's (tx)-(ub), both kept whole
+- `56b0061` Renumber (ts)-(tw) -> (tx)-(ub): the THIRD collision on this branch's letters
+- `2ba1b9c` The pair census scored each arm's OLDEST 30 closes: georgia's shadow stamped at 09:22Z and still read 0/30 (ts)
+- `ecf1d2f` Credit Eamon by name in this branch's entries (tw)
+- `0cc6715` The sniper was on the wrong side of its own thesis: a perp lists AFTER the spot hype (tw)
+- `7aa9962` Merge origin/main (116 commits) — and my four letters collide a SECOND time
+- `6a1b01d` The sniper's side is per-source: listing and young go SHORT on a measured debut fade (letter pending)
+- `091cc2f` Merge PR #229: mum's bar widens to the measured cell — RSI_MAX 25->30, referee-confirmed (tr)
+- `bbf0bf0` The risk-up one-shot goes the way of every provisioner — receipts verified on both rows (tq)
+- `e40ca82` [deploy-live-mum] Mum's bar widens to exactly what was measured: RSI_MAX 25->30, the rescue tiers refused with their numbers (tr)
+- `c284590` Merge PR #228: the (tq) risk-up one-shot registered — derived gross ceilings, scaled cap, halt parity
+- `4b08462` Pre-registration snapshot: mum supply study verdict bars, committed before any result exists (tq)
+- `eed4576` Register the (tq) one-shot: derived gross ceilings for avo+georgia, scaled-cap activation, halt parity
 
 ## How this file stays honest
 
