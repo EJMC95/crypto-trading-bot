@@ -773,7 +773,12 @@ def _selftest():
         _hook = os.path.join(_tmp, ".claude", "hooks", "hook.py")
         for _p in (_mine, _theirs, _hook):
             with open(_p, "w", encoding="utf-8") as _fh:
-                _fh.write("# [2026-08-27 (zz)] a citation\n")
+                # ASSEMBLED, never written literally: a whole-file scan
+                # matches the guard's own source, so a literal fixture makes
+                # this file flag ITSELF — the (po) trap, inside the guard
+                # written to avoid it. Caught by running the guard after the
+                # test passed.
+                _fh.write("# [2026-08-27 " + "(zz)" + "] a citation\n")
         _seen = sorted(walk_py(_tmp))
         assert _seen == sorted([_mine, _hook]), _seen
         # POSITIVE CONTROL: without the skip the walk MUST find the worktree
@@ -787,7 +792,7 @@ def _selftest():
             SKIP_RELPATHS.update(_saved)
         # and the dangling-citation arm genuinely fires on that file, so the
         # skip is suppressing a REAL finding rather than a hypothetical one
-        assert dangling_code_citations([_theirs], {"fa"}), \
+        assert dangling_code_citations([_theirs], {"f" + "a"}), \
             "the citation arm must flag the worktree file when it is scanned"
         assert not dangling_code_citations([_mine], {"zz"}), \
             "a known letter must not be reported as dangling"
