@@ -1,3 +1,93 @@
+## 2026-08-27 (uk) — A RETIRED ARM HAS NO EXECUTION TO DIVERGE FROM: THE FARMER'S OWN RETIREMENT FLATTEN WAS READ AS SLIPPAGE AND CUT ALL THREE LIVE BOOKS' CLIPS BY 25% FOR FIVE DAYS
+
+**Eamon, 27-Aug: "Fix the funding farmer issue".** Found by this morning's
+daily brief; every number below is off the live payload, not reasoned about.
+
+### What was actually happening
+
+`fleet_tuning` carried three open levers, all authored by the evidence board,
+all with the same reason string — **"live-vs-shadow divergence alert"**:
+
+```
+live.avo.clip_scale     = 0.75    $352.49 -> $264.37   (-$88.12)
+live.georgia.clip_scale = 0.75    $364.92 -> $273.69   (-$91.23)
+live.mum.clip_scale     = 0.75    $712.51 -> $534.38   (-$178.13)
+```
+
+**$357.48 of real-money clip withheld** — and 👩 mum, restricted on it, **has
+never taken a trade in her life**. The chain, end to end:
+
+1. `market_context.py:477` hardcodes `LIVE = "perps-funding-lighter-lighter"`
+   — 💸 the Farmer's live arm, **retired 22-Aug `(ta)`** — and fires
+   `live-shadow-gap` off a rolling 7d `paper_trades` window.
+2. That arm's last four closes ARE the retirement: `short_retired` on **ETH,
+   BTC, SOL and XAU at 04:01–04:02Z on 22-Aug**, four forced market exits
+   booked at whatever the book was down, against a shadow twin that kept
+   trading normally. The window read them as **−2.223pp of "execution
+   divergence"** across exactly those 4 coins / 7 paired closes.
+3. `evidence_board.synthesize_live` consumes any fresh `live-shadow-gap` as
+   `gap`, and **`gap` is ROWS-FREE by design** (its own docstring says so), so
+   `if gap or hurt:` restricts EVERY live row. 🙏 avo's and 👩 mum's `why`
+   strings contain only the divergence clause and no hurt term of their own.
+
+**The organ's own execution numbers said the opposite the whole time:**
+`order_slip.live.slip_bps` **0.63** against shadow's **1.08** — live fills
+BETTER. `slip_streak` had reached **77 cycles**.
+
+### The second half, and the reason this is not just a stale alert
+
+The window DRAINS. Seven days after the flatten the alert stops on its own —
+for a reason unrelated to any of the three books — and `impl_shortfall` falls
+to `insufficient`, which "stays quiet". **The fleet's only live-vs-shadow
+execution instrument would have gone dark while three live/shadow pairs sat
+unwatched**, and `insufficient` is byte-identical between "thin week" and
+"this pair no longer exists" — the `(lv)` `{open: 0}` ambiguity at the
+real-money surface.
+
+### What ships — no new rule, the existing declaration finally asked
+
+`fleet_bus.RETIRED_LIVE_ARMS` has been the fleet's ONE declaration since
+`(ta)`, and `experiment_judge` reads it at **two** call sites — which is
+exactly why 🧪 the judge next door correctly published
+`farmer: {phase: "stood_down", successor: "freqtrade-georgia-lighter"}`
+throughout, while its two neighbours kept grading a corpse. A second copy of
+that table would be a second rule (the 8x funding bug's shape), so both
+readers now call `live_arm_retired`:
+
+* **`market_context`** skips the divergence check and says so in the log.
+  Guarded OUTSIDE the `try` and unwound through a `_RetiredArm` sentinel
+  caught ABOVE the broad handler — a deliberate skip logging as "divergence
+  check failed" is the *check-that-inspects-nothing* class, where the reason
+  it did not run IS the finding.
+* **`impl_shortfall`** publishes a new verdict **`stood_down`**, ranked FIRST
+  (above `insufficient`), reporting the number and refusing the verdict — the
+  `arm-drift` contract reused. It carries `stood_down.{live_bot, shadow_bot,
+  why, wake_when}` (I8) and kills both actuator paths: the phone push and the
+  RESTRICT proposals on `live.funding.*`, since both ride a streak that only
+  counts `live-slipping`.
+
+**The standing alert self-clears within 6h** (`EVBOARD_LIVE_GAP_FRESH_H`) once
+`last_seen` stops being refreshed; nothing has to un-fire it.
+
+**Fail-safe direction is the loud one**: an unknown row is NOT retired, so a
+typo can never silence a living book's divergence alert. A dark `fleet_bus`
+in `impl_shortfall` degrades to today's behaviour, never to a silenced book.
+
+### Born-dark + deploy, both caught by the guards rather than by me
+
+`Dockerfile.marketcontext` did not COPY `fleet_bus.py`, and the import is
+UNGUARDED (the `funding_basis` idiom in that file) — so the COPY ships in the
+same commit, and a test pins that `fleet_bus` stays stdlib-only at import so
+this image never needs a cascade. `audit_deploy_coverage` then reddened on the
+new orphan: a change to `fleet_bus.py` had no route to `market-context`. Both
+its `paths:` entry and the service grep now carry it — **a retirement declared
+in `fleet_bus` that cannot reach this service is this same bug again.**
+
+Pinned by `tests/autonomy/test_retired_arm_divergence.py` (13 tests: verdict
+rank, number-survives-refusal, both actuator paths, inert-while-live, the
+AST wiring in `market_context`, sentinel-before-broad-handler, the COPY, and
+the no-cascade bound).
+
 ## 2026-08-26 (ui) — MAIN WENT RED BY THE CLOCK: A FIXTURE ANCHORED TO A FROZEN INSTANT PASSED THE HOUR IT WAS WRITTEN AND ROTTED ORGAN BY ORGAN — 0 FAILURES AT 13:13Z, 11 AT 21:48Z, AND 11 FOREVER
 
 Found chasing an unexplained failure in a full-suite run, and it is not mine —

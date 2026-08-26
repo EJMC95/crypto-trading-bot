@@ -83,6 +83,7 @@ from collections import deque
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import fleet_bus
 import funding_basis
 from venues.symbol_map import from_lighter
 
@@ -104,6 +105,14 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)])
 log = logging.getLogger(BOT)
+
+
+class _RetiredArm(Exception):
+    """[(uk)] Sentinel: the divergence check's live arm is retired, so there
+    is nothing to measure. Raised to unwind the check's own body and caught
+    ABOVE the broad handler, so a deliberate skip is never logged as a fault.
+    Not an error condition — see the block at `evaluate_alerts`."""
+
 
 # Binance futures symbol -> fleet symbol (strip USDT; k-prefix the 1000x memes)
 _BINANCE_MAP = {"1000BONK": "kBONK", "1000SHIB": "kSHIB", "1000PEPE": "kPEPE",
@@ -470,11 +479,48 @@ def evaluate_evidence(quality):
     # alerting on noise (the 13-Jul +5.4% firing was the old ratio artifact:
     # live 9W/0L on its 3 slots vs shadow 15W/5L on 8, same-coin closes
     # near-identical — SOL +$0.19 live vs +$0.27 shadow).
+    #
+    # [2026-08-27 (uk)] A RETIRED ARM HAS NO EXECUTION TO DIVERGE FROM, and
+    # this check could not tell. `LIVE` below is a hardcoded row, and it was
+    # retired 22-Aug ((ta)) — but its last four closes are the RETIREMENT
+    # FLATTEN itself (`short_retired` on ETH/BTC/SOL/XAU at 04:01-04:02Z),
+    # four forced market exits booked at whatever the book was down, against
+    # a shadow twin that kept trading normally. The 7d window read that as
+    # -2.223pp of "execution divergence" and fired `live-shadow-gap`, which
+    # `evidence_board.synthesize_live` consumes as a ROWS-FREE `gap` — so
+    # `if gap or hurt:` cut EVERY live row's clip to 0.75x for five days,
+    # including 👩 mum, who has never taken a trade in her life. Measured
+    # cost at the moment this shipped: $88.12 + $91.23 + $178.13 = $357.48 of
+    # clip withheld across the trio, by a book that has been flat since 22-Aug.
+    # The organ's OWN numbers said the opposite (live slip 0.63bps vs shadow
+    # 1.08bps — live fills BETTER).
+    #
+    # The declaration already existed and already had two consumers
+    # (`experiment_judge` reads it twice, which is why 🧪 the judge next door
+    # correctly published `farmer: {phase: "stood_down"}` throughout). This
+    # check just never asked. Fail-safe direction is `live_arm_retired`'s, not
+    # ours: an unknown row is NOT retired, so a typo can never silence a
+    # living book's divergence alert — the loud direction is the safe one.
+    # The alert self-clears within `EVBOARD_LIVE_GAP_FRESH_H` (6h) once
+    # `last_seen` stops being refreshed; nothing has to un-fire it.
+    LIVE, SHAD = "perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"
+    # Guarded OUTSIDE the try, deliberately: a `raise` inside it would land in
+    # the `except` below and log "divergence check failed" — a DELIBERATE skip
+    # reading as a fault is the same class as a check that inspects nothing and
+    # reports clean. A retired arm is a decision, not an error, and the log
+    # line says which.
+    _retired = fleet_bus.live_arm_retired(LIVE)
+    if _retired:
+        log.info("divergence check SKIPPED: %s is a retired live arm — no "
+                 "execution to diverge from; alert not fired (any standing "
+                 "one ages out of the board's freshness window on its own)",
+                 LIVE)
     try:
+        if _retired:
+            raise _RetiredArm(LIVE)
         conn2 = store._get_conn()
         if conn2 is None:
             raise LookupError("no DB connection")
-        LIVE, SHAD = "perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"
         with conn2.cursor() as cur:
             # closed_at is TEXT (iso); seen_at is a real TIMESTAMPTZ stamped at
             # insert (== close publication time) — filter on that.
@@ -499,6 +545,11 @@ def evaluate_evidence(quality):
                                 f"{gap:+.2%} across {n_overlap} overlapping coins "
                                 f"({tot_w} paired closes) — execution divergence "
                                 f"worth investigating")
+    except _RetiredArm:
+        # Caught BEFORE the broad handler on purpose. A deliberate skip must
+        # never surface as "divergence check failed": the reason it did not
+        # run is the finding, and a fault log here would hide it.
+        pass
     except Exception as e:  # noqa: BLE001
         log.warning("divergence check failed: %s", e)
 
