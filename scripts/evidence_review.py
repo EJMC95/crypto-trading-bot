@@ -675,11 +675,35 @@ def verify_alerts(cur, errors):
                 verdicts.append((key, "active" if sym in coins else "resolved",
                                  coins.get(sym, f"{sym} no longer vetoed")))
             elif kind == "live_shadow":
-                gap = live_shadow_gap(cur)
-                verdicts.append((key, "resolved" if abs(gap["gap_pp"]) < 2.0 else "active",
-                                 f"per-trade gap {gap['gap_pp']:+.3f}pp "
-                                 f"(live {gap['live_pct']:+.3f}% n={gap['live_n']} vs "
-                                 f"shadow {gap['shadow_pct']:+.3f}% n={gap['shadow_n']})"))
+                # [2026-08-27] EVERY live row, against ITS OWN twin — the same
+                # rule the `live-shadow` evidence section adopted on 26-Aug.
+                # THE INCIDENT: that pass fixed the evidence section and the
+                # helper (which grew a required `live` argument) and left THIS
+                # call on the old one-book signature, so the verifier raised
+                # TypeError and the key published "verification failed" — an
+                # alert that can never be verified is an alert nobody reads.
+                # The class, not the instance: a hand-typed book here would go
+                # stale on the next slot swap exactly as the old one did.
+                notes, worst, measurable = [], 0.0, 0
+                for _live in DECLARED_LIVE:
+                    g = live_shadow_gap(cur, _live)
+                    if not g["live_n"] or not g["shadow_n"]:
+                        notes.append(f"{_live}: insufficient paired closes "
+                                     f"(live n={g['live_n']}, "
+                                     f"shadow n={g['shadow_n']})")
+                        continue
+                    measurable += 1
+                    worst = max(worst, abs(g["gap_pp"]))
+                    notes.append(f"{_live}: {g['gap_pp']:+.3f}pp "
+                                 f"(live {g['live_pct']:+.3f}% n={g['live_n']} vs "
+                                 f"shadow {g['shadow_pct']:+.3f}% n={g['shadow_n']})")
+                # FAIL-CLOSED: with nothing measurable the gap is UNKNOWN, and
+                # an unknown must never publish as "resolved" — that is the
+                # vacuous all-clear this key exists to make impossible.
+                status = ("active" if not measurable or worst >= 2.0
+                          else "resolved")
+                verdicts.append((key, status, "; ".join(notes) or
+                                 "no live rows declared"))
             else:
                 verdicts.append((key, "active",
                                  f"no verifier for this key shape — {a.get('msg','')[:120]}"))
@@ -1695,6 +1719,83 @@ def selftest():
         raise AssertionError("a row with no distinct twin must raise")
     except ValueError:
         pass
+
+    # ---- [2026-08-27] THE VERIFIER BRANCH IS DRIVEN, NOT JUST THE HELPER --
+    # THE INCIDENT: the 26-Aug pass above gave `live_shadow_gap` a REQUIRED
+    # `live` argument and updated the evidence section to iterate every live
+    # row — but left `verify_alerts`'s own call on the old one-book signature.
+    # It raised TypeError on the very next run and the 'live-shadow-gap' key
+    # published "verification failed", i.e. the alert meant to catch a live
+    # book drifting from its control could not be verified at all. Every
+    # assertion above stayed GREEN, because they all drive the HELPER and
+    # nothing drove the CALLER. So: drive `verify_alerts` itself, and read
+    # back both the status and WHICH BOTS the branch queried.
+    class _AlertCur:
+        """Serves bot_state reads, then the gap queries, off one cursor.
+
+        `rows` is the LIVE arm's ledger; `shadow_rows` the twin's (defaulting
+        to the same), so a divergence can actually be constructed — feeding
+        one row-set to both arms pins the gap at 0.00pp and makes the
+        DIVERGING branch unreachable from any test.
+        """
+
+        def __init__(self, rows, shadow_rows=None):
+            self.rows = rows
+            self.shadow_rows = rows if shadow_rows is None else shadow_rows
+            self.seen, self._next, self._arm = [], None, None
+
+        def execute(self, sql, params=None):
+            if "bot_state" in sql:
+                key = params[0]
+                payload = ({"alerts": [{"key": "live-shadow-gap",
+                                        "ts": dt.datetime.now(
+                                            dt.timezone.utc).timestamp(),
+                                        "msg": "x"}]}
+                           if key == ALERTS_KEY else None)
+                self._next = [(payload, dt.datetime.now(dt.timezone.utc))] \
+                    if payload else []
+            else:
+                self.seen.append(params[0])
+                self._arm = params[0]
+                self._next = None
+
+        def fetchone(self):
+            return self._next[0] if self._next else None
+
+        def fetchall(self):
+            return list(self.shadow_rows
+                        if str(self._arm).endswith("-lshadow") else self.rows)
+
+    _ac = _AlertCur([(0.01, 1.0, 100.0)])
+    _errs = []
+    _v = verify_alerts(_ac, _errs)
+    assert not _errs, f"the live-shadow verifier must not fail soft: {_errs}"
+    _ls = [x for x in _v if x[0] == "live-shadow-gap"]
+    assert len(_ls) == 1, _v
+    # EVERY declared live row is queried against its own twin — not row[0]
+    _want = [b for r in DECLARED_LIVE for b in (r, shadow_twin(r))]
+    assert _ac.seen == _want, f"{_ac.seen} != {_want}"
+    assert _ls[0][1] == "resolved", _ls          # a 0.00pp gap resolves
+    for _r in DECLARED_LIVE:
+        assert _r in _ls[0][2], f"{_r} missing from the verdict note"
+
+    # FAIL-CLOSED: nothing measurable must NOT read "resolved". A phantom-only
+    # ledger ($0.00, no entry price) leaves n=0 on both arms, and the old
+    # branch would have divided that into a clean all-clear.
+    _ac0 = _AlertCur([(0.0, 0.0, None)])
+    _v0 = verify_alerts(_ac0, [])
+    _ls0 = [x for x in _v0 if x[0] == "live-shadow-gap"][0]
+    assert _ls0[1] == "active", \
+        f"an unmeasurable gap must never publish resolved: {_ls0}"
+
+    # and a real divergence still fires: live +5.0%/trade vs shadow +1.0% is
+    # a 4.00pp gap, twice the 2.0pp bar. Without this the branch could be
+    # pinned at "resolved" and every assertion above would stay green.
+    _acd = _AlertCur([(0.05, 1.0, 100.0)], shadow_rows=[(0.01, 1.0, 100.0)])
+    _vd = verify_alerts(_acd, [])
+    _lsd = [x for x in _vd if x[0] == "live-shadow-gap"][0]
+    assert _lsd[1] == "active", _lsd
+    assert "+4.000pp" in _lsd[2], _lsd
 
     # ---- [2026-08-26, 2nd pass] HALT EVENTS ARE NOT TRADES ----------------
     # THE INCIDENT: this script had NO phantom-close filter while

@@ -1,3 +1,51 @@
+## 2026-08-27 (uj) — THE LIVE-SHADOW ALERT COULD NOT BE VERIFIED AT ALL: THE 26-AUG PASS FIXED THE EVIDENCE SECTION AND THE HELPER, AND LEFT THE VERIFIER ON THE OLD SIGNATURE
+
+`(ta)`/`(tb)`/`(te)` took the fleet from one live row to THREE, and the 26-Aug
+pass correctly rewrote `live_shadow_gap` to take an explicit `live` book and
+made the `live-shadow` EVIDENCE section iterate `DECLARED_LIVE`. It left
+`verify_alerts`'s own call — `live_shadow_gap(cur)` — on the one-argument form.
+
+**MEASURED in this morning's run**: the `live-shadow-gap` key published
+`"verification failed: TypeError"`, and `payload.errors` carried
+`live_shadow_gap() missing 1 required positional argument: 'live'`. So the ONE
+alert whose job is to catch a real-money book drifting from its control arm has
+been unverifiable since the signature changed — an alert that cannot be verified
+is an alert nobody reads.
+
+**WHY EVERY TEST STAYED GREEN, and this is the transferable half.** The 26-Aug
+block is thorough: it drives `live_shadow_gap` with a recording cursor and reads
+back *which bots it queried*, and a mutation round proved a hardcoded foreign
+twin RED. Every one of those assertions drives the **helper**. Nothing drove the
+**caller**. The class was closed at one call site and left open at the other —
+`(hj)`'s "a second copy of a rule is a second rule" in the call-site dimension.
+
+**WHAT SHIPS.** The verifier iterates `DECLARED_LIVE` like its sibling, reports
+every live row against its own twin, and is **FAIL-CLOSED**: with nothing
+measurable the key stays `active`, because an unknown gap must never publish as
+`resolved` — that is the vacuous all-clear the key exists to prevent. Today it
+reads: avo +0.546pp, georgia −0.295pp, mum insufficient (live n=0) — no
+divergence, and for the first time that verdict is EARNED rather than absent.
+
+Pinned by a selftest that drives `verify_alerts` ITSELF and reads back the
+queried bots, the status, and the note. The recording cursor had to grow
+separate live/shadow row-sets first: feeding one set to both arms pins the gap
+at 0.00pp and makes the DIVERGING branch unreachable from any test — the
+`(po)` "a check that inspects nothing" shape, inside the test written to close
+it. 4 mutations verified RED: watch only `DECLARED_LIVE[0]`; fail-OPEN on an
+unmeasurable gap; the divergence bar never trips; the verifier pinned to a
+FOREIGN shadow twin (the 26-Aug incident, reproduced at the call site that
+still had it).
+
+Found by the daily review's own `payload.errors` — the fail-soft channel doing
+exactly its job. This script ships in no container and runs from the repo, so
+the push is the deploy.
+
+**[LETTER MOVED (ug) -> (uj), 27-Aug.** Three concurrent sessions took (ug),
+(uh) and (ui) on `origin/main` while this entry was being written — the race
+`audit_changelog_letters` exists to catch, and it caught it pre-push. The
+cross-branch arm named the collision by title; no tracked code cited either
+entry yet, so this one moved. Recorded inline per the changelog-letter rule.**]
+
 ## 2026-08-26 (uf) — THE `listing` SOURCE HAS NO MEASURED SIDE ON ITS OWN BAND: THE SHORT'S EVIDENCE LIVES IN `young`'s BAND, AND THE t=+4.05 THAT SEEMED TO SUPPORT IT MEASURES SAMPLING DENSITY
 
 `(ua)` flipped 🎯 the Perp Sniper's `listing` source to SHORT@24h and `(ub)`
