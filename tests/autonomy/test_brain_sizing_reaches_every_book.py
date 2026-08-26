@@ -244,6 +244,20 @@ RAW_READ_OK = {
     "lighter_ticket_taker.py":
         "(dm) breakoutup self-veto — reads the payload to VETO a lens, "
         "never to size; the sizing path goes through fleet_bus.brain_clip",
+    # (uc) the SAME read, one consumer along, and strictly weaker: the
+    # incubator asks `tt.breakoutup_self_vetoed` (imported, never
+    # re-implemented) whether to admit `breakoutup` to its FITNESS. It sizes
+    # nothing and sends no orders — it has no clip, no rail and no broker — so
+    # the property this guard protects (the operator's notional rail must see
+    # the SIZED clip) has no surface here at all. Declared rather than left
+    # withheld because the alternative is worse than either: with the read
+    # unwired the lens was scored fail-OPEN, so a `breakoutup` the brain had
+    # DECISIVELY graded a loser still entered the organ's fitness — the exact
+    # asymmetry the taker's own veto exists to prevent.
+    "strategy_incubator.py":
+        "(uc) breakoutup self-veto in the FITNESS BASIS — reads the payload to "
+        "VETO a lens, never to size; this organ places no orders and has no "
+        "clip path, so there is no rail for a sized clip to reach",
 }
 
 #: books that SEND ORDERS (live or funded paths). For these the operator's

@@ -380,15 +380,44 @@ def fresh_lens_fwd(state, now):
 #: KEY STRING is deliberately absent from this module: that guard is a plain
 #: substring scan over the file text, so even naming the key in prose trips
 #: it — which is itself the honest signal that the declaration is owed.
-BRKUP_VETO_WIRED = False
+#: [(uc)] CLOSED. `strategy_incubator.py` is declared in that guard's
+#: `RAW_READ_OK` with the taker's own reason, so the read below is legitimate
+#: and the consequence above no longer stands: a `breakoutup` the brain has
+#: decisively graded a loser is now excluded from this organ's fitness, exactly
+#: as the taker excludes it from its fills. The funnel still publishes the
+#: state every cycle — `wired` now — because a flag that stops being reported
+#: is a flag nobody can check.
+BRKUP_VETO_WIRED = True
 
 
 def stake_mults_payload():
-    """The brain's raw per-close-tag grades, or {} while the read is withheld.
+    """The brain's raw per-close-tag grades, or {} on any trouble.
 
-    Kept as a seam rather than an inline `{}` so the freshness path above stays
-    exercised and closing the gap is a one-line body change."""
-    return {}
+    Fail-OPEN by construction (a dark/unreadable brain vetoes NOTHING), which
+    matches `tt.breakoutup_self_vetoed`'s own documented degrade — the two
+    consumers must not disagree about what an absent grade means. Freshness is
+    the CALLER's job and is applied by `fresh_stake_mults`.
+
+    Keyed by the literal, matching this module's own `brain-lens-forward` read
+    rather than inventing a constant the taker does not export —
+    `lighter_ticket_taker` names the same key inline at its own read site, so a
+    shared constant would have to be added there, to a file this change has no
+    reason to touch. The RULE is imported (the veto itself is
+    `tt.breakoutup_self_vetoed`); only the key name is repeated.
+
+    BOUND TO A NAME ON PURPOSE, rather than returned inline: the guard that
+    licenses this read finds it by walking assignments whose value mentions the
+    key, then proves the bound name never reaches a multiplication or a
+    clip/stake/notional target. A bare `return store.load_state(...)` binds
+    nothing, so the guard reads the declaration as stale and — worse — its
+    sizing arms have no name to track through this file. Binding it keeps the
+    guard EFFECTIVE here instead of blind.
+    """
+    try:
+        raw_mults = store.load_state("brain-stake-mults") or {}
+    except Exception:                      # noqa: BLE001 — a veto read is
+        raw_mults = {}                     # an enhancement, never a dependency
+    return raw_mults
 
 
 def fresh_stake_mults(state, now):

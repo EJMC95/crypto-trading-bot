@@ -557,28 +557,42 @@ def test_run_once_checks_freshness_before_passing_the_grade():
         "the brain grade must be freshness-checked at the caller"
 
 
-def test_the_withheld_raw_read_is_declared_not_silent():
-    """THE ONE HALF THIS PASS COULD NOT WIRE, pinned so it cannot rot.
+def test_the_raw_read_is_wired_and_declared_together():
+    """[(uc)] THE GAP IS CLOSED, and this test now pins the OTHER direction.
 
-    `tt.breakoutup_self_vetoed` needs the RAW brain stake-mults payload (it
-    reads `n`, which `fleet_bus.brain_mults` drops through the clamp), and the
-    fleet's raw-read guard requires such a reader to be DECLARED in its own
-    `RAW_READ_OK` map — a file this pass did not own. So the read is withheld
-    and the consequence is PUBLISHED rather than taken quietly. This test
-    fails the moment either half changes, which is the point: closing the gap
-    must be a deliberate edit in both places."""
-    assert si.BRKUP_VETO_WIRED is False, (
-        "if the raw read has been wired, this organ must be listed in the "
-        "fleet raw-read guard's RAW_READ_OK — update both together")
-    assert si.stake_mults_payload() == {}, "withheld means empty, not junk"
-    # the guard that forces the declaration: this module must not name the key
+    It was written to pin a WITHHELD read: `tt.breakoutup_self_vetoed` needs
+    the RAW stake-mults payload (it reads `n`, which `fleet_bus.brain_mults`
+    drops through the clamp), and the fleet's raw-read guard requires such a
+    reader to be DECLARED in its own `RAW_READ_OK` — a file that pass did not
+    own, so the read was withheld and the consequence published.
+
+    Both halves shipped together, so the invariant flips: the read is wired
+    AND the declaration exists. The pairing is what matters and is what this
+    asserts — a wired read with no declaration is the hole the guard exists to
+    prevent, and a declaration with no read is a stale exemption ((hl)'s
+    `DRIFT_OK` lesson). Either one alone fails here."""
+    assert si.BRKUP_VETO_WIRED is True, (
+        "the read was un-wired; if that is deliberate, also remove "
+        "strategy_incubator.py from the raw-read guard's RAW_READ_OK")
     guard = REPO / "tests/autonomy/test_brain_sizing_reaches_every_book.py"
     assert guard.exists(), "the raw-read guard moved; re-derive this rule"
-    raw = si.stake_mults_payload.__doc__ or ""
-    assert "withheld" in raw
-    # ...and the seam must still run the freshness path, so closing the gap is
-    # a one-line body change rather than a rewire
-    assert si.fresh_stake_mults(si.stake_mults_payload(), si.now_ts()) == {}
+    assert "strategy_incubator.py" in guard.read_text(), (
+        "BRKUP_VETO_WIRED is True but this organ is NOT declared in the "
+        "raw-read guard — that is an undeclared raw read")
+
+    # The read must be a REAL read, not a stub that satisfies the flag: drive
+    # the veto end to end through the taker's own rule in both directions.
+    decisive = {"mults": {tt.BOT_ROW:
+                          {"long-breakoutup": {"mult": 0.5, "n": 99}}}}
+    assert tt.breakoutup_self_vetoed(decisive, tt.BOT_ROW) is True
+    assert "breakoutup" not in si.scored_lens_set(
+        {"breakout", "divergence"}, decisive, tt.BOT_ROW), \
+        "a decisively-graded loser must not enter the fitness once wired"
+    # ...and the fail-OPEN degrade is unchanged: a dark brain vetoes NOTHING
+    assert "breakoutup" in si.scored_lens_set(
+        {"breakout", "divergence"}, {}, tt.BOT_ROW)
+    # the freshness seam still runs (the caller owns freshness, per the taker)
+    assert si.fresh_stake_mults({}, si.now_ts()) == {}
 
 
 # ---------------------------------------------------------------------------
