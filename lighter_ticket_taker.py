@@ -2773,6 +2773,19 @@ def main(_ctx=None):
             # losing day_start and re-baselining the daily-loss rail.
             coin_vetoed = {}
     opened_syms, opened_lenses = set(), set()
+    # [2026-08-27 (uk)] THE SLOT CENSUS — which constraint actually binds.
+    # `open 6/6` is BYTE-IDENTICAL between "six tickets existed" and "twenty
+    # existed and fourteen were refused for want of a slot" (I18/(lv), in the
+    # mirror direction: not an arm that opens NOTHING, an arm that is always
+    # FULL). Three throttles can bind here and none was counted:
+    #   slots_full  -- `len(pos) >= MAX_OPEN`, which `break`s silently
+    #   lens_once   -- one NEW position per lens per cycle
+    #   held_sym    -- never add to a symbol already held
+    # So nobody tuning TT_MAX_OPEN could see the thing they were tuning (I23).
+    # This is the measurement that has to exist BEFORE a slot change can be
+    # justified, and it is REPORTED, never a gate — it changes no entry.
+    slot_census = {"offered": 0, "slots_full": 0, "lens_once": 0,
+                   "held_sym": 0, "opened": 0}
     # [2026-07-17] Hard mode allow-list, evaluated ONCE and independently of any
     # bus payload. Live = divergence only; shadow keeps filling all four so the
     # control arm still grades them. See allowed_lenses().
@@ -2865,12 +2878,22 @@ def main(_ctx=None):
                                 or _vbase in coin_vetoed):
                 continue          # measured slippage over the bar (fail-open)
             # one NEW position per lens per cycle; never add to a held symbol
+            # [(uk)] counted BEFORE the `continue`/`break` so the census sees
+            # exactly what each throttle refused. `slots_full` is counted for
+            # EVERY remaining ticket rather than once, because the question it
+            # answers is "how much supply did the cap turn away this cycle?"
+            slot_census["offered"] += 1
+            if len(pos) >= MAX_OPEN:
+                slot_census["slots_full"] += 1
+                continue
             if (not sym or sym in pos or sym in opened_syms
                     or lens in opened_lenses
                     or _sl_active(sl_block.get(sym), t_now)):
+                if sym and (sym in pos or sym in opened_syms):
+                    slot_census["held_sym"] += 1
+                elif lens in opened_lenses:
+                    slot_census["lens_once"] += 1
                 continue
-            if len(pos) >= MAX_OPEN:
-                break
             mark = marks.get(sym)
             if not mark:
                 continue
@@ -3056,6 +3079,7 @@ def main(_ctx=None):
                          "bars": entry_bars()}
             opened_syms.add(sym)
             opened_lenses.add(lens)
+            slot_census["opened"] += 1
             print(f"[ticket-taker] {iso(t_now)} OPEN "
                   f"{'long' if is_long else 'SHORT'} {sym} ({lens}) "
                   f"${clip}{'' if bmult == 1.0 else f' (brain {bmult:.2f}x)'}"
@@ -3152,6 +3176,15 @@ def main(_ctx=None):
                # so a config-as-code override that silently beats the env var is
                # caught (railway-config-as-code-overrides-env).
                "max_open": MAX_OPEN,
+               # [(uk)] WHICH CONSTRAINT BINDS. `slots_full > 0` is the only
+               # evidence that raising MAX_OPEN would buy trades this book has
+               # already earned; `lens_once > 0` says the per-lens-per-cycle
+               # throttle is the binder instead and slots would change nothing.
+               # Reported, never a gate. A cycle that never reached the entry
+               # loop (stale scout / stress veto) publishes the zeroed census
+               # rather than the previous cycle's, so quiet is never mistaken
+               # for full.
+               "slot_census": slot_census,
                "cap_usd": (rails.max_notional if rails is not None else None),
                # D1: total capital excluded from pnl_abs — self-describing
                **({"capital_adjust": round(capital_adjust["total"]

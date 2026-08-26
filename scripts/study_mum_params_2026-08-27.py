@@ -220,7 +220,7 @@ def main():
         if len(rets) < 5:
             return None
         mean = sum(rets) / len(rets)
-        t_cl = S.cluster_t(ex, keys)
+        t_cl = S.cluster_t(ex, keys)[0]      # cluster_t returns (t, G)
         # matched-random null
         bycoin = {}
         for s, i in eps:
@@ -277,10 +277,10 @@ def main():
                 keys.append((s, tape[s][i + 1][0] // 86400))
         if len(br) >= 10:
             h1, h2 = halves(br)
-            row["br"] = (sum(br) / len(br), S.iid_t(br), S.cluster_t(br, keys),
+            row["br"] = (sum(br) / len(br), S.iid_t(br), S.cluster_t(br, keys)[0],
                          h1, h2, len(br))
             print(f"   BRACKET (24h): {sum(br)/len(br):+.3f}%/trade  "
-                  f"t {S.iid_t(br):+.2f}  t_cl {S.cluster_t(br, keys):+.2f}  "
+                  f"t {S.iid_t(br):+.2f}  t_cl {S.cluster_t(br, keys)[0]:+.2f}  "
                   f"halves {h1:+.3f}/{h2:+.3f}  n={len(br)}")
         q1[cid] = row
 
@@ -345,7 +345,7 @@ def main():
         mh = sum(hold_bars) / len(hold_bars)
         perbd = mean / (mh / 24.0) if mh else 0.0
         h1, h2 = halves(rr)
-        tc = S.cluster_t(rr, keys)
+        tc = S.cluster_t(rr, keys)[0]
         q2[H] = (mean, S.iid_t(rr), tc, h1, h2, mh, perbd, len(rr), mix)
         print(f"{H:5d} {len(rr):5d} {mean:+9.3f} {S.iid_t(rr):+6.2f} {tc:+6.2f} "
               f"{h1:+7.3f}/{h2:+7.3f} {mh:11.1f} {perbd:+10.3f} "
