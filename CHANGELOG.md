@@ -1,3 +1,104 @@
+## 2026-08-26 (uf) — THE `listing` SOURCE HAS NO MEASURED SIDE ON ITS OWN BAND: THE SHORT'S EVIDENCE LIVES IN `young`'s BAND, AND THE t=+4.05 THAT SEEMED TO SUPPORT IT MEASURES SAMPLING DENSITY
+
+`(ua)` flipped 🎯 the Perp Sniper's `listing` source to SHORT@24h and `(ub)`
+corrected the fade that justified it as **76-83% CALENDAR**, keeping the flip on
+the counterfactual. `(ub)` also left one thing unmeasured and said so: the flip
+was carried by a number computed across **both** debut bands. This closes it,
+and the answer is **NEITHER SIDE**.
+
+**THE HEADLINE** — `listing`'s own 0-7d band, through the book's OWN bracket
+(tp+15/sl−10, stop checked before target inside each bar), against a
+**calendar-matched control** (same bracket, same side, same calendar hour, on
+every coin ≥60d mature, excluding the entry coin), by-coin as the honest unit,
+at the shipped 24h hold:
+
+| side | excess | by-coin t |
+|---|---|---|
+| LONG | **−0.036%** | −0.07 |
+| SHORT | **+0.123%** | +0.29 |
+
+SHORT beats LONG by **+0.160pp** at paired t=+0.17 — the widest margin available
+and indistinguishable from noise.
+
+**THREE THINGS SETTLE IT.**
+
+1. **THE SIGN FLIPS WITH HORIZON.** LONG wins at 6h (paired SHORT−LONG −0.310%,
+   t=−0.77) and at 72h (−0.408%, t=−0.26); SHORT wins only at 24h. Two of three
+   horizons favour LONG, no |by-coin t| reaches 0.80, and **the shipped hold is
+   the single cell where the short looks best** — the `(oe)` artifact signature.
+2. **THE RAW SIGNAL DOES NOT SURVIVE THE BRACKET.** Raw-return matched excess at
+   0-7d is **+0.663%** by-coin (t=+0.59); run the identical entries through
+   tp+15/sl−10/24h and it becomes **−0.036%**. The debut band's fat right tail is
+   exactly what a +15% cap and a −10% stop clip (exit mix: `max_hold` 75%, `sl`
+   17%, `tp` 9%). `(ml)`'s doctrine landing on a directional read: **a mean says
+   nothing about what a bracket books**, so "0-7d points LONG" cannot be acted on.
+3. **THE t=+4.05 IS AN OVERLAP ARTIFACT — and this is the transferable half.**
+   Sweeping ONLY the sampling stride at 0-7d, pooled t runs
+   **3.98 / 2.29 / 1.52 / 0.95 / 0.36** at stride 1/3/6/12/24 while the point
+   estimate barely moves and by-coin t holds at 0.62/0.63/0.59/0.53/0.31. The
+   placebo names the mechanism outright: at stride 24 with a 24h hold — i.e.
+   NON-overlapping — pooled SE **0.0730** equals by-coin SE **0.0728**.
+   **Pooled t over overlapping windows measures how densely you sampled, not
+   how big the edge is**, and it is free to quote any number you like by
+   choosing a stride. This fleet already pays for the cluster-robust form on its
+   ledgers (`(kw)`/`(ky)`); this is the same defect in a REPLAY, where the
+   sampling rate is a free parameter the analyst picks.
+
+**THE BEST CASE FOR THE SHIPPED SHORT, AND IT FAILS EVERYTHING.** The LITERAL
+listing trade — one entry per coin at its first bar, 24h, n=**24 coins** —
+reads +0.900%, t=+0.57. Sign test **13/24** positive (binomial p=0.84, a coin
+flip); top 3 coins = **224%** of the total and **ex-top-3 the short LOSES
+−1.276%** (t=−1.09); leave-one-coin-out t ∈ [+0.05, +0.90]; block-bootstrap 95%
+CI **[−2.010%, +4.070%]** with P(mean≤0)=**0.269**.
+
+**WHERE THE SHORT'S EVIDENCE ACTUALLY LIVES.** Same estimator, same bracket,
+same control, 24h, by-coin — **8-21d**: LONG **−0.374% (t=−2.67)**, SHORT
++0.253% (t=+1.47). That band is the **`young`** source's, not `listing`'s. So
+`(ua)`'s flip was correct for the source it was measured on and INHERITED by a
+source whose own band does not support it. Note even there only *"LONG loses"*
+is significant; the short itself is t=+1.47 < 2.
+
+**A STRUCTURAL BONUS THAT SETTLES `(ub)`'s CALENDAR WORRY.** The 11 coins born
+at the venue's opening instant — the ones `(ub)` found carrying the fade —
+**cannot contaminate a matched estimate at all**: no coin on the venue was 60d
+mature during 2025-01-17..24, so all 11 have ZERO control coverage and the
+with/without-launch excess numbers come out **byte-identical**. The raw numbers
+DO move (24h SHORT raw +0.745% → +0.910%) and never reach the matched one. 19 of
+46 entry coins drop out the same way; the matched sample is 27 coins / 735
+entries, control breadth median 27, min 11.
+
+**VALIDATED BEFORE USE, all three passed** — the calibration discipline `(gx)`
+requires: a **positive control** (planting +2.0%/24h on the entry path only
+recovers LONG +1.535% t=+3.12 / SHORT −1.600% t=−3.91; −2.0% recovers the
+mirror, attenuated ~75-88% because the bracket truncates the planted drift), a
+**placebo** (the same estimator on MATURE 61-120d entries returns LONG +0.049%
+t=+0.67, SHORT −0.076% t=−1.07 — zero, as required), and a **reconciliation** to
+`(ub)`'s referee, which reproduces to three decimals on both bands.
+
+**AND ONE FALSE NEGATIVE, CAUGHT BY THE HOUSE RULE.** The first version keyed
+entries on `born + h*3600`, but `born` is not hour-aligned while bars are — it
+selected NOTHING and printed a clean, entirely false, all-zero table. `(po)`:
+**empty output is not a negative result until the check has been seen to produce
+a positive one.** Fixed to walk actual bar timestamps.
+
+**WHAT SHIPS — THE DECLARATION, NOT A FLIP.** `dir_by_src` publishes
+`listing: short` and `young: short` in the same shape while one is measured and
+the other is not, and no reader could tell them apart. `SOURCE_SIDE_BASIS` and
+`extra.dir_basis_by_src` now say which: **`young` = `measured`** (`(sl)`'s
+−0.457%/trade t=−2.38, corroborated on the 8-21d band above); **`listing` =
+`unsupported`**; **`surge` = `unsupported`** (`(sk)` measured its entry at
+percentile 0.429 at the shipped 6h hold — worse than a random minute on the same
+coin). REPORTED, NEVER A GATE (I15) — this changes no trade.
+
+**NOT RE-FLIPPED TO LONG, deliberately**: that side is not supported either, and
+swapping an unsupported side for another unsupported side is motion, not growth.
+`listing` stays SHORT and stays declared hypothesis-grade, which is what it
+already was. Its practical stake is small — `(sk)` measured the source at ZERO
+crypto supply for 86 days — and the point of the measurement is that the next
+session reading `dir_by_src` does not infer evidence that was never there.
+3 mutations verified RED (stop publishing the basis; let `listing` read
+`measured`; drop a source's entry).
+
 ## 2026-08-26 (ud) — THE ALLOCATION'S TWO HALVES DO NOT ADD UP: $1,151.66 OF FLEET CAPITAL IS WITHHELD BY THE ERA GATE AND RETURNED TO NOBODY, AND SIXTEEN BOOKS SIT BELOW FLAT TO FUND A BONUS THAT IS REFUSED
 
 **MEASURED on the live payload, not reasoned about** — `fleet-allocation` at
@@ -160,7 +261,7 @@ pre-existing flap test, which is the cleanest evidence the narrowing is right.
 **THE SECOND HALF — A RETRY MUST KEEP ITS SOURCE.** `_src_map` is built from
 the three live candidate lists, so a stale pending symbol had **no source**,
 and the fallbacks are not neutral: `side_is_long(None)` is **LONG** and
-`hold_sec_for(None)` is the old `MAX_HOLD_SEC`. Since `(ua)` this book takes
+`hold_sec_for(None)` is the old `MAX_HOLD_SEC`. Since `(ub)` this book takes
 `young` **SHORT at 24h** and `surge` **LONG at 6h** — so an un-sourced retry
 would have opened a young symbol on the **wrong side**, at the wrong hold, and
 stamped an un-parseable tag on the close. The pending record now carries `src`
@@ -643,6 +744,20 @@ names, on the instrument built to end exactly that.
 ## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE OF ITS OWN THESIS — and the "debut fade" it was flipped on is 76-83% CALENDAR, corrected in place the same day
 
 **Eamon, 26-Aug:** *"let listing sniper fly like it used to."*
+
+**CORRECTED IN PLACE A SECOND TIME, per I12 — see `(uf)`, which closes the one
+thing this entry left open and says so.** The correction below establishes the
+fade as 76-83% CALENDAR and keeps the flip on the counterfactual; it also notes
+that the flip's number was computed across BOTH debut bands and that
+`listing`'s OWN band was never measured separately. It has been now, with a
+calendar-matched control and the book's own bracket: **on 0-7d NEITHER side is
+supported** (LONG −0.036% t=−0.07, SHORT +0.123% t=+0.29, by-coin), the
+apparent pooled t=+4.05 is a sampling-STRIDE artifact (3.98 → 0.36 as the
+stride goes 1 → 24 while by-coin t holds at ~0.6), and **the short's evidence
+lives in the 8-21d band — `young`'s, not `listing`'s** (LONG −0.374%, t=−2.67).
+The side is NOT re-flipped (LONG is unsupported too) and stays declared
+hypothesis-grade; what changed is that the book now PUBLISHES which of its
+three sides is measured and which is not (`extra.dir_basis_by_src`).
 
 **CORRECTED IN PLACE per I12, hours after shipping, by an adversarial review of
 this entry's own claim (5 independent lenses + a code reviewer + a second

@@ -231,6 +231,31 @@ SOURCE_SIDE = {
     for src, dflt in (("listing", "short"), ("surge", "long"),
                       ("young", "short"))
 }
+#: [2026-08-26] WHAT EACH SIDE ACTUALLY RESTS ON — published, because
+#: `dir_by_src` says `listing: short` and `young: short` in the same shape while
+#: one is measured and the other is not, and a reader cannot tell them apart.
+#: This is the (lv)/I18 rule applied to a DECLARATION rather than a census: a
+#: payload must not be byte-identical between "measured" and "assumed".
+#:
+#: `measured`  — a calendar-matched, bracket-aware, by-coin estimate supports
+#:               this side on THIS source's own band.
+#: `unsupported` — MEASURED, and neither side is supported. Not "untested".
+#:
+#: * young/short = MEASURED. `(sl)`: shorting an externally-priced debut reads
+#:   -0.457%/trade, t=-2.38 — the only significant cell in that study. Corrobor-
+#:   ated on the 8-21d band with a calendar-matched control: LONG -0.374%
+#:   (t=-2.67), SHORT +0.253% (t=+1.47), by-coin, through the book's own bracket.
+#: * listing/short = UNSUPPORTED. On its OWN 0-7d band the same estimator reads
+#:   LONG -0.036% (t=-0.07) and SHORT +0.123% (t=+0.29): neither. The side was
+#:   inherited from a band that is not this source's. NOT re-flipped to LONG —
+#:   that side is not supported either.
+#: * surge/long = UNSUPPORTED. `(sk)`: the surge entry sits at percentile 0.429
+#:   at the shipped 6h hold, i.e. WORSE than a random minute on the same coin.
+#:
+#: REPORTED, NEVER A GATE (I15) — this changes no trade. It exists so the next
+#: session reading `dir_by_src` does not infer evidence that was never there.
+SOURCE_SIDE_BASIS = {"listing": "unsupported", "surge": "unsupported",
+                     "young": "measured"}
 #: [2026-08-26] The hold a PINNED side restores. `SNIPER_DIRECTION` is
 #: documented as the one-env revert to the pre-change book, and it short-
 #: circuited the SIDE while leaving the per-source HOLD in force — so
@@ -1443,7 +1468,7 @@ def main():
         # pending symbol no longer in any list this loop (see `_stale_pending`
         # below) has no live source, and the fallbacks are not neutral: LONG at
         # the old MAX_HOLD_SEC. `young` is SHORT/24h and `listing` SHORT/24h
-        # since (ua), so an un-sourced retry would take the WRONG SIDE and
+        # since (ub), so an un-sourced retry would take the WRONG SIDE and
         # stamp an un-parseable tag on the close. Lowest priority — a live
         # source always wins, so this can only fill a gap, never override.
         for _s, _rec in pending.items():
@@ -1691,6 +1716,7 @@ def main():
                                  # beside it is the real answer.
                                  "dir": "long" if DIRECTION_LONG else "short",
                                  "dir_by_src": dict(SOURCE_SIDE),
+                                 "dir_basis_by_src": dict(SOURCE_SIDE_BASIS),
                                  "hold_h_by_src": dict(SOURCE_HOLD_H),
                                  "dir_pinned": DIRECTION_PINNED,
                                  # [2026-07-15 GAP FIX] position detail so the
@@ -2305,6 +2331,17 @@ def selftest():
     assert kw3["extra"]["dir_by_src"] == {"listing": "short", "surge": "long",
                                           "young": "short"}, kw3["extra"]
     assert kw3["extra"]["hold_h_by_src"]["young"] == 24.0
+    # [2026-08-26] ...and WHAT EACH SIDE RESTS ON, in the same payload. Two
+    # sources publish `short` and only one of them is measured; without this a
+    # reader infers evidence that was never there ((lv)/I18 for a declaration).
+    _basis = kw3["extra"]["dir_basis_by_src"]
+    assert set(_basis) == set(kw3["extra"]["dir_by_src"]), (
+        "every source with a published side must publish its basis: "
+        f"{_basis} vs {kw3['extra']['dir_by_src']}")
+    assert _basis["young"] == "measured" and _basis["listing"] == "unsupported", (
+        "the young short is measured ((sl): t=-2.38) and the listing short is "
+        f"measured-UNSUPPORTED on its own band — they must not read alike: {_basis}")
+    assert set(_basis.values()) <= {"measured", "unsupported"}, _basis
     assert kw3["extra"]["dir_pinned"] is False
     assert ven3.opened == [], "shadow must NEVER send an order to the venue"
 
