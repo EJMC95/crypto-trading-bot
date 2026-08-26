@@ -1601,6 +1601,37 @@ def selftest():
     assert len(DECLARED_LIVE) >= 1
     assert set(LIVE_TWINS) == {shadow_twin(r) for r in DECLARED_LIVE}
 
+    # THE WIRING, not just the helper. Asserting shadow_twin() in isolation
+    # leaves the real defect alive: `live_shadow_gap` could still hardcode a
+    # foreign shadow and every helper assertion above would stay green. (A
+    # mutation round proved exactly that — restoring the hardcoded Farmer
+    # twin passed this selftest until this block existed.) So drive the
+    # function with a recording cursor and read back WHICH BOTS it queried.
+    class _RecCur:
+        def __init__(self):
+            self.seen = []
+
+        def execute(self, _sql, params):
+            self.seen.append(params[0])
+
+        def fetchone(self):
+            return (5, 0.01)
+
+    _rc = _RecCur()
+    live_shadow_gap(_rc, "freqtrade-avo-maria-lighter")
+    assert _rc.seen == ["freqtrade-avo-maria-lighter",
+                        "freqtrade-avo-maria-lshadow"], _rc.seen
+    _rc2 = _RecCur()
+    live_shadow_gap(_rc2, "freqtrade-georgia-lighter")
+    assert _rc2.seen == ["freqtrade-georgia-lighter",
+                         "freqtrade-georgia-lshadow"], _rc2.seen
+    # and a row with no distinct twin must REFUSE rather than self-compare
+    try:
+        live_shadow_gap(_RecCur(), "some-book-lshadow")
+        raise AssertionError("a row with no distinct twin must raise")
+    except ValueError:
+        pass
+
     # ---- [2026-08-02] CONTAINER vs REPO ----------------------------------
     # THE INCIDENT: on 2-Aug both Farmer arms reported `705425a83422` while the
     # repo predicted `30bf230bd5fb` at the same build_n=15. `arm_drift_line`
