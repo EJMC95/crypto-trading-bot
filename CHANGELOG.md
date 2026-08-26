@@ -1,3 +1,37 @@
+## 2026-08-26 (to) — THE FIXED-DOLLAR-CAP CLASS CLOSES: EQUITY_SCALED_CAP, OPT-IN, FLOOR-PRESERVING, FAIL-SAFE DARK
+
+Third measured instance in three weeks of the same shape — a FIXED-dollar
+rail on a book whose clip is equity-derived: (sr) Eamon's deposit stranding
+a slot at cap $200; the farmer-cap HANDOFF row (gross FALLING 5->2->1 slots
+as brain conviction rises against a fixed cap); and this morning's (tn) find
+(🙏 avo at cap_slots 3 of 5, $639 of her on-record gross undeliverable,
+beside a $6 daily rail that was 10% of the PRE-deposit equity). (tn) fixed
+the VALUES; per the forward-motion rule a fix closes a CLASS or it is not
+finished, so this is the class:
+
+`SafetyRails.equity_scale(equity, gross)` — called once per loop by the live
+host with its fresh equity read — re-derives the cap as **max(env floor,
+equity x gross x 1.05)** when `EQUITY_SCALED_CAP` is set on the service.
+The operator's explicit cap env stays REQUIRED at live boot and becomes the
+FLOOR: scaling only ever adds headroom in step with real equity, never
+invents a cap where none was set (a capless shadow rail stays capless),
+never undercuts the one that was, and a dark/junk equity read moves NOTHING
+(I4 — an unreadable number must not steer a real-money rail). `cap_src`
+publishes beside `cap_usd` ("env" | "scaled") so the row says which rule is
+binding (I8). OFF — the default everywhere today — is byte-identical to the
+pre-(to) rails, pinned by test.
+
+Expectancy price: zero (per-trade % is clip-invariant, (hl); gross_x_max
+stays the operator's ceiling and this cannot raise it — the cap tracks the
+gross the operator already set, nothing more). Shipped to MAIN ONLY per the
+(mm) rule: behaviour-neutral until a service opts in, so it rides each live
+image's next qualifying deploy; activation is then one env flip per service
+(auto-restart), avo the natural first. Pinned by
+`tests/autonomy/test_equity_scaled_cap.py` (6 tests; 5/5 mutations red).
+The HANDOFF carried row `equity-scaling-cap` is DELETED — its own
+`closes_when` predicate reported CLOSE THIS the moment the switch landed,
+which is `session_state.py` doing exactly what (sl) built it for.
+
 ## 2026-08-26 (tn) — AVO'S TWO FIXED-DOLLAR RAILS WERE STILL SIZED FOR THE $60 BOOK: CAP 1200 → 1700, DAILY-LOSS BACKSTOP 6 → 32, BOTH DERIVED AND READ BACK
 
 The same optimisation pass found 🙏 avo — the winning arm Eamon flagged this

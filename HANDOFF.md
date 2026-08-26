@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-26 11:34 Sydney (01:34Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-26 13:20 Sydney (03:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,19 +69,25 @@ _Still open because:_ real-money row: measure and hand over, never hand-set.
 
 _Still open because:_ the one unbuilt candidate with evidence behind it is a parabolic-extension entry veto (price vs its own recent range at entry) — book logic, backtest-first on her own ledger + candles; nobody has run it. The (tm) parity fix means her live grade now accrues under her actual policy, so the live arm's fresh era is the other thing time has to deliver.
 
-### `equity-scaling-cap`  ·  owner: **session**
-THIRD measured instance of the fixed-dollar-vs-grown-equity class in three weeks: (sr) avo's deposit stranding a slot at cap $200, the farmer-cap row above, and 26-Aug avo again at cap_slots 3 of 5 ($639 of on-record gross undeliverable) plus her $6 abs daily rail = 10% of the PRE-deposit equity. The (tn) one-shot fixed today's VALUES (1700/32, derived, read back); the CLASS stays open until SafetyRails can scale: max_notional = max(env_floor, equity x gross_x x 1.05), re-read per boot, EQUITY_SCALED_CAP as the switch.
-
-_Still open because:_ a rails code change across the shared live image of all three trio services — needs mutation-pinned tests and a deliberate marker deploy ((te) discipline), not an env flip; until built, this measurement recurs at the next deposit or equity run-up.
-
 ### `carry-garrett-ranking-collision`  ·  owner: **OPERATOR**
 🌾 carry's measured-depth gate now reaches the whole of 🛢️ Garrett's [0.1M, 2M) band, and Garrett's own (pl) measurement found 6 of 6 of its top-ranked candidates are >=20% APR — so carry is a rival for exactly the supply Garrett ranks first. A RANKING collision; audit_book_overlap's axes (apr x vol x class) cannot express it.
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (14 commit(s), entries (tj), (tk), (tl), (tm), (tn))
+## Shipped today (25 commit(s), entries (tj), (tk), (tl), (tm), (tn), (to))
 
+- `ff22aa2` The fixed-dollar-cap class closes: EQUITY_SCALED_CAP, opt-in, floor-preserving, fail-safe dark (to)
+- `023bdf6` Merge PR #225: the avo cap+halt one-shot goes the way of every provisioner (tn)
+- `c71c4b8` The avo cap+halt one-shot goes the way of every provisioner — receipts on the row (tn)
+- `c188e13` Merge PR #224: georgia's live exit parity (veto + ratchet), mum's census split, avo cap+halt one-shot (tm, tn)
+- `10d7a02` Merge remote-tracking branch 'origin/main' into claude/real-money-bot-optimisations-d42zko
 - `f355361` The georgia carried rows record their 26-Aug measurements; the equity-scaling cap becomes a named build decision (tm)
+- `14087d8` Regenerate the handoff after the 26-Aug expansion research
+- `4effb9e` Extract holdwatch_accumulate: the mutation round proved the dispersion counter was unreachable from any test
+- `5f7c2fe` 🪁 band-kelly's holdwatch publishes its dispersion — the field that says the exit is the leak could not say it was significant
+- `8f2718d` Pin the WIRING, not just the helper: a mutation round showed the selftest missed the real defect
+- `7937778` The divergence detector was subtracting two different books, and two live rows had no check at all (daily review 26-Aug)
+- `f6d5b6b` The winners' referee was grading halt EVENTS as trades on both real-money books (daily review 26-Aug)
 - `0c37554` One-shot cap+halt parity for avo's live service (registered from main; deleted after use) (tn)
 - `2d4444c` [deploy-live-georgia] [deploy-live-mum] Georgia's live arm runs her own exit policy at last — breakout veto + trailing ratchet ported; mum's census names the uptrend block (tm)
 - `77eeef4` The georgia attestation one-shot goes the way of every provisioner (tl)

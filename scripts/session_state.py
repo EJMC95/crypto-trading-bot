@@ -341,25 +341,6 @@ CARRIED = [
         "closes_when": lambda: False,
     },
     {
-        "id": "equity-scaling-cap",
-        "owner": "session",
-        "what": "THIRD measured instance of the fixed-dollar-vs-grown-equity "
-                "class in three weeks: (sr) avo's deposit stranding a slot at "
-                "cap $200, the farmer-cap row above, and 26-Aug avo again at "
-                "cap_slots 3 of 5 ($639 of on-record gross undeliverable) "
-                "plus her $6 abs daily rail = 10% of the PRE-deposit equity. "
-                "The (tn) one-shot fixed today's VALUES (1700/32, derived, "
-                "read back); the CLASS stays open until SafetyRails can "
-                "scale: max_notional = max(env_floor, equity x gross_x x "
-                "1.05), re-read per boot, EQUITY_SCALED_CAP as the switch.",
-        "why_open": "a rails code change across the shared live image of all "
-                    "three trio services — needs mutation-pinned tests and a "
-                    "deliberate marker deploy ((te) discipline), not an env "
-                    "flip; until built, this measurement recurs at the next "
-                    "deposit or equity run-up.",
-        "closes_when": lambda: _has("venues/safety.py", "EQUITY_SCALED_CAP"),
-    },
-    {
         "id": "carry-garrett-ranking-collision",
         "owner": "OPERATOR",
         "what": "🌾 carry's measured-depth gate now reaches the whole of 🛢️ "
