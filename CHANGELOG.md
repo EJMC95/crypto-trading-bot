@@ -1,3 +1,82 @@
+## 2026-08-26 (ug) — THE CLUSTER-ROBUST `t` HAD THREE IMPLEMENTATIONS, AND THE TWO COPIES REPRODUCED THE `(kg)` DEGENERACY THE OWNER WAS FIXED FOR: t = 2.38e+16 WHERE THE OWNER REFUSES
+
+Found while looking for an owner for the overlapping-window hazard `(uf)`
+measured. There wasn't one — but there were **three** implementations of the
+cluster-robust `t`, which is the statistic standing between a book and REAL
+MONEY (`t >= 2.0`, and `(kw)` measured that an iid t=2.00 on a
+daily-rebalancing book is a true t of about **0.98**).
+
+| site | shape |
+|---|---|
+| `golive_readiness.cluster_stats` | the `(kw)` OWNER |
+| `study_leverage_sizing_2026-08-16.cluster_t` | **delegates** — correct, and says so |
+| `study_mum_supply_2026-08-26.cluster_t` | hand-rolled copy |
+| `study_sniper_exit_shape_2026-08-20.cluster_t` | hand-rolled copy |
+
+**THE COPIES ARE NOT CARELESSNESS — THE OWNER WAS UNREACHABLE.**
+`cluster_stats` builds its groups INTERNALLY by scanning timestamps against
+`CLUSTER_WINDOW_S`, i.e. it hard-codes the batched-close cluster DEFINITION.
+A study clustering by coin, coin-day or entry-day has no way in. Both copies'
+own docstrings say exactly that (*"same estimator as
+golive_readiness.cluster_stats, generalised to an arbitrary cluster key"*).
+So this is "A SECOND COPY OF A RULE IS A SECOND RULE" arriving through a real
+**gap in the interface**, which is why the fix is an entry point and not a
+rule about copying.
+
+**AND THEY HAD ALREADY DRIFTED, IN THE DANGEROUS DIRECTION.** Algebraically all
+three are the same sandwich — verified numerically, they agree to 1e-12. But
+the owner carries a `(kg)` DEGENERACY GUARD that neither copy has
+(`se_cr < se_iid * 1e-6` -> refuse), and its own docstring records that the
+guard *"was found by a test fixture that built the exactly-cancelling case by
+accident"*. **MEASURED, on a near-cancelling sample whose honest iid `t` is
+1.94 — unremarkable:**
+
+```
+study_mum_supply copy    t_cluster = 2.38e+16
+study_sniper_exit copy   t_cluster = 2.38e+16
+golive_readiness OWNER   t_cluster = None      <- fails CLOSED
+```
+
+A fix made once and left undone in two places — and **not a contrived shape for
+this fleet**. The guard fires when a cluster's demeaned values cancel, which is
+the DESIGN of a delta-neutral basket: ⚖️ Counterweight closes ten hedged legs in
+one instant, and 👩 mum — whose study is one of the two — is LIVE on real money.
+
+**THE FIX: `golive_readiness.cluster_se(values, keys)`** is now the ONE owner of
+the arithmetic INCLUDING the guard, reachable with an arbitrary cluster key.
+`cluster_stats` keeps the batched-close cluster DEFINITION and nothing else — it
+flattens its own groups and hands them over, so a bug fixed there is fixed for
+every caller. Both studies delegate; a study may own its cluster KEY, never the
+ESTIMATOR. Behaviour-preserving for the existing caller, verified byte-identical
+on the ordinary case (`n_clusters 12, max_batch 6, t_cluster 1.05, n_eff 13.2`).
+
+**A MUTATION SURVIVED THE FIRST DRAFT OF THE TESTS, AND IT WAS MY TEST THAT WAS
+WRONG.** Deleting the `G < 2` branch left the suite GREEN: with the branch gone
+the code divides by `g - 1 == 0`, the blanket `except` swallows it, and `None`
+comes back anyway. Identical first element, entirely different reason —
+*"refused because a single cluster has no between-cluster variation"* versus
+*"crashed and said nothing"*. The test asserted only the `None`. It now asserts
+the FULL tuple `(None, 1, 3)`: the deliberate path reports the cluster count and
+the real max cluster size, the exception path reports zeros. **That is the
+(po)/(tu) class in my own test — a receipt for one property standing in for
+another** — and the mutation is what graded it, not re-reading it (I3).
+
+5 mutations verified RED against a green baseline: drop the `(kg)` guard from
+the owner · delete the single-cluster refusal · make `cluster_stats` re-derive ·
+return either study to its own copy. Delegation is pinned by the CALL via AST
+and by the ABSENCE of the sandwich arithmetic beside it — a call PLUS a copy is
+still a copy, and a boolean-equality assertion is satisfied by a re-typed copy,
+which is the mutation that survived a round in `(tu)`.
+
+**WHAT THIS DOES NOT CLOSE, stated so it is not mistaken for done:** the `(uf)`
+OVERLAPPING-WINDOW hazard still has no owner. Batch clustering answers
+"observations shared an instant"; it does not answer "the analyst chose the
+sampling stride, and a 24h hold sampled hourly is 24x-counted". Note
+`study_sniper_exit_shape`'s own docstring reaches for the right instinct —
+clustering by entry CALENDAR DAY — and that is still not enough when the hold is
+24h, because adjacent days overlap. `(uf)` had to find it by sweeping the stride
+by hand. That instrument is the next piece of work, not this one.
+
 ## 2026-08-26 (uf) — THE `listing` SOURCE HAS NO MEASURED SIDE ON ITS OWN BAND: THE SHORT'S EVIDENCE LIVES IN `young`'s BAND, AND THE t=+4.05 THAT SEEMED TO SUPPORT IT MEASURES SAMPLING DENSITY
 
 `(ua)` flipped 🎯 the Perp Sniper's `listing` source to SHORT@24h and `(ub)`
