@@ -92,3 +92,51 @@ def test_the_ledger_read_is_the_quarantined_fetch():
     assert "fetch_paper_trades" in src
     assert "psycopg2" not in src and ".execute(" not in src, \
         "no raw SQL — the quarantine lives in the fetch"
+
+
+def test_phantom_closes_never_reach_the_referee():
+    """[2026-08-26 daily review] A halt/flatten EVENT is not a trade.
+
+    THE INCIDENT: the docket graded 13 phantom rows — $0.00 P&L with no entry
+    price — and all 13 sat on the two REAL-MONEY books
+    (`freqtrade-avo-maria-lighter` 9, `freqtrade-georgia-lighter` 4). That put
+    a real-money row on the docket's "ON THEIR WAY [to proven winning]" list
+    at n=13/t=1.46 when its true traded n is 4, below the MIN_N floor.
+    `golive_readiness` had filtered these since (th); the docket had not, so
+    the fleet's two graders disagreed about the same real-money ledger.
+
+    The direction is the reason this matters: a block of exact-$0.00 rows does
+    not merely inflate n, it SHRINKS the sample variance, so it biases `t`
+    UPWARD — the referee erred toward crowning a real-money book.
+    """
+    import golive_readiness as gr
+
+    # (1) the signature is the GATE'S OWN, by identity — never a second copy
+    assert wd.gr.is_phantom_close is gr.is_phantom_close
+    src = (ROOT / "scripts" / "winners_docket.py").read_text()
+    assert "def is_phantom_close" not in src, \
+        "a second copy of the phantom signature is a second rule"
+
+    # (2) the filter actually runs in the docket's own loader
+    real = [dict(bot="bk", profit_ratio=0.01, profit_abs=1.0, open_rate=100.0,
+                 close_ts=(T0 + timedelta(hours=i)).isoformat(),
+                 open_ts=(T0 + timedelta(hours=i - 1)).isoformat(),
+                 exit_reason="long_hold", enter_tag="long") for i in range(12)]
+    phantom = [dict(bot="bk", profit_ratio=0.0, profit_abs=0.0, open_rate=None,
+                    close_ts=(T0 + timedelta(hours=200 + i)).isoformat(),
+                    open_ts=(T0 + timedelta(hours=199 + i)).isoformat(),
+                    exit_reason="long_daily_loss", enter_tag="long")
+               for i in range(9)]
+    kept = wd.era_scoped_rows(real + phantom)["bk"]
+    assert len(kept) == 12, f"phantom rows reached the referee: {len(kept)}"
+    assert all(r["abs"] != 0.0 or r["exit"] != "long_daily_loss" for r in kept)
+
+    # (3) FAIL-OPEN, exactly as the gate defines it: a real $0.00 close that
+    #     HAS an entry price is a genuine scratch trade and must survive, or
+    #     the filter becomes a silent sample-shrinker.
+    scratch = dict(bot="bk2", profit_ratio=0.0, profit_abs=0.0, open_rate=100.0,
+                   close_ts=(T0 + timedelta(hours=5)).isoformat(),
+                   open_ts=T0.isoformat(), exit_reason="long_hold",
+                   enter_tag="long")
+    assert len(wd.era_scoped_rows([scratch])["bk2"]) == 1, \
+        "a real scratch close was dropped — the filter exceeded its signature"

@@ -56,6 +56,16 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import fleet_tuning as tuning
 
+# [(ta)] the fleet's declaration of which LIVE ARMS are retired. Soft import
+# for the same reason every other organ's is: a judge that cannot import the
+# bus must keep judging, not crash. Dark bus ⇒ no stand-down ⇒ the paired bar's
+# own `live >= 10` floor still blocks every promotion onto a flat arm, so the
+# fail-open direction here costs visibility, never safety.
+try:
+    import fleet_bus as _bus
+except Exception:  # noqa: BLE001
+    _bus = None
+
 try:
     import fleet_proposals as fprop      # organ proposal channel (optional)
 except Exception:  # noqa: BLE001
@@ -118,6 +128,64 @@ CANDIDATES = [
     # to the candidate the venue's own tape actually supports. Reordering is
     # restrict-safe: no bar moves, no lever changes, the paired bar still
     # gates every promotion.
+    # [2026-08-20 (sk)] max-hold-24 JUMPS THE QUEUE, and it is the
+    # best-evidenced candidate this queue has ever carried.
+    #
+    # THE MEASUREMENT, on 328 ledger closes (279 priced, 14-Jul->19-Aug)
+    # replayed against Lighter's own 15m candles. CALIBRATION GATE PASSED:
+    # the harness reproduces 27/27 take-profit closes and 238/243 (97.9%) of
+    # the non-barrier ones. Return by realised hold, pooled:
+    #     0-3h   +0.285%  (n=85, t=+2.30)      24-48h  -1.797%  (n=20, t=-1.89)
+    #     3-6h   +0.481%  (n=37, t=+2.59)      48-73h  -1.797%  (n=22, t=-3.07)
+    #     6-12h  +0.413%  (n=67, t=+1.97)
+    #     12-24h +0.569%  (n=48, t=+1.24)
+    # **The book's returns invert at 24h.** The cap sweep, computed SEPARATELY
+    # per arm and peaking at 24h on BOTH — a single interior peak bracketed by
+    # worse cells on both sides, not a grid edge:
+    #     LIVE   (n=91)  72h +0.113 (t=+0.81, halves +15.0/-4.7)
+    #                 -> 24h +0.217 (t=+1.76, halves +15.8/+4.0)
+    #     SHADOW (n=159) 72h -0.054 (t=-0.28, halves +18.3/-26.9)
+    #                 -> 24h +0.270 (t=+1.59, halves +36.4/+6.5)
+    # Pooled delta +0.1924pp; trade bootstrap 95% CI [+0.064, +0.325],
+    # P(delta<=0)=0.0017; symbol-cluster bootstrap CI [+0.049, +0.468].
+    # Realised-path maxDD **41.99pp -> 14.52pp**. The gain is spread across
+    # every exit family, not one.
+    #
+    # AND IT IS NOT THE TAPE. Two same-coin/same-side placebos: an
+    # unconditioned random-start truncation gains +0.230pp where this book's
+    # own gains +1.278pp; the rigorous one — synthetic positions CONDITIONED
+    # IDENTICALLY (same barriers, required to survive 24h untouched, so the
+    # survivorship selection is matched) — returns -0.299% on the forward leg
+    # against this book's -1.278%. Excess -0.979pp, t=-2.44, P(excess>=0)=0.011.
+    # That kills the martingale/conditioning explanation. A random short on
+    # these coins earns -0.07%/24h, so this is not the (hm) free-short bonus
+    # either. Jackknife by coin: no coin carries it (t=+2.33..+3.73 across all
+    # eight drops).
+    #
+    # THE PRICE, DECLARED. `BRACKET_SIG_FIELDS` includes `max_hold_h`, so a
+    # promotion RESETS the 30-day era on both arms and costs the live row 26.6
+    # of the 30 days it has banked. Cheap here, and checked: the live row's own
+    # horizon organ says its t bar needs ~1208d at the current trajectory, so
+    # the window bar was never binding — and the cap is precisely what changes
+    # the trajectory (t +0.82 -> +1.76 live, -0.25 -> +1.59 shadow, and the
+    # halves bar flips FAIL->PASS on both arms). Forfeited tail accrual is
+    # netted pro-rata into every number above (mean +0.097pp/affected trade).
+    # Roughly one extra round trip per truncated position, ~0.012pp against a
+    # +0.19pp gain. Turnover is NOT the win: the book runs 4/6 and 3/5 slots
+    # against `eligible: 2`, so a shorter hold buys no extra entries today.
+    #
+    # WHY IT GOES FIRST. `slope-gate-off` has been `phase: running` with
+    # `promoted_ts: null` for five weeks behind a paired bar that was
+    # structurally biased against it (see `match_policy` — the shadow arm's
+    # explore bucket was a 0.161pp handicap against a 0.50pp margin, now
+    # fixed). This candidate is the only one in the queue whose evidence
+    # includes a conditioned placebo, a calibration gate and two bootstraps,
+    # and it is the only one that moves the DRAWDOWN bar. 24.0 is the cage
+    # floor of `xp.funding.max_hold_h` ([24.0, 96.0]), so no cage change is
+    # needed. No flap risk: `pos_bars()` prices max_hold at ENTRY, so it
+    # reaches only new positions. The judge remains the sole writer of
+    # `live.funding.*` — nothing here touches the live arm.
+    {"name": "max-hold-24",     "levers": {"xp.funding.max_hold_h": 24.0}},
     {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
     # [2026-08-13 (ln) ORDER SWAPPED — min-vol-1e5 now runs BEFORE
     # min-vol-2e6, by operator directive ("fix all of the above and ...
@@ -362,7 +430,8 @@ def ran_candidate(row, levers):
     return True
 
 
-def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
+def arm_trades(rows, bot, start_ts, end_ts=None, levers=None,
+               keep_srcs=None):
     """[(close_ts, pnl_pct)] for one arm inside the window, oldest first.
 
     levers=None keeps the historical behaviour (time-window attribution only) —
@@ -376,6 +445,11 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
             continue
         if levers is not None and not ran_candidate(r, levers):
             continue
+        # [(sk)] entry-policy match — see `match_policy`. Applied here so the
+        # decision is made while the ROW is in hand; a caller filtering the
+        # returned (ts, pct) pairs cannot, because close_ts is not unique.
+        if keep_srcs is not None and _src_of(r) not in keep_srcs:
+            continue
         try:
             ts = parse_ts(r.get("close_ts"))
         except Exception:
@@ -384,6 +458,96 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
             out.append((ts, float(r["profit_ratio"])))
     out.sort()
     return out
+
+
+def _src_of(row):
+    """The ENTRY POLICY that produced a close, or None when unstamped."""
+    x = row.get("extra") if isinstance(row, dict) else None
+    if isinstance(x, str):
+        try:
+            x = json.loads(x)
+        except Exception:                                        # noqa: BLE001
+            x = None
+    v = (x or {}).get("src") if isinstance(x, dict) else None
+    return str(v) if isinstance(v, str) and v else None
+
+
+def policy_srcs(rows, bot, start_ts, end_ts=None):
+    """The set of entry policies one arm actually ran in the window.
+
+    None (not an empty set) when the arm stamps nothing — "I cannot tell" and
+    "the arm ran no policies" are different states, and only the first must
+    disable the match.
+    """
+    seen, any_row = set(), False
+    for r in rows or []:
+        if str(r.get("bot")) != bot or r.get("profit_ratio") is None:
+            continue
+        try:
+            ts = parse_ts(r.get("close_ts"))
+        except Exception:                                        # noqa: BLE001
+            continue
+        if not (ts >= start_ts and (end_ts is None or ts < end_ts)):
+            continue
+        any_row = True
+        sv = _src_of(r)
+        if sv:
+            seen.add(sv)
+    return seen if (seen or not any_row) else None
+
+
+def match_policy(rows, bot, start_ts, end_ts, keep, levers=None):
+    """Restrict one arm to closes whose entry policy the CONTROL also ran.
+    Returns (trades, dropped).
+
+    FILTERS AT THE ROW, deliberately. The first draft joined `arm_trades`'
+    `[(ts, pct)]` back onto the rows by TIMESTAMP, and a fixture caught it
+    within the hour: two closes can share a close_ts — ⚖️ Counterweight closes
+    ten legs in one instant, and even here 3 of 40 on-policy closes were
+    silently dropped because an off-policy row overwrote their key. A join on a
+    non-unique key is not a filter.
+
+    [2026-08-20 (sk)] WHY THE PAIRED BAR NEEDED THIS. The judge's whole job is
+    "did the experiment arm beat the control by MARGIN_PP?", and `arm_trades`
+    gated the experiment arm on the lever RECEIPT alone — proof it ran the
+    candidate's BARS — while saying nothing about which ENTRY POLICY produced
+    the close. The two arms do not run the same one: the shadow twin runs
+    `explore_k=2` (+ scaled conviction) and the live control runs
+    `explore_k=0`, so a third of the experiment arm's closes are a policy the
+    control never runs.
+
+    MEASURED post-28-Jul, the src-stamped era, both arms on one build so no
+    `arm_drift` fires: shadow ALL n=113 mean -0.1711%/trade, of which
+    src=exploit n=74 mean -0.0104% and src=explore n=38 mean **-0.4961%**;
+    live n=73 mean -0.0368% and 72 of its 73 stamped `exploit`. The paired gap
+    the judge computed was **-0.1343pp**; on src-matched subsets it is
+    **+0.0264pp**. The explore bucket was a **0.161pp handicap against a
+    +0.50pp margin** — 32% of the bar, charged to the experiment before it
+    started.
+
+    THIS IS NOT HYPOTHETICAL AND IT IS NOT CHEAP. The judge's ONE completed
+    verdict in five weeks reads `RELEASED-OPERATOR ... 3-variable A/B (shadow
+    ran explore+conviction mid-window)` — the asymmetry already destroyed a
+    candidate — and the growth promoter has been parked on "shadow arm not
+    positive in its own right", which is circular, because explore is what
+    makes it not positive. Zero promotions to real money in five weeks, on the
+    fleet's ONLY designed path to more of it.
+
+    SYMMETRIC, so no guess is made. Both arms are restricted to the SAME src
+    set, which also drops unstamped rows from both rather than assuming an
+    unstamped close was exploit. FAIL-SAFE toward today's behaviour: `keep` of
+    None (the control stamps nothing) filters nothing, and an empty result
+    filters nothing — a bias fix that can silence the judge entirely would be
+    a worse defect than the bias.
+    """
+    everything = arm_trades(rows, bot, start_ts, end_ts, levers=levers)
+    if keep is None:
+        return everything, 0
+    kept = arm_trades(rows, bot, start_ts, end_ts, levers=levers,
+                      keep_srcs=keep)
+    if not kept:
+        return everything, 0
+    return kept, len(everything) - len(kept)
 
 
 def _mean_pct(trades):
@@ -415,10 +579,21 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     min_closes = min_closes or MIN_CLOSES
     live_min = live_min or LIVE_MIN_CLOSES
     margin_pp = MARGIN_PP if margin_pp is None else margin_pp
-    sh = arm_trades(rows, shadow_bot, start_ts, end_ts, levers=cand_levers)
-    lv = arm_trades(rows, live_bot, start_ts, end_ts)
+    _keep0 = policy_srcs(rows, live_bot, start_ts, end_ts)
+    sh, _sh_drop = match_policy(rows, shadow_bot, start_ts, end_ts, _keep0,
+                                levers=cand_levers)
+    lv, _lv_drop = match_policy(rows, live_bot, start_ts, end_ts, _keep0)
+    # [2026-08-20 (sk)] COMPARE LIKE WITH LIKE — see `match_policy`. The
+    # control defines the policy set; the experiment arm is restricted to it,
+    # and so is the control, so the restriction is symmetric and no unstamped
+    # row is guessed at. Published (`policy_match`) rather than silent: a
+    # sample that shrank by a third without saying so is the same class of
+    # defect this fixes.
+    _keep = _keep0
     v = {"promote": False, "n_shadow": len(sh), "n_live": len(lv),
-         "shadow_mean_pct": _mean_pct(sh), "live_mean_pct": _mean_pct(lv)}
+         "shadow_mean_pct": _mean_pct(sh), "live_mean_pct": _mean_pct(lv),
+         "policy_match": {"keep": sorted(_keep) if _keep else None,
+                          "dropped_shadow": _sh_drop, "dropped_live": _lv_drop}}
     # [2026-07-17 ARM DRIFT] The arms are running DIFFERENT CODE, so this
     # comparison contains a code delta and cannot be read as edge. Same class as
     # ARM SKEW below, and checked FIRST: skew asks "is the arm running the
@@ -472,8 +647,20 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     half_sh_min = max(2, min_closes // 2)
     half_lv_min = max(3, live_min // 2)
     for a, b, label in (((start_ts, mid, "h1"), (mid, end_ts, "h2")) if both_halves else ()):
-        sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers)
-        lv_h = arm_trades(rows, live_bot, a, b)
+        # [(sk)] the halves take the SAME policy match as the full window.
+        # Caught by the fix's own fixture: matching only the full window left
+        # the both-halves gate — the doctrine's central noise filter — reading
+        # the biased sample, so a candidate could clear the window bar and be
+        # failed by a half that still counted the control's off-policy closes.
+        # A half-applied bias fix is worse than none: it looks corrected.
+        sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers,
+                          keep_srcs=_keep)
+        lv_h = arm_trades(rows, live_bot, a, b, keep_srcs=_keep)
+        if _keep is not None and not sh_h:
+            # same fail-safe as the full window: never let the match starve a
+            # half into a verdict about missing data
+            sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers)
+            lv_h = arm_trades(rows, live_bot, a, b)
         if len(sh_h) < half_sh_min or len(lv_h) < half_lv_min:
             v[label] = {"shadow_n": len(sh_h), "live_n": len(lv_h)}
             v["why"] = (f"{label} under-powered: shadow {len(sh_h)}/"
@@ -1389,6 +1576,263 @@ def consume_release_request(req, phase, current, now):
     return "release", None
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-25 (ti)] JUDGE V2.0 — THE MULTI-PAIR CENSUS.
+#
+# Eamon: *"The judge has malfunctioned several times for this sole reason,
+# and it's well overdue for v2."* The sole reason, measured across four
+# recorded failures (the I23 0.161pp handicap · the (pt) frozen window · the
+# (ta) silent stand-down · the (tb) census erasure) and confirmed live on the
+# bus: a SINGLE-pair machine hardwired to the Farmer's lanes, stood down
+# since (ta) naming a successor it structurally could not judge.
+#
+# v2.0 ships the ENGINE'S EYES: every live/shadow twin in
+# fleet_bus.JUDGED_PAIRS gets a per-pair published state with FAIRNESS
+# PRECHECKS that emit `unjudgeable:<reason>` (naming the object, I8) instead
+# of ever computing a biased bar — the F1 closure made structural. The
+# farmer lane's serial candidate machine below is UNCHANGED and mirrors into
+# pairs["farmer"]; family pairs run no candidates yet (their xp.<book>.*
+# lever wave is v2.1, one registry entry away, and arrives as its own
+# measured act) — so v2.0's blast radius on trading is ZERO while every
+# pair's judgeability becomes a readable, wake-conditioned fact.
+# Top-level phase/current stay the farmer lane's for consumer compatibility
+# (impl_shortfall, the dashboard card); the rollup flip is v2.1's, taken
+# WITH its consumers.
+
+def _latest_policy_stamp(rows, bot, look=30):
+    """(stamp_dict|None, stamped_n, total_n) over the bot's newest `look`
+    ledger closes. None = the arm does not stamp yet — an ABSENCE, reported
+    as `policy_unstamped`, never guessed at ((kk): an absence is not a
+    change; I6: it is only evidence once the other arm shows the mechanism
+    works)."""
+    mine = [r for r in rows or [] if str(r.get("bot")) == bot]
+    mine = mine[-look:]
+    stamped = [r for r in mine
+               if isinstance((r.get("extra") or {}).get("policy"), dict)]
+    latest = (stamped[-1]["extra"]["policy"] if stamped else None)
+    return latest, len(stamped), len(mine)
+
+
+def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
+    """Stage-0 fairness for ONE pair -> a publishable pair state dict.
+
+    Ordered by ACTIONABILITY (the (gl)/I8 rule — the reason the operator
+    sees decides what they do next): retirement > dark live row > pnl_form >
+    policy stamps > policy parity > capacity parity > idle. Every
+    unjudgeable state names its object and carries `wake_when`; UNREADABLE
+    parity inputs are `parity_unreadable`, never assumed-equal — darkness
+    must not re-open the F1 handicap through the stage built to close it."""
+    live_bot, shadow_bot = pspec["live_bot"], pspec["shadow_bot"]
+    st = {"live_bot": live_bot, "shadow_bot": shadow_bot,
+          "pnl_form": pspec["pnl_form"], "candidate": None, "hold": None}
+
+    def _un(reason, detail, wake):
+        st.update(phase="unjudgeable",
+                  unjudgeable={"reason": reason, "detail": detail,
+                               "wake_when": wake})
+        return st
+
+    if _bus is not None and _bus.live_arm_retired(live_bot):
+        spec = (getattr(_bus, "RETIRED_LIVE_ARMS", {}) or {}).get(live_bot, {})
+        st.update(phase="stood_down",
+                  stood_down={
+                      "why": f"live arm retired {spec.get('since', '?')} "
+                             f"{spec.get('entry', '')}",
+                      "wake_when": f"{spec.get('override', '?')}=run on both "
+                                   f"services (and the parked candidate "
+                                   f"queue resumes at its head)",
+                      "successor": spec.get("successor")})
+        return st
+    live_row = next((r for r in bot_rows or []
+                     if str(r.get("bot")) == live_bot), None)
+    shadow_row = next((r for r in bot_rows or []
+                       if str(r.get("bot")) == shadow_bot), None)
+
+    def _fresh(row):
+        # [(tj)] the REAL publisher (`fetch_bot_pnl`) carries `updated_at`
+        # (ISO), never a precomputed `age_sec` — the first live census read
+        # every row dark because this required the dashboard feed's derived
+        # field. The (hj) class, caught by the census's own first run within
+        # the hour: a consumer is tested against the payload its publisher
+        # builds, and the selftest now drives the `updated_at`-only shape
+        # FIRST. Unknown age stays dark (fail-closed — this gate ADMITS a
+        # pair toward a real-money comparison).
+        if not isinstance(row, dict):
+            return False
+        try:
+            age = row.get("age_sec")
+            if age is None:
+                ts = parse_ts(row.get("updated_at") or row.get("updated"))
+                if ts is None:
+                    return False
+                age = now_ts() - ts
+            return float(age) <= 3 * float(row.get("ttl_sec") or 900)
+        except (TypeError, ValueError):
+            return False
+
+    if not _fresh(live_row):
+        return _un("live_row_dark",
+                   f"{live_bot} absent or stale in bot_pnl — a registry "
+                   f"entry must never outlive its row (the audit-scope "
+                   f"lesson: a rule keyed to a list goes stale on every "
+                   f"slot swap)",
+                   "the live row publishes fresh again")
+    # P1 — policy parity, from the arms' OWN close stamps (the shared
+    # policy_stamp builder is the one source; a spec-side field list would
+    # miss exactly the live-only divergences F1 is made of).
+    lp, ln, lt = _latest_policy_stamp(rows, live_bot)
+    sp, sn, stn = _latest_policy_stamp(rows, shadow_bot)
+    st["stamps"] = {"live": f"{ln}/{lt}", "shadow": f"{sn}/{stn}"}
+    if lp is None or sp is None:
+        which = []
+        if lp is None:
+            which.append(f"{live_bot} ({pspec['host_file']})")
+        if sp is None:
+            which.append(f"{shadow_bot} (lighter_family_bot.py)")
+        return _un("policy_unstamped",
+                   f"no policy stamp on the newest closes of: "
+                   f"{', '.join(which)}",
+                   "both arms' closes carry the shared policy_stamp "
+                   "(ships with this build; wakes on the first stamped "
+                   "close each side)")
+    diffs = [f for f in pspec["policy_fields"]
+             if lp.get(f) != sp.get(f) and f != "venue"]
+    if diffs:
+        return _un("policy_mismatch",
+                   f"arms diverge on {diffs}: live="
+                   f"{ {f: lp.get(f) for f in diffs} } shadow="
+                   f"{ {f: sp.get(f) for f in diffs} }",
+                   "the divergence is ported across or declared out of "
+                   "this pair's policy_fields — a measured act, never a "
+                   "silent default")
+    # P3 — capacity parity off the rows' own published caps (I1-fresh).
+    lmo = (live_row.get("extra") or {}).get("max_open")
+    smo = ((shadow_row or {}).get("extra") or {}).get("max_open")
+    if lmo is None or smo is None:
+        return _un("parity_unreadable",
+                   f"max_open unreadable (live={lmo} shadow={smo}) — "
+                   f"assumed-equal would re-open the F1 handicap through "
+                   f"the stage built to close it",
+                   "both rows publish extra.max_open fresh")
+    if lmo != smo:
+        return _un("capacity_mismatch",
+                   f"live max_open {lmo} vs shadow {smo} — a capacity "
+                   f"delta biases the paired bar unless it IS the "
+                   f"receipted candidate",
+                   "the caps match, or the delta becomes this pair's "
+                   "first receipted candidate")
+    st.update(phase="idle",
+              note="judgeable; no candidate in this pair's queue "
+                   f"({pspec['xp_prefix']}*) — the lever wave is v2.1",
+              # [(ti)] THE POWER REPORT — the statistics audit's central
+              # finding, published instead of re-argued: at v1's 30/10
+              # floors the minimum detectable per-trade gap is
+              # 1.28*sd*sqrt(1/30+1/10) = 0.365*sd, so at family-book
+              # dispersion (sd 3-6%) the 0.5pp margin was a coin-flip
+              # detector. REPORT ONLY (I16's own advisory scoping — an
+              # actuator-grade bar is v2.1's, class-split by candidate and
+              # cluster-robust); a pair whose MDE dwarfs the margin is
+              # visible here before anyone spends a 7-day window on it.
+              power=_pair_power(rows, live_bot, shadow_bot, pspec, now))
+    return st
+
+
+def _pair_power(rows, live_bot, shadow_bot, pspec, now, window_d=14.0):
+    """{sd_pct, closes_per_day, n} per arm + mde_pp at the v1 floors, over
+    the trailing window's ECONOMIC closes (strip_exits removed — the same
+    strip the bar itself will take). None fields where the sample cannot
+    say; never raises."""
+    try:
+        import math
+        cutoff = now - window_d * 86400.0
+        out = {}
+        strips = tuple(pspec.get("strip_exits") or ())
+        sds = []
+        for label, bot in (("live", live_bot), ("shadow", shadow_bot)):
+            pts = []
+            for r in rows or []:
+                if str(r.get("bot")) != bot:
+                    continue
+                if any(s in str(r.get("exit_reason") or "") for s in strips):
+                    continue
+                try:
+                    ts = parse_ts(r.get("close_ts"))
+                    if ts is None or ts < cutoff:
+                        continue
+                    p = r.get("profit_ratio")
+                    if p is None:
+                        continue
+                    pts.append(float(p) * 100.0)
+                except Exception:  # noqa: BLE001
+                    continue
+            n = len(pts)
+            sd = None
+            if n >= 5:
+                m = sum(pts) / n
+                sd = math.sqrt(sum((x - m) ** 2 for x in pts) / (n - 1))
+                sds.append(sd)
+            out[label] = {"n": n, "sd_pct": (round(sd, 3) if sd else None),
+                          "closes_per_day": round(n / window_d, 2)}
+        if sds:
+            pooled = max(sds)
+            out["mde_pp_at_floors"] = round(
+                1.28 * pooled * math.sqrt(1 / 30 + 1 / 10), 3)
+            out["margin_pp"] = MARGIN_PP
+        return out
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def pair_census(rows, bot_rows, now):
+    """Every JUDGED_PAIRS entry -> its published state. The farmer entry is
+    OVERWRITTEN by the serial machine's own state in save() — the machine
+    is senior for the lane it actually runs."""
+    out = {}
+    for pid, pspec in (getattr(_bus, "JUDGED_PAIRS", {}) or {}).items():
+        try:
+            out[pid] = _pair_precheck(pid, pspec, rows, bot_rows, now)
+        except Exception as e:  # noqa: BLE001
+            out[pid] = {"phase": "unjudgeable",
+                        "unjudgeable": {"reason": "parity_unreadable",
+                                        "detail": f"census error: {e!r}",
+                                        "wake_when": "the census computes"}}
+    return out
+
+
+def _farmer_pair_entry(payload):
+    """Mirror the serial machine's top-level state into pairs['farmer'] —
+    one machine, two views, no second copy of the rule: everything here is
+    DERIVED from the payload the machine just built."""
+    hold = None
+    if payload.get("phase") == "running":
+        le = payload.get("last_eval") or {}
+        if le.get("arm_drift"):
+            hold = "arm_drift"
+        elif le.get("arm_skew"):
+            hold = "arm_skew"
+        elif payload.get("assert_fail_notified"):
+            hold = "assert_fail"
+        elif str(le.get("why") or "").startswith(("floors", "h1", "h2")):
+            hold = "floors"
+    entry = {"phase": payload.get("phase"),
+             "candidate": payload.get("candidate"), "hold": hold,
+             "live_bot": LIVE_BOT, "shadow_bot": SHADOW_BOT,
+             "pnl_form": "funding",
+             # provenance: THIS entry is the serial machine's own state, not
+             # the census's precheck view — the machine is senior for the
+             # lane it runs, and a reader (or a test) can tell which view
+             # it is holding.
+             "src": "machine"}
+    if payload.get("phase") == "stood_down":
+        le = payload.get("last_eval") or {}
+        spec = (le.get("retired") or {})
+        entry["stood_down"] = {
+            "why": le.get("why"),
+            "wake_when": f"{spec.get('override', '?')}=run on both services",
+            "successor": spec.get("successor")}
+    return entry
+
+
 def run_once():
     now = now_ts()
     # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
@@ -1473,6 +1917,15 @@ def run_once():
             return          # state just changed wholesale; resume next cycle
     rows = store.fetch_paper_trades(limit=4000)
     have_ledger = bool(rows)
+    # [(ti)] v2.0: the multi-pair census — every registered twin's
+    # judgeability, precheck-verdicted and wake-conditioned, computed once
+    # per cycle and attached to every save() below. Guarded like every
+    # optional read: a dark fetch censuses nothing (the farmer mirror still
+    # publishes from the machine's own state).
+    try:
+        _census = pair_census(rows, store.fetch_bot_pnl() or [], now)
+    except Exception:  # noqa: BLE001
+        _census = {}
     # [2026-07-28] ONE drift snapshot per cycle, shared by the growth step and
     # the running phase — the drift check and the numbers it gates must never
     # describe different moments (the 17-Jul same-snapshot doctrine).
@@ -1535,6 +1988,17 @@ def run_once():
                    "growth_reach": kw.get("growth_reach",
                                           st.get("growth_reach")),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
+        # [(ti)] v2.0 pairs map: the census, with the farmer entry
+        # OVERWRITTEN by this machine's own just-built state (the machine is
+        # senior for the lane it runs). Top-level phase/current stay the
+        # farmer lane's for consumer compat; the pairs map is the truth a
+        # v2.1 rollup flip will promote, WITH its consumers.
+        try:
+            _pairs = dict(_census)
+            _pairs["farmer"] = _farmer_pair_entry(payload)
+            payload["pairs"] = _pairs
+        except Exception:  # noqa: BLE001
+            payload["pairs"] = {}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
             try:
@@ -1549,6 +2013,38 @@ def run_once():
               f"candidate={payload['candidate']} "
               f"{kw.get('note') or ''}", flush=True)
         return payload
+
+    # [2026-08-22 (ta)] THE LIVE ARM IS RETIRED — STAND DOWN, OUT LOUD.
+    #
+    # This judge exists to promote `live.funding.*` bars onto ONE row, and 💸
+    # the Farmer's live arm was retired 22-Aug so 🔮 georgia could take the
+    # sub-account. Its paired bar needs `live >= 10` closes in the window, so a
+    # flat arm silences the pipeline CORRECTLY and INVISIBLY — `promote: false`
+    # would read identically for "no candidate cleared the bar" and "there is
+    # no live arm left to promote onto". That is the (I18) ambiguity a
+    # component owes its own census for.
+    #
+    # RETURNING IS THE RELEASE. Promoted levers are TTL'd and are kept alive by
+    # this cycle re-asserting them; not asserting is how the rail was designed
+    # to revert ("expiry = env defaults"), so a stand-down cleans up after
+    # itself with no second code path to get wrong. Measured at the
+    # retirement: ZERO `live.*` levers open, so nothing had to.
+    #
+    # Placed AFTER the state read and the release-request consumption (both
+    # safe, and the latter only ever RELEASES) and BEFORE any evaluation, so
+    # the judge writes a phase and touches nothing else.
+    if _bus is not None and _bus.live_arm_retired(LIVE_BOT):
+        _spec = (getattr(_bus, "RETIRED_LIVE_ARMS", {}) or {}).get(LIVE_BOT, {})
+        return save(phase="stood_down",
+                    note=(f"live arm {LIVE_BOT} retired "
+                          f"{_spec.get('since', '?')} {_spec.get('entry', '')}"
+                          f" -> {_spec.get('successor', '?')}; not promoting, "
+                          f"and not re-asserting (TTL reverts any open lever). "
+                          f"Resurrect with "
+                          f"{_spec.get('override', '?')}=run on BOTH this "
+                          f"service and the live one."),
+                    last_eval={"promote": False, "why": "live arm retired",
+                               "retired": dict(_spec, row=LIVE_BOT)})
 
     # [2026-07-28 §3c] the growth-lever pair runs its own self-contained
     # promoter EVERY cycle, whatever the serial queue is doing (it is
@@ -2107,20 +2603,34 @@ def _selftest():
     # now UNREACHABLE at its current mean (~1,152 closes needed), the
     # 7-day de-risking slot costs more than it insures. Operator-directed
     # 13-Aug, executed under the real-money grant; paired bar unchanged.
-    assert names[:5] == ["slope-gate-off", "min-vol-1e5", "min-vol-2e6",
-                         "tp-0.06", "enter-gate-0.105"], names
+    # [2026-08-20 (sk)] max-hold-24 leads. Its prior is the strongest this
+    # queue has carried: a CALIBRATED own-tape replay (27/27 tp, 97.9%
+    # non-barrier reproduced), a single interior peak reproduced INDEPENDENTLY
+    # on both arms, two bootstraps (trade P<=0 = 0.0017; symbol-cluster CI
+    # [+0.049, +0.468]), a coin jackknife that no drop breaks, and — the part
+    # nothing else in the queue has — an IDENTICALLY CONDITIONED placebo
+    # (matched survivors, same barriers, same 24h survival requirement) that
+    # rules out the martingale explanation at P=0.011. It is also the only
+    # candidate that moves the DRAWDOWN bar (realised maxDD 41.99 -> 14.52pp).
+    assert names[:6] == ["max-hold-24", "slope-gate-off", "min-vol-1e5",
+                         "min-vol-2e6", "tp-0.06", "enter-gate-0.105"], names
     # the rule itself, asserted independently of the literal above: every
     # static is ranked by the strength of its recorded prior, strongest first.
-    _PRIOR_RANK = {"slope-gate-off": 0,    # venue-supported ((dp))
-                   "min-vol-1e5": 1,       # calibrated own-tape replay, both
-                                           # halves +ve — strongest DIRECT prior
-                   "min-vol-2e6": 2,       # unrefuted friction-tier prior —
+    _PRIOR_RANK = {"max-hold-24": 0,       # calibrated own-tape replay +
+                                           # CONDITIONED placebo + two
+                                           # bootstraps + coin jackknife, and
+                                           # both arms peak at the same cell
+                                           # independently ((sk))
+                   "slope-gate-off": 1,    # venue-supported ((dp))
+                   "min-vol-1e5": 2,       # calibrated own-tape replay, both
+                                           # halves +ve — strong DIRECT prior
+                   "min-vol-2e6": 3,       # unrefuted friction-tier prior —
                                            # indirect ((ln) swap)
-                   "tp-0.06": 3,           # MUTE — no both-halves-positive tp
-                   "enter-gate-0.105": 4}  # tape prior AGAINST it
-    _ranks = [_PRIOR_RANK[n] for n in names[:5]]
+                   "tp-0.06": 4,           # MUTE — no both-halves-positive tp
+                   "enter-gate-0.105": 5}  # tape prior AGAINST it
+    _ranks = [_PRIOR_RANK[n] for n in names[:6]]
     assert _ranks == sorted(_ranks), \
-        f"statics must run strongest-prior-first ((ju)'s rule): {names[:5]}"
+        f"statics must run strongest-prior-first ((ju)'s rule): {names[:6]}"
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -2135,7 +2645,8 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "min-vol-1e5", "min-vol-2e6", "tp-0.06",
+    assert n2 == ["max-hold-24", "slope-gate-off", "min-vol-1e5",
+                  "min-vol-2e6", "tp-0.06",
                   "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
@@ -2312,22 +2823,18 @@ def _selftest():
     # is (ju)'s rule applied to tp-0.06 as well. Walked one slot at a time so
     # the DRAIN ORDER is pinned, not just the list: this is what actually
     # decides which question the fleet asks next.
-    assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
-    assert next_candidate(pool, ["slope-gate-off"],
-                          None)["name"] == "min-vol-1e5"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5"],
-                          None)["name"] == "min-vol-2e6"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5",
-                                 "min-vol-2e6"],
-                          None)["name"] == "tp-0.06"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5",
-                                 "min-vol-2e6", "tp-0.06"],
-                          None)["name"] == "enter-gate-0.105"
+    # [2026-08-20 (sk)] max-hold-24 drains FIRST — the queue's strongest prior
+    # (see its CANDIDATES note) and the only candidate that moves the drawdown
+    # bar. Walked one slot at a time so the DRAIN ORDER is pinned, not just the
+    # list: this is what actually decides which question the fleet asks next.
+    _drained = []
+    for _expect in ("max-hold-24", "slope-gate-off", "min-vol-1e5",
+                    "min-vol-2e6", "tp-0.06", "enter-gate-0.105"):
+        assert next_candidate(pool, list(_drained), None)["name"] == _expect, \
+            (_drained, _expect)
+        _drained.append(_expect)
     # the statics precede queue proposals by pool construction (statics first)
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
-                                 "min-vol-1e5", "tp-0.06",
-                                 "enter-gate-0.105"],
-                          None)["name"] == "xp-tp-0.05"
+    assert next_candidate(pool, _drained, None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----
@@ -2512,10 +3019,119 @@ def _selftest():
                           None, t0, 28 * day)
     assert c is None and not r, "nothing untried, nothing aged -> exhausted"
 
+    # ---- [(ti)] v2.0: the multi-pair census + the imported vocabulary ------
+    assert _bus is not None, "selftest requires fleet_bus (same image)"
+    _VOC = _bus.XP_JUDGE_PHASES
+    # every phase this module can emit is IN the imported vocabulary — the
+    # (tb) inversion: a new phase that skips fleet_bus reddens THIS build,
+    # instead of being erased by the validator downstream.
+    for _p in ("idle", "running", "promoted", "stood_down", "unjudgeable"):
+        assert _p in _VOC, _p
+    assert set(_bus.XP_JUDGE_UNJUDGEABLE) >= {
+        "policy_unstamped", "policy_mismatch", "capacity_mismatch",
+        "parity_unreadable", "live_row_dark"}
+
+    _psp = dict(_bus.JUDGED_PAIRS["georgia"])
+    _stamp = {"strategy": "daytrader-15m", "venue": "lighter_live",
+              "stoploss": -0.05, "roi": {"0": 0.02}, "sides": ["long"],
+              "scan_order": "diversified"}
+    _sstamp = dict(_stamp, venue="lighter_shadow", scan_order="list")
+
+    def _led(bot, pol):
+        return {"bot": bot, "extra": ({"policy": pol} if pol else {})}
+
+    def _row(bot, max_open=5, age=60):
+        # [(tj)] the PUBLISHER'S shape: fetch_bot_pnl carries `updated_at`
+        # (ISO), never a derived age_sec — the first live census read every
+        # row dark because the fixture here was written in the dashboard
+        # feed's shape instead ((hj)). Driven as the publisher builds it.
+        return {"bot": bot, "updated_at": iso(t0 - age), "ttl_sec": 900,
+                "extra": {"max_open": max_open}}
+
+    _lb, _sb = _psp["live_bot"], _psp["shadow_bot"]
+    # dark live row -> live_row_dark (a registry entry must not outlive its
+    # row: the audit-scope stale-list class, made a named ageable state)
+    _v = _pair_precheck("georgia", _psp, [], [], t0)
+    assert _v["phase"] == "unjudgeable" and \
+        _v["unjudgeable"]["reason"] == "live_row_dark", _v
+    # unstamped arms -> policy_unstamped NAMING the stamper files
+    _v = _pair_precheck("georgia", _psp, [_led(_lb, None), _led(_sb, None)],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "policy_unstamped", _v
+    assert "lighter_family_bot.py" in _v["unjudgeable"]["detail"], _v
+    # stamped but diverging on scan_order -> policy_mismatch NAMING the field
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _sstamp)],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "policy_mismatch", _v
+    assert "scan_order" in _v["unjudgeable"]["detail"], _v
+    # matched policy, capacity 5 vs 6 -> capacity_mismatch (the (ne) delta)
+    _match = dict(_sstamp, scan_order="diversified")
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _match)],
+                        [_row(_lb, 5), _row(_sb, 6)], t0)
+    assert _v["unjudgeable"]["reason"] == "capacity_mismatch", _v
+    # UNREADABLE capacity is parity_unreadable, NEVER assumed-equal —
+    # darkness must not re-open the F1 handicap through the stage built to
+    # close it (mutation: default the None to "equal" => this reddens)
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _match)],
+                        [_row(_lb, 5), _row(_sb, None)], t0)
+    assert _v["unjudgeable"]["reason"] == "parity_unreadable", _v
+    # the negative control: everything matched -> IDLE, judgeable, no
+    # candidate (a census that flags everything trains ignoring it)
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp), _led(_sb, _match)],
+                        [_row(_lb, 5), _row(_sb, 5)], t0)
+    assert _v["phase"] == "idle", _v
+    # retired live arm -> stood_down with wake_when + successor
+    _fsp = dict(_bus.JUDGED_PAIRS["farmer"])
+    _v = _pair_precheck("farmer", _fsp, [], [], t0)
+    assert _v["phase"] == "stood_down", _v
+    assert "run" in _v["stood_down"]["wake_when"], _v
+    # the pairs map reaches the SAVED payload with the farmer mirrored —
+    # driven through the REAL run_once against a stubbed store (mutations:
+    # drop the payload attach, or the farmer overwrite => this reddens)
+    _saved = {}
+    _sv = {k: getattr(store, k, None) for k in (
+        "load_state_checked", "load_state", "save_state",
+        "fetch_paper_trades", "fetch_bot_pnl", "save_history")}
+    store.load_state_checked = lambda k: (True, {})
+    store.load_state = lambda k: None
+    store.save_state = lambda k, v: _saved.__setitem__(k, v) or True
+    store.fetch_paper_trades = lambda limit=4000: []
+    store.fetch_bot_pnl = lambda: []
+    store.save_history = lambda k, v: True
+    try:
+        run_once()
+    finally:
+        for _k, _fn in _sv.items():
+            if _fn is not None:
+                setattr(store, _k, _fn)
+    _pl = _saved.get(KEY) or {}
+    assert set(_pl.get("pairs") or {}) == set(_bus.JUDGED_PAIRS), \
+        sorted(_pl.get("pairs") or {})
+    assert _pl["pairs"]["farmer"]["phase"] == _pl["phase"], _pl["pairs"]
+    # ...and the farmer entry is the MACHINE'S state, not the census's
+    # precheck view — the two agree while stood_down, so provenance is what
+    # makes the overwrite testable (mutation: drop the overwrite => red)
+    assert _pl["pairs"]["farmer"].get("src") == "machine", _pl["pairs"]
+    for _pid, _pe in _pl["pairs"].items():
+        assert _pe.get("phase") in _VOC, (_pid, _pe)
+
+    # the farmer mirror derives holds from the machine's own payload
+    _fe = _farmer_pair_entry({"phase": "running", "candidate": "x",
+                              "last_eval": {"arm_skew": True}})
+    assert _fe["hold"] == "arm_skew", _fe
+    _fe = _farmer_pair_entry({"phase": "running", "candidate": "x",
+                              "last_eval": {"why": "floors: shadow 3/30"}})
+    assert _fe["hold"] == "floors", _fe
+
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, proprioception early-fade, registry mapping, "
           "arm-skew receipt gate, per-half floors, relative+rolling fade, "
-          "asserted-write guard)")
+          "asserted-write guard; v2.0 census: vocab imported, dark/unstamped/"
+          "mismatch/capacity/unreadable/idle/stood_down + farmer mirror)")
 
 
 def _selftest_growth():

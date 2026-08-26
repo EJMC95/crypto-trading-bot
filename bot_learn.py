@@ -98,7 +98,7 @@ MULT_SOFT_N = 15      # era trades before a 0.75x may publish
 # inheritance, no urgent path — see EXP_* there). v3-ONLY: the
 # BRAIN_MULT_ENGINE=v2 kill switch zeroes the expand side too, and this
 # dedicated switch stands down just the widening while reductions keep
-# working. Consumers clamp at fleet_bus.MULT_CEIL (1.5) and only SHADOW
+# working. Consumers clamp at fleet_bus.MULT_CEIL (2.0 since (sm)) and only SHADOW
 # books read mults — no live bot consumes them.
 # [2026-07-21 AUDIT FIX] accept the full stand-down synonym set (+strip):
 # the original `!= "off"` meant BRAIN_MULT_EXPAND=false / 0 / no / disabled

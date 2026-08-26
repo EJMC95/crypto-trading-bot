@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """🎯 THE SNIPER'S INTENDED JOB: what is a DEBUT trade actually worth, and in
-which DIRECTION?  [2026-08-20 (sl)]
+which DIRECTION?  [2026-08-20 (tt)]
 
-`(sk)` established what the book CANNOT do: its exit bracket is a near-dead
+`(ts)` established what the book CANNOT do: its exit bracket is a near-dead
 branch, the ANSEM ladder is inert here, and its realised entries sit at the
 50th percentile of random. It also established WHY the book is idle — the
 `young` source, the only observable route to a debut regime, admits NOTHING,
 because the venue files memecoin debuts under `strategy_index 7` and the (lk)
 screen tests `== 2`.
 
-This study asks the question `(sk)` deliberately left open: **if the young
+This study asks the question `(ts)` deliberately left open: **if the young
 source were unblocked, what would it be trading, and would a LONG be the right
 side?** It is the measurement that has to come BEFORE any screen change (I19 —
 a widening is paid for in expectancy), and it is deliberately built to be able
@@ -40,7 +40,7 @@ DECLARED LIMITS, none fixable from this endpoint:
   * `created_at` is epoch-0 on some rows (MRNA, US10Y). Those are EXCLUDED,
     never treated as ancient or as newborn.
   * 1h resolution. The bot polls at 60s, so intra-hour paths are invisible;
-    per `(sk)` the exit-basis gap this creates is real and one-sided, which is
+    per `(ts)` the exit-basis gap this creates is real and one-sided, which is
     why the shipped bracket's absolute level here is NOT quotable as the book's
     expected P&L. DIRECTION and RANK across cells are what this study is for.
 """
@@ -56,7 +56,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-# The (sk) harness is the ONE owner of walk_exit / slip_bps / score / the
+# The (ts) harness is the ONE owner of walk_exit / slip_bps / score / the
 # shipped-rule reader. Its filename carries hyphens so `import` cannot reach
 # it; load it by path rather than growing a second copy of the exit rule ((hj)).
 _SPEC = importlib.util.spec_from_file_location(

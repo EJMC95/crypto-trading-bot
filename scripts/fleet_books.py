@@ -97,7 +97,18 @@ ROW_ENTRY = {
     "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
     "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
     "perps-funding-carry-lshadow": "funding_carry_bot.py",
+    # [2026-08-22 (ta)/(tb)] 💸 the Farmer's live row is RETIRED, and its entry
+    # stays mapped for the same reason the Taker's did through (ma): an old
+    # container's last stamped publishes must resolve rather than read
+    # UNMAPPED. 🔮 georgia now runs on that service.
     "perps-funding-lighter-lighter": "lighter_funding_bot.py",
+    "freqtrade-georgia-lighter": "lighter_avo_live_bot.py",
+    # [2026-08-25] 👩 mum's live row, mapped PRE-provision per the (jb) gate —
+    # the day her service exists and stamps its first publish, currency must
+    # resolve it rather than fail on an unmapped row. NOT in DECLARED_LIVE:
+    # that set follows the FEED (audit_live_roster), and moves only when the
+    # row actually publishes venue=lighter_live. Runbook: MUM_GOLIVE_RUNBOOK.md.
+    "freqtrade-mum-lighter": "lighter_avo_live_bot.py",
     "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
     "perps-funding-spread-lshadow": "lighter_funding_spread_bot.py",
     "pm-abbott-lshadow": "parliament_main.py",
@@ -114,10 +125,18 @@ ROW_ENTRY = {
 #: cost it four false ACTION items.
 MARKER_GATED = {
     "perps-funding-lighter-lighter": ("[deploy-live-farmer]", "[deploy-live]"),
+    # [(tb)] 🔮 georgia's live row — the service kept its gate through the swap
+    # but gained its OWN marker, because she and 🙏 Avo share one image and a
+    # single marker would restart both books on every fix to either.
+    "freqtrade-georgia-lighter": ("[deploy-live-georgia]", "[deploy-live]"),
     "lighter-ticket-taker-lighter": ("[deploy-live-taker]", "[deploy-live]"),
     # [2026-08-13 (ma)] the slot's new occupant deploys behind the SAME
     # marker (the service kept its gate through the swap).
     "freqtrade-avo-maria-lighter": ("[deploy-live-taker]", "[deploy-live]"),
+    # [2026-08-25 (te)] 👩 mum's live row — her OWN marker, third book on the
+    # shared image; service `mum-live`, fresh sub-account (Eamon's launch
+    # order, MUM_GOLIVE_RUNBOOK.md).
+    "freqtrade-mum-lighter": ("[deploy-live-mum]", "[deploy-live]"),
     # [2026-08-03] `funding-farmer-shadow` holds ZERO real money and yet is
     # marker-gated, which looks wrong and is not. `(hi)` joined the two arms'
     # deploy CLOCK on purpose: the shadow is the judge's CONTROL arm, and the
@@ -152,8 +171,17 @@ NON_BOT_ROWS = {}
 #: with it. Reading order for any consumer that CAN reach the feed:
 #: `live_rows_from_feed(doc)` first, this only as the fallback.
 DECLARED_LIVE = (
-    "perps-funding-lighter-lighter",   # 💸 Funding Farmer
     "freqtrade-avo-maria-lighter",     # 🙏 Avo Maria — (ma) slot swap, 13-Aug
+    # [2026-08-22 (tb)] 🔮 georgia — the (ta) slot swap. She runs on
+    # `trail-blazer-live`, the service 💸 the Farmer gave up: it was converted
+    # in place rather than replaced, so no API key was ever read or moved.
+    # Service names in this fleet have never matched their books.
+    "freqtrade-georgia-lighter",
+    # [2026-08-25 (te)] 👩 mum — the FIRST live book born on a FRESH
+    # sub-account rather than a converted slot (Eamon created account
+    # 281474976496180 and its keys himself; the provisioner carried them
+    # straight into service `mum-live`). Third variant on the shared image.
+    "freqtrade-mum-lighter",
 )
 
 

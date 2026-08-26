@@ -1,4 +1,4 @@
-"""The horizon must not call a THIN sample a dead one.  [2026-08-20 (sm)]
+"""The horizon must not call a THIN sample a dead one.  [2026-08-20 (tu)]
 
 THE DEFECT. `gate_horizon` declared `unreachable` — *"more of the same closes
 cannot flip mean/t/halves"* — on `mean <= 0` **alone, at any n**. That claim is

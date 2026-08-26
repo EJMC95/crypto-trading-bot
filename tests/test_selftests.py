@@ -70,6 +70,13 @@ SELFTEST_MODULES = [
     # 18-Aug, and the first one voided a round on 19-Aug in the session that
     # wrote this.
     "scripts.mutate",
+    # [2026-08-25 (tk)] the LIVE P&L + SYNC AUDIT. --selftest is offline and
+    # pure (a fixture payload in the dashboard's own shape; no network, no
+    # git, no DB — the network path is main()'s, not selftest()'s), so it
+    # belongs here and not in SELFTEST_EXCLUDE. Registered in the round that
+    # added the tool, caught by this very guard on the PR's first CI run —
+    # the "selftest nobody runs" shape, prevented by its own detector.
+    "scripts.live_pnl_audit",
     # [2026-08-18 (qd)/I21] the WINNERS' DOCKET. SELFTEST_MODULES and
     # deliberately NOT ENFORCED_AUDITS, per this file's own rule: its verdict
     # reads the live ledger, which moves with every close and no code change.
@@ -149,7 +156,22 @@ SELFTEST_MODULES = [
     # "delete the stop" artifact its own first real run produced, grid-edge
     # detection, and the CALIBRATION gate — no reproduction of the observed
     # result, no recommendation, fail-closed when no baseline is supplied.
+    "scripts.audit_lever_measurability",
+    # [2026-08-20 (sp)] SELFTEST_MODULES only, and the rule at the head of
+    # ENFORCED_AUDITS is why: this guard's verdict depends on CHANGELOG.md,
+    # which any concurrent session can change without touching code — the
+    # `audit_recurrence` shape exactly. Its negative fixtures run here (five
+    # attribution forms must FIRE, nine role references must stay quiet); the
+    # scan runs in changelog-check.yml, where "is my entry right" is the
+    # actual subject.
+    "scripts.audit_operator_name",
+    "scripts.ceiling",
+    "fleet_manifest",
+    "scripts.session_state",
     "scripts.study_exit_sweep",
+    "scripts.study_stop_reclaim",
+    "scripts.study_trail_sweep",
+    "scripts.study_depth_vs_volume",
     # [2026-07-30 (hf)] LEDGER INTEGRITY — is a book's ledger ONE book's record?
     # --selftest is fully offline and pins the discrimination that makes the
     # detector usable rather than alarming: sequential holds on one symbol are
@@ -433,14 +455,14 @@ GUARD_ONLY_AUDITS = [
     # CANNOT calibrate against this book at 1m — see its header) is a finding
     # to re-run, never to re-argue from prose.
     "scripts/study_sniper_exit_shape_2026-08-20.py",
-    # [2026-08-20 (sl)] The DEBUT-DIRECTION study behind the young-source
+    # [2026-08-20 (tt)] The DEBUT-DIRECTION study behind the young-source
     # supply fix. Path-invoked for the same hyphenated-filename reason as the
     # study above; its `--selftest` is offline and pure (synthetic bars with
     # known answers), and it pins the two things that decide whether the study
     # may speak: that `venue_priced` is a CLASSIFICATION and not `class == 2`,
     # and that entries are LAG-1 at a bar open rather than clamped.
     "scripts/study_sniper_debut_direction_2026-08-20.py",
-    # [2026-08-20 (sl)] The dark-scout fallback drift guard. Its LIVE run needs
+    # [2026-08-20 (tt)] The dark-scout fallback drift guard. Its LIVE run needs
     # the venue, so CI runs only `--selftest` — which pins the comparison logic
     # itself (drift in both directions, the override excluded from both,
     # inactive books ignored). The live check is a one-command operator action;
@@ -480,6 +502,29 @@ SELFTEST_EXCLUDE = {
     # unregistered in f6d7a2a and turned this rot-guard red on main; declaring
     # it is the pattern (a silent omission is what the guard exists to catch).
     "scripts/audit_secret_leak.py",
+    # [2026-08-22 (sw)] THE TWO 22-Aug STUDIES, excluded for the same
+    # MECHANICAL reason as the (sb) entry directly below and enforced the same
+    # way — their filenames carry a hyphenated date, so a
+    # `"scripts.study_georgia_entry_rank_2026-08-22"` entry in SELFTEST_MODULES
+    # is not an importable module name, collects ZERO tests and reports green.
+    #
+    # Both `--selftest`s are offline and pure (no network, no cached tape, no
+    # DB), so neither is exempt from RUNNING — only from being imported by
+    # dotted name. `tests/autonomy/test_2026_08_22_studies.py` loads both by
+    # PATH, runs each `_selftest`, and adds the two structural checks that
+    # matter: the Farmer study must keep REFUSING an unknown volume (a data gap
+    # becoming a free pass is what would drift it back to the rank-universe it
+    # exists to correct), and the georgia study must keep preferring a stamped
+    # `entry_rank` over its own reconstruction (or the I23 fix it motivated is
+    # inert). If that file is deleted, nothing covers either study and these
+    # two lines are a lie.
+    #
+    # Each carries a decision that was ACTED ON: the first is why 💸 the
+    # Farmer's gate was NOT moved (on the honest population the shipped 0.05 is
+    # the best of seven; on the rank universe 0.40 looks like +$14.95), and the
+    # second is why 🔮 georgia's throttle went 2 -> 3.
+    "scripts/study_farmer_gate_minvol_2026-08-22.py",
+    "scripts/study_georgia_entry_rank_2026-08-22.py",
     # [2026-08-20 (sb)] 🧭 nav-cook's FOUNDING harness. Excluded from
     # SELFTEST_MODULES for a MECHANICAL reason, not a discretionary one: the
     # filename carries a hyphenated date, so `"scripts.study_dislocation_band_

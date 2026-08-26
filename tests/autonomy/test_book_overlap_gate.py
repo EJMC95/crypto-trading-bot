@@ -253,3 +253,63 @@ class TestArmPairsAreNotTwoBooks:
         assert not mod.same_book(["perps-funding-lighter-lighter",
                                   "perps-funding-lighter-lshadow",
                                   "band-garrett-lshadow"])
+
+
+class TestAConditionalFloorIsNotTheFloorItPublishes:
+    """[(sk)] 🌾 carry's turnover floor became a FAST PATH rather than a
+    verdict: below it, a coin is admitted on MEASURED book depth and payback.
+    So `caps.min_vol` keeps reading $1M while the book's real reach extends
+    underneath it — and this guard, whose whole job is "who else can take this
+    supply?", would UNDERSTATE the one book whose reach just grew.
+
+    That is the `(gl)` phantom-rival class inverted, and the inverted direction
+    is the worse one: a phantom rival is noise the operator learns to ignore,
+    but a rival that is REAL and INVISIBLE is a sibling silently starved, with
+    an UNDECLARED collision never failing the run that should have caught it.
+    """
+
+    def _gate(self, caps):
+        cur = _Cur([("perps-funding-carry-lshadow",
+                     {"caps": dict({"enter_apr": 0.2, "min_vol": 1e6}, **caps)})])
+        return mod.living_gates(cur)["perps-funding-carry-lshadow"]
+
+    def test_a_depth_admitting_book_reaches_below_its_published_floor(self):
+        g = self._gate({"depth_admit": True})
+        assert g["min_vol"] == 0.0, (
+            "the published floor is still being read as the real one — a "
+            "sub-floor rival would be invisible to the collision check")
+        assert g["min_vol_published"] == 1e6, (
+            "the published floor must be KEPT, not overwritten: it is what "
+            "the operator reads to understand where the escape starts")
+
+    def test_a_book_without_the_escape_keeps_its_floor(self):
+        """The control group. If this arm fired on every book it would make
+        every funding book a rival for every other, which is a detector that
+        flags everything."""
+        assert self._gate({})["min_vol"] == 1e6
+        assert self._gate({"depth_admit": False})["min_vol"] == 1e6
+
+    @pytest.mark.parametrize("bad", ["true", "yes", 1, 0, "", None, [], {}])
+    def test_only_a_REAL_bool_widens_the_reach(self, bad):
+        """Same three-valued discipline as `crypto_only`: this arm WIDENS a
+        book's claimed reach, so a malformed value must not trigger it — an
+        unpublished escape may not manufacture a collision."""
+        g = self._gate({"depth_admit": bad})
+        assert g["depth_admit"] is None, f"{bad!r} must not be believed"
+        assert g["min_vol"] == 1e6, f"{bad!r} widened the reach"
+
+    def test_the_widened_floor_is_still_marked_as_a_volume_bound(self):
+        """`vol_known` gates the (gl) unpublished-ceiling rule. A book whose
+        floor became conditional still PUBLISHES a volume bound, so it must
+        not fall back into the UNKNOWN branch and stop being compared."""
+        assert self._gate({"depth_admit": True})["vol_known"] is True
+
+    def test_the_printed_line_says_depth_not_a_bare_zero(self):
+        """I8. Printed bare, a 0.00M floor reads as 'this book has no floor',
+        which is a different and much less useful fact than 'this book's floor
+        is conditional'."""
+        import inspect
+        src = inspect.getsource(mod)
+        assert 'else f"{(mn or 0) / 1e6:.2f}M"' in src and '"depth"' in src, (
+            "the per-book line does not distinguish a depth escape from an "
+            "absent floor")

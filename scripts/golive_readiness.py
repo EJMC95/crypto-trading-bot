@@ -277,6 +277,23 @@ POLICY_ERA = {
         "book from 13-Jul for a STRATEGY change — a book can have an earlier "
         "hypothesis era than its accounting era, and the later of the two is "
         "what a promotion sample may use."),
+    # [2026-08-26] EXACT-KEY on purpose (era_base matches exact before the
+    # suffix strip): the LIVE row only. The shadow twin keeps 17-Jul — its
+    # ledger always ran the declared policy; scoping both would discard the
+    # 195-close sample that IS the go-live case.
+    "freqtrade-georgia-lighter": (
+        "2026-08-26",
+        "live-host exit parity fix: for its first 4 days on the (ta) "
+        "sub-account the live arm ran WITHOUT DayTraderGated's trailing ATR "
+        "ratchet (fixed -5% stop instead; 0 trailing closes in 51 vs the "
+        "shadow's 106 of 207) and WITHOUT the trend_breakout veto on the "
+        "range_top exit signal (24 of 51 closes were "
+        "long-trend-breakout_range_top at 15m median hold — a combination "
+        "the shadow's ledger cannot book at all). That sample is a different "
+        "exit policy in kind, not this book's record; pooling it into the "
+        "fixed arm's grade is the silent-pooling hazard the (hm) bracket "
+        "precedent names. The row was FLAT at the boundary, so no straddlers "
+        "exist."),
     "freqtrade-dad": (
         "2026-07-17",
         "family book, same lighter_family_bot accrual fix, 4 closes opened "
@@ -876,6 +893,21 @@ def drop_retired_sleeves(rows, retired, tag_of=None):
     return kept, dropped
 
 
+def is_phantom_close(r):
+    """[2026-08-25 (th)] True for a ledger row that is a halt/flatten EVENT
+    wearing a close's shape: exactly $0.00 P&L with NO entry price. The
+    signature — never the reason string (a real forced-flatten loss keys the
+    same reason and must stay in the sample) and never timestamp inversion
+    (verified to hit a real economic close). Fail-open: anything unparseable
+    is NOT a phantom — this filter must never be able to silently shrink a
+    graded sample beyond its exact signature."""
+    try:
+        return (float(r.get("profit_abs") or 0.0) == 0.0
+                and r.get("open_rate") is None)
+    except (TypeError, ValueError):
+        return False
+
+
 def era_rows(bot, rows, parse=None, detail=False):
     """(era_scoped, all_time, era_iso) — THE SINGLE OWNER of "which of a book's
     trades describe the book as it runs today".
@@ -1054,7 +1086,7 @@ def stats(rows, book_usd=None):
         dd = min(dd, eq - peak)
     wins = sum(1 for x in pct if x > 0)
     realised = sum(r[1] or 0 for r in rows)
-    # [2026-08-20 (sm)] `se_pct` — computed one line above inside `t` and then
+    # [2026-08-20 (tu)] `se_pct` — computed one line above inside `t` and then
     # thrown away, which is why the horizon could only ask "is the mean
     # negative?" and never "is it negative BEYOND NOISE?". Published so a
     # verdict can be power-aware. Reported, never a bar.
@@ -1410,7 +1442,7 @@ HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 # A verdict can flip on one trade, so a single reading is noise. The book must
 # hold a stuck verdict for DOCKET_DAYS, and the clock RESETS the moment the
 # verdict changes — a book that recovers leaves the docket and starts over.
-#: [2026-08-20 (sm)] The one-sided bar the horizon uses to ask whether a
+#: [2026-08-20 (tu)] The one-sided bar the horizon uses to ask whether a
 #: negative mean is negative BEYOND NOISE. The SAME standard `fleet_allocation`
 #: applies to feed a book, deliberately: the fleet should not doubt a book on
 #: one bar and feed it on another.
@@ -1455,7 +1487,7 @@ DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: joins only once the book has HAD its window and still cannot produce a rate
 #: (see `_docket_stuck`), which is I17's own wording — "still undecidable at
 #: the floor after its window".
-#: [2026-08-20 (sm)] `underpowered` is DELIBERATELY ABSENT from this tuple, and
+#: [2026-08-20 (tu)] `underpowered` is DELIBERATELY ABSENT from this tuple, and
 #: that absence is the whole point of the verdict. A book whose mean is negative
 #: but whose sample cannot EXCLUDE a positive mean has not been measured to
 #: fail — it has not been measured. Docketing it starts a keep-or-retire clock
@@ -1760,7 +1792,7 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
 
     mean = s.get("mean_pct")
 
-    # [2026-08-20 (sm)] THE MEAN BAR IS POWER-GATED NOW, and this is a
+    # [2026-08-20 (tu)] THE MEAN BAR IS POWER-GATED NOW, and this is a
     # CORRECTNESS fix rather than a softening.
     #
     # This branch used to declare `unreachable` — "more of the same closes
@@ -3174,6 +3206,20 @@ def main():
               "clean-looking 'READY: none' over zero rows is the one output "
               "this grader must never produce.", file=sys.stderr)
         return 2
+    # [2026-08-25 (th)] THE PHANTOM SIGNATURE — a $0.00 close with NO entry
+    # price is a halt/flatten EVENT, not a trade (avo carried 9 of 13, five
+    # with closed_at before opened_at, one on a coin the book cannot hold).
+    # Excluded by SIGNATURE, never by reason string — georgia's TRX −$3.87
+    # `daily_loss` is a REAL forced-flatten loss and stays in the sample.
+    # Belt to the write-site tag (`extra.non_economic`); measured effect:
+    # georgia n 46→42, mean +0.1535%→+0.1681%, t unchanged 0.680 — the era
+    # is NOT invalidated (no P&L value moves; this is hygiene, not an
+    # accounting-basis change).
+    _phantoms = sum(1 for r in rows if is_phantom_close(r))
+    if _phantoms:
+        rows = [r for r in rows if not is_phantom_close(r)]
+        print(f"(phantom closes excluded by signature: {_phantoms} — "
+              f"$0.00 with no entry price)")
     books = {}
     for r in rows:
         bot = str(r.get("bot"))

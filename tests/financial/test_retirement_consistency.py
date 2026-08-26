@@ -20,12 +20,17 @@ import pnl_dashboard
 RETIRED = pnl_dashboard.RETIRED_ROWS
 LEGACY = set(cleanup_legacy_bots.LEGACY_BOTS)
 
-# The two rows that hold REAL MONEY today (base id + the -lighter live suffix).
-# [2026-08-13 (ma)] lighter-ticket-taker-lighter -> freqtrade-avo-maria-lighter:
-# the live slot's THIRD occupant (operator slot swap, cutover verified by stamp
-# readback e49ba8fa7ed2). The taker's live row moved to the RETIRED side of
-# these invariants, exactly as the Tide Rider live row did on 17-Jul.
-LIVE_ROWS = {"perps-funding-lighter-lighter", "freqtrade-avo-maria-lighter"}
+# The rows that hold REAL MONEY today — DERIVED from the one declaration
+# rather than retyped here. [2026-08-25] This file carried its own hardcoded
+# pair and went red on main when the (ta)/(tb) swap pruned the Farmer's row:
+# the exact twelve-places rot `fleet_books` ((mn)) exists to end, in a test
+# ABOUT retirement consistency. A second copy of a rule is a second rule.
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2] / "scripts"))
+from fleet_books import DECLARED_LIVE  # noqa: E402
+
+LIVE_ROWS = set(DECLARED_LIVE)
 
 
 def test_every_hidden_row_is_also_pruned():
@@ -71,6 +76,13 @@ def test_the_34_67_double_count_fix_is_locked():
     assert "lighter-ticket-taker-lighter" in LEGACY
     assert "freqtrade-avo-maria-lighter" not in RETIRED
     assert "freqtrade-avo-maria-lighter" not in LEGACY
+    # [2026-08-25] third generation: 💸 the Farmer's live row retired (ta)/(tb),
+    # flatten receipt read (open == 0), then hidden + pruned; 🔮 georgia is the
+    # slot's current occupant and must not be filtered.
+    assert "perps-funding-lighter-lighter" in RETIRED
+    assert "perps-funding-lighter-lighter" in LEGACY
+    assert "freqtrade-georgia-lighter" not in RETIRED
+    assert "freqtrade-georgia-lighter" not in LEGACY
 
 
 def test_is_live_bot_matches_the_live_suffix():

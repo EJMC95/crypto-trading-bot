@@ -233,7 +233,11 @@ jobs:
             # Manual dispatch can still deploy freqtrade-bots ON PURPOSE (e.g. when
             # we intentionally ship a strategy change and accept one paper-DB reset).
             svcs="${DISPATCH_SVCS:-freqtrade-bots,pnl-dashboard}"
-            case ",$svcs," in *,trail-blazer-live,*) case ",$svcs," in *,funding-farmer-shadow,*) :;; *) svcs="$svcs,funding-farmer-shadow";; esac;; esac
+            # [(tb)] the auto-pair is GONE: trail-blazer-live runs georgia now,
+            # and her control arm is freqtrade-georgia-lshadow inside the shared
+            # family-lighter-shadow service — pairing there would redeploy six
+            # unrelated shadow books on every georgia fix. Dispatch the Farmer's
+            # shadow explicitly when it needs code.
           else
             # Diff the WHOLE push (before..after), not just the last commit —
             # a multi-commit push ending in a docs commit was deploying nothing.
@@ -465,6 +469,39 @@ jobs:
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"
               echo "-> live-taker marker: including tide-rider-lighter-live (REAL MONEY)"
             fi
+            # [2026-08-22 (sx)] 🔮 georgia's live arm. SAME IMAGE, SAME FILE SET
+            # — lighter_avo_live_bot.py is a VARIANT HOST now, so georgia's
+            # service runs the identical container with FAMILY_LIVE_BOOK=
+            # freqtrade-georgia and her own GEORGIA_* env + sub-account.
+            #
+            # Its OWN marker, deliberately: `[deploy-live-georgia]`. Two live
+            # books that share an image must still be deployable one at a time,
+            # or every georgia fix restarts Avo (and a restart wipes
+            # memory-only halts — see the flatten-halt-redeploy incident).
+            # `[deploy-live]` still takes both, which is what live_all means.
+            #
+            # The service does not exist until Eamon creates it; the resolve
+            # step reports an unresolvable name as an ::error:: and fails, so
+            # this rule stays commented until then — a warn-only rule is not a
+            # guard ((gl)), and a red build on a service nobody has made yet is
+            # noise. UNCOMMENT WITH THE SERVICE, in the same commit.
+            # [(tb) ACTIVATED] The service is `trail-blazer-live` — converted in
+            # place at (ta) rather than newly created, so no API key was ever
+            # read or moved. Service names in this fleet have never matched
+            # their books; this is the third slot to change hands.
+            if echo "$changed" | grep -qE "$taker_files" \
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-georgia]'; }; then
+              svcs="${svcs:+$svcs,}trail-blazer-live"
+              echo "-> live-georgia marker: including trail-blazer-live (REAL MONEY, runs georgia)"
+            fi
+            # 👩 mum's live arm — same image/file set, own marker so three
+            # live books deploy one at a time. ACTIVATED 25-Aug with the
+            # service (provisioned by one-shot dispatch, Eamon's launch order).
+            if echo "$changed" | grep -qE "$taker_files" \
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-mum]'; }; then
+              svcs="${svcs:+$svcs,}mum-live"
+              echo "-> live-mum marker: including mum-live (REAL MONEY, runs mum)"
+            fi
             # [2026-07-30 (hi)] THE EXPERIMENT'S TWO ARMS MUST DEPLOY TOGETHER.
             # `funding-farmer-shadow` — the CONTROL arm of the promotion pipeline
             # — appeared nowhere in this workflow, only in a comment inside
@@ -483,11 +520,18 @@ jobs:
             # the judge's comment says must not become a soft one); only the
             # deploy CLOCK is joined.
             # `audit_deploy_coverage.py --arms` enforces the pairing.
-            if echo "$changed" | grep -qE "$farmer_files" \
-               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-farmer]'; }; then
-              svcs="${svcs:+$svcs,}trail-blazer-live,funding-farmer-shadow"
-              echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"
-              echo "-> ...and funding-farmer-shadow, its CONTROL arm (arm-drift)"
+            # [2026-08-22 (tb)] THE FARMER HAS NO LIVE ARM ANY MORE, so this
+            # rule no longer gates real money. `trail-blazer-live` runs 🔮
+            # georgia from (ta); the Farmer's SHADOW book keeps trading as an
+            # ordinary $1k shadow and therefore gets an ordinary UNMARKED
+            # route, exactly like band-garrett-shadow below it.
+            #
+            # The `[deploy-live-farmer]` marker is retained as a NO-OP alias so
+            # an old habit or an old runbook line cannot silently deploy
+            # nothing AND cannot deploy the wrong book: it now moves the shadow
+            # arm only, which is what the name will mean from here.
+            if echo "$changed" | grep -qE "$farmer_files"; then
+              svcs="${svcs:+$svcs,}funding-farmer-shadow"
             fi
             # [(lr) ACTIVATED] 🛢️ Garrett — Farmer's file set, no marker.
             # MUST sit after farmer_files is assigned (empty grep = always).

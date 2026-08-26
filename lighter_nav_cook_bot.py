@@ -334,8 +334,87 @@ def build_state(positions, recent, pend, last_ts, now=None,
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, recent, open_pnl, realized):
-    """The published `extra` — ONE builder ((hj))."""
+def offuniverse_census(rows, universe, lo_bps, hi_bps, min_vol_m,
+                       class_of=None, excluded=(7,)):
+    """Band activity on coins this book does NOT scan — REPORT ONLY.
+
+    [2026-08-20] THE STALL THIS BOOK COULD NOT EXPLAIN. `resolve_universe`
+    filters by VOLUME before the scan, so a dislocation on a sub-floor coin
+    never reaches `census` at all. `in_band: 0` was therefore byte-identical
+    between "the band is quiet" and "the band is busy with names I do not
+    scan", and distinguishing them took a manual tape replay. That is (lv)/I18
+    one layer earlier than usual — at the universe filter, not the entry gate.
+
+    MEASURED the day this shipped: over 23.9h the [45,60)bps band produced
+    **252 confirmed in-band events and this book could trade 3**. H100 alone
+    was 174 of them at **$0.02M** volume; UNITREE/CXMT/MRNA/ANSEM are class 7
+    (pre-IPO). Every one is refused by a screen this book MEASURED and should
+    keep — the `(qq)` fill study puts the fleet's own slippage at a mean
+    17.49bps and p90 398bps below $0.1M, and pre-IPO is the band's only
+    NEGATIVE class (-0.165%, n=45). So this counts them; it must never admit
+    them.
+
+    Pure and total: no I/O, and an unreadable row is skipped rather than
+    guessed at. `class_of` is injectable so the selftest needs no bus.
+    """
+    seen = {str(s).strip().upper() for s in (universe or ())}
+    out = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0, "top": []}
+    for r in rows or ():
+        try:
+            raw = r.get("sym")
+            if raw is None:
+                continue          # `str(None)` is "NONE" — truthy, and a coin
+                                  # that does not exist. Caught by the selftest.
+            sym = str(raw).strip().upper()
+            prem = float(r.get("prem_bps"))
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not sym or not (lo_bps <= abs(prem) < hi_bps):
+            continue
+        if sym in seen:
+            continue                      # already counted by the real census
+        out["in_band"] += 1
+        vol = r.get("vol_m")
+        vol = float(vol) if isinstance(vol, (int, float)) else None
+        try:
+            cls = class_of(sym) if class_of else None
+        except Exception:      # noqa: BLE001
+            cls = None         # unknown class -> falls through to thin/other,
+                               # never raises out of a REPORTING helper
+        if cls in excluded:
+            out["preipo"] += 1
+            why = "preipo"
+        elif vol is not None and vol < min_vol_m:
+            out["thin"] += 1
+            why = "thin"
+        else:
+            # In the band, not excluded, not thin — and still not scanned.
+            # That is the ONE bucket worth an operator's attention here,
+            # because it is the only one this book's own rules do not explain.
+            out["other"] += 1
+            why = "unscanned"
+        if len(out["top"]) < 5:
+            out["top"].append({"sym": sym, "prem_bps": round(prem, 1),
+                               "vol_m": vol, "why": why})
+    return out
+
+
+def build_extra(census, positions, recent, open_pnl, realized,
+                offuniverse=None):
+    """The published `extra` — ONE builder ((hj)).
+
+    [25-Aug (tk)] `offuniverse` joins the SIGNATURE. (sq) shipped the census
+    and threaded it into the publish CALL (`offuniverse=_offuni`) without
+    adding the parameter here, so every publish raised TypeError, the
+    handler printed one log line, and the bot traded on MUTE — the row froze
+    4.5 days behind `status:"online"` while the process was healthy. The
+    selftest now drives this builder with the loop's exact call shape so a
+    signature/call drift fails offline instead of silencing the row. None
+    degrades to the zeros-with-error shape — absent is the ambiguity the
+    census exists to remove ((sq))."""
+    if offuniverse is None:
+        offuniverse = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0,
+                       "top": [], "error": True}
     return {
         "mode": "dry-run",
         "venue": "lighter",
@@ -367,6 +446,7 @@ def build_extra(census, positions, recent, open_pnl, realized):
                           % GATE_HI_BPS,
         },
         "scan": census,
+        "offuniverse": offuniverse,
         "sample": sample_block(recent),
         "thesis": {
             "cell": "dislocation mirror, residual band [%.0f,%.0f) bps"
@@ -403,6 +483,8 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
             side=pos["side"],
             entry_price=pos.get("entry"), exit_price=exit_px,
             extra={"dev_entry_bps": pos.get("dev_entry_bps"),
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "dev_exit_bps": (round(dev_now, 1)
                                     if dev_now is not None else None),
                    "ghost_side": pos.get("ghost_side"),
@@ -413,16 +495,24 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
         print("[%s] ledger write failed for %s: %s" % (now_iso(), coin, exc))
 
 
-def _open(positions, coin, dev_bps, bv, t0, cls=None):
+def _open(positions, coin, dev_bps, bv, t0, cls=None, notional=None,
+          brain_mult=1.0):
     """Open the mirror leg. Entry price is the REAL side's VWAP for my clip —
-    a long pays the ask walk, a short earns the bid walk."""
+    a long pays the ask walk, a short earns the bid walk.
+
+    [(so)] `bv` must be the book view walked for `notional`, not for the flat
+    clip: the whole point of this entry price is that it pays the walk, so a
+    brain-scaled clip priced off the base clip's VWAP would book a fill the
+    venue never offered. The caller re-walks; this asserts nothing it cannot
+    see, which is why the caller's re-walk is fail-CLOSED."""
     side = mirror_side(dev_bps)
     px = bv["buy_vwap"] if side == "long" else bv["sell_vwap"]
     if not px or px <= 0:
         return False
     positions[coin] = {
         "coin": coin, "side": side, "entry": px, "last_px": px,
-        "notional": CLIP_USD, "t0": t0,
+        "notional": CLIP_USD if notional is None else float(notional),
+        "brain_mult": brain_mult, "t0": t0,
         "dev_entry_bps": round(dev_bps, 1),
         "ghost_side": ghost_side(dev_bps),
         "cls": cls,
@@ -490,6 +580,13 @@ def main():
         census = {"scanned": len(universe), "ref_blind": 0 if ref else 1,
                   "no_book": 0, "held": 0, "in_band": 0, "below_band": 0,
                   "above_band": 0, "preipo": 0, "confirming": 0,
+                  # [(so)] a candidate the brain resized and whose book could
+                  # not then be re-walked at the sized clip. Its own bucket
+                  # because "we could not price the SIZE" is a different
+                  # refusal from "the venue has no book" and from "too thin" —
+                  # collapsing it into either makes a brain-scale problem read
+                  # as a venue problem for as long as it lasts.
+                  "resize_blind": 0,
                   "slip": 0, "capped": 0, "opened": 0}
 
         for coin in universe:
@@ -564,18 +661,72 @@ def main():
                 census["capped"] += 1
                 continue
             side = mirror_side(dev_bps)
-            slip = (bv.get("buy_slip_bps") if side == "long"
-                    else bv.get("sell_slip_bps"))
+            # [2026-08-20 (so)] the brain sizes this entry, keyed on the SAME
+            # `<side>-navband` _close publishes. A resized clip must be
+            # RE-WALKED before it is priced or gated: this book's entry is a
+            # VWAP through the real book and its slip gate is the one thing
+            # standing between it and a thin coin, so pricing a 2x clip off
+            # the 1x walk would understate both. Fail-CLOSED — no re-walk, no
+            # entry.
+            _clip, _bm = (fleet_bus.brain_clip(
+                bot_id, "%s-navband" % side, CLIP_USD,
+                deployed_usd=sum(p.get("notional") or 0.0
+                                 for p in positions.values()),
+                gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                        CLIP_USD))
+                if fleet_bus is not None else (CLIP_USD, 1.0))
+            bv_e = bv
+            if _bm != 1.0:
+                try:
+                    bv_e = ghost.book_view(ctx, coin, _clip)
+                except Exception:  # noqa: BLE001
+                    bv_e = None
+                if not bv_e:
+                    census["resize_blind"] += 1
+                    continue
+            slip = (bv_e.get("buy_slip_bps") if side == "long"
+                    else bv_e.get("sell_slip_bps"))
             if slip is None or slip > MAX_ENTRY_SLIP_BPS:
                 census["slip"] += 1
                 continue
-            if _open(positions, coin, dev_bps, bv, t0, cls=cls):
+            if _open(positions, coin, dev_bps, bv_e, t0, cls=cls,
+                     notional=_clip, brain_mult=_bm):
                 census["opened"] += 1
                 pend.pop(coin, None)
-                print("[%s] OPEN %s %s dev %+.1fbps clip $%.0f"
-                      % (now_iso(), coin, side, dev_bps, CLIP_USD))
+                print("[%s] OPEN %s %s dev %+.1fbps clip $%.0f%s"
+                      % (now_iso(), coin, side, dev_bps, _clip,
+                         "" if _bm == 1.0 else " (brain %.2fx)" % _bm))
 
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())
+        # I18: the OFF-UNIVERSE band view. Fail-safe — a dark bus yields [] and
+        # the block reports zeros rather than vanishing, because a MISSING block
+        # would reintroduce the very ambiguity it exists to remove.
+        # [2026-08-21] THE WHOLE BLOCK IS INSIDE THE TRY, not just the fetch.
+        # Shipped 20-Aug with only the `scout_prem_outliers()` call guarded —
+        # but `class_of` below calls `fleet_bus.venue_class()`, which does I/O,
+        # and it sat OUTSIDE. A REPORTING block must never be able to take a
+        # trading loop down, and this one could: nav-cook stopped publishing at
+        # the deploy that carried it and was dark for 11.5h while every other
+        # service in the same run stayed fresh. Whatever the proximate throw,
+        # the shape was mine — a census is worth exactly zero trades, so it
+        # gets zero authority to interrupt one.
+        try:
+            _rows = (fleet_bus.scout_prem_outliers()
+                     if fleet_bus is not None else [])
+            _offuni = offuniverse_census(
+                _rows, universe, GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                class_of=((lambda s: fleet_bus.venue_class(s))
+                          if (fleet_bus is not None and not ALLOW_PREIPO)
+                          else None),
+                excluded=tuple(EXCLUDED_CLASSES))
+        except Exception as _exc:      # noqa: BLE001
+            # Zeros, never absent: a MISSING block reintroduces the ambiguity
+            # this exists to remove, so it reports "I could not look" instead.
+            print("[%s] offuniverse census failed (reporting only, book "
+                  "unaffected): %s" % (now_iso(), _exc))
+            _offuni = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0,
+                       "top": [], "error": True}
+
         equity = START_EQUITY + realized + open_pnl
         try:
             # "online", NOT "running": the watchdog's NOT-ONLINE check accepts
@@ -589,7 +740,8 @@ def main():
                 pnl_pct=(equity - START_EQUITY) / START_EQUITY,
                 open_trades=len(positions), closed_trades=n_closed,
                 wins=n_wins, losses=max(0, n_closed - n_wins),
-                extra=build_extra(census, positions, recent, open_pnl, realized),
+                extra=build_extra(census, positions, recent, open_pnl,
+                                  realized, offuniverse=_offuni),
             )
             store.snapshot_equity(bot_id, equity, len(positions), realized)
         except Exception as exc:  # noqa: BLE001
@@ -730,6 +882,90 @@ def _selftest():
 
     sb = sample_block([{"pnl": 1.0, "pct": 0.01}, {"pnl": -0.5, "pct": -0.005}])
     assert sb["n"] == 2 and sb["win"] == 0.5
+    # ---------------------------------------------------------------- (2026-08-20)
+    # THE OFF-UNIVERSE BAND CENSUS. This exists because `in_band: 0` could not
+    # distinguish "band quiet" from "band busy with names I do not scan", and
+    # telling them apart took a manual tape replay.
+    _uni = ["SOXL", "SNDK"]
+    _rows = [
+        {"sym": "SOXL", "prem_bps": 50.0, "vol_m": 1.7},    # IN universe -> skip
+        {"sym": "H100", "prem_bps": 52.0, "vol_m": 0.02},   # thin
+        {"sym": "H100b", "prem_bps": -47.0, "vol_m": 0.02},  # thin, negative side
+        {"sym": "UNITREE", "prem_bps": 55.0, "vol_m": 0.80},  # pre-IPO
+        {"sym": "WIDE", "prem_bps": 120.0, "vol_m": 9.0},   # out of band -> skip
+        {"sym": "NARROW", "prem_bps": 12.0, "vol_m": 9.0},  # out of band -> skip
+        {"sym": "ODD", "prem_bps": 50.0, "vol_m": 9.0},     # liquid, not excluded
+        {"sym": None, "prem_bps": 50.0},                    # junk -> skipped
+        {"sym": "NOPREM", "vol_m": 9.0},                    # no premium -> skipped
+    ]
+    _cls = {"UNITREE": 7}.get
+    _o = offuniverse_census(_rows, _uni, GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                            class_of=_cls, excluded=(7,))
+    assert _o["in_band"] == 4, _o          # H100, H100b, UNITREE, ODD
+    assert _o["thin"] == 2, _o
+    assert _o["preipo"] == 1, _o
+    assert _o["other"] == 1, _o
+    assert _o["thin"] + _o["preipo"] + _o["other"] == _o["in_band"], (
+        "every off-universe in-band coin must land in exactly one bucket, or "
+        "the block can silently lose a reason — the defect it exists to remove")
+    assert all(t["sym"] != "SOXL" for t in _o["top"]), \
+        "a coin the book DOES scan is already in `census` and must not be counted twice"
+
+    # It must be TOTAL on junk, not merely not-crash: a dark/garbled bus is the
+    # normal failure here and must report zeros, never vanish.
+    _z = offuniverse_census([], [], GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M)
+    assert _z == {"in_band": 0, "thin": 0, "preipo": 0, "other": 0, "top": []}, _z
+    assert offuniverse_census(None, None, GATE_LO_BPS, GATE_HI_BPS,
+                              MIN_VOL_M)["in_band"] == 0
+    assert offuniverse_census([{"junk": 1}, 7, None], [], GATE_LO_BPS,
+                              GATE_HI_BPS, MIN_VOL_M)["in_band"] == 0
+
+    # A REPORTING HELPER MAY NEVER RAISE. [2026-08-21] The 20-Aug ship guarded
+    # only the bus FETCH; `class_of` does I/O and sat outside it, so a census
+    # could interrupt a trading loop. nav-cook went dark for 11.5h at that
+    # deploy while all 18 other services in the same run stayed fresh. This
+    # arm drives the exact path: a class_of that throws must degrade the coin
+    # to "unknown", never propagate.
+    def _boom(_s):
+        raise RuntimeError("venue_class exploded")
+    _r = offuniverse_census([{"sym": "AAA", "prem_bps": 50.0, "vol_m": 9.0}],
+                            [], GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                            class_of=_boom, excluded=(7,))
+    assert _r["in_band"] == 1 and _r["other"] == 1, (
+        "a throwing class_of must degrade to unknown, not raise: %r" % (_r,))
+
+    # THE PUBLISH CALL SHAPE, driven end-to-end. [25-Aug (tk)] (sq) threaded
+    # `offuniverse=_offuni` into the publish CALL without adding the
+    # parameter to build_extra's SIGNATURE, so every publish raised
+    # TypeError, the loop's own handler printed one line, and the bot traded
+    # MUTE for 4.5 days behind status:"online" — a consumer tested against a
+    # payload its publisher never built ((hj)), in reverse. This drives the
+    # builder with the LOOP'S exact keyword shape; a future drift between
+    # call and signature fails here, offline, instead of on the row.
+    _extra = build_extra({"scanned": 0}, {}, [], 0.0, 0.0, offuniverse=_o)
+    assert _extra["offuniverse"] is _o, \
+        "the census must reach the row verbatim"
+    _extra_dark = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)
+    assert _extra_dark["offuniverse"].get("error") is True and \
+        _extra_dark["offuniverse"]["in_band"] == 0, (
+        "no census given must publish the zeros-with-error shape — absent "
+        "is the ambiguity the block exists to remove: %r"
+        % (_extra_dark["offuniverse"],))
+
+    # REPORT-ONLY, structurally. This block names coins the book refuses ON
+    # PURPOSE; if it ever reached a gate it would become a widening of two
+    # MEASURED screens. Pinned by AST so a future edit cannot quietly wire it.
+    import ast as _ast
+    _tree = _ast.parse(open(__file__).read())
+    for _fn in _ast.walk(_tree):
+        if isinstance(_fn, _ast.FunctionDef) and _fn.name in ("cook_exit",
+                                                              "class_ok"):
+            _calls = {getattr(n.func, "id", None)
+                      for n in _ast.walk(_fn) if isinstance(n, _ast.Call)}
+            assert "offuniverse_census" not in _calls, (
+                "%s must never consult the off-universe census — it is a "
+                "REPORT, and its coins are excluded by measurement" % _fn.name)
+
     print("nav-cook selftest OK")
 
 

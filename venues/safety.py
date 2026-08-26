@@ -54,6 +54,26 @@ _PILOT_ALIASES = {
 #: direction.
 LIQ_HEADROOM_K = float(os.environ.get("LIGHTER_LIQ_HEADROOM_K", "4"))
 
+#: [2026-08-26 (to)] EQUITY_SCALED_CAP — opt-in, per service. THE CLASS THIS
+#: CLOSES, third measured instance in three weeks: a FIXED-dollar notional cap
+#: on a book whose clip is equity-derived stops fitting the moment equity
+#: moves — (sr) Eamon's deposit stranded a slot at cap $200; the farmer-cap
+#: HANDOFF row (gross FALLS as conviction rises against a fixed cap); 26-Aug
+#: 🙏 avo at cap_slots 3 of 5 with $639 of her on-record gross undeliverable,
+#: plus a $6 daily rail that was 10% of the PRE-deposit equity. When the
+#: switch is ON, `SafetyRails.equity_scale` re-derives the cap every loop as
+#: `max(env floor, equity x gross x EQUITY_CAP_HEADROOM)` — the operator's
+#: explicit cap env stays REQUIRED at live boot and becomes the FLOOR, so
+#: scaling only ever adds headroom in step with real equity, never invents a
+#: cap where none was set and never undercuts the one that was. Headroom 1.05
+#: mirrors the (sr)/(tn) precedent (x1.040/x1.064 hand-derived); at avo's
+#: 26-Aug numbers the floor binds until equity ~$324 (319.6x5x1.05 = 1678 <
+#: 1700) and scaling takes over smoothly above it. OFF (the default) is
+#: byte-identical to the pre-(to) rails.
+EQUITY_SCALED_CAP = os.environ.get(
+    "EQUITY_SCALED_CAP", "").strip().lower() in ("1", "on", "true", "yes")
+EQUITY_CAP_HEADROOM = 1.05
+
 
 class SafetyRails:
     def __init__(self, bot: str, venue_mode: str):
@@ -64,6 +84,12 @@ class SafetyRails:
         raw = (os.environ.get(f"{alias}_MAX_NOTIONAL") if alias else None) or \
             os.environ.get(f"{env_prefix(bot)}_MAX_NOTIONAL")
         self.max_notional = float(raw) if raw else None
+        #: [2026-08-26 (to)] the operator's env value doubles as the FLOOR for
+        #: the opt-in equity-scaled cap; `cap_src` says which one is binding
+        #: so the row can publish it (I8 — a number with no provenance is a
+        #: number the next reader re-derives wrong).
+        self.cap_floor = self.max_notional
+        self.cap_src = "env"
         self.max_daily_loss = float(os.environ.get("LIGHTER_MAX_DAILY_LOSS", "30"))
         self.halted_day = None
 
@@ -100,6 +126,29 @@ class SafetyRails:
         if self.max_notional is None:
             return True
         return (open_notional + add_usd) <= self.max_notional + 1e-9
+
+    def equity_scale(self, equity, gross):
+        """Re-derive the notional cap from live equity — see EQUITY_SCALED_CAP.
+
+        Called once per loop by the host with its fresh equity read and its
+        configured gross multiple. Fail-safe in every direction: switch OFF or
+        no env floor (a shadow rail with no cap must not GAIN one) -> no-op;
+        an unreadable/non-finite/non-positive equity or gross -> the cap KEEPS
+        its last value (a dark read must not move a real-money rail, I4/(pq));
+        and the result can never sit below the operator's env floor by
+        construction. Returns the effective cap either way."""
+        if not EQUITY_SCALED_CAP or self.cap_floor is None:
+            return self.max_notional
+        try:
+            eq, g = float(equity), float(gross)
+        except (TypeError, ValueError):
+            return self.max_notional
+        if not (0 < eq < float("inf")) or not (0 < g < float("inf")):
+            return self.max_notional
+        scaled = eq * g * EQUITY_CAP_HEADROOM
+        self.max_notional = max(self.cap_floor, scaled)
+        self.cap_src = "scaled" if scaled > self.cap_floor else "env"
+        return self.max_notional
 
     def headroom_check(self, margin_state, stop_frac):
         """May the book ADD notional without sitting inside its own liquidation?

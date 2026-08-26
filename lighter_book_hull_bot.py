@@ -602,6 +602,10 @@ def _close(bot_id, key, pos, reason, exit_rate, pnl, spread_exit=None):
                    "accrued": round(pos.get("accrued") or 0.0, 4),
                    "fees": round(pos.get("fees") or 0.0, 4),
                    "notional": pos.get("notional"),
+                   # [(so)] I22 receipt: the brain scale this stake was sized
+                   # at. Without it the notional column is the only trace and
+                   # nobody can tell a brain move from a config change.
+                   "brain_mult": pos.get("brain_mult"),
                    "entry_prem_bps": pos.get("entry_prem_bps"),
                    "spread_bps_entry": pos.get("spread_bps_entry"),
                    "spread_bps_exit": spread_exit,
@@ -805,11 +809,26 @@ def main():
                 for c, f, apr in candidates(fund, held, stable_since, t0,
                                             prem_map=prem_map, max_n=free):
                     side = "short" if apr > 0 else "long"
-                    _open_position(positions, c, side, CLIP_USD, t0, apr,
+                    # [2026-08-20 (so)] the brain sizes this entry. The tag is
+                    # composed from the SAME two parts record_close publishes
+                    # (`<side>-basis_<exit>`), so the key looked up here and the
+                    # key the brain buckets under cannot drift — a lookup on a
+                    # tag the ledger never writes returns 1.0 forever, which is
+                    # the registered-but-inert failure wearing a consumer's hat.
+                    _clip, _bm = (fleet_bus.brain_clip(
+                        bot_id, f"{side}-basis", CLIP_USD,
+                        deployed_usd=sum(p.get("notional") or 0.0
+                                         for p in positions.values()),
+                        gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                                CLIP_USD))
+                        if fleet_bus is not None else (CLIP_USD, 1.0))
+                    _open_position(positions, c, side, _clip, t0, apr,
                                    prem_bps=prem_map.get(c))
+                    positions[c]["brain_mult"] = _bm
                     positions[c]["spread_bps_entry"] = live_spread_bps(ctx, c)
                     held.add(c)
-                    print(f"[{now_iso()}] OPEN {c} {side} ${CLIP_USD:.0f} | "
+                    print(f"[{now_iso()}] OPEN {c} {side} ${_clip:.0f}"
+                          f"{'' if _bm == 1.0 else f' (brain {_bm:.2f}x)'} | "
                           f"{apr:+.1%} TRUE | payback "
                           f"{payback_hours(apr):.0f}h | prem "
                           f"{prem_map.get(c) if prem_map.get(c) is not None else '?'}bps")

@@ -479,7 +479,7 @@ def fresh_mid(ctx, coin):
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
-                  reason, shadow, notional=None):
+                  reason, shadow, notional=None, extra=None):
     # [2026-08-20 (sc)] pnl_pct WAS PRICE-ONLY ON A FUNDING BOOK, AND THE GO-LIVE
     # GATE GRADES ON pnl_pct. The caller computes `total = price_pnl + accr`, so
     # `pnl_abs` has always carried funding while this percentage discarded it —
@@ -526,6 +526,11 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
             # tested — the price PATH cannot be joined to the trade.
             # Telemetry only; no gate moves.
             entry_price=ent_px, exit_price=exit_px,
+            # [(so)] I22 receipts (notional + the scales that produced it).
+            # This book had NO `extra` at all, so its every sizing term was
+            # unrecorded — the allocation organ has been rewriting its clip
+            # since (jr) and no close could say by how much.
+            extra=(extra or None),
             venue="lighter", shadow=shadow)
     except Exception:  # noqa: BLE001
         pass
@@ -722,7 +727,12 @@ def main():
                  price_pnl, accr, reason)
         _record_close(bot_id, coin, m.get("entry"), m.get("opened_ts"), px,
                       total, was_long=not m.get("is_short"), reason=reason,
-                      shadow=shadow_tag, notional=m.get("notional"))
+                      shadow=shadow_tag, notional=m.get("notional"),
+                      extra={"notional": m.get("notional"),
+                             "alloc_scale": m.get("alloc_scale"),
+                             "brain_mult": m.get("brain_mult"),
+                             "accrued": round(accr, 6),
+                             "price_pnl": round(price_pnl, 6)})
         meta.pop(coin, None)
 
     while True:
@@ -745,12 +755,60 @@ def main():
         # clip; held legs keep their entry size). The live arm's clip stays
         # PINNED at GOLIVE_ORDER_USD per (ia) — capital levers do not reach
         # real money, and the allocation organ doubly so. Dark bus -> 1.0.
+        # [2026-08-20 (so)] and the BRAIN's scale beside it, same arm, same
+        # NEW-entries-only rule. Two properties carry this one:
+        #  * ONE scale for BOTH legs. This book is DOLLAR-NEUTRAL by
+        #    construction — one clip opens a long leg and a short leg — while
+        #    the brain buckets its closes per side (`long`, `short`). Sizing
+        #    the legs by their own mults would quietly turn the fleet's
+        #    canonical spread book into a directional one wearing a spread
+        #    book's name, so the sides are combined (min) and the pair takes
+        #    one number. `fleet_bus.brain_mult_multi` owns that rule.
+        #  * The LIVE arm is untouched, per (ia): its clip is PINNED at
+        #    GOLIVE_ORDER_USD because that is the config both validations
+        #    cleared, and capital levers do not reach real money on this book.
+        # Measured the day this shipped, and it is why the wiring is not
+        # theoretical: the brain had been asking this exact book to size its
+        # long side at 0.75 for **91 consecutive runs** (n=48, t=-1.38) into a
+        # consumer that did not exist.
+        # Both default to 1.0 on the LIVE arm and on a dark bus, so the
+        # receipt below is always well-formed — a missing name here would
+        # NameError inside the entry loop, i.e. telemetry taking down trading.
+        _alloc = _bmult = 1.0
+        # [(sp)] THE BRAIN MAY ONLY MOVE THIS CLIP WHILE THE BOOK IS FLAT.
+        # This book is DOLLAR-NEUTRAL and its rebalance keeps held legs
+        # (`if c in meta: continue`), so a clip that changes mid-life leaves
+        # generations of legs at different sizes. Measured by the audit: one
+        # mult step from 1.0 to 6.7 replacing a single short leg leaves shorts
+        # at 4x$20 + $536 against longs at 5x$20 — **$570 of net directional
+        # delta on a book that models zero price exposure.** The (sp) gross
+        # bound caps the magnitude and cannot fix the ASYMMETRY, because the
+        # asymmetry is between generations, not between sides.
+        # Gating on flatness is exact: every leg of a generation is then sized
+        # by one number. The ALLOCATION organ is deliberately NOT gated here —
+        # it has rebound this clip every loop since (jr) and narrowing that is
+        # a separate change with a separate owner; what this refuses to do is
+        # make a pre-existing asymmetry 6.7x wider.
+        _brain_ok = not meta
         if not _is_live and fleet_bus is not None:
             _alloc = fleet_bus.allocation_scale(bot_id) or 1.0
-            _target = ctx.order_usd(ORDER_USD, own=True) * _alloc
+            _base = ctx.order_usd(ORDER_USD, own=True) * _alloc
+            # [(sp)] the BOOK-LEVEL GROSS BOUND on the product. Both legs of
+            # every pair draw on ONE budget — `K * 2` legs is this book's real
+            # position count, and using K alone would let the bound be breached
+            # by exactly the factor that makes it a spread book. Trims only the
+            # brain's increase, so a neutral or reducing brain is unaffected.
+            _target, _bmult = (fleet_bus.brain_clip_multi(
+                [(bot_id, "long"), (bot_id, "short")], _base,
+                deployed_usd=sum(float(m.get("notional") or 0.0)
+                                 for m in meta.values()),
+                gross_cap_usd=fleet_bus.brain_gross_cap(K * 2, ORDER_USD),
+                # one `order_usd` sizes every leg of the rebalance below, so
+                # the bound has to know it is sizing 2K of them at once.
+                slots=K * 2) if _brain_ok else (_base, 1.0))
             if abs(_target - order_usd) > 1e-9:
-                log.info("allocation scale %.2fx: clip %.2f -> %.2f",
-                         _alloc, order_usd, _target)
+                log.info("allocation %.2fx x brain %.2fx: clip %.2f -> %.2f",
+                         _alloc, _bmult, order_usd, _target)
                 order_usd = _target
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
@@ -878,6 +936,12 @@ def main():
                                # the clip this leg was opened at — the
                                # `open_notional()` doctrine, applied to grading.
                                "notional": float(order_usd),
+                               # [(so)] and the two scales that produced it,
+                               # recorded SEPARATELY — multiplied together
+                               # they are unattributable, and this book
+                               # carries both organs.
+                               "alloc_scale": round(_alloc, 4),
+                               "brain_mult": round(_bmult, 4),
                                "opened_ts": t0, "accrued": 0.0}
                     log.info("OPEN %s %s $%.0f @ %.6g (%dh mean %+.1f%% apr)",
                              c, "SHORT" if is_short else "LONG", order_usd,

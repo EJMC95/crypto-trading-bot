@@ -119,6 +119,15 @@ _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
                        # False` below), so this entry is what makes Avo's
                        # arm real rather than silently inert.
                        "live.avo.": "evidence-board",
+                       # [2026-08-22 (tb)] 🔮 georgia's arm, for the same
+                       # reason and found the same way: (sx) registered
+                       # `live.georgia.clip_scale` in LEVERS and stopped there,
+                       # so it was unwritable by ANY author until this line.
+                       "live.georgia.": "evidence-board",
+                       # [2026-08-25] 👩 mum's arm, registered WITH its lever
+                       # in one commit — the (tb) lesson applied forward
+                       # instead of re-learned.
+                       "live.mum.": "evidence-board",
                        "live.funding.": "experiment-judge"}
 
 
@@ -196,7 +205,7 @@ LEVERS = {
         "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-taker",
         "note": "dip conviction bar (range_pos <=); default 0.05", "env_default": 0.05},
     "taker.brk_range": {
-        "kind": "float", "lo": 0.90, "hi": 0.97, "lane": "lighter-taker",
+        "kind": "float", "lo": 0.90, "hi": 0.95, "lane": "lighter-taker",
         "note": "breakout conviction bar (range_pos >=); default 0.95", "env_default": 0.95},
     "taker.momo_chg": {
         "kind": "float", "lo": 3.0, "hi": 6.0, "lane": "lighter-taker",
@@ -213,8 +222,100 @@ LEVERS = {
         "kind": "float", "lo": -0.04, "hi": -0.02, "lane": "lighter-taker",
         "note": "stop-loss fraction; default -0.03", "env_default": -0.03},
     "taker.max_hold_h": {
-        "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
+        "kind": "float", "lo": 48.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48", "env_default": 48.0},
+    # [2026-08-20 (sk)] THE RESTRICTIVE END OF EVERY BREAKOUTUP CAGE IS NOW
+    # PINNED AT THE MODULE DEFAULT, because the actuator that moves these is
+    # STRUCTURALLY BLIND to the lens they govern.
+    #
+    # MEASURED, on the live bus: `taker.brk_range` sat at **0.97** (cage hi =
+    # tightest; default 0.95) and `taker.max_hold_h` at **24.0** (cage lo =
+    # tightest; default 48) — BOTH `set_by: scout-tuner`, both from
+    # `organ-proposal:event-sentinel`. And `lighter_ticket_replay.py:206` reads
+    # `_up = False if lens == "breakout" else None`, so `bull_entry_ok` refuses
+    # EVERY breakout entry and the tuner's replay contains ZERO breakoutup
+    # trades. Its own published baseline agrees: breakout taken=0 closed=0.
+    #
+    # THE CONSEQUENCE IS ARITHMETIC, NOT STATISTICS. On a lens the gate cannot
+    # fill, a candidate's replay delta is exactly $0.00 — so RESTRICT passes
+    # `not_worse` for free (it fails only if `var < base - tol`), while EXPAND
+    # needs `+MARGIN_HALF` on BOTH halves and can never clear $0.00, and the
+    # starving-widen path needs `taken > 0` and logs "0 replay fills — no
+    # evidence". **The cage on this book's only living lens could only ever get
+    # smaller.** That is the one-way ratchet, in the actuator.
+    #
+    # WHAT THIS FIX CLAIMS, AND WHAT IT DOES NOT. `clamp()` is
+    # `min(hi, max(lo, v))` and runs at READ as well as write, so pinning the
+    # restrictive end at the default snaps both live levers back on the next
+    # `get_lever` — no lever write, no deploy race. It is NOT a widening: the
+    # values return to what the operator configured, and reach in the growth
+    # direction is untouched (max_hold may still go to 72, brk_range down to
+    # 0.90). It is also NOT sold as alpha — the 24h->48h restoration measures
+    # +0.22pp to +0.57pp/trade on the book's own closes but LOSES to a
+    # same-coin random-start placebo (P=0.45..0.88), i.e. most of it is
+    # exposure rather than edge. **The claim is that an unevidenced
+    # restriction is reversed**, and the burden for undoing a restriction a
+    # blind gate imposed is not the burden for widening past a validated one.
+    #
+    # `taker.div_gap_pp` is DELIBERATELY LEFT at its levered 75.0 (default
+    # 62.5). Its lens is divergence, which the replay CAN see (42 taken), so
+    # the tuner had real evidence — and a 12-rung ladder through that replay
+    # reads negative at every rung and monotonically LESS negative as the bar
+    # tightens. Fixing the ratchet means fixing it where the gate is blind,
+    # not everywhere a lever moved.
+    #
+    # THE DURABLE FIX IS UPSTREAM and is NOT in this change: teach
+    # `lighter_ticket_replay` the taker's own breakoutup relabel so the gate
+    # can SEE the lens before it is allowed to steer it. Until then, do NOT
+    # add any breakoutup constant to `lighter_scout_tuner`'s PROPOSAL_TAKER /
+    # TAKER_LADDERS / SWEEP_* — that hands more of this book to a blind
+    # actuator. The two levers below are registered for CONSUMPTION only, and
+    # their cages are one-sided at the default for exactly this reason.
+    #
+    # [2026-08-20 (sk)] THE BREAKOUT ARM'S TREND EXIT JOINS THE RAIL. Under
+    # BULL_MODE `bull_exit()` routes breakout/breakoutup to a DIFFERENT exit
+    # from every other lens — no TP cap, a wide hard stop, and a trailing
+    # give-back off the peak — and both of its numbers were bare env literals
+    # with no registry entry. So the growth rail could move the fixed
+    # reversion bracket (`taker.tp`/`taker.sl`) that divergence uses and could
+    # not touch the exit that actually binds the taker's best long lens:
+    # `long-breakoutup_hold` n=27 +$23.77 (+1.412%/trade) against
+    # `long-breakoutup_trail` n=18 -$9.59 (-1.722%). That is I18 — the binding
+    # constraint must be a reachable lever — and until now it was not one.
+    #
+    # REGISTERING MOVES NOTHING (the `disloc.exit_bps` idiom): both defaults
+    # are today's values and this ships INERT. It is reach, not a set value,
+    # and the distinction matters here because the widening these knobs invite
+    # was MEASURED AND WITHHELD the same day: on the trail, the harness's own
+    # calibration drift (+0.508pp) exceeds the whole 6%->OFF effect (~0.10pp);
+    # on the clock, leave-one-symbol-out takes the 48h->96h gain from +0.78pp
+    # to +0.07pp without HYPE. What the rail gets is the ABILITY to walk them
+    # through `lighter_scout_tuner`'s replay gate hourly, on evidence, instead
+    # of a session hand-setting a number two measurements refused.
+    #
+    # SHADOW ONLY, structurally: `lighter_ticket_taker.apply_tuning` returns
+    # an empty dict when TT_VENUE == lighter_live, and the live arm is
+    # divergence-SHORT only (`LIVE_SIDES`), so the breakout branch of
+    # `bull_exit` is unreachable on real money twice over.
+    "taker.brk_trail": {
+        # Cage `hi` stops at 0.15 because the sweep measured the rule
+        # SATURATING there — 15%, 20% and trail-OFF are the same book, so a
+        # cage past 0.15 is reach into a region where the lever does nothing.
+        # `lo` 0.04 keeps a tightening notch available if the trend arm ever
+        # measures better banking earlier.
+        "kind": "float", "lo": 0.06, "hi": 0.15, "lane": "lighter-taker",
+        "note": ("breakout TREND exit: give-back off the peak before banking; "
+                 "env default 0.06 (TT_BRK_TRAIL)"),
+        "env_default": 0.06, "step": 0.01},
+    "taker.brk_sl": {
+        # Signed like `taker.sl`, so `lo` is the WIDER stop. -0.12 is the
+        # widest the arm's own rationale supports ("entries draw -3.4% before
+        # running"); -0.05 is a notch tighter than shipped and still wider
+        # than the reversion bracket's -0.03, which the breakout pop churns.
+        "kind": "float", "lo": -0.12, "hi": -0.07, "lane": "lighter-taker",
+        "note": ("breakout TREND exit: wide hard stop; env default -0.07 "
+                 "(TT_BRK_SL)"),
+        "env_default": -0.07, "step": -0.01},
     # [2026-07-21] post-stop re-entry cooldown (TT_SL_COOLDOWN_H, default
     # 2.0h — the same-day churn fix: NBIS -$5.37/8, BOT -$4.60/3, every
     # same-minute re-entry a loser). Registered so the proposal channel and
@@ -252,6 +353,35 @@ LEVERS = {
     "live.avo.clip_scale": {
         "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
         "note": "🙏 Avo live clip multiplier, restrict-only; 1.0 = equity/slots",
+        "env_default": 1.0},
+    # [2026-08-22 (sx)] 🔮 georgia's own arm, registered AHEAD of her live row.
+    # Same shape and same cage as Avo's for the same reason: the consumer is
+    # the SAME code (`lighter_avo_live_bot._clip_scale_now`, now a variant
+    # host) and clamps to min(1.0, ...), so a cage above 1.0 would register
+    # authority the consumer silently discards.
+    #
+    # Registered before she is funded ON PURPOSE: `fleet_tuning.get_lever`
+    # returns the env default for an UNREGISTERED name, so a live book whose
+    # arm does not exist has a dial nothing can turn — the reverse of the
+    # registered-but-inert failure and just as silent. This costs nothing
+    # while she is unfunded (nothing writes it) and means the protection is
+    # already there on the first real order.
+    "live.georgia.clip_scale": {
+        "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
+        "note": "🔮 georgia live clip multiplier, restrict-only; 1.0 = equity/slots",
+        "env_default": 1.0},
+    # [2026-08-25] 👩 mum's own arm, registered AHEAD of her live row — the
+    # same pre-registration georgia's got at (sx), for the same reason: an
+    # unregistered name silently returns the env default, so a live book
+    # whose arm does not exist has a dial nothing can turn. Same cage as her
+    # siblings' because the consumer is the SAME restrict-only code
+    # (`lighter_avo_live_bot._clip_scale_now`, min(1.0, ...)). Its prefix is
+    # in `_LIVE_PREFIX_OWNERS` in the SAME commit — (tb) measured that
+    # registering the lever and stopping there leaves it unwritable by any
+    # author, the registered-but-inert failure with extra steps.
+    "live.mum.clip_scale": {
+        "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
+        "note": "👩 mum live clip multiplier, restrict-only; 1.0 = equity/slots",
         "env_default": 1.0},
     # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
     # money). The experiment judge runs ONE candidate at a time here; while
@@ -486,6 +616,33 @@ LEVERS = {
         "kind": "float", "lo": 1e6, "hi": 2e6, "lane": "lighter-books",
         "note": "Yield Harvester 24h $ turnover floor; env default 1e6 since (pr)",
         "env_default": 1000000.0, "step": -250000.0},
+    "carry.payback_max_h": {
+        # [2026-08-20 (sk)] THE OTHER HALF OF THE LIQUIDITY GATE, and the only
+        # one that can OPEN this book. `carry.min_vol`'s cage is one-sided in
+        # the TIGHTEN direction (default sits at `lo`), so after (pr) the rail
+        # had no lever anywhere that could widen 🌾 carry's intake — the fleet's
+        # best-evidenced book, sitting at 0 of 12 slots with `eligible: 0` of
+        # 228 scanned. That is I18 in its purest form: every reachable motion
+        # restricted a book whose problem was that it could not find a trade.
+        #
+        # WHAT IT GATES. A coin below the turnover floor is admitted only if
+        # the LIVE book can fill this book's clip and the funding repays the
+        # MEASURED round trip within this many hours (`depth_admits`). It is a
+        # bound on a payback horizon, not on volume, so it is denominated in
+        # the same units as the decision — unlike turnover, which measured
+        # 2026-08-20 as close to orthogonal to fill cost at an $80 clip.
+        #
+        # CAGE. `lo` 6h is roughly the fastest payback the venue has ever
+        # offered (UNITREE at 1162% APR repays 34.8bps in 2.6h, so even `lo`
+        # admits the extremes); `hi` 168h is a QUARTER of the 336h max hold —
+        # deliberately far short of it, because a carry that needs most of its
+        # maximum life just to break even has no margin for the rate decaying,
+        # which is the thing carries actually do. Step walks UP a notch at a
+        # time, each one replay-gated like every other lever on this lane.
+        "kind": "float", "lo": 6.0, "hi": 168.0, "lane": "lighter-books",
+        "note": ("Yield Harvester max payback horizon (h) for a sub-floor "
+                 "coin admitted on MEASURED book depth; env default 48"),
+        "env_default": 48.0, "step": 12.0},
     "fundspread.k": {
         # measured AT its cap: 10 open = exactly K=5 x 2 legs.
         # [2026-08-04] default 8 -> 5: the (fz) widening reverted per its own

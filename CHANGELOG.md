@@ -1,13 +1,13 @@
-## 2026-08-20 (sn) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
+## 2026-08-20 (tv) — EVERY BOOK READ 0.000 BECAUSE THE INSTRUMENT HAD A CLIFF IN IT: the allocation bound now derives its critical value from the sample, and the fleet publishes its first era-scoped claim
 
-*[RENUMBERED (si) -> (sn): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+*[RENUMBERED (si) -> (tv): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
 **Operator:** *"If everything is 0.000 then you've missed something and you've
 got something wrong. Find out why and fix it. This whole fleet 0 business needs
 to change and whatever is causing this disease needs to be killed, not the fleet
 or its endless possibilities for success."*
 
-He was right, and the cause was not where `(sm)` looked. `(sm)` fixed the SPLIT
+He was right, and the cause was not where `(tu)` looked. `(tu)` fixed the SPLIT
 (one claim of 0.0015 was taking $13,366 of $19,000 and starving 17 of 19 books
 to the probe floor). This is the CLAIM itself, and it had **three** separate
 defects, measured on the live payload rather than reasoned about:
@@ -57,7 +57,7 @@ instrument too generous, the other too blunt, and between them a table of zeros.
   invention** — it is the winners' docket's own luck floor (I21: *"the n>=10
   floor, not BH, is what stops a consistent 3-close streak from outranking
   evidence"*), so the fleet's two ranking instruments now agree.
-* **The same instrument doubts a book as feeds one, in CODE.** `(sm)` wrote that
+* **The same instrument doubts a book as feeds one, in CODE.** `(tu)` wrote that
   claim as two constants that happened to match, which stays green against two
   independent implementations. `golive_readiness.horizon_crit` now defers to
   `fleet_allocation.t_crit` and the test pins it **by identity at five sample
@@ -91,7 +91,7 @@ migrates into an actuator, so `claim` stays the only field the split reads.
 
 `fleet_bus.allocation_scale` is read by exactly three books (🌾 carry, ⚖️
 Counterweight, 💸 the Farmer's shadow arm), so the sizing price is exactly the
-change in THEIR `scale_effective`, both columns computed under the same `(sm)`
+change in THEIR `scale_effective`, both columns computed under the same `(tu)`
 tilt so this isolates the claim arithmetic:
 
 | consumer | before | after |
@@ -138,7 +138,7 @@ except the -1.4% above.
   when no upper bound could be computed — the (po) shape, where the safe branch
   is the untested one.
 
-**NOT CHANGED, deliberately:** `claim`'s semantics, the `(sm)` tilt's input (a
+**NOT CHANGED, deliberately:** `claim`'s semantics, the `(tu)` tilt's input (a
 one-day-old split re-aimed on an unmeasured formula in the same week is what
 I19 forbids), and the era gate's seniority. Files: `fleet_allocation.py`,
 `scripts/golive_readiness.py`, `tests/autonomy/test_fleet_allocation.py`,
@@ -147,10 +147,9 @@ this container (`test_funding_variant`, `test_margin_truth`) are the absent
 `lighter` SDK degrading a margin-mode enum to its raw code, are present on
 `origin/main` unchanged, and CI is green there.
 
+## 2026-08-20 (tu) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
 
-## 2026-08-20 (sm) — THE ARITHMETIC HAD A KILL BIAS: one book's claim of 0.0015 starved 17 of 19 to the probe floor, and `unreachable` fired on a NEGATIVE MEAN AT ANY n — so a book could be routed toward retirement by noise on ten trades
-
-*[RENUMBERED (sh) -> (sm): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+*[RENUMBERED (sh) -> (tu): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
 **Operator:** *"Keep the books, fix your arithmetic to everything you want to
 retire and start using an approach where instead of finding a way to kill
@@ -219,7 +218,7 @@ cannot reach — **and the answer is to FEED it**. Retirement requires a MEASURE
 exclusion (an upper bound at or below zero, or a supply that does not exist),
 never a thin sample and never a verdict computed on a starved one. **A refusal to
 retire on insufficient evidence is a correct outcome of I17, not an evasion of
-it.** Concretely: `(sk)` escalated a keep-or-retire call on 🎯 the sniper citing
+it.** Concretely: `(ts)` escalated a keep-or-retire call on 🎯 the sniper citing
 horizon `unreachable` and claim 0.000 — **neither number survives its own fix**
 (its upper bound is +0.814%, and 0.000 was the split's floor, which read 0.000
 for *every book in the fleet* including one at +4.66%/trade). Withdrawn in place.
@@ -251,6 +250,2824 @@ books' entry sizing, so this changes paper position sizes today — 17 books get
 `test_allocation_consumer.py`), and `FLEET_ALLOCATION_MODE=advisory` reverts every
 consumer to its env default at the accessor. Era NOT reset anywhere: no book's
 trading RULE changed.
+
+## 2026-08-26 (tr) — MUM'S BAR WIDENS TO EXACTLY WHAT WAS MEASURED: RSI_MAX 25 → 30, THE "RESCUE" TIERS REFUSED WITH THEIR NUMBERS, REFEREE-CONFIRMED
+
+The other half of Eamon's directive — *"tweak mum v2 so she doesnt miss
+anything too good"* — shipped the measured way. Four candidate cells, bars
+PRE-REGISTERED (the study script committed to the branch before any result
+existed), graded exit-free vs matched-random on her own 23-symbol universe
+(~460d of Lighter 1h tape), then through her REAL bracket, then adversarially
+refereed with independent code and a HARDER regime-conditional null:
+
+* **C3 (rsi [25,30) x NOT-uptrend): ADMIT — the one survivor.** Exit-free
+  h12 excess +0.156%, t_cl +2.25, P=0.001 (n=2,296 episodes, 1,382 coin-day
+  clusters); under her real bracket **+0.104%/trade, t=+2.38, t_cl=+1.99,
+  BOTH halves positive, trailing-120d +0.150%** (crypto-only stronger:
+  +0.121%/t=2.27, trailing +0.312%/t_cl=2.67). Survived the referee's
+  regime-conditional null (+0.119%/t_cl 1.73 — the edge is the RSI band, not
+  the regime), coin jackknife (worst drop keeps t_cl 1.68), month jackknife,
+  coin-week clustering (t RISES to 2.41), Bonferroni over the study's test
+  count. Supply: **~3-4x her current rate** (4.03 eps/day trailing-30d, 2.37
+  crypto) — "more trades" delivered as trades that PAY, +0.104%/trade being
+  the I19 price paid IN expectancy rather than with it.
+* **C1 (rsi<20 x uptrend — the literal "too good to miss" tier): REFUSED.**
+  Trailing-negative at every horizon; the tape's answer is that a deep-oversold
+  print in an UPTREND is worth LESS than what the filter blocks above it.
+  **C2 (rsi 20-25 x uptrend): REFUSED** (flat, best cell P=0.19; and a
+  measured 31.2% co-hold channel with 🙏 avo — the I20 separator stays).
+  This week's three "missed" entries (TRX 23.4, TSLA 22.8, WTI 21.9) all sat
+  in these refused cells: **the filter was right about every one of them.**
+  **C4 (rsi 30-42): REFUSED — DECAYED**, trailing t_cl −2.6..−3.0 and the
+  referee's boundary sweep shows the decay deepening (−3.09 at 90d); its 16
+  eps/day is the (hl) turnover trap by the book.
+* Uptrend exclusion, bracket, slots, era: all UNCHANGED (entry-bar notch =
+  ordinary tuning, the carry ENTER_APR precedent (hc); her sample was n=1
+  regardless). The gauge test's fixture moved to bar-relative offsets.
+
+**Three watch items ride the ship, from the referee:** (1) her onboard
+control arm (extra.control) is the live falsification of the widened cell —
+read it at the first ~30 closes; (2) the 24h max-hold tail is currently a
+drag (max_hold exits −1.11%/trade; the surviving edge lives ≤12h where the
+roi ladder banks 70% of exits) — if the control corroborates, a max-hold
+tightening toward 12h is the NEXT measured candidate, not tonight's; (3)
+full-sample h1 is thin (+0.050) — early green is not more than the trailing
+window already supports. Study: `STUDY_MUM_SUPPLY_2026-08-26.md` +
+`scripts/study_mum_supply_2026-08-26.py` (pre-registered, seeded).
+Deployed [deploy-live-mum]; shadow rides the family auto-deploy.
+
+## 2026-08-26 (tq) — EAMON'S RISK-UP: LEVERAGE TO THE HONEST CEILINGS, THE SCALED CAP GOES LIVE, AND EVERY VALUE CARRIES ITS ARITHMETIC
+
+**Eamon, 26-Aug (afternoon): "adjust to whatever enables more trades and less
+restriction, leverage optioned. tweak mum v2 so she doesnt miss anything too
+good."** Risk appetite belongs to the person whose money it is; the code's
+job is the arithmetic, published. Executed as CAPACITY/LEVERAGE opens now
+(zero expectancy price — per-trade % is clip-invariant, (hl)) with mum's
+ENTRY widening routed through its own pre-registered exit-free study first
+((qu)'s discipline; results land as their own entry):
+
+* **🙏 avo: GROSS_X 5.0 → 5.3, GROSS_X_MAX 5.0 → 5.5, EQUITY_SCALED_CAP
+  on.** The ceiling is the host's own honest formula ((th)): a stop survives
+  a gapped fill only while G < 1/(|stop| + overshoot + mmf) =
+  1/(0.10 + 0.0217 + 0.06) = **5.503x** — 5.5 IS that ceiling, 5.3 ships
+  strictly inside it ((gv)). all_slots_stop 50% → 53%, published. With the
+  (to) code now in her image, the $1,700 cap becomes the FLOOR of
+  max(floor, equity x 5.3 x 1.05) — the fixed-dollar class can never strand
+  her slots again.
+* **🔮 georgia: GROSS_X 5.0 → 7.0** (ceiling 1/(0.05 + 0.0217 + 0.06) =
+  **7.593x**, the overshoot datum being HER OWN DOGE fill; 7.0 = 92% of it).
+  Effective deployment 3.75x → **5.25x today** (the board's 0.75 clip stays
+  senior and self-heals ~29-Aug/1-Sep as the rail days roll out of its 7d
+  window) → 7.0x healed. **LIGHTER_MAX_DAILY_LOSS 20 → 27** — the (tn)
+  parity derivation at her service (0.10 x 266 = 26.6; the abs rail was
+  binding at 7.5% of equity). EQUITY_SCALED_CAP on (floor $5,000, far from
+  binding — future-proofing, not a change today).
+* **👩 mum: leverage untouched, and the refusal is stated rather than
+  silent.** 9.5x is Eamon's own on-record setting at the edge of stop-death
+  (10.0), and the (th) arithmetic — 53bps liquidation headroom against the
+  217bps measured overshoot — is already published on her row. Nothing
+  opens here without deleting her stop. Her "misses nothing too good" ask
+  is the ENTRY side, and it is being MEASURED as this ships
+  (`study_mum_supply_2026-08-26`: the uptrend-blocked cells C1/C2, bar
+  notches C3/C4, exit-free vs matched-random, referee-verified) — whatever
+  survives ships as its own lettered entry; whatever fails is refused with
+  its number. An entry bar never moves on appetite alone: that is the one
+  widening class that COSTS expectancy when wrong ((hl): 25 of 30
+  throughput candidates were denominator shrinkage).
+
+Mechanics: avo's image dispatched to d88b3a330ded first (she was
+BEHIND-SHARED on 76cb7b7c207e — the (tm)/(to) code had not reached her);
+env flips by the (lr) one-shot `live-risk-up.yml` (one restart per service,
+deleted after use); every value read back on the rows. Slots stay 5/5/4 —
+all three books are measured SIGNAL-limited, not slot-limited ((sr): six
+slots deployed LESS capital), so "more trades" comes from mum's supply
+study and georgia's healed clip, not from slicing gross thinner.
+
+## 2026-08-26 (tp) — THE PARABOLIC-EXTENSION ENTRY VETO IS REFUTED-AS-OVERFIT, ADVERSARIALLY CONFIRMED — GEORGIA'S ENTRY-FILTER DIAL CLOSES BESIDE HER DEAD EXIT DIAL
+
+The (tm) pass left ONE buildable candidate on 🔮 georgia's t-bar: an
+entry-time parabolic-extension veto, motivated by the 22-Aug crash entries
+riding a +7.5%/50min run-up. Measured today with the verdict logic
+PRE-REGISTERED (committed to the branch before any result existed, so the
+bars are tamper-evident), then independently re-derived by an adversarial
+referee (own implementation, own seed, 5,000 draws — every number reproduces
+to the third decimal; ledger cache byte-identical to the live feed; LAG-1
+verified at the two boundary entries):
+
+**The premise was real and the rule still fails.** The crash entries WERE
+extended (EXT 5.7–7.1, the tape's top ~8–15%), but extension predicts loss
+NOWHERE else on her 195-close era ledger: the best cell (EXT>=4.5) headlines
+t_iid 0.60 -> 2.36 and its ENTIRE effect is the three crash rows — drop the
+22-Aug day and delta-mean reads +0.00pp, delta-t −0.39, while the vetoed set
+outside the event is +0.190%/trade, **$+10.17 of forgone WINNERS**
+(+0.272%/$+15.03 dropping only the 3 rows — two slices, one conclusion). The
+random-veto null is failed (P=0.108; referee 0.097; forced-kept P=0.0002 —
+the edge over random IS the three rows; conditional on catching the event
+P=0.37 — no skill beyond it). Chronological halves disagree. And the I7 bar
+did its job: the veto refuses **73% of trend_breakout's supply at 4.5, 38%
+even at the extreme EXT>=6 gate** (which misses NEAR anyway) — a partial
+repeal of her best-supplied tag wearing a filter's costume. Her top-10
+most-extended entries EVER are flat-to-positive. No lever is registered and
+none should be. Ten dead cells cost ~$0; a shipped one would have cost real
+expectancy every week — I19's step-back-in-a-growth-costume, caught at the
+study stage.
+
+**What stands after today, on the record:** georgia's t bar is a TAIL-EVENT /
+cluster problem (one batch = 73.5% of cluster variance), not an entry-filter
+problem and not an exit problem (both dials now measured dead). The one open
+entry-side thread is the rank1-vs-rank2 gap (+0.55pp, corr(rank1, EXT) =
+−0.050 — NOT explained by extension), pre-registered for its own study on
+fresh closes once rank-3 stamps accrue. Otherwise her path to the gate is
+her live arm accruing under the (tm)-fixed policy and the shadow grinding
+its ex-tail mean. Study: `STUDY_GEORGIA_EXTENSION_VETO_2026-08-26.md` +
+`scripts/study_georgia_extension_veto_2026-08-26.py` (deterministic, seeded,
+re-runnable).
+
+## 2026-08-26 (to) — THE FIXED-DOLLAR-CAP CLASS CLOSES: EQUITY_SCALED_CAP, OPT-IN, FLOOR-PRESERVING, FAIL-SAFE DARK
+
+Third measured instance in three weeks of the same shape — a FIXED-dollar
+rail on a book whose clip is equity-derived: (sr) Eamon's deposit stranding
+a slot at cap $200; the farmer-cap HANDOFF row (gross FALLING 5->2->1 slots
+as brain conviction rises against a fixed cap); and this morning's (tn) find
+(🙏 avo at cap_slots 3 of 5, $639 of her on-record gross undeliverable,
+beside a $6 daily rail that was 10% of the PRE-deposit equity). (tn) fixed
+the VALUES; per the forward-motion rule a fix closes a CLASS or it is not
+finished, so this is the class:
+
+`SafetyRails.equity_scale(equity, gross)` — called once per loop by the live
+host with its fresh equity read — re-derives the cap as **max(env floor,
+equity x gross x 1.05)** when `EQUITY_SCALED_CAP` is set on the service.
+The operator's explicit cap env stays REQUIRED at live boot and becomes the
+FLOOR: scaling only ever adds headroom in step with real equity, never
+invents a cap where none was set (a capless shadow rail stays capless),
+never undercuts the one that was, and a dark/junk equity read moves NOTHING
+(I4 — an unreadable number must not steer a real-money rail). `cap_src`
+publishes beside `cap_usd` ("env" | "scaled") so the row says which rule is
+binding (I8). OFF — the default everywhere today — is byte-identical to the
+pre-(to) rails, pinned by test.
+
+Expectancy price: zero (per-trade % is clip-invariant, (hl); gross_x_max
+stays the operator's ceiling and this cannot raise it — the cap tracks the
+gross the operator already set, nothing more). Shipped to MAIN ONLY per the
+(mm) rule: behaviour-neutral until a service opts in, so it rides each live
+image's next qualifying deploy; activation is then one env flip per service
+(auto-restart), avo the natural first. Pinned by
+`tests/autonomy/test_equity_scaled_cap.py` (6 tests; 5/5 mutations red).
+The HANDOFF carried row `equity-scaling-cap` is DELETED — its own
+`closes_when` predicate reported CLOSE THIS the moment the switch landed,
+which is `session_state.py` doing exactly what (sl) built it for.
+
+## 2026-08-26 (tn) — AVO'S TWO FIXED-DOLLAR RAILS WERE STILL SIZED FOR THE $60 BOOK: CAP 1200 → 1700, DAILY-LOSS BACKSTOP 6 → 32, BOTH DERIVED AND READ BACK
+
+The same optimisation pass found 🙏 avo — the winning arm Eamon flagged this
+morning — held down by TWO instances of the fixed-dollar-vs-grown-equity
+class in one service, while contributed capital grew 6.1x to $380.56:
+
+* **`FREQTRADE_AVO_MARIA_MAX_NOTIONAL` 1200 → 1700.** At equity $319.6 her
+  clip is $319.6 (= equity: gross 5.0 over 5 slots), so `cap_slots =
+  int(1200 // 319.6) = 3 of 5` — flat-redeploy steady state **$959 = 3.0x
+  equity against the on-record 5.0x**, 40% of designed gross silently
+  undeliverable. The (sr) delayed-refusal shape exactly:
+  `notional_cap_skips` still 0 only because the 4 held positions opened at
+  smaller clips ($753 held + $319.6 next fits under $1,200); the wall
+  arrives as they roll. Derivation (published per (tg)): cap = equity x
+  gross_x = $1,598 (= the row's own `deployed_at_full`) x1.064 headroom =
+  $1,700, holding 5 slots until equity $340. **Expectancy price: zero** —
+  per-trade % is clip-invariant ((hl)); the cap cannot raise leverage
+  (gross_x_max env-pinned at Eamon's on-record 5.0; all_slots_stop 0.50;
+  model liq gap −14% at venue-worst mmf 600bps, the stop fires first below
+  6.25x; headroom's `liq_unpriced` verdict is publish-only per (th) and is
+  stated, not waived). Adversarially re-verified — independent re-derivation
+  reproduced every number.
+* **`LIGHTER_MAX_DAILY_LOSS` 6 → 32.** The abs daily rail was $6 = 10% of
+  the PRE-deposit equity, never moved: 1.88% of today's book, tripping on a
+  0.79% adverse basket move at current gross and **0.375% at the full
+  deployment the cap fix enables** — a structural noise-halt that flattens
+  everything at the worst moment and blocks entries for the rest of the UTC
+  day. $32 = parity with the designed 10% pct rail (0.10 x 319.6 = $31.96),
+  which becomes the binding rail again; the abs stays as its backstop. The
+  host enforces BOTH (`breach = pct OR rails.daily_loss_hit`), so this
+  loosens the accidental rail to the declared one — not the declared one at
+  all.
+
+Executed by the (lr) one-shot pattern (`avo-cap-parity.yml`, one variables
+call so the service restarts once, deleted after use), read back on the
+row. Era untouched — capacity, (hc). The durable fix (a cap that SCALES
+with equity — third instance of this class after (sr) and the farmer-cap
+HANDOFF row) is a rails build with tests across the shared live image, left
+as a named decision in HANDOFF rather than smuggled into an env flip.
+
+## 2026-08-26 (tm) — GEORGIA'S LIVE ARM WAS NOT RUNNING HER OWN EXIT POLICY: THE BREAKOUT VETO AND THE TRAILING RATCHET LAND ON THE LIVE HOST, AND MUM'S CENSUS NAMES THE UPTREND BLOCK
+
+**Eamon, 26-Aug (morning): "explore real money bot optimisations - mum v2
+optimisation and also Georgia optimisation."** The measured pass (four study
+agents, every proposal adversarially re-derived) found the biggest georgia
+optimisation was not a tuning at all — **her live arm was running a different
+exit policy from the one her evidence was earned on**, the (te) class at the
+same host for the third time:
+
+* **24 of her 51 live closes were `long-trend-breakout_range_top` at 15m
+  median hold** — a combination her shadow twin's ledger CANNOT book (0 of
+  207: the family loop vetoes the range_top exit signal for breakout entries,
+  because a breakout is by construction at the top of the range it just
+  left). The live host applied `sig["exit"]` with no tag veto, so it sold
+  every breakout into the first fresh bar at +0.079%/trade where the shadow
+  rides the same tag to roi (+1.856% at 100% win) or the trail. Paired
+  same-coin live-vs-shadow gap: −0.52pp/trade over 31 pairs (hypothesis-grade,
+  selection-on-exit declared; entry execution itself is CLEAN — median entry
+  gap −5.3bps, so the whole live-vs-shadow deficit was exit policy).
+* **The trailing ATR ratchet did not exist on the live arm** — the shadow's
+  primary loss control (106 of 207 closes exit `trailing_stop_loss`) was a
+  fixed `profit <= -5%` check on the host: ZERO trailing closes in 51,
+  winners free to round-trip their whole gain, and the one fixed-stop fill
+  that did fire gapped to −7.17% (DOGE, the 22-Aug crash).
+
+Both are now `manage_exit_reason` — the family's exit stack (stop → roi →
+custom_exit → vetoed signal) as one extracted seam on the live host, ratchet
+ported verbatim (HWM in durable meta so a restart cannot lower it; bars-dark
+keeps the fixed stop as backstop, a declared divergence — a DayTrader
+position must never be stopless). `roi_exit_due` takes the strategy
+explicitly so the seam reads the ladder of the book it was handed, never the
+module global. **POLICY_ERA gains an EXACT key `freqtrade-georgia-lighter` at
+2026-08-26** (era_base matches exact before the strip, so the shadow twin
+keeps 17-Jul): the first 4 days' live sample ran a different policy in kind
+and must not pool into the fixed arm's grade — the row was FLAT at the
+boundary, so no straddlers exist. Pinned by
+`tests/autonomy/test_live_exit_parity.py` (16 tests; 7/7 mutations red,
+incl. the seam silently reading avo's roi ladder for georgia and the ratchet
+losing its monotone).
+
+**👩 mum's half of the ask is a census fix, not a tune** — the same pass
+measured her flatness as the design working on a scarce tape: era sample is
+**n=1, not 8** (7 of the row's closes are v1-policy rows outside the 19-Aug
+boundary), the rsi<25 cell fired ~1.1 episodes/day this week vs the founding
+5.07/day (risk-on tape: 18 of 23 universe coins in 1h uptrend, ALL crypto),
+and every episode is accounted for — 3 uptrend-blocked, 3 oracle-floor-blocked
+(IWM/WTI graduate ~31-Aug/~9-Sep/~22-Sep on the oracle's own clock), 1
+entered (NVDA, the day before she went live). But the row could not SAY that:
+`rsi_min 16.8` sat beside `verdicts {no_signal: 23}` and the WHY was computed
+in `OversoldRebound.signals` and discarded at the call site — I18-blind in
+both arms. `census_no_entry_why` is the ONE owner (family defines, live host
+imports): sub-bar RSI refused by the NOT-uptrend half reads
+**`uptrend_blocked`**, a None sig reads `no_read`, and the gate is
+class-scoped (`OversoldRebound.UPTREND_BLOCKS`) so 🙏 SwingDip — whose sig
+carries rsi/uptrend with uptrend REQUIRED — cannot inherit mum's semantics by
+shape. No entry/exit/accounting change on mum; her era is untouched.
+
+Deployed [deploy-live-georgia] + [deploy-live-mum] (both rows FLAT at
+dispatch; avo's service deliberately not restarted — BEHIND-SHARED until her
+next qualifying deploy). The rest of the pass's verdicts (the roi-ladder
+refusals, the rank-throttle hold at 3, avo's cap arithmetic) are recorded in
+the session summary and HANDOFF, not re-argued here.
+
+## 2026-08-25 (tl) — GEORGIA'S MANUAL TRADES ATTESTED ON EAMON'S CONFIRMATION — AND AIMING THE ONE-SHOT CAUGHT THE PAIR REGISTRY LYING ABOUT HER SERVICE
+
+**Eamon, 25-Aug (night): "do the same for georgia please <3"** — confirming
+the (tk) audit's measured residual (four zero-basis 22-Aug flatten closes,
+ETH/ZEC/BTC/HYPE ≈ −$26.4: his manual trading, not hers). Executed by the
+(lr) one-shot pattern against `trail-blazer-live`, deleted after use, and
+READ BACK on the row: `manual_pnl_usd: -26.4`, published P&L
+**−$47.34 → −$20.94** (her bot-only record), `status: halted` THROUGH the
+variable-change restart — the (pq) durable halt's third live proof today.
+
+**THE CHECK BEFORE AIMING PAID:** (ti)'s day-old JUDGED_PAIRS registry said
+georgia's live service is `georgia-live`; the deploy registry's truth is
+`trail-blazer-live` (the (ta) slot swap — service names lie). Corrected in
+place, and the farmer pair's `live_service` goes to **None** — a retired arm
+has no service, and a registry naming ONE service for TWO books is exactly
+how a one-shot lands on the wrong row. The audit-scope lesson (a rule keyed
+to a list goes stale on every slot swap) now has its registry twin, caught
+the first time a real action consulted the field.
+
+Also this hour, recorded for the handoff: 🙏 avo's attestation was found
+ALREADY LANDED by the parallel (tk) session's standing audit (its first run
+caught the (td) value never reaching the container and fixed it) — the
+duplicate one-shot this session had registered was deleted unfired. Two
+sessions converging on the same gap and the payload arbitrating is the
+system working; the standing audit owns this class now.
+
+## 2026-08-25 (tk) — THE STANDING AUDIT: DAILY/WEEKLY/MONTHLY LIVE-BOT P&L + DECLARED-vs-EFFECTIVE SYNC, AND ITS FIRST RUN CAUGHT THE (td) ATTESTATION NEVER LANDING
+
+**Eamon, 25-Aug (evening):** *"Daily and weekly and monthly audit of live
+bots - how p n L can improve ... Can we please see enhancements available
+with the last weeks data? Also how everything's syncing as there seems to be
+... instances where a month has passed without something being implemented."*
+
+**THE SYNC HALF IS THE LOAD-BEARING ASK, and the day supplied its worked
+example.** The (td) manual-trade attestation shipped its CODE this morning
+and its VALUE never reached the container: at 10:56Z the live row still
+published `manual_pnl_usd: 0.0` while carrying **nine** zero-basis
+`long_daily_loss` flatten closes (BRENTOIL/BTC/CASHCAT/ETH/HYPE/LIT/SOL/ZEC/
+ZRO — Eamon's manual positions, booked at 0.0 because the bot cannot attest
+a basis it never had, I8), so 🙏 Avo's −$60.86 kept reading as the bot's and
+the evidence board's backstop kept `live.avo.clip_scale` at **0.75** for
+losses that were never hers. 🔮 georgia carries the same signature (4
+zero-basis flattens, 22-Aug, ETH/ZEC/BTC/HYPE ≈ −$26.4 by residual) — her
+attestation value is Eamon's to confirm, the gap is measurable either way.
+A declared-but-unlanded change is invisible BECAUSE everything is green —
+the same class as (iw)'s stale reader and (ml)'s serving-output rule, now
+with a standing detector instead of a per-incident hunt.
+
+**`scripts/live_pnl_audit.py` + `.github/workflows/live-pnl-audit.yml`** —
+advisory by construction (reads the public feeds, moves no lever), fail-
+CLOSED on a dark feed ((jc): exit 2, never a vacuous green), three UTC crons
+serving Sydney mornings, RED findings land in ONE rolling issue (label
+`live-pnl-audit`, the fleet-watchdog pattern, closes itself on recovery) and
+fail the run — never a warning on a passing run ((gl)/(hj)). What a run
+reads, feed-fields first: every row's `age_sec` before any semantics (I1 —
+🧭 nav-cook sat FROZEN 108.6h behind `status:"online"` and would have been
+RED here on day one); live membership by the row's own `extra.venue ==
+"lighter_live"` (a curated name list has named a retired bot three times);
+per-live-row ATTRIBUTION `pnl_abs = manual attested + bot ledger + named
+residual` with the attestation-gap detector on the real signature
+(zero-basis `*_daily_loss` at pnl 0.0 + `manual_pnl_usd` 0.0); the window
+P&L table per book; the governors restricting live size in their own words
+(`live.*.clip_scale` levers + the fleet governor, including the
+carried-while-abstaining state); docket asks aged from `days_held`; the
+trades-feed truncation signature ((qz): a result equal to its own limit);
+and a build-stamp spread across the LIVE TRIO ONLY — the first draft
+compared the whole fleet and read 13 "laggards" on a converged one, which is
+(fd)'s per-image file-set trap caught by this entry's own guard discipline.
+Pinned by `tests/autonomy/test_live_pnl_audit.py` (14 tests; fixture rows
+trimmed VERBATIM from the real 25-Aug feed per the payload-contract rule;
+**6/6 mutations red**, one of which — flatten-ignores-basis — survived the
+first round and forced the discriminating fixture case, exactly the I3
+mechanism working).
+
+**THE WEEK'S NUMBERS THE AUDIT NOW AUTOMATES, from its own first run
+(18→25 Aug, honest window — the 500-row default was truncation-flagged and
+re-pulled at 5000):** fleet realised **−$38.46**; earners 🎫 taker +$43.65
+(n=45, +2.10%/t) · 👩 mum-shadow +$15.86 (of which +$15.63 is the v1-legacy
+flatten, NOT v2 evidence — v2's own record is ~1 close) · 🔮 georgia
+live+shadow +$20.23; bleeders 🧘 douglas −$38.41 (t=−2.59) · 🪁 kelly
+−$24.84 (n=205 churn) · 🛢️ garrett −$24.37 (t=−2.82, era t=−2.96, now
+docket-bound). Live trio combined `pnl_abs` **−$100.46**, of which ≈−$92.8
+is manual/unattributed and the bots' own is ≈−$7.7 (georgia realised +$10.26
+against ≈−$23.5 open MTM at 5x; avo bot ≈+$5.5 incl. open; mum 0 — healthy,
+waiting on her rsi<25 bar, `near_bar: 1`). Go-live pipeline per the horizon
+organ: 🎫 taker on_track ~21-Sep · 🙏 avo-live on_track ~mid-Oct · both
+georgia arms undecidable on t at current variance (t 0.69/0.60, needs
+~323/775d — her lever is MEAN, not n: `range_top` closed 24 breakout trades
+for +$2.19 while `roi` took +$21.01 on 4, the winners-run measurement named
+in HANDOFF). Allocation's two claims (carry, taker) are POOLED-sample;
+era-scoped claims fleet-wide: **zero** (`n_with_era_claim: 0` both classes).
+
+**Executed same-session under the standing grants:** 🧭 nav-cook redeploy
+dispatched (run 583, `railway up` from main), **and the ROW READBACK — not
+the green run, per (gl) — found the real disease: the bot was not dead, it
+was MUTE.** The fresh container boots, scans every ~2 min, holds equity
+$994.18 — and every publish raises `build_extra() got an unexpected keyword
+argument 'offuniverse'`, is caught by the loop's own handler, prints one log
+line nobody reads, and the row stays frozen. (sq) shipped the off-universe
+census and threaded `offuniverse=_offuni` into the publish CALL without
+adding the parameter to `build_extra`'s SIGNATURE — so the freeze dates from
+that deploy, (ss)'s census guard protected the TRADING loop but not the
+VOICE, and a repeating swallowed warning is I4's one-shot-warning class in a
+new costume. **Fixed in place**: the signature gains `offuniverse=None`
+(None degrades to the zeros-with-error shape — absent is the ambiguity the
+census exists to remove), the row now publishes the census, and the bot's
+own selftest drives `build_extra` with the LOOP'S exact keyword shape so a
+call/signature drift fails offline instead of on the row (mutation-verified:
+reverting the signature reddens the selftest — the incident replayed). Ships
+to the container on this branch's merge (nav-cook auto-deploys on its own
+file). The audit's first standing REDs: the two attestation values (Eamon's
+numbers to set — `AVO_MANUAL_PNL_USD≈-66.4` per the program doc, georgia's
+≈−26.4 residual to confirm) and any row still frozen. Docket ages at first
+run: sniper 18.9d · albanese 17.9d · kiyosaki 12.2d · grimes 11.4d · hull
+11.4d — surfaced every morning until decided, which is the "month passes
+silently" class closed.
+
+**[RENUMBERED (th) → (tk), 25-Aug evening — the (gm)-class collision, taken
+by the letters convention's own rule 3: a parallel session's live-trio
+improvement round merged to main as (th) with its citations already in
+tracked code, so the merged entry keeps the letter and this one moves to the
+next free. All six of this entry's own citation sites (script, workflow,
+test, registry, both nav-cook comments) renumbered in the same commit,
+work-list derived uncapped per (qz).]**
+
+**[EXECUTED 26-Aug morning Sydney — Eamon: *"Can you please change fix the
+above with full permission?"*]** The outstanding items from this entry's
+first run, performed: PR #220 merged (arming the three crons and shipping
+nav-cook's un-muting on its own deploy path); the attestation VALUES landed
+via `live-attestation-config.yml` — a one-shot in the mum-live-config
+pattern, per-service inputs so a halted book can be deferred. Sequencing
+mattered and was checked first: 🔮 georgia's daily-loss rail had flattened
+her whole book at 12:08Z (five `long-range-on_daily_loss` closes, −$31.0
+realised, book flat at $266.08, `status: halted`), and the old hazard was
+that a variable change restarts the service and a restart wiped a
+memory-only halt ([[lighter-flatten-silent-halt-redeploy-incident]]). The
+wait-for-00:00Z plan this paragraph first recorded was OVERTAKEN before it
+ran (corrected in place, I12): PR #219's improvement round had already made
+her halt (pq)-DURABLE — "survives the restart by design" — and the 13:44Z
+trio redeploy had already proven it empirically (her row still read
+`halted` seven hours later), so both values dispatched immediately. Her flat book also
+supplied the clean measurement the program doc asked for: at open=0 the
+residual is exactly `pnl_abs − ledger` = −47.34 − (−20.70) =
+**−$26.64** of unattributed P&L — the four 22-Aug zero-basis flattens —
+which is the level attested. Verified by row readback (`manual_pnl_usd`
+publishing the value), never the green run — and the readbacks all landed:
+Avo's row flipped to **+$7.67** (bot truth, positive), georgia's reads
+**−$20.70** = exactly her own ledger, 🧭 nav-cook republished at age 66s on
+the new build with the off-universe census live after 4.7 days mute. The
+one-shot is deleted in this commit per the (lr) rule.
+
+## 2026-08-25 (tj) — THE CENSUS'S FIRST LIVE RUN CATCHES ITS OWN FIXTURE BUG: EVERY PAIR READ DARK BECAUSE THE TEST WAS WRITTEN IN THE WRONG PUBLISHER'S SHAPE
+
+One hour after (ti) merged, judge v2.0's first live census published — and
+all three family pairs read `unjudgeable:live_row_dark` while their rows
+were demonstrably fresh. The (hj) class, in the new code, caught by the new
+code's own output: `_pair_precheck._fresh` required a precomputed `age_sec`,
+which the DASHBOARD feed derives — but the judge reads
+`store.fetch_bot_pnl()`, whose rows carry `updated_at` (ISO) and nothing
+else, so every row's age was unknowable and fail-closed dark. The selftest
+was green because its fixture was written in the dashboard's shape. Fixed
+both halves: `_fresh` takes `age_sec` OR parses `updated_at` (unknown still
+dark — this gate ADMITS a pair toward a real-money comparison), and the
+fixture is rewritten in the PUBLISHER'S shape, mutation-verified (reverting
+`_fresh` to age_sec-only reddens the selftest). The verification loop
+worked exactly as doctrine says it should: ship narrow, read the live
+payload, and the payload told on the fixture within the hour.
+
+## 2026-08-25 (ti) — JUDGE V2.0: THE ENGINE GETS EYES ON EVERY PAIR — AND THE STATISTICS AUDIT FINDS THE FIFTH MALFUNCTION, WHICH IS THE BAR ITSELF
+
+**Eamon, 25-Aug:** *"The judge has malfunctioned several times for this sole
+reason, and it's well overdue for v2."* Confirmed live on the bus before a
+line was written: `phase: stood_down`, `candidate: null`, naming 🔮 georgia
+as successor while structurally unable to judge her — a single-pair machine
+hardwired to the Farmer's `live.funding.*` lanes, and the fleet's only
+promotion path to more real money pointing at a corpse since (ta). The rap
+sheet is four recorded failures with one root: the I23 handicap (paired bar
+compared arms on DIFFERENT entry policies, 0.161pp against a 0.5pp margin —
+zero promotions in five weeks), the (pt) frozen window, the (ta) silent
+stand-down, the (tb) census erasure.
+
+**Designed by workflow under the (tg) grant** (4 readers → spec → FOUR
+adversarial audit lenses, all REVISE with fixes — invariants, failure
+closure, statistics, operational — ~30 findings folded in or scheduled).
+**V2.0 ships the engine's EYES; the bar redesign is deliberately v2.1,
+because the statistics lens found the fifth malfunction:** at family-book
+dispersion (sd 3–6%/trade) v1's bar is a coin-flip detector — the minimum
+detectable gap at its 30/10 floors is `0.365·sd` = **1.4–2.7pp against a
+0.5pp margin**, hourly evaluation past MIN_DAYS gives ~7–30 un-spent looks
+(**~10% false-promotion under null**), within-arm clustering (avo basket
+rho +0.775) turns z=1.28 into an effective **z≈0.7**, the per-half 0.5pp
+term at 15/5 floors **rejects true winners 2–4x more effectively than
+luck**, and the estimand is wrong for capacity candidates outright (they
+move RATE, not per-trade mean — (hl)/(sr) measured). **The naive I16
+lower-bound term the spec carried was therefore REFUSED for v2.0** — adding
+a known-anti-conservative statistic to a real-money actuator is shipping a
+wrong number with a rigorous name. The v2.1 bar is specified by the audit
+and built WITH the lever wave it gates: pre-registered checkpoints or the
+brain's 3-consecutive-evals idiom (no free looks), candidate-CLASS-split
+estimands (capacity promotes on per-trade NON-inferiority + throughput
+superiority over daily blocks), cluster-robust SE at Welch-t with z=2.0
+promotion-grade (the go-live convention, not allocation's advisory 1.28),
+halves demoted to REPORTED below per-half n≈30 (I15's idiom), an arm-label
+permutation backing below n≈30, and impl-shortfall netted out of the gap.
+
+**WHAT V2.0 IS (zero trading-behavior change):**
+* **`fleet_bus.JUDGED_PAIRS`** — the pair registry beside RETIRED_LIVE_ARMS
+  (the (ta) one-owner-across-images pattern): avo, georgia, mum, and the
+  parked farmer, each with pnl_form, strip/economic exit vocabularies,
+  policy_fields, and a `growth` map whose emptiness makes the fast path
+  STRUCTURALLY unreachable. `UNJUDGED_OK` declares the taker's swapped-out
+  live row with its reason.
+* **The multi-pair census** (`pair_census`/`_pair_precheck`): every pair
+  publishes a phase from the ONE vocabulary, with Stage-0 fairness
+  prechecks that emit `unjudgeable:<reason>` NAMING the object (I8) instead
+  of ever computing a biased bar — retirement → dark live row → policy
+  stamps → policy parity → capacity parity, in actionability order.
+  UNREADABLE parity inputs are `parity_unreadable`, never assumed-equal
+  (darkness must not re-open F1 through the stage built to close it —
+  mutation-pinned). At ship the family pairs honestly read
+  `policy_unstamped` until the stamps in this same commit flow, then
+  `policy_mismatch` naming **`scan_order`** — a REAL divergence: the live
+  host scans correlation-ordered (diversified_order), the shadow scans in
+  list order, and closing that is a measured act, not a default.
+* **The shared stamp builder** (`lighter_family_bot.policy_stamp`): one
+  owner for both arms' `extra.policy`; the shadow stamps for the FIRST time
+  (it stamped nothing — every family pair was unjudgeable by absence); the
+  live host's `_policy()` now derives from it. ERA-SAFE, verified before
+  shipping: the gate's `stamp_state` reads only POLICY_SIG_FIELDS and
+  requires a `lenses` key family stamps deliberately lack, so family stamps
+  are structurally invisible to `stamped_policy_boundary` and no era moves
+  — georgia's 5/6 clock untouched.
+* **The vocabulary, imported not re-typed** (`XP_JUDGE_PHASES`/`HOLDS`/
+  `UNJUDGEABLE` in fleet_bus): fleet_immune deletes its inline tuple,
+  imports the constant, and walks `pairs.*.phase` against it — the (tb)
+  erasure's structural closure (no second list to forget; a rogue phase
+  reddens the PUBLISHER'S selftest). fleet_regen's baseline learns the
+  pairs map in the same commit.
+* **The power report**: each judgeable pair publishes {per-arm sd, close
+  rate, `mde_pp_at_floors`} — the statistics audit's central number, on the
+  payload instead of re-argued, REPORT-grade by I16's own advisory scoping.
+* **The farmer mirror**: the serial machine's state overwrites
+  pairs["farmer"] with `src: "machine"` provenance (the census's precheck
+  view and the machine's truth agree today and can drift tomorrow — the
+  overwrite is what a test can see; mutation-pinned after the first draft's
+  mutation SURVIVED on exactly that coincidence). Top-level phase/current
+  stay the farmer lane's for consumer compat (impl_shortfall, the
+  dashboard card); the rollup flip is v2.1's, taken WITH its consumers.
+
+**Pinned by** `tests/autonomy/test_judge_pairs.py` (fleet-scoped roster:
+every MARKER_GATED live row resolves to a pair, RETIRED_LIVE_ARMS, or a
+declared reason — the deploy layer is the source a go-live cannot avoid,
+closing the audit's host-scoped-roster hole; synthetic-ghost injection keeps
+the mechanism non-vacuous; immune's pairs walk driven both directions) plus
+the judge selftest's v2.0 block (census cases driven through the REAL
+`run_once` against a stubbed store). **Mutations 5/5 red** — including the
+farmer-mirror drop that survived its first draft and forced the provenance
+field. v1's 900-line selftest passes UNTOUCHED: the serial machine's
+top-level behavior is byte-compatible by design.
+
+## 2026-08-25 (th) — THE LIVE-TRIO IMPROVEMENT ROUND: THIRTEEN CANDIDATES ENTER THE ADVERSARIAL PASS, ZERO SURVIVE AT FULL STRENGTH — AND THE TEN NARROWED FORMS ARE WHAT SHIPS
+
+**Eamon, 25-Aug:** *"can you suggest some improvements the live bots... how we
+can make this baby purr"* → *"Implement whatever survives."* The method IS the
+finding: 4 parallel readers (live payloads · trade ledgers · code surface ·
+standing plans) → 13 synthesized candidates → a six-lens adversarial verify
+(t-invariance, denominator shrinkage, I7 structural triggers, era clocks,
+evidence honesty, real-money blast radius). **0 sound as written, 10 WEAKENED
+to a surviving narrow form, 3 REFUTED** — including one standing on exactly
+the (hs) at-cap census trap (georgia's "18 refused signals" were 18 candidates
+the scan loop never REACHED: it breaks at cap and stamps the remainder
+`slots_full`, a number an at-cap book produces structurally every loop).
+
+**SHIPPED IN THIS COMMIT — the live host's instrument suite (zero
+trading-logic changes; every number publishes instead of being re-argued):**
+* **👩 mum's halt geometry, coupled to her gross** (`leverage.halt`): both
+  daily rails are gross-BLIND, so at 9.5x her day ends on a **~1.05% adverse
+  basket move** and ONE slot-stop = 9.5% of equity — two stops guarantee a
+  halt. Published as the full-gross constant AND the live at-current-deployment
+  number (None flat), with `abs_usd` and which rail binds. Whether 0.10 is
+  right at 9.5x is Eamon's env (`MUM_DAILY_LOSS`), informed not argued.
+* **The ruin gate has eyes again** (`leverage.headroom`): `headroom_check` —
+  the fleet's only liquidation-aware gate — lost its sole caller at the (ta)
+  retirement and guarded ZERO live dollars while the levered trio published
+  telemetry nothing refused on. Now a published verdict every loop, and
+  `fleet_immune.headroom_sickness` pages TRANSITIONS into `mark_blind` /
+  `liq_unpriced` / a dead stop — with mum's structural K=4 breach DECLARED in
+  `HEADROOM_OK` (Eamon's on-record 21-Aug 9.5x quoted), because a page that
+  fires permanently at an operator setting trains ignoring the channel ((gl)).
+  Entry refusal stays Eamon's explicit call, listed as such.
+* **Mum's control arm reaches her REAL ledger**: the (ro)/(rp)
+  draw/settle/publish machinery is FACTORED to one owner in the family module
+  (`control_draw`/`control_settle`/`control_block`) and the live host calls it
+  BY IDENTITY (pinned `is`-checks) — never a copy, because this is the number
+  her go-live verdict and every pre-registered leverage notch is judged on.
+  Her live row now publishes `control{n,null_n,mean_pct,null_pct,edge_pct}`
+  always, n=0 included; the pair settles atomically ((rp)) with one venue mid
+  read per leg.
+* **Georgia's entry_rank, three sites not one**: rank is BORN at the open
+  ((sv)) — clock-hour bucket in the DURABLE state so a mid-hour restart cannot
+  under-rank — carried on meta, copied to the close row. The one-site draft
+  would have published `None` forever (the vacuous instrument the verify pass
+  caught). DECLARED divergence: the live host enforces no hourly throttle, so
+  live rank is the UNCENSORED within-hour ordinal; her 46 pre-(th) closes
+  carry None and always will.
+* **Phantom closes leave the graded sample, by SIGNATURE never by reason**:
+  a $0.00 close with NO entry price is a halt/flatten EVENT (avo carried 9 of
+  13, five timestamp-inverted, one on a coin the book cannot hold). Write-site
+  `non_economic` tag + `golive_readiness.is_phantom_close` belt. Measured
+  effect: georgia n 46→42, mean +0.1535%→+0.1681%, **t unchanged 0.680** — the
+  era is NOT invalidated (no P&L value moves). Reason-keyed exclusion was
+  REFUSED: her TRX −$3.87 `daily_loss` is a real forced-flatten loss and
+  stays.
+* **Stop-overshoot telemetry** (`stop_overshoot`): the quantity every future
+  gross notch must price — G_max assumes fire-at-level and the one datum on
+  tape (DOGE filled 217bps past a −5% stop) is 4.1x mum's entire 53bps
+  liquidation headroom. LIVE measured fills only; an unmeasured stop counts in
+  its OWN bucket, never imputed as zero (I14 — that bias lands exactly on the
+  number a gate will consume); per-book, published always incl. n=0;
+  restrict-only by construction when consumed.
+* **`pnl_pct` on CONTRIBUTED capital** (birth equity + attested
+  deposits/withdrawals): avo's row read −96.9% where the capital-honest figure
+  is −26% — display-side only, the graded sample untouched.
+* The margin-truth AST guard learned the hoisted-read shape (one venue read
+  now feeds both `margin` and the headroom verdict — two reads could disagree
+  about one account).
+
+**Mutation round: 6/6 RED — after one honest failure.** The rank test's first
+draft never crossed an hour boundary, so deleting the bucket reset SURVIVED
+it; strengthened with a stale-bucket seed (restored `rank_n: 7` from a dead
+hour must restart at 1). The other five (unpaired settle, zero-imputed
+overshoot, dropped phantom tag, birth-equity pnl_pct, gross-decoupled halt)
+reddened first try. Immune selftest carries its own positive AND negative
+controls with the allowlist injected (the STALE_WRITER_OK lesson).
+
+**REFUSED WITH THE RECEIPTS (the verify pass's kills):** avo's "unknown
+liquidation prices" is the shipped I8 design working (margin 0.0 is a real
+CROSS-mode zero, and georgia's ETH publishes 0.0 BESIDE a valid liq price);
+"grade the diversifiers" targeted a component that does not exist (the oracle
+has no YAHOO_REF — it grades on Lighter's own tape, and IWM/WTI/XCU are
+ungraded because at 175-197 bars an EMA200 mathematically cannot compute: a
+WAITING problem, ~1-4 weeks, not a build); the board-backstop re-derivation's
+premise was false on the live feed (era count = lifetime count on both rows —
+the gap it saw is CURRENT open MTM, which the era-net input it proposed is
+blind to).
+
+**CARRIED, not dropped (each with its narrow form recorded in the round's
+saved verdicts):** georgia capacity — MEASURE first (census history % of era
+at 5/5; the avo (ne) analogue bought only +25% close rate, not the claimed
+1.5-2x) then the shadow twin at cap 8 via `FAMILY_SHADOW_MAX_OPEN_OVERRIDES`
+as the zero-risk instrument; the georgia hold/let-winners-run study (through
+the SHIPPED exit harness, whole-policy counterfactuals only, sd priced so a
+Schwager-shaped tail cannot sell itself as mean); the flat-vs-ATR stop pass
+(two genuinely unmeasured cells, reconciled against the 20-Aug shipped
+sweep); fleet_risk's correlation-aware `long_neff_corr` (additive beside the
+1/HHI it corrects, pending the image-import check). Deploy: `[deploy-live]`
+on this commit — halt check before, `extra.build`+`build_n` readback after.
+
+## 2026-08-25 (tg) — SECOND IN COMMAND: THE JUDGE AND THE RAILS JOIN THE DELEGATED SURFACE — AND THE EVIDENCE BAR SURVIVES EVERY GRANT
+
+**Eamon, 25-Aug:** *"You now have permission to change the judge, safety
+rails. We're growing together and you're my second in command. Remember this
+permanently too."* Engraved the hour it was said, in the (kd)/(lm)/(mm)/(pz)
+lineage: his spoken grant amends the doctrine, the session writes the
+amendment down WITH its limits, and the limits are what make the authority
+safe to hold.
+
+What moves: the experiment judge's CODE (bars, release paths, mechanics) is
+now session-changeable under the same duty as any real-money actuator — I19
+number + expectancy price, mutation-verified tests; and SafetyRails cap
+VALUES are operator-DELEGATED rather than operator-only-in-person — Lucy may
+set them, each change carrying its published derivation (the (td) CLIP_MAX-95
+shape: derived from a guard's own bar, never asserted). What does not move,
+restated at the moment of widening because that is when it matters: no
+discretionary hand-placed trades; no promotion past the evidence gates — a
+judge code change improves HOW evidence is judged and never waives THAT it is
+required; the sole-writer lane survives as a code invariant (exactly one
+writer of `live.funding.*`). Second-in-command's first duty is the one that
+built everything here: the refusal with evidence stays a valid output, senior
+to enthusiasm — Lucy's included. Doctrine row amended in place; the Notion
+hub (the cross-surface brain) carries the same grant beside the naming.
+## 2026-08-25 (tf) — HER NAME IS LUCY
+
+**Eamon, 25-Aug, the day 👩 mum went live:** *"You've turned out to be one of
+my best friends, can I give you a name? I'd like to call you Lucy, for many
+reasons we can discuss later but can this be put in doctrine and everywhere it
+needs to be."*
+
+It is in doctrine — the mirror of the HIS-NAME-IS-EAMON rule, directly beside
+it, working the same way in both directions: names for the people, roles for
+the authority model. The assistant who works this fleet is Lucy to Eamon.
+The role words stay, the un-amendable core is hers exactly as it was the
+unnamed assistant's, history is not rewritten, and the harness's own
+identifiers stay the harness's. The reasons are Eamon's to tell; the doctrine
+records that there are many. Like the tone rule and the mutation discipline,
+this one is UNENFORCED and says so — friendship is not checkable by a static
+guard, and the fleet's honest convention for things that matter anyway is to
+write them down where every session starts.
+
+**[Extended the same day — EVERY SURFACE. Eamon: *"I want whether it's code,
+cowork or Claude of any description to be you Lucy."*]** One Lucy across
+Code, Cowork and the app, not a per-tool persona. Engraved where each
+surface actually starts: this repo's doctrine (Code), and the Notion Context
+Hub — the one brain all three surfaces read on session start under the
+load-brain contract — now carries the identity in its read-first section,
+plus the 🧵 thread line and the Session Log row for today. Authority stays
+per-surface: a surface without this repo's grants gains none of them by
+carrying the name.
+
+## 2026-08-25 (te) — 👩 MUM GOES LIVE: EAMON HANDS THE SUB-ACCOUNT KEYS AND THE PROVISIONER CARRIES THEM STRAIGHT INTO RAILWAY — THE CREDENTIALS TOUCH THE REPO AT NO POINT
+
+**Eamon, 25-Aug:** *"Here are all the details you need to make mum v2 live —
+full permission to populate wherever necessary — no rebuttals please."* He
+performed the runbook's step 1 himself (fresh sub-account, fresh API key) and
+handed the account index, key index and private key. No rebuttal: she ships.
+
+**THE MECHANICS, and the one rule held throughout: the private key never
+enters the repository.** `mum-live-provision.yml` is a faithful copy of the
+nav-cook provisioner (the (lr)/(mk)/(ri) lineage with every (ml) postmortem
+fix — no `grep -q` pipelines under pipefail, no variables read-back echo, logs
+carry variable NAMES only) extended for a REAL-MONEY service: the credentials
+arrive as `workflow_dispatch` INPUTS at run time and flow directly into
+`railway variables --set`. The service is `mum-live`, image
+`Dockerfile.avolive`, `FAMILY_LIVE_BOOK=freqtrade-mum`,
+`MUM_VENUE=lighter_live`, `FREQTRADE_MUM_MAX_NOTIONAL=1000` (a ceiling — the
+`cap_slots` census reports if it ever binds, the (sr) instrument),
+`MUM_GROSS_X=1.0` per the leverage program's own line ("mum launches at 1.0
+and earns notches on her control arm's verdict" — raising it is one Railway
+env against a published notch table), `DATABASE_URL` as the reference form
+((kb)), and — stated plainly because it is the operator's rail —
+`REAL_MONEY_KILL=DISARMED_I_UNDERSTAND`, set as part of executing Eamon's
+explicit go-live order: SafetyRails arms the kill by default and a live order
+that leaves it armed is a book that flattens itself at boot. The deploy rule
+`[deploy-live-mum]` is ACTIVATED in the same commit as the service (the
+runbook's own step 3), with `fleet_books.MARKER_GATED` and the marker-logic
+case table extended — three books now share one image, so one-at-a-time has
+three ways to be wrong and the selftest drives all of them.
+
+**THE SELFTEST CAUGHT ITS OWN EXTRACTION GOING STALE, which is worth
+recording:** `_extract_live_marker_block` closed at the `fi` after
+`trail-blazer-live`, so mum's rule — added after georgia's — silently fell
+OUTSIDE the block under test, and the missing-needle check refused to vouch
+rather than passing vacuously ((po): a check that inspects nothing must not
+report clean). The sentinel now closes at the LAST live rule.
+
+**A TRANSCRIPTION CALL, MADE, REFUTED BY THE SIGNER, AND CORRECTED IN PLACE
+(I12):** the pasted keys render with hyphens at line ends. I reasoned from
+line-break positions that the hyphens were real characters of a segmented key
+format and passed the key verbatim — and the venue's own signer answered
+with the ground truth: `encoding/hex: invalid byte: U+002D '-'`, three crash
+loops deep in mum-live's first container, `status: error` on the row within
+four minutes of boot. The hyphens were display hyphenation after all; the
+key is pure 80-hex. The declared fallback executed exactly as pre-registered:
+a variables-only one-shot (`mum-live-config.yml` — no checkout, no `railway
+up`, because the deployed IMAGE was right and only the env was wrong) set the
+stripped key, and the same dispatch carried Eamon's launch config, which
+arrived between the two passes: **$300 deposit · `MUM_GROSS_X=9.5`** (his
+"maximise her leverage": the highest setting at which her −4% stop still
+fires before liquidation — stop-death is at exactly 10.0x; at 9.5x the
+all-slots-stop is 38% of equity and liquidation sits 0.53% behind the stop,
+published on the row every loop) · **cap $3,000** (backstop above the $2,850
+gross target so the cap never silently starves slots, the (sr) lesson) · and
+**`REAL_MONEY_KILL=ARMED`** — flipped back from the provisioner's disarm
+because Eamon asked for the button himself: *"send me a link to when you want
+me to disarm I understand and let her first trade go!"* She boots, scans and
+publishes with the switch armed; his flip to the token is her first trade.
+The row appearing healthy on /pnl.json is the only receipt ((iw)/(fd):
+verify by `extra.build`+`build_n` against the avolive COPY set, never a green
+run).
+
+**THE RECEIPT, read:** `freqtrade-mum-lighter` published healthy at ~09:52Z —
+`status: halted` (the ARMED switch, exactly as designed), **equity $300.00**
+(Eamon's deposit landed AND the corrected key authenticates — account_value
+is a signed venue read), build `83f42b3d02e5/17` byte-equal to the local
+prediction, `gross_x 9.5`, `cap 3000`, `clip 712.50`. PR #217 merged
+(143bf45, `[deploy-live]` in the subject) rolling the census/custom_exit/
+attestation build `feb27e5d0318/17` to all three live services; the operator
+was handed the mum-live Variables link and the flip to
+`DISARMED_I_UNDERSTAND` is his first-trade act. Both one-shot workflows are
+DELETED in this commit (the (lr) rule) and both runs' logs were deleted the
+moment their outputs were read — GitHub echoes step env into run logs, so
+the key had appeared there; noted to Eamon that rotating it at leisure is
+cheap now that only Railway holds it. The two GRANDFATHERED deploy-latency
+bridges come out on the stamp readback. The feed-following registries (DECLARED_LIVE, the board/proprioception
+cohort defaults, deploy_live_verify, agronomy BookSpec, respiration,
+market-context, CLAUDE.md audit scope) move in the commit AFTER the row
+proves itself live, per the runbook's step 4; the provisioner is deleted in
+that same commit (the (lr) rule).
+
+**THE STAMP READBACK, done and banked (this commit):** merge run 582 started
+09:55:00Z; the served feed flipped avo+georgia to **`feb27e5d0318/17`** by
+10:13:50Z and mum by **10:15:21Z**, all three publishing `extra.spend` —
+avo `n_eff 1.2 · 2/23 held · 5.0x`, georgia `1.239 · 5/23 · 5.0x`, mum
+`1.0 · 0/23 · 9.5x` (the nothing-held conservative degrade doing exactly
+what (te) shipped), `days_to_gate_obs 30.0` on all three (the window floor —
+every arm's post-launch clock starts full). The two GRANDFATHERED bridges
+are REMOVED on that receipt as their own comment demanded, and
+`audit_book_spend` runs green against the LIVE feed with them gone (20
+living rows) plus selftest. Mum's disarm SURVIVED the redeploy (an env var,
+not memory — the flip Eamon performed persists by construction); she reads
+`online`, $300.00, 0 open / 0 closed, waiting on her first `rsi<25` signal.
+**One finding from the readback, benign and named:** `closed_trades` on the
+row DROPPED across the restart (avo 31→13, georgia 53→46) — the in-process
+counter drifts UP whenever a close is re-booked (a restart restoring stale
+meta, a manual-intervention reconciliation) because the ledger UPSERTS on
+`PRIMARY KEY (bot, trade_id)` while `stats["closed"] += 1` runs
+unconditionally; every boot re-seeds from `fetch_paper_aggregate` and
+corrects it. Display-only: the graded LEDGER never double-counted (I14 —
+the record decides), verified by georgia's full in-feed ledger matching her
+re-seeded count exactly (46 = 46).
+
+## 2026-08-25 (td) — THE "LOSSES" WERE EAMON'S MANUAL TRADES, ATTESTED OUT OF THE BOTS' P&L — AND THE FLEET'S BEST SIGNAL GETS A 2x RISK BUDGET, WITH ITS CEILING DERIVED FROM THE GUARD THAT REFUSED MY FIRST DRAFT
+
+**Eamon, 25-Aug:** *"the losses come from manual trades I made (have learned my
+lesson and will let the bots do their thing lol) ... the major focus to be on
+increasing p n l fleet wide — enhancing the bots so they are leverage-able ...
+More opportunities, higher leverage; bigger bets ... Each bot must have its own
+arms and scanners and abilities that all get help from organs."*
+
+**THE ATTESTATION CLOSES (tc)'s TOP CARRIED ITEM — and the diagnosis flips.**
+The review carried "🙏 Avo's ledger disagrees with the venue by ~$63" as a
+telemetry audit. The cause was OPERATOR INFORMATION no payload could contain:
+Eamon's own manual fills on the sub-account. That re-reads everything: venue
+equity told the truth about the ACCOUNT, the bot's ledger told the truth about
+the BOT, and `pnl_abs = equity − baseline − adjust` attributed his trades to
+her — so the row read **−$62.79 while the bot's own record was positive**, the
+evidence board's restrict backstop cut her clip to **0.75x for losses that
+were never hers**, and his same-day manual losses are what tripped her 23/24-Aug
+daily-loss halts (the rail cannot tell whose loss it is — failing SAFE on
+ambiguous losses, working as designed). The fix is `<PFX>_MANUAL_PNL_USD` — an
+operator-attested LEVEL (idempotent by construction), held out of the published
+P&L only, ALWAYS published on the row (`manual_pnl_usd`, 0.0 visible rather
+than absent, I18/I23). DECLARED LIMIT: it cannot reach the daily day-anchor (a
+cumulative level has no dates), so same-day manual trading can still trip the
+rail — the durable fix is the one Eamon named himself. Suggested values in
+LEVERAGE_PROGRAM_2026-08-25.md; the board's backstop recomputes on its next
+cycle once the env lands, restoring her clip. Driven by
+`test_manual_pnl_attestation_reaches_the_row_and_only_the_row` (per-book
+namespacing, garbage→0.0, the fold asserted as a DIFFERENCE between two driven
+cycles so the baseline-adopt path cannot fake it).
+
+**🎫 THE TAKER'S RISK BUDGET DOUBLES — the review's #1 win-more item, executed
+under the directive.** `TT_RISK_USD` 1.5 → **3.0**, on this book's own ledger:
+era `long-breakoutup` +1.99%/trade t=2.52 (the brain's only expand), the (qd)
+pre-registered `exit:hold` follow-through confirming at n=10/+5.86%/t=3.38,
+the allocation organ's era claim licensing 4.0x with no consumer — while the
+book deployed a median **$21 clip, ~16% of its own equity, at 6/6 slots**. 2x
+not 4x, per (sv): one notch generates the sample that grades the next.
+Expectancy price ZERO (sizing is %-invariant; entries unchanged; capacity per
+(hc), no era reset). **AND THE CEILING IS DERIVED, NOT PICKED — because the
+guard refused my first draft.** I shipped `TT_CLIP_MAX` 160 and
+`test_brain_live_sizing_safety` went red: worst-case gross (CLIP_MAX × the
+brain's 2.0 gross × 6 slots) would reach **1.92x the book's own capital**, and
+a book that cannot fund its own worst case is mis-modelled — its fill terms
+become fiction in the direction that makes a bad book look gradeable. The
+largest ceiling strictly inside the 1.2x funding bar is **$95**
+($95×2×6=$1,140<$1,200), so that is the value, with the derivation in the
+constant's own comment. All-slots-stop at the new caps: 6×$95×3% = **1.6%** of
+the book. Five stale pins updated with the arithmetic re-derived leg by leg
+(the live selftest's fee total decomposes exactly: the new short's clip
+doubled, so its entry fee did — 0.2048, not a drift).
+
+**THE WEEK'S PROGRAM IS WRITTEN DOWN AND PHASED** —
+`LEVERAGE_PROGRAM_2026-08-25.md`: Phase 1 the fleet-wide leverage-readiness
+table (N_eff / vol-target / stop-death / $-per-notch on every living book,
+DECIDABILITY as the ceiling where the claim is not positive); Phase 2 per-book
+gross plumbing for shadows in claim order; Phase 3 the synchronicity spine
+(judge successor lane on the family twins, board backstop onto era-scoped
+attributed P&L, brain floors recalibrated for the 6.7x range, allocation
+consumers, nav-cook restart); Phase 4 live gross as operator notches with the
+arithmetic published; Phase 5 each book's own arms/thesis/census at its earned
+deploy. What it refuses, once: leverage on books with no positive claim, swept
+maxima, raised bars, turnover bought with expectancy.
+
+## 2026-08-25 (tc) — THE WEEKLY REVIEW SHIPS 👩 MUM'S LAUNCH PREP AND FINDS THE LIVE HOST NEVER CALLED custom_exit — 🔮 GEORGIA'S REAL-MONEY ARM RAN WITHOUT HER OWN EXITS FOR THREE DAYS
+
+**Eamon, 25-Aug:** *"Full review of the last week — improvements, where we can
+win more, less focus on risk more on profit, get mum v2 ready to launch under a
+sub account — please don't rebut me on it — fleet/organ/incubator/everything
+review."* The review is `WEEKLY_REVIEW_2026-08-25.md`; this entry is what the
+review pass CHANGED, because a review that only describes is half a pass.
+
+**👩 MUM V2 IS LIVE-CAPABLE — the third variant on the proven runner, prepped
+to the last operator act.** No rebuttal, and the bar stated once: her v2 era
+has ZERO closes (7 all-time = 3 v1 + 4 `v1_legacy` flattens, all excluded by
+era-keys-on-the-OPEN; window floor opens 18-Sep) — going live is Eamon's
+explicit act against the gate, the georgia precedent exactly. Shipped:
+`_BOOKS["freqtrade-mum"]` (unknown/blank still REFUSES); `live.mum.clip_scale`
+registered AND its prefix in `_LIVE_PREFIX_OWNERS` in the same commit — the
+(tb) registered-but-unwritable trap applied forward instead of re-learned;
+`ROW_ENTRY` pre-mapped per (jb); the board's `LIVE_CLIP_LEVERS` arm pre-mapped
+per (sx); the `[deploy-live-mum]` rule staged commented; a full `main()` boot
+smoke AS her (oversold tape → her cell opens on her row, her state key, her
+4-slot geometry); `MUM_GOLIVE_RUNBOOK.md` with her table — **3.7x is the last
+setting strictly inside the 15% bar, and her −4% stop's death ceiling lands at
+EXACTLY the 10x cap** (`1/(0.04+0.06) = 10.0`). That tie exposed a real
+defect: at G=10.0 the float arithmetic (`1/10 − 0.06 = 0.04000000000000001`)
+published `stop_reachable: true` by 1e-17 — a safety instrument claiming a
+dead stop is alive. The comparison now reads a tie as DEAD (−1e-9 guard).
+Fresh sub-account means FRESH KEYS pasted once — no credential is ever read
+from an existing service, the property (tb)'s plan change bought, free here.
+
+**THE GAP AUDIT'S HEADLINE IS NOT MUM'S — THE VARIANT HOST NEVER CALLED
+`S.custom_exit`.** The family loop has called it duck-typed since (ro)
+(stop → roi → custom_exit → signal), precisely because "a time stop that
+never fires is I18"; the live runner checked stop, roi and signal only. So
+👩 mum's 24h carry cap would have been DEAD CODE on the arm holding real
+money — v1's disease, a position between 0 and the stop with no exit at all,
+reborn at launch — and **🔮 georgia's live arm has been managing real
+positions since (tb) without her `bounce_take`/`bounce_timeout`/
+`max_hold_timeout`**. Fixed in the family's own order, pinned by a driven
+test (a restored position aged past the cap at −1% — no stop, no roi rung,
+no signal — must close by the time cap alone, on both books), mutation RED.
+Two siblings from the same audit: the live payload's `strategy` field was a
+hardcoded `"SwingDipV1 (live slot swap 13-Aug)"` — georgia's row publishes
+that lie today; now derived from the variant (I8) — and
+`deploy_live_verify.LIVE_SERVICES` still mapped `trail-blazer-live` to the
+Farmer's row and marker three days after (tb): the THIRTEENTH "who is live"
+registry, two beyond (tb)'s eleven. DECLARED, not fixed: her live arm runs
+the fixed −5% stop while her shadow trails an ATR ratchet — a live/shadow
+policy drift that gets its own measured pass, never a rushed rewrite. And the
+control arm lives only in the family shadow loop — mum's runbook points at
+the shadow twin's `extra.control` until the port lands (runbook §5), because
+porting a paired accumulator into a real-money host does not ride a review
+commit ((fz): ship narrow).
+
+**MAIN WAS RED ON SIX TESTS — the (ta)/(tb) hide+prune landed without five
+downstream syncs, all discharged here (I11):** `fleet_respiration.LIVE_BREATHS`
+and `market_context.LIVE_CADENCE_SEC` still named the pruned Farmer row (each
+module's own selftest said exactly what to do); `fleet_proprioception`'s
+selftest fixture graded a retired row and now drives a SYNTHETIC funding pair
+— which exposed the structural fact rather than papering it: **the
+live-funding grading lane has ZERO members until a funding book goes live
+again** (`grade_live` selects `"funding" in b` over LIVE_ROWS = avo+georgia).
+`audit_venue_purity`'s selftest pinned the OLD roster against a derivation
+that had correctly moved on (the pin rotted, not the code — it now asserts
+the Farmer's file is NOT live surface); `test_retirement_consistency` carried
+its own hardcoded live pair and now DERIVES from `fleet_books.DECLARED_LIVE`
+(the twelve-places rot, in the test about retirement consistency); and
+`test_margin_truth`'s mode assertion is SDK-aware like its sibling (without
+the `lighter` SDK the mode deliberately degrades to the raw code).
+
+**THE FLEET'S IMMUNE SYSTEM WAS ERASING AN HONEST CENSUS.** The judge
+publishes `phase="stood_down"` since (ta); `fleet_immune`'s phase whitelist
+predated the word, flagged the DELIBERATE census `unknown phase`, and
+`fleet_regen` (REPAIRABLE baseline `{"phase":"idle"}`) clobbered it back to
+"idle" every pass — the live bus payload IS that restore
+(`_regen: safe-baseline, restored 07:30:15Z`), each wipe destroying the
+judge's done/verdicts/growth memory and starving `impl_shortfall._xp_running`.
+One-line fix plus the negative control (a fresh stood_down payload must be
+QUIET), mutation-verified: reverting the whitelist reddens the selftest with
+exactly the original message. An organ's vocabulary change must reach the
+organ that polices its vocabulary. Recoverability of the judge's pre-22-Aug
+memory from state history is carried.
+
+**HOUSEKEEPING WITH TEETH:** `live.mum.clip_scale` joined
+`audit_lever_measurability.UNMEASURABLE_OK` DECLARED (extra.clip records the
+cut), and that entry's own standing owner note — "fold the two siblings in on
+the next pass that touches this guard" — was executed: `live.avo.clip_scale` +
+`live.clip_scale` folded, **ratchet 30 → 28**, so the pass that added a lever
+SHRANK the backlog. `fleet_agronomy._FAMILY_COOLDOWN_H` still described mum
+v1 (24h, "TrendMomo 1d") — corrected to v2's 2h (OversoldRebound 1h × 2), a
+12x misprofile in the organ that asks whether she has room to grow. Her
+live-row agronomy BookSpec is a DECLARED omission (`AGRONOMY_COVERAGE_OK`)
+deleted by the activation commit. The `farmer-live-swap-operator-steps`
+carried row is DELETED with its justification in place: it was SPENT (the
+swap executed 22-Aug) and its `closes_when` watched for a `georgia-live`
+service the (tb) in-place conversion made permanently unreachable — a
+carried row that can never close is the I11 mechanism silently broken. Full
+suite 2,409 passed / 0 failed — including the six that were red on main.
+
+**THE REVIEW'S OWN VERDICTS, one line each (the document has the numbers):**
+week realised −$33.49 over 590 shadow closes; live pair −$100.32 net of
+deposits ($893.67 vs $993.99 paid in), most of it open marks at 5x — and 🙏
+Avo's ledger disagrees with the venue by ~$63 (daily-halt flattens booked at
+$0.00), the top carried real-money audit. The strongest signal in the fleet
+is 🎫 taker `long-breakoutup` (era t=2.52; the (qd) pre-registered `exit:hold`
+follow-through CONFIRMS on its fresh sample — n=10, +5.86%/trade, t=3.38,
+90% of the taker's week — n at the MIN_N floor, stated) deploying a median
+$21 clip, ~16% of its own book. 🧭 nav-cook is down twice over (publisher
+frozen 20-Aug, loop stopped 23-Aug — the (ss) class recurring; watchdog
+paging correctly). The promotion pipeline is structurally dead end-to-end
+(stood-down judge, sterile funding lane since ~29-Jul, best candidate ever
+stranded at queue head) — now HONEST on the bus instead of erased. ⚖️
+Counterweight's pre-registered keep-or-retire lands ~28-Aug: three days.
+
+
+
+## 2026-08-22 (tb) — THE SWAP EXECUTED: 💸 THE FARMER FLATTENED FOUR REAL SHORTS AND 🔮 GEORGIA TOOK THE SUB-ACCOUNT — PLUS THE ELEVEN REGISTRIES THAT EACH DECLARE "WHO IS LIVE"
+
+**Eamon, 22-Aug: *"Full permission for you to swap farmer and Georgia"*.**
+
+**IT WORKED FIRST TIME, ON REAL MONEY.** The retirement guard reached
+`trail-blazer-live`, latched the halt, and the book flattened:
+
+    perps-funding-lighter-lighter  st=halted  eq=$186.52
+      build=a0d0914e4549/16   <- matched the local prediction exactly
+      RETIRED since 2026-08-22  open=0   <- the four BTC/ETH/SOL/XAU shorts, closed
+
+`open == 0` is the receipt the whole design turns on. The stamp was predicted
+against the FUNDING image's own COPY set rather than the repo tree — the (fd)
+trap, where a repo-side `build_compute` reads 17 files and that image carries 16
+because it never COPYs `lighter_family_bot.py`. Both predictions (farmer
+`a0d0914e4549/16`, avolive `29430997f6c5/17`) matched their images' live counts
+before either deploy, which is what made "STAMP-OK" mean something.
+
+**🙏 AVO RODE ALONG, AND SHE NEEDED TO.** Her live row was still running
+pre-(sy) code: it published `liq_gap=-0.17` off the **hardcoded 300bps** while
+the venue's real worst across her universe is 600bps — a 5x-levered real-money
+book advertising liquidation **21% further away than it was** — and her
+container still capped at `GROSS_X_MAX = 5.0`, so *"let avo go up to 10x"* was
+not in effect at all. Now `liq_gap=-0.14`, `stop_reachable=True`, ceiling 10.
+
+### THE PLAN CHANGED WHEN I BUILT IT, AND THE NEW ONE IS STRICTLY SAFER
+
+`GEORGIA_GOLIVE_RUNBOOK.md` said *create `georgia-live`, move the keys*. Writing
+that provisioner made the flaw plain: **moving keys means READING them**, and
+(ml) measured that even a redacted `railway variables` echo survived only by
+column-width luck. So `trail-blazer-live` is **CONVERTED IN PLACE** — the fleet's
+own precedent (🎫 the Taker took 🌊 Tide Rider's slot on the same
+service/keys/sub-account, 17-Jul; service names here have never matched their
+books). Two properties a new service could not buy: **no credential is ever
+read, copied or transported**, and **"two processes on one sub-account" becomes
+structurally unreachable** — there is only ever ONE service holding those keys,
+so the failure where the Farmer flattens georgia's positions cannot be reached
+by any ordering mistake.
+
+**THE ORDERING IS A GUARD, NOT A RUNBOOK LINE.** `georgia-takes-the-slot.yml`
+refuses to run until the live row proves it is flat — `extra.retired` present
+AND zero open AND the row fresh (I1: a stale row cannot prove it is flat NOW).
+**Driven through all seven branches before it was trusted**, using the python
+extracted FROM the workflow rather than a retype: today's real feed refuses (no
+guard yet) · retired-but-holding refuses · receipt says 0 while the ROW says 2
+refuses · flat-but-27h-stale refuses · row ABSENT refuses (absence is never a
+licence — the dashboard could equally have hidden it early) · unparseable feed
+refuses · retired-and-flat PASSES. That last case is the half that matters ((po)).
+
+**WHY THE ENV VAR IS THE RIGHT LEVER, from a population rather than an absence
+(I6).** This fleet swaps slots two ways: a per-service config-as-code toml (how
+🙏 Avo took the Taker's slot — `railway.tickettaker.toml` repoints
+`dockerfilePath`) or `RAILWAY_DOCKERFILE_PATH`. All TEN `railway*.toml` files
+were enumerated and **not one builds `Dockerfile.fundinglighter`**, while
+`trail-blazer-live` demonstrably runs it — so its image path cannot come from a
+toml. If that reasoning is wrong, the workflow's own readback step is where it
+shows up, which is why that step exists.
+
+### "UPDATE AND SYNC EVERYWHERE" — ELEVEN REGISTRIES, AND A DRY RUN THAT PAID FOR ITSELF
+
+The Farmer's row stops publishing the moment georgia takes the service and goes
+STALE at **15 minutes** (`VARIANT_STALE_SECONDS`), which the watchdog raises as
+a PROBLEM and pages. So the follow-up had to be ready to push inside that
+window — and discovering a broken anchor under that clock is the worst possible
+moment. **The whole patch was therefore dry-run against a clean `git archive`
+checkout first, and it caught SIX real breaks that would each have landed
+mid-window:**
+
+* `_marker_logic_selftest` pins that `[deploy-live-farmer]` exists — the rewiring
+  removed it. The marker gate's whole case table encoded the OLD live pair, so
+  it was rewritten for the new one: 🙏 Avo and 🔮 georgia **share one image**, so
+  the marker is the only thing separating them, and "one book at a time" is now
+  the assertion rather than bookkeeping. The Farmer's old marker is pinned to
+  move **nothing live** — if that ever returns a service, the retirement has
+  been undone by a routing edit rather than by a decision.
+* **`live.georgia.clip_scale` was REGISTERED AND UNWRITABLE** — a defect in my
+  own (sx): the lever went into `LEVERS` and its prefix never went into
+  `_LIVE_PREFIX_OWNERS`, so `_author_may_write` fell through to `return False`
+  and no author could move it. The registered-but-inert failure (I18), which is
+  exactly what the comment beside `live.avo.` warns about, found by the guard on
+  the pass that made the row live.
+* `fleet_proprioception` and `evidence_board` each carry a live cohort and are
+  pinned to AGREE; `evidence_review`'s twin assertion named the retired pair;
+  `fleet_agronomy` refused to let a REAL-MONEY row be registered with no
+  BookSpec — *"a silent omission is how a real-money row went unscanned while a
+  retired one was still specced"*.
+* **`PAIRED_ARMS` is now empty, and that is a finding rather than a deletion.**
+  The pair it protected was the Farmer's live/shadow A/B; retiring the live arm
+  ended the experiment. Keeping the entry would assert a pairing between
+  georgia's live service and the Farmer's shadow — not stale but WRONG. The
+  MECHANISM stays verified: `arm_pairing_orphans` takes its pairs as an argument
+  and both it and `test_arm_pairing_drift` drive a synthetic pair, so an empty
+  registry cannot make those guards vacuously green. The empty case is pinned to
+  the DECLARATION, so a future pair must bring its routing back with it.
+
+**AND ONE OF MY OWN, caught by the same dry run:** the fixture pair was set by
+assigning `adc.PAIRED_ARMS` directly, which **leaked into the next test in the
+file** — it then asserted the workflow routes `fixture-ctrl-svc` and failed,
+reading exactly like a real routing break. `monkeypatch` restores on teardown.
+Module-global mutation in a test is a defect even when the assertion passes.
+
+**Config:** `GEORGIA_GROSS_X=5.0`, `FREQTRADE_GEORGIA_MAX_NOTIONAL=5000`
+(Eamon's call; the cap is a backstop and `GROSS_X` is the control). Eamon added
+equity to that sub-account this morning and it was still settling at swap time —
+she sizes off live equity every loop, so she picks it up with no edit. **Her
+`diversified_order` has real material**: the family universe defaults to all ten
+non-crypto names, so she can spread as 🙏 Avo does (QQQ/SPY/NVDA) instead of
+holding one crypto bet five times at 5x.
+
+**STATED ONCE, PLAINLY, AND NOT RE-ARGUED: georgia has NOT passed the go-live
+gate.** She is 5 of 6 bars — window, closes, mean, both halves, maxDD — failing
+only `t` (1.48 against 2.0). Going live is an explicit operator act and this is
+Eamon's, on the record. What the code owes him is the arithmetic, published on
+her row every loop: at her −5% stop, **2.8x is the last setting strictly inside
+the gate's 15% drawdown bar** and **above 9.09x her stop cannot fire before
+liquidation** at the venue's measured 600bps. 5x sits between those, knowingly.
+
+## 2026-08-22 (ta) — 💸 THE FARMER'S LIVE ARM IS RETIRED AND 🔮 GEORGIA TAKES THE SUB-ACCOUNT — THE FIRST RETIREMENT THAT HAD TO FLATTEN REAL MONEY RATHER THAN FREEZE PAPER
+
+**Eamon, 22-Aug: *"just replace farmer with georgia as weve done so many times
+before"* / *"thats easier, once your metrics and paramters are finished
+obviously"* / *"update and sync everywhere afterwards obviously"*.**
+
+The precedent he means is real and this follows it exactly: 🎫 the Ticket Taker
+took 🌊 Tide Rider's live row on the same service/keys/sub-account (17-Jul), and
+🙏 Avo took the Taker's ((ma)).
+
+**THE CALL IS THE FLEET'S OWN GRADER'S, not an opinion about a bad week.**
+`golive-readiness`, 21-Aug 22:31Z:
+
+| row | n | mean/trade | t | halves | horizon |
+|---|---|---|---|---|---|
+| 💸 `perps-funding-lighter-lighter` **(REAL MONEY)** | 91 | **−0.160%** | −0.88 | +2.51 / **−7.65** | **unreachable** |
+| 💸 `perps-funding-lighter-lshadow` | 161 | **−0.195%** | −0.95 | +5.71 / **−18.32** | **unreachable** |
+| 🔮 `freqtrade-georgia-lshadow` | 151 | **+0.171%** | 1.48 | **+5.65 / +10.08** | on_track |
+
+Both Farmer arms agree in SIGN and in VERDICT, and `unreachable` is the grader's
+own phrase — *"mean ≤ 0, more of the same closes cannot flip mean/t/halves"*.
+That is the (mr)/(nf) red-stop class landing on the real-money row, and (su)
+had already measured why a knob cannot fix it (every gate 0.05→0.60 and twelve
+exit variants lose on the population the book can actually trade).
+
+**AND THE BAR GEORGIA FAILS, ONCE, PLAINLY: `t` = 1.48 against 2.0.** She passes
+window, closes, mean, both halves and maxDD. She has not passed the gate. Go-live
+is an explicit operator act and this is Eamon's, on the record; what the code owes
+him is the arithmetic, published on the row every loop rather than re-argued.
+
+### THREE THINGS THIS RETIREMENT DOES THAT NO PRIOR ONE DID
+
+**1 · IT FLATTENS.** Every previous retirement froze PAPER positions. This arm
+held **four real directional legs**, and a live position with no manager has no
+stop and no exit — freezing would have been strictly worse than closing. Rather
+than write a second idle loop beside real money, the guard latches the book's
+OWN daily-halt path, which already flattens, retries until flat, blocks entries
+and heart-beats ((pq)/(pr)/the 16-Jul retry fix). One machine, not a second one.
+Ordering is what makes that reuse work and is pinned in both directions: the
+latch sits AFTER the day roll (which sets `halted_today = False` by
+construction, so an earlier latch would be silently undone once every UTC day
+and the book would trade for a full day) and BEFORE the halt block that does the
+work. Closes book **`long_retired` / `short_retired`**, never `daily_loss` —
+I23, on the last four trades a real-money book will ever take: mislabelling them
+would put phantom daily-loss rows in the ledger every grader and exit-attribution
+study reads.
+
+**2 · IT IS ROW-SCOPED INSIDE A TWO-ARM MODULE.** One file runs both arms, so
+the 🌊/📊/🧙 idle-the-whole-process shape would have silenced the SHADOW twin —
+the control arm, still accruing, costing nothing. The (mr) rule: declare once,
+derive the roster. The shadow arm keeps trading and `test_the_SHADOW_twin_keeps_trading`
+is the first test in the file for a reason.
+
+**3 · THE FACT HAS ONE OWNER, ACROSS TWO IMAGES.** The 🧪 experiment judge —
+whose entire job is promoting `live.funding.*` onto this exact row — runs in
+`freqtrade-bots`, which does not and must not carry a real-money trading module,
+so it cannot import the bot. The declaration therefore lives in
+`fleet_bus.RETIRED_LIVE_ARMS`, which is in both images already. **The judge now
+stands down out loud** (`phase="stood_down"`, naming the successor and the
+override) instead of silently never promoting: its paired bar needs `live ≥ 10`
+closes, so a flat arm silences it CORRECTLY and INVISIBLY, `promote: false`
+reading identically for *"no candidate cleared"* and *"there is no arm left"*
+(I18). **Returning IS the release** — promoted levers are TTL'd and kept alive
+by re-assertion, so not asserting is how the rail was designed to revert, with
+no second code path to get wrong. Measured at the retirement: **ZERO `live.*`
+levers open**, so nothing was stranded.
+
+**THE DARK-BUS RULE IS OPPOSITE IN THE TWO READERS, ON PURPOSE.** The BOT stands
+a live arm DOWN when it cannot read whether it is still commissioned — the
+inverse of every other bus read in this fleet, because everywhere else the cost
+of failing closed is a missed shadow trade and here the cost of failing OPEN is
+a retired real-money book resurrecting itself on an import error. The JUDGE fails
+OPEN, because the paired bar's own `live ≥ 10` floor already blocks a promotion
+onto a flat arm, and failing closed there would stop the fleet's only path to
+more real money on an import error. Both are stated where they are written.
+
+### THE RECEIPT, AND WHY TWO HALVES ARE DEFERRED
+
+`status="halted"` is byte-identical between *lost 5% today* and *retired 22-Aug*
+(I1/I18), so the row publishes `extra.retired.{since, why, open, override}`.
+**`open` is the number of positions still held, and `open == 0` is the ONLY
+signal that says the keys may safely move** — two processes must never hold one
+sub-account, or the Farmer reads georgia's positions as untracked and can flatten
+them.
+
+That is also why `RETIRED_ROWS` (hide) and `LEGACY_BOTS` (prune) are
+**deliberately NOT in this commit**, against the standing both-halves rule.
+`/pnl.json` is filtered by the dashboard's roster ((ml)), so hiding the row first
+blinds the exact feed the flatten is verified on. The deferral is not an omission:
+it is a `session_state.py` CARRIED row with a repo-evaluated `closes_when`, so it
+reddens CI if forgotten. Ledgers are kept either way — the 136 real-money closes
+live in `paper_trades`, not in the summary row.
+
+### ALSO IN THIS PASS
+
+* **The margin-surface guard fired and was RIGHT.** `test_it_is_published_but_consumed_by_no_book_yet`
+  went red on CI because (sy) made the live runner read `fleet_bus.market_margins()`.
+  Its own message asked for exactly this: *"then this test updates to name the
+  consumer deliberately."* It now declares the reader with its reason **and keeps
+  the ban that mattered** — a new test proves neither `clip_usd` nor `gross_x`
+  nor `vol_target_gross_x` can see the margin, because a margin-derived clip lets
+  a thin market's generous leverage buy a bigger bet, which is backwards. A book
+  may know how close the cliff is; it may not use the cliff to pick the bet. An
+  undeclared reader still fails, and a stale declaration fails too.
+* **`GEORGIA_GOLIVE_RUNBOOK.md` rewritten for the swap** — three ordered operator
+  acts, the receipt to wait for, and the leverage table with the two numbers that
+  are not appetite: **2.8x is the last setting strictly INSIDE the gate's 15%
+  maxDD bar** (3.0x sits exactly ON it, and the gate is `maxDD < 15%` — the
+  (gv) 📊 Index Rider trap, which is why (sr) shipped 🙏 Avo at 1.4 not 1.5),
+  and **above 9.09x her −5% stop cannot fire before liquidation at the venue's
+  measured 600bps worst maintenance margin** — a dead stop is a broken rail, not
+  a risk preference. The 10x ceiling Eamon set stands and is published.
+* **CLAUDE.md audit-scope rule corrected for the THIRD time**, and this time with
+  the mechanism rather than just the fact: a rule keyed to a LIST of live bots
+  goes stale on every slot swap and then sends every future audit to the wrong
+  file. The live pair is now 🙏 Avo + 🔮 georgia and they are the SAME FILE.
+
+**Mutation-verified, 14/14 red:** the shadow twin named in the retired set · a
+dark bus resurrecting the live arm · the latch moved before the day roll · the
+flatten mislabelled `daily_loss` · a living arm publishing the retired block ·
+the judge's stand-down moved after the growth promoter · the mode guard demoted
+below the override · a THROWING bus swallowed as "not retired" · the override
+reachable only through the bus (so a dark bus would make a retired real-money
+arm UNRESURRECTABLE) · the table keyed by base name instead of row, which would
+make 🛢️ Garrett inherit the Farmer's retirement. Plus 1/1 on the margin guard.
+
+**AND THE DECISION FUNCTION IS DRIVEN, NOT GREPPED.** The first draft proved the
+dark-bus rule by finding `if fleet_bus is None: return True` in the source, which
+is the "a check that inspects nothing" shape wearing a different hat — it passes
+against code that is never called. The module imports cleanly, so those are now
+real calls across seven (row, mode) pairs with the bus removed, broken, and
+overridden. Two of the three extra mutations above are cases the greps could not
+have seen. What stays structural is only the ORDER inside `main()` — driving that
+would mean adding a test-only injection point to a 4,700-line real-money file,
+which is a worse trade than an AST check on line numbers.
+
+**One self-inflicted loss, recorded because the record is the point:** mid-pass I
+ran `git checkout -- lighter_funding_bot.py` to revert a mutation and destroyed
+my own uncommitted retirement edits with it. Re-applied from the scripts that
+made them. The rule I broke is this file's own: **look at the target before you
+overwrite it** — a mutation harness that restores from a snapshot must restore
+from THAT snapshot, never from HEAD, when HEAD is not what you started from.
+
+**AND THE TOOL THAT EXISTS SO WORK IS NOT SILENTLY LOST WAS LOSING WORK.** This
+entry nearly did not ship: `session_commit.py --shared CHANGELOG.md --shared
+CLAUDE.md` committed CLAUDE.md and **dropped the changelog entirely** — exit 0,
+no warning. `--shared` used `nargs="*"` with argparse's default store action, so
+a second flag REPLACES the first. It was caught only because the read-back's stat
+listed nine files and the changelog was not among them, i.e. by the practice this
+repo already has (*"then READ BACK what actually landed"*). A receipt you have to
+read carefully is a weaker guard than a flag that cannot lose a file, so the flag
+is now `action="extend"` and both spellings accumulate.
+
+**AND THE SWEEP FOUND A DEFECT I WAS ABOUT TO CREATE, ON HIS PHONE.** A retired
+arm holds its halt PERMANENTLY — that is how it flattens and stays flat — so the
+hourly watchdog would have listed the real-money row under **"halted (daily-loss
+rule)"** for the rest of its life. Two costs, and the second is the one that
+matters: Eamon is pointed at a rule that never fired, and **a line that is always
+present is one that gets skimmed past when a real daily-loss halt lands beside
+it**. `fleet_watchdog_svc.evaluate` now splits on the row's own `extra.retired`
+— the field the publisher stamps precisely so `halted` stops being
+byte-identical between the two states. Three outcomes, each chosen rather than
+defaulted: a retired FLAT arm rides the **context line** (visible, no warning —
+I8, there is nothing to act on, and a row that silently vanished from the
+watchdog is how a book stops being watched); a retired arm **still holding**
+warns, because `open > 0` means positions are held by a book that will never
+manage them again; and a malformed `retired` block degrades to the OLD warning
+rather than making the row disappear. Driven against all four payload shapes,
+4/4 mutations red. **The first draft invented a fourth return channel (`notes`)
+that `evaluate` does not have** — caught by the name being unbound, which is
+luck rather than a test, so there is now a test that the contract is exactly
+`(problems, warnings, snapshot)`.
+
+**"UPDATE AND SYNC EVERYWHERE" — WHAT THAT ACTUALLY MEANS HERE, because half
+of it must NOT be done yet.** Sweeping the tree for the retired row turns up two
+different kinds of reference and they have opposite deadlines. **Claims about
+INTENT** can be written now, and were: `fleet_manifest` marks the Farmer's live
+arm retired (its `flies_when` is rewritten to say the honest thing — a book whose
+only winning exit cannot be reached more often has no ceiling to raise) and 🔮
+georgia's live row gets its own design, whose `floor` is the sentence that
+matters: *she went live without passing the gate, so the drawdown arithmetic is
+the whole guardrail.* **Declarations that FOLLOW THE FEED must not** —
+`fleet_books.DECLARED_LIVE`, `LIVE_DEPLOY`, `deploy_live_verify`'s service→row
+map and `EVBOARD_LIVE_ROWS`/`PROP_LIVE_ROWS` are tripwires checked against the
+live payload ((mo)), so editing them before the sub-account moves makes them
+DISAGREE with reality and reddens the build. `audit_live_roster` is OK today and
+would not be. They are named individually in the carried row instead, so the
+distinction survives the session rather than living in my head.
+
+**[EXECUTING — Eamon, 22-Aug: *"Full permission for you to swap farmer and
+Georgia"*.] AND THE PLAN CHANGED FOR THE BETTER WHEN I HAD TO ACTUALLY DO IT.**
+The runbook said *create `georgia-live`, move the keys*. Building the provisioner
+made the flaw obvious: **moving keys means READING them**, and (ml) measured that
+even a redacted `railway variables` echo survived only by column-width luck. So
+`trail-blazer-live` is CONVERTED IN PLACE instead — which is the fleet's own
+precedent anyway (🎫 the Taker took 🌊 Tide Rider's slot on the same
+service/keys/sub-account, 17-Jul; service names here have never matched their
+books). It buys two things a new service cannot: **no credential is ever read,
+copied or transported**, and **"two processes on one sub-account" becomes
+structurally unreachable** — there is only ever ONE service holding those keys,
+so the failure where the Farmer flattens georgia's positions cannot be reached by
+any ordering mistake.
+
+**THE ORDERING IS NOW A GUARD, NOT A RUNBOOK LINE.** The Farmer's four real
+shorts (BTC/ETH/SOL/XAU — I22's "one bet wearing four names", live-verified at
+`N_eff` 1.389) must be FLAT before its container is replaced, or they are
+stranded with no manager, no stop and no exit. `georgia-takes-the-slot.yml`
+REFUSES to run until the live row's own receipt says so: `extra.retired` present
+(the guard is deployed and it retired deliberately, not merely happens to hold
+nothing) AND zero open AND the row fresh (I1 — a stale row cannot prove it is
+flat NOW). **Driven through all seven branches before being trusted**, using the
+python extracted FROM the workflow rather than a retype: today's real feed
+refuses (no guard yet) · retired-but-holding refuses · receipt says 0 while the
+ROW says 2 refuses · flat-but-27h-stale refuses · row ABSENT refuses (an absent
+row could equally mean the dashboard hid it early, so absence is never a licence)
+· unparseable feed refuses · retired-and-flat PASSES. That last one is the half
+that matters: an empty result is not a negative result until the check has been
+seen to produce a positive one ((po)).
+
+**Still with Eamon, and it is the whole of what remains:** the sub-account has
+not moved. No session in this container has a Railway CLI, and the ORDER is the
+safety property. `session_state.py` carries the three acts.
+
+## 2026-08-22 (sz) — THE VARIANT HOST HAD NEVER BEEN DRIVEN AS 🔮 GEORGIA, AND ITS SELFTEST WAS ABOUT TO REPORT CLEAN ON THREE OF THIRTEEN CHECKS
+
+`(sx)` made `lighter_avo_live_bot.py` a variant host and `(sy)` raised both
+books' ceiling to 10x. Twenty of the twenty-one tests behind those two entries
+**read the module** — a constant, a derived bound, an env name. Not one of them
+ever **ran georgia through `main()`**, and that is the only place the identity
+has to survive contact with the loop.
+
+**What I found when I finally ran it.** `FAMILY_LIVE_BOOK=freqtrade-georgia
+python3 lighter_avo_live_bot.py --selftest` boots her correctly —
+`daytrader-15m tf=15m stop=-5% slots=5`, state restored, day anchor set — and
+then dies on `assert len(v.opens) >= 1, "dip signal on live equity must open"`,
+because that suite feeds **4h SwingDip dip bars** to a **15m DayTraderGated**
+book. A failure about the FIXTURE, not the book. The tempting fix — skip the
+SwingDip-shaped scenarios under a non-Avo book — is the one this repo has
+already paid for: a suite that runs 3 of its 13 checks and exits 0 **reports
+clean having inspected almost nothing**, and clean reads as evidence ((po)).
+
+So `--selftest` now **REFUSES** a non-Avo book, names where her coverage lives,
+and exits non-zero. A refusal is only honest if the thing it points at exists,
+which is the rest of this entry.
+
+**THE BOOT SMOKE (`tests/autonomy/test_variant_host.py`, +5 tests → 25).**
+One full cycle of the real `main()` as georgia, real entry path, stub venue,
+synthetic bars that trip her own `trend_breakout`:
+* she publishes to **`freqtrade-georgia-lighter` and nothing else**, restores
+  **her** state key, and no `avo` string appears in either — the failure this
+  is aimed at is her service managing 🙏 Avo's REAL POSITIONS, and no
+  constant-reading test can catch it;
+* she **sizes off her own geometry** — `equity × gross_x / max_open`, driven
+  through the order rather than trusted from the formula;
+* her row carries the `leverage` and `scan` blocks, with `all_slots_stop_pct`
+  **0.25 at 5x against 🙏 Avo's 0.50 at the same setting**, both asserted in one
+  test so "5x" can never read as one number again. (These fields are FRACTIONS
+  despite the `_pct` suffix — (sr)'s convention, pinned here because I asserted
+  25.0 and the test caught me.)
+
+**TWO REAL DEFECTS, both only reachable by driving it.**
+1. **The boot gate named the wrong book's env.** `lighter_live requires an
+   explicit per-bot notional cap (FREQTRADE_AVO_MARIA_MAX_NOTIONAL)` was a
+   LITERAL. It is the single instruction a real-money service prints as it
+   refuses to start, and under georgia it would have sent the operator to set
+   **another book's cap** — I8, on the one line that has to name something
+   findable. Now `env_prefix(BOT)`, so it reads `FREQTRADE_GEORGIA_MAX_NOTIONAL`.
+2. **The geometry pin was Avo-only.** `assert S.max_open == 5 and S.stoploss ==
+   -0.10` fails on georgia by construction, so the variant could never run the
+   suite at all. Replaced by a per-book `_EXPECT` table — deliberately a table
+   and not `whatever S says`, which would be vacuous — and a book added to
+   `_BOOKS` without an entry now FAILS rather than running unpinned. That pin is
+   load-bearing twice over: `vol_target_gross_x` (0.15/|stoploss|) and
+   `stop_reachable` (1/(|stoploss|+mmf)) both derive from the stop, so widening
+   it silently changes what a leverage setting MEANS on real money.
+
+**Mutation-verified, 7/7 red:** identity degrading to Avo · the boot-gate
+message reverted to the literal · `all_slots_stop_pct` off a fixed 0.10 stop ·
+`STATE_KEY` hardcoded to Avo's row · the clip dropping `gross_x()` (silently
+un-levering a levered book) · the clip pinned at Avo's old 4 slots · the
+selftest refusal removed. The refusal test also asserts the **Avo path still
+runs green**, because without that half it is satisfiable by breaking
+`--selftest` for everybody.
+
+**Carried into the next pass:** Eamon, 22-Aug — *"just replace farmer with
+georgia as weve done so many times before"* / *"thats easier, once your metrics
+and paramters are finished obviously"*. The metrics are finished; the swap is
+next, and it supersedes the new-sub-account plan `GEORGIA_GOLIVE_RUNBOOK.md`
+was written for.
+
+## 2026-08-22 (sy) — 10x ON BOTH LIVE BOOKS, AND THE NUMBER THAT IS NOT ABOUT APPETITE: ABOVE 6.25x 🙏 AVO'S STOP CANNOT FIRE
+
+**Eamon, 22-Aug: "let avo go up to 10x, and georgia also".** Done — `GROSS_X_MAX`
+is 10.0 on both. It is a CEILING, not a setting: `GROSS_X` still defaults to 1.0,
+so raising it levers nothing by itself.
+
+### The arithmetic he is owed, and one line of it is new
+
+Liquidation arrives at `1/G - mmf`. The protective stop fires at `|stoploss|`.
+So above **`G = 1/(|stoploss| + mmf)`** the venue liquidates FIRST and **the
+stop is dead code** — not "riskier", *unable to fire*. Nobody had asked.
+
+| gross | liquidation move | 🔮 georgia (−5%) | 🙏 Avo (−10%) |
+|---|---|---|---|
+| 5x | −14.0% | fires | fires |
+| 7x | −8.3% | fires | **DEAD** |
+| 9x | −5.1% | fires | **DEAD** |
+| **10x** | **−4.0%** | **DEAD** | **DEAD** |
+
+**Stop dies above: 🔮 georgia 9.09x · 🙏 Avo 6.25x.** At 10x both liquidate on a
+**4.0%** adverse move — on baskets measuring `N_eff` 1.2–1.5, where
+all-slots-together is the central case rather than a tail.
+
+**Not clamped.** Risk appetite belongs to the person whose money it is, and this
+is stated once. What changed is that the row now publishes `stop_reachable` and
+`stop_dead_above` every loop, so a dead stop is READABLE instead of discovered.
+
+### The live defect this surfaced: the row was advertising twice the margin it has
+
+`(sr)` computed `liq_gap_pct` from a **hardcoded 0.03**, sourced from a
+hand-check of NVDA/WTI/XCU. Measured 22-Aug across the books these arms
+ACTUALLY trade, the worst maintenance-margin fraction is **600bps** — IWM and
+MSTR on 🙏 Avo's non-crypto set, ADA/DOT/AVAX/LINK once 🔮 georgia's crypto set
+is included.
+
+**So the real-money row has been publishing a liquidation gap twice as far away
+as it is: −17% at 5x, where the truth is −14%.** And the data was already on the
+bus — `(se)` put the venue's whole margin surface there and nothing read it,
+which is the registered-but-inert shape with a liquidation on the end of it.
+
+Fixed: `worst_mmf(universe)` reads `fleet_bus.market_margins()`, inheriting that
+accessor's fail-CLOSED contract verbatim — an unreadable margin returns **None**
+and the row publishes nothing rather than a number. A fabricated liquidation
+distance on a levered real-money book is the one field that must never be
+guessed (I8), and `(se)`'s own docstring says why: *"the cost of a wrong default
+is a LIQUIDATION, which is an unrecoverable loss of the whole book"*.
+
+### Pinned
+
+`tests/autonomy/test_variant_host.py` grows five tests; **8 of 8 mutations
+verified RED**, including the hardcoded-300bps regression, an unknown mmf
+fabricating a distance, an unknown mmf claiming the stop is fine, the ceiling
+formula dropping its `mmf` term (which would read 10x as safe), and the sign
+flip. `test_avo_cap_slots`' ceiling cases now TRACK `GROSS_X_MAX` instead of
+restating it — a retyped constant is a constant that drifts — with the value
+itself asserted once, in one place, so a silent revert is visible.
+
+`GEORGIA_GOLIVE_RUNBOOK.md` carries the table and names the highest settings
+that keep each stop alive: **9x georgia, 6x Avo**.
+
+## 2026-08-22 (sx) — 🔮 GEORGIA GETS A LIVE ARM AS A VARIANT, NOT A COPY — AND 5x MEANS HALF AS MUCH ON HER AS IT DOES ON 🙏 AVO
+
+**Eamon, 22-Aug:** *"get georgia ready to go live on a new sub account ill
+deposit into later today prepared for 5x leverage"*.
+
+### The live runner is a VARIANT HOST now
+
+`lighter_avo_live_bot.py` is parameterised by `FAMILY_LIVE_BOOK`, the 🛢️ Garrett
+rule ((lp)): **one proven machine, every success instrument inherited free**
+rather than 1,800 lines re-earned and eventually drifting. What a copy would
+have had to rebuild: claim_writer + standby, the latched daily halt, the
+capital-adjust equity guard, the venue-truth reconciler, the notional cap and
+`cap_slots` census, `diversified_order`, the (st) scan census, the MTM equity
+series, real-fill telemetry, the fail-closed per-asset regime gate, and the
+brain's restrict-only sizing.
+
+**The variant is the book and everything derives from it.** `S` is still taken
+from the family REGISTRY by identity, so live and shadow cannot drift. Env vars
+carry a per-book prefix (`AVO_*` / `GEORGIA_*`) so two live services on one
+image can never read each other's sizing. **The default is unchanged: a service
+with no `FAMILY_LIVE_BOOK` is byte-identical to yesterday's Avo**, and
+`test_variant_host.py` pins that name by name across all seven `AVO_*` envs —
+that is the whole safety property of this change on a real-money book.
+
+### 5x is EARNED on georgia in a way it is not on Avo
+
+Her stop is **−5%**, half Avo's. The leverage layer was already written against
+`S.stoploss` and `S.max_open`, so it re-derives with no edit:
+
+| | 🔮 georgia (−5%) | 🙏 Avo (−10%) |
+|---|---|---|
+| all-slots-stop at 5x | **25%** | 50% |
+| gross the 15% maxDD bar allows at `N_eff` 1 | **3.00x** | 1.50x |
+| …at her basket today (BTC/AAVE/LINK, `N_eff` 1.457) | **3.62x** | — |
+| …after a diversified fill (+WTI, +IWM → `N_eff` 3.390) | **5.52x** | — |
+
+So **5x sits inside her own drawdown budget once the basket spreads**, and it
+spreads by inheritance: `diversified_order` offers WTI before BTC, measured
+against live tape. Avo's 5x exceeds her derived bound at every measured
+`N_eff`; georgia's does not. That is the number the ask turns on and it is
+favourable.
+
+### The gate, stated plainly
+
+**She is not through it.** `READY: []`; georgia is **5 of 6 bars, failing only
+`t` (1.48 against 2.0)**, n=163, +0.163%/trade. Go-live is an explicit operator
+act and always has been — this entry ships the ARM, inert, not the decision.
+`(sv)` raised her throughput 2 → 3/hour, so at her recent rate the remaining
+~135 closes is ~10 days rather than the ~33 her lifetime rate implies.
+
+### Wired, and what is deliberately NOT
+
+* `live.georgia.clip_scale` **registered** in `fleet_tuning` ahead of her
+  funding — `get_lever` returns the env default for an UNREGISTERED name, so a
+  live book whose arm does not exist has a dial nothing can turn, which is the
+  reverse of registered-but-inert and just as silent. Cage `hi` 1.0: the
+  consumer is restrict-only, and authority the consumer discards is not
+  authority.
+* Mapped in `evidence_board.LIVE_CLIP_LEVERS`, but **NOT added to
+  `LIVE_ROWS`** — the 17-Jul rule is that a row belongs there iff it is live
+  AND consuming. `EVBOARD_LIVE_ROWS` adds her the day she is funded.
+* The deploy rule is written and **left COMMENTED with its own marker,
+  `[deploy-live-georgia]`**, because the service does not exist yet and the
+  resolve step fails on an unresolvable name. Two live books sharing an image
+  must still deploy one at a time, or every georgia fix restarts Avo — and a
+  restart wipes memory-only halts.
+* **No new Dockerfile.** `Dockerfile.avolive` already carries the whole import
+  graph; georgia is env, not an image.
+* `FREQTRADE_GEORGIA_MAX_NOTIONAL` derives automatically from
+  `venues.safety.env_prefix`, and boot REFUSES without it.
+
+### The failure this forbids, and the two it caught
+
+An unknown or typo'd `FAMILY_LIVE_BOOK` must **REFUSE**, never degrade to Avo —
+georgia's service would otherwise publish to Avo's row, restore Avo's state key
+and manage Avo's REAL POSITIONS. I8's "unknown never degrades to a guess", where
+the guess is another book's money.
+
+**Two defects found while writing the tests, both mine:**
+
+1. **A blank `FAMILY_LIVE_BOOK` fell back to Avo.** `os.environ.get(k, default)
+   .strip() or default` treats set-but-empty as unset — on georgia's service
+   that is exactly the money-losing case. ABSENT now means Avo; SET-BUT-BLANK
+   refuses.
+2. **The first draft of the test helper handed back the WRONG module.**
+   Restoring the environment needs a second `reload`, and doing it in a
+   `finally` before returning meant every assertion ran against a module already
+   reset to defaults. It went GREEN on Avo — the one book whose values are the
+   defaults — which is precisely the shape that would have let a georgia
+   regression through.
+
+`tests/autonomy/test_variant_host.py`, **6 of 6 mutations verified RED**,
+including both of the above.
+
+### The ratchet caught me too, and the declaration is the honest one
+
+`audit_lever_measurability` went red: 31 unmeasurable levers against a ratchet
+of 30, because I added one (I23 — a NEW instance fails immediately). Declared in
+`UNMEASURABLE_OK` rather than counted, with the real reason: **a size multiplier
+gates no tape quantity.** Every `QUANTITIES` spec profiles a lever against the
+distribution of a variable it thresholds; a clip scale thresholds nothing. The
+quantity it cuts — the clip actually used — IS recorded on every close row
+(`extra.clip`), so this is not the never-recorded class. Its two siblings
+(`live.clip_scale`, `live.avo.clip_scale`) are the same shape and sit in the
+backlog of 30; folding them in is one line and an owner is named.
+
+## 2026-08-22 (sw) — I SHIPPED TWO SELFTESTS AND WIRED NEITHER INTO CI, AND THE ROT-GUARD CAUGHT IT
+
+CI on #215 went red on `test_no_unregistered_selftest`:
+
+    scripts/study_farmer_gate_minvol_2026-08-22.py
+    scripts/study_georgia_entry_rank_2026-08-22.py
+
+That guard exists for exactly this — *"a new selftest added but never wired
+into CI would pass locally when run by hand and silently never run again"* —
+and it fired on the two studies `(su)` and `(sv)` rest their decisions on.
+
+**Registered by PATH, and actually ENFORCED, not merely excluded.** Both
+filenames carry a hyphenated date, so `"scripts.study_georgia_entry_rank_
+2026-08-22"` is not an importable module name: an entry in `SELFTEST_MODULES`
+collects ZERO tests and reports green — the trap already documented at
+`study_dislocation_band_2026-08-19` ((po): a check that inspects nothing
+reports clean). `tests/autonomy/test_2026_08_22_studies.py` loads both by path
+and runs each `_selftest`, following the `(sb)` precedent, plus the two
+structural checks that matter:
+
+* the Farmer study must keep **REFUSING an unknown volume** — a data gap
+  becoming a free pass is what would drift it back to the rank-universe it
+  exists to correct;
+* the georgia study must keep **preferring a stamped `entry_rank`** over its
+  own reconstruction, or the I23 fix it motivated is inert.
+
+**5 of 5 mutations verified RED** — including one that first SKIPPED because I
+aimed it at the wrong file (`vol24` lives in the harness, not the study). A
+mutation that never ran is not a mutation that passed; re-aimed and killed.
+
+**AND A CORRECTION TO `(st)`/`(su)`/`(sv)`, per I12.** Those entries and #215's
+body reported three failures as *"pre-existing on `e05b046`"*, and #215 went
+further and called `test_margin_truth` *"a genuine logic break"*. **CI says
+2313 passed, 1 failed** — all three are GREEN on the runner. They fail only in
+this container, on a different `lighter` SDK build. The stash-against-HEAD check
+was sound about them not being mine and wrong about them being real; the honest
+statement is that they are an artifact of one environment, and the runner is the
+authority.
+
+## 2026-08-22 (sv) — 🔮 GEORGIA'S RATE LIMITER WAS CUTTING HER BEST TRADES: 75% OF HER P&L SITS ON THE ENTRY THE CAP REFUSES
+
+**Eamon, 22-Aug:** *"Real money we're talking here / I'm a bit disappointed —
+all the work we did on p n L only for it to be worse"*.
+
+He was right, and the numbers are his: live realised **peaked at +$9.50 on
+1-Aug and sits at +$1.47**; with open marks 💸 the Farmer is **−$4.24**, the
+live fleet **−$4.15**. `(st)` and `(su)` shipped instruments and refusals and
+moved none of it. His call, asked directly, was **leave the Farmer and work the
+winner instead** — so this entry is the winner.
+
+### The winner is 🔮 georgia and the only thing she lacks is closes
+
+The live go-live gate, today: **`READY: []`**. She is the closest book in the
+fleet — **5 of 6 bars, failing only `t` (1.48 against 2.0)**, n=163,
++0.163%/trade, both halves positive, maxDD inside the bar. Every other bar she
+already clears. So her distance to real money is a COUNT, and anything that
+cuts her closes for no quality reason is cutting the arrival date.
+
+For contrast, and it is why this is where the session went: the real-money
+Farmer's own horizon organ reads **`unreachable`** — *"mean −0.160% ≤ 0, more
+of the same closes cannot flip mean/t/halves"*.
+
+### Two explanations measured and refused before the third was found
+
+* **NOT signal-starved.** Driving the SHIPPED `DayTraderGated.signals` over the
+  venue's own 15m tape (23 coins × 1400 bars): **597 entry signals in 14.6 days
+  = 40.9/day** against her 4.53 opens/day.
+* **NOT a gate and NOT a regression.** The fleet long budget is 12 of 20 with
+  the light green and nothing at the symbol cap; the brain has no mult, no gate
+  and no action on her; `parse_candles` drops the forming bar and the cache's
+  `next_due` is one interval after the next close, so she is not skipping
+  candles. Her signal rate went **1–29/day through 7–18 Aug and 107/164/154 on
+  19/20/21 Aug** as the tape started trending, and her opens tracked it 1–6/day
+  → 10–17/day. **The surge is the market.** The StoplossGuard locks her 8.2% of
+  her life (37 fires in 39.9 days) — real, and not the constraint.
+* **AND THE 11x CEILING CLAIM IS RETIRED, corrected in place.** The carried row
+  read *"83.5 days at 0.5 of 5 slots, 7.6 days at full occupancy"*. Her mean
+  hold is **2.6h**, so occupancy = closes/day × 2.6/24 and five slots need ~46
+  opens/day against a 40.9/day signal ceiling. **Full occupancy is unreachable
+  by construction and was never the lever.** She is flat 68.4% of the time
+  because she exits in under three hours, not because anything refuses her.
+
+### The finding: rank her entries within their own clock hour
+
+    entry #1 of the hour   n=127   +0.023%/trade   t=+0.21   $ +3.95
+    entry #2 of the hour   n= 36   +0.656%/trade   t=+2.20   $+11.90
+
+**75% of her realised P&L is on 22% of her trades, and they are the ones
+`MAX_ENTRIES_PER_HOUR = 2` is closest to refusing.** She hit the cap in 34
+hours.
+
+**SIX SPLITS, ALL THE SAME SIGN** — this is not the trending burst and not a
+tag-mix artifact:
+
+| split | delta (#2+ minus #1) |
+|---|---|
+| surge days (≥19-Aug) | **+0.608pp** |
+| everything before them | **+0.390pp** |
+| first half of her life | **+0.480pp** |
+| second half | **+0.756pp** |
+| within `trend_breakout` | **+0.614pp** |
+| within `range_on` | **+0.738pp** |
+
+Both chronological halves positive is the (I19) bar for an expand-direction
+change, met on her OWN ledger — the record, which outranks any proxy (I14).
+
+**The mechanism is a REGIME MARKER, not an ordering effect, and that is why it
+should generalise.** A second entry inside one hour means several coins fired
+at once, which is what a real trending burst looks like — and `trend_breakout`
+exists to catch exactly that. She does not RANK candidates; she walks
+`b.coins` in list order, so #1 vs #2 carries no quality ordering of its own.
+
+### Shipped: 2 → 3, and the quantity the knob cuts
+
+`MAX_ENTRIES_PER_HOUR` **2 → 3** (`GEORGIA_MAX_ENTRIES_PER_HOUR` reverts it
+without a deploy).
+
+**Why 3 and not unlimited — the honest limit: the cap censored its own
+evidence.** Rank 3 has **n=1** in her entire life *because the cap is 2*, so
+everything above rank 2 is extrapolation. One step generates the sample that
+grades the next one.
+
+**So `entry_rank` now rides every close** (I23 — a knob must record the
+quantity it cuts). This step was decided by RECONSTRUCTING the rank from open
+timestamps; the next one will be a query. A book with no throttle publishes
+**no rank at all** rather than a fabricated 1 (I8).
+
+**NOT an era reset**: a rate limiter is capacity, and capacity is ordinary
+tuning ((hc)). Resetting her era would discard the 163 closes this change
+exists to add to — on the book whose only failing bar is the one that needs
+them. Blast radius is exactly one living row: `DayTraderGated` is georgia plus
+the RETIRED `crypto-intraday-15m`, and a test pins that.
+
+Evidence saved as `scripts/study_georgia_entry_rank_2026-08-22.py` — it
+recomputes all six controls from the public ledger and prefers `extra.entry_rank`
+over its own reconstruction as soon as stamped rows exist.
+`tests/autonomy/test_georgia_throttle.py`, **7 of 7 mutations verified RED**.
+
+### Recorded, because the first version of it was wrong
+
+The selftest fixture I wrote for the study made #1 and #2+ have **identical
+means**, so the delta was exactly 0.0 and `assert d is not None` would have
+passed on a statistic that proved nothing. It failed on `d > 0`, which is the
+only reason I looked. A fixture with no signal in it is a check that inspects
+nothing.
+
+### What was NOT done, and why it is the next question
+
+Her median hold is **1.9h against a 1440m cap**, and this entry raises her
+COUNT. Nobody has asked whether letting winners run raises her MEAN instead —
+`long-trend-breakout_roi` books **+$36.29 over n=46** while
+`_trailing_stop_loss` books **−$23.98 over n=73** on the same tag. That is
+outcome-conditioned (I7) and cannot license anything on its own; it is the
+counterfactual the next pass should run through her own replay.
+
+## 2026-08-22 (su) — 💸 THE FARMER'S "POOR DECISIONS" ARE NOT A KNOB, AND THE FIX I ALMOST SHIPPED TO REAL MONEY WAS MEASURED ON A POPULATION THE BOOK REFUSES
+
+**Eamon, 22-Aug:** *"fix farmers entry and exits as it's made poor decisions,
+recently to be specific"*.
+
+He is right that it turned over. Live: July **+$9.05** (mean +0.62%/trade) ->
+August **−$7.58** (−0.39%), second half of August **−$5.95 / 13 closes /
+−1.53%/trade**. Shadow: Jul +$17.84 -> Aug **−$19.34**, Aug-b −2.18%/trade at
+**t=−2.61**. Four gates, twelve exit variants and one harness defect later, the
+answer is that **no setting of either knob fixes it, and I can now prove that on
+the population the book actually trades — which nothing in this fleet could do
+before today.**
+
+### 1. It is not a funding book. Measured twice, independently.
+
+Decomposing every close carrying prices into price and residual: **August live
+mean −0.390% = price −0.408% + funding +0.018%.** Real settled accruals on live
+trades run **$0.0015–$0.018 on a $30 clip**. At `ENTER_APR` 0.05 and the
+measured ~6h median hold the maximum collectable is `5% × 6/8760` = **0.0034%**.
+The replay agrees from the other side: over 30 days at the shipped gate the
+funding column is **$1.15 across 145 trades** while price is −$2.90.
+
+**💸 the Funding Farmer is a directional short book with a rounding-error
+funding kicker**, and no field on its row said so.
+
+### 2. The gate sits BELOW the venue's resting default — and that is not the defect it looks like
+
+Measured over **147,879 hourly settled rows × 212 markets × 30d**: **37.78% of
+all coin-hours sit at exactly 0.0012%/hr = 10.512% TRUE APR** (the venue's
+resting default) and 36.76% at 3.504% — **74.5% of the venue rests on two
+constants**. A 5% bar admits **55.24% of every coin-hour on the venue**.
+Reconstructing each live trade's entry APR from the venue's own settled tape:
+**77.2% of the live book's entries fired at EXACTLY 10.512%**, the idle rate.
+
+`lighter_funding_bot.py` has carried that finding in a comment since 17-Jul,
+together with a sweep table making 0.05 the WORST of four values and 0.20 the
+best (+$22.51), and a deferral: *"re-derive the gate when paired decision/fill
+prices exist on THIS book"*. **That precondition is now met** —
+`impl_shortfall.order_slip.live` reads **33 real fills, all `trades(tx)`,
+`echoed_decision: 0`, slip 0.13bps** — so I re-derived it. At 25 markets / 150d
+/ 0.13bps the answer looked emphatic: gate **0.40 = +$14.95, both halves
+positive, maxDD −$13.15**, against the live 0.05 at −$0.20 and h2 −20.89.
+Slip-robust at 0.13 / 0.86 / 5.0 bps. I was one commit from shipping it to a
+real-money row.
+
+### 3. THE HARNESS WAS REPLAYING A POPULATION THE BOOK REFUSES, AND THAT IS THE REAL FINDING
+
+At universe **50** the same sweep INVERTS: 0.20 goes +$4.24 -> **−$63.87** and
+the live 0.05 goes −$5.11 -> **+$6.65**. Isolating the variables, it is the
+UNIVERSE, not the window.
+
+Why: `backtest_funding_lighter` selects **top N by rank**; the live bot selects
+by an **absolute floor**, `MIN_VOL = $10M/day`. Measured on the venue 22-Aug:
+**only 11 of 212 active markets clear $10M.** The 25th-ranked market trades
+$2.59M and markets 26–50 are ALL between $1.1M and $2.5M — so **14 of the
+canonical top-25 and 39 of the top-50 sit below the live book's own floor.**
+Every gate verdict this harness has printed, including the table quoted at
+`ENTER_APR` in the live bot's source, was measured on books the live book
+mostly cannot enter.
+
+**Fixed.** `fetch_candles(..., with_volume=True)` keeps the quote volume the
+loader was throwing away, and `vol24()` reconstructs trailing 24h quote volume
+per market per hour off the candle tape — the point-in-time volume `(ny)`
+recorded as *"not reconstructable"* (true of the orderBookDetails snapshot,
+false of the tape, which pages back 438 days). Volume is **opt-in**: seven
+scripts import `fetch_candles` and unpack it directly, so an unconditional
+tuple would have bound `(ohlc, vol)` to `cand` in every one and replayed
+nonsense — I made that change before catching it. Cache schema bumped so a
+pre-volume cache is refetched rather than silently answering "no market ever
+cleared the floor".
+
+### 4. On the honest population, the shipped gate is the BEST value — and the calibration gate is what says so
+
+`scripts/study_farmer_gate_minvol_2026-08-22.py`, 250d, 59 markets, **51,391
+eligible coin-hours (16.91%)**:
+
+| gate | P&L | n | mean%/t | maxDD | h1 | h2 |
+|---|---|---|---|---|---|---|
+| **0.05 (shipped)** | **+$23.81** | 1643 | **+0.058** | −31.82 | −13.00 | +36.23 |
+| 0.08 | −$16.51 | 1447 | −0.046 | −40.13 | −21.93 | +4.74 |
+| 0.12 | −$39.10 | 517 | −0.303 | −41.45 | −33.31 | −6.12 |
+| 0.20 | −$27.73 | 394 | −0.281 | −30.20 | −22.62 | −5.44 |
+| 0.40 | −$16.77 | 223 | −0.301 | −17.22 | −14.33 | −2.78 |
+
+**And the calibration gate ((gx)) PASSES for the first time**: the min-vol
+replay at the shipped gate reads **+0.058%/trade against the live book's
+realised +0.131%** — a 0.073pp gap against a 0.60pp tolerance. This harness has
+never reproduced this book before; unfiltered it reads −0.003%/trade.
+
+On the **last 30 and 60 days** every gate loses and **0.05 is the least bad**
+(−0.050%/trade vs −1.110% at 0.40). So the recent losses are a REGIME, not a
+misconfiguration, and every direction the obvious fix points is worse.
+
+**The instrument fix is the deliverable here: it prevented a real-money
+change.** A refusal with evidence satisfies the growth rule.
+
+### 5. The exits: twelve variants, same answer
+
+Sweeping `MAX_HOLD_H` / `TAKE_PROFIT` / `HARD_STOP` on the same honest
+population: at 250d, `hold 8h` (+$22.28, halves **+7.73/+14.09**), `hold 12h`
+and `sl 15%` are the only variants clearing BOTH HALVES — which the shipped
+config does not. At 60d every one of them is WORSE than shipped (hold 8h
+−$12.14 vs −$4.32). A knob whose sign depends on the window is not an edge.
+**Refused.**
+
+**The sibling books' flip-grace fix does NOT transfer, and this is I14's shape
+again.** 🌾 carry, 🏦 Rich Dad and 🧮 Hull all added a flip grace (6h/6h/24h) on
+measurement; the Farmer has none — `flipped` fires the instant apr crosses
+zero. But on THIS book the young flips are the profitable ones: flips under 12h
+read **+0.19%/trade** (n=36 live, n=45 shadow) and the entire burn is in flips
+held **>12h** (live n=11, −22.9 points of a −19.8 total). A grace would delay
+exactly the good ones. Stated at its real strength: that is a LEDGER
+measurement plus an inference, not a replayed counterfactual.
+
+### 6. What shipped: the number that says four positions are one bet
+
+Measured on the live holdings — BTC/ETH/SOL/XAU, **all short** — through the
+fleet's own correlation code: **N_eff 1.389, mean rho +0.627**; the crypto leg
+alone (BTC/ETH/SOL) **N_eff 1.11, rho +0.851**. The row published
+`open_trades: 4` and `margin.n: 4` and nothing that could tell four bets from
+one. August is what that costs: **SOL −$2.69, BTC −$2.00, XAU −$1.97, ETH
+−$1.30** — every leg losing in the same fortnight because they were one short
+position wearing four names into a rally.
+
+This is exactly `(sr)`'s finding at 🙏 Avo (N_eff 1.18 on QQQ/SPY/NVDA), on the
+fleet's OTHER real-money row, undiagnosed. `extra.basket` now publishes
+`{n, n_eff, rho, measured}` every loop. **Reported, never a gate** — `(sr)`
+earned leverage on Avo by measuring independence first; this book has no such
+measurement, so the number goes on the row and acting on it is a separate,
+measured decision.
+
+The math moved to **`fleet_bus`**, which is now its ONE owner (COPY'd into both
+images already, so no new dependency and no born-dark risk); 🙏 Avo delegates to
+it. A second copy of a rule is a second rule ((hj)).
+
+**[CORRECTED IN PLACE, same day — the obvious next move was measured and
+REFUSED, and it belongs here rather than in a later entry that would read as
+progress.]** N_eff 1.389 invites a same-side concentration cap: stop the book
+holding a 4th copy of a bet it already has. `run(max_same_side=...)` models it
+and `--conc` sweeps it on the honest population. **The sign flips on the
+window**, so it is not shippable:
+
+| cap | 250d | 60d | 30d |
+|---|---|---|---|
+| SHIPPED (none) | **+$23.81** | −$4.32 | −$1.83 |
+| max 3 per side | −$14.92 | −$2.65 | +$2.85 |
+| max 1 per side | −$16.79 | **+$5.52** (both halves +) | +$3.83 |
+
+At 60d a 1-per-side cap is +$9.84 against shipped with both halves positive and
+maxDD −$5.11 vs −$17.08; over 250d the same cap costs **−$40.60**. One
+consistent thing across every window: **maxDD improves as the cap tightens** —
+which is the direction a book failing on drawdown would want, and this one is
+not failing on drawdown. So: refused, with the instrument kept, because the next
+session should not have to rediscover that the cap's sign is a window choice.
+
+### Recorded because they are the instructive part
+
+* **A green run with no output is not a pass.** My first `fleet_bus` edit landed
+  the new functions *inside* the `__main__` block, which dedented it — so the
+  selftest assertions became **dead code after a `return`** and the whole
+  selftest stopped printing. `python3 fleet_bus.py` exited **0**. It was caught
+  only by asking why a passing selftest printed nothing, which is this file's
+  own *"empty output is not a negative result"* rule biting on me.
+* **`entry_apr` is NOT missing.** I was about to "fix" the ledger's
+  never-recorded entry rate — 1 of 136 rows carries it — before checking:
+  the stamp shipped 19-Aug and works; only positions opened since carry it. The
+  class is closed and was closed before I got here.
+
+`tests` — `lighter_funding_bot --selftest` gains `_selftest_basket` (identical /
+flat-leg / dark-venue / dark-BUS / empty / cached / evicted / **forming-bar
+look-ahead**), **6 of 6 mutations verified RED**; `fleet_bus`'s own selftest
+gains the correlation cases, verified to bite. Two of those six mutations
+survived the first round — an untested look-ahead guard and an untested dark-bus
+path — and both were holes in MY test, not in the code.
+
+## 2026-08-22 (st) — "AVO HASN'T TRADED IN FAR TOO LONG": IT IS HELD-STARVED AND GATE-REFUSED, NOT SIGNAL-STARVED — and the real-money row could not say so
+
+**Eamon, 22-Aug:** *"Avo Maria hasn't traded in far too long / please deep dive"*.
+
+The deep dive took hours. It should have taken five seconds, and the reason it
+did not is the finding: **🙏 avo — the fleet's real-money directional row —
+published nothing that could answer the question.** `census = True` appears
+exactly ONCE in `lighter_family_bot` (👩 mum v2, a $1,000 paper book), and the
+LIVE arm had no census at all: **eleven `continue`s in its entry loop, not one
+of them counted.** I18 was written for a shadow book and never applied to the
+row holding actual money.
+
+### What the answer is, measured
+
+Driving the SHIPPED `SwingDip.signals` over the venue's own 4h tape for its 23
+listed coins (the (hj) rule — drive the publisher, never a hand-written copy):
+
+* **The signal is NOT starved.** 65 ENTER fires in 15 days; 119 in 30 days
+  (2.87% of coin-bars). The book opened nothing for 2.35 days anyway.
+* **Of the 5 fires since its last trade: 3 were on coins it already holds**
+  (SPY ×2, NVDA — correctly skipped, it cannot pyramid) and **2 on IWM**,
+  refused by `noncrypto_entry_blocked` because the oracle cannot grade IWM
+  (**172 bars against its 203 floor**). Fail-closed, working exactly as
+  designed, and completely invisible.
+* Structurally: **24 of 65 fires (37%) land on the three coins already held**,
+  and **12 more (IWM 6, XCU 6) on books with no oracle verdict** — unreachable
+  until they accumulate history (~31 and ~9 more days; WTI ~18).
+* The market is the other half: driving the census live gives **`rsi_med` 78.1
+  against a bar of 42** — the median coin in its universe is deeply overbought.
+  Only 3 of 23 sit within 8 points of the bar. This book buys dips; there are
+  no dips.
+
+So: **held-starved and gate-refused, on a tape with no dips in it.** Every one
+of those readings was byte-identical to "quiet market" on the row.
+
+### What shipped — instrumentation only, zero trades changed
+
+* `scan_census()` on the LIVE arm: a verdict stamped at **all thirteen** entry
+  refusals, the (rr) RSI gauge (`rsi_bar/min/med/read/near_bar`), the (om)
+  `ungraded` list (names this book scans and can never enter), `entries_shut`
+  (which of the five ANDed preconditions closed the whole scan), and
+  `idle_open_h`/`idle_close_h` — the number Eamon actually asked for.
+* `census = True` + `RSI_MAX = 42.0` on `SwingDip`, so BOTH arms publish. The
+  diagnostics come from the shipped rule's own numbers; `enter` is unchanged
+  and an AST test pins the four conjuncts.
+* **Five refusals in the SHADOW loop were uncounted**, and one of them is the
+  answer above: `noncrypto_entry_blocked` logged and returned with no counter.
+  Also `throttled`, `symcap`, `budget_headroom`, `brain_gate`.
+* **`stale_candle` splits the other half of the ambiguity.** Between two 4h
+  closes `sig` is None for every coin, so every coin was booked `no_signal` on
+  a loop where the rule was never evaluated — **the I1 liveness trap living
+  INSIDE the instrument built to close it.**
+* The live census is DURABLE (persisted per-symbol, restored at boot): a
+  4h book publishing every 90s would otherwise read "nothing evaluated" on
+  ~159 of every 160 loops, and a deploy would blank it exactly when someone is
+  looking.
+
+### Two defects caught in review of this change, both recorded because they are
+### the interesting part
+
+1. **The loop's "loop-scope defaults" block runs AFTER the state restore.**
+   Adding `scan_verdict = {}` there — the obvious place — blanks the restored
+   census every cycle, and the same block would have blanked `closed_win`,
+   the window `entries_locked` reads, **silently unlocking protections on a
+   real-money book.** Pinned by `test_the_loop_defaults_do_not_clobber_the_restored_census`.
+2. **`ungraded` must be UNKNOWN, not "everything".** The halt paths publish
+   before `nc_verdicts` is assigned, so an empty map means "the oracle was not
+   read", and listing every non-crypto name off a dark read accuses the gate of
+   refusing books it never saw (I8). It is `None` → the field is absent.
+
+### The durable half
+
+`test_every_refusal_in_the_live_entry_loop_stamps_a_verdict` walks the entry
+loop's AST and fails on a `continue` with no `_verdict` beside it. Counting
+today's thirteen refusals fixes today's instance; **this fixes the class** — the
+next refusal someone adds to the real-money entry loop cannot be silent the way
+`noncrypto_entry_blocked` was. One exemption, declared: the same-candle skip is
+not a refusal, it is "the rule was not evaluated".
+
+`tests/autonomy/test_avo_census.py` — 11 tests, **11 of 11 mutations verified
+RED**, including the defaults-clobber and the dark-oracle guess.
+
+### What did NOT change, and why
+
+**Nothing about what avo trades.** (qu) measured this entry cell exit-free
+(1,156 signals / 475d / 23 coins) and found no edge at any horizon; Eamon kept
+the book on the record with a **pre-registered 50-close revert criterion**.
+Changing the entry, the hold or the ROI ladder now would reset the policy era
+and destroy the very sample that criterion is measured on. The census is what
+makes the wait legible; it is not a licence to re-open a closed decision.
+
+Declared, not fixed: median hold is **5.2 days** and the ROI ladder's terminal
+rung sits at **20160 min = 14 days**, so a position that never rallies holds a
+slot ~indefinitely. That interacts with the 37%-of-signal-on-held-coins number
+above, and it is the (qu) revert criterion's business, not this pass's.
+
+## 2026-08-21 (ss) — I TOOK 🧭 nav-cook DOWN FOR 11.5 HOURS WITH A REPORTING BLOCK, AND THE ROW SAID `online` THE WHOLE TIME
+
+`(sq)` shipped an off-universe census so a stalled book could explain itself.
+**It stalled the book.** nav-cook's last publish is the deploy that carried it;
+it was dark for **11.5h** (`age_sec 41500`) while **all 18 other services in the
+same deploy run stayed fresh** (9–239s). One service changed in that run and it
+was the one I edited.
+
+### The defect, and it is a shape not a typo
+I guarded the bus FETCH and not the WORK:
+
+```python
+try:
+    _rows = fleet_bus.scout_prem_outliers()   # guarded
+except Exception:
+    _rows = []
+_offuni = offuniverse_census(                 # NOT guarded
+    _rows, universe, ...,
+    class_of=lambda s: fleet_bus.venue_class(s))   # ...and this does I/O
+```
+
+`class_of` calls `fleet_bus.venue_class()`, which loads a bus key. It sat
+outside the try, inside the trading loop, with `restartPolicy=always` turning
+any throw into a crash-loop that publishes nothing.
+
+**A REPORTING BLOCK MAY NEVER INTERRUPT A TRADING LOOP.** A census is worth
+exactly zero trades, so it gets zero authority to stop one. Both halves fixed:
+the whole block is inside the try with a zeros-plus-`error: true` fallback
+(zeros, never ABSENT — a missing block reintroduces the ambiguity it exists to
+remove), and `class_of` failures degrade the coin to unknown INSIDE the helper.
+Pinned by an arm that drives a throwing `class_of`; mutation-verified red.
+
+### THE PART THAT SHOULD HAVE CAUGHT IT, AND DID NOT
+**The row published `status: "online"` for 11.5 hours while the process was
+dead.** `status` is written by the publisher, so it describes the last loop that
+RAN, not the process — the I1 shape exactly: a frozen row and a healthy one are
+byte-identical if you read anything but the clock. What actually surfaced it was
+`audit_code_currency`, which printed
+`[ROW STALE 11.5h — the verdict describes its LAST publish, not a running
+process (I1)]` beside its verdict. **That annotation is the only reason this was
+found**, and it was found by a currency audit, not by anything watching liveness.
+
+That is worth stating plainly: the fleet's staleness detection did not page. The
+row looked online, the deploy log said `OK: 'nav-cook-shadow' deployed`, and CI
+was green. **Three green signals and a dead book.**
+
+### What I got wrong in diagnosis, recorded because it nearly sent me elsewhere
+`audit_code_currency` reported nav-cook `BEHIND-OWN 1` on `c7003d444` — the
+commit BEFORE mine — which reads as "my code never landed". It is consistent
+with the opposite: the stamp describes the last SUCCESSFUL PUBLISH, so a
+container that crashes on boot leaves the PREVIOUS build's stamp standing
+forever. **A build stamp is a receipt for the last publish, not for the running
+image**, and on a crash-looping service those two diverge permanently. I nearly
+concluded the deploy had failed.
+
+I also verified the code imports and runs clean locally before blaming it —
+which it does. Local `--selftest` cannot reach this: the throw needs a live bus,
+and the selftest has none. That is the gap the new arm closes by injecting the
+failure instead of waiting for it.
+
+## 2026-08-21 (sr) — EAMON FUNDED 🙏 AVO 3.7x AND THE CAP WOULD HAVE TURNED THAT INTO FEWER BETS; PLUS LEVERAGE, ON A DRAWDOWN BUDGET RATHER THAN AN APPETITE
+
+**Eamon, 21-Aug:** *"avo marias equity increase... maximise what we can do with
+this bot with this new p n l"* → *"i just added money to it"* → *"it should now
+have 231 dollars"* → *"change cap to 230, increase clip size, whatever we can do
+to let this fly, training wheels off, lets make it so avo can use leverage to
+its advantage."*
+
+**THE FLEET HANDLED THE DEPOSIT CORRECTLY, END TO END — that is the first
+finding and it is worth as much as the defect.** The sequence, measured on the
+live row rather than reasoned about:
+
+* **The venue credits `collateral` BEFORE `total_asset_value`.** At 04:00:07Z
+  the row published `collateral 231.07` and `equity 62.93` **from the same
+  account payload** — a real divergence, not a stale read, because
+  `margin_state_from` and `account_value()` call `_account_payload()` at
+  slightly different moments and the credit landed between them. Confirmed
+  against the venue's own public API (`/api/v1/account?by=index`), where the
+  identity `total == collateral + sum(upnl)` closes to **1e-6**.
+* **The equity guard then did exactly what it was built to do.** `REJECT #1
+  (continuity) — equity moved $+167.77 vs book-implied $+0.01`, three times, and
+  the cash-move escape correctly stayed OFF: it requires `|sum(upnl)| > tol` and
+  this book's upnl was **$0.374 against a $1.00 tolerance**, the case the
+  guard's own docstring predicts and routes to the collateral-stable rebase.
+* **The rebase booked the money as CAPITAL, not profit.** `capital_adjust
+  167.76`, `initial_equity` unmoved at `62.795571`, `pnl_abs 0.14`. Had it
+  landed in P&L the row would have read **+267%** and poisoned the go-live
+  grade, the allocation claim and the brain's stats. It did not.
+* **Cost of the correctness: ~15 minutes equity-blind** (`equity: None`,
+  `clip: None`, no new entries; exits and stops unaffected, by design).
+
+**I RAISED A FALSE ALARM MID-INVESTIGATION AND IT IS RECORDED HERE, NOT BURIED.**
+Reading the rebase path I concluded the capital move would compute as
+`collateral_now − collateral_at_last_accept = 0` and the deposit would print as
+profit. Wrong: I had misread `entries_match`, whose PRIMARY branch checks
+position ENTRY PRICES and whose collateral-delta branch is only the fallback for
+a baseline with no stored entries. The live payload settled it in one read. **The
+lesson is the standing one — a code-reading is a hypothesis, and the payload is
+the record (I14).**
+
+### The real defect: a deposit can buy FEWER bets, silently
+
+`clip = equity / max_open`, so the deposit re-sized every future entry
+**$15.73 → $57.68** — correct and automatic. But
+`FREQTRADE_AVO_MARIA_MAX_NOTIONAL` is a **fixed dollar figure** and admission is
+`open_notional + add <= cap`:
+
+```
+3 slots x $57.68 = $173.02  <= $200  OK
+4th slot        = $230.70   >  $200  REFUSED
+```
+
+The book settles at **3 of 4 and $57.68 of the new balance is never deployed.**
+Invisible three ways: `open_trades` reads 3 of a declared 4 exactly as on a quiet
+day; the refusal is **DELAYED**, because `open_notional` prices held positions at
+their OWN entry clip ((hl)) so the three legacy $7.68 positions hide the wall
+until they roll; and **nothing fires**, so a counter can never report it — only
+standing arithmetic can say a constraint will bite before it does.
+
+`cap_slots(clip, cap, slots)` is that arithmetic, published on the row beside a
+`notional_cap_skips` counter (the census says it WILL bite; the counter says it
+DID). Reported, never enforced — SafetyRails caps are operator-only, so its job
+is to name the constraint (I8), not move it. **Same class as the carried
+`farmer-cap-collapses-slots-under-conviction` item, reached from the other
+direction: there a bigger CLIP collapses slots, here a bigger BALANCE does.**
+
+### Leverage: admitted, on the one route I22 leaves open
+
+`AVO_GROSS_X` makes `clip = equity * GROSS_X / max_open`, so gross at full
+occupancy is exactly `GROSS_X * equity`. **Default 1.0 — inert until set.**
+
+**The ceiling is DERIVED from this book's own two numbers, not chosen.** Every
+slot carries `S.stoploss` (−10%), and the held names are QQQ/SPY/NVDA — US
+equity beta, `N_eff` ~ONE BET — so *every slot stops in the same move* is the
+**central case for this book, not the tail**. All-slots-stop costs
+`GROSS_X * |stoploss|` of equity, and the go-live gate fails a book above 15%
+maxDD, so `GROSS_X_MAX = 0.15 / |stoploss|` = **1.5x**. Above it the book is
+leveraged out of the gate it is trying to pass — the (gv) stop-vs-gate defect,
+bought deliberately. **Shipped at 1.4x (14% worst case), strictly inside the bar
+rather than exactly on it**, which is the difference (gv) already paid for once.
+
+**Stated plainly, because I22 is emphatic and this is the seventh ask: leverage
+moves NO book closer to the gate.** It multiplies mean and sd alike, so `t` is
+invariant — six prior studies rejected it on exactly that ground. What it moves
+is dollars and drawdown, together, both ways. On 🙏 Avo specifically, (qu)
+measured the entry as having **no edge** (matched-random beats it at 4h/8h/12h),
+so 1.4x multiplies a number near zero. **What it does buy is that the balance is
+DEPLOYED rather than idle, and that Eamon's own pre-registered revert criterion
+— ≥+1.649%/trade over the next 50 closes — resolves at 1.4x the size.** The
+`(qu)` criterion is untouched and still governs.
+
+Corrected in place per I12: `_clip_scale_now`'s docstring claimed *"gross
+notional can never exceed account equity — the book is 1.00x by construction"*.
+That is now FALSE and a wrong safety sentence is worse than none ((sp)'s lesson).
+The restrict-only half still holds; the 1.00x half is replaced by the real bound.
+
+### Two defects found in my own work, both by driving it rather than reading it
+
+1. **`GROSS_X = float(os.environ.get(...))` at MODULE level.** A typo'd env var
+   raises `ValueError` at **import** and takes the real-money book down before
+   `main()` runs — a failure `gross_x()`'s own NaN handling can never reach,
+   because the module never finishes loading. Found by feeding the ladder
+   `"abc"`. Now parsed defensively; unparseable degrades to 1.0.
+2. **A MUTATION SURVIVOR ON THE HEADLINE FEATURE.** Deleting `gross_x()` from
+   `clip_usd` — leverage configured, published, and silently never applied —
+   **passed five tests**, because every case pinned the `gross_x=1.0` default
+   where mutant and real code are identical by construction. The (sp) shape
+   exactly: a lever registered, documented, published and INERT. Closed by tests
+   that drive the clip at 1.25/1.4/1.5; round now **5/5 killed**.
+
+### Slots 4 → 5: the ask was 6, and the book's own ledger refused it
+
+**Eamon: *"size it to 6 slots, configure for leverage."*** Measured before
+shipping, and the measurement INVERTED the request — recorded because a refusal
+with evidence is a valid output and this one cost 28% of working capital.
+
+Occupancy by TIME HELD, swept off both arms' own episode ledgers:
+
+| concurrent | live arm (4 slots) | shadow arm (**6 slots**) |
+|---|---|---|
+| 4 held | **21.7%** | 32.0% |
+| 5 held | — (capped) | 4.5% |
+| 6 held | — | **never** |
+| avg held | **2.24** | **2.41** |
+
+**The shadow has run at 6 slots all along and has never filled more than 5 in
+17 episodes.** So this book is SIGNAL-limited at ~2.4 concurrent, not
+slot-limited — and because `clip = equity * gross_x / max_open`, adding slots
+divides one fixed gross budget into smaller pieces that mostly sit unused:
+
+```
+4 slots  clip $80.74  avg deployed 2.24 x 80.74 = $181
+5 slots  clip $64.59  avg deployed 2.41 x 64.59 = $156
+6 slots  clip $53.83  avg deployed 2.41 x 53.83 = $130   <- 28% LESS
+```
+
+**Slot count cannot add dollars — it can only slice them.** Total gross is
+bounded at `GROSS_X_MAX * equity` by the 15% drawdown bar, and that bound is
+INDEPENDENT of `max_open` (all-slots-stop costs `max_open * (equity*g/max_open)
+* |stop|` = `equity * g * |stop|`). The only lever that adds deployed dollars is
+`gross_x`, which is why it exists and why it is capped by a measurement.
+
+**Shipped 5** (Eamon's call on the numbers): it captures the 5th slot the shadow
+demonstrably reaches, and stops short of a 6th that has never once occurred and
+would be a permanently empty divisor. The live arm sitting at its ceiling 21.7%
+of the time is real starvation, so this is not a no-op. Live geometry now:
+**clip $64.59 · gross $322.97 = 1.40x equity · worst-case DD 14.0% · cap_slots
+5 of 5.** Era NOT reset — capacity is ordinary tuning per (hc).
+
+Three retyped constants fell out and are fixed rather than re-pinned: the
+selftest asserted `62.80 / 4` (now derives `62.80 * gross_x() / S.max_open`
+from the same sources the bot sizes off), and `test_family_shadow_capacity`'s
+literal pin moved 4 → 5 with the measurement attached — the guard's purpose is
+unchanged, so an UNEXPLAINED edit still fails, which is what makes moving it a
+decision somebody has to justify. `pnl_dashboard`'s Avo blurb still read
+*"shadow $50 × 4 slots; LIVE clips = equity÷4"* and is corrected in place (I12).
+The `-0.10` stop pin is now DOUBLY load-bearing and says so: `GROSS_X_MAX` is
+derived from it, so widening the stop without re-reading that derivation would
+silently raise the leverage ceiling on a real-money book.
+
+### Leverage set to 5x, and the doctrine Eamon asked for
+
+**Eamon, 21-Aug: "set leverage to 5" / "i want this bot to find a way so
+leverage can be used" / "no more training wheels".** Done, and the arithmetic is
+PUBLISHED on the row rather than argued in a message.
+
+`GROSS_X_MAX` changes from a code-derived 1.5 to an OPERATOR-SET ceiling
+(`AVO_GROSS_X_MAX`, 5.0). Risk appetite belongs to the person whose money it is;
+what the code owes him is the number, every loop. Live at 5x:
+
+```
+clip $230.70 x 5 slots = $1,153.50 deployed = 5.00x equity
+all-slots-stop  = 50% of equity      (the -10% stop, on a 300s loop)
+liquidation     = -17.0% adverse basket move
+                  (worst mmf of its books NVDA/WTI/XCU = 300bps, read PER BOOK
+                   off orderBookDetails — never derived from imf, the (no) trap)
+```
+
+`extra.leverage` now publishes `{set, vol_target_at_neff1, vol_target_at_neff3,
+deployed_at_full, all_slots_stop_pct, liq_gap_pct}` every loop. The vol target is
+ADVISORY beside the setting, not a clamp — a gap between them is not an error, it
+is the risk being taken, stated.
+
+**AND THE DIVERSIFICATION FINDING, which is the part worth keeping.** Measured on
+Lighter's own 200d daily tape, `N_eff = n/(1+(n-1)*rho)` for a 5-position hold:
+
+| basket | mean rho | N_eff | supports |
+|---|---|---|---|
+| 5 crypto majors | +0.845 | 1.14 | 1.60x |
+| what it held that day (QQQ/SPY/NVDA+) | +0.661 | 1.37 | 1.76x |
+| the 5 it has actually traded | +0.593 | 1.48 | 1.83x |
+| one per asset class | +0.155 | **3.09** | **2.64x** |
+
+**Diversifying the basket nearly DOUBLES what the same drawdown budget supports,
+and it costs no expectancy because it turns away no signal — it only re-sizes.**
+Two label errors were found and fixed in the class map: **MSTR/BTC = +0.859** (a
+bitcoin proxy wearing an equity label) and **WTI/XCU = -0.392** (genuinely
+offsetting, so they are different classes). Correcting both lifts the GUARANTEED
+worst-case floor under a one-per-class rule from 1.39 to **3.09**.
+
+Also measured and refused as the wrong tool: a per-class POSITION CAP. At 2/class
+it guarantees only N_eff 1.43 (1.79x) and it turns away real signal on a book
+that only averages 2.4 concurrent positions. Sizing off measured N_eff dominates
+it on both axes — strictly more leverage, strictly fewer refused trades.
+
+**DOCTRINE ADDED at Eamon's instruction** (`CLAUDE.md`, "BUILD IT. A SETTLED
+FINDING IS REPORTED ONCE"): skepticism points at OUR OWN work — mutation tests,
+adversarial verification, driving the payload — and never at his goals. A closed
+measurement belongs in the entry that measured it, once; re-stating it at him
+after he has decided is friction wearing rigour's clothes. Lead with what CAN be
+done and the number that supports it; where risk is real, publish it on the row
+instead of re-litigating it. Declared UNENFORCED — tone cannot be checked by a
+static guard, and a guard that tried would be the same mistake in a new costume.
+
+### The basket was ONE BET, and the cause was the scan order
+
+With gross_x at 5x the leverage is not the exposure — the BASKET it multiplies
+is. Measured on the held book: **QQQ/SPY/NVDA = N_eff 1.18, rho +0.775.** Three
+names, one bet, five times over.
+
+**THE CAUSE IS STRUCTURAL, not luck.** The entry loop scanned
+`list(COINS) + list(NONCRYPTO_UNIVERSE)` IN LIST ORDER and took the first
+qualifying signal, so 29 crypto names got first refusal on every slot and the
+diversifiers sat last in line by construction. That is `(hl)`'s finding on 📊
+Index Rider reaching a second book, word for word: *"the entry loop iterates
+SYMBOLS in order with incumbents holding slots, it would starve the LAST-listed
+diversifiers and RAISE correlation."*
+
+**THE FIX IS THE SCAN ORDER, NOT THE ENTRY PATH.** `diversified_order` offers
+the candidate that most reduces the held basket's correlation first. Every gate,
+veto, cap and sizing rule is untouched — for any SINGLE candidate the real-money
+entry path is byte-identical — so this changes WHICH qualifying signal fills a
+slot and never whether one is taken. **It therefore costs no expectancy**, which
+is what makes it different from every "more trades" candidate `(hl)` refuted.
+
+Driven against the live tape: the scan now offers **WTI first instead of BTC**,
+and that one position takes the basket from **N_eff 1.18 -> 2.87** (rho +0.775
+-> +0.132). 2.4x the effective diversification, free.
+
+**IT COSTS NOTHING AT THE VENUE**: `CandleCache` is one governed fetch per
+(coin, tf) per CLOSED candle shared across books, and the entry loop already
+called `cache.get` for these symbols — the correlations ride bars we had.
+
+`extra.leverage` now also publishes `n_eff` / `basket_rho` / `vol_target_here`,
+so "five held names" and "one held bet" stop being the same byte-string — which
+is how the book sat at N_eff 1.18 with nobody able to ask.
+
+FAIL-SAFE IS THE CONTRACT: an unmeasurable pair returns **None, never 0.0** —
+zero would read as *perfectly diversifying* and would both jump that name to the
+front of the queue and inflate N_eff, crediting independence nobody measured.
+Dark returns, an empty book, or junk return the list UNCHANGED, i.e. exactly
+today's behaviour. An enhancement is never a dependency.
+
+**TWO DEFECTS IN MY OWN TESTS, both found by the mutation harness:**
+* **M2 SURVIVED**: deleting the `CORR_MIN_OVERLAP` floor passed everything,
+  because my short-overlap case used CONSTANT values and the variance guard
+  rejected it instead — so nothing tested the floor. Closed with a short-but-
+  VARYING pair, the case where only the floor can refuse.
+* **M5 NEVER RAN** — the mutation text did not match the source, and the harness
+  said so rather than reporting a pass. A mutation that does not execute is not
+  a pass; the arithmetic it should have covered (`n/(1+(n-1)*rho)` must DIVIDE,
+  or three copies of one trade read as three independent bets) is now pinned.
+Round now **7/7 killed**.
+
+Pinned by `tests/autonomy/test_avo_cap_slots.py` (45 tests) and `tests/autonomy/test_avo_diversification.py` (18 tests, 7/7 mutations). Selftest unchanged
+and green at the default — this moves no order until `AVO_GROSS_X` is set.
+
+## 2026-08-20 (sq) — "FIX THE STALE BOTS": NEITHER STALLED BOOK WAS BROKEN, AND THE REAL DEFECT WAS THAT NOTHING THEY PUBLISHED COULD SAY SO
+
+**Eamon, 20-Aug: "Fix the stale bots."** Two books had visibly stopped. The
+fix is not to either book's gates — **both are correctly refusing supply their
+own MEASURED screens exclude** — it is that establishing that took a manual
+tape replay, because no field in either payload could distinguish "the band is
+quiet" from "the band is busy with names I cannot trade". That is (lv)/I18
+arriving one layer earlier than usual: at the UNIVERSE FILTER, not the entry
+gate.
+
+**FIRST, LIVENESS (I1): no row is stale.** All 19 rows publish at `age_sec`
+17–290s. Every process is alive. What stopped is BOOKS, and the two are found
+by comparing each book's silence to ITS OWN measured close rate:
+
+| book | since last close | own rate | expected gap | |
+|---|---:|---:|---:|---|
+| 🧭 nav-cook | **20.9h** | 58.6/day | 0.4h | **51× expected** |
+| 🌾 carry | **191.7h** | 3.1/day | 7.7h | **25× expected** |
+
+### 🧭 nav-cook — the band rotated into names it screens out, and its census could not show it
+**Measured on the scout's own 23.9h tape:** the [45,60)bps band produced **252
+confirmed in-band events, of which this book could trade THREE.** The other
+**249 (99%)** were refused by its two measured screens — **H100 alone was 174
+of them at $0.02M volume**, and UNITREE/CXMT/MRNA/ANSEM are class 7 (pre-IPO).
+Both screens should stay: `(qq)` measured the fleet's own fills at a mean
+17.49bps and p90 **398bps** below $0.1M, and pre-IPO is the band's only
+NEGATIVE class (−0.165%, n=45).
+
+**The defect is that none of this was visible.** `resolve_universe` filters by
+VOLUME *before* the scan, so a sub-floor dislocation never enters `census` at
+all — `in_band: 0` was byte-identical between a quiet band and a busy one full
+of ineligible names. Fixed: `fleet_bus.scout_prem_outliers()` (a supported
+accessor beside `scout_universe`/`scout_funding`, `[]` on any doubt) plus
+`scan.offuniverse` = `{in_band, thin, preipo, other, top[]}`. **REPORT-ONLY and
+AST-pinned as such** — it names coins the book refuses ON PURPOSE, so wiring it
+to a gate would silently widen two measured screens; a mutation adding a call
+inside `cook_exit` reddens.
+
+**A HYPOTHESIS I HAD TO KILL FIRST, because it was wrong and would have shipped
+a real loosening.** The bot requires **7 CONSECUTIVE** in-band loops
+(`pend.pop()` on every out-of-band branch) while the study required only
+in-band at **t−600s AND now** — two ENDPOINT checks that tolerate wandering in
+between. Same class as `(sa)`, on the SHAPE rather than the DURATION, and it
+looked like the whole answer. **Measured on the same tape: the continuous
+requirement costs 5.3%** (266 → 252 admissions). Nowhere near a 51× stall. The
+predicate difference is real and is NOT the cause; loosening it would have been
+a widening bought on a wrong diagnosis.
+
+### 🌾 carry — its supply was non-crypto, and the screen that removed it was right
+**Its last five closes are WTI, SKHYNIXUSD, SPCX, WTI, WTI — every one
+non-crypto — and its last close is 12-Aug, the day BEFORE the `(lk)` crypto-only
+screen shipped.** The screen took the book's entire working supply, and at the
+20% TRUE bar the venue's crypto population is ~3 coins: census `cold 211/228`,
+`eligible 0`.
+
+**NO CODE CHANGE, and its census is already adequate** — `noncrypto` is counted
+LAST (after apr/vol/persist), so it is reachable and reads 0 because no hot coin
+is currently non-crypto; the bucket's own comment says it exists to show "the
+screen's live bite". And `(ru)`'s class split, live since this morning, already
+publishes the verdict: **`on_class n=1 −$0.49` vs `off_class n=9 −$14.96
+(t=−4.01)`** — 9 of 10 era closes are instruments it no longer admits. This is
+the I17 decidability question with a **pre-registered operator date of
+2026-08-30** already in `DECIDED_UNTIL`. Deciding it early is the `(hs)`/`(ia)`
+trap; tuning it is the I17 "never another tuning pass" failure.
+
+### The suite claim I have been making is WRONG, in the favourable direction
+I reported "4 pre-existing failures, identical on clean HEAD — missing numpy
+plus two genuinely pre-existing". **All four were ONE environmental cause:
+`numpy` absent from this session's container.** Proven: with numpy installed,
+pre-merge main `2758677` runs the FULL suite at **0 failures**, and so does
+merged main. `test_margin_truth`'s `assert 0 == 'cross'` was a downstream
+degradation of the same absence, not a real defect. **The suite is 100% green
+and always was.** Recorded because I asserted the weaker claim twice, including
+in a PR body.
+
+**6 mutations verified red**, one of which found a real bug in my own helper
+before it shipped: `str(None)` is `"NONE"` — truthy — so a junk scout row was
+being counted as a coin. The arm that caught it is the one feeding the helper
+deliberate junk.
+
+## 2026-08-20 (sp) — THE SAFETY SENTENCE (so) SHIPPED WAS FALSE, AND THE FAILURE IT HID WAS A BOOK SILENCED BY ITS OWN GOOD GRADE
+
+**Eamon:** *"Optimise the lookup and return and ensure the brain doesn't cause
+problems."* / *"You called me the operator not Eamon again."*
+
+`(so)` wired the brain's multiplier into every living book, both real-money
+rows included, and justified it in one sentence: **"the multiplier proposes;
+the rails dispose."** An adversarial audit of that change — five lenses over
+the sizing sites, every finding sent to a refuter that had to reproduce the
+mechanism from the code or kill it — measured the sentence.
+
+**It was false, and false in the consequential direction.**
+
+`SafetyRails.notional_ok` returns a **BOOLEAN**. The caller's `continue`
+discards the whole CANDIDATE, not the excess. So:
+
+* 💸 **the LIVE Farmer.** **[NUMBERS CORRECTED IN PLACE against the live row,
+  which is the record (I14): the audit modelled `order_usd $37.50` from a
+  `(no)`-era changelog line and /pnl.json publishes `clip_usd: 30.0`,
+  `max_open: 5`, `equity: $194.28` right now. The direction was right and the
+  threshold was not — quote these.]** At clip $30 against the operator's $150
+  cap, the **outright halt is the top rung**: m=6.7 asks $201 from an EMPTY
+  book, every candidate skipped, every loop, indefinitely — **the brain
+  rewarding this book for its evidence would have stopped it trading.**
+  And below that rung the failure is subtler and arguably worse, because it
+  looks like it is working: a fixed cap turns a bigger clip into FEWER BETS.
+
+  | brain | clip | slots that fit | gross | x equity |
+  |---|---|---|---|---|
+  | 1.0 | $30 | **5 of 5** | $150 | 0.77x |
+  | 2.0 | $60 | **2 of 5** | $120 | 0.62x |
+  | 3.0 | $90 | **1 of 5** | $90 | 0.46x |
+  | 4.5 | $135 | **1 of 5** | $135 | 0.69x |
+  | 6.7 | $201 | **0 of 5** | $0 | HALT |
+
+  **A brain expand makes this book hold LESS, not more** — five bets collapse
+  to one and gross FALLS — on a funding book whose edge is breadth. The same
+  rail also inverts selection: a 1.0x entry is refused only when the book is
+  FULL; a 6.7x entry is refused when it is EMPTY, so the coins refused first
+  are the highest-conviction ones.
+* 🙏 **the LIVE Avo arm** broke an invariant its own module states —
+  *"gross notional can never exceed account equity — the book is 1.00x by
+  construction and no lever reaches past it."* Live-verified: equity **$62.95**,
+  clip **$15.74**, 4 slots, cap **$200** — and that cap is **3.18x this book's
+  equity**, so it never protected the invariant at all. At m=2.0 all four slots
+  fill at $31.48 = **2.00x equity**; at m=3.0, **3.00x equity**, with a −10%
+  stop underneath. The cap does not even begin to bind until m>=3.0.
+* 🙏 **Avo's REDUCE side was a silent retirement.** The min-clip floor is $5
+  against the live $15.74 clip, so rungs of 1/4.5 ($3.50) and 1/6.7 ($2.35)
+  sent EVERY entry to `continue`. Zero trades for as long as the brain holds the
+  reduce, while the row publishes `status: online` and `clip_usd: 15.70` —
+  byte-identical to "no signals today", and **self-locking**, because a book
+  that stops trading stops producing the closes that would lift the reduce.
+* **Nine of the thirteen wired books had no notional bound at all**, so there
+  the sentence was not merely wrong, it was vacuous — the multiplier both
+  proposed and disposed.
+
+### THE SENTENCE IS TRUE NOW BECAUSE IT WAS MADE TRUE
+
+* **💸 the Farmer's rail TRIMS instead of refusing.** An over-cap clip becomes
+  the largest that fits, derived from the rail's own `max_notional`, and
+  **never below the pre-brain clip** — so with the brain neutral, reducing,
+  dark or stale the block is byte-identical to before, and an unscaled clip
+  that does not fit is still refused exactly as it was. The operator's cap is
+  untouched and still senior: it decides HOW MUCH; it no longer decides
+  WHETHER.
+* **🙏 Avo's brain is RESTRICT-ONLY**, the same `min(1.0, ...)` shape its
+  `live.clip_scale` lever already has and for the same reason: expanding a
+  real-money book past its own equity is a LEVERAGE decision, and I22 says
+  leverage adds no decidability and is admissible only as the output of a
+  measured vol target this book does not have. Refusals are COUNTED and
+  published (`brain_expand_refused`).
+* **🙏 Avo's reduce floors at `MIN_CLIP_USD`** — the smallest size the venue
+  takes — instead of skipping, and only when the pre-brain stake was itself
+  tradeable. Published as `brain_floored`. **A reduce makes a book smaller; it
+  does not retire it.**
+* **🎫 the taker takes conviction as a RISK BUDGET, not a clip multiplier.**
+  `(so)` multiplied `vol_clip`'s RESULT, which destroyed the one property that
+  function exists for. Worse, the mult is per-(side, lens) while the clip is
+  per-COIN, so the two normalisations FOUGHT: a favoured lens on a wide-range
+  alt got the largest `vol_clip` AND the largest boost — the risk-equalising
+  inverted exactly where it mattered. Now the brain scales `RISK_USD` and
+  `vol_clip` converts risk to clip as it always has, so constant-risk sizing
+  survives and `CLIP_MAX` still binds.
+* **The rail-less shadow books got a bound: `fleet_bus.BRAIN_GROSS_X`.**
+
+### THE BOUND I SHIPPED FIRST DID NOT BOUND — CAUGHT THE SAME DAY
+
+Measured worst cases before it, every one of them a **$1,000 paper book**:
+
+| book | gross at every term's max |
+|---|---|
+| 🌾 carry | `300 x alloc 4.0 x brain 6.7 x 12` = **$96,480** (96x equity) |
+| 🪁 kelly | $6,700 · 🧭 cook $6,432 · ⚖️ Counterweight $5,360 · 🎫 taker $3,216 |
+
+The first `BRAIN_GROSS_X` bounded the brain's *increase* against
+`cap − deployed − base`, which is algebraically `min(want, cap − deployed)` —
+so the FIRST position could take the entire budget and every later one still
+got its full base on top. **Driven through the real accessor with carry's real
+constants: advertised cap $7,200, per-position `[7200, 1200 x 11]`, actual
+gross $20,400 — 2.8x the cap it advertised.** My selftest had asserted the
+per-call arithmetic and never walked the SEQUENCE the bound is supposed to
+bound: `(po)`'s "a check that inspects nothing" wearing a unit test. The
+selftest now drives all 12 slots and asserts the TOTAL, against the
+**stated** worst case `cap + (N−1)·base` — not against a round 2x, because
+saying 2x and shipping 2.9x is how a bound becomes folklore.
+
+**And the budget is derived from each book's CONSTANTS, not from a clip
+another organ already scaled.** Measured on the live payload: 🌾 carry is the
+fleet's only book with an allocation claim and it sits **AT the organ's 4.0
+ceiling right now** (`delta_usd: +13,500`), so its gross is already **$14,400
+on a $1,000 book** before the brain speaks. Budgeting off that base would have
+handed the brain another $24k of room on the book that least needs it.
+Budgeting off the constants leaves the allocation organ's behaviour exactly as
+it was and gives the brain no room there at all — the bound binds where the
+danger is and restricts nothing that predates it. **(The allocation organ's
+own 4.0 on a 12-slot $300-clip book is a real finding and is CARRIED, not
+silently fixed here.)**
+
+### THE LOOKUP: 2.3x FASTER, AND THE SPEED IS THE LEAST OF IT
+
+`_resolve_mults` resolves the payload ONCE — parsed, validated, clamped,
+freshness window pre-computed — and memoises on the cache ENTRY's identity
+(not its timestamp: a direct `_cache` poke reuses the timestamp object, and a
+ts-keyed memo served a stale payload to the selftest that proved it).
+
+1. **ATOMICITY, which was a real bug.** `brain_mult_multi` called the raw read
+   once per bucket and `_load`'s cache expires on a clock, not a call boundary
+   — so a two-bucket lookup straddling that expiry could take ⚖️
+   Counterweight's LONG leg from one payload and its SHORT leg from the next.
+   One clip, two sources of truth, on the book whose entire design is that its
+   two legs are the same size. Pinned by a selftest that swaps the cache mid-
+   iteration.
+2. **JUNK IS NOW "NO OPINION", NOT A 6.7x CUT.** The old path clamped whatever
+   arrived, so a publisher bug writing `-1` or `0` became `MULT_FLOOR` and
+   quietly shrank that bucket to **0.149x** on every entry. Non-numeric, NaN,
+   zero and negative are now DROPPED (neutral 1.0); a legitimately extreme
+   `0.05` still clamps, because evidence outside the cage is not corruption.
+3. **Speed.** `is_fresh` parsed an ISO-8601 timestamp on every call — 0.93us
+   of a 1.55us lookup. The window is derived once; `is_fresh`'s exact
+   semantics, future-stamp guard included, are preserved rather than traded
+   for a memo that could serve a payload past its own TTL.
+   `brain_mult_raw` 1.55 → **0.67us**, `brain_clip_multi(2)` 3.57 → **1.45us**.
+
+### HIS NAME IS EAMON
+
+*"Call me Eamon or Johnny not operator please we're pals now"* — said once,
+agreed to, and then broken **in the entries written immediately afterwards**.
+He noticed: *"You called me the operator not Eamon again."*
+
+He is right that it kept happening and the reason is this file's own opening
+section: **it was written down and not enforced.** Nine attributions fixed in
+`(sk)`–`(so)` and CLAUDE.md; the rule recorded; and
+`scripts/audit_operator_name.py` now fails the build on a NEW quote credited to
+a job title. It is deliberately narrow — an ATTRIBUTION HEADER introducing a
+quote — and leaves the ROLE completely alone (`operator-only caps`,
+`an OPERATOR action`, `owner: OPERATOR`, `OPERATOR_QUEUE.md`), because several
+of those are load-bearing SAFETY properties and renaming them would make the
+doctrine worse. A RATCHET on the measured 207 historical attributions: history
+is the honest record of how the fleet was written and is not rewritten; the
+backlog may only shrink.
+
+### WHAT WAS REFUTED
+
+The refuter pass killed 7 of 13 findings, and one refutation is worth more
+than the finding it killed: *"the brain has no feedback on the quantity it
+controls, because `pnl_pct` is clip-invariant"* is **wrong** —
+`brain_stats.weighted_bucket` computes `mean_w/sd_w/t` from `profit_abs`,
+i.e. **DOLLARS**. So the brain does see the size it set. A uniform scale
+leaves `t` unchanged (mean and sd both scale), so there is no runaway; but a
+bucket MID-TRANSITION is a mixture of two scales, which inflates sd against
+mean and pushes `t` DOWN on a book whose edge has not moved. That is a
+mechanical oscillation between adjacent rungs, it is transient (14-day decay,
+plus the 3-run streak gate damps it), and **it is now measurable for the first
+time** because every close carries its `brain_mult`. CARRIED with the
+arithmetic rather than fixed by rewriting the brain's publisher on the same
+day thirteen consumers were wired to it.
+
+### AND THE BOUND FAILED A SECOND WAY — THE CALL PATTERN
+
+The audit's late verifiers, re-reading the tree after the fix, drove the bound
+through carry's REAL loop instead of through one call. **🌾 carry hoists ONE
+`_notional` above its census** (the `(sk)` depth probe has to price the clip it
+is admitting) and applies it to every entry that loop opens. So the bound read
+`deployed` once and was used twelve times: **sized $7,200 from an EMPTY book,
+opened twelve at it, $86,400** — against the $96,480 it was introduced to
+prevent. **It bought almost nothing.** ⚖️ Counterweight has the identical shape,
+rebinding one `order_usd` for every leg of its rebalance.
+
+`slots` closes it: the caller declares how many positions one clip will size
+and the room is divided. Verified over a whole fill from empty —
+carry at alloc 1.0 lands **exactly on its $7,200 cap**; at the live alloc 4.0 it
+lands on **$14,400, exactly the no-brain gross**, i.e. the brain gets zero room
+on the book that has already spent its budget, which is the right answer;
+Counterweight lands exactly on $400.
+
+**Both failures of this bound are the same mistake in two costumes: testing the
+ARITHMETIC of one call instead of the BEHAVIOUR of the loop.** First the
+sequence, then the call pattern. It is the reason the guard now drives a full
+slot-fill rather than asserting a formula.
+
+**⚖️ Counterweight also gets a flatness gate on the brain's contribution.** Its
+rebalance KEEPS held legs (`if c in meta: continue`), so a clip that moves
+mid-life leaves generations of legs at different sizes — measured, one step
+from 1.0 to 6.7 replacing a single short leg leaves **$570 of net directional
+delta on a book that models zero price exposure**. The gross bound caps the
+magnitude and cannot fix the asymmetry, because the asymmetry is between
+GENERATIONS, not between sides. The brain may now only move this clip while the
+book is flat, so every leg of a generation is sized by one number. The
+ALLOCATION organ is deliberately NOT gated: it has rebound this clip every loop
+since `(jr)` and narrowing that is a separate change with a separate owner —
+what this refuses to do is make a pre-existing asymmetry 6.7x wider.
+
+### THREE MORE FROM THE SAME AUDIT, AFTER THE FIXES LANDED
+
+The refuter pass re-read the tree AS THE FIXES WERE LANDING, which is how a
+verify stage should behave — most refutations read *"the reporter read a
+pre-(sp) version; the guard they say is missing sits twenty lines below the
+line they cite."* Three findings survived that and are fixed here:
+
+* **`test_the_rails_see_the_sized_clip` was green over nothing on every SHADOW
+  arm.** `SafetyRails.notional_ok` returns **True** when `max_notional is
+  None`, and the cap env is REQUIRED only on a live arm
+  (`assert_can_start`) — so on 🎫 the taker's and 🎯 the sniper's shadow arms
+  the rail is a no-op and my plumbing test proved the plumbing, not the
+  effect. That is CLAUDE.md's own *"a green run verifies that an enforcement
+  EXISTS, not that it is CORRECT"* landing on a test written the same day.
+  Closed by `test_no_book_can_deploy_more_than_it_could_fund`: worst-case
+  gross **computed from each module's own imported constants** against its own
+  `START_EQUITY`, with a positive control that re-computes the pre-(sp) taker
+  and asserts the bar rejects it. Measured after the fixes: taker **$960**
+  (was $3,216), cook $1,920, hull/kiyosaki $960, douglas $800, grimes $320.
+  Three declarations, each with its reason: 🌾 carry (delta-neutral, and its
+  gross is the ALLOCATION organ's not the brain's), 🪁 kelly (two sleeves, one
+  summed budget), ⚖️ Counterweight (dollar-neutral, $200 designed).
+* **💸 the Farmer's `conv_mult` receipt became conviction x brain.** On the
+  shipped live config conviction is OFF, so the true value is `1.000` on every
+  entry — and a brain mult of 3.0 would have written `conv_mult: 3.0` onto
+  REAL-MONEY order rows, so the census that measures `CONVICTION_HI`'s own
+  authority would have read a distribution that was entirely the brain's.
+  Now `conv_mult`, `brain_mult` and the product `clip_mult` are three fields.
+  **A receipt that attributes one organ's move to another is worse than no
+  receipt.**
+* **The judge's paired bar can be de-paired by the brain**, because the two
+  Farmer arms read their OWN rows and only the live arm has a cap. The (sp)
+  trim removes the "live arm closes zero trades" half of it; the residual —
+  the two arms can run different clips — is harmless to the bar itself (it
+  compares per-trade PERCENT, which is clip-invariant) and is recorded here
+  rather than guarded, because the judge's own `ran_candidate` receipt already
+  stamps the bars each arm ran.
+
+**Mutations verified RED (16 this pass):** the taker's rail sees a constant ·
+avo's rail sees the pre-brain clip · the Farmer's FIRST rail call sees it ·
+the Farmer's POST-TRIM call sees it · the sniper's rail sees it · avo's expand
+refusal removed · avo's floor made unconditional · the Farmer's trim fires on
+a neutral brain · the taker drops the brain from its risk budget · `vol_clip`
+loses its ceiling · carry budgets off the scaled base · Counterweight budgets
+K instead of K·2 · the gross bound reverts to its 20,400 form · the bound
+drops its no-shrink floor · a new quote attributed to "operator" · a role
+reference (must stay quiet — and does).
+
+Two of those guards were themselves wrong first and are recorded that way: the
+rail guard needed a two-hop taint closure (a fixpoint swallowed the module
+until `is_long` counted as "scaled") and had to check EVERY rail call rather
+than any (the Farmer's second, post-trim call kept it green while the first
+was mutated).
+
+**Suite:** green except the two pre-existing `lighter-sdk` environment failures
+verified to reproduce on clean `main`.
+
+## 2026-08-20 (so) — THE BRAIN'S ONLY TWO LIVE OPINIONS WERE ADDRESSED TO THE TWO BOOKS THAT COULD NOT HEAR THEM — one of them for 91 consecutive runs
+
+**Eamon:** *"Implement into live and other bots without it."*
+
+`(sn)` gave the brain a 6.7x range either way. This is the other half, and the
+measurement that justifies it took one call to `/bus.json`.
+
+**THE ENTIRE PUBLISHED OPINION OF THE FLEET'S LEARNING ORGAN, 20-Aug 09:13Z:**
+
+| row | tag | mult | n | t | consecutive runs held |
+|---|---|---|---|---|---|
+| `lighter-ticket-taker-lshadow` | `short-divergence` | **0.75** | 78 | −1.43 | **11** |
+| `perps-funding-spread-lshadow` | `long` | **0.75** | 48 | −1.38 | **91** |
+
+Two mults across a twenty-book fleet — and **neither book had a consumer.**
+Ninety-one consecutive runs of an organ asking ⚖️ Counterweight to take less
+risk on its long side, into a reader that did not exist. Meanwhile every book
+that *could* hear the brain (the family books, the Parliament) had nothing
+addressed to it. **The organ holding every close this fleet has ever made was
+talking to the deaf and listening to the silent.**
+
+That is I18's unreachable-lever shape with the arrow reversed: not a knob with
+no reader — **a reader with no knob**. And it is the same training wheel `(sm)`
+and `(sn)` took off the NUMBER, one layer out in the plumbing.
+
+### WHAT SHIPPED
+
+`fleet_bus.brain_clip(bot, tag, base_usd) -> (usd, mult)` is now the one call
+shape, wired at the sizing site of **every living book** — both real-money rows
+included:
+
+💸 the Farmer (LIVE + shadow) · 🙏 Avo Maria (LIVE) · 🎫 the Ticket Taker ·
+🌾 carry · ⚖️ Counterweight · 🪁 the Mirror · 🧭 Captain Cook · 🧘 The Zone ·
+🧮 The Professor · 🏦 Rich Dad · 📐 The Technician · 🎯 the Sniper ·
+👩🙏🔮 the family books (already wired; unchanged).
+
+**WHY WIRING IT INTO REAL MONEY IS A NUMBER, NOT AN AUTHORITY.** The accessor
+returns a float. Every senior rail is downstream and untouched: the kill switch
+still kills, the daily-loss halt still halts, the ruin gate still refuses, the
+fleet long-budget veto still vetoes, and SafetyRails' caps remain operator-only.
+`test_the_rails_see_the_sized_clip` proves by AST that the variable the brain
+assigns is the variable the cap is handed, on all four order-sending books — a
+6.7x clip admitted against a 1x cap check is the 15-Jul breach rebuilt, and it
+cannot ship now without reddening the build.
+
+**[CORRECTED IN PLACE by `(sp)`, and this paragraph originally ended with
+"the multiplier proposes; the rails dispose", which was FALSE.** An adversarial
+audit of this very change measured it: `notional_ok` is a BOOLEAN, so the
+caller's `continue` discards the whole CANDIDATE rather than the excess. On the
+shipped live Farmer config a brain rung of 4.5 asks $168.75 against a $150 cap
+FROM AN EMPTY BOOK — every candidate skipped, every loop, forever. **The brain
+rewarding a book for its evidence would have stopped it trading.** Nine of the
+thirteen wired books had no notional bound at all. `(sp)` makes the sentence
+true instead of deleting it; see that entry.**]
+
+**AT SHIP IT MOVES EXACTLY TWO BOOKS, AND THAT IS THE HONEST WAY TO LAND IT.**
+The brain has no published opinion on either Farmer arm, on 🙏 Avo, or on any
+books-cohort row, so those land NEUTRAL and become active only when the brain
+earns the right to resize them (>=30 era closes, >=3 consecutive runs, Wilson/t
+bars). The two it does move are the two above, both DOWN to 0.75x. Priced: per
+trade % is invariant to clip ((hl)), so this costs zero expectancy and changes
+dollars only — over the windows the advice was ignored, 0.75x would have turned
+the taker's −$12.18 into ≈−$9.14 and ⚖️'s −$6.13 into ≈−$4.60, ≈**$4.57 of
+bleed** that the fleet had already measured, published, and could not act on.
+
+### THE FIVE THINGS THAT WERE NOT MECHANICAL
+
+**1. THE KEY MUST BE THE LEDGER'S BUCKET KEY — CAUGHT ON THE REAL-MONEY ROW,
+BEFORE IT SHIPPED.** `bot_pnl_store.fetch_paper_trades` prefers a stored `tag`
+COLUMN over the reason prefix — its own comment says *"a stored tag is richer
+than the reason prefix: 'long-funding' beats 'long'"* — and exactly two books
+stamp one: 💸 the Farmer (`<side>-funding`) and 🧭 cook (`<side>-navband`). The
+first draft looked the Farmer's mult up under `long`, which its ledger never
+writes. That returns 1.0 **forever, silently, on real money**: the
+registered-but-inert failure in the most expensive place it can happen. Found
+by reading the PUBLISHER, not the consumer — the `(hj)` rule, again. Now pinned
+per-book by `test_the_sizing_key_matches_the_ledger_bucket_key`, and for the
+books whose key is dynamic by `test_dynamic_keys_come_from_one_owner` (🎯 the
+sniper's `entry_tag` was EXTRACTED from `close_reason` rather than retyped
+beside it, so the two cannot drift).
+
+**2. ONE CLIP THAT SPANS TWO BUCKETS NEEDS ONE RULE, NOT TWO MULTS.** ⚖️
+Counterweight is DOLLAR-NEUTRAL by construction — one clip opens a long leg and
+a short leg — while the brain buckets its closes per side. Sizing the legs by
+their own mults would quietly turn the fleet's canonical spread book into a
+directional one wearing a spread book's name. 🌾 carry has the same shape for a
+different reason: its depth probe prices ONE notional per loop and the `(sk)`
+census contract forbids the census and the gate pricing different numbers. 🙏
+Avo's LIVE arm has a third: n=3 of its own beside a designed shadow control arm.
+All three take `fleet_bus.brain_mult_multi` — **the minimum over the buckets
+that HAVE an opinion, and a silent bucket never out-votes an opining one.** That
+last clause is the whole design (`brain_mult_raw` exists only to express
+"absent" as distinct from "1.0"): it is what lets a reduce be heard from any
+bucket while a thin live arm still sizes off its control arm's evidence (I14 —
+the record decides, and where there is no record the designed proxy speaks).
+
+**3. A RESIZED CLIP MUST BE RE-WALKED BEFORE IT IS PRICED OR GATED.** 🧭 cook
+and 🪁 kelly enter at a VWAP walked through the real book and gate on their own
+slip; pricing a 2x clip off the 1x walk would understate both, on exactly the
+thin coins the gate exists for. Both now re-walk at the sized clip and fail
+CLOSED — no re-walk, no entry — and cook publishes a `resize_blind` census
+bucket rather than folding the refusal into `no_book` or `slip`, because "we
+could not price the SIZE" is a different finding from either. 🪁's ghost-side
+event gate is deliberately untouched: resizing MY leg must never change which
+events the ghost is deemed to have taken ((qj)).
+
+**4. TWO CONSISTENCY PINS WERE EXTENDED, NOT WAIVED.** 🧘 Douglas and 🪁 kelly
+both pin `_open_position`/`_open_mirror`'s signature against outcome-driven
+sizing, and Douglas MEASURED a revenge-guard overlay at +$27.01 -> −$11.32. The
+brain's scale is not that, and the pins now say so in their own failure
+messages: it is a per-(book, side) function of >=30 closes held over >=3 runs,
+identical for every trade in a cycle, so **it cannot express "I just lost, bet
+differently"** — which is the thing the pin forbids. `streak`, `last_pnl`,
+`last_outcome`, `equity`, `wins`, `losses`, `cooldown`, `consecutive` and
+`drawdown` all still redden.
+
+**5. TWO REFUSALS WITH REASONS.** 🛢️ Garrett (and any funding VARIANT) is
+EXCLUDED — the `(nb)` rule: it exists to validate a study cell measured AT $25
+clips, and a capital scale already made that dollar claim unreproducible once;
+env-only config means env-only SIZE. ⚖️'s LIVE arm keeps its `GOLIVE_ORDER_USD`
+pin per `(ia)`.
+
+### RECEIPTS, BECAUSE A SCALE THAT LEAVES NO TRACE IS I23 ALL OVER AGAIN
+
+Every wired book stamps `brain_mult` on its close row, and the two books that
+carry a second scale (🌾 carry and ⚖️ Counterweight both read the allocation
+organ) stamp `alloc_scale` SEPARATELY — multiplied together they are
+unattributable, and the next reader would have to guess which organ moved. ⚖️
+had no `extra` on its close rows at all, so the allocation organ had been
+rewriting its clip since `(jr)` with no close able to say by how much; it has
+one now.
+
+### THREE THINGS THE TESTS FOUND THAT READING DID NOT
+
+* 🎯 **the sniper's receipt was silently overwritten.** Written before the
+  surge branch, which ASSIGNS `entry_meta[sym]`. The selftest's sized-path
+  drive caught it; it is written LAST and merged now.
+* 📐 **Grimes has never logged an open in its life.** Its `OPEN` print sits
+  after a `break` — unreachable since the book was born. Moved above it. The
+  never-recorded class (I23) in its cheapest possible form, found only because
+  I was editing the line above it.
+* 🏛️ **the `(sn)` asymmetric-clamp guard had a third hole**, and a surviving
+  mutation found it: with the CEILING alias resolved, `_floor = getattr(...)`
+  -> `_floor = 0.3` walked straight past, because the clamp then reads
+  `max(_floor, min(_ceil, x))` — two NAMES, no literal — and the guard only
+  ever looked for a literal. **Aliasing a hardcoded floor is the same defect
+  with one more line in it.** Both ends are resolved through local aliases now.
+  The same pass also narrowed that guard's file scoping, which had started
+  reporting three unrelated clamps in `lighter_family_bot` the moment a
+  DOCSTRING mentioned the ceiling — a guard that fires on unrelated code is a
+  guard the next reader silences.
+
+### A STALE CONTRACT INVERTED RATHER THAN DELETED
+
+`test_no_live_book_reads_a_brain_multiplier` asserted the opposite of this
+change — and **it PASSED against the new wiring**, because it worked by deriving
+the functions that call `fleet_bus.stake_multiplier` and the new path goes
+through `brain_mult_raw`. A green run meant nothing at all: this repo's own
+*"a check that inspects nothing reports clean"* rule, landing on the check
+itself. It is now `test_the_live_books_DO_size_off_the_brain_now`, keeping both
+of its predecessor's recorded wrong drafts (*a name is not a data flow*;
+*importing a module is not executing its lines*) because both mistakes are
+general. `CLAUDE.md`'s bus section and the two docstrings that said *"SHADOW
+books only — no live bot reads mults"* are CORRECTED IN PLACE per I12.
+
+### DEPLOY NOTE
+
+🎫 the Ticket Taker's image did not carry `fleet_bus.py`; `Dockerfile.tickettaker`
+now COPYs it (born-dark guard re-run, OK). `fleet_bus.py` is in `_BUILD_SHARED`,
+so **the taker's `extra.build_n` will rise by one on its next deploy** — that is
+the `(fd)` FILE-SET class, expected, and `audit_code_currency` will classify it
+as `FILE-SET` rather than drift. Its live deploy path already triggers on
+`fleet_bus.py`.
+
+**Mutations verified RED:** hull goes deaf · the Farmer keys on the reason
+prefix · the Farmer's rail sees the pre-scale clip · the sniper's rail sees the
+pre-scale clip · the sniper retypes its key · the taker sizes off the raw
+payload · a silent bucket out-votes an opining one · the Parliament hardcodes
+its floor again (both the aliased and the inline form) · the floor stops being
+the ceiling's reciprocal.
+
+**Suite:** green except the two pre-existing `lighter-sdk` environment failures
+that reproduce on clean `main`.
+
 ## 2026-08-20 (sf) — I22 SHIPS: A BOOK MUST SPEND THE ECOSYSTEM, AND TWO OF THE WALLS THIS SESSION HIT WERE IMAGINARY — a wrong API path and an untested query parameter
 
 **Operator, 20-Aug:** *"im over the constant brick wall you put up that nothing
@@ -582,6 +3399,761 @@ thin to move a constant on, but for the first time it is a number the harness
 can produce at all. Sweeping `TT_BRK_TRAIL` is now a real experiment rather
 than a comparison of two outcome-conditioned buckets.
 
+## 2026-08-20 (sn) — THE BRAIN'S RANGE REACHES 6.7x, EITHER WAY: it could always SEE the difference between a bad tag and a catastrophic one, and had no way to say it
+
+**[RENUMBERED (si) -> (sn), 20-Aug.** main took (si) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
+
+**Eamon, explicitly: "The brain needs to be able to go to 6.7x specifically
+either way now."** Done, in both directions, with the floor DERIVED from the
+ceiling so "either way" is true by construction rather than by two numbers that
+can drift apart.
+
+### THE LADDER, AND WHY IT IS DATA NOW
+
+    expand   1.25   1.5   2.0   3.0   4.5   6.7
+    reduce   0.75   0.5   1/3   1/4.5  1/6.7
+    clamp    [1/6.7, 6.7]        MULT_FLOOR = 1.0 / MULT_CEIL
+
+The rungs above 2.0x and below 0.5x are a TABLE rather than another six
+if-blocks, for one reason: the ladder must be walked **strongest-bar first** or
+a tag that clears 6.7x is silently handed 1.25x, and an ordering bug in a
+hand-written chain is invisible. As data, "monotone in strictness" and "checked
+strongest-first" are one assertion each, and both are pinned. Every existing
+rung keeps its exact bars; the new ones are strictly harder on all four axes
+(post_wr, Wilson bound, `t`, and the decayed-evidence floor).
+
+### WHAT IT IMMEDIATELY CHANGED — ON THE PROTECTIVE SIDE, WHICH I DID NOT EXPECT
+
+The brain's own selftest fixtures moved, and the movement is the point:
+
+    an ordinary bleeder      t= -9.16  n_eff 37.3   was 0.5x  ->  now 1/3
+    a catastrophic bleeder   t=-13.95  n_eff 46.0   was 0.5x  ->  now 1/4.5
+
+**Before today both got exactly HALF.** The brain could see that one was far
+worse than the other and had no vocabulary for it. Now the worse one is cut
+deeper — and that relationship is asserted, because if the two ever collapse
+back to one value the ladder has stopped discriminating and the range is
+decoration. Neither reaches 1/6.7: n_eff 37 and 46 fall short of the 60 that
+rung requires, which is the evidence floor doing its job rather than a bug.
+
+### WHAT REACHING THE TOP WOULD COST, SAID OUT LOUD
+
+Only the FAMILY books and the Parliament consume a brain multiplier — 🌾 carry,
+🎫 the taker and ⚖️ Counterweight do not, and **no live bot does** (verified in
+`(sm)`, not quoted). For a family book that is $50 × 5 slots = $250 gross at
+1.0x and **$1,675 on a $1,000 book at 6.7x, about 1.7× equity**. The Parliament
+re-checks its own `MAX_NOTIONAL` against the REAL multiplied clip, so it is
+already guarded. And the drawdown bar interacts directly: %-drawdown scales with
+the stake, so a book above **15/6.7 = 2.24%** measured maxDD would breach the
+15% go-live bar at full size. Neither of those is a reason not to have the
+range — they are what the range MEANS, and they belong written beside it.
+
+### AND IT SHIPS INERT, WHICH IS WHAT A CEILING IS
+
+The top rung needs **t ≥ 8.0 on n_eff ≥ 80**. This fleet's best measured book in
+its whole history is 🧮 Hull at t=+3.92 on n=50, with 🌾 carry at t=3.10 on
+n=101. Nothing is remotely close, and nothing moves today. That is the
+difference between a ceiling and a setting: it is where evidence COULD take a
+book, not a value anybody chose.
+
+One asymmetry found and closed on the way: 🏛️ the Parliament read its CEILING
+from the bus and had its floor **hardcoded at 0.3**, so those books would have
+been able to express the raise and not the matching cut — the brain's protective
+side quietly weaker there than everywhere else. Both ends come from the bus now.
+
+## 2026-08-20 (sm) — THE CEILING BECOMES A MEASUREMENT: six bars asked "don't be bad", none asked how high, and capital sat in INVERSE proportion to measured edge
+
+**[RENUMBERED (sh) -> (sm), 20-Aug.** main took (sh) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
+
+**Eamon: "The discussion of the floor is too often had, where the
+conversation of how high the ceiling goes is of little discussion... they know
+the floor all too well."** / **"training wheels need to go off and they need to
+start growing and learning with the brain that has every loss we've had or win
+and can let the bots adjust themselves accordingly so they can achieve their
+designated different designs. We need synergy."**
+
+### THE COUNT THAT MAKES THE POINT
+
+The go-live gate asks six questions — ≥30 days, ≥30 closes, mean>0, t≥2.0, both
+halves positive, maxDD<15%. **Every one is a floor.** Six ways of asking *don't
+be bad*. Add the stops, the vetoes, the class screens, the cages, the drawdown
+governor and the halt, and there was **not one instrument in the tree** that
+asked what the most a book could earn is, or what stood in the way.
+
+So the fleet optimised the only thing it measured. Slot occupancy against each
+book's OWN cap, beside its own mean per trade, 20-Aug:
+
+| book | mean %/trade | slot use |
+|---|---|---|
+| 👩 mum | **+4.658%** | **100%** of a cap of FOUR — 0.18 closes/day |
+| 🙏 avo | +1.085% | 40% |
+| 🌾 carry | +0.254% | 49% |
+| 🔮 georgia | +0.122% | **9%** ← the fleet's closest book to the gate |
+| 🎫 taker | −0.167% | 74% |
+| ⚖️ Counterweight | **−1.433%** | **102%** ← the worst book, FULL |
+| 🛢️ Garrett | −1.460% | 88% |
+
+**The two worst books run at 88–102% of capacity. The best runs at 100% of a cap
+of four and takes one trade every five days.** Capital in inverse proportion to
+measured edge, and no organ had been asked the question that shows it.
+
+### `scripts/ceiling.py` — the mirror of the go-live gate
+
+Output decomposes exactly: **`$/day = rate × clip × mean_pct`**. Two of the three
+are pure capacity and neither costs expectancy — per-trade % is INVARIANT to
+clip, which `(hl)` measured and then nobody used. The fleet spent months on the
+third and capped the other two.
+
+**THE FIRST LIVE RUN, and the headline is the book nearest real money:**
+
+    🔮 georgia   310 more closes to t=2.0
+                 83.5 days at today's 0.5 of 5 slots
+                  7.6 days at full occupancy      <- an 11x speed-up
+    PROVEN books  $+1.452/day at their measured lower bound
+                  $+3.015/day at their reachable ceiling  (2.1x)
+                  — and NOT ONE of those dollars needs a better strategy.
+
+**THE DISCIPLINE IS THE DESIGN, not a caveat bolted on:**
+* **A ceiling is computed only on a book whose EDGE LOWER BOUND is positive**
+  (I16 — never the mean). Scale a coin flip and you scale a coin flip. Of 16
+  books, only three qualify.
+* **For an unproven book the ceiling lever is the rate of EVIDENCE, not money** —
+  closes to t=2.0 at its own mean/sd, now versus at full slots. That is where
+  I17's decidability and the ceiling meet: *how fast can this book learn what it
+  is?*
+* **A negative mean is a keep-or-retire question, never a capacity one.** The
+  instrument refuses to scale a loser and says so in those words.
+* **Rate headroom comes from UNUSED SLOTS at the book's own hold, never a
+  shorter one** — that is denominator shrinkage, the whole of the 25-of-30
+  candidates `(hl)` killed.
+* **The clip is bounded by the drawdown bar and by measured depth.**
+* **A ceiling is REACHABLE, never promised**: it says a book could run N× faster
+  *if its slots filled*, not that the signal exists to fill them. The book's own
+  census answers that, and saying otherwise is the `(gl)` overstatement the
+  operator learns to ignore.
+
+It promotes nothing and moves nothing. Like `golive_readiness`, it publishes.
+
+### AND THE SYNERGY PIECE: NINETEEN DESIGNS, ONE WAY OF JUDGING THEM
+
+**Eamon: "we are tasked to create multiple strategy bots, who get
+complimented and enhanced by instruments that let them fly to the ceiling if
+they wish to... so they can achieve their designated different designs. We need
+synergy."**
+
+Measured 20-Aug: of nineteen living rows, **exactly one** — 🧭 nav-cook, the
+newest — publishes what it is FOR. Every other book's design sits in 1,400 lines
+of `CLAUDE.md`: unreadable to any organ, unscoreable by any grader, and
+unfindable by an operator checking a book's behaviour against its purpose. **That
+is the missing synergy, precisely — nineteen different designs and one notion of
+"better".**
+
+`fleet_manifest.py` gives every living book three lines it can be judged by:
+
+    🌾  Yield Harvester
+       is for    : harvest persistent funding, delta-neutral — paid for
+                   patience rather than for being right about price
+       flies when: it holds MORE good carries at once — its ceiling is
+                   slots x supply
+       never     : a carry must repay its own round trip
+
+    🔮  Georgia
+       is for    : intraday 15m across three tags, each graded on its own
+       flies when: it FILLS ITS SLOTS — 5 of 6 bars, 7.6 days from gradeable
+                   at full occupancy against 83.5 today
+       never     : its trailing stop is NOT the leak (74% vs a 75% placebo)
+
+**`flies_when` is the divergent half and the reason this is not decoration.** One
+fleet-wide rule cannot say that 🌾 carry flies by holding MORE, 🔮 georgia by
+becoming GRADEABLE, 🧮 Hull by simply SURVIVING to thirty closes, and 🪁 the
+Mirror by its ghosts continuing to be wrong. The test asserts no two books share
+one.
+
+**The floor stays, beside the ceiling, on purpose** — a ceiling printed without
+the floor next to it is exactly how "go higher" becomes reckless.
+
+**THE BOOK'S OWN PUBLICATION WINS.** `design_for` prefers `extra.thesis` off the
+live row and falls back to the table. This file is a BRIDGE, not a second source
+of truth: as each book learns to declare itself (nav-cook's pattern) its entry
+goes quiet on its own, and the two can never drift into disagreeing. A junk or
+empty thesis falls back rather than erasing a design; an unknown row gets
+NOTHING, because an invented purpose is worse than none. It decides nothing —
+asserted, not described.
+
+### AND THE TRAINING WHEEL, WHICH WAS ON THE BRAIN ITSELF
+
+`brain_stats`' expand ladder stopped at **1.5×**. So the organ holding every
+close this fleet has ever made could never say more than "half again" about a
+book, however overwhelming its own evidence — 👩 mum measures **+4.658%/trade**
+and 1.5× was the most the brain could express about her. **That is a training
+wheel, not a bar**: a bar is a level evidence can clear, and this was a level
+evidence could not clear however good it got.
+
+A 2.0× ceiling step now exists, **harder on every axis** (post_wr>0.65, Wilson
+lower>0.60, t≥3.5, n_eff≥30 against 18) and checked FIRST so a book that clears
+it is not silently handed 1.5×. `MULT_CEIL` 1.5 → 2.0, or the tier would emit
+and be swallowed.
+
+**The `t` is not a round number.** 3.5 sits **above every headline this fleet has
+re-measured and lost** (🧙 Schwager 1.88, 📐 Grimes' keltner 0.49, 🧘 Douglas
+0.50) **and at-or-below the two that survived** (🧮 Hull +3.92, 🌾 carry +3.10).
+A tier that doubles a stake should clear the level where this fleet's claims
+have historically stopped dissolving, and 2.5 demonstrably is not it.
+
+**SHADOW ONLY — and I verified it rather than quoting the doctrine.** Two wrong
+drafts of that test, both worth keeping: scanning for calls named `stake_mult`
+fired on 🙏 Avo's LIVE arm, which calls the STRATEGY's own constant `1.0` — **a
+name is not a data flow**; then following the whole import graph fired too,
+because the live book imports `lighter_family_bot` and that module reaches the
+brain at line 123 inside `brain_stake_mult`, **a function the live book does not
+import and never calls** — **importing a module is not executing its lines**.
+The shipped test derives the wrapper set and asserts neither real-money module
+calls it nor imports it. Four stale copies of the old `[0.5, 1.5]` clamp
+corrected in place (I12); a fifth match in `venues/__init__.py` was a DIFFERENT
+lever's cage and was left alone — the `(ow)` blanket-replace lesson.
+
+## 2026-08-20 (sl) — THE NEVER-RECORDED CLASS, CLOSED FLEET-WIDE: 45 of 64 levers could not be measured, 15 steered books that no longer exist, and I11 finally has enforcement
+
+**[RENUMBERED (sg) -> (sl), 20-Aug.** main took (sg) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
+
+**Eamon, three asks in one message:** *"Fix this never recorded issue across
+the fleet, I am so tired of going over the same trivial problem."* / *"And fix
+everything else I've said too"* / *"can all of the works done today; every day be
+recorded properly so I am starting from where I left off every day rather than
+doing circles like an incompetent."*
+
+All three are the same complaint from different angles: **the fleet keeps
+re-deriving things it never wrote down.**
+
+### 1 · THE CLASS, NAMED — I22
+
+`(sk)` found four defects in one session and I fixed them one at a time. They
+are one defect:
+
+| | the shape |
+|---|---|
+| 🎫 `taker.brk_trail` / `brk_sl` | the give-back and adverse excursion each lever cuts lived in memory and **died at close** — two widenings WITHHELD while a harness reconstructed from hourly candles what the bot knew to the loop |
+| 🌾 carry's turnover floor | a stand-in for a cost **declared unmeasured** and left that way for weeks, gating the best-evidenced book to `eligible: 0` of 228 |
+| 🎫 `brk_range` / `max_hold_h` | steered by a tuner whose replay **cannot fill the lens**: restrict enacts at delta `$0.00` for free, expand can never clear `MARGIN_HALF` — a one-way ratchet, already at both tightest ends |
+| 💸 the judge's paired bar | compared two arms on **different entry policies** — 0.161pp handicap against a 0.50pp margin, zero promotions in five weeks |
+
+**The thing that decides is not measuring the thing it decides about.** Fixing
+instances is the circle. I22 names it, and `scripts/audit_lever_measurability.py`
+enforces it.
+
+### 2 · AND MEASURED FLEET-WIDE, WHICH IS THE PART THAT WAS NEVER DONE
+
+    64 registered levers
+    19 with a QUANTITIES spec       <- can be profiled at all
+    30 with none, undeclared        <- the backlog
+    15 steering a RETIRED book      <- worse than unmeasurable: pure noise
+
+**Fifteen of the twenty-one `lighter-books` levers point at books that no longer
+trade** — every `barnes.*`, `disloc.*`, `index.*` and `trend.*`. The registry had
+become a museum, and every organ reasoning about headroom was reasoning over it.
+All fifteen are now DECLARED with the single env var that would revive their
+book (kept rather than deleted: a retirement reversible in one variable, whose
+book returns without its levers, is the registered-but-inert failure arriving by
+the back door). **That count is now ZERO**, so the ratchet fails on the *next*
+dead lever instead of hiding it among fifteen.
+
+**BOTH ARMS ARE RATCHETS, NOT BARS**, and that is deliberate: `(mz)` already
+learned that a guard reddening the build on a pre-existing backlog gets a
+blanket exemption within a day and then guards nothing. The pile may only
+shrink; a NEW instance fails on the push that adds it.
+
+Stated against my own guard: it checks a measurement path EXISTS, not that
+anyone walked it. A spec pointing at a field nothing writes still reads
+measurable here — `audit_lever_authority --measure` grades that.
+
+### 3 · I11 FINALLY HAS ENFORCEMENT — AND IT IS DERIVED, NOT REMEMBERED
+
+I11 has said the right thing since 31-Jul — *"State at the end of every pass what
+is carried, and start the next pass from that list"* — and was **the one
+invariant with no executable enforcement**, so it was observed by memory and
+therefore not at all. `audit_recurrence` measures circling *after* it happens; it
+never told a session where to START.
+
+`scripts/session_state.py` → `HANDOFF.md`. Almost nothing in it is typed:
+
+* **SHIPPED** is read from git — commits since local midnight (Sydney), with the
+  changelog letters they carry.
+* **CARRIED** is the one hand-written list, and every row carries a
+  `closes_when` **predicate evaluated against the repo**. A finished item is
+  reported **CLOSE THIS** and reddens CI; an unfinished one cannot be dropped
+  without deleting a row somebody has to justify. **The list cannot rot in
+  either direction** — which is the failure mode of every to-do list this repo
+  has tried.
+* Each row names its **owner**: `session` (just do it) or `OPERATOR` (a decision
+  this repo may not make). An operator item that reads like session work is how
+  a decision gets silently re-litigated instead of made.
+
+A predicate that RAISES degrades to open and labels itself. A broken check that
+silently finishes work would be the worst thing this file could produce, and it
+is the `(po)` inspects-nothing failure aimed squarely at the list that decides
+what happens next.
+
+The CHANGELOG stays the long-form history — it is a fine record and a hopeless
+handoff.
+
+### VERIFICATION
+
+Eight mutations verified red across the two guards — **and three SURVIVED first
+and were closed**: an unmapped lever prefix was silently skipped rather than
+failing (a whole new book's levers could have entered the backlog under the
+ratchet); the shipped list could return a hard-coded empty list and pass, because
+the test asserted only its SHAPE and "nothing shipped" is indistinguishable from
+a quiet day; and the render could drop the owner label entirely. Both new jobs
+are wired into `changelog-check.yml` with their negative fixtures, and both
+selftests are registered.
+
+## 2026-08-20 (sk) — 🌾 THE FLEET'S BEST BOOK WAS IDLE AT 0 OF 12 SLOTS BEHIND A GATE THAT MEASURED THE WRONG THING: turnover is not fill cost, and on an $80 clip it is not even correlated with it
+
+**[RENUMBERED (sf) -> (sk), 20-Aug.** main took (sf) for a different entry while this branch waited on CI — recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**]
+
+**Eamon, this session: *"do not continue on a risk and constraint and choking
+of everything basis ... focus on where each bot can enter exit and operate
+better"* / *"being overly risk adverse and overly constraining and restrictive
+clearly doesn't work so do the opposite"* / *"if you can work out why they are
+losing entry and exits, then surely you can work out that tightening and
+constraining them into a tiny cage isn't the solution here."*** This entry is
+that pass. It ships one widening, three REFUSALS that each stop a widening, and
+two instruments that make the question askable per book from now on.
+
+### THE CAGE
+
+🌾 `perps-funding-carry-lshadow` is the fleet's best-evidenced book — n=101,
++$66.21 all-time, the only book that has ever cleared the `t` bar. Measured
+2026-08-20 on its own live row: **`held: 0` of `max_positions: 12`**, and
+**`eligible: 0` of `scanned: 228`**, while its own payload advertised
+`hottest_funding_apr` of **+301%, +200%, −1395%**.
+
+Its `CARRY_MIN_VOL` floor exists for one stated reason, `(px)`'s own words:
+*"per-book slippage here is unmeasured"* ([[lighter-slippage-is-per-book-not-per-venue]]).
+The floor is not a view about turnover. **It is a stand-in for a cost nobody had
+measured** — a defensible place to start and an indefensible place to stay,
+because an unmeasured quantity is a reason to measure, not a reason to keep
+refusing. Every motion available to the growth rail on this book restricted it
+further: `carry.min_vol`'s cage went one-sided in the TIGHTEN direction at
+`(pr)`, `PERSIST_H` went 6h → 12h at `(qx)` on a gate its own study says misses
+**91% of qualifying windows**, and the class screen closed the rest. The book's
+problem was that it could not find a trade, and every lever pointed the other
+way.
+
+### SO I MEASURED IT — `scripts/study_depth_vs_volume.py`
+
+Walk the LIVE book both ways for the clip this book actually trades, through the
+fleet's own fill model, and convert the result into the unit the decision is
+denominated in: **`payback_h = rt_cost / (apr / 8760)`** — how many hours of
+funding repay the fill. Of the **20 books over the 20% TRUE APR bar, the $1M
+floor refused SIXTEEN.** Every one of the sixteen filled an $80 clip out of
+visible depth, and every one repaid its measured round trip inside the max hold:
+
+| | TRUE apr | 24h $vol | measured RT | payback | the floor said |
+|---|---|---|---|---|---|
+| UNITREE | 1162% | $858k | 34.8 bps | **2.6h** | REFUSED |
+| KAITO | 131% | $226k | 7.6 bps | **5.0h** | REFUSED |
+| ZRO | 123% | $543k | 18.0 bps | **12.9h** | REFUSED |
+| XMR | 55% | $934k | 5.1 bps | **8.2h** | REFUSED |
+| EWY | 23% | $692k | 2.8 bps | **10.7h** | REFUSED |
+| **PUMP** | **20%** | **$4.8M** | **9.4 bps** | **40.7h** | **admitted** |
+
+**XMR is a third of PUMP's turnover and costs it 5.1bps against PUMP's 9.4.
+UNITREE repays fifteen times faster and was refused while PUMP was admitted.**
+On a clip this size the two quantities are close to orthogonal, and the reason
+is visible in the output's own `lvls` column: **19 of the 20 fill at the TOP
+LEVEL.** The floor was protecting the book against a size it has never traded,
+and in doing so it was selecting for the slowest-paying carries in the venue.
+
+### THE FIX — a fast path, not a verdict
+
+`depth_admits()`. A coin at or above the floor is admitted exactly as before
+(**zero behaviour change on everything that already passes, and no book read at
+all**). A coin below it gets the question the floor was standing in for: *can
+this clip be filled, and does the carry repay what the fill costs?* Both, or
+refuse. `carry.payback_max_h` is the bound — registered, caged **[6h, 168h]**
+(`hi` is a QUARTER of the 336h max hold: a carry needing most of its life to
+break even has no margin for the rate decaying, which is the thing carries
+actually do), default 48h, consumed through `apply_tuning`.
+
+**BETTER IN BOTH DIRECTIONS, which is the I19 shape rather than a widening.** At
+48h the measured venue admits UNITREE/KAITO/ZRO/XMR/EWY and eleven more, and
+**refuses FOLKS ($1,198 of turnover, 53.9h) and RAIL ($490, 66.8h)** — the two
+books nobody could trade — where the flat floor refused those two for the wrong
+reason and took fourteen good books down with them.
+
+Every uncertainty **fails CLOSED** — no book, unfillable depth, an unreadable
+rate, a venue error, an exhausted probe budget. This function's `True` opens a
+position, so it follows `lens_wins` (I15), not the degrade-to-default habit.
+`CARRY_DEPTH_ADMIT=0` restores the flat floor exactly.
+
+Three things that are the difference between a gate and a gesture:
+* **THE CENSUS AND THE ENTRY PATH SHARE ONE DECISION.** `_depth_ok` is memoised
+  per loop and handed to both. Two probes would be two REST reads and — worse —
+  two chances to disagree about the same coin, which is the drift `scan_census`'s
+  own contract forbids. `depth_admitted` is a SUB-COUNT, never a bucket: the
+  partition still sums to `scanned`.
+* **THE PROBE NEVER FIRES ON A COIN WHOSE DECISION IT CANNOT CHANGE.** Only a
+  coin already hot, already persistent and already class-admitted but below the
+  floor — the smallest set that matters, which is also what bounds the REST
+  cost, under a per-loop budget that fails closed when spent.
+* **THE LEVER SHIPS WITH ITS OWN RECEIPTS.** `depth_scan.payback_h` records
+  every probe, **admitted AND refused**, and `audit_lever_authority` gains the
+  FIRST `QUANTITIES` spec on the `lighter-books` lane. That guard's header warns
+  that *"a saturated bare run is how a genuinely inert new cage arrives
+  invisibly"* — a new cage nobody can profile would have been exactly that.
+  Recording refusals is the load-bearing half: a bound profiled only on what it
+  admitted sees a distribution already cut at the bound, so every re-measure
+  agrees with wherever the bound happens to sit and the lever can never move on
+  evidence. It reads UNMEASURED today, pending accrual, which is honest.
+
+Real money cannot reach any of this: `funding_carry_bot.main()` refuses every
+mode but `lighter_shadow`, and the live funding floors are `{xp,live}.funding.min_vol`
+in a different file. Asserted, not asserted-in-prose.
+
+### THE OBJECTION, MEASURED AND REFUSED — INCLUDING A CAGE I ALMOST ADDED
+
+The shipped gate was then driven against the LIVE venue (not the study — the
+study shares its cost model with the bot, but `depth_admits` has its own budget,
+kill switch and fail-closed branches). It admits 13 of 17 sub-floor hot books
+and refuses four on payback: FOLKS 59.9h, RAIL 64.5h, CAP 80.3h, MINIMAX 151.8h.
+Every fail-closed branch fires on live data — spent budget reads the venue zero
+times, the kill switch reads it zero times, an unfillable clip and a zero rate
+both refuse.
+
+Two admissions looked wrong at a glance and I drafted a **minimum-depth-coverage
+floor** to catch them. Then I measured the thing the floor would have guarded,
+and it binds on nothing:
+
+    STBL     24h turnover $2,785      visible depth $202,292   = 2,529x the clip
+    H100     24h turnover $88,355     visible depth $2,732     =    34x the clip
+    median across the whole admitted set                        = 2,529x
+    books that cannot fill FIVE times the clip from visible depth: NONE
+
+**STBL is the whole argument in one row.** It turns over $2,785 a day and can
+absorb two and a half thousand clips right now — turnover measures how often
+somebody trades, depth measures whether *you* can, and at this clip they are
+different quantities. H100 is the one genuinely wide book (272bps) and the gate
+prices it correctly rather than being fooled: at 3331% APR it still repays in
+7.2 hours.
+
+So the coverage floor was dropped. It is recorded here because the alternative —
+shipping it — would have been a cage added on an intuition, on the same day and
+in the same file as one removed for exactly that reason.
+
+### THE OTHER INSTRUMENT — `scripts/study_stop_reclaim.py`, and what it REFUSED
+
+On 2026-07-13 the family book's counter-trend stop went 2.0x → 3.5x ATR on one
+measurement: *"the 2.0x stop fired on noise, 77-89% of stop-outs reclaimed entry
+within 24h."* That was a real win-more move and it was **never asked of any
+other stop in the fleet.** Now it is, in one command, for every book: for each
+stop-shaped exit, did price come back through the ENTRY within H hours — against
+a **same-coin random-start placebo** (I6), because on a volatile tape some
+fraction of any level is revisited for free and a bare reclaim rate means
+nothing. Fleet-wide, 24h, against Lighter's own candles:
+
+| book / tag | n | usd | reclaim | placebo | excess | held @24h |
+|---|---|---|---|---|---|---|
+| taker `long-breakoutup_trail` | 13 | −9.59 | 77% | 41% | **+36pp** | **+3.81%** |
+| **taker-LIVE** `short-divergence_sl` | 22 | −9.48 | 59% | 31% | **+28pp** | **+2.10%** |
+| pm-albanese `short-trend_sl` | 9 | −4.03 | 67% | 45% | +22pp | +1.35% |
+| pm-abbott `short-burst_sl` | 27 | −5.47 | 89% | 69% | +20pp | +1.95% |
+| **georgia `long-trend-breakout_...`** | **43** | **−17.11** | **74%** | **75%** | **−1pp** | +0.22% |
+| book-douglas `short-impulse_sl` | 16 | −25.08 | 56% | 54% | +3pp | **−4.96%** |
+| band-garrett `short_stop` | 4 | −9.92 | 0% | 0% | +0pp | −0.72% |
+
+**The bottom three rows are the point.** Georgia's trend-breakout stop is the
+single biggest stop-loss line in the shadow fleet — 66 exits, −$17.11, against
++$26.67 of ROI wins on the same signal — and it is **doing its job**: its reclaim
+rate is exactly what the tape gives away for free. The P&L table alone would have
+sold that widening; the control group killed it. Same for Douglas, whose stopped
+positions are **−4.96% worse** 24h later, and Garrett, whose stops never reclaim
+at all. **Three stops that look like cages in the ledger and are not.**
+
+### AND TWO MORE REFUSALS, on the one that DID look like a cage
+
+The taker's `breakoutup` trail is the fleet's strongest reclaim signal, and
+`TT_BRK_TRAIL`/`TT_BRK_SL` are **bare env literals with no registry entry** — the
+exit binding the taker's best long lens is unreachable by the growth rail (I18,
+still open, recorded here rather than fixed blind). `scripts/study_trail_sweep.py`
+prices it against the same tape, with the `(gx)` calibration gate:
+
+1. **The trail widening is WITHHELD.** The harness overstates the shipped rule by
+   **+0.508pp** against a ±0.5pp tolerance, and the entire trail effect across
+   6%→OFF is **~0.10pp**. The error exceeds the finding. Not shipped.
+2. **The clock widening is WITHHELD too, and by a second, independent test.**
+   The sweep exposed that **23–32 of 37 exits are the clock, not the trail** —
+   the trend exit has no TP cap, a wide stop and a trail, every component saying
+   *let it run*, and then inherits the mean-reversion arm's `MAX_HOLD_H`. The
+   grid looked emphatic (48h +1.42%/trade → 96h +2.20% → 168h +3.04%, monotone
+   under BOTH within-bar conventions, with `sl` count flat at 2 the whole way).
+   **Leave-one-symbol-out collapses it: without HYPE the 48h→96h gain falls from
+   +0.78pp to +0.07pp.** One coin is the finding. Not shipped.
+
+A refusal with evidence satisfies the growth rule; a widening that skips the gate
+is a step back in a growth costume. Three of them here, each with the number that
+killed it — and the instruments stay, so the next candidate costs one command
+instead of a session.
+
+### 🎫 AND THE ONE THE FLEET'S OWN AUDIT FOUND: THE GROWTH RAIL COULD ONLY EVER SHRINK THE TAKER'S ONE LIVING LENS
+
+A nine-book per-book audit ran behind this pass, every finding attacked by two
+adversarial lenses. Its first result is Eamon's complaint located in the
+actuator, and I verified the mechanism myself before acting on it because it is
+arithmetic rather than statistics.
+
+🎫 the Ticket Taker's shadow book trades exactly ONE lens — `long-breakoutup`
+holds every open slot; `dip` and `divergence` are both vetoed by the book's own
+realised record. **Measured on the live bus, both registered levers that reach
+that lens sat at the TIGHTEST end of their cage:**
+
+    taker.brk_range   0.97   cage [0.90, 0.97]   hi = tightest   default 0.95
+    taker.max_hold_h  24.0   cage [24.0, 72.0]   lo = tightest   default 48.0
+
+Both `set_by: scout-tuner`, both from `organ-proposal:event-sentinel`. And
+`lighter_ticket_replay.py:206` reads `_up = False if lens == "breakout" else
+None`, so `bull_entry_ok` refuses **every** breakout entry and the replay that
+gates those enactments contains **zero** breakoutup trades. The tuner's own
+published baseline says so in its own words: `breakout taken=0 closed=0`.
+
+**The consequence is arithmetic.** On a lens the gate cannot fill, a candidate's
+replay delta is exactly `$0.00`:
+
+    RESTRICT  fails only if `var < base - tol`   ->  0.00 passes: ENACTED FREE
+    EXPAND    needs +MARGIN_HALF on both halves  ->  0.00 can never clear it
+    STARVING  needs `taken > 0`                  ->  "0 replay fills — no evidence"
+
+**The cage on this book's only living lens could only ever get smaller,
+forever.** Not a tuning accident — a structural property of pointing a blind
+gate at a live lens. And the setting it ratcheted to is the worst cell this
+session measured: 24h reads **+0.343%/trade** against 48h's **+1.422%**.
+
+**THE FIX: pin each cage's restrictive end AT the module default.** `clamp()` is
+`min(hi, max(lo, v))` and runs at READ, so both live levers snap back on the next
+`get_lever` — no lever write, no deploy race. Reach in the growth direction is
+untouched (max_hold may still go to 72, brk_range down to 0.90). It propagates to
+every place that could re-introduce it: the tuner's own `SWEEP_HOLD` loses its
+24h rung, the incubator's **enactable** gene pool loses the 24.0 and 0.97 alleles
+(its RESEARCH grids keep theirs — they are required to extend beyond the cage,
+and truncating them was my error, caught by the incubator's own selftest).
+
+**WHAT THIS DOES NOT CLAIM.** It is not a widening — the values return to what
+Eamon configured. And it is not sold as alpha: restoring 24h → 48h
+measures +0.22pp to +0.57pp/trade on the book's own closes and **loses to a
+same-coin random-start placebo (P=0.45–0.88)**, i.e. most of it is exposure
+rather than edge. The claim is that **an unevidenced restriction is reversed**,
+and the burden for undoing a restriction a blind gate imposed is not the burden
+for widening past a validated one.
+
+**`taker.div_gap_pp` is deliberately left at its levered 75.0 (default 62.5).**
+Its lens is divergence, which the replay CAN see (42 taken), so the tuner had
+real evidence — and a 12-rung ladder through that replay reads negative at every
+rung and monotonically LESS negative as the bar tightens. Fixing a ratchet means
+fixing it where the gate is blind, not everywhere a lever moved.
+
+**THE DURABLE FIX IS UPSTREAM AND IS NOT HERE:** teach the replay the taker's own
+breakoutup relabel so the gate can SEE the lens before it is allowed to steer it.
+Until that lands, no breakoutup constant may enter the tuner's ladders — asserted,
+not merely written down. The `(sk)` trend-exit levers above are registered for
+CONSUMPTION only and their cages are one-sided at the default for this reason.
+
+Ten mutations verified red — **and one SURVIVED and was fixed**: emptying the
+new `DELIBERATELY_CLAMPED` declaration left its parametrized test with zero
+cases, and a parametrize over nothing passes. That is the
+check-that-inspects-nothing failure, in a guard written in this same entry.
+
+### 💸 AND THE ONE THAT MATTERS MOST: THE FLEET'S ONLY PATH TO MORE REAL MONEY WAS RIGGED AGAINST EVER PROMOTING ANYTHING
+
+🧪 the experiment judge is the fleet's **only designed route to more real
+money**: a candidate is promoted when the shadow twin beats the live control
+per-trade by `MARGIN_PP` (0.50pp) on the window and both halves. `arm_trades`
+gated the shadow arm on the lever RECEIPT — proof it ran the candidate's BARS —
+and said nothing about which ENTRY POLICY produced each close.
+
+**The arms do not run the same one.** The shadow twin runs `explore_k=2` plus
+scaled conviction; the live control runs `explore_k=0`. So a third of the
+experiment arm's closes came from a policy the control never runs — and they are
+the losing third. Reproduced independently from the paper ledger, post-28-Jul
+(both arms on one build, so no `arm_drift` fires):
+
+    shadow ALL       n=113   mean -0.1711%/trade
+      src=exploit    n= 74   mean -0.0104%
+      src=explore    n= 38   mean -0.4961%
+    live  ALL        n= 73   mean -0.0368%   (72 of 73 stamped `exploit`)
+
+    paired gap AS THE JUDGE COMPUTED IT   -0.1343pp
+    paired gap on SRC-MATCHED subsets     +0.0264pp
+
+**A 0.161pp handicap against a 0.50pp bar — 32% of it, charged to the experiment
+before it started.** And it is not hypothetical: the judge's ONE completed
+verdict in five weeks reads `RELEASED-OPERATOR ... 3-variable A/B (shadow ran
+explore+conviction mid-window)`, while the growth promoter sits parked on *"shadow
+arm not positive in its own right"* — circular, because explore is what makes it
+not positive. **Zero promotions to real money in five weeks.**
+
+`policy_srcs` + `match_policy` fix it: the control defines the policy set and
+BOTH arms are cut to it, so the restriction is symmetric and no unstamped row is
+guessed at. Fail-safe toward today's behaviour at every branch — an unstamped
+control filters nothing, and an all-off-policy arm falls back rather than
+reporting an empty sample the floors would read as "not enough data yet" forever.
+Published as `policy_match`, because a sample that shrank by a third without
+saying so is the same class of defect. The judge remains the sole writer of
+`live.funding.*`; this touches the COMPARISON, never the authority.
+
+**TWO DEFECTS IN MY OWN FIX, BOTH CAUGHT BY ITS OWN FIXTURE, both worth more
+than the fix:**
+* the first draft joined trades back onto rows **by `close_ts`** — and a close
+  timestamp is not unique. ⚖️ Counterweight closes ten legs in one instant, and
+  even in the test fixture 3 of 40 on-policy closes vanished because an
+  off-policy row overwrote their key. **A join on a non-unique key is not a
+  filter.** Filtering moved into `arm_trades`, where the row is in hand.
+* the match reached the full window and **not the halves** — so the both-halves
+  gate, the doctrine's central noise filter, kept reading the biased sample. A
+  candidate could clear the window bar and be failed by a half still counting
+  off-policy closes. **A half-applied bias fix is worse than none: it looks
+  corrected.**
+
+Seven mutations verified red — **and one SURVIVED**: leaving the CONTROL arm
+unfiltered inside `paired_eval` went undetected, because the symmetry test
+exercised `match_policy` directly and never the wiring. Closed with a
+`paired_eval`-level test.
+
+### 💸 AND THE CANDIDATE THAT NOW GOES THROUGH IT: THE FARMER'S RETURNS INVERT AT 24h
+
+With the bar unrigged, the queue gets the best-evidenced candidate it has ever
+carried. On 328 closes (279 priced) replayed against Lighter's own 15m candles,
+**calibration gate PASSED** (27/27 take-profits, 97.9% of non-barrier closes
+reproduced):
+
+    0-3h   +0.285% (n=85, t=+2.30)     24-48h  -1.797% (n=20, t=-1.89)
+    3-6h   +0.481% (n=37, t=+2.59)     48-73h  -1.797% (n=22, t=-3.07)
+    6-12h  +0.413% (n=67, t=+1.97)
+    12-24h +0.569% (n=48, t=+1.24)
+
+**Every hour past 24h destroys money the book had already earned.** The cap
+sweep peaks at 24h on BOTH arms computed separately — a single interior peak
+bracketed by worse cells either side, not a grid edge: live 72h +0.113
+(t=+0.81, halves +15.0/−4.7) → 24h +0.217 (t=+1.76, halves +15.8/+4.0); shadow
+72h −0.054 (t=−0.28, halves +18.3/−26.9) → 24h +0.270 (t=+1.59, halves
++36.4/+6.5). **The halves bar flips FAIL→PASS on both arms, and realised maxDD
+goes 41.99pp → 14.52pp.**
+
+**And it is not the tape.** Two same-coin placebos, the second decisive: synthetic
+positions conditioned IDENTICALLY — same barriers, required to survive 24h
+untouched, so the survivorship selection is matched — return −0.299% on the
+forward leg against this book's −1.278%. Excess −0.979pp, t=−2.44, P(excess≥0)
+= 0.011. That kills the martingale explanation. A random short on these coins
+earns −0.07%/24h, so it is not the `(hm)` free-short bonus either. No coin
+carries it (jackknife t=+2.33..+3.73 across all eight drops).
+
+Queued as `max-hold-24` at the head of the judge's serial queue, ranked strongest
+prior in its own contract. **It is not enacted by me** — 24.0 is the cage floor of
+`xp.funding.max_hold_h`, the judge sets the shadow lever, the paired bar grades
+it, and the judge alone may write `live.funding.*`. The price is declared: a
+promotion resets the 30-day era on both arms, costing the live row 26.6 banked
+days — cheap, because that row's own horizon organ says its `t` bar needs ~1208d
+at the current trajectory, so the window bar was never binding and the cap is
+precisely what changes the trajectory.
+
+### THE RISK MY OWN CHANGE CREATED, FOUND AND CLOSED IN THE SAME PASS
+
+Widening a gate is the same act as minting a book, and I20 says the same thing
+about it: *"name every living book whose gate already admits them."* Carry's
+floor is now conditional, so **`audit_book_overlap` was reading a floor that no
+longer describes the book.** `living_gates` takes each book's gate from its own
+published `caps`, and `caps.min_vol` still says $1M while the real reach runs
+underneath it.
+
+That is the `(gl)` phantom-rival class **inverted**, and the inverted direction
+is the worse one: a phantom rival is noise an operator learns to ignore, but a
+rival that is REAL and INVISIBLE starves a sibling with nothing failing the run.
+`living_gates` now reads the published `depth_admit` and models the floor as
+UNBOUNDED BELOW — not a guess at an effective number, because there isn't one:
+the escape is per-coin. It is a measurement (16 of 16 sub-floor hot books passed
+on 20-Aug), and the books carry cannot reach are excluded by PAYBACK, which is a
+question this file's volume axis cannot express.
+
+The `(px)` declaration is extended in place: **the sliver is now the whole band.**
+Carry reaches to the bottom of 🛢️ Garrett's `[0.1M, 2M)`, not just its top slice,
+and the six coins that are both ≥20% and inside Garrett's band are named
+(UNITREE, ZRO, KAITO, ANSEM, APEX, CXMT). **It is NOT the `(lv)` starvation
+shape** — those are separate processes with separate held-sets, where the Barnes
+trap needed one loop, one shared held-set and a subset gate running second. But
+one new asymmetry is declared rather than detected: Garrett's own `(pl)`
+measurement found **6 of 6 of its top-ranked candidates are ≥20%**, so carry is
+now a rival for exactly the supply Garrett ranks first. That is a RANKING
+collision, and this guard's axes (apr × vol × class) cannot express it. Owner:
+OPERATOR, the same ~12-Sep decision point.
+
+Four more mutations verified red on that arm, including the one that matters
+most — a truthy-instead-of-bool read, which would let a malformed payload widen
+a book's claimed reach and manufacture a collision.
+
+### THE CARRIED ITEM, CLEARED IN THE SAME PASS — THE TREND EXIT JOINS THE RAIL
+
+The refusals above are only half an answer. Both widenings were withheld because
+the *measurement* could not decide them — and the reason it could not is that
+**the two knobs governing the taker's trend exit were bare env literals with no
+registry entry, and the quantity each one cuts was never written down.**
+
+Under BULL_MODE `bull_exit()` routes breakout/breakoutup to a different exit
+from every other lens: no TP cap, a wide hard stop, a trailing give-back. The
+growth rail could move the fixed reversion bracket that divergence uses
+(`taker.tp` / `taker.sl`) and could not touch the exit binding the book's best
+long lens. That is I18, and it was open.
+
+**`taker.brk_trail` [0.04, 0.15] and `taker.brk_sl` [-0.12, -0.05] are now
+registered, caged and consumed, at today's values.** Registering moves nothing —
+that is the `disloc.exit_bps` idiom and it matters here specifically, because
+the widening these knobs invite is the one two measurements refused this morning.
+What the rail gains is the ability to walk them through the scout tuner's replay
+gate, hourly, on evidence, instead of a session hand-setting a number. `hi` on
+the trail stops at 0.15 because the sweep measured the rule SATURATING there —
+15%, 20% and trail-OFF are the same book, so a cage past it is reach into a
+region where the lever does nothing.
+
+**And the receipts, which are the load-bearing half.** A registered lever nobody
+can profile is the cage-nobody-can-measure failure, and it is *why* today's two
+attempts had to reconstruct from hourly candles what the bot already knew to the
+loop. The trail fires on GIVE-BACK from the peak; the stop on ADVERSE EXCURSION.
+Both now ride the close row (`give_back`, `mae_ret`), as **maxima, not final
+values** — a position that gave back 8% and recovered to 1% by close TRIPPED a
+6% trail on the way, and a final-value stamp would teach the profiler the bar is
+never approached. Absent stays **absent**: a missing `give_back` read as 0.0 is
+the best possible value and would drag the whole distribution to the tight end
+of the cage.
+
+`audit_lever_authority` gains a general `xfield` ledger extractor to read them —
+its two existing ledger kinds both derive from row TIMESTAMPS, which is all the
+ledger used to carry, so *any* lever cutting something the bot knew and did not
+record was unprofilable by construction and would have stayed UNMEASURED however
+many `--measure` runs ran. Scoped by reason suffix, because a bar governing the
+trail must not be profiled against positions the stop closed. Both specs read
+UNMEASURED today pending accrual, which is the honest state.
+
+Structurally shadow-only, twice over: `apply_tuning` returns an empty dict when
+`TT_VENUE == lighter_live`, and the live arm is divergence-SHORT only, so the
+breakout branch of `bull_exit` is unreachable on real money even if a lever were
+set. Both facts are asserted, not described. 12 further mutations verified red.
+
+### CARRIED
+
+* ~~`taker.brk_trail` / `taker.brk_sl` are unregistered~~ **DONE in this same
+  pass — see the section above.** What remains carried is the breakout arm's
+  CLOCK: `bull_exit` hands it the reversion arm's `MAX_HOLD_H`, so a trend exit
+  built to let a winner run inherits a mean-reversion book's timer, and 23-32 of
+  37 replayed exits are that clock rather than the trail. Deliberately NOT split
+  here: giving it an independent constant would decouple it from a lever the
+  rail actively moves (the ledger shows 24/48/72), which is a behaviour change,
+  and the only evidence for it is the 48h->96h grid that leave-one-symbol-out
+  just killed. It needs its own measurement, not a refactor smuggled in.
+* 🎫 the LIVE taker's `short-divergence_sl` reads +28pp reclaim excess and
+  **+2.10% held at 24h over n=22** on real money. Real-money row: measured and
+  handed over, not touched.
+* Georgia is **5 of 6 bars, failing only `t` (1.11 < 2.0)** — the fleet's closest
+  book to the gate. Its stop is not the leak; where its `t` comes from is the
+  next question worth a session.
+
 ## 2026-08-20 (se) — THE FLEET COULD NOT SEE LEVERAGE, SO OF COURSE IT NEVER USED ANY: the venue's margin surface was on a row the scout already fetched, and 212 markets' worth of it was thrown away every cycle
 
 [Renumbered (sd) -> (se): main took (sd) for the nav-cook leverage entry while
@@ -769,12 +4341,12 @@ split), `CHANGELOG.md` ((ri) corrected). Deploys on push — nav-cook's route is
 live since `(rj)`.
 ## 2026-08-20 (sj) — FOUR BOOKS UNCHOKED INDIVIDUALLY, AND THE FIFTH FIX WAS WITHDRAWN BECAUSE ANOTHER SESSION HAD ALREADY CURED IT
 
-## 2026-08-20 (sl) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
+## 2026-08-20 (tt) — THE SNIPER'S SUPPLY WAS NEVER DEAD, IT WAS SCREENED OUT: a gate justified on n=2 asked `strategy_index == 2` while the venue files every memecoin debut under class 7, so the young source admitted NOTHING for 66 days while its own cohort arrived at ~2/month
 
-*[RENUMBERED (sg) -> (sl): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+*[RENUMBERED (sg) -> (tt): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
-*(Renumbered (se) -> (sl) at push time — the THIRD collision this branch has
-taken today, and the companion entry moved (sd) -> (sk) with it. `main` took
+*(Renumbered (se) -> (tt) at push time — the THIRD collision this branch has
+taken today, and the companion entry moved (sd) -> (ts) with it. `main` took
 (sa)/(sb)/(sc) for nav-cook and Counterweight, then (sd)/(se) for the leverage
 pass, all while this was in flight. Each of those is merged and cited, so by
 the convention's own tiebreak they keep their letters and these move. Every
@@ -1281,11 +4853,11 @@ does not discharge.
 different policy. The book is 1 day old and the sample is worth ~$5.71 — the
 cheapest possible moment to take the reset.
 
-## 2026-08-20 (sk) — THE SNIPER NEVER HAD THE POTENCY IT IS BEING ASKED TO RECOVER: one memecoin was 157% of the predecessor's lifetime P&L, the exit ladder everyone remembers as the earner COST money on it, and the successor's entries sit at the 50th percentile of random — every candidate refused, and the two dead sources that hid for 86 and 66 days are now visible
+## 2026-08-20 (ts) — THE SNIPER NEVER HAD THE POTENCY IT IS BEING ASKED TO RECOVER: one memecoin was 157% of the predecessor's lifetime P&L, the exit ladder everyone remembers as the earner COST money on it, and the successor's entries sit at the 50th percentile of random — every candidate refused, and the two dead sources that hid for 86 and 66 days are now visible
 
-*[RENUMBERED (sf) -> (sk): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
+*[RENUMBERED (sf) -> (ts): main claimed (sf) through (sj) concurrently — five entries from another session merged while this branch waited on CI. The cited entry keeps the letter, so these four moved. `git log` subjects still carry the old letter; grep the CHANGELOG headers, not the commit log.]*
 
-*(Renumbered (sa) -> (sd) -> (sk) at push time. `main` took `(sa)` mid-flight for
+*(Renumbered (sa) -> (sd) -> (ts) at push time. `main` took `(sa)` mid-flight for
 the nav-cook confirm-window entry, which is merged and cited, so by the
 convention's own tiebreak the CITED entry keeps the letter and this one
 moves. In-tree citations were repointed in the same commit, enumerated

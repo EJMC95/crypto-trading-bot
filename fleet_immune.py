@@ -55,6 +55,14 @@ try:
 except Exception:  # noqa: BLE001
     tuning = None
 
+# [(ti)] the judge's phase vocabulary — IMPORTED so this validator and its
+# publisher can never disagree about it again (the (tb) erasure's structural
+# closure). Soft: a dark bus validates nothing rather than crashing the organ.
+try:
+    import fleet_bus as _fb
+except Exception:  # noqa: BLE001
+    _fb = None
+
 KEY = "fleet-immune"
 TTL_SEC = int(os.environ.get("IMMUNE_TTL_SEC", "2400"))       # 40 min
 MAX_ALERT_AGE_H = float(os.environ.get("IMMUNE_MAX_ALERT_AGE_H", "24"))
@@ -379,9 +387,27 @@ def organ_invariants(states, now):
 
     xp = states.get("xp-judge") or {}
     if _fresh(xp, now):
-        ph = xp.get("phase")
-        if ph is not None and ph not in ("idle", "running", "promoted"):
-            sick("xp-judge", f"unknown phase {ph!r}")
+        # [2026-08-25 (ti)] THE VOCABULARY IS IMPORTED, NEVER RE-TYPED — the
+        # (tb) incident's structural closure: this organ's inline phase tuple
+        # lagged the judge's (ta) vocabulary change and ERASED a deliberate
+        # census. One constant in fleet_bus, imported by publisher and
+        # validator alike, means there is no second list to forget; a future
+        # phase addition that skips fleet_bus reddens the JUDGE'S own
+        # selftest (subset assert) rather than being flagged sick here.
+        # Fail-open on a dark bus (a validator that cannot read the
+        # vocabulary validates nothing, exactly like every soft import).
+        _vocab = tuple(getattr(_fb, "XP_JUDGE_PHASES", ()) or ()) if _fb \
+            else ()
+        if _vocab:
+            ph = xp.get("phase")
+            if ph is not None and ph not in _vocab:
+                sick("xp-judge", f"unknown phase {ph!r}")
+            # v2.0: the per-pair map speaks the same vocabulary.
+            for _pid, _p in sorted((xp.get("pairs") or {}).items()):
+                _pph = (_p or {}).get("phase") if isinstance(_p, dict) \
+                    else None
+                if _pph is not None and _pph not in _vocab:
+                    sick("xp-judge", f"pair {_pid}: unknown phase {_pph!r}")
 
     # [2026-07-30 (hh)] A LEDGER THAT IS NOT ONE BOOK'S RECORD. This is the
     # purest ALIVE-BUT-SICK shape in the fleet: the row is fresh, in-TTL and
@@ -482,6 +508,61 @@ def organ_invariants(states, now):
                                              "insufficient"):
                 sick("fleet-proprioception", f"{lever} unknown verdict {vd!r}")
 
+    return out
+
+
+# [2026-08-25 (th)] Standing headroom conditions that are STRUCTURAL at an
+# on-record operator setting — paged once at the decision, not every loop
+# after it. Mum's K=4 breach is Eamon's 21-Aug 9.5x, quoted: her gap is 1.13
+# stop-widths against the K=4 bar BY CONFIGURATION, so a page on it would
+# fire permanently and train ignoring the channel ((gl)). The allowlist is
+# (bot -> allowed reasons); a NEW reason on an allowlisted book still pages,
+# and any reason on a non-allowlisted book still pages.
+HEADROOM_OK = {
+    "freqtrade-mum-lighter": {"too_close"},
+}
+
+
+def headroom_sickness(bot_rows, ok=None):
+    """[2026-08-25 (th)] THE RUIN GATE'S VERDICT, WATCHED. The variant host
+    publishes `extra.leverage.headroom` (SafetyRails.headroom_check — the
+    fleet's only liquidation-aware gate, caller-less on live money since the
+    (ta) retirement) as verdict-only telemetry; this is the organ that turns
+    a bad verdict into a page. Conditions paged: a dead protective stop
+    (`stop_reachable` false — above the ceiling, liquidation fires first), a
+    position whose mark we cannot read (`mark_blind`), one the venue will not
+    price (`liq_unpriced`), or a LIVE measured liquidation distance inside
+    the stop itself. Structural conditions at on-record operator settings are
+    DECLARED in HEADROOM_OK with the decision quoted — never defaulted.
+    Fresh rows only (I1) and only rows that publish the block: absence is a
+    deploy-latency state, not a sickness."""
+    allow = HEADROOM_OK if ok is None else ok
+    out = []
+    for r in bot_rows or []:
+        if _row_stale(r):
+            continue
+        bot = str(r.get("bot") or "")
+        lev = (r.get("extra") or {}).get("leverage")
+        if not isinstance(lev, dict):
+            continue
+        allowed = allow.get(bot, set())
+        hd = lev.get("headroom")
+        if isinstance(hd, dict) and hd.get("ok") is False:
+            why = str(hd.get("reason") or "unknown")
+            if why not in allowed and why not in ("state_unreadable",):
+                # state_unreadable is the venue read failing, which the
+                # respiration/watchdog layer owns — a margin-read outage on
+                # every loop would page here forever ((gl)).
+                out.append({"organ": bot,
+                            "detail": f"headroom refused: {why} "
+                                      f"(gap {hd.get('gap_stop_widths')} "
+                                      f"stop-widths)"})
+        if lev.get("stop_reachable") is False and "stop_dead" not in allowed:
+            out.append({"organ": bot,
+                        "detail": f"protective stop is DEAD at gross "
+                                  f"{lev.get('set')} (ceiling "
+                                  f"{lev.get('stop_dead_above')}) — "
+                                  f"liquidation fires before the stop"})
     return out
 
 
@@ -1145,6 +1226,7 @@ def run_once():
     # only observable BETWEEN cycles, so the memory IS the sensor).
     churn_seen = dict(prior.get("churn_seen") or {})
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
+            + headroom_sickness(bot_rows)
             + stale_writer_sickness(bot_rows)
             + restart_churn(states, churn_seen, now)
             + brain_amnesia(states.get("learning-brain"),
@@ -1332,6 +1414,14 @@ def _selftest():
     assert organs == {"lighter-market", "brain-lens-forward",
                       "regime-oracle", "xp-judge",
                       "fleet-proprioception", "golive-readiness"}, organs
+    # [2026-08-25] the DELIBERATE phase is QUIET: (ta)'s stood_down census was
+    # flagged sick by this very check, and fleet_regen then clobbered the
+    # judge's honest "my live arm is retired" back to "idle" every pass —
+    # erasing an I18 census with the fleet's own immune system. This negative
+    # control keeps that from returning.
+    _sd = organ_invariants({"xp-judge": {"updated": fresh, "ttl_sec": 10800,
+                                         "phase": "stood_down"}}, now)
+    assert not [i for i in _sd if i["organ"] == "xp-judge"], _sd
     _gl = [i["detail"] for i in inv if i["organ"] == "golive-readiness"]
     assert len(_gl) == 1, f"only the compromised book may be flagged: {_gl}"
     assert "dup-book" in _gl[0] and "TWO WRITERS" in _gl[0], _gl
@@ -1482,6 +1572,55 @@ def _selftest():
     assert alert_fossils([], now) == ([], [])
     assert organ_invariants({}, now) == []
     assert bot_row_sickness([]) == []
+
+    # ---- [2026-08-25 (th)] HEADROOM: the ruin gate's verdict, watched -----
+    # Driven with payloads shaped like the variant host's REAL leverage block
+    # ((hj): a consumer is tested against what its publisher builds), fresh
+    # `updated` stamps so I1 admits them. The allowlist mechanism is tested
+    # with the injected `ok=` (the STALE_WRITER_OK lesson: arms reading the
+    # live dict go vacuously green the day it empties).
+    def _hrow(bot, headroom=None, stop_ok=True, age=60):
+        lev = {"set": 9.5, "stop_dead_above": 10.0, "stop_reachable": stop_ok}
+        if headroom is not None:
+            lev["headroom"] = headroom
+        return {"bot": bot, "age_sec": age, "ttl_sec": 900,
+                "extra": {"leverage": lev}}
+
+    _hs = headroom_sickness([
+        # mark_blind on a non-allowlisted book -> SICK
+        _hrow("freqtrade-avo-maria-lighter",
+              {"ok": False, "reason": "mark_blind", "gap_stop_widths": None}),
+        # mum's structural too_close, allowlisted -> silent
+        _hrow("freqtrade-mum-lighter",
+              {"ok": False, "reason": "too_close", "gap_stop_widths": 1.13}),
+        # clean verdict -> silent (a detector that flags everything trains
+        # the operator to ignore it)
+        _hrow("freqtrade-georgia-lighter",
+              {"ok": True, "reason": "ok", "gap_stop_widths": 9.1}),
+        # venue-read outage -> silent here (respiration's page, not this one)
+        _hrow("book-x-lighter",
+              {"ok": False, "reason": "state_unreadable",
+               "gap_stop_widths": None}),
+    ], ok={"freqtrade-mum-lighter": {"too_close"}})
+    assert [s["organ"] for s in _hs] == ["freqtrade-avo-maria-lighter"], _hs
+    assert "mark_blind" in _hs[0]["detail"], _hs
+    # a DEAD stop pages even with no headroom block at all
+    _hs2 = headroom_sickness([_hrow("freqtrade-x-lighter", stop_ok=False)],
+                             ok={})
+    assert _hs2 and "stop is DEAD" in _hs2[0]["detail"], _hs2
+    # mum's SAME too_close on the LIVE allowlist stays silent (the declared
+    # structural condition), while a NEW reason on her row still pages
+    assert headroom_sickness([_hrow(
+        "freqtrade-mum-lighter",
+        {"ok": False, "reason": "too_close", "gap_stop_widths": 1.13})]) == []
+    _hs3 = headroom_sickness([_hrow(
+        "freqtrade-mum-lighter",
+        {"ok": False, "reason": "liq_unpriced", "gap_stop_widths": None})])
+    assert _hs3 and "liq_unpriced" in _hs3[0]["detail"], _hs3
+    # a stale row is a corpse, not a sickness (I1)
+    assert headroom_sickness(
+        [_hrow("freqtrade-avo-maria-lighter", stop_ok=False,
+               age=999999)]) == []
 
     # ---- [2026-07-31 (hu)] STALE WRITER: deployed OK, never landed --------
     # The measured shape: seven services stamped, carry unstamped on an old

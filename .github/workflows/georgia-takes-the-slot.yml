@@ -1,0 +1,191 @@
+# ONE-SHOT: 🔮 georgia takes 💸 the Farmer's sub-account. DELETE AFTER USE.
+#
+# **Eamon, 22-Aug: "just replace farmer with georgia as weve done so many times
+# before" / "Full permission for you to swap farmer and Georgia".**
+#
+# WHY IT CONVERTS `trail-blazer-live` IN PLACE rather than creating a new
+# service and moving keys. The fleet's own precedent is exactly this — 🎫 the
+# Ticket Taker took 🌊 Tide Rider's slot on the SAME service/keys/sub-account
+# (17-Jul), and service names in this fleet have never matched their books
+# (`trail-blazer-live` runs the Farmer; `tide-rider-lighter-live` runs 🙏 Avo).
+# Converting in place buys two things a new service cannot:
+#   * **no credential is ever read, copied or transported.** A provisioner that
+#     moved API keys would have to read them, and (ml) measured that even a
+#     redacted `railway variables` echo survived only by column-width luck.
+#     Here the keys are never touched — they simply stay on the service.
+#   * **"two processes on one sub-account" becomes structurally unreachable.**
+#     There is only ever ONE service holding those keys, so the failure that
+#     would have the Farmer flatten georgia's positions cannot be reached by
+#     any ordering mistake.
+#
+# THE ORDERING IS ENFORCED HERE, NOT IN A RUNBOOK. The Farmer's four real
+# positions must be FLAT before its container is replaced, or they are stranded
+# with no manager, no stop and no exit. So this job REFUSES to run until the
+# live row's own receipt says so — `extra.retired` present (the guard is
+# deployed and it retired deliberately) AND zero open. Fail-CLOSED on a dark,
+# stale or unparseable feed: the cost of a wrong default here is four abandoned
+# real-money shorts.
+#
+# A green run is NOT a running book. The proof is the row
+# `freqtrade-georgia-lighter` publishing on /pnl.json with an `extra.build` +
+# `extra.build_n` pair matching the local prediction ((iw)/(fd)).
+name: Georgia takes the slot
+on:
+  workflow_dispatch:
+    inputs:
+      gross_x:
+        description: "GEORGIA_GROSS_X (leverage). 5 = Eamon's setting; her stop is dead above 9.09x."
+        required: true
+        default: "5.0"
+      max_notional:
+        description: "FREQTRADE_GEORGIA_MAX_NOTIONAL (USD hard cap; boot gate)"
+        required: true
+        default: "1200"
+
+jobs:
+  swap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: REFUSE unless the Farmer's live arm is retired AND flat
+        run: |
+          set -uo pipefail
+          curl -fsS --max-time 60 \
+            https://pnl-dashboard-production-858c.up.railway.app/pnl.json \
+            -o feed.json || { echo "::error::feed unreachable — refusing"; exit 1; }
+          python3 - <<'PY'
+          import json, sys
+          ROW = "perps-funding-lighter-lighter"
+          try:
+              d = json.load(open("feed.json"))
+          except Exception as e:
+              print(f"::error::feed unparseable ({e}) — refusing"); sys.exit(1)
+          rows = d if isinstance(d, list) else (d.get("bots") or [])
+          hit = [r for r in rows if r.get("bot") == ROW]
+          if not hit:
+              # NOT a licence to proceed: an absent row could equally mean the
+              # dashboard hid it before the flatten finished.
+              print(f"::error::{ROW} absent from the feed — cannot confirm it "
+                    "is flat, refusing"); sys.exit(1)
+          r = hit[0]
+          extra = r.get("extra") if isinstance(r.get("extra"), dict) else {}
+          ret = extra.get("retired")
+          if not isinstance(ret, dict):
+              print(f"::error::{ROW} publishes no extra.retired — the "
+                    "retirement guard is not deployed yet. Deploy "
+                    "trail-blazer-live first and let it flatten."); sys.exit(1)
+          openn = ret.get("open")
+          live = r.get("open_trades")
+          if openn != 0 or (live or 0) != 0:
+              print(f"::error::{ROW} still holds {openn} (row says {live}) — "
+                    "the flatten has not finished. Refusing: replacing the "
+                    "container now strands real positions with no manager.")
+              sys.exit(1)
+          age = r.get("age_sec")
+          if age is None or age > 1800:
+              print(f"::error::{ROW} age_sec={age} — a stale row cannot prove "
+                    "it is flat NOW (I1: liveness before semantics)."); sys.exit(1)
+          print(f"OK: {ROW} retired {ret.get('since')} and FLAT "
+                f"(age {age}s). Safe to take the slot.")
+          PY
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Convert trail-blazer-live to georgia
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          GROSS_X: ${{ inputs.gross_x }}
+          MAX_NOTIONAL: ${{ inputs.max_notional }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          SVC="trail-blazer-live"
+
+          echo "::group::$SVC — verify it resolves"
+          status_json="$(railway status --json || true)"
+          case "$status_json" in
+            *"\"$SVC\""*) : ;;
+            *) echo "::error::service '$SVC' did not resolve"; exit 1 ;;
+          esac
+          echo "::endgroup::"
+
+          # Variable NAMES only in the log — never values, and never a
+          # `railway variables` read-back echo ((ml): its sed redaction
+          # survived by column-width luck). The --set exit code is the check.
+          # LIGHTER_* keys and DATABASE_URL are deliberately NOT named here:
+          # they stay exactly as they are, which is the whole point of
+          # converting in place.
+          echo "::group::$SVC — set georgia's config"
+          echo "setting: RAILWAY_DOCKERFILE_PATH FAMILY_LIVE_BOOK GEORGIA_VENUE FREQTRADE_GEORGIA_MAX_NOTIONAL GEORGIA_GROSS_X"
+          railway variables --service "$SVC" \
+            --set "RAILWAY_DOCKERFILE_PATH=Dockerfile.avolive" \
+            --set "FAMILY_LIVE_BOOK=freqtrade-georgia" \
+            --set "GEORGIA_VENUE=lighter_live" \
+            --set "FREQTRADE_GEORGIA_MAX_NOTIONAL=${MAX_NOTIONAL}" \
+            --set "GEORGIA_GROSS_X=${GROSS_X}" \
+            --skip-deploys || { echo "::error::$SVC variable set failed"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::$SVC — deploy georgia"
+          ok=0
+          for i in 1 2 3; do
+            if railway up --service "$SVC" --ci; then ok=1; break; fi
+            echo "retry $i failed; sleeping"; sleep 15
+          done
+          if [ "$ok" != 1 ]; then echo "::error::$SVC railway up failed x3"; exit 1; fi
+          echo "::endgroup::"
+
+          echo "::endgroup::"
+
+      - name: Prove it by the ROW, not by the green run
+        env:
+          GROSS_X: ${{ inputs.gross_x }}
+        run: |
+          set -uo pipefail
+          # WHY THE ENV VAR IS THE RIGHT LEVER HERE, established from a
+          # population rather than an absence ((hu)): this fleet does slot
+          # swaps two ways — a per-service config-as-code toml (how 🙏 Avo took
+          # the Taker's slot: railway.tickettaker.toml repoints dockerfilePath)
+          # or the RAILWAY_DOCKERFILE_PATH env (how every provisioned service
+          # since (lr) is built). All TEN railway*.toml files were enumerated
+          # and not one builds Dockerfile.fundinglighter, while
+          # trail-blazer-live demonstrably runs it — so its image path cannot
+          # be coming from a toml. If that reasoning is wrong, THIS step is
+          # where it shows up, which is the point of having it.
+          for i in $(seq 1 20); do
+            curl -fsS --max-time 45 \
+              https://pnl-dashboard-production-858c.up.railway.app/pnl.json \
+              -o feed.json 2>/dev/null || true
+            if python3 - <<'PY'
+          import json, sys
+          try:
+              d = json.load(open("feed.json"))
+          except Exception:
+              sys.exit(1)
+          rows = d if isinstance(d, list) else (d.get("bots") or [])
+          r = next((x for x in rows
+                    if x.get("bot") == "freqtrade-georgia-lighter"), None)
+          if not r:
+              sys.exit(1)
+          e = r.get("extra") or {}
+          print(f"row live: status={r.get('status')} equity={r.get('equity')} "
+                f"build={e.get('build')}/{e.get('build_n')} "
+                f"svc={e.get('svc')} leverage={e.get('leverage')}")
+          sys.exit(0)
+          PY
+            then
+              echo "GEORGIA IS PUBLISHING — the swap landed."; exit 0
+            fi
+            echo "waiting for the row ($i/20)"; sleep 30
+          done
+          echo "::error::freqtrade-georgia-lighter never appeared after 10 min."
+          echo "::error::The container did not become georgia. Most likely the"
+          echo "::error::service has a config-as-code file overriding"
+          echo "::error::RAILWAY_DOCKERFILE_PATH — check trail-blazer-live's"
+          echo "::error::'Railway Config File' setting in the UI and clear it or"
+          echo "::error::point it at a toml building Dockerfile.avolive."
+          exit 1

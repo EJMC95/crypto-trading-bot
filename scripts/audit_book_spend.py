@@ -69,6 +69,13 @@ GRANDFATHERED = {
     "nav-cook-lshadow": "born 19-Aug (ri), one day before I22",
     "pm-albanese-lshadow": "pre-I22 parliament",
     "pm-turnbull-lshadow": "pre-I22 parliament",
+    # [2026-08-25 (te)] The two deploy-latency bridges that sat here for
+    # freqtrade-georgia-lighter and freqtrade-mum-lighter were REMOVED the
+    # same day, on the receipt they named: all three live rows read back
+    # build feb27e5d0318/17 with `extra.spend` publishing by 10:15:21Z
+    # (avo/georgia flipped 10:13:50Z, mum 10:15:21Z — the [deploy-live]
+    # merge 143bf45). Both books now face the census HONESTY checks like
+    # any post-I22 birth.
 }
 
 #: A book may exceed MAX_DAYS_TO_GATE only with a reason, an OWNER and a DATE.

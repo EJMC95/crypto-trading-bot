@@ -1,0 +1,127 @@
+# live-pnl-audit — the DAILY / WEEKLY / MONTHLY live-bot P&L + sync audit.
+#
+# Born 25-Aug-2026 (tk) at Eamon's ask: "Daily and weekly and monthly audit of
+# live bots - how p n L can improve ... Also how everything's syncing as there
+# seems to be instances where a month has passed without something being
+# implemented."
+#
+# The judgment stays in scripts/live_pnl_audit.py (advisory, read-only,
+# fail-closed on a dark feed). This workflow is only cadence + surfacing, per
+# the anti-polling doctrine (P2: if it matters, it is an Action, not a wakeup
+# chain): the report lands in the run summary, and RED findings open/update
+# ONE rolling issue (label live-pnl-audit, the fleet-watchdog pattern) that
+# closes itself on recovery — so a frozen live row or a declared-but-unlanded
+# change cannot sit quietly for a month.
+#
+# Schedules are UTC; the Sydney times they serve (operator-timezone rule):
+#   daily   30 20 * * *  ->  06:30 next morning AEST (05:30 in AEDT months)
+#   weekly  45 20 * * 0  ->  Monday 06:45 AEST
+#   monthly 15 20 1 * *  ->  morning of the 2nd AEST (cron has no "last day")
+# The three fire the SAME script with a different table window — the sync
+# sweep runs identically in all of them, because a sync gap should never wait
+# for Monday.
+#
+# Cost note ((ql): Actions minutes are a measured constraint here): one tiny
+# ubuntu job, stdlib python, no pip, ~1 min/run, ~35 runs/month.
+
+name: live-pnl-audit
+
+on:
+  schedule:
+    - cron: "30 20 * * *"
+    - cron: "45 20 * * 0"
+    - cron: "15 20 1 * *"
+  workflow_dispatch:
+    inputs:
+      window:
+        description: "Table window"
+        type: choice
+        options: [daily, weekly, monthly]
+        default: weekly
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: live-pnl-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        # full history: the queue-sweep proxy reads OPERATOR_QUEUE.md's git
+        # mtime, and a shallow clone would date it at the clone ((jc) lesson:
+        # the code-currency job needs depth for the same reason).
+        with:
+          fetch-depth: 0
+
+      - name: Decide window
+        id: win
+        env:
+          SCHED: ${{ github.event.schedule }}
+          DISPATCH_WIN: ${{ inputs.window }}
+        run: |
+          # Pure-bash matching — no producer|grep -q under pipefail ((ml)).
+          win="daily"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            win="${DISPATCH_WIN:-weekly}"
+          elif [[ "$SCHED" == "45 20 * * 0" ]]; then
+            win="weekly"
+          elif [[ "$SCHED" == "15 20 1 * *" ]]; then
+            win="monthly"
+          fi
+          echo "window=$win" >> "$GITHUB_OUTPUT"
+          echo "table window: $win"
+
+      - name: Run the audit (fail-closed on a dark feed)
+        id: audit
+        run: |
+          set -o pipefail
+          rc=0
+          python3 scripts/live_pnl_audit.py \
+            --window "${{ steps.win.outputs.window }}" \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --gha | tee report.md || rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # exit 2 = feed dark: the audit could not see, which is itself the
+          # failure — fail the job immediately, no issue juggling on blindness.
+          if [ "$rc" = "2" ]; then exit 2; fi
+
+      - name: Open/update the rolling issue on RED, close on recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RC: ${{ steps.audit.outputs.rc }}
+        run: |
+          gh label create live-pnl-audit --repo "$REPO" --color B60205 \
+            --description "daily/weekly/monthly live P&L + sync audit" \
+            2>/dev/null || true
+          NUM=$(gh issue list --repo "$REPO" --label live-pnl-audit \
+            --state open --json number -q '.[0].number' || true)
+          NOW=$(date -u +"%Y-%m-%dT%H:%MZ")
+          if [ "$RC" = "1" ]; then
+            TITLE="🔴 Live P&L audit: RED findings"
+            { echo "_Updated $NOW by live-pnl-audit — RED findings stand._"
+              echo
+              cat report.md; } > body.md
+            if [ -z "$NUM" ]; then
+              gh issue create --repo "$REPO" --label live-pnl-audit \
+                --title "$TITLE" --body-file body.md
+            else
+              gh issue edit "$NUM" --repo "$REPO" --body-file body.md \
+                >/dev/null
+            fi
+          elif [ "$RC" = "0" ] && [ -n "$NUM" ]; then
+            gh issue close "$NUM" --repo "$REPO" \
+              --comment "✅ Recovered — no RED findings at $NOW."
+          fi
+
+      - name: Fail the run when RED findings stand
+        if: ${{ steps.audit.outputs.rc != '0' }}
+        run: |
+          echo "::error::live_pnl_audit exit ${{ steps.audit.outputs.rc }} — see the run summary / rolling issue"
+          exit 1

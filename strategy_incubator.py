@@ -115,7 +115,11 @@ EDGE_MARGIN = _env_f("INCUBATOR_EDGE_MARGIN", EDGE_TRADES * TRADE_SWING)
 # TAKER genes: (tt attr, lever, discrete allele grid within registry bounds).
 # The grid is the search space; offspring are points on it.
 TAKER_GENES = {
-    "BRK_RANGE": ("taker.brk_range", [0.90, 0.93, 0.95, 0.97]),
+    # [2026-08-20 (sk)] the 0.97 allele is gone — see the cage note in
+    # fleet_tuning. An allele the registry clamps is a gene that silently
+    # breeds to a different value than the one scored, and this one bred
+    # TIGHTER than the operator's default on a lens the replay cannot fill.
+    "BRK_RANGE": ("taker.brk_range", [0.90, 0.93, 0.95]),
     "DIP_RANGE": ("taker.dip_range", [0.05, 0.08, 0.11, 0.15]),
     "MOMO_CHG": ("taker.momo_chg", [3.0, 4.0, 5.0, 6.0]),
     # [2026-07-17] DIV_GAP_PP was the one taker lever in the fleet_tuning
@@ -131,7 +135,8 @@ TAKER_GENES = {
     "DIV_GAP_PP": ("taker.div_gap_pp", [37.5, 50.0, 62.5, 75.0, 87.5]),
     "TAKE_PROFIT": ("taker.tp", [0.03, 0.04, 0.05, 0.06]),
     "STOP_LOSS": ("taker.sl", [-0.04, -0.03, -0.02]),
-    "MAX_HOLD_H": ("taker.max_hold_h", [24.0, 48.0, 72.0]),
+    # [(sk)] the 24h allele is gone with the cage — see BRK_RANGE above.
+    "MAX_HOLD_H": ("taker.max_hold_h", [48.0, 72.0]),
 }
 # The gene whose alleles the TAPE must be long enough to exercise (see
 # reachable_genes) — a hold >= the span never fires.
@@ -431,12 +436,17 @@ REGISTER_TOP_N = int(os.environ.get("INCUBATOR_REGISTER_TOP_N", "24"))
 # to the cage exactly.
 RESEARCH_MODE = os.environ.get("INCUBATOR_RESEARCH", "on").lower() != "off"
 RESEARCH_GENES = {
+    # [(sk)] UNCHANGED, deliberately: RESEARCH grids are required to extend
+    # BEYOND the cage (`is_enactable` is what gates action, and the selftest
+    # fails a research grid that never leaves it). Only TAKER_GENES — the
+    # ENACTABLE pool — lost the alleles the (sk) cage now refuses.
     "BRK_RANGE":   ("taker.brk_range",   [0.85, 0.90, 0.93, 0.95, 0.97, 0.99]),
     "DIP_RANGE":   ("taker.dip_range",   [0.03, 0.05, 0.08, 0.11, 0.15, 0.20]),
     "MOMO_CHG":    ("taker.momo_chg",    [2.0, 3.0, 4.0, 5.0, 6.0, 8.0]),
     "DIV_GAP_PP":  ("taker.div_gap_pp",  [25.0, 37.5, 50.0, 62.5, 75.0, 87.5, 100.0]),
     "TAKE_PROFIT": ("taker.tp",          [0.02, 0.03, 0.04, 0.05, 0.06, 0.08]),
     "STOP_LOSS":   ("taker.sl",          [-0.06, -0.04, -0.03, -0.02, -0.015]),
+    # [(sk)] UNCHANGED for the same reason as BRK_RANGE above.
     "MAX_HOLD_H":  ("taker.max_hold_h",  [12.0, 24.0, 48.0, 72.0, 96.0]),
 }
 
@@ -1548,13 +1558,18 @@ def _selftest():
     breed(c2, narrow)                                # must not raise
     assert conform([None, "nope", 42], TAKER_GENES) == []
     assert conform(None, TAKER_GENES) == []
-    held = conform([{"MAX_HOLD_H": 72.0}], reachable_genes(TAKER_GENES, 43.0)[0])
+    held = conform([{"MAX_HOLD_H": 72.0}], reachable_genes(TAKER_GENES, 60.0)[0])
     assert held[0]["MAX_HOLD_H"] == 72.0, "off-grid allele in force is kept"
 
     # [2026-07-17] IMB-10: unreachable max-hold alleles dropped, and only those
-    g2, dropped = reachable_genes(TAKER_GENES, 43.0)
-    assert dropped == [48.0, 72.0], dropped
-    assert g2["MAX_HOLD_H"][1] == [24.0], g2["MAX_HOLD_H"]
+    # [2026-08-20 (sk)] span re-anchored 43h -> 60h. The grid lost its 24h rung
+    # with the registry cage (the breakoutup ratchet fix), so a 43h span now
+    # makes EVERY allele unreachable and trips the never-strip-bare branch —
+    # which would have left this block asserting a different property than the
+    # one it was written for. 60h keeps the shape: 48 reachable, 72 not.
+    g2, dropped = reachable_genes(TAKER_GENES, 60.0)
+    assert dropped == [72.0], dropped
+    assert g2["MAX_HOLD_H"][1] == [48.0], g2["MAX_HOLD_H"]
     assert g2["TAKE_PROFIT"] == TAKER_GENES["TAKE_PROFIT"], "other genes intact"
     assert reachable_genes(TAKER_GENES, 200.0)[1] == [], "all reachable -> no-op"
     assert reachable_genes(TAKER_GENES, 0.0)[1] == [], "unknown span -> no-op"

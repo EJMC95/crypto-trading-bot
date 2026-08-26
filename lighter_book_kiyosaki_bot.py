@@ -414,6 +414,8 @@ def _close(bot_id, key, pos, reason, exit_rate, pnl):
                    "accrued": round(pos.get("accrued") or 0.0, 4),
                    "fees": round(pos.get("fees") or 0.0, 4),
                    "notional": pos.get("notional"),
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "held_h": round(held_h, 2)})
     except Exception:  # noqa: BLE001
         pass
@@ -593,9 +595,24 @@ def main():
                 for c, f, apr in candidates(fund, held, hot_since, t0,
                                             max_n=free):
                     side = "short" if apr > 0 else "long"
-                    _open_position(positions, c, side, CLIP_USD, t0, apr)
+                    # [2026-08-20 (so)] the brain sizes this entry, under the
+                    # SAME tag record_close publishes (`<side>-cashflow_<exit>`)
+                    # so the lookup key and the bucket key cannot drift.
+                    # Kiyosaki-consistent, not a bolt-on: buying MORE of the
+                    # asset whose cash flow has proved out, and less of the one
+                    # that has not, is lesson 1 with a measurement behind it.
+                    _clip, _bm = (fleet_bus.brain_clip(
+                        bot_id, f"{side}-cashflow", CLIP_USD,
+                        deployed_usd=sum(p.get("notional") or 0.0
+                                         for p in positions.values()),
+                        gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                                CLIP_USD))
+                        if fleet_bus is not None else (CLIP_USD, 1.0))
+                    _open_position(positions, c, side, _clip, t0, apr)
+                    positions[c]["brain_mult"] = _bm
                     held.add(c)
-                    print(f"[{now_iso()}] OPEN {c} {side} ${CLIP_USD:.0f} | "
+                    print(f"[{now_iso()}] OPEN {c} {side} ${_clip:.0f}"
+                          f"{'' if _bm == 1.0 else f' (brain {_bm:.2f}x)'} | "
                           f"{apr:+.1%} TRUE | payback "
                           f"{payback_hours(apr):.0f}h")
 

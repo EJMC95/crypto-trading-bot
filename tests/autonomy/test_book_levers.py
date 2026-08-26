@@ -54,7 +54,7 @@ BOOK_LEVERS = [
     # slots and went 98.9h without an OPEN because only 14 of 203 books clear
     # $2M of 24h turnover (median book $0.043M); its own hot list was 13-16x
     # below the floor and KAITO missed by $2,000.
-    "carry.min_vol",
+    "carry.min_vol", "carry.payback_max_h",
     # [2026-08-03] FOUND BY THE COMPLETENESS TEST BELOW ON ITS FIRST RUN, not
     # by a human: `disloc.exit_bps` — the fleet's FIRST exit lever, shipped
     # (gu) 30-Jul — was registered on this lane and listed nowhere here, so it

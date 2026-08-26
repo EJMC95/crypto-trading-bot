@@ -93,7 +93,7 @@ YOUNG_MAX_PER_LOOP = int(os.environ.get("SNIPER_YOUNG_MAX_PER_LOOP", "2"))
 # `orderBookDetails` the only venue-priced book in the last 120 days that this
 # floor refuses while having real turnover is ANSEM at $0.228M/day — the floor
 # was excluding it by $0.022M. 0.20 still sits at TWICE the $0.1M step where
-# the fleet's slippage model changes tier, which is the exact reason (sl)
+# the fleet's slippage model changes tier, which is the exact reason (tt)
 # REFUSED the move to $0.10M and that refusal is unchanged: below $0.1M the
 # model cannot price the band it would admit ((qq): mean 17.49bps, p90 398bps).
 YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.20"))
@@ -155,11 +155,11 @@ DIRECTION_PINNED = _DIRECTION_ENV in ("long", "short")
 #  * `listing` and `young` flip to SHORT. They are the two sources that target
 #    the faded band; `surge` is a volume event on a mostly-MATURE book, its
 #    cell is the flat control above, and it is left alone — its own evidence
-#    ((sk): 0 of 367 exit cells survive BH at FDR 0.05) is untouched by this.
+#    ((ts): 0 of 367 exit cells survive BH at FDR 0.05) is untouched by this.
 #  * The hold for those two goes 6h -> 24h. 6h is +0.132% = 13bps gross, which
 #    is inside plausible round-trip slippage on a book at this book's volume
 #    floor; 24h is 67bps and clears it. **72h measured BEST and is deliberately
-#    NOT taken: it is the grid EDGE of what was tested, and (hl)/(sk) is
+#    NOT taken: it is the grid EDGE of what was tested, and (hl)/(ts) is
 #    explicit that a grid-edge winner is reported unbounded, never shipped as a
 #    value.** 24h is the plateau interior — the 🧭 nav-cook precedent.
 #  * The young WINDOW stays 21 days. Widening it was the obvious move and the
@@ -336,10 +336,10 @@ ALLOW_NONCRYPTO = os.environ.get("SNIPER_ALLOW_NONCRYPTO", "").strip().lower() \
 def _class_ok(sym):
     """May `sym` enter via the SURGE source? Crypto perps only.
 
-    [(sl)] Scope narrowed from "surge/young" to SURGE. The young source now
+    [(tt)] Scope narrowed from "surge/young" to SURGE. The young source now
     asks `_young_class_ok` — a different question, for a measured reason; see
     below. Nothing about the surge screen changed: its evidence (non-crypto
-    surge −$5.01/13, and (sk)'s class-7 surge at −0.840%/trade @6h, negative at
+    surge −$5.01/13, and (ts)'s class-7 surge at −0.840%/trade @6h, negative at
     every hold) is unaffected and it stays crypto-only.
     """
     if ALLOW_NONCRYPTO or fleet_bus is None:
@@ -350,7 +350,7 @@ def _class_ok(sym):
         return True
 
 
-# [2026-08-20 (sl)] THE YOUNG SOURCE ASKS A DIFFERENT QUESTION — and this is
+# [2026-08-20 (tt)] THE YOUNG SOURCE ASKS A DIFFERENT QUESTION — and this is
 # the change that gives this book its supply back, not another screen.
 #
 # THE DEFECT, measured. (lk) applied ONE screen to both sources on evidence
@@ -368,7 +368,7 @@ def _class_ok(sym):
 # CASHCAT ($0.45M) and UNITREE ($0.84M), both class 7, both refused. The book
 # was not quiet; it was structurally unable to admit anything.
 #
-# AND THE SUPPLY WAS NEVER DEAD. `(qi)`/`(sk)` reported "ZERO crypto births for
+# AND THE SUPPLY WAS NEVER DEAD. `(qi)`/`(ts)` reported "ZERO crypto births for
 # 86 days", which is true of `strategy_index == 2` and FALSE of the cohort this
 # book trades: on the venue-priced axis, births run **1.67-2.00/30d and have
 # not stopped in any month measured** — CAP (Jun), ANSEM (Jul), CASHCAT (Aug).
@@ -378,7 +378,7 @@ def _class_ok(sym):
 # really making ("already priced where the underlying trades"). It admits
 # crypto-native books INCLUDING class-7 memecoins, and still refuses tokenised
 # equity/FX/commodity/pre-IPO. That exclusion is now BETTER evidenced than it
-# was: (sl) measured shorting an externally-priced debut at −0.714%/trade,
+# was: (tt) measured shorting an externally-priced debut at −0.714%/trade,
 # **t=−2.04** — the only significant cell in the study — so the half of (lk)
 # this keeps is the half the tape supports.
 # Reversible independently of the surge screen: SNIPER_YOUNG_ALLOW_ANY=1.
@@ -400,7 +400,7 @@ def _young_class_ok(sym):
         return True
 
 
-# [2026-08-20 (sk)] THE PER-SOURCE CENSUS — I18/(lv)'s "a sleeve that opens
+# [2026-08-20 (ts)] THE PER-SOURCE CENSUS — I18/(lv)'s "a sleeve that opens
 # nothing must publish its OWN census at its OWN bar".
 #
 # MEASURED THE DAY THIS SHIPPED, and it is why the guard exists rather than a
@@ -584,7 +584,7 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
     cannot dedup it), and bounded by `limit`.
     """
     rows = []
-    # [(sl)] the YOUNG screen, not the surge one — `_young_class_ok` asks
+    # [(tt)] the YOUNG screen, not the surge one — `_young_class_ok` asks
     # "is this priced on this venue", which admits the class-7 memecoin debuts
     # `is_crypto` refuses. An explicit `class_ok=` still overrides, which is
     # what the tests drive.
@@ -615,7 +615,7 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
         if s in (already or set()):
             continue
         cen["fresh"] += 1
-        if not class_ok(s):               # [(sl)] priced on THIS venue
+        if not class_ok(s):               # [(tt)] priced on THIS venue
             continue
         cen["class_ok"] += 1
         try:
@@ -642,6 +642,21 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
 SNIPE_SOURCES = ("listing", "surge", "young")
 
 
+def entry_tag(was_long, src=None):
+    """The enter_tag this book's closes carry — and therefore the EXACT key
+    the brain's stake multiplier must be looked up under.
+
+    [2026-08-20 (so)] Extracted from `close_reason` rather than retyped beside
+    it. `close_reason` now composes from this, so a source that stops being
+    whitelisted, or a side that changes shape, moves BOTH the ledger bucket
+    and the sizing lookup in one edit. A retyped key is the registered-but-
+    inert failure in its quietest form: the lookup silently returns 1.0
+    forever and nothing anywhere says so.
+    """
+    side = "long" if was_long else "short"
+    return f"{side}-{src}" if src in SNIPE_SOURCES else side
+
+
 def close_reason(was_long, exit_reason, src=None):
     """The ledger close tag, source-stamped — the taker's lens pattern.
 
@@ -653,10 +668,7 @@ def close_reason(was_long, exit_reason, src=None):
     enter_tag='long-young' / exit='max_hold' and the brain buckets each source
     separately. Forward-only: rows written before this stamp keep their tags.
     """
-    side = "long" if was_long else "short"
-    if src in SNIPE_SOURCES:
-        return f"{side}-{src}_{exit_reason}"
-    return f"{side}_{exit_reason}"
+    return f"{entry_tag(was_long, src)}_{exit_reason}"
 
 
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
@@ -1026,7 +1038,24 @@ def main():
         if not px:
             log.info("%s: %s — staying pending, will retry next loop", sym, why)
             return False
-        size = round(order_usd / px, 6)
+        # [2026-08-20 (so)] the brain sizes the snipe, PER ADMISSION SOURCE —
+        # which is the whole reason (na) source-stamped these tags. The three
+        # sources are three different bets sharing one row (a listing pop, a
+        # volume surge, a young book), the (qi) study measured them to be
+        # nothing like each other, and until now they were all sized the same.
+        # `clip` (not order_usd) is what the cap below must see: a bigger clip
+        # has to be admitted against the cap it will actually fill.
+        # [2026-08-20 merge] the side comes from the SOURCE, not the module
+        # default. `close_reason` writes `short-young_*` for a young position,
+        # so keying the brain lookup off `DIRECTION_LONG` would ask for
+        # `long-young` — a tag this book never writes. That is precisely the
+        # failure this function's own docstring names: the lookup returns 1.0
+        # forever and nothing says so. One owner for the side, as for the key.
+        clip, bmult = (fleet_bus.brain_clip(bot_id,
+                                            entry_tag(side_is_long(src), src),
+                                            order_usd)
+                       if fleet_bus is not None else (order_usd, 1.0))
+        size = round(clip / px, 6)
         if size <= 0:
             # PaperBroker.open() silently no-ops on size<=0 and market_open would
             # send a zero clip: returning True here would log a phantom "SNIPED"
@@ -1034,7 +1063,7 @@ def main():
             # absorption this file was fixed for. Refuse instead.
             log.error("%s: clip $%.2f at px %.6f rounds to size 0 — NOT sniping"
                       " (check LIGHTER_ORDER_USD); staying pending",
-                      sym, order_usd, px)
+                      sym, clip, px)
             return False
         if dry_run:
             broker.mark(sym, px)
@@ -1055,11 +1084,11 @@ def main():
             # notional and walked a new clip straight through the operator's
             # hard cap. `meta={}` — this bot keeps no per-position clip record,
             # so the venue's own avg entry price prices each held position.
-            open_ntl = open_notional(ctx.venue.positions(), {}, open_now, order_usd)
-            if not ctx.rails.notional_ok(open_ntl, order_usd):
+            open_ntl = open_notional(ctx.venue.positions(), {}, open_now, clip)
+            if not ctx.rails.notional_ok(open_ntl, clip):
                 log.info("%s NOTIONAL_CAP_SKIP ($%.2f deployed + $%.2f clip > "
                          "cap $%s) — staying pending",
-                         sym, open_ntl, order_usd, ctx.rails.max_notional)
+                         sym, open_ntl, clip, ctx.rails.max_notional)
                 return False
             try:
                 ctx.venue.market_open(sym, side_is_long(src), size)
@@ -1077,9 +1106,21 @@ def main():
                 _meta = surge_admission(sym, _surge_ratios, SURGE_MULT)
                 if _meta is not None:
                     entry_meta[sym] = _meta
-        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f) [src=%s hold=%.0fh]",
-                 sym, "LONG" if side_is_long(src) else "SHORT", px, size,
-                 order_usd, src or "?", hold_sec_for(src) / 3600.0)
+        # [(so)] I22 receipt, written LAST and MERGED. entry_meta is the
+        # book's existing durable per-open extra map (restored at boot, popped
+        # by the close), so the scale survives a restart exactly as the surge
+        # telemetry does. Written last because the surge branch above ASSIGNS
+        # the key — a receipt written first is silently overwritten, which is
+        # how it failed the first time it was run. Recorded only when the
+        # scale MOVED: absence already means "flat clip", and a column of 1.0s
+        # on a book the brain has no opinion about is noise, not evidence.
+        if bmult != 1.0:
+            entry_meta[sym] = dict(entry_meta.get(sym) or {},
+                                   brain_mult=round(bmult, 4))
+        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f%s) [src=%s hold=%.0fh]",
+                 sym, "LONG" if side_is_long(src) else "SHORT", px, size, clip,
+                 "" if bmult == 1.0 else f" brain {bmult:.2f}x", src or "?",
+                 hold_sec_for(src) / 3600.0)
         return True
 
     # [2026-07-16 AUDIT FIX] seed W/L from the durable ledger — this bot
@@ -1160,7 +1201,7 @@ def main():
                 log.info("%s: inactive past the give-up window — dropped from "
                          "pending (never sniped)", sym)
         fresh = [s for s in new_listings if s not in pending]
-        # [(sk)] the listing funnel. Deliberately SHORTER than the other two —
+        # [(ts)] the listing funnel. Deliberately SHORTER than the other two —
         # this source has no class screen and no volume floor ((lk) left it
         # open on purpose), so `offered` and `fresh` ARE its whole gate, and
         # publishing stages it does not have would overstate the filtering.
@@ -1193,7 +1234,7 @@ def main():
             log.info("levers applied %s", _lv)
         _surge = []
         _surge_ratios = {}      # [(ne)] always bound, even on a dark scout
-        # [(sk)] the census STARTS at its liveness verdict, before any count,
+        # [(ts)] the census STARTS at its liveness verdict, before any count,
         # so a dark or stale scout publishes `scan: "dark"/"stale"` instead of
         # an all-zero funnel that reads exactly like a live scan finding
         # nothing (I1 — liveness before semantics).
@@ -1277,7 +1318,7 @@ def main():
             # candle per day, so the two units are directly comparable).
             _age_src = ({s: a for s, a in _ages.items()
                          if s not in not_young} or bar_counts)
-            # [(sk)] WHICH age source answered is part of the census: the
+            # [(ts)] WHICH age source answered is part of the census: the
             # scout's exact `ages_d` and the 4/loop candle-probe cache are
             # different instruments, and a funnel read off the fallback means
             # something weaker than one read off the venue's own created_at.
@@ -1485,7 +1526,7 @@ def main():
                                  "held": {c: ("L" if side_is_long(
                                      entry_src.get(c)) else "S")
                                           for c in _held_syms},
-                                 # [2026-08-20 (sk)] THE PER-SOURCE CENSUS —
+                                 # [2026-08-20 (ts)] THE PER-SOURCE CENSUS —
                                  # see _new_funnel(). `watching`/`pending`
                                  # above are book-wide, so until now nothing
                                  # in this payload could say WHICH of the
@@ -1573,7 +1614,7 @@ def main():
                                               # see the (lk) block: n=1,
                                               # unmeasured, founding thesis.
                                               "listing": False},
-                                          # [(sl)] WHICH QUESTION each screen
+                                          # [(tt)] WHICH QUESTION each screen
                                           # asks. `surge: is_crypto` and
                                           # `young: venue_priced` are DIFFERENT
                                           # gates and a payload saying only
@@ -2098,6 +2139,18 @@ def selftest():
         def is_crypto(self, sym):        # [(lk)] the surge source is crypto-only
             return str(sym).upper() != "SPXUSD"
 
+        # [(so)] the brain's sizing accessor. `mult` is settable so the drive
+        # below can prove the SIZED path, not just the neutral one. The
+        # accessor's own contract (clamp, staleness, dark-brain, silent
+        # bucket) is proven in fleet_bus's selftest against fleet_bus's own
+        # payload — what this stand-in exists to test is the CONSUMER: that
+        # the size, the notional cap check and the receipt all read the sized
+        # clip rather than the flat one.
+        mult = 1.0
+
+        def brain_clip(self, _bot, _tag, base):
+            return base * self.mult, self.mult
+
     # QUIET carries `ratio: None`. It is not a decoration, and it is the one
     # property a unit test on `surge_ratio_map` CANNOT state: `surge_candidates`
     # reads that field as `float(r.get("ratio") or 0.0)` (-> 0.0, simply not a
@@ -2134,6 +2187,32 @@ def selftest():
         f"the admission telemetry was not recorded: {_blob7.get('entry_meta')}"
     assert "SPXUSD" not in _blob7["entry_src"], "the class screen let SPXUSD in"
     assert "QUIET" not in _blob7["entry_meta"], _blob7["entry_meta"]
+    # [(so)] and the brain SIZES it. Same fixture, same admission, mult 2x:
+    # the venue must receive DOUBLE the size, and the scale must land in the
+    # durable receipt map beside the surge telemetry rather than replacing it.
+    # Asserted on the VENUE and on the SAVED BLOB, because a sizing term that
+    # only shows up in a log line is the never-recorded class this pass exists
+    # to close.
+    _bus.mult = 2.0
+    try:
+        ven7b = _FakeVenue(_srg_markets, _srg_books, {})
+        fs7b = _drive(ven7b, 1000.0, CLIP,
+                      {"baseline": ["OLD", "SRG"], "entry_ts": {},
+                       "pending": {}}, bus=_bus)
+    finally:
+        _bus.mult = 1.0
+    assert [o[0] for o in ven7b.opened] == ["SRG"], ven7b.opened
+    assert abs(ven7b.opened[0][2] - 2 * ven7.opened[0][2]) < 1e-5, (
+        "the brain's 2x never reached the order size: "
+        f"{ven7b.opened[0][2]} vs {ven7.opened[0][2]}")   # 6dp size rounding
+    _m7b = fs7b.saves[-1][1]["entry_meta"]["SRG"]
+    assert _m7b["brain_mult"] == 2.0, _m7b
+    assert _m7b["surge_ratio"] == 5.0, ("the receipt REPLACED the admission "
+                                        f"telemetry instead of joining it: {_m7b}")
+    # a flat clip records NOTHING — absence already means 1.0, and a column of
+    # 1.0s on a book the brain has no opinion about is noise, not evidence.
+    assert "brain_mult" not in _blob7["entry_meta"]["SRG"], \
+        _blob7["entry_meta"]["SRG"]
 
     # ...and the record SURVIVES A RESTART and reaches the LEDGER ROW — the
     # whole point of a durable map, and the leg with three call sites between

@@ -414,6 +414,8 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
             venue="lighter", shadow=True, side=pos["side"],
             entry_price=entry_px, exit_price=exit_px,
             extra={"atr_frac": pos.get("atr_frac"),
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "sl_frac": pos.get("sl_frac"),
                    "tp_frac": pos.get("tp_frac"),
                    "notional": pos.get("notional"),
@@ -424,20 +426,35 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
         pass
 
 
-def _open_position(positions, coin, side, mark, atr, t0, signal_t):
+def _open_position(positions, coin, side, mark, atr, t0, signal_t,
+                   notional=None, brain_mult=1.0):
     """Open one modelled position at mark, bracket predefined from the entry
     bar's ATR (rule 1). SIGNATURE IS THE CONSISTENCY RULE (rule 3): no
     streak, no last-outcome, no equity parameter exists, so size cannot vary
     with results without changing this function's shape. An unpriceable mark
-    refuses the entry."""
+    refuses the entry.
+
+    [2026-08-20 (so)] `notional` arrives as an argument and the rule 3 pin is
+    UNCHANGED, because the two are about different things and it is worth
+    saying which. What Douglas forbids — and what this book MEASURED at
+    +$27.01 -> −$11.32 — is *your last outcome* moving *your next bet*: a
+    cooldown after a loss, a pause after a streak, a bigger clip because you
+    are up. What arrives here is the brain's per-(book, side) scale, a
+    function of >= 30 closes held for >= 3 consecutive brain runs. Two trades
+    on the same side in the same cycle get the SAME clip; a trade taken right
+    after a loser gets the same clip as one taken after a winner. That is
+    consistency, and the pin below still bans every input that would break it.
+    """
     if not mark or mark <= 0 or not atr or atr <= 0:
         return None
-    positions[coin] = {"coin": coin, "side": side, "notional": CLIP_USD,
+    ntl = CLIP_USD if notional is None else float(notional)
+    positions[coin] = {"coin": coin, "side": side, "notional": ntl,
                        "opened_ts": t0, "entry_mark": mark,
                        "last_mark": mark, "atr_frac": atr,
                        "sl_frac": SL_ATR * atr, "tp_frac": TP_ATR * atr,
                        "signal_t": signal_t,
-                       "fees": SLIP_COST * CLIP_USD}
+                       "brain_mult": brain_mult,
+                       "fees": SLIP_COST * ntl}
     return positions[coin]
 
 
@@ -652,7 +669,19 @@ def main():
                 # 12:00 bar of [0.014507, 0.014938]). An unpriceable coin
                 # refuses the entry, which _open_position already enforces.
                 mark = fresh_mid(ctx.venue, coin) or 0.0
-                pos = _open_position(positions, coin, side, mark, a, t0, sig_t)
+                # [2026-08-20 (so)] the brain's per-(book, side) scale, keyed
+                # on the SAME `<side>-impulse` record_close publishes. See
+                # _open_position's note for why this is not the cooldown
+                # overlay this book measured and refused.
+                _clip, _bm = (fleet_bus.brain_clip(
+                    bot_id, f"{side}-impulse", CLIP_USD,
+                    deployed_usd=sum(p.get("notional") or 0.0
+                                     for p in positions.values()),
+                    gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                            CLIP_USD))
+                    if fleet_bus is not None else (CLIP_USD, 1.0))
+                pos = _open_position(positions, coin, side, mark, a, t0, sig_t,
+                                     notional=_clip, brain_mult=_bm)
                 if pos is None:
                     acted[coin] = sig_t
                     unpriceable += 1
@@ -660,7 +689,8 @@ def main():
                 pos["spread_bps_entry"] = live_spread_bps(ctx, coin)
                 acted[coin] = sig_t
                 opened += 1
-                print(f"[{now_iso()}] OPEN {coin} {side} ${CLIP_USD:.0f} @ "
+                print(f"[{now_iso()}] OPEN {coin} {side} ${_clip:.0f}"
+                      f"{'' if _bm == 1.0 else f' (brain {_bm:.2f}x)'} @ "
                       f"{mark} | fade {IMPULSE_K:.1f}xATR impulse | "
                       f"sl {pos['sl_frac']:.2%} tp {pos['tp_frac']:.2%} "
                       f"exp {MAX_HOLD_H:.0f}h")
@@ -772,11 +802,23 @@ def _selftest():
     # 3) CONSISTENCY IS STRUCTURAL (rule 3): sizing can see no outcomes.
     params = set(inspect.signature(_open_position).parameters)
     for banned in ("streak", "last_pnl", "equity", "wins", "losses",
-                   "cooldown"):
+                   "cooldown", "last_outcome", "consecutive", "drawdown"):
         assert banned not in params, \
             f"_open_position grew a '{banned}' input — outcomes must not " \
-            "size trades (the measured cooldown overlay cost $38.33)"
+            "size trades (the measured cooldown overlay cost $38.33). " \
+            "[(so)] `notional`/`brain_mult` are DELIBERATELY allowed and " \
+            "are not this: the brain's scale is a per-(book, side) function " \
+            "of >=30 closes over >=3 runs, identical for every trade in a " \
+            "cycle, so it cannot express 'I just lost, bet differently'."
+    # …and the default is still the flat clip, so a caller that passes no
+    # notional sizes exactly as this book always has.
     assert pos["notional"] == CLIP_USD == pl["notional"]
+    assert pos["brain_mult"] == 1.0, "unsized entries record a 1.0 receipt"
+    _pb = _open_position({}, "BM", "long", 100.0, 0.02, t, sig_t,
+                         notional=CLIP_USD * 2, brain_mult=2.0)
+    assert _pb["notional"] == CLIP_USD * 2 and _pb["brain_mult"] == 2.0
+    assert abs(_pb["fees"] - SLIP_COST * CLIP_USD * 2) < 1e-12, \
+        "fees must be charged on the SIZED notional, not the flat clip"
 
     # 4) the 20-trade sample (rule 4): R denominated in predefined risk
     rec = [{"pnl": 1.5, "r": 1.5}, {"pnl": -1.0, "r": -1.0}]
