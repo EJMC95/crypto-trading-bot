@@ -784,6 +784,27 @@ def run_once(publish=False):
         if rec is None:
             continue
         set_era_twin(rec, *_era_twin(b, rs))
+    # [2026-08-26] RECOMPUTE THE HEADLINE, because it was counting a field that
+    # did not exist yet.
+    #
+    # `build()` computes `by_class` — including `n_with_era_claim` — and the era
+    # twin is filled HERE, afterwards, because it needs the ledger rows and the
+    # era owner's import. `build` cannot know it, so it sets every `claim_era`
+    # to None first ((lx)). So the counter ran over a column that was None on
+    # every book, by construction, and `n_with_era_claim` could only ever be
+    # ZERO — whatever the data said.
+    #
+    # MEASURED the day this was found: `freqtrade-avo-maria-lighter` published
+    # `claim_era: 0.000174` — a real, positive, era-scoped claim — while the
+    # headline beside it read `n_with_era_claim: 0`. The payload contradicted
+    # itself in the one field a reader checks first.
+    #
+    # It is exactly the failure `(ua)` was written about, one layer up: that
+    # entry quoted this zero as evidence that no book COULD qualify, and the
+    # cliff it removed was a real cause — but even with the cliff gone the
+    # number could not move, because the count precedes the data. A headline
+    # that cannot be non-zero is not a measurement. Corrected in place per I12.
+    payload["by_class"] = class_totals(payload["books"], books)
     # The go-live verdict is IMPORTED, never re-derived here — allocation is a
     # different question and must not become a second gate. Optional by design:
     # that module is the other half of the fleet's grading surface and this
