@@ -133,6 +133,7 @@ Usage:
     python lighter_band_kelly_bot.py --selftest                    # offline
 """
 import argparse
+import math
 import os
 import sys
 import time
@@ -453,16 +454,46 @@ def build_state(positions, recent, pend, noconv, enter_bps_eff, last_ts,
 def holdwatch_block(hw_stats):
     """Published every loop: mean EXTRA % the mirror would have earned by
     holding on past its own exit, per horizon. REPORTED, never a bar — and
-    n is published beside every mean so a thin cell reads as thin (I15)."""
+    n is published beside every mean so a thin cell reads as thin (I15).
+
+    [2026-08-26] IT NOW PUBLISHES ITS DISPERSION, and that is the whole point
+    of the field. The expansion review read `+60m mean +0.291%` against a
+    `conv` exit realising −0.186%/trade (n=200, t=−3.38) and could not say
+    whether the gap was an edge or noise, because the accumulator kept only
+    `n` and `sum` — a mean with no sd is a number no decision can be made on
+    (I23: the thing that decides must measure the thing it decides about).
+    `sd_pct`/`t`/`win_pct` ride beside it now, so the exit re-spec this field
+    exists to justify becomes a query rather than another session's guess.
+
+    BACKWARD-COMPATIBLE BY CONSTRUCTION: a durable `hw_stats` restored from
+    before this change carries `n`/`sum` and no `sumsq`, so dispersion is
+    counted over its OWN sample `n2` and reported as None until n2 >= 2 —
+    never over a mismatched n, which would understate sd on exactly the
+    horizons with the longest history."""
     out = {"note": "extra %/trade from holding PAST the ghost's exit; "
-                   "telemetry only, no position differs because of it",
+                   "telemetry only, no position differs because of it. "
+                   "t is over n2 (samples carrying dispersion); the mean is "
+                   "vs a MID while the exit was a VWAP, so it is optimistic "
+                   "by ~half the spread — reported, never a bar (I15).",
            "horizons_s": list(HOLD_HORIZONS_S)}
     for h in HOLD_HORIZONS_S:
         b = (hw_stats or {}).get(str(int(h))) or {}
         n = int(b.get("n") or 0)
-        out[f"+{int(h // 60)}m"] = {
-            "n": n,
-            "mean_pct": round(b["sum"] / n, 4) if n else None}
+        n2 = int(b.get("n2") or 0)
+        cell = {"n": n,
+                "mean_pct": round(b["sum"] / n, 4) if n else None,
+                "n2": n2, "sd_pct": None, "t": None, "win_pct": None}
+        if n2 >= 2:
+            m2 = b.get("sumsq")
+            mean2 = (b.get("sum2") or 0.0) / n2
+            if m2 is not None:
+                var = (m2 - n2 * mean2 * mean2) / (n2 - 1)
+                sd = math.sqrt(var) if var > 0 else 0.0
+                cell["sd_pct"] = round(sd, 4)
+                cell["t"] = (round(mean2 / (sd / math.sqrt(n2)), 2)
+                             if sd > 0 else None)
+            cell["win_pct"] = round(100.0 * int(b.get("wins") or 0) / n2, 1)
+        out[f"+{int(h // 60)}m"] = cell
     return out
 
 
@@ -970,6 +1001,13 @@ def main():
                 _b = hw_stats.setdefault(str(int(_h)), {"n": 0, "sum": 0.0})
                 _b["n"] += 1
                 _b["sum"] += _x
+                # dispersion, on its OWN counter — a bucket restored from
+                # before this field existed has `n` without `sumsq`, and
+                # dividing the new sumsq by the old n would understate sd.
+                _b["n2"] = int(_b.get("n2") or 0) + 1
+                _b["sum2"] = float(_b.get("sum2") or 0.0) + _x
+                _b["sumsq"] = float(_b.get("sumsq") or 0.0) + _x * _x
+                _b["wins"] = int(_b.get("wins") or 0) + (1 if _x > 0 else 0)
                 _rec.setdefault("done", []).append(_h)
         holdwatch = [r for r in holdwatch
                      if len(r.get("done") or ()) < len(HOLD_HORIZONS_S)
@@ -1187,6 +1225,40 @@ def _selftest():
     assert hb["+15m"]["n"] == 2 and abs(hb["+15m"]["mean_pct"] - 1.5) < 1e-9
     assert hb["+30m"]["n"] == 0 and hb["+30m"]["mean_pct"] is None
     assert list(hb["horizons_s"]) == list(HOLD_HORIZONS_S)
+    # [2026-08-26] DISPERSION. The mean alone could not say whether +60m's
+    # +0.291% beat the conv exit's −0.186% or was noise; these pin the
+    # answer's shape. A LEGACY bucket (n/sum, no n2) must report the mean and
+    # decline the statistic — never compute sd over a mismatched n.
+    assert hb["+15m"]["n2"] == 0
+    assert hb["+15m"]["sd_pct"] is None and hb["+15m"]["t"] is None, \
+        "a pre-dispersion bucket must not invent a statistic"
+    assert hb["+15m"]["win_pct"] is None
+    _s = [1.0, 2.0, 3.0, -1.0]          # mean +1.25, sd 1.7078, t +1.4640
+    _hw = {"900": {"n": len(_s), "sum": sum(_s), "n2": len(_s),
+                   "sum2": sum(_s), "sumsq": sum(x * x for x in _s),
+                   "wins": sum(1 for x in _s if x > 0)}}
+    hb2 = holdwatch_block(_hw)["+15m"]
+    assert abs(hb2["mean_pct"] - 1.25) < 1e-9
+    assert abs(hb2["sd_pct"] - 1.7078) < 1e-3, hb2["sd_pct"]
+    assert abs(hb2["t"] - 1.46) < 0.02, hb2["t"]
+    assert abs(hb2["win_pct"] - 75.0) < 1e-9, hb2["win_pct"]
+    # a MIXED bucket — legacy samples plus new ones — reports the mean over
+    # every sample and the statistic over the dispersion-carrying subset only.
+    hb3 = holdwatch_block({"900": {"n": 10, "sum": 20.0, "n2": len(_s),
+                                   "sum2": sum(_s),
+                                   "sumsq": sum(x * x for x in _s),
+                                   "wins": 3}})["+15m"]
+    assert hb3["n"] == 10 and abs(hb3["mean_pct"] - 2.0) < 1e-9
+    assert hb3["n2"] == 4 and abs(hb3["sd_pct"] - 1.7078) < 1e-3, \
+        "sd must be over n2, never over n"
+    # zero-variance and single-sample cells decline rather than divide by zero
+    assert holdwatch_block({"900": {"n": 1, "sum": 1.0, "n2": 1, "sum2": 1.0,
+                                    "sumsq": 1.0, "wins": 1}})["+15m"]["t"] is None
+    _flat = {"900": {"n": 3, "sum": 6.0, "n2": 3, "sum2": 6.0,
+                     "sumsq": 12.0, "wins": 3}}
+    assert holdwatch_block(_flat)["+15m"]["sd_pct"] == 0.0
+    assert holdwatch_block(_flat)["+15m"]["t"] is None, \
+        "zero dispersion is not infinite significance"
     _st = build_state({}, [], {}, {}, 60.0, 0.0, now=1.0,
                       holdwatch=[{"coin": "X"}], hw_stats={"900": {"n": 1, "sum": 2.0}})
     assert _st["holdwatch"] and _st["hw_stats"], "the watch must survive a restart"
