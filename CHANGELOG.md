@@ -1,3 +1,36 @@
+## 2026-08-27 (um) — THE LETTER GUARD WAS READING OTHER SESSIONS' PRIVATE WORKTREES: A SESSION COULD BE TURNED RED BY WORK THAT WAS NOT ITS OWN, ON A FAILURE IT COULD NOT FIX
+
+`audit_changelog_letters`'s citation arm walks every `.py` under the repo root,
+excluding `.git`, `.venv`, `node_modules`, `__pycache__`. It does **not**
+exclude `.claude/worktrees` — which is exactly where `new_session_worktree.sh`
+puts every concurrent session's private branch, and that script **asserts the
+path is git-ignored**.
+
+**So the guard was scanning files git itself excludes from the current branch.**
+Measured today: 4 sibling worktrees present, and 3 dangling citations from a
+branch whose OWN changelog carries the entry they point at. From this session
+they were unfixable — not my files, not my branch, and merging someone's
+half-finished worktree to green my build is not a repair.
+
+**WHY THIS MATTERS MORE THAN THE THREE LINES IT PRINTED.** This repo has paid
+for the cry-wolf failure twice and written it down both times: *"a guard whose
+only output is a warning on a passing run is not a guard"*, and the rule that a
+guard reddening on a pre-existing backlog *"gets exempted within a day and then
+guards nothing"*. A guard that goes red on another session's uncommitted work
+is the same shape with a worse ending — the natural fix is to stop believing
+it, and the citation arm is the thing standing between a real-money finding and
+a commit body nobody reads.
+
+**THE FIX IS SCOPED, NOT BLANKET.** `SKIP_RELPATHS = {.claude/worktrees}` only —
+NOT all of `.claude`, because hooks and settings under it are this branch's own
+files and must still be scanned. The walk moved into `walk_py()` so the skip is
+one rule with one owner rather than a condition inlined at a call site.
+
+Found while resolving a letter race during the daily review: the guard correctly
+caught two real cross-branch collisions on my own entry ((ug)->(uj)->(ul)) and
+then reported three failures that were nobody's defect. The first half is the
+guard working; the second half is what this fixes.
+
 ## 2026-08-27 (uk) — `open 6/6` CANNOT TELL A FULL BOOK FROM A STARVED ONE: 🎫 THE TAKER'S SLOT CAP IS THE ONE LEGAL GO-LIVE ACCELERATOR AND NOTHING COUNTED WHAT IT REFUSED
 
 **Eamon, 27-Aug: *"Get taker ready to go live - it's clearly learned how to get
