@@ -1,3 +1,72 @@
+## 2026-08-27 (un) — MUM'S BAR AT 32 IS SUPPORTED AND MY PRE-REGISTRATION TESTED THE WRONG OBJECT: WIDENING A THRESHOLD MERGES EPISODES AND MOVES THE ENTRY, SO THE ISOLATED SLIVER IS AN ADVERSELY-SELECTED SUBSET
+
+**Eamon, 27-Aug: *"Widen mum to 32, maximise her optics metrics and
+parameters."*** Both halves measured on Lighter's own 1h tape, bars
+pre-registered in `6f04ca2` before any number existed. Full working:
+`STUDY_MUM_PARAMS_2026-08-27.md`.
+
+**CALIBRATION FIRST.** The control cell is (tr)'s ADMITTED C3 (`rsi 25-30 &
+NOT-uptrend`) and the harness reproduces it tightly — episodes **2,297** vs
+(tr)'s 2,296, bracket **+0.110%/trade** vs +0.104%, h12 excess **+0.165%** vs
++0.156%, t_cl **+2.40** vs +2.25, both halves positive. (gx) satisfied; the
+cells below are entitled to speak.
+
+**THE METHODOLOGICAL FINDING, and it is the transferable half.** I
+pre-registered the ask as an isolated sliver `rsi [30,32)`. That is **not what
+widening a threshold does**, and the episode counts say so outright:
+
+```
+rsi<30  -> 2110 episodes        rsi<32 -> 2784 episodes
+[30,32) -> 2099 episodes        2110 + 2099 = 4209  !=  2784
+median entry RSI  28.2 (rsi<30)  ->  30.2 (rsi<32)
+```
+
+Episodes are runs of consecutive qualifying bars, so a wider bar **MERGES
+adjacent runs and moves the entry earlier**. `[30,32)` in isolation therefore
+selects "RSI entered 30–32 and did NOT continue below 30" — the dips that
+FAILED. Under the widened threshold those same bars are the entry point of dips
+that continue. The sliver read +0.062%/trade with a trailing-120d of −0.175%
+and looked like a refusal; the actual object reads:
+
+| cell | n | %/trade | t_cl | halves | trail-120d | eps/day |
+|---|---|---|---|---|---|---|
+| `rsi<30` (shipped) | 2110 | +0.075% | +1.47 | +0.062/+0.087 | +0.143% | 4.59 |
+| **`rsi<32`** | 2784 | **+0.111%** | **+2.44** | **+0.114/+0.108** | **+0.172%** | **6.05** |
+
+**Better on every axis: +48% per trade, cluster-t clears 2.0, both halves
+positive, better trailing window, and +32% more trades.** Coin jackknife worst
+drop (DOT) keeps **t_cl +1.86** — stronger than the +1.68 of the cell (tr)
+shipped yesterday; 11/15 months positive; roi banks 70% of exits.
+
+**So the pre-registration failed, not the measurement** — and that is recorded
+rather than quietly re-labelled. The generalisable rule: **a threshold change
+and a band-in-isolation are different objects on episode-deduped data, and the
+count is the tell** — if the sub-cells do not sum to the union, the sliver is
+carrying a selection effect. `(uf)` found the mirror of this in a REPLAY
+(sampling stride inflating pooled `t`); this is it in the CELL DESIGN.
+
+**Q2 — THE HOLD: (tr)'s own watch item, resolved as REFUSED, and 24h stands.**
+(tr) flagged "max_hold exits −1.11%/trade; the surviving edge lives ≤12h" as
+the next candidate. Swept 8/12/16/20/24h with entries CONSTANT: **all four
+shorter holds REFUSE**. 24h is best per trade (+0.075%) and strongest (t_cl
++1.47). `hold=8` earns 54% more per BAR-DAY (+0.265 vs +0.172) — the exact
+`(hl)` denominator-shrinkage signature, caught by the pre-declared bar (a),
+because mum has 4 slots and is **currently flat**: she is not capital-bound, so
+per-trade is the metric. Declared conditional: if she ever becomes slot-bound,
+`hold=8` becomes correct.
+
+**NOT SHIPPED — real money.** `MUM_RSI_MAX` 30 → 32 on `mum-live` is Eamon's
+act, and it wants the referee pass (tr) ran (independent code,
+regime-conditional null, coin-week clustering) first. The post-hoc BAND
+`rsi 22-32` reads better still (+0.127%/trade, t_cl +2.82, 6.82 eps/day) by
+dropping the deep-oversold tail `(qu)` measured decayed through zero — it is
+the NEXT pre-registered candidate, not a same-day ship.
+
+**Why she has not traded, for the record:** her live census reads
+`rsi_min 31.3` against `rsi_bar 30.0` across all 23 symbols — the lowest RSI in
+her universe is above her bar. Nothing is stuck; her cell is empty. At 32 that
+same loop would have had candidates.
+
 ## 2026-08-27 (um) — THE LETTER GUARD WAS READING OTHER SESSIONS' PRIVATE WORKTREES: A SESSION COULD BE TURNED RED BY WORK THAT WAS NOT ITS OWN, ON A FAILURE IT COULD NOT FIX
 
 `audit_changelog_letters`'s citation arm walks every `.py` under the repo root,
