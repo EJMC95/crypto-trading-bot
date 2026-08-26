@@ -113,15 +113,60 @@ try:                                     # run as a script (sys.path[0]=scripts/
     from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                   GOLIVE_MIN_DAYS, bar_map, book_payload,
                                   drop_retired_sleeves, era_rows, gate_horizon,
-                                  grade, retired_sleeves, same_pair_overlaps,
-                                  stats)
+                                  grade, is_phantom_close, retired_sleeves,
+                                  same_pair_overlaps, stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
     from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                           GOLIVE_MIN_DAYS, bar_map,
                                           book_payload, drop_retired_sleeves,
                                           era_rows, gate_horizon, grade,
-                                          retired_sleeves, same_pair_overlaps,
-                                          stats)
+                                          is_phantom_close, retired_sleeves,
+                                          same_pair_overlaps, stats)
+
+
+def sql_row_is_phantom(pnl_abs, entry_price):
+    """[2026-08-26 daily review, 2nd pass] Is this `paper_trades` row a
+    halt/flatten EVENT wearing a close's shape?
+
+    THE DETECTION IS NOT RE-TYPED HERE. This shapes a SQL row into the two
+    fields `golive_readiness.is_phantom_close` reads and delegates, because a
+    second copy of that signature is a second rule and the two would drift on
+    exactly the rows that matter (CLAUDE.md). The `(th)` gate has filtered
+    these since 25-Aug; `winners_docket` since this morning; THIS script did
+    not, which is why the class was still open.
+
+    THE INCIDENT: 13 rows of exactly $0.00 with no entry price — all of them
+    on the two REAL-MONEY books (🙏 avo-lighter 9, 🔮 georgia-lighter 4,
+    every one tagged `long_daily_loss`) — were counted as trades by BOTH
+    live-money sections of this review. It published `💰 LIVE
+    freqtrade-avo-maria-lighter: n=13` on the same page as its own go-live
+    grader's n=4, and its divergence detector averaged 9 zeros into Avo's
+    live per-trade return, reporting a +0.822%/trade book as +0.253% and a
+    gap of -0.023pp instead of +0.546pp. Zeros do not merely dilute the mean:
+    they shrink the sample variance, so a gap detector fed them is biased
+    toward the all-clear it is supposed to be able to withhold.
+    """
+    return is_phantom_close({"profit_abs": pnl_abs, "open_rate": entry_price})
+
+
+def live_lens_rollup(rows):
+    """[(lens, pnl_abs, entry_price)] -> [(lens, n, net)] desc by n, phantoms
+    dropped.
+
+    EXTRACTED because a mutation round proved it: with this inline in
+    `scan_new_evidence` the phantom filter on the 💰 LIVE section was
+    unreachable from any test — deleting it left the suite GREEN, on the one
+    section of this report that names real money. Same lesson the band-kelly
+    dispersion counter taught the same morning.
+    """
+    agg = {}
+    for lens, pnl_abs, entry_price in rows:
+        if sql_row_is_phantom(pnl_abs, entry_price):
+            continue
+        n, net = agg.get(lens, (0, 0.0))
+        agg[lens] = (n + 1, net + float(pnl_abs or 0.0))
+    return sorted(((k, v[0], round(v[1], 2)) for k, v in agg.items()),
+                  key=lambda r: r[1], reverse=True)
 
 # Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
 # than the real closes bar, or a genuine candidate is hidden before it is graded.
@@ -656,14 +701,26 @@ def live_shadow_gap(cur, live, shadow=None, days=14):
         raise ValueError(f"{live}: no distinct shadow twin")
     out = {}
     for role, bot in (("live", live), ("shadow", shadow)):
-        cur.execute(f"""SELECT count(*), avg(pnl_pct)
+        # Rows, not an aggregate: the phantom test is the GATE'S, and it reads
+        # a row. Averaging in SQL would force a re-typed predicate here — the
+        # second-copy failure. These sets are ~hundreds of rows per book.
+        # [(tu)] `entry_price` is the COLUMN. It is NOT a key inside `extra`,
+        # and reading it as one made the phantom signature a tautology — see
+        # `sql_row_is_phantom`.
+        cur.execute(f"""SELECT pnl_pct, pnl_abs, entry_price
                           FROM paper_trades
                          WHERE bot=%s AND pnl_abs IS NOT NULL
                            AND {CA} > now() - interval '%s days'""",
                     (bot, days))
-        n, avg = cur.fetchone()
-        out[f"{role}_n"] = n or 0
-        out[f"{role}_pct"] = float(avg or 0.0) * 100.0
+        # [(tu)] a NULL `pnl_pct` is SKIPPED, never coerced to 0.0. The WHERE
+        # clause admits it (it filters on pnl_abs alone) and the SQL `avg()`
+        # this replaced ignored NULLs by definition, so coercing re-introduced
+        # exactly the zero-dilution bias the phantom filter above exists to
+        # remove — in the same function, on the same mean.
+        pcts = [float(pct) for pct, pabs, entry in cur.fetchall()
+                if pct is not None and not sql_row_is_phantom(pabs, entry)]
+        out[f"{role}_n"] = len(pcts)
+        out[f"{role}_pct"] = (statistics.fmean(pcts) if pcts else 0.0) * 100.0
     out["gap_pp"] = out["live_pct"] - out["shadow_pct"]
     return out
 
@@ -689,10 +746,13 @@ def scan_new_evidence(cur, errors):
 
     with Section(errors, "live-rows"):
         for bot in LIVE_ROWS:
-            cur.execute("""SELECT split_part(reason,'_',1), count(*), sum(pnl_abs)
-                             FROM paper_trades WHERE bot=%s AND pnl_abs IS NOT NULL
-                            GROUP BY 1 ORDER BY 2 DESC""", (bot,))
-            by_lens = [(r[0], r[1], round(float(r[2]), 2)) for r in cur.fetchall()]
+            # Rows, not an aggregate — see `sql_row_is_phantom`. This section
+            # reported 9 of 🙏 Avo's halt events as a `long` lens worth $0.00.
+            cur.execute("""SELECT split_part(reason,'_',1), pnl_abs,
+                                  entry_price
+                             FROM paper_trades WHERE bot=%s AND pnl_abs IS NOT NULL""",
+                        (bot,))
+            by_lens = live_lens_rollup(cur.fetchall())
             if by_lens:
                 tot_n = sum(r[1] for r in by_lens)
                 tot = sum(r[2] for r in by_lens)
@@ -1608,14 +1668,18 @@ def selftest():
     # twin passed this selftest until this block existed.) So drive the
     # function with a recording cursor and read back WHICH BOTS it queried.
     class _RecCur:
-        def __init__(self):
+        """Rows are (pnl_pct, pnl_abs, entry_price) — the shape the fixed
+        `live_shadow_gap` reads. `rows` defaults to two real closes."""
+
+        def __init__(self, rows=None):
             self.seen = []
+            self.rows = rows if rows is not None else [(0.01, 1.0, 100.0)]
 
         def execute(self, _sql, params):
             self.seen.append(params[0])
 
-        def fetchone(self):
-            return (5, 0.01)
+        def fetchall(self):
+            return list(self.rows)
 
     _rc = _RecCur()
     live_shadow_gap(_rc, "freqtrade-avo-maria-lighter")
@@ -1631,6 +1695,135 @@ def selftest():
         raise AssertionError("a row with no distinct twin must raise")
     except ValueError:
         pass
+
+    # ---- [2026-08-26, 2nd pass] HALT EVENTS ARE NOT TRADES ----------------
+    # THE INCIDENT: this script had NO phantom-close filter while
+    # `golive_readiness` has had one since (th) and `winners_docket` gained
+    # one this morning — so the class was closed in two graders and left open
+    # in the one that writes the report the operator reads. Both live-money
+    # sections counted 13 halt/flatten rows ($0.00, no entry price, all on the
+    # two REAL-MONEY books) as trades.
+    assert sql_row_is_phantom(0.0, None) is True
+    # a REAL scratch trade has an entry price and must SURVIVE — the
+    # counterfactual that a too-broad "drop every $0.00 row" filter fails
+    # [(tu)] a FLOAT, which is what the `entry_price` column actually yields —
+    # the hand-typed "100" was a shape this query can never emit ((hj)).
+    assert sql_row_is_phantom(0.0, 100.0) is False
+    # the real one, from the live ledger: band-kelly 1000PEPE 22-Aug, a
+    # converged round trip that scratched flat and MUST survive the filter
+    assert sql_row_is_phantom(0.0, 0.004083) is False
+    # a real forced-flatten LOSS keys the same `long_daily_loss` reason and
+    # must survive: the signature is $0.00 AND no entry price, never the reason
+    assert sql_row_is_phantom(-30.96, None) is False
+    assert sql_row_is_phantom(-30.96, 100.0) is False
+    # and it is the GATE'S detection, not a re-typed copy. [(tu)] The old
+    # assertion here compared two BOOLEANS, which a faithful re-typed copy
+    # satisfies exactly — a mutation replacing the delegation with an inline
+    # `float(pnl_abs or 0) == 0.0 and entry is None` SURVIVED it. Pin the CALL.
+    assert sql_row_is_phantom(0.0, None) is \
+        is_phantom_close({"profit_abs": 0.0, "open_rate": None})
+    import ast as _ast0
+    import pathlib as _pl0
+    _srcp = _pl0.Path(__file__).read_text(encoding="utf-8")
+    _pf = next(n for n in _ast0.walk(_ast0.parse(_srcp))
+               if isinstance(n, _ast0.FunctionDef)
+               and n.name == "sql_row_is_phantom")
+    assert any(isinstance(n, _ast0.Call) and isinstance(n.func, _ast0.Name)
+               and n.func.id == "is_phantom_close" for n in _ast0.walk(_pf)), \
+        "sql_row_is_phantom stopped delegating — a second copy of the gate's " \
+        "signature is a second rule, and the two drift on the rows that matter"
+
+    # [(tu)] THE SOURCE FIELD, which is what actually shipped broken. Both
+    # queries read `extra->>'entry_price'` — a JSONB key NO writer sets
+    # (bot_pnl_store publishes `entry_price` as its own column and `extra` as a
+    # separate JSONB). Measured over 3,235 ledger rows, 26-Jun..26-Aug:
+    # `extra.entry_price` non-null in ZERO. So the third tuple slot was NULL on
+    # every real row, `open_rate is None` was a tautology, and the signature
+    # degenerated from "$0.00 AND no entry price" to "$0.00" — the exact
+    # too-broad filter the counterfactual above forbids. It read CORRECTLY on
+    # the day (halt events are $0.00 anyway) and would have silently deleted
+    # the next genuine scratch close; band-kelly booked one on 22-Aug
+    # (1000PEPE `short-snap_conv`, entry 0.004083, pnl $0.00).
+    # No fixture can catch this — `_RecCur` never executes SQL — so the guard
+    # is on the QUERY TEXT, tied to the publisher's own schema. It reads the
+    # module's STRING CONSTANTS via AST, never the raw source: a page-wide
+    # substring scan matches this very comment, which is the (po) trap (three
+    # tests in one session failed on the sentence promising the property).
+    # scoped to strings that ARE queries, which also excludes this guard's own
+    # search literal — a whole-module scan matches itself, the same self-
+    # reference that just made the first draft of this assertion fail.
+    _sql = [n.value for n in _ast0.walk(_ast0.parse(_srcp))
+            if isinstance(n, _ast0.Constant) and isinstance(n.value, str)
+            and "paper_trades" in n.value]
+    assert not any("extra->>'entry_price'" in q for q in _sql), \
+        "entry_price is a COLUMN, not a key in extra — reading it as JSONB " \
+        "makes the phantom test a tautology that drops real scratch trades"
+    _pt = [q for q in _sql if "entry_price" in q]
+    assert len(_pt) == 2, \
+        f"expected both phantom-filtered queries to select the entry_price " \
+        f"column, found {len(_pt)}"
+    _store_src = (_pl0.Path(__file__).resolve().parents[1]
+                  / "bot_pnl_store.py").read_text(encoding="utf-8")
+    assert "ADD COLUMN IF NOT EXISTS entry_price" in _store_src, \
+        "the publisher no longer declares entry_price as a column — re-derive " \
+        "where the phantom signature's entry price comes from before trusting it"
+
+    # THE WIRING, not just the helper. Drive the real function with Avo's real
+    # 23/24-Aug shape — 9 phantom halts + 4 traded closes — and read the
+    # published numbers back. Before the fix this returned n=13 and a mean
+    # diluted by nine zeros.
+    _avo_live = [(0.0, 0.0, None)] * 9 + [(0.008, 0.13, 100.0)] * 4
+    _gc = _RecCur(_avo_live)
+    _g = live_shadow_gap(_gc, "freqtrade-avo-maria-lighter")
+    assert _g["live_n"] == 4, f"halt events counted as trades: {_g['live_n']}"
+    assert abs(_g["live_pct"] - 0.8) < 1e-9, _g["live_pct"]
+    # ALL-phantom must read n=0 (no verdict), never n=9 at a 0.00% mean —
+    # a book that only halted has produced no evidence, not flat evidence
+    _gz = live_shadow_gap(_RecCur([(0.0, 0.0, None)] * 9),
+                          "freqtrade-georgia-lighter")
+    assert _gz["live_n"] == 0 and _gz["live_pct"] == 0.0, _gz
+    # [(tu)] A NULL `pnl_pct` IS SKIPPED, NOT COUNTED AS A 0.00% TRADE. The
+    # WHERE clause admits such a row (it filters on pnl_abs alone) and the SQL
+    # `avg()` this replaced ignored NULLs by definition — so coercing with
+    # `float(pct or 0.0)` re-introduced the very zero-dilution bias the phantom
+    # filter three lines up exists to remove, in the same mean. One real close
+    # at +2% plus one NULL-pct row must read n=1 / +2.00%, never n=2 / +1.00%.
+    _gn = live_shadow_gap(_RecCur([(0.02, 1.0, 100.0), (None, 5.0, 100.0)]),
+                          "freqtrade-georgia-lighter")
+    assert _gn["live_n"] == 1, f"a NULL pnl_pct was counted as a trade: {_gn}"
+    assert abs(_gn["live_pct"] - 2.0) < 1e-9, _gn
+
+    # The 💰 LIVE section is the OTHER site, and it needed EXTRACTING before a
+    # test could reach it: a mutation round deleting its phantom filter left
+    # the whole suite green while it was inline in `scan_new_evidence`.
+    # Avo's real 26-Aug ledger: 9 `long_daily_loss` halts + 4 real closes.
+    _avo_rows = ([("long", 0.0, None)] * 9
+                 + [("long-dip-in-uptrend", 0.1287, 100.0)] * 4)
+    _roll = live_lens_rollup(_avo_rows)
+    assert _roll == [("long-dip-in-uptrend", 4, 0.51)], _roll
+    assert not any(lens == "long" for lens, _n, _net in _roll), \
+        "halt events published as a 'long' lens on a REAL-MONEY row"
+    assert sum(n for _l, n, _net in _roll) == 4, _roll
+    # a real forced-flatten LOSS on the same reason survives, and so does a
+    # genuine scratch trade — the too-broad filter must fail here
+    _keep = live_lens_rollup([("long", -30.96, None), ("long", 0.0, 100.0)])
+    assert _keep == [("long", 2, -30.96)], _keep
+    # ordering contract: biggest n first (the report reads left to right)
+    assert [n for _l, n, _x in live_lens_rollup(
+        [("a", 1.0, 1.0)] + [("b", 1.0, 1.0)] * 3)] == [3, 1]
+
+    # WIRING: the section must CALL the extracted helper. Asserting the helper
+    # alone is what let the inline copy rot — an AST check, not a substring
+    # (the incident text above contains the name too).
+    import ast as _ast
+    import pathlib as _pathlib
+    _src = _pathlib.Path(__file__).read_text(encoding="utf-8")
+    _fn = next(n for n in _ast.walk(_ast.parse(_src))
+               if isinstance(n, _ast.FunctionDef) and n.name == "scan_new_evidence")
+    _calls = {n.func.id for n in _ast.walk(_fn)
+              if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)}
+    assert "live_lens_rollup" in _calls, \
+        "scan_new_evidence stopped routing the LIVE section through the filter"
 
     # ---- [2026-08-02] CONTAINER vs REPO ----------------------------------
     # THE INCIDENT: on 2-Aug both Farmer arms reported `705425a83422` while the

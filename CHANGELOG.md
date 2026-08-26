@@ -1,3 +1,78 @@
+## 2026-08-26 (tu) — THE DAILY REVIEW COUNTED 13 HALT EVENTS AS REAL-MONEY TRADES — AND THE FILTER THAT FIXED IT READ A JSONB KEY NOTHING HAS EVER WRITTEN
+
+Two commits from an earlier pass today, held unpushed, reviewed before
+publishing and shipped with the blocker they carried fixed. **The inherited
+half is right and worth having;** the correction is that its filter was
+sourcing the wrong field, and no test could see it.
+
+### THE INHERITED FIX
+
+`scripts/evidence_review.py` writes the report the operator reads, and it had
+no phantom-close filter while `golive_readiness` has had one since (th) and
+`winners_docket` gained one this morning — so the class was closed in two
+graders and left open in the one that publishes. **13 rows of exactly $0.00
+with no entry price — every one on a REAL-MONEY book (🙏 avo-lighter 9,
+🔮 georgia-lighter 4, all tagged `long_daily_loss`) — were counted as trades by
+BOTH live-money sections.** It printed `💰 LIVE freqtrade-avo-maria-lighter:
+n=13` on the same page as its own grader's n=4, and averaged nine zeros into
+Avo's live per-trade return: **+0.822%/trade reported as +0.253%**, a gap of
+−0.023pp instead of +0.546pp. Zeros do not merely dilute a mean — they shrink
+the sample variance, so a gap detector fed them is biased toward the all-clear
+it exists to be able to withhold. Detection delegates to
+`golive_readiness.is_phantom_close`; `live_lens_rollup` was extracted because a
+mutation round proved the LIVE section's filter unreachable from any test.
+
+### THE BLOCKER IT SHIPPED WITH
+
+Both new queries read **`extra->>'entry_price'`** — and `entry_price` is a
+dedicated `DOUBLE PRECISION` **column**, with `extra` a separate JSONB. Nothing
+has ever written that key: one writer tree-wide (`bot_pnl_store.py:1256`) binds
+the two as separate INSERT columns, `_stamp_build` adds only `svc`/`build`/
+`build_n`, no migration backfills it, and **measured over 3,235 ledger rows
+(26-Jun → 26-Aug), `extra.entry_price` is non-null in ZERO.** So the third tuple
+slot was NULL on every real row, `open_rate is None` became a tautology, and the
+signature degenerated from *"$0.00 **and** no entry price"* to *"$0.00"* — the
+exact too-broad filter the commit's own counterfactual forbids, violating
+`is_phantom_close`'s declared invariant that it *"must never be able to silently
+shrink a graded sample beyond its exact signature."*
+
+**It read CORRECTLY on the day** (halt events are $0.00 anyway, and 0 rows were
+wrongly dropped across the six covered books), so this is latent, not active —
+and it would have silently deleted the next genuine scratch close. One already
+exists: 🪁 band-kelly booked `1000PEPE short-snap_conv` on 22-Aug, entry
+0.004083, P&L exactly $0.00.
+
+**WHY NO TEST SAW IT, and it is this file's own rule:** `_RecCur` never executes
+SQL, and the counterfactual `assert sql_row_is_phantom(0.0, "100") is False`
+hand-feeds a **string** — a shape that query can never emit. The one assertion
+guarding *"must never drop a REAL trade"* was unreachable in production. The
+(hj)/(ts) class again, in the SOURCE-FIELD dimension: a fixture built by the
+consumer's author encodes the author's mistake.
+
+### WHAT SHIPPED
+
+* **The column, at both sites.** Fixtures rebuilt in the publisher's shape —
+  floats, including the real 0.004083 scratch row.
+* **A NULL `pnl_pct` is skipped, not coerced.** `float(pct or 0.0)` counted such
+  a row as a 0.00% trade while the SQL `avg()` it replaced ignored NULLs by
+  definition — **the same zero-dilution bias, re-introduced three lines from the
+  filter that removes it.** The WHERE clause admits these rows (it screens on
+  `pnl_abs` alone).
+* **The delegation is pinned by the CALL, not a boolean.** The old assertion
+  compared two `True`s, which a faithful re-typed copy satisfies exactly — a
+  mutation inlining the predicate SURVIVED it. Now an AST check.
+* **A guard on the query text itself,** tied to the publisher's schema, because
+  no fixture can reach it. It reads the module's **string constants via AST**,
+  not the raw source: a whole-file scan matches this very entry's prose *and its
+  own search literal* — both of which failed the first two drafts, which is the
+  (po) trap landing twice inside the guard written to avoid it.
+
+**6/6 mutations verified RED**, including reverting the SQL to
+`extra->>'entry_price'` and the delegation copy that had survived. Full suite
+green. `scripts/evidence_review.py` ships in no container and is run from the
+repo by the `daily-evidence-review` task at 07:33 Sydney, so this push is the
+deploy; it lands in tomorrow morning's report.
+
 ## 2026-08-26 (tt) — THE WINNERS' DOCKET CROWNED A PROVEN WINNER ON THE WINDOW THAT GENERATED THE HYPOTHESIS: I21's follow-through half was prose, and it failed on the first bucket that ever reached it
 
 Found by the daily review, three days after the registration it broke.
