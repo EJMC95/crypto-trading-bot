@@ -72,6 +72,42 @@ def test_a_pinned_direction_overrides_every_source(monkeypatch):
     assert all(m.side_is_long(s) is False for s in m.SNIPE_SOURCES)
 
 
+def test_a_pinned_direction_restores_the_old_hold_too(monkeypatch):
+    """A revert must land where the book actually WAS.
+
+    [2026-08-26] `DIRECTION_PINNED` short-circuited the SIDE and left the
+    per-source HOLD in force, so the documented one-env revert produced
+    LONG @ 24h — a cell the book has never run and which measures materially
+    worse than the LONG @ 6h it claims to restore. A revert that lands somewhere
+    new is not a revert.
+    """
+    monkeypatch.setenv("SNIPER_DIRECTION", "long")
+    import lighter_perp_sniper as m
+    m = importlib.reload(m)
+    for src in m.SNIPE_SOURCES:
+        assert m.side_is_long(src) is True
+        assert m.hold_sec_for(src) == float(m.MAX_HOLD_SEC), (
+            f"{src}: pinned side but hold {m.hold_sec_for(src)/3600}h != "
+            f"the book-wide {m.MAX_HOLD_SEC/3600}h")
+
+
+def test_a_typo_in_a_side_env_never_resolves_to_a_side(monkeypatch):
+    """`!= "short"` made every typo mean LONG, and published the junk verbatim
+    in `dir_by_src` — so the payload advertised a side the book was not taking.
+    A lever that fails open on a typo is not a lever."""
+    monkeypatch.delenv("SNIPER_DIRECTION", raising=False)
+    monkeypatch.setenv("SNIPER_SIDE_YOUNG", "shrot")
+    import lighter_perp_sniper as m
+    m = importlib.reload(m)
+    assert m.SOURCE_SIDE["young"] == "short", \
+        "a junk side must fall back to the DECLARED default, not to long"
+    assert m.side_is_long("young") is False
+    monkeypatch.setenv("SNIPER_DIRECTION", "lnog")
+    m = importlib.reload(m)
+    assert m.DIRECTION_PINNED is False, \
+        "a typo'd kill switch must not read as armed"
+
+
 def test_one_source_moves_by_env_without_moving_the_others(monkeypatch):
     monkeypatch.delenv("SNIPER_DIRECTION", raising=False)
     monkeypatch.setenv("SNIPER_SIDE_YOUNG", "long")
@@ -110,21 +146,83 @@ def test_the_exit_timer_reads_the_positions_own_hold_not_the_constant():
 
 # ------------------------------------------------- the payload must not lie
 def test_the_held_map_reads_the_side_off_the_position(sniper):
-    """With one side per source, a `held` map built from a module constant
-    reports every short as a long — to `fleet_risk`'s exposure view, which is
-    the organ that decides whether the fleet is one-sided."""
+    """The `held` map must describe the POSITION, not how it was admitted.
+
+    [2026-08-26] REWRITTEN, because the first version of this test was VACUOUS
+    and an adversarial review proved it. It AST-located the dict comprehension
+    and then checked the SUBSTRING "side_is_long" — which a map hard-coded to
+    `side_is_long(None)` (i.e. "every symbol is long") still satisfies. It
+    named the exact failure it could not detect.
+
+    The defect it missed was real: the map read `side_is_long(entry_src.get(c))`
+    — the SOURCE — and `side_is_long(None)` is True, so any held position whose
+    `entry_src` was lost published "L" whatever side it was really on. That is
+    reachable via a lost order ack, a restart after a failed save_state, the
+    junk-drop whitelist on restore, or any position opened before the deploy.
+
+    This version asserts BEHAVIOUR through the real owner instead.
+    """
+    m = sniper
+    # a real short with no source at all — the exact unreachable-by-substring case
+    assert m._side_letter("X", {"X": -2.5}, {}) == "S"
+    assert m._side_letter("X", {"X": 2.5}, {}) == "L"
+    # the POSITION wins over the source when they disagree
+    assert m._side_letter("X", {"X": -2.5}, {"X": "surge"}) == "S", \
+        "surge is a LONG source; a short position must still report short"
+    assert m._side_letter("X", {"X": 1.0}, {"X": "young"}) == "L", \
+        "young is a SHORT source; a long position must still report long"
+    # no size at all: fall back to the source, then to the book-wide default
+    assert m._side_letter("X", {}, {"X": "young"}) == "S"
+    assert m._side_letter("X", {}, {}) == ("L" if m.DIRECTION_LONG else "S")
+    # junk never raises and never silently reports long
+    assert m._side_letter("X", {"X": "oops"}, {"X": "young"}) == "S"
+    assert m._side_letter("X", {"X": 0.0}, {"X": "young"}) == "S"
+
+    # ...and the call site must actually USE it, or the behaviour above is moot.
     src = (ROOT / "lighter_perp_sniper.py").read_text()
     tree = ast.parse(src)
-    found = False
+    maps = [ast.unparse(n) for n in ast.walk(tree)
+            if isinstance(n, ast.DictComp)
+            and ('"L"' in ast.unparse(n) or "_side_letter" in ast.unparse(n))]
+    assert any("_side_letter" in b for b in maps), \
+        f"the published held map must call _side_letter; got: {maps}"
+
+
+def test_the_cooldown_is_stamped_on_the_open_not_the_offer(sniper):
+    """A candidate that never opened must not start a 168h cooldown.
+
+    `surge_done` is read by `active_done` to EXCLUDE symbols from the next
+    candidate list. Stamped at OFFER time, a candidate that failed to snipe (a
+    one-sided book with no ask, a full cap, a bad tick) was excluded from every
+    later `_surge`/`_young` list and so never reached `run_snipe_pass` again —
+    never retried, and never given up either, because the bounded give-up lives
+    inside that pass. The `listing` source was immune, which is why it hid.
+    """
+    src = (ROOT / "lighter_perp_sniper.py").read_text()
+    tree = ast.parse(src)
+    stamps = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.DictComp):
-            blob = ast.unparse(node)
-            if '"L"' in blob or "'L'" in blob:
-                found = True
-                assert "side_is_long" in blob, (
-                    "the held map must resolve each position's OWN side; "
-                    f"got: {blob}")
-    assert found, "no held-map comprehension found to check"
+        if not isinstance(node, ast.Assign):
+            continue
+        tgt = node.targets[0]
+        if (isinstance(tgt, ast.Subscript)
+                and isinstance(tgt.value, ast.Name)
+                and tgt.value.id == "surge_done"):
+            stamps.append(node)
+    assert stamps, "no surge_done stamp found at all"
+    # every stamp inside the trading loop must sit behind a check that the
+    # snipe actually opened — i.e. inside the _try_snipe wrapper.
+    fns = {f.name: f for f in ast.walk(tree)
+           if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    assert "_try_snipe" in fns, "the open-time stamp wrapper is gone"
+    wrapper = ast.unparse(fns["_try_snipe"])
+    assert "surge_done[" in wrapper, "the wrapper must own the stamp"
+    assert "if ok" in wrapper or "ok and" in wrapper, \
+        "the stamp must be conditional on the snipe having OPENED"
+    # and the young offer must no longer subtract `pending`, or a pending
+    # symbol can never advance its attempt counter to the give-up.
+    assert "| set(pending), YOUNG_MAX_PER_LOOP" not in src, \
+        "subtracting `pending` from the young offer re-entombs the candidate"
 
 
 def test_the_payload_publishes_a_side_per_source(sniper):

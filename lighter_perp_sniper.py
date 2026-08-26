@@ -112,6 +112,10 @@ DIRECTION_LONG = _DIRECTION_ENV != "short"
 #: True only when the operator has PINNED a side explicitly. A pinned side wins
 #: over every per-source rule — the kill switch for the whole change below.
 DIRECTION_PINNED = _DIRECTION_ENV in ("long", "short")
+if _DIRECTION_ENV and not DIRECTION_PINNED:
+    log.warning("SNIPER_DIRECTION=%r is not 'long' or 'short' — the kill switch"
+                " is NOT armed; per-source sides remain in force",
+                _DIRECTION_ENV)
 
 # [2026-08-20] THE SIDE IS PER-SOURCE, AND THIS IS WHY THE BOOK NEVER FLEW.
 #
@@ -121,6 +125,40 @@ DIRECTION_PINNED = _DIRECTION_ENV in ("long", "short")
 # listings on ONE venue, and a perp lists AFTER the spot hype. Measured on this
 # venue's own tape, the two are opposite trades, and the successor kept the
 # predecessor's side.
+#
+# [2026-08-26] THE JUSTIFICATION BELOW WAS REFUTED HOURS AFTER IT SHIPPED, BY AN
+# ADVERSARIAL REVIEW OF THIS COMMENT'S OWN CLAIM. The SIDE FLIP STANDS; the
+# "debut fade" that motivated it does not. Corrected in place per I12 — see
+# CHANGELOG (ub) for the full working. In short:
+#
+#  * The controls were described as "paired within coin so market drift cannot
+#    produce them". FALSE AS WRITTEN: the pairing is within coin but ACROSS
+#    TIME, and this venue's listings CLUSTER (13-19 books/month Jul-Sep 2025,
+#    ~1/month since), so a coin's young band and its mature band are different
+#    calendar windows by construction.
+#  * 11 of the 45 "debuts" share ONE birth instant — the venue's own opening —
+#    and are BTC, ETH, SOL, XRP, DOGE, LINK, AVAX, POL, NEAR, TAO, GRAM:
+#    assets with no debut at all. Outside them the headline cell CHANGES SIGN
+#    (8-21d at 24h: launch batch -1.953%, the other 34 coins +0.056%).
+#  * Coin + calendar-week fixed effects put the age dummy at -0.09..-0.15%/24h
+#    (t=-0.28..-0.47) against a raw -0.56..-0.62%. 76-83% of it is CALENDAR.
+#  * The gradient t-values quoted below are the POOLED column. BY COIN they are
+#    -0.61 / -1.02 / -0.47 / -1.52: 0 of 10 cells reach |t|=2.
+#  * The mature control is flat only in ITS OWN window. The same coins shorted
+#    at the young coins' calendar hours return +0.125%/trade, t=+3.28.
+#
+# WHY THE FLIP IS KEPT ANYWAY — the counterfactual, matched-null excess:
+#    PRIOR    LONG  @ 6h   raw -0.134%   matched-null -0.027% (t=-0.39)
+#    SHIPPED  SHORT @ 24h  raw +0.695%   matched-null +0.157% (t=+0.83)
+# SHORT measures better than LONG on every convention including the
+# market-neutral one (+0.343pp/trade at a fixed hold) — but NEITHER LEG IS
+# DISTINGUISHABLE FROM ZERO. This is a better-pointed coin flip on a $1,000
+# paper book, not a measured edge, and it is not to be cited as one. The 6h
+# short (+0.132%, t=+2.69) is WITHDRAWN outright: matched-null +0.019%,
+# t=+0.34. `listing` enters at age ~0 where the calendar-matched excess is
+# POSITIVE (+0.694%/24h), so its flip is HYPOTHESIS-GRADE ((qi)).
+#
+# The original numbers are left below so the size of the correction is legible.
 #
 # MEASURED, 45 venue-priced books, every hour of each book's own first 21 days
 # (n=23,102 hours), LONG:
@@ -171,11 +209,35 @@ DIRECTION_PINNED = _DIRECTION_ENV in ("long", "short")
 # behaviour, never a guess ((ht)). Reverts: `SNIPER_DIRECTION=long` pins the
 # whole book back to one side; `SNIPER_SIDE_<SOURCE>` / `SNIPER_HOLD_H_<SOURCE>`
 # move one source.
+def _side_env(src, dflt):
+    """One source's side, VALIDATED. A typo must not resolve to a side.
+
+    [2026-08-26] `!= "short"` meant `SNIPER_SIDE_YOUNG="shrot"` silently
+    resolved to LONG and then published the junk verbatim in `dir_by_src`, so
+    the payload advertised a side the book was not taking. A lever that fails
+    open on a typo is not a lever. Unknown values fall back to the DECLARED
+    default and say so — never to a guess ((ht)).
+    """
+    raw = os.environ.get(f"SNIPER_SIDE_{src.upper()}", dflt).strip().lower()
+    if raw in ("long", "short"):
+        return raw
+    log.warning("SNIPER_SIDE_%s=%r is not 'long' or 'short' — using the"
+                " declared default %r", src.upper(), raw, dflt)
+    return dflt
+
+
 SOURCE_SIDE = {
-    src: os.environ.get(f"SNIPER_SIDE_{src.upper()}", dflt).strip().lower()
+    src: _side_env(src, dflt)
     for src, dflt in (("listing", "short"), ("surge", "long"),
                       ("young", "short"))
 }
+#: [2026-08-26] The hold a PINNED side restores. `SNIPER_DIRECTION` is
+#: documented as the one-env revert to the pre-change book, and it short-
+#: circuited the SIDE while leaving the per-source HOLD in force — so
+#: `SNIPER_DIRECTION=long` gave LONG at 24h, a cell that measures 5.3x WORSE
+#: than the LONG-at-6h it claims to restore. A revert that lands somewhere the
+#: book has never been is not a revert. Pinning the side now pins the hold to
+#: the book-wide `MAX_HOLD_SEC` as well.
 SOURCE_HOLD_H = {
     src: float(os.environ.get(f"SNIPER_HOLD_H_{src.upper()}", dflt))
     for src, dflt in (("listing", "24"), ("surge", "6"), ("young", "24"))
@@ -195,6 +257,26 @@ def side_is_long(src):
         if src in SOURCE_SIDE else DIRECTION_LONG
 
 
+def _side_letter(coin, sizes, entry_src):
+    """"L"/"S" for the published `held` map — from the POSITION, not the source.
+
+    [2026-08-26] The signed size is the only thing that knows what a position
+    actually is. `entry_src` is a HINT about how it was admitted, it can be
+    absent, and `side_is_long(None)` degrades to LONG — which is the right
+    degrade for OPENING a position and the wrong one for DESCRIBING one.
+
+    Falls back to the source only when no size is available at all, and to the
+    book-wide default after that, so the map never omits a held symbol.
+    """
+    try:
+        sz = sizes.get(coin)
+        if sz is not None and float(sz) != 0.0:
+            return "L" if float(sz) > 0 else "S"
+    except (TypeError, ValueError):
+        pass
+    return "L" if side_is_long(entry_src.get(coin)) else "S"
+
+
 def hold_sec_for(src):
     """Seconds this source's positions may be held before the timer fires.
 
@@ -203,6 +285,11 @@ def hold_sec_for(src):
     closes it EARLIER than its own rule would, never later, so the degrade is
     in the safe direction.
     """
+    if DIRECTION_PINNED:
+        # A pinned side is the documented revert to the single-sided book, and
+        # that book held for MAX_HOLD_SEC. Pinning the side without the hold
+        # left the revert on LONG@24h — see SOURCE_HOLD_H's note.
+        return float(MAX_HOLD_SEC)
     try:
         return float(SOURCE_HOLD_H[src]) * 3600.0
     except (KeyError, TypeError, ValueError):
@@ -1260,8 +1347,6 @@ def main():
             if _surge:
                 log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
                          SURGE_MULT, ", ".join(_surge))
-                for _s in _surge:
-                    surge_done[_s] = now.timestamp()
         # [2026-07-30] THIRD SOURCE — books still inside their debut regime.
         # The candle probe is GOVERNED and MONOTONE: at most YOUNG_PROBE_BUDGET
         # unknown symbols per loop, and a book measured older than the young bar
@@ -1326,15 +1411,13 @@ def main():
                 "probe" if bar_counts else "dark")
             _young = young_candidates(_age_src, YOUNG_MAX_BARS, _vols,
                                       YOUNG_MIN_VOL_M,
-                                      active_done(surge_done, now.timestamp())
-                                      | set(pending), YOUNG_MAX_PER_LOOP,
+                                      active_done(surge_done, now.timestamp()),
+                                      YOUNG_MAX_PER_LOOP,
                                       census=_young_cen)
             if _young:
                 log.info("YOUNG-BOOK CANDIDATES (<=%d daily bars): %s",
                          YOUNG_MAX_BARS,
                          ", ".join(f"{s}({bar_counts.get(s)}d)" for s in _young))
-                for _s in _young:
-                    surge_done[_s] = now.timestamp()
         # [2026-08-04] which source ADMITTED each candidate this pass, for the
         # close-tag stamp. Listing wins a tie (candidate order: it is tried
         # first, so it is the source that actually admitted the symbol);
@@ -1359,12 +1442,40 @@ def main():
                    "not_young": len(not_young),
                    "pending": len(pending), "max_open": max_open,
                    "open_before": open_now}
+        # [2026-08-26] THE COOLDOWN IS STAMPED ON THE OPEN, NOT ON THE OFFER.
+        #
+        # `surge_done` is the surge/young dedup ledger and `active_done` reads
+        # it to EXCLUDE symbols from the next candidate list. It was stamped the
+        # moment a symbol was OFFERED — so a candidate that failed to snipe (a
+        # one-sided book with no ask, a full cap, a bad tick) started a 168h
+        # cooldown having never opened, was excluded from every subsequent
+        # `_surge`/`_young` list, and therefore never reached `run_snipe_pass`
+        # again: never retried, and never given up either, because the bounded
+        # give-up lives INSIDE that pass. Entombed.
+        #
+        # The `listing` source was immune throughout — `new_listings` is
+        # `active - baseline`, and `baseline` moves only on an OPEN or a
+        # deliberate give-up — which is exactly why this stayed invisible. A
+        # brand-new perp is the MOST likely book to be one-sided on its first
+        # tick, so this quietly spent the supply `(ty)` had just restored after
+        # 66 days at zero. Found by an adversarial review, not by the tests.
+        #
+        # `pending` is no longer subtracted from the young offer either: a
+        # pending symbol must keep being OFFERED so its attempt counter can
+        # advance to the give-up. `run_snipe_pass` already dedups within a pass
+        # (`seen`) and owns the retry/abandon rule — this restores the same
+        # contract the listing source has always had.
+        def _try_snipe(_s, _n):
+            ok = open_snipe(_s, now.timestamp(), _n, src=_src_map.get(_s))
+            if ok and _src_map.get(_s) in ("surge", "young"):
+                surge_done[_s] = now.timestamp()
+            return ok
+
         open_now, _sniped, _abandoned = run_snipe_pass(
             candidates=new_listings + _surge + _young, pending=pending,
             baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
-            try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n,
-                                              src=_src_map.get(s)),
+            try_snipe=_try_snipe,
             is_held=lambda s: s in _held_now, census=_census)
 
         # ----- manage open snipes (TP / SL / max-hold) -----
@@ -1478,6 +1589,9 @@ def main():
             pub_open = broker.open_count()
             pub_pnl = pub_equity - PAPER_START
             _held_syms = sorted(broker.pos)
+            # [2026-08-26] THE POSITION'S OWN SIGNED SIZE, not its source. See
+            # `_side_letter` below for why the source is the wrong owner.
+            _held_size = {c: broker.pos[c][0] for c in _held_syms}
         else:
             _pos = ctx.venue.positions()
             pub_equity = None
@@ -1491,6 +1605,7 @@ def main():
             # today precisely so a silent sniper can be SEEN. A dashboard row
             # that simply stops updating is the failure this bot keeps having.
             _held_syms = sorted(_pos)
+            _held_size = {c: _pos[c].get("size") for c in _held_syms}
         try:
             store.publish(bot_id, status="online", equity=pub_equity, pnl_abs=pub_pnl,
                           open_trades=pub_open,
@@ -1518,13 +1633,26 @@ def main():
                                  # [2026-07-15 GAP FIX] position detail so the
                                  # fleet exposure/concentration view can see
                                  # this book (it was sym_uncovered before).
-                                 # [2026-08-20] read the side off the
-                                 # POSITION, not off a module constant. With
-                                 # one side per source this map was about to
-                                 # start lying to the fleet exposure view — it
-                                 # would have reported every short as a long.
-                                 "held": {c: ("L" if side_is_long(
-                                     entry_src.get(c)) else "S")
+                                 # [2026-08-26] read the side off the
+                                 # POSITION'S OWN SIGNED SIZE. The first draft
+                                 # read `side_is_long(entry_src.get(c))`, i.e.
+                                 # the SOURCE — and `side_is_long(None)` is
+                                 # True, so any held position whose `entry_src`
+                                 # was lost published "L" whatever side it was
+                                 # really on. That is reachable: a lost order
+                                 # ack, a restart after a failed save_state,
+                                 # the junk-drop whitelist on restore, or any
+                                 # position opened before this shipped. The
+                                 # entry P&L (`was_long = sz > 0`) and
+                                 # `close_reason` both key off the size, so the
+                                 # payload contradicted the ledger for the SAME
+                                 # position. Found by an adversarial review;
+                                 # the guard written with the first draft was
+                                 # VACUOUS against exactly this (a substring
+                                 # check for "side_is_long" that a hard-coded
+                                 # `side_is_long(None)` still satisfies).
+                                 "held": {c: _side_letter(c, _held_size,
+                                                          entry_src)
                                           for c in _held_syms},
                                  # [2026-08-20 (tx)] THE PER-SOURCE CENSUS —
                                  # see _new_funnel(). `watching`/`pending`
@@ -1990,7 +2118,12 @@ def selftest():
               "G3": {"bids": [[40.0, 5]], "asks": [[40.2, 5]]}}
     _markets = {s: {"status": "active"} for s in ("OLD", "NEW", "G1", "G2", "G3")}
     _state = {"baseline": ["OLD", "G1", "G2", "G3"], "entry_ts": {}, "pending": {}}
-    ven = _FakeVenue(_markets, _books, _held3)
+    # [2026-08-26] G3 is held SHORT. The fixture was all-long, so the `held`
+    # map's short branch was never executed — which is how a map that read the
+    # SOURCE instead of the POSITION shipped, and how the guard written beside
+    # it stayed green against a mutation hard-coding every symbol to "L".
+    _held3_signed = dict(_held3, G3={"size": -1.0, "entry": 40.0})
+    ven = _FakeVenue(_markets, _books, _held3_signed)
     fs = _drive(ven, CAP, CLIP, _state)
 
     # fix 2 — funded modes PERSIST. Was `if dry_run`: the live row read back
@@ -2015,10 +2148,15 @@ def selftest():
     # failure was SILENT, so the fixture asserts the ROW, not an exception.
     assert fs.published, "funded mode published NOTHING — the 17-Jul AttributeError"
     _bot, kw = fs.published[-1]
-    # [2026-08-20] G1-G3 are RESTORED venue positions with no `entry_src`, so
-    # they read the book-wide default (long) — the un-tagged degrade, asserted
-    # rather than assumed.
-    assert kw["extra"]["held"] == {"G1": "L", "G2": "L", "G3": "L"}, kw["extra"]
+    # [2026-08-26] G1-G3 are RESTORED venue positions with NO `entry_src`, so
+    # the source can say nothing about them. G3 is held SHORT and must publish
+    # "S" anyway, because the map reads the POSITION'S OWN SIGNED SIZE. Under
+    # the first draft — `side_is_long(entry_src.get(c))`, and
+    # `side_is_long(None)` is True — G3 published "L" while its own exit P&L
+    # and close tag treated it as a short. That contradiction is the whole
+    # reason this assertion exists in behavioural form rather than as a
+    # substring check for the helper's name.
+    assert kw["extra"]["held"] == {"G1": "L", "G2": "L", "G3": "S"}, kw["extra"]
     assert kw["extra"]["mode"] == "lighter_live" and kw["open_trades"] == 3
     assert kw["equity"] is None and kw["extra"]["pending"] == 1
 
