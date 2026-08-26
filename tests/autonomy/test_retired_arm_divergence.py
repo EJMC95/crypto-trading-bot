@@ -219,9 +219,24 @@ def test_the_skip_is_not_logged_as_a_failure():
 def test_the_marketcontext_image_carries_fleet_bus():
     """market_context now imports fleet_bus UNGUARDED, so a missing COPY is a
     crash-loop on a real service rather than a degraded organ. This is the
-    born-dark class the fleet has already paid for three times."""
-    assert "fleet_bus.py" in DOCKERFILE.read_text(), \
-        "Dockerfile.marketcontext must COPY fleet_bus.py"
+    born-dark class the fleet has already paid for three times.
+
+    Reads the COPY DIRECTIVES, not the file text. The first version of this
+    test was `"fleet_bus.py" in DOCKERFILE.read_text()` and a mutation round
+    proved it VACUOUS: the rationale comment directly above the COPY names
+    the file, so deleting it from the COPY left the substring in place and
+    the guard green. That is this repo's own "a substring test is NOT a
+    wiring test" rule, walked into by the guard written to enforce it."""
+    copied = set()
+    for line in DOCKERFILE.read_text().splitlines():
+        line = line.strip()
+        if not line.upper().startswith("COPY "):
+            continue
+        # `COPY a.py b.py ./` — every token but the directive and the dest
+        copied.update(line.split()[1:-1])
+    assert "fleet_bus.py" in copied, (
+        "Dockerfile.marketcontext must COPY fleet_bus.py — market_context "
+        f"imports it unguarded. COPY'd today: {sorted(copied)}")
 
 
 def test_fleet_bus_brings_no_import_cascade_into_that_image():

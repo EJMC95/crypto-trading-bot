@@ -86,7 +86,14 @@ in `fleet_bus` that cannot reach this service is this same bug again.**
 Pinned by `tests/autonomy/test_retired_arm_divergence.py` (13 tests: verdict
 rank, number-survives-refusal, both actuator paths, inert-while-live, the
 AST wiring in `market_context`, sentinel-before-broad-handler, the COPY, and
-the no-cascade bound).
+the no-cascade bound). **9 mutations verified RED** — and the tenth SURVIVED,
+which is the honest half: the born-dark guard was
+`"fleet_bus.py" in DOCKERFILE.read_text()`, and deleting the file from the
+COPY left the string sitting in the rationale comment directly above it, so
+the guard stayed green with the import broken. **That is this repo's own "a
+substring test is NOT a wiring test" rule, walked into by the guard written
+to enforce it** — the same shape as `(ub)`'s vacuous `side_is_long` check a
+day earlier. It now parses the COPY DIRECTIVES and kills the mutation.
 
 ## 2026-08-26 (ui) — MAIN WENT RED BY THE CLOCK: A FIXTURE ANCHORED TO A FROZEN INSTANT PASSED THE HOUR IT WAS WRITTEN AND ROTTED ORGAN BY ORGAN — 0 FAILURES AT 13:13Z, 11 AT 21:48Z, AND 11 FOREVER
 
