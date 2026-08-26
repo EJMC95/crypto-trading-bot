@@ -1639,6 +1639,22 @@ def _latest_policy_stamp(rows, bot, look=30):
     return latest, len(stamped), len(mine)
 
 
+def _stamp_readable(stamp, field):
+    """Did the arm actually SAY something about `field`?
+
+    A waiver may only cover a divergence both arms can be READ on. `dict.get`
+    returns None for both "the arm stamps null here" and "the arm has never
+    heard of this field", and neither is a measured value — so both are
+    UNREADABLE and fail closed at the rung above. Deliberately not a
+    truthiness test: `0`, `False` and `[]` are values an arm can legitimately
+    stamp, and treating them as absent would fail a pair closed on a real
+    reading (which is safe, but wrong, and trains the operator to ignore the
+    state)."""
+    if not isinstance(stamp, dict):
+        return False
+    return field in stamp and stamp.get(field) is not None
+
+
 def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
     """Stage-0 fairness for ONE pair -> a publishable pair state dict.
 
@@ -1647,7 +1663,12 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
     policy stamps > policy parity > capacity parity > idle. Every
     unjudgeable state names its object and carries `wake_when`; UNREADABLE
     parity inputs are `parity_unreadable`, never assumed-equal — darkness
-    must not re-open the F1 handicap through the stage built to close it."""
+    must not re-open the F1 handicap through the stage built to close it.
+
+    The policy-parity rung honours this pair's DECLARED `policy_waived`
+    fields (fleet_bus): a waived divergence does not block, is republished on
+    the entry as `policy_waived`, and is refused outright where either arm's
+    value is unreadable. A pair with no waiver behaves exactly as before."""
     live_bot, shadow_bot = pspec["live_bot"], pspec["shadow_bot"]
     st = {"live_bot": live_bot, "shadow_bot": shadow_bot,
           "pnl_form": pspec["pnl_form"], "candidate": None, "hold": None}
@@ -1721,8 +1742,47 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                    "both arms' closes carry the shared policy_stamp "
                    "(ships with this build; wakes on the first stamped "
                    "close each side)")
-    diffs = [f for f in pspec["policy_fields"]
-             if lp.get(f) != sp.get(f) and f != "venue"]
+    # [2026-08-26] THE DECLARED WAIVER, honoured HERE and nowhere else.
+    # `pspec["policy_waived"]` (fleet_bus, per pair) maps a FIELD to the
+    # measurement that makes it inert on THAT pair. Three properties, each
+    # driven by tests/autonomy/test_judge_policy_waiver.py:
+    #   * a waived field does not BLOCK, but the divergence is still
+    #     REPORTED on the published entry (`st["policy_waived"]`, both arms'
+    #     values + the reason). A waiver that hides the difference is how
+    #     this class comes back;
+    #   * it covers a field the arms READ DIFFERENTLY — never one either arm
+    #     cannot read. A missing/None value on either side is DARKNESS and
+    #     falls through to `parity_unreadable` below, because assumed-equal
+    #     is precisely the F1 handicap this stage was built to close;
+    #   * a pair with no `policy_waived` key takes the identical path it did
+    #     before: `waived` and `dark` stay empty, `diffs` is built in
+    #     policy_fields order exactly as the old comprehension built it.
+    waivers = pspec.get("policy_waived") or {}
+    diffs, waived, dark = [], {}, []
+    for f in pspec["policy_fields"]:
+        if f == "venue" or lp.get(f) == sp.get(f):
+            continue
+        if f in waivers:
+            if _stamp_readable(lp, f) and _stamp_readable(sp, f):
+                waived[f] = {"live": lp.get(f), "shadow": sp.get(f),
+                             "why": str(waivers[f])}
+            else:
+                dark.append(f)
+            continue
+        diffs.append(f)
+    if waived:
+        # published BEFORE any later rung can return, so a pair that stops at
+        # capacity parity still carries its waiver on the payload.
+        st["policy_waived"] = waived
+    if dark:
+        return _un("parity_unreadable",
+                   f"waived field(s) {dark} unreadable on an arm (live="
+                   f"{ {f: lp.get(f) for f in dark} } shadow="
+                   f"{ {f: sp.get(f) for f in dark} }) — a waiver covers a "
+                   f"MEASURED divergence, never an absent value; "
+                   f"assumed-equal would re-open the F1 handicap through "
+                   f"the stage built to close it",
+                   "both arms stamp the waived field with a readable value")
     if diffs:
         return _un("policy_mismatch",
                    f"arms diverge on {diffs}: live="
@@ -1731,6 +1791,50 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                    "the divergence is ported across or declared out of "
                    "this pair's policy_fields — a measured act, never a "
                    "silent default")
+    # [2026-08-26] P2b — THE REQUIRED-STAMP RUNG, the waiver's mirror.
+    #
+    # A `policy_fields` entry NEITHER host stamps compares None to None, reads
+    # EQUAL, and sails through the rung above in silence — so the registry
+    # would claim to police a divergence it structurally cannot see. That is
+    # how 🔮 georgia's SECOND entry-policy divergence stayed invisible while
+    # the first one blocked her: the shadow throttles entries per clock hour
+    # and the live host does not, and no stamp carries it.
+    # `pspec["policy_stamp_required"]` (fleet_bus, per pair, field -> reason
+    # with the measurement and the exact stamp work) turns that absence into a
+    # BLOCK that self-closes the moment both publishers stamp the key.
+    #
+    # PRESENCE, never truthiness: `None` is the honest stamp for "this host
+    # has no such rule", and a host that says so has answered — the divergence
+    # then blocks at the PARITY rung above, on its value, which is where it
+    # belongs.
+    #
+    # RUNG ORDER, deliberate: this sits AFTER parity, so a pair that already
+    # has a VISIBLE divergence keeps reporting that one (the more actionable
+    # of two wire-class blocks, and the precedence every existing consumer was
+    # written against). Either way the pair cannot reach `idle` while a
+    # required field is unstamped, which is the property that matters.
+    # It reuses `policy_unstamped` rather than minting a reason: the fact IS
+    # that the stamp is missing a field, and a new string would fall through
+    # every consumer's reason map to "unknown".
+    missing = [f for f, _why in sorted((pspec.get("policy_stamp_required")
+                                        or {}).items())
+               if f not in lp or f not in sp]
+    if missing:
+        return _un("policy_unstamped",
+                   f"required policy field(s) {missing} are stamped by "
+                   f"NEITHER arm's closes (live {live_bot} / "
+                   f"{pspec['host_file']}, shadow {shadow_bot} / "
+                   f"lighter_family_bot.py) — the arms are known to differ "
+                   f"here and an unstamped field compares equal, so the "
+                   f"parity rung above cannot see it: "
+                   + " | ".join(str((pspec.get("policy_stamp_required")
+                                     or {}).get(f, "")) for f in missing),
+                   "lighter_family_bot.policy_stamp() — the ONE builder both "
+                   "hosts call — carries the field, each host answering for "
+                   "itself (None is a valid answer meaning 'no such rule "
+                   "here'); the divergence then blocks on its VALUE at the "
+                   "parity rung until the arms are aligned or it is waived "
+                   "on its own evidence")
     # P3 — capacity parity off the rows' own published caps (I1-fresh).
     lmo = (live_row.get("extra") or {}).get("max_open")
     smo = ((shadow_row or {}).get("extra") or {}).get("max_open")
@@ -1747,9 +1851,20 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                    f"receipted candidate",
                    "the caps match, or the delta becomes this pair's "
                    "first receipted candidate")
+    # [2026-08-26] A WAIVED PAIR SAYS SO WHERE THE OPERATOR READS IT. The
+    # structured `policy_waived` above is the machine-readable record; the
+    # 🏭 pipeline card renders `note` for an idle pair, so a pair that is
+    # judgeable ONLY because of a declared waiver must not read identically
+    # to one whose arms genuinely match (I1's shape at the report layer).
+    # Empty waiver -> the byte-identical pre-waiver note.
+    _note = ("judgeable; no candidate in this pair's queue "
+             f"({pspec['xp_prefix']}*) — the lever wave is v2.1")
+    if waived:
+        _note += (f" · judgeable WITH a declared parity waiver on "
+                  f"{sorted(waived)} (measured inert on this pair; the "
+                  f"divergence is published, not hidden)")
     st.update(phase="idle",
-              note="judgeable; no candidate in this pair's queue "
-                   f"({pspec['xp_prefix']}*) — the lever wave is v2.1",
+              note=_note,
               # [(ti)] THE POWER REPORT — the statistics audit's central
               # finding, published instead of re-argued: at v1's 30/10
               # floors the minimum detectable per-trade gap is
@@ -3058,9 +3173,13 @@ def _selftest():
         "parity_unreadable", "live_row_dark"}
 
     _psp = dict(_bus.JUDGED_PAIRS["georgia"])
+    # [2026-08-26] the fixture stamps georgia's REQUIRED field aligned on both
+    # arms, because it is a SEPARATE (unwaived) block with its own case below
+    # — a fixture diverging on two fields at once cannot say which produced
+    # the verdict.
     _stamp = {"strategy": "daytrader-15m", "venue": "lighter_live",
               "stoploss": -0.05, "roi": {"0": 0.02}, "sides": ["long"],
-              "scan_order": "diversified"}
+              "scan_order": "diversified", "max_entries_per_hour": 3}
     _sstamp = dict(_stamp, venue="lighter_shadow", scan_order="list")
 
     def _led(bot, pol, age=60):
@@ -3137,12 +3256,57 @@ def _selftest():
                  for _ in range(30)] + [_led(_sb, _sstamp, age=5)]
     assert _latest_policy_stamp(_dateless, _sb)[:2] == (_sstamp, 1), \
         _latest_policy_stamp(_dateless, _sb)[:2]
-    # stamped but diverging on scan_order -> policy_mismatch NAMING the field
+    # stamped but diverging on a NON-WAIVED field -> policy_mismatch NAMING
+    # the field. [2026-08-26] This used `scan_order`, which georgia now
+    # DECLARES waived — so the case moved to `stoploss` rather than being
+    # deleted: the rung must still block on an undeclared divergence, and a
+    # test that quietly stopped asserting that would be the waiver hiding the
+    # mechanism instead of one field. The waiver's own cases (and the
+    # narrowness control on avo/mum, which carry no waiver and must still
+    # read policy_mismatch on scan_order) live in
+    # tests/autonomy/test_judge_policy_waiver.py.
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _stamp),
+                         _led(_sb, dict(_sstamp, scan_order="diversified",
+                                        stoploss=-0.09))],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "policy_mismatch", _v
+    assert "stoploss" in _v["unjudgeable"]["detail"], _v
+    # ...and the DECLARED waiver clears the same rung on scan_order alone,
+    # republishing the divergence rather than swallowing it (mutation: drop
+    # the `st["policy_waived"]` attach, or waive without publishing => red)
     _v = _pair_precheck("georgia", _psp,
                         [_led(_lb, _stamp), _led(_sb, _sstamp)],
                         [_row(_lb), _row(_sb)], t0)
-    assert _v["unjudgeable"]["reason"] == "policy_mismatch", _v
+    assert _v["phase"] == "idle", _v
+    assert _v["policy_waived"]["scan_order"]["live"] == "diversified", _v
+    assert _v["policy_waived"]["scan_order"]["shadow"] == "list", _v
+    # ...and a waiver NEVER covers darkness: the same pair with the waived
+    # field absent from an arm's stamp is parity_unreadable, not waived
+    # (mutation: waive without the readability check => this reddens)
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, {k: v for k, v in _stamp.items()
+                                    if k != "scan_order"}),
+                         _led(_sb, _sstamp)],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "parity_unreadable", _v
     assert "scan_order" in _v["unjudgeable"]["detail"], _v
+    # [2026-08-26] THE WAIVER'S MIRROR: a policy field NEITHER arm stamps
+    # compares None to None and reads EQUAL, so the parity rung above cannot
+    # see it. georgia's hourly entry throttle is exactly that — the shadow
+    # throttles, the live host declares it does not, and no stamp carries it —
+    # so it is DECLARED required and blocks, naming the field and the stamp
+    # work. (mutation: drop the `missing` rung => this reddens)
+    _nothrottle = {k: v for k, v in _stamp.items()
+                   if k != "max_entries_per_hour"}
+    _v = _pair_precheck("georgia", _psp,
+                        [_led(_lb, _nothrottle),
+                         _led(_sb, dict(_nothrottle, venue="lighter_shadow",
+                                        scan_order="list"))],
+                        [_row(_lb), _row(_sb)], t0)
+    assert _v["unjudgeable"]["reason"] == "policy_unstamped", _v
+    assert "max_entries_per_hour" in _v["unjudgeable"]["detail"], _v
+    assert "policy_stamp" in _v["unjudgeable"]["wake_when"], _v
     # matched policy, capacity 5 vs 6 -> capacity_mismatch (the (ne) delta)
     _match = dict(_sstamp, scan_order="diversified")
     _v = _pair_precheck("georgia", _psp,

@@ -2019,6 +2019,458 @@ def golive_card():
         return ""
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-26] 🏭 THE PRODUCTION PIPE — "where does a new book actually get
+# stuck?", answered at a glance instead of by hand-reading /bus.json.
+#
+# Eamon's standing complaint is that the inventions have not produced: no new
+# bot has appeared on the dashboard as a promoted, real-money book. The fleet
+# already publishes every number needed to answer that — across FOUR keys the
+# dashboard fetches anyway — and nobody had joined them.
+#
+# IT LEADS WITH THE PROMOTION PIPE, NOT THE GO-LIVE BARS, and that ordering is
+# the whole point of the card. Leading with the bars shows a dozen books
+# failing on EVIDENCE — the one blocker nobody can clear this week, because it
+# is arithmetic on a sample that does not exist yet. The judge's pairs are
+# where a session can actually move something: on the live payload the day this
+# shipped, three of four pairs were `unjudgeable` on a POLICY STAMP or a scan
+# ORDER, not on performance. That is a wire, and a wire can be closed.
+#
+# So every blocker is sorted into one of three classes, and the class says who
+# owns it:
+#   * MEASUREMENT — no owner needed, the clock does it (closes must accrue).
+#   * DECISION    — owner: Eamon (a keep-or-retire, an override flip).
+#   * WIRE        — a code gap a session can close today.
+# An unrecognised state is UNKNOWN and says so; it never falls into a class it
+# was not measured into (I8: unknown degrades to honest, never to a guess).
+# ---------------------------------------------------------------------------
+
+#: Blocker classes. `done` = not blocked. The tuple is
+#: (label, colour, background, tooltip).
+PIPE_MEASURE, PIPE_DECIDE = "measure", "decide"
+PIPE_WIRE, PIPE_DONE, PIPE_UNKNOWN = "wire", "done", "unknown"
+
+PIPE_CLASS = {
+    PIPE_MEASURE: ("⏳ measure", "#d29922", "rgba(210,153,34,.14)",
+                   "BLOCKED ON A MEASUREMENT — no owner needed, the clock "
+                   "does it: closes have to accrue before anything can be "
+                   "judged."),
+    PIPE_DECIDE: ("🧑 decide", "#8250df", "rgba(130,80,223,.14)",
+                  "BLOCKED ON A DECISION — owner: Eamon. No amount of waiting "
+                  "or coding moves this; it needs a call."),
+    PIPE_WIRE: ("🔌 wire", "#0969da", "rgba(9,105,218,.14)",
+                "BLOCKED ON A WIRE — a code gap someone can close. This is "
+                "the class a session can clear this week."),
+    PIPE_DONE: ("✓ moving", "#1a7f37", "rgba(26,127,55,.16)",
+                "not blocked — this pair is judgeable and running."),
+    PIPE_UNKNOWN: ("? unknown", "#d1242f", "rgba(209,36,47,.14)",
+                   "the judge published a state this card does not recognise. "
+                   "Deliberately NOT filed under a class — an unmapped reason "
+                   "must never render as a known blocker or as progress."),
+}
+
+#: `xp-judge` pairs[*].unjudgeable.reason -> blocker class. Keyed on the
+#: JUDGE'S OWN reason strings (experiment_judge._pair_precheck's `_un(...)`
+#: calls), so a new reason arriving from the publisher renders UNKNOWN rather
+#: than being silently absorbed into whichever class happens to be nearest.
+PIPE_PAIR_REASON = {
+    # the stamp ships with the build; it wakes on the first stamped CLOSE each
+    # side — i.e. it is waiting for trades, not for code.
+    "policy_unstamped": PIPE_MEASURE,
+    # every one of these needs a human to change something in the tree/config.
+    "live_row_dark": PIPE_WIRE,
+    "policy_mismatch": PIPE_WIRE,
+    "parity_unreadable": PIPE_WIRE,
+    "capacity_mismatch": PIPE_WIRE,
+}
+
+#: `xp-judge` pairs[*].phase -> blocker class, for the phases that carry no
+#: `unjudgeable` block of their own.
+PIPE_PAIR_PHASE = {
+    "stood_down": PIPE_DECIDE,   # wake_when is an operator env flip
+    "idle": PIPE_WIRE,           # judgeable; nothing in the candidate queue
+    "running": PIPE_MEASURE,     # accruing closes toward the paired bar
+    "promoted": PIPE_DONE,
+}
+
+
+def _pipe_syd(iso):
+    """An ISO TIMESTAMP -> 'DD-Mon HH:MM Syd', or None if it is unparseable.
+
+    Sydney-local because Eamon reads it (CLAUDE.md's timezone rule); the
+    payloads themselves stay UTC. Deliberately refuses a BARE DATE — see
+    `_pipe_eta`.
+
+    `tzdata` can be absent on a slim image, so this mirrors
+    `fleet_watchdog_svc._now_op`'s measured fallback rather than inventing a
+    second policy: a fixed +10 stamp, LABELLED `Syd*` so the star says it is
+    right in winter and may be an hour out under daylight saving. The one
+    thing it never does is hand back the bare UTC clock time."""
+    d = _iso_dt(iso)
+    if d is None:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return d.astimezone(ZoneInfo("Australia/Sydney")).strftime(
+            "%d-%b %H:%M Syd")
+    except Exception:  # noqa: BLE001
+        return (d.astimezone(dt.timezone.utc)
+                + dt.timedelta(hours=10)).strftime("%d-%b %H:%M Syd*")
+
+
+def _pipe_eta(eta):
+    """The grader's horizon `eta` -> (text, tooltip-suffix).
+
+    The gate horizon publishes a bare CALENDAR DATE ('2026-11-10'), not an
+    instant, so there is no time-of-day to convert and shifting it into Sydney
+    would invent a day boundary the grader never computed (a UTC date spans two
+    Sydney dates). It is therefore rendered AS PUBLISHED and LABELLED as the
+    grader's UTC calendar date, rather than silently relabelled — the Sydney
+    rule is about never handing over a bare unlabelled time, and a fabricated
+    shift would be worse than an honest label."""
+    if not eta:
+        return None, ""
+    return (str(eta), " The grader publishes this as a UTC calendar date "
+                      "(no time of day), so it is shown unconverted; in "
+                      "Sydney it lands on that date or the one after.")
+
+
+def _pipe_stage(value, unknown_why):
+    """One funnel stage -> its rendered HTML.
+
+    THE TRAP THIS CLOSES: a dark key must render '?', never '0'. 'No book
+    reached the bar' and 'nobody asked' are different findings that look
+    identical once a missing payload is coerced to a number, and the second one
+    silently reads as a healthy measurement. `None` is UNKNOWN."""
+    if value is None:
+        return ('<b style="color:#d1242f" title="UNKNOWN — '
+                + html.escape(str(unknown_why)) + '">?</b>')
+    return f'<b>{int(value)}</b>'
+
+
+def _pipe_funnel(alloc, gl):
+    """-> [(label, value|None, unknown_reason, tooltip)] — the production
+    funnel, every stage from a named publisher field.
+
+    `alloc`/`gl` are the FRESH payloads or None. A stage whose source is dark,
+    stale or missing its field is None (unknown) and is rendered as such."""
+    dark_a = "fleet-allocation is dark or stale — no roster to count"
+    dark_g = "golive-readiness is dark or stale — no grades to count"
+
+    rows_n = alloc.get("n_books") if isinstance(alloc, dict) else None
+    rows_n = rows_n if isinstance(rows_n, int) else None
+
+    # ever-closed = roster minus the organ's own declared zero-close list. An
+    # ABSENT list is unknown; an EMPTY list is a real measurement (no zero-close
+    # books), so `is None` is the test, never truthiness.
+    zc = alloc.get("zero_close_books") if isinstance(alloc, dict) else None
+    closed_n = (rows_n - len(zc)
+                if rows_n is not None and isinstance(zc, list) else None)
+
+    # I16 claims: max(0, mean - 1.28*SE) > 0. If NOT ONE book carries a numeric
+    # `claim`, the field is absent from this payload version and the answer is
+    # unknown — counting zero would assert "no book has evidence".
+    claim_n, saw_claim = None, False
+    books = alloc.get("books") if isinstance(alloc, dict) else None
+    if isinstance(books, dict) and books:
+        n = 0
+        for v in books.values():
+            c = v.get("claim") if isinstance(v, dict) else None
+            if isinstance(c, (int, float)):
+                saw_claim = True
+                if c > 0:
+                    n += 1
+        claim_n = n if saw_claim else None
+
+    # on-track: the grader's OWN horizon verdict, over graded books AND the
+    # below-floor map (a thin book on track is still on track).
+    track_n = None
+    if isinstance(gl, dict):
+        pool = {}
+        for k in ("books", "below_floor"):
+            m = gl.get(k)
+            if isinstance(m, dict):
+                pool.update(m)
+        if pool:
+            track_n = sum(
+                1 for v in pool.values()
+                if isinstance(v, dict)
+                and str((v.get("horizon") or {}).get("verdict")) == "on_track")
+
+    ready = gl.get("ready") if isinstance(gl, dict) else None
+    bar_n = len(ready) if isinstance(ready, list) else None
+
+    return [
+        ("rows", rows_n, dark_a,
+         "living book rows the allocation organ ranks"),
+        ("ever closed", closed_n, dark_a,
+         "rows with at least one closed trade — the rest are undecidable "
+         "until they trade (I17)"),
+        ("measured claim", claim_n, dark_a + " (or no book publishes `claim`)",
+         "books whose I16 lower bound max(0, mean - 1.28*SE) is positive — "
+         "evidence, not a lucky mean"),
+        ("on track", track_n, dark_g,
+         "books the gate horizon projects will reach the bar at their measured "
+         "trajectory"),
+        ("AT THE BAR", bar_n, dark_g,
+         "books passing all six go-live bars right now. Go-live still needs "
+         "Eamon's explicit act."),
+    ]
+
+
+def _pipe_pairs(judge):
+    """-> [(class, pair_id, headline, wake_when, detail)] for every judge pair,
+    WIRE first — the class a session can actually clear this week."""
+    out = []
+    pairs = judge.get("pairs") if isinstance(judge, dict) else None
+    if not isinstance(pairs, dict):
+        return out
+    for pid, p in pairs.items():
+        if not isinstance(p, dict):
+            continue
+        phase = str(p.get("phase") or "")
+        un = p.get("unjudgeable") if isinstance(p.get("unjudgeable"), dict) else None
+        sd = p.get("stood_down") if isinstance(p.get("stood_down"), dict) else None
+        if un:
+            reason = str(un.get("reason") or "")
+            cls = PIPE_PAIR_REASON.get(reason, PIPE_UNKNOWN)
+            head, wake, detail = reason or "unjudgeable", un.get("wake_when"), un.get("detail")
+        elif sd:
+            cls = PIPE_PAIR_PHASE.get(phase, PIPE_UNKNOWN)
+            head = phase or "stood_down"
+            wake, detail = sd.get("wake_when"), sd.get("why")
+            if sd.get("successor"):
+                detail = f'{detail or ""} → {sd["successor"]}'.strip()
+        else:
+            cls = PIPE_PAIR_PHASE.get(phase, PIPE_UNKNOWN)
+            head, wake, detail = phase or "?", None, p.get("note")
+        # the stamp census IS the measurement, so show it where it exists
+        st = p.get("stamps") if isinstance(p.get("stamps"), dict) else None
+        if st:
+            bits = " · ".join(f'{k} {st[k]}' for k in ("live", "shadow") if st.get(k))
+            if bits:
+                detail = f'{detail or ""} [{bits}]'.strip()
+        out.append((cls, str(pid), head, wake, detail))
+    order = {PIPE_WIRE: 0, PIPE_DECIDE: 1, PIPE_MEASURE: 2,
+             PIPE_UNKNOWN: 3, PIPE_DONE: 4}
+    out.sort(key=lambda r: (order.get(r[0], 9), r[1]))
+    return out
+
+
+def pipeline_card():
+    """🏭 The production pipe (bot_state `golive-readiness`, `xp-judge`,
+    `fleet-allocation`, `strategy-incubator` — four keys the dashboard already
+    fetches; no new source, no new deploy rule).
+
+    Read-only and fail-silent, like every other card: it grades nothing,
+    promotes nothing and writes no lever. What it does is JOIN the four organs
+    that between them answer "why has no new bot reached real money?", and
+    order the answer by who can act.
+
+    HONESTY CONTRACT — the reason this card is worth testing at all. Every key
+    may be dark, stale or missing a field, and a missing number here is
+    dangerous in one specific direction: `0 at the bar` is a real and common
+    measurement, so a dark grader coerced to zero renders as a confident,
+    plausible, WRONG reading. So each funnel stage carries its own source and
+    a dark source prints `?` with a tooltip naming what is missing, never a
+    number and never a green state. A payload past `grace × ttl_sec` is
+    treated as dark (I1: liveness before semantics) and said so in the header.
+    The card hides entirely only when ALL FOUR keys are missing — a partially
+    dark fleet is exactly when the unknowns need to be visible."""
+    try:
+        st = fetch_states(["golive-readiness", "xp-judge", "fleet-allocation",
+                           "strategy-incubator"])
+        raw = {k: (st.get(k) if isinstance(st.get(k), dict) else None)
+               for k in ("golive-readiness", "xp-judge", "fleet-allocation",
+                         "strategy-incubator")}
+        if not any(raw.values()):
+            return ""                      # nothing published at all — hide
+        # I1: a stale payload is DARK for every value it would have supplied.
+        stale = [k for k, v in raw.items() if v and not _state_fresh(v)]
+        use = {k: (v if v and _state_fresh(v) else None) for k, v in raw.items()}
+        gl, judge = use["golive-readiness"], use["xp-judge"]
+        alloc, inc = use["fleet-allocation"], use["strategy-incubator"]
+
+        # ---- the funnel -------------------------------------------------
+        cells = []
+        for label, val, why, tip in _pipe_funnel(alloc, gl):
+            cells.append(
+                f'<span title="{html.escape(tip)}">'
+                f'{_pipe_stage(val, why)} '
+                f'<span class="muted">{html.escape(label)}</span></span>')
+        funnel = ('<div style="font-size:.95em;padding:2px 0">'
+                  + ' <span class="muted">&rarr;</span> '.join(cells)
+                  + '</div>')
+
+        # ---- THE PROMOTION PIPE (leads) ---------------------------------
+        rows = []
+        pair_rows = _pipe_pairs(judge)
+        if judge is None:
+            rows.append('<div style="font-size:.85em;color:#d1242f" '
+                        'title="xp-judge is dark or stale, so the promotion '
+                        'pipe cannot be read at all. This is NOT the same as '
+                        '&quot;no pairs are blocked&quot;.">'
+                        'promotion pipe UNKNOWN — xp-judge dark or stale</div>')
+        elif not pair_rows:
+            rows.append('<div style="font-size:.85em;color:#d1242f" '
+                        'title="xp-judge published no `pairs` map — an older '
+                        'payload, or the census did not run. Not a clean '
+                        'pipe.">promotion pipe UNKNOWN — no pairs '
+                        'published</div>')
+        for cls, pid, head, wake, detail in pair_rows:
+            lab, col, bg, tip = PIPE_CLASS[cls]
+            rows.append(
+                '<div style="display:flex;gap:6px;font-size:.85em;padding:1px 0;'
+                'white-space:nowrap">'
+                f'<span title="{html.escape(tip)}" style="width:78px;'
+                f'color:{col};background:{bg};border-radius:3px;padding:0 3px;'
+                f'font-size:.9em;text-align:center">{lab}</span>'
+                f'<span style="width:64px">{html.escape(pid)}</span>'
+                f'<span style="width:130px;color:{col};overflow:hidden;'
+                f'text-overflow:ellipsis">{html.escape(str(head))}</span>'
+                f'<span class="muted" style="flex:1;overflow:hidden;'
+                f'text-overflow:ellipsis"'
+                + (f' title="wake_when: {html.escape(str(wake))}"' if wake else '')
+                + f'>{html.escape(str(detail or ""))}</span></div>')
+            if wake:
+                rows.append(
+                    '<div class="muted" style="font-size:.75em;padding-left:150px;'
+                    'overflow:hidden;text-overflow:ellipsis;white-space:nowrap" '
+                    'title="the judge&#39;s own `wake_when` — what has to '
+                    'become true for this pair to start being judged">wake: '
+                    + html.escape(str(wake)) + '</div>')
+
+        # ---- BLOCKED ON A MEASUREMENT: the ETA'd books ------------------
+        meas = []
+        if gl is None:
+            meas.append('<span style="color:#d1242f" title="golive-readiness '
+                        'is dark or stale — no horizon to read">unknown '
+                        '(grader dark)</span>')
+        else:
+            pool = {}
+            for k in ("books", "below_floor"):
+                m = gl.get(k)
+                if isinstance(m, dict):
+                    pool.update(m)
+            for b, v in sorted(pool.items()):
+                hz = (v.get("horizon") or {}) if isinstance(v, dict) else {}
+                if str(hz.get("verdict")) != "on_track":
+                    continue
+                txt, note = _pipe_eta(hz.get("eta"))
+                lab = (f'{b} &rarr; {html.escape(txt)}' if txt
+                       else f'{b} <span style="color:#d1242f">eta unknown</span>')
+                meas.append(f'<span title="{html.escape(str(hz.get("why") or ""))}'
+                            f'{html.escape(note)}">{lab}</span>')
+            if not meas:
+                meas.append('<span class="muted">none — no book is on track '
+                            'to the bar at its measured trajectory</span>')
+        meas_line = ('<div style="font-size:.8em;padding-top:3px" '
+                     'title="BLOCKED ON A MEASUREMENT — nobody owns these; '
+                     'they need closes. Dates are the grader&#39;s own '
+                     'projection at the measured trajectory, never a promise.">'
+                     '<span class="muted">⏳ measurement:</span> '
+                     + " · ".join(meas) + '</div>')
+
+        # ---- BLOCKED ON A DECISION: the I17 docket ----------------------
+        if gl is None:
+            dec = ('<span style="color:#d1242f">unknown — grader dark or '
+                   'stale</span>')
+        elif not isinstance(gl.get("decision_docket"), list):
+            dec = ('<span style="color:#d1242f" title="this payload carries no '
+                   '`decision_docket` — an older grader, or the docket read '
+                   'failed. Not the same as an empty docket.">unknown — no '
+                   'docket published</span>')
+        else:
+            dk = [d for d in gl["decision_docket"] if isinstance(d, dict)]
+            if not dk:
+                dec = ('<span class="muted">none open</span>')
+            else:
+                held = [d.get("days_held") for d in dk
+                        if isinstance(d.get("days_held"), (int, float))]
+                worst = max(dk, key=lambda d: (d.get("days_held") or 0))
+                oldest = (f'longest {max(held):.0f}d — '
+                          f'{html.escape(str(worst.get("book")))}'
+                          if held else 'age unknown')
+                since = _pipe_syd(worst.get("since"))
+                dec = (f'<b>{len(dk)}</b> book(s) asking keep-or-retire · '
+                       f'{oldest}'
+                       + (f' <span class="muted">(since {html.escape(since)})'
+                          f'</span>' if since else ''))
+                if not gl.get("docket_valid", True):
+                    dec += (' <span style="color:#d29922" title="the grader '
+                            'could not read its own prior docket-seen map, so '
+                            'every clock reads as first-seen today — the ages '
+                            'above are FLOORS.">clocks unverified</span>')
+        dec_line = ('<div style="font-size:.8em;padding-top:1px" '
+                    'title="BLOCKED ON A DECISION — owner: Eamon. I17: a book '
+                    'that cannot reach its own bar is a keep-or-retire call, '
+                    'never another tuning pass.">'
+                    '<span class="muted">🧑 decision (Eamon):</span> '
+                    + dec + '</div>')
+
+        # ---- the incubator: is anything even being bred? ----------------
+        if inc is None:
+            inc_txt = ('<span style="color:#d1242f">unknown — '
+                       'strategy-incubator dark or stale</span>')
+        else:
+            ch = inc.get("champion") if isinstance(inc.get("champion"), dict) else {}
+            fr = inc.get("frontier") if isinstance(inc.get("frontier"), dict) else {}
+            cap = (inc.get("proposal_capacity")
+                   if isinstance(inc.get("proposal_capacity"), dict) else {})
+            el = inc.get("elite")
+            net = ch.get("net")
+            bits = [f'champion {("$" + money(net)) if isinstance(net, (int, float)) else "unknown"}'
+                    f' ({html.escape(str(ch.get("confidence") or "—"))})',
+                    ('frontier enactable '
+                     + ('yes' if fr.get("enactable") is True
+                        else 'no' if fr.get("enactable") is False else 'unknown')),
+                    f'elite {len(el)}' if isinstance(el, list) else 'elite unknown']
+            if cap.get("exhausted") is True:
+                bits.append('<span style="color:#d29922">funding lane '
+                            'EXHAUSTED</span>')
+            elif isinstance(cap.get("untried"), int):
+                bits.append(f'{cap["untried"]} untried')
+            else:
+                bits.append('<span style="color:#d1242f">funding lane '
+                            'unknown</span>')
+            inc_txt = " · ".join(bits)
+        inc_line = ('<div style="font-size:.8em;padding-top:1px" '
+                    'title="the reproduction organ. An empty elite list plus a '
+                    'non-enactable frontier plus an exhausted funding lane '
+                    'means nothing is currently queued to become a new book.">'
+                    '<span class="muted">🧬 breeding:</span> '
+                    + inc_txt + '</div>')
+
+        # ---- header: liveness FIRST (I1) --------------------------------
+        dark = sorted(k for k, v in raw.items() if not v)
+        warn = ""
+        if dark or stale:
+            parts = []
+            if dark:
+                parts.append("dark: " + ", ".join(dark))
+            if stale:
+                parts.append("stale: " + ", ".join(sorted(stale)))
+            warn = (f' · <span style="color:#d1242f" title="Every number this '
+                    f'card would have taken from these keys reads UNKNOWN, not '
+                    f'zero.">{html.escape(" · ".join(parts))}</span>')
+        age = ""
+        _a = _state_age_h(raw.get("xp-judge") or raw.get("golive-readiness"))
+        if _a is not None:
+            age = f' · judge {int(_a * 60)}m ago'
+        return (f'<div class="card"><h2>🏭 Production pipe '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">shadow &rarr; graded &rarr; real money'
+                f'{age}{warn} — read-only; promotes nothing. Blockers are '
+                f'sorted by WHO can clear them: a wire is a code gap, a '
+                f'measurement needs closes, a decision needs Eamon.</div>'
+                f'{funnel}'
+                f'<div class="muted" style="padding-top:4px">promotion pipe '
+                f'(🧪 judge pairs) — wire-blocked first</div>'
+                f'{"".join(rows)}{meas_line}{dec_line}{inc_line}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def brain_card_html():
     """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
     try:
@@ -2531,7 +2983,11 @@ def render():
     # [2026-07-30] 🚦 the go-live grader sits directly after the radar: the
     # radar says "is there an edge?", the grader says "has it earned real
     # money?" — the same books, the next question.
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card() + golive_card()
+    # [2026-08-26] 🏭 the production pipe closes the sequence: the radar asks
+    # "is there an edge?", the grader "has it earned real money?", and the pipe
+    # "then why has nothing arrived?" — joining the grader, the judge, the
+    # allocation organ and the incubator into one answer sorted by who can act.
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card() + golive_card() + pipeline_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}

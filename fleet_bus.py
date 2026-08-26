@@ -111,6 +111,33 @@ def live_arm_retired(row):
 # default in either direction re-opens the F1 contamination class).
 # `growth` empty = the fast path is STRUCTURALLY unreachable for the pair,
 # not merely flagged off.
+#
+# [2026-08-26] `policy_waived` — the DECLARED PARITY WAIVER, per pair, in the
+# `BORN_DARK_OK` / `UNJUDGED_OK` / `STALE_WRITER_OK` idiom: a mapping from the
+# waived FIELD to a reason string carrying the MEASUREMENT that makes it inert
+# on THAT pair and the condition that reopens it. Three properties are the
+# whole safety of it, and each is driven by
+# `tests/autonomy/test_judge_policy_waiver.py`:
+#   1. THE FIELD STAYS IN `policy_fields`. Deleting it would hide the
+#      divergence; the waiver removes the BLOCK, never the visibility, and the
+#      judge republishes the waived field with both arms' values every loop.
+#   2. IT IS PER-PAIR, NEVER A FLEET RULE. A waiver is a claim about one pair's
+#      measured occupancy; the same field on another pair still blocks.
+#   3. IT NEVER COVERS DARKNESS. A waived field whose value is missing or
+#      unreadable on either arm is `parity_unreadable`, not waived — an
+#      assumed-equal dark input is exactly the F1 handicap this stage exists to
+#      close, and a waiver must not smuggle it back in.
+#
+# [2026-08-26] `policy_stamp_required` — THE WAIVER'S MIRROR, and the reason a
+# `policy_fields` entry can be trusted at all. A field NEITHER host stamps
+# compares None-to-None, reads EQUAL, and passes the parity rung in silence —
+# so the registry would claim to police a divergence it structurally cannot
+# see. This map (field -> the reason, carrying the measurement and the exact
+# stamp work) makes the absence BLOCK: the pair reads
+# `unjudgeable:policy_unstamped` naming the field and the two publisher files,
+# and it self-closes the moment both hosts stamp the key. PRESENCE is the test,
+# never truthiness — `None` is the honest stamp for "this host has no such
+# rule", and a host that says so has answered.
 JUDGED_PAIRS = {
     "avo": {
         "live_bot": "freqtrade-avo-maria-lighter",
@@ -147,7 +174,74 @@ JUDGED_PAIRS = {
                            "bounce_take", "range_top", "max_hold", "trade",
                            "delisted", "trend_breakdown", "flip"),
         "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
-                          "scan_order"),
+                          "scan_order", "max_entries_per_hour"),
+        # [2026-08-26] THE SECOND ENTRY-POLICY DIVERGENCE ON THIS PAIR, and it
+        # is NOT waived: it is MEASURED MATERIAL, and neither host stamps it
+        # yet, so it is declared REQUIRED and blocks until they do.
+        "policy_stamp_required": {
+            "max_entries_per_hour":
+                "THE ARMS RUN DIFFERENT ENTRY POLICIES AND NEITHER STAMPS IT. "
+                "The shadow throttles entries per clock hour "
+                "(lighter_family_bot.DayTraderGated.MAX_ENTRIES_PER_HOUR = 3, "
+                "env GEORGIA_MAX_ENTRIES_PER_HOUR, applied at "
+                "`throttle_ok()` and refused at the entry site); the live "
+                "host enforces NO throttle and says so in its own comment — "
+                "'this host enforces NO hourly throttle ... so live rank is "
+                "the UNCENSORED within-hour ordinal'. MEASURED on the two "
+                "arms' own ledgers (phantom halt rows excluded): entries per "
+                "ACTIVE hour, shadow {1: 108h, 2: 44h, 3: 4h} = at-or-over "
+                "the cap in 2.6% of active hours; live {1: 16h, 2: 5h, 3: 3h, "
+                "4: 1h, 9: 1h} = 19.2%, and it reaches NINE in one hour. The "
+                "difference is systematic in a quantity the book's own ledger "
+                "shows matters: shadow entry_rank 1 = -0.443%/trade (n=24), "
+                "rank 2 = +0.828% (n=9), rank 3 = -7.752% (n=3). One arm is "
+                "rank-censored at 3 and the other is uncensored, so a paired "
+                "bar over these two samples compares different entry "
+                "populations — the F1 handicap judge v2 exists to close. "
+                "THE STAMP WORK, exactly: `lighter_family_bot.policy_stamp()` "
+                "is the ONE builder both hosts call, so it takes one new "
+                "argument each host answers for itself — the shadow "
+                "`DayTraderGated.MAX_ENTRIES_PER_HOUR` (or None for a book "
+                "with no throttle), the live host None. Once both stamp it, "
+                "this rung passes and the PARITY rung takes over: 3 vs None "
+                "diverges and still blocks, correctly, until the arms are "
+                "aligned or someone waives it on ITS OWN evidence. Neither "
+                "file is this pass's to edit; declared here so the hole is "
+                "visible and blocking rather than silent.",
+        },
+        # [2026-08-26] THE ONE DECLARED WAIVER IN THE FLEET, and it is narrow
+        # on purpose — see the `policy_waived` note above JUDGED_PAIRS.
+        "policy_waived": {
+            "scan_order":
+                "MEASURED INERT ON THIS PAIR. The live host scans via "
+                "`lighter_avo_live_bot.diversified_order` and the shadow "
+                "scans in list order (`lighter_family_bot`), so the arms "
+                "really do diverge — but scan ORDER can only change WHICH "
+                "candidate is taken while the book is CHOOSING, i.e. at or "
+                "near its position cap. Time-weighted occupancy from each "
+                "arm's own ledger (episodes built from opened_at/closed_at, "
+                "phantom halt rows excluded on golive_readiness."
+                "is_phantom_close's signature): freqtrade-georgia-lshadow "
+                "cap 5, 208 episodes over 44.4d — flat 66.3% of the time, "
+                "mean occupancy 0.56 of 5, AT CAP 0.6%; "
+                "freqtrade-georgia-lighter cap 5, 47 episodes over 4.2d — "
+                "flat 51.3%, mean occupancy 0.90 of 5, AT CAP 5.0%. Both "
+                "arms are SIGNAL-limited, not slot-limited, so the ordering "
+                "rule is unreachable for ~95-99% of the pair's life and "
+                "cannot materially bias a paired comparison. "
+                "NOT A FLEET RULE — this is why avo and mum carry no waiver "
+                "and must keep reading `policy_mismatch` on the same field: "
+                "avo's live arm was measured sitting at its ceiling 21.7% of "
+                "the time ((sr)), an ORDER OF MAGNITUDE more often, so the "
+                "same divergence is not inert there. "
+                "REVISIT — delete this waiver and port the divergence across "
+                "instead — when EITHER arm's at-cap time exceeds 10% of its "
+                "trailing window (2x the live arm's measured 5.0%, and the "
+                "point at which the scan order begins to choose), or if the "
+                "live arm's cap or clip changes such that it fills. The live "
+                "reading rests on a 4.2d window and n=47, so it is the half "
+                "to re-measure first.",
+        },
         "growth": {},
         "control_role": "load_bearing",
         "host_file": "lighter_avo_live_bot.py",
