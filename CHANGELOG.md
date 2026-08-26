@@ -1,3 +1,50 @@
+## 2026-08-26 (tq) — EAMON'S RISK-UP: LEVERAGE TO THE HONEST CEILINGS, THE SCALED CAP GOES LIVE, AND EVERY VALUE CARRIES ITS ARITHMETIC
+
+**Eamon, 26-Aug (afternoon): "adjust to whatever enables more trades and less
+restriction, leverage optioned. tweak mum v2 so she doesnt miss anything too
+good."** Risk appetite belongs to the person whose money it is; the code's
+job is the arithmetic, published. Executed as CAPACITY/LEVERAGE opens now
+(zero expectancy price — per-trade % is clip-invariant, (hl)) with mum's
+ENTRY widening routed through its own pre-registered exit-free study first
+((qu)'s discipline; results land as their own entry):
+
+* **🙏 avo: GROSS_X 5.0 → 5.3, GROSS_X_MAX 5.0 → 5.5, EQUITY_SCALED_CAP
+  on.** The ceiling is the host's own honest formula ((th)): a stop survives
+  a gapped fill only while G < 1/(|stop| + overshoot + mmf) =
+  1/(0.10 + 0.0217 + 0.06) = **5.503x** — 5.5 IS that ceiling, 5.3 ships
+  strictly inside it ((gv)). all_slots_stop 50% → 53%, published. With the
+  (to) code now in her image, the $1,700 cap becomes the FLOOR of
+  max(floor, equity x 5.3 x 1.05) — the fixed-dollar class can never strand
+  her slots again.
+* **🔮 georgia: GROSS_X 5.0 → 7.0** (ceiling 1/(0.05 + 0.0217 + 0.06) =
+  **7.593x**, the overshoot datum being HER OWN DOGE fill; 7.0 = 92% of it).
+  Effective deployment 3.75x → **5.25x today** (the board's 0.75 clip stays
+  senior and self-heals ~29-Aug/1-Sep as the rail days roll out of its 7d
+  window) → 7.0x healed. **LIGHTER_MAX_DAILY_LOSS 20 → 27** — the (tn)
+  parity derivation at her service (0.10 x 266 = 26.6; the abs rail was
+  binding at 7.5% of equity). EQUITY_SCALED_CAP on (floor $5,000, far from
+  binding — future-proofing, not a change today).
+* **👩 mum: leverage untouched, and the refusal is stated rather than
+  silent.** 9.5x is Eamon's own on-record setting at the edge of stop-death
+  (10.0), and the (th) arithmetic — 53bps liquidation headroom against the
+  217bps measured overshoot — is already published on her row. Nothing
+  opens here without deleting her stop. Her "misses nothing too good" ask
+  is the ENTRY side, and it is being MEASURED as this ships
+  (`study_mum_supply_2026-08-26`: the uptrend-blocked cells C1/C2, bar
+  notches C3/C4, exit-free vs matched-random, referee-verified) — whatever
+  survives ships as its own lettered entry; whatever fails is refused with
+  its number. An entry bar never moves on appetite alone: that is the one
+  widening class that COSTS expectancy when wrong ((hl): 25 of 30
+  throughput candidates were denominator shrinkage).
+
+Mechanics: avo's image dispatched to d88b3a330ded first (she was
+BEHIND-SHARED on 76cb7b7c207e — the (tm)/(to) code had not reached her);
+env flips by the (lr) one-shot `live-risk-up.yml` (one restart per service,
+deleted after use); every value read back on the rows. Slots stay 5/5/4 —
+all three books are measured SIGNAL-limited, not slot-limited ((sr): six
+slots deployed LESS capital), so "more trades" comes from mum's supply
+study and georgia's healed clip, not from slicing gross thinner.
+
 ## 2026-08-26 (tp) — THE PARABOLIC-EXTENSION ENTRY VETO IS REFUTED-AS-OVERFIT, ADVERSARIALLY CONFIRMED — GEORGIA'S ENTRY-FILTER DIAL CLOSES BESIDE HER DEAD EXIT DIAL
 
 The (tm) pass left ONE buildable candidate on 🔮 georgia's t-bar: an
