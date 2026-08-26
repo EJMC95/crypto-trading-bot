@@ -1,3 +1,106 @@
+## 2026-08-26 (tn) — AVO'S TWO FIXED-DOLLAR RAILS WERE STILL SIZED FOR THE $60 BOOK: CAP 1200 → 1700, DAILY-LOSS BACKSTOP 6 → 32, BOTH DERIVED AND READ BACK
+
+The same optimisation pass found 🙏 avo — the winning arm Eamon flagged this
+morning — held down by TWO instances of the fixed-dollar-vs-grown-equity
+class in one service, while contributed capital grew 6.1x to $380.56:
+
+* **`FREQTRADE_AVO_MARIA_MAX_NOTIONAL` 1200 → 1700.** At equity $319.6 her
+  clip is $319.6 (= equity: gross 5.0 over 5 slots), so `cap_slots =
+  int(1200 // 319.6) = 3 of 5` — flat-redeploy steady state **$959 = 3.0x
+  equity against the on-record 5.0x**, 40% of designed gross silently
+  undeliverable. The (sr) delayed-refusal shape exactly:
+  `notional_cap_skips` still 0 only because the 4 held positions opened at
+  smaller clips ($753 held + $319.6 next fits under $1,200); the wall
+  arrives as they roll. Derivation (published per (tg)): cap = equity x
+  gross_x = $1,598 (= the row's own `deployed_at_full`) x1.064 headroom =
+  $1,700, holding 5 slots until equity $340. **Expectancy price: zero** —
+  per-trade % is clip-invariant ((hl)); the cap cannot raise leverage
+  (gross_x_max env-pinned at Eamon's on-record 5.0; all_slots_stop 0.50;
+  model liq gap −14% at venue-worst mmf 600bps, the stop fires first below
+  6.25x; headroom's `liq_unpriced` verdict is publish-only per (th) and is
+  stated, not waived). Adversarially re-verified — independent re-derivation
+  reproduced every number.
+* **`LIGHTER_MAX_DAILY_LOSS` 6 → 32.** The abs daily rail was $6 = 10% of
+  the PRE-deposit equity, never moved: 1.88% of today's book, tripping on a
+  0.79% adverse basket move at current gross and **0.375% at the full
+  deployment the cap fix enables** — a structural noise-halt that flattens
+  everything at the worst moment and blocks entries for the rest of the UTC
+  day. $32 = parity with the designed 10% pct rail (0.10 x 319.6 = $31.96),
+  which becomes the binding rail again; the abs stays as its backstop. The
+  host enforces BOTH (`breach = pct OR rails.daily_loss_hit`), so this
+  loosens the accidental rail to the declared one — not the declared one at
+  all.
+
+Executed by the (lr) one-shot pattern (`avo-cap-parity.yml`, one variables
+call so the service restarts once, deleted after use), read back on the
+row. Era untouched — capacity, (hc). The durable fix (a cap that SCALES
+with equity — third instance of this class after (sr) and the farmer-cap
+HANDOFF row) is a rails build with tests across the shared live image, left
+as a named decision in HANDOFF rather than smuggled into an env flip.
+
+## 2026-08-26 (tm) — GEORGIA'S LIVE ARM WAS NOT RUNNING HER OWN EXIT POLICY: THE BREAKOUT VETO AND THE TRAILING RATCHET LAND ON THE LIVE HOST, AND MUM'S CENSUS NAMES THE UPTREND BLOCK
+
+**Eamon, 26-Aug (morning): "explore real money bot optimisations - mum v2
+optimisation and also Georgia optimisation."** The measured pass (four study
+agents, every proposal adversarially re-derived) found the biggest georgia
+optimisation was not a tuning at all — **her live arm was running a different
+exit policy from the one her evidence was earned on**, the (te) class at the
+same host for the third time:
+
+* **24 of her 51 live closes were `long-trend-breakout_range_top` at 15m
+  median hold** — a combination her shadow twin's ledger CANNOT book (0 of
+  207: the family loop vetoes the range_top exit signal for breakout entries,
+  because a breakout is by construction at the top of the range it just
+  left). The live host applied `sig["exit"]` with no tag veto, so it sold
+  every breakout into the first fresh bar at +0.079%/trade where the shadow
+  rides the same tag to roi (+1.856% at 100% win) or the trail. Paired
+  same-coin live-vs-shadow gap: −0.52pp/trade over 31 pairs (hypothesis-grade,
+  selection-on-exit declared; entry execution itself is CLEAN — median entry
+  gap −5.3bps, so the whole live-vs-shadow deficit was exit policy).
+* **The trailing ATR ratchet did not exist on the live arm** — the shadow's
+  primary loss control (106 of 207 closes exit `trailing_stop_loss`) was a
+  fixed `profit <= -5%` check on the host: ZERO trailing closes in 51,
+  winners free to round-trip their whole gain, and the one fixed-stop fill
+  that did fire gapped to −7.17% (DOGE, the 22-Aug crash).
+
+Both are now `manage_exit_reason` — the family's exit stack (stop → roi →
+custom_exit → vetoed signal) as one extracted seam on the live host, ratchet
+ported verbatim (HWM in durable meta so a restart cannot lower it; bars-dark
+keeps the fixed stop as backstop, a declared divergence — a DayTrader
+position must never be stopless). `roi_exit_due` takes the strategy
+explicitly so the seam reads the ladder of the book it was handed, never the
+module global. **POLICY_ERA gains an EXACT key `freqtrade-georgia-lighter` at
+2026-08-26** (era_base matches exact before the strip, so the shadow twin
+keeps 17-Jul): the first 4 days' live sample ran a different policy in kind
+and must not pool into the fixed arm's grade — the row was FLAT at the
+boundary, so no straddlers exist. Pinned by
+`tests/autonomy/test_live_exit_parity.py` (16 tests; 7/7 mutations red,
+incl. the seam silently reading avo's roi ladder for georgia and the ratchet
+losing its monotone).
+
+**👩 mum's half of the ask is a census fix, not a tune** — the same pass
+measured her flatness as the design working on a scarce tape: era sample is
+**n=1, not 8** (7 of the row's closes are v1-policy rows outside the 19-Aug
+boundary), the rsi<25 cell fired ~1.1 episodes/day this week vs the founding
+5.07/day (risk-on tape: 18 of 23 universe coins in 1h uptrend, ALL crypto),
+and every episode is accounted for — 3 uptrend-blocked, 3 oracle-floor-blocked
+(IWM/WTI graduate ~31-Aug/~9-Sep/~22-Sep on the oracle's own clock), 1
+entered (NVDA, the day before she went live). But the row could not SAY that:
+`rsi_min 16.8` sat beside `verdicts {no_signal: 23}` and the WHY was computed
+in `OversoldRebound.signals` and discarded at the call site — I18-blind in
+both arms. `census_no_entry_why` is the ONE owner (family defines, live host
+imports): sub-bar RSI refused by the NOT-uptrend half reads
+**`uptrend_blocked`**, a None sig reads `no_read`, and the gate is
+class-scoped (`OversoldRebound.UPTREND_BLOCKS`) so 🙏 SwingDip — whose sig
+carries rsi/uptrend with uptrend REQUIRED — cannot inherit mum's semantics by
+shape. No entry/exit/accounting change on mum; her era is untouched.
+
+Deployed [deploy-live-georgia] + [deploy-live-mum] (both rows FLAT at
+dispatch; avo's service deliberately not restarted — BEHIND-SHARED until her
+next qualifying deploy). The rest of the pass's verdicts (the roi-ladder
+refusals, the rank-throttle hold at 3, avo's cap arithmetic) are recorded in
+the session summary and HANDOFF, not re-argued here.
+
 ## 2026-08-25 (tl) — GEORGIA'S MANUAL TRADES ATTESTED ON EAMON'S CONFIRMATION — AND AIMING THE ONE-SHOT CAUGHT THE PAIR REGISTRY LYING ABOUT HER SERVICE
 
 **Eamon, 25-Aug (night): "do the same for georgia please <3"** — confirming

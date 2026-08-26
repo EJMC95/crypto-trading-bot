@@ -277,6 +277,23 @@ POLICY_ERA = {
         "book from 13-Jul for a STRATEGY change — a book can have an earlier "
         "hypothesis era than its accounting era, and the later of the two is "
         "what a promotion sample may use."),
+    # [2026-08-26] EXACT-KEY on purpose (era_base matches exact before the
+    # suffix strip): the LIVE row only. The shadow twin keeps 17-Jul — its
+    # ledger always ran the declared policy; scoping both would discard the
+    # 195-close sample that IS the go-live case.
+    "freqtrade-georgia-lighter": (
+        "2026-08-26",
+        "live-host exit parity fix: for its first 4 days on the (ta) "
+        "sub-account the live arm ran WITHOUT DayTraderGated's trailing ATR "
+        "ratchet (fixed -5% stop instead; 0 trailing closes in 51 vs the "
+        "shadow's 106 of 207) and WITHOUT the trend_breakout veto on the "
+        "range_top exit signal (24 of 51 closes were "
+        "long-trend-breakout_range_top at 15m median hold — a combination "
+        "the shadow's ledger cannot book at all). That sample is a different "
+        "exit policy in kind, not this book's record; pooling it into the "
+        "fixed arm's grade is the silent-pooling hazard the (hm) bracket "
+        "precedent names. The row was FLAT at the boundary, so no straddlers "
+        "exist."),
     "freqtrade-dad": (
         "2026-07-17",
         "family book, same lighter_family_bot accrual fix, 4 closes opened "

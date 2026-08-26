@@ -105,6 +105,9 @@ from lighter_family_bot import (
     # [(ti)] the ONE policy-stamp builder, shared with the shadow host so
     # judge v2's parity precheck compares like with like.
     policy_stamp,
+    # [2026-08-26] the ONE census owner for a no-entry verdict (mum's
+    # uptrend_blocked split) — imported, never re-typed ((hj)).
+    census_no_entry_why,
 )
 from venues import marks
 from venues.safety import (
@@ -565,13 +568,62 @@ def _clip_scale_now():
         return 1.0
 
 
-def roi_exit_due(age_min, profit):
+def roi_exit_due(age_min, profit, strategy=None):
     """freqtrade-style ROI ladder, byte-identical to the family Book's rule:
-    the rung is the LARGEST minute key <= age, exit when profit >= its bar."""
-    if not S.roi:
+    the rung is the LARGEST minute key <= age, exit when profit >= its bar.
+    [2026-08-26] takes the strategy explicitly so the manage_exit_reason seam
+    reads the ladder of the book it was HANDED, never the module global S —
+    a test driving georgia's ladder must not silently read avo's."""
+    roi = (strategy or S).roi
+    if not roi:
         return False
-    rung = max((k for k in S.roi if k <= age_min), default=None)
-    return rung is not None and profit >= S.roi[rung]
+    rung = max((k for k in roi if k <= age_min), default=None)
+    return rung is not None and profit >= roi[rung]
+
+
+def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
+    """The family loop's exit stack, in the family loop's order (stop -> roi
+    -> custom_exit -> exit signal), as ONE testable seam. Mutates m["stop_px"]
+    (the ratchet HWM lives in durable meta, so a restart cannot lower it).
+
+    [2026-08-26] TWO family semantics this host was missing, both found by
+    pairing 🔮 georgia's live ledger against her shadow twin's — the (te)
+    class again (the variant host not running the strategy's own policy):
+
+    * THE TRAILING ATR RATCHET. The family runs DayTraderGated's stop as
+      `atr_stop_dist` ratcheted from the high-water mark (106 of her 207
+      shadow closes exit `trailing_stop_loss`); this host checked only the
+      fixed `profit <= stoploss`, so her live arm had NO ratchet — zero
+      trailing closes in 51, winners free to round-trip to -5%, and the one
+      fixed-stop fill that did fire gapped to -7.17% (DOGE, 22-Aug). Ported
+      verbatim; when bars are dark the fixed stop stays as the backstop (a
+      deliberate divergence from the family, where bars always exist —
+      a DayTrader position must never be stopless).
+
+    * THE trend_breakout VETO on the exit signal. The family vetoes
+      `range_top` for breakout entries — a breakout is by construction at the
+      top of the range it just left, so the unvetoed signal exits it on the
+      first fresh bar. Measured on the live row before this fix: 24 of 51
+      closes were `long-trend-breakout_range_top` at 15m median hold, a
+      combination the shadow's ledger cannot book at all (0 of 207), mean
+      +0.079%/trade where the shadow rides the same tag to roi/trail.
+    """
+    reason = None
+    if isinstance(strategy, DayTraderGated) and bars and bars.get("t"):
+        dist = strategy.atr_stop_dist(m.get("tag"), bars, px)
+        m["stop_px"] = max(float(m.get("stop_px") or 0.0), px * (1.0 - dist))
+        if px <= m["stop_px"]:
+            reason = "trailing_stop_loss"
+    elif profit <= strategy.stoploss:
+        reason = "stop_loss"
+    if not reason and roi_exit_due(age_min, profit, strategy):
+        reason = "roi"
+    if not reason and hasattr(strategy, "custom_exit"):
+        reason = strategy.custom_exit(m.get("tag"), age_min, profit)
+    if not reason and sig and sig.get("exit") \
+            and m.get("tag") != "trend_breakout":
+        reason = sig.get("exit_reason", "exit_signal")
+    return reason
 
 
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
@@ -1308,7 +1360,13 @@ def main(_ctx=None, once=False):
             if was_stop and entry:
                 if measured and exit_px:
                     try:
-                        _si = entry * (1.0 + float(S.stoploss))
+                        # [2026-08-26] the level a TRAILING close fired at is
+                        # the ratchet's own stop_px, not the fixed level from
+                        # entry — measuring a ratchet fill against the entry
+                        # stop would book a bogus (usually flattering)
+                        # overshoot into the number a gross gate consumes.
+                        _si = float(m.get("stop_px") or 0.0) or \
+                            entry * (1.0 + float(S.stoploss))
                         _obv = (_si - exit_px) / _si * 1e4
                         if _obv == _obv and abs(_obv) != float("inf"):
                             _ob = round(_obv, 1)
@@ -1594,24 +1652,14 @@ def main(_ctx=None, once=False):
                 continue
             profit = (px - entry) / entry
             age_min = (t0 - float(m.get("opened_ts") or t0)) / 60.0
-            reason = None
-            if profit <= S.stoploss:
-                reason = "stop_loss"
-            if not reason and roi_exit_due(age_min, profit):
-                reason = "roi"
-            # [2026-08-25] custom_exit timeouts — the family loop's own order
-            # (stop -> roi -> custom_exit -> signal), duck-typed per (ro). The
-            # host NEVER called this: 🔮 georgia's live arm ran real money
-            # without her bounce_take/bounce_timeout/max_hold_timeout, and 👩
-            # mum's 24h carry cap would have been dead code on the live arm —
-            # a position sitting between 0 and the stop had NO exit but the
-            # stop, which is v1's disease reborn (I18: a time stop that never
-            # fires). Found by the mum go-live gap audit, live-verified on
-            # georgia's held positions.
-            if not reason and hasattr(S, "custom_exit"):
-                reason = S.custom_exit(m.get("tag"), age_min, profit)
-            if not reason and sig and sig.get("exit"):
-                reason = sig.get("exit_reason", "exit_signal")
+            # [2026-08-25] custom_exit joined the stack (the host NEVER called
+            # it — 🔮 georgia ran real money without her own timeouts, the
+            # (te) audit's find). [2026-08-26] the WHOLE stack is now the
+            # manage_exit_reason seam, which also carries the two family
+            # semantics that audit missed: DayTraderGated's trailing ATR
+            # ratchet and the trend_breakout veto on the exit signal — see the
+            # seam's own docstring for the measured live cost of each.
+            reason = manage_exit_reason(S, m, px, profit, age_min, sig, bars)
             if reason:
                 try:
                     res = venue.market_close(sym)
@@ -1718,8 +1766,11 @@ def main(_ctx=None, once=False):
                 if sig and isinstance(sig.get("rsi"), (int, float)):
                     last_rsi[sym] = float(sig["rsi"])
                 if not sig or not sig.get("enter"):
-                    _verdict(sym, "no_signal" if sig else "no_read",
-                             sig=sig)
+                    # [2026-08-26] the ONE census owner: 👩 mum's sub-bar RSI
+                    # refused by the NOT-uptrend half now reads
+                    # `uptrend_blocked`, not a `no_signal` byte-identical to
+                    # "no low rsi anywhere" (I18).
+                    _verdict(sym, census_no_entry_why(S, sig), sig=sig)
                     continue
                 px = marks.fresh_mid(venue, sym)
                 if not px:

@@ -111,6 +111,27 @@ def ledger_reason(tag, exit_reason):
     return f"{ledger_tag(tag)}_{exit_reason}"
 
 
+def census_no_entry_why(strategy, sig):
+    """The census bucket for a coin that produced no entry — ONE owner, read
+    by both the shadow loop and the live host (a second copy is a second
+    rule, (hj)).
+
+    [2026-08-26] Split out of a bare `no_signal`, because on 👩 mum's LIVE row
+    the two states it pooled are the difference between "the filter is doing
+    its measured job" and "something is mis-wired on real money at 9.5x":
+    rsi_min read 16.8 against her 25.0 bar beside `verdicts {no_signal: 23}`,
+    and the WHY (the NOT-uptrend half of the cell refusing a sub-bar RSI) was
+    computed in `OversoldRebound.signals` and discarded at the call site —
+    I18-blind in both arms. Gated on `UPTREND_BLOCKS` (the strategy whose
+    semantics this encodes), never on the shape of the sig dict: 🙏 SwingDip
+    reports rsi/uptrend too, and its uptrend is REQUIRED, not blocking."""
+    if (getattr(strategy, "UPTREND_BLOCKS", False) and sig
+            and isinstance(sig.get("rsi"), (int, float))
+            and sig["rsi"] < strategy.RSI_MAX and sig.get("uptrend")):
+        return "uptrend_blocked"
+    return "no_signal" if sig else "no_read"
+
+
 def brain_stake_mult(bot_id, tag):
     """The brain's TWO-WAY per-(bot, tag) stake multiplier for an entry
     (reduce-only until 21-Jul), looked up under EXACTLY the identity this
@@ -657,6 +678,12 @@ class OversoldRebound(Carrier):
                    "maxdd": {"lookback": 72, "trades": 8, "dd": 0.15, "stop": 12}}
     min_bars = 210                      # e200 on 1h needs >200 closed bars
     RSI_MAX = 25.0                      # (qu)'s measured dose cell
+    #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
+    #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
+    #: carrier whose signals dict happens to carry rsi/uptrend for OTHER
+    #: reasons (🙏 SwingDip reports rsi<42 with uptrend REQUIRED) never
+    #: inherits mum's semantics by shape alone.
+    UPTREND_BLOCKS = True
     MAX_HOLD_MIN = 1440                 # 24h — the MEASURED plateau interior
     control_arm = True                  # publishes its own random-entry null
     census = True                       # publishes why nothing opened (I18)
@@ -1869,7 +1896,8 @@ def main():
             # was never evaluated at all. That is the I1 liveness trap living
             # INSIDE the instrument built to close it.
             b.scan = {"scanned": 0, "held": 0, "no_bars": 0, "no_px": 0,
-                      "no_signal": 0, "stale_candle": 0, "locked": 0,
+                      "no_signal": 0, "uptrend_blocked": 0, "no_read": 0,
+                      "stale_candle": 0, "locked": 0,
                       "capped": 0, "cooldown": 0, "vetoed": 0,
                       "noncrypto_ungated": 0, "budget_headroom": 0,
                       "symcap": 0, "throttled": 0, "brain_gate": 0,
@@ -2002,7 +2030,12 @@ def main():
                     b.scan["stale_candle"] += 1
                     continue      # rule not evaluated this loop — not a verdict
                 if not sig or not sig.get("enter"):
-                    b.scan["no_signal"] += 1
+                    # [2026-08-26] bucket via the ONE owner (census_no_entry_why,
+                    # shared with the live host): 👩 mum's uptrend-blocked
+                    # refusals stop pooling with "no low rsi", and a rule that
+                    # returned None (warmup/dark indicators) reads `no_read`,
+                    # not `no_signal` — a verdict the rule never gave.
+                    b.scan[census_no_entry_why(b.s, sig)] += 1
                     continue
                 if locked:
                     b.scan["locked"] += 1

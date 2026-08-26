@@ -224,7 +224,9 @@ def test_the_census_distinguishes_a_stale_candle_from_no_signal():
     src = (ROOT / "lighter_family_bot.py").read_text()
     assert 'b.scan["stale_candle"] += 1' in src
     i = src.index('b.scan["stale_candle"] += 1')
-    j = src.index('b.scan["no_signal"] += 1')
+    # [2026-08-26] the no-signal booking routes through census_no_entry_why
+    # (the uptrend_blocked split) — same site, same ordering property.
+    j = src.index('b.scan[census_no_entry_why(b.s, sig)] += 1')
     assert i < j, "the stale-candle check must run BEFORE the no-signal count"
 
 
