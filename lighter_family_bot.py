@@ -677,7 +677,17 @@ class OversoldRebound(Carrier):
                    "slguard": {"lookback": 24, "trades": 3, "stop": 6},
                    "maxdd": {"lookback": 72, "trades": 8, "dd": 0.15, "stop": 12}}
     min_bars = 210                      # e200 on 1h needs >200 closed bars
-    RSI_MAX = 25.0                      # (qu)'s measured dose cell
+    #: [2026-08-26 (tr)] 25.0 -> 30.0 — Eamon's "she doesnt miss anything too
+    #: good", shipped the measured way: the rsi [25,30) x NOT-uptrend cell was
+    #: the ONE of four candidates to clear the pre-registered exit-free bar
+    #: (STUDY_MUM_SUPPLY_2026-08-26: bracket +0.104%/trade, t=2.38, t_cl=1.99,
+    #: both halves positive, trailing +0.150%; crypto-only stronger; referee-
+    #: confirmed vs a regime-conditional null + coin/month jackknives). The
+    #: uptrend "rescue" tiers and rsi 30-42 were REFUSED with numbers (C1/C2
+    #: trailing-negative/flat, C4 decayed to t_cl -3.0) — the bar admits
+    #: exactly what was measured, nothing wider. Supply ~3-4x. Era unchanged
+    #: (entry-bar notch = ordinary tuning, the carry ENTER_APR precedent (hc)).
+    RSI_MAX = 30.0
     #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
     #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
     #: carrier whose signals dict happens to carry rsi/uptrend for OTHER

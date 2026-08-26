@@ -240,13 +240,13 @@ def test_the_gauge_says_how_far_the_market_is_from_the_bar():
     b = _B()
     b.s = _mum()
     b.scan = {"scanned": 4, "no_signal": 4, "opened": 0}
-    #                bar-4  bar+2  bar+13  bar+27   (bar is RSI_MAX = 25)
-    b.last_rsi = {"A": 21.0, "B": 27.0, "C": 38.0, "D": 52.0}
+    #                bar-4  bar+2  bar+13  bar+27   ((tr): bar is RSI_MAX = 30)
+    b.last_rsi = {"A": 26.0, "B": 32.0, "C": 43.0, "D": 57.0}
     scan = fam._census_extra(b)["scan"]
     assert scan["rsi_bar"] == b.s.RSI_MAX
-    assert scan["rsi_min"] == 21.0, "the closest coin to the bar"
+    assert scan["rsi_min"] == 26.0, "the closest coin to the bar"
     assert scan["rsi_read"] == 4
-    # within 8 points of the bar: 21.0 and 27.0 qualify, 38.0 and 52.0 do not.
+    # within 8 points of the bar: 26.0 and 32.0 qualify, 43.0 and 57.0 do not.
     # This is the leading indicator — visible hours before an entry, where the
     # entry itself is only visible days after.
     assert scan["near_bar"] == 2
