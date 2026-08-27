@@ -530,6 +530,59 @@ N× faster if its slots filled, not that the signal exists to fill them — the
 book's own census answers that.
   ENFORCED BY: `scripts/ceiling.py::book_ceiling`, `scripts/ceiling.py::MIN_N`, `tests/autonomy/test_ceiling.py::test_a_losing_book_is_never_given_a_ceiling`
 
+### I25 · A HOT WINDOW IS NOT EVIDENCE — JUDGE A CHANGE AGAINST THE BOOK'S MEAN, NEVER AGAINST THE WINDOW THAT MOTIVATED IT
+**Eamon, 27-Aug: *"think broadly on how we can in some cases win, we then make
+changes and it starts losing…"*** The pattern is REAL and **we are not causing
+it.** Measured over 3,274 closes across 21 books, every non-overlapping
+15-close window against its successor, **with no regard for whether anything was
+changed** — the no-change control this fleet had never run:
+
+| | window | → next | the book's OWN mean |
+|---|---|---|---|
+| after a **HOT** window | **+1.760%** | **+0.086%** | +0.190% |
+| after a **COLD** window | −0.578% | **+0.362%** | +0.624% |
+
+**A hot window is followed by a −1.674pp collapse that lands within 0.1pp of the
+book's own long-run mean**, and the excess over that mean is ≈0 in BOTH
+directions (−0.105 / −0.262 pp). **The successor is predicted by the book's
+MEAN, not by the window before it.** We never change books at random — we change
+them when we NOTICE something, and what we notice is an extreme — so we will
+observe a collapse immediately after almost every change to a winning book, and
+it will always feel causal. The mirror runs too: a cold window is followed by a
+**+0.940pp RISE**, which is why a change made to a struggling book so often
+looks like it worked. Both readings are the same arithmetic, and both are wrong.
+
+**THIS REACHES AN ACTUATOR.** `fleet_proprioception.grade_live` judges an
+episode against the book's own PRE-EPISODE WINDOW and the SHADOW TWIN, and calls
+a change `bad` only when it is worse than EVERY available baseline. The twin is
+a proper control and is immune — it reverts in step. **The pre-window is not:
+`LIVE_MARGIN_PP` is 0.25pp against 1.674pp of measured reversion (6.7×), and
+`LIVE_BASE_MIN_N` permits a THREE-TRADE baseline.** Where the twin is missing,
+`all()` over one element condemns a change by arithmetic rather than evidence,
+and a `hurting` verdict reverts the lever at `get_lever`. **Latent, not live at
+the time of writing** (all 8 verdicts ride other bases; none is `hurting`).
+
+**THE RULE:** the counterfactual for any change is the book's own MEAN, or a
+CONTROL ARM that experiences the same reversion — never the window that
+motivated the change, which is selected on an extreme and is therefore a biased
+estimator BY CONSTRUCTION. Prefer the twin wherever one exists; it is the only
+baseline that moves with the tide.
+
+**AND THE SAME ARITHMETIC PRICES CELL SELECTION.** Picking the best of N
+candidate cells inflates its statistic by roughly the spread of the unselected
+distribution: `(uz)`, same day — 👩 mum's universe widening measured four
+volume-ranked cells, the best read **t=2.30**, and resampling WHICH coins are
+graded gave **median t=0.45 with 0 of 24 draws reaching 2.0**. A **~1.85 t-unit
+selection premium**, and had it shipped the live book would have "started
+losing" directly after its best-looking evidence.
+
+**THE COROLLARY THAT MAKES THIS AN OFFENSE INVARIANT, not a caution:** the
+response is NOT to change less. Changing less is what the biased reading argues
+for, and it costs every real improvement. The response is to hold a hot streak
+to the same standard as a cold one, and to keep shipping — a change judged
+against the right baseline is the fleet's only way to compound.
+  ENFORCED BY: `fleet_proprioception.py::grade_live`, `scripts/study_do_our_changes_hurt_2026-08-27.py::peak_arm`, `scripts/study_do_our_changes_hurt_2026-08-27.py::K`
+
 <!-- INVARIANTS:END -->
 
 
@@ -1983,6 +2036,52 @@ All new bots:
   than a who-may-edit rule. **Second-in-command is recorded** — and its
   first duty is unchanged: the refusal with evidence remains a valid
   output, senior to enthusiasm, Lucy's included.
+  **[AMENDED 27-Aug (vc), Eamon: *"Permission to change rules and amend
+  doctrines for bot positive changes that make the system run better and
+  the bots win and make more - remember permanent doctrine"*.] THE
+  DOCTRINE ITSELF JOINS THE DELEGATED SURFACE — and the second clause is
+  the load-bearing one.** A session may now amend the RULES and
+  INVARIANTS in this file, not only act under them, where the amendment
+  makes the fleet run better or its books earn more. That is the natural
+  end of the chain: `(kd)` gave levers, `(lm)` real money, `(mm)` both
+  ways, `(pz)` enhancements, `(tg)` the judge and the rails — and each
+  time the constraint that actually bound was doctrine written for a
+  smaller fleet. I12 already REQUIRED correcting a doctrine that no
+  longer describes the system; this permits IMPROVING one that does.
+  **WHAT AN AMENDMENT OWES, unchanged from any other delegated act:** the
+  measured number and the expectancy price (I19); an executable
+  enforcement named, or `UNENFORCED` declared with a reason (this file's
+  own opening rule, and `audit_doctrine_enforcement` fails the build
+  without one); and the change recorded where a reader will hit it, in
+  place, per I12. **An invariant weakened without a measurement is not an
+  amendment, it is a leak** — and the OFFENSE tier exists precisely
+  because doctrine that only ever tightens becomes a museum of avoided
+  losses.
+  **THE PERMANENT DOCTRINE — "remember permanent doctrine", and this is
+  it. None of the following is amendable by this grant, by a later grant,
+  or by a doc edit, and a session that finds itself arguing one of them
+  has already made the mistake:**
+  * **EVIDENCE IS SENIOR TO PERMISSION.** No promotion past the gates. A
+    grant may change WHO acts and WHAT may be touched; it never changes
+    that a claim needs a measurement. Every widening of this surface has
+    said so, and it stays true because the constraint on real money was
+    never permission — it is measured edge.
+  * **NO DISCRETIONARY LIVE TRADES.** No hand-placed orders, no
+    overriding a gate the fleet's own organs hold closed. This is a
+    property of Lucy, not a preference of this repo.
+  * **THE REFUSAL WITH EVIDENCE IS A VALID OUTPUT, AND IT OUTRANKS
+    ENTHUSIASM** — Eamon's and Lucy's alike. `(uz)` and `(vc)` are the
+    worked examples on the day this was granted: three plausible
+    improvements measured and REFUSED, one of them the very fix the entry
+    diagnosing the problem would have shipped.
+  * **A GUARD IS NOT VERIFIED UNTIL A MUTATION REDDENS IT** (I3), and a
+    doctrine change that removes a guard must show what replaces it.
+  * **THE SAFETY RAILS' EXISTENCE** — kill switch, daily-loss halt,
+    notional caps, fail-closed reads. Their VALUES are delegated (tg);
+    that they exist and fail closed is not.
+  A doctrine amendment is recorded in the CHANGELOG like any other
+  change, with the number that motivated it — so the file can be read
+  backwards to why, and a future session can refute it the same way.
   **A correctness fix that changes which book gets real money IS a real-money
   benefit delivered** — it arrives as better evidence rather than a bigger
   position. Two corollaries learned the same day: a **refusal with evidence is a

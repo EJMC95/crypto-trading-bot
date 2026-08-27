@@ -1,3 +1,19 @@
+**[27-Aug, LATER THE SAME DAY] THIS ENTRY'S FINDING IS NOW I25, AND THE GRANT
+THAT ALLOWED IT IS RECORDED.** Eamon: *"Permission to change rules and amend
+doctrines for bot positive changes that make the system run better and the bots
+win and make more - remember permanent doctrine"*. Two edits to `CLAUDE.md`:
+(1) the GROWTH FINDINGS amendment chain gains the doctrine-amendment grant,
+with **THE PERMANENT DOCTRINE** stated in full beside it — evidence senior to
+permission, no discretionary live trades, the refusal-with-evidence outranking
+enthusiasm (Lucy's included), I3's mutation bar, and the rails' EXISTENCE (their
+VALUES stay delegated per (tg)); (2) **I25 · A HOT WINDOW IS NOT EVIDENCE**,
+carrying the −1.674pp reversion, the 6.7x margin gap in `grade_live`, and the
+~1.85 t-unit selection premium from (uz). Its enforcement resolves
+(`audit_doctrine_enforcement`: 25 invariants, 24 enforced, 1 declared).
+**I25 is an OFFENSE invariant on purpose** — the biased reading argues for
+changing LESS, which costs every real improvement; the rule is to hold a hot
+streak to a cold streak's standard and keep shipping.
+
 ## 2026-08-27 (vc) — "WE WIN, WE CHANGE IT, IT STARTS LOSING" IS REGRESSION TO THE MEAN, MEASURED: A HOT WINDOW IS FOLLOWED BY −1.674pp WITH OR WITHOUT A CHANGE, AGAINST A GRADER MARGIN OF 0.25pp
 
 **Eamon, 27-Aug: *"think broadly on how we can in some cases win, we then make
