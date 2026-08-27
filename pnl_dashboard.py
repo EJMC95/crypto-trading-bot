@@ -2630,6 +2630,143 @@ def fetch_golive_dd():
     return out
 
 
+# ------------------------------------------------------------- ledger events
+# [2026-08-27 (vm)] THE WINDOW BOUNDARIES ARE DECLARED ONCE. The aggregate
+# FILTERs on them and the candidate query has to place each undecided row in
+# the SAME windows; written twice they would drift — a day apart at a daylight
+# boundary, silently — and the card would count a row in one query's 7d and not
+# the other's. One string, two readers: the (hj) rule at its smallest scale.
+_W_TODAY = "close_ts >= date_trunc('day', now())"
+_W_7D = "close_ts >= now() - interval '7 days'"
+_W_30D = "close_ts >= now() - interval '30 days'"
+
+# The CANDIDATE test — deliberately NOT the verdict. It is the cheap half that
+# narrows a whole ledger to the handful of rows the OWNER then decides on, and
+# it is the same expression `bot_pnl_store.fetch_paper_aggregate` uses for the
+# same job, in that function's own words: "SQL narrows to CANDIDATES cheaply;
+# `is_non_economic` DECIDES".
+_LEDGER_CAND_SQL = "pnl_abs = 0 OR extra->>'non_economic' = 'true'"
+
+
+def _non_economic_owner():
+    """Resolve `bot_pnl_store.is_non_economic` — the ONE owner of the question
+    "is this ledger row an EVENT rather than a TRADE?" ((tw)).
+
+    Returns None when the owner cannot be reached, and `fold_ledger_candidates`
+    then ADMITS every candidate. That is the fail-OPEN direction, and it is the
+    whole reason this is a LOOKUP and not a re-implementation: with no owner the
+    card falls back to exactly its pre-(vm) numbers, never to a silently smaller
+    book. `Dockerfile.dashboard` COPYs `bot_pnl_store.py` (line 9), so this
+    import is not born-dark today; the guard is for the day someone edits that
+    COPY set.
+    """
+    try:
+        from bot_pnl_store import is_non_economic
+        return is_non_economic
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def fold_ledger_candidates(out, cands):
+    """Decide the ledger rows the aggregate deliberately left undecided, and
+    fold the real TRADES back into `out`. Mutates and returns `out`.
+
+    [2026-08-27 (vm)] THE CARD SHOWED EAMON PHANTOM LOSSES ON REAL MONEY.
+    `(tw)` established the defect — a daily-loss halt flattens positions with no
+    entry basis and no P&L, `publish_paper_trade` wrote those EVENTS into the
+    closed-trade ledger as TRADES, and `losses = closed - wins` then counted
+    every one as a LOSS. It fixed the OWNER (`is_non_economic`) and the book's
+    own boot seed (`fetch_paper_aggregate`). It did not fix the DASHBOARD, which
+    is the thing Eamon actually looks at. Measured 27-Aug:
+    `grep -c is_non_economic pnl_dashboard.py` = **0** against 4 hits in the
+    owner, and the two live cards read 🙏 avo **15 closes / 5W / 10L** where the
+    honest record is **6 / 5 / 1**, and 🔮 georgia **60 / 27 / 33** where the row
+    itself reads **56 / 27 / 29**. Nine and four phantom losses, on real money,
+    on the whole reporting surface.
+
+    THE SPLIT IS THE OWNER'S, VERBATIM: SQL narrows to CANDIDATES cheaply
+    (`_LEDGER_CAND_SQL`), `is_non_economic` DECIDES. The predicate is not
+    re-expressed here in SQL or in Python — a second copy of a rule is a second
+    rule ((hj)), and (tw) records that an earlier draft of its own pass
+    re-expressed it as a SQL filter and drifted from it inside one commit.
+
+    FAIL-OPEN IN EVERY DIRECTION, because the defect being repaired is a count
+    that was too BIG and the defect this must never introduce is one that is too
+    SMALL:
+      * no owner (`_non_economic_owner()` is None) ⇒ every candidate is folded
+        back as a trade, so the card degrades to its exact pre-(vm) numbers;
+      * the predicate raising on a row ⇒ that row is ADMITTED;
+      * `bot_trades` ⇒ never a CANDIDATE at all (see the union), because it has
+        no `extra` column to carry the (th) marker, and a table that cannot
+        answer the question must never be answered FOR.
+
+    VISIBILITY, NOT SILENCE: the excluded rows publish as `record.events`,
+    always present and 0 on a clean book. An unexplained drop from 15 closes to
+    6 is a second confusion in place of the first; "6 closed · 9 halt events" is
+    a fact a reader can act on — the same I1 argument the `n_*` counters beside
+    it already make.
+
+    `cands` are the rows of the candidate query: bot, pnl, entry_price, extra,
+    and the three window booleans SQL itself evaluated, so no window boundary is
+    ever recomputed in Python.
+    """
+    decide = _non_economic_owner()
+    for r in (cands or []):
+        bot = r.get("bot")
+        if not bot:
+            continue                       # unkeyable row: nothing to fold into
+        b = out.setdefault(bot, {})
+        rec = b.setdefault("record", {"n": 0, "w": 0, "l": 0,
+                                      "total": 0.0, "events": 0})
+        # a record built by the aggregate above already carries `events`; one
+        # built HERE is a book whose every ledger row was a candidate.
+        rec.setdefault("events", 0)
+        is_event = False
+        if decide is not None:
+            try:
+                is_event = bool(decide(r.get("pnl"), r.get("entry_price"),
+                                       r.get("extra")))
+            except Exception:  # noqa: BLE001
+                is_event = False           # unreadable row ⇒ ADMIT it
+        if is_event:
+            rec["events"] += 1
+            continue
+        # ADMITTED — a real trade the cheap SQL test could not tell apart from
+        # an event (a close that landed exactly flat, or a funding book's
+        # price-free accrual row). It was excluded from the aggregate, so it is
+        # put back here rather than lost.
+        try:
+            # NOT a fabricated zero: a NULL-P&L row cannot BE a candidate (the
+            # union COALESCEs that test to FALSE), so this branch is
+            # unreachable — and if it ever fires, counting the trade and adding
+            # nothing to the sum is the only choice that invents no number.
+            pnl = float(r.get("pnl") or 0.0)
+        except (TypeError, ValueError):
+            pnl = 0.0
+        rec["n"] += 1
+        if pnl > 0:
+            rec["w"] += 1
+        rec["l"] = rec["n"] - rec["w"]
+        rec["total"] = round(float(rec.get("total") or 0.0) + pnl, 2)
+        for flag, n_key, sum_key in (("in_today", "today_n", "today_closed"),
+                                     ("in_7d", "n_7d", "pnl_7d"),
+                                     ("in_30d", "n_30d", "pnl_30d")):
+            if not r.get(flag):
+                continue
+            b[n_key] = int(b.get(n_key) or 0) + 1
+            b[sum_key] = round(float(b.get(sum_key) or 0.0) + pnl, 2)
+        # best/worst are EXTREMA, so they cannot be repaired by subtraction the
+        # way a count can — an event at $0.00 becomes the "worst trade" of an
+        # all-winning book and the "best" of an all-losing one. Excluding then
+        # re-folding is what makes them right; None means the aggregate saw no
+        # admitted rows at all for this bot.
+        b["best_trade"] = (round(pnl, 2) if b.get("best_trade") is None
+                           else round(max(b["best_trade"], pnl), 2))
+        b["worst_trade"] = (round(pnl, 2) if b.get("worst_trade") is None
+                            else round(min(b["worst_trade"], pnl), 2))
+    return out
+
+
 def fetch_ledger_enrich():
     """[2026-07-07 UNIFORM CARDS] One cached ledger pass so EVERY bot's card
     carries the same fields regardless of what its publisher sends:
@@ -2658,14 +2795,34 @@ def fetch_ledger_enrich():
             g = cur.fetchone()
             parts = []
             if g["t1"]:
+                # [(vm)] `bot_trades` CANNOT CARRY THE MARKER — its CREATE has
+                # neither `extra` nor `entry_price` and there is not one
+                # `ALTER TABLE bot_trades` in the tree (checked, whole file).
+                # So it is never a CANDIDATE (`FALSE` below) and every one of
+                # its rows is admitted as a trade without the owner being asked.
+                # That is fail-OPEN made STRUCTURAL rather than incidental: the
+                # tempting `NULL::jsonb, NULL::double precision` alone would
+                # make each of its flat closes look exactly like a halt event
+                # (pnl 0 · no entry price · no funding form) and delete real
+                # freqtrade trades from the record. Nulls are still supplied so
+                # the two branches union; `cand` is what withholds them.
                 parts.append("SELECT bot, pair, profit_abs AS pnl, "
-                             "exit_reason AS reason, close_ts "
+                             "exit_reason AS reason, close_ts, "
+                             "NULL::double precision AS entry_price, "
+                             "NULL::jsonb AS extra, FALSE AS cand "
                              "FROM bot_trades WHERE close_ts IS NOT NULL")
             if g["t2"]:
+                # COALESCE(..., FALSE) is load-bearing: with `pnl_abs` NULL and
+                # no marker the bare OR is NULL, and a NULL `cand` satisfies
+                # neither `WHERE cand` nor `WHERE NOT cand` — the row would fall
+                # out of BOTH queries and vanish from the card. Unknown means
+                # "not a candidate", i.e. keep it.
                 parts.append("SELECT bot, pair, pnl_abs, reason, "
                              "COALESCE(CASE WHEN pg_input_is_valid(closed_at, "
                              "'timestamptz') THEN closed_at::timestamptz END, "
-                             "seen_at) FROM paper_trades")
+                             "seen_at), entry_price, extra, "
+                             f"COALESCE({_LEDGER_CAND_SQL}, FALSE) "
+                             "FROM paper_trades")
             if parts:
                 union = " UNION ALL ".join(parts)
                 # [(vj)] 7d/30d P&L and best/worst join this SAME aggregate.
@@ -2681,22 +2838,31 @@ def fetch_ledger_enrich():
                 # fixed the publisher and the docs but not the consumer.
                 # Derived here from the ledger this pass already scans, so the
                 # numbers are REALISED closes — the same basis as `record`.
+                # [(vm)] `WHERE NOT cand` is the whole reporting fix: the
+                # aggregate now runs over the rows SQL can settle by itself, and
+                # the handful it cannot are decided by the owner and folded back
+                # in below. n/w/l, 7d/30d, today and best/worst all ride this
+                # one aggregate, so all of them are repaired together.
                 cur.execute(
                     f"WITH t AS ({union}) "
                     "SELECT bot, COUNT(*) n, SUM((pnl>0)::int) w, SUM(pnl) total, "
-                    "COALESCE(SUM(pnl) FILTER (WHERE close_ts >= date_trunc('day', now())),0) today_closed, "
-                    "COUNT(*) FILTER (WHERE close_ts >= date_trunc('day', now())) today_n, "
-                    "SUM(pnl) FILTER (WHERE close_ts >= now() - interval '7 days') pnl_7d, "
-                    "COUNT(*) FILTER (WHERE close_ts >= now() - interval '7 days') n_7d, "
-                    "SUM(pnl) FILTER (WHERE close_ts >= now() - interval '30 days') pnl_30d, "
-                    "COUNT(*) FILTER (WHERE close_ts >= now() - interval '30 days') n_30d, "
+                    f"COALESCE(SUM(pnl) FILTER (WHERE {_W_TODAY}),0) today_closed, "
+                    f"COUNT(*) FILTER (WHERE {_W_TODAY}) today_n, "
+                    f"SUM(pnl) FILTER (WHERE {_W_7D}) pnl_7d, "
+                    f"COUNT(*) FILTER (WHERE {_W_7D}) n_7d, "
+                    f"SUM(pnl) FILTER (WHERE {_W_30D}) pnl_30d, "
+                    f"COUNT(*) FILTER (WHERE {_W_30D}) n_30d, "
                     "MAX(pnl) best, MIN(pnl) worst "
-                    "FROM t GROUP BY bot")
+                    "FROM t WHERE NOT cand GROUP BY bot")
                 for r in cur.fetchall():
                     b = out.setdefault(r["bot"], {})
                     n, w = int(r["n"]), int(r["w"] or 0)
                     b["record"] = {"n": n, "w": w, "l": n - w,
-                                   "total": round(float(r["total"] or 0), 2)}
+                                   "total": round(float(r["total"] or 0), 2),
+                                   # always present, 0 on a clean book: absent
+                                   # and zero are different states and only one
+                                   # of them means "nothing was withheld".
+                                   "events": 0}
                     b["today_closed"] = round(float(r["today_closed"] or 0), 2)
                     b["today_n"] = int(r["today_n"] or 0)
 
@@ -2709,6 +2875,24 @@ def fetch_ledger_enrich():
                     b["pnl_7d"], b["n_7d"] = _num(r["pnl_7d"]), int(r["n_7d"] or 0)
                     b["pnl_30d"], b["n_30d"] = _num(r["pnl_30d"]), int(r["n_30d"] or 0)
                     b["best_trade"], b["worst_trade"] = _num(r["best"]), _num(r["worst"])
+                # [(vm)] THE SECOND HALF OF THE OWNER'S PATTERN. The candidates
+                # are a tiny set — (tw) measured the fleet-wide legacy bridge at
+                # exactly 13 rows — so this is a cheap query, and it carries the
+                # window booleans SQL itself evaluated so `fold_ledger_candidates`
+                # never recomputes a boundary in Python.
+                cur.execute(
+                    f"WITH t AS ({union}) "
+                    "SELECT bot, pnl, entry_price, extra, "
+                    f"({_W_TODAY}) in_today, ({_W_7D}) in_7d, "
+                    f"({_W_30D}) in_30d "
+                    "FROM t WHERE cand")
+                fold_ledger_candidates(out, cur.fetchall())
+                # `last_close` is deliberately NOT filtered. It answers "what is
+                # the most recent row this book wrote?", which is a LIVENESS
+                # question (I1) — hiding a halt event there would leave a book
+                # that flattened this morning showing a days-old close and
+                # looking like it simply went quiet. The record says what the
+                # book TRADED; the last-close line says what it last DID.
                 cur.execute(
                     f"WITH t AS ({union}) "
                     "SELECT DISTINCT ON (bot) bot, pair, pnl, reason, close_ts "
@@ -2892,9 +3076,19 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     _closed = row.get("closed_trades")
     if _closed is None and (en.get("record") or {}).get("n"):
         _closed = en["record"]["n"]
+    # [(vm)] THE WITHHELD ROWS ARE SHOWN, NOT ERASED. `record` now excludes the
+    # basis-free flatten rows a daily-loss halt writes ((tw)), so the count
+    # DROPS on exactly the books that halted — 🙏 avo 15 → 6, 🔮 georgia 60 → 56
+    # — and a reader handed an unexplained drop has been given a second
+    # confusion in place of the first. `record.events` is that explanation, and
+    # it is a real fact about a real-money book: nine halts is news.
+    _events = (en.get("record") or {}).get("events") or 0
+    _ev_txt = (f' · {_events} halt event{"" if _events == 1 else "s"}'
+               if _events else '')
     if _closed is not None or row.get("open_trades") is not None:
         rows.append(f'<div class="row"><span>Trades</span>'
-                    f'<b>{_closed or 0} closed · {row.get("open_trades") or 0} open</b></div>')
+                    f'<b>{_closed or 0} closed · {row.get("open_trades") or 0} open'
+                    f'{_ev_txt}</b></div>')
     if row.get("wins") is not None:
         rows.append(f'<div class="row"><span>Win / Loss</span>'
                     f'<b>{row.get("wins") or 0} / {row.get("losses") or 0}</b></div>')
