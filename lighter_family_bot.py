@@ -687,7 +687,24 @@ class OversoldRebound(Carrier):
     #: trailing-negative/flat, C4 decayed to t_cl -3.0) — the bar admits
     #: exactly what was measured, nothing wider. Supply ~3-4x. Era unchanged
     #: (entry-bar notch = ordinary tuning, the carry ENTER_APR precedent (hc)).
-    RSI_MAX = 30.0
+    #: [2026-08-27 (un)] 30.0 -> 32.0 — Eamon's "widen mum to 32", measured on
+    #: her own 23-symbol universe over 460d of Lighter 1h tape
+    #: (STUDY_MUM_PARAMS_2026-08-27). `rsi<32` vs the shipped `rsi<30`:
+    #: **+0.111%/trade vs +0.075%, cluster-t +2.44 vs +1.47, both halves
+    #: positive (+0.114/+0.108), trailing-120d +0.172% vs +0.143%, and 6.05
+    #: eps/day vs 4.59** — better per trade AND more of them. Coin jackknife
+    #: worst drop keeps t_cl +1.86 (stronger than the +1.68 of the cell (tr)
+    #: shipped); 11/15 months positive; roi banks 70% of exits.
+    #: THE TRAP THIS AVOIDED, recorded because the first answer was wrong: the
+    #: pre-registered cell tested `rsi [30,32)` IN ISOLATION and read weak
+    #: (+0.062%/trade, trailing NEGATIVE). Episodes are runs of consecutive
+    #: qualifying bars, so a wider bar MERGES adjacent runs and moves the entry
+    #: earlier (median entry RSI 28.2 -> 30.2) — 2110 + 2099 != 2784. The
+    #: isolated sliver is "RSI entered 30-32 and did NOT continue below 30",
+    #: i.e. the dips that FAILED: an adversely-selected subset, not the object
+    #: being changed. If sub-cells do not sum to the union, the sliver carries
+    #: a selection effect. Era unchanged (entry-bar notch, the (hc) precedent).
+    RSI_MAX = 32.0
     #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
     #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
     #: carrier whose signals dict happens to carry rsi/uptrend for OTHER

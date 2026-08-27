@@ -156,7 +156,15 @@ def test_the_oversold_threshold_is_genuinely_DEEP():
     assert sig["uptrend"] is False, "fixture must be outside an uptrend"
     assert 40 < sig["rsi"] < 65, "fixture must be a MILD reading, not a deep one"
     assert sig["enter"] is None, "a mild dip is not this book's cell"
-    assert s.RSI_MAX <= 30, "an entry bar above 30 is no longer 'deep oversold'"
+    # [2026-08-27 (un)] ceiling 30 -> 32, and it moves ONLY as far as the tape
+    # was measured. `rsi<32` reads +0.111%/trade / cluster-t +2.44 / both
+    # halves positive / trailing +0.172% over 460d on her own universe
+    # (STUDY_MUM_PARAMS_2026-08-27), against +0.075% / +1.47 at the old bar.
+    # The GUARD'S PURPOSE IS UNCHANGED and still bites: this fixture is a mild
+    # rsi 40-65 reading and must still be refused, so "widen to 95" — buy
+    # anything falling — fails here exactly as before. The number tracks the
+    # measurement; it is not a dial to be turned when a cell looks quiet.
+    assert s.RSI_MAX <= 32, "an entry bar above 32 is no longer 'deep oversold'"
 
 
 def test_no_exit_signal_the_bracket_is_the_rule():
