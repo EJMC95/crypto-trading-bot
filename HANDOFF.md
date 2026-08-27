@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-28 08:22 Sydney (22:22Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-28 09:17 Sydney (23:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,14 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (56 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
+## Shipped today (62 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vd), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
 
+- `aa7e0ed` The recorded cost gets its first consumer: carry publishes it beside the proxy that stands in for it (vd)
+- `10b05c4` [deploy-live-mum] Both arms to 36 — Eamon's call; shipped as the default so they pair by construction (vd)
+- `0934efc` [deploy-live-mum] Mum's bar returns to its measured peak 36->32: supply is fixed by slots+universe, so the bar no longer has to carry that job (vd)
+- `659697e` The study hardcoded mum's RSI bar and a sibling session moved it 32->36 under a live book — read it from the carrier (vd)
+- `855557e` [deploy-live-mum] Mum's supply: the CAP was binding, not the market count — 4->12 slots + 13->40 crypto, shipped together because neither works alone (vd)
+- `e4ee899` Regenerate HANDOFF — I11's regenerate-last half (vn)
 - `d1386e7` Record the 8.2h georgia outage in (vn) — a transient venue 403 killed a real-money book and nothing paged (vn)
 - `e385a99` Record (vn), and acknowledge the georgia recurrence with a reason and an owner (vn)
 - `263b029` [deploy-live] Georgia's lockout could not be tuned, and the taker goes to 8 (vn)
