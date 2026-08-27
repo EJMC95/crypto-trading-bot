@@ -65,6 +65,26 @@ _sse = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_sse)
 
 DAYS = 180
+
+#: THE BAR THE BOOK ACTUALLY RUNS — read from the carrier, never retyped.
+#:
+#: [28-Aug (vd)] This file hardcoded `32.0` at every call site, and on 27-Aug a
+#: concurrent session moved mum's bar to `MUM_RSI_MAX` defaulting to **36.0**
+#: ((ve), Eamon's call, shipped knowing 36 is past the measured peak). Every
+#: number this study produced for a day therefore described a book the fleet
+#: was no longer running — and the gap is not cosmetic: at 12 slots over the
+#: top-40, bar 32 reads +0.202%/trade (t=3.21) and bar 36 reads **+0.026%
+#: (t=0.47)**. A retyped constant is a constant that drifts, and this one
+#: drifted under a live real-money book inside 24 hours.
+def live_bar():
+    try:
+        import lighter_family_bot as _fam
+        for s in _fam.STRATEGIES:
+            if s.bot == "freqtrade-mum":
+                return float(s.RSI_MAX)
+    except Exception:                                       # noqa: BLE001
+        pass
+    return 36.0                     # the shipped default, not a guess
 #: Her LIVE bracket, read off the published row rather than retyped from prose:
 #: policy.roi {0:0.02, 240:0.016, 480:0.012, 720:0.008, 1080:0.004, 1440:0.0},
 #: policy.stoploss -0.04. The ladder is (minutes_held, min_profit_to_exit).
@@ -229,10 +249,11 @@ def main():
               f"{win:>7.0f}  " + " ".join(f"{k}={v}" for k, v in top))
 
     # WHICH TERM BINDS — the question an RSI sweep cannot answer about itself.
-    print("\nWHICH TERM BLOCKS ENTRY (bar-level, at the shipped RSI_MAX=32):")
+    print(f"\nWHICH TERM BLOCKS ENTRY (bar-level, at the SHIPPED "
+          f"RSI_MAX={live_bar():g} — read from the carrier, not retyped):")
     tot = {"rsi": 0, "trend": 0, "both": 0}
     for sym, bars in tape.items():
-        _e, b = episodes(bars, 32.0, True)
+        _e, b = episodes(bars, live_bar(), True)
         for k in tot:
             tot[k] += b[k]
     n = sum(tot.values()) or 1
