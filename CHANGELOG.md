@@ -146,6 +146,46 @@ every freqtrade flat close look like a halt event and **deleted real trades**.
 `record.events` is always present (0 on a clean book), so the drop from 15 to 6
 is EXPLAINED rather than being a second confusion in place of the first.
 
+### [SAME DAY, AFTER THE DEPLOY] THE GAUGE REACHED THE SHADOW AND NOT THE MONEY
+
+Verified in the live payload an hour after the deploy landed
+(`extra.build 631d2e425b73` / 17 on all three live rows, byte-equal to the
+local prediction): 👩 mum's **shadow** published `outside_uptrend_n 5 ·
+both_terms_n 0` against `rsi_min 35.3 < rsi_bar 36.0` — **the RSI half is MET
+and the TREND half is what binds her, measured for the first time** — and her
+**LIVE row published neither.** The gauge went into `lighter_family_bot`; her
+live arm runs `lighter_avo_live_bot`. So it reached the $1,000 paper book and
+not the $300 of real money it was built for.
+
+**That is `(vh)`'s class recurring inside the wave that named it** — *find a
+plausible mechanism, verify it in ONE file, ship without asking which code path
+the affected book actually runs.* Ported to the live host, captured from the
+same `sig` in the same pass, `uptrend` admitted only as a real bool (a `None`
+coerced to False publishes a fabricated PASS on the exact term a widening is
+argued from). Pinned by a test that asserts BOTH arms gauge it, so the next
+host cannot ship without it.
+
+**`days_to_gate_obs` is NOT nulled, and the measurement decided it.** The plan
+said publish `null` on a zero-close book; `audit_book_spend` treats
+`spend.get(f) is None` as a MISSING FIELD and fails, so nulling it reddens the
+build on all three real-money rows for a reporting improvement. The BASIS is
+published beside the number instead — `days_to_gate_basis: birth_window` with
+`closes_obs: 0` — so the floor is legible as a floor rather than read as a
+trajectory. Whether the guard should REFUSE that state is Eamon's call, not a
+side effect of a telemetry pass.
+
+**AND MY OWN TEST WAS VACUOUS, found by mutation and not by reading.** The
+gate assertion was `"UPTREND_BLOCKS" in src` — satisfied by the name appearing
+in the COMMENT that explains the gate, so replacing the real
+`if getattr(strategy, "UPTREND_BLOCKS", False):` with `if True:` left it GREEN.
+That is `(uk)`'s defect — *"a substring the comment also carried"* — reproduced
+hours after the entry recording it. Now an AST walk requiring the counters to
+be built INSIDE the `If` whose test names the flag. A second apparent survivor
+was a mutation that never applied (a wrong indentation guess); the round now
+asserts the edit landed before scoring it, and carries a no-op control that
+must stay GREEN so the tests are not merely failing on any edit. 4 real
+mutations, all RED.
+
 ### PUBLISH-ONLY, ASSERTED RATHER THAN CLAIMED
 
 Nothing a book trades changed anywhere in this wave: no entry rule, exit rule,
