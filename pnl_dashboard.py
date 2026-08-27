@@ -2595,6 +2595,41 @@ def fetch_open_trades():
 _ENRICH_CACHE = {"ts": 0.0, "data": {}}
 
 
+def fetch_golive_dd():
+    """{bot: {"pct": float|None, "basis": str|None, "why": str|None}} — the
+    go-live drawdown bar, read off the grader's own `golive-readiness` payload.
+
+    [(vg)] THE GRADER IS THE OWNER. `scripts/golive_readiness.py` publishes
+    `max_dd_pct` per book as the WORSE of realised and mark-to-market (I9,
+    (ia)), already a PERCENT (13.1 means 13.1%) — so it must never be passed
+    through `pct()`, which multiplies by 100 and renders +1310.00%. Measured
+    on the live payload: 14 graded books all carry it; the 6 `below_floor`
+    books carry `why_absent` instead ("no closed trades in the ledger"), and
+    the union covers every rendered row.
+
+    A book the grader cannot speak for returns `pct=None` WITH its `why`, so
+    the card can say UNKNOWN rather than omit the line. Absent entirely means
+    the grader is dark — also unknown, never a plausible zero, because `0.0%`
+    drawdown is a real everyday reading on this fleet and would be
+    byte-identical to a dead grader.
+    """
+    st = fetch_states(["golive-readiness"]).get("golive-readiness") or {}
+    out = {}
+    for section in ("books", "below_floor"):
+        for bot, rec in (st.get(section) or {}).items():
+            if not isinstance(rec, dict):
+                continue
+            pct_v = rec.get("max_dd_pct")
+            try:
+                pct_v = float(pct_v) if pct_v is not None else None
+            except (TypeError, ValueError):
+                pct_v = None
+            out[bot] = {"pct": pct_v,
+                        "basis": rec.get("maxdd_basis"),
+                        "why": rec.get("why_absent") or rec.get("mtm_why")}
+    return out
+
+
 def fetch_ledger_enrich():
     """[2026-07-07 UNIFORM CARDS] One cached ledger pass so EVERY bot's card
     carries the same fields regardless of what its publisher sends:
@@ -2633,11 +2668,29 @@ def fetch_ledger_enrich():
                              "seen_at) FROM paper_trades")
             if parts:
                 union = " UNION ALL ".join(parts)
+                # [(vg)] 7d/30d P&L and best/worst join this SAME aggregate.
+                # `card()` read `row["pnl_weekly"]`, `row["pnl_monthly"]`,
+                # `row["best_trade"]` and `row["worst_trade"]` off a bot_pnl row
+                # for weeks — four columns `bot_pnl` HAS NEVER HAD (its 12 are
+                # bot, closed_trades, equity, extra, losses, open_trades,
+                # pnl_abs, pnl_daily, pnl_pct, status, updated_at, wins), each
+                # behind an `is not None` guard, so two card sections were
+                # unreachable dead code on every bot forever. They are the
+                # read-side residue of the 28-Jul doc-truth cleanup, which
+                # struck those exact five names from `publish()`'s docs and
+                # fixed the publisher and the docs but not the consumer.
+                # Derived here from the ledger this pass already scans, so the
+                # numbers are REALISED closes — the same basis as `record`.
                 cur.execute(
                     f"WITH t AS ({union}) "
                     "SELECT bot, COUNT(*) n, SUM((pnl>0)::int) w, SUM(pnl) total, "
                     "COALESCE(SUM(pnl) FILTER (WHERE close_ts >= date_trunc('day', now())),0) today_closed, "
-                    "COUNT(*) FILTER (WHERE close_ts >= date_trunc('day', now())) today_n "
+                    "COUNT(*) FILTER (WHERE close_ts >= date_trunc('day', now())) today_n, "
+                    "SUM(pnl) FILTER (WHERE close_ts >= now() - interval '7 days') pnl_7d, "
+                    "COUNT(*) FILTER (WHERE close_ts >= now() - interval '7 days') n_7d, "
+                    "SUM(pnl) FILTER (WHERE close_ts >= now() - interval '30 days') pnl_30d, "
+                    "COUNT(*) FILTER (WHERE close_ts >= now() - interval '30 days') n_30d, "
+                    "MAX(pnl) best, MIN(pnl) worst "
                     "FROM t GROUP BY bot")
                 for r in cur.fetchall():
                     b = out.setdefault(r["bot"], {})
@@ -2646,6 +2699,16 @@ def fetch_ledger_enrich():
                                    "total": round(float(r["total"] or 0), 2)}
                     b["today_closed"] = round(float(r["today_closed"] or 0), 2)
                     b["today_n"] = int(r["today_n"] or 0)
+
+                    def _num(v):
+                        return round(float(v), 2) if v is not None else None
+                    # n_* rides along so a window with NO closes stays
+                    # distinguishable from one that closed exactly flat — the
+                    # (hf)/I1 shape at the reporting layer, and the whole reason
+                    # this card is being repaired in the first place.
+                    b["pnl_7d"], b["n_7d"] = _num(r["pnl_7d"]), int(r["n_7d"] or 0)
+                    b["pnl_30d"], b["n_30d"] = _num(r["pnl_30d"]), int(r["n_30d"] or 0)
+                    b["best_trade"], b["worst_trade"] = _num(r["best"]), _num(r["worst"])
                 cur.execute(
                     f"WITH t AS ({union}) "
                     "SELECT DISTINCT ON (bot) bot, pair, pnl, reason, close_ts "
@@ -2859,23 +2922,49 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
         pnl_daily = en.get("today_equity_delta")
         if pnl_daily is None and en.get("today_n"):
             pnl_daily = en.get("today_closed")
-    pnl_weekly  = row.get("pnl_weekly")
-    pnl_monthly = row.get("pnl_monthly")
+    # [(vg)] FROM THE LEDGER PASS, NOT FROM `row`. These read
+    # `row["pnl_weekly"]`/`row["pnl_monthly"]` — bot_pnl columns that do not
+    # exist — so both lines were unreachable on every bot, forever. REALISED
+    # closes in the window, the same basis as the record line below.
+    pnl_weekly  = en.get("pnl_7d")
+    pnl_monthly = en.get("pnl_30d")
     if pnl_daily is not None:
         rows.append(f'<div class="row"><span>Today P&amp;L (UTC)</span>'
                     f'<b class="{cls(pnl_daily)}">{money(pnl_daily)}</b></div>')
+    # `P&amp;L`, not `P&L` — a raw ampersand is invalid HTML, and it survived
+    # here precisely because these two lines have never rendered: unreachable
+    # code is also unexercised code. The neighbouring "Today P&amp;L" line,
+    # which does render, had it right all along.
     if pnl_weekly is not None:
-        rows.append(f'<div class="row"><span>7d P&L</span>'
+        rows.append(f'<div class="row"><span>7d P&amp;L</span>'
                     f'<b class="{cls(pnl_weekly)}">{money(pnl_weekly)}</b></div>')
     if pnl_monthly is not None:
-        rows.append(f'<div class="row"><span>30d P&L</span>'
+        rows.append(f'<div class="row"><span>30d P&amp;L</span>'
                     f'<b class="{cls(pnl_monthly)}">{money(pnl_monthly)}</b></div>')
-    max_dd = row.get("max_drawdown")
-    if max_dd is not None:
+    # [(vg)] MAX DRAWDOWN IS A GO-LIVE BAR AND IT ALWAYS RENDERS NOW.
+    # It read `row["max_drawdown"]`, a bot_pnl column that has never existed,
+    # so the line was silently absent on every book — and absent is
+    # byte-identical to "this book has no drawdown", on the one number that
+    # governs whether real money is allowed. Sourced from the grader that owns
+    # it (`golive_dd`, the WORSE of realised and MTM); UNKNOWN is stated with
+    # the grader's own reason rather than dropped, because a missing row is
+    # exactly the failure being repaired here.
+    # UNITS: `max_dd_pct` is ALREADY a percent — `pct()` would render 13.1 as
+    # +1310.00%. Formatted directly, and pinned by a test.
+    _dd = en.get("golive_dd")
+    if _dd and _dd.get("pct") is not None:
+        _basis = _dd.get("basis")
+        _bl = f' title="worse of realised and mark-to-market; basis: {_basis}"' \
+            if _basis else ""
         rows.append(f'<div class="row"><span>Max Drawdown</span>'
-                    f'<b style="color:#f85149">{pct(max_dd)}</b></div>')
-    best_trade  = row.get("best_trade")
-    worst_trade = row.get("worst_trade")
+                    f'<b style="color:#f85149"{_bl}>{_dd["pct"]:.1f}%</b></div>')
+    else:
+        _why = (_dd or {}).get("why") or "go-live grader is dark or stale"
+        rows.append(f'<div class="row"><span>Max Drawdown</span>'
+                    f'<b style="color:#8b949e" title="{html.escape(str(_why))}">'
+                    f'unknown</b></div>')
+    best_trade  = en.get("best_trade")
+    worst_trade = en.get("worst_trade")
     if best_trade is not None or worst_trade is not None:
         rows.append(f'<div class="row"><span>Best / Worst trade</span>'
                     f'<b>{money(best_trade)} / {money(worst_trade)}</b></div>')
@@ -2981,6 +3070,20 @@ def render():
         enrich = fetch_ledger_enrich()
     except Exception:  # noqa: BLE001
         enrich = {}
+    # [(vg)] MAX DRAWDOWN REACHES THE CARD. It is one of the six GO-LIVE BARS
+    # and the card read it off `row["max_drawdown"]` — a bot_pnl column that
+    # does not exist — so the line silently never rendered and a reader could
+    # not tell "this book has no drawdown" from "this number was never
+    # computed". IMPORTED, never recomputed: `scripts/golive_readiness.py`
+    # owns this number (the WORSE of realised and MTM, per I9) and a second
+    # computation here would be a second rule ((hj)). The payload was already
+    # fetched twice per render for other cards; it just never reached this
+    # scope.
+    try:
+        for _bot, _dd in fetch_golive_dd().items():
+            enrich.setdefault(_bot, {})["golive_dd"] = _dd
+    except Exception:  # noqa: BLE001
+        pass          # a dark grader leaves `golive_dd` ABSENT -> renders unknown
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
     # [2026-07-30] 🚦 the go-live grader sits directly after the radar: the
