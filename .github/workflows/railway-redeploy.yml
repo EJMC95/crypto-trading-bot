@@ -296,7 +296,11 @@ jobs:
             # A change here that does not deploy is a blind spot on real money.
             # [2026-07-17] This service had NO deploy rule at all; market_context.py
             # had only ever shipped via a manual `railway up`.
-            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$|requirements\.txt$)'; then
+            # [2026-08-27 (uk)] fleet_bus.py joins this image's trigger set:
+            # the divergence check now reads `live_arm_retired` from it, so a
+            # retirement declared in fleet_bus that does not reach THIS service
+            # leaves the check firing on a corpse — which is the bug (uk) fixed.
+            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|fleet_bus\.py$|venues/|cleanup_legacy_bots\.py$|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}market-context"
             fi
             # [2026-07-30] THE SHADOW BOOKS. Each ships its own image, and each

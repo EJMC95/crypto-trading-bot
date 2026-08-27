@@ -20,6 +20,7 @@ Postgres. Shipped in Dockerfile.freqtrade next to bot_pnl_store.py (CWD
 /freqtrade), so strategies use the same `import` mechanics that already
 work for the market-pulse reads.
 """
+import math
 import os
 
 from datetime import datetime, timedelta, timezone
@@ -890,9 +891,38 @@ def era_supports_expansion(row):
     otherwise read as evidence. `float('nan') > 0.0` is already False, so NaN
     needs no special case; None, a missing key and every junk type land on
     "no expansion" too.
+
+    [2026-08-26] ...AND `float('inf')` DID NEED ONE. `inf > 0.0` is True, so
+    this returned True and GRANTED the expansion the paragraph above promises to
+    decline — the one shape surprise that walked straight through the guard
+    written for shape surprises. `nan` was fine (`nan > 0.0` is False) and
+    `-inf` was fine; only the widening direction leaked, which is the direction
+    that matters here.
+
+    HONEST SCOPE, so nobody over-reads it: `bot_pnl_store.json_safe` nulls
+    non-finite floats at the write boundary (I5), so a PUBLISHED `inf` is
+    unreachable and no consumer can hold one today. This is defence-in-depth on
+    the organ's own IN-PROCESS path — `set_era_twin` computes `scale_effective`
+    from the raw float before publish, so an in-process `inf` would publish
+    `scale_effective` beside `claim_era: null`, an internally contradictory row.
+    **Not a live bug; a contract the code did not keep.**
+
+    `math.isfinite` is chosen for INTENT — a non-finite value is not a
+    measurement — and NOT because it catches more: `ce == float('inf')` is
+    behaviourally identical here, since `-inf > 0.0` and `nan > 0.0` are
+    already False. That was verified by a mutation, which SURVIVED; the claim
+    that `isfinite` also rescues `-inf` was wrong and is recorded here rather
+    than left standing. What the tests pin is that `inf` DECLINES, which is the
+    property that matters.
+    Note `import math` had to be ADDED to this module — it had none, and
+    without it the NameError is swallowed by `allocation_scale`'s blanket
+    `except`, silently returning None for every book and disabling the organ
+    fleet-wide. A patch that looks like one line is two.
     """
     ce = row.get("claim_era")
     if isinstance(ce, bool) or not isinstance(ce, (int, float)):
+        return False
+    if not math.isfinite(ce):
         return False
     return ce > 0.0
 

@@ -40,18 +40,35 @@ THE TEXTBOOK, AS RULES:
        fail-OPEN on a dark feed, so the measured baseline rule above is the
        floor, never hostage to this refinement. Stated, not buried (I19).
   5. Margin prudence (ch. 2): position notional is bounded and fixed —
-       $80 × 4 slots, no leverage stacking, no top-ups.
+       $80 × 10 slots, no leverage stacking, no top-ups.
 
-THE SUPPLY, NAMED (I20 — measured before minting, 13-Aug):
-  TRUE |apr| in [~7.8%, 20%) × 24h volume in [$2M, $10M), crypto only.
-  This cell COMPLETES THE FLEET'S VOLUME TILING at the mid-band aprs:
-    🛢️ Garrett  [0.1M, 2M)   @ >=5%  — thin tier (its band excludes this)
-    🧮 Hull     [2M, 10M)    @ [7.8%, 20%)  — THIS BOOK
+THE SUPPLY, NAMED (I20 — measured before minting, 13-Aug; the floor CORRECTED
+IN PLACE 26-Aug per I12, because the line below described a band this book no
+longer trades):
+  TRUE |apr| in [~7.8%, 20%) × 24h volume in [$1M, $10M), crypto only.
+  This cell sits inside the fleet's volume tiling at the mid-band aprs:
+    🛢️ Garrett  [0.1M, 2M)   @ >=5%  — thin tier
+    🧮 Hull     [1M, 10M)    @ [7.8%, 20%)  — THIS BOOK
     💸 Farmer   [10M, inf)   @ >=5%  — deep tier (its floor excludes this)
-  The 20% CEILING hands everything above it to the carry cohort (🌾 carry,
-  🎸 Barnesy's carry sleeve, 🏦 Rich Dad all enter at >=20% TRUE / $2M) —
-  half-open, so no coin is ever two books' supply at the boundary. ZERO
-  living rivals admit this cell. Live occupancy at authoring: LIT, ZEC,
+  The tiling against 💸 the Farmer is still exact and half-open. Against 🛢️
+  Garrett it is NOT any more: since 26-Aug this book's floor reaches into
+  Garrett's band and the two contend for [$1M, $2M) × [7.82%, 20%) TRUE. That
+  is a DECLARED overlap, not a discovered one — see `HULL_BAND_PAIR` below and
+  the I20 note above `MIN_VOL`, and it is owed an entry in
+  `audit_book_overlap.KNOWN_CELL_COLLISIONS` once the new gate publishes.
+  The 20% CEILING hands everything above it to the carry cohort (🌾 carry and
+  🏦 Rich Dad both enter at >=20% TRUE; ~~🎸 Barnesy's carry sleeve~~ RETIRED
+  17-Aug (pm), and carry's own floor is $1M since (px) with a measured-depth
+  fast path below that (sk) — corrected in place 26-Aug per I12, because the
+  old "$2M" read as a volume separation this book must not rely on) —
+  half-open on the APR axis, which is what actually keeps this book and the
+  carry cohort apart: verified against `audit_book_overlap.cells_collide`
+  itself, hull x carry does NOT collide at any volume.
+  ~~ZERO living rivals admit this cell.~~ **[26-Aug — that is no longer true
+  and the sentence is corrected rather than deleted, because it is exactly
+  what the floor move cost: 🛢️ Garrett admits the [$1M, $2M) sliver of it.
+  ONE rival, on a minority of each book's supply, and it is the paragraph
+  four lines up.]** Live occupancy at authoring: LIT, ZEC,
   PUMP (the venue's ~10.5% base-rate coins in the mid tier — supply present
   in ~100% of measured hours, vs the carry cell's 6.6%).
 
@@ -136,6 +153,17 @@ Lighter's own settled funding series, 18-coin liquid set):
     **Measured 16-Aug: 6.0 closes/30d, so ~5 months to 30 closes from a
     standing start. Unlike 🧙 Schwager the binding bar here is CLOSES, not
     `t` — this book needs TIME, not a better statistic.**
+    **[26-Aug — CORRECTED IN PLACE per I12: "it needs TIME" was the wrong
+    diagnosis and waiting would not have fixed it.** The live book produced
+    **ZERO closes in 13 days** while holding 6 of 6 slots with $480 deployed —
+    not stalled at the entry, stalled at the EXIT. `EXIT_APR` (3.5%) sits
+    BELOW Lighter's crypto resting default of 10.512% TRUE and every held coin
+    sat exactly AT that pin, so `decay_paid` and `liability_flip` are both
+    unreachable by construction and `max_hold` (504h) is the only exit that
+    can fire. 6.0 closes/30d was a REPLAY number from a study whose coins
+    moved off the pin; the live book's rate is bounded by `cap / max_hold`.
+    That is what makes the cap and the volume floor ONE knob here, and it is
+    why they moved together — see `HULL_BAND_PAIR` below.]**
   * the grid is a PLATEAU, not a lucky cell: every persist>=24h × grace>=6h
     × floor {7.8%, 10%} cell is positive; every grace=1h cell is negative.
   * survivorship caveat: the universe is today's liquid set; historical
@@ -203,7 +231,74 @@ CLIP_USD = float(os.environ.get("HULL_CLIP_USD", "80"))
 #: delta-neutral MODELLED (P&L is accrued - fees, no price term), and 6 x $80
 #: = $480 of a $1,000 shadow book stays inside the same gross envelope its
 #: siblings run. The entry gate, band and exits are untouched.
-MAX_POSITIONS = int(os.environ.get("HULL_MAX_POSITIONS", "6"))
+#:
+#: ==========================================================================
+#: [2026-08-26] 6 -> 10, AND THE VOLUME FLOOR 2e6 -> 1e6, **AS A PAIR** —
+#: NEVER EITHER ALONE. `HULL_BAND_PAIR` below is the executable form of that
+#: sentence; `tests/autonomy/test_hull_band_widen.py` reddens if one reverts
+#: without the other, because each half ALONE is measurably worse than doing
+#: nothing (the numbers are three paragraphs down).
+#:
+#: THE DIAGNOSIS FIRST, because it is the real finding and it is NOT what the
+#: (ny) note above assumed. This book has ZERO closes in 13 days and it is not
+#: stuck: 6/6 slots filled, $480 deployed, the entry gate working exactly as
+#: designed. **Its EXITS are structurally unreachable.** `EXIT_APR` = 0.035
+#: sits BELOW Lighter's crypto RESTING DEFAULT of 0.10512 TRUE, and all six
+#: held coins sit at exactly 10.512% — the pin. A rate PINNED at the venue
+#: default cannot decay under 3.5% and cannot flip sign, so `decay_paid` and
+#: `liability_flip` are both unreachable by construction and `max_hold`
+#: (504h = 21 days) is the ONLY exit that can ever fire. Its sibling 🌾 carry
+#: closes 104 times over the same tape because carry's `EXIT_APR` is 0.15,
+#: ABOVE the pin — the same rule, on the other side of the same constant.
+#: The band arithmetic says it too: this book's bar catches **4.2%** of the
+#: venue's books, carry's catches **88.2%**.
+#:
+#: SO THE CAP AND THE FLOOR ARE ONE KNOB HERE. With `max_hold` as the only
+#: live exit, a slot is occupied for up to 21 days, and CLOSES/30d is
+#: therefore `min(supply, cap) / hold` — bounded by whichever of supply and
+#: cap is SMALLER. At the shipped tier only 5-6 crypto books sit in
+#: [$2M,$10M), so supply and cap are at PARITY and the cap alone is provably
+#: INERT: replayed at cap 6/8/9/10/12/14/16 the shipped tier gives
+#: BYTE-IDENTICAL ledgers. And the floor alone, at cap 6, is a STEP BACK
+#: (+$1.90 -> +$1.66 per 30d) — more supply competing for the same six slots
+#: displaces better-paying coins with worse ones. Only the pair moves.
+#:
+#: MEASURED (funding tape, both cells replayed through this book's own rules):
+#:   shipped  [2M,10M) x cap 6 :  6.5 closes/30d, mean +0.1507, t=+2.18,
+#:                                I16 lower bound +0.062, $ALL/30d +$1.90
+#:   proposed [1M,10M) x cap 10: 12.0 closes/30d (+85%), mean +0.1393 (-8%),
+#:                                t=+2.58, LB +0.070, $ALL/30d +$2.86 (+51%),
+#:                                both halves positive (+1.80/+1.55)
+#: I19 PRICE, STATED: it COSTS 8% of per-trade expectancy and BUYS 51% more
+#: total dollars. That is not denominator shrinkage — the (hl) failure mode is
+#: a trade count that rises while total dollars fall or hold; here TOTAL
+#: DOLLARS RISE, and the hold is untouched (no exit was shortened).
+#: PLATEAU, not a grid edge: cap 10/12/14 all read >= +$2.86 with a flat mean
+#: and cap 12 peaks at +$3.36. **10 is chosen over the peak on purpose** — it
+#: keeps gross at 10 x $80 = $800 of a $1,000 book rather than $960, so the
+#: book still cannot deploy more than it holds.
+#: DECIDABILITY (I17, the reason this is worth doing at all): 30 closes moves
+#: from ~mid-Jan-2027 to ~mid-Nov-2026.
+#: DRAWDOWN is not a concern and here is the arithmetic rather than the
+#: assurance: delta-neutral MODELLED, so the worst case is every slot paying
+#: the full modelled round trip and accruing nothing — 10 x $0.24 = $2.40 =
+#: **0.24%** of the book against a 15% bar.
+#: ENTRY-ONLY: `carry_exit` takes no volume argument (structurally — pinned by
+#: the test), so the six OPEN positions are untouched, nothing is force-closed
+#: and no (hc) era resets: this is capacity + supply, i.e. ordinary tuning.
+#: ==========================================================================
+#:
+#: ONE DECLARATION FOR BOTH HALVES. The two defaults are DERIVED from this
+#: tuple rather than written twice, so "the floor and the cap move together"
+#: is a property of the code and not a sentence in a comment somebody has to
+#: remember — the same reason `(sa)`'s confirm window is derived from the
+#: study's own facts instead of typed as a literal. A future session that
+#: wants to walk one half back has to edit this tuple, which moves both, and
+#: `tests/autonomy/test_hull_band_widen.py` then names the refused half and
+#: its number. `(min_vol_usd, max_positions)`.
+HULL_BAND_PAIR = (1e6, 10)
+MAX_POSITIONS = int(os.environ.get("HULL_MAX_POSITIONS",
+                                   str(HULL_BAND_PAIR[1])))
 
 # ---- rule 2: the no-arbitrage band ------------------------------------------
 # modelled friction, declared: 15bps per side on both legs of the modelled
@@ -221,8 +316,24 @@ APR_LO_EFF = RT_COST_FRAC * HOURS_PER_YEAR / PAYBACK_MAX_H
 APR_HI = float(os.environ.get("HULL_APR_HI", "0.20"))
 EXIT_APR = float(os.environ.get("HULL_EXIT_APR", "0.035"))
 
-# ---- the volume TIER [2M, 10M): completes Garrett|Hull|Farmer ---------------
-MIN_VOL = float(os.environ.get("HULL_MIN_VOL", "2e6"))
+# ---- the volume TIER [1M, 10M): completes Garrett|Hull|Farmer ---------------
+# [2026-08-26] The floor moved 2e6 -> 1e6. It is the OTHER half of the pair
+# declared at `HULL_BAND_PAIR` above — read that block for the diagnosis (the
+# exits are unreachable under the venue's resting pin, so `max_hold` is the
+# only live exit and slots are the throughput), the measurement (+85% closes,
+# -8% mean, +51% total dollars, both halves positive) and the two REFUSED
+# halves with their own numbers. The ceiling does NOT move: [.., 10M) is 💸
+# the Farmer's edge and the tiling stays half-open (I20).
+#
+# THE I20 CONSEQUENCE, DECLARED rather than discovered by the guard: the new
+# floor reaches DOWN into 🛢️ Garrett's published band [0.1M, 2M) @ >=5% TRUE,
+# so Hull x Garrett now contend for [1M, 2M) x [7.82%, 20%) TRUE — a
+# populated sliver of each book's supply, not the whole of either. That is a
+# NEW declared cell collision for `audit_book_overlap.KNOWN_CELL_COLLISIONS`
+# once this row publishes its new `caps.min_vol`; the audit reads the LIVE
+# payload, so it cannot fire before the deploy and must not be silenced by
+# pre-declaring against a gate that is not yet published.
+MIN_VOL = float(os.environ.get("HULL_MIN_VOL", str(HULL_BAND_PAIR[0])))
 MAX_VOL = float(os.environ.get("HULL_MAX_VOL", "10e6"))   # half-open [lo, hi)
 
 # ---- rule 3: basis noise tolerances (the measured cells) --------------------
@@ -908,14 +1019,24 @@ def _selftest():
         "a dark basis feed must ADMIT — the measured baseline is the floor"
 
     # 3) entry gates + ordering. rate 1e-4 -> 10.95% TRUE (in band);
-    #    2e-4 -> 21.9% (above band); 5e-5 -> 5.5% (below); vols tile.
-    fund = {"A": {"rate": 1e-4, "vol": 5e6},        # eligible
-            "B": {"rate": -1.2e-4, "vol": 3e6},     # eligible, hotter
-            "C": {"rate": 1e-4, "vol": 1e6},        # thin (< $2M)
-            "D": {"rate": 1e-4, "vol": 20e6},       # deep (the Farmer's tier)
-            "E": {"rate": 2e-4, "vol": 5e6},        # above band (carry's)
-            "G": {"rate": 5e-5, "vol": 5e6},        # below band
-            "N": {"rate": 1e-4, "vol": 5e6}}        # noncrypto (screened)
+    #    2e-4 -> 21.9% (above band); 5e-5 -> 5.5% (below).
+    #    THE VOLUMES ARE DERIVED FROM THE SHIPPED BAND, not typed. This
+    #    fixture read `"C": {"vol": 1e6}  # thin (< $2M)` until 26-Aug, when
+    #    the floor moved to $1M and turned that coin ELIGIBLE while its
+    #    comment still called it thin — a retyped constant is a constant that
+    #    drifts, and this one drifted straight into the census PARTITION this
+    #    selftest exists to pin. Deriving them makes the next band move
+    #    re-classify the fixture with the book instead of against it.
+    _mid = (MIN_VOL + MAX_VOL) / 2.0
+    fund = {"A": {"rate": 1e-4, "vol": _mid},         # eligible
+            "B": {"rate": -1.2e-4, "vol": MIN_VOL},   # eligible, hotter — and
+                                                      # AT the floor, which is
+                                                      # CLOSED (`vol < min`)
+            "C": {"rate": 1e-4, "vol": MIN_VOL / 2.0},  # thin, below the floor
+            "D": {"rate": 1e-4, "vol": MAX_VOL * 2.0},  # deep, the Farmer's
+            "E": {"rate": 2e-4, "vol": _mid},         # above band (carry's)
+            "G": {"rate": 5e-5, "vol": _mid},         # below band
+            "N": {"rate": 1e-4, "vol": _mid}}         # noncrypto (screened)
     cands = candidates(fund, set(), old, t0, class_ok=lambda c: c != "N")
     assert [c for c, _f, _a in cands] == ["B", "A"], cands
     assert candidates(fund, {"A", "B"}, old, t0,
@@ -1010,6 +1131,37 @@ def _selftest():
     assert H == 3 * 365
     assert abs(RT_COST_FRAC - 0.003) < 1e-12
     assert MIN_VOL < MAX_VOL, "the volume band must be a real band"
+    # [26-Aug] the floor and the cap are ONE decision (see HULL_BAND_PAIR):
+    # each half alone was measured WORSE than shipping neither — the floor
+    # alone +$1.90 -> +$1.66/30d, the cap alone byte-identical (inert).
+    #
+    # WHAT THIS ASSERT ACTUALLY CATCHES, corrected in place per I12 after a
+    # mutation round measured it — it read "pins that the shipped defaults are
+    # still DERIVED from the one tuple", which overstates in the direction that
+    # matters. `MIN_VOL`/`MAX_POSITIONS` are DERIVED FROM the tuple, so
+    # comparing them back to it is TRUE BY CONSTRUCTION for ANY tuple:
+    # mutating `HULL_BAND_PAIR` to (2e6, 10) or (1e6, 6) — a half-revert, the
+    # exact thing the sentence claimed — leaves this selftest GREEN. Measured,
+    # not reasoned: 3 of 6 mutations survived this selector.
+    # It catches ONE real thing, and that thing is worth keeping: a
+    # de-derivation that CHANGES a value (`str(HULL_BAND_PAIR[0])` -> "2e6"),
+    # i.e. the half-revert arriving through one `os.environ.get` default.
+    # THE SHIPPED VALUES ARE PINNED IN `tests/autonomy/test_hull_band_widen.py`,
+    # which writes 1e6 and 10 out as literals precisely so it does not read the
+    # value it is pinning — that file kills the tuple edits, verified.
+    if not os.environ.get("HULL_MIN_VOL") \
+            and not os.environ.get("HULL_MAX_POSITIONS"):
+        assert (MIN_VOL, MAX_POSITIONS) == HULL_BAND_PAIR, \
+            "the volume floor and the position cap must move as a PAIR"
+    # NON-TAUTOLOGICAL, and the arithmetic that chose cap 10 over the measured
+    # peak of 12: whatever the tuple says, the book may not promise more gross
+    # than it holds. Catches an UPWARD cap edit here, in the container, where
+    # this selftest runs and pytest does not.
+    assert CLIP_USD * MAX_POSITIONS <= 0.80 * START_EQUITY, \
+        (f"{MAX_POSITIONS} x ${CLIP_USD:.0f} = "
+         f"${CLIP_USD * MAX_POSITIONS:.0f} exceeds 80% of a "
+         f"${START_EQUITY:.0f} book — cap 12 measured BETTER (+$3.36 vs "
+         "+$2.86/30d) and was refused for exactly this reason")
 
     # 11) a dark class screen fails OPEN
     global fleet_bus

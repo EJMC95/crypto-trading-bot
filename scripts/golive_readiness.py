@@ -990,6 +990,66 @@ def era_rows(bot, rows, parse=None, detail=False):
 CLUSTER_WINDOW_S = 60.0
 
 
+def cluster_se(values, keys):
+    """(se_cr, n_clusters, max_cluster) for the mean of `values` clustered by
+    `keys` — THE ONE OWNER OF THE ARITHMETIC. `(None, G, m)` on a shape this
+    estimator cannot judge.
+
+        SE_cr = sqrt( G/(G-1) * sum_g ( sum_{i in g} (x_i - xbar) )^2 ) / n
+
+    [2026-08-26] EXTRACTED, because the owner could only be reached through ONE
+    hard-coded cluster DEFINITION. `cluster_stats` builds its groups internally
+    by scanning timestamps against `CLUSTER_WINDOW_S`, so a study that needs to
+    cluster by coin, coin-day or entry-day had no way in and re-implemented the
+    estimator instead. Two did — `study_mum_supply_2026-08-26.py` and
+    `study_sniper_exit_shape_2026-08-20.py` — and their own docstrings say so
+    ("same estimator as golive_readiness.cluster_stats, generalised to an
+    arbitrary cluster key"). That is "A SECOND COPY OF A RULE IS A SECOND RULE"
+    arriving through a real gap in the interface rather than through
+    carelessness, which is why the fix is an entry point and not a scolding.
+
+    THEY HAD ALREADY DRIFTED, and it is the dangerous direction. MEASURED the
+    day this shipped, on a near-cancelling sample whose honest iid t is 1.94:
+
+        study_mum_supply copy    t_cluster = 2.38e+16
+        study_sniper_exit copy   t_cluster = 2.38e+16
+        this owner               t_cluster = None      <- fails CLOSED
+
+    Both copies reproduce the `(kg)` degenerate-t pathology (win 100%, t=6.1e15)
+    that the guard below was written to kill — a fix made once and left undone
+    in two places. Not contrived for this fleet either: the guard fires when a
+    cluster's demeaned values cancel, which is the DESIGN of a delta-neutral
+    basket. ⚖️ Counterweight closes ten hedged legs in one instant.
+
+    Fail-CLOSED on G < 2 (a single cluster has no between-cluster variation, so
+    any value would be invented) and on a near-zero `se_cr`, which is not
+    evidence of enormous significance but a shape this estimator cannot judge.
+    Absent means "not computable", never "fine".
+    """
+    try:
+        n = len(values)
+        if n < 2 or len(values) != len(keys):
+            return None, 0, 0
+        mean = sum(values) / n
+        sums, sizes = {}, {}
+        for x, k in zip(values, keys):
+            sums[k] = sums.get(k, 0.0) + (x - mean)
+            sizes[k] = sizes.get(k, 0) + 1
+        g = len(sums)
+        if g < 2:
+            return None, g, (max(sizes.values()) if sizes else 0)
+        meat = sum(v * v for v in sums.values())
+        se_cr = math.sqrt((g / (g - 1.0)) * meat) / n
+        var = sum((x - mean) ** 2 for x in values) / (n - 1)
+        se_iid = math.sqrt(var) / math.sqrt(n) if var > 0 else 0.0
+        # THE (kg) DEGENERACY GUARD, now in the ONE place every caller reaches.
+        if not (se_cr > 0) or (se_iid > 0 and se_cr < se_iid * 1e-6):
+            return None, g, max(sizes.values())
+        return se_cr, g, max(sizes.values())
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return None, 0, 0
+
+
 def cluster_stats(rows, mean, sd, n):
     """Cluster-robust view of `t`, keyed on batched CLOSES. Reported, never a
     bar — see the note in `stats`.
@@ -1030,11 +1090,15 @@ def cluster_stats(rows, mean, sd, n):
                 cur, cur_ts = [r[0]], ts
         if cur:
             groups.append(cur)
-        g = len(groups)
-        if g < 2:
+        # [2026-08-26] THE ARITHMETIC IS `cluster_se`'s, not a second copy —
+        # this function's job is the batched-close CLUSTER DEFINITION and
+        # nothing else. Flatten the groups it built into (value, key) pairs and
+        # hand them over, so a bug fixed there is fixed for every caller.
+        vals = [x for grp in groups for x in grp]
+        gkeys = [i for i, grp in enumerate(groups) for _ in grp]
+        se_cr, g, max_batch = cluster_se(vals, gkeys)
+        if se_cr is None:
             return None
-        meat = sum((sum(x - mean for x in grp)) ** 2 for grp in groups)
-        se_cr = math.sqrt((g / (g - 1.0)) * meat) / n
         se_iid = sd / math.sqrt(n)
         # DEGENERACY GUARD. When the batches' deviations cancel, `meat` goes to
         # ~0 and this would report an astronomically large `t_cluster` and
@@ -1043,10 +1107,8 @@ def cluster_stats(rows, mean, sd, n):
         # exactly-cancelling case by accident. A near-zero between-batch
         # variance is not evidence of enormous significance; it is a shape
         # this estimator cannot judge, so it fails CLOSED like the G<2 case.
-        if not (se_cr > 0) or se_cr < se_iid * 1e-6:
-            return None
         return {"n_clusters": g,
-                "max_batch": max(len(x) for x in groups),
+                "max_batch": max_batch,
                 "t_cluster": round(mean / se_cr, 2),
                 "n_eff": round(n * (se_iid / se_cr) ** 2, 1),
                 "window_s": CLUSTER_WINDOW_S}

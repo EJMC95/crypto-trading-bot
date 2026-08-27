@@ -252,11 +252,29 @@ def test_junk_era_claims_decline_the_expansion(monkeypatch):
     `"0.5"` is the case that caught the first draft: `float(ce)` coerces it and
     granted the full 4.0x off a value the publisher never writes. `True` is the
     second — `isinstance(True, int)` is True, so a naive numeric check reads a
-    boolean as evidence."""
+    boolean as evidence.
+
+    [2026-08-26] `float("inf")` is the THIRD, and it was live: `inf > 0.0` is
+    True, so the guard written for shape surprises granted the expansion on the
+    one surprise that pointed the widening way. `nan` was already covered by
+    `nan > 0.0` being False and `-inf` by the sign — only `+inf` leaked, which
+    is the direction that matters. Found by an adversarial review of the
+    allocation gate; verified RED here before the fix ("assert 1.69 == 1.0").
+    (`-inf` and `nan` are in the tuple as REGRESSION cover, not as new cases: a
+    mutation replacing `isfinite` with `== inf` SURVIVES, because in front of a
+    `> 0.0` the two are behaviourally identical. `isfinite` is there for intent;
+    the property these pin is that `inf` DECLINES.)
+    A PUBLISHED `inf` is unreachable (`json_safe` nulls it at the write
+    boundary, I5) so this is defence-in-depth on the in-process path, not a
+    live loss — but a contract the code does not keep is a defect whatever its
+    blast radius, and the fix needed `import math` ADDED to `fleet_bus`, which
+    had none: without it the NameError is swallowed by `allocation_scale`'s
+    blanket except and the organ goes dark fleet-wide."""
     books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
                               for i in range(20)})
     carry = "perps-funding-carry-lshadow"
-    for junk in (float("nan"), "0.5", True, None, [], {}):
+    for junk in (float("nan"), float("inf"), float("-inf"),
+                 "0.5", True, None, [], {}):
         p = _payload(monkeypatch, books, era=_ERA_OK)
         p["books"][carry]["claim_era"] = junk
         assert fleet_bus.allocation_scale(carry) == 1.0, \

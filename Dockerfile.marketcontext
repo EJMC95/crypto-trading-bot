@@ -30,7 +30,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # someone's laptop is the control that already failed here once — this dict
 # rotted because retiring a row and sweeping the rosters were separate acts
 # nobody linked.
-COPY market_context.py bot_pnl_store.py funding_basis.py cleanup_legacy_bots.py ./
+# [2026-08-27 (uk)] fleet_bus.py joins for ONE accessor: `live_arm_retired`.
+# The live-vs-shadow divergence check pairs a HARDCODED live row, and when
+# that row was retired ((ta)) the check kept firing `live-shadow-gap` on the
+# retirement flatten itself — which `evidence_board.synthesize_live` consumes
+# ROWS-FREE, so it cut all three live books' clips by 25% for five days.
+# `RETIRED_LIVE_ARMS` is the fleet's ONE declaration of a retired live arm and
+# `experiment_judge` already reads it twice; a second copy of that table here
+# would be a second rule (the 8x funding bug's exact shape, argued three
+# comments up). fleet_bus is stdlib-only at import (math/os/datetime), so this
+# brings no cascade — the same reasoning cleanup_legacy_bots.py is COPY'd on.
+COPY market_context.py bot_pnl_store.py funding_basis.py cleanup_legacy_bots.py fleet_bus.py ./
 COPY venues/ ./venues/
 
 ENV PYTHONUNBUFFERED=1

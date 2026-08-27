@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-26 13:29 Sydney (03:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-27 08:39 Sydney (22:39Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,36 +74,48 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (28 commit(s), entries (tj), (tk), (tl), (tm), (tn), (to))
+## Shipped today (40 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj))
 
-- `eaf6c4a` The extension-veto study's results: REFUTED-AS-OVERFIT — adversarial referee still to rule (to)
-- `27a9c4d` Pre-registration snapshot: the extension-veto study's verdict bars, committed before any result exists (to)
-- `b9adb9a` The extension-veto study's candle cache joins the ignored set (to)
-- `776438a` The fixed-dollar-cap class closes: EQUITY_SCALED_CAP, opt-in, floor-preserving, fail-safe dark (to)
-- `023bdf6` Merge PR #225: the avo cap+halt one-shot goes the way of every provisioner (tn)
-- `c71c4b8` The avo cap+halt one-shot goes the way of every provisioner — receipts on the row (tn)
-- `c188e13` Merge PR #224: georgia's live exit parity (veto + ratchet), mum's census split, avo cap+halt one-shot (tm, tn)
-- `10d7a02` Merge remote-tracking branch 'origin/main' into claude/real-money-bot-optimisations-d42zko
-- `f355361` The georgia carried rows record their 26-Aug measurements; the equity-scaling cap becomes a named build decision (tm)
-- `14087d8` Regenerate the handoff after the 26-Aug expansion research
-- `4effb9e` Extract holdwatch_accumulate: the mutation round proved the dispersion counter was unreachable from any test
-- `5f7c2fe` 🪁 band-kelly's holdwatch publishes its dispersion — the field that says the exit is the leak could not say it was significant
-- `8f2718d` Pin the WIRING, not just the helper: a mutation round showed the selftest missed the real defect
-- `7937778` The divergence detector was subtracting two different books, and two live rows had no check at all (daily review 26-Aug)
-- `f6d5b6b` The winners' referee was grading halt EVENTS as trades on both real-money books (daily review 26-Aug)
-- `0c37554` One-shot cap+halt parity for avo's live service (registered from main; deleted after use) (tn)
-- `2d4444c` [deploy-live-georgia] [deploy-live-mum] Georgia's live arm runs her own exit policy at last — breakout veto + trailing ratchet ported; mum's census names the uptrend block (tm)
-- `77eeef4` The georgia attestation one-shot goes the way of every provisioner (tl)
-- `b90deb5` Georgia's manual P&L attested (-26.4, read back on the row) — and the pair registry's service name corrected by the act of aiming at it (tl)
-- `e5535a4` One-shot attestation for georgia's manual P&L (registered from main; deleted after use)
-- `b9515b6` The duplicate attestation one-shot goes the way of every provisioner — the (tk) session already executed it
-- `fc24edf` One-shot attestation workflow for avo's manual P&L (registered from main so dispatch resolves; deleted after use)
-- `2db5b3a` The attestation one-shot goes the way of every provisioner; the (tk) record carries its receipts (tk)
-- `1ebbb75` Merge PR #220: the standing live-bot audit, nav-cook un-muted, the attestation one-shot registered (tk)
-- `30dba6a` One-shot attestation config + the (tk) execution record: Eamon's full-permission morning (tk)
-- `b63035a` Merge origin/main: (ti)/(tj) in; the standing-audit entry renumbers (th)->(tk) on the merged entry's seniority
-- `7e85c73` Merge PR #222: the census's freshness reads the publisher's shape (tj)
-- `9d8876d` The census's first live run catches its own fixture bug — freshness now reads the publisher's shape (tj)
+- `5b21a24` Four books tuned on their own ledgers, no retirements — and the card I shipped green yesterday was a time bomb (uj)
+- `a8c4929` Georgia publishes her census: one of four books whose row could not answer stuck-vs-slow (uc)
+- `f786461` Kill the stride survivor: a slice of one cannot see a stride (uc)
+- `5fceb7b` The joint sweep was dark for 4.5 days of every orbit: stride the walk, coprime so coverage is untouched (uc)
+- `4b00a89` Merge PR #233: one owner for cluster-robust t (ug), the redistribution refused (uh), main un-redded (ui)
+- `56d2029` Regenerate HANDOFF.md — I11's read-first/regenerate-last half
+- `e62af15` Correct (ui)'s timestamps in place: two of them were inferred, not measured
+- `fc343b8` The redistribution is refused with the number nobody had run; and main's red-by-the-clock fixture is fixed (uh)(ui)
+- `749e689` The cluster-robust t had three implementations, and both copies reproduced the (kg) degeneracy the owner was fixed for (ug)
+- `cced85d` Merge PR #232: sniper entombment (ue) + listing side unsupported (uf) + allocation gate leak (ud)
+- `259f0c5` The listing source has no measured side on its own band — the short's evidence lives in young's (uf)
+- `2c38512` Register scripts/audit_stuck_vs_slow's --selftest — inherited RED from main
+- `36e95c7` Repoint a changelog citation the (uc) -> (ue) renumber left dangling
+- `bc38b72` The allocation's two halves do not add up: $1,151.66 is withheld by the era gate and returned to nobody (ud)
+- `86c88bd` A surge/young pending symbol that stops qualifying is never offered again, so its give-up can never fire (uc)
+- `e8360e5` Close the declared gap: breakoutup's self-veto now reaches the incubator's fitness (uc)
+- `623e6eb` The incubator mutation round: the survivors were test gaps, and the code was right in every one (uc)
+- `814329d` Declare the board's golive freshness bound — the (ia) exception, one consumer along (uc)
+- `98da5f7` The incubator's fitness was not the taker's book — and the mechanism I published for it was REFUTED before it shipped (uc)
+- `27529e2` Stuck is not slow: the discriminator is OCCUPANCY, and the docket was reading two full books as empty ones (uc)
+- `acef2aa` The board stops widening on a sample the gate refuses; the judge sees georgia's real divergence; the pipe becomes legible (uc)
+- `15eafa9` Merge PR #231: the era headline counted a field that did not exist yet (ua)
+- `73723c8` The daily review counted 13 halt EVENTS as real-money trades — and the filter that fixed it read a JSONB key nothing has ever written (tu)
+- `f860e5c` The era headline counted a field that did not exist yet — it could only ever read zero (ua)
+- `093a44e` The winners' docket crowned a PROVEN winner on the window that generated the hypothesis (tt)
+- `63e497e` Merge PR #207: the sniper flies the other way — per-source side, and the fade that justified it corrected in place (tx)(ty)(tz)(ua)(ub)
+- `04b3c94` The debut fade is 76-83% CALENDAR: the side flip stands, its justification is corrected in place, four code defects fixed (ub)
+- `471323a` Merge origin/main — main's (ts) and this branch's (tx)-(ub), both kept whole
+- `56b0061` Renumber (ts)-(tw) -> (tx)-(ub): the THIRD collision on this branch's letters
+- `2ba1b9c` The pair census scored each arm's OLDEST 30 closes: georgia's shadow stamped at 09:22Z and still read 0/30 (ts)
+- `ecf1d2f` Credit Eamon by name in this branch's entries (tw)
+- `0cc6715` The sniper was on the wrong side of its own thesis: a perp lists AFTER the spot hype (tw)
+- `7aa9962` Merge origin/main (116 commits) — and my four letters collide a SECOND time
+- `6a1b01d` The sniper's side is per-source: listing and young go SHORT on a measured debut fade (letter pending)
+- `091cc2f` Merge PR #229: mum's bar widens to the measured cell — RSI_MAX 25->30, referee-confirmed (tr)
+- `bbf0bf0` The risk-up one-shot goes the way of every provisioner — receipts verified on both rows (tq)
+- `e40ca82` [deploy-live-mum] Mum's bar widens to exactly what was measured: RSI_MAX 25->30, the rescue tiers refused with their numbers (tr)
+- `c284590` Merge PR #228: the (tq) risk-up one-shot registered — derived gross ceilings, scaled cap, halt parity
+- `4b08462` Pre-registration snapshot: mum supply study verdict bars, committed before any result exists (tq)
+- `eed4576` Register the (tq) one-shot: derived gross ceilings for avo+georgia, scaled-cap activation, halt parity
 
 ## How this file stays honest
 

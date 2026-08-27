@@ -121,7 +121,53 @@ START_EQUITY = 1000.0
 # the 30-name configured list, so no scout book is added: the cage-safe
 # equivalent of the 0 switch ([20,90] cannot hold 0 and audit_lever_bounds
 # requires the default inside the cage).
-UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "30"))
+#
+# [2026-08-27 WIDENED 30 -> 40 — THE FIRST VALUE THAT DOES ANYTHING.] At 30
+# this knob was STRUCTURALLY INERT and the file said so above: the configured
+# core is 30 names, so `len(out) >= width` on the top-up's first pass and the
+# scout adds ZERO. The live row is the receipt — `caps.universe_n: 30` beside
+# `caps.universe: 25` (prune_dead drops 5 names the venue no longer lists).
+# 31 is the first width that admits a single scout book; 40 is the first that
+# admits a MEANINGFUL cross-section, and the supply exhausts at 36, so this is
+# a ONE-STEP move with no headroom behind it.
+#
+# WHY THIS IS NOT THE (jg) REVERT AGAIN. (jg) reverted 60 -> 30 because the
+# wide set pulled in NON-CRYPTO books whose funding dispersion is ~9x crypto's
+# — its evidence window (31-Jul -> 5-Aug) IS the non-crypto window, and that
+# confound is now CLOSED IN CODE: `resolve_universe` runs
+# `fleet_bus.crypto_only()` on the top-up since (ki), so the population (jg)
+# measured is structurally unreachable from here. What (jg) reverted alongside
+# it — K 8 -> 5 — is the term that moved gross exposure, and K is UNTOUCHED.
+#
+# MEASURED (the widening's own numbers, per I19):
+#   * adds 10 CRYPTO names — FARTCOIN, GRAM, HBAR, LIT, PUMP, TAO, TRUMP, UNI,
+#     ZEC, ZRO — taking the tradeable universe 25 -> 35;
+#   * ZERO expectancy cost BY CONSTRUCTION: gross is `2 * K * clip`, and K,
+#     clip, leg count (10) cadence (24h) and hold are all unchanged. This
+#     changes only WHICH names fill the same ten slots — the (hl) rule that a
+#     per-trade % is invariant to what the selector RANKS, not what it holds;
+#   * carry received over the same 10 legs 75.3%/yr -> 171.4%/yr (2.28x);
+#   * per-basket price sd 0.11642 -> 0.16827 (+45%); carry/noise 0.01773 ->
+#     0.02791 (+57%); days-to-|t|=2 12,730 rebalances (~35 years) -> 5,137
+#     (~14 years).
+#
+# THE HONEST LIMIT, stated rather than buried: ~14 years is STILL NOT
+# DECIDABLE. This makes the book earn more per unit of the noise it already
+# carries; it does NOT make it gradeable, and nothing here should be read as
+# moving ⚖️ toward the gate.
+#
+# K STAYS 5 — measured as the optimum AT the widened universe, so this is a
+# refusal with evidence rather than an omission (carry/noise: K=3 0.02463,
+# K=5 0.02791, K=8 0.02680, K=12 0.02012). Do NOT walk `fundspread.k`.
+#
+# I18 NOTE, the next gate behind this one: `UNIVERSE_MIN_VOL_M` below is a
+# BARE LITERAL — unregistered, unreachable by the rail. If the top-up ever
+# needs to reach deeper than 40 names, that floor is what binds next.
+#
+# NOTE FOR THE REGISTRY: `fleet_tuning.LEVERS["fundspread.universe_n"]`
+# carries `env_default` and `audit_lever_bounds`'s drift arm FAILS when it
+# disagrees with the literal below. It must read 40.
+UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "40"))
 # Minimum 24h $M turnover for a scout-added book. Kept well above dust: this
 # book always holds BOTH sides, so an illiquid leg it cannot exit is a real
 # cost, unlike the Farmer's single-sided carry.

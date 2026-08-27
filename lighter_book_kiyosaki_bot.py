@@ -33,12 +33,16 @@ validated wherever one exists, with exactly ONE new rule (restrict-only):
   4. "It's not how much you make, it's how much you keep" (financial
        literacy — the ONE NEW RULE). Every entry must pass the PAYBACK
        VELOCITY test: at the entry rate, accrued funding must repay the full
-       modelled round trip within PAYBACK_MAX_H (120h — a deal must return
-       its cost inside ~1/3 of the 336h max hold). At this file's declared
-       friction (30bps RT) that makes the EFFECTIVE entry bar ~21.9% TRUE
-       apr — a TIGHTENING of the validated 20% floor, never a widening, so
-       it cannot admit anything the 21-Jul gate sweep did not validate; it
-       can only decline some of it. Stated, not buried (I19).
+       modelled round trip within PAYBACK_MAX_H. At this file's declared
+       friction (30bps RT) that bar is `RT * 8760 / payback_h` — see
+       `effective_entry_bar()`, which is the INVERSE of `payback_hours` so
+       the number is derived, never retyped. It is a TIGHTENING of the
+       validated 20% floor, never a widening, so it cannot admit anything the
+       21-Jul gate sweep did not validate; it can only decline some of it.
+       Stated, not buried (I19).
+       **[2026-08-27] 120h -> 48h, CORRECTED IN PLACE per I12 — this
+       paragraph said "120h ... ~21.9% TRUE apr" and it no longer describes
+       the book.** See the PAYBACK_MAX_H block below for the measurement.
   5. "Don't let emotions drive decisions" (fear and greed).
        Hysteresis on BOTH ends: 6h funding persistence before entry (greed
        guard — "persistent funding pays carries, spikes pay fees", the
@@ -147,9 +151,12 @@ DELIST_GIVEUP_H = 24.0          # coin absent from the map this long -> close
 #: venue and was simply left behind — an inherited constant whose own source
 #: has since moved is not an independent choice, it is a stale copy. Measured
 #: consequence of being left behind: 7 days alive, ZERO trades, census
-#: `cold 209/228`. The gate this book adds on top (payback velocity,
-#: ~21.9% TRUE) is unchanged and still binds ABOVE carry's 20% floor, so this
-#: admits nothing the 21-Jul sweep did not validate (I19, restrict-preserving).
+#: `cold 209/228`. The gate this book adds on top (payback velocity) still
+#: binds ABOVE carry's 20% floor, so this admits nothing the 21-Jul sweep did
+#: not validate (I19, restrict-preserving). [2026-08-27: this line read
+#: "~21.9% TRUE" — CORRECTED IN PLACE per I12, the payback window moved
+#: 120h -> 48h so that bar is now ~54.8%; the number lives in one place,
+#: `effective_entry_bar()`, precisely so a prose copy cannot go stale again.]
 MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "1e6"))
 
 # ---- lesson 2: capacity (cash flow only, so clip == exposure to costs) ------
@@ -169,10 +176,43 @@ SLIP_COST = 0.0005              # per side (Lighter fee is zero, measured)
 HEDGE_COST = 0.0010             # per side, the modelled off-venue hedge leg
 RT_COST_FRAC = 2.0 * (SLIP_COST + HEDGE_COST)
 # a deal must repay its own round trip within this many hours at the ENTRY
-# rate. 120h == the 20%-floor payback (131.4h) tightened to an effective
-# ~21.9% TRUE bar — restrict-only relative to the validated gate, by
-# construction (payback_hours is monotone-decreasing in |apr|).
-PAYBACK_MAX_H = float(os.environ.get("RICHDAD_PAYBACK_MAX_H", "120"))
+# rate. Restrict-only relative to the validated gate, by construction
+# (payback_hours is monotone-decreasing in |apr|, so a SMALLER cap admits a
+# strict SUBSET — driven in tests/autonomy/test_kiyosaki_payback.py, not
+# asserted here).
+#
+# [2026-08-27] 120h -> 48h. WHY, and it is the book's own binding gate:
+# `payback_max_h` sets the EFFECTIVE entry bar at `RT * 8760 / payback_h`, so
+# 120h was ~21.9% TRUE — the LOOSEST bar in the funding cohort, barely above
+# the 20% floor it inherited. At that bar the book admits coins that pay for
+# ~2 days and then sit at a resting default for the other 12, and this book
+# CANNOT SELL THEM: `RICHDAD_EXIT_APR` (0.01875) is 5.6x below the crypto
+# resting pin, so a pinned coin never reaches `decay_paid`, never flips to
+# `liability_flip`, and rides to `max_hold` 336h later. Confirmed on the book
+# itself: 4 of its 6 held coins have ALREADY reverted to a pin (ZEC 10.5,
+# AAVE 10.5, HYPE 10.5, NBIS 3.5). 48h => an effective bar of ~54.8%, which
+# is the value 🌾 carry independently runs (`CARRY_PAYBACK_MAX_H`, 48).
+#
+# MEASURED, on this book's own cell (the I19 price, both directions):
+#   shipped  120h: 19.0 closes/30d, mean +0.0145, t=+0.26, I16 lower bound
+#                  0.000, h2 NEGATIVE (-0.43), $ALL/30d +$1.20
+#   proposed  48h: 11.0 closes/30d (-42%), mean +0.1630 (11x), t=+2.00,
+#                  LB +0.059, BOTH halves positive (+1.65/+1.93),
+#                  $ALL/30d +$2.70 (+125%)
+# It costs 8 closes/30d and buys 125% more dollars AND the book's only
+# measured claim. A broad PLATEAU rather than a spike: 42h +$2.52, 48h
+# +$2.70, 54h +$2.62, 60h +$2.43, monotone away (84h +$1.78, 120h +$1.20).
+#
+# REFUSED, with its number: differentiating from 🌾 carry by BAND instead
+# (admit only [21.9%, 36.5%), disjoint from carry's reach) reads n=3, mean
+# -0.169, t=-2.65, BOTH HALVES NEGATIVE — the supply this book would hold
+# EXCLUSIVELY carries negative expectancy on its own; the edge is in the TOP
+# of the ranking, which carry also takes. Tightening beats carving.
+#
+# ENTRY-ONLY: `candidates`/`scan_census` consume this and `cashflow_exit`
+# does not, so open positions are untouched and the (hc) clock does NOT
+# reset (ordinary tuning — a gate step, not a change of kind).
+PAYBACK_MAX_H = float(os.environ.get("RICHDAD_PAYBACK_MAX_H", "48"))
 
 # ---- (lk): crypto perps only, reversible without a deploy -------------------
 ALLOW_NONCRYPTO = os.environ.get(
@@ -212,6 +252,23 @@ def payback_hours(apr, rt_cost_frac=None):
     if a <= 0.0:
         return float("inf")
     return rt / (a / HOURS_PER_YEAR)
+
+
+def effective_entry_bar(payback_max_h=None, rt_cost_frac=None):
+    """The |TRUE apr| the payback gate ACTUALLY requires — the INVERSE of
+    `payback_hours`, so `payback_hours(effective_entry_bar()) == payback_max_h`.
+
+    ONE OWNER for a number three places used to retype (the header, the boot
+    line, the census reader's head). It matters because `enter_apr` UNDERSTATES
+    this book: the published gate says 20% while the binding bar is this, and
+    `audit_book_overlap.living_gates` models the cell from `enter_apr`. Publish
+    the derived number rather than a retyped one — a retyped constant is a
+    constant that drifts, and this one is now 2.5x its own `enter_apr`."""
+    ph = PAYBACK_MAX_H if payback_max_h is None else payback_max_h
+    rt = RT_COST_FRAC if rt_cost_frac is None else rt_cost_frac
+    if not ph or ph <= 0.0:
+        return float("inf")
+    return rt * HOURS_PER_YEAR / ph
 
 
 def candidates(fund, held, hot_since, t0, enter_apr=None, min_vol=None,
@@ -376,6 +433,13 @@ def build_extra(census, positions, open_pnl, realized):
         # binding constraint instead of inferring it (I8 one layer in)
         "caps": {"enter_apr": ENTER_APR, "exit_apr": EXIT_APR,
                  "persist_h": PERSIST_H, "payback_max_h": PAYBACK_MAX_H,
+                 # [2026-08-27] the bar that actually BINDS. `enter_apr` reads
+                 # 20% while the payback gate refuses everything below this,
+                 # and every cross-book reader (audit_book_overlap's cell
+                 # model included) has only ever seen the 20%. A gate nobody
+                 # can read from the row is the (lv) `{open: 0}` ambiguity one
+                 # layer in — publish the binding constraint, don't infer it.
+                 "payback_bar_true": round(effective_entry_bar(), 6),
                  "max_positions": MAX_POSITIONS, "clip_usd": CLIP_USD,
                  "min_vol": MIN_VOL,
                  # [(ne)] the (mf) headline change (1h->6h, +$26.88 t=1.91 ->
@@ -482,7 +546,7 @@ def main():
     print(f"[{now_iso()}] 🏦 Rich Dad start | venue lighter | "
           f"enter>={ENTER_APR:.2%} TRUE exit<{EXIT_APR:.2%} | "
           f"payback<={PAYBACK_MAX_H:.0f}h (effective bar "
-          f"{RT_COST_FRAC * HOURS_PER_YEAR / PAYBACK_MAX_H:.1%}) | "
+          f"{effective_entry_bar():.1%}) | "
           f"${CLIP_USD:.0f}x{MAX_POSITIONS} | "
           f"realized so far ${realized:+.2f} ({n_closed} closed)")
 
@@ -664,16 +728,17 @@ def _selftest():
     persistence gate or the payback requirement on decay each redden this."""
     t0 = 1_000_000.0
     hot_old = {c: t0 - 7 * 3600 for c in ("A", "B", "C", "D", "E", "S")}
-    # rate 3e-4 * 1095 = 0.3285 TRUE (payback 80.0h — passes); 9.6e-5 ->
-    # 0.10512 TRUE (cold at the 20% bar — the verified ETH anchor);
-    # 1.9e-4 -> 0.20805 TRUE (clears the 20% bar, FAILS the payback gate:
-    # 126.3h > 120 — the coin only the literacy rule refuses).
-    fund = {"A": {"rate": 3e-4, "vol": 5e6},
-            "B": {"rate": -4e-4, "vol": 3e6},
-            "C": {"rate": 3e-4, "vol": 1e5},       # thin
+    # rate 6e-4 * 1095 = 0.657 TRUE (payback 40.0h — passes the 48h gate);
+    # 9.6e-5 -> 0.10512 TRUE (cold at the 20% bar — the verified ETH anchor);
+    # 3e-4 -> 0.3285 TRUE (clears the 20% bar, FAILS the payback gate: 80.0h
+    # > 48 — the coin only the literacy rule refuses, and the coin the OLD
+    # 120h cap ADMITTED, so this row is also the restrict-direction witness).
+    fund = {"A": {"rate": 6e-4, "vol": 5e6},
+            "B": {"rate": -8e-4, "vol": 3e6},
+            "C": {"rate": 6e-4, "vol": 1e5},       # thin
             "D": {"rate": 9.6e-5, "vol": 5e6},     # cold: 10.5% TRUE
-            "E": {"rate": 5e-4, "vol": 5e6},       # hot, not persisted
-            "S": {"rate": 1.9e-4, "vol": 5e6}}     # slow payback: 20.8% TRUE
+            "E": {"rate": 1e-3, "vol": 5e6},       # hot, not persisted
+            "S": {"rate": 3e-4, "vol": 5e6}}       # slow payback: 32.9% TRUE
     hot_old.pop("E")
 
     # 1) payback velocity — the one new rule, pinned by arithmetic
@@ -681,14 +746,21 @@ def _selftest():
     assert abs(payback_hours(0.20) - 131.4) < 0.1, payback_hours(0.20)
     assert payback_hours(0.20) > PAYBACK_MAX_H, \
         "a bare-20% coin must be refused by the literacy gate"
-    assert payback_hours(-0.30) < PAYBACK_MAX_H, "sign must not matter"
+    assert payback_hours(-0.60) == payback_hours(0.60) < PAYBACK_MAX_H, \
+        "sign must not matter"
     assert payback_hours(0.30) < payback_hours(0.25) < payback_hours(0.22), \
         "payback must be monotone-decreasing in |apr|"
-    # the effective bar the gate implies, stated in the header: ~21.9%
-    eff = RT_COST_FRAC * HOURS_PER_YEAR / PAYBACK_MAX_H
-    assert 0.215 < eff < 0.225, eff
+    # the effective bar the gate implies — DERIVED as the inverse of the
+    # gate's own function, never retyped arithmetic. `payback_bar_true` on
+    # the row is this same call.
+    eff = effective_entry_bar()
+    assert abs(payback_hours(eff) - PAYBACK_MAX_H) < 1e-6, (eff, PAYBACK_MAX_H)
     assert eff > ENTER_APR, \
         "the literacy gate must TIGHTEN the validated bar, never widen it"
+    # [2026-08-27] the 120h -> 48h tightening, in the one direction that
+    # matters: a smaller cap raises the bar, so it can only DECLINE (I19).
+    assert effective_entry_bar(48.0) > effective_entry_bar(120.0), \
+        "a shorter payback window must demand a HOTTER coin, never a colder"
 
     # 2) the entry gate: bar, floor, persistence, class, payback, ordering
     cands = candidates(fund, set(), hot_old, t0, class_ok=lambda c: True)
@@ -697,6 +769,12 @@ def _selftest():
                       class_ok=lambda c: True) == []
     # S clears the validated 20% bar and is refused by payback alone
     assert all(c != "S" for c, _f, _a in cands)
+    # ...and the OLD 120h cap admitted it, which is what makes the shipped
+    # value the RESTRICTING one rather than merely a different number.
+    assert any(c == "S" for c, _f, _a in candidates(
+        fund, set(), hot_old, t0, payback_max_h=120.0,
+        class_ok=lambda c: True)), \
+        "the fixture must contain a coin the loosened cap would have taken"
     # E is hot and liquid but has no persisted streak -> excluded
     assert all(c != "E" for c, _f, _a in cands)
     # D is the 8x trap: 9.6e-5 quoted IS 10.5% TRUE, below a 20% bar. Pin
@@ -778,6 +856,11 @@ def _selftest():
     assert extra["caps"]["enter_apr"] == ENTER_APR
     assert extra["caps"]["payback_max_h"] == PAYBACK_MAX_H
     assert extra["caps"]["crypto_only"] is True
+    # the BINDING bar is on the row, and it is the derived one — a reader
+    # that only saw `enter_apr` would model this book 2.5x too loose.
+    assert abs(extra["caps"]["payback_bar_true"] - effective_entry_bar()) \
+        < 1e-6, extra["caps"]["payback_bar_true"]
+    assert extra["caps"]["payback_bar_true"] > extra["caps"]["enter_apr"]
     assert extra["scan"]["scanned"] == 6
     assert extra["income_statement"]["assets"] == 1
     # [(lz)] the book must NAME what it holds. This book shares its gate with

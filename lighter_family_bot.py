@@ -879,6 +879,25 @@ class SwingDip(Carrier):
 class DayTraderGated(Carrier):
     """DayTraderV5Gated — entry modes switched by BTC's 4h 50/200 EMA regime;
     trailing ATR stop capped by the carrier stoploss; ROI ladder; timeouts."""
+    # [2026-08-27 (uc)] 🔮 georgia PUBLISHES HER CENSUS. She was one of four
+    # living books whose row carried no scan counters at all, which makes the
+    # STUCK-vs-SLOW question structurally unanswerable for her —
+    # `scripts/audit_stuck_vs_slow.py` can only classify her UNKNOWN, and
+    # `{closed: 0}` stays byte-identical between "nothing qualified" and
+    # "a gate refuses everything" (I18; I1 at book scale).
+    #
+    # She is the book where that gap costs the most: 5 of 6 go-live bars, the
+    # fleet's closest to real money, and the one whose binding constraint is
+    # CLOSES — so "why did nothing open this cycle?" is precisely the question
+    # her row could not answer. Her throttle already records `entry_rank` on
+    # every close ((sv)); this records the refusals that never became a close.
+    #
+    # REPORTING ONLY, and structurally so: `scan_extra` is called at publish
+    # time, returns `{"scan": ...}` into `extra`, and decides no trade. The
+    # `rsi_bar` block inside it is guarded on `getattr(b.s, "RSI_MAX", None)`,
+    # which this class does not define, so that half is simply absent rather
+    # than wrong — no era moves, no gate moves, no clip moves.
+    census = True
     roi = {0: 0.018, 180: 0.012, 360: 0.008, 720: 0.005}
     protections = {"cooldown_candles": 4,
                    "slguard": {"lookback": 48, "trades": 3, "stop": 12},

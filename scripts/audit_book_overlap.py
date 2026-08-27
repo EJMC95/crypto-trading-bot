@@ -223,6 +223,27 @@ def living_gates(cur):
 #: supplied by hand (`--gate 0.20 --floor 2e6`). Nobody ran it. That is exactly
 #: how THREE books ended up on a cell that holds at most two coins at once. The
 #: rule existed; the run did not — the `(gk)` shape.
+
+#: [2026-08-27] ⚖️ Counterweight's 30 -> 40 widening, as DATA rather than prose.
+#:
+#: Written as constants because the first version was a sentence, and a mutation
+#: round killed it: dropping a coin from the shared list left the declaration
+#: still passing a `coin in why` check, because the same ticker also appears in
+#: the admitted list two clauses earlier. That is the "a page-wide substring scan
+#: is not a structural claim" rule landing on a guard's own declaration. The
+#: prose below INTERPOLATES these, so the sentence and the set cannot drift.
+#:
+#: ADMITS — the 10 crypto names the scout top-up adds at width 40 (the core is
+#: 30, so every width <= 30 admitted none of them).
+FUNDSPREAD_TOPUP_ADMITS = ("FARTCOIN", "GRAM", "HBAR", "LIT", "PUMP", "TAO",
+                           "TRUMP", "UNI", "ZEC", "ZRO")
+#: CARRY_SHARED — the subset 🌾 carry held SHORT at the widening, i.e. the names
+#: that will be double-counted in `fleet_allocation`'s independent claims. A
+#: SNAPSHOT of a book that turns over: the structural claim (a rank book and a
+#: level book meet at the tail of the same distribution) is what the declaration
+#: rests on, not this roster.
+FUNDSPREAD_CARRY_SHARED = ("FARTCOIN", "GRAM", "UNI", "ZEC", "ZRO")
+
 KNOWN_CELL_COLLISIONS = {
     frozenset({"perps-funding-carry-lshadow", "book-kiyosaki-lshadow"}):
         "THE CARRY CELL (>=20% TRUE / >=$2M / crypto). Measured 17-Aug over "
@@ -311,6 +332,59 @@ KNOWN_CELL_COLLISIONS = {
         "(px) fallback key: the carry/Garrett sliver alone, for tapes where "
         "the >=$2M Rich Dad intersection reads empty. Same declaration as "
         "the 3-book component above.",
+    # [2026-08-27] ⚖️ Counterweight's scout universe widened 30 -> 40, which is
+    # the FIRST width that admits any scout book at all (the configured core is
+    # 30 names, so every earlier value was structurally inert — the live row
+    # read `universe_n: 30` beside `universe: 25`). The 10 names it admits are
+    # `FUNDSPREAD_TOPUP_ADMITS` above, and HALF of them —
+    # `FUNDSPREAD_CARRY_SHARED` — are supply 🌾 carry is ALREADY holding on the
+    # SAME SIDE, so I20's accounting cost
+    # arrives at a book that had never been in this map before, and it is
+    # declared BEFORE the first shared leg rather than after.
+    #
+    # WHY THE DETECTOR CANNOT FIND THIS ONE, and why that is the reason to
+    # write it down rather than an excuse not to: `living_gates` keys on a
+    # published `enter_apr`, and ⚖️ has none — it is a cross-sectional RANK, it
+    # takes the top-K and bottom-K of whatever it sees and thresholds nothing.
+    # So `collisions()` can never group it, `cells_collide` has no apr band to
+    # compare, and this entry will not be MATCHED by a live run today. That is
+    # the (sk) shape exactly ("a RANKING collision, not a gate collision ...
+    # declared here rather than detected"), and the (pj) lesson beside it: a
+    # detector's roster is part of the detector, so an overlap it structurally
+    # cannot see is the one most worth declaring by hand.
+    frozenset({"perps-funding-carry-lshadow", "perps-funding-spread-lshadow"}):
+        "THE RANK/HARVEST OVERLAP ((ki)-screened crypto supply). ⚖️ "
+        "Counterweight ranks the venue's funding cross-section and SHORTS its "
+        "K=5 most-positive funders; 🌾 carry SHORTS coins paying >=20% TRUE "
+        "for 12h. Those are the same names by construction at the extreme of "
+        "the distribution, on the SAME SIDE. MEASURED at the 30 -> 40 "
+        f"widening, 2026-08-27: of the {len(FUNDSPREAD_TOPUP_ADMITS)} crypto "
+        f"names the top-up admits ({', '.join(FUNDSPREAD_TOPUP_ADMITS)}), "
+        f"{len(FUNDSPREAD_CARRY_SHARED)} were held SHORT by 🌾 carry at the "
+        f"widening — {', '.join(FUNDSPREAD_CARRY_SHARED)} — and four of those "
+        "were re-confirmed open on the live /pnl.json at ship (ZEC had closed; "
+        "carry turns over, so the set is a snapshot and the STRUCTURAL claim, "
+        "not the roster, is what this declares). WHY IT IS DECLARED AND NOT "
+        "REFUSED: the double-counted "
+        "size is ~2% of the shared position — ⚖️ trades ~$5.00/leg (its $20 "
+        "backtested clip at the allocation organ's 0.25 probe floor) against "
+        "carry's $225-300 clips — and it is NOT the (lv) starvation shape: "
+        "separate processes, separate held-sets, and ⚖️ is ALWAYS-IN with a "
+        "fixed 10 legs, so it consumes none of carry's supply and carry "
+        "consumes none of its ranking. The cost is I20's accounting one and "
+        "the standing correction is the same: a coin held by both counts "
+        "TWICE in fleet_allocation's independent claims, so report_now's "
+        "effective-bet line is what to read. NOT a differentiation-by-row-id "
+        "case either — ⚖️ takes a RANK and carry takes a LEVEL, which is a "
+        "genuinely different rule reaching the same names at the tail, not a "
+        "second copy of one gate. OPEN, OWNER: OPERATOR, at the row's own "
+        "already-scheduled ~28-Aug keep-or-retire call ((jg)'s pre-registered "
+        "criterion) for whether ⚖️ lives at all; and if it does, a second "
+        "look at ~26-Sep — 30 rebalances, one full 24h-cadence era under the "
+        "widened cross-section — asking whether the shared-name share of its "
+        "legs is still ~2% of size or has grown. REVERT is one number: "
+        "FUNDSPREAD_UNIVERSE_N back to 30 restores the hand list exactly, "
+        "because 30 == the configured core.",
 }
 
 
