@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-27 17:18 Sydney (07:18Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-27 17:31 Sydney (07:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,9 +74,15 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (88 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz))
+## Shipped today (94 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc))
 
+- `4a1569c` We win, we change it, it starts losing — measured as regression to the mean: a hot window is followed by -1.674pp with or without a change (vc)
+- `5837e0c` Merge remote-tracking branch 'origin/main'
+- `8e9d4b0` Georgia's entry cap 3 -> 5, graded on the uncensored population: rank 3 is her best entry, days-to-gate 344 -> 187 (vb)
+- `9c79fdf` The judge never checked whether the control arm was alive: a ten-day-dead shadow row certified a pair idle (va)
+- `80917b4` Regenerate HANDOFF (uz)
 - `62488dc` Mum is slow not stuck: her RSI bar is the measured peak, the universe widening is refuted by resampling, and the tape fetches once (uz)
+- `6dc2563` Pre-registration snapshot: georgia's entry-rank cap verdict bars, committed before any result exists (uy)
 - `656fd01` Mum is SLOW not stuck, and her shipped RSI bar is the measured peak — widening past 32 costs expectancy (ut)
 - `67145a2` The venue tape, fetched once: a durable cache of CLOSED bars — 1804x on re-run, 0 requests (ut)
 - `a8dc14c` Record the inert-sort fix + correct (ts)'s order-independence claim in place; renumbered (uw) -> (uy) on a cross-branch collision (uy)
