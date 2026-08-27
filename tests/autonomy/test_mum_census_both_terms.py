@@ -593,15 +593,34 @@ def test_the_live_spend_census_says_what_its_days_to_gate_is_made_of():
             isinstance(n, _ast.Constant) and n.value == field
             for n in _ast.walk(_ast.parse(src))), \
             f"the live spend census does not publish {field!r}"
-    # and the guard's own contract is unchanged: the field stays PRESENT
+    # [(vn), Eamon: "the guard should not refuse that"] A DECLARED unknown is
+    # admitted; a BARE one is not. `days_to_gate_obs` is (2/S_d)^2 and a book
+    # with zero closes has no S_d, so any number is a floor that can never
+    # bind — mum's 28.1 kept the guard green on the book I22 exists to catch.
     import scripts.audit_book_spend as sp
     assert "days_to_gate_obs" in sp.REQUIRED_FIELDS
-    assert sp.birth_census({"bot": "x", "extra": {"spend": {
-        "markets_scanned": 23, "n_eff": 1.0, "sides": "long",
-        "gross_x": 10.0, "days_to_gate_obs": None,
-        "days_to_gate_basis": "birth_window", "closes_obs": 0}}}), \
-        "a null days_to_gate must still be REFUSED as a missing field — that " \
-        "is why the basis is published instead of nulling the number"
+    base = {"markets_scanned": 23, "n_eff": 1.0, "sides": "long",
+            "gross_x": 10.0}
+    declared = dict(base, days_to_gate_obs=None,
+                    days_to_gate_basis="birth_window", closes_obs=0)
+    assert not sp.birth_census({"bot": "x", "extra": {"spend": declared}}), \
+        "a DECLARED unknown (basis + closes_obs 0) must be admitted"
+    bare = dict(base, days_to_gate_obs=None)
+    assert sp.birth_census({"bot": "x", "extra": {"spend": bare}}), \
+        "a BARE null must still be refused — 'no rate' and 'missing field' " \
+        "must never be one byte-string (I1)"
+    # BOTH halves of the exemption are load-bearing and each needs its own
+    # case: a mutation round showed the fixture above was caught by the
+    # closes_obs clause alone, so dropping the basis requirement stayed GREEN.
+    no_basis = dict(base, days_to_gate_obs=None, closes_obs=0)
+    assert sp.birth_census({"bot": "x", "extra": {"spend": no_basis}}), \
+        "a null with no `days_to_gate_basis` must be refused — an unknown " \
+        "that does not say WHY it is unknown is just a missing field"
+    trading = dict(base, days_to_gate_obs=None,
+                   days_to_gate_basis="measured_rate", closes_obs=42)
+    assert sp.birth_census({"bot": "x", "extra": {"spend": trading}}), \
+        "a book WITH closes still owes a number — the exemption is only for " \
+        "a book that genuinely cannot compute one"
 
 
 def test_the_live_trend_gauge_survives_a_loop_that_skips_the_signal_call():

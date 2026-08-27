@@ -972,8 +972,20 @@ class DayTraderGated(Carrier):
     # than wrong — no era moves, no gate moves, no clip moves.
     census = True
     roi = {0: 0.018, 180: 0.012, 360: 0.008, 720: 0.005}
+    #: [2026-08-27 (vn)] Eamon: *"unlock georgia"* / *"keep her at 5 bars"*.
+    #: `stop` is a BAR count (`stop * tf_s`), so on her 15m book 12 bars was a
+    #: 3h lockout and 5 is 75 minutes. MEASURED before moving it: over her
+    #: whole live life the row published `entries_shut_reason_30d
+    #: {protections_locked: 9}` and `hours_shut_today 3.597` — and the live arm
+    #: was serving a lockout that could run to the 48-bar LOOKBACK (12h), not
+    #: to this number at all, because it re-armed every loop instead of
+    #: latching (fixed in `lighter_avo_live_bot.entries_lock`, same entry).
+    #: So this value only starts meaning anything on the live arm today.
+    #: Env-tunable so the next move is his without a deploy.
     protections = {"cooldown_candles": 4,
-                   "slguard": {"lookback": 48, "trades": 3, "stop": 12},
+                   "slguard": {"lookback": 48, "trades": 3,
+                               "stop": int(os.environ.get(
+                                   "GEORGIA_SLGUARD_STOP_BARS", "5"))},
                    "maxdd": {"lookback": 96, "trades": 10, "dd": 0.15, "stop": 24}}
     min_bars = 70
     BAND_PCT_ON = 0.015

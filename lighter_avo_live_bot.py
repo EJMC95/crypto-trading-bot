@@ -737,7 +737,7 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
     return out
 
 
-def entries_lock(closed, t_now, baseline):
+def entries_lock(closed, t_now, baseline, latch=None):
     """The family Book's protections (slguard + maxdd) on THIS arm's own
     closes, with the drawdown denominator the LIVE baseline instead of the
     shadow's $1,000 — 20% of a paper grand would never bind on a $63 book.
@@ -750,9 +750,36 @@ def entries_lock(closed, t_now, baseline):
     and thirty days of them could not be attributed to anything. The gate
     reads the ts and the census reads the cause off ONE computation — a second
     function asking "which protection fired" would be a second copy of this
-    rule, free to disagree with the rail it describes."""
+    rule, free to disagree with the rail it describes.
+
+    [2026-08-27 (vn)] IT NOW LATCHES, AND UNTIL TODAY IT DID NOT — which made
+    the `stop` parameter INERT on real money. The family Book this re-expresses
+    checks its stored `guard_until` FIRST and returns without re-evaluating
+    (`if now < self.guard_until: return True`), so a lockout stands for exactly
+    `stop` bars. This arm recomputed `t_now + stop * tf_s` EVERY loop while the
+    trigger held, and the entry gate is `t0 >= locked_until` — so the lock ran
+    for as long as `trades` stops sat inside the `lookback` window, never for
+    `stop`. MEASURED on 🔮 georgia (15m): configured 12 bars = 3h, actually
+    served up to the 48-bar lookback = **12h**, and moving `stop` would have
+    changed only the number printed on the row.
+
+    Two arms re-expressing one protection and disagreeing about how long it
+    runs is the `(vh)` class at a rail rather than at a gauge. The latch is
+    passed IN and returned OUT rather than held in a module global, so the
+    caller owns persistence and this stays a pure function the tests can drive.
+    """
     tf_s = _interval_ms(S.tf) / 1000.0
     p = S.protections
+    # THE LATCH, checked first — exactly the family's order. A lockout that is
+    # still running is reported as-is and the triggers are NOT re-evaluated,
+    # so it cannot extend itself while the closes that armed it age out.
+    if latch:
+        try:
+            _u, _c = float(latch[0] or 0.0), latch[1]
+            if t_now < _u:
+                return _u, _c
+        except (TypeError, ValueError, IndexError):
+            pass
     sg = p.get("slguard")
     if sg:
         win = [c for c in closed if t_now - c["ts"] <= sg["lookback"] * tf_s]
@@ -1152,6 +1179,11 @@ def main(_ctx=None, once=False):
                       for k, v in (state.get("last_enter") or {}).items()
                       if isinstance(v, bool)}
         last_open_ts = [float(state.get("last_open_ts") or 0.0)]
+        # [(vn)] the StoplossGuard/MaxDrawdown LATCH, restored like the family
+        # Book's `guard_until`. A list so the publish helper's closure sees the
+        # value this loop computed, the same shape `last_open_ts` uses.
+        guard_latch = [float(state.get("guard_until") or 0.0),
+                       (state.get("guard_cause") or None)]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
@@ -1307,6 +1339,7 @@ def main(_ctx=None, once=False):
                 # candles. Blank-most-of-the-time is the worse failure.
                 "last_uptrend": last_uptrend, "last_enter": last_enter,
                 "last_open_ts": last_open_ts[0],
+                "guard_until": guard_latch[0], "guard_cause": guard_latch[1],
                 "capital_adjust": {"total": round(capital_adjust, 2)}})
             ok = store.save_state(STATE_KEY, state)
             if ok is False:
@@ -1598,8 +1631,19 @@ def main(_ctx=None, once=False):
                                     else 1.0)),
                     "sides": "long",
                     "gross_x": gross_x(),
-                    "days_to_gate_obs": round(
-                        max(0.0, 30.0 - (t0 - born_ts) / 86400.0), 1),
+                    # [(vn)] NULL when there is no rate, and Eamon's call:
+                    # *"the guard should not refuse that"*. This is
+                    # `(2/S_d)^2` and a book with ZERO closes has no S_d, so
+                    # any number here is a floor that can never bind — 👩 mum
+                    # published `28.1` having never traded, which kept
+                    # `audit_book_spend` green on exactly the book I22 exists
+                    # to catch. The guard now admits a DECLARED unknown (the
+                    # basis below, plus `closes_obs == 0`) and still refuses a
+                    # bare one, so "no rate" and "missing field" stay
+                    # distinguishable (I1).
+                    "days_to_gate_obs": (
+                        round(max(0.0, 30.0 - (t0 - born_ts) / 86400.0), 1)
+                        if (st.get("closed") or 0) else None),
                     # [(vm)] WHAT THAT NUMBER IS MADE OF. It is the birth
                     # countdown, and on a book with NO closes that is a floor
                     # which can never bind: 👩 mum published `28.1` on 27-Aug
@@ -2033,7 +2077,12 @@ def main(_ctx=None, once=False):
         except Exception:  # noqa: BLE001
             pass
 
-        locked_until, lock_cause = entries_lock(closed_win, t0, baseline)
+        locked_until, lock_cause = entries_lock(
+            closed_win, t0, baseline, latch=(guard_latch[0], guard_latch[1]))
+        # the latch the NEXT loop honours — persisted, like the family's
+        # `guard_until`, so a redeploy cannot silently reset a running lockout
+        # (nor extend one: a lockout already expired stays expired).
+        guard_latch[0], guard_latch[1] = locked_until, lock_cause
         # [(st)] this cycle's verdicts, folded into the durable per-symbol map
         # at the bottom of the loop. Cycle-local so a coin the loop never
         # reached keeps its PREVIOUS verdict instead of being silently reset.

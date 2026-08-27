@@ -182,7 +182,21 @@ START_EQUITY = 1000.0
 # if initial_equity is ever re-baselined by hand.
 CAPITAL_ADJUST_USD = float(os.environ.get("CAPITAL_ADJUST_USD", "32.22"))
 CLIP_USD = float(os.environ.get("TT_CLIP_USD", "50"))   # fallback when no vol data
-MAX_OPEN = int(os.environ.get("TT_MAX_OPEN", "6"))
+# [2026-08-27 (vn)] 6 -> 8, Eamon: *"take it to 8"*, and it CLEARED THE REPLAY
+# rather than bypassing it. `slot_census` (uo) had shown `{offered: 4,
+# slots_full: 4, lens_once: 0}` — four tickets a loop refused purely on the
+# position cap, with the per-lens throttle NOT binding — but that was n=1 cycle.
+# Driven through `lighter_ticket_replay` over the same 2,388-snapshot bus tape
+# (19-27 Aug), the taker's REAL code, both arms identical but for this number:
+#     6 slots -> 75 closes, net +$1.85, $0.025/trade
+#     8 slots -> 99 closes, net +$6.76, $0.068/trade
+# +32% throughput AND a better mean, so this is not denominator shrinkage
+# ((hl)'s 25-of-30 failure mode) — it is the slot cap having been the binding
+# constraint, as the census said. DECLARED LIMIT: the replay cannot resolve the
+# up-regime without a candle fetch, so `breakoutup` (39% of the live book's
+# closes) is absent from BOTH arms — the comparison is apples-to-apples, the
+# LEVEL is not the book's. Capacity, so the era clock does not reset ((hc)).
+MAX_OPEN = int(os.environ.get("TT_MAX_OPEN", "8"))
 # [2026-07-14c CONSTANT-RISK SIZING] Fixed $ clips carry wildly different risk
 # across books (a $50 clip in a 10%-range alt is ~5x the risk of $50 in BTC).
 # Size so every position risks ~the same dollars: expected adverse move ~ half
@@ -206,12 +220,21 @@ RISK_USD = float(os.environ.get("TT_RISK_USD", "3.0"))
 CLIP_MIN = float(os.environ.get("TT_CLIP_MIN", "20"))
 # CLIP_MAX is DERIVED from the fleet's own funding bar, not picked: the
 # sizing-safety guard (test_brain_live_sizing_safety) requires worst-case
-# gross — CLIP_MAX x BRAIN_GROSS_X (2.0) x MAX_OPEN (6) — to stay inside
+# gross — CLIP_MAX x BRAIN_GROSS_X (2.0) x MAX_OPEN — to stay inside
 # 1.2x the book's $1,000 capital, because fill/slippage terms calibrated at
-# the designed clip become fiction above what the book could fund. $95 is
-# the largest ceiling strictly inside that bar ($95 x 2 x 6 = $1,140 <
-# $1,200); a first draft shipped 160 and the guard correctly refused it.
-CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "95"))
+# the designed clip become fiction above what the book could fund. A first
+# draft shipped 160 and the guard correctly refused it.
+# [2026-08-27 (vn)] 95 -> 70, and THE PAIRING IS MANDATORY, not a second
+# opinion: at MAX_OPEN 8 the old ceiling gives 95 x 2 x 8 = $1,520 and the
+# guard reddens. 70 x 2 x 8 = $1,120, strictly inside $1,200 — the same
+# "strictly inside" the 95 was chosen for at 6 slots (75 would sit exactly ON
+# the bar). It reads as undoing (td)'s 80 -> 95 and mostly is not: the book's
+# MEDIAN DEPLOYED CLIP is ~$21, so a $70 ceiling binds on almost nothing,
+# while the extra two slots are worth +32% of closes on the replay. Trading
+# the tail of one trade's size for a third more trades is the right side of
+# that swap on a book whose binding go-live bar is `t`, which grows with
+# sqrt(n) at fixed edge.
+CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "70"))
 TAKE_PROFIT = float(os.environ.get("TT_TP", "0.04"))       # +4%
 STOP_LOSS = float(os.environ.get("TT_SL", "-0.03"))        # -3%
 MAX_HOLD_H = float(os.environ.get("TT_MAX_HOLD_H", "48"))

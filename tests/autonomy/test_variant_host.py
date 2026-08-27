@@ -554,12 +554,30 @@ def test_mum_boots_and_completes_a_cycle_as_HERSELF():
         assert ordr[1]["shadow"] is False
         # [(te)] the I22 spend census, complete on every publish — the guard's
         # first real test was this host's own variants, and it fired.
+        # [(vn)] `days_to_gate_obs` is now NULL on a book with no closes, and
+        # Eamon's call: *"the guard should not refuse that"*. It is (2/S_d)^2
+        # and a book with zero closes has no S_d, so any number is a floor
+        # that can never bind — mum published 28.1 having never traded, which
+        # is what kept `audit_book_spend` GREEN on exactly the book I22 exists
+        # to catch. The census must still SAY it cannot answer, so the
+        # declaration is required in the number's place and a bare null is
+        # still a missing field.
         spend = pub["extra"]["spend"]
-        for f in ("markets_scanned", "n_eff", "sides", "gross_x",
-                  "days_to_gate_obs"):
+        for f in ("markets_scanned", "n_eff", "sides", "gross_x"):
             assert spend.get(f) is not None, (f, spend)
         assert spend["sides"] == "long"
-        assert 0.0 <= spend["days_to_gate_obs"] <= 30.0, spend
+        if spend.get("closes_obs"):
+            assert 0.0 <= spend["days_to_gate_obs"] <= 30.0, spend
+            assert spend["days_to_gate_basis"] == "measured_rate", spend
+        else:
+            assert spend["days_to_gate_obs"] is None, (
+                "a book with no closes must publish NULL, not a floor that "
+                "can never bind", spend)
+            assert spend["days_to_gate_basis"] == "birth_window", spend
+        # ...and either way the guard that owns the contract must accept it
+        import scripts.audit_book_spend as _sp
+        assert not _sp.birth_census({"bot": "freqtrade-mum-lighter",
+                                     "extra": {"spend": spend}}), spend
 
 
 def test_manual_pnl_attestation_reaches_the_row_and_only_the_row():

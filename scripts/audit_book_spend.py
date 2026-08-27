@@ -133,6 +133,24 @@ def birth_census(row, today=None):
                 f"predates I22 it belongs in GRANDFATHERED with a reason."]
     for f in REQUIRED_FIELDS:
         if spend.get(f) is None:
+            # [2026-08-27 (vn)] Eamon: *"the guard should not refuse that"* —
+            # and he is right, because the thing it was refusing is the HONEST
+            # answer. `days_to_gate_obs` is `(2/S_d)^2`, and a book with no
+            # closes has no S_d: any number it prints is a floor that can never
+            # bind. 👩 mum published `28.1` having never traded, which is what
+            # kept this guard GREEN on exactly the book I22 exists to catch —
+            # the number was doing the opposite of its job.
+            #
+            # So a DECLARED unknown is admitted and a bare one is not. The
+            # census must say WHY it cannot answer (`days_to_gate_basis`) and
+            # show the count that makes it unanswerable (`closes_obs == 0`).
+            # That keeps the I1 distinction this whole class turns on: "I
+            # measured and there is no rate" and "the field is missing" must
+            # never be one byte-string. A book with closes still owes a number.
+            if (f == "days_to_gate_obs"
+                    and spend.get("days_to_gate_basis")
+                    and spend.get("closes_obs") == 0):
+                continue
             probs.append(f"{bot}: spend census missing `{f}`")
     n_eff = spend.get("n_eff")
     if isinstance(n_eff, (int, float)) and isinstance(
