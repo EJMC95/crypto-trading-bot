@@ -259,7 +259,36 @@ def test_the_judge_fails_OPEN_on_a_dark_bus_and_says_why():
     fleet's only path to more real money on an import error."""
     src = (ROOT / "experiment_judge.py").read_text()
     assert "_bus = None" in src
-    assert "if _bus is not None and _bus.live_arm_retired(LIVE_BOT):" in src
+    # [(vm)] PIN THE PROPERTY, NOT THE LINE. This asserted the literal
+    # `if _bus is not None and _bus.live_arm_retired(LIVE_BOT):`, and (vm)'s
+    # per-pair restart made the stand-down read `live_bot` — the pair's own row
+    # instead of the module global — so a test guarding fail-OPEN failed on a
+    # RENAME while the property it exists for was intact. A substring is not a
+    # wiring test: walk the AST and require that EVERY `live_arm_retired` call
+    # sits under a `<bus> is not None` guard in the same boolean expression,
+    # which survives any rename and catches a genuinely unguarded call.
+    import ast
+    tree = ast.parse(src)
+    calls, guarded = 0, 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.BoolOp) or not isinstance(node.op, ast.And):
+            continue
+        txt = " ".join(ast.unparse(v) for v in node.values)
+        if "live_arm_retired(" not in txt:
+            continue
+        calls += 1
+        if any(isinstance(v, ast.Compare)
+               and isinstance(v.ops[0], ast.IsNot)
+               and isinstance(v.comparators[0], ast.Constant)
+               and v.comparators[0].value is None
+               for v in node.values):
+            guarded += 1
+    # positive control: a walk that finds NO calls proves nothing
+    assert calls >= 1, "no live_arm_retired call found — the walk is broken"
+    assert calls == guarded, (
+        f"{calls - guarded} live_arm_retired call(s) are not guarded by an "
+        "`is not None` bus check — a dark bus would stop the judge instead of "
+        "letting the paired bar's own live>=10 floor do the blocking")
 
 
 # ---- 5  the watchdog does not misattribute the halt ------------------------

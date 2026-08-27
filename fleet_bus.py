@@ -318,6 +318,15 @@ XP_JUDGE_UNJUDGEABLE = (
     "policy_unstamped", "policy_mismatch", "capacity_mismatch",
     "parity_unreadable", "no_live_arm", "live_row_dark",
     "shadow_row_dark",
+    # [2026-08-27 (vm)] DISTINCT FROM `policy_unstamped` ON PURPOSE. 👩 mum
+    # read `policy_unstamped` while her stamps were {live: "0/0", shadow:
+    # "0/8"} and the host file that reason names stamps CORRECTLY — 🔮 georgia
+    # reads 30/30 from the same code. So it sent the next reader hunting a
+    # stamping bug in a file with no bug. Her real condition is that she has
+    # never closed a trade: the pair wakes on a TRADE, not on a code change,
+    # which is why the dashboard maps it beside `policy_unstamped` as MEASURE
+    # rather than WIRE.
+    "no_closes",
     "pnl_form_mismatch", "unknown_exit_reason")
 
 

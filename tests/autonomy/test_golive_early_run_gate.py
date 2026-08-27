@@ -234,7 +234,14 @@ def test_no_long_sleep_precedes_the_first_publish_attempt():
 
 def test_the_early_run_is_gated_and_the_steady_loop_is_not():
     block = _golive_block()
-    idx = [i for i, ln in enumerate(block) if "golive_readiness.py" in ln]
+    # [(vm)] COUNT INVOCATIONS, NOT MENTIONS. This read "golive_readiness.py"
+    # in ln and so counted COMMENTS: the day a neighbouring loop's comment
+    # named the grader (explaining which files Dockerfile.freqtrade COPYs) the
+    # count went 2 -> 3 and this failed on prose. The property is about how
+    # many times the organ is RUN, so only executable lines may be counted —
+    # and it stays strict, because a genuine third invocation still fails.
+    idx = [i for i, ln in enumerate(block)
+           if "golive_readiness.py" in ln and not ln.lstrip().startswith("#")]
     assert len(idx) == 2, f"expected exactly 2 invocations, got {len(idx)}"
     early = " ".join(block[idx[0]:idx[0] + 2])
     steady = " ".join(block[idx[1]:idx[1] + 2])

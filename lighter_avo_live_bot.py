@@ -717,18 +717,27 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
     return out
 
 
-def entries_locked(closed, t_now, baseline):
+def entries_lock(closed, t_now, baseline):
     """The family Book's protections (slguard + maxdd) on THIS arm's own
     closes, with the drawdown denominator the LIVE baseline instead of the
     shadow's $1,000 — 20% of a paper grand would never bind on a $63 book.
-    Returns the lock-release ts (0.0 = unlocked) so the row can PUBLISH it."""
+    Returns (lock-release ts, cause) — 0.0 = unlocked — so the row can PUBLISH
+    both.
+
+    [2026-08-27 (vm)] This was `entries_locked` and returned the ts ALONE; the
+    CAUSE existed only as the branch that computed it and died there. So the
+    row could say a lockout was running and never which rail was running it,
+    and thirty days of them could not be attributed to anything. The gate
+    reads the ts and the census reads the cause off ONE computation — a second
+    function asking "which protection fired" would be a second copy of this
+    rule, free to disagree with the rail it describes."""
     tf_s = _interval_ms(S.tf) / 1000.0
     p = S.protections
     sg = p.get("slguard")
     if sg:
         win = [c for c in closed if t_now - c["ts"] <= sg["lookback"] * tf_s]
         if sum(1 for c in win if c.get("stop")) >= sg["trades"]:
-            return t_now + sg["stop"] * tf_s
+            return t_now + sg["stop"] * tf_s, "slguard"
     dd = p.get("maxdd")
     ref = baseline if baseline and baseline > 0 else 1000.0
     if dd:
@@ -740,8 +749,214 @@ def entries_locked(closed, t_now, baseline):
                 peak = max(peak, cum)
                 worst = max(worst, (peak - cum) / ref)
             if worst >= dd["dd"]:
-                return t_now + dd["stop"] * tf_s
-    return 0.0
+                return t_now + dd["stop"] * tf_s, "maxdd"
+    return 0.0, None
+
+
+# --------------------------------------------------------------------------
+# [2026-08-27 (vm)] WHAT THE RAILS COST — the live trio's shut accounting.
+#
+# MEASURED 27-Aug: `freqtrade-georgia-lighter` published
+# `scan.entries_shut: "protections_locked"` beside
+# `entry_vetoes.locked_until: 2026-08-27T11:45:14Z` — ONE lockout, live, with
+# nothing behind it. `entry_vetoes` carried `notional_cap_skips`,
+# `brain_floored` and `fleet_long_veto` and NO halt counter at all, so on the
+# fleet's only real-money books nobody could state how many evidence-days the
+# rails have taken. That cuts both ways and that is why it is worth building:
+# an unmeasured rail can neither be defended under I19 nor loosened under it —
+# 👩 mum's whole revival was an argument about how fast a book can reach 30
+# closes, and the hours her own protections hold her shut are not in it.
+#
+# EVERYTHING HERE IS PUBLISH-ONLY. No gate reads any of it, and none of these
+# names appears anywhere in the entry path — AST-pinned in
+# tests/autonomy/test_shutout_accounting.py, which is the test that matters
+# here: a counter that grows a consumer becomes a gate, and on real money that
+# is the whole risk of this change.
+
+#: The rails that can shut this book, as CAUSE BUCKETS. Two of them are
+#: `entries_lock`'s own branches (read from it, never re-derived), one is the
+#: daily-loss latch and one is the per-coin cooldown.
+SHUT_CAUSES = ("daily_halt", "slguard", "maxdd", "cooldown")
+
+#: Everything else that shuts a loop — the kill switch, an unreadable venue, a
+#: clip under the dust floor, a halt read that failed. An hour the four
+#: buckets cannot explain must be VISIBLE, never dropped: a total quietly
+#: larger than its own parts under-reports what the rails cost, which is the
+#: direction that argues for keeping a rail nobody has priced.
+SHUT_UNATTRIBUTED = "unattributed"
+
+#: History namespace for the shut series (`<row>:rails:census`). Deliberately
+#: NOT `<row>:census` — the scan census is a different series with different
+#: buckets, and pooling two series under one key is the (hp) two-writers shape
+#: at counter scale.
+RAILS_CENSUS_BOT = BOT_ROW + ":rails"
+
+
+def shut_cause(kill_armed, halted, t_now, locked_until, lock_cause,
+               entries_shut, verdicts):
+    """WHICH RAIL SHUT THIS LOOP -> (bucket, reason); (None, None) when the
+    book could open. PURE: it reads decisions this cycle already made and
+    makes none of its own.
+
+    Precedence is the loop's own order (kill switch -> daily halt ->
+    protections -> the remaining `entries_ok` terms), so exactly ONE bucket
+    owns a shut loop and the buckets sum to the total by construction.
+
+    A halt read that FAILED is `unattributed`, not `daily_halt`: the loop
+    fails closed on it (correctly), but charging the daily rail for a Postgres
+    blip would inflate the one number an argument about that rail will use.
+    Unknown degrades to "I cannot attribute this", never to a guess.
+
+    `cooldown` is the only book-level reading that has to be inferred, and it
+    is inferred CONSERVATIVELY — the scan ran, every coin it evaluated was
+    refused for cooldown, and nothing else shut the book. One coin cooling
+    while the rest were merely signal-less is the book working, not a rail
+    shutting it."""
+    if kill_armed:
+        return SHUT_UNATTRIBUTED, "kill_switch"
+    if halted:
+        return "daily_halt", "halted_today"
+    if locked_until and t_now < locked_until:
+        return (lock_cause if lock_cause in SHUT_CAUSES
+                else SHUT_UNATTRIBUTED), "protections_locked"
+    if entries_shut:
+        return SHUT_UNATTRIBUTED, str(entries_shut)
+    vals = list((verdicts or {}).values())
+    if vals and all(v == "cooldown" for v in vals):
+        return "cooldown", "cooldown"
+    return None, None
+
+
+def shut_day_edge(seen, day, bucket):
+    """The FIRST loop of each UTC day to reach each bucket -> {"any": 1,
+    "<bucket>": 1}. Mutates `seen` ({"day": iso, "causes": [...]}), which
+    lives in the bot's durable state so a mid-day redeploy cannot re-count a
+    day it has already counted.
+
+    Days cannot be summed out of loop counters — 40 shut loops is one day or
+    forty — so the SERIES has to carry the edge. A DAY is the unit an evidence
+    argument actually runs in: the go-live gate accrues closes over days, and
+    a rail that costs 12 days of a 30-day window is a different object from
+    one that costs 12 loops."""
+    if not isinstance(seen, dict):
+        return {}
+    if seen.get("day") != day:
+        seen["day"], seen["causes"] = day, []
+    if not bucket:
+        return {}
+    causes = seen.setdefault("causes", [])
+    out = {}
+    if not causes:
+        out["any"] = 1
+    if bucket not in causes:
+        causes.append(bucket)
+        out[bucket] = 1
+    return out
+
+
+def basket_move_state(eq, open_ntl):
+    """WHY `leverage.halt.basket_move_now_pct` is None, when it is.
+
+    [(vm)] Measured 27-Aug: 🔮 georgia and 👩 mum published `null` while 🙏 avo
+    published 0.0658 — and `null` is byte-identical between "the book is FLAT,
+    so no basket move can reach the halt at all" and "the sensor is dark", on
+    the one number that says how far a levered real-money book is from ending
+    its own day. That is I1 at field scale, so the distinction is published
+    beside the value instead of left to the reader. The VALUE is untouched."""
+    if eq is None:
+        return "equity_dark"
+    if open_ntl is None:
+        return "notional_dark"
+    if not open_ntl:
+        return "flat"
+    if not eq:
+        return "equity_zero"
+    return "measured"
+
+
+def rails_cost(census_bot, t_now, day, bucket, reason, locked_until, halted,
+               seen, days=30):
+    """Snapshot THIS loop's shut row, then roll the series up. Never raises.
+
+    THE ROLLUP IS A DUTY CYCLE OVER THE SPAN ACTUALLY COVERED
+    (`shut_loops / loops * hours`), never `loops * LOOP_SECONDS`: the loop
+    sleeps a variable remainder, a redeploy drops samples, and multiplying by
+    the nominal period would invent time the series never saw.
+    `census_window` reports the span first-sample-to-last for exactly this
+    reason — and one sample spans 0.0, because a rate is undefined on one loop.
+
+    `hours_shut_today` is a FLOOR ((ks)'s convention): the shut still to run
+    from THIS loop's own rails — the lock's release, or the UTC day roll that
+    clears the halt (`_halt_day != cur_day` at the top of the loop, read from
+    that rule rather than re-derived) — plus the measured elapsed shut today
+    when the series can supply it. A dark series degrades to the lock-only
+    number and SAYS so in `today_basis`; it never degrades to 0.0, which would
+    read as "the rails cost nothing today" (I1).
+
+    PUBLISH-ONLY: writes one history row, reads two windows, returns a dict
+    for the payload. Nothing here reads a gate and no gate reads it."""
+    out = {"hours_shut_today": 0.0, "today_basis": "lock_only",
+           "lock_pending_h": 0.0, "shut_now": bucket, "shut_reason": reason,
+           "lockout_hours_30d": None, "halt_days_30d": None,
+           "entries_shut_reason_30d": None}
+    try:
+        t_now = float(t_now)
+        # THE LOCK-ONLY FLOOR IS COMPUTED FIRST, deliberately: it needs nothing
+        # but this loop's own rails, so a store with no census API at all (an
+        # image shipped before the series existed) still publishes the honest
+        # floor and its `lock_only` basis instead of falling to 0.0 through the
+        # guard below. The order IS the fail-safe.
+        pend_lock = max(0.0, float(locked_until or 0.0) - t_now) / 3600.0
+        pend_halt = (((int(t_now) // 86400 + 1) * 86400 - t_now) / 3600.0
+                     if halted else 0.0)
+        out["lock_pending_h"] = round(pend_lock, 3)
+        # MAX, not sum: two rails shutting the same wall-clock hours cost that
+        # hour ONCE. Summing would double-charge a locked book that also halted.
+        pending = max(pend_lock, pend_halt)
+        out["hours_shut_today"] = round(pending, 3)
+
+        buckets = SHUT_CAUSES + (SHUT_UNATTRIBUTED,)
+        store.snapshot_census(census_bot, {
+            "shut": 1 if bucket else 0,
+            "shut_by": {c: (1 if bucket == c else 0) for c in buckets},
+            "day_first": shut_day_edge(seen, day, bucket),
+            "reason": ({str(reason): 1} if reason else {})})
+
+        w = store.census_window(census_bot, hours=24.0 * float(days))
+        loops = int(w.get("loops") or 0)
+        span = float(w.get("hours") or 0.0)
+        if loops:
+            parts = {c: round(float(w.get("shut_by." + c) or 0.0)
+                              / loops * span, 3) for c in buckets}
+            # the total is the SUM OF THE PUBLISHED PARTS, so the two can never
+            # disagree by a rounding step. A total that does not equal its own
+            # parts is precisely the silently-dropped hour this block exists to
+            # make impossible.
+            parts["total"] = round(sum(parts.values()), 3)
+            parts["loops"], parts["span_h"] = loops, round(span, 4)
+            out["lockout_hours_30d"] = parts
+            dayb = {c: int(w.get("day_first." + c) or 0) for c in buckets}
+            # NOT the sum of the parts, deliberately: one day can hit two
+            # rails, so `days_any` is its own counter and is <= that sum.
+            dayb["days_any"] = int(w.get("day_first.any") or 0)
+            out["halt_days_30d"] = dayb
+            out["entries_shut_reason_30d"] = {
+                k.split(".", 1)[1]: int(v) for k, v in w.items()
+                if str(k).startswith("reason.")}
+
+        # today = since the UTC midnight the halt latch itself rolls on.
+        today_h = (t_now % 86400.0) / 3600.0
+        wd = (store.census_window(census_bot, hours=today_h)
+              if today_h > 0 else {})
+        dloops = int(wd.get("loops") or 0)
+        if dloops:
+            elapsed = (float(wd.get("shut") or 0.0) / dloops
+                       * float(wd.get("hours") or 0.0))
+            out["today_basis"] = "lock+series"
+            out["hours_shut_today"] = round(pending + elapsed, 3)
+    except Exception:  # noqa: BLE001 — telemetry never breaks a live loop
+        pass
+    return out
 
 
 def main(_ctx=None, once=False):
@@ -843,6 +1058,11 @@ def main(_ctx=None, once=False):
     # cycles so the halt paths (which publish before the scan re-measures) can
     # report the last known value instead of nothing. None until first measured.
     spend_n_eff = None
+    # [(vm)] the last rails-cost rollup, computed once per TRADING pass and
+    # re-published unchanged by the telemetry refreshes in between — a refresh
+    # must not add a loop to the census (it would inflate the denominator and
+    # deflate every duty cycle) nor spend two more history reads.
+    _rails = [None]
 
     while True:
         t0 = time.time()
@@ -998,6 +1218,10 @@ def main(_ctx=None, once=False):
         # Loop-scope defaults so the publish helper is callable from the
         # kill/halt paths, which run BEFORE the entry section assigns these.
         locked_until = 0.0
+        # [(vm)] which protection set that lock — "slguard" | "maxdd" | None.
+        # Defaulted here for the same reason `locked_until` is: the kill and
+        # halt paths publish before the entry section runs.
+        lock_cause = None
         fleet_long_veto = False
         brain_gated_tags = []
         brain_expand_refused = brain_floored = 0
@@ -1109,6 +1333,22 @@ def main(_ctx=None, once=False):
                 _open_ntl = open_notional(live_pos, meta, len(live_pos), 0.0)
             except Exception:  # noqa: BLE001
                 _open_ntl = None
+            # [(vm)] WHAT THE RAILS COST. Which rail (if any) is shutting the
+            # book right now, then the series it belongs to — snapshotted and
+            # rolled up ONCE per trading pass, on the same `snapshot` flag the
+            # MTM series uses, so a telemetry refresh cannot add a loop to the
+            # denominator. `kill` comes off the caller's own extra rather than
+            # a second `rails.kill_check()`: re-asking a switch to label a
+            # publish would be a second read of a safety control.
+            _shut_now, _shut_why = shut_cause(
+                bool((extra_extra or {}).get("kill")), halted_today, t0,
+                locked_until, lock_cause, entries_shut, cycle_verdict)
+            if snapshot:
+                _rails[0] = rails_cost(
+                    RAILS_CENSUS_BOT, t0, cur_day, _shut_now, _shut_why,
+                    locked_until, halted_today,
+                    state.setdefault("shut_days", {}))
+            _rc = _rails[0] or {}
             # [(sr)] ONE effective clip, read by both `clip_usd` and `cap_slots`
             # — the cap census must describe the clip the row publishes, and a
             # second copy of this expression is how the two drift apart.
@@ -1216,6 +1456,13 @@ def main(_ctx=None, once=False):
                         "basket_move_now_pct": (
                             round(DAILY_LOSS_LIMIT * eq / _open_ntl, 4)
                             if (eq and _open_ntl) else None),
+                        # [(vm)] WHY that number is null, when it is — see
+                        # basket_move_state(). "flat" (no basket, so no basket
+                        # move can reach the halt) and "equity_dark" (the
+                        # sensor could not answer) published the SAME null on
+                        # three real-money rows until this field existed.
+                        "basket_move_now_state": basket_move_state(
+                            eq, _open_ntl),
                         "binding": ("abs" if (
                             day_start_equity
                             and getattr(rails, "max_daily_loss", None)
@@ -1254,6 +1501,29 @@ def main(_ctx=None, once=False):
                     "coin_veto": {c: coin_vetoed[c]
                                   for c in sorted(coin_vetoed)},
                     "live_clip_scale": live_scale,
+                    # [(vm)] WHAT THE RAILS COST, beside the counters that
+                    # already say what the SIZING refused. `locked_until` above
+                    # publishes ONE lock with no history behind it, so a book
+                    # locked out for a third of a month and a book that has
+                    # never locked were the same row. See rails_cost().
+                    #   shut_now  -- the rail shutting the book THIS loop, or
+                    #                None. `shut_reason` is its own vocabulary
+                    #                ("kill_switch", "clip_below_min", ...).
+                    #   *_30d     -- None when the series is dark, NEVER a
+                    #                zero-filled dict: "the rails cost
+                    #                nothing" and "there is no data" must not
+                    #                be one byte-string (I1).
+                    #   hours_shut_today -- a FLOOR, and `hours_shut_basis`
+                    #                says whether the elapsed half is measured
+                    #                or only the lock still to run.
+                    "shut_now": _rc.get("shut_now"),
+                    "shut_reason": _rc.get("shut_reason"),
+                    "hours_shut_today": _rc.get("hours_shut_today"),
+                    "hours_shut_basis": _rc.get("today_basis"),
+                    "lockout_hours_30d": _rc.get("lockout_hours_30d"),
+                    "halt_days_30d": _rc.get("halt_days_30d"),
+                    "entries_shut_reason_30d": _rc.get(
+                        "entries_shut_reason_30d"),
                 },
                 "capital_adjust": round(cap_adj, 2),
                 # [(td)] the operator's manual-trade attestation, always
@@ -1693,7 +1963,7 @@ def main(_ctx=None, once=False):
         except Exception:  # noqa: BLE001
             pass
 
-        locked_until = entries_locked(closed_win, t0, baseline)
+        locked_until, lock_cause = entries_lock(closed_win, t0, baseline)
         # [(st)] this cycle's verdicts, folded into the durable per-symbol map
         # at the bottom of the loop. Cycle-local so a coin the loop never
         # reached keeps its PREVIOUS verdict instead of being silently reset.
@@ -2422,9 +2692,21 @@ def _selftest():
             "day_start": {"day": now().date().isoformat(), "equity": 62.80}}
         run(v, _StubRails())
         assert v.opens == [], "slguard (2 stops) must lock entries"
-        assert captured["published"][-1][1]["extra"]["entry_vetoes"][
-            "locked_until"] is not None, \
+        _ev = captured["published"][-1][1]["extra"]["entry_vetoes"]
+        assert _ev["locked_until"] is not None, \
             "the lock must be PUBLISHED, not only enforced"
+        # [(vm)] and the row must say WHICH rail, and what it is costing. With
+        # no DB under the selftest the series is dark, so the 30d blocks are
+        # None (never a zero-filled dict) while `hours_shut_today` still
+        # carries the lock's own remaining hours — the lock-only FLOOR.
+        assert _ev["shut_now"] == "slguard", _ev["shut_now"]
+        assert _ev["shut_reason"] == "protections_locked", _ev["shut_reason"]
+        assert _ev["hours_shut_today"] > 0, _ev["hours_shut_today"]
+        assert _ev["hours_shut_basis"] == "lock_only"
+        assert _ev["lockout_hours_30d"] is None, \
+            "a dark series must not publish a zero-filled rollup"
+        assert captured["published"][-1][1]["extra"]["leverage"]["halt"][
+            "basket_move_now_state"] == "flat", "no positions ⇒ flat, not dark"
 
         # ---- 10) unreadable positions: no orders either way ----------------
         captured["state"].clear()

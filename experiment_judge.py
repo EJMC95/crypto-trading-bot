@@ -96,6 +96,28 @@ COOLDOWN_H = float(os.environ.get("XPJ_COOLDOWN_H", "48"))
 # back to env defaults) must win over an indefinitely-blind promotion.
 BLIND_MAX = int(os.environ.get("XPJ_BLIND_MAX_CYCLES", "24"))
 
+#: The one-sided 90% normal quantile, the MDE multiplier for `_pair_power`.
+#: DELIBERATELY NOT imported from `fleet_allocation.Z_LOWER`, which is the same
+#: 1.28 for the same reason: that one is a LIVE ENV LEVER on the allocation
+#: lane (`ALLOC_Z_LOWER`), so importing it would let a session tightening
+#: capital allocation silently move the judge's published power report. Same
+#: number, different owner — named here so the coincidence is on the record
+#: rather than looking like a missed de-duplication.
+MDE_Z = 1.28
+
+
+def half_floors(min_closes=None, live_min=None):
+    """THE PER-HALF SAMPLE FLOORS — one owner, so the bar and the power report
+    can never disagree about what the binding rung is.
+
+    [(vm)] `paired_eval` computed these inline and `_pair_power` retyped the
+    FULL-WINDOW floors instead, which is how the published MDE came to describe
+    a rung that is not the binding one. Returns (shadow_half, live_half)."""
+    mc = MIN_CLOSES if min_closes is None else min_closes
+    lm = LIVE_MIN_CLOSES if live_min is None else live_min
+    return max(2, mc // 2), max(3, lm // 2)
+
+
 # One candidate at a time, in order.
 CANDIDATES = [
     # [2026-07-21 REVIEW D2] the gate WIDENING (11-Jul "opt-in, shadow-validate",
@@ -644,8 +666,10 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     # real money. Floors derive from the effective window floors (env-tunable
     # via the same XPJ_* knobs), so an even split of exactly-at-floor data
     # still clears; a lopsided one holds until the thin half fills in.
-    half_sh_min = max(2, min_closes // 2)
-    half_lv_min = max(3, live_min // 2)
+    # [(vm)] ONE owner for these two numbers — `half_floors`. They were typed
+    # here and the power report retyped the FULL-WINDOW pair instead, so the
+    # published MDE described a rung the bar does not use.
+    half_sh_min, half_lv_min = half_floors(min_closes, live_min)
     for a, b, label in (((start_ts, mid, "h1"), (mid, end_ts, "h2")) if both_halves else ()):
         # [(sk)] the halves take the SAME policy match as the full window.
         # Caught by the fix's own fixture: matching only the full window left
@@ -1708,6 +1732,19 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
     live_bot, shadow_bot = pspec["live_bot"], pspec["shadow_bot"]
     st = {"live_bot": live_bot, "shadow_bot": shadow_bot,
           "pnl_form": pspec["pnl_form"], "candidate": None, "hold": None}
+    # [2026-08-27 (vm)] THE POWER REPORT IS PUBLISHED ON EVERY STATE, NOT ONLY
+    # ON `idle`. It was computed inside the `idle` rung's `st.update(...)`, and
+    # every `_un(...)` and the `stood_down` branch return BEFORE that line — so
+    # three of four live pairs published no power at all, and the one number
+    # that says HOW LONG a blocked pair still has to run was visible only on
+    # the pairs that were not blocked. Exactly backwards: a pair reading
+    # `policy_unstamped` for a fortnight is the one whose closes/day and
+    # `eta_judgeable` decide whether closing the wire is worth the week.
+    # Computed ONCE here so no rung can forget it and no two rungs can disagree
+    # (`_pair_power` never raises and returns None where the sample cannot
+    # say — a blocked pair's report is honest, not absent).
+    st["power"] = _pair_power(rows, live_bot, shadow_bot, pspec, now)
+    st["eta_judgeable"] = _eta_judgeable(st["power"], now)
 
     def _un(reason, detail, wake):
         st.update(phase="unjudgeable",
@@ -1811,6 +1848,32 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
     lp, ln, lt = _latest_policy_stamp(rows, live_bot)
     sp, sn, stn = _latest_policy_stamp(rows, shadow_bot)
     st["stamps"] = {"live": f"{ln}/{lt}", "shadow": f"{sn}/{stn}"}
+    # [2026-08-27 (vm)] AN EMPTY LEDGER IS NOT AN UNSTAMPED ONE — `no_closes`.
+    #
+    # 👩 mum published `policy_unstamped` naming `lighter_avo_live_bot.py` as
+    # the file to go fix, on stamps `{live: "0/0", shadow: "0/8"}`. That host
+    # HAS no stamping bug — 🔮 georgia reads `30/30` off the same code — so the
+    # reason sent the next reader hunting a defect in a file that does not have
+    # one (I8: the reason the operator sees decides what they do next, and a
+    # wrong object is worse than an opaque one). Her actual condition is that
+    # her LIVE arm has never closed a trade: `0/0` is zero closes, while
+    # `0/8` is eight closes and none stamped, and the old rung read them as the
+    # same fact because it only ever looked at `latest is None`.
+    #
+    # The split is on the DENOMINATOR, which is the only thing that
+    # distinguishes them, and it runs FIRST because no stamping work can fix an
+    # empty ledger. Its wake condition is a trade, not a deploy.
+    _empty = [f"{b} ({t} closes)" for b, t in ((live_bot, lt), (shadow_bot, stn))
+              if t == 0]
+    if _empty:
+        return _un("no_closes",
+                   f"no closes at all on: {', '.join(_empty)} — the arm has "
+                   f"never traded, so there is nothing to stamp and nothing "
+                   f"to pair (stamps {st['stamps']}); this is NOT a stamping "
+                   f"defect in {pspec['host_file']} / lighter_family_bot.py",
+                   "the arm closes its first trade — a paired bar needs "
+                   f"{MIN_CLOSES} shadow and {LIVE_MIN_CLOSES} live closes, "
+                   "so the first one is the floor, not the bar")
     if lp is None or sp is None:
         which = []
         if lp is None:
@@ -1944,23 +2007,15 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
         _note += (f" · judgeable WITH a declared parity waiver on "
                   f"{sorted(waived)} (measured inert on this pair; the "
                   f"divergence is published, not hidden)")
-    st.update(phase="idle",
-              note=_note,
-              # [(ti)] THE POWER REPORT — the statistics audit's central
-              # finding, published instead of re-argued: at v1's 30/10
-              # floors the minimum detectable per-trade gap is
-              # 1.28*sd*sqrt(1/30+1/10) = 0.365*sd, so at family-book
-              # dispersion (sd 3-6%) the 0.5pp margin was a coin-flip
-              # detector. REPORT ONLY (I16's own advisory scoping — an
-              # actuator-grade bar is v2.1's, class-split by candidate and
-              # cluster-robust); a pair whose MDE dwarfs the margin is
-              # visible here before anyone spends a 7-day window on it.
-              power=_pair_power(rows, live_bot, shadow_bot, pspec, now))
+    # [(ti)/(vm)] the POWER REPORT rides `st` from the top of this function —
+    # every state carries it, `idle` included. It stays REPORT ONLY (I16's own
+    # advisory scoping); nothing gates on it.
+    st.update(phase="idle", note=_note)
     return st
 
 
 def _pair_power(rows, live_bot, shadow_bot, pspec, now, window_d=14.0):
-    """{sd_pct, closes_per_day, n} per arm + mde_pp at the v1 floors, over
+    """{sd_pct, closes_per_day, n} per arm + the MDE at the floors, over
     the trailing window's ECONOMIC closes (strip_exits removed — the same
     strip the bar itself will take). None fields where the sample cannot
     say; never raises."""
@@ -1997,10 +2052,92 @@ def _pair_power(rows, live_bot, shadow_bot, pspec, now, window_d=14.0):
                           "closes_per_day": round(n / window_d, 2)}
         if sds:
             pooled = max(sds)
-            out["mde_pp_at_floors"] = round(
-                1.28 * pooled * math.sqrt(1 / 30 + 1 / 10), 3)
+            # [2026-08-27 (vm)] THE PUBLISHED MDE DESCRIBED THE WRONG RUNG.
+            # It read `sqrt(1/30 + 1/10)` — the FULL-WINDOW floors — while the
+            # bar that actually binds is the PER-HALF one: `paired_eval` splits
+            # the window and requires the margin on h1 AND h2 at
+            # `half_floors()` = (15, 5). That interval is
+            # sqrt(1/15+1/5)/sqrt(1/30+1/10) = **1.414x wider**, and it must be
+            # cleared TWICE — so the number the operator was reading
+            # under-stated the real detection threshold by 41% on the rung that
+            # rejects candidates first. Both are published now: `mde_pp_half`
+            # is THE bar (kept as the headline `mde_pp_at_floors` so no
+            # consumer silently keeps reading the looser one under the old key
+            # — the key's MEANING is corrected, not its name), and
+            # `mde_pp_full_window` stays beside it so the 1.414x is visible
+            # rather than asserted. Still REPORT ONLY: `paired_eval` is
+            # untouched and no verdict moves.
+            _hs, _hl = half_floors()
+            out["mde_pp_half"] = round(
+                MDE_Z * pooled * math.sqrt(1 / _hs + 1 / _hl), 3)
+            out["mde_pp_full_window"] = round(
+                MDE_Z * pooled * math.sqrt(1 / MIN_CLOSES + 1 / LIVE_MIN_CLOSES), 3)
+            out["mde_pp_at_floors"] = out["mde_pp_half"]
+            out["mde_basis"] = (f"per-half floors {_hs}/{_hl}, cleared twice "
+                                f"(h1 AND h2) — the binding rung; full-window "
+                                f"{MIN_CLOSES}/{LIVE_MIN_CLOSES} is looser")
             out["margin_pp"] = MARGIN_PP
         return out
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _eta_judgeable(power, now, min_days=None, min_closes=None, live_min=None):
+    """WHEN could this pair be judged at all, at its arms' MEASURED close
+    rates — a FLOOR, with the BINDING term named.
+
+    Same shape and same discipline as `scripts/golive_readiness.gate_horizon`:
+    one `days` per term, the binding one is the MAX, and the answer is
+    explicitly a floor (the earliest the paired bar can OPEN, never a claim
+    that it will pass). Three terms, each one of the judge's own gates:
+
+        window         MIN_DAYS — the calendar the candidate must run
+        shadow_closes  MIN_CLOSES / shadow closes-per-day
+        live_closes    LIVE_MIN_CLOSES / live closes-per-day
+
+    From a STANDING START, deliberately: a candidate window begins when the
+    judge asserts its levers, so the closes it needs are the ones that accrue
+    AFTER that moment — the trailing sample sizes the rate, never the numerator.
+
+    FAIL-SAFE: an arm with no measurable rate makes its own term
+    UNPROJECTABLE, and the whole answer is then `days: None` with that arm
+    NAMED — never a number computed off the arms that do move, which would read
+    as a real ETA for a pair that has one dead arm (I1: the smaller arm is the
+    one that decides). Never raises; `None` power in, `None` out.
+
+    `now` is the clock this cycle was HANDED (epoch seconds or a datetime, via
+    `_epoch`), never the wall clock — the (va) lesson: a date computed off
+    `now_ts()` inside a function given a `now` is undriveable by a test and
+    silently disagrees with every other field on the same payload."""
+    md = MIN_DAYS if min_days is None else float(min_days)
+    mc = MIN_CLOSES if min_closes is None else int(min_closes)
+    lm = LIVE_MIN_CLOSES if live_min is None else int(live_min)
+    if not isinstance(power, dict):
+        return None
+    try:
+        terms, dead = {"window": round(md, 1)}, []
+        for label, need in (("shadow", mc), ("live", lm)):
+            rate = (power.get(label) or {}).get("closes_per_day")
+            key = f"{label}_closes"
+            if not isinstance(rate, (int, float)) or rate <= 0:
+                terms[key], dead = None, dead + [label]
+                continue
+            terms[key] = round(need / float(rate), 1)
+        if dead:
+            return {"days": None, "eta": None, "kind": "floor",
+                    "binding": f"{dead[0]}_closes", "terms": terms,
+                    "why": (f"no measurable close rate on the {'/'.join(dead)} "
+                            f"arm over the power window — the pair cannot be "
+                            f"judged at any date, and a number from the other "
+                            f"arm alone would read as one")}
+        binding = max(terms, key=lambda k: terms[k])
+        days = terms[binding]
+        return {"days": days,
+                "eta": iso(_epoch(now) + days * 86400.0)[:10],
+                "kind": "floor", "binding": binding, "terms": terms,
+                "why": (f"floor {days:.1f}d, bound by {binding} "
+                        f"({', '.join(f'{k} {v}d' for k, v in sorted(terms.items()))}) "
+                        f"— the earliest the paired bar can OPEN, not pass")}
     except Exception:  # noqa: BLE001
         return None
 
@@ -2035,6 +2172,95 @@ def pair_census(rows, bot_rows, now):
                         "unjudgeable": {"reason": "parity_unreadable",
                                         "detail": f"census error: {e!r}",
                                         "wake_when": "the census computes"}}
+    return out
+
+
+# [2026-08-27 (vm)] THE STAND-DOWN IS PER-PAIR, NOT PER-PROCESS.
+#
+# MEASURED before this change: `run_once` hit `if _bus.live_arm_retired(
+# LIVE_BOT): return save(stood_down)` at module scope, and BOTH production
+# `paired_eval` call sites sit below it — so the sole producer of
+# `promote: True` ran ZERO TIMES PER CYCLE, for every pair, because ONE pair's
+# live arm is retired. The four `pairs` entries computed above it are a
+# read-only precheck; the judge published a census of four and judged none.
+#
+# The retirement itself is CORRECT and stays: 💸 the Farmer's live arm was
+# retired 22-Aug (ta) and must never be promoted onto. What was wrong is its
+# SCOPE — a process-wide return keyed on a module global, standing down three
+# living pairs on a fourth's retirement.
+#
+# So the question the machine asks is now "is MY OWN lane parked?", answered
+# off the census's own per-pair verdict. Today the answer is still yes (the
+# serial machine's lane IS the farmer's — `LIVE_BOT` is its live arm), so no
+# trade and no promotion moves; what changes is that georgia's, mum's and
+# avo's lanes are no longer stood down BY the farmer, and the moment their
+# `xp.<book>.*` candidate wave lands (v2.1) they are admitted per-pair instead
+# of needing this gate rewritten under them.
+def serial_lane_id(live_bot=None, pairs=None):
+    """Which declared pair IS this module's serial candidate machine's lane?
+
+    DERIVED, never declared a second time: the machine trades `LIVE_BOT` vs
+    `SHADOW_BOT`, so the pair naming `LIVE_BOT` as its live arm is its lane. A
+    second hardcoded `"farmer"` here would be a second copy of the rule, and it
+    would go stale on exactly the slot swap that produced this defect.
+    None when no declared pair claims the row (an unpaired machine)."""
+    lb = live_bot or LIVE_BOT
+    src = pairs if pairs is not None else (getattr(_bus, "JUDGED_PAIRS", {}) or {})
+    for pid, ps in src.items():
+        if isinstance(ps, dict) and ps.get("live_bot") == lb:
+            return pid
+    return None
+
+
+def lane_stood_down(pairs, live_bot=None, bus=None):
+    """-> (parked: bool, lane_id, stood_down_block) for the SERIAL machine's
+    OWN lane.
+
+    Two independent arms, and that is deliberate rather than belt-and-braces
+    tidiness:
+      * the CENSUS arm is the per-pair one — this lane is parked because the
+        precheck parked THIS pair, not because some other pair is retired;
+      * the BUS arm is the fail-CLOSED backstop. `pair_census` degrades to `{}`
+        on a dark `bot_pnl` fetch or any census error, and an empty census must
+        never read as "nobody is retired" and hand a RETIRED REAL-MONEY ARM
+        back to the candidate machine. Darkness stands down.
+    Neither arm can be removed without opening one of those two holes."""
+    lane = serial_lane_id(live_bot, pairs=None)
+    entry = (pairs or {}).get(lane) if lane else None
+    if isinstance(entry, dict) and entry.get("phase") == "stood_down":
+        return True, lane, dict(entry.get("stood_down") or {})
+    lb = live_bot or LIVE_BOT
+    if bus is not None and bus.live_arm_retired(lb):
+        spec = (getattr(bus, "RETIRED_LIVE_ARMS", {}) or {}).get(lb, {})
+        return True, lane, {"why": f"live arm retired {spec.get('since', '?')} "
+                                   f"{spec.get('entry', '')}",
+                            "successor": spec.get("successor"),
+                            "src": "bus (census dark — fail-closed)"}
+    return False, lane, None
+
+
+def lane_census(pairs, live_bot=None):
+    """The one-line answer to 'how many of its pairs is the judge judging?' —
+    published beside the pairs map so `0 of 4` stops being something a reader
+    has to derive by hand from four nested phases.
+
+    `live` = a pair the machine could run today (idle/running/promoted).
+    Every declared pair lands in exactly one bucket; an unrecognised phase
+    lands in `unknown` rather than being absorbed into a known one (the
+    pipeline card's own rule, and for the same reason)."""
+    out = {"serial_lane": serial_lane_id(live_bot, pairs=None),
+           "live": [], "stood_down": [], "unjudgeable": [], "unknown": []}
+    for pid, ent in sorted((pairs or {}).items()):
+        ph = (ent or {}).get("phase") if isinstance(ent, dict) else None
+        if ph in ("idle", "running", "promoted"):
+            out["live"].append(pid)
+        elif ph == "stood_down":
+            out["stood_down"].append(pid)
+        elif ph == "unjudgeable":
+            out["unjudgeable"].append(pid)
+        else:
+            out["unknown"].append(pid)
+    out["judging"] = f"{len(out['live'])} of {len(pairs or {})}"
     return out
 
 
@@ -2236,8 +2462,13 @@ def run_once():
             _pairs = dict(_census)
             _pairs["farmer"] = _farmer_pair_entry(payload)
             payload["pairs"] = _pairs
+            # [(vm)] the roll-up of that map: which lanes are live, which are
+            # parked, and which one the serial machine below actually runs.
+            # Published, not derived by every reader — see `lane_census`.
+            payload["lanes"] = lane_census(_pairs)
         except Exception:  # noqa: BLE001
             payload["pairs"] = {}
+            payload["lanes"] = {}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
             try:
@@ -2272,17 +2503,36 @@ def run_once():
     # Placed AFTER the state read and the release-request consumption (both
     # safe, and the latter only ever RELEASES) and BEFORE any evaluation, so
     # the judge writes a phase and touches nothing else.
-    if _bus is not None and _bus.live_arm_retired(LIVE_BOT):
-        _spec = (getattr(_bus, "RETIRED_LIVE_ARMS", {}) or {}).get(LIVE_BOT, {})
+    #
+    # [2026-08-27 (vm)] SCOPED TO THIS LANE'S OWN PAIR — see `lane_stood_down`.
+    # The condition was `_bus.live_arm_retired(LIVE_BOT)` read as a fact about
+    # the PROCESS; it is now a fact about the pair this machine runs, taken off
+    # the census's own per-pair verdict with the bus as the fail-closed
+    # backstop. Same answer today (the farmer's lane IS this machine's, and it
+    # stays parked), and no longer the reason three living pairs are skipped.
+    _parked, _lane, _why = lane_stood_down(_census, bus=_bus)
+    if _parked:
+        _spec = (getattr(_bus, "RETIRED_LIVE_ARMS", {}) or {}).get(LIVE_BOT, {}) \
+            if _bus is not None else {}
+        _others = [p for p in sorted(_census) if p != _lane]
         return save(phase="stood_down",
-                    note=(f"live arm {LIVE_BOT} retired "
+                    note=(f"lane {_lane}: live arm {LIVE_BOT} retired "
                           f"{_spec.get('since', '?')} {_spec.get('entry', '')}"
                           f" -> {_spec.get('successor', '?')}; not promoting, "
                           f"and not re-asserting (TTL reverts any open lever). "
                           f"Resurrect with "
                           f"{_spec.get('override', '?')}=run on BOTH this "
-                          f"service and the live one."),
+                          f"service and the live one. "
+                          f"THIS PARKS ONE LANE, NOT THE JUDGE: {_others} keep "
+                          f"their prechecks and wake conditions, and admit "
+                          f"candidates as soon as their queues exist."),
                     last_eval={"promote": False, "why": "live arm retired",
+                               "lane": _lane, "lane_why": _why,
+                               # `note` is PRINTED, never persisted (see
+                               # save()), so the fact that this parks one lane
+                               # and not the judge has to live on the payload
+                               # or it lives in a log nobody greps.
+                               "lanes_not_parked": _others,
                                "retired": dict(_spec, row=LIVE_BOT)})
 
     # [2026-07-28 §3c] the growth-lever pair runs its own self-contained

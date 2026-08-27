@@ -2336,6 +2336,14 @@ CENSUS_REFUSALS = frozenset({
     "held_sym", "candle_err", "short_history", "stale_pending", "stops_blind",
     "trend_dark", "fleet_veto", "repeat", "dip_capped", "dip_cooldown",
     "dip_slip",
+    # [(vm)] 🏛️ the Parliament's four, added the same day its books gained a
+    # census. They are NOT folded into the near-miss `gated`, and the reason is
+    # the whole value of `binding_gate`: measured while the mapping was being
+    # tightened, 9 `stale-data` refusals lost to 3 slot refusals and the gate
+    # reported `slots_full` — naming the wrong fix. An undeclared refusal
+    # abstains (it is summed and listed in `unclassified`); a MIS-declared one
+    # sends the operator at the wrong knob, which is worse than silence.
+    "venue_stress", "daily_halt", "ml_gate", "blocked_other",
 })
 
 

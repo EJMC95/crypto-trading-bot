@@ -112,6 +112,18 @@ COPY fleet_allocation.py /freqtrade/fleet_allocation.py
 # Publish-only and --publish gated, exactly like the radar: it grades, it
 # promotes nothing, and go-live stays an explicit operator act.
 COPY scripts/golive_readiness.py /freqtrade/scripts/golive_readiness.py
+# [2026-08-27 (vm)] THE WIN SIDE GETS A SCHEDULE, AND ITS CLAIMS GET AN OWNER.
+# Same reasoning as the grader directly above, and the same (gk) failure it was
+# built to end: `winners_docket.py` — the fleet's ONLY instrument that can say
+# "this bucket is winning, provably" (I21) — has existed since 18-Aug in NO
+# image and NO loop, so it ran only when a human typed it. `claims_ledger.py`
+# is its record: every number the fleet has committed to, each naming an organ
+# field that can recompute it, so a figure quoted in doctrine reddens a build
+# when it drifts instead of standing stale for days. WITHOUT THESE TWO LINES
+# both run_all.sh loops are no-ops behind `|| true` — `audit_claim_freshness`
+# fails on exactly that and prints these lines verbatim.
+COPY scripts/winners_docket.py /freqtrade/scripts/winners_docket.py
+COPY scripts/claims_ledger.py /freqtrade/scripts/claims_ledger.py
 # [2026-07-21] 🏛️ the Parliament — the six-layer PM shadow fleet (six $1k
 # books + scanners + ML + tuners + brain), launched from run_all.sh. Imports
 # bot_pnl_store / fleet_bus / funding_basis / paper_broker — all COPY'd above

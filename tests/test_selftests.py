@@ -90,6 +90,20 @@ SELFTEST_MODULES = [
     # tests/autonomy/test_winners_docket.py carries the mutation-verified
     # structural pins (5 of 5 red).
     "scripts.winners_docket",
+    # [2026-08-27 (vm)] THE LEDGER OF CLAIMS and its freshness audit. BOTH in
+    # SELFTEST_MODULES and deliberately NOT ENFORCED_AUDITS, by the rule stated
+    # at the head of ENFORCED_AUDITS: the freshness verdict reads the number an
+    # ORGAN publishes, which moves with every close and no code change, so a
+    # scan here would redden local `pytest` on the fleet's trading activity —
+    # and its live arm exits 2 with no DATABASE_URL, which is a deliberate
+    # INCONCLUSIVE, not a pass. Both `--selftest` blocks are offline and pure
+    # (fixture payloads, an injected clock, a `file://` URL that cannot
+    # resolve; no network, no DB, no git), and the structural pins live in
+    # tests/autonomy/test_claims_ledger.py — including the one a fixture cannot
+    # reach: every claim's dotted owner path resolved against a payload built
+    # by `golive_readiness`'s OWN publisher functions.
+    "scripts.claims_ledger",
+    "scripts.audit_claim_freshness",
     # [2026-08-20 I22] the BOOK SPEND census. SELFTEST_MODULES and deliberately
     # NOT ENFORCED_AUDITS, the same reason as winners_docket directly above: its
     # live arm reads the public /pnl.json, which moves with every publish and no

@@ -2077,6 +2077,11 @@ PIPE_PAIR_REASON = {
     # the stamp ships with the build; it wakes on the first stamped CLOSE each
     # side — i.e. it is waiting for trades, not for code.
     "policy_unstamped": PIPE_MEASURE,
+    # [(vm)] same class, and it must be mapped or the card renders `? unknown`
+    # (red) on a book whose only fault is that it has not traded yet — louder
+    # than the state deserves. 👩 mum has never closed a trade; she wakes on a
+    # TRADE, not on anything in the tree.
+    "no_closes": PIPE_MEASURE,
     # every one of these needs a human to change something in the tree/config.
     "live_row_dark": PIPE_WIRE,
     # [(va)] the control arm's publisher is dead — the fix is the stopped or

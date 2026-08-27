@@ -1451,7 +1451,70 @@ def _census_extra(b):
             out["near_bar"] = sum(1 for v in vals if v < bar + 8)
     except Exception:  # noqa: BLE001
         pass
+    # [2026-08-27 (vm)] THE TERM NOBODY COULD SEE, and it is why 👩 mum's
+    # binding gate MOVED with nothing on the row saying so. Measured on her
+    # live payload 27-Aug: `rsi_bar 36.0 · rsi_min 27.8 · near_bar 5 ·
+    # verdicts {no_signal: 22, uptrend_blocked: 1}` — the RSI half is now MET
+    # (27.8 < 36.0) and the one coin that met it was refused by the TREND
+    # half. `census_no_entry_why` can only report `uptrend_blocked` once RSI
+    # has ALSO passed, so whenever RSI is the tighter term the NOT-uptrend
+    # conjunct counts ZERO — and a widening of MUM_RSI_MAX could not be
+    # priced, because nobody could say how many of those 5 near-bar coins are
+    # even outside an uptrend. Two numbers close it:
+    #   outside_uptrend_n — the trend term ALONE, independent of RSI
+    #   both_terms_n      — the shipped rule's own `enter`, so the census and
+    #                       the gate can never disagree about the cell
+    # Gated on UPTREND_BLOCKS for the same reason the bucket is: 🙏 SwingDip
+    # publishes `uptrend` too and REQUIRES it, so "outside" would mean the
+    # opposite there — the semantics are the carrier's, never the dict's
+    # shape. Absent rather than zero when nothing was read (I8), and REPORTED:
+    # no gate reads either number.
+    try:
+        if getattr(b.s, "UPTREND_BLOCKS", False):
+            if b.last_uptrend:
+                out["outside_uptrend_n"] = sum(
+                    1 for u in b.last_uptrend.values() if not u)
+            if b.last_enter:
+                out["both_terms_n"] = sum(
+                    1 for e in b.last_enter.values() if e)
+    except Exception:  # noqa: BLE001
+        pass
     return {"scan": out}
+
+
+#: [2026-08-27 (vm)] how often `census_24h` is recomputed. The scan census is
+#: SNAPSHOT every ~90s loop (one small insert); the ROLLUP reads up to ~2,880
+#: history rows, and recomputing that per book per loop buys sums that moved
+#: by exactly one loop. 30 min is the `fleet_allocation` publish cadence.
+CENSUS_ROLLUP_S = float(os.environ.get("FAMILY_CENSUS_ROLLUP_S", "1800"))
+
+
+def _census_series_extra(b, t_now):
+    """[2026-08-27 (vm)] `census_24h` — this book's scan census SUMMED over
+    the trailing day, through bot_pnl_store's own owner (`census_window`), so
+    a refusal finally has a denominator. `no_signal: 22` on ONE loop and on
+    960 of them are the same integer and opposite facts, and until the series
+    existed every family row published only the first.
+
+    The cached rollup carries its own `age_s`, because a cache that quietly
+    froze would be I1 living inside the instrument built to answer I18.
+    `census_window` returns {} on dark/empty history — never a zero-filled
+    dict — and the key is then OMITTED rather than published empty; a stale
+    rollup degrades to the PREVIOUS honest value with a visibly growing age,
+    never to a guess."""
+    if not getattr(b.s, "census", False):
+        return {}
+    try:
+        if b._rollup is None or (t_now - b._rollup_at) >= CENSUS_ROLLUP_S:
+            roll = store.census_window(b.bot_id)
+            if roll:
+                b._rollup, b._rollup_at = roll, t_now
+        if not b._rollup:
+            return {}
+        return {"census_24h": dict(
+            b._rollup, age_s=round(max(0.0, t_now - b._rollup_at)))}
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 class Book:
@@ -1476,6 +1539,21 @@ class Book:
         # `control_arm` / `census`, so no other book's payload shape moves.
         self.last_mark = {}      # coin -> most recent mark seen this cycle
         self.last_rsi = {}       # coin -> last computed RSI (gate reachability)
+        # [2026-08-27 (vm)] THE OTHER CONJUNCT. 👩 mum's rule is `rsi <
+        # RSI_MAX and NOT uptrend and v > 0`; (rr) gauged the RSI half and
+        # the trend half had no gauge at all, so a bar that is MET while
+        # every near-bar coin sits inside an uptrend reads exactly like a bar
+        # nothing reaches. Both are the STRATEGY'S OWN values, taken straight
+        # off its `signals()` dict — never recomputed here, because a second
+        # copy of a rule is a second rule ((hj)) and this one would drift the
+        # moment the entry cell moves.
+        self.last_uptrend = {}   # coin -> last uptrend verdict (bool ONLY)
+        self.last_enter = {}     # coin -> did the SHIPPED rule say enter
+        # [(vm)] the 24h census rollup + when it was computed. Cached rather
+        # than recomputed every 90s loop: the snapshot is one small insert,
+        # the rollup is a ~2,880-row read whose sums move by one loop.
+        self._rollup = None
+        self._rollup_at = 0.0
         self.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
         self.scan = {}           # per-cycle census counters
         self.halted_today = False
@@ -2144,6 +2222,16 @@ def main():
                 # the row can say how far the market is from the entry bar.
                 if sig and isinstance(sig.get("rsi"), (int, float)):
                     b.last_rsi[coin] = float(sig["rsi"])
+                # [(vm)] the trend conjunct and the FULL condition, off the
+                # same sig, in the same pass — no second walk of the universe.
+                # A non-bool `uptrend` is ABSENT rather than False: False
+                # here means "outside an uptrend", i.e. the term PASSES, and
+                # a fabricated pass is the loudest possible reading from no
+                # data (the (st) `rsi_min: 0.0` trap, I8).
+                if sig and isinstance(sig.get("uptrend"), bool):
+                    b.last_uptrend[coin] = sig["uptrend"]
+                if sig:
+                    b.last_enter[coin] = bool(sig.get("enter"))
 
                 held = coin in b.broker.pos
                 px = marks.fresh_mid(venue, coin)
@@ -2399,7 +2487,8 @@ def main():
                            "fund_open": round(open_accr, 4),
                            "btc_regime_up": regime,
                            "skipped_unlisted": b.s.skipped,
-                           **_control_extra(b), **_census_extra(b)})
+                           **_control_extra(b), **_census_extra(b),
+                           **_census_series_extra(b, t0)})
             except Exception:  # noqa: BLE001
                 pass
             # [2026-08-15 (my)] I9: the MTM equity series for the six family/
@@ -2412,6 +2501,20 @@ def main():
             try:
                 store.snapshot_equity(b.bot_id, b.equity(),
                                       b.broker.open_count())
+            except Exception:  # noqa: BLE001
+                pass
+            # [2026-08-27 (vm)] THE CENSUS SERIES. `bot_pnl` is ONE UPSERTED
+            # row, so `scan` has never had a history: 👩 mum's row could say
+            # what refused her on this loop and never what has refused her all
+            # week — which is the denominator every I19 widening needs and no
+            # family book has ever had. Same seam and same never-raises
+            # contract as `snapshot_equity` above. The stored payload comes
+            # from the ONE owner (`_census_extra`), so the series and the
+            # published field can never be two different censuses ((hj)).
+            try:
+                _scan = _census_extra(b).get("scan")
+                if _scan:
+                    store.snapshot_census(b.bot_id, _scan)
             except Exception:  # noqa: BLE001
                 pass
             b.persist()

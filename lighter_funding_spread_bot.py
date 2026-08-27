@@ -200,6 +200,11 @@ ORDER_USD = float(os.environ.get("FUNDSPREAD_ORDER_USD", "20"))
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDSPREAD_DAILY_LOSS", "0.05"))
 LOOP_SECONDS = int(os.environ.get("FUNDSPREAD_LOOP_SECONDS", "300"))
 SAMPLE_SECONDS = 3300           # ~hourly funding samples (one per venue period)
+# [(vm)] census rows a 24h window needs at THIS book's cadence + 50% headroom.
+# `census_window`'s default assumes a 30s loop (~2,880 rows); this book runs at
+# 300s, so the default would fetch ~10x what it can use every loop. DERIVED, so
+# a cadence change carries the window; `truncated` reports it if it ever binds.
+CENSUS_LIMIT = max(200, int(1.5 * 24 * 3600 / max(1.0, LOOP_SECONDS)))
 MIN_COVERAGE = LOOKBACK_H // 2  # doctrine: rank only with >=half-window history
 # [2026-07-17 BASIS FIX] Lighter quotes an 8h rate — was annualised as hourly
 # (8x). Logging-only here, but a log that lies is how the fleet believed the
@@ -460,6 +465,118 @@ def crypto_only_now():
                    for c in COINS if str(c).strip())
     except Exception:      # noqa: BLE001
         return None
+
+
+# --------------------------- the rank, and its census -------------------------
+# [2026-08-27 (vm)] THIS BOOK PUBLISHED NO CENSUS AT ALL. It is a LIVING row on
+# the decision docket at `undecidable` — and its payload carried `caps`, a
+# `held` map and `ff_overlap`, i.e. what it HOLDS and nothing about what it
+# TURNED AWAY. So "why does this book almost never close?" had no answer in the
+# payload, and the two candidate answers are opposite actions: a rebalance that
+# is being SKIPPED (too few rankable coins — a supply/coverage problem, fixable)
+# and a rebalance that runs and re-selects the SAME 2K legs (a rank that does
+# not churn — an edge/decidability problem, not fixable by more coins).
+#
+# The two functions below are the book's REAL ranking gate, lifted out of the
+# rebalance branch verbatim so the census is filled BY the admission path and
+# cannot drift from it ((hj) — a second copy of a rule is a second rule). The
+# loop calls them ONCE per loop; the rebalance branch consumes what they
+# returned rather than re-deriving it, so the published census is the exact
+# selection the book acted on and never a lookalike computed beside it.
+#
+# BUCKET NAMES ARE THE FLEET'S DECLARED VOCABULARY (`bot_pnl_store`'s
+# CENSUS_DENOMINATORS / CENSUS_REFUSALS), not this file's private words, so
+# `census_window`'s `binding_gate` can name the gate that killed the loop. In
+# particular `cold` is a mid-pack coin — rankable, and its funding rank simply
+# is not extreme enough to earn a leg — which is exactly what `cold` means in
+# every other funding book here.
+def rank_scores(coins, supports, fund_hist, floor, min_coverage=None,
+                census=None):
+    """{coin: trailing MEAN hourly funding rate} for every RANKABLE coin.
+
+    Rankable = the venue supports it AND at least `min_coverage` samples of its
+    funding sit inside the lookback window (`floor` = its left edge, epoch
+    seconds). Pure — `supports` is a predicate, `fund_hist` the caller's
+    rolling window. Fills three census buckets when given one: `scanned` (the
+    resolved universe), `unsupported` and `short_history`."""
+    min_coverage = MIN_COVERAGE if min_coverage is None else min_coverage
+    cen = census if census is not None else {}
+    cen["scanned"] = len(coins or ())
+    cen.setdefault("unsupported", 0)
+    cen.setdefault("short_history", 0)
+    scores = {}
+    for coin in (coins or ()):
+        if not supports(coin):
+            cen["unsupported"] += 1
+            continue
+        rs = [r for t, r in (fund_hist or {}).get(coin, []) if t >= floor]
+        if len(rs) >= min_coverage:
+            scores[coin] = sum(rs) / len(rs)
+        else:
+            cen["short_history"] += 1
+    return scores
+
+
+def rank_targets(scores, k=None, census=None):
+    """{coin: is_short} the rank WANTS held: LONG the k most-negative funding
+    coins (longs receive), SHORT the k most-positive.
+
+    `{}` when fewer than 2k coins are rankable — the whole rebalance is skipped
+    in that case, which is the book's own behaviour and NOT a per-coin refusal,
+    so those coins land in `waiting` rather than `cold`: they are not too
+    mid-pack to trade, they are waiting for a quorum. Fills `waiting`, `cold`
+    (rankable, mid-pack, not selected) and `eligible` (the 2k legs)."""
+    k = K if k is None else k
+    cen = census if census is not None else {}
+    cen.setdefault("waiting", 0)
+    cen.setdefault("cold", 0)
+    cen.setdefault("eligible", 0)
+    if len(scores) < 2 * k:
+        cen["waiting"] += len(scores)
+        return {}
+    ranked = sorted(scores, key=scores.get)      # most negative first
+    want = {c: False for c in ranked[:k]}        # LONG  (receive <0)
+    want.update({c: True for c in ranked[-k:]})  # SHORT (receive >0)
+    cen["eligible"] += len(want)
+    cen["cold"] += len(scores) - len(want)
+    return want
+
+
+def rank_census(funnel, scan, want, held):
+    """The published `scan` — the liveness verdict FIRST (I1), then the gate
+    funnel `rank_scores`/`rank_targets` just filled, then the turnover counts
+    that answer the question this book's row could not.
+
+    `scan`: "fresh" once the ranking window is populated, "warming" while the
+    book is still filling it, "dark" when funding could not be read at all. A
+    verdict, deliberately a STRING: `snapshot_census` cannot sum it and counts
+    it under `_dropped`, which is correct — a verdict summed over 24h is a fake
+    measurement (the 🎯 sniper's `sources.*.scan` rule).
+
+    `retained` / `rotating` / `entering` are the CHURN, and they are the whole
+    decidability story of an always-in book: one holding the same 2K legs every
+    rebalance closes nothing, which is how a row reaches 2,500 days to a
+    30-close bar with every gate working exactly as designed. They are OVERLAY
+    counts, not buckets — the partition is
+    `scanned == unsupported + short_history + waiting + cold + eligible`, and
+    `held` sits outside it because a held coin is still ranked (unlike every
+    entry-gated book here, where held is skipped first).
+
+    DECLARED: `retained`/`rotating`/`entering` are not in the fleet's declared
+    refusal vocabulary and so are REPORTED by `census_window` under
+    `unclassified` rather than allowed to win `binding_gate`. That is correct
+    and deliberate — none of the three is a refusal, and a turnover count
+    winning "the gate that killed this loop" would be exactly the wrong
+    instruction."""
+    held = set(held or ())
+    want_set = set(want or {})
+    out = {"scan": scan}
+    out.update(funnel or {})
+    out["held"] = len(held)
+    out["retained"] = len(held & want_set)
+    out["rotating"] = len(held - want_set)
+    out["entering"] = len(want_set - held)
+    return out
 
 
 def lighter_backfill(market_id, hours):
@@ -940,26 +1057,32 @@ def main():
                     * funding_basis.to_hourly(rate, "lighter") * notional * dt_h
 
         # ---- rebalance on schedule -----------------------------------------
+        # ---- rank the cross-section — EVERY loop, acted on only at rebalance -
+        # [2026-08-27 (vm)] this derivation used to live INSIDE the rebalance
+        # branch, so the book's own ranking was invisible for 23 of every 24
+        # hours and the row could not say why nothing turned over. It is the
+        # SAME code (same `t0`, same `floor`, same `fund_hist`), lifted into
+        # two pure functions and called once per loop; the rebalance branch
+        # below consumes exactly what it returned. PUBLISH-ONLY: nothing acts
+        # on `scores`/`want` outside `if t0 >= next_reb`, so no entry, exit,
+        # threshold or size moves — only the census now exists on quiet loops.
+        _funnel = {}
+        floor = t0 - LOOKBACK_H * 3600
+        scores = rank_scores(COINS, ctx.supports, fund_hist, floor,
+                             census=_funnel)
+        want = rank_targets(scores, census=_funnel)
+        census = rank_census(_funnel, ("fresh" if want else "warming"),
+                             want, meta)
+
         if next_reb is None:
             next_reb = t0            # first loop rebalances immediately
         if t0 >= next_reb:
             while next_reb <= t0:
                 next_reb += REBALANCE_H * 3600
-            floor = t0 - LOOKBACK_H * 3600
-            scores = {}
-            for coin in COINS:
-                if not ctx.supports(coin):
-                    continue
-                rs = [r for t, r in fund_hist.get(coin, []) if t >= floor]
-                if len(rs) >= MIN_COVERAGE:
-                    scores[coin] = sum(rs) / len(rs)
-            if len(scores) < 2 * K:
+            if not want:
                 log.warning("rebalance skipped: only %d/%d coins rankable",
                             len(scores), 2 * K)
             else:
-                ranked = sorted(scores, key=scores.get)      # most negative first
-                want = {c: False for c in ranked[:K]}        # LONG  (receive <0)
-                want.update({c: True for c in ranked[-K:]})  # SHORT (receive >0)
                 for c in list(meta):
                     if want.get(c) != meta[c].get("is_short"):
                         close_position(c, "rebalance")
@@ -992,8 +1115,13 @@ def main():
                     log.info("OPEN %s %s $%.0f @ %.6g (%dh mean %+.1f%% apr)",
                              c, "SHORT" if is_short else "LONG", order_usd,
                              meta[c]["entry"], LOOKBACK_H, scores[c] * H * 100)
-                lo = {c: f"{scores[c]*H*100:+.0f}%" for c in ranked[:K]}
-                hi = {c: f"{scores[c]*H*100:+.0f}%" for c in ranked[-K:]}
+                # `want` is the rank's own verdict, so the log is derived
+                # from it rather than from a second sort of `scores` — the
+                # `ranked` local moved into `rank_targets` with the rule.
+                lo = {c: f"{scores[c]*H*100:+.0f}%"
+                      for c, is_s in want.items() if not is_s}
+                hi = {c: f"{scores[c]*H*100:+.0f}%"
+                      for c, is_s in want.items() if is_s}
                 log.info("REBALANCE done | LONG %s | SHORT %s | next %s",
                          lo, hi, datetime.fromtimestamp(
                              next_reb, tz=timezone.utc).isoformat())
@@ -1010,6 +1138,17 @@ def main():
 
         # ---- publish + persist ----------------------------------------------
         open_accr = sum((meta.get(c) or {}).get("accrued", 0.0) for c in meta)
+        # [2026-08-27 (vm)] accumulate the census FIRST, then read the window,
+        # so THIS loop's refusals are inside the number the row publishes.
+        # Both calls never raise (store contract) and neither gates anything:
+        # publish-only, and it must stay that way — a counter that grows a
+        # consumer becomes a gate.
+        try:
+            store.snapshot_census(bot_id, census)
+            census_24h = store.census_window(bot_id, hours=24,
+                                             limit=CENSUS_LIMIT)
+        except Exception:  # noqa: BLE001
+            census_24h = None
         try:
             store.publish(
                 bot_id, status="online",
@@ -1041,6 +1180,18 @@ def main():
                                 "crypto_only": crypto_only_now()},
                        "held": {c: ("S" if m.get("is_short") else "L")
                                 for c, m in meta.items()},
+                       # [2026-08-27 (vm)] WHY DID NOTHING TURN OVER? This row
+                       # published what it HOLDS and nothing about what the
+                       # rank turned away, on a book sitting `undecidable` at
+                       # ~2,500 days to the 30-close bar. `scan` is this loop's
+                       # funnel (liveness verdict first, then one counter per
+                       # gate stage, filled by the ranking functions
+                       # themselves); `census_24h` is the same funnel SUMMED
+                       # over the trailing day, so `retained: 10` finally has a
+                       # denominator in loops. `None` — never a zero-filled
+                       # dict — when the history is dark or empty (I1).
+                       "scan": census,
+                       "census_24h": census_24h or None,
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(open_accr, 4),
                        "ff_overlap": f"{ff_overlap}/{len(meta)}" if meta else "0/0",
@@ -1264,6 +1415,47 @@ def _selftest():
         assert K == GOLIVE_K, "live must PIN K back to the validated value"
     finally:
         globals()["K"] = _saved_k
+
+    # ---- [(vm)] the rank census: partition, churn, and the skip branch ----
+    # Runs in the CONTAINER, where pytest does not.
+    _now = 1_000_000.0
+    _floor = _now - LOOKBACK_H * 3600
+    _hist = {}
+    for _i, _c in enumerate(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
+                             "K_", "L"]):
+        _hist[_c] = [[int(_floor + 60 * j), (_i - 5) * 1e-5]
+                     for j in range(MIN_COVERAGE)]
+    _hist["THIN"] = [[int(_floor + 60), 1e-5]]          # under MIN_COVERAGE
+    _hist["OLD"] = [[int(_floor - 7200), 1e-5]] * MIN_COVERAGE   # pre-window
+    _coins = list(_hist) + ["GONE"]
+    _sup = lambda c: c != "GONE"                        # noqa: E731
+    _fun = {}
+    _sc = rank_scores(_coins, _sup, _hist, _floor, census=_fun)
+    assert _fun["scanned"] == len(_coins), _fun
+    assert _fun["unsupported"] == 1, _fun
+    assert _fun["short_history"] == 2, _fun     # THIN (few) + OLD (all stale)
+    _wt = rank_targets(_sc, census=_fun)
+    assert len(_wt) == 2 * K, _wt
+    assert sum(1 for v in _wt.values() if v) == K, _wt
+    assert _fun["eligible"] == 2 * K and _fun["waiting"] == 0
+    assert (_fun["scanned"] == _fun["unsupported"] + _fun["short_history"]
+            + _fun["waiting"] + _fun["cold"] + _fun["eligible"]), \
+        "the census buckets must PARTITION the scanned universe"
+    # the skip branch: too few rankable => no targets, and they WAIT rather
+    # than read as mid-pack (`cold`), which would name the wrong gate.
+    _fun2 = {}
+    _sc2 = rank_scores(["A", "B"], _sup, _hist, _floor, census=_fun2)
+    assert rank_targets(_sc2, census=_fun2) == {}
+    assert _fun2["waiting"] == 2 and _fun2["cold"] == 0, _fun2
+    # churn: an always-in book that re-selects its own legs closes NOTHING,
+    # and that is the whole 2,500-day story.
+    _cen = rank_census(_fun, "fresh", _wt, set(_wt))
+    assert list(_cen)[0] == "scan", "the liveness verdict comes FIRST (I1)"
+    assert _cen["retained"] == 2 * K and _cen["rotating"] == 0 \
+        and _cen["entering"] == 0, _cen
+    _cen2 = rank_census(_fun, "fresh", _wt, {"ZZZ"})
+    assert _cen2["rotating"] == 1 and _cen2["entering"] == 2 * K, _cen2
+    assert rank_census({}, "dark", {}, {})["scan"] == "dark"
 
     print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/"
           "ledger-row/universe-widening; go-live gate: opt-in, ready, "

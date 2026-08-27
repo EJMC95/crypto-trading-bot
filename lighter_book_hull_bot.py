@@ -316,6 +316,43 @@ APR_LO_EFF = RT_COST_FRAC * HOURS_PER_YEAR / PAYBACK_MAX_H
 APR_HI = float(os.environ.get("HULL_APR_HI", "0.20"))
 EXIT_APR = float(os.environ.get("HULL_EXIT_APR", "0.035"))
 
+# ---- the venue's RESTING FUNDING PINS — why the exits above are DEAD --------
+# [2026-08-27 (vm)] `{eligible: 1}` is byte-identical between "quiet" and
+# "structurally impossible", and this book has been publishing the second while
+# reading as the first (I1/I18 at book scale). MEASURED 27-Aug: of its 11
+# in-band coins **TEN sit at exactly the venue's resting funding default**, and
+# a rate PINNED at that default is a CONSTANT — it cannot decay under
+# `EXIT_APR` and it cannot change sign. So `decay_paid` and `liability_flip`
+# are unreachable BY CONSTRUCTION on a pinned coin and `max_hold` (504h) is the
+# only exit that can fire, which is the whole of the (26-Aug) diagnosis three
+# blocks up. The row now says so every loop instead of leaving it in a comment.
+#
+# THE PINS ARE DERIVED, NEVER RETYPED ([[venue-resting-defaults-trap]], I12/(hj)
+# — a retyped constant is a constant that drifts, and this one has two
+# venue-specific values that already read 8x wrong once). What is written here
+# is the venue's RAW per-period quote; the APR comes from the one basis
+# authority, exactly as `H` does, so a basis change moves both together:
+#   9.6e-05/8h -> 10.512% TRUE (crypto)   3.2e-05/8h -> 3.504% (non-crypto)
+# The second is present because `HULL_ALLOW_NONCRYPTO` can admit that
+# population; it is BELOW `EXIT_APR`, so a non-crypto pin is the one pin this
+# book's decay exit CAN clear — which is exactly why the reachability report
+# asks `carry_exit`'s own bar rather than assuming "pinned == dead".
+RESTING_RATES = (9.6e-05, 3.2e-05)
+RESTING_APRS = tuple(funding_basis.to_apr(r, "lighter") for r in RESTING_RATES)
+#: absolute TRUE-apr tolerance for "sitting ON the pin". 1e-4 of apr is 0.01
+#: percentage points — three orders below the 10.512% pin it separates, and
+#: wide enough for the venue's own float rounding.
+PIN_TOL = 1e-4
+
+#: How many stored census rows a 24h window needs at THIS book's cadence, with
+#: 50% headroom for restarts. `census_window`'s own default assumes a 30s loop
+#: (~2,880 rows) and this book runs at 300s, so the default would fetch ~10x
+#: what it can use every 5 minutes, forever. DERIVED from `LOOP_SECONDS` rather
+#: than typed, so a cadence change carries the window with it ((sa)'s rule);
+#: if it ever binds, `census_window` says so in `truncated` ((qz)) instead of
+#: letting a sampled window read as an exhaustive one.
+CENSUS_LIMIT = max(200, int(1.5 * 24 * 3600 / max(1.0, LOOP_SECONDS)))
+
 # ---- the volume TIER [1M, 10M): completes Garrett|Hull|Farmer ---------------
 # [2026-08-26] The floor moved 2e6 -> 1e6. It is the OTHER half of the pair
 # declared at `HULL_BAND_PAIR` above — read that block for the diagnosis (the
@@ -578,6 +615,110 @@ def carry_exit(pos, apr, t0):
     return None
 
 
+def at_resting_pin(apr, tol=None):
+    """Is |TRUE apr| sitting ON one of the venue's resting funding defaults?
+
+    A pinned rate is not a quiet rate — it is a CONSTANT, and that is the
+    difference between "nothing happened to close" and "nothing CAN". Absolute
+    tolerance on the apr fraction; `None`/junk is NOT a pin (unknown degrades
+    to the honest answer, never to a claim)."""
+    t = PIN_TOL if tol is None else tol
+    try:
+        a = abs(float(apr))
+    except (TypeError, ValueError):
+        return False
+    return any(abs(a - p) <= t for p in RESTING_APRS)
+
+
+def pinned_count(fund, tol=None):
+    """How many of the books this loop SCANNED are resting on a pin.
+
+    The denominator for the exit-reachability report below: 10 of 11 in-band
+    coins pinned is a structural fact about the supply, while 10 of 200 would
+    be noise. Counts every scanned book, band or not — a coin's pin does not
+    care which band it is in, and restricting the count to the band would hide
+    a venue-wide freeze. Junk rows are skipped, never counted as un-pinned."""
+    n = 0
+    for f in (fund or {}).values():
+        try:
+            rate = float((f or {}).get("rate") or 0.0)
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if at_resting_pin(rate * H, tol):
+            n += 1
+    return n
+
+
+def exits_reachable(positions, fund, tol=None):
+    """CAN THIS BOOK'S EXITS EVER FIRE ON WHAT IT HOLDS RIGHT NOW?
+
+    [2026-08-27 (vm)] The row read `{held: 10, eligible: 1}` — supply-limited,
+    plainly — and it was not: `EXIT_APR` (3.5%) sits BELOW the crypto resting
+    pin (10.512%), so on a pinned coin `carry_exit`'s first two branches are
+    dead letters and `max_hold` is the only exit that can fire. A count of
+    positions (never coins), one per exit `carry_exit` can return, published
+    every loop so the diagnosis is falsifiable from the payload: if the venue
+    ever comes off its pin these numbers move on their own.
+
+    Reachability is stated against `carry_exit`'s OWN bars — `EXIT_APR` for the
+    decay leg and a sign change for the flip leg — and the claim is PINNED
+    against the real rule by test (walk a pinned position past `FLIP_GRACE_H`
+    with full payback accrued and `carry_exit` still returns only `max_hold`).
+    That test is the guard: a future edit to `carry_exit`'s bars reddens it
+    rather than silently making this report a second, stale copy ((hj)).
+
+      decay_paid     -- |apr| can fall under EXIT_APR. A pinned coin can only
+                        do that when the pin itself is under the bar (the
+                        non-crypto 3.504% pin is; the crypto 10.512% one is
+                        not), so this is NOT "pinned == dead" assumed.
+      liability_flip -- the rate can change sign. A constant cannot.
+      max_hold       -- a CLOCK, unconditional: reachable on every position
+                        this book holds, which is precisely why it is the only
+                        exit this book has been using.
+      unpriceable    -- the coin published no readable rate this loop, so
+                        nothing above is claimed for it (I1: unknown is its own
+                        bucket, never folded into a zero).
+
+    `held` is the denominator so `decay_paid: 0` is never read without it.
+    Pure; decides nothing."""
+    out = {"held": len(positions or {}), "decay_paid": 0,
+           "liability_flip": 0, "max_hold": 0, "unpriceable": 0}
+    for pos in (positions or {}).values():
+        f = (fund or {}).get((pos or {}).get("coin"))
+        try:
+            apr = float((f or {}).get("rate") or 0.0) * H
+        except (TypeError, ValueError, AttributeError):
+            f = None
+            apr = 0.0
+        if f is None:
+            out["unpriceable"] += 1
+            continue
+        out["max_hold"] += 1            # the clock runs on every held position
+        pinned = at_resting_pin(apr, tol)
+        if (not pinned) or abs(apr) < EXIT_APR:
+            out["decay_paid"] += 1
+        if not pinned:
+            out["liability_flip"] += 1
+    return out
+
+
+def oldest_held_h(positions, now=None):
+    """Hours the LONGEST-held position has been open, or None when flat.
+
+    Beside `max_hold` = MAX_HOLD_H this is the whole throughput story of a book
+    whose only live exit is a clock: it says how far the front of the queue has
+    walked toward the only door it can leave by. None (never 0.0) when there is
+    nothing held — a flat book makes no claim about its own age."""
+    t = time.time() if now is None else now
+    ages = []
+    for pos in (positions or {}).values():
+        try:
+            ages.append((t - float((pos or {}).get("opened_ts"))) / 3600.0)
+        except (TypeError, ValueError):
+            continue
+    return round(max(ages), 2) if ages else None
+
+
 def position_pnl(pos):
     """MTM P&L of one position: accrued funding − fees. NO price term —
     rule 1 is structural: this function cannot see a mark, so no future edit
@@ -615,7 +756,8 @@ def build_state(positions, stable_since, stable_sign, last_ts, now=None,
 
 
 def build_extra(census, positions, open_pnl, realized,
-                band_prems=None, veto_fires=0, prem_coverage=0):
+                band_prems=None, veto_fires=0, prem_coverage=0,
+                fund=None, census_24h=None, now=None):
     """The published `extra` — ONE builder ((hj)). `caps` publishes the FULL
     band, floor AND ceiling, apr AND volume — (gl)/I20: an unpublished
     ceiling is how a band book gets counted as a rival for supply its own
@@ -635,8 +777,25 @@ def build_extra(census, positions, open_pnl, realized,
                  "payback_max_h": PAYBACK_MAX_H,
                  "basis_veto_bps": BASIS_VETO_BPS,
                  "max_positions": MAX_POSITIONS, "clip_usd": CLIP_USD,
-                 "crypto_only": not ALLOW_NONCRYPTO},
+                 "crypto_only": not ALLOW_NONCRYPTO,
+                 # [2026-08-27 (vm)] THE EXITS, AND WHETHER THEY CAN FIRE.
+                 # `max_hold_h` is published beside them because it is the
+                 # clock the other two collapse onto once the venue pins:
+                 # `oldest_held_h` / `max_hold_h` is then this book's entire
+                 # throughput. `n_at_pin` is the supply-side denominator (of
+                 # `scan.scanned`) that makes the reachability counts a
+                 # measurement rather than an assertion.
+                 "max_hold_h": MAX_HOLD_H,
+                 "exits_reachable": exits_reachable(positions, fund),
+                 "n_at_pin": pinned_count(fund),
+                 "oldest_held_h": oldest_held_h(positions, now)},
         "scan": census,
+        # [2026-08-27 (vm)] the census SUMMED over the trailing 24h — the
+        # denominator a single loop's `{eligible: 1}` has never had. `None`
+        # (never a zero-filled dict) when the history is dark or empty, which
+        # is the whole contract of `census_window`: a fabricated zero reads as
+        # "measured, nothing refused" when the truth is "no data" (I1).
+        "census_24h": census_24h or None,
         # [19-Aug (qi)] the veto's falsifiability surface: the premiums of
         # every in-band admissible coin THIS loop (how close the population
         # runs to the 10bps bar), fetch coverage (0 = fetch failed, the
@@ -947,9 +1106,20 @@ def main():
             # ---- publish -------------------------------------------------
             open_pnl = sum(position_pnl(p) for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
+            # [2026-08-27 (vm)] accumulate FIRST, then read the window, so
+            # this loop's refusals are inside the number the row publishes.
+            # Both calls never raise (store contract) and neither gates
+            # anything — publish-only, and it must stay that way.
+            try:
+                store.snapshot_census(bot_id, census)
+                _cen24 = store.census_window(bot_id, hours=24,
+                                             limit=CENSUS_LIMIT)
+            except Exception:  # noqa: BLE001
+                _cen24 = None
             extra = build_extra(census, positions, open_pnl, realized,
                                 band_prems=band_prems, veto_fires=veto_fires,
-                                prem_coverage=len(prem_map or {}))
+                                prem_coverage=len(prem_map or {}),
+                                fund=fund, census_24h=_cen24, now=t0)
             try:
                 store.publish(
                     bot_id, status="online", equity=equity,
@@ -1162,6 +1332,49 @@ def _selftest():
          f"${CLIP_USD * MAX_POSITIONS:.0f} exceeds 80% of a "
          f"${START_EQUITY:.0f} book — cap 12 measured BETTER (+$3.36 vs "
          "+$2.86/30d) and was refused for exactly this reason")
+
+    # 10b) [(vm)] THE PINS, AND THE EXITS THEY KILL. Runs in the CONTAINER,
+    # where pytest does not — the same reason the cap arithmetic above lives
+    # here. The claim is driven against `carry_exit` itself, never asserted:
+    # a position on a crypto-pinned coin, walked past FLIP_GRACE_H with the
+    # round trip fully repaid, still returns ONLY `max_hold`.
+    _crypto_pin, _noncrypto_pin = RESTING_APRS
+    assert abs(_crypto_pin - 0.10512) < 1e-9, _crypto_pin
+    assert abs(_noncrypto_pin - 0.03504) < 1e-9, _noncrypto_pin
+    assert EXIT_APR < _crypto_pin, \
+        "the crypto pin is ABOVE the decay bar — that is the (vm) diagnosis"
+    assert at_resting_pin(_crypto_pin) and at_resting_pin(-_crypto_pin)
+    assert not at_resting_pin(APR_LO_EFF) and not at_resting_pin(None)
+    _pinned = {"coin": "P", "side": "short", "notional": 80.0,
+               "opened_ts": t0 - 3600, "accrued": 5.0,
+               "fees": (SLIP_COST + HEDGE_COST) * 80.0}
+    for _dt_h in (0.0, FLIP_GRACE_H + 1.0, MAX_HOLD_H - 2.0):
+        assert carry_exit(dict(_pinned), _crypto_pin, t0 + _dt_h * 3600.0) \
+            is None, "a pinned rate must reach NO exit before the clock"
+    _pinned_old = dict(_pinned, opened_ts=t0 - (MAX_HOLD_H + 1) * 3600.0)
+    assert carry_exit(_pinned_old, _crypto_pin, t0) == "max_hold", \
+        "max_hold is the ONLY exit a crypto-pinned position can ever reach"
+    _pin_rate = RESTING_RATES[0]
+    _fund_pin = {"P": {"rate": _pin_rate, "vol": _mid},
+                 "Q": {"rate": 3e-05, "vol": _mid}}     # Q well under the bar
+    _rx = exits_reachable({"P": _pinned}, _fund_pin)
+    assert _rx == {"held": 1, "decay_paid": 0, "liability_flip": 0,
+                   "max_hold": 1, "unpriceable": 0}, _rx
+    _rx2 = exits_reachable({"Q": dict(_pinned, coin="Q")}, _fund_pin)
+    assert _rx2["decay_paid"] == 1 and _rx2["liability_flip"] == 1, _rx2
+    _rx3 = exits_reachable({"Z": dict(_pinned, coin="Z")}, _fund_pin)
+    assert _rx3 == {"held": 1, "decay_paid": 0, "liability_flip": 0,
+                    "max_hold": 0, "unpriceable": 1}, \
+        "a coin with no rate is UNPRICEABLE, never a reachable zero"
+    assert pinned_count(_fund_pin) == 1, pinned_count(_fund_pin)
+    assert oldest_held_h({}, now=t0) is None, "a flat book makes no age claim"
+    assert oldest_held_h({"P": _pinned}, now=t0) == 1.0
+    _ex_pin = build_extra(cen, {"P": _pinned}, 0.0, 0.0, fund=_fund_pin,
+                          now=t0)
+    assert _ex_pin["caps"]["n_at_pin"] == 1
+    assert _ex_pin["caps"]["max_hold_h"] == MAX_HOLD_H
+    assert _ex_pin["caps"]["exits_reachable"]["max_hold"] == 1
+    assert _ex_pin["census_24h"] is None, "a dark window is None, never {}"
 
     # 11) a dark class screen fails OPEN
     global fleet_bus
