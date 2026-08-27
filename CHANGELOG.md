@@ -1,3 +1,99 @@
+## 2026-08-27 (uq) — THE LIVE TRIO GOES BACK TO 10x: EAMON'S OWN 22-AUG CEILING RESTORED, THE ARITHMETIC PUBLISHED, AND MUM'S CAP UN-STRANDED SO 10x MEANS 10x ON HER BOOK
+
+**Eamon, 27-Aug: "change bots back to their 10x leverage".** "Back to" is
+literal: `GROSS_X_MAX` has defaulted to **10.0** in `lighter_avo_live_bot.py`
+since **Eamon, 22-Aug: *"let avo go up to 10x, and georgia also"***. `(tq)`
+walked the RUNNING values down to 5.3 / 7.0 / 9.5 on a derived
+"honest ceiling" and additionally clamped avo's own ceiling env to 5.5. This
+restores his setting. Risk appetite belongs to the person whose money it is;
+the code's job is the arithmetic, published.
+
+**[RENUMBERED (ul) -> (uq) before push.** A concurrent session landed a
+different (ul) on main — *the wire goes in: the incubator's champion* —
+while this was being written, and `audit_changelog_letters`' cross-branch
+arm caught it PRE-PUSH. Theirs was already on main and is cited; this one
+was not, so this one moved. Recorded inline because `git log` subjects keep
+the OLD letter.**
+
+### What moved (env only — no code change; the ceiling was never a clamp)
+
+| service | env | was | now |
+|---|---|---|---|
+| `tide-rider-lighter-live` 🙏 avo | `AVO_GROSS_X_MAX` | 5.5 | **10.0** |
+| `tide-rider-lighter-live` 🙏 avo | `AVO_GROSS_X` | 5.3 | **10.0** |
+| `trail-blazer-live` 🔮 georgia | `GEORGIA_GROSS_X` | 7.0 | **10.0** |
+| `mum-live` 👩 mum | `MUM_GROSS_X` | 9.5 | **10.0** |
+| `mum-live` 👩 mum | `EQUITY_SCALED_CAP` | unset | **1** |
+
+Avo's ceiling had to be lifted FIRST or `gross_x()` would clamp to 5.5 —
+`max(1.0, min(GROSS_X_MAX, GROSS_X))`, so the setting alone would have been
+silently inert.
+
+### THE ARITHMETIC, derived from the host's own closed forms and READ BACK on the rows
+
+| book | stop | dead above | `stop_reachable` @10x | liq gap | all-slots-stop | halt fires at |
+|---|---:|---:|---|---:|---:|---:|
+| 🙏 avo | −10% | 6.25x | **False** | −4.00% | 100% | **1.00%** |
+| 🔮 georgia | −5% | 9.09x | **False** | −4.00% | 50% | **1.00%** |
+| 👩 mum | −4% | 10.00x | **False** | −4.00% | 40% | **1.00%** |
+
+**Every protective stop is dead code at 10x, and the row says so** —
+`stop_reachable: false` on all three, published every loop. The stop fires at
+`|stoploss|`; liquidation arrives at `1/G − mmf`, so above `G = 1/(|stop|+mmf)`
+the venue liquidates first. At the venue's real worst maintenance margin
+(600bps, measured 22-Aug) that ceiling is 6.25x / 9.09x / 10.00x and all three
+are now at or above it. `liq_gap_pct` depends only on `G` and `mmf`, so at 10x
+**the three books are risk-identical in the liquidation sense: a 4.00% adverse
+basket move liquidates**, whatever their stop says.
+
+**THE RAIL THAT STILL WORKS IS THE DAILY-LOSS HALT, and it is the whole
+answer to the dead stop.** `basket_move_at_full_gross_pct = DAILY_LOSS/G` =
+**1.00%** on all three — it fires at ONE QUARTER of the liquidation distance,
+and against the fleet's measured 217bps stop overshoot the worst modelled exit
+is 1.00 + 2.17 = **3.17% against 4.00%**. It is also `(pq)`-DURABLE (persisted,
+retried idempotently every cycle, and a failed write prints CRITICAL rather
+than passing silently), so a redeploy cannot resume trading on a halted day.
+
+### The one thing that had to be FIXED for 10x to mean 10x
+
+👩 mum's notional cap was a fixed **$3,000** and her book is $300 — so at 10x
+her full deployment is `4 × $750 = $3,000.00`, **exactly** the cap. `notional_ok`
+is a boolean and a caller's `continue` discards the whole CANDIDATE, so the
+first cent of positive MTM would have silently refused her 4th slot: the
+`(sr)` `cap_slots < max_open` defect, armed and waiting on the only book that
+has never taken a trade. `EQUITY_SCALED_CAP=1` is the `(to)` mechanism her two
+siblings already run — cap becomes `max($3,000, equity × 10 × 1.05)` and the
+row now reads **$3,150 / `cap_src: scaled`**.
+
+### READ BACK on the live rows (12:28 AEST), never on a green run
+
+```
+avo      gross_x=10.0 max=10.0 clip=509.96 cap=3569.71 scaled  stop_reachable=False
+georgia  gross_x=10.0 max=10.0 clip=392.01 cap=5000.00 env     stop_reachable=False
+mum      gross_x=10.0 max=10.0 clip=562.50 cap=3150.00 scaled  stop_reachable=False
+```
+
+All three `online`, none halted, `retired: null` — checked BEFORE dispatching,
+per the `(pz)` mechanics. Clips are still × the board's 0.75 restriction; once
+`(uk)`'s stale-alert fix ages out (≤6h from the 00:00:33Z market-context
+deploy) they land at **$679.95 / $522.68 / $750.00**.
+
+### What this does NOT buy, stated once because it is a fact and not an argument
+
+Leverage multiplies mean and sd alike, so **`t` is invariant and no book moves
+closer to the go-live gate** (I22, seven prior rejections). It multiplies
+DOLLARS and DRAWDOWN. What it does buy is deployed balance on three books that
+were sitting on idle collateral, at a setting Eamon put on the record five days
+ago. Era NOT reset on any of the three — capacity is ordinary tuning per
+`(hc)`, so no book's 30-day clock moves.
+
+**DECLARED, unchanged by this and still true:** 🔮 georgia's sub-account is in
+ISOLATED margin (`imf_pct 100`, `max_lev 1.0` on her NVDA leg, $5.17 free
+collateral against $254.68 posted), so her configured 10x may be unreachable on
+that venue path regardless of this env. That is a venue-side setting, not a bot
+one, and it is a watch item rather than a measured block — she is signal-limited
+today (`no_signal 22`) with `notional_cap_skips: 0`.
+
 ## 2026-08-27 (uk) — A RETIRED ARM HAS NO EXECUTION TO DIVERGE FROM: THE FARMER'S OWN RETIREMENT FLATTEN WAS READ AS SLIPPAGE AND CUT ALL THREE LIVE BOOKS' CLIPS BY 25% FOR FIVE DAYS
 
 **Eamon, 27-Aug: "Fix the funding farmer issue".** Found by this morning's
