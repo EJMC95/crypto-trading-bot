@@ -100,7 +100,7 @@ caught two real cross-branch collisions on my own entry ((ug)->(uj)->(ul)) and
 then reported three failures that were nobody's defect. The first half is the
 guard working; the second half is what this fixes.
 
-## 2026-08-27 (uk) — `open 6/6` CANNOT TELL A FULL BOOK FROM A STARVED ONE: 🎫 THE TAKER'S SLOT CAP IS THE ONE LEGAL GO-LIVE ACCELERATOR AND NOTHING COUNTED WHAT IT REFUSED
+## 2026-08-27 (uo) — `open 6/6` CANNOT TELL A FULL BOOK FROM A STARVED ONE: 🎫 THE TAKER'S SLOT CAP IS THE ONE LEGAL GO-LIVE ACCELERATOR AND NOTHING COUNTED WHAT IT REFUSED
 
 **Eamon, 27-Aug: *"Get taker ready to go live - it's clearly learned how to get
 up!"*** He is reading a real signal — the `exit:hold` pre-registration CONFIRMED
@@ -159,6 +159,12 @@ the census rather than on this paragraph's arithmetic.
 **NOT SHIPPED, deliberately**: the slot change itself. A capacity change
 justified by a guess is the thing this census exists to replace — let it run,
 then decide. Taker selftests + the full taker suite green.
+
+**[LETTER MOVED (uk) -> (uo), 27-Aug** — the FOURTH collision of the day on
+this session's letters ((ug)/(uh)/(ui), then (uj), now (uk)). Three concurrent
+sessions were writing to main throughout; `audit_changelog_letters` caught every
+one pre-push, which is the guard earning its keep. Citations in
+`lighter_ticket_taker.py` repointed in the same commit.**]
 
 ## 2026-08-27 (ul) — THE LIVE-SHADOW ALERT COULD NOT BE VERIFIED AT ALL: THE 26-AUG PASS FIXED THE EVIDENCE SECTION AND THE HELPER, AND LEFT THE VERIFIER ON THE OLD SIGNATURE
 
