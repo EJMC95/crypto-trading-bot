@@ -1138,12 +1138,19 @@ def main(_ctx=None, once=False):
         last_rsi = {str(k): float(v)
                     for k, v in (state.get("last_rsi") or {}).items()
                     if isinstance(v, (int, float))}
-        # [(vm)] the trend-term gauge. NOT restored from state, unlike
-        # `last_rsi`: a stale uptrend verdict from a previous boot would be
-        # counted as this loop's reading of a term the operator is about to
-        # argue a widening from. Empty until the scan fills it, and ABSENT
-        # rather than zero in the census when it is.
-        last_uptrend, last_enter = {}, {}
+        # [(vm)] the trend-term gauge, restored exactly as `last_rsi` is and
+        # for the same reason (see `_persist`): the entry loop skips
+        # `S.signals()` on a candle it has already acted on, so on a 1h book
+        # these are written about once an hour and an unrestored map would
+        # leave the row blank in between. Only real bools survive the restore —
+        # a `None` read as False publishes a fabricated PASS on the binding
+        # term.
+        last_uptrend = {str(k): bool(v)
+                        for k, v in (state.get("last_uptrend") or {}).items()
+                        if isinstance(v, bool)}
+        last_enter = {str(k): bool(v)
+                      for k, v in (state.get("last_enter") or {}).items()
+                      if isinstance(v, bool)}
         last_open_ts = [float(state.get("last_open_ts") or 0.0)]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
@@ -1287,6 +1294,18 @@ def main(_ctx=None, once=False):
                 # [(st)] the census survives a restart, or every deploy would
                 # blank the one instrument that says why the book is quiet.
                 "scan_verdict": scan_verdict, "last_rsi": last_rsi,
+                # [(vm)] the trend gauge persists for the SAME reason, and it
+                # took a live read-back to see why. `last_sig_ts` makes the
+                # entry loop `continue` before `S.signals()` once a candle has
+                # been acted on, so on 👩 mum's 1h book the gauge is only
+                # written ~once an hour — leaving `outside_uptrend_n` ABSENT on
+                # every loop in between, which is the exact ambiguity this wave
+                # exists to remove. My first cut deliberately did NOT persist
+                # these, reasoning that a stale reading would be counted as
+                # this loop's; `last_rsi` one line up has identical staleness
+                # and is persisted precisely so the row can answer BETWEEN
+                # candles. Blank-most-of-the-time is the worse failure.
+                "last_uptrend": last_uptrend, "last_enter": last_enter,
                 "last_open_ts": last_open_ts[0],
                 "capital_adjust": {"total": round(capital_adjust, 2)}})
             ok = store.save_state(STATE_KEY, state)

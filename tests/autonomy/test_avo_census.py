@@ -235,12 +235,33 @@ def test_the_census_distinguishes_a_stale_candle_from_no_signal():
 def test_the_census_is_persisted():
     """A deploy must not blank the one instrument that says why the book is
     quiet — that would reset it exactly when someone is looking."""
+    # [(vm)] BY AST, NOT BY A FIXED-SIZE SOURCE SLICE. This read
+    # `src[i:i + 900]` and so depended on how much PROSE sits inside
+    # `_persist` — adding a comment explaining why the trend gauge persists
+    # pushed `last_open_ts` past the 900th character and failed a test whose
+    # subject had not changed. Same class as the two other slice/substring
+    # guards corrected today: pin the STRUCTURE the property lives in.
+    import ast as _ast
     src = (ROOT / "lighter_avo_live_bot.py").read_text()
-    i = src.index("def _persist():")
-    block = src[i:i + 900]
-    for k in ('"scan_verdict": scan_verdict', '"last_rsi": last_rsi',
-              '"last_open_ts": last_open_ts[0]'):
-        assert k in block, f"{k} is not persisted — a restart blanks the census"
+    tree = _ast.parse(src)
+    fn = next(n for n in _ast.walk(tree)
+              if isinstance(n, _ast.FunctionDef) and n.name == "_persist")
+    persisted = {}
+    for node in _ast.walk(fn):
+        if not isinstance(node, _ast.Dict):
+            continue
+        for k, v in zip(node.keys, node.values):
+            if isinstance(k, _ast.Constant) and isinstance(k.value, str):
+                persisted[k.value] = _ast.unparse(v)
+    # positive control: a walk that finds nothing must not pass vacuously
+    assert len(persisted) >= 5, \
+        f"_persist parsed to {len(persisted)} keys — the walk is broken"
+    for k, expect in (("scan_verdict", "scan_verdict"),
+                      ("last_rsi", "last_rsi"),
+                      ("last_open_ts", "last_open_ts[0]")):
+        assert persisted.get(k) == expect, (
+            f"{k} is not persisted as {expect!r} (got {persisted.get(k)!r}) — "
+            "a restart blanks the census")
 
 
 def test_the_loop_defaults_do_not_clobber_the_restored_census():

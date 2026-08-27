@@ -602,3 +602,76 @@ def test_the_live_spend_census_says_what_its_days_to_gate_is_made_of():
         "days_to_gate_basis": "birth_window", "closes_obs": 0}}}), \
         "a null days_to_gate must still be REFUSED as a missing field — that " \
         "is why the basis is published instead of nulling the number"
+
+
+def test_the_live_trend_gauge_survives_a_loop_that_skips_the_signal_call():
+    """[(vm)] THE DEFECT A LIVE READ-BACK FOUND AND THE CODE READ FINE.
+
+    The live entry loop skips `S.signals()` on a candle it has already acted
+    on (`if last_sig_ts.get(sym) == sig_ts: continue`), so on 👩 mum's 1h book
+    the trend gauge is written about ONCE AN HOUR. The first cut deliberately
+    did not persist the maps — reasoning that a stale reading would be counted
+    as this loop's — and the row published `outside_uptrend_n: None` for ten
+    minutes straight after the deploy while her SHADOW read 5.
+
+    `last_rsi`, one line away in the same `_persist` dict, has identical
+    staleness and IS persisted precisely so the row can answer BETWEEN
+    candles. Blank-most-of-the-time is the worse failure, and a field that is
+    absent whenever nothing recently closed is the exact ambiguity this wave
+    exists to remove.
+
+    So: the gauge travels with `last_rsi` in BOTH directions — persisted and
+    restored — and this fails if either half is dropped."""
+    import ast as _ast
+    import pathlib as _p
+
+    src = (_p.Path(__file__).resolve().parents[2]
+           / "lighter_avo_live_bot.py").read_text()
+    tree = _ast.parse(src)
+
+    # PERSIST: the dict passed to state.update must carry all three keys
+    persisted = set()
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.Dict):
+            continue
+        keys = {k.value for k in node.keys
+                if isinstance(k, _ast.Constant) and isinstance(k.value, str)}
+        if "last_rsi" in keys and "scan_verdict" in keys:
+            persisted |= keys
+    assert {"last_rsi", "last_uptrend", "last_enter"} <= persisted, (
+        "the trend gauge is not persisted beside `last_rsi` — on a 1h book "
+        "the entry loop skips the signal call between candles, so the row "
+        f"would publish it blank most of the time. persisted={sorted(persisted)}")
+
+    # RESTORE: each must be read back out of `state`
+    restored = {
+        _ast.unparse(n.args[0])
+        for n in _ast.walk(tree)
+        if isinstance(n, _ast.Call)
+        and _ast.unparse(n.func).endswith("state.get")
+        and n.args and isinstance(n.args[0], _ast.Constant)
+    }
+    for key in ("'last_rsi'", "'last_uptrend'", "'last_enter'"):
+        assert key in restored, (
+            f"{key} is persisted but never restored — a deploy would blank "
+            "the one instrument that says why the book is quiet")
+
+    # ...and the restore admits ONLY real bools. A mutation round found this
+    # unpinned: state is a JSON round-trip and a legacy or corrupted entry
+    # coerced by truthiness would count a non-reading as a PASS on the exact
+    # term a widening is argued from — the same fail-safe the write site has.
+    filtered = 0
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.DictComp):
+            continue
+        src_c = _ast.unparse(node)
+        if "last_uptrend" not in src_c and "last_enter" not in src_c:
+            continue
+        for gen in node.generators:
+            for cond in gen.ifs:
+                c = _ast.unparse(cond)
+                if "isinstance" in c and "bool" in c:
+                    filtered += 1
+    assert filtered >= 2, (
+        "the restored trend maps are not filtered to real bools — a JSON "
+        f"round-trip can hand back anything (found {filtered} of 2 guards)")
