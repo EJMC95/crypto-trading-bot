@@ -1228,6 +1228,72 @@ def scout_funding(current_time=None):
         return {}
 
 
+def recorded_cost_bps(sym=None, current_time=None):
+    """The fleet's OWN MEASURED execution cost per coin — `{sym: {...}}`, or a
+    single coin's dict when `sym` is given. `{}` / `None` on any doubt.
+
+    [2026-08-27] **THE FLEET HAS BEEN RECORDING THIS SINCE 9-JUL AND NOTHING
+    HAS EVER READ IT.** Eamon, 27-Aug: *"I think we record things far too
+    slowly and it impairs our judgement."* He is right, and the mechanism is
+    worse than slow — it was structurally unreachable:
+
+      * `venues/shadow.py` writes `spread_bps` + `slippage_bps` to
+        `venue_orders` on EVERY fill. Measured 27-Aug: **3,230 book-walk rows**
+        going back to 9-Jul, including SKHYNIXUSD n=409 and SNDK n=112.
+      * `market_context.coin_quality()` folds them 14-daily and publishes
+        `coin-quality` — **135 coins**, live.
+      * And that payload carried `{ts, coins}` and **no `updated` / `ttl_sec`**,
+        so `is_fresh` returned False on it FOREVER. A consumer obeying the bus
+        contract could never read it, which is why none was ever written.
+
+    The cost of that gap is not hypothetical. The books that needed this number
+    gate on a **24h-turnover PROXY** (`MIN_VOL`) — a stand-in `(px)` declared
+    as *"per-book slippage here is unmeasured"* while it was being measured —
+    and the (ur) study, needing a spread the bus could not give it, fell back
+    to **Roll's estimator and overstated the good names 5-12x**, producing a
+    refusal on the wrong binding constraint.
+
+    CONTRACT, identical to every sibling here: any doubt returns `{}` (or
+    `None` for a single symbol), and **a caller must read that as "I have no
+    measurement", never as "the cost is zero"** — a missing cost that defaults
+    to free is the same defect this accessor exists to correct, pointed the
+    other way. Fields per coin, all optional: `spread_bps` (FULL spread, so
+    cost per side is HALF), `slip_bps`, `orders_14d`, `measured_14d`.
+    """
+    try:
+        p = _load("coin-quality", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None if sym else {}
+        coins = p.get("coins")
+        if not isinstance(coins, dict):
+            return None if sym else {}
+        if sym is not None:
+            v = coins.get(str(sym))
+            return v if isinstance(v, dict) else None
+        return {str(k): v for k, v in coins.items() if isinstance(v, dict)}
+    except Exception:
+        return None if sym else {}
+
+
+def recorded_half_spread_bps(sym, current_time=None):
+    """Cost of ONE side, in bps, for `sym` — or `None` when unmeasured.
+
+    `venue_orders.spread_bps` is `(ask - bid) / mid * 1e4`, i.e. the FULL
+    spread, and crossing it costs about HALF per side. That halving is done
+    here, in one place, because a caller doing it inline is a second copy of a
+    unit convention and this fleet has already paid for one of those (the
+    8x funding-basis error).
+    """
+    rec = recorded_cost_bps(sym, current_time)
+    if not rec:
+        return None
+    try:
+        v = float(rec.get("spread_bps"))
+    except (TypeError, ValueError):
+        return None
+    return v / 2.0 if v >= 0 else None
+
+
 def scout_prem_outliers(current_time=None):
     """[{sym, prem_bps, vol_m}, ...] — the scout's venue-wide premium outliers,
     the same rows the dislocation family's entry gate is measured against.

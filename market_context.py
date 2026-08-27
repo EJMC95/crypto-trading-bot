@@ -837,8 +837,25 @@ def main():
         if time.time() - last_quality >= QUALITY_EVERY_H * 3600:
             q = coin_quality()
             if q:
+                # [27-Aug] `updated` + `ttl_sec` ARE THE BUS CONTRACT, and
+                # omitting them made this payload PERMANENTLY UNCONSUMABLE.
+                # `fleet_bus.is_fresh` reads `payload["updated"]` and
+                # `payload["ttl_sec"]` and returns False on any exception, so a
+                # `{ts, coins}` payload can never be fresh — which is the
+                # structural reason nothing in the fleet had ever read the
+                # fleet's OWN measured execution cost. Measured 27-Aug: this
+                # key held 135 coins with real `spread_bps`/`slip_bps`, while
+                # the books that needed it gated on a 24h-turnover PROXY and a
+                # study reconstructed the same quantity with Roll's estimator
+                # and overstated the good names 5-12x. `ts` is kept beside the
+                # new fields so any existing reader is untouched.
+                _now_iso = datetime.now(timezone.utc).isoformat()
                 store.save_state("coin-quality",
-                                 {"ts": datetime.now(timezone.utc).isoformat(),
+                                 {"ts": _now_iso,
+                                  "updated": _now_iso,
+                                  # 2.5 refresh periods: a skipped tick must not
+                                  # blind the consumer, a dead collector must.
+                                  "ttl_sec": int(QUALITY_EVERY_H * 3600 * 2.5),
                                   "coins": q})
                 log.info("coin-quality table refreshed: %d coins", len(q))
             try:
