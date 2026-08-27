@@ -1,3 +1,63 @@
+## 2026-08-27 (vh) — TWO OF MY OWN PUBLISHED FINDINGS WERE WRONG, BOTH THE SAME WAY: I MATCHED A CONSTANT TO A SYMPTOM WITHOUT CHECKING WHICH ARM EXECUTES IT
+
+Corrections to `(ve)` and `(vg)`, made in place per I12, plus the answer to
+**Eamon: *"measure it and then deploy, its data that says it wins it should be
+implementated straight away"*** — which is that the measurement already exists,
+was run today, and says the opposite.
+
+### THE EXIT CHANGE HE ASKED ME TO MEASURE: ALREADY MEASURED, AND IT LOSES
+
+`(uw)`, earlier today, on 🔮 georgia's exits: **48 configurations walked over
+her 212 REAL, PRICED entries — ZERO with a positive mean, ZERO with both halves
+positive.** So there is nothing to deploy, and re-running it would spend his
+money to reach the same answer.
+
+**The part worth keeping is why an earlier pass said the opposite.** `(ux)`'s
+exit-free proxy rated a variant at +0.599%/trade against a shipped +0.162% —
+and it had replayed **1,816 entries where she actually took 212**, modelling
+none of `MAX_ENTRIES_PER_HOUR`, slot contention, the long budget, coin vetoes
+or the StoplossGuard. Her own ledger disagreed in sign, I14 gave the record
+seniority, and the record-based re-run flipped the verdict. **A proxy that
+grades trades a book cannot take is not measuring that book.** My own read of
+her ledger — 37 of 50 exits at +0.131% against 6 roi exits at +2.277% — is a
+true description of the SHAPE and still not evidence that changing it wins;
+`trailing_stop_loss` at −1.287% is the counter-signal, and 48 cells confirmed
+it.
+
+### CORRECTION 1 — THE DRAWDOWN RAIL IS NOT DEAD ON THE LIVE BOOKS
+
+`(ve)` claimed `START_EQUITY = 1000.0` left the 15% drawdown guard unreachable
+on all three real-money books. **False.** `lighter_avo_live_bot` does not import
+the family `Book`; it has its own `entries_locked(closed, t_now, baseline)`
+using `ref = baseline`, and its docstring already said so — *"the drawdown
+denominator the LIVE baseline instead of the shadow's $1,000."* The constant
+governs only the SHADOW books, which really are $1,000 books, where it is
+correct.
+
+### CORRECTION 2 — `FAMILY_CLEAR_GUARD` NEVER REACHED THE BOOK IT WAS FOR
+
+`(vg)` shipped it into `lighter_family_bot.Book` — the SHADOW arm — and I told
+Eamon georgia was unlocked. Her LIVE arm computes its lock **fresh every loop**
+from her recent closes; there is no stored `guard_until` there, so the switch is
+inert on that service. The env var has been removed rather than left as
+misleading config. Her live lock is **self-releasing** as the triggering stops
+age out of the 12h/24h windows. The mechanism remains correct for the shadow
+books; the claim about which arm it reached was wrong.
+
+### THE PATTERN, because it is the fourth instance today and it is one habit
+
+`closed_at` where the publisher emits `close_ts`. `ttl_sec` on a table with no
+such column. `START_EQUITY` in the module the live book does not execute.
+`FAMILY_CLEAR_GUARD` in the class the live book does not instantiate. Every one
+is the same move: **find a plausible mechanism, verify it in ONE file, ship
+without asking which code path the affected book actually runs.** The fixture
+lessons already cover the read side ("diff the key names against the
+publisher's dict"); this is the same discipline one level up — **diff the
+MODULE against the running arm.** For this fleet that is a concrete check:
+`lighter_avo_live_bot` and `lighter_family_bot` share strategies and share
+almost nothing else, so a fix aimed at a live book that edits the family module
+is wrong by default until its import list says otherwise.
+
 ## 2026-08-27 (vg) — 🔮 GEORGIA'S REAL P&L STORY, MEASURED: HER STRATEGY IS +3.62pp AND ONE DOGE GAP PLUS THE HALT RAIL TOOK THE MONEY — PLUS AN EXPLICIT OPERATOR UNLOCK
 
 **Eamon, 27-Aug:** *"Unlock Georgia"* and *"Georgias problem is she's alllowed
@@ -16,6 +76,20 @@ way — and it is why the `[deploy-live]` in (ve) left her locked.
 whose entry lock is dropped **once** at boot, operator-only, opt-in, and it
 **logs what it cleared**. An unlock nobody can see is how a protection goes
 missing quietly.
+
+**[CORRECTED IN PLACE 27-Aug (vh) — IT DOES NOT UNLOCK THE LIVE ARM, AND I SAID
+IT HAD.** `FAMILY_CLEAR_GUARD` went into `lighter_family_bot.Book`, which runs
+the SHADOW books. 🔮 georgia's LIVE arm runs `lighter_avo_live_bot`, which does
+not import `Book` at all and computes `entries_locked(closed, t_now, baseline)`
+**fresh every loop from her recent closes** — there is no stored `guard_until`
+on that arm, so there is nothing to clear and the switch is inert there. The
+env var set on `trail-blazer-live` has been REMOVED rather than left as
+misleading config. The live lock is self-releasing: it lifts when the stops
+that triggered it age out of the 12h (slguard) or 24h (maxdd) window. The
+mechanism is still correct and still useful FOR THE SHADOW BOOKS; what was
+wrong was my claim about which arm it reached. I verified the durable
+`guard_until` in one file and shipped a fix without checking which file the
+live book executes.]**
 
 ### HER LEDGER, HALT ROWS SEPARATED FROM STRATEGY ROWS
 
@@ -200,10 +274,24 @@ fix. Her real problem is a **−$36.96 record on a $247.90 book**.
 
 ### THE FINDING NEITHER OF US WENT LOOKING FOR: THE DRAWDOWN RAIL IS DEAD ON ALL THREE LIVE BOOKS
 
-`entries_locked`'s maxdd guard computes
+**[CORRECTED IN PLACE 27-Aug (vh) — THIS FINDING IS WRONG AND I PUBLISHED IT
+ANYWAY. The claim below is FALSE for the live books.** `lighter_avo_live_bot`
+does NOT import the family `Book`; it has its OWN `entries_locked(closed,
+t_now, baseline)` whose drawdown denominator is `ref = baseline` — the LIVE
+baseline — and its docstring says so in its own words: *"with the drawdown
+denominator the LIVE baseline instead of the shadow's $1,000 — 20% of a paper
+grand would never bind on a $63 book."* So the live arm was already
+capital-aware, and `START_EQUITY = 1000.0` governs only the SHADOW paper books,
+which genuinely ARE $1,000 books — where it is CORRECT, not a bug. **I found a
+constant, matched it to a symptom, and never checked which arm executes it.**
+That is the same one-field-and-stop pattern that produced two dead fixture keys
+earlier today. Nothing was broken and nothing needed fixing; the paragraph
+below stands only as the error, kept per I12 rather than deleted.]**
+
+~~`entries_locked`'s maxdd guard computes
 `worst = (peak - cum) / START_EQUITY`, and **`START_EQUITY = 1000.0` is a
 hardcoded module constant** while the three real-money books hold **$247.90
-(georgia), $300.00 (mum), $340.56 (avo)**. So the "15% drawdown" guard needs a
+(georgia), $300.00 (mum), $340.56 (avo)**.~~ So the "15% drawdown" guard needs a
 **$150** drawdown to fire — **60% of georgia's entire book**. It is not
 mis-tuned; it is unreachable. The same capital-blind class the fleet already
 fixed once for the live Taker ([[taker-live-daily-loss-rail-capital-blind]]).
