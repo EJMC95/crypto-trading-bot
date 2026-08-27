@@ -885,6 +885,72 @@ class TestLedgerQuarantine:
         assert "is_quarantined(" in body, "declared but never applied"
         assert "_quarantined" in body, "a silent filter hides its own effect"
 
+    def test_no_caller_passes_bot_and_pair_in_the_wrong_order(self):
+        """[(uz)] APPLIED IS NOT ENOUGH — IT MUST BE APPLIED THE RIGHT WAY ROUND.
+
+        The test above is a SUBSTRING check on ONE file. It cannot see argument
+        order and it cannot see any other caller, and both blind spots were
+        occupied: `scripts/study_band_kelly_2026-08-18.py` called
+        `is_quarantined(r.get("pair"), r.get("bot"), ...)` — the two same-typed
+        positional strings reversed. The match is `p == q_pair and q_bot in b`,
+        so `p` held a bot name, never equalled a quarantined pair, and the
+        filter returned False for EVERY row in the fleet, forever. 45 rows the
+        fleet had ruled inadmissible flowed into a mirror book's ghost-negation
+        table, where negating a phantom LOSS reads as a phantom GAIN.
+
+        Detection is by AST across the whole tree, against the publisher's own
+        `inspect.signature` — so renaming a parameter moves the guard with it.
+        A positional slot is a suspect when its argument expression names a
+        DIFFERENT parameter and not its own.
+
+        STRING LITERALS ARE EXEMPT and that is load-bearing: the pair literal
+        `'BOT/USDC'` contains "bot", and without the exemption this fired on
+        three innocent lines in this very file — a guard that cries wolf is one
+        that gets exempted, and then guards nothing.
+        """
+        import ast
+        import inspect
+        import pathlib as _p
+        import bot_pnl_store as s
+
+        params = list(inspect.signature(s.is_quarantined).parameters)
+        assert params[:2] == ["bot", "pair"], params   # the premise, pinned
+
+        root = _p.Path(__file__).resolve().parents[2]
+        suspects, seen_calls = [], 0
+        for path in root.rglob("*.py"):
+            if ".venv" in path.parts:
+                continue
+            try:
+                tree = ast.parse(path.read_text())
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                name = (fn.attr if isinstance(fn, ast.Attribute)
+                        else getattr(fn, "id", None))
+                if name != "is_quarantined":
+                    continue
+                seen_calls += 1
+                for i, arg in enumerate(node.args):
+                    if i >= len(params) or isinstance(arg, ast.Constant):
+                        continue
+                    src_i = ast.unparse(arg).lower()
+                    mine = params[i]
+                    others = [p for j, p in enumerate(params) if j != i]
+                    if any(o in src_i for o in others) and mine not in src_i:
+                        suspects.append(
+                            f"{path.relative_to(root)}:{node.lineno} slot {i} "
+                            f"expects {mine!r}, got {ast.unparse(arg)!r}")
+
+        # positive control: an AST walk that finds NO calls proves nothing
+        assert seen_calls >= 5, (
+            f"only {seen_calls} is_quarantined call(s) found — the walk is "
+            "broken, and an empty scan would pass this vacuously")
+        assert not suspects, "argument-order swap(s):\n  " + "\n  ".join(suspects)
+
 
 # ---------------------------------------------------------------------------
 # (ij) 01-Aug — the taker's REALISED lens grade must read the shape

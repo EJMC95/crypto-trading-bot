@@ -216,7 +216,17 @@ def ledger_rows(bot):
     era = ERA_FLOOR.get(bot)
     out = []
     for r in rows:
-        if store.is_quarantined(r.get("pair"), r.get("bot"), r.get("closed_at")):
+        # [(uz)] KEYWORDS, because this call shipped with `bot` and `pair`
+        # SWAPPED. The publisher is `is_quarantined(bot, pair, closed_at)` and
+        # its match is `p == q_pair and q_bot in b`, so with the two positional
+        # strings reversed `p` held a BOT NAME, could never equal a quarantined
+        # PAIR, and the filter returned False for every row in the fleet,
+        # forever. Two same-typed positional strings is the whole trap; naming
+        # them makes the swap unrepresentable at this site, and
+        # `tests/autonomy/test_payload_contracts.py` now catches it at every
+        # other one.
+        if store.is_quarantined(bot=r.get("bot"), pair=r.get("pair"),
+                                closed_at=r.get("closed_at")):
             continue
         if era and str(r.get("opened_at") or "")[:10] < era:
             continue
