@@ -216,7 +216,7 @@ def ledger_rows(bot):
     era = ERA_FLOOR.get(bot)
     out = []
     for r in rows:
-        # [(vb)] KEYWORDS, because this call shipped with `bot` and `pair`
+        # [(vg)] KEYWORDS, because this call shipped with `bot` and `pair`
         # SWAPPED. The publisher is `is_quarantined(bot, pair, closed_at)` and
         # its match is `p == q_pair and q_bot in b`, so with the two positional
         # strings reversed `p` held a BOT NAME, could never equal a quarantined

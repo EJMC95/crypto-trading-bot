@@ -886,7 +886,7 @@ class TestLedgerQuarantine:
         assert "_quarantined" in body, "a silent filter hides its own effect"
 
     def test_no_caller_passes_bot_and_pair_in_the_wrong_order(self):
-        """[(vb)] APPLIED IS NOT ENOUGH — IT MUST BE APPLIED THE RIGHT WAY ROUND.
+        """[(vg)] APPLIED IS NOT ENOUGH — IT MUST BE APPLIED THE RIGHT WAY ROUND.
 
         The test above is a SUBSTRING check on ONE file. It cannot see argument
         order and it cannot see any other caller, and both blind spots were
@@ -907,6 +907,14 @@ class TestLedgerQuarantine:
         `'BOT/USDC'` contains "bot", and without the exemption this fired on
         three innocent lines in this very file — a guard that cries wolf is one
         that gets exempted, and then guards nothing.
+
+        POSITIONAL **AND** KEYWORD. The first cut walked `node.args` only, and
+        a mutation round against this guard found the hole: written as
+        `is_quarantined(bot=r.get("pair"), pair=r.get("bot"))` the same swap
+        passed GREEN. Worse, the (vg) fix had just converted the one site with
+        a proven history of this slip into a keyword call — so the guard was
+        blind exactly where the defect had already happened once. Both arms are
+        walked now, and the keyword case is pinned below.
         """
         import ast
         import inspect
@@ -934,16 +942,25 @@ class TestLedgerQuarantine:
                 if name != "is_quarantined":
                     continue
                 seen_calls += 1
-                for i, arg in enumerate(node.args):
-                    if i >= len(params) or isinstance(arg, ast.Constant):
+                # BOTH ARMS. Reading `node.args` alone left the guard blind to
+                # a KEYWORD swap — `is_quarantined(bot=r.get("pair"),
+                # pair=r.get("bot"))` passed green — and the (vg) fix converted
+                # the ONE site with a proven history of this exact slip into a
+                # keyword call, so the guard was blind precisely where the bug
+                # had happened. Found by mutating this guard against itself.
+                slots = [(params[i], a) for i, a in enumerate(node.args)
+                         if i < len(params)]
+                slots += [(kw.arg, kw.value) for kw in node.keywords
+                          if kw.arg in params]
+                for mine, arg in slots:
+                    if isinstance(arg, ast.Constant):
                         continue
                     src_i = ast.unparse(arg).lower()
-                    mine = params[i]
-                    others = [p for j, p in enumerate(params) if j != i]
+                    others = [p for p in params if p != mine]
                     if any(o in src_i for o in others) and mine not in src_i:
                         suspects.append(
-                            f"{path.relative_to(root)}:{node.lineno} slot {i} "
-                            f"expects {mine!r}, got {ast.unparse(arg)!r}")
+                            f"{path.relative_to(root)}:{node.lineno} "
+                            f"slot {mine!r} got {ast.unparse(arg)!r}")
 
         # positive control: an AST walk that finds NO calls proves nothing
         assert seen_calls >= 5, (
