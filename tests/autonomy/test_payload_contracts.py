@@ -924,10 +924,48 @@ class TestLedgerQuarantine:
         params = list(inspect.signature(s.is_quarantined).parameters)
         assert params[:2] == ["bot", "pair"], params   # the premise, pinned
 
+        def _swapped_slots(node, params):
+            """The detection rule, ONE implementation.
+
+            Inlined in the walk, this could not be exercised on a case with a
+            KNOWN answer, so the walk going quiet (a bad skip, a broken parse)
+            was byte-identical to the tree being clean. Both the walk and the
+            negative control below call THIS — a second copy would be a second
+            rule, which is how the `(vj)` keyword blind spot survived its first
+            round.
+            """
+            slots = [(params[i], a) for i, a in enumerate(node.args)
+                     if i < len(params)]
+            slots += [(kw.arg, kw.value) for kw in node.keywords
+                      if kw.arg in params]
+            out = []
+            for mine, arg in slots:
+                if isinstance(arg, ast.Constant):
+                    continue
+                src_i = ast.unparse(arg).lower()
+                others = [p for p in params if p != mine]
+                if any(o in src_i for o in others) and mine not in src_i:
+                    out.append((mine, arg))
+            return out
+
         root = _p.Path(__file__).resolve().parents[2]
+        # THIS BRANCH'S TREE ONLY — `.claude/worktrees` holds OTHER concurrent
+        # sessions' private checkouts, and a whole-tree rglob reddens this
+        # session on work that is not its own and that it cannot fix. Measured
+        # the day this was added: the tracked caller was already correct (the
+        # (vj) keyword form) and the suite was RED on three stale worktree
+        # copies of the pre-(vj) swap. That is exactly the defect `(um)` fixed
+        # in `audit_changelog_letters.py` nine hours earlier — same shape, same
+        # day — so this uses that guard's mechanism rather than a second
+        # ad-hoc skip. Scoped to the worktree root ONLY: everything else under
+        # `.claude` is this branch's own file and must still be scanned.
+        skip_rel = (".claude", "worktrees")
         suspects, seen_calls = [], 0
         for path in root.rglob("*.py"):
             if ".venv" in path.parts:
+                continue
+            _rel = path.relative_to(root).parts
+            if _rel[:len(skip_rel)] == skip_rel:
                 continue
             try:
                 tree = ast.parse(path.read_text())
@@ -948,24 +986,39 @@ class TestLedgerQuarantine:
                 # the ONE site with a proven history of this exact slip into a
                 # keyword call, so the guard was blind precisely where the bug
                 # had happened. Found by mutating this guard against itself.
-                slots = [(params[i], a) for i, a in enumerate(node.args)
-                         if i < len(params)]
-                slots += [(kw.arg, kw.value) for kw in node.keywords
-                          if kw.arg in params]
-                for mine, arg in slots:
-                    if isinstance(arg, ast.Constant):
-                        continue
-                    src_i = ast.unparse(arg).lower()
-                    others = [p for p in params if p != mine]
-                    if any(o in src_i for o in others) and mine not in src_i:
-                        suspects.append(
-                            f"{path.relative_to(root)}:{node.lineno} "
-                            f"slot {mine!r} got {ast.unparse(arg)!r}")
+                for mine, arg in _swapped_slots(node, params):
+                    suspects.append(
+                        f"{path.relative_to(root)}:{node.lineno} "
+                        f"slot {mine!r} got {ast.unparse(arg)!r}")
 
         # positive control: an AST walk that finds NO calls proves nothing
         assert seen_calls >= 5, (
             f"only {seen_calls} is_quarantined call(s) found — the walk is "
             "broken, and an empty scan would pass this vacuously")
+
+        # NEGATIVE CONTROL — the rule still FIRES. A skip is the cheapest way
+        # to turn a guard green, so the detector is driven here on a case with
+        # a known answer. Both forms, because the keyword arm is the one that
+        # was blind in `(vj)`'s first round.
+        for _form in ('is_quarantined(r.get("pair"), r.get("bot"), t)',
+                      'is_quarantined(bot=r.get("pair"), pair=r.get("bot"))'):
+            _call = ast.parse(_form).body[0].value
+            assert _swapped_slots(_call, params), \
+                f"the detector no longer fires on a known swap: {_form}"
+        _ok = ast.parse('is_quarantined(r.get("bot"), r.get("pair"), t)'
+                        ).body[0].value
+        assert not _swapped_slots(_ok, params), \
+            "the detector fires on a CORRECT call — it would be exempted away"
+
+        # and the skip must be SUPPRESSING something rather than sitting inert:
+        # where sibling worktrees exist, prove none of them was scanned. Silent
+        # when there are none (CI checks out a clean tree), so this can only
+        # ever catch the skip growing too wide, never the tree being tidy.
+        _wt = root.joinpath(*skip_rel)
+        if _wt.is_dir():
+            assert not [s for s in suspects if s.startswith(".claude/")], \
+                "the worktree skip is not taking effect"
+
         assert not suspects, "argument-order swap(s):\n  " + "\n  ".join(suspects)
 
 
