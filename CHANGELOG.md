@@ -1,3 +1,115 @@
+## 2026-08-27 (uz) — 👩 MUM IS SLOW, NOT STUCK: HER SHIPPED RSI BAR IS THE MEASURED PEAK, THE UNIVERSE WIDENING IS REFUTED BY RESAMPLING, AND THE TAPE NOW FETCHES ONCE (1804x)
+
+**Eamon, 27-Aug: *"Let's grow this PnL"*** — and *"we record things far too
+slowly and it impairs our judgement"*. Three progressions, and the one that
+would have grown P&L is REFUSED with the number that refutes it.
+
+### 1 · THE TAPE FETCHES ONCE — `scripts/tape_cache.py`
+
+**39 study scripts fetch venue candles; there was no shared cache**, against a
+venue throttled at ~21 req/min. A 400d hourly pull for 21 symbols is ~190
+requests — nine minutes — and every study paid it again. I paid it TWICE in one
+session. The cost is not wall-clock: **a measurement that takes ten minutes does
+not get re-run**, so numbers get quoted from memory instead of re-derived.
+
+Measured, same 30d pull for 6 symbols: **COLD 11.18s / 6 requests -> WARM 0.01s
+/ ZERO requests = 1804x**, 4,320 bars served from disk.
+
+Correctness is measured, not assumed: **historical bars on this venue do not
+revise** ((nu) re-fetched 1,500 bars, zero differences), so a CLOSED bar served
+from disk is the venue's own answer. `_closed_before()` is the single owner of
+that boundary and **the forming bar is never written** — its own selftest arm
+proves it, because freezing a partial bar would be the (ml) entry-bar class in a
+new costume. Any doubt (corrupt file, unknown schema, unwritable dir) degrades
+to a LIVE FETCH, never to `{}`: a cache returning empty would make every study
+silently measure nothing. 7/7 selftest, registered in `SELFTEST_MODULES`,
+gitignored.
+
+### 2 · THE BUS CONTRACT IS A RATCHET NOW — `scripts/audit_bus_contract.py`
+
+`(ut)` fixed `coin-quality` and did NOT close the class. This does: a key one
+module saves and ANOTHER loads is a bus payload, and it must carry
+`updated`+`ttl_sec` or `is_fresh` judges it stale forever. **Verified against
+the real defect: reintroducing it in all three forms (both fields, ttl only,
+updated only) reddens 3/3.** Registered in `ENFORCED_AUDITS`.
+
+**Two defects in my own guard, found before it shipped.** It first inspected
+**exactly ONE key** — decoration, and the check-that-inspects-nothing failure it
+exists to prevent — because real publishers build a payload in a variable;
+`_local_dicts` resolves those, and teaching it `fleet_bus._load` (not just
+`load_state`) found the accessors the contract is actually FOR. And it now
+**states its own coverage**: it resolves a key only when both sides use string
+literals, 5 of ~18 live cross-read keys. A guard that hides how little it sees
+is the same failure wearing a badge.
+
+### 3 · 👩 MUM — ZERO TRADES ON REAL MONEY, AND SHE IS CORRECT
+
+Real money reads **-$14.95** (🙏 avo +$24.17 / 🔮 georgia -$39.12 / 👩 mum
+**$0.00 on n=0**). A live book producing nothing is the cheapest P&L there is.
+`scripts/study_mum_reachability_2026-08-27.py` asks I17's question — stuck, or
+slow? — and her own census (I18) names the term: `rsi_bar 32.0 · rsi_min 36.3 ·
+verdicts {no_signal: 23}`. **The lowest RSI across all 23 of her coins is 36.3
+against a bar of 32.** Not refusing fills; the cell is not occurring.
+
+**HER SHIPPED BAR IS THE MEASURED PEAK — the obvious move would have LOST
+MONEY.** Episodes/day, mean, `t`, and edge over a matched random-entry null
+((hm)), 180d, her exact rule and her live bracket at LAG-1:
+
+| RSI bar | eps/day | mean% | t | edge vs null |
+|---|---|---|---|---|
+| 30 | 5.28 | +0.136 | 2.30 | +0.183 |
+| **32 (shipped)** | **7.03** | **+0.163** | **3.22** | **+0.306** |
+| 35 | 9.18 | +0.066 | 1.43 | +0.086 |
+| 38 | 11.19 | −0.011 | **−0.25** | +0.067 |
+
+An INTERIOR peak, not a grid edge. Widening buys turnover and destroys
+expectancy — I19, measured rather than asserted. The trend term is not the
+knob: it blocks 2.5% of bars alone vs RSI's 48.8%.
+
+**THE THREE BLOCKED SIGNALS WERE CORRECTLY GATED.** Since go-live (25-Aug) her
+cell fired exactly three times — **WTI +0.87%, WTI +0.40%, NVDA +1.60%**, ~$8.60
+on a $300 book — and all three are non-crypto, where the per-asset regime gate
+is fail-CLOSED. The oracle names why: `WTI short-history(190<203)`,
+`XCU (199<203)`, `IWM (177<203)` — their venue tape is younger than the EMA200
+warmup. **WTI graduates in ~13 days, XCU in ~4.** Nothing to fix; the gate is
+working, and this is the I17 SLOW verdict with a date on it.
+
+**AND THE UNIVERSE WIDENING IS REFUTED.** She scans 15 crypto of the venue's
+111, so width was the live lever. Uncapped it looked excellent — top-40 offering
+12.04 signals/day at +0.250%/trade, t=5.65. **Two measurements killed it:**
+* **THE CAP BITES.** At her real 4 slots, one position per coin, sequential:
+  **1,558 of 2,177 signals REFUSED (72%)**. Taken rate 1.70 -> 3.44/day, ~2x not
+  3x. The (hl) rule — a book pays for the entries its holds block.
+* **RESAMPLING KILLS IT OUTRIGHT.** The `t` sequence across volume-ranked cells
+  read 1.37 / 1.25 / **2.30** / 0.32 — a spread wider than the bar, with one
+  peak, which is the (oe) signature. Holding the rule fixed and resampling WHICH
+  coins are graded, 24 draws each: at k=40, `t` runs **−0.78 to +1.41, median
+  0.45, and 0 of 24 reach 2.0** while the volume-ranked cell claims 2.30. It
+  does not reproduce. The tell: at k=13 the volume-ranked universe reads
+  **t=1.36 against a random median of 1.38** — volume ordering carries NO
+  information there, so it cannot be informative at 40 either.
+* **AND MORE IS WORSE ON MEDIAN**: random-draw median `t` 1.38 -> 0.81 -> 0.45
+  -> 0.50 and median total +55.3% -> +40.8% -> +25.2% as k grows 13 -> 50. At a
+  fixed 4-slot cap extra supply does not add the BEST signal, it adds whichever
+  fires FIRST. **Her current 13 is the best size measured.**
+
+**DO NOT RE-PROPOSE** mum's RSI bar above 32 (t=1.43 at 35, −0.25 at 38) or a
+crypto-universe widening (0 of 24 draws at k=40 reach t=2; median total FALLS
+with k). Both are refusals with numbers, and both were the tempting move.
+
+### 4 · TWO CORRECTIONS AGAINST MYSELF, SAME SESSION
+
+* I flagged mum's shadow `stale_candle: 22` as a defect. **It is not** — entries
+  evaluate only on a NEW candle, so a mid-hour snapshot reads stale for every
+  coin, and the code says so in its own comment. Caught by reading the gate
+  instead of the census.
+* A hand-rolled mutation loop left a stale pytest rewrite cache and produced a
+  **false failure** I chased; `scripts/mutate.py` exists for exactly that
+  ([[mutation-tests-lie-under-out-of-tree-pycache]]). Its refusal to run on an
+  uncommitted target is the feature, and it was right.
+* An `&&` chain swallowed a rebase conflict — **the code landed and the
+  changelog did not**, caught only by reading back from origin.
+
 ## 2026-08-27 (uy) — THE (ts) SORT WAS INERT ON EVERY REAL ROW: `_close_rank` READ THE DB COLUMN, NOT THE KEY THE PUBLISHER EMITS
 
 **[RENUMBERED (uw) -> (uy), 27-Aug.** Written and committed as `(uw)`; two
