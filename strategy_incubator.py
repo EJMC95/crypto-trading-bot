@@ -32,6 +32,13 @@ invention of new ones. Nothing here bypasses NO_REAL_MONEY or the judge.
 
 Publishes bot_state 'strategy-incubator' (leaderboard + elite) and appends
 to 'xp-queue'. Run-once; run_all.sh loops it. --selftest is offline.
+
+[2026-08-27] AND IT NOW HAS A WIRE ON THE TAKER SIDE TOO. A STABLE champion
+is PROPOSED to `tuning-proposals`, where the scout tuner replay-gates it —
+see THE WIRE below `assess_champion` for why that channel and not
+`fleet_tuning.write_levers`, and for the three preconditions. Still zero
+actuator: proposals enact nothing, and this author cannot reach a `live.*`
+lever at all (`fleet_proposals` fails CLOSED on the live lane).
 """
 import json
 import math
@@ -62,6 +69,11 @@ try:
     import fleet_proprioception as proprio   # outcome grades (optional import)
 except Exception:  # noqa: BLE001
     proprio = None
+
+try:
+    import fleet_proposals as fprop          # the organs' proposal channel
+except Exception:  # noqa: BLE001
+    fprop = None                             # dark channel proposes nothing
 
 KEY = "strategy-incubator"
 QUEUE_KEY = "xp-queue"
@@ -598,8 +610,19 @@ REGISTER_TOP_N = int(os.environ.get("INCUBATOR_REGISTER_TOP_N", "24"))
 # [2026-07-29] RESEARCH SPACE — exploring BEYOND the registry cage.
 #
 # WHY THIS IS SAFE, and the reasoning must survive: the incubator has NO
-# ACTUATOR. Its only consumer is the dashboard (verified: nothing outside
-# pnl_dashboard.py reads bot_state 'strategy-incubator'). The fleet_tuning
+# ACTUATOR. ~~Its only consumer is the dashboard (verified: nothing outside
+# pnl_dashboard.py reads bot_state 'strategy-incubator')~~
+# **[2026-08-27 CORRECTED IN PLACE per I12 — that parenthesis is no longer
+# true and a session acting on it would draw the wrong conclusion about this
+# very paragraph.** The STABLE champion is now PROPOSED to the scout tuner
+# through `fleet_proposals` (see THE WIRE, below `assess_champion`). The
+# headline survives exactly as written and is the reason the wire is safe: a
+# proposal enacts nothing — the tuner replay-gates every entry against the
+# recorded tape before any lever moves, and no proposal from this author can
+# reach a `live.*` lever. **What the wire makes load-bearing is the sentence
+# after next**: the out-of-cage FRONTIER is now the one thing in this file
+# that must never be proposed, and `champion_proposal` refuses it twice over
+# (`is_enactable`, then a per-gene clamp re-derivation).] The fleet_tuning
 # cages bound what the SCOUT TUNER may ENACT on the shadow taker; they were
 # never a bound on what this organ may MEASURE. Clamping the search to them
 # bought no safety and cost the whole out-of-cage question.
@@ -999,6 +1022,191 @@ def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
     return (True, streak, stable, "stable" if stable else "candidate",
             f"beats default ${edge:+.2f}, both halves ≥ ${HALF_MARGIN:g}, "
             f"streak {streak}/{PERSIST_CYCLES}")
+
+
+# ---------------------------------------------------------------------------
+# THE WIRE (2026-08-27) — the champion reaches the tuner's replay gate
+# ---------------------------------------------------------------------------
+# Until today this organ computed a valid, clamped, in-cage lever dict every
+# single cycle and handed it TO NOBODY. Measured by AST over 423 .py files:
+# `genotype_to_levers` had exactly TWO call sites in the whole tree, both
+# inside this file's own `_selftest`. The breeding, the joint-space sweep, the
+# funnel, the cage analysis and the anti-overfit champion gate all ran, and
+# their output could not reach a single bot. Reproduction with no gametes.
+#
+# THE CHANNEL IS `fleet_proposals.propose`, NEVER `fleet_tuning.write_levers`,
+# and that IS the safety of it: a proposal ENACTS NOTHING. The scout tuner
+# picks it up on its next cycle and gates it through ITS OWN replay over the
+# recorded tape (restrict = not-worse on both halves; expand = the full winner
+# bar with the brain's lens veto senior; <=3 enactments per cycle; bounded,
+# TTL'd, auto-reverting). Writing the lever directly would hand an UNREPLAYED
+# genotype to a running book — an authority this organ has never had and does
+# not gain here. The author lane confirms it in the other direction: driven,
+# `_author_may_propose("taker.tp", "strategy-incubator")` is True (shadow lane,
+# fail-open) and every `live.*` lever is False (fail-closed), so this wire is
+# structurally incapable of reaching real money.
+#
+# THREE PRECONDITIONS, each load-bearing and each pinned by a test:
+#   1. STABLE ONLY, never the fittest of the cycle. `assess_champion` crowns a
+#      `candidate` on one reading and `stable` only after PERSIST_CYCLES
+#      independent cycles on the SAME genotype. One reading is a max over
+#      ~1500 genotypes — the winner's curse `rank()` exists to avoid.
+#   2. ENACTABLE ONLY, re-checked HERE rather than inherited from the caller.
+#      DRIVEN on the live FRONTIER genotype (26-Aug): `genotype_to_levers`
+#      returns SEVEN levers and silently CLAMPS FOUR of them — BRK_RANGE
+#      0.97->0.95, DIV_GAP_PP 100->87.5, MAX_HOLD_H 24->48, STOP_LOSS
+#      -0.015->-0.02 — i.e. it would propose a configuration that was never
+#      scored. That is the (sk) BRK_RANGE lesson already recorded in
+#      TAKER_GENES. A clamp mismatch on ANY gene refuses the WHOLE proposal
+#      rather than dropping that one lever: a partial genotype was not scored
+#      either.
+#   3. AN HONEST DIRECTION, read from its OWNER. The tuner DISQUALIFIES a
+#      proposal whose declared direction disagrees with the one it re-derives,
+#      so a stale second copy of the tighter-direction map would leave this
+#      channel looking alive and enacting nothing, forever, silently.
+#
+# EXPECT NOTHING TO ENACT TODAY, and that is the correct state, not a defect:
+# the live champion is `tentative` with streak 0 and a weak half, `elite` is
+# [] and the enactable-and-both-halves population is 0. The wire is NECESSARY
+# AND NOT SUFFICIENT. What ships today is that when a champion does persist,
+# it reaches a gate instead of a dashboard card — and that the state is
+# PUBLISHED every cycle (`proposal` on the payload), because an empty channel
+# is byte-identical between "nothing qualified" and "the wire is broken" —
+# the (lv) `{open: 0}` ambiguity in a new costume.
+PROPOSE_ON = os.environ.get("INCUBATOR_PROPOSE", "on").lower() != "off"
+PROPOSE_AUTHOR = "strategy-incubator"
+
+
+def _tighter_map():
+    """{lever: "up"|"down"} — which way is TIGHTER for each lever the tuner
+    will consume, READ FROM ITS OWNER (`lighter_scout_tuner.PROPOSAL_TAKER`)
+    and never copied. A second copy of this map would be a second rule, and
+    wrong is SILENT here: the tuner disqualifies a proposal whose declared
+    direction disagrees with its own re-derivation, so a drifted copy makes
+    the channel look alive while enacting nothing.
+
+    Returns None — never {} — when unreadable, so the caller REFUSES rather
+    than proposing a direction it could not derive. Fail-safe direction: a
+    dark map proposes nothing.
+
+    Read PROPOSAL_TAKER and nothing else from that module. In particular do
+    NOT reach for its `DEFAULTS`: it snapshots them from `tt` at ITS import,
+    and this organ patches `tt` attributes during `evaluate`, so the value
+    there depends on when the import happened. `current` is passed in by the
+    caller for exactly that reason."""
+    try:
+        import lighter_scout_tuner as _tuner
+        m = {lever: tighter
+             for lever, (_attr, tighter) in _tuner.PROPOSAL_TAKER.items()
+             if tighter in ("up", "down")}
+        return m or None
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def _money(x):
+    return f"${x:+.2f}" if isinstance(x, (int, float)) else "$?"
+
+
+def champion_proposal(champion, current, tighter=None, genes=None):
+    """What the STABLE champion asks the scout tuner to replay-gate.
+
+    Returns the publishable VIEW — `{"levers": {...}, "refused": str|None,
+    ...}` — where `levers` is ready for `fleet_proposals.propose` and is `{}`
+    whenever anything at all disqualifies the cycle. `refused` always carries
+    the reason, because an empty channel with no reason is the failure this
+    wire exists to end.
+
+    `current` is {gene: the taker's own running value} — the same module attrs
+    the tuner captures as its DEFAULTS. DECLARED LIMIT: the tuner re-derives
+    direction against `DEFAULTS + this cycle's own sweep bars`, so if its
+    sweep has already moved an attr PAST the champion's allele in the same
+    cycle, our declared direction and its derived one disagree and it
+    disqualifies the entry (logged there, enacted nowhere). That fails toward
+    refusal, which is the safe side, and `current` is published here so the
+    disagreement is diagnosable rather than mysterious.
+
+    Pure — no store, no clock, no network."""
+    genes = genes or TAKER_GENES
+    view = {"author": PROPOSE_AUTHOR, "levers": {}, "refused": None,
+            "no_consumer": [], "current": {}, "genotype_levers": {}}
+    if not PROPOSE_ON:
+        view["refused"] = "disabled by INCUBATOR_PROPOSE=off"
+        return view
+    gt = (champion or {}).get("genotype")
+    if not isinstance(gt, dict) or not gt:
+        view["refused"] = "no champion this cycle"
+        return view
+    if not champion.get("stable"):
+        view["refused"] = (
+            f"champion is not STABLE (streak {int(champion.get('streak') or 0)}"
+            f"/{PERSIST_CYCLES}) — one cycle's fittest is a max over the "
+            f"population, not evidence")
+        return view
+    # PRECONDITION 2, both halves. `is_enactable` is fail-CLOSED on an unknown
+    # gene or an unclampable value; the per-gene loop below then re-derives the
+    # clamp itself, so this never rests on a caller having filtered `scored`.
+    if not is_enactable(gt, genes):
+        view["refused"] = ("champion genotype is NOT ENACTABLE — an "
+                           "out-of-cage allele would clamp to a value that "
+                           "was never scored")
+        return view
+    levers = genotype_to_levers(gt, genes)
+    view["genotype_levers"] = dict(levers)
+    for g, v in sorted(gt.items()):
+        lever = (genes.get(g) or (None,))[0]
+        if lever is None or levers.get(lever) != v:
+            view["genotype_levers"] = {}
+            view["refused"] = (
+                f"clamp mismatch on {g}={v!r} — refusing the WHOLE genotype; "
+                f"a partial one was never scored either")
+            return view
+    if not tighter:
+        view["refused"] = ("no direction map (lighter_scout_tuner."
+                           "PROPOSAL_TAKER unreadable) — a direction that "
+                           "cannot be derived must not be declared")
+        return view
+
+    reason = (f"bred champion, stable {int(champion.get('streak') or 0)}/"
+              f"{PERSIST_CYCLES} cycles — replay net "
+              f"{_money(champion.get('net'))} vs default "
+              f"{_money((champion.get('net') or 0) - (champion.get('vs_default') or 0))}")
+    evidence = (f"incubator replay over the recorded scout tape: "
+                f"{int(champion.get('closes') or 0)} closes, lower bound "
+                f"{_money(champion.get('lcb'))}, halves "
+                f"{_money(champion.get('h1'))}/{_money(champion.get('h2'))}; "
+                f"bars closes>={MIN_CLOSES} half>=${HALF_MARGIN:g} "
+                f"edge>=${EDGE_MARGIN:g}")
+    out, no_consumer = {}, []
+    for g, v in sorted(gt.items()):
+        lever = genes[g][0]
+        t = tighter.get(lever)
+        if t is None:
+            # DECLARED, not silently dropped: the tuner's PROPOSAL_TAKER
+            # deliberately omits tp/sl ("their direction semantics are not
+            # monotone"), so proposing them would fill the channel with
+            # entries no consumer reads — the registered-but-inert shape.
+            no_consumer.append(lever)
+            continue
+        cur = current.get(g)
+        view["current"][g] = cur
+        if cur is None or v == cur:
+            continue                      # already there — nothing to ask for
+        out[lever] = {
+            "value": v,
+            "direction": ("restrict" if (t == "up" and v > cur)
+                          or (t == "down" and v < cur) else "expand"),
+            "reason": reason, "evidence": evidence}
+    view["no_consumer"] = sorted(no_consumer)
+    if not out:
+        view["refused"] = ("champion matches the taker's running "
+                           "configuration on every consumable lever — "
+                           "nothing to propose")
+        return view
+    view["levers"] = out
+    view["lanes"] = sorted({(tuning.LEVERS.get(l) or {}).get("lane")
+                            for l in out} - {None})
+    return view
 
 
 # ---------------------------------------------------------------------------
@@ -1669,6 +1877,42 @@ def run_once():
                                  "candidates": candidates_now,
                                  "source": "strategy-incubator"})
 
+    # --- THE WIRE: the STABLE champion -> the tuner's replay gate ----------
+    # See the block above `champion_proposal`. This proposes; it never enacts.
+    proposal = champion_proposal(champion,
+                                 {g: getattr(tt, g) for g in TAKER_GENES},
+                                 _tighter_map())
+    _plevers = proposal.get("levers") or {}
+    proposal["sent"] = False
+    if _plevers:
+        if fprop is None:
+            proposal["refused"] = ("fleet_proposals unimportable — the "
+                                   "channel is dark, nothing was proposed")
+        else:
+            try:
+                _sent = fprop.propose(_plevers, set_by=PROPOSE_AUTHOR,
+                                      now_ts=now)
+            except Exception as _pe:            # noqa: BLE001
+                _sent, proposal["error"] = None, repr(_pe)[:160]
+            proposal["sent"] = bool(_sent)
+            if not _sent:
+                # a failed durable write is the landed-signal contract saying
+                # NO (fleet_proposals returns None) — never report it as sent
+                proposal["refused"] = ("propose() did not land — dark DB, or "
+                                       "nothing survived the registry/author "
+                                       "filter at the channel")
+    if proposal["sent"]:
+        print(f"[incubator] 🗳️  proposed {len(_plevers)} lever(s) to the scout "
+              f"tuner's replay gate: "
+              f"{ {k: v['value'] for k, v in _plevers.items()} } "
+              f"(directions "
+              f"{ {k: v['direction'] for k, v in _plevers.items()} }) — "
+              f"the tuner gates each through its own replay; this enacts "
+              f"nothing", flush=True)
+    else:
+        print(f"[incubator] 🗳️  proposed nothing: {proposal.get('refused')}",
+              flush=True)
+
     # the incubator's OWN proposed ledger stamps birth time; the queue copy
     # stays exactly {name, levers} (the judge's contract, untouched)
     proposed_all = ((prior.get("proposed") or [])
@@ -1724,6 +1968,16 @@ def run_once():
         # should be made from.
         "frontier": frontier,
         "cage_analysis": cages,
+        # [2026-08-27] THE WIRE, published every cycle whether or not it fired.
+        # `levers` is what went to `tuning-proposals`, `sent` whether the write
+        # landed, `refused` the reason it did not, `no_consumer` the levers the
+        # tuner's own PROPOSAL_TAKER declines to read (tp/sl), and `current`
+        # the taker values the directions were derived against. Published
+        # because `{levers: {}}` is otherwise byte-identical between "no
+        # champion persisted" and "the channel is broken" — the (lv) rule.
+        # This organ still ENACTS NOTHING: the scout tuner replay-gates each
+        # entry, and no proposal from this author can reach a live.* lever.
+        "proposal": proposal,
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):

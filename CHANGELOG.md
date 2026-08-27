@@ -94,6 +94,108 @@ the guard stayed green with the import broken. **That is this repo's own "a
 substring test is NOT a wiring test" rule, walked into by the guard written
 to enforce it** — the same shape as `(ub)`'s vacuous `side_is_long` check a
 day earlier. It now parses the COPY DIRECTIVES and kills the mutation.
+## 2026-08-27 (ul) — THE WIRE GOES IN: THE INCUBATOR'S CHAMPION REACHES A REPLAY GATE INSTEAD OF A DASHBOARD CARD — AND THE "SURFACE HAS TURNED POSITIVE" HEADLINE IS REFUTED BY ITS OWN PRE-REGISTRATION, WITHIN THE HOUR
+
+**Eamon, 27-Aug:** *"Can you put the wire in? And put through the top three
+candidates as famous Portuguese men and women."* The wire is in. The three
+books are REFUSED, with the arithmetic. And the reading that made the wire feel
+urgent did not survive one hour of its own pre-registered test.
+
+### THE WIRE
+`genotype_to_levers` (strategy_incubator.py:858) has always returned a clean,
+clamped lever dict and — verified by AST across **423 files** — was called at
+exactly two sites, **both inside `_selftest`**. The organ bred ~1,519 genotypes
+an hour, ranked them, gated them, published them, and **no bot could read the
+answer**.
+
+It now proposes through **`fleet_proposals.propose()`**, never
+`fleet_tuning.write_levers`. That choice is the whole safety: the scout tuner
+replay-gates every entry against the recorded tape (expand needs the full
+winner bar, brain veto senior, ≤3/cycle, TTL'd, auto-reverting) before anything
+is written. The road was already live and carrying traffic — `taker.momo_chg`
+=6.0 is on the bus right now stamped *"organ-proposal:event-sentinel
+(replay-gated at this tuner)"* — so what was missing was an on-ramp, not a road.
+
+**THREE PRECONDITIONS, each a refusal:**
+* **STABLE only** (`streak >= PERSIST_CYCLES`), never `scored[0]` and never the
+  frontier. Driven proof this matters: `genotype_to_levers` on the LIVE frontier
+  genotype silently **CLAMPS** `DIP_RANGE 0.2→0.15`, `STOP_LOSS -0.015→-0.02`,
+  `DIV_GAP_PP 100→87.5` — enacting a configuration that was **never scored**.
+  That is the (sk) `BRK_RANGE 0.97` lesson, already recorded in `TAKER_GENES`.
+* **ENACTABLE only**, re-checked at the wire with a per-gene clamp
+  re-derivation, and **any** mismatch refuses the WHOLE genotype — a partial one
+  was never scored either.
+* **An honest DIRECTION**, read from its OWNER (`lighter_scout_tuner.
+  PROPOSAL_TAKER`) rather than copied. A second copy would be a second rule and
+  wrong SILENTLY here: the tuner DISQUALIFIES a mismatched direction, so a
+  drifted copy leaves the channel looking alive and enacting nothing forever.
+  Unreadable returns None, never `{}`, and the caller then refuses.
+
+**IT ENACTS NOTHING TODAY, stated rather than buried.** Driven against the live
+payload: `levers {}`, `refused: "champion is not STABLE (streak 0/3) — one
+cycle's fittest is a max over the population, not evidence"`. `elite []`,
+`enactable 0`. The wire is NECESSARY AND NOT SUFFICIENT. `payload["proposal"]`
+publishes every cycle — levers, sent, refused, no_consumer, current — because
+`{levers: {}}` is otherwise byte-identical between *"no champion persisted"* and
+*"the wire is broken"* ((lv)). **Declared limit:** the tuner's `PROPOSAL_TAKER`
+deliberately omits `taker.tp`/`taker.sl` (direction semantics are not monotone),
+so those two are dropped and NAMED in `no_consumer` rather than filling the
+channel with entries nothing reads. 28 tests, **12/12 mutations red**.
+
+### AND THE HEADLINE THAT MOTIVATED IT IS REFUTED
+Four hours earlier this session reported the fitness fix had turned the surface
+positive: `both_halves_pos` **0 → 34**, champion net −29.42 → +44.27, lower
+bound −52.68 → +9.51. **Measured across four consecutive production cycles the
+count reads 0 → 34 → 3 → 8.** That is not a trend; it is the exact instability
+**P3 of `PREREG_INCUBATOR_FITNESS_2026-08-26.md` predicted this morning** —
+*"h1 should be UNSTABLE across adjacent cycles... appears in some cycles and not
+others, with no stable trend"* — and the pre-registration is what caught its own
+author. Production's two consecutive cycles swung **34 → 3 on a tape that rolled
+~1/183rd of its span.**
+
+**The companion claim — "the winners are out-of-cage, so the CAGE is the binding
+constraint" — is also dead, and by arithmetic rather than opinion.** Only
+**5,760 of 226,800** research genotypes (**2.54%**) are fully in-cage, and
+per-cycle `enactable_all` runs ~50 of 1519 (3.29%). With 34 winners the EXPECTED
+in-cage overlap is `50 × 34/1519 = 1.1`, so **observing 0 has P = 0.33**. On the
+next cycle, with 3 winners, expected overlap is 0.099. **Neither cycle carries
+any information about the cage.** No widening was run and none is recommended;
+the honest next step is the test that separates *too-tight* from *overfit*, and
+those 34 were selected BY the same replay that scored them.
+
+What DOES look durable, said carefully: the champion's net and lower bound have
+been positive in every post-fix reading (+44.27 then +53.09; lcb +9.51 then
++18.42) against −29.42 / −52.68 before. Two readings. The pre-registration asks
+for three.
+
+### THE THREE PORTUGUESE BOOKS — REFUSED, WITH THE ARITHMETIC
+The naming rule is RECORDED (CLAUDE.md, after the Australian-musician rule):
+the next cohort is named for famous **Portuguese men and women**, row shape
+**`lus-<surname>-lshadow`** (Lusitania/Lusophone; `pt-` rejected because two
+letters read as a strategy abbreviation). No list of names — a list invites a
+session to hunt for strategies to hang them on, which is backwards.
+
+**But three taker genotypes cannot be three books, and the gates say so:**
+* **I20** — they would enter on the SAME scout tickets, the same lenses and the
+  same universe as 🎫 the existing taker. That is one bet held three times at
+  three row ids, which is exactly what retired 🎸 Barnesy (0 of 9 episodes were
+  a coin its parent was not already holding).
+* **I22** — a fresh (hm) clock from zero needs `342 closes / 4.40 per day =`
+  **77.7 days**, against `MAX_DAYS_TO_GATE = 60`. `audit_book_spend` refuses it.
+  A design that cannot be decided inside 60 days is a STUDY, not a book.
+
+**THE CONSTRUCTIVE HALF, which is the real answer:** measured on 286 live scout
+snapshots, **21 non-crypto markets ≥$0.5M/day — $79.6M/day — that no living
+DIRECTIONAL book scans** (the family non-crypto universe is a hardcoded 10; the
+venue carries 213 markets / $1,306M/day, 102 of them non-crypto). And the
+decisive number is independence, not width: **crypto-10 `N_eff` 1.59** (rho
++0.590) versus **family-10 non-crypto 4.72** (+0.124) — holding on a
+US-cash-session-only control (1.51 vs 4.04), so it is not a staleness artifact.
+Every live book publishes `n_eff` **1.0 / 1.0 / 2.349** at `days_to_gate_obs`
+**28.4**; at `n_eff 4.04` the same per-bet edge implies **~7.0 days to gate**.
+**Diversification is the only lever measured to buy decidability by the square**
+(I22: `S_d² = Σ S_i²`), and it is unclaimed. That is where a Portuguese book
+should be born — not on the taker's supply.
 
 ## 2026-08-26 (ui) — MAIN WENT RED BY THE CLOCK: A FIXTURE ANCHORED TO A FROZEN INSTANT PASSED THE HOUR IT WAS WRITTEN AND ROTTED ORGAN BY ORGAN — 0 FAILURES AT 13:13Z, 11 AT 21:48Z, AND 11 FOREVER
 

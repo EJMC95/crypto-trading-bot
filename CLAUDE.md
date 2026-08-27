@@ -2231,6 +2231,48 @@ All new bots:
   (the Parliament pattern), not something the incubator does on its own — it
   breeds genotypes replayed against an EXISTING book's tape and can never
   create a row. See [[incubator-cannot-mint-books]].
+- **NAMING THE COHORT AFTER THAT: famous PORTUGUESE MEN AND WOMEN (Eamon,
+  27-Aug).** The 🏛️ Parliament took the last Australian PMs; the 🎸 `band-`
+  cohort took Australian musicians; the 📚 `book-` cohort took authors and the
+  🧭 `nav-` cohort took navigators. The NEXT cohort of books that earns its own
+  dashboard rows is named for famous Portuguese men and women. Proposed row-id
+  shape: **`lus-<surname>-lshadow`** — from *Lusitania* / Lusophone, the
+  standing adjective for Portuguese. It is chosen to match what every existing
+  prefix actually does: `pm-` / `band-` / `book-` / `nav-` each name the COHORT
+  rather than the strategy family, and each is three or four characters, so
+  `lus-` sits in the same column on the dashboard and sorts as its own block.
+  (`pt-` was the obvious alternative and is rejected: two letters reads as an
+  abbreviation of a strategy — "point", "portfolio" — where `lus-` can only be
+  the cohort.) The surname is Eamon's to pick, book by book; no list is
+  recorded here, because a list of names invites a session to go looking for
+  strategies to hang them on, which is exactly backwards.
+  **THIS IS A NAMING RULE AND NOT A LICENCE TO MINT BOOKS — the same caveat the
+  Australian-musician rule carries, and it has since grown TEETH.** A row is
+  minted only when a strategy has actually cleared its bar, and minting one is
+  a BUILD (the Parliament pattern), never something the incubator does on its
+  own — it breeds genotypes replayed against an EXISTING book's tape and can
+  never create a row ([[incubator-cannot-mint-books]]). Since that rule was
+  written the fleet has paid for minting rows it could not grade and has put
+  two executable gates in front of the act, and a Portuguese name clears
+  neither of them:
+  * **I20 — NAME THE SUPPLY.** `scripts/audit_book_overlap.py --gate --floor`
+    answers, before the row exists, which coins the proposed gate actually
+    yields and which living books already hold them. A supply already spoken
+    for is not new edge; it is one bet held twice at a second row id, which is
+    what retired 🎸 Barnesy (0 of 9 of its episodes were a coin its parent was
+    not already holding). Differentiate by an apr BAND, a volume TIER, an asset
+    CLASS or a time AXIS — never by a new row id.
+  * **I22 — PUBLISH THE SPEND.** `scripts/audit_book_spend.py` requires every
+    book born after 20-Aug to publish `extra.spend` — `markets_scanned`,
+    `n_eff` (correlation-aware, never a symbol count), `sides`, `gross_x`,
+    `days_to_gate_obs` — every loop, and reddens the build at
+    `days_to_gate_obs > MAX_DAYS_TO_GATE` (60). A design that cannot be decided
+    inside 60 days is a STUDY: it may run as an instrument, and it does not get
+    a row, a clock, capital or a slot of the enforced fleet budget.
+  So the order is supply → spend → build → name. **A refusal counts as
+  compliance**: three good Portuguese names and no unclaimed cell is this rule
+  working, and the answer then is to find the cell or decline — never to widen
+  the tape or lower the bar so a name has somewhere to live.
 - **THE CAGE MUST FIT THE VALUE (30-Jul, operator: "if the bounds don't
   correlate properly then recalibrate individually").** A lever is THREE
   things that must agree: the registry cage (`LEVERS[name]["lo"/"hi"]`), the
