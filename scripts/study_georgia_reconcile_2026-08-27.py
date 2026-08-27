@@ -2,14 +2,14 @@
 """STUDY: 🔮 georgia — RECONCILE the replay with the RECORD, on HER OWN entries.
 [2026-08-27, Eamon: "Let's run it now baby!"]
 
-WHY THIS EXISTS. `(uv)`'s exit-free test said `range_on` has a large entry edge
+WHY THIS EXISTS. `(ux)`'s exit-free test said `range_on` has a large entry edge
 (t_cl +4.28, P(rand>=)=0.000 at every horizon) while her LEDGER says that sleeve
 LOSES (-0.037%/trade) and `trend_breakout` earns. **I14 is explicit: when a
 book's own realised trades disagree with a proxy, the RECORD decides.** So the
 proxy does not get to redesign a real-money book until the disagreement is
 explained.
 
-THE MECHANISM THAT COULD EXPLAIN IT, and why this study is the test: `(uv)`
+THE MECHANISM THAT COULD EXPLAIN IT, and why this study is the test: `(ux)`
 replayed **1816 entries where she actually took 212**. It models none of
 `MAX_ENTRIES_PER_HOUR`, slot contention, the fleet long budget, coin vetoes or
 the StoplossGuard — so its entry set is not her entry set, and its verdict may
@@ -22,7 +22,7 @@ re-derived, not filtered — they are the trades she actually opened. So a
 difference between two cells is caused by the EXIT and nothing else.
 
 ===========================================================================
-FIDELITY — the trail is her REAL one, not a fixed percentage. `(uv)`'s grid
+FIDELITY — the trail is her REAL one, not a fixed percentage. `(ux)`'s grid
 swept a static stop; her actual rule is `DayTraderGated.atr_stop_dist`:
 
     dist    = min(mult * ATR14 / px, 0.05)        # capped at |stoploss|
@@ -38,7 +38,7 @@ LOW and fills AT `stop_px` — conservative, and the calibration gate below is
 what decides whether that convention is faithful.
 
 ===========================================================================
-CALIBRATION GATE (gx), AND IT IS MUCH TIGHTER THAN `(uv)`'s. Because the
+CALIBRATION GATE (gx), AND IT IS MUCH TIGHTER THAN `(ux)`'s. Because the
 entries are hers, the shipped policy must reproduce her ACTUAL per-trade mean
 on the SAME trades — not merely land in the same region. Tolerance +/-0.25pp
 overall AND the sign must match per sleeve. FAIL => every recommendation is
@@ -61,7 +61,7 @@ VERDICT, PRE-DECLARED — a variant is ADMITTED only if ALL of:
 Anything else REFUSE, printing (a)-(d) so the refusal carries numbers.
 
 A refusal is a first-class outcome. If nothing clears, the finding is that
-`(uv)`'s exit result does NOT survive contact with her real entry set, and the
+`(ux)`'s exit result does NOT survive contact with her real entry set, and the
 shipped exit stands.
 
 Usage: .venv/bin/python3 scripts/study_georgia_reconcile_2026-08-27.py
@@ -125,31 +125,43 @@ def roi_thr(lad, age):
     return t
 
 
-def walk(bars, atr, zones, e, entry, lad, mult, hold, rtop):
-    """Her REAL exit stack from bar e at `entry`. Bot's own check order."""
+def walk(bars, atr, zones, e, entry, lad, mult, hold, rtop, sleeve):
+    """Her REAL exit stack from bar e at `entry`. Bot's own check order.
+
+    TWO FIDELITY FIXES the calibration gate forced, both real rules I had
+    dropped and both worth naming:
+      * `range_top` is VETOED for `trend_breakout` positions (the bot's own
+        `m.get("tag") != "trend_breakout"`). That tag is 154 of her 212
+        entries, so letting the signal fire on them made the replay exit 131
+        times via range_top against her real 65, and only 21 via roi against
+        her real 82.
+      * EVERY trigger reads the bar CLOSE, not high/low. The bot polls a MARK
+        (`px`) — it never sees an intrabar extreme — so testing `hi`/`lo`
+        would grant the replay fills production cannot get, the (ml) class.
+    """
     stop_px = 0.0
     for k in range(e, min(e + hold, len(bars))):
-        _t, o, hi, lo, c, _v = bars[k]
+        _t, _o, _hi, _lo, c, _v = bars[k]
         age = (k - e) * BAR_MIN
-        # 1) ATR ratchet trail — updates on close, triggers on low
+        profit = c / entry - 1.0
+        # 1) ATR ratchet trail — ratchets on the mark, triggers on the mark
         a = atr[k]
         if a and c:
             dist = min(mult * a / c, abs(STOPLOSS))
             stop_px = max(stop_px, c * (1.0 - dist))
-        if stop_px and lo <= stop_px:
-            return (stop_px / entry - 1.0) * 100.0, "trail", k - e
+        if stop_px and c <= stop_px:
+            return profit * 100.0, "trail", k - e
         # 2) hard stop
-        if lo <= entry * (1.0 + STOPLOSS):
-            return STOPLOSS * 100.0, "stop", k - e
+        if profit <= STOPLOSS:
+            return profit * 100.0, "stop", k - e
         # 3) ROI ladder
-        thr = roi_thr(lad, age)
-        if hi >= entry * (1.0 + thr):
-            return thr * 100.0, "roi", k - e
-        # 4) range_top signal
-        if rtop and k > e:
+        if profit >= roi_thr(lad, age):
+            return profit * 100.0, "roi", k - e
+        # 4) range_top signal — vetoed for trend_breakout, needs live volume
+        if (rtop and k > e and _v > 0 and sleeve != "trend_breakout"):
             z = zones.get(k)
             if z is not None and c >= z:
-                return (c / entry - 1.0) * 100.0, "range_top", k - e
+                return profit * 100.0, "range_top", k - e
     if e + hold >= len(bars):
         return None
     return (bars[e + hold][4] / entry - 1.0) * 100.0, "max_hold", hold
@@ -207,7 +219,15 @@ def main():
         if i >= len(b) - 8:
             miss += 1
             continue
-        sleeve = reason.split("_")[0].replace("long-", "").replace("long", "long")
+        # `long-range-on_range_top` -> `range_on`. The ledger writes the tag
+        # HYPHENATED while the code's tags are UNDERSCORED, and comparing the
+        # two forms silently made the trend_breakout veto inert and the
+        # range_on subset EMPTY (it printed `+nan`, which is what caught it —
+        # (po): a nan is not a result).
+        sleeve = (reason.split("_")[0]
+                  .replace("long-", "", 1).replace("-", "_"))
+        if sleeve == "long":
+            sleeve = "long"
         ent.append((pair, i, ep, actual, sleeve, o))
     print(f"mapped {len(ent)} entries onto 15m bars ({miss} unmapped)\n")
     if len(ent) < 100:
@@ -221,7 +241,7 @@ def main():
                 continue
             m = mult_map(sl)
             r = walk(tape[pair], atrs[pair], zones[pair], i, ep, lad, m,
-                     hold, rtop)
+                     hold, rtop, sl)
             if r:
                 rr.append(r[0])
                 keys.append((pair, o.date()))
@@ -295,7 +315,7 @@ def main():
            if r[5] > rep_m + MIN_GAIN and r[7] > 0 and r[8] > 0
            and r[6] >= bt and r[9] > rob]
     if not adm:
-        print("  ADMIT: none. (uv)'s exit result does NOT survive contact "
+        print("  ADMIT: none. (ux)'s exit result does NOT survive contact "
               "with her real entry set — the shipped exit stands.")
     else:
         for r in sorted(adm, key=lambda x: -x[5])[:10]:

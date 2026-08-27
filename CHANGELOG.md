@@ -1,3 +1,128 @@
+## 2026-08-27 (ux) — 🔮 GEORGIA, ENTRY FIRST: `range_on` BEATS RANDOM AT EVERY HORIZON AND `trend_breakout` — HER DOMINANT SLEEVE — DOES NOT; THE EXIT SWEEP THAT FOLLOWED IS SUPERSEDED BY `(uw)`
+
+**Eamon, 27-Aug: *"If it's not diversification then it's entry and exits, please
+evolve."*** `(qu)`'s hard-won rule sets the order: ~600 bracket sweeps on 🙏 avo
+failed because there was no ENTRY edge for any bracket to harvest, so the
+exit-free test runs FIRST. Bars pre-registered in `088e70c` before any result
+existed; 90d of Lighter's own 15m tape, her actual 23-symbol universe, LAG-1,
+episodes not ticks, matched-random null ((hm)).
+
+**Q1 — ENTRY, exit-free, vs matched-random:**
+
+| sleeve | episodes | best excess | t_cl | trailing-30d | verdict |
+|---|---|---|---|---|---|
+| `range_on` | 244 | **+2.300%** @24h | **+4.28** | +3.054% | **SURVIVES** |
+| `bounce_pullback` | 376 | +0.610% @24h | +1.94 | +2.192% | SURVIVES |
+| `trend_breakout` | 1196 | −0.127% @12h | +1.08 | +1.563% | **DEAD** |
+
+`range_on` beats random at EVERY horizon with P(random>=signal)=0.000 and a
+RISING trailing window. `trend_breakout` — **154 of her 212 real entries** — is
+negative at 4h/8h/12h and misses the bar at 24h. Note the honest qualifier: its
+trailing-30d is +1.563%, so "DEAD" is this study's pre-declared bar speaking,
+not a claim that the sleeve is proven worthless.
+
+**THE FIDELITY FIX THAT MATTERED**, caught mid-run: the rule was being fed a
+GROWING full-history prefix while the live `CandleCache` only ever holds
+`SPAN_BARS["15m"] = 300` bars. The replay had MORE history than production —
+the opposite of faithful, and O(n²) besides. Windowed to production's own span:
+correct, and ~29x faster.
+
+**Q2 — the exit sweep, and it is SUPERSEDED. Read `(uw)`, not this.** On the
+1,816-entry signal population the sweep admitted eight variants (best
++0.599%/trade vs a shipped +0.162%), every one of them turning the `range_top`
+signal exit OFF. Two things stopped it shipping, and both were stated before
+`(uw)` ran: the best cell sat at the MAXIMUM of both grid axes — `(gx)`: a
+grid-edge winner is reported unbounded, never shipped as a value, and its −8%
+stop is unreachable anyway because the trail is capped at her −5% `stoploss` —
+and the whole result **contradicted her own ledger**, which `(hm)`/I14 settles
+in the ledger's favour.
+
+`(uw)` re-ran the sweep on her **212 REAL entries** instead of the 1,816 the
+rule could theoretically take, and **zero of 48 exit configurations reach a
+positive mean**. So the Q2 table here describes trades she never took. It is
+retained because the ENTRY result (Q1) stands on its own and because the
+disagreement between the two is the finding.
+
+## 2026-08-27 (uw) — 🔮 GEORGIA: THE EXIT IS NOT THE PROBLEM. 48 EXIT CONFIGURATIONS ON HER OWN 212 ENTRIES, ZERO WITH A POSITIVE MEAN, ZERO WITH BOTH HALVES POSITIVE — AND THE PROXY THAT SAID OTHERWISE WAS GRADING 1,816 TRADES SHE NEVER TOOK
+
+**Eamon, 27-Aug: *"If it's not diversification then it's entry and exits, please
+evolve."*** Diversification was ruled out in `(uu)` (57 of 60 live closes are
+crypto; `n_eff ~ 1.0` is structural). This is the other half, and the answer is
+that **neither knob is available** — for a reason worth writing down.
+
+**WHAT `(ux)` FOUND, AND WHY IT DID NOT GET TO SHIP.** An exit-free entry test
+over 90d of her own 15m tape rated `range_on` a strong survivor (excess +0.672%
+to +2.300%, cluster-t +3.40..+4.28, P(rand>=)=0.000 at EVERY horizon, trailing
+window rising) and `trend_breakout` — her DOMINANT sleeve, 154 of 212 real
+entries — DEAD. Its exit sweep then admitted eight variants, the best reading
++0.599%/trade against a shipped +0.162%.
+
+**Her LEDGER says the reverse**: `trend_breakout` +0.128%/trade, `range_on`
+−0.195%. **I14 is explicit — when a book's realised trades disagree with a
+proxy, the RECORD decides** — so the proxy was not allowed to redesign a
+real-money book. The suspected mechanism was named before it was tested:
+`(ux)` replayed **1,816 entries where she actually took 212**, modelling none
+of `MAX_ENTRIES_PER_HOUR`, slot contention, the fleet long budget, coin vetoes
+or the StoplossGuard.
+
+**THIS STUDY REMOVES THAT DEGREE OF FREEDOM.** Every candidate exit is walked
+over her **212 REAL, PRICED entries** (pair + opened_at + entry_price straight
+from `paper_trades`, both arms), so a difference between cells is caused by the
+EXIT and nothing else. Her ACTUAL trail is modelled — the ratcheting
+`min(mult x ATR14/px, 5%)`, not a static stop — in the bot's own check order.
+
+**THE CALIBRATION GATE EARNED ITS KEEP THREE TIMES**, and each catch was a real
+rule I had dropped:
+
+| harness state | replay vs actual | what was wrong |
+|---|---|---|
+| first run | **−0.360pp FAIL** | — |
+| + `live_vol` on the range_top signal | −0.355pp FAIL | her 10 non-crypto symbols carry `v==0` out of hours |
+| + close-only triggers (no bar hi/lo) | −0.199pp pass | the bot polls a MARK; testing hi/lo grants fills production cannot get ((ml)) |
+| + the `trend_breakout` range_top VETO | **−0.079pp PASS** | `m.get("tag") != "trend_breakout"` — 154 of 212 entries |
+
+The last one was found by a **`+nan`** in the range_on column: the ledger writes
+tags HYPHENATED (`long-range-on`) while the code's tags are UNDERSCORED
+(`range_on`), so my veto was inert and the range_on subset was EMPTY. `(po)`:
+a nan is not a result. Final exit mix tracks her book — roi 86 vs her real 82.
+
+**THE VERDICT, on a harness that reproduces her to 0.079pp:**
+
+```
+48 exit configurations   (roi ladder/flat2.0/flat3.0 x ATR mult 2.0-3.5
+                          x hold 12h/24h x range_top ON/OFF)
+cells with mean > 0                 :  0 of 48
+cells with BOTH halves positive     :  0 of 48
+best second half in the whole grid  : -0.437%
+best cell overall                   : -0.020%/trade  (flat2.0, mult 3.5,
+                                       12h, rtop OFF) — still negative
+```
+
+**ADMIT: none.** `(ux)`'s exit result does not survive contact with her real
+entry set, and the shipped exit stands.
+
+**AND THE SHAPE OF THE FAILURE IS THE FINDING.** Every one of the 48 cells is
+POSITIVE in its first half (+0.35 to +0.72) and NEGATIVE in its second
+(−0.44 to −1.12). The replay holds its configuration FIXED throughout, so that
+decline cannot be caused by the 20-Aug stop widening or by any exit at all —
+**it is in the entries.** No exit configuration reaches a positive mean on her
+own trades, which is the cleanest possible statement that the exit is not the
+lever.
+
+**WHAT THIS LEAVES.** Diversification: unavailable `(uu)`. Exits: measured and
+refused here. Entry supply: already worked on 22-Aug (signal supply 40.9/day vs
+4.53 opens; `MAX_ENTRIES_PER_HOUR` 2 -> 3). The remaining hypothesis is the one
+this study makes visible rather than settles: **the subset her production
+filters actually select may be worse than the signal population** — `(ux)`'s
+1,816-entry population shows edge where her 212 do not. That is a testable
+question and it is the next study, not a knob.
+
+**NOT A RETIREMENT CALL, and stated so deliberately.** Her shadow is
++0.087%/trade over n=197 and she sits 5 of 6 go-live bars, failing only `t`.
+This entry records that **no tuning lever is available on the two axes Eamon
+named**, which makes her a keep-or-decide question (I17) rather than a tuning
+one — and that is Eamon's call, on evidence, not a session's.
+
 ## 2026-08-27 (uu) — FOUR REFUSALS WITH EVIDENCE: (tr)'s CELL VERDICTS SURVIVE THE CORRECTED ESTIMATOR, 32 IS AT THE OPTIMUM, 🔮 GEORGIA CANNOT DIVERSIFY, AND THE ARITY GUARD IS NOT WORTH SHIPPING
 
 Eamon: *"optomise and fix anything needed."* Four things were checked and all
