@@ -295,6 +295,37 @@ def _row_keys_read_by(fn_name, rowvar="r"):
 LEDGER_ROW_READERS = (("_close_rank", "r"), ("_latest_policy_stamp", "r"))
 
 
+def test_the_key_extractor_scopes_to_the_row_and_not_to_its_neighbours():
+    """The guard below is only as good as its extractor, so the extractor is
+    tested on a function that reads FOUR different dicts.
+
+    `_pair_precheck` reads `row.get(...)` (a bot_pnl row), `pspec.get(...)`
+    (the pair spec), `r.get(...)` (a ledger row) and `spec.get(...)` (the
+    retirement declaration) in one body. Without the `rowvar` scoping the
+    extractor would pool them, and the guard would then report `since`,
+    `override` and `policy_waived` as ledger keys the publisher never
+    emits — crying wolf on four correct reads, which is how a guard gets
+    exempted and then guards nothing.
+
+    Asserted as DISJOINT sets rather than "non-empty", because a pooling
+    extractor is still non-empty.
+
+    (mutation: drop `n.func.value.id == rowvar` from `_row_keys_read_by`
+    => this reddens)
+    """
+    by_var = {v: _row_keys_read_by("_pair_precheck", v)
+              for v in ("row", "pspec", "r", "spec")}
+    assert by_var["row"] == {"age_sec", "updated_at", "updated"}, by_var["row"]
+    assert by_var["r"] == {"bot"}, by_var["r"]
+    assert "policy_waived" in by_var["pspec"], by_var["pspec"]
+    assert "since" in by_var["spec"], by_var["spec"]
+    for a, b in ((("row", "r")), ("row", "pspec"), ("r", "spec")):
+        assert not (by_var[a] & by_var[b]), (a, b, by_var[a] & by_var[b])
+    # ...and the sub-dict read `(r.get("extra") or {}).get("policy")` is NOT a
+    # row key under any of them — its receiver is an expression, not a name.
+    assert not any("policy" in v for v in by_var.values()), by_var
+
+
 def test_every_ledger_key_the_census_reads_is_one_the_publisher_emits():
     """[(uw)] THE CLASS, NOT THE INSTANCE.
 
