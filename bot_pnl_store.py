@@ -1326,12 +1326,20 @@ def fetch_paper_aggregate(bot):
                 """
                 SELECT COALESCE(SUM(pnl_abs), 0.0),
                        COUNT(*),
-                       COUNT(*) FILTER (WHERE pnl_abs > 0)
+                       COUNT(*) FILTER (WHERE pnl_abs > 0),
+                       COUNT(*) FILTER (WHERE pnl_abs = 0
+                                     OR extra->>'non_economic' = 'true')
                 FROM paper_trades WHERE bot = %s
                 """,
                 (bot,),
             )
-            realized, closed, wins = cur.fetchone()
+            # 4th column is a CANDIDATE count, not a verdict: `is_non_economic`
+            # still decides. It exists so a clean book pays ONE round trip —
+            # the contract `test_a_clean_book_is_untouched_and_asks_no_second_query`
+            # pins, and which the first draft of this pass broke.
+            _agg = cur.fetchone() or (0.0, 0, 0, 0)
+            realized, closed, wins = _agg[0], _agg[1], _agg[2]
+            _cand = int(_agg[3] or 0) if len(_agg) > 3 else 0
         closed = int(closed or 0)
         wins = int(wins or 0)
         realized = float(realized or 0.0)
@@ -1352,6 +1360,46 @@ def fetch_paper_aggregate(bot):
         # a cheap way to avoid scanning a whole ledger to ask it. Fail-OPEN is
         # inherited: an unparseable row is ADMITTED, so this can never silently
         # shrink a book's totals beyond the declared windows.
+        # [2026-08-27 (tw)] EVENTS ARE NOT TRADES — the same withholding
+        # shape as the quarantine pass below, and for the same reason. A
+        # halt/flatten row has no basis (no entry price, no P&L) and was
+        # counted here as a CLOSE and, via `losses = closed - wins`, as a
+        # LOSS: 🙏 avo published 3W/10L over 13 "closes" on a book that had
+        # taken 4 real trades. The book re-seeds these counters from this
+        # aggregate at every boot, so the miscount was self-healing in the
+        # wrong direction.
+        #
+        # SQL narrows to CANDIDATES cheaply; `is_non_economic` DECIDES. The
+        # predicate is written once, in the owner ((hj)) — an earlier draft
+        # of this pass re-expressed it as a SQL FILTER and immediately
+        # drifted from it (three of the five funding-form keys), which is
+        # the second-copy failure in miniature.
+        #
+        # `realized` is deliberately NOT adjusted: an event's P&L is 0.00 by
+        # definition, so equity and pnl_abs cannot move — only the COUNTS.
+        try:
+            with conn.cursor() as cur:
+                if not _cand:
+                    raise StopIteration           # no candidates: no 2nd query
+                cur.execute(
+                    "SELECT pnl_abs, entry_price, extra FROM paper_trades "
+                    "WHERE bot = %s AND (pnl_abs = 0 "
+                    "      OR extra->>'non_economic' = 'true')",
+                    (bot,),
+                )
+                cand = cur.fetchall()
+            n_events = sum(1 for _p, _e, _x in cand
+                           if is_non_economic(_p, _e, _x))
+            if n_events:
+                closed -= n_events
+                # an event never has pnl > 0, so it was never in `wins`;
+                # subtracting it from `closed` alone is what turns a phantom
+                # LOSS back into nothing at all.
+        except StopIteration:
+            pass
+        except Exception as e:  # noqa: BLE001
+            _warn_once(f"paper-aggregate event filter failed ({e})")
+
         try:
             q_pairs = sorted({str(qp) for qp, qb, _lo, _hi, _why
                               in LEDGER_QUARANTINE if qb in str(bot or "")})
@@ -1476,6 +1524,84 @@ LEDGER_QUARANTINE = (
      "fabricated by a test run with DATABASE_URL exported: fixture entry "
      "100.01, +5.09% in 2.2s; not a trade (qc)"),
 )
+
+
+# The funding form: a funding book books ACCRUAL, never a price, so its
+# price-free rows are real trades and must never match the event signature.
+_FUNDING_FORM = ("entry_apr", "exit_apr", "accrued", "held_h", "fees")
+
+
+def is_non_economic(pnl_abs, entry_price, extra):
+    """True when a ledger row records an EVENT, not a TRADE.
+
+    [2026-08-27 (tw)] A daily-loss halt flattens positions the book cannot
+    attest — no entry basis, no P&L — and `publish_paper_trade` wrote them
+    into the closed-trade ledger anyway. `fetch_paper_aggregate` then counted
+    every one as a CLOSE and, because `losses = closed - wins`, as a LOSS.
+
+    Measured on the two real-money books: 🙏 avo published **3W / 10L on 13
+    closes** where the book had taken **4 real trades (3W / 1L)** — 9 of 13
+    "trades" were the 23/24-Aug flatten events — and 🔮 georgia 24W / 28L on
+    52 where the real record is 24W / 24L. The dashboard, the daily review
+    and every W/L reader has been reading a real-money book's record with
+    phantom losses in it, and the book itself re-seeds those counters from
+    this aggregate at every boot.
+
+    THE DISTINCTION IS NOT THE REASON STRING, and that is the whole care
+    needed here: `daily_loss` appears on BOTH. georgia's 25-Aug rail closed
+    five REAL positions at real prices for -$30.96, and her 22-Aug TRX
+    -$3.87 is a real forced flatten; those are losses the book genuinely
+    took and they MUST stay in the sample. The events are the rows with **no
+    basis at all**:
+
+      * `extra.non_economic is True` — the (th) write-site marker. This is
+        the forward CONTRACT and the only exact test.
+      * the LEGACY BRIDGE, declared rather than permanent: pnl == 0 AND no
+        entry price AND no funding form. The 13 rows above predate the
+        marker and no DB row carries it yet, so without this they would
+        stay miscounted forever.
+
+    The bridge's blast radius was MEASURED before it shipped, not assumed:
+    fleet-wide, `pnl == 0 AND entry_price IS NULL` matches **exactly those
+    13 rows and nothing else**. Funding books are the population that could
+    have been hurt — they legitimately record no price — and they have
+    **zero** zero-P&L rows (carry 0 of 105, farmer-shadow 0 of 215, garrett
+    0 of 56), so the conjunction cannot fire on them today. `_FUNDING_FORM`
+    makes that structural rather than lucky: a row carrying accrual
+    telemetry is a funding TRADE whatever its P&L rounds to.
+
+    Fail-OPEN on anything unparseable — a row that cannot be classified is
+    ADMITTED as a trade. A filter that swallows what it cannot read would
+    silently shrink the samples it touches, which is the disease and not the
+    cure (`is_quarantined`'s contract, verbatim, for the same reason).
+    """
+    try:
+        # ABSENT and UNREADABLE are different, and collapsing them is the
+        # same class again: `extra if isinstance(extra, dict) else {}` reads
+        # a malformed extra as "no funding telemetry", which is an
+        # ASSUMPTION about data it could not parse. None is genuinely empty;
+        # anything else non-dict is unreadable, so fail-OPEN and admit.
+        if extra is None:
+            ex = {}
+        elif isinstance(extra, dict):
+            ex = extra
+        else:
+            return False
+        if ex.get("non_economic") is True:
+            return True
+        # `float(pnl_abs or 0.0)` would coerce a MISSING P&L to zero — the
+        # very "fabricate what you do not know" class this owner exists to
+        # close, reproduced inside it. Caught by its own test before it
+        # shipped. An unknown P&L is NOT a zero P&L: admit the row.
+        if pnl_abs is None or float(pnl_abs) != 0.0:
+            return False
+        if entry_price is not None:
+            return False
+        if any(k in ex for k in _FUNDING_FORM):
+            return False
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def is_quarantined(bot, pair, closed_at):
