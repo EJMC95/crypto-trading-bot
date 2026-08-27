@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-27 17:31 Sydney (07:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-27 18:36 Sydney (08:36Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -8,11 +8,6 @@ _Generated 2026-08-27 17:31 Sydney (07:31Z) by `scripts/session_state.py`. Do no
 (su) found `backtest_funding_lighter` selects its universe by RANK while the live bot filters on an absolute $10M/day floor only 11 of 212 markets clear — so its verdicts were measured on books the book refuses, and the gate table it produced INVERTS between universe 25 and 50. The loader now carries volume and `study_farmer_gate_minvol_2026-08-22` replays the honest population. **Four other scripts reuse that loader and have not been re-derived**: study_farmer_take_profit, backtest_farmer_breadth_lighter, backtest_funding_persistence and backtest_xsect_funding_lighter.
 
 _Still open because:_ each cites its own verdict in a header that other work reads as settled ('do not re-test what a script header rejects'), so re-running them is not optional tidying — it is checking whether four standing refusals were measured on the wrong books. Cheap now that the tape carries volume; nobody has done it.
-
-### `farmer-cap-collapses-slots-under-conviction`  ·  owner: **OPERATOR**
-💸 the LIVE Farmer's notional cap turns a bigger clip into FEWER BETS. Live-verified: clip $30, cap $150, 5 slots, equity $194.28 — at brain 1.0x it holds 5 positions for $150 gross; at 2.0x it holds TWO ($120); at 3.0x it holds ONE ($90). Gross FALLS as conviction rises, on a funding book whose edge is breadth. (sp)'s trim fixes the outright halt at 6.7x; it cannot fix this, because a fixed cap and a bigger clip are arithmetically the same constraint.
-
-_Still open because:_ the resolution is a cap that scales with equity rather than a fixed dollar env, or an explicit concentration policy — and SafetyRails caps are OPERATOR-ONLY by design, which is the one limit neither permission nor a doc edit moves. What a session can do is measure whether 5 small bets beat 1 large one on this book's own ledger; nobody has.
 
 ### `allocation-organ-4x-on-carry`  ·  owner: **OPERATOR**
 💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right now (`delta_usd: +13,500` on a $1,000 book, the fleet's only measured claim), and carry runs 12 slots x $300. That is **$14,400 of gross on a $1,000 book** from the allocation organ alone, before the brain says anything — 14.4x equity on a book whose modelled `HEDGE_COST * notional` is calibrated at $300 a position. (sp)'s brain bound is derived from carry's CONSTANTS precisely so it does not double this; it also does not fix it.
@@ -59,10 +54,10 @@ _Still open because:_ 18 bot edits and 18 deploys; do it a book at a time on the
 
 _Still open because:_ each one needs the bot to stamp its own governing quantity first (the (sk) give_back/mae_ret pattern).
 
-### `live-taker-divergence-stop-unpriced`  ·  owner: **session**
-The LIVE taker's short-divergence stop reads +28pp reclaim excess and +2.10% held at 24h over n=22 — a measured SIGNAL with no priced VALUE. lighter_ticket_replay is the calibrated instrument; a candle walk is not (it has no short branch).
+### `taker-divergence-stop-unpriced`  ·  owner: **session**
+🎫 the taker's short-divergence stop (SHADOW arm) reads +28pp reclaim excess and +2.10% held at 24h over n=22 — a measured SIGNAL with no priced VALUE. lighter_ticket_replay is the calibrated instrument; a candle walk is not (it has no short branch).
 
-_Still open because:_ real-money row: measure and hand over, never hand-set.
+_Still open because:_ shadow book, so a session may measure AND act ((kd)); the reason it is open is that nobody has priced it — the replay is the instrument and it has not been run.
 
 ### `georgia-t-bar`  ·  owner: **session**
 🔮 georgia is 5 of 6 go-live bars, failing only t. [MEASURED 26-Aug (tm) pass]: the weak t is ONE real 3-leg flash-crash batch (22-Aug 05:11Z: XRP -16.4/NEAR -19.5/TRX -3.0) = 73.5% of cluster variance — drop those 3 rows and t_cluster reads +2.51. Tail CONTROL cannot clear the bar honestly (at the live arm's own measured -7.17% crash fill for a -5% stop, t_cluster caps at ~1.40), and the stress-metric entry pause is REFUTED on the fleet's own instrument (scout stress read 8.6bps at the 05:00:33 entry vs the taker's 15bps bar; the 11.8 peak came 13 MINUTES after the dump started). Exits are a dead dial (see ceiling-slots-georgia). What remains is ENTRY QUALITY: the crash entry rode a +7.5%-in-50-min parabolic spike, and rank1 entries earn +0.023% vs rank2's +0.656%.
@@ -74,8 +69,13 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (94 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc))
+## Shipped today (99 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vg))
 
+- `581d8cf` The bot card read five bot_pnl columns that do not exist (vg)
+- `eac49ae` Close my own guard's keyword blind spot; renumber (vb) -> (vg) (vg)
+- `e1adb62` Renumber (uz) -> (vb): both uz and va were taken on main mid-write (vb)
+- `9888ce7` The mirror book's quarantine filter was a permanent no-op: bot/pair swapped (uz)
+- `d7efafe` Regenerate HANDOFF (vc)
 - `4a1569c` We win, we change it, it starts losing — measured as regression to the mean: a hot window is followed by -1.674pp with or without a change (vc)
 - `5837e0c` Merge remote-tracking branch 'origin/main'
 - `8e9d4b0` Georgia's entry cap 3 -> 5, graded on the uncensored population: rank 3 is her best entry, days-to-gate 344 -> 187 (vb)

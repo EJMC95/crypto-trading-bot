@@ -117,26 +117,6 @@ CARRIED = [
             "scripts/study_farmer_take_profit.py", "minvol_entry_ok"),
     },
     {
-        "id": "farmer-cap-collapses-slots-under-conviction",
-        "owner": "OPERATOR",
-        "what": "💸 the LIVE Farmer's notional cap turns a bigger clip into "
-                "FEWER BETS. Live-verified: clip $30, cap $150, 5 slots, "
-                "equity $194.28 — at brain 1.0x it holds 5 positions for $150 "
-                "gross; at 2.0x it holds TWO ($120); at 3.0x it holds ONE "
-                "($90). Gross FALLS as conviction rises, on a funding book "
-                "whose edge is breadth. (sp)'s trim fixes the outright halt at "
-                "6.7x; it cannot fix this, because a fixed cap and a bigger "
-                "clip are arithmetically the same constraint.",
-        "why_open": "the resolution is a cap that scales with equity rather "
-                    "than a fixed dollar env, or an explicit "
-                    "concentration policy — and SafetyRails caps are "
-                    "OPERATOR-ONLY by design, which is the one limit neither "
-                    "permission nor a doc edit moves. What a session can do is "
-                    "measure whether 5 small bets beat 1 large one on this "
-                    "book's own ledger; nobody has.",
-        "closes_when": lambda: _has("venues/safety.py", "max_notional_frac"),
-    },
-    {
         "id": "allocation-organ-4x-on-carry",
         "owner": "OPERATOR",
         "what": "💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right "
@@ -305,13 +285,25 @@ CARRIED = [
         "closes_when": lambda: _ratchet_at_or_below("unmeasurable", 0),
     },
     {
-        "id": "live-taker-divergence-stop-unpriced",
+        "id": "taker-divergence-stop-unpriced",
         "owner": "session",
-        "what": "The LIVE taker's short-divergence stop reads +28pp reclaim "
-                "excess and +2.10% held at 24h over n=22 — a measured SIGNAL "
-                "with no priced VALUE. lighter_ticket_replay is the calibrated "
-                "instrument; a candle walk is not (it has no short branch).",
-        "why_open": "real-money row: measure and hand over, never hand-set.",
+        "what": "🎫 the taker's short-divergence stop (SHADOW arm) reads +28pp "
+                "reclaim excess and +2.10% held at 24h over n=22 — a measured "
+                "SIGNAL with no priced VALUE. lighter_ticket_replay is the "
+                "calibrated instrument; a candle walk is not (it has no short "
+                "branch).",
+        # [(vg)] RE-POINTED. This read "The LIVE taker's ..." and "real-money
+        # row: measure and hand over, never hand-set" — but the taker's LIVE
+        # arm was retired 13-Aug (ma) when 🙏 Avo Maria took its slot, so for a
+        # fortnight the row told the next session it was handling real money
+        # when the only arm still trading is the $1k shadow. That inverts the
+        # standing rule: it made a shadow measurement look untouchable. The
+        # SHADOW arm is unretired and still accruing, so the work is real —
+        # only its subject and its caution were wrong.
+        "why_open": "shadow book, so a session may measure AND act ((kd)); "
+                    "the reason it is open is that nobody has priced it — "
+                    "the replay is the instrument and it has not been run.",
+        "subject": ("lighter-ticket-taker-lshadow",),
         "closes_when": lambda: False,      # only a measurement closes this
     },
     {
@@ -404,6 +396,45 @@ def shipped_today(now=None, since=None):
     return rows, letters
 
 
+def _dead_rows():
+    """Row ids the fleet has retired, from the two registries that declare it.
+
+    Fail-OPEN (empty set on any import trouble): a dark registry must not start
+    reporting live rows as dead. The cost of failing open is a missed stale
+    row; the cost of failing closed is a session sent to re-point a book that
+    is trading fine."""
+    try:
+        import cleanup_legacy_bots as _legacy
+        import fleet_bus as _fb
+        return set(getattr(_fb, "RETIRED_LIVE_ARMS", {}) or {}) | \
+            set(getattr(_legacy, "LEGACY_BOTS", ()) or ())
+    except Exception:                                        # noqa: BLE001
+        return set()
+
+
+def subject_status():
+    """-> [(id, row, why)] for every CARRIED row whose SUBJECT has been retired.
+
+    [(vg)] A HANDOFF ROW OUTLIVED THE BOOK IT WAS ABOUT. `carried_status`
+    answers "is the work done?" and nothing answered "does the thing still
+    exist?" — so `farmer-cap-collapses-slots-under-conviction` kept demanding
+    attention for 💸 the LIVE Farmer five days after (ta) retired it, with a
+    predicate that could never fire. I11 makes this file the thing a session
+    STARTS from, so a row pointed at a corpse spends the scarcest resource
+    there is: the first hour of the next pass.
+
+    Deliberately NOT folded into `closes_when`. A dead subject does not mean
+    the work is DONE — it means the row must be re-pointed at a living book or
+    retired with a reason, and those are different acts with different owners.
+    """
+    dead = _dead_rows()
+    if not dead:
+        return []
+    return [(it["id"], row,
+             "subject retired — re-point this row at a living book or close it")
+            for it in CARRIED for row in it.get("subject", ()) if row in dead]
+
+
 def carried_status():
     """-> [(item, done)]. A predicate that RAISES counts as not-done, and says
     so: a broken predicate must not silently close an item."""
@@ -479,8 +510,19 @@ def main(argv=None):
                   f"predicate says they are DONE: {', '.join(stale)}. "
                   "Delete the row (and say so in the changelog).")
             return 1
+        # [(vg)] ...and a SECOND way a row goes stale: its subject retires
+        # under it. Reported separately from `stale` because the remedy
+        # differs — a done row is DELETED, a dead-subject row is RE-POINTED at
+        # a living book or closed with a reason.
+        orphan = subject_status()
+        if orphan:
+            print("audit_session_state: FAIL — carried item(s) pointed at a "
+                  "RETIRED row:")
+            for _id, _row, _why in orphan:
+                print(f"  {_id}: {_row} — {_why}")
+            return 1
         print(f"audit_session_state: OK — {len(CARRIED)} carried item(s), "
-              "none stale.")
+              "none stale, none orphaned.")
         return 0
     if not a.write:
         print(text)
@@ -492,7 +534,15 @@ def selftest():
     ids = [i["id"] for i in CARRIED]
     assert len(ids) == len(set(ids)), f"duplicate carried id: {ids}"
     for it in CARRIED:
-        assert set(it) == {"id", "owner", "what", "why_open", "closes_when"}, it
+        # `subject` is OPTIONAL on purpose: several rows are about the fleet's
+        # machinery rather than a book, and forcing a row id on those would
+        # invite a made-up one. Where it IS given it must be a tuple of row
+        # ids, so `subject_status` can never be handed a bare string and
+        # iterate its characters.
+        assert set(it) <= {"id", "owner", "what", "why_open", "subject",
+                           "closes_when"}, it
+        assert {"id", "owner", "what", "why_open", "closes_when"} <= set(it), it
+        assert isinstance(it.get("subject", ()), tuple), it["id"]
         assert it["owner"] in ("session", "OPERATOR"), it
         assert it["what"].strip() and it["why_open"].strip(), it
         assert isinstance(it["closes_when"](), bool), it["id"]

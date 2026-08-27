@@ -128,3 +128,80 @@ def test_the_handoff_file_is_current():
             continue
         assert it["id"] in body, (
             f"{it['id']} is carried but absent from HANDOFF.md — regenerate it")
+
+
+# ---------------------------------------------------------------------------
+# [(vg)] A CARRIED ROW WHOSE **SUBJECT** RETIRED UNDER IT
+#
+# `carried_status` asks "is the work done?". Nothing asked "does the thing this
+# row is about still exist?" — so `farmer-cap-collapses-slots-under-conviction`
+# demanded attention for 💸 the LIVE Farmer for five days after (ta) retired it,
+# behind a predicate that could never fire (it grepped for `max_notional_frac`,
+# a string that has never existed in this repo outside that lambda). A second
+# row was stale the same way, calling the taker's SHADOW arm a "real-money row"
+# a fortnight after its live arm was retired.
+#
+# I11 makes this file the thing a session STARTS from, so a row aimed at a
+# corpse spends the scarcest resource there is: the first hour of the next pass.
+# ---------------------------------------------------------------------------
+
+def test_no_carried_row_points_at_a_retired_book():
+    """The live list, against the fleet's own two retirement registries."""
+    assert S.subject_status() == [], S.subject_status()
+
+
+def test_the_subject_guard_actually_fires_on_a_dead_row():
+    """BOTH DIRECTIONS. A guard that can only ever return empty is decoration
+    ((po): a check that inspects nothing reports clean) — and one that flags
+    everything is worse than none. Driven with a REAL retired row id and a REAL
+    living one, so neither half can pass by accident."""
+    dead = S._dead_rows()
+    assert dead, "both retirement registries read empty — the guard is blind"
+    assert "perps-funding-lighter-lighter" in dead, sorted(dead)[:5]
+
+    row = {"id": "_probe", "owner": "session", "what": "w" * 70,
+           "why_open": "y" * 30, "closes_when": lambda: False,
+           "subject": ("perps-funding-lighter-lighter",)}
+    S.CARRIED.append(row)
+    try:
+        flagged = S.subject_status()
+        assert [f[0] for f in flagged] == ["_probe"], flagged
+        assert S.main(["--check"]) == 1, "a dead subject must fail --check"
+        # ...and the LIVING half: same row, a book that still trades
+        row["subject"] = ("lighter-ticket-taker-lshadow",)
+        assert S.subject_status() == [], S.subject_status()
+        assert S.main(["--check"]) == 0
+    finally:
+        S.CARRIED[:] = [i for i in S.CARRIED if i["id"] != "_probe"]
+
+
+def test_a_row_with_no_subject_does_not_explode_the_check():
+    """`subject` is OPTIONAL — several rows are about the fleet's machinery
+    rather than a book. Reading it with `[...]` instead of `.get(..., ())`
+    raises KeyError against every ad-hoc row the other tests here append, which
+    is exactly how this guard would have shipped broken."""
+    row = {"id": "_nosubj", "owner": "session", "what": "w" * 70,
+           "why_open": "y" * 30, "closes_when": lambda: False}
+    S.CARRIED.append(row)
+    try:
+        assert S.subject_status() == []
+        assert S.main(["--check"]) == 0
+    finally:
+        S.CARRIED[:] = [i for i in S.CARRIED if i["id"] != "_nosubj"]
+
+
+def test_a_dark_registry_reports_nothing_rather_than_flagging_everything():
+    """Fail-OPEN, deliberately. A missed stale row costs a session a wrong
+    first hour; failing CLOSED would send it to re-point books that are
+    trading fine, which is worse and trains the reader to ignore the guard."""
+    real = S._dead_rows
+    S._dead_rows = lambda: set()
+    try:
+        row = {"id": "_probe2", "owner": "session", "what": "w" * 70,
+               "why_open": "y" * 30, "closes_when": lambda: False,
+               "subject": ("perps-funding-lighter-lighter",)}
+        S.CARRIED.append(row)
+        assert S.subject_status() == []
+    finally:
+        S._dead_rows = real
+        S.CARRIED[:] = [i for i in S.CARRIED if i["id"] != "_probe2"]
