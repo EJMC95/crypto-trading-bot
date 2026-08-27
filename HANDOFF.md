@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-28 00:20 Sydney (14:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-28 08:22 Sydney (22:22Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,12 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (52 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm))
+## Shipped today (56 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
 
+- `d1386e7` Record the 8.2h georgia outage in (vn) — a transient venue 403 killed a real-money book and nothing paged (vn)
+- `e385a99` Record (vn), and acknowledge the georgia recurrence with a reason and an owner (vn)
+- `263b029` [deploy-live] Georgia's lockout could not be tuned, and the taker goes to 8 (vn)
+- `09052aa` Regenerate HANDOFF — I11's regenerate-last half (vm)
 - `8daa9da` Record the storage half and the third brittle guard in (vm), in place per I12 (vm)
 - `1c6d851` [deploy-live] The gauge was ported and still blank: a 1h book writes it once an hour (vm)
 - `aac9ca9` Record the live-arm gap and the vacuous-test correction in (vm), in place per I12 (vm)
