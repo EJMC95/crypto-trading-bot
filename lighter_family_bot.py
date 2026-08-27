@@ -1235,7 +1235,27 @@ def live_strategies():
 # ---------------------------------------------------------------------------
 # Per-book runtime (one ShadowBroker + protections + ledger per family bot)
 
-def policy_stamp(strategy, venue, scan_order):
+def throttle_cap(strategy):
+    """The entries-per-clock-hour cap THIS STRATEGY enforces, or None when it
+    enforces none.
+
+    [(uv)] ONE OWNER, read by both the actuator (`Book.throttle_ok`) and the
+    policy stamp. A second copy would let the two disagree about whether a book
+    is throttled — and the stamp exists precisely to expose that divergence, so
+    a stamp derived from its own copy of the rule could certify a throttle the
+    loop does not apply, or miss one it does.
+
+    NOTE it is keyed on the STRATEGY CLASS, which is only half the question —
+    the other half belongs to the HOST. Georgia's live arm runs this very
+    `DayTraderGated` and enforces NO throttle, which is why `policy_stamp`
+    takes the cap as an argument each host answers for itself rather than
+    deriving it here.
+    """
+    return (strategy.MAX_ENTRIES_PER_HOUR
+            if isinstance(strategy, DayTraderGated) else None)
+
+
+def policy_stamp(strategy, venue, scan_order, max_entries_per_hour):
     """[(ti)] THE ONE BUILDER of the (jf) policy stamp, shared by BOTH arms.
 
     Judge v2's fairness precheck (P1) compares the two arms' stamps on the
@@ -1257,6 +1277,16 @@ def policy_stamp(strategy, venue, scan_order):
         "roi": {str(k): v for k, v in strategy.roi.items()},
         "sides": ["long"],
         "scan_order": scan_order,
+        # [(uv)] PRESENCE IS THE CONTRACT, never truthiness. `None` is the
+        # honest answer meaning "this host enforces no hourly throttle", and a
+        # host that says so HAS answered — a field neither arm stamps compares
+        # None-to-None, reads EQUAL, and slips through the parity rung in
+        # silence, which is the hole `fleet_bus.policy_stamp_required` was
+        # added to make blocking. ERA-SAFE: `golive_readiness.stamp_state`
+        # builds its signature from POLICY_SIG_FIELDS
+        # ("venue", "bull", "lenses", "sides") only, so this field moves no
+        # era boundary — verified before shipping, and pinned by a test.
+        "max_entries_per_hour": max_entries_per_hour,
     }
 
 
@@ -1528,13 +1558,14 @@ class Book:
         needed a reconstruction from timestamps instead of a query (I23).
         `last_rank` is the granted rank (1-based); None when this book has no
         throttle at all, so a non-DayTrader book never publishes a fake 1."""
-        if not isinstance(self.s, DayTraderGated):
+        cap = throttle_cap(self.s)
+        if cap is None:
             self.throttle["last_rank"] = None
             return True
         bucket = int(now // 3600)
         if self.throttle["bucket"] != bucket:
             self.throttle.update(bucket=bucket, n=0)
-        if self.throttle["n"] >= self.s.MAX_ENTRIES_PER_HOUR:
+        if self.throttle["n"] >= cap:
             return False
         self.throttle["n"] += 1
         self.throttle["last_rank"] = self.throttle["n"]
@@ -1631,7 +1662,8 @@ class Book:
                 extra={**({"entry_rank": m["entry_rank"]}
                           if m.get("entry_rank") is not None else {}),
                        "policy": policy_stamp(self.s, "lighter_shadow",
-                                                  "list")},
+                                                  "list",
+                                                  throttle_cap(self.s))},
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass

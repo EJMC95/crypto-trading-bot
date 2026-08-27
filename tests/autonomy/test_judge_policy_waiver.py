@@ -452,7 +452,9 @@ def test_no_family_policy_field_is_one_the_publisher_never_stamps():
     class _S:                      # the fields policy_stamp actually reads
         style, stoploss, roi = "daytrader-15m", -0.05, {0: 0.02}
 
-    emitted = set(fb.policy_stamp(_S(), "lighter_shadow", "list"))
+    # [(uv)] the 4th argument is the HOST's answer for its own hourly
+    # throttle; None here means "this stub host enforces none".
+    emitted = set(fb.policy_stamp(_S(), "lighter_shadow", "list", None))
     assert emitted, "the shared policy_stamp builder emitted nothing"
     for pid, p in fleet_bus.JUDGED_PAIRS.items():
         if p.get("host_file") != "lighter_avo_live_bot.py":

@@ -1,3 +1,103 @@
+## 2026-08-27 (uv) — THE ARMS RAN DIFFERENT ENTRY POLICIES AND NEITHER STAMPED IT: `max_entries_per_hour` JOINS THE SHARED STAMP, EACH HOST ANSWERING FOR ITSELF
+
+Judge v2's census blocked 🔮 georgia on `policy_unstamped` naming
+`max_entries_per_hour`, and declared the stamp work rather than doing it
+("neither file is this pass's to edit; declared here so the hole is visible and
+blocking rather than silent"). This is that pass.
+
+**THE HOLE, and why it needed a rung of its own.** The SHADOW throttles entries
+per clock hour (`DayTraderGated.MAX_ENTRIES_PER_HOUR = 3`, applied at
+`throttle_ok`); the LIVE host enforces none and says so in its own comment.
+Because **neither arm stamped the field**, it compared None-to-None, read
+EQUAL, and passed the parity rung in silence — the registry claimed to police a
+divergence it structurally could not see. Measured on the arms' own ledgers
+(phantom halt rows excluded): entries per ACTIVE hour, shadow `{1: 108h, 2: 44h,
+3: 4h}` = at-or-over the cap in **2.6%** of active hours; live `{1: 16h, 2: 5h,
+3: 3h, 4: 1h, 9: 1h}` = **19.2%, reaching NINE in one hour.** And the censored
+quantity is one the book's own ledger shows matters: shadow `entry_rank` 1 =
+−0.443%/trade (n=24), rank 2 = **+0.828%** (n=9), rank 3 = −7.752% (n=3). One
+arm is rank-censored at 3 and the other is uncensored, so a paired bar over
+these two samples compares different entry populations — the F1 handicap.
+
+**WHAT SHIPPED**
+* `policy_stamp` takes `max_entries_per_hour` as a **required** argument.
+  A default would let a host forget and still emit a key carrying the WRONG
+  answer ("no throttle") for a book that has one; `inspect.signature` pins the
+  absence of a default.
+* **The HOST answers, not the strategy** — and this is the whole subtlety.
+  georgia's live arm runs *this very* `DayTraderGated` class and enforces no
+  throttle, so a stamp derived from the strategy would certify a throttle the
+  live loop does not apply. The shadow answers `throttle_cap(self.s)`; the live
+  host answers `None`, which is an ANSWER, not a decline.
+* **`throttle_cap` is ONE owner**, read by both the actuator (`throttle_ok`) and
+  the stamp. A second copy would let the two disagree about whether a book is
+  throttled — and the stamp exists precisely to expose that disagreement.
+* Both call sites are pinned by AST, not substring: if a host silently passed
+  `None`, both arms would compare EQUAL and the divergence would go quiet again
+  — asserting the builder alone would not see it (the enacted-is-not-applied
+  class).
+
+**ERA-SAFE, VERIFIED BEFORE SHIPPING RATHER THAN ASSERTED.** The obvious way
+this goes wrong is that `stamped_policy_boundary` grades the maximal
+same-signature SUFFIX of a ledger, so a stamp field that entered the signature
+would split old rows from new and **RESET georgia's era — wiping the very sample
+this work exists to make judgeable.** It does not: `stamp_state` builds its
+signature from `POLICY_SIG_FIELDS` (`venue`, `bull`, `lenses`, `sides`) alone.
+Pinned by a test that asserts both the exclusion and that a row's signature is
+byte-identical with and without the field.
+
+**SHIPPED TO THE SHADOW ONLY — NO REAL-MONEY RESTART, and that was a
+correction.** I had this down as a mandatory `[deploy-live]` on the reasoning
+that the required rung tests `f not in lp or f not in sp`, so BOTH arms must
+carry the key. **That has the rung order backwards.** The parity rung runs
+FIRST (`experiment_judge.py`, "RUNG ORDER, deliberate: this sits AFTER
+parity"), and it reads `lp.get(f)` — so an ABSENT key on the live arm renders
+as `None`, identical to an explicitly-stamped `None`. Driven through the real
+`_pair_precheck`, the shadow-only and both-arms census entries are
+**byte-identical**: same phase, same reason, same detail
+(`live={'max_entries_per_hour': None} shadow={'max_entries_per_hour': 3}`), and
+the repo already asserts it in
+`test_a_required_field_stamped_by_only_one_arm_still_blocks`. So the live half
+buys exactly one thing — telling "answered None" from "not yet shipped" at the
+required rung — which matters only once the throttle is aligned or waived. It
+rides the next deploy that moves a trade instead of restarting
+`tide-rider-lighter-live`, `trail-blazer-live` and `mum-live` for a payload
+state the shadow already delivers, at an expectancy price of zero.
+
+**A ZERO CAP THROTTLES TO ZERO — it does not un-throttle.** `if cap is None`
+and `if not cap` agree on every value the tree constructs, so the falsy form
+survived untested — and it inverts the exact setting an operator reaches for to
+STOP a book entering: `GEORGIA_MAX_ENTRIES_PER_HOUR=0` would silently become
+UNLIMITED. No fixture built a 0 cap; one does now, and that mutation is red.
+
+**IT DOES NOT MAKE THE PAIR JUDGEABLE, and saying so is the point.** georgia
+moves from `policy_unstamped` to `policy_mismatch` on 3-vs-None. The judge's own
+suite already pre-registered that exact outcome
+(`test_the_throttle_divergence_is_not_waived_and_still_blocks`). What this buys
+is that the divergence is now VISIBLE with both values on the payload instead of
+a hole the registry could not see; **closing it — port the throttle to live,
+drop it from the shadow, or waive it on measured occupancy — is a separate
+measured act about real money.** 6/6 mutations verified RED; full suite green.
+
+### REFUSED IN THE SAME PASS, WITH EVIDENCE
+
+* **🙏 avo's `scan_order` block: LEAVE IT.** `scan_order` is **not the binding
+  rung**. Driving the REAL `_pair_precheck` over both arms' full ledgers through
+  three counterfactuals: as-is → `policy_mismatch [scan_order]`; port
+  `diversified_order` to the shadow → `capacity_mismatch` (live `max_open` 5 vs
+  shadow 6); waive `scan_order` → `capacity_mismatch`, identical; port AND align
+  caps → `idle`, *"no candidate in this pair's queue (xp.avo.*)"*. So porting a
+  live ordering rule into a shadow book buys **a changed shadow trading policy
+  and no judgeable pair** — the fix at the visible rung reveals the next one, and
+  the terminal state is idle-with-no-candidate anyway.
+* **The 21-Aug "family census" change: ABANDONED.** Main converged on the
+  substance — all three living family books already carry `census = True` ((st)
+  22-Aug for avo, (uc) today for georgia), and the abandoned branch's own test
+  PASSES against current main with no diff applied. Worse, its file is six days
+  stale: copying it would revert `RSI_MAX` 32.0 → 25.0 and undo two
+  deploy-marked real-money widenings. The only residual delta is a `Carrier`
+  class default, which is a separate one-line change if anyone still wants it.
+
 ## 2026-08-27 (uu) — FOUR REFUSALS WITH EVIDENCE: (tr)'s CELL VERDICTS SURVIVE THE CORRECTED ESTIMATOR, 32 IS AT THE OPTIMUM, 🔮 GEORGIA CANNOT DIVERSIFY, AND THE ARITY GUARD IS NOT WORTH SHIPPING
 
 Eamon: *"optomise and fix anything needed."* Four things were checked and all

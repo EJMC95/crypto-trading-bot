@@ -1554,7 +1554,13 @@ def main(_ctx=None, once=False):
             POLICY_SIG_FIELDS and requires a `lenses` key these stamps
             deliberately lack, so family stamps are structurally invisible
             to `stamped_policy_boundary` and adding a field moves no era."""
-            return {**policy_stamp(S, "lighter_live", "diversified"),
+            # [(uv)] `max_entries_per_hour=None` is this host ANSWERING, not
+            # declining to: it enforces no hourly throttle (see the entry
+            # loop's own comment — live rank is the UNCENSORED within-hour
+            # ordinal), while the shadow's `DayTraderGated` caps at 3. Passing
+            # the strategy's own cap here would stamp a throttle this host does
+            # not apply, which is why the argument is the HOST's to answer.
+            return {**policy_stamp(S, "lighter_live", "diversified", None),
                     "brain_gate": "row+shadow", "coin_veto": True}
 
         def _flatten_all(why):
