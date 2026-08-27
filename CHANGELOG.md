@@ -1,3 +1,108 @@
+## 2026-08-27 (vn) — THE LOCKOUT THAT COULD NOT BE TUNED, THE GUARD THAT REFUSED THE HONEST ANSWER, AND A SLOT CAP THAT CLEARED ITS REPLAY
+
+Four operator calls in one pass — **Eamon: *"take it to 8"* / *"the guard
+should not refuse that"* / *"unlock georgia"* / *"keep her at 5 bars"*** — and
+measuring the smallest of them turned up a defect on real money that nobody
+had asked about.
+
+### 🔮 GEORGIA'S LOCKOUT RAN TO THE **LOOKBACK**, NOT TO ITS OWN `stop`
+
+*"keep her at 5 bars"* is a one-character change to `slguard["stop"]`, and it
+would have bought **nothing**, because on the live arm that parameter was
+INERT. The family `Book` this arm re-expresses checks its stored `guard_until`
+FIRST and returns without re-evaluating — `if now < self.guard_until: return
+True` — so a lockout stands for exactly `stop` bars. **The live arm had no
+latch:** it recomputed `t_now + stop * tf_s` on EVERY loop while the trigger
+held, and the entry gate is `t0 >= locked_until`. So the lock ran for as long
+as `trades` stops sat inside the `lookback` window.
+
+**Measured on her 15m book: a configured 3h lockout that actually served up to
+the 48-bar lookback — 12 HOURS — on real money, with the knob meant to control
+it changing only the number printed on the row.** Her published history says
+the same thing out loud: `entries_shut_reason_30d {protections_locked: 9}`
+and `hours_shut_today 3.597`.
+
+Two arms re-expressing ONE protection and disagreeing about how long it runs
+is `(vh)`'s class at a RAIL rather than at a gauge. The latch is passed in and
+returned out rather than held in a module global, so the caller owns
+persistence and the rule stays a pure function the tests drive; it is persisted
+and restored beside the family's own `guard_until`, so a redeploy can neither
+clear a running lockout nor resurrect an expired one. A junk latch falls
+through to the real triggers. **`stop` is now 5 bars (75 min) and, for the
+first time, means what it says.** Nothing else moved: the −5% stop, the
+daily-loss halt, the kill switch and SafetyRails are untouched and senior.
+
+The cross-arm agreement is pinned by driving the SHIPPED family method against
+a stub `self` — the rule, never a re-typed copy.
+
+### `days_to_gate_obs` — THE GUARD WAS REFUSING THE HONEST ANSWER
+
+`(vm)` published a `birth_window` basis beside the number rather than nulling
+it, because `audit_book_spend` treats `spend.get(f) is None` as a MISSING
+FIELD and nulling it would have reddened the build on all three real-money
+rows. Eamon: **"the guard should not refuse that"** — and he is right, because
+the thing it refused is the truth. `days_to_gate_obs` is `(2/S_d)^2`, and a
+book with **zero closes has no S_d**: any number it prints is a floor that can
+never bind. 👩 mum published `28.1` having never traded, **which is what kept
+this guard GREEN on exactly the book I22 exists to catch** — the number was
+doing the opposite of its job.
+
+So a **DECLARED** unknown is admitted and a **BARE** one is not: the census
+must say WHY it cannot answer (`days_to_gate_basis`) and show the count that
+makes it unanswerable (`closes_obs == 0`). A book WITH closes still owes a
+number. That keeps the I1 distinction the whole class turns on — *"I measured
+and there is no rate"* and *"the field is missing"* must never be one
+byte-string. Both halves of the exemption are separately pinned, because a
+mutation round showed the first fixture was caught by the `closes_obs` clause
+alone and the basis requirement could be deleted GREEN.
+
+### 🎫 THE TAKER: 6 → 8 SLOTS, AND IT CLEARED THE REPLAY
+
+`(uo)`'s `slot_census` had shown `{offered: 4, slots_full: 4, lens_once: 0}` —
+four tickets a loop refused purely on the position cap, the per-lens throttle
+NOT binding — but that is **n=1 cycle**, which is this week's whole lesson.
+Driven through `lighter_ticket_replay` over the same 2,388-snapshot bus tape
+(19–27 Aug), the taker's REAL code, both arms identical but for the number:
+
+| | closes | net | per trade |
+|---|---|---|---|
+| 6 slots | 75 | **+$1.85** | $0.025 |
+| 8 slots | **99** | **+$6.76** | **$0.068** |
+
+**+32% throughput AND a better mean**, so it is not `(hl)`'s denominator
+shrinkage — the slot cap was the binding constraint, exactly as the census
+said. **DECLARED LIMIT:** the replay cannot resolve the up-regime without a
+candle fetch, so `breakoutup` (39% of the live book's closes) is absent from
+BOTH arms — the comparison is apples-to-apples, the LEVEL is not the book's.
+
+**`CLIP_MAX` 95 → 70 is MANDATORY, not a second opinion.** The sizing-safety
+bar requires `CLIP_MAX × BRAIN_GROSS_X(2.0) × MAX_OPEN` inside 1.2× the book's
+$1,000, because fill and slippage terms calibrated at the designed clip become
+fiction above what the book could fund. At 8 slots the old ceiling gives
+$1,520 and the guard reddens; 70 × 2 × 8 = **$1,120**, strictly inside. It
+reads as undoing `(td)`'s 80 → 95 and mostly is not: the book's **median
+deployed clip is ~$21**, so a $70 ceiling binds on almost nothing, while the
+extra slots are worth a third more closes. On a book whose binding go-live bar
+is `t` — which grows with `sqrt(n)` at fixed edge — that is the right side of
+the swap. Capacity, so the era clock does not reset ((hc)). The property is
+pinned across the whole reachable cap range, not just today's two numbers.
+
+### AND MY OWN TEST TOOK DOWN FOUR OTHERS
+
+`test_georgia_guard_latch` called `os.environ.setdefault("FAMILY_LIVE_BOOK",
+"freqtrade-georgia")` at import, so **the entire pytest process ran as georgia
+from that point on** — mum's variant boot, avo's clip arm, the telemetry
+cadence and the module selftest all failed downstream, none of them related to
+anything I changed. `test_variant_host.loaded` already saves and restores the
+environment and reloads on the way out, and its own docstring records the
+identical mistake being made once before. Imported rather than re-written, so
+it stays one rule. **A test that mutates global state is not a test of the
+thing it names; it is a change to every test after it.**
+
+18 mutations across the four changes, all RED, each round carrying a **no-op
+control that must stay GREEN** — without one, a test that fails on *any* edit
+is indistinguishable from one that pins the property.
+
 ## 2026-08-27 (vm) — THE FLEET COULD NOT COUNT WHAT ITS GUARDS REFUSED: 0 OF 20 ROWS ACCUMULATED A CENSUS, SO EVERY LOOSENING WAS UNPRICEABLE AND BLINDNESS ALWAYS RESOLVED RESTRICTIVELY
 
 **Eamon, 27-Aug:** *"the guards, and arms and security system we have is too
