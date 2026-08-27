@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-27 18:42 Sydney (08:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-28 00:20 Sydney (14:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,15 +69,32 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (102 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vj))
+## Shipped today (52 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm))
 
-- `58304e3` Pin each retirement registry term against a stub (vj)
-- `05a8429` Kill the survivor: pin BOTH retirement registries separately (vj)
-- `a7396b8` A carried row outlived the book it was about, behind a predicate that could never fire (vj)
-- `581d8cf` The bot card read five bot_pnl columns that do not exist (vj)
-- `eac49ae` Close my own guard's keyword blind spot; renumber (vb) -> (vj) (vj)
-- `e1adb62` Renumber (uz) -> (vb): both uz and va were taken on main mid-write (vb)
-- `9888ce7` The mirror book's quarantine filter was a permanent no-op: bot/pair swapped (uz)
+- `8daa9da` Record the storage half and the third brittle guard in (vm), in place per I12 (vm)
+- `1c6d851` [deploy-live] The gauge was ported and still blank: a 1h book writes it once an hour (vm)
+- `aac9ca9` Record the live-arm gap and the vacuous-test correction in (vm), in place per I12 (vm)
+- `66c5d6e` [deploy-live] The trend gauge reached mum's shadow and not her real money (vm)
+- `b22ca2b` Record (vm), and correct georgia's go-live number in place per I12 (vm)
+- `0fe40f3` [deploy-live] Every refusal becomes countable, and the instruments finally connect (vm)
+- `84d8515` The card was showing Eamon phantom losses on his real-money books (vm)
+- `9ef3517` Every refusal becomes countable: snapshot_census + census_window, the denominator the fleet never had (vm)
+- `27e4fcb` The quarantine-order guard read other sessions' worktrees: same defect (um) fixed nine hours earlier (vl)
+- `6902c4b` [deploy-live] nav-cook recovers 34 closes (sa) could not, carry declares its basis — and the flap I reported was already fixed (vk)
+- `80f8a66` Record the five-front pass; renumber (vg) -> (vj) on the day's sixth letter collision (vj)
+- `898ec44` Four standing refusals re-derived on the population the bot actually trades (vg)
+- `fcd66f6` Pin each retirement registry term against a stub (vg)
+- `aeaf3b7` Kill the survivor: pin BOTH retirement registries separately (vg)
+- `6ebb2df` A carried row outlived the book it was about, behind a predicate that could never fire (vg)
+- `9dafd11` The bot card read five bot_pnl columns that do not exist (vg)
+- `6f0df30` Close my own guard's keyword blind spot; renumber (vb) -> (vg) (vg)
+- `cc636c4` Renumber (uz) -> (vb): both uz and va were taken on main mid-write (vb)
+- `d57e1dc` The mirror book's quarantine filter was a permanent no-op: bot/pair swapped (uz)
+- `7e71e38` Two of my own published findings were wrong, both the same way (vh)
+- `fa315f2` [deploy-live-georgia] Georgia's real P&L story, and an explicit operator unlock (vg)
+- `5bde692` Georgia was size-cut on money her strategy never lost; Avo sat one ordinary stop-out from the same (vf)
+- `91c4e6f` [deploy-live] Mum's bar 32 -> 36 and Georgia unlocked — Eamon's call, shipped (ve)
+- `5bbdf95` Doctrine joins the delegated surface, with the permanent core stated in full — and I25: a hot window is not evidence (vc)
 - `d7efafe` Regenerate HANDOFF (vc)
 - `4a1569c` We win, we change it, it starts losing — measured as regression to the mean: a hot window is followed by -1.674pp with or without a change (vc)
 - `5837e0c` Merge remote-tracking branch 'origin/main'
@@ -106,73 +123,6 @@ _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~1
 - `70a5968` Regenerate HANDOFF — I11's regenerate-last half, skipped at this session's start and stale by ten entries (ut)
 - `2fcb366` Register audit_bus_contract in ENFORCED_AUDITS — a guard whose scan runs nowhere is the (gk) shape (ut)
 - `82935a9` A cross-read payload without updated+ttl_sec is unconsumable by design: ratchet the class coin-quality opened (ut)
-- `b15d4b1` Record the recorded-cost unlock + correct (ur)'s cost number in place; renumbered (us) -> (ut) on a cross-branch collision (ut)
-- `8ffc68f` One owner for the coin-quality TTL: the test was recomputing the publisher's arithmetic, so halving the real TTL left it green (us)
-- `0bea667` Close the mutation survivor: map mode must drop junk entries (us)
-- `76d1bef` The fleet has recorded its own execution cost since 9-Jul and nothing could ever read it: coin-quality shipped with no updated/ttl_sec, so is_fresh judged it stale forever (us)
-- `b225109` The dashboard was never wrong, it was behind: the live row refreshes between trading passes (us)
-- `34e5909` The floor test read a bare env the module never reads (ur)
-- `a529903` The live row refreshes between trading passes: near-live positions with no trading change (ur)
-- `fe2fb56` The LUS cohort is REFUSED: the study that would have minted it reported the opposite of what it computed — a double negation swapped both side labels under a "we ran both directions" defence (ur)
-- `7d498cc` The live trio goes back to 10x: Eamon's own 22-Aug ceiling restored, arithmetic published, mum's cap un-stranded (uq)
-- `596f7a9` Renumber (ul) -> (up): fifth concurrent letter collision on this entry today
-- `e57a106` Merge remote-tracking branch 'origin/main'
-- `0d7370b` The wire goes in — and the headline that motivated it is refuted by its own pre-registration (ul)
-- `f655643` Merge remote-tracking branch 'origin/main'
-- `98948af` Renumber (uk) -> (uo): concurrent session took the letter on main
-- `7502025` Repoint the taker's slot-census citations after the fourth letter collision: (uk) -> (uo)
-- `5a82e8a` Pin what the widening DOES, not just its ceiling: a mutation round showed a silent revert to 30 left the suite green (un)
-- `35ed688` Mum's bar widens to the measured cell: RSI_MAX 30 -> 32, the isolated-sliver trap recorded (un)
-- `27051f8` The born-dark guard was vacuous: a substring the comment also carried (uk)
-- `73acead` Mum's bar at 32 is supported and my pre-registration tested the wrong object: widening a threshold merges episodes and moves the entry (un)
-- `b0019d8` A retired arm has no execution to diverge from: the Farmer's own retirement flatten was cutting all three live books' clips 25% (uk)
-- `d99966c` The guard's own test fixture made it flag itself: assemble the citation instead of writing it literally (um)
-- `bda40e0` The letter guard was reading other sessions' private worktrees: a session could be turned red by work that was not its own (um)
-- `dfe80c7` Changelog for (uk) the taker slot census; (uj) renumbered to (ul) after a concurrent session took the letter
-- `6ecdb47` The taker's slot cap is the one legal go-live accelerator and nothing counted what it refused: extra.slot_census (uk)
-- `6f04ca2` Pre-registration snapshot: mum's bar-at-32 and max-hold verdict bars, committed before any result exists (uj-followup)
-- `2256b25` Regenerate the handoff after the tuning wave (uj)
-- `4ab3f4a` The live-shadow alert could not be verified at all: the 26-Aug pass fixed the evidence section and the helper, and left the verifier on the old signature (uj)
-- `5b21a24` Four books tuned on their own ledgers, no retirements — and the card I shipped green yesterday was a time bomb (uj)
-- `a8c4929` Georgia publishes her census: one of four books whose row could not answer stuck-vs-slow (uc)
-- `f786461` Kill the stride survivor: a slice of one cannot see a stride (uc)
-- `5fceb7b` The joint sweep was dark for 4.5 days of every orbit: stride the walk, coprime so coverage is untouched (uc)
-- `4b00a89` Merge PR #233: one owner for cluster-robust t (ug), the redistribution refused (uh), main un-redded (ui)
-- `56d2029` Regenerate HANDOFF.md — I11's read-first/regenerate-last half
-- `e62af15` Correct (ui)'s timestamps in place: two of them were inferred, not measured
-- `fc343b8` The redistribution is refused with the number nobody had run; and main's red-by-the-clock fixture is fixed (uh)(ui)
-- `749e689` The cluster-robust t had three implementations, and both copies reproduced the (kg) degeneracy the owner was fixed for (ug)
-- `cced85d` Merge PR #232: sniper entombment (ue) + listing side unsupported (uf) + allocation gate leak (ud)
-- `259f0c5` The listing source has no measured side on its own band — the short's evidence lives in young's (uf)
-- `2c38512` Register scripts/audit_stuck_vs_slow's --selftest — inherited RED from main
-- `36e95c7` Repoint a changelog citation the (uc) -> (ue) renumber left dangling
-- `bc38b72` The allocation's two halves do not add up: $1,151.66 is withheld by the era gate and returned to nobody (ud)
-- `86c88bd` A surge/young pending symbol that stops qualifying is never offered again, so its give-up can never fire (uc)
-- `e8360e5` Close the declared gap: breakoutup's self-veto now reaches the incubator's fitness (uc)
-- `623e6eb` The incubator mutation round: the survivors were test gaps, and the code was right in every one (uc)
-- `814329d` Declare the board's golive freshness bound — the (ia) exception, one consumer along (uc)
-- `98da5f7` The incubator's fitness was not the taker's book — and the mechanism I published for it was REFUTED before it shipped (uc)
-- `27529e2` Stuck is not slow: the discriminator is OCCUPANCY, and the docket was reading two full books as empty ones (uc)
-- `acef2aa` The board stops widening on a sample the gate refuses; the judge sees georgia's real divergence; the pipe becomes legible (uc)
-- `15eafa9` Merge PR #231: the era headline counted a field that did not exist yet (ua)
-- `73723c8` The daily review counted 13 halt EVENTS as real-money trades — and the filter that fixed it read a JSONB key nothing has ever written (tu)
-- `f860e5c` The era headline counted a field that did not exist yet — it could only ever read zero (ua)
-- `093a44e` The winners' docket crowned a PROVEN winner on the window that generated the hypothesis (tt)
-- `63e497e` Merge PR #207: the sniper flies the other way — per-source side, and the fade that justified it corrected in place (tx)(ty)(tz)(ua)(ub)
-- `04b3c94` The debut fade is 76-83% CALENDAR: the side flip stands, its justification is corrected in place, four code defects fixed (ub)
-- `471323a` Merge origin/main — main's (ts) and this branch's (tx)-(ub), both kept whole
-- `56b0061` Renumber (ts)-(tw) -> (tx)-(ub): the THIRD collision on this branch's letters
-- `2ba1b9c` The pair census scored each arm's OLDEST 30 closes: georgia's shadow stamped at 09:22Z and still read 0/30 (ts)
-- `ecf1d2f` Credit Eamon by name in this branch's entries (tw)
-- `0cc6715` The sniper was on the wrong side of its own thesis: a perp lists AFTER the spot hype (tw)
-- `7aa9962` Merge origin/main (116 commits) — and my four letters collide a SECOND time
-- `6a1b01d` The sniper's side is per-source: listing and young go SHORT on a measured debut fade (letter pending)
-- `091cc2f` Merge PR #229: mum's bar widens to the measured cell — RSI_MAX 25->30, referee-confirmed (tr)
-- `bbf0bf0` The risk-up one-shot goes the way of every provisioner — receipts verified on both rows (tq)
-- `e40ca82` [deploy-live-mum] Mum's bar widens to exactly what was measured: RSI_MAX 25->30, the rescue tiers refused with their numbers (tr)
-- `c284590` Merge PR #228: the (tq) risk-up one-shot registered — derived gross ceilings, scaled cap, halt parity
-- `4b08462` Pre-registration snapshot: mum supply study verdict bars, committed before any result exists (tq)
-- `eed4576` Register the (tq) one-shot: derived gross ceilings for avo+georgia, scaled-cap activation, halt parity
 
 ## How this file stays honest
 
