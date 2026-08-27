@@ -165,6 +165,27 @@ coerced to False publishes a fabricated PASS on the exact term a widening is
 argued from). Pinned by a test that asserts BOTH arms gauge it, so the next
 host cannot ship without it.
 
+**AND THE PORT WAS STILL BLANK ON THE ROW — found by reading the payload, not
+the code.** Ten minutes and two trading passes after that deploy, mum's live
+`outside_uptrend_n` was still `None`. The port was correct; the STORAGE was
+not. The live entry loop skips `S.signals()` on a candle it has already acted
+on (`if last_sig_ts.get(sym) == sig_ts: continue`), so on her **1h** book the
+gauge is written about ONCE AN HOUR — and I had deliberately chosen not to
+persist the maps, reasoning that a stale reading would be counted as this
+loop's. `last_rsi`, one line away in the same `_persist` dict, has identical
+staleness and IS persisted precisely so the row can answer BETWEEN candles.
+**Blank-most-of-the-time is the worse failure, and it is the exact ambiguity
+this wave exists to remove.** Persisted and restored now, bools only, both
+halves pinned.
+
+**A THIRD BRITTLE GUARD, same class as the two above.** `test_the_census_is_
+persisted` read `src[i:i + 900]` from `_persist`, so the COMMENT explaining why
+the trend gauge persists pushed `last_open_ts` past the 900th character and
+failed a test whose subject had not changed. Now it parses the dict by AST with
+a positive control. Three guards corrected today for pinning SURFACE — a fixed
+slice, a source substring, a mention count — and all three broke on PROSE while
+the property they exist for was intact.
+
 **`days_to_gate_obs` is NOT nulled, and the measurement decided it.** The plan
 said publish `null` on a zero-close book; `audit_book_spend` treats
 `spend.get(f) is None` as a MISSING FIELD and fails, so nulling it reddens the
