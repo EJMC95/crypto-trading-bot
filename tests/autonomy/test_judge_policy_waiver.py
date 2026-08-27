@@ -50,6 +50,7 @@ the interesting stamp at the NEWEST end and a differently-stamped tail behind
 it — a one-row-per-key fixture cannot test a window, and that exact gap bit
 this census twice in two days ((tj), (ts)).
 """
+import ast
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -132,10 +133,17 @@ def _ledger(live_bot, shadow_bot, live_pol, shadow_pol,
 
 def _row(bot, max_open=5, age_s=30):
     """A `bot_pnl` row as `fetch_bot_pnl` really returns it — `updated_at` as
-    ISO, never a precomputed `age_sec` (the (tj) trap)."""
+    ISO, never a precomputed `age_sec` (the (tj) trap).
+
+    [(uw)] `ttl_sec: 900` is gone: this claimed publisher fidelity while
+    carrying a key `fetch_bot_pnl` does not build (`ttl_sec` occurs zero times
+    in bot_pnl_store.py — the table has no such column). `_fresh` read
+    `3 * (row.ttl_sec or 900)`, so the fixture drove the per-row branch and
+    production drove the fallback: mutating the live bar `900 -> 1` left the
+    whole suite green. The bar is now `PAIR_ROW_STALE_S` and this drives it."""
     return {"bot": bot, "status": "online", "equity": 1000.0,
             "pnl_abs": 0.0, "pnl_pct": 0.0, "open_trades": 1,
-            "closed_trades": 52, "wins": 30, "losses": 22, "ttl_sec": 900,
+            "closed_trades": 52, "wins": 30, "losses": 22,
             "updated_at": (_now() - timedelta(seconds=age_s)).isoformat(),
             "extra": {"max_open": max_open}}
 
@@ -188,6 +196,136 @@ def test_the_waiver_is_still_reported_when_a_later_rung_blocks():
     assert st["unjudgeable"]["reason"] == "capacity_mismatch", st
     assert st.get("policy_waived", {}).get("scan_order", {}) \
         .get("shadow") == "list", st
+
+
+def test_the_verdict_does_not_depend_on_the_order_the_rows_arrive_in():
+    """[(uw)] THE FIXTURES WERE PUBLISHER-SHAPED AND PUBLISHER-ORDERED, AND
+    THE SECOND HALF HID A DEAD SORT.
+
+    Every case in this file hands `_pair_precheck` rows already newest-first,
+    because that is how `fetch_paper_trades` returns them — so the window came
+    out right whether or not `_latest_policy_stamp`'s sort did any work. It
+    did none: `_close_rank` read `closed_at`, the DB COLUMN, which that fetch
+    normalises to `close_ts` and never emits, so it ranked EVERY real row
+    `(False, 0.0)` and the sort was a stable no-op. `(ts)` added that sort
+    precisely to make the answer independent of how the caller fetched, and
+    with the key wrong it was not.
+
+    Delivered oldest-first, a dead sort scores the TAIL — stamped
+    `stoploss=-0.99` by `_ledger` — and the pair reads `policy_mismatch`
+    instead of `idle`. So this asserts the verdict, not the plumbing.
+
+    (mutation: `close_ts` -> `closed_at` in `_close_rank` => this reddens)
+    """
+    lb, sb = GEORGIA["live_bot"], GEORGIA["shadow_bot"]
+    rows = _ledger(lb, sb, LIVE_POL, SHADOW_POL)
+    bot_rows = [_row(lb, 5), _row(sb, 5)]
+    expected = _precheck(GEORGIA, rows, bot_rows)
+    assert expected.get("phase") == "idle", expected
+
+    oldest_first = list(reversed(rows))
+    # neither the publisher's order nor its exact reverse, so a "fix" that
+    # flips the slice to suit one caller cannot satisfy this either
+    rotated = rows[len(rows) // 3:] + rows[:len(rows) // 3]
+    for label, perm in (("oldest-first", oldest_first), ("rotated", rotated)):
+        got = _precheck(GEORGIA, perm, bot_rows)
+        assert got.get("phase") == "idle", (label, got)
+        assert got.get("unjudgeable") is None, (label, got)
+        assert got["stamps"] == expected["stamps"], (label, got["stamps"])
+        assert got.get("policy_waived") == expected.get("policy_waived"), label
+
+
+def test_the_sort_key_reads_the_key_the_publisher_actually_emits():
+    """The (hj) rule at its narrowest: `_close_rank` must rank a row that the
+    REAL publisher built. A key the publisher never emits degrades silently to
+    the NULLS-LAST bucket — no raise, no log, just an inert sort — which is
+    why this needs asserting directly rather than through a verdict.
+
+    (mutation: `close_ts` -> `closed_at` in `_close_rank` => this reddens)
+    """
+    newer = ej._close_rank(_close(GEORGIA["shadow_bot"], 1))
+    older = ej._close_rank(_close(GEORGIA["shadow_bot"], 900))
+    assert newer[0] is True, ("inert on a publisher-shaped row", newer)
+    assert newer > older, (newer, older)
+    # a row carrying no close time at all is unorderable, never "newest"
+    assert ej._close_rank({"bot": "x", "extra": {}}) == (False, 0.0)
+
+
+def _publisher_row_keys():
+    """The key set `bot_pnl_store.fetch_paper_trades` really constructs, read
+    off its own `out.append({...})` literal. Derived from the publisher rather
+    than restated here, because a retyped key set is a second copy of the
+    contract and drifts exactly like the one that caused (uw)."""
+    import bot_pnl_store
+    tree = ast.parse(open(bot_pnl_store.__file__).read())
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef)
+              and n.name == "fetch_paper_trades")
+    keys = set()
+    for n in ast.walk(fn):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "append" and n.args
+                and isinstance(n.args[0], ast.Dict)):
+            keys |= {k.value for k in n.args[0].keys
+                     if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    return keys
+
+
+def _row_keys_read_by(fn_name, rowvar="r"):
+    """Every `<rowvar>.get("literal")` inside one judge function.
+
+    Receiver must be a BARE NAME: `(r.get("extra") or {}).get("policy")` is a
+    read of the extra SUB-DICT, not of the row, and counting it would make
+    this guard cry wolf on every stamp field."""
+    tree = ast.parse(open(ej.__file__).read())
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == fn_name)
+    return {n.args[0].value for n in ast.walk(fn)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "get" and isinstance(n.func.value, ast.Name)
+            and n.func.value.id == rowvar and n.args
+            and isinstance(n.args[0], ast.Constant)
+            and isinstance(n.args[0].value, str)}
+
+
+#: Judge functions that read a LEDGER row, with the local the row is bound to.
+#: Curated, not discovered: adding one is a deliberate act, and every entry
+#: here has been checked to consume `fetch_paper_trades` output specifically
+#: (not `fetch_bot_pnl` rows, which are a different publisher and shape).
+LEDGER_ROW_READERS = (("_close_rank", "r"), ("_latest_policy_stamp", "r"))
+
+
+def test_every_ledger_key_the_census_reads_is_one_the_publisher_emits():
+    """[(uw)] THE CLASS, NOT THE INSTANCE.
+
+    `_close_rank` read `closed_at` — the DB COLUMN — for a day while
+    `fetch_paper_trades` normalised it to `close_ts` and emitted no `closed_at`
+    at all. Nothing caught it: `.get` on an absent key returns None, so the
+    consumer and the publisher can disagree forever in total silence, and the
+    fixtures agreed with the CONSUMER so they could not tell either.
+
+    This reads both sides off their own ASTs, so it reddens whichever side
+    moves — a `closed_at` retyped into the judge, or a `close_ts` renamed in
+    the publisher. The fallback it replaced could only ever have covered the
+    first, and only by hiding it.
+
+    (mutation: `close_ts` -> `closed_at` in `_close_rank` => this reddens)
+    """
+    emitted = _publisher_row_keys()
+    # positive control: the extractor must actually find a real key set, or
+    # an empty `emitted` would make every subset check below vacuously true
+    assert {"bot", "close_ts", "extra"} <= emitted, sorted(emitted)
+    assert "closed_at" not in emitted, (
+        "fetch_paper_trades now emits closed_at — the (uw) premise changed, "
+        "re-read _close_rank before relaxing this")
+
+    for fn_name, rowvar in LEDGER_ROW_READERS:
+        read = _row_keys_read_by(fn_name, rowvar)
+        assert read, (fn_name, "extracted no row keys — the AST walk is "
+                               "broken or the row variable was renamed")
+        assert read <= emitted, (
+            fn_name, "reads ledger keys the publisher never emits",
+            sorted(read - emitted), "emitted:", sorted(emitted))
 
 
 def test_an_undeclared_divergence_on_the_same_pair_still_blocks():

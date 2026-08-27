@@ -1599,13 +1599,43 @@ def consume_release_request(req, phase, current, now):
 # (impl_shortfall, the dashboard card); the rollup flip is v2.1's, taken
 # WITH its consumers.
 
+#: How stale a `bot_pnl` row may be before `_pair_precheck` calls the arm dark.
+#: 3x the fleet's conventional 900s publish TTL, which is the value this bar has
+#: always ACTUALLY had — it was written as `3 * (row.ttl_sec or 900)` and
+#: `fetch_bot_pnl` emits no `ttl_sec`, so the per-row term never once applied.
+#: Named here so it is greppable, mutatable and true. Live hosts publish every
+#: 300s (`lighter_avo_live_bot.LOOP_SECONDS`), so this is ~9x headroom.
+PAIR_ROW_STALE_S = 3 * 900
+
+
 def _close_rank(r):
     """Sort key mirroring the publisher's own `ORDER BY closed_at DESC NULLS
     LAST` — non-null closes rank above unorderable ones, newest first under
     `reverse=True`. `parse_ts` RAISES on junk, so an unreadable stamp degrades
-    to the NULLS-LAST bucket rather than taking the reader down."""
+    to the NULLS-LAST bucket rather than taking the reader down.
+
+    [(uw)] IT READS THE PUBLISHER'S KEY, NOT THE SQL'S. This read `closed_at`
+    — the DB COLUMN name, lifted off the `ORDER BY` clause it was written to
+    mirror — while `store.fetch_paper_trades`, the judge's ONLY ledger source
+    (the fetch site below), normalises that column to `close_ts` and emits no
+    `closed_at` at all. So on real data every row ranked `(False, 0.0)` and
+    the sort was a stable NO-OP: the window was still the newest `look` only
+    because the SQL happens to deliver them that way — precisely the
+    caller-dependence (ts) was written to remove, reintroduced inside the fix
+    for it. Every other ledger consumer in this file already reads `close_ts`.
+
+    ONE KEY, NO FALLBACK, DELIBERATELY. A `closed_at` fallback was written and
+    removed: the census has exactly one production caller (the fetch below)
+    and it is publisher-shaped, so the tolerance served no caller — it only
+    kept a future wrong-shaped one silently working, which is the mechanism
+    that hid this for a day. `.get` on a missing key degrades to the NULLS-LAST
+    bucket with no raise and no log, so tolerance here is indistinguishable
+    from correctness. The drift it was meant to catch is caught instead by
+    `tests/autonomy/test_judge_policy_waiver.py`, which reads this key off the
+    AST and checks it against the key `fetch_paper_trades` really emits — a
+    rename on EITHER side reddens, which the fallback could never have done."""
     try:
-        ts = parse_ts(r.get("closed_at"))
+        ts = parse_ts(r.get("close_ts"))
     except (TypeError, ValueError, AttributeError):
         ts = None
     return (ts is not None, ts or 0.0)
@@ -1704,6 +1734,17 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
         # builds, and the selftest now drives the `updated_at`-only shape
         # FIRST. Unknown age stays dark (fail-closed — this gate ADMITS a
         # pair toward a real-money comparison).
+        # [(uw)] ...AND `ttl_sec` WAS THE SAME MISS, TWO LINES BELOW THAT
+        # COMMENT. The bar read `3 * float(row.get("ttl_sec") or 900)` as
+        # though the horizon were per-book, but `bot_pnl` HAS NO SUCH COLUMN
+        # and `ttl_sec` does not occur once in bot_pnl_store.py — so the read
+        # was None on every real row and the bar was always the fallback. Dead
+        # rather than wrong, but it made the LIVE number untestable: both
+        # fixtures supplied the phantom key, so the suite took a branch
+        # production never takes and `900 -> 1` survived the whole suite. The
+        # horizon is a CONSTANT because bot_pnl cannot carry a TTL; a per-book
+        # bar has to come from somewhere that exists (pnl_dashboard's
+        # `stale_secs_for` is the worked example), not from an absent key.
         if not isinstance(row, dict):
             return False
         try:
@@ -1713,7 +1754,7 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                 if ts is None:
                     return False
                 age = now_ts() - ts
-            return float(age) <= 3 * float(row.get("ttl_sec") or 900)
+            return float(age) <= PAIR_ROW_STALE_S
         except (TypeError, ValueError):
             return False
 
@@ -3183,13 +3224,18 @@ def _selftest():
     _sstamp = dict(_stamp, venue="lighter_shadow", scan_order="list")
 
     def _led(bot, pol, age=60):
-        # [(ts)] the PUBLISHER'S ORDER, not just its fields: every ledger row
-        # carries `closed_at`, and `fetch_paper_trades` hands them back
-        # `ORDER BY closed_at DESC NULLS LAST`. The pre-(ts) fixture built one
-        # UNDATED row per bot, where a newest-vs-oldest slice is unobservable
-        # by construction — which is how the census shipped reading each arm's
-        # OLDEST 30 closes.
-        return {"bot": bot, "closed_at": iso(t0 - age),
+        # [(ts)] the PUBLISHER'S ORDER, not just its fields: `fetch_paper_trades`
+        # hands rows back `ORDER BY closed_at DESC NULLS LAST`. The pre-(ts)
+        # fixture built one UNDATED row per bot, where a newest-vs-oldest slice
+        # is unobservable by construction — which is how the census shipped
+        # reading each arm's OLDEST 30 closes.
+        # [(uw)] ...AND THE PUBLISHER'S KEY. This built `closed_at` — the DB
+        # COLUMN — which `fetch_paper_trades` normalises to `close_ts` and never
+        # emits. So every ordering assertion below was driving a shape the judge
+        # is never handed, and `_close_rank` reading `closed_at` was invisible to
+        # all of them while ranking every REAL row (False, 0.0). Driven as the
+        # publisher builds it, so the sort has to do the work.
+        return {"bot": bot, "close_ts": iso(t0 - age),
                 "extra": ({"policy": pol} if pol else {})}
 
     def _row(bot, max_open=5, age=60):
@@ -3197,7 +3243,13 @@ def _selftest():
         # (ISO), never a derived age_sec — the first live census read every
         # row dark because the fixture here was written in the dashboard
         # feed's shape instead ((hj)). Driven as the publisher builds it.
-        return {"bot": bot, "updated_at": iso(t0 - age), "ttl_sec": 900,
+        # [(uw)] ...except for `ttl_sec: 900`, which it ALSO built and which
+        # `fetch_bot_pnl` does not emit either — `ttl_sec` occurs zero times in
+        # bot_pnl_store.py. That phantom fed `3 * (row.ttl_sec or 900)`, so the
+        # fixture took the per-row branch while production took the fallback,
+        # and the live number was unmutatable behind it. Gone; the bar is
+        # `PAIR_ROW_STALE_S` and the fixture now drives the real one.
+        return {"bot": bot, "updated_at": iso(t0 - age),
                 "extra": {"max_open": max_open}}
 
     _lb, _sb = _psp["live_bot"], _psp["shadow_bot"]
@@ -3211,6 +3263,19 @@ def _selftest():
                         [_row(_lb), _row(_sb)], t0)
     assert _v["unjudgeable"]["reason"] == "policy_unstamped", _v
     assert "lighter_family_bot.py" in _v["unjudgeable"]["detail"], _v
+    # [(uw)] THE SORT KEY MUST FIRE ON THE PUBLISHER'S OWN KEY. `_close_rank`
+    # read `closed_at` — the DB COLUMN, not the key `fetch_paper_trades`
+    # emits — so it returned the NULLS-LAST bucket for every REAL row and the
+    # sort below was a stable no-op. Asserted DIRECTLY on the rank, because
+    # every ordering case that follows can be satisfied by delivery order
+    # alone: they are what the sort is FOR, not proof that it ran.
+    # (mutation: `close_ts` -> `closed_at` in _close_rank => this reddens)
+    _ranked = _close_rank(_led(_sb, None, age=1))
+    assert _ranked[0] is True and _ranked[1] > 0.0, \
+        ("_close_rank is inert on a publisher-shaped row", _ranked)
+    # ...and it is ORDERING, not merely non-degenerate: newer outranks older.
+    assert _close_rank(_led(_sb, None, age=1)) > \
+        _close_rank(_led(_sb, None, age=900))
     # [(ts)] THE INCIDENT: an arm that has JUST started stamping. 30 older
     # unstamped closes + 1 stamped newest, delivered NEWEST-FIRST exactly as
     # `fetch_paper_trades` returns them. The shipped `mine[-look:]` scored the
@@ -3225,6 +3290,13 @@ def _selftest():
     assert _p == _sstamp, _p
     # ORDER-INDEPENDENT: the same rows any which way give the same answer, so
     # this cannot be "fixed" by flipping the slice to suit one caller.
+    # [(uw)] THIS ONLY BECAME A TEST WHEN THE FIXTURE ABOVE STARTED BUILDING
+    # THE PUBLISHER'S KEY. Written against `closed_at` rows it exercised a
+    # shape the judge is never handed, and passed while the sort was inert on
+    # every real one — a permutation is only a test of a SORT if the sort key
+    # can read the rows. The middle permutation is deliberately neither the
+    # publisher's order nor its reverse, so a fix that just flips the slice
+    # cannot satisfy it either.
     for _perm in (list(reversed(_fresh)), _fresh[15:] + _fresh[:15]):
         assert _latest_policy_stamp(_perm, _sb) == (_p, _n, _t), _perm[:1]
     # "LATEST" MEANS LATEST: with two stamped closes the NEWEST stamp is the
@@ -3243,16 +3315,16 @@ def _selftest():
            [_led(_sb, _sstamp, age=500)]
     assert _latest_policy_stamp(_old, _sb) == (None, 0, 30), \
         _latest_policy_stamp(_old, _sb)
-    # an unreadable `closed_at` degrades to the NULLS-LAST bucket, never a
+    # an unreadable `close_ts` degrades to the NULLS-LAST bucket, never a
     # raise (parse_ts throws on junk; the census must survive one bad row)
-    _junk = [{"bot": _sb, "closed_at": "not-a-date", "extra": {}},
+    _junk = [{"bot": _sb, "close_ts": "not-a-date", "extra": {}},
              _led(_sb, _sstamp, age=5)]
     assert _latest_policy_stamp(_junk, _sb)[0] == _sstamp
     # NULLS **LAST**, mirroring the publisher: undated rows are UNORDERABLE,
     # never "newest". Sorted the other way a bot with `look` junk rows would
     # fill the whole window and hide a real stamped close behind rows that
     # merely have no date. (mutation: `ts is None` in _close_rank => reddens)
-    _dateless = [{"bot": _sb, "closed_at": None, "extra": {}}
+    _dateless = [{"bot": _sb, "close_ts": None, "extra": {}}
                  for _ in range(30)] + [_led(_sb, _sstamp, age=5)]
     assert _latest_policy_stamp(_dateless, _sb)[:2] == (_sstamp, 1), \
         _latest_policy_stamp(_dateless, _sb)[:2]

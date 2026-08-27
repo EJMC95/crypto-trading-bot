@@ -195,17 +195,32 @@ def _row(bot, max_open=4, age_s=30):
     handed. A NOW-relative stamp silently ages past the 3xTTL bar as the
     session runs, and every pair then collapses to `live_row_dark` — a fixture
     whose verdicts depend on what time the suite happens to run is worse than
-    no fixture, so the dependency is honoured here rather than papered over."""
-    return {"bot": bot, "ttl_sec": 900,
+    no fixture, so the dependency is honoured here rather than papered over.
+
+    [(uw)] `ttl_sec: 900` removed — the same (tj) miss this docstring warns
+    about, in the line below it. `fetch_bot_pnl` emits no `ttl_sec` (zero
+    occurrences in bot_pnl_store.py; the table has no such column), so the
+    fixture drove `3 * row.ttl_sec` while production drove the `or 900`
+    fallback, leaving the live bar unmutatable. The bar is now the named
+    `experiment_judge.PAIR_ROW_STALE_S`."""
+    return {"bot": bot,
             "updated_at": (datetime.now(timezone.utc)
                            - timedelta(seconds=age_s)).isoformat(),
             "extra": {"max_open": max_open}}
 
 
 def _close(bot, i, policy=None):
-    """A ledger close row shaped the way `_latest_policy_stamp` reads them."""
-    r = {"bot": bot, "closed_at": (NOW - timedelta(hours=i)).isoformat(),
-         "pnl_pct": 0.01, "extra": {}}
+    """A ledger close row shaped the way `bot_pnl_store.fetch_paper_trades`
+    BUILDS them — the judge's only ledger source.
+
+    [(uw)] This said "shaped the way `_latest_policy_stamp` reads them", and
+    that is the defect's own fingerprint: written to match the CONSUMER, it
+    built `closed_at`/`pnl_pct` — the DB COLUMN names — while the fetch
+    normalises those to `close_ts`/`profit_ratio` and emits neither. A fixture
+    that agrees with the consumer instead of the publisher cannot detect the
+    two disagreeing, which is exactly what `_close_rank` was doing."""
+    r = {"bot": bot, "close_ts": (NOW - timedelta(hours=i)).isoformat(),
+         "profit_ratio": 0.01, "extra": {}}
     if policy is not None:
         r["extra"]["policy"] = dict(policy)
     return r
