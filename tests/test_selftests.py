@@ -375,6 +375,14 @@ ENFORCED_AUDITS = [
     # scan asserts nothing when no deploy cadence is reachable, so it is safe
     # offline and in CI.
     "scripts/audit_boot_stagger.py",      # organs can reach their first run
+    # [2026-08-27 (ut)] THE BUS CONTRACT. `coin-quality` published the fleet's
+    # own measured execution cost for seven weeks as `{ts, coins}` — no
+    # `updated`, no `ttl_sec` — so `fleet_bus.is_fresh` judged it stale FOREVER
+    # and no consumer could ever be written. Registered in the same commit that
+    # adds the guard, per this file's own rule: static, offline, no DB (CI has
+    # no DATABASE_URL, and a guard that read live rows would pass vacuously on
+    # an empty result). Exits 0 today against a one-entry RATCHET.
+    "scripts/audit_bus_contract.py",      # cross-read payloads carry updated+ttl_sec
     "scripts/audit_image_imports.py",     # born-dark guard (CI-gating)
     "scripts/audit_sdk_pin.py",           # real-money wheel pin (CI-gating)
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
