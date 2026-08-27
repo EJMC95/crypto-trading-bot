@@ -1,3 +1,101 @@
+## 2026-08-27 (tw) — EVENTS ARE NOT TRADES: THE REAL-MONEY BOOKS WERE PUBLISHING PHANTOM LOSSES, AND THE CLASS BEHIND SIX DEFECTS GETS ITS GUARD
+
+`(tv)` fixed one write site. This closes the CLASS behind it, because fixing
+the instance and leaving the class open is the circle this repo keeps paying
+for. The six defects the data sweep found are **one shape in six costumes: a
+write site that did not know something and wrote a plausible-looking value
+instead of recording the absence.**
+
+**THE INSTANCE: 🙏 avo published 3W / 10L over 13 "closes" on a book that had
+taken FOUR real trades (3W / 1L).** 🔮 georgia: 52 closes / 24W / 28L against
+a real **48 (24W / 24L)**. Nine and four of those rows are daily-loss FLATTEN
+EVENTS — no entry basis, no P&L — written into the closed-trade ledger and
+counted by `fetch_paper_aggregate` as closes and, via `losses = closed −
+wins`, as LOSSES. The books re-seed those counters from that aggregate at
+every boot, so the miscount was self-healing in the wrong direction, and the
+dashboard and every W/L reader has been reading a real-money book's record
+with phantom losses in it.
+
+**THE DISTINCTION IS NOT THE REASON STRING, and that is the whole care this
+needed.** `daily_loss` appears on BOTH: georgia's 25-Aug rail closed five REAL
+positions at real prices for −$30.96, and her 22-Aug TRX −$3.87 is a real
+forced flatten. Those are losses the book genuinely took and they STAY. The
+events are the rows with **no basis at all**, and all 13 were enumerated and
+classified individually — not sampled.
+
+**`bot_pnl_store.is_non_economic` is the one owner** (mirroring
+`is_quarantined`, beside it, for the same reason): the `(th)` marker is the
+forward CONTRACT, and a DECLARED legacy bridge — pnl == 0 AND no entry price
+AND no funding form — covers the 13 rows that predate it. **The bridge's blast
+radius was MEASURED before it shipped:** fleet-wide, `pnl = 0 AND entry_price
+IS NULL` matches **exactly those 13 rows and nothing else**. Funding books are
+the population that could have been hurt (they legitimately record no price)
+and have **zero** zero-P&L rows — carry 0 of 105, farmer-shadow 0 of 215,
+garrett 0 of 56 — so the conjunction cannot fire on them; `_FUNDING_FORM`
+makes that structural rather than lucky. `realized` is deliberately untouched
+(an event's P&L is 0.00), so **no equity moves — only the counts.**
+
+**TWO DEFECTS IN MY OWN FIX, both the class reproduced inside the thing
+closing it, and both caught by the discipline rather than by reading:**
+* `float(pnl_abs or 0.0)` **coerces a MISSING P&L to zero**, so an
+  unknown-P&L row read as an event. Fixed to `pnl_abs is None or ...`.
+  **The first test for it did not cover it** — it reached its assertion
+  through the unreadable-`extra` path, so the mutation SURVIVED (M1 GREEN)
+  and an isolating case had to be written. A test that looks like cover and
+  is not is exactly what mutation rounds are for.
+* `extra if isinstance(extra, dict) else {}` reads a MALFORMED extra as "no
+  funding telemetry" — an assumption about data it could not parse. ABSENT
+  (`None`) and UNREADABLE are now different: unreadable fails OPEN.
+
+**A THIRD, caught by an existing contract test:** the first draft added an
+unconditional second query, breaking
+`test_a_clean_book_is_untouched_and_asks_no_second_query`. The aggregate's
+first query now carries a cheap CANDIDATE count and the second round trip runs
+only when there is something to classify — SQL narrows, the owner DECIDES, and
+the predicate stays written once.
+
+**THE CLASS-CLOSER: `scripts/audit_ledger_records.py`.** I8 already says
+*"unknown degrades to the OLD id, never to a guess"* — but I8 governs a
+DETECTOR'S OUTPUT, and every one of these is a LEDGER WRITE. The class had no
+guard, which is why it recurred six times before anyone counted it. Five rules,
+each an INTERNALLY IMPOSSIBLE condition so a finding is never a matter of
+taste: R1 `opened_at > closed_at` · R2 an id rendering an absent value · R3 an
+event the marker does not claim · R4 row counters vs the ledger · R5 `pnl_abs`
+basis divergence (REPORTED, never ratcheted — carry's realised-only basis is an
+operator ruling, not a build failure). It is a RATCHET on the counts measured
+today (8 / 15 / 13 / 3), per the `(mz)` lesson, and its CI regime **exits 0
+having explicitly SAID it inspected nothing** when there is no DATABASE_URL —
+a skip that announces itself is not a pass; `--strict` turns it into a failure.
+
+**ITS FIRST TWO LIVE RUNS EACH CAUGHT A BUG IN ITSELF, which is the point:**
+R4 first reported 🧘 douglas (−2) as drift when those rows are QUARANTINED on
+purpose; corrected, it then reported 🎫 the taker (+45) — and the taker keeps
+its own running count while douglas seeds from the quarantine-filtered
+aggregate. **Books do not share one counting convention**, so R4 is now a BAND:
+`upper = total − events` (counting events is the defect) and `lower = upper −
+quarantined` (below it the row has lost closes its ledger holds). Anything
+between the edges is a declared convention. Result: exactly three flags, all
+real — avo +9, georgia +4, 🧭 nav-cook −34.
+
+**A FINDING REFUTED, recorded because refusing to "fix" a non-defect matters as
+much as fixing one:** the sweep flagged `fill_measured=true` on the 13
+basis-less rows as a false claim. It is not — `measured` describes the EXIT
+leg, and the flatten really did fill. It is the ENTRY that is unknown. No
+change made.
+
+Pinned by `tests/autonomy/test_non_economic.py` (11 tests, **6/6 mutations
+red**) and the audit's own selftest. **NOT changed here, and named so it is not
+lost:** the 13 legacy rows carry no durable marker (the signature is the bridge
+until a backfill); 🌾 carry holds **18 positions against a published cap of
+14** while `carry.max_positions` FLAPS 14→16→18→20→expire→14, **28 changes in
+three hours** — the `(hs)`/I7 saturation ratchet recurring; nav-cook's row
+understates 37 closes as 3; and carry's `pnl_abs` basis leaves a fleet sum
+$15.76 short. **👩 mum's records remain CLEAN** — 0 closes, 0 ledger rows, no
+phantoms, no bleed.
+
+Deployed `[deploy-live]` — the aggregate is what the three live rows re-seed
+their counters from.
+
 ## 2026-08-27 (uv) — THE ARMS RAN DIFFERENT ENTRY POLICIES AND NEITHER STAMPED IT: `max_entries_per_hour` JOINS THE SHARED STAMP, EACH HOST ANSWERING FOR ITSELF
 
 Judge v2's census blocked 🔮 georgia on `policy_unstamped` naming
