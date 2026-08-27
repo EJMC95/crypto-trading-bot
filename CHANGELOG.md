@@ -1,3 +1,103 @@
+## 2026-08-27 (vc) — "WE WIN, WE CHANGE IT, IT STARTS LOSING" IS REGRESSION TO THE MEAN, MEASURED: A HOT WINDOW IS FOLLOWED BY −1.674pp WITH OR WITHOUT A CHANGE, AGAINST A GRADER MARGIN OF 0.25pp
+
+**Eamon, 27-Aug: *"think broadly on how we can in some cases win, we then make
+changes and it starts losing…"*** It is the most testable thing anyone has said
+about this fleet, and it is now measured. **The pattern is REAL and WE ARE NOT
+CAUSING IT.**
+
+### THE FOUR MECHANISMS, AND WHY TELLING THEM APART IS THE WHOLE JOB
+
+They demand OPPOSITE responses: (1) *we damage books* -> change less; (2) *we
+overfit* -> hold out before shipping; (3) *regression to the mean* -> change
+nothing about changing, change what we BELIEVE about a hot streak; (4) *edge
+decay* -> re-measure on a rolling basis. `scripts/study_do_our_changes_hurt_2026-08-27.py`
+separates them.
+
+### THE NO-CHANGE CONTROL — THE ARM THAT SETTLES IT
+
+Every non-overlapping 15-close window across 21 books with n>=40 (3,274 closes,
+timestamps through `golive_readiness.parse_stamp`, the one owner —
+`closed_at` is TEXT in four formats). **Nothing was necessarily changed between
+a window and its successor**; this is what reversion looks like on its own:
+
+| | window | -> next | the book's OWN mean |
+|---|---|---|---|
+| after a **HOT** window | **+1.760%** | **+0.086%** | +0.190% |
+| after a **COLD** window | −0.578% | **+0.362%** | +0.624% |
+
+**A hot window is followed by a −1.674pp collapse, and it lands within 0.1pp of
+the book's own long-run mean.** Excess over that mean is ≈0 in BOTH directions
+(−0.105 pp after hot, −0.262 pp after cold): **the next window is predicted by
+the book's MEAN, not by the window before it.**
+
+We do not change books at random — we change them when we NOTICE something, and
+what we notice is an extreme. So we will observe a collapse immediately after
+almost every change we make to a winning book, **and it will always feel
+causal.** It is not. The same arithmetic runs the other way: a cold window is
+followed by a +0.940pp RISE, which is why a change made to a struggling book so
+often looks like it worked.
+
+### THE GRADER THAT JUDGES OUR CHANGES INHERITS THIS, CONDITIONALLY
+
+`fleet_proprioception.grade_live` compares an episode to TWO baselines — the
+book's own **pre-episode window** and the **shadow twin** over the same window —
+and requires being worse than EVERY baseline (`all(...)`) before calling a
+change `bad`. **The twin is a proper control and is immune to this**: it
+experiences the same reversion. But when the twin is unavailable, `baselines`
+collapses to the pre-window alone and `all()` over one element is just that
+window.
+
+**Sized: `LIVE_MARGIN_PP` = 0.25 pp against a measured post-hot-window reversion
+of 1.674 pp — 6.7x the margin**, and `LIVE_BASE_MIN_N` = 3 permits a
+THREE-TRADE baseline. An episode that begins after a hot window is condemned by
+arithmetic, not by evidence.
+
+**LATENT, NOT LIVE — stated so nobody reads this as an outage.** All 8 current
+verdicts ride the `replay-counterfactual` / `grading-throughput` bases, none is
+`hurting`, and no actuator is reverting anything on this path today.
+
+### AND THE FIX IS **NOT** SHIPPED, ON ITS OWN NUMBER
+
+The obvious repair is a wider baseline window. Measured, predicting the next 15
+closes across 96 cut points:
+
+| baseline | mean abs error |
+|---|---|
+| 5x pre-window | **1.708 pp** |
+| long-run mean | 1.727 pp |
+| 1x pre-window (shipped) | 1.992 pp |
+
+14% lower error — **and the paired difference is t=+1.10.** Not significant.
+**REFUSED.** Shipping a real-money actuator change on t=1.10 is precisely the
+pattern this entry diagnoses, and doing it inside the entry that diagnoses it
+would be the joke writing itself. Re-decide when the ledger carries more cut
+points; the instrument is committed and the query is one command.
+
+### THE DOCTRINE THIS LEAVES — and it is the actionable half
+
+* **A HOT WINDOW IS NOT EVIDENCE. Its successor is the book's mean.** Measured
+  at −1.674pp of reversion, 6.7x the margin our own grader uses.
+* **JUDGE A CHANGE AGAINST THE BOOK'S OWN MEAN, NEVER AGAINST THE WINDOW THAT
+  MOTIVATED IT.** The motivating window is selected on an extreme, so it is a
+  biased counterfactual BY CONSTRUCTION. Where a shadow twin exists, prefer it —
+  it is the only baseline that reverts in step.
+* **THE SELECTION PREMIUM IS ~1.85 `t`-UNITS ON THIS FLEET'S OWN HABIT.** Same
+  day, 👩 mum's universe widening: four volume-ranked cells measured, best taken
+  at t=2.30, and resampling WHICH coins are graded gives t median 0.45 with
+  **0 of 24 draws reaching 2.0** ((uz)). Had it shipped, the live book would
+  have "started losing" right after its best-looking evidence — mechanism (2),
+  caught before it shipped, and the same shape as (oe)'s churn on 📐 Grimes,
+  which DID ship.
+
+### THE CONFOUND, DECLARED RATHER THAN BURIED
+
+Arm 1 (book-age vs calendar) is **NOT identifiable on this data and must not be
+quoted**: mean age-slope −0.856pp (t=−2.17, negative in 13/21 books) sits beside
+a fleet-wide calendar move of +0.614% (Jul, n=1778) -> −0.488% (Aug, n=1241).
+Nearly every book started in July, so "late in a book's life" and "August" are
+the same rows. The two cannot be separated until books with staggered births
+accumulate. The no-change control above needs no such control — it is
+within-book and sequential — which is why it, and not Arm 1, carries this entry.
 ## 2026-08-27 (va) — THE JUDGE NEVER CHECKED WHETHER THE CONTROL ARM WAS ALIVE: A TEN-DAY-DEAD SHADOW ROW CERTIFIED A PAIR `idle`
 
 **[RENUMBERED (uz) -> (va) at push time.** A concurrent session published its
