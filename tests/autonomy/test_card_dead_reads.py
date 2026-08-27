@@ -1,4 +1,4 @@
-"""[(vg)] THE BOT CARD READ FIVE bot_pnl COLUMNS THAT DO NOT EXIST.
+"""[(vj)] THE BOT CARD READ FIVE bot_pnl COLUMNS THAT DO NOT EXIST.
 
 `pnl_dashboard.card()` read `row["pnl_weekly"]`, `row["pnl_monthly"]`,
 `row["max_drawdown"]`, `row["best_trade"]` and `row["worst_trade"]` off a row

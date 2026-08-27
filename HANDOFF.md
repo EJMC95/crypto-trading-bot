@@ -10,7 +10,7 @@ _Generated 2026-08-27 18:42 Sydney (08:42Z) by `scripts/session_state.py`. Do no
 _Still open because:_ the VERDICTS are now re-derived and recorded in each header; what is still open is the WIRING — these scripts keep selecting by rank, so the next person to run one gets the rank-selected answer unless they pass the floor by hand. Closes when study_farmer_take_profit uses `minvol_entry_ok` itself.
 
 ### `allocation-clamp-is-a-per-position-bound-doing-per-book-duty`  ·  owner: **OPERATOR**
-💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vg)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
+💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vj)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
 
 _Still open because:_ the clamp is a capital-allocation policy and moving it moves money between books — an operator call (I16), not a session one. It is NOT urgent: nothing is near the ceiling today. What a session CAN do first is derive the per-book bound the drawdown bar implies (the `GROSS_X_MAX = 0.15/|stop|` shape (sr) used on avo) and publish it beside the claim, so the ceiling stops being a single number shared by books with different stops.
 
@@ -69,13 +69,13 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (102 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vg))
+## Shipped today (102 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vj))
 
-- `58304e3` Pin each retirement registry term against a stub (vg)
-- `05a8429` Kill the survivor: pin BOTH retirement registries separately (vg)
-- `a7396b8` A carried row outlived the book it was about, behind a predicate that could never fire (vg)
-- `581d8cf` The bot card read five bot_pnl columns that do not exist (vg)
-- `eac49ae` Close my own guard's keyword blind spot; renumber (vb) -> (vg) (vg)
+- `58304e3` Pin each retirement registry term against a stub (vj)
+- `05a8429` Kill the survivor: pin BOTH retirement registries separately (vj)
+- `a7396b8` A carried row outlived the book it was about, behind a predicate that could never fire (vj)
+- `581d8cf` The bot card read five bot_pnl columns that do not exist (vj)
+- `eac49ae` Close my own guard's keyword blind spot; renumber (vb) -> (vj) (vj)
 - `e1adb62` Renumber (uz) -> (vb): both uz and va were taken on main mid-write (vb)
 - `9888ce7` The mirror book's quarantine filter was a permanent no-op: bot/pair swapped (uz)
 - `d7efafe` Regenerate HANDOFF (vc)

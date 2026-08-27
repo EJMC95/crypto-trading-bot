@@ -131,7 +131,7 @@ def test_the_handoff_file_is_current():
 
 
 # ---------------------------------------------------------------------------
-# [(vg)] A CARRIED ROW WHOSE **SUBJECT** RETIRED UNDER IT
+# [(vj)] A CARRIED ROW WHOSE **SUBJECT** RETIRED UNDER IT
 #
 # `carried_status` asks "is the work done?". Nothing asked "does the thing this
 # row is about still exist?" — so `farmer-cap-collapses-slots-under-conviction`

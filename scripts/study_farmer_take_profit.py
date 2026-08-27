@@ -42,7 +42,7 @@ VERDICT AS RUN (150d Lighter tape, 2026-02-24 -> 2026-07-24):
   * tp-0.06 BEATS live on top-25 and LOSES badly on all-79. A knob whose sign
     depends on the universe is not an edge, it is a coin the tape cannot call.
 
-**[(vg)] RE-DERIVED ON THE LIVE BOT'S OWN POPULATION — THE REFUSAL SURVIVES AND
+**[(vj)] RE-DERIVED ON THE LIVE BOT'S OWN POPULATION — THE REFUSAL SURVIVES AND
 HARDENS.** (su) found this study's loader selects its universe by RANK while the
 live Farmer filters on an absolute $10M/day floor only 11 of 212 markets clear,
 so the table above was measured partly on books the bot refuses — which put four

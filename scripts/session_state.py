@@ -107,7 +107,7 @@ CARRIED = [
                 "have not been re-derived**: study_farmer_take_profit, "
                 "backtest_farmer_breadth_lighter, backtest_funding_persistence "
                 "and backtest_xsect_funding_lighter.",
-        # [(vg)] THE MEASUREMENT IS DONE; THE WIRING IS NOT. All four were
+        # [(vj)] THE MEASUREMENT IS DONE; THE WIRING IS NOT. All four were
         # re-run against the live bot's $10M/day floor and each verdict is now
         # recorded in its own header, so the next session must NOT re-measure:
         #   * take_profit  — refusal SURVIVES and HARDENS. tp-0.06 goes from
@@ -136,7 +136,7 @@ CARRIED = [
         "id": "allocation-clamp-is-a-per-position-bound-doing-per-book-duty",
         "owner": "OPERATOR",
         "what": "💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION "
-                "slippage bound being asked to do a per-BOOK job. **[(vg)] THE "
+                "slippage bound being asked to do a per-BOOK job. **[(vj)] THE "
                 "4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was "
                 "measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 "
                 "carry right now, delta_usd +13,500, $14,400 of gross on a "
@@ -318,7 +318,7 @@ CARRIED = [
                 "SIGNAL with no priced VALUE. lighter_ticket_replay is the "
                 "calibrated instrument; a candle walk is not (it has no short "
                 "branch).",
-        # [(vg)] RE-POINTED. This read "The LIVE taker's ..." and "real-money
+        # [(vj)] RE-POINTED. This read "The LIVE taker's ..." and "real-money
         # row: measure and hand over, never hand-set" — but the taker's LIVE
         # arm was retired 13-Aug (ma) when 🙏 Avo Maria took its slot, so for a
         # fortnight the row told the next session it was handling real money
@@ -441,7 +441,7 @@ def _dead_rows():
 def subject_status():
     """-> [(id, row, why)] for every CARRIED row whose SUBJECT has been retired.
 
-    [(vg)] A HANDOFF ROW OUTLIVED THE BOOK IT WAS ABOUT. `carried_status`
+    [(vj)] A HANDOFF ROW OUTLIVED THE BOOK IT WAS ABOUT. `carried_status`
     answers "is the work done?" and nothing answered "does the thing still
     exist?" — so `farmer-cap-collapses-slots-under-conviction` kept demanding
     attention for 💸 the LIVE Farmer five days after (ta) retired it, with a
@@ -536,7 +536,7 @@ def main(argv=None):
                   f"predicate says they are DONE: {', '.join(stale)}. "
                   "Delete the row (and say so in the changelog).")
             return 1
-        # [(vg)] ...and a SECOND way a row goes stale: its subject retires
+        # [(vj)] ...and a SECOND way a row goes stale: its subject retires
         # under it. Reported separately from `stale` because the remedy
         # differs — a done row is DELETED, a dead-subject row is RE-POINTED at
         # a living book or closed with a reason.

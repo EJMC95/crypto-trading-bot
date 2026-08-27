@@ -193,7 +193,7 @@ scripts/backtest_funding_persistence.py — is the CARRY'S SURVIVAL predictable?
 ║    /funding-rates); see UNITS below.                                      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-**[(vg)] RE-DERIVED ON THE LIVE BOT'S OWN POPULATION — THE RULING SURVIVES AND
+**[(vj)] RE-DERIVED ON THE LIVE BOT'S OWN POPULATION — THE RULING SURVIVES AND
 HARDENS.** (su) found this file's loader (`backtest_funding_lighter.load()`)
 selects its universe by RANK while the live Farmer filters on an absolute
 $10M/day floor that only 11 of 212 markets clear — so this verdict, along with

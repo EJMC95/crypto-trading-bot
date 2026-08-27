@@ -1,3 +1,161 @@
+## 2026-08-27 (vj) — FIVE FRONTS, AND THE TWO LOUDEST ALARMS WERE BOTH STALE: A QUARANTINE THAT MATCHED NOTHING, A DRAWDOWN BAR THAT NEVER RENDERED, AND A HANDOFF ROW GUARDING A CORPSE
+
+Eamon: *"Fix all of the above - use the knowledge we have and as much edge we
+can squeeze."* Five fronts, measured before touched. **Two of the five turned
+out to be smaller than reported and I say so first, because I raised both.**
+
+### 1 · 🪁 band-kelly's quarantine filter matched NOTHING, ever — and it changed NO shipped decision
+
+`scripts/study_band_kelly_2026-08-18.py` called
+`is_quarantined(r["pair"], r["bot"], ...)` against a publisher whose signature
+is `(bot, pair, closed_at)`. The match is `p == q_pair and q_bot in b`, so with
+the two same-typed positional strings reversed **`p` held a bot name, could
+never equal a quarantined pair, and the filter returned False for every row in
+the fleet, forever.** Driven: correct-order matches 47 rows, swapped matches 0.
+
+**I ESCALATED THIS AS "the mirror book's founding evidence is contaminated" AND
+THAT WAS WRONG.** Measured, both ways, on all 23 cells of the negation table:
+
+| | as shipped | corrected |
+|---|---|---|
+| taker `short-divergence` | n=131, mirror **+0.193%/t**, t=+0.68 | n=86, **−0.007%/t**, t=**−0.02** |
+| snapfade (n=65 crypto) | +0.605%/t, t=+5.71 | **identical** |
+| dipfade (n=13) | +1.162%/t, t=+2.66 | **identical** |
+
+**22 of 23 cells are byte-identical. Neither shipped roster family is
+touched** — snapfade's ghost has zero quarantined rows and dipfade's ghost
+FAMILY (`long-dip`) has zero; all 45 leaked rows are `short-divergence`, which
+was never promoted to a family. The founding numbers reproduce EXACTLY and
+Eamon's 18-Aug I16 override on dipfade stands. What was actually wrong is the
+one report-only cell a future session would mine for the NEXT family: it read a
+mirror WINNER where the truth is flat, because the 45 rows are ghost LOSERS
+summing −25.92pp and **negating a phantom loss reads as a phantom gain.**
+
+Fixed with KEYWORDS, and the class closed by an AST guard checking every
+`is_quarantined` caller in the tree against the publisher's own
+`inspect.signature`. Two things the guard taught me about itself:
+* **string literals must be exempt** — the pair literal `'BOT/USDC'` contains
+  "bot" and fired on three innocent lines without it;
+* **it walked `node.args` only**, so the same swap written as KEYWORDS passed
+  GREEN — and the fix had just made the one site with a proven history of this
+  slip a keyword call, so the guard was blind exactly where the bug happened.
+  Found by mutating the guard against itself. Both arms now; both forms RED.
+
+### 2 · The bot card read FIVE bot_pnl columns that do not exist
+
+`card()` read `pnl_weekly`, `pnl_monthly`, `max_drawdown`, `best_trade` and
+`worst_trade` off a `SELECT * FROM bot_pnl` row. **The table has none of them.**
+Each sat behind an `is not None` guard, so four card sections were unreachable
+dead code on every bot, forever — the read-side residue of the 28-Jul doc-truth
+cleanup, which struck those exact five names from `publish()`'s docs and fixed
+the publisher and the docs but never the consumer. Driven on a real live row:
+all four False, on all 20 rendered rows.
+
+**MAX DRAWDOWN IS ONE OF THE SIX GO-LIVE BARS**, and the card omitted the line
+rather than saying unknown — so a reader could not tell *"this book has no
+drawdown"* from *"this number was never computed"*, which is the (hf)/I1
+byte-identical shape at the reporting layer, on the rule that governs real
+money. It is now IMPORTED from the grader that owns it (`golive-readiness`,
+the worse of realised and MTM per I9) — never recomputed, because a second
+computation is a second rule. **UNIT TRAP, pinned:** `max_dd_pct` is ALREADY a
+percent, and `pct(13.1)` renders **+1310.00%** — a number that would read as a
+catastrophic breach on a book that is under the bar. An ungraded book renders
+`unknown` carrying the grader's own `why_absent`, never nothing. 7d/30d and
+best/worst come from the ledger pass that was already running.
+Also fixed a raw `&` in two labels — invalid HTML that survived precisely
+because those lines never rendered: **unreachable code is unexercised code.**
+
+### 3 · A carried HANDOFF row guarded a book that had been retired for five days
+
+`farmer-cap-collapses-slots-under-conviction` demanded attention for 💸 the LIVE
+Farmer, retired 22-Aug (ta). Its `closes_when` grepped for `max_notional_frac`
+— **a string that has never existed anywhere in this repo or its history except
+inside that lambda** (`git log --all -S` finds exactly one commit: the one that
+added it). It was a guess at what the fix would be CALLED, so the row was
+**unfalsifiable from birth**: I11 says a finished item must report CLOSE THIS
+and redden CI, and this one was structurally incapable of ever doing so. The fix
+it waited for shipped six days later as `EQUITY_SCALED_CAP` ((to)) — whose own
+entry names this very row as an instance of the class it closes, and which
+deleted a SIBLING row whose predicate DID fire. **This one survived on the name
+mismatch alone.** Corrected, it fired immediately; the row is deleted.
+
+A second row was stale the same way: it called 🎫 the taker's **shadow** arm a
+*"real-money row: measure and hand over, never hand-set"* a fortnight after the
+live arm retired — inverting the standing rule and making a $1k shadow
+measurement look untouchable.
+
+`subject_status()` closes the class: a row may name the rows it is about, and
+one pointed at a retired book fails `--check`. Fail-OPEN on a dark registry — a
+missed stale row costs a wrong first hour, failing closed would send a session
+to re-point books that are trading fine. **A predicate must name a symbol that
+EXISTS, or it is a wish.**
+
+### 4 · Four standing refusals re-derived on the population the bot actually trades
+
+`(su)` found the shared loader picks its universe by RANK while the live Farmer
+filters on a $10M/day floor only **11 of 212** markets clear — so four verdicts
+other work treats as settled were measured partly on books the bot refuses. All
+four re-run against the floor:
+
+* **take_profit — SURVIVES and HARDENS.** tp-0.06 goes from *"beats live on
+  top-25"* to **LOSING $10–$28** vs live; both-halves clears **0 of 60 rows**.
+  The universe-dependent sign that made it "a coin the tape cannot call" was
+  itself the rank artifact.
+* **persistence — SURVIVES and HARDENS.** Its 3 clearing arms go to **ZERO**.
+* **breadth — FLIPS to STRUCTURALLY UNMEASURABLE.** At the live floor the
+  explore slice is **n=0, byte-identical to baseline**, on both windows and
+  both slips. There is nothing below the top exploit set that clears the floor,
+  so the breadth question has never actually been asked. Unpopulated is not
+  negative — `{n: 0}` is byte-identical between "quiet" and "impossible"
+  ((lv)). Where the slice IS populated (no floor) it LOSES, −$0.096 to
+  −$0.117/trade.
+* **xsect — NOT AFFECTED**; it never calls the rank loader.
+
+**No standing refusal was wrong. One "it earns" reading was never measurable.**
+
+### 5 · The allocation 4.0 alarm is WITHDRAWN — measured stale
+
+The carried row read *"💰 sits AT its 4.0 ceiling on 🌾 carry right now,
+`delta_usd +13,500`, **$14,400 of gross on a $1,000 book**"*, and I repeated it
+to Eamon. Measured on the live payload: the **maximum scale anywhere in the
+fleet is 1.594** (🙏 avo shadow) and **carry sits at 1.272** ($1,271.75 target).
+`(tz)` replaced the winner-take-all split with a tilted flat prior, which made
+4.0 structurally unreachable — so the row described the organ as it behaved
+BEFORE a fix that had already shipped, which is the same rot as §3 in a
+different costume.
+
+What survives is LATENT, not live, and is stated on the row for its owner: the
+clamp is a per-POSITION slippage bound doing a per-BOOK job, and it still
+PERMITS a scale that breaches the 15% go-live drawdown bar — because **maxDD is
+the one bar that is not clip-invariant** ((hl) measured the invariance for the
+other five). ⚖️ Counterweight breaches at **3.06x, inside the 4.0 ceiling**.
+Not urgent (nothing is near it), an operator call (I16), and **not patched
+here**: the proposed patch was verified to not compile and to redden five tests
+including the era gate's only positive controls. A refusal with evidence beats
+a broken fix.
+
+### What this pass cost and what it bought
+
+**BOOKS MOVED: NONE, and no real money moved.** Nothing here changes a trade, a
+lever, a clip or a cap — main only, no live deploy earned. What it bought is
+that four instruments now tell the truth: a quarantine that filters, a card that
+shows the drawdown bar, a handoff that cannot guard a corpse, and four refusals
+measured on the coins the book can actually buy.
+
+**MUTATIONS: 20/20 killed across five rounds, and three of the survivors were in
+guards I had just written this session** — the keyword blind spot above, an
+emptiable roster (`for` over an empty tuple inspects nothing and reports clean),
+and an unscoped extractor that would have cried wolf on four unrelated dicts.
+My own test also failed on its own docstring: a banned-substring check for
+`"peak"` matched the word *"speak"* — the exact "a page-wide substring scan is
+not a structural claim" defect this file records, committed inside the test
+written to enforce it. Rewritten over the AST with the docstring stripped.
+
+**[RENUMBERED (uz) -> (vb) -> (vg) -> (vj), 27-Aug.** Six letter collisions in
+one day; each was caught pre-push by `audit_changelog_letters`' cross-branch
+arm, which is the guard working exactly as built. Recorded inline because
+`git log` subjects keep the old letter.**]**
+
 ## 2026-08-27 (vh) — TWO OF MY OWN PUBLISHED FINDINGS WERE WRONG, BOTH THE SAME WAY: I MATCHED A CONSTANT TO A SYMPTOM WITHOUT CHECKING WHICH ARM EXECUTES IT
 
 Corrections to `(ve)` and `(vg)`, made in place per I12, plus the answer to

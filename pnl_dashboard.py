@@ -2599,7 +2599,7 @@ def fetch_golive_dd():
     """{bot: {"pct": float|None, "basis": str|None, "why": str|None}} — the
     go-live drawdown bar, read off the grader's own `golive-readiness` payload.
 
-    [(vg)] THE GRADER IS THE OWNER. `scripts/golive_readiness.py` publishes
+    [(vj)] THE GRADER IS THE OWNER. `scripts/golive_readiness.py` publishes
     `max_dd_pct` per book as the WORSE of realised and mark-to-market (I9,
     (ia)), already a PERCENT (13.1 means 13.1%) — so it must never be passed
     through `pct()`, which multiplies by 100 and renders +1310.00%. Measured
@@ -2668,7 +2668,7 @@ def fetch_ledger_enrich():
                              "seen_at) FROM paper_trades")
             if parts:
                 union = " UNION ALL ".join(parts)
-                # [(vg)] 7d/30d P&L and best/worst join this SAME aggregate.
+                # [(vj)] 7d/30d P&L and best/worst join this SAME aggregate.
                 # `card()` read `row["pnl_weekly"]`, `row["pnl_monthly"]`,
                 # `row["best_trade"]` and `row["worst_trade"]` off a bot_pnl row
                 # for weeks — four columns `bot_pnl` HAS NEVER HAD (its 12 are
@@ -2922,7 +2922,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
         pnl_daily = en.get("today_equity_delta")
         if pnl_daily is None and en.get("today_n"):
             pnl_daily = en.get("today_closed")
-    # [(vg)] FROM THE LEDGER PASS, NOT FROM `row`. These read
+    # [(vj)] FROM THE LEDGER PASS, NOT FROM `row`. These read
     # `row["pnl_weekly"]`/`row["pnl_monthly"]` — bot_pnl columns that do not
     # exist — so both lines were unreachable on every bot, forever. REALISED
     # closes in the window, the same basis as the record line below.
@@ -2941,7 +2941,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     if pnl_monthly is not None:
         rows.append(f'<div class="row"><span>30d P&amp;L</span>'
                     f'<b class="{cls(pnl_monthly)}">{money(pnl_monthly)}</b></div>')
-    # [(vg)] MAX DRAWDOWN IS A GO-LIVE BAR AND IT ALWAYS RENDERS NOW.
+    # [(vj)] MAX DRAWDOWN IS A GO-LIVE BAR AND IT ALWAYS RENDERS NOW.
     # It read `row["max_drawdown"]`, a bot_pnl column that has never existed,
     # so the line was silently absent on every book — and absent is
     # byte-identical to "this book has no drawdown", on the one number that
@@ -3070,7 +3070,7 @@ def render():
         enrich = fetch_ledger_enrich()
     except Exception:  # noqa: BLE001
         enrich = {}
-    # [(vg)] MAX DRAWDOWN REACHES THE CARD. It is one of the six GO-LIVE BARS
+    # [(vj)] MAX DRAWDOWN REACHES THE CARD. It is one of the six GO-LIVE BARS
     # and the card read it off `row["max_drawdown"]` — a bot_pnl column that
     # does not exist — so the line silently never rendered and a reader could
     # not tell "this book has no drawdown" from "this number was never

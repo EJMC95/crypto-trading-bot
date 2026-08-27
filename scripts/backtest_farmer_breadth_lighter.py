@@ -18,7 +18,7 @@ budget. This tests two additions BEFORE they touch the live-money bot
                    earn, or at least not lose? That is the breadth question — is
                    there edge beyond the 2 coins it knows.
 
-                   **[(vg)] ON THE LIVE BOT'S OWN POPULATION THE EXPLORE SLICE
+                   **[(vj)] ON THE LIVE BOT'S OWN POPULATION THE EXPLORE SLICE
                    IS EMPTY, SO THIS QUESTION HAS NEVER ACTUALLY BEEN ASKED.**
                    (su) found this study's loader picks its universe by RANK
                    while the live Farmer filters on an absolute $10M/day floor
