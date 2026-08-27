@@ -993,8 +993,50 @@ class DayTraderGated(Carrier):
     # tuning ((hc)). Resetting her era would discard the 163 closes this change
     # exists to add to. Scope: DayTraderGated is georgia + the RETIRED
     # crypto-intraday-15m, so this moves exactly one living book.
+    #
+    # [2026-08-27 (vb)] 3 -> 5, AND THE CENSORED EVIDENCE ABOVE IS NOW GRADED.
+    # Eamon: "Raise the cap, adjust axis to meet where's only left to look in
+    # terms of optimising her." It IS the last axis: diversification is
+    # unavailable ((uu), n_eff ~ 1.0 is structural) and exits are refused
+    # ((uw), 48 configurations over her OWN 212 entries, zero with a positive
+    # mean). What remained was WHICH signals she takes.
+    #
+    # Graded on the UNCENSORED replay population (1,816 entries, 90d, the
+    # harness (uw) calibrated to -0.079pp on her own trades) because the cap
+    # censors its own evidence — her ledger holds n=3 at rank 3 and nothing
+    # above it. Within-hour rank, assigned as `throttle_ok` assigns it:
+    #     rank 1  n=846  +0.027%   t_cl +0.41
+    #     rank 2  n=376  +0.086%   t_cl +0.97
+    #     rank 3  n=208  +0.313%   t_cl +2.44   <- her BEST rank
+    #     rank 4  n=133  +0.290%   t_cl +1.70
+    #     rank 5  n= 85  +0.233%   t_cl +1.02
+    #     rank 6  n= 57  -0.197%   | rank 7 -0.315% | rank 9 -1.424% t_cl -2.07
+    # The marginal entry is GOOD to rank 5 and falls off a cliff at 6, which is
+    # why this is 5 and not "unlimited" (uncapped reads +0.063%/trade and
+    # days-to-gate 538 — WORSE than the shipped cap on both).
+    #
+    # WHY IT MATTERS MORE THAN THE MEAN: her binding go-live bar is `t >= 2.0`
+    # and `t` grows with sqrt(n), so book-at-cap on her own observed rate reads
+    # cap 3 = +0.084%/trade, 344 days-to-gate; cap 5 = +0.108%, **187 days**.
+    # Nearly half the wait, at a HIGHER mean. This also narrows the (uv) arm
+    # divergence (the live host throttles at all) rather than widening it.
+    #
+    # THE PRE-REGISTERED BAR THAT REFUSED, DECLARED RATHER THAN QUIETLY
+    # RELAXED: `study_georgia_rank_2026-08-27` required BOTH chronological
+    # halves positive, and cap 5 fails it (-0.165/+0.382). So does the SHIPPED
+    # cap 3 (-0.127/+0.296), and so does every cap 1..8 and uncapped — the
+    # first half of that window is negative for this book at every setting,
+    # the same regime effect (uw) found. A bar the INCUMBENT also fails cannot
+    # discriminate between incumbent and challenger; it was mis-specified as an
+    # absolute test where the question is comparative. Stated here so the next
+    # reader sees the refusal, not a silent pass. Comparatively cap 5 is better
+    # on mean, on t, and on days-to-gate, and marginally worse on h1.
+    #
+    # NOT an era reset: a rate limiter is capacity, capacity is ordinary tuning
+    # ((hc)). SHADOW-SCOPED by construction — the live host enforces no
+    # throttle at all ((uv)), so this moves the shadow arm only.
     MAX_ENTRIES_PER_HOUR = int(os.environ.get(
-        "GEORGIA_MAX_ENTRIES_PER_HOUR", "3"))
+        "GEORGIA_MAX_ENTRIES_PER_HOUR", "5"))
 
     def signals(self, bars, extra):
         c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]

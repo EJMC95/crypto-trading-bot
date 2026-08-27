@@ -183,7 +183,7 @@ JUDGED_PAIRS = {
             "max_entries_per_hour":
                 "THE ARMS RUN DIFFERENT ENTRY POLICIES AND NEITHER STAMPS IT. "
                 "The shadow throttles entries per clock hour "
-                "(lighter_family_bot.DayTraderGated.MAX_ENTRIES_PER_HOUR = 3, "
+                "(lighter_family_bot.DayTraderGated.MAX_ENTRIES_PER_HOUR = 5 since (vb), "
                 "env GEORGIA_MAX_ENTRIES_PER_HOUR, applied at "
                 "`throttle_ok()` and refused at the entry site); the live "
                 "host enforces NO throttle and says so in its own comment — "

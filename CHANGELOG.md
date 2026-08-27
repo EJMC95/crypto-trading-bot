@@ -1,3 +1,93 @@
+## 2026-08-27 (vb) — THE CAP THAT CENSORED ITS OWN EVIDENCE IS GRADED AT LAST: RANK 3 IS 🔮 GEORGIA'S **BEST** ENTRY (n=208, t_cl +2.44) WHERE HER LEDGER SAID −7.752% ON n=3 — CAP 3 → 5, DAYS-TO-GATE 344 → 187
+
+**Eamon, 27-Aug: *"Raise the cap, adjust axis to meet where's only left to look
+in terms of optimising her."*** It IS the last axis, and that is measured rather
+than asserted: diversification is unavailable (`(uu)`, `n_eff ~ 1.0` is
+structural), exits are refused (`(uw)`, 48 configurations over her OWN 212
+entries, **zero** with a positive mean), entry SUPPLY was worked 22-Aug. What
+remained is WHICH of the available signals she takes.
+
+**THE MEASUREMENT PROBLEM, and it is why this was worth a study rather than a
+setting.** `MAX_ENTRIES_PER_HOUR` censors the very data needed to judge it —
+her ledger holds **n=3** at rank 3 and NOTHING above. The cap's own shipped
+comment said so in advance (*"the cap has CENSORED its own evidence... one step
+generates the rank-3 sample that grades the next one"*), and two prior readings
+disagreed exactly as a censored sample makes them: 22-Aug had rank2 (+0.656%) >
+rank1 (+0.023%) and raised 2 → 3; `(uv)` had rank3 **−7.752% on n=3**.
+
+**GRADED ON THE UNCENSORED POPULATION** — 1,816 replayed entries over 90d,
+through the harness `(uw)` calibrated to **−0.079pp** against her own trades
+(her real ATR-ratchet trail, the bot's within-bar check order, close-only
+triggers, the `trend_breakout` range_top veto, production's 300-bar window).
+Rank assigned as `Book.throttle_ok` assigns it — per BOOK, per UTC clock hour:
+
+| rank | n | mean %/trade | t_cl |
+|---|---|---|---|
+| 1 | 846 | +0.027% | +0.41 |
+| 2 | 376 | +0.086% | +0.97 |
+| **3** | **208** | **+0.313%** | **+2.44** |
+| 4 | 133 | +0.290% | +1.70 |
+| 5 | 85 | +0.233% | +1.02 |
+| 6 | 57 | −0.197% | −0.62 |
+| 7 | 38 | −0.315% | −0.73 |
+| 9 | 20 | −1.424% | −2.07 |
+
+**Rank 3 is her BEST entry, not her worst.** The −7.752% that made it look
+catastrophic was three trades. The marginal entry stays good to rank 5 and
+falls off a cliff at 6 — which is why this ships **5, not "unlimited"**:
+uncapped reads +0.063%/trade and 538 days-to-gate, WORSE than the shipped cap
+on both counts.
+
+**WHY IT MATTERS MORE THAN THE MEAN.** Her binding go-live bar is `t >= 2.0`
+and `t` grows with `sqrt(n)`, so a cap is a claim about the BOOK, not about
+rank K. Book-at-cap, rates scaled to her OWN observed 4.74 closes/day so the
+replay's uncapped throughput cannot flatter it:
+
+| cap | mean %/trade | iid t | closes/day | **days-to-gate** |
+|---|---|---|---|---|
+| 3 (shipped) | +0.084% | +1.87 | 4.74 | **344** |
+| 4 | +0.102% | +2.35 | 5.18 | 218 |
+| **5** | **+0.108%** | **+2.54** | 5.47 | **187** |
+| 6 | +0.098% | +2.31 | 5.66 | 226 |
+| none | +0.063% | +1.50 | 6.02 | 538 |
+
+**Nearly half the wait, at a HIGHER mean.** This is the (hl) turnover trap's
+mirror image and the distinction is the point: more trades bought here are not
+denominator shrinkage, they are ranks whose measured expectancy is *above* the
+book's average.
+
+**THE PRE-REGISTERED BAR THAT REFUSED — DECLARED, NOT QUIETLY RELAXED.** The
+study required BOTH chronological halves positive, and cap 5 fails it
+(−0.165/+0.382). **So does the shipped cap 3** (−0.127/+0.296), and so does
+every cap 1..8 and uncapped: the first half of that window is negative for this
+book at every setting — the same regime effect `(uw)` found across all 48 of
+its exit cells. **A bar the INCUMBENT also fails cannot discriminate between
+incumbent and challenger**; it was mis-specified as an absolute test where the
+question is comparative. Comparatively cap 5 is better on mean, on `t`, and on
+days-to-gate, and marginally worse on h1. That refusal is on the record here
+and in the code comment, so no future reader mistakes this for a clean pass.
+
+**SCOPE, and it narrows a divergence rather than widening one.** SHADOW-ONLY by
+construction: the live host enforces no throttle at all (`(uv)`), so raising
+the shadow's cap moves the two arms CLOSER, not further apart. NOT an era reset
+— a rate limiter is capacity and capacity is ordinary tuning (`(hc)`).
+`DayTraderGated` is georgia + the RETIRED crypto-intraday-15m, so exactly one
+living book moves. Reversible without a deploy via
+`GEORGIA_MAX_ENTRIES_PER_HOUR`.
+
+**[LETTER: the SEVENTH collision today. This entry was drafted as (uy),
+which a concurrent session had already taken on main, and again as (uz), which
+collided the same way. Landed on (vb); the citations in `lighter_family_bot.py`,
+`fleet_bus.py` and `tests/autonomy/test_georgia_throttle.py` were repointed in
+the same commit.]**
+
+**TESTS RESTRUCTURED, because they failed on the VALUE rather than the
+behaviour.** Three tests hardcoded `3` and broke on a change they should have
+been indifferent to. The behavioural ones now DERIVE from the constant (the cap
+binds; a refusal does not advance the recorded rank; ranks are granted 1..cap),
+and the value is pinned in exactly ONE place with its measurement, so it cannot
+drift silently but also cannot fail the wrong test twice.
+
 ## 2026-08-27 (uy) — THE (ts) SORT WAS INERT ON EVERY REAL ROW: `_close_rank` READ THE DB COLUMN, NOT THE KEY THE PUBLISHER EMITS
 
 **[RENUMBERED (uw) -> (uy), 27-Aug.** Written and committed as `(uw)`; two

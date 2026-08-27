@@ -54,12 +54,18 @@ class _B:
     throttle_ok = fam.Book.throttle_ok
 
 
-def test_the_cap_is_three_and_it_actually_binds():
+def test_the_cap_actually_binds():
+    """DERIVED from the constant, not retyped. [(vb)] the cap moved 3 -> 5 and
+    this test hardcoded 3, so it failed on the value rather than on the
+    BEHAVIOUR it exists to protect — that the cap is a real bound. A retyped
+    constant drifts; the value itself is pinned once, in
+    `test_the_cap_is_the_measured_value` below."""
+    cap = fam.DayTraderGated.MAX_ENTRIES_PER_HOUR
     b = _B(_georgia())
     t = 1_000_000 * 3600.0                       # a clean hour boundary
-    granted = [b.throttle_ok(t + i) for i in range(6)]
-    assert granted[:3] == [True, True, True], granted
-    assert granted[3:] == [False, False, False], "the cap must still be a bound"
+    granted = [b.throttle_ok(t + i) for i in range(cap + 3)]
+    assert granted[:cap] == [True] * cap, granted
+    assert granted[cap:] == [False] * 3, "the cap must still be a bound"
 
 
 def test_the_next_hour_resets_it():
@@ -74,9 +80,23 @@ def test_the_cap_stays_operator_overridable():
     """A rate limiter on the book nearest real money must be reversible without
     a deploy — the same contract every other bar on these books carries."""
     src = (ROOT / "lighter_family_bot.py").read_text()
-    assert 'os.environ.get(\n        "GEORGIA_MAX_ENTRIES_PER_HOUR", "3")' in src \
-        or 'GEORGIA_MAX_ENTRIES_PER_HOUR' in src, "no env override on the cap"
-    assert _georgia().MAX_ENTRIES_PER_HOUR == 3, "the shipped step is 2 -> 3"
+    assert 'GEORGIA_MAX_ENTRIES_PER_HOUR' in src, "no env override on the cap"
+
+
+def test_the_cap_is_the_measured_value():
+    """THE ONE PLACE THE VALUE IS PINNED, so it cannot drift silently — every
+    other test here derives from the constant.
+
+    [(vb)] 3 -> 5, graded on the UNCENSORED replay population (1,816 entries)
+    because the cap censors its own evidence: her ledger holds n=3 at rank 3
+    and nothing above. Within-hour rank reads +0.027 / +0.086 / **+0.313**
+    (t_cl +2.44) / +0.290 / +0.233 at ranks 1-5 and falls off a cliff at 6
+    (-0.197, then -0.315, then -1.424). Book-at-cap on her own rate: cap 3 =
+    +0.084%/trade and 344 days-to-gate; cap 5 = +0.108% and 187. Uncapped is
+    WORSE than both (+0.063%, 538d), which is why this is a number and not
+    `None`."""
+    assert _georgia().MAX_ENTRIES_PER_HOUR == 5, \
+        "the measured step is 3 -> 5; rank 6+ is negative"
 
 
 def test_the_rank_is_recorded_and_is_the_granted_rank():
@@ -84,22 +104,24 @@ def test_the_rank_is_recorded_and_is_the_granted_rank():
     reconstructing this from open timestamps; that must not be needed twice."""
     b = _B(_georgia())
     t = 1_000_000 * 3600.0
+    cap = fam.DayTraderGated.MAX_ENTRIES_PER_HOUR
     seen = []
-    for _ in range(3):
+    for _ in range(cap):
         b.throttle_ok(t)
         seen.append(b.throttle["last_rank"])
-    assert seen == [1, 2, 3], seen
+    assert seen == list(range(1, cap + 1)), seen
 
 
 def test_a_refused_entry_does_not_advance_the_rank():
     """A refusal is not an entry — if it bumped the counter the recorded rank
     would drift away from the trade it describes."""
+    cap = fam.DayTraderGated.MAX_ENTRIES_PER_HOUR
     b = _B(_georgia())
     t = 1_000_000 * 3600.0
-    for _ in range(3):
+    for _ in range(cap):
         b.throttle_ok(t)
     assert b.throttle_ok(t) is False
-    assert b.throttle["last_rank"] == 3, "a refusal moved the recorded rank"
+    assert b.throttle["last_rank"] == cap, "a refusal moved the recorded rank"
 
 
 def test_a_book_without_a_throttle_publishes_NO_rank():
