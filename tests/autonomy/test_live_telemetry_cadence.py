@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[2026-08-27 (ur)] THE ROW REFRESHES BETWEEN TRADING PASSES — AND REACHES NOTHING THAT TRADES.
+"""[2026-08-27 (us)] THE ROW REFRESHES BETWEEN TRADING PASSES — AND REACHES NOTHING THAT TRADES.
 
 **Eamon, 27-Aug: "Make sure the pnl dashboard is actually reflecting the live
 positions, by the millisecond."**

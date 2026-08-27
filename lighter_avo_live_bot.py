@@ -189,7 +189,7 @@ S = next(s for s in STRATEGIES if s.bot == BOT)
 
 LOOP_SECONDS = int(_env("LOOP_SECONDS", "300"))
 
-#: [2026-08-27 (ur)] TELEMETRY CADENCE — how often the ROW is refreshed from
+#: [2026-08-27 (us)] TELEMETRY CADENCE — how often the ROW is refreshed from
 #: the venue BETWEEN trading passes. **Eamon, 27-Aug: "Make sure the pnl
 #: dashboard is actually reflecting the live positions, by the millisecond."**
 #:
@@ -1348,7 +1348,7 @@ def main(_ctx=None, once=False):
                     extra=payload)
             except Exception:  # noqa: BLE001
                 pass
-            # [(ur)] THE MTM SERIES STAYS ON THE TRADING CADENCE. This append
+            # [(us)] THE MTM SERIES STAYS ON THE TRADING CADENCE. This append
             # feeds `<bot>:equity`, which `golive_readiness.apply_mtm` reads for
             # the 15% max-drawdown BAR (I9) — a real-money gate. The telemetry
             # refresh below re-publishes the ROW several times per trading pass,

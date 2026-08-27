@@ -1,3 +1,113 @@
+## 2026-08-27 (us) — THE DASHBOARD WAS NEVER WRONG, IT WAS BEHIND: THE LIVE ROW NOW REFRESHES FROM THE VENUE BETWEEN TRADING PASSES, AND CHANGES NO TRADE
+
+**Eamon, 27-Aug: "On lighter Georgia doesn't show to be holding nvidia"**, then
+**"Make sure the pnl dashboard is actually reflecting the live positions, by
+the millisecond."**
+
+### First: the dashboard and the venue agreed, and the stale thing was MY summary
+
+🔮 georgia closed NVDA at **11:25 AEST for +$3.38** (`long-trend-breakout_roi`).
+The row did not show her holding it either. Verified on the live payload that
+the bot's own bookkeeping is byte-identical to the VENUE's account payload —
+`margin_state` derives from Lighter's own response, so this is not the bot
+marking its own homework:
+
+| book | bot `held` | venue `margin.positions` | match |
+|---|---|---|---|
+| 🙏 avo | ADA · DOT · TRX | same 3 | ✅ |
+| 🔮 georgia | AAVE · AVAX · NEAR · XAG · XRP | same 5 | ✅ |
+| 👩 mum | — | — | ✅ |
+
+**What was stale was the summary I gave him**, which quoted an 08:20 payload at
+12:45 as if it were current — I1, by the session that has the rule. The
+isolated-margin/1x watch item in it is WITHDRAWN: she is cross-mode at 7.50x
+actual, every liq price known, nearest 43.9% away.
+
+### THE MEASUREMENT: the dashboard is not the lag, the poll is
+
+```
+bot polls venue + publishes   every 300s   <- LOOP_SECONDS, all three services
+/pnl.json                     no cache, fresh from Postgres per request
+dashboard page                meta refresh 30s
+```
+
+Worst case ~330s, median ~165s. Measured across **26 independent feed reads**
+on 27-Aug the row age ran **3s -> 287s, uniform on [0,300]** — exactly a 300s
+loop. So a position closed at 11:25 can sit on the card until 11:29. The card
+already prints `updated Ns ago`, so it never claimed to be fresher than it was;
+nothing was broken, and "by the millisecond" is not available from a poll.
+
+### WHY NOT SIMPLY SHORTEN THE TRADING LOOP — the option that was REFUSED
+
+`LOOP_SECONDS` is not a display knob: **stops, ROI and the trail are evaluated
+once per trading pass**, so shortening it tightens real exit enforcement on
+real money. The fleet already records the quantity it would cut (I23) —
+georgia's `stop_overshoot.p90_bps` = **26.4**. That is an I19 change owing a
+measurement, and it would likely reset the (hm) era clock on three live books,
+including the arm whose shadow twin is the fleet's closest to the gate. It also
+costs 5x the venue REST load, and **a rate-limited account read on a real-money
+book can stop an EXIT** — a far worse failure than a stale card. Refused for
+now; the measurement is the open item, not the flip.
+
+### WHAT SHIPS: publish more often, decide at exactly the same rate
+
+`_telemetry_sleep` replaces the loop's one long `sleep` with several short ones
+and a venue READ in between. **The trading pass still runs exactly every
+`LOOP_SECONDS`** — driven against a fake clock in the test, not asserted.
+Worst-case row age **~330s -> ~70s**; with the page's refresh, what Eamon sees
+goes from up to 5.5 minutes behind to about one.
+
+`TELEMETRY_SECONDS`, default **60**, **floored at 20** (a typo must not hammer a
+real-money venue path) and **clamped to `LOOP_SECONDS`** (it can never publish
+more often than it sleeps). Per-book env like every other setting here —
+`AVO_TELEMETRY_SECONDS` / `GEORGIA_…` / `MUM_…`; a bare `TELEMETRY_SECONDS` is
+read by nothing, which is exactly how the first version of its own test managed
+to be vacuous (below).
+
+**THE COST IS PRICED, NOT ASSUMED.** A refresh costs `n_positions + 1` REST
+calls (one order-book mid per held coin for the risk marks — `stop_marks` is
+per-coin and uncached — plus one account read). Across the live trio that is
+**~11 calls/min of new load against ~9/min today, roughly 2x**. At the 15s
+cadence first considered it would have been **~44/min, ~5x**. 60s buys ~5x the
+freshness for ~2x the load; that is the trade taken, and the refresh **yields**
+(`deadline - 1.0`) rather than spending a call the imminent trading pass needs.
+
+### THE HAZARD THIS ALMOST SHIPPED WITH, found before it ran
+
+`_publish_row` also calls `store.snapshot_equity`, which appends `<bot>:equity`
+— **the MTM series `golive_readiness.apply_mtm` reads for the 15% max-drawdown
+BAR (I9), on real-money books.** Refreshing 5x more often would have changed
+that gate's SAMPLING BASIS mid-window (300s spacing before, 60s after) on a
+series whose entire job is to find the deepest trough — and a denser series can
+only report an equal-or-worse maxDD. **A display change would have quietly
+tightened a live gate.** The append is now gated on `snapshot=`, the refresh
+passes `snapshot=False`, and a test pins that **exactly one** call site opts out
+(the opposite slip — a trading pass opting out — would take the series dark
+instead of dense, equally silent).
+
+Also unreachable from the refresh, by AST test on the call names rather than a
+substring scan: every order/exit path, `account_value` (so `EquityGuard`'s
+capital-move corroboration cadence is untouched — the (sr) deposit path rebases
+on CONSECUTIVE reads, and changing how often it is asked is a real-money
+accounting change), and all state persistence. It never runs on the HALTED path
+(that branch has its own sleep and `continue`s), so a refresh can never
+overwrite `status="halted"` with `"online"`. It cannot raise: a telemetry read
+must not be able to stop a live trading loop.
+
+### THE SECOND VACUOUS GUARD OF THE DAY, recorded because that is now a pattern
+
+The floor test set a bare `TELEMETRY_SECONDS`, which `_env` never reads (it
+reads `f"{_PFX}_{name}"`). Every reload returned the default 60, `60 >= 20`
+passed, and the mutation dropping the floor **20 -> 1 SURVIVED**. It now derives
+the key from `avo._PFX` and opens with a **positive control** — set 137, assert
+137 — so a test that cannot fail says so before it asserts anything. This is the
+same shape as `(uk)`'s Dockerfile guard hours earlier: **both were substring/name
+assumptions about a mechanism I had not driven.** 9 tests, and the bounds now
+redden 3/3 where they previously survived.
+
+Pinned by `tests/autonomy/test_live_telemetry_cadence.py` (9 tests, 7 mutations
+verified RED across two rounds). Shipped to all three live services under the
+(pz) enhancement grant; none was halted at dispatch.
 ## 2026-08-27 (ur) — THE LUS COHORT IS REFUSED, AND THE STUDY THAT WOULD HAVE MINTED IT REPORTED THE EXACT OPPOSITE OF WHAT IT COMPUTED: A DOUBLE NEGATION SWAPPED BOTH SIDE LABELS UNDERNEATH AN EXPLICIT "WE RAN BOTH DIRECTIONS" DEFENCE
 
 **Eamon, 27-Aug: *"Can you put the wire in? And put through the top three
