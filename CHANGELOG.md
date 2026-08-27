@@ -638,7 +638,7 @@ sessions were writing to main throughout; `audit_changelog_letters` caught every
 one pre-push, which is the guard earning its keep. Citations in
 `lighter_ticket_taker.py` repointed in the same commit.**]
 
-## 2026-08-27 (ul) — THE LIVE-SHADOW ALERT COULD NOT BE VERIFIED AT ALL: THE 26-AUG PASS FIXED THE EVIDENCE SECTION AND THE HELPER, AND LEFT THE VERIFIER ON THE OLD SIGNATURE
+## 2026-08-27 (up) — THE LIVE-SHADOW ALERT COULD NOT BE VERIFIED AT ALL: THE 26-AUG PASS FIXED THE EVIDENCE SECTION AND THE HELPER, AND LEFT THE VERIFIER ON THE OLD SIGNATURE
 
 `(ta)`/`(tb)`/`(te)` took the fleet from one live row to THREE, and the 26-Aug
 pass correctly rewrote `live_shadow_gap` to take an explicit `live` book and
@@ -680,7 +680,7 @@ Found by the daily review's own `payload.errors` — the fail-soft channel doing
 exactly its job. This script ships in no container and runs from the repo, so
 the push is the deploy.
 
-**[LETTER MOVED (ug) -> (uj) -> (ul), 27-Aug.** Three concurrent sessions took (ug),
+**[LETTER MOVED (ug) -> (uj) -> (ul) -> (up), 27-Aug — FIVE collisions on one entry.** Three concurrent sessions took (ug),
 (uh) and (ui) on `origin/main` while this entry was being written, and then
 took (uj) too while the follow-up work ran — the race `audit_changelog_letters`
 exists to catch, and it caught BOTH collisions pre-push. The
