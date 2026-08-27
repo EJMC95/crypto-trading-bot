@@ -1614,7 +1614,7 @@ def _close_rank(r):
     `reverse=True`. `parse_ts` RAISES on junk, so an unreadable stamp degrades
     to the NULLS-LAST bucket rather than taking the reader down.
 
-    [(uw)] IT READS THE PUBLISHER'S KEY, NOT THE SQL'S. This read `closed_at`
+    [(uy)] IT READS THE PUBLISHER'S KEY, NOT THE SQL'S. This read `closed_at`
     — the DB COLUMN name, lifted off the `ORDER BY` clause it was written to
     mirror — while `store.fetch_paper_trades`, the judge's ONLY ledger source
     (the fetch site below), normalises that column to `close_ts` and emits no
@@ -1734,7 +1734,7 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
         # builds, and the selftest now drives the `updated_at`-only shape
         # FIRST. Unknown age stays dark (fail-closed — this gate ADMITS a
         # pair toward a real-money comparison).
-        # [(uw)] ...AND `ttl_sec` WAS THE SAME MISS, TWO LINES BELOW THAT
+        # [(uy)] ...AND `ttl_sec` WAS THE SAME MISS, TWO LINES BELOW THAT
         # COMMENT. The bar read `3 * float(row.get("ttl_sec") or 900)` as
         # though the horizon were per-book, but `bot_pnl` HAS NO SUCH COLUMN
         # and `ttl_sec` does not occur once in bot_pnl_store.py — so the read
@@ -3229,7 +3229,7 @@ def _selftest():
         # fixture built one UNDATED row per bot, where a newest-vs-oldest slice
         # is unobservable by construction — which is how the census shipped
         # reading each arm's OLDEST 30 closes.
-        # [(uw)] ...AND THE PUBLISHER'S KEY. This built `closed_at` — the DB
+        # [(uy)] ...AND THE PUBLISHER'S KEY. This built `closed_at` — the DB
         # COLUMN — which `fetch_paper_trades` normalises to `close_ts` and never
         # emits. So every ordering assertion below was driving a shape the judge
         # is never handed, and `_close_rank` reading `closed_at` was invisible to
@@ -3243,7 +3243,7 @@ def _selftest():
         # (ISO), never a derived age_sec — the first live census read every
         # row dark because the fixture here was written in the dashboard
         # feed's shape instead ((hj)). Driven as the publisher builds it.
-        # [(uw)] ...except for `ttl_sec: 900`, which it ALSO built and which
+        # [(uy)] ...except for `ttl_sec: 900`, which it ALSO built and which
         # `fetch_bot_pnl` does not emit either — `ttl_sec` occurs zero times in
         # bot_pnl_store.py. That phantom fed `3 * (row.ttl_sec or 900)`, so the
         # fixture took the per-row branch while production took the fallback,
@@ -3263,7 +3263,7 @@ def _selftest():
                         [_row(_lb), _row(_sb)], t0)
     assert _v["unjudgeable"]["reason"] == "policy_unstamped", _v
     assert "lighter_family_bot.py" in _v["unjudgeable"]["detail"], _v
-    # [(uw)] THE SORT KEY MUST FIRE ON THE PUBLISHER'S OWN KEY. `_close_rank`
+    # [(uy)] THE SORT KEY MUST FIRE ON THE PUBLISHER'S OWN KEY. `_close_rank`
     # read `closed_at` — the DB COLUMN, not the key `fetch_paper_trades`
     # emits — so it returned the NULLS-LAST bucket for every REAL row and the
     # sort below was a stable no-op. Asserted DIRECTLY on the rank, because
@@ -3290,7 +3290,7 @@ def _selftest():
     assert _p == _sstamp, _p
     # ORDER-INDEPENDENT: the same rows any which way give the same answer, so
     # this cannot be "fixed" by flipping the slice to suit one caller.
-    # [(uw)] THIS ONLY BECAME A TEST WHEN THE FIXTURE ABOVE STARTED BUILDING
+    # [(uy)] THIS ONLY BECAME A TEST WHEN THE FIXTURE ABOVE STARTED BUILDING
     # THE PUBLISHER'S KEY. Written against `closed_at` rows it exercised a
     # shape the judge is never handed, and passed while the sort was inert on
     # every real one — a permutation is only a test of a SORT if the sort key

@@ -197,7 +197,7 @@ def _row(bot, max_open=4, age_s=30):
     whose verdicts depend on what time the suite happens to run is worse than
     no fixture, so the dependency is honoured here rather than papered over.
 
-    [(uw)] `ttl_sec: 900` removed — the same (tj) miss this docstring warns
+    [(uy)] `ttl_sec: 900` removed — the same (tj) miss this docstring warns
     about, in the line below it. `fetch_bot_pnl` emits no `ttl_sec` (zero
     occurrences in bot_pnl_store.py; the table has no such column), so the
     fixture drove `3 * row.ttl_sec` while production drove the `or 900`
@@ -213,7 +213,7 @@ def _close(bot, i, policy=None):
     """A ledger close row shaped the way `bot_pnl_store.fetch_paper_trades`
     BUILDS them — the judge's only ledger source.
 
-    [(uw)] This said "shaped the way `_latest_policy_stamp` reads them", and
+    [(uy)] This said "shaped the way `_latest_policy_stamp` reads them", and
     that is the defect's own fingerprint: written to match the CONSUMER, it
     built `closed_at`/`pnl_pct` — the DB COLUMN names — while the fetch
     normalises those to `close_ts`/`profit_ratio` and emits neither. A fixture

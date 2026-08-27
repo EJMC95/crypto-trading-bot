@@ -1,3 +1,115 @@
+## 2026-08-27 (uy) — THE (ts) SORT WAS INERT ON EVERY REAL ROW: `_close_rank` READ THE DB COLUMN, NOT THE KEY THE PUBLISHER EMITS
+
+**[RENUMBERED (uw) -> (uy), 27-Aug.** Written and committed as `(uw)`; two
+concurrent sessions landed `(uw)` (🔮 georgia's 48 exit configurations) and
+`(ux)` on main while this was in a worktree, and `audit_changelog_letters`'
+cross-branch arm caught it pre-push — the collision it was built for. By the
+letter rule the CITED entry keeps it and this one had 13 code citations to
+their zero, but every one of mine was still unpushed while theirs was already
+on main: moving mine is 13 mechanical edits that break nothing, moving theirs
+edits a peer's published entry. Lowest blast radius wins over precedence.
+Recorded inline because `git log` subjects keep the old letter.**]**
+
+`(ts)` diagnosed the pair census correctly — the window was scoring each arm's
+OLDEST 30 closes — and fixed it by ORDERING the window itself, *"so the answer
+is the same however the rows were fetched"*. **That sentence was false the day
+it was written, and the (ts) entry is corrected in place per I12.** The sort it
+added has never once run.
+
+```
+_close_rank({'bot': B, 'close_ts': <iso>, 'extra': {...}})  ->  (False, 0.0)
+```
+
+`_close_rank` read `r.get("closed_at")` — **the DB COLUMN name, lifted off the
+`ORDER BY closed_at DESC NULLS LAST` clause it was written to mirror**. But
+`store.fetch_paper_trades`, the judge's ONLY ledger source
+(`experiment_judge.py:2059`), *normalises* that column and emits **`close_ts`**;
+there is no `closed_at` key on any row the judge is ever handed. Every one of the
+14 keys it emits is listed in its own `out.append({...})`, and `closed_at` is not
+among them. So the key returned `None`, `parse_ts` raised, and every row fell to
+the NULLS-LAST bucket — a **stable no-op sort**. Measured on the same rows:
+
+| rows handed in | `_latest_policy_stamp` returns |
+|---|---|
+| publisher's order (newest-first) | `scan_order: diversified` — the newest stamp ✅ |
+| the same rows reversed | `scan_order: ancient` — **the OLDEST stamp, called "latest"** |
+
+The window still lands on the newest 30 in production **only because the SQL
+happens to deliver them that way** — which is precisely the caller-dependence
+(ts) existed to remove, reintroduced inside the fix for it. Every other ledger
+consumer in the file (lines 454, 487, 1174, 1900) already reads `close_ts`.
+
+**WHY IT WAS INVISIBLE: THE FIXTURE WAS WRITTEN TO MATCH THE CONSUMER, NOT THE
+PUBLISHER.** `(ts)`'s `_led()` built `closed_at`, so its five regression cases —
+including an explicit order-independence loop — drove a shape the judge is never
+handed, and passed while the sort was dead on every real one. **A permutation is
+only a test of a SORT if the sort key can read the rows.**
+`tests/autonomy/test_pipeline_card.py::_close` had it too, and its docstring
+named the defect exactly: *"shaped the way `_latest_policy_stamp` reads them"*.
+This is the (hj) class — *a consumer reading a key its publisher does not emit* —
+inside the fix for the previous instance of the same class, which is the third
+time in three days ((tj) field shape → (ts) ordering → this).
+
+**A SECOND PHANTOM KEY IN THE SAME FIXTURES, found by the sweep and fixed with
+it.** `_fresh` gated liveness on `3 * float(row.get("ttl_sec") or 900)` — and
+`ttl_sec` occurs **zero times in `bot_pnl_store.py`**; `bot_pnl` has no such
+column. Dead rather than wrong (the read was always `None`, the bar always
+2700s), but both `_row()` fixtures supplied the phantom key, so **the suite took
+a branch production never takes and the live bar was unmutatable: `900 -> 1` left
+the whole suite green.** The per-row term is gone — a horizon `bot_pnl` cannot
+carry is not a knob — and the bar is now the named `PAIR_ROW_STALE_S`, driven by
+the real fixtures. Behaviour is identical; what changed is that it can now be
+tested. Note the irony this sits beside: the `(tj)` comment three lines above it
+says the publisher *"carries `updated_at` (ISO), never a precomputed
+`age_sec`"* — correct, and two lines later it read a key that publisher does not
+carry either.
+
+**THE CLASS, NOT THE INSTANCE.** Fixing four key names would guarantee a fourth
+visit, so the guard reads BOTH SIDES OFF THEIR OWN ASTs: every
+`<row>.get("literal")` in the census's ledger readers must be a key
+`fetch_paper_trades` really constructs. A rename on **either** side reddens —
+which a tolerant `closed_at` fallback could never have done, and which is why the
+fallback I first wrote was removed rather than shipped: **the census has exactly
+one production caller and it is publisher-shaped, so tolerance served no caller
+and only kept a future wrong-shaped one silently working**. `.get` on a missing
+key returns `None` with no raise and no log, so tolerance there is
+indistinguishable from correctness — the mechanism that hid this.
+
+**MUTATION-VERIFIED, 10/10 — AND THE GUARD'S OWN TWO SURVIVORS WERE THE
+INTERESTING PART.** Production: `close_ts→closed_at` RED · `PAIR_ROW_STALE_S 2700
+→1` RED (unmutatable before this pass) · `reverse=True` dropped RED · the whole
+`sort` → `pass` RED · `mine[:look]→[-look:]` RED · `stamped[0]→[-1]` RED · the
+NULLS-LAST rank RED. Then the guard was mutated against itself and **survived
+twice**: emptying `LEDGER_ROW_READERS` left it green (a `for` over an empty tuple
+inspects nothing and reports clean — *this file's own "a check that inspects
+nothing" rule, inside the check written to enforce it*), and dropping the
+extractor's `rowvar` scoping left it green (latent: it would pool the four
+different dicts `_pair_precheck` reads and cry wolf on `since`, `override` and
+`policy_waived`). Both closed, both now RED.
+
+**BOOKS MOVED: NONE — and that is the honest report.** The judge promotes
+nothing today (the farmer lane is `stood_down` since (ta), georgia's candidate
+queue is empty until v2.1), so no promotion was mis-decided and no real money
+moved. What was at risk is the fleet's only designed path to more of it: the
+census's `stamps` counter is what says whether a pair can be judged at all, and
+it was one caller-side reordering away from reporting a policy the arm had
+already left. Main only — this changes no trade any book takes, so it does not
+qualify for the (mm) push-both-ways rule and rides the next deploy that does.
+
+**STILL OPEN, FOUND BY THE SAME SWEEP AND DELIBERATELY NOT BUNDLED HERE** (I11 —
+one surface per pass): `_pair_precheck` applies its I1 liveness gate to the LIVE
+row only, so capacity parity is computed off a shadow row of ANY age — executed
+proof, a shadow row **10 days stale** yields verdicts byte-identical to a fresh
+one, publishing either a `capacity_mismatch` that sends a session to align two
+caps when the real fact is a dead control arm (the I8/(ht) wrong-object class,
+and `pnl_dashboard` maps it to PIPE_WIRE, *"a session can clear this week"*), or
+`phase: idle / judgeable` certifying a pair fit for a paired real-money
+comparison whose control arm is dead. Also: `brain_replay.load_trades` is a
+PARTIAL second copy of `fetch_paper_trades` that ignores the `tag` column and the
+ledger quarantine — 313 rows change bucket, and driven through the real harness
+the v3-vs-v2 certification's headline `saved` **flips sign** (+$0.128 → −$0.586)
+because it is computed over a partition production never uses. Both carry
+executed evidence; both are their own pass.
 ## 2026-08-27 (tw) — EVENTS ARE NOT TRADES: THE REAL-MONEY BOOKS WERE PUBLISHING PHANTOM LOSSES, AND THE CLASS BEHIND SIX DEFECTS GETS ITS GUARD
 
 `(tv)` fixed one write site. This closes the CLASS behind it, because fixing
@@ -2521,8 +2633,22 @@ window cannot test a window.
 
 **THE FIX ORDERS THE WINDOW ITSELF** rather than inheriting the caller's order —
 `_close_rank` mirrors the publisher's own `DESC NULLS LAST` (an unparseable
-`closed_at` degrades to the NULLS-LAST bucket, never a raise: `parse_ts` throws
-on junk), so the answer is the same however the rows were fetched. Fixture
+close stamp degrades to the NULLS-LAST bucket, never a raise: `parse_ts` throws
+on junk), so the answer is the same however the rows were fetched.
+**[CORRECTED IN PLACE 27-Aug (uy) per I12 — THAT LAST CLAUSE WAS FALSE FOR A
+DAY, AND SO WAS THE `closed_at` IN THE SENTENCE ABOVE IT.** `_close_rank` read
+`r.get("closed_at")` — the DB COLUMN, lifted off the very `ORDER BY` clause this
+paragraph quotes — while `fetch_paper_trades` normalises that column to
+`close_ts` and emits no `closed_at` at all. So it ranked EVERY real row
+`(False, 0.0)`, the sort was a stable no-op, and the answer was the same however
+the rows were fetched only in the sense that it was never computed: the window
+landed on the newest 30 purely because the SQL delivers them that way — the
+caller-dependence this entry set out to remove, reintroduced inside its own fix.
+Measured: the same rows handed in reverse returned the OLDEST stamp as "latest".
+The fixture below is the reason it hid — it built `closed_at` too, so the five
+regression cases drove a shape the judge is never handed. Fixed and
+mutation-pinned in (uy); the ordering doctrine this entry establishes is
+unaffected and correct.]** Fixture
 rebuilt in the publisher's shape (dated rows, many per bot) plus five regression
 cases: the incident itself, order-independence across permutations (so this
 cannot be "fixed" by flipping the slice to suit one caller), **newest-stamp-wins

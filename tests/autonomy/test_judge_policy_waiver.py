@@ -135,7 +135,7 @@ def _row(bot, max_open=5, age_s=30):
     """A `bot_pnl` row as `fetch_bot_pnl` really returns it — `updated_at` as
     ISO, never a precomputed `age_sec` (the (tj) trap).
 
-    [(uw)] `ttl_sec: 900` is gone: this claimed publisher fidelity while
+    [(uy)] `ttl_sec: 900` is gone: this claimed publisher fidelity while
     carrying a key `fetch_bot_pnl` does not build (`ttl_sec` occurs zero times
     in bot_pnl_store.py — the table has no such column). `_fresh` read
     `3 * (row.ttl_sec or 900)`, so the fixture drove the per-row branch and
@@ -199,7 +199,7 @@ def test_the_waiver_is_still_reported_when_a_later_rung_blocks():
 
 
 def test_the_verdict_does_not_depend_on_the_order_the_rows_arrive_in():
-    """[(uw)] THE FIXTURES WERE PUBLISHER-SHAPED AND PUBLISHER-ORDERED, AND
+    """[(uy)] THE FIXTURES WERE PUBLISHER-SHAPED AND PUBLISHER-ORDERED, AND
     THE SECOND HALF HID A DEAD SORT.
 
     Every case in this file hands `_pair_precheck` rows already newest-first,
@@ -255,7 +255,7 @@ def _publisher_row_keys():
     """The key set `bot_pnl_store.fetch_paper_trades` really constructs, read
     off its own `out.append({...})` literal. Derived from the publisher rather
     than restated here, because a retyped key set is a second copy of the
-    contract and drifts exactly like the one that caused (uw)."""
+    contract and drifts exactly like the one that caused (uy)."""
     import bot_pnl_store
     tree = ast.parse(open(bot_pnl_store.__file__).read())
     fn = next(n for n in ast.walk(tree)
@@ -327,7 +327,7 @@ def test_the_key_extractor_scopes_to_the_row_and_not_to_its_neighbours():
 
 
 def test_every_ledger_key_the_census_reads_is_one_the_publisher_emits():
-    """[(uw)] THE CLASS, NOT THE INSTANCE.
+    """[(uy)] THE CLASS, NOT THE INSTANCE.
 
     `_close_rank` read `closed_at` — the DB COLUMN — for a day while
     `fetch_paper_trades` normalised it to `close_ts` and emitted no `closed_at`
@@ -356,7 +356,7 @@ def test_every_ledger_key_the_census_reads_is_one_the_publisher_emits():
     # an empty `emitted` would make every subset check below vacuously true
     assert {"bot", "close_ts", "extra"} <= emitted, sorted(emitted)
     assert "closed_at" not in emitted, (
-        "fetch_paper_trades now emits closed_at — the (uw) premise changed, "
+        "fetch_paper_trades now emits closed_at — the (uy) premise changed, "
         "re-read _close_rank before relaxing this")
 
     for fn_name, rowvar in LEDGER_ROW_READERS:
