@@ -2773,7 +2773,7 @@ def main(_ctx=None):
             # losing day_start and re-baselining the daily-loss rail.
             coin_vetoed = {}
     opened_syms, opened_lenses = set(), set()
-    # [2026-08-27 (uk)] THE SLOT CENSUS — which constraint actually binds.
+    # [2026-08-27 (uo)] THE SLOT CENSUS — which constraint actually binds.
     # `open 6/6` is BYTE-IDENTICAL between "six tickets existed" and "twenty
     # existed and fourteen were refused for want of a slot" (I18/(lv), in the
     # mirror direction: not an arm that opens NOTHING, an arm that is always
@@ -2878,7 +2878,7 @@ def main(_ctx=None):
                                 or _vbase in coin_vetoed):
                 continue          # measured slippage over the bar (fail-open)
             # one NEW position per lens per cycle; never add to a held symbol
-            # [(uk)] counted BEFORE the `continue`/`break` so the census sees
+            # [(uo)] counted BEFORE the `continue`/`break` so the census sees
             # exactly what each throttle refused. `slots_full` is counted for
             # EVERY remaining ticket rather than once, because the question it
             # answers is "how much supply did the cap turn away this cycle?"
@@ -3176,7 +3176,7 @@ def main(_ctx=None):
                # so a config-as-code override that silently beats the env var is
                # caught (railway-config-as-code-overrides-env).
                "max_open": MAX_OPEN,
-               # [(uk)] WHICH CONSTRAINT BINDS. `slots_full > 0` is the only
+               # [(uo)] WHICH CONSTRAINT BINDS. `slots_full > 0` is the only
                # evidence that raising MAX_OPEN would buy trades this book has
                # already earned; `lens_once > 0` says the per-lens-per-cycle
                # throttle is the binder instead and slots would change nothing.
