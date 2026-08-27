@@ -88,6 +88,29 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### AND BACK TO 36 — EAMON'S CALL, BOTH ARMS, SAME DAY
+
+**Eamon: *"both of them to 36"*.** Shipped as the code DEFAULT so both arms
+read it and PAIR by construction — an env on one service is what left them
+split in the first place.
+
+**The cost, recorded once and not re-argued:** at the shipped 12-slot /
+top-40 config, 36 measures **+0.026%/trade (t=+0.47)** against 32's
+**+0.202% (t=+3.21)**. 32 remains the measured peak by two independent
+studies and is one env away (`MUM_RSI_MAX=32`) whenever he wants it.
+
+**THE PAIRING RESOLVED ITSELF BEFORE THIS LANDED, and that is worth recording
+rather than quietly dropping.** The 32 deploy left live at 32 and the shadow
+at 36, which I flagged as a broken control — but the shadow was one commit
+behind on its auto-deploy path, not missing a route, and it converged to 32 on
+its own (`ede34670a66a`) minutes later. So the divergence was deploy LAG, not
+a structural unpairing, and the pair clock held. The instruction stands on its
+own terms; the pairing argument for it turned out to be moot.
+
+**STANDING NOTE FOR WHOEVER GRADES HER:** her ledger now spans TWO bars — the
+shadow's 9 closes at 36, a brief 32 window on both arms, then 36 again. Those
+are different policies and must not be pooled into one grade ((hc)).
+
 ### THE NON-CRYPTO HALF — SHIPPED ON REAFFIRMATION, WITH ITS PRICE STATED
 
 Her rule on the **21 liquid non-crypto markets she could not see** measures

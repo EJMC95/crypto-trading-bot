@@ -924,7 +924,29 @@ class OversoldRebound(Carrier):
     #: and it was right on its own terms — a forward test, never evidence. What
     #: changed is not the verdict on 36 but the reason it was needed.
     #: `MUM_RSI_MAX` still tunes it without a deploy, in either direction.
-    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "32.0"))
+    #:
+    #: [2026-08-28 (vd), SAME DAY] **BACK TO 36.0 — Eamon: *"both of them to
+    #: 36"*, after the 32 deploy left the arms unpaired (live 32 / shadow 36).
+    #: HIS DECISION, ON HIS OWN MONEY, MADE WITH THE NUMBER IN FRONT OF HIM.**
+    #: The cost is recorded once and not re-argued: at the shipped 12-slot /
+    #: top-40 config, 36 measures **+0.026%/trade, t=+0.47** against 32's
+    #: **+0.202%, t=+3.21**.
+    #:
+    #: WHAT THE DEFAULT DOES THAT AN ENV WOULD NOT: both arms read this literal,
+    #: so they PAIR by construction. The 32 pass moved the live arm first and
+    #: the shadow lagged a commit behind — and a control arm running a different
+    #: bar is not a control ((pt)'s pair clock: arms move together or the
+    #: comparison measures the difference between them instead of the change).
+    #: Pairing at 36 is what this instruction buys, and it is worth saying that
+    #: the pairing is real even though the cell is flat.
+    #:
+    #: THE STANDING NOTE FOR WHOEVER GRADES HER: her ledger now spans TWO bars.
+    #: The shadow's 9 closes and anything the live arm books today were taken
+    #: under 36, with a brief 32 window in between; those are different
+    #: policies and must not be pooled into one grade ((hc)'s era discipline).
+    #: 32 remains the measured peak by two independent studies and is one env
+    #: away — `MUM_RSI_MAX=32` — whenever he wants it.
+    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "36.0"))
     #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
     #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
     #: carrier whose signals dict happens to carry rsi/uptrend for OTHER
