@@ -1,3 +1,79 @@
+## 2026-08-27 (uu) — FOUR REFUSALS WITH EVIDENCE: (tr)'s CELL VERDICTS SURVIVE THE CORRECTED ESTIMATOR, 32 IS AT THE OPTIMUM, 🔮 GEORGIA CANNOT DIVERSIFY, AND THE ARITY GUARD IS NOT WORTH SHIPPING
+
+Eamon: *"optomise and fix anything needed."* Four things were checked and all
+four came back REFUSE. Recorded so the next session does not re-tread them —
+a refusal with evidence is a first-class outcome (CLAUDE.md standing rule), and
+the expensive failure mode here is re-running a settled measurement.
+
+**1. `(un)`'s METHOD FINDING DOES NOT OVERTURN `(tr)`'s REFUSALS — IT
+VALIDATES THEM.** `(un)` showed an isolated sliver is an adversely-selected
+subset of a threshold widening, which put every `(tr)` cell verdict in
+question: they were all measured as slivers, and the bias runs in the
+REFUSE direction. Re-measured as UNIONS (the object the bot would actually
+run), same tape, same bars:
+
+| cell, as a UNION | n | %/trade | t_cl | halves | trail-120d | eps/day |
+|---|---|---|---|---|---|---|
+| `rsi<32 & NOT-up` **(shipped)** | 2784 | **+0.111%** | **+2.44** | +0.114/+0.108 | +0.171% | 6.05 |
+| `rsi<36 & NOT-up` | 4080 | +0.048% | +1.19 | +0.015/+0.081 | +0.064% | 8.87 |
+| `rsi<42 & NOT-up` (C4) | 5920 | **−0.061%** | **−1.75** | −0.135/+0.013 | −0.125% | 12.87 |
+| `+ OR (rsi<20 & up)` (C1) | 2884 | +0.109% | +2.45 | +0.115/+0.103 | +0.155% | 6.27 |
+| `+ OR (rsi<25 & up)` (C2) | 3099 | +0.106% | +2.46 | +0.089/+0.124 | +0.149% | 6.74 |
+
+* **C4 REFUSED under the corrected estimator too** — `(tr)` was right, and the
+  sliver bias did not change that verdict.
+* **32 IS AT OR NEAR THE OPTIMUM.** The edge decays monotonically above it:
+  +0.111% at 32, +0.048% at 36, −0.061% at 42. There is no more supply on this
+  axis, so `(un)`'s ship landed on the right number and the bar should not be
+  walked again without new evidence.
+* **The uptrend disjuncts are a WASH, not a win**: +11% trades for −4% per
+  trade and −13% on the trailing window. Fails `(tr)`'s improve-both-windows
+  bar, and its separate I20 reason stands unchanged — admitting uptrend
+  entries re-opens the measured 31.2% co-hold channel with 🙏 avo.
+
+**2. 🔮 GEORGIA CANNOT DIVERSIFY HER WAY TO A HIGHER `n_eff`, AND THIS
+CORRECTS MY OWN 27-Aug SUGGESTION.** The daily review proposed raising her
+`n_eff` as a free win, on the `(sr)` avo precedent. **It is not available.**
+Measured on her ledger: **57 of 60 live closes are crypto** (shadow: 210 of
+214) — ~2% non-crypto supply over weeks. `diversified_order` already runs for
+her (she shares avo's variant host; her stamp reads `scan_order: diversified`)
+and can only reorder candidates that produce a SIGNAL. Her 15m DayTrader rule
+essentially never fires on SPY/QQQ/NVDA/XAU. So her `n_eff ≈ 1.0` is
+STRUCTURAL, and the consequence is the one that matters: **her leverage is not
+earnable through diversification the way 🙏 avo's was** (1.18 → 2.87 for free).
+At 7x her all-slots-stop is 35% against a 15% gate bar because the exposure is
+genuinely one bet. That is a live keep-or-reduce question for Eamon, not a knob.
+
+**3. THE ORACLE'S THREE UNGRADED NAMES ARE A CLOCK, NOT A DEFECT.** IWM/WTI/XCU
+are refused by the per-asset regime gate for a measured reason — `min_bars 203`
+vs **XCU 199, WTI 190, IWM 177** daily bars. Fail-closed working as designed;
+they graduate on their own in roughly **4, 13 and 26 days**. Nothing to fix, and
+`noncrypto_ungated: 0` on the live census confirms the gate is not what is
+holding georgia's non-crypto entries down (item 2 is).
+
+**4. THE ARITY GUARD IS REFUSED — ZERO LIVE INSTANCES AND A NOISY DETECTOR.**
+`(ul)`'s defect was a helper that grew a required argument while one call site
+kept the old arity. A tree-wide AST scan for that class found **20 hits and all
+20 are FALSE POSITIVES** — locally-scoped nested `def row(...)` / `_f(...)`
+matched by NAME across a module without respecting scope. A scope-aware version
+is real work for a class with no current instances, and a guard that reports 20
+false alarms is the cry-wolf trap this repo has already paid for twice
+((gl), (mz)). Not shipped; the scan is recorded here so the next session knows
+it was run and what it cost.
+
+**ALSO SETTLED, because it cost twenty minutes: A BUILD STAMP PREDICTED FROM
+THE REPO IS ONLY VALID AT THE INSTANT YOU COMPUTE IT.** `build_compute` moved
+twice on a tree `git status` called CLEAN, which reads exactly like the
+`(ml)` stale-container class. Cause: **another session pushed 8 commits and
+moved HEAD in this SHARED worktree**, rewriting `fleet_bus.py` and
+`lighter_avo_live_bot.py` under a running session. `__pycache__` was ruled out
+(the walk takes `.py` only) and the hash is deterministic (3 identical runs).
+**The instrument for "which commit is this bot running?" is
+`audit_code_currency`, which resolves a stamp to a COMMIT — never a hand
+comparison of two hashes computed at different times.** Verdict after the
+churn: zero BEHIND-OWN, all three live rows correctly DEFERRED behind their
+marker gate, every shadow CURRENT.
+
 ## 2026-08-27 (ut) — THE FLEET HAS BEEN RECORDING ITS OWN EXECUTION COST SINCE 9-JUL AND NOTHING COULD EVER READ IT: `coin-quality` SHIPPED WITHOUT `updated`/`ttl_sec`, SO THE BUS CONTRACT JUDGED IT STALE FOREVER
 
 **[RENUMBERED (us) -> (ut), 27-Aug.** A concurrent session landed a different
