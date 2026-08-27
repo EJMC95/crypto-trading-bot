@@ -92,7 +92,7 @@ import funding_basis
 import fleet_bus as _bus            # [(su)] the ONE owner of the basket math
 import fleet_tuning as tuning
 from lighter_family_bot import (
-    STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE,
+    STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE, carrier_universe,
     regime_inputs_for, btc_regime_up, btc_tide_up, noncrypto_regimes,
     noncrypto_entry_blocked, brain_entry_gated, brain_clip_for,
     ledger_reason, ledger_tag,
@@ -1061,8 +1061,12 @@ def main(_ctx=None, once=False):
             f"({env_prefix(BOT)}_MAX_NOTIONAL) — refusing to start.")
 
     cache = CandleCache(venue)
-    universe = [c for c in (list(COINS) + list(NONCRYPTO_UNIVERSE))
-                if venue.supports(c)]
+    # [28-Aug (vd)] ONE OWNER with the shadow runner. Both hosts built this
+    # list inline, so widening one would have left the other narrow — and for
+    # 👩 mum those two are the REAL-MONEY arm and the SHADOW twin that is
+    # supposed to control for it. A second copy of a universe rule is a second
+    # rule, and here it would have silently un-paired an arm from its control.
+    universe = [c for c in carrier_universe(S) if venue.supports(c)]
     has_noncrypto = any(c in NONCRYPTO_EFFECTIVE for c in universe)
 
     _PRINT(f"[avo-live] {iso(now())} BOOT | {S.style} tf={S.tf} "

@@ -162,11 +162,46 @@ UNIVERSE = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX",
 # session filter, no frozen-bar hazard. Coverage graduates with the tape:
 # at ship NVDA/TSLA/XAU/XAG clear the 203-bar EMA floor; MSTR ~1wk out;
 # SPY/QQQ ~3-4wk; XCU/WTI/IWM later — each NAMED short-history until then.
+#: [2026-08-28 (vd)] WIDENED 10 -> 29. **Eamon: *"allow her to see non crypto
+#: also just in case"*.** Every liquid non-crypto market on the venue
+#: (>= $0.5M/day) now gets a per-asset grade, so a family book can SEE it.
+#:
+#: **THE GATE, NOT THIS TABLE, IS WHAT ADMITS A TRADE — and that is the whole
+#: safety of this widening.** `lighter_family_bot` fail-CLOSES on an ungraded
+#: book: a name here that has not yet earned a grade admits NOTHING, and a
+#: graded one admits longs only inside its OWN long-window. Measured 27-Aug,
+#: three of the original ten still read `short-history` (IWM 177, WTI 190,
+#: XCU 199 bars against the 203-bar EMA200 warmup), so most of the names added
+#: here will be ungraded for weeks and are INERT until they are not.
+#:
+#: DECLARED ADVERSE, because the number exists and points the other way:
+#: 👩 mum's rule on the 21 liquid non-crypto markets she could not previously
+#: see reads **-0.179%/trade, by-coin t=-1.81, -0.241% against a matched
+#: random-entry null, both halves negative** — measured UNGATED, i.e. without
+#: the per-asset long-window this table feeds. So the honest statement is:
+#: ungated it loses, the gate is the thing that could make it not lose, and
+#: the gated expectancy is UNMEASURED. Shipped on Eamon's explicit
+#: reaffirmation after that number was put in front of him (I19: the price is
+#: stated, not hidden). Revert: trim this dict back to the ten above — and the
+#: `NONCRYPTO_SYMS` drift guard in `lighter_family_bot` will fail the build
+#: until its twin is trimmed to match, which is exactly what it is for.
 NONCRYPTO = {
+    # the validated ten
     "SPY": "equity-index", "QQQ": "equity-index", "IWM": "equity-index",
     "NVDA": "equity-single", "TSLA": "equity-single", "MSTR": "equity-single",
     "WTI": "commodity", "XAU": "commodity", "XAG": "commodity",
     "XCU": "commodity",
+    # [(vd)] the liquid remainder — inert until each earns a grade
+    "US100": "equity-index", "US500": "equity-index",
+    "SOXL": "equity-index",
+    "SNDK": "equity-single", "MU": "equity-single", "INTC": "equity-single",
+    "NBIS": "equity-single", "DRAM": "equity-single", "CBRS": "equity-single",
+    "MRNA": "equity-single", "CRCL": "equity-single", "COIN": "equity-single",
+    "META": "equity-single", "AAPL": "equity-single", "MRVL": "equity-single",
+    "STRC": "equity-single",
+    "SKHYNIXUSD": "equity-single", "SAMSUNGUSD": "equity-single",
+    "SMIC": "equity-single",
+    "BRENTOIL": "commodity",
 }
 
 ADX_TREND = 17          # >= trending (matches RegimeSwitchV2 after Jul-6 cut)
@@ -788,7 +823,15 @@ def _selftest():
     assert _fleet_mixed == _fleet_alone, (_fleet_mixed, _fleet_alone)
     assert _fleet_mixed["read"] == "risk-on uptrend", _fleet_mixed
     assert _nc_sum["n_short"] == len(NONCRYPTO) and _nc_sum["n_published"] == len(NONCRYPTO)
-    assert _nc_sum["by_class"]["equity-index"] == ["IWM", "QQQ", "SPY"], _nc_sum
+    # [28-Aug (vd)] DERIVED from NONCRYPTO, not retyped. This line pinned
+    # ["IWM","QQQ","SPY"] and so reddened the moment the table widened — while
+    # the property it is actually asserting is that `by_class` BUCKETS the
+    # table correctly, which is true at any size. A retyped constant is a
+    # constant that drifts, and here it drifted the same day.
+    assert _nc_sum["by_class"]["equity-index"] == sorted(
+        s for s, k in NONCRYPTO.items() if k == "equity-index"), _nc_sum
+    assert sum(len(v) for v in _nc_sum["by_class"].values()) == len(NONCRYPTO), \
+        "every classified book must land in exactly one bucket"
     assert "never blended" in _nc_sum["note"]
     # empty non-crypto (all young at ship) summarizes clean
     _f2, _nc2 = summarize(dict(_crypto_up))

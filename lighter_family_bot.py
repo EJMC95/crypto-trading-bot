@@ -85,7 +85,126 @@ COINS = os.environ.get(
 NONCRYPTO_UNIVERSE = [c.strip() for c in os.environ.get(
     "FAMILY_NONCRYPTO_COINS",
     "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XAG,XCU").split(",") if c.strip()]
+
+#: [28-Aug (vd)] PER-CARRIER non-crypto EXTENSION — `"bot:SYM,SYM;bot:SYM"`.
+#: Eamon: *"allow her to see non crypto also just in case"*.
+#:
+#: **PER-CARRIER ON PURPOSE, and this was a real catch.** The first cut widened
+#: the shared `NONCRYPTO_UNIVERSE` and silently took 🙏 avo's universe from 25
+#: to 45 — a LIVE book, currently the fleet's only profitable real-money arm
+#: (+$24.17), for which none of this was measured. A supply fix for one book
+#: must not re-aim two others.
+#:
+#: SEEING IS NOT TRADING. Every name here is ungraded by the oracle until it
+#: has 203 daily bars, and `regime_inputs_for` fail-CLOSES on an ungraded book,
+#: so this widens the SCAN and admits nothing until each earns a per-asset
+#: grade. Measured UNGATED, the added set is NEGATIVE for her rule
+#: (-0.179%/trade, by-coin t=-1.81, -0.241% vs a matched random null, both
+#: halves negative) — the full write-up sits on `regime_oracle.NONCRYPTO`.
+#: The GATED expectancy is unmeasured, and the gate is the only reason this is
+#: not simply a losing widening. Revert: FAMILY_NONCRYPTO_EXTRA="".
+FAMILY_NONCRYPTO_EXTRA = os.environ.get(
+    "FAMILY_NONCRYPTO_EXTRA",
+    "freqtrade-mum:US100,US500,SOXL,SNDK,MU,INTC,NBIS,DRAM,CBRS,MRNA,"
+    "CRCL,COIN,META,AAPL,MRVL,STRC,SKHYNIXUSD,SAMSUNGUSD,SMIC,BRENTOIL")
+
+
+def noncrypto_extra(bot, raw=None):
+    """Extra non-crypto symbols for `bot`, or [] when unset."""
+    raw = FAMILY_NONCRYPTO_EXTRA if raw is None else raw
+    for group in str(raw or "").split(";"):
+        name, _, syms = group.partition(":")
+        if name.strip() == bot:
+            return [c.strip() for c in syms.split(",") if c.strip()]
+    return []
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
+
+#: [2026-08-28 (vd)] PER-CARRIER CRYPTO WIDTH. `"bot:N,bot:N"`; absent = the
+#: hand-typed `COINS`, exactly as before.
+#:
+#: **Eamon, 28-Aug: *"fix mums supply"* / *"she definitely needs to scan all
+#: markets"* / *"increase to optimum slots immediately and universe"*.**
+#: 👩 mum went live 25-Aug and took ZERO trades in three days. Her census named
+#: the term (`rsi_bar 32.0 · rsi_min 36.3 · no_signal 23`) — the cell was simply
+#: not occurring on 13 crypto majors.
+#:
+#: MEASURED, 180d of her own rule and her own bracket, replayed at her REAL cap
+#: (one position per coin, sequential, LAG-1). Two dials, and the fleet had been
+#: turning the wrong one:
+#:     universe 13, slots 4   (as shipped)   t=1.14   1.58 trades/day
+#:     universe 40, slots 4                  t=1.18   3.51/day   <- width alone: NOTHING
+#:     universe 13, slots 12                 t=2.31   2.23/day
+#:     universe 40, slots 12                 t=3.20   6.38/day   <- both
+#: **The CAP was the binding constraint, not the market count** — at 4 slots she
+#: refused 367 of 651 signals on her own coins. Width is inert until the slots
+#: exist, which is why these two numbers ship together and neither alone.
+#:
+#: AND IT SURVIVES THE TEST THAT KILLED THE PREVIOUS ATTEMPT. Resampling WHICH
+#: coins are graded, rule and slots held fixed, 24 draws: at 4 slots only
+#: **2 of 24** reach t=2.0 (median 0.94); at 12 slots **24 of 24** do (median
+#: 2.88) and the volume-ranked cell (3.20) sits INSIDE that spread — so the
+#: universe choice is not carrying the result, the slots are, and slots are not
+#: a selected quantity. A `(uz)`-style widening at a FIXED cap was refused the
+#: day before on exactly this test; the cap is why it failed.
+#:
+#: WHY 40 AND NOT "ALL MARKETS". At 12 slots, 40 beats 25 (t=2.13) and beats
+#: 60 (t=2.77). Wider only wins once the cap is gone — at 30 slots the ranking
+#: inverts and 60 leads — but 30 slots is UNREACHABLE: `fleet_risk.LONG_BUDGET`
+#: is 20 fleet-wide with 9 already held, so a 30-slot book would starve every
+#: other one. 12 is the interior optimum inside the fleet's own rail.
+#:
+#: NON-CRYPTO IS DELIBERATELY NOT WIDENED. Her rule on the 21 liquid non-crypto
+#: markets she cannot see reads **-0.179%/trade, by-coin t=-1.81, -0.241% vs a
+#: matched random-entry null, both halves negative.** "Scan all markets" is
+#: measured POSITIVE on crypto and measured NEGATIVE here, so the two halves of
+#: that instruction are answered differently and the reason is a number (I19).
+FAMILY_CRYPTO_N = os.environ.get("FAMILY_CRYPTO_N", "freqtrade-mum:40")
+
+
+def crypto_width(bot, raw=None):
+    """Crypto width for `bot` from FAMILY_CRYPTO_N, or 0 when unset."""
+    raw = FAMILY_CRYPTO_N if raw is None else raw
+    for part in str(raw or "").split(","):
+        name, _, n = part.partition(":")
+        if name.strip() == bot:
+            try:
+                return max(0, int(n.strip()))
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def carrier_universe(s, raw=None):
+    """The symbols carrier `s` scans. **ONE OWNER, BOTH HOSTS.**
+
+    The shadow runner and the live variant host each built
+    `list(COINS) + NONCRYPTO_UNIVERSE` inline, so widening one would have
+    silently left the other narrow — and for 👩 mum those are the SHADOW twin
+    and the REAL-MONEY arm, i.e. the control and the book it controls for.
+    A second copy of a universe rule is a second rule.
+
+    FAIL-SAFE, in the only direction that is safe for a universe: any doubt
+    about the scout returns the CONFIGURED list. This can only ever ADD names
+    to `COINS`, never drop one — a dark organ must not shrink a book's
+    universe (the `scout_universe` contract, stated in its own docstring), and
+    the 15 majors are the set every prior measurement of this rule was made on.
+    """
+    if s.coins:
+        return list(s.coins)
+    n = crypto_width(s.bot, raw)
+    crypto = list(COINS)
+    if n > len(COINS):
+        try:
+            import fleet_bus
+            wide = [c for c in (fleet_bus.scout_universe() or [])
+                    if fleet_bus.is_crypto(c)][:n]
+        except Exception:                                   # noqa: BLE001
+            wide = []
+        # A short or dark read is not a reason to narrow: only extend.
+        if len(wide) >= len(COINS):
+            crypto = list(dict.fromkeys(crypto + wide))
+    nc = list(NONCRYPTO_UNIVERSE) + noncrypto_extra(s.bot)
+    return crypto + list(dict.fromkeys(nc))
 
 
 # ---------------------------------------------------------------------------
@@ -1190,7 +1309,24 @@ STRATEGIES = [
     # -15% -> -4% is a stop sized for a 12h hold instead of a month-long one.
     # TrendMomo (v1's class) is KEPT above: the replay/study tools import it
     # and her v1 ledger is history, not archaeology.
-    OversoldRebound("freqtrade-mum", tf="1h", stoploss=-0.04, max_open=4,
+    # [28-Aug (vd)] 4 -> 12 SLOTS. Eamon: *"increase to optimum slots
+    # immediately and universe"*. THE CAP WAS THE BINDING CONSTRAINT, not the
+    # market count: replayed on 180d of her own rule at her own bracket she
+    # refused 367 of 651 signals on her OWN 13 coins, and `t` goes 1.14 -> 2.31
+    # at 12 slots on that same list. Verified the way the previous widening was
+    # killed — resampling WHICH coins are graded, rule and slots fixed, 24
+    # draws: at 4 slots 2/24 reach t=2.0, at 12 slots 24/24, and the
+    # volume-ranked cell sits INSIDE that spread. The slots carry it, and slots
+    # are not a selected quantity.
+    # Like (sr) on 🙏 avo this literal is LIVE CLIP GEOMETRY
+    # (clip = equity * gross_x / max_open), so GROSS IS UNCHANGED at 10x:
+    # $300 x 10 / 12 = $250 a slot against $750 at 4, all-slots-stop stays
+    # 12 x $250 x 4% = $120, and the $3,150 notional cap still funds all 12.
+    # It buys TRADES, not dollars — which is exactly what a live book with ZERO
+    # closes needs. NOT 30 (the unconstrained optimum, t=4.06): fleet_risk's
+    # LONG_BUDGET is 20 fleet-wide with 9 already held, so a 30-slot book would
+    # starve every other one.
+    OversoldRebound("freqtrade-mum", tf="1h", stoploss=-0.04, max_open=12,
                     style="oversold-1h"),
     MomoBreakout("freqtrade-dad", tf="4h", stoploss=-0.12, max_open=4,
                  style="momo-breakout-4h"),
@@ -1876,8 +2012,19 @@ def btc_tide_up(cache):
 # INERT TODAY: no family universe lists a non-crypto symbol — the universe
 # widening (step 3) stays a review decision (evidence:
 # REGIME_GATE_PER_ASSET_2026-07-30.md; re-runs at SPY/QQQ graduation).
+#: [28-Aug (vd)] WIDENED 10 -> 29 in lockstep with `regime_oracle.NONCRYPTO`.
+#: The two sets are drift-guarded against each other by this module's own
+#: selftest, so they move together or the build goes red — see the rationale
+#: and the DECLARED ADVERSE number on the oracle's copy, which is the one
+#: place it is written down.
+#: The "INERT TODAY" line above is now FALSE for 👩 mum and corrected here per
+#: I12: her universe carries non-crypto, so the per-asset gate is live surface
+#: on a real-money book rather than a dormant branch.
 NONCRYPTO_SYMS = frozenset({
-    "SPY", "QQQ", "IWM", "NVDA", "TSLA", "MSTR", "WTI", "XAU", "XAG", "XCU"})
+    "SPY", "QQQ", "IWM", "NVDA", "TSLA", "MSTR", "WTI", "XAU", "XAG", "XCU",
+    "US100", "US500", "SOXL", "SNDK", "MU", "INTC", "NBIS", "DRAM", "CBRS",
+    "MRNA", "CRCL", "COIN", "META", "AAPL", "MRVL", "STRC",
+    "SKHYNIXUSD", "SAMSUNGUSD", "SMIC", "BRENTOIL"})
 
 # [2026-07-30 (fd) FAIL-CLOSED CLASSIFICATION] The gate keys on the KNOWN set
 # above, but the UNIVERSE is env-driven (FAMILY_NONCRYPTO_COINS). Those two
@@ -2019,7 +2166,7 @@ def main():
             s.max_open = _mo_overrides[s.bot]
         # [2026-07-30 STEP 3] the four family books (no s.coins override)
         # carry the non-crypto universe; spot ports pin their own lists
-        src = list(s.coins) if s.coins else list(COINS) + NONCRYPTO_UNIVERSE
+        src = carrier_universe(s)
         listed = [c for c in src if venue.supports(c)]
         s.skipped = [c for c in src if c not in listed]
         books.append(Book(s, venue, listed))

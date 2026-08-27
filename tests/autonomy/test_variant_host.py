@@ -167,7 +167,11 @@ def test_mum_resolves_to_her_own_identity():
         import lighter_family_bot as fam
         assert m.S is next(s for s in fam.STRATEGIES
                            if s.bot == "freqtrade-mum")
-        assert m.S.tf == "1h" and m.S.max_open == 4
+        # [28-Aug (vd)] 4 -> 12: the cap was her binding supply constraint
+        # (367 of 651 signals refused on her own coins; t 1.14 -> 2.31 at 12
+        # on the SAME list, 24/24 resampled draws clearing t=2.0). Gross is
+        # unchanged — slots slice `equity * gross_x`, they do not add to it.
+        assert m.S.tf == "1h" and m.S.max_open == 12
         assert abs(float(m.S.stoploss) + 0.04) < 1e-9
         assert m.S.style == "oversold-1h"
 
@@ -188,8 +192,14 @@ def test_5x_on_mum_is_a_20pct_all_slots_stop_and_the_bar_allows_3_75():
         assert m.gross_x() == 5.0
         assert abs(m.gross_x() * abs(float(m.S.stoploss)) - 0.20) < 1e-9
         assert abs(m.vol_target_gross_x(1.0) - 3.75) < 1e-6
-        # the clip is the balance split across HER four slots
-        assert abs(m.clip_usd(500.0) - 500.0 * 5.0 / 4.0) < 1e-9
+        # The clip is the balance split across HER OWN slots — DERIVED, never
+        # retyped. [28-Aug (vd)] this line hand-typed `/ 4.0` while the
+        # docstring two lines up promised "nothing hand-typed for her", so a
+        # measured slot change reddened a test that was not about slots. Note
+        # what does NOT move: the all-slots-stop assertion above is
+        # `gross_x * |stop|` and is INDEPENDENT of the slot count, which is
+        # exactly why adding slots costs no book-level risk.
+        assert abs(m.clip_usd(500.0) - 500.0 * 5.0 / m.S.max_open) < 1e-9
 
 
 def test_georgia_cannot_boot_without_her_own_venue_env():

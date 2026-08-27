@@ -1,3 +1,112 @@
+## 2026-08-28 (vd) — 👩 MUM'S SUPPLY: THE CAP WAS THE BINDING CONSTRAINT, NOT THE MARKET COUNT — 4 → 12 SLOTS AND 13 → 40 CRYPTO, SHIPPED TOGETHER BECAUSE NEITHER WORKS ALONE
+
+**Eamon, 28-Aug: *"fix mums supply"* → *"she definitely needs to scan all
+markets"* → *"increase to optimum slots immediately and universe"* → *"allow
+her to see non crypto also just in case"*.** 👩 mum went live 25-Aug on a fresh
+sub-account and took **ZERO trades in three days**. Her own census named the
+term — `rsi_bar 32.0 · rsi_min 36.3 · verdicts {no_signal: 23}` — the lowest
+RSI across all 23 of her coins was 36.3 against a bar of 32. Not refusing
+fills; the cell was not occurring.
+
+### THE MEASUREMENT, AND THE FLEET HAD BEEN TURNING THE WRONG DIAL
+
+180d of her own rule, her own bracket, replayed at her REAL cap (one position
+per coin, sequential, LAG-1):
+
+| universe | slots | trades/day | mean%/trade | t |
+|---|---|---|---|---|
+| 13 | **4** (as shipped) | 1.58 | +0.133 | 1.14 |
+| **40** | **4** | 3.51 | +0.102 | **1.18** |
+| 13 | **12** | 2.23 | +0.222 | **2.31** |
+| 40 | 12 | 6.38 | +0.202 | **3.20** |
+
+**Width alone does NOTHING (1.14 → 1.18).** At 4 slots she refused **367 of
+651** signals on her own coins. The cap was the constraint the whole time, and
+width is inert until the slots exist — which is why these two numbers ship
+together and neither ships alone.
+
+**AND IT SURVIVES THE TEST THAT KILLED `(uz)` THE DAY BEFORE.** Resampling
+WHICH coins are graded, rule and slots held FIXED, 24 draws each:
+
+| slots | draws reaching t≥2.0 | median t | volume-ranked cell |
+|---|---|---|---|
+| 4 | **2 / 24** | 0.94 | 1.18 |
+| 8 | 15 / 24 | 2.21 | 2.69 |
+| 12 | **24 / 24** | 2.88 | 3.20 |
+| 16 | **24 / 24** | 3.40 | 3.50 |
+
+The ranked cell sits INSIDE the spread, so **the universe choice is not
+carrying it — the slots are, and slots are not a selected quantity.** `(uz)`
+failed because it varied the universe at a FIXED cap; the cap is why it failed.
+
+**WHY 12 AND NOT 30.** The unconstrained optimum is ~30 slots (t=4.06, and
+30 vs 40 are byte-identical, so it is a saturation point rather than a grid
+edge). It is UNREACHABLE: `fleet_risk.LONG_BUDGET` is **20 fleet-wide with 9
+already held**, so a 30-slot book would starve every other one. 12 is the
+interior optimum inside the fleet's own rail. At 12 slots, 40 beats 25
+(t=2.13) and beats 60 (t=2.77) — "all markets" only wins once the cap is gone.
+
+**GROSS IS UNCHANGED, WHICH IS WHY THIS IS SHIPPABLE ON REAL MONEY.**
+`clip = equity × gross_x / max_open`, so slots SLICE a fixed budget: $300 × 10
+/ 12 = **$250 a slot** against $750 at 4, all-slots-stop stays **12 × $250 ×
+4% = $120**, and the $3,150 notional cap still funds all 12. **It buys TRADES,
+not dollars** — exactly what a live book with zero closes needs.
+
+### THE NON-CRYPTO HALF — SHIPPED ON REAFFIRMATION, WITH ITS PRICE STATED
+
+Her rule on the **21 liquid non-crypto markets she could not see** measures
+**−0.179%/trade, by-coin t=−1.81, −0.241% against a matched random-entry null,
+both halves negative.** That number was put in front of Eamon and the
+instruction was reaffirmed (*"just in case"*), so it ships — I19 requires the
+price stated, not the change refused.
+
+**WHAT MAKES IT SAFE IS THAT SEEING IS NOT TRADING.** Every added name is
+ungraded by the oracle until it has 203 daily bars, and `regime_inputs_for`
+fail-CLOSES on an ungraded book: it widens the SCAN and admits NOTHING until
+each name earns a per-asset grade, then only inside that name's own
+long-window. Three of the ORIGINAL ten still read `short-history` (IWM 177,
+WTI 190, XCU 199 bars), so most of the added set is inert for weeks. **The
+measured number is UNGATED; the gated expectancy is unmeasured, and the gate
+is the only reason this is not simply a losing widening.** Stated plainly so
+nobody later reads the widening as evidence.
+
+### THREE DEFECTS CAUGHT WHILE BUILDING IT
+
+* **A SECOND COPY OF THE UNIVERSE RULE.** The shadow runner and the live
+  variant host each built `COINS + NONCRYPTO_UNIVERSE` inline. Widening one
+  would have left the other narrow — and for mum those two are the REAL-MONEY
+  arm and the SHADOW TWIN that controls for it, so the arms would have
+  silently stopped being comparable. `carrier_universe()` is now the one owner
+  and an AST test pins both hosts to it.
+* **BLAST RADIUS — caught by reading the output, not the diff.** The first cut
+  widened the SHARED `NONCRYPTO_UNIVERSE` and took 🙏 avo's universe from 25 to
+  45 — **a live book, the fleet's only profitable real-money arm (+$24.17)**,
+  for which none of this was measured. Both widenings are per-carrier now
+  (`FAMILY_CRYPTO_N`, `FAMILY_NONCRYPTO_EXTRA`) and a regression arm pins that
+  avo and georgia are untouched at 5 slots / 25 names.
+* **THREE RETYPED CONSTANTS**, all reddened by a legitimate change:
+  `test_variant_host` hand-typed `max_open == 4` and `500.0 * 5.0 / 4.0` — the
+  latter two lines below a docstring promising *"nothing hand-typed for
+  her"* — and `regime_oracle`'s selftest pinned
+  `by_class["equity-index"] == ["IWM","QQQ","SPY"]`. All three now DERIVE. The
+  all-slots-stop assertion deliberately does not move: it is `gross_x × |stop|`
+  and is independent of slot count, which is the arithmetic proof that adding
+  slots costs no book-level risk.
+* **AND MY OWN TEST FAILED ON ITS OWN DOCSTRING** — the one-owner arm first
+  asserted the substring `list(COINS) + NONCRYPTO_UNIVERSE` was absent, and
+  the prose explaining the old code contains it. That is the
+  *"a page-wide substring scan is not a structural claim"* defect, for at
+  least the fourth recorded time. It is an AST walk for the BinOp now, scoped
+  to exclude the one function allowed to build it.
+
+### PINNED
+
+`tests/autonomy/test_mum_supply.py` — 26 tests: the slot count, the
+gross-invariance arithmetic, one-owner-by-AST, the per-carrier scoping
+regression arm, five fail-safe cases where a dark/short/junk/raising scout must
+never SHRINK the universe below `COINS`, and the classification-integrity pair
+(`NONCRYPTO_SYMS` ≡ `regime_oracle.NONCRYPTO`, and every added name known to
+the classifier so none can be handed BTC's gate).
 ## 2026-08-27 (vn) — THE LOCKOUT THAT COULD NOT BE TUNED, THE GUARD THAT REFUSED THE HONEST ANSWER, AND A SLOT CAP THAT CLEARED ITS REPLAY
 
 Four operator calls in one pass — **Eamon: *"take it to 8"* / *"the guard
