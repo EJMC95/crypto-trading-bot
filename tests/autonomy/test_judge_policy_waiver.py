@@ -311,6 +311,15 @@ def test_every_ledger_key_the_census_reads_is_one_the_publisher_emits():
 
     (mutation: `close_ts` -> `closed_at` in `_close_rank` => this reddens)
     """
+    # THE ROSTER MUST NOT BE EMPTIABLE. A `for` over an empty tuple passes in
+    # silence, so shrinking `LEDGER_ROW_READERS` would retire this guard
+    # without reddening anything — the "a check that inspects nothing reports
+    # clean" class, caught here by mutation on this very test.
+    covered = {name for name, _ in LEDGER_ROW_READERS}
+    assert {"_close_rank", "_latest_policy_stamp"} <= covered, sorted(covered)
+    for name, _ in LEDGER_ROW_READERS:
+        assert callable(getattr(ej, name, None)), (name, "no such function")
+
     emitted = _publisher_row_keys()
     # positive control: the extractor must actually find a real key set, or
     # an empty `emitted` would make every subset check below vacuously true
