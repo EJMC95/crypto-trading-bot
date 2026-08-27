@@ -269,6 +269,8 @@ def main():
 
     S = [x for x in fb.STRATEGIES if x.bot == "freqtrade-georgia"][0]
     MIN = S.min_bars
+    SPAN = fb.CandleCache.SPAN_BARS["15m"]      # 300 — production's own window
+    print(f"signal window: {SPAN} bars (the live CandleCache span, verbatim)")
 
     # ---- evaluate the BOT'S OWN signal on every bar -----------------------
     ep = {k: [] for k in SLEEVES}          # (sym, i)
@@ -281,15 +283,21 @@ def main():
         v = [x[5] for x in b]
         zones[s] = {}
         for i in range(MIN, len(b) - max(HORIZONS) - 2):
-            sub = {"c": c[:i + 1], "h": h[:i + 1], "l": lo[:i + 1],
-                   "v": v[:i + 1]}
+            # [FIDELITY, not an optimisation] The live bot's CandleCache only
+            # ever holds SPAN_BARS["15m"] = 300 bars, so the rule never sees
+            # more than that. Feeding it a growing full-history prefix would
+            # give the replay MORE history than production has — the opposite
+            # of faithful — and it is also O(n^2). Window = the bot's own span.
+            a = max(0, i + 1 - SPAN)
+            sub = {"c": c[a:i + 1], "h": h[a:i + 1], "l": lo[a:i + 1],
+                   "v": v[a:i + 1]}
             sig = S.signals(sub, {"btc_regime_up": regime_at(b[i][0])})
             if not sig:
                 prev[s] = None
                 continue
             # sell_zone for the range_top exit: recompute from the same window
-            rh = fb.roll_max(h[:i + 1], 14, i - 1)
-            rl = fb.roll_min(lo[:i + 1], 14, i - 1)
+            rh = fb.roll_max(h[a:i + 1], 14, i - a - 1)
+            rl = fb.roll_min(lo[a:i + 1], 14, i - a - 1)
             if rh is not None and rl is not None:
                 band = max(rh - rl, 1e-9)
                 zones[s][i] = rl + 0.78 * band       # rng_hi - 0.22*band
