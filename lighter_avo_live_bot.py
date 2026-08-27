@@ -188,6 +188,45 @@ def _env(name, default):
 S = next(s for s in STRATEGIES if s.bot == BOT)
 
 LOOP_SECONDS = int(_env("LOOP_SECONDS", "300"))
+
+#: [2026-08-27 (ur)] TELEMETRY CADENCE — how often the ROW is refreshed from
+#: the venue BETWEEN trading passes. **Eamon, 27-Aug: "Make sure the pnl
+#: dashboard is actually reflecting the live positions, by the millisecond."**
+#:
+#: THE MEASUREMENT THAT MOTIVATED IT. The dashboard was never wrong — it was
+#: BEHIND, and it said so. End-to-end: the bot polls the venue and publishes
+#: every `LOOP_SECONDS` (300), `/pnl.json` holds no cache, and the page carries
+#: `meta refresh 30`. Worst case ~330s, median ~165s; measured across 26
+#: independent feed reads on 27-Aug the row age ran 3s -> 287s, uniform on
+#: [0, 300] — exactly a 300s loop. So a position closed at 11:25 could still be
+#: on the card at 11:29, which is what a live venue view disagreeing with the
+#: dashboard actually looks like.
+#:
+#: WHY THIS IS NOT `LOOP_SECONDS`. Stops, ROI and the trail are evaluated ONCE
+#: PER TRADING PASS, so shortening the trading loop tightens real exit
+#: enforcement on real money — a behaviour change with a measurable price
+#: (georgia already records the quantity it would cut, `stop_overshoot.p90_bps`
+#: = 26.4) that owes an I19 measurement and would likely reset the (hm) era
+#: clock on three live books. **This changes NO trading decision**: the trading
+#: pass still runs exactly every `LOOP_SECONDS`; the loop merely stops sleeping
+#: through the gap in one block and re-publishes what the venue says instead.
+#: No entry, exit, sizing, gate, halt, order or ledger path is reachable from
+#: it, and the MTM series that feeds the drawdown bar is explicitly excluded
+#: (see `snapshot=` in `_publish_row`).
+#:
+#: THE COST IS REST, AND IT IS PRICED. A refresh costs `n_positions + 1` calls
+#: (one order-book mid per held coin for the risk marks, plus one account
+#: read). At 60s across the live trio that is ~11 calls/min of NEW load against
+#: ~9/min today — roughly 2x. At 15s it would have been ~44/min, ~5x, and a
+#: rate-limited account read on a real-money book can stop an EXIT, which is a
+#: far worse failure than a stale card. 60s buys ~5x the freshness for ~2x the
+#: load; that is the trade that was taken.
+#:
+#: FLOORED AT 20s so a typo cannot hammer a real-money venue path, and clamped
+#: to `LOOP_SECONDS` so it can never publish more often than it sleeps. Set it
+#: to `LOOP_SECONDS` (or higher) to disable the refresh entirely.
+TELEMETRY_SECONDS = max(20, min(LOOP_SECONDS,
+                                int(_env("TELEMETRY_SECONDS", "60"))))
 DAILY_LOSS_LIMIT = float(_env("DAILY_LOSS", "0.10"))
 DELIST_GIVEUP_H = float(_env("DELIST_GIVEUP_H", "6"))
 #: Below this clip the book is dust — skip entries rather than spray sub-$5
@@ -1033,7 +1072,7 @@ def main(_ctx=None, once=False):
                 return None
 
         def _publish_row(eq, base_eq, cap_adj, live_pos, st,
-                         status="online", extra_extra=None):
+                         status="online", extra_extra=None, snapshot=True):
             # [(td)] manual trades are held OUT of the bot's P&L — the row
             # grades the BOT's record; equity stays venue truth everywhere
             # else (leverage, margin, drawdown arithmetic all unchanged).
@@ -1309,10 +1348,75 @@ def main(_ctx=None, once=False):
                     extra=payload)
             except Exception:  # noqa: BLE001
                 pass
-            try:
-                store.snapshot_equity(BOT_ROW, eq, open_trades=len(live_pos))
-            except Exception:  # noqa: BLE001
-                pass
+            # [(ur)] THE MTM SERIES STAYS ON THE TRADING CADENCE. This append
+            # feeds `<bot>:equity`, which `golive_readiness.apply_mtm` reads for
+            # the 15% max-drawdown BAR (I9) — a real-money gate. The telemetry
+            # refresh below re-publishes the ROW several times per trading pass,
+            # and letting it append here would silently change that gate's
+            # SAMPLING BASIS mid-window (300s spacing before, 60s after) on a
+            # series whose whole job is to find the deepest trough. A denser
+            # series can only report an equal-or-worse maxDD, so this would have
+            # tightened a live gate as a side effect of a display change — the
+            # "a bar computed on the wrong sample means nothing" class.
+            # Telemetry publishes pass snapshot=False; nothing else does.
+            if snapshot:
+                try:
+                    store.snapshot_equity(BOT_ROW, eq, open_trades=len(live_pos))
+                except Exception:  # noqa: BLE001
+                    pass
+
+        def _telemetry_sleep(t0, eq, base_eq, cap_adj, live_pos, st):
+            """Sleep out the rest of the trading cycle, re-publishing the ROW
+            from the venue every `TELEMETRY_SECONDS`. PUBLISHES ONLY.
+
+            The trading pass still runs exactly every `LOOP_SECONDS` — this
+            replaces one long `sleep` with several short ones and a venue READ
+            in between, so the dashboard stops being up to a full trading cycle
+            behind the book. Worst-case row age goes ~330s -> ~70s at the
+            shipped 60s cadence (plus the page's own 10s refresh).
+
+            WHAT IT CANNOT REACH, which is the whole safety argument:
+              * no entry, exit, stop, trail, ROI or sizing evaluation — those
+                live in the trading pass and are not called from here;
+              * no order path, no `_flatten_all`, no ledger write;
+              * no equity re-read, so `EquityGuard`'s capital-move detection
+                and its corroboration cadence are untouched (the (sr) deposit
+                path rebases on CONSECUTIVE reads — changing how often it is
+                asked is a real-money accounting change, and this does not);
+              * no `snapshot_equity`, so the MTM series behind the drawdown bar
+                keeps its 300s sampling basis (`snapshot=False`);
+              * no state persistence — `_persist` / `_persist_day` are the
+                trading pass's.
+            It re-reads the venue's OWN account payload, which is exactly the
+            point: a position closed by hand, or liquidated, shows up here
+            without waiting for the next trading pass.
+
+            Never raises. A telemetry read must not be able to stop a live
+            trading loop — the same rule `_margin_block` is written under."""
+            deadline = t0 + LOOP_SECONDS
+            while True:
+                remain = deadline - time.time()
+                if remain <= 0:
+                    return
+                time.sleep(max(1.0, min(TELEMETRY_SECONDS, remain)))
+                # Do not spend a REST call when the trading pass is already
+                # due: it is about to publish a strictly better row, and the
+                # account read it needs must not queue behind ours.
+                if time.time() >= deadline - 1.0:
+                    return
+                try:
+                    _publish_row(
+                        eq, base_eq, cap_adj, live_pos, st, snapshot=False,
+                        extra_extra={
+                            # Present ONLY on a refresh: its absence marks the
+                            # authoritative trading pass. A reader that cares
+                            # which one it is asks for the key; one that just
+                            # wants the positions does not have to.
+                            "telemetry_only": True,
+                            "since_trading_pass_s": round(
+                                time.time() - t0, 1)})
+                except Exception:  # noqa: BLE001
+                    pass
 
         def _real_fill(sym, is_ask, fallback, leg, res=None):
             """Fill from the venue's own tape (price, measured, reason);
@@ -1965,7 +2069,7 @@ def main(_ctx=None, once=False):
 
         if once:
             return
-        time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
+        _telemetry_sleep(t0, equity, baseline, capital_adjust, pos, stats)
 
 
 def _supervised():
