@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-27 08:39 Sydney (22:39Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-27 16:13 Sydney (06:13Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,8 +74,37 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (40 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj))
+## Shipped today (69 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut))
 
+- `2fcb366` Register audit_bus_contract in ENFORCED_AUDITS — a guard whose scan runs nowhere is the (gk) shape (ut)
+- `82935a9` A cross-read payload without updated+ttl_sec is unconsumable by design: ratchet the class coin-quality opened (ut)
+- `b15d4b1` Record the recorded-cost unlock + correct (ur)'s cost number in place; renumbered (us) -> (ut) on a cross-branch collision (ut)
+- `8ffc68f` One owner for the coin-quality TTL: the test was recomputing the publisher's arithmetic, so halving the real TTL left it green (us)
+- `0bea667` Close the mutation survivor: map mode must drop junk entries (us)
+- `76d1bef` The fleet has recorded its own execution cost since 9-Jul and nothing could ever read it: coin-quality shipped with no updated/ttl_sec, so is_fresh judged it stale forever (us)
+- `b225109` The dashboard was never wrong, it was behind: the live row refreshes between trading passes (us)
+- `34e5909` The floor test read a bare env the module never reads (ur)
+- `a529903` The live row refreshes between trading passes: near-live positions with no trading change (ur)
+- `fe2fb56` The LUS cohort is REFUSED: the study that would have minted it reported the opposite of what it computed — a double negation swapped both side labels under a "we ran both directions" defence (ur)
+- `7d498cc` The live trio goes back to 10x: Eamon's own 22-Aug ceiling restored, arithmetic published, mum's cap un-stranded (uq)
+- `596f7a9` Renumber (ul) -> (up): fifth concurrent letter collision on this entry today
+- `e57a106` Merge remote-tracking branch 'origin/main'
+- `0d7370b` The wire goes in — and the headline that motivated it is refuted by its own pre-registration (ul)
+- `f655643` Merge remote-tracking branch 'origin/main'
+- `98948af` Renumber (uk) -> (uo): concurrent session took the letter on main
+- `7502025` Repoint the taker's slot-census citations after the fourth letter collision: (uk) -> (uo)
+- `5a82e8a` Pin what the widening DOES, not just its ceiling: a mutation round showed a silent revert to 30 left the suite green (un)
+- `35ed688` Mum's bar widens to the measured cell: RSI_MAX 30 -> 32, the isolated-sliver trap recorded (un)
+- `27051f8` The born-dark guard was vacuous: a substring the comment also carried (uk)
+- `73acead` Mum's bar at 32 is supported and my pre-registration tested the wrong object: widening a threshold merges episodes and moves the entry (un)
+- `b0019d8` A retired arm has no execution to diverge from: the Farmer's own retirement flatten was cutting all three live books' clips 25% (uk)
+- `d99966c` The guard's own test fixture made it flag itself: assemble the citation instead of writing it literally (um)
+- `bda40e0` The letter guard was reading other sessions' private worktrees: a session could be turned red by work that was not its own (um)
+- `dfe80c7` Changelog for (uk) the taker slot census; (uj) renumbered to (ul) after a concurrent session took the letter
+- `6ecdb47` The taker's slot cap is the one legal go-live accelerator and nothing counted what it refused: extra.slot_census (uk)
+- `6f04ca2` Pre-registration snapshot: mum's bar-at-32 and max-hold verdict bars, committed before any result exists (uj-followup)
+- `2256b25` Regenerate the handoff after the tuning wave (uj)
+- `4ab3f4a` The live-shadow alert could not be verified at all: the 26-Aug pass fixed the evidence section and the helper, and left the verifier on the old signature (uj)
 - `5b21a24` Four books tuned on their own ledgers, no retirements — and the card I shipped green yesterday was a time bomb (uj)
 - `a8c4929` Georgia publishes her census: one of four books whose row could not answer stuck-vs-slow (uc)
 - `f786461` Kill the stride survivor: a slice of one cannot see a stride (uc)
