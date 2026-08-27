@@ -181,6 +181,37 @@ def test_the_subject_guard_actually_fires_on_a_dead_row():
         S.CARRIED[:] = [i for i in S.CARRIED if i["id"] != "_probe"]
 
 
+def test_both_registries_are_read_even_when_todays_data_cannot_tell_them_apart():
+    """EACH TERM, ON ITS OWN. Every id in `RETIRED_LIVE_ARMS` today is ALSO in
+    `LEGACY_BOTS`, so no live row can distinguish the two terms — measured:
+    deleting the `RETIRED_LIVE_ARMS` term left the whole suite green. That is a
+    property of today's data, not of the code, and it will silently become
+    wrong the first time a live arm is retired without being pruned — which is
+    exactly the (ta) deferred-prune window this fleet has already run once.
+
+    So each term is driven against a stub. Not contrived: it asserts the
+    function reads the registry it says it reads.
+    """
+    import fleet_bus as _fb
+    import cleanup_legacy_bots as _legacy
+
+    real_arms = getattr(_fb, "RETIRED_LIVE_ARMS", {})
+    real_legacy = getattr(_legacy, "LEGACY_BOTS", ())
+    try:
+        _fb.RETIRED_LIVE_ARMS = {"_only-in-retired-live-arms": {}}
+        _legacy.LEGACY_BOTS = ["_only-in-legacy-bots"]
+        dead = S._dead_rows()
+        assert "_only-in-retired-live-arms" in dead, (
+            "the RETIRED_LIVE_ARMS term is not wired", sorted(dead))
+        assert "_only-in-legacy-bots" in dead, (
+            "the LEGACY_BOTS term is not wired", sorted(dead))
+    finally:
+        _fb.RETIRED_LIVE_ARMS = real_arms
+        _legacy.LEGACY_BOTS = real_legacy
+    # and the real registries are back
+    assert "perps-funding-lighter-lighter" in S._dead_rows()
+
+
 def test_a_row_with_no_subject_does_not_explode_the_check():
     """`subject` is OPTIONAL — several rows are about the fleet's machinery
     rather than a book. Reading it with `[...]` instead of `.get(..., ())`
