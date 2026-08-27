@@ -167,6 +167,34 @@ def test_the_oversold_threshold_is_genuinely_DEEP():
     assert s.RSI_MAX <= 32, "an entry bar above 32 is no longer 'deep oversold'"
 
 
+def test_the_widened_band_actually_admits_its_cell():
+    """[2026-08-27 (un)] The CEILING test above bounds the bar; nothing pinned
+    what widening it DOES. A mutation round proved it: reverting RSI_MAX 32 ->
+    30 left the whole suite GREEN — "the suite does not test what you changed."
+
+    So this pins the PURPOSE, not the constant: a reading inside the newly
+    admitted band [30, 32) outside an uptrend must ENTER. Reverting the bar to
+    30 makes this fail, which is what a test for a widening is for. Pinning
+    `RSI_MAX == 32` instead would be a re-typed constant that any future
+    MEASURED move has to edit anyway ((tr) moved 25 -> 30 the same way).
+
+    Fixture is mid-band (rsi ~31.0), not at the 32 edge, so an RSI
+    implementation detail cannot drift it across the boundary."""
+    s = _mum()
+    n = 300
+    decline = [100.0 - 0.5755 * i + (0.7 if i % 2 else -0.7) for i in range(n)]
+    bars = {"c": decline, "h": [c * 1.004 for c in decline],
+            "l": [c * 0.996 for c in decline], "v": [10.0] * n,
+            "t": list(range(n))}
+    sig = s.signals(bars, {})
+    assert sig is not None
+    assert sig["uptrend"] is False, "fixture must be outside an uptrend"
+    assert 30.0 <= sig["rsi"] < 32.0, \
+        f"fixture must sit in the NEWLY ADMITTED band, got {sig['rsi']:.3f}"
+    assert sig["enter"] == "oversold-rebound", \
+        "the widened bar must admit its own measured cell"
+
+
 def test_no_exit_signal_the_bracket_is_the_rule():
     """Douglas's discipline: predefined at entry, never widened. v1's only exit
     was a signal, which is why it never came."""
