@@ -1,3 +1,173 @@
+## 2026-08-27 (ur) — THE LUS COHORT IS REFUSED, AND THE STUDY THAT WOULD HAVE MINTED IT REPORTED THE EXACT OPPOSITE OF WHAT IT COMPUTED: A DOUBLE NEGATION SWAPPED BOTH SIDE LABELS UNDERNEATH AN EXPLICIT "WE RAN BOTH DIRECTIONS" DEFENCE
+
+**Eamon, 27-Aug: *"Can you put the wire in? And put through the top three
+candidates as famous Portuguese men and women"* → *"Full permission to
+proceed"*.** The naming rule this file gained the same day sets the order —
+**supply → spend → build → name** — and says in its own words that *"a refusal
+counts as compliance: three good Portuguese names and no unclaimed cell is this
+rule working"*. **This is that outcome, and it is reported as a result rather
+than a shortfall.** No row was minted. What follows is what the search bought.
+
+### 1 · THE SUPPLY IS REAL, AND MY OWN HEADLINE NUMBER FOR IT WAS WRONG
+
+`scripts/study_lus_supply_2026-08-27.py`. Measured on the venue's own
+`orderBookDetails` + daily candles: **213 active markets, $1,371M/day**; the
+non-crypto population is **102 markets / $151M/day**, of which **28 clear a
+$0.5M/day fill floor** and **21 ($74.6M/day) are DIRECTIONALLY UNCLAIMED** —
+the family books (👩 mum · 🙏 avo · 🔮 georgia) hold the only directional claim,
+on 7 of the 28, and 🧭 cook's admission is an EVENT gate on the [45,60)bps
+premium band rather than a claim on the name. Claims are READ FROM THE MODULES,
+never retyped.
+
+**A session-earlier claim of `N_eff 4.72` for that unclaimed set is CORRECTED
+IN PLACE per I12 — it was echoing I22's cross-class figure, not measuring this
+basket.** Honest, out of sample, at a realistic 6-slot cap: crypto **1.54**,
+unclaimed non-crypto **2.25**, best DESIGNED basket **2.46**. So the class buys
+a real **1.6× in effective bets** (days-to-gate improves ~1.6×), not the 4.7×
+that was quoted, and the earlier implication of "28.4 days → 7.0 days" is
+withdrawn.
+
+**Two defects the instrument caught in itself**, both now fixed with the reason
+written into the code:
+* It reported **`N_eff 14.89` from SIX names** — arithmetically fine as a
+  variance-reduction ratio (mean pairwise ρ was negative), meaningless as the
+  bet COUNT that I22's `S_d² = Σ S_i²` is additive in. Capped at `n`.
+* The basket search was **fitting the correlation matrix in-sample**. Under a
+  train/test split **71% of the design premium evaporates** — the designed
+  basket keeps only **+9%** over volume-ranking. The win is the asset CLASS,
+  not the selection, which is (oe)'s universe-churn finding at design time.
+
+### 2 · TREND, MOMENTUM AND REVERSAL: NOTHING, AND THE ONE TEMPTING CELL WAS MICROSTRUCTURE
+
+`scripts/study_noncrypto_trend_2026-08-27.py`, six candidates over the 21
+unclaimed names. **Not one passes a single row of the bar** (by-coin t≥2 ·
+by-period t≥2 · both nulls P≤0.05 · top-3 <50% · halves same sign ·
+days-to-gate ≤60). Best days-to-gate anywhere is **295 days**.
+
+The one alive-looking cell — cross-sectional reversal, +1.474%/trade at nominal
+P=0.010 — died three ways, and the first is the transferable one: **84% of the
+return is earned in the one bar you cannot trade** (day 1 alone +1.245%/t=+3.17;
+days 2–5 +0.346%/t=+0.41). The rule selects on `close[i]` and fills at
+`close[i]` — the same print — so "biggest loser" partly means "last print landed
+low on bid-ask bounce", which un-bounces next bar; at LAG-1 the mean drops
+**76%**. Its null was also anti-conservative (it destroyed within-period
+cross-sectional correlation); a period bootstrap gives 95% CI
+**[−0.875%, +3.559%]**, containing zero. And it goes negative at **25 bps/side**.
+
+### 3 · THE SESSION BOOK — REFUSED 0/5, AND THE STUDY WAS A LIVE LANDMINE
+
+The lead candidate was a TIME-axis cell (I20 admits one): fade the perp's drift
+across its underlying's CLOSED window. It first printed **"8h fade +0.352%/trade,
+by-coin t=+2.78, null P=0.002, top-3 9%, both halves positive"**. Every one of
+those five figures was wrong or measured on the wrong axis.
+
+**THE SIGN WAS INVERTED.** `scripts/study_lus_session_2026-08-27.py` computed
+
+    for side, sgn in (("fade", -1.0), ("follow", +1.0)):
+        r = [sgn * (-1.0 if dr > 0 else 1.0) * fw for ...]
+
+where `(-1.0 if dr > 0 else 1.0)` is **already** `-sign(drift)` — the fade
+position. Multiplying by `sgn = -1.0` on the row labelled *fade* double-negates
+into `+sign(drift)*fwd`: continuation. **Both labels were swapped**, and every
+derived statistic (n=1508, pooled t, by-coin t, concentration, the null)
+reconciled to the digit, so nothing downstream could notice. Run as literally
+specified the rule is a **significant LOSER: by-coin −0.528%/trade, t=−4.11**.
+The perps CONTINUE their closed-window move; they do not revert — the opposite
+of the hypothesis the file was built on.
+
+**What makes it worth an executable pin rather than a one-line fix is HOW it
+survived.** The module carried an explicit symmetry defence in its own prose —
+*"BOTH DIRECTIONS... a rule that must be flipped to win was not a finding in
+the first place"* — and that defence was useless, because both directions WERE
+computed and both were printed under the wrong names. **THE RULE, and it belongs
+beside I3: printing both directions is not a control unless the sign convention
+is itself asserted against a hand-computed case.** A symmetric sweep is
+symmetric about the wrong axis just as happily as the right one.
+
+**TWO MORE DEFECTS in the same file**, both fixed: the halves split the trade
+list by **COIN ORDER, not time** (so "both halves positive" — one of the six
+go-live bars — tested nothing; on a calendar split it reads +0.235/+0.320), and
+the US session hours were **EDT-only** while ~4 months of the window are EST
+(that subsample reads t=−0.17).
+
+**AND THE SURVIVING CONTINUATION EFFECT STILL EARNS NO BOOK.** It is REAL gross
+— an interior plateau rising from ~0 at 1–2h, peaking 10–12h, decaying to zero
+by 48h, robust to lag and to a 3×3 entry/endpoint seam matrix, so it is neither
+a grid artifact nor the same-print bounce (which is measurably a HEADWIND here:
+`corr(drift, hour-1) = −0.038`, and hour 1 contributes **−3.7%** of the total).
+It fails on cost and on power:
+* break-even **17.6 bps/side**; the t=2.0 bar is lost at **4.9 bps/side** —
+  against a median **15.0 bps** Roll half-spread measured on these same books
+  and the fleet's own **17.49 bps** mean fill slippage ((qq)). Net of each
+  book's own spread: **+0.018%/trade, t=+0.13**.
+* I22 fails even GROSS: `S_d=+0.2163` ⇒ **85 days-to-gate** vs the 60-day bar.
+  Net of spread: never.
+* top-3 concentration on the axis that matters — **by NAME — is 56.9%**
+  (SNDK alone 26.0%), past the undecidable-by-tail bar. The 9% first printed is
+  on the TRADE axis, which cannot see a one-name effect.
+
+**THE I20 CELL IS FALSIFIED, and this is what actually ends it.** The book was
+to be differentiated on each name's own underlying session. It is not that.
+Same tape, same names, one hour changed: **SKHYNIXUSD at its own KRX open reads
+−0.427%/t=−0.80 and at the US open +1.199%/t=+3.92**; SAMSUNGUSD −0.179%/t=−0.42
+vs +0.869%/t=+2.99. Korean stocks prefer the American clock. What is being
+measured is a single US-clock ~18h return autocorrelation across a universe that
+is 15 of 19 American — **there is no time axis to mint a book on.**
+
+**ONE CONTROL IS DECLARED UNSOUND rather than quoted.** The adversarial pass
+offered a "mid-session placebo" (close=16/open=17 UTC) reading t=−3.59, and
+called it larger than the real boundary. It is not evidence either way: moving
+the boundary into mid-session also collapses the drift window from ~18h to ~1h,
+so it compares different measurements, not different hours. **The Korean-vs-US
+comparison is the sound one** (both windows ~17–18h) and the refusal rests on
+it. Recorded because a refusal built on a bad control is as fragile as a claim.
+
+### 4 · WHAT SHIPPED
+
+* `scripts/study_lus_supply_2026-08-27.py` — the supply/N_eff/session census,
+  with the cap and the holdout split.
+* `scripts/study_lus_session_2026-08-27.py` — FIXED (one `trade_return` owner,
+  time-ordered halves, DST-aware hours, the null routed through the same owner
+  rather than re-implementing the position inline — a second copy of a rule was
+  a second copy of the same bug) and its docstring now leads with the refusal.
+* `scripts/study_noncrypto_trend_2026-08-27.py` — the trend/momentum/reversal
+  refusal.
+* `tests/autonomy/test_lus_session_sign.py` — 9 tests, **8 mutations verified
+  RED** including the original double negation, the coin-order halves and the
+  DST removal. It also carries an arm asserting the TRUTH TABLE'S OWN
+  invariants, because **two rows of that table were wrong when first written**
+  (both drift-DOWN rows listed `fade` and `follow` with the same sign, which is
+  impossible) — a fixture written by whoever wrote the code encodes the same
+  confusion, so the fixture needs its own check.
+
+**A methodology note against myself:** the first mutation round reported 5/5 RED
+and then a restored file still failed, because a hand-rolled mutate loop left a
+stale pytest assertion-rewrite cache (same size, same-second mtime). That is
+[[mutation-tests-lie-under-out-of-tree-pycache]] exactly, and `scripts/mutate.py`
+exists to prevent it. Results above are from a cleared-cache re-run.
+
+### 5 · DO NOT RE-PROPOSE
+
+| Killed | The number that killed it |
+|---|---|
+| The 19-name session book, any hold | literal spec **−0.528%/trade, t=−4.11** |
+| Its continuation twin, full universe | **85 days** gross; **never** net of measured spread |
+| Semis-only as a mintable cell | **79 days** net; N_eff **2.7 of 6**; in-sample pick retains **2 of 6** out of sample |
+| Any 4h variant | t=2.0 lost at **0–0.4 bps/side** |
+| Trend / momentum / reversal on this universe | best days-to-gate **295** |
+| Leverage to raise `S_d` | t invariant — the **seventh** measured rejection |
+| Quoting pooled `t` here | overstates **1.4–2.0×** (day-clustered +2.71 vs pooled +4.19) |
+
+**THE ONE THING THAT COULD REOPEN IT, and it is cheap.** Roll's estimator
+conflates bid-ask bounce with genuine reversion, so **15.0 bps is an UPPER
+bound** on the true spread. A REAL effective half-spread for
+SNDK/INTC/MU/NBIS/DRAM/SOXL from `venue_orders` / `implementation_shortfall` —
+data the fleet already records — would settle it: at **≤10 bps/side the
+semis-only cell reads ~50 days, inside the bar**. That would then need
+pre-registering in the **CONTINUATION** orientation with the session framing
+dropped, and grading forward on day-as-unit `t`. A different finding, under a
+different name. **Owner: session, no date — nothing rides on it.**
+
 ## 2026-08-27 (uq) — THE LIVE TRIO GOES BACK TO 10x: EAMON'S OWN 22-AUG CEILING RESTORED, THE ARITHMETIC PUBLISHED, AND MUM'S CAP UN-STRANDED SO 10x MEANS 10x ON HER BOOK
 
 **Eamon, 27-Aug: "change bots back to their 10x leverage".** "Back to" is
