@@ -136,3 +136,19 @@ def test_an_unknown_symbol_is_none_not_zero(bus):
     bus(_payload({"SNDK": {"spread_bps": 4.36}}))
     assert fleet_bus.recorded_cost_bps("NEVER_TRADED", NOW) is None
     assert fleet_bus.recorded_half_spread_bps("NEVER_TRADED", NOW) is None
+
+
+def test_map_mode_drops_junk_entries(bus):
+    """MAP mode must hand a consumer only well-formed rows.
+
+    Found by mutation: replacing the comprehension with a bare `return coins`
+    survived the first round, so a payload carrying a junk value would have
+    been passed through to every consumer — which iterates it expecting dicts.
+    `coin-quality` is folded from a live SQL aggregate, so a null or a stray
+    scalar is a realistic shape, not a contrived one.
+    """
+    bus(_payload({"SNDK": {"spread_bps": 4.36},
+                  "JUNK": "not-a-dict", "NIL": None, "NUM": 7}))
+    m = fleet_bus.recorded_cost_bps(None, NOW)
+    assert set(m) == {"SNDK"}, f"junk survived the filter: {sorted(m)}"
+    assert all(isinstance(v, dict) for v in m.values())
