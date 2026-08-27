@@ -87,6 +87,32 @@ is `t` — which grows with `sqrt(n)` at fixed edge — that is the right side o
 the swap. Capacity, so the era clock does not reset ((hc)). The property is
 pinned across the whole reachable cap range, not just today's two numbers.
 
+### THE INCIDENT THIS PASS FOUND BY ACCIDENT: 🔮 GEORGIA WAS DARK FOR 8.2 HOURS
+
+Verifying the deploy turned up a real-money book that had been **dead since
+14:04:46Z** — found only because a routine `status` read on the live trio came
+back `error`. Her log ends on a **transient CloudFront 403 from the venue**
+(`lighter.exceptions.ForbiddenException: Request blocked`) hit during the
+container restart a deploy caused; the process exited and never came back. 🙏
+avo and 👩 mum are the SAME image on the SAME venue and were unaffected, so it
+is per-service and not a fleet-wide block — and it is transient: the next
+deploy brought her back in ~90s (`50154a4e1ed0`, online, `n_stale: 0`).
+
+**Cost: zero open positions, so no unmanaged exposure** — she had flattened
+before dying. What it cost was ~8h of the only live book with a meaningful
+closed sample not trading, on a book whose binding problem is decidability.
+
+**AND NOTHING PAGED, which is the part worth keeping.** Her row read
+`status: "error"`, but that is the DASHBOARD's verdict computed from
+`age_sec: 29507 / stale: true` — not something the bot published, because the
+bot published nothing at all. **A dead publisher cannot report that it is
+dead** (I13), and the watchdog's NOT-ONLINE test is a test on a `status` string
+a dead process never writes. The standing rule this leaves, recorded rather
+than built, because the fix is a pager change and that is its own pass:
+**after any `[deploy-live]`, read `age_sec` on all three live rows, not just
+`extra.build`** — a stamp that never changes is byte-identical between "behind"
+and "dead", and the build check alone would have said the wrong one.
+
 ### AND MY OWN TEST TOOK DOWN FOUR OTHERS
 
 `test_georgia_guard_latch` called `os.environ.setdefault("FAMILY_LIVE_BOOK",
