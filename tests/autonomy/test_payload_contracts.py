@@ -886,7 +886,7 @@ class TestLedgerQuarantine:
         assert "_quarantined" in body, "a silent filter hides its own effect"
 
     def test_no_caller_passes_bot_and_pair_in_the_wrong_order(self):
-        """[(uz)] APPLIED IS NOT ENOUGH — IT MUST BE APPLIED THE RIGHT WAY ROUND.
+        """[(vb)] APPLIED IS NOT ENOUGH — IT MUST BE APPLIED THE RIGHT WAY ROUND.
 
         The test above is a SUBSTRING check on ONE file. It cannot see argument
         order and it cannot see any other caller, and both blind spots were
