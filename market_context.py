@@ -99,6 +99,15 @@ BINANCE_WS = "wss://fstream.binance.com/ws/!forceOrder@arr"
 
 LOOP_SECONDS = int(os.environ.get("MCTX_LOOP_SECONDS", "300"))
 QUALITY_EVERY_H = float(os.environ.get("MCTX_QUALITY_EVERY_H", "6"))
+
+#: TTL on the `coin-quality` payload, and it has ONE owner because a retyped
+#: constant is a constant that drifts. [27-Aug] Written as a module constant
+#: after a mutation round: the publish-side TTL was inline and the test
+#: RECOMPUTED it with its own literal, so halving the real one left the test
+#: green — a test that re-implements the publisher's arithmetic is not testing
+#: the publisher. 2.5 refresh periods: one skipped tick must NOT blind every
+#: consumer, a dead collector MUST.
+COIN_QUALITY_TTL_SEC = int(QUALITY_EVERY_H * 3600 * 2.5)
 TOP_N = int(os.environ.get("MCTX_TOP_N", "60"))   # bound the state row size
 
 logging.basicConfig(
@@ -853,9 +862,7 @@ def main():
                 store.save_state("coin-quality",
                                  {"ts": _now_iso,
                                   "updated": _now_iso,
-                                  # 2.5 refresh periods: a skipped tick must not
-                                  # blind the consumer, a dead collector must.
-                                  "ttl_sec": int(QUALITY_EVERY_H * 3600 * 2.5),
+                                  "ttl_sec": COIN_QUALITY_TTL_SEC,
                                   "coins": q})
                 log.info("coin-quality table refreshed: %d coins", len(q))
             try:

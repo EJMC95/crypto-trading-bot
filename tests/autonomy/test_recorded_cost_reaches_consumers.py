@@ -96,7 +96,10 @@ def test_the_real_publisher_shape_passes_is_fresh():
     original gap survived.
     """
     import market_context as mctx
-    ttl = int(mctx.QUALITY_EVERY_H * 3600 * 2.5)
+    # READ the publisher's own constant — do NOT recompute it. A mutation
+    # round caught exactly that: halving the real TTL left this test green
+    # because it was re-deriving the number with its own literal.
+    ttl = mctx.COIN_QUALITY_TTL_SEC
     assert ttl > mctx.QUALITY_EVERY_H * 3600, (
         "TTL must outlive one refresh period or a single skipped tick blinds "
         "every consumer")
