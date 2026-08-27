@@ -88,6 +88,32 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### THE RECORDED COST GETS ITS FIRST CONSUMER — THE READ IS NO LONGER INERT
+
+`(ut)` unlocked `coin-quality` after seven weeks and shipped `recorded_cost_bps`
+with **zero consumers**, declaring it as such. That is the registered-but-inert
+shape (I18) and it is exactly how the payload it fixes got there — so it is
+closed in the same milestone rather than carried.
+
+🌾 carry now publishes `caps.cost_bps` every loop: `{n, median_half_bps, worst,
+worst_bps}` across the coins it holds or could hold. Driven against the LIVE
+bus, its own cell reads **8 coins, median half-spread 1.61 bps, worst KAITO at
+4.90** (scout-derived across 29: median 1.43, worst STABLECOINX 17.61).
+
+**WHY THIS CONSUMER AND NOT A GATE.** `(px)` shipped carry's `min_vol` floor
+with the words *"per-book slippage here is unmeasured"* — and it was being
+measured the whole time, into a payload nothing could read. Publishing the
+number beside the proxy is what makes the proxy **FALSIFIABLE**: a reader can
+now see whether a turnover floor screens for the cost it stands in for.
+REPORTED, NEVER A BAR (I15) — it changes no entry, no exit, no sizing, because
+moving an entry rule needs its own measurement and expectancy price (I19),
+while publishing costs nothing.
+
+Fail-safe pinned in both directions: any doubt returns `None`, **never 0.0** (a
+cost that reads as FREE would authorise exactly the books this warns about),
+and the read cannot raise into the trading loop — it is published from inside a
+live book's publish block, and a reporting field must never take a book down.
+
 ### AND BACK TO 36 — EAMON'S CALL, BOTH ARMS, SAME DAY
 
 **Eamon: *"both of them to 36"*.** Shipped as the code DEFAULT so both arms

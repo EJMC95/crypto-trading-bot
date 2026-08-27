@@ -204,6 +204,45 @@ DEPTH_ADMIT = os.environ.get("CARRY_DEPTH_ADMIT", "1").strip().lower() \
 DEPTH_PROBE_BUDGET = int(os.environ.get("CARRY_DEPTH_PROBE_BUDGET", "24"))
 
 
+def _cost_now(syms=None):
+    """The fleet's OWN RECORDED execution cost for this book's cell, or None.
+
+    [2026-08-28 (vd)] `{n, median_half_bps, worst, worst_bps}` — the median
+    half-spread across the coins this book is holding or could hold, read from
+    `fleet_bus.recorded_cost_bps` (folded from `venue_orders.spread_bps`, the
+    fleet's own fills). REPORTED, NEVER A BAR: no caller gates on this, and
+    that is deliberate — moving the entry rule needs its own measurement and
+    expectancy price (I19), while PUBLISHING the number costs nothing and makes
+    `min_vol` falsifiable for the first time.
+
+    Fail-safe in the one direction that matters: any doubt is `None`, never
+    0.0. A cost that reads as FREE would authorise exactly the books this is
+    meant to warn about.
+    """
+    try:
+        import fleet_bus
+        held = list(syms) if syms else []
+        if not held:
+            try:
+                held = [c for c in (fleet_bus.scout_universe() or [])][:40]
+            except Exception:                               # noqa: BLE001
+                held = []
+        vals = []
+        for c in held:
+            h = fleet_bus.recorded_half_spread_bps(c)
+            if h is not None:
+                vals.append((float(h), c))
+        if not vals:
+            return None
+        vals.sort()
+        mid = vals[len(vals) // 2][0]
+        worst = vals[-1]
+        return {"n": len(vals), "median_half_bps": round(mid, 2),
+                "worst": worst[1], "worst_bps": round(worst[0], 2)}
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
 def rt_cost_bps(book, notional):
     """Measured adverse cost of getting `notional` IN and OUT, in bps of mid.
 
@@ -1658,7 +1697,31 @@ def main():
                                     # unpublished-gate class).
                                     "payback_max_h": (PAYBACK_MAX_H
                                                       if DEPTH_ADMIT else None),
-                                    "depth_admit": DEPTH_ADMIT},
+                                    "depth_admit": DEPTH_ADMIT,
+                                    # [2026-08-28 (vd)] THE MEASURED COST,
+                                    # BESIDE THE PROXY THAT STANDS IN FOR IT.
+                                    # `(px)` shipped `min_vol` declaring
+                                    # "per-book slippage here is unmeasured" —
+                                    # and it was being measured the whole time:
+                                    # `venues/shadow` has written `spread_bps`
+                                    # to `venue_orders` since 9-Jul (3,230
+                                    # rows), folded onto `coin-quality` (135
+                                    # coins), and NOTHING could read it because
+                                    # the payload shipped without
+                                    # `updated`/`ttl_sec` and so failed
+                                    # `is_fresh` forever ((ut)).
+                                    #
+                                    # This is the FIRST CONSUMER of that read,
+                                    # and it is REPORTED, NEVER A BAR (I15):
+                                    # it changes no entry, no exit and no
+                                    # sizing. Publishing it is what makes the
+                                    # proxy falsifiable — a reader can now see
+                                    # whether the turnover floor is screening
+                                    # for the cost it claims to.
+                                    # `None` on any doubt, NEVER 0.0: an
+                                    # unmeasured cost that reads as free is
+                                    # the same defect pointed the other way.
+                                    "cost_bps": _cost_now()},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation

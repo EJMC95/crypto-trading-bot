@@ -155,3 +155,48 @@ def test_map_mode_drops_junk_entries(bus):
     m = fleet_bus.recorded_cost_bps(None, NOW)
     assert set(m) == {"SNDK"}, f"junk survived the filter: {sorted(m)}"
     assert all(isinstance(v, dict) for v in m.values())
+
+
+# ------------------------------------------------------------ the consumer
+def test_carry_publishes_the_measured_cost_beside_its_proxy(monkeypatch):
+    """[28-Aug (vd)] THE FIRST CONSUMER, and the reason this accessor is not
+    another inert read.
+
+    `(px)` shipped 🌾 carry's `min_vol` floor declaring "per-book slippage here
+    is unmeasured" — while `venues/shadow` had been writing `spread_bps` on
+    every fill since 9-Jul. Publishing the measured number beside the proxy is
+    what makes the proxy FALSIFIABLE; nothing gates on it (I15).
+    """
+    import funding_carry_bot as fc
+    monkeypatch.setattr(fleet_bus, "_load",
+                        lambda k, ct=None: _payload({
+                            "BTC": {"spread_bps": 0.30},
+                            "ETH": {"spread_bps": 1.00},
+                            "KAITO": {"spread_bps": 9.80},
+                        }) if k == "coin-quality" else None)
+    got = fc._cost_now(["BTC", "ETH", "KAITO"])
+    assert got["n"] == 3
+    assert got["worst"] == "KAITO" and got["worst_bps"] == pytest.approx(4.90)
+    assert got["median_half_bps"] == pytest.approx(0.50)
+
+
+@pytest.mark.parametrize("payload", [None, {}, _payload({}),
+                                     _payload({"BTC": {"slip_bps": 1.0}})])
+def test_the_consumer_reports_none_never_zero(monkeypatch, payload):
+    """A cost that reads as FREE would authorise exactly the books this is
+    meant to warn about — so every doubt is None, not 0.0."""
+    import funding_carry_bot as fc
+    monkeypatch.setattr(fleet_bus, "_load",
+                        lambda k, ct=None: payload if k == "coin-quality" else None)
+    assert fc._cost_now(["BTC"]) is None
+
+
+def test_the_consumer_never_raises_into_the_trading_loop(monkeypatch):
+    """It is published from inside the publish block of a live loop. A read
+    that raises would take the book down for a REPORTING field."""
+    import funding_carry_bot as fc
+
+    def boom(*a, **k):
+        raise RuntimeError("bus down")
+    monkeypatch.setattr(fleet_bus, "_load", boom)
+    assert fc._cost_now(["BTC"]) is None
