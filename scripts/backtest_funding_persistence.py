@@ -193,6 +193,18 @@ scripts/backtest_funding_persistence.py — is the CARRY'S SURVIVAL predictable?
 ║    /funding-rates); see UNITS below.                                      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
+**[(vg)] RE-DERIVED ON THE LIVE BOT'S OWN POPULATION — THE RULING SURVIVES AND
+HARDENS.** (su) found this file's loader (`backtest_funding_lighter.load()`)
+selects its universe by RANK while the live Farmer filters on an absolute
+$10M/day floor that only 11 of 212 markets clear — so this verdict, along with
+three sibling refusals, was measured partly on books the bot refuses, and all
+four were re-run against the honest population. Result here: the three arms that
+DID clear the economic bar on both halves go to **ZERO** at the live floor.
+Nothing survives, so "predictable and it does not matter" is not merely
+unchanged — it is now measured on the coins the book can actually buy, which is
+the only population the claim was ever about. **Do not re-open this on a
+rank-selected table.**
+
 WHY THIS EXISTS. [[backtest_funding_lighter]] settled that the Funding Farmer
 loses at every gate on Lighter, and found the mechanism: 63% of trades end
 because the RATE EVAPORATED, at a median hold of 8h, earning ~0.5bps against a

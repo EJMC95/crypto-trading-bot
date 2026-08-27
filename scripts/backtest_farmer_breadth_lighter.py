@@ -17,6 +17,29 @@ budget. This tests two additions BEFORE they touch the live-money bot
                    (the durable quality gate). Question: does the explore SLICE
                    earn, or at least not lose? That is the breadth question — is
                    there edge beyond the 2 coins it knows.
+
+                   **[(vg)] ON THE LIVE BOT'S OWN POPULATION THE EXPLORE SLICE
+                   IS EMPTY, SO THIS QUESTION HAS NEVER ACTUALLY BEEN ASKED.**
+                   (su) found this study's loader picks its universe by RANK
+                   while the live Farmer filters on an absolute $10M/day floor
+                   that only 11 of 212 markets clear. Re-run against that floor:
+                   base -38.80 n=817 · +explore -38.80 n=817 · **explore slice
+                   n=0, `identical=True`** — byte-identical to baseline, on BOTH
+                   windows (150d and the recorded 2026-02-24..07-24) and BOTH
+                   slip cells (5bps and 0.5bps). There is nothing below the top
+                   exploit set that clears the live floor, so any earlier
+                   "explore earns / is neutral" reading was measured on coins
+                   the book refuses. The verdict is not NEGATIVE, it is
+                   **STRUCTURALLY UNMEASURABLE at the shipped floor** — and the
+                   two are not the same: `{n: 0}` is byte-identical between
+                   "quiet" and "impossible" ((lv)), which is exactly why this
+                   note exists rather than a number.
+                   Where the slice IS populated (rank-selected, no floor) it
+                   LOSES: all-30 n=168 **-$0.096/t** (5bps) / -$0.073/t
+                   (0.5bps), maxDD -51.04 -> -64.06; top-25 by mean-vol24 n=145
+                   **-$0.117/t** / -$0.095/t. So the honest summary is: on the
+                   population the book trades there is no slice to measure, and
+                   on the population it does not trade the slice loses.
   L2 CONVICTION  — size each slot by a bounded function of its conviction (|apr|,
                    crowding) instead of a flat clip. Two variants:
                      REALLOC — same total budget (mean mult ~1x): isolates

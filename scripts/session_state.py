@@ -107,33 +107,59 @@ CARRIED = [
                 "have not been re-derived**: study_farmer_take_profit, "
                 "backtest_farmer_breadth_lighter, backtest_funding_persistence "
                 "and backtest_xsect_funding_lighter.",
-        "why_open": "each cites its own verdict in a header that other work "
-                    "reads as settled ('do not re-test what a script header "
-                    "rejects'), so re-running them is not optional tidying — "
-                    "it is checking whether four standing refusals were "
-                    "measured on the wrong books. Cheap now that the tape "
-                    "carries volume; nobody has done it.",
+        # [(vg)] THE MEASUREMENT IS DONE; THE WIRING IS NOT. All four were
+        # re-run against the live bot's $10M/day floor and each verdict is now
+        # recorded in its own header, so the next session must NOT re-measure:
+        #   * take_profit  — refusal SURVIVES and HARDENS. tp-0.06 goes from
+        #     "beats live on top-25" to LOSING $10-$28 vs live; both-halves
+        #     clears 0 of 60 rows. The universe-dependent sign was itself the
+        #     rank artifact.
+        #   * persistence  — "predictable and it does not matter" SURVIVES and
+        #     HARDENS: its 3 clearing arms go to ZERO at the floor.
+        #   * breadth      — the explore verdict FLIPS to STRUCTURALLY
+        #     UNMEASURABLE: at the live floor the explore slice is n=0,
+        #     byte-identical to baseline on both windows and both slips. Where
+        #     the slice IS populated (no floor) it loses -$0.096 to -$0.117/t.
+        #   * xsect        — NOT AFFECTED; it never calls the rank loader.
+        # So no standing refusal was wrong, and one "it earns" reading was
+        # never measurable at all — which is the (lv) `{n: 0}` ambiguity again.
+        "why_open": "the VERDICTS are now re-derived and recorded in each "
+                    "header; what is still open is the WIRING — these scripts "
+                    "keep selecting by rank, so the next person to run one "
+                    "gets the rank-selected answer unless they pass the floor "
+                    "by hand. Closes when study_farmer_take_profit uses "
+                    "`minvol_entry_ok` itself.",
         "closes_when": lambda: _has(
             "scripts/study_farmer_take_profit.py", "minvol_entry_ok"),
     },
     {
-        "id": "allocation-organ-4x-on-carry",
+        "id": "allocation-clamp-is-a-per-position-bound-doing-per-book-duty",
         "owner": "OPERATOR",
-        "what": "💰 fleet_allocation sits AT its 4.0 ceiling on 🌾 carry right "
-                "now (`delta_usd: +13,500` on a $1,000 book, the fleet's only "
-                "measured claim), and carry runs 12 slots x $300. That is "
-                "**$14,400 of gross on a $1,000 book** from the allocation "
-                "organ alone, before the brain says anything — 14.4x equity on "
-                "a book whose modelled `HEDGE_COST * notional` is calibrated at "
-                "$300 a position. (sp)'s brain bound is derived from carry's "
-                "CONSTANTS precisely so it does not double this; it also does "
-                "not fix it.",
-        "why_open": "the organ's 0.25-4.0 clamp is a capital-allocation policy "
-                    "and moving it moves money between books — an operator "
-                    "call (I16), not a session one. What a session CAN do "
-                    "first is measure whether 4.0 on a 12-slot book was ever "
-                    "intended, or whether the clamp was written for a 4-slot "
-                    "one.",
+        "what": "💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION "
+                "slippage bound being asked to do a per-BOOK job. **[(vg)] THE "
+                "4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was "
+                "measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 "
+                "carry right now, delta_usd +13,500, $14,400 of gross on a "
+                "$1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM "
+                "scale anywhere in the fleet is **1.594** (🙏 avo shadow) and "
+                "carry sits at **1.272** ($1,271.75 target on a $1,000 book). "
+                "(tz) replaced the winner-take-all split with a tilted flat "
+                "prior, which made 4.0 structurally unreachable — so the row "
+                "described the organ as it behaved BEFORE the fix that had "
+                "already shipped. What survives is LATENT, not live: the "
+                "ceiling still PERMITS a scale that breaches the 15% go-live "
+                "drawdown bar, because maxDD is the one bar that is NOT "
+                "clip-invariant ((hl) measured per-trade % invariance for the "
+                "other five) — ⚖️ Counterweight breaches at 3.06x, inside the "
+                "4.0 ceiling.",
+        "why_open": "the clamp is a capital-allocation policy and moving it "
+                    "moves money between books — an operator call (I16), not a "
+                    "session one. It is NOT urgent: nothing is near the "
+                    "ceiling today. What a session CAN do first is derive the "
+                    "per-book bound the drawdown bar implies (the "
+                    "`GROSS_X_MAX = 0.15/|stop|` shape (sr) used on avo) and "
+                    "publish it beside the claim, so the ceiling stops being a "
+                    "single number shared by books with different stops.",
         # closes when the clamp is re-decided (either bound moves) or carry's
         # slot count and clip stop multiplying out past its own equity.
         "closes_when": lambda: not _has("fleet_bus.py",

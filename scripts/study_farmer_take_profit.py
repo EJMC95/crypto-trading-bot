@@ -42,6 +42,27 @@ VERDICT AS RUN (150d Lighter tape, 2026-02-24 -> 2026-07-24):
   * tp-0.06 BEATS live on top-25 and LOSES badly on all-79. A knob whose sign
     depends on the universe is not an edge, it is a coin the tape cannot call.
 
+**[(vg)] RE-DERIVED ON THE LIVE BOT'S OWN POPULATION — THE REFUSAL SURVIVES AND
+HARDENS.** (su) found this study's loader selects its universe by RANK while the
+live Farmer filters on an absolute $10M/day floor only 11 of 212 markets clear,
+so the table above was measured partly on books the bot refuses — which put four
+standing refusals in doubt, this one among them. Re-run against that floor:
+
+    tp-0.06 minus tp-0.04 (the live value), FLOORED population
+      recorded window (2026-02-24 -> 07-24)   -10.12 (5bps)  /  -11.63 (0.5bps)
+      current 150d                            -26.54 (5bps)  /  -28.18 (0.5bps)
+
+  * The sign is now UNAMBIGUOUS: on the population the bot actually trades,
+    tp-0.06 does not "beat live on top-25" — it LOSES by $10 to $28. The
+    universe-dependent sign that made this a coin flip was itself an artifact of
+    ranking coins the book cannot buy.
+  * BOTH-HALVES still clears NOWHERE: **0 YES rows of 60** (3 populations x 2
+    windows x 2 slips x 5 TP values). tp-0.05 on the floored recorded window is
+    the only positive total (+7.29 / +6.48) and its h1 is NEGATIVE in both
+    (-24.48 / -14.40), so the reasoning above holds unchanged.
+  * The refusal is therefore STRONGER than when written, not weaker. Do not
+    re-open this on the strength of a rank-selected table.
+
   => tp-0.06 is NOT refuted. It is UNSUPPORTED, and Lighter's own tape cannot
      settle it. Per [[backtest-on-lighter-only]] that is the end of the enquiry:
      no NEW take_profit allele can be justified from this venue's evidence
