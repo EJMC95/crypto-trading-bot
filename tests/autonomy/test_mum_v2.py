@@ -164,7 +164,15 @@ def test_the_oversold_threshold_is_genuinely_DEEP():
     # rsi 40-65 reading and must still be refused, so "widen to 95" — buy
     # anything falling — fails here exactly as before. The number tracks the
     # measurement; it is not a dial to be turned when a cell looks quiet.
-    assert s.RSI_MAX <= 32, "an entry bar above 32 is no longer 'deep oversold'"
+    # [2026-08-27 (ve)] CEILING RAISED 32 -> 36 by Eamon's explicit decision
+    # ("bring her to 35.9 and see how she handles those trades") on a live book
+    # that had taken ZERO trades since 25-Aug. The bar is now past the measured
+    # dose-response peak, which is a FORWARD TEST, not a measurement — and the
+    # guard's purpose is unchanged and still bites: the mild rsi 40-65 fixture
+    # below must still be REFUSED, so "widen to 95" fails here exactly as
+    # before. What moved is the number he chose; what did not move is that the
+    # bar cannot quietly become "buy anything falling".
+    assert s.RSI_MAX <= 36, "an entry bar above 36 is no longer 'oversold'"
 
 
 def test_the_widened_band_actually_admits_its_cell():
@@ -276,11 +284,17 @@ def test_the_gauge_says_how_far_the_market_is_from_the_bar():
     b = _B()
     b.s = _mum()
     b.scan = {"scanned": 4, "no_signal": 4, "opened": 0}
-    #                bar-4  bar+2  bar+13  bar+27   ((tr): bar is RSI_MAX = 30)
-    b.last_rsi = {"A": 26.0, "B": 32.0, "C": 43.0, "D": 57.0}
+    # [(ve)] BAR-RELATIVE, as this comment always claimed the offsets were.
+    # The values were hardcoded against a bar of 30, so a MEASURED bar move
+    # ((tr) 25->30, (un) ->32, (ve) ->36) broke a test whose subject is the
+    # near_bar WINDOW, not the bar. A re-typed constant is a constant that
+    # drifts; these are now derived, so the next move edits nothing here.
+    _bar = b.s.RSI_MAX
+    #                     bar-4      bar+2      bar+13      bar+27
+    b.last_rsi = {"A": _bar - 4, "B": _bar + 2, "C": _bar + 13, "D": _bar + 27}
     scan = fam._census_extra(b)["scan"]
     assert scan["rsi_bar"] == b.s.RSI_MAX
-    assert scan["rsi_min"] == 26.0, "the closest coin to the bar"
+    assert scan["rsi_min"] == _bar - 4, "the closest coin to the bar"
     assert scan["rsi_read"] == 4
     # within 8 points of the bar: 26.0 and 32.0 qualify, 43.0 and 57.0 do not.
     # This is the leading indicator — visible hours before an entry, where the

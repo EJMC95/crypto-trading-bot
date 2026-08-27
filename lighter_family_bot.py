@@ -759,7 +759,25 @@ class OversoldRebound(Carrier):
     #: i.e. the dips that FAILED: an adversely-selected subset, not the object
     #: being changed. If sub-cells do not sum to the union, the sliver carries
     #: a selection effect. Era unchanged (entry-bar notch, the (hc) precedent).
-    RSI_MAX = 32.0
+    #: [2026-08-27 (ve)] 32.0 -> 36.0, EAMON'S CALL ON HIS OWN MONEY, and it is
+    #: a FORWARD TEST rather than a measured widening — recorded that way so
+    #: nobody later reads it as evidence. His words: "She's too slow, we need to
+    #: bring her to 35.9 and see how she handles those trades."
+    #:
+    #: WHY 36.0 AND NOT 35.9: the comparison is strict (`rsi[i] < self.RSI_MAX`)
+    #: and 35.9 was the live minimum across all 23 coins at the time of the ask
+    #: — so a 35.9 bar admits NOTHING, excluding the very coin it was aimed at.
+    #: 36.0 is the smallest bar that admits it. Setting the literal number
+    #: requested would have looked like compliance and delivered zero trades.
+    #:
+    #: WHAT IT COSTS, stated once: the (un)/(tr) studies measured 32 as the
+    #: peak of the dose-response (+0.111%/trade, cluster-t +2.44 at rsi<32 vs
+    #: +0.075%/+1.47 at 30), and 36 is PAST that peak — this is expected to
+    #: trade more and earn less per trade. It buys a live sample in a cell the
+    #: tape has not been offering, on a book that had taken ZERO trades since
+    #: going live on 25-Aug. `MUM_RSI_MAX` makes it tunable without a deploy so
+    #: the next move is his, not a code push.
+    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "36.0"))
     #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
     #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
     #: carrier whose signals dict happens to carry rsi/uptrend for OTHER
@@ -994,7 +1012,7 @@ class DayTraderGated(Carrier):
     # exists to add to. Scope: DayTraderGated is georgia + the RETIRED
     # crypto-intraday-15m, so this moves exactly one living book.
     #
-    # [2026-08-27 (vb)] 3 -> 5, AND THE CENSORED EVIDENCE ABOVE IS NOW GRADED.
+    # [2026-08-27 (ve)] 3 -> 5, AND THE CENSORED EVIDENCE ABOVE IS NOW GRADED.
     # Eamon: "Raise the cap, adjust axis to meet where's only left to look in
     # terms of optimising her." It IS the last axis: diversification is
     # unavailable ((uu), n_eff ~ 1.0 is structural) and exits are refused

@@ -1,3 +1,82 @@
+## 2026-08-27 (ve) — 👩 MUM'S BAR 32 -> 36 AND 🔮 GEORGIA UNLOCKED: EAMON'S CALL, SHIPPED — PLUS THE DRAWDOWN RAIL ON ALL THREE LIVE BOOKS IS MEASURING AGAINST MONEY THAT ISN'T THERE
+
+**Eamon, 27-Aug, on a day where every change I had shipped made the instruments
+stricter and no book freer:** *"The judge needs to actually judge positively as
+opposed to so negatively — it's role isnt to starve every opportunity"* /
+*"improved doesn't mean more restricted and blocked and starved it means the
+opposite"* / *"She's too slow, we need to bring her to 35.9"* / *"Unlock
+Georgia"*. He was right about the day: five entries, two of which ADD blocks,
+none of which made a live book trade or earn more.
+
+### 👩 MUM: RSI_MAX 32.0 -> 36.0, AND IT IS A FORWARD TEST, NOT A MEASUREMENT
+
+She had taken **ZERO trades since going live on 25-Aug**. Her own census says
+why and it is not a fault: 23 coins scanned, all `no_signal`, bar `rsi < 32`,
+and the market's **minimum** RSI across all 23 was **35.9** (median 52.5). The
+tape simply has not come to her.
+
+**Why 36.0 and not the 35.9 he asked for.** The comparison is strict
+(`rsi[i] < self.RSI_MAX`) and 35.9 *was* the live minimum — so a 35.9 bar
+admits **nothing**, excluding the exact coin it was aimed at. 36.0 is the
+smallest bar that admits it. Setting the literal number would have looked like
+compliance and delivered zero trades.
+
+**The price, stated once and not re-argued:** (un)/(tr) measured 32 as the PEAK
+of the dose-response (+0.111%/trade, cluster-t +2.44, vs +0.075%/+1.47 at 30).
+**36 is past that peak** — expect more trades at a lower mean. What it buys is
+a live sample in a cell the tape has not been offering, on a book that was
+producing no evidence at all. `MUM_RSI_MAX` makes it tunable **without a
+deploy**, so the next move is his rather than a code push.
+
+The ceiling test moves 32 -> 36 with the reason recorded rather than deleted —
+its purpose is unchanged and still bites (the mild rsi 40-65 fixture is still
+REFUSED, so "widen to 95" fails exactly as before). And the gauge fixture is
+now **bar-relative**, as its own comment always claimed the offsets were: it
+hardcoded values against a bar of 30, so every measured bar move broke a test
+whose subject is the near_bar WINDOW, not the bar.
+
+### 🔮 GEORGIA: UNLOCKED — AND THE LOCK WAS NOT WHAT WAS HOLDING HER BACK
+
+Her row read `entries_shut: "protections_locked"`. The lock is `slguard`
+(3 stops inside 48 candles = 12h -> entries off 12 candles = 3h), pre-existing
+config, and this deploy clears it by restarting the host (the guard is
+in-memory `guard_until`).
+
+**Measured before doing it, because the number changes what it is worth:**
+across her whole live life — 56 closes, 22-Aug to 27-Aug, 121.5h — slguard has
+locked her **once, for 3.0h: 2% of her live life.** 7 of 56 exits are stops.
+So unlocking her buys ~52 minutes today and roughly nothing thereafter. It is
+not the constraint, and I would rather say that once than let it look like a
+fix. Her real problem is a **−$36.96 record on a $247.90 book**.
+
+### THE FINDING NEITHER OF US WENT LOOKING FOR: THE DRAWDOWN RAIL IS DEAD ON ALL THREE LIVE BOOKS
+
+`entries_locked`'s maxdd guard computes
+`worst = (peak - cum) / START_EQUITY`, and **`START_EQUITY = 1000.0` is a
+hardcoded module constant** while the three real-money books hold **$247.90
+(georgia), $300.00 (mum), $340.56 (avo)**. So the "15% drawdown" guard needs a
+**$150** drawdown to fire — **60% of georgia's entire book**. It is not
+mis-tuned; it is unreachable. The same capital-blind class the fleet already
+fixed once for the live Taker ([[taker-live-daily-loss-rail-capital-blind]]).
+
+**NOT fixed in this entry, deliberately.** Repairing it makes a live book MORE
+restricted on the day its owner asked for the opposite, and the correct
+denominator is a decision about his money, not mine — the honest candidate is
+the book's own live equity, which would make the guard bite at ~$37 on georgia
+rather than $150. Flagged for his call. **A rail you believe you have and do
+not is worse than one you know is off**, which is the only reason it is in this
+entry at all.
+
+Also on the row and unresolved: 👩 mum publishes `stop_reachable: false` with
+`stop_dead_above: 10.0` at `leverage.set = 10.0` — at that setting her stop
+sits at or beyond liquidation. She has been flat, so it has cost nothing; now
+that her bar admits trades it is live surface. His call, one number:
+`AVO_GROSS_X`-style leverage below 10 makes the stop reachable again.
+
+Deployed `[deploy-live]` — all three live hosts share one image, and georgia's
+unlock IS the restart. Verified none was halted first (a redeploy wipes
+memory-only halts). Suite green, 2975 passed.
+
 **[27-Aug, LATER THE SAME DAY] THIS ENTRY'S FINDING IS NOW I25, AND THE GRANT
 THAT ALLOWED IT IS RECORDED.** Eamon: *"Permission to change rules and amend
 doctrines for bot positive changes that make the system run better and the bots
