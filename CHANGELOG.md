@@ -1,3 +1,81 @@
+## 2026-08-27 (vf) — 🔮 GEORGIA WAS BEING SIZE-CUT ON MONEY HER STRATEGY NEVER LOST, AND 🙏 AVO SAT ONE ORDINARY STOP-OUT FROM THE SAME FATE
+
+**Eamon, 27-Aug:** *"it's role isnt to starve every opportunity"* /
+*"improved doesn't mean more restricted and blocked and starved it means the
+opposite"* / *"this is wasting real money"*. He was right, and the starvation
+was not where either of us was looking — not the judge, which judges nothing,
+but the **evidence board's live-clip down-reflex**, the one organ that shrinks
+real money automatically. Three defects, all in that one path.
+
+### 1. A HALT IS AN EVENT, NOT A TRADE — AND IT WAS COUNTED AS SEVERAL
+
+`fetch_realized_window` summed every ledger row in the trailing 7d. Measured on
+🔮 georgia: her window read **−$36.96** and the board cut her live clip to
+**0.75x** on it. **−$34.83 of that was 10 forced-flatten rows spanning 6
+events — five of them closed at ONE timestamp** (25-Aug 12:08). Her strategy's
+own 7d result is **−$2.13**, comfortably inside any bar.
+
+One bad afternoon, counted five times, shrank a real-money book — and those
+rows were *already* punished by the daily-loss rail that created them. The
+window now takes `exclude_reasons`, sourced from
+`fleet_bus.JUDGED_PAIRS[*]["strip_exits"]` — the place the fleet already
+declares *"halt events, not candidate outcomes"* — rather than a second list.
+**What is stripped is REPORTED** (sum, row count, and DISTINCT DAY count), so a
+book genuinely halting often stays visible as such.
+
+### 2. THE BAR WAS A FLAT $10 FROM WHEN THE LIVE BOOKS WERE ~$60 AT 1x
+
+One **ordinary designed stop-out** — `equity × gross_x × |stoploss| / max_open`,
+every term published on the book's own row — is now:
+
+| book | designed stop-out | vs the $10 bar |
+|---|---|---|
+| 🙏 avo | **$68.11** | 6.8× |
+| 👩 mum | $30.00 | 3.0× |
+| 🔮 georgia | $24.79 | 2.5× |
+
+So the fleet's best book, **+$16.46 over that same window**, sat one entirely
+normal loss from being cut to 0.75x. That is I7 at a live actuator: a trigger
+the book satisfies **structurally, by its own design**, is not a measurement.
+The bar is now `max(flat floor, this book's designed stop-out)` — never looser
+than the operator's floor, never so tight that the book's own configured loss
+unit trips it. Unreadable fields keep the flat floor (fail toward today).
+
+### 3. THE LIFETIME BACKSTOP NEVER HEALED — AND IT WAS STRICTER THAN THE GATE
+
+Found only because the driven test refused to go green: even with the halts
+stripped, georgia stayed cut. A flat **$20** lifetime backstop had her, and at
+−$39.12 she would have stayed cut however well she traded — the exact
+never-heals failure `fetch_realized_window`'s own docstring was written to end.
+The flat bar is also unrelated to book size: $20 is 7% of georgia's book and
+would be 2% of a $1,000 one.
+
+**The fleet already declares where a book is in trouble** — `GOLIVE_MAX_DD`,
+the 15% drawdown bar that governs real money — so an actuator stricter than
+that is stricter than the gate it serves. Imported, never re-typed. Georgia is
+−$39.12 on a $287.02 book = **13.6%, inside the 15% the gate allows.**
+
+### WHAT IT DOES, AND WHAT IT DELIBERATELY DOES NOT
+
+**Georgia's clip returns to 1.00x** and avo stops being one stop-out from a cut.
+**No compensating restriction was added**, and that is a decision, not an
+omission: a halt already costs the book its day and flattens it. Cutting its
+clip for the same event is punishing it twice — which is the miscount, not a
+safeguard. The daily-loss rail, the kill switch, SafetyRails caps and the fleet
+long-budget veto are all untouched and all still senior.
+
+**The negative control is pinned**: a loss BEYOND the designed stop-out still
+restricts, on both books. A reflex that never fires is as useless as one that
+always does.
+
+**4/4 mutations RED — after the first round left 2 of 4 SURVIVING.** The first
+draft of the tests re-derived the bar arithmetic inline instead of driving
+`synthesize_live`, so reverting the derived bar *and* reverting the halt strip
+both left the suite green. That is the third time today I have written a test
+that does not exercise what I changed — and the fix each time is the same:
+drive the real function, and pin the CALL SITE by AST when the test supplies
+the input itself.
+
 ## 2026-08-27 (ve) — 👩 MUM'S BAR 32 -> 36 AND 🔮 GEORGIA UNLOCKED: EAMON'S CALL, SHIPPED — PLUS THE DRAWDOWN RAIL ON ALL THREE LIVE BOOKS IS MEASURING AGAINST MONEY THAT ISN'T THERE
 
 **Eamon, 27-Aug, on a day where every change I had shipped made the instruments

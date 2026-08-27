@@ -1937,7 +1937,7 @@ if __name__ == "__main__":
 # never-raise pattern as everything above.
 
 
-def fetch_realized_window(bots, days=7):
+def fetch_realized_window(bots, days=7, exclude_reasons=None):
     """[2026-07-16 LIVE-LANE BALANCE] Per-bot realized P&L over the trailing
     window, straight from the paper_trades ledger: {bot: {"pnl", "closes"}}.
     Bots with no closes in the window get {"pnl": 0.0, "closes": 0} — present,
@@ -1953,15 +1953,51 @@ def fetch_realized_window(bots, days=7):
         _ensure_paper_trades_table(conn)
         from datetime import datetime, timedelta, timezone
         cut = (datetime.now(timezone.utc) - timedelta(days=float(days))).isoformat()
-        out = {str(b): {"pnl": 0.0, "closes": 0} for b in bots}
+        out = {str(b): {"pnl": 0.0, "closes": 0,
+                        "stripped_pnl": 0.0, "stripped_n": 0,
+                        "stripped_days": 0} for b in bots}
+        # [(vf)] A HALT IS AN EVENT, NOT A TRADE — and it was being counted as
+        # several. `exclude_reasons` names the exit families that are FORCED
+        # flattens rather than the strategy's own outcome; the fleet already
+        # owns this vocabulary as `fleet_bus.JUDGED_PAIRS[*]["strip_exits"]`,
+        # and the caller passes it rather than this module re-typing it.
+        # MEASURED on 🔮 georgia, 27-Aug: her 7d window read **-$36.96** and
+        # the evidence board cut her live clip to 0.75x on it — but **-$34.83
+        # of that was 10 halt rows spanning 6 events, five of them closed at
+        # ONE timestamp** (25-Aug 12:08). Her strategy's own 7d result was
+        # **-$2.13**, comfortably inside the bar. One bad afternoon, counted
+        # five times, shrank a real-money book.
+        # WHAT IS STRIPPED IS REPORTED, never silently dropped: the caller
+        # gets the excluded sum, row count and DISTINCT DAY count back, so a
+        # book that is genuinely halting often is still visible as such.
+        _ex = [str(r) for r in (exclude_reasons or []) if str(r)]
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0) FROM paper_trades "
-                "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
-                "AND closed_at >= %s GROUP BY bot",
-                (list(out), cut))
-            for b, n, s in cur.fetchall():
-                out[str(b)] = {"pnl": float(s or 0.0), "closes": int(n or 0)}
+            if _ex:
+                _like = "(" + " OR ".join(["reason ILIKE %s"] * len(_ex)) + ")"
+                cur.execute(
+                    "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0), "
+                    "COUNT(*) FILTER (WHERE " + _like + "), "
+                    "COALESCE(SUM(pnl_abs) FILTER (WHERE " + _like + "), 0), "
+                    "COUNT(DISTINCT LEFT(closed_at, 10)) "
+                    "  FILTER (WHERE " + _like + ") "
+                    "FROM paper_trades "
+                    "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
+                    "AND closed_at >= %s GROUP BY bot",
+                    tuple(f"%{r}%" for r in _ex) * 3 + (list(out), cut))
+                for b, n, tot, xn, xp, xd in cur.fetchall():
+                    out[str(b)] = {"pnl": float(tot or 0.0) - float(xp or 0.0),
+                                   "closes": int(n or 0) - int(xn or 0),
+                                   "stripped_pnl": float(xp or 0.0),
+                                   "stripped_n": int(xn or 0),
+                                   "stripped_days": int(xd or 0)}
+            else:
+                cur.execute(
+                    "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0) FROM paper_trades "
+                    "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
+                    "AND closed_at >= %s GROUP BY bot",
+                    (list(out), cut))
+                for b, n, s in cur.fetchall():
+                    out[str(b)].update(pnl=float(s or 0.0), closes=int(n or 0))
         return out
     except Exception as e:  # noqa: BLE001
         _warn_once(f"realized-window read failed ({e})")

@@ -570,6 +570,18 @@ def live_clip_lever(bot):
     the shared lever (the old behaviour), never to a guess — I8."""
     return LIVE_CLIP_LEVERS.get(str(bot), "live.clip_scale")
 LIVE_MIN_CLOSED = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED", "30"))
+#: [(vf)] The exit families that are FORCED FLATTENS rather than the strategy's
+#: own result. Sourced from fleet_bus so the board and the judge cannot drift
+#: about what counts as a trade; the literal is the fail-safe for a dark import
+#: and is deliberately the SAME tuple.
+try:                                     # pragma: no cover - import shape
+    from fleet_bus import JUDGED_PAIRS as _JP
+    _STRIP_EXITS = tuple(sorted({r for p in (_JP or {}).values()
+                                 for r in (p.get("strip_exits") or ())})) \
+        or ("daily_loss", "kill_switch", "v1_legacy")
+except Exception:                        # noqa: BLE001
+    _STRIP_EXITS = ("daily_loss", "kill_switch", "v1_legacy")
+
 LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10/7d hurts
 LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
 LIVE_DD_MIN = float(os.environ.get("EVBOARD_LIVE_DD_MIN", "-0.02"))      # 7d fleet dd
@@ -589,6 +601,17 @@ LIVE_LADDER = [1.0, 1.25, 1.5]
 #            LIVE_SLOW_TOL) AND >=1 row PROVES it: >=LIVE_MIN_CLOSED
 #            lifetime closes, >=LIVE_MIN_CLOSED_7D closes in the window,
 #            positive 7d realized. Dark window = no up-scale (fail-closed).
+#: [(vf)] The gate's OWN drawdown failure line, imported not re-typed — a second
+#: copy of the rule that governs real money is a second rule. None if unreadable,
+#: in which case the flat backstop below stands unchanged (fail toward today).
+try:                                     # pragma: no cover - import shape
+    from golive_readiness import GOLIVE_MAX_DD as _GATE_MAX_DD
+except Exception:                        # noqa: BLE001
+    try:
+        from scripts.golive_readiness import GOLIVE_MAX_DD as _GATE_MAX_DD
+    except Exception:                    # noqa: BLE001
+        _GATE_MAX_DD = None
+
 LIVE_DOWN_HARD = float(os.environ.get("EVBOARD_LIVE_DOWN_HARD",
                                       str(2 * LIVE_DOWN_PNL)))
 LIVE_SLOW_TOL = float(os.environ.get("EVBOARD_LIVE_SLOW_TOL", "1"))
@@ -732,20 +755,72 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     # window drops every row back to the old lifetime rule. The DOWN reflex
     # runs on whatever rows ARE visible — a vanished bot_pnl row must never
     # disarm the tighten side (it only blocks the expand side, below).
+    def _designed_stop_usd(r):
+        """[(vf)] ONE ORDINARY STOP-OUT on this book, in dollars, from the row's
+        OWN published fields — or None when they are not all readable.
+
+        `equity x gross_x x |stoploss| / max_open` is the loss the book is
+        DESIGNED to take when a single slot stops. A down-reflex whose bar sits
+        below that fires on the book's own design rather than on its risk —
+        exactly the I7 shape ("a trigger a book satisfies structurally is not a
+        measurement"), at a live actuator that shrinks real money.
+
+        MEASURED 27-Aug against the shipped $10 bar: 🙏 avo $68.09 (6.8x the
+        bar), 👩 mum $30.00 (3.0x), 🔮 georgia $24.79 (2.5x). So the fleet's
+        BEST book — +$16.46 over the same 7d — sat one ordinary stop-out from
+        being cut to 0.75x. The bar was written when the live books were ~$60
+        at 1x leverage and never moved when they were funded and levered."""
+        try:
+            e = float(r.get("equity") or 0.0)
+            x = (r.get("extra") or {})
+            gx = float(((x.get("leverage") or {}).get("set")) or 0.0)
+            sl = abs(float(((x.get("policy") or {}).get("stoploss")) or 0.0))
+            n = int(x.get("cap_slots") or x.get("max_open") or 0)
+            if e > 0 and gx > 0 and sl > 0 and n > 0:
+                return e * gx * sl / n
+        except (TypeError, ValueError):
+            pass
+        return None
+
     def _hurt_why(b, r):
         life = float(r.get("pnl_abs") or 0)
+        # the bar is the WORSE of the flat floor and this book's own designed
+        # stop-out: never looser than the operator's floor, never so tight that
+        # one designed loss trips it. Unreadable fields keep the flat floor.
+        _ds = _designed_stop_usd(r)
+        bar = max(LIVE_DOWN_PNL, _ds) if _ds else LIVE_DOWN_PNL
         w = (window or {}).get(b) if window else None
         if w is not None:
             wp = float(w.get("pnl") or 0)
-            if wp <= -LIVE_DOWN_PNL:
-                return f"{b} 7d ${wp:+.2f}"
+            if wp <= -bar:
+                _sx = float(w.get("stripped_pnl") or 0.0)
+                _sd = int(w.get("stripped_days") or 0)
+                _note = (f" [excl {_sd}d of halts ${_sx:+.2f}]"
+                         if w.get("stripped_n") else "")
+                return f"{b} 7d ${wp:+.2f} vs bar ${bar:.2f}{_note}"
             if int(w.get("closes") or 0) == 0:
                 return (f"{b} ${life:+.2f} (mark)"
-                        if life <= -LIVE_DOWN_PNL else None)
-            if life <= -LIVE_DOWN_HARD:
-                return f"{b} lifetime ${life:+.2f} (backstop)"
+                        if life <= -bar else None)
+            # [(vf)] THE LIFETIME BACKSTOP IS THE GATE'S OWN DRAWDOWN LINE,
+            # not a flat $20. `LIVE_DOWN_HARD` never heals — a book down more
+            # than it trades perfectly for a week and stays cut, which is the
+            # exact failure `fetch_realized_window`'s own docstring was written
+            # to end ("lifetime pnl_abs anchors never heal"). Worse, the flat
+            # bar is unrelated to book size: $20 is 7% of 🔮 georgia's book and
+            # would be 2% of a $1,000 one. The fleet ALREADY declares where a
+            # book is in trouble — `golive_readiness.GOLIVE_MAX_DD`, the 15%
+            # bar that governs real money — so an actuator stricter than that
+            # is stricter than the gate it serves. Measured 27-Aug: georgia
+            # -$39.12 on a $287.02 book = 13.6%, INSIDE the 15% the gate
+            # allows, yet the flat backstop had her permanently restricted.
+            _hard = LIVE_DOWN_HARD
+            _start = float(r.get("equity") or 0.0) - life
+            if _start > 0 and _GATE_MAX_DD:
+                _hard = max(_hard, _start * float(_GATE_MAX_DD))
+            if life <= -_hard:
+                return f"{b} lifetime ${life:+.2f} vs ${_hard:.2f} (backstop)"
             return None
-        return f"{b} ${life:+.2f}" if life <= -LIVE_DOWN_PNL else None
+        return f"{b} ${life:+.2f}" if life <= -bar else None
 
     hurt = [w for b, r in sorted(rows.items()) for w in [_hurt_why(b, r)] if w]
     if gap or hurt:
@@ -1824,7 +1899,12 @@ def run_once():
     live_window = None
     try:
         if hasattr(store, "fetch_realized_window"):
-            live_window = store.fetch_realized_window(sorted(LIVE_ROWS), days=7)
+            # [(vf)] A FORCED FLATTEN IS NOT A TRADING OUTCOME. The families
+            # come from `fleet_bus.JUDGED_PAIRS[*]["strip_exits"]` — the ONE
+            # place the fleet already declares "halt events, not candidate
+            # outcomes" — rather than a second list typed here.
+            live_window = store.fetch_realized_window(
+                sorted(LIVE_ROWS), days=7, exclude_reasons=_STRIP_EXITS)
     except Exception:  # noqa: BLE001
         live_window = None
     # [2026-08-16 (nj)] PER-ROW from here down: one decision, one arm, one
