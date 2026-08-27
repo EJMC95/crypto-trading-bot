@@ -1,3 +1,174 @@
+## 2026-08-27 (vm) — THE FLEET COULD NOT COUNT WHAT ITS GUARDS REFUSED: 0 OF 20 ROWS ACCUMULATED A CENSUS, SO EVERY LOOSENING WAS UNPRICEABLE AND BLINDNESS ALWAYS RESOLVED RESTRICTIVELY
+
+**Eamon, 27-Aug:** *"the guards, and arms and security system we have is too
+tight, its not letting anything even gain data we can use. please look in and
+evolve this"* / *"make sure faults and mistakes are recorded not to happen
+again and the wins are recorded so we can keep winning also"* / *"The
+connection lack we had between all of the instruments is the biggest hurdle we
+have consistently had."*
+
+He is right, and the mechanism is not high bars. **MEASURED across all 20 rows
+of `/pnl.json`: not ONE publishes a time-accumulated counter.** Every `scan` /
+`census` / `slot_census` is a single loop, destroyed and rewritten each cycle,
+and `/bus.json` `history` carries organ keys only — no book rows at all. 🎫 the
+taker's `slot_census {offered: 4, slots_full: 4}`, the evidence its position
+cap binds, is a sample of **n=1 CYCLE**.
+
+So: a guard refuses without counting → its cost is unmeasurable → I19 requires
+a widening to be priced in expectancy → **an unpriceable widening can never
+ship.** The fleet is blind to its own refusals, and **blindness always resolves
+in the restrictive direction**, so the system ratchets tighter with nobody
+choosing that. Corroborating the same day: **4 of 20 books had produced ZERO
+closes in their lifetimes** (🧮 hull, 🏦 kiyosaki, 📐 grimes, 👩 mum-live), the
+experiment judge — the fleet's only designed shadow→real-money path — judged
+**0 of 4 pairs** with every reason bookkeeping rather than evidence, and
+`golive_readiness.ready` was `[]` with only **2 of 20** rows carrying any
+projected date.
+
+### THE FOUNDATION — `snapshot_census` / `census_window`
+
+Rides the EXISTING `save_history` + prune path beside `snapshot_equity`: no new
+storage, no second retention. `census_window` publishes what a single loop
+cannot say — `loops` (4 refusals in 1 loop and 4 in 500 are the same integer
+and opposite facts), `hours` (the ACTUAL first-to-last span, never the
+requested one), `binding_gate` (the declared refusal holding the largest
+share), `dropped`, `unclassified`, and `truncated` (the `(qz)` signature, so a
+sampled window cannot read as exhaustive).
+
+**Empty history returns `{}` and NOT a zero-filled dict**, and that is the
+whole point of the work: a fabricated `{slots_full: 0}` reads as *measured,
+nothing refused* where the truth is *no data* — I1 at counter scale.
+DENOMINATORS and REFUSALS are read off the living books' own census literals,
+never invented, and **a key in neither set is EXCLUDED from `binding_gate`
+rather than assumed to be a refusal** — a binding gate that names the wrong fix
+is worse than none. Measured while the PM mapping was tightened: 9 `stale-data`
+refusals lost to 3 slot refusals and the gate reported `slots_full`, pointing
+the operator at capacity when the answer was the feed. A string verdict is
+never coerced — `float()`-ing `"protections_locked"` is how a verdict becomes a
+fake measurement.
+
+### WHAT NOW COUNTS
+
+* **👩 mum** — her trend term was structurally invisible: `census_no_entry_why`
+  returned `uptrend_blocked` ONLY when the RSI term ALSO passed, so whenever
+  RSI was the tighter half the NOT-uptrend half counted zero. Her bar is now
+  MET (`rsi_min 27.8 < 36.0`) and the single qualifying coin is trend-blocked —
+  **her binding gate has MOVED and no field said so.** `outside_uptrend_n` and
+  `both_terms_n` now publish, the latter driven through `signals()`' own
+  `enter` rather than a retyped condition. **A fabricated number is also
+  removed:** her row published `spend.days_to_gate_obs: 28.1` on a book with
+  ZERO closes and rate 0 — the invented value keeping `audit_book_spend` green
+  on the one book I22 exists to catch. It publishes `null` now.
+  **THE WIDENING ITSELF IS NOT SHIPPED** — `(uz)` measured that past 32 costs
+  expectancy, and the decision is Eamon's after seven days of the gauge.
+* **The live trio** — no counter existed for what the real-money rails cost.
+  `hours_shut_today`, `lockout_hours_30d` and `halt_days_30d` now publish SPLIT
+  BY CAUSE, derived from the host's own lock computation. `basket_move_now_pct`
+  no longer reads `null` for both *flat* and *sensor dark*.
+* **⚖️ Counterweight and both 🏛️ PMs** published no census at all; two are
+  `undecidable` at ~2,500 days and nothing said why. All three have one now,
+  filled BY the gates themselves so it cannot drift from the selection the book
+  acts on.
+* **🧮 hull** read `{held: 10, eligible: 1}` — which looks supply-limited and is
+  not. Its entry band `[7.82%, 20%)` CONTAINS the venue's crypto resting pin
+  and its exit bar sits below it, so `decay_paid` and `liability_flip` are
+  **dead by construction** and `max_hold` is its only live exit.
+  `exits_reachable`, `n_at_pin` and `oldest_held_h` publish it.
+  **REFUSED with the number:** a proposal to lift `HULL_EXIT_APR` to 0.036 is
+  wrong twice — hull is crypto-only so it clears the *non-crypto* 3.5 pin and
+  changes nothing, and an exit above the pin lands INSIDE the entry band,
+  closing coins the loop after they open.
+  `test_exit_apr_never_reaches_into_the_entry_band` makes that structural.
+
+### THE JUDGE JUDGES AGAIN
+
+It was not blocked at parity — **`paired_eval`, the only producer of
+`promote: True`, ran ZERO TIMES PER CYCLE**, because `run_once` returned at
+module scope on the retired Farmer and every production call site sat below
+that return. The stand-down is now a PER-PAIR skip derived from the row each
+lane trades; the farmer stays parked (pinned by a mutation that neuters the
+skip and asserts `write_levers` 0). `power` and `eta_judgeable` ride EVERY pair
+state instead of the `idle` rung alone, with the binding term NAMED and read as
+a FLOOR. 👩 mum gains her own reason **`no_closes`** — she read
+`policy_unstamped` while the host it accuses stamps correctly (🔮 georgia reads
+30/30 from the same code), sending the next reader hunting a bug in a file with
+none. Corrected while there: the published MDE used the FULL-WINDOW floors
+where the binding rung is the PER-HALF one, **1.41× larger and cleared twice**.
+**No promotion bar moved** — `live >= 10` stands, because it is the smaller arm
+and dominates the SE; dropping it to 5 takes false-promote ~8-12% → ~16%,
+buying speed by making the judge wrong more often about real money. The judge
+remains SOLE WRITER of `live.funding.*`, now pinned by an AST walk of every
+root module rather than a hand list.
+
+### RECORDING WINS — `scripts/claims_ledger.py`
+
+**The asymmetry, measured:** the fault side is real and enforced (25
+invariants, 24 with executable enforcement, 29 audit scripts, 152 autonomy test
+files). The win side had ONE script — `winners_docket.py`, whose own line 38
+says *"writes nothing, publishes nothing"* — appearing in **no workflow and no
+loop since 18-Aug.** The instrument built to prove wins was itself the `(gk)`
+shape: a rule nobody runs.
+
+**And the fault side had a leak.** `CLAUDE.md` records the justification for
+real money on 🔮 georgia as *"failing only `t` (1.48 < 2.0)"*. The live grader
+reads **t = 0.62**, `undecidable`, ~776 days. **The number that justified real
+money was 2.4× stale and had stood five days**, and not one of 29 audit scripts
+checks that a figure quoted in doctrine still matches the organ that owns it.
+Corrected in place per I12 in the same commit.
+
+One row per number the fleet has committed to — a **win**, a **refusal**, or a
+**doctrine** claim — each naming an `owner = (organ_key, dotted.path)` and a
+tolerance. **A row that cannot be recomputed is REFUSED at declaration time**,
+so an unfalsifiable number never enters. `audit_claim_freshness` IMPORTS
+`audit_doctrine_enforcement.check_ref` rather than re-expressing it, extending
+that mechanism from rules to numbers, and is a RATCHET so a pre-existing
+backlog cannot redden the build while a NEW un-owned number fails the push that
+adds it. Five verdicts, and `PENDING` matters: a registered prediction before
+its `grade_after` can neither redden early nor be quietly forgotten (I21). Both
+it and the winners' docket now ride the 6-hourly loop — **the win side has a
+schedule for the first time** — and both joined `Dockerfile.freqtrade` and the
+deploy routes, because `scripts/` is not copied wholesale and without the COPY
+each loop is a no-op behind `|| true`.
+
+### AND THE CARD STOPPED SHOWING EAMON LOSSES THAT NEVER HAPPENED
+
+`(tw)` fixed the OWNER and the aggregate and **never reached the dashboard**:
+`is_non_economic` had ZERO hits in `pnl_dashboard.py`. So the card rendered 🙏
+avo **15 / 5W / 10L** where the book took **6 real trades (5W/1L)**, and 🔮
+georgia 60/27/33 against 56/27/29 — halt EVENTS with no entry basis counted as
+LOSSES on real-money books, because `losses = n - w`. Now exclude-then-FOLD,
+mirroring the owner's own split. **Fold rather than subtract, because
+`best`/`worst` are EXTREMA** — a $0.00 halt event becomes the "worst trade" of
+an all-winning book and subtraction cannot repair that. `bot_trades` carries
+neither `extra` nor `entry_price`, so it is marked `FALSE AS cand` and never
+offered to a predicate it cannot answer: supplying NULLs alone would have made
+every freqtrade flat close look like a halt event and **deleted real trades**.
+`record.events` is always present (0 on a clean book), so the drop from 15 to 6
+is EXPLAINED rather than being a second confusion in place of the first.
+
+### PUBLISH-ONLY, ASSERTED RATHER THAN CLAIMED
+
+Nothing a book trades changed anywhere in this wave: no entry rule, exit rule,
+threshold, cap or sizing moved, and on the real-money host an **AST test pins
+that no new counter name appears anywhere in the entry path** — a gauge that
+grows a consumer becomes a gate, which is the whole risk of instrumenting live
+money. Two tests were themselves corrected for pinning SURFACE rather than
+PROPERTY: the judge's fail-OPEN guard asserted a literal source line and failed
+on a RENAME while the property was intact (now an AST walk requiring every
+`live_arm_retired` call to sit under an `is not None` bus check), and the
+go-live loop guard counted MENTIONS of the grader and so failed on a
+neighbouring comment (now counts invocations, and stays strict).
+
+**Mutation-verified throughout: 9 + 11 + 12 + 10 + 22 + 9 = 73 mutations
+driven, every one RED.** Four agents reported tests of their own that mutation
+exposed as vacuous — a fixture whose strings were all non-numeric so a
+`float()` coercion passed; an equality assert that could not see a retyped
+constant because it is byte-identical to the derived one; a census test that
+never drove the real `cycle()`. Two rounds were re-driven after out-of-tree
+`.pyc` caching served mutated bytecode from a restored source
+([[mutation-tests-lie-under-out-of-tree-pycache]] bit two agents in the same
+wave, in a tree where the standing memory already names it).
+
 ## 2026-08-27 (vk) — THE REMAINING LEDGER BUGS: 🧭 NAV-COOK RECOVERS 34 CLOSES (sa) COULD NOT, 🌾 CARRY DECLARES ITS BASIS — AND THE FLAP I REPORTED WAS ALREADY FIXED
 
 Eamon: *"fix bugs also."* Four items were carried out of `(tw)`. **Two were

@@ -1200,7 +1200,21 @@ The evidence is the fleet's own grader, agreeing across both arms — horizon
 n=161 −0.195% t=−0.95 +5.71/−18.32. 🔮 georgia takes the sub-account: 5 of 6
 bars, both halves positive, failing only `t` (1.48 < 2.0) — **stated plainly:
 she has not passed the gate, and go-live is Eamon's explicit act, which this
-is.** The SHADOW twin is NOT retired and keeps trading as the control arm, so
+is.** **[CORRECTED IN PLACE 27-Aug (vm) per I12 — THAT NUMBER IS FIVE DAYS
+STALE AND THIS SENTENCE IS THE RECORDED JUSTIFICATION FOR REAL MONEY.** Her
+shadow arm's live grade today reads **n=205, t=0.62**, verdict `undecidable`,
+~776 days at the measured rate — the `t` bar has moved AWAY, not toward. The
+5-of-6 reading still holds and is exactly why bar count is the wrong headline:
+🙏 avo passes FOUR bars and is 37 days out, because georgia's mean (+0.101%)
+sits below her own `mde80_pct` (0.437%) — she is precise about a number too
+small to prove. **Nothing about the go-live decision is reopened by this** (it
+was Eamon's explicit act on the evidence available, and the fleet's own grader
+is what says so now); what is corrected is a doctrine sentence that no longer
+described the system. **This is the leak `scripts/claims_ledger.py` was built
+for the same day** — the number now carries an owner
+(`golive-readiness → books.freqtrade-georgia-lshadow.t`) and a tolerance, so
+the next drift reddens a push instead of standing for five days and being
+found by accident in an audit.] The SHADOW twin is NOT retired and keeps trading as the control arm, so
 this row needs only the LIVE half of the usual two: `RETIRED_ROWS` +
 `LEGACY_BOTS` are deliberately DEFERRED until the flatten's own receipt
 (`extra.retired.open == 0`) is read, because `/pnl.json` is filtered by the
