@@ -70,18 +70,34 @@ def test_the_cadence_is_floored_and_clamped():
 
 def test_the_bounds_are_applied_to_the_env_not_just_the_default(monkeypatch):
     """The floor has to survive an operator setting a smaller number — a
-    default-only floor is the bound that is never tested and never binds."""
+    default-only floor is the bound that is never tested and never binds.
+
+    THE ENV NAME IS DERIVED, NOT TYPED. `_env` reads `f"{_PFX}_{name}"` — a
+    per-book namespace (`AVO_TELEMETRY_SECONDS`, `GEORGIA_…`, `MUM_…`) so two
+    live services on one image cannot read each other's sizing. The first
+    version of this test set a bare `TELEMETRY_SECONDS`, which the module never
+    reads: every reload returned the default 60, `60 >= 20` passed, and a
+    mutation dropping the floor 20 -> 1 SURVIVED. Reading `_PFX` off the module
+    is what makes this test able to fail."""
     import importlib
     import lighter_avo_live_bot as avo
-    for raw, want_min in (("1", 20), ("0", 20), ("-5", 20)):
-        monkeypatch.setenv("TELEMETRY_SECONDS", raw)
-        reloaded = importlib.reload(avo)
-        assert reloaded.TELEMETRY_SECONDS >= want_min, (raw, reloaded.TELEMETRY_SECONDS)
-    monkeypatch.setenv("TELEMETRY_SECONDS", "99999")
-    reloaded = importlib.reload(avo)
-    assert reloaded.TELEMETRY_SECONDS <= reloaded.LOOP_SECONDS
-    monkeypatch.delenv("TELEMETRY_SECONDS", raising=False)
-    importlib.reload(avo)
+    key = f"{avo._PFX}_TELEMETRY_SECONDS"
+
+    # positive control FIRST: prove the env reaches the constant at all,
+    # otherwise every assertion below is vacuous exactly as it was.
+    monkeypatch.setenv(key, "137")
+    assert importlib.reload(avo).TELEMETRY_SECONDS == 137, (
+        f"{key} does not reach TELEMETRY_SECONDS — this test cannot fail")
+
+    for raw in ("1", "0", "-5"):
+        monkeypatch.setenv(key, raw)
+        got = importlib.reload(avo).TELEMETRY_SECONDS
+        assert got >= 20, f"{key}={raw} produced {got}, floor not applied"
+    monkeypatch.setenv(key, "99999")
+    got = importlib.reload(avo)
+    assert got.TELEMETRY_SECONDS <= got.LOOP_SECONDS
+    monkeypatch.delenv(key, raising=False)
+    assert importlib.reload(avo).TELEMETRY_SECONDS == 60
 
 
 # ---- 2  the MTM series stays on the trading cadence -----------------------
