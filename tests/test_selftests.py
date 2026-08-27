@@ -434,6 +434,16 @@ ENFORCED_AUDITS = [
     # the SAME row as distant history does not, and a removed anchor is
     # reported rather than silently skipping the check.
     "scripts/audit_live_roster.py",
+    # [2026-08-27 (tw)] A RECORD MUST NOT FABRICATE WHAT IT DOES NOT KNOW.
+    # Its --selftest pins the `is_non_economic` contract this audit imports
+    # rather than re-expresses — that georgia's real -$0.84 LIT loss and her
+    # five REAL forced-flatten closes are never classified as events, that a
+    # funding row booking accrual is a TRADE, and that anything unparseable
+    # fails OPEN — plus that the RATCHET keys are the four it reports on.
+    # Registered because the guard caught its own omission on first CI: the
+    # file was UNTRACKED during the local run, so the enumerator could not
+    # see it (the (th) `live_pnl_audit` shape, exactly).
+    "scripts/audit_ledger_records.py",
     # [2026-08-19 (qz)] MID-LINE conflict markers. changelog-check.yml has
     # carried an anchored `git grep -nE '^(<<<<<<<|>>>>>>>|=======$)'` since the
     # committed-stash-marker incident, and on 19-Aug the SAME class landed again
