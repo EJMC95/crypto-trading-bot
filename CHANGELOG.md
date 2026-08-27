@@ -1,3 +1,74 @@
+## 2026-08-27 (va) — THE JUDGE NEVER CHECKED WHETHER THE CONTROL ARM WAS ALIVE: A TEN-DAY-DEAD SHADOW ROW CERTIFIED A PAIR `idle`
+
+**[RENUMBERED (uz) -> (va) at push time.** A concurrent session published its
+own (uz) — "Mum is slow not stuck" — while this was being written and
+mutation-tested; `audit_changelog_letters`' cross-branch arm caught it before
+the push. Theirs was already on main and mine was unpushed, so mine moved: 7
+citations across 4 files, counted before and after.**]**
+
+I1 is this file's FIRST invariant — *before interpreting what a payload SAYS,
+establish that something still writes it* — and the pair census had exactly one
+liveness check in it, on the live arm. Found by a peer session and handed over;
+verified here by driving the real `_pair_precheck` before a line was changed.
+
+**THE DEFECT.** `fetch_bot_pnl` upserts on a bot primary key, so a dead
+publisher's final row persists **forever** rather than ageing out. Every rung
+below `live_row_dark` read the SHADOW row's last known values as current.
+Measured, same fixture, only the shadow row's age changed:
+
+| shadow row | caps 5 vs 6 | caps 5 vs 5 |
+|---|---|---|
+| fresh (60s) | `capacity_mismatch` | **`idle`** |
+| **10 DAYS stale** | `capacity_mismatch` | **`idle`** |
+
+Byte-identical. The left column sends a human to align caps against a corpse —
+the dashboard files `capacity_mismatch` under PIPE_WIRE, *"a session can clear
+this week"*. **The right column is the dangerous one: `idle` means JUDGEABLE,
+and idle is the state a real comparison starts from.** Nor do the rungs in
+front of capacity help: `_latest_policy_stamp` has no recency window at all, so
+a dead arm still yields a policy stamp and parity passes on it. A FALSE
+CERTIFICATION rather than a wrong bar, which is why it fails CLOSED.
+
+`shadow_row_dark` is the new rung, in the shared vocabulary (the (tb)
+inversion) and in the dashboard's reason map — an unmapped reason renders as an
+unexplained blocker. It names the arm (I8) and its `wake_when` names the thing
+to fix: **the stopped or crash-looping shadow SERVICE, not the pair's caps.**
+Inert on today's fleet — every shadow row is seconds fresh, and the census
+verdicts are unchanged against live rows.
+
+**AND THE GATE COULD NOT BE TESTED, WHICH IS WHY THIS SURVIVED.** `_fresh` read
+`now_ts()` and ignored the `now` it was handed. The judge's in-module selftest
+drives `t0 = 1_800_000_000.0` — **~12.2M seconds in the FUTURE of wall clock** —
+so every age came out NEGATIVE and the bar passed for any horizon. That
+selftest could not exercise this gate in either direction, and it would have
+silently flipped behaviour on **2027-01-15**, when t0 becomes the past. The gate
+now reads the clock it is handed. Production passes `now_ts()`, so no verdict
+moves.
+
+**THAT EXPOSED A SECOND LATENT DEFECT: `now` HAD TWO SHAPES AND NOTHING
+NOTICED.** `run_once` passes a float; the pipeline-card fixture passes a
+`datetime`. While `_fresh` ignored the argument, both "worked". The moment it
+was actually READ, the datetime path raised inside `_fresh`'s own
+`except (TypeError, ValueError)` and every pair in that fixture went
+`live_row_dark` — failing closed, the safe direction, and still a defect.
+`_epoch` normalises it **at the point of use** rather than one level up, so the
+direct callers (the judge's selftest, the pair tests) are covered too — a
+normalisation in `pair_census` alone would have left exactly the callers that
+let the two shapes coexist unnoticed.
+
+**5/5 mutations RED**, and two of them were defects in my own tests first:
+* the `_epoch` mutation SURVIVED twice. First because my tests passed only
+  floats; then — after adding a datetime case — because my fixture built its
+  rows by calling `_epoch`, **the function under test**, so a corrupted
+  `_epoch` moved the rows and the bar together and they stayed consistent. The
+  fixture now derives the instant independently. *A test must not source its
+  expectation from the code it is testing.*
+* `PAIR_ROW_STALE_S` and the fail-open-on-unreadable-row branch are pinned too.
+
+A stale docstring in `test_pipeline_card.py` asserting that `_fresh` "reads
+`now_ts()` and ignores the `now` it is handed" is corrected in place (I12) —
+it described the behaviour this entry removes.
+
 ## 2026-08-27 (uz) — 👩 MUM IS SLOW, NOT STUCK: HER SHIPPED RSI BAR IS THE MEASURED PEAK, THE UNIVERSE WIDENING IS REFUTED BY RESAMPLING, AND THE TAPE NOW FETCHES ONCE (1804x)
 
 **Eamon, 27-Aug: *"Let's grow this PnL"*** — and *"we record things far too

@@ -317,6 +317,7 @@ XP_JUDGE_HOLDS = ("arm_skew", "arm_drift", "floors", "assert_fail")
 XP_JUDGE_UNJUDGEABLE = (
     "policy_unstamped", "policy_mismatch", "capacity_mismatch",
     "parity_unreadable", "no_live_arm", "live_row_dark",
+    "shadow_row_dark",
     "pnl_form_mismatch", "unknown_exit_reason")
 
 

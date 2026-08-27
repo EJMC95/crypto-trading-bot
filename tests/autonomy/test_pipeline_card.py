@@ -190,12 +190,19 @@ def _row(bot, max_open=4, age_s=30):
     `updated_at` as ISO, never a precomputed `age_sec` (the (tj) trap the
     judge's own census walked into).
 
-    Stamped off the WALL CLOCK, not the fixture's frozen `NOW`, because the
-    judge's own `_fresh()` reads `now_ts()` and ignores the `now` it is
-    handed. A NOW-relative stamp silently ages past the 3xTTL bar as the
-    session runs, and every pair then collapses to `live_row_dark` — a fixture
-    whose verdicts depend on what time the suite happens to run is worse than
-    no fixture, so the dependency is honoured here rather than papered over.
+    Stamped off the WALL CLOCK, which is also what this module's `NOW` is
+    (`datetime.now(timezone.utc)` at import), so the two agree.
+
+    [(va)] CORRECTED IN PLACE: this used to say `_fresh()` "reads `now_ts()`
+    and ignores the `now` it is handed". That is no longer true — the gate now
+    reads the clock it is HANDED, so that it can be driven at a fixed instant
+    (the judge's in-module selftest drives a t0 ~12.2M seconds in the future,
+    where a wall-clock read made every age negative and the bar unfalsifiable).
+    `pair_census` normalises `now` via `_epoch`, so this fixture may pass its
+    `NOW` datetime and production may pass a float, and both mean the same
+    instant. A fixture whose verdicts depend on what time the suite runs is
+    still worse than no fixture — that part stands, and wall-clock stamps
+    against a wall-clock `NOW` are what keep it honest.
 
     [(uy)] `ttl_sec: 900` removed — the same (tj) miss this docstring warns
     about, in the line below it. `fetch_bot_pnl` emits no `ttl_sec` (zero
