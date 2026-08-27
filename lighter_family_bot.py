@@ -1518,7 +1518,22 @@ class Book:
             self.meta = {str(k): v for k, v in (saved.get("meta") or {}).items()}
             self.closed = list(saved.get("closed") or [])
             self.fund_realized = float(saved.get("fund_realized") or 0.0)
-            self.guard_until = float(saved.get("guard_until") or 0.0)
+            # [(vg)] THE GUARD IS DURABLE, so a restart does NOT clear it —
+            # which is correct (a redeploy must not be a way to bypass a
+            # protection) and is also why "unlock her" could not be done by
+            # deploying. `FAMILY_CLEAR_GUARD` is the explicit, auditable way:
+            # a comma-list of bot ids whose entry lock is dropped ONCE at boot.
+            # Operator-only, opt-in, and it logs what it cleared — an unlock
+            # nobody can see is how a protection goes missing quietly.
+            _g = float(saved.get("guard_until") or 0.0)
+            _clear = {b.strip() for b in
+                      os.environ.get("FAMILY_CLEAR_GUARD", "").split(",")
+                      if b.strip()}
+            if _g and self.bot_id in _clear:
+                log.warning("%s FAMILY_CLEAR_GUARD: entry lock dropped by "
+                            "operator (was until %.0f)", self.bot_id, _g)
+                _g = 0.0
+            self.guard_until = _g
             self.cooldown = {str(k): float(v) for k, v in
                              (saved.get("cooldown") or {}).items()}
             # [2026-07-16 AUDIT FIX] restore the accrual clock — it reset to

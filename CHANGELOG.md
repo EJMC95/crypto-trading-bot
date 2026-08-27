@@ -1,3 +1,74 @@
+## 2026-08-27 (vg) — 🔮 GEORGIA'S REAL P&L STORY, MEASURED: HER STRATEGY IS +3.62pp AND ONE DOGE GAP PLUS THE HALT RAIL TOOK THE MONEY — PLUS AN EXPLICIT OPERATOR UNLOCK
+
+**Eamon, 27-Aug:** *"Unlock Georgia"* and *"Georgias problem is she's alllowed
+to lose heavily and only win slightly - there's your fix"*. The second is a
+correct diagnosis of her SHAPE, and measuring it turned up a different
+distribution of blame than either of us expected.
+
+### WHY THE RESTART DID NOT UNLOCK HER — AND THE EXPLICIT TOOL THAT DOES
+
+`guard_until` is **durable** (restored from saved state), so a redeploy cannot
+clear it. That is correct — a restart must never be a way to bypass a
+protection, which is exactly the
+[[lighter-flatten-silent-halt-redeploy-incident]] lesson pointing the other
+way — and it is why the `[deploy-live]` in (ve) left her locked.
+`FAMILY_CLEAR_GUARD` is the auditable alternative: a comma-list of bot ids
+whose entry lock is dropped **once** at boot, operator-only, opt-in, and it
+**logs what it cleared**. An unlock nobody can see is how a protection goes
+missing quietly.
+
+### HER LEDGER, HALT ROWS SEPARATED FROM STRATEGY ROWS
+
+| | |
+|---|---|
+| strategy closes | **50** (win rate 54.0%) |
+| avg win / avg loss | **+0.956% / −0.965%** → payoff **0.99 : 1** |
+| break-even win rate needed | 50.2% — she clears it |
+| **strategy total** | **+3.62pp** |
+| one DOGE gap, 22-Aug | **−7.17pp (−$14.16)** |
+| halt / forced-flatten events | **−$34.83** across 6 events |
+| **row P&L** | **−$39.12** |
+
+**Her strategy is marginally profitable. The money went to one gap and to the
+halt rail** — and (vf) has just stopped the evidence board cutting her size
+using those same halt rows a second time.
+
+### THE ONE TRADE, AND WHY A TIGHTER STOP IS NOT OBVIOUSLY THE FIX
+
+DOGE, opened 04:49:16Z, closed 05:14:16Z — **7.17% against her in 25 minutes**,
+entry 0.098785 → exit 0.091702, straight through a **−5%** stop. Her next-worst
+loss is **−1.75%**: that single trade IS her tail. Truncating it is worth
++5.17pp of the +3.62pp total.
+
+But it was a GAP, not a broken stop, and a gap blows through any level. The
+telemetry says so: the six trades that publish `stop_overshoot_bps` read
+**1.5, 3.0, 7.0, 16.1, 17.1, 26.4 bps** — her stop execution is tight now, and
+that trade predates the field. **So the specific event is likely already
+unrepeatable**, and tightening the stop would mostly harvest the 22 losses that
+are already inside −1.75%.
+
+### THE STRUCTURAL ASYMMETRY IS REAL, AND IT IS AN EXIT, NOT THE STOP
+
+His claim holds where it counts. Her ROI ladder caps at **1.8% decaying to
+0.5%** against a **−5%** stop, and the binding exit is `range_top`
+(`c[i] >= sell_zone`):
+
+| exit | n | mean |
+|---|---|---|
+| `range_top` | **37** | **+0.131%** |
+| `roi` | 6 | **+2.277%** |
+| `trailing_stop_loss` | 6 | −1.287% |
+| `stop_loss` | 1 | −7.170% |
+
+**37 of 50 exits are taken at +0.131% while only 6 reach +2.277%.** That is
+"win slightly", precisely located. **NOT changed in this entry**, and the
+reason is in the same table: `trailing_stop_loss` at −1.287% is what happens
+when she holds past the range top and reverses, so the naive fix — hold longer
+— has a measured counter-signal in her own ledger. Moving `sell_zone` is worth
+real money and therefore worth a replay first (I19), not a same-hour guess on a
+live book. It is the next candidate, and it is the first thing the judge should
+grade once it has a lever to grade.
+
 ## 2026-08-27 (vf) — 🔮 GEORGIA WAS BEING SIZE-CUT ON MONEY HER STRATEGY NEVER LOST, AND 🙏 AVO SAT ONE ORDINARY STOP-OUT FROM THE SAME FATE
 
 **Eamon, 27-Aug:** *"it's role isnt to starve every opportunity"* /
