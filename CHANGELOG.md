@@ -73,6 +73,81 @@ moved HEAD in this SHARED worktree**, rewriting `fleet_bus.py` and
 comparison of two hashes computed at different times.** Verdict after the
 churn: zero BEHIND-OWN, all three live rows correctly DEFERRED behind their
 marker gate, every shadow CURRENT.
+## 2026-08-27 (tv) — THE ':None' COLLISION: A REAL LOSING TRADE ON THE LIVE BOOK WAS ONE HALT EVENT FROM BEING SILENTLY ZEROED
+
+**Eamon asked for a full data-integrity sweep — "make sure all data has been
+recorded correctly, for each bot, in the right place."** Five parallel
+finders over every record surface; the adversarial-verify phase died on
+usage credits, so every claim below was re-run by hand against the ledger
+before it was believed. This entry fixes the one defect that could still
+DESTROY data going forward. The rest are recorded as findings, not fixes.
+
+**THE DEFECT IS ONE LINE PRODUCING TWO FAILURES, on both real-money books.**
+`trade_id=f"{sym}:{m.get('opened_ts')}"` renders a missing open time as the
+literal string `"None"`, so every unknown-open close on one pair lands on the
+SAME primary key — and `paper_trades` upserts `ON CONFLICT (bot, trade_id) DO
+UPDATE SET pnl_abs=EXCLUDED.pnl_abs`. **A collision here is never visible as a
+duplicate; it is a silent overwrite**, which is exactly why a duplicate-id
+scan reported the ledger clean ((gn)'s lesson: pick a test that COULD detect
+the damage — the upsert makes the damage un-scannable by construction).
+
+Measured 26-Aug: **15 exposed rows** — 🙏 avo 9, 🔮 georgia 5, one legacy —
+and **one of them is not an event at all**: georgia's LIT close, **−$0.84,
+entry 3.6604**, a real money-losing trade sitting under `LIT:None`. The next
+halt event on LIT would have rewritten its `pnl_abs` to 0.00, leaving no
+trace. That is a real-money record one ordinary event away from destruction.
+
+**The same `None` fabricated the OPEN STAMP.** `opened_ts or time.time()`
+takes the CURRENT loop clock, which runs AFTER the close instant computed
+earlier in the same pass, so **8 rows carry `opened_at` LATER than
+`closed_at`** — including that same LIT trade, open stamped 8 seconds after
+its close. Any hold-duration grader reads a negative number.
+
+**FIXED IN ONE OWNER** — `lighter_family_bot.close_identity`, imported by the
+live host ((hj): a second copy is a second rule, and the two sites had already
+drifted — the id path renders `0` as `"0"` while the stamp path treats it as
+falsy, so one close could be self-inconsistent):
+* **KNOWN open → BYTE-IDENTICAL to the shipped format**, and this is
+  load-bearing rather than cosmetic: the upsert MATCHES on `trade_id`, so a
+  changed format would turn every re-published close into a duplicate INSERT
+  and double-count a live book's ledger. Pinned against a real ledger id
+  (`DOT:1787808646.8214896`).
+* **UNKNOWN open (None or 0) → `<pair>:evt:<close epoch>`**, unique per close
+  instant, `opened_at` pinned to the CLOSE (zero hold, never negative). `0`
+  joins the unknown class deliberately: it is 1970, it is what this codebase's
+  own `or` fallbacks already treat as absent, and two closes at `:0` collide
+  exactly like `:None`. No `:0` row exists, so nothing is orphaned.
+
+**Forward-only, and that is the point**: once unknown-open closes stop
+claiming `:None`, the 15 existing rows can no longer be overwritten by
+anything. The three already lost to the 24-Aug episode are unrecoverable.
+
+Pinned by `tests/autonomy/test_close_identity.py` (11 tests, **5/5 mutations
+red** — including one that reverts the id to `:None` and one that routes a
+KNOWN open down the event path). The wiring test is AST-shaped and narrowed
+to the ONE defect shape (`trade_id=` as an f-string at a `publish_paper_trade`
+call), because `close_identity` legitimately builds an f-string itself and a
+page-wide grep cannot tell the owner from a caller re-implementing it; it
+carries its own can-this-fire proof, and asserts it saw >=2 publish sites so a
+matcher that finds nothing is not a pass.
+
+**FOUND AND NOT FIXED HERE — recorded so they are not lost:** (1) the two
+live rows publish **phantom halt EVENTS as closed trades, all counted as
+LOSSES** — avo reads 13 closes / 3W / **10L** where the book took **4 real
+trades (3W/1L)**; georgia reads 52 / 24W / 28L against **48 real (24W/24L)**.
+The `(th)` `non_economic` marker exists at the write site but **zero DB rows
+carry it**, so graders can exclude only by heuristic signature. (2) 🌾 carry
+holds **18 positions against a published cap of 14**, because
+`carry.max_positions` is FLAPPING 14->16->18->20->expire->14 — **28 changes in
+three hours** — the (hs)/I7 saturation ratchet recurring. (3) 🧭 nav-cook's
+row understates its whole life (3 closes / −$5.82 vs a **37-close / −$9.62**
+ledger; equity **$3.80** too high). (4) carry's `pnl_abs` is realised-only
+while the other 19 rows are equity−1000, so a fleet sum is **$15.76** short.
+**👩 mum's records are CLEAN** — 0 closes, 0 ledger rows, no phantoms, no
+bleed.
+
+Deployed `[deploy-live]` — the fix is on the shared carrier host, and all
+three live rows write through it.
 
 ## 2026-08-27 (ut) — THE FLEET HAS BEEN RECORDING ITS OWN EXECUTION COST SINCE 9-JUL AND NOTHING COULD EVER READ IT: `coin-quality` SHIPPED WITHOUT `updated`/`ttl_sec`, SO THE BUS CONTRACT JUDGED IT STALE FOREVER
 

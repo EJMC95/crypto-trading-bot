@@ -132,6 +132,61 @@ def census_no_entry_why(strategy, sig):
     return "no_signal" if sig else "no_read"
 
 
+def close_identity(pair, opened_ts, closed_at):
+    """`(trade_id, opened_at_iso)` for a close whose OPEN may be UNKNOWN.
+
+    [2026-08-27] THE ':None' COLLISION, and it was one line producing two
+    defects on the two REAL-MONEY books. `f"{pair}:{m.get('opened_ts')}"`
+    renders a missing open time as the literal string ``"None"``, so EVERY
+    close on one pair with an unknown open lands on the SAME primary key —
+    and `paper_trades` upserts `ON CONFLICT (bot, trade_id) DO UPDATE SET
+    pnl_abs=EXCLUDED.pnl_abs`, so the second one OVERWRITES the first.
+    A collision here is never visible as a duplicate; it is a silent
+    destruction, which is why a duplicate-id scan reported the ledger clean
+    (the `(gn)` lesson: pick a test that COULD detect the damage).
+
+    Measured 26-Aug across the fleet: 15 exposed rows — 🙏 avo 9, 🔮 georgia
+    5, one legacy — and one of them is **not** an event at all:
+    georgia's LIT close, **-$0.84, entry 3.6604**, a real money-losing trade
+    sitting under `LIT:None` that the next halt event on LIT would have
+    zeroed. Forward-only by construction: once unknown-open closes stop
+    claiming `:None`, the existing rows can no longer be overwritten.
+
+    The same `None` fabricated the OPEN STAMP too — `opened_ts or
+    time.time()` takes the CURRENT loop clock, which runs AFTER the close
+    instant computed earlier in the same pass, so 8 rows carry `opened_at`
+    LATER than `closed_at` and any hold-duration grader reads a NEGATIVE
+    number. Both halves are fixed here.
+
+    ONE owner, shared by the live host and the shadow carrier ((hj) — a
+    second copy is a second rule), because the two write sites had drifted
+    already: the id path renders `0` as ``"0"`` while the stamp path treats
+    it as falsy, so the same close could be self-inconsistent.
+
+      * **KNOWN open -> BYTE-IDENTICAL to the shipped format.** Load-bearing,
+        not cosmetic: the upsert MATCHES on `trade_id`, so a changed format
+        would turn every re-published close into a duplicate INSERT and
+        double-count a live book's ledger. Verified against the real rows
+        (`DOT:1787808646.8214896`).
+      * **UNKNOWN open (None or 0) -> `<pair>:evt:<close epoch>`**, unique
+        per close instant, and `opened_at` pinned to the CLOSE (zero hold,
+        never negative). `0` joins the unknown class deliberately: it is
+        1970, it is what the codebase's own `or` fallbacks already treat as
+        absent, and two closes at `:0` collide exactly like `:None`. No
+        `:0` row exists in the ledger, so nothing is orphaned by the choice.
+
+    This does NOT decide whether an event belongs in the ledger at all — the
+    `(th)` `non_economic` signature still marks that, and the row counters
+    are a separate defect. It only guarantees that whatever IS written can
+    never overwrite something else.
+    """
+    if opened_ts:
+        return (f"{pair}:{opened_ts}",
+                datetime.fromtimestamp(float(opened_ts),
+                                       tz=timezone.utc).isoformat())
+    return (f"{pair}:evt:{closed_at.timestamp():.3f}", closed_at.isoformat())
+
+
 def brain_stake_mult(bot_id, tag):
     """The brain's TWO-WAY per-(bot, tag) stake multiplier for an entry
     (reduce-only until 21-Jul), looked up under EXACTLY the identity this
@@ -1530,12 +1585,17 @@ class Book:
         log.info("%s CLOSE %s | price %+.2f funding %+.2f [%s]",
                  self.bot_id, coin, price_pnl, fund_pnl, reason)
         try:
+            # [2026-08-27] id + open stamp from the ONE owner: an unknown
+            # open must not claim ':None' (a PK collision that OVERWRITES a
+            # prior row) nor fabricate an open LATER than this close.
+            _t_close = datetime.now(timezone.utc)
+            _tid, _opened_iso = close_identity(
+                coin, m.get("opened_ts"), _t_close)
             store.publish_paper_trade(
-                self.bot_id, trade_id=f"{coin}:{m.get('opened_ts')}",
+                self.bot_id, trade_id=_tid,
                 pnl_abs=float(total), pnl_pct=pct, pair=coin,
-                opened_at=datetime.fromtimestamp(
-                    m.get("opened_ts") or time.time(), tz=timezone.utc).isoformat(),
-                closed_at=datetime.now(timezone.utc).isoformat(),
+                opened_at=_opened_iso,
+                closed_at=_t_close.isoformat(),
                 reason=ledger_reason(m.get("tag"), reason),
                 # [2026-07-30 (gr)] EXIT TELEMETRY — `px` (the exit mark) and
                 # m["entry"] were both in scope and neither reached the row, so

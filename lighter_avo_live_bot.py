@@ -108,6 +108,9 @@ from lighter_family_bot import (
     # [2026-08-26] the ONE census owner for a no-entry verdict (mum's
     # uptrend_blocked split) — imported, never re-typed ((hj)).
     census_no_entry_why,
+    # [2026-08-27] the ONE owner of a close's identity + open stamp — an
+    # unknown open must never claim a colliding ':None' id ((hj)).
+    close_identity,
 )
 from venues import marks
 from venues.safety import (
@@ -1504,13 +1507,19 @@ def main(_ctx=None, once=False):
                    f"{price_pnl:+.2f} funding {fund:+.2f} [{reason}]"
                    f"{'' if measured else ' (exit UNMEASURED)'}")
             try:
+                # [2026-08-27] id + open stamp from the ONE owner
+                # (lighter_family_bot.close_identity): on THIS row an unknown
+                # open claimed ':None', and the upsert overwrites on a PK
+                # match — georgia's real -$0.84 LIT close was one halt event
+                # away from being zeroed. The same None also stamped an open
+                # LATER than the close on 8 rows.
+                _tid, _opened_iso = close_identity(
+                    sym, m.get("opened_ts"), t_now)
                 store.publish_paper_trade(
                     BOT_ROW,
-                    trade_id=f"{sym}:{m.get('opened_ts')}",
+                    trade_id=_tid,
                     pnl_abs=float(total), pnl_pct=pct, pair=sym,
-                    opened_at=datetime.fromtimestamp(
-                        float(m.get("opened_ts") or time.time()),
-                        tz=timezone.utc).isoformat(),
+                    opened_at=_opened_iso,
                     closed_at=t_now.isoformat(),
                     reason=ledger_reason(m.get("tag"), reason),
                     entry_price=entry or None, exit_price=exit_px or None,
