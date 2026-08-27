@@ -181,15 +181,28 @@ def audit(cur, living):
 
     # R5 — one field, one meaning. Reported, never ratcheted.
     cur.execute(
-        "SELECT bot, equity, pnl_abs FROM bot_pnl WHERE bot LIKE '%%lshadow'")
-    for bot, eq, pnl in cur.fetchall():
+        "SELECT bot, equity, pnl_abs, extra FROM bot_pnl "
+        "WHERE bot LIKE '%%lshadow'")
+    for bot, eq, pnl, ex in cur.fetchall():
         if eq is None or pnl is None:
             continue
         resid = float(eq) - 1000.0 - float(pnl)
-        if abs(resid) > 0.01:
-            out["R5_basis_divergence"].append(
-                f"{bot}: equity-1000-pnl_abs = {resid:+.4f} "
-                f"(every other shadow row reconciles to 0.0000)")
+        if abs(resid) <= 0.01:
+            continue
+        # [(vk)] A DECLARED basis is not a divergence. 🌾 carry publishes
+        # `pnl_abs` realised-only on purpose — accrual is not realised until
+        # the leg closes — and now SAYS so on the row, with the reconciling
+        # `open_pnl` beside it. The defect was never the convention; it was
+        # that a fleet-summing consumer had no way to know. A row that
+        # declares its basis has closed that, so it stops being reported;
+        # a row that diverges SILENTLY still is.
+        basis = (ex or {}).get("pnl_basis") if isinstance(ex, dict) else None
+        if basis:
+            continue
+        out["R5_basis_divergence"].append(
+            f"{bot}: equity-1000-pnl_abs = {resid:+.4f} with NO "
+            f"`extra.pnl_basis` (every other shadow row reconciles to "
+            f"0.0000; declare the basis or use the fleet convention)")
     return out
 
 

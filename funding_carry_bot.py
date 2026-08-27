@@ -1589,6 +1589,20 @@ def main():
                     open_trades=len(positions),
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": "dry-run", "open_pnl": round(open_pnl, 2),
+                           # [2026-08-27 (vk)] ONE FIELD, ONE MEANING — or
+                           # else SAY which meaning. This row's `pnl_abs` is
+                           # REALISED-ONLY while its `equity` includes
+                           # `open_pnl` too, so `equity - START - pnl_abs`
+                           # reads +$16.63 here and EXACTLY 0.0000 on all 19
+                           # other shadow rows. That is deliberate for a
+                           # funding book (accrual is not realised until the
+                           # leg closes) and it was UNDECLARED, so a consumer
+                           # summing `pnl_abs` fleet-wide silently understated
+                           # the fleet by that amount with nothing to detect
+                           # it by. The reconciling term was already published
+                           # beside it; only the DECLARATION was missing.
+                           # ((gl): publish the band, not just the floor.)
+                           "pnl_basis": "realised",
                            # [2026-07-30] the EFFECTIVE cap this loop is
                            # running, so the board can SEE saturation
                            # instead of inferring it from occupancy alone —

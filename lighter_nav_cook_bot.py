@@ -588,6 +588,41 @@ def main():
     n_closed = int(st.get("n_closed") or 0)
     n_wins = int(st.get("n_wins") or 0)
 
+    # [2026-08-27 (vk)] AND THE RECORD THE (sa) FIX COULD NOT RECOVER.
+    # (sa) made these three fields PERSIST; it could not restore the 34
+    # closes already lost to the restarts before it. So this row kept
+    # publishing `closed_trades: 3 / pnl_abs: -5.82 / equity: 994.18`
+    # against its OWN ledger's 37 closes / -$9.62 — the row overstating
+    # equity by $3.80 and disagreeing with every ledger-reading grader
+    # (golive_readiness, fleet_allocation, the horizon sweep all read the
+    # ROW). Persisting a counter forward does not repair a counter that
+    # started wrong.
+    #
+    # `fetch_paper_aggregate` is the fleet's existing answer — its whole
+    # docstring is "lets a bot recover its cumulative totals after a
+    # local-file wipe" — and this book simply never called it. It is
+    # quarantine- and event-filtered ((tw)), so it returns the ADMISSIBLE
+    # record rather than a raw row count.
+    #
+    # ADOPT-ON-MORE, never overwrite: the ledger is the durable record, so
+    # it may only ever RAISE these counters. A ledger read that is short
+    # (a partial fetch, a filtered window, a DB blip returning None) can
+    # therefore never shrink a book's own history — the failure direction
+    # that would turn a recovery into the very data loss it repairs.
+    try:
+        _agg = store.fetch_paper_aggregate(bot_id)
+        if _agg and int(_agg.get("closed") or 0) > n_closed:
+            print("[%s] counters BEHIND the ledger (%d closed vs %d) — "
+                  "adopting the ledger's record: realized %+.2f -> %+.2f"
+                  % (now_iso(), n_closed, int(_agg["closed"]),
+                     realized, float(_agg.get("realized") or 0.0)))
+            realized = float(_agg.get("realized") or 0.0)
+            n_wins = int(_agg.get("wins") or 0)
+            n_closed = int(_agg["closed"])
+    except Exception as e:  # noqa: BLE001
+        print("[%s] ledger re-seed skipped (%s) — keeping persisted counters"
+              % (now_iso(), e))
+
     while True:
         t0 = time.time()
 

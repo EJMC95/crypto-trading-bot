@@ -1,3 +1,86 @@
+## 2026-08-27 (vk) — THE REMAINING LEDGER BUGS: 🧭 NAV-COOK RECOVERS 34 CLOSES (sa) COULD NOT, 🌾 CARRY DECLARES ITS BASIS — AND THE FLAP I REPORTED WAS ALREADY FIXED
+
+Eamon: *"fix bugs also."* Four items were carried out of `(tw)`. **Two were
+real and are fixed, one was ALREADY FIXED and my report of it was stale, and
+one is left open with a reason.** The stale one is the entry worth reading.
+
+**1. THE FLAP WAS NOT A BUG — I MEASURED ACROSS ITS FIX.** `(tw)` reported 🌾
+carry's `carry.max_positions` FLAPPING 14→16→18→20→expire→14, *"28 changes in
+three hours — the (hs)/I7 saturation ratchet recurring"*. Before touching the
+shared actuator I re-measured, and **the flap has stopped**: zero changes
+across ~30 board snapshots (~1.3h), the lever unset, and `evidence_board`
+publishing exactly the right verdict — *"OVERHANG/UNIT: open 17 > published
+cap 12, so the book is not AT capacity — held at 12"*. A 26-Aug OVERHANG term
+already refuses any widening while `open_n > cap`, **and names 🌾 carry as its
+own worked example**. My 3-hour window straddled the deploy, so what I
+measured was the defect AND its repair averaged together. Corrected in place
+in `(tw)` per I12. **The transferable rule: a rate measured across a window
+that contains the fix measures the fix, not the defect** — and it is the
+argument for re-measuring a carried claim before acting on it, not after.
+(The overhang itself is real and DRAINS BY DESIGN: the book cannot enter while
+over its cap, so the count falls as legs close.)
+
+**2. 🧭 NAV-COOK RECOVERS THE RECORD `(sa)` COULD NOT — FIXED.** `(sa)` made
+`realized`/`n_closed`/`n_wins` PERSIST; it could not restore the **34 closes
+already lost** to the restarts before it. So the row kept publishing
+`closed_trades: 3 / pnl_abs: −5.82 / equity: 994.18` against its own ledger's
+**37 closes / −$9.62** — equity overstated by **$3.80**, and every organ that
+grades the ROW (`golive_readiness`, `fleet_allocation`, the horizon sweep)
+reading a book two-thirds smaller than it is. **Persisting a counter forward
+does not repair a counter that started wrong.**
+
+`fetch_paper_aggregate` is the fleet's existing answer — its docstring is
+literally *"lets a bot recover its cumulative totals after a local-file
+wipe"* — and this book never called it. It is quarantine- and event-filtered
+((tw)), so it returns the ADMISSIBLE record rather than a raw row count; a
+hand-rolled `SELECT count(*)` here would have re-seeded the very phantom rows
+`(tw)` had just removed.
+
+**ADOPT-ON-MORE, never overwrite**, and that direction is the whole safety of
+it: the ledger may only ever RAISE these counters, so a partial fetch, a
+filtered window or a DB blip **cannot turn a recovery into the data loss it
+repairs**. Pinned by `tests/autonomy/test_navcook_ledger_reseed.py` (8 tests,
+**4/4 mutations red**), with the comparison operator itself AST-pinned —
+because a substring test would pass against `>=`, `<`, or a bare `if _agg:`,
+and all three are wrong in the destructive direction.
+
+**3. 🌾 CARRY DECLARES ITS BASIS — FIXED, and the fix is a declaration, not a
+change of behaviour.** This row's `pnl_abs` is REALISED-ONLY while its
+`equity` includes `open_pnl`, so `equity − 1000 − pnl_abs` reads **+$16.63**
+here and **exactly 0.0000** on all 19 other shadow rows. That is correct for a
+funding book — accrual is not realised until the leg closes — and it was
+UNDECLARED, so a consumer summing `pnl_abs` fleet-wide understated the fleet
+by that amount with nothing to detect it by. The reconciling term
+(`extra.open_pnl`) was **already published beside it**; only the declaration
+was missing. `extra.pnl_basis: "realised"` closes it ((gl): publish the band,
+not just the floor), and `audit_ledger_records`' R5 now reports only a row
+that diverges **silently** — a declared basis is not a divergence.
+
+**4. LEFT OPEN, with the reason:** the 13 legacy event rows still carry no
+durable `non_economic` marker. `(tw)`'s signature bridge already excludes them
+correctly, so the counters are right today; the backfill is a WRITE to
+historical real-money records and buys only self-description, which is
+Eamon's call rather than a session's.
+
+**TWO PROCESS FAILURES IN THIS PASS, both mine, both caught before they
+landed:**
+* **A blanket `(tx)` → `(vk)` replace corrupted four `trades(tx)` strings** —
+  a FILL-SOURCE LABEL, nothing to do with changelog letters — plus the real
+  `(tx)` sniper entry's header and its renumber notes. Restored CHANGELOG.md
+  from `origin/main` and re-applied the one correction against a single
+  unique anchor. **A letter is a token, not a substring**, and this is the
+  `(qz)` truncated-search lesson wearing the opposite costume: not too few
+  matches, too many.
+* An existing test slices carry's publish payload on the prose word
+  `"carries"` and my new comment contained it, truncating the slice before
+  `"caps"`. Reworded my comment rather than touching another session's guard.
+
+Letter picked at push time: origin/main had advanced to `(vj)` while this
+branch worked, and `(tx)`/`(ty)`/`(tz)` were all taken.
+
+Deployed `[deploy-live]` — the aggregate 🧭 nav-cook now re-seeds from is the
+same one the three live rows read.
+
 ## 2026-08-27 (vj) — FIVE FRONTS, AND THE TWO LOUDEST ALARMS WERE BOTH STALE: A QUARANTINE THAT MATCHED NOTHING, A DRAWDOWN BAR THAT NEVER RENDERED, AND A HANDOFF ROW GUARDING A CORPSE
 
 Eamon: *"Fix all of the above - use the knowledge we have and as much edge we
@@ -1433,9 +1516,20 @@ LOSSES** — avo reads 13 closes / 3W / **10L** where the book took **4 real
 trades (3W/1L)**; georgia reads 52 / 24W / 28L against **48 real (24W/24L)**.
 The `(th)` `non_economic` marker exists at the write site but **zero DB rows
 carry it**, so graders can exclude only by heuristic signature. (2) 🌾 carry
-holds **18 positions against a published cap of 14**, because
-`carry.max_positions` is FLAPPING 14->16->18->20->expire->14 — **28 changes in
-three hours** — the (hs)/I7 saturation ratchet recurring. (3) 🧭 nav-cook's
+holds **18 positions against a published cap of 14**. ~~because
+`carry.max_positions` is FLAPPING 14->16->18->20->expire->14 — 28 changes in
+three hours — the (hs)/I7 saturation ratchet recurring.~~ **[CORRECTED IN
+PLACE 27-Aug (vk) per I12 — the flap was ALREADY FIXED when I measured it,
+and my window straddled the fix.** The 26-Aug OVERHANG term in
+`evidence_board`'s saturation branch refuses a widening whenever
+`open_n > cap`, and names this very book as its worked example. Re-measured
+after: **zero changes across ~30 board snapshots (~1.3h)**, the lever unset
+(book on its env default 12), and the board publishing the correct verdict —
+*"OVERHANG/UNIT: open 17 > published cap 12, so the book is not AT capacity —
+held at 12"*. The OVERHANG itself is real and DRAINS BY DESIGN: the book
+cannot enter while over its cap, so the count falls as legs close. The lesson
+is one this repo keeps paying for — **a rate measured across a window that
+contains the fix measures the fix, not the defect.**] (3) 🧭 nav-cook's
 row understates its whole life (3 closes / −$5.82 vs a **37-close / −$9.62**
 ledger; equity **$3.80** too high). (4) carry's `pnl_abs` is realised-only
 while the other 19 rows are equity−1000, so a fleet sum is **$15.76** short.
