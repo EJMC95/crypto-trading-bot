@@ -1,3 +1,130 @@
+## 2026-08-27 (ut) — THE FLEET HAS BEEN RECORDING ITS OWN EXECUTION COST SINCE 9-JUL AND NOTHING COULD EVER READ IT: `coin-quality` SHIPPED WITHOUT `updated`/`ttl_sec`, SO THE BUS CONTRACT JUDGED IT STALE FOREVER
+
+**[RENUMBERED (us) -> (ut), 27-Aug.** A concurrent session landed a different
+(us) on main — *the dashboard was never wrong, it was behind* — while this was
+being written, and theirs was pushed first. Recorded inline per the
+changelog-letter rule; the cross-branch arm of `audit_changelog_letters` caught
+it pre-push, which is the sixth letter collision it has caught this week.**]
+
+**Eamon, 27-Aug: *"I think we record things far too slowly and it impairs our
+judgement."*** He is right, and the mechanism turned out to be worse than slow.
+The recording was not late — it was **structurally unreachable**, and it had
+been for seven weeks.
+
+### THE INSTANCE THAT EXPOSED IT
+
+`(ur)`, hours earlier, refused the LUS cohort partly on execution cost. It had
+no measured spread to hand, so it used **Roll's estimator: 15.0 bps/side**, and
+concluded the surviving cell was *"NEVER"* viable net of cost.
+
+The measured number was already in the database. **`venues/shadow.py` writes
+`spread_bps` and `slippage_bps` to `venue_orders` on every fill** — 3,230
+book-walk rows back to 9-Jul, **including SKHYNIXUSD n=409 and SNDK n=112, two
+of the six names the verdict turned on**. `market_context.coin_quality()` folds
+them 14-daily and publishes `coin-quality`: **135 coins, live.**
+
+**Recorded FULL spread (cost per side is half), 27-Aug:**
+
+| SKHYNIXUSD | SNDK | MU | INTC | SOXL | NBIS | DRAM |
+|---|---|---|---|---|---|---|
+| 2.52 (n=409) | 4.36 (n=112) | 2.70 (n=27) | 2.39 | 7.58 (n=16) | 9.55 (n=17) | 13.21 (n=9) |
+
+and across **412 REAL (non-shadow) fills** the recorded SLIPPAGE runs **median
+0.35 bps, mean 1.19, p90 6.90**. **Roll overstated the liquid names 5-12x.**
+
+### WHY NOTHING READ IT — TWO MISSING FIELDS
+
+`coin-quality` published `{"ts": ..., "coins": {...}}`. `fleet_bus.is_fresh`
+reads `payload["updated"]` and `payload["ttl_sec"]` and returns False on any
+exception. **So every consumer obeying the bus contract would have judged this
+payload stale FOREVER** — which is exactly why none was ever written. Proven,
+not asserted:
+
+    is_fresh(live coin-quality payload)                = False
+    is_fresh(same payload + updated/ttl_sec)           = True
+
+That is the whole distance between the fleet and its own measured cost. The
+books that needed it gate on a **24h-turnover PROXY** — a stand-in `(px)`
+declared as *"per-book slippage here is unmeasured"* **while it was being
+measured** — and `study_depth_vs_volume` had already argued the case in 2026-08
+without the read side existing to close it.
+
+**THE CLASS, and it is I23 in a new costume:** *the thing that decides is not
+measuring the thing it decides about* — except here it IS measured, published,
+and even attached to every ledgered entry as *"validation dataset only"*. The
+decider simply could not read it. **A recording nothing can consume is not a
+slow recording, it is an absent one**, and it is worse than absent because it
+looks like diligence.
+
+### WHAT SHIPPED
+
+* **`market_context`** publishes `updated` + `ttl_sec` on `coin-quality`, `ts`
+  kept beside them so any existing reader is untouched. TTL is
+  `COIN_QUALITY_TTL_SEC` = **2.5 refresh periods** — one skipped tick must not
+  blind every consumer, a dead collector must.
+* **`fleet_bus.recorded_cost_bps(sym=None)`** — the supported read, matching
+  every sibling accessor's fail-safe contract, and
+  **`fleet_bus.recorded_half_spread_bps(sym)`**, which owns the halving in ONE
+  place because `spread_bps` is the FULL spread and a caller halving it inline
+  is a second copy of a unit convention (this fleet has already paid 8x for one
+  of those).
+* **THE FAIL-SAFE DIRECTION IS THE WHOLE SAFETY:** any doubt returns
+  `None`/`{}`, never `0.0`. **An unmeasured cost that defaults to FREE is the
+  same defect pointed the other way** and would silently authorise every book
+  that consulted it.
+* `scripts/study_lus_net_2026-08-27.py` — the cell re-measured net of each
+  name's OWN recorded cost, fail-CLOSED on an unpriced name (excluded, never
+  given the median).
+* `tests/autonomy/test_recorded_cost_reaches_consumers.py` — 8 tests, **6/6
+  mutations RED**, including a REGRESSION ARM that reddens if either
+  bus-contract field is dropped again.
+
+### THE RE-MEASUREMENT, AND THE REFUSAL STILL STANDS
+
+**Eamon, same session: *"Where things are missed by a fraction / widen or
+tighten accordingly — I find we often miss out by a hair, let's give a little
+wiggle room too."*** Implemented with a hard edge: **the BARS do not move —
+`t>=2.0`, 60 days-to-gate, both halves — the DESIGN does.** Two consequences:
+
+1. **Every bar now publishes its MARGIN.** A pass at t=2.01 and a pass at t=3.5
+   are not the same evidence, and a fleet printing only pass/fail cannot tell a
+   hair from a wall. The cost-screened cell misses day-as-unit `t` by **0.066
+   (3%)** — genuinely a hair, and now legible as one.
+2. **A COST-BASED tightening is not curve-fitting**, which is why it is the
+   lever pulled: selecting names by RECORDED SPREAD is selection on a property
+   measured independently of returns, unlike `(ur)`'s return-selected semis
+   which retained only 2 of 6 names out of sample.
+
+Net of recorded cost, hold x cost-bar sweep (day-as-unit `t`, days-to-gate):
+
+| cost bar | h=8 | h=12 |
+|---|---|---|
+| <=2.5 bps/side | +0.347% t=2.26 **119d** | +0.366% t=2.25 121d |
+| <=3.5 | +0.289% t=1.93 164d | +0.306% t=2.06 145d |
+| <=8.0 | +0.401% t=2.13 135d | +0.419% t=2.26 119d |
+
+**REFUSED, on decidability rather than cost.** Best days-to-gate anywhere is
+**119d against a 60-day bar — 2x out, which is not a hair.** And `t` is
+non-monotone in the cost bar (2.26 -> 1.93 -> 2.13), which is the signature of
+noise-shuffling rather than a mechanism; across the 36-cell sweep BH at FDR 0.05
+would need **t~3.0** and the best cell is **2.26**. No cell survives
+multiplicity. `(ur)`'s verdict is unchanged; its REASON is corrected in place.
+
+**What would legitimately close a 2x gap** is I22's own equation and nothing
+else: `S_d^2 = SUM S_i^2` over INDEPENDENT sleeves, so halving days-to-gate
+needs `S_d x sqrt(2)` — a genuinely independent SECOND SLEEVE, not a second
+parameterisation of this one. Inventing one to rescue the first is the
+widen-until-it-passes failure, and it is declined here rather than attempted.
+
+### THE STANDING WIN
+
+The LUS cell is refused. **The unlock is fleet-wide and outlives it:** every
+book that currently gates on a volume PROXY can now read the fleet's own
+measured cost, and the next study that needs a spread will not reconstruct one.
+**Owner: session. Not wired into any gate in this pass** — changing a live
+entry gate needs its own measured number and expectancy price (I19), and this
+entry ships the READ, not the decision.
+
 ## 2026-08-27 (us) — THE DASHBOARD WAS NEVER WRONG, IT WAS BEHIND: THE LIVE ROW NOW REFRESHES FROM THE VENUE BETWEEN TRADING PASSES, AND CHANGES NO TRADE
 
 **Eamon, 27-Aug: "On lighter Georgia doesn't show to be holding nvidia"**, then
@@ -199,6 +326,23 @@ list by **COIN ORDER, not time** (so "both halves positive" — one of the six
 go-live bars — tested nothing; on a calendar split it reads +0.235/+0.320), and
 the US session hours were **EDT-only** while ~4 months of the window are EST
 (that subsample reads t=−0.17).
+
+**[27-Aug (ut)] CORRECTED IN PLACE per I12 — THE COST NUMBER BELOW IS WRONG BY
+5-12x, AND WITH IT THE WORD "never".** Everything in this section was computed
+against **Roll's estimator at 15.0 bps/side**, used because no measured spread
+was reachable from the bus. The fleet had been RECORDING the real thing since
+9-Jul — `venue_orders.spread_bps`, 3,230 book-walk rows — and publishing it on
+`coin-quality` (135 coins), where a missing `updated`/`ttl_sec` pair made it
+permanently unreadable. Recorded FULL spreads (cost/side is half): **SKHYNIXUSD
+2.52 (n=409) - SNDK 4.36 (n=112) - MU 2.70 (n=27) - INTC 2.39 - SOXL 7.58 -
+NBIS 9.55 - DRAM 13.21**; and on 412 REAL fills the recorded SLIPPAGE runs
+**median 0.35 bps, mean 1.19**. So: *"NEVER net of measured spread"* is FALSE.
+Net of each name's OWN recorded cost the cell reads **~119-137 days-to-gate**
+with several holds clearing day-as-unit `t`>=2. **The REFUSAL STANDS** — 119d is
+still 2x the 60-day bar, and no cell survives multiplicity across the 36-cell
+sweep (BH at FDR 0.05 needs t~3.0; the best is 2.26) — but it stands on
+decidability, NOT on cost, and anyone quoting the 15.0 bps figure or the word
+"never" from this entry is quoting a defect. Full working: `(ut)`.
 
 **AND THE SURVIVING CONTINUATION EFFECT STILL EARNS NO BOOK.** It is REAL gross
 — an interior plateau rising from ~0 at 1–2h, peaking 10–12h, decaying to zero
