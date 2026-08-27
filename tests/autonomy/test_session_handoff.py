@@ -157,7 +157,13 @@ def test_the_subject_guard_actually_fires_on_a_dead_row():
     living one, so neither half can pass by accident."""
     dead = S._dead_rows()
     assert dead, "both retirement registries read empty — the guard is blind"
+    # BOTH REGISTRY TERMS, PINNED SEPARATELY. `perps-funding-lighter-lighter`
+    # is in RETIRED_LIVE_ARMS *and* LEGACY_BOTS, so a test using only it stays
+    # green when either term is deleted — measured: dropping LEGACY_BOTS
+    # survived the first mutation round. 🎸 band-barnes is in LEGACY_BOTS only
+    # and is what makes that term load-bearing here.
     assert "perps-funding-lighter-lighter" in dead, sorted(dead)[:5]
+    assert "band-barnes-lshadow" in dead, "the LEGACY_BOTS term is not wired"
 
     row = {"id": "_probe", "owner": "session", "what": "w" * 70,
            "why_open": "y" * 30, "closes_when": lambda: False,
