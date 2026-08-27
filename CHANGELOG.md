@@ -52,6 +52,42 @@ interior optimum inside the fleet's own rail. At 12 slots, 40 beats 25
 4% = $120**, and the $3,150 notional cap still funds all 12. **It buys TRADES,
 not dollars** — exactly what a live book with zero closes needs.
 
+### AND THE BAR GOES BACK TO ITS PEAK — 36 → 32, SAME PASS
+
+**Eamon, after seeing the number: *"deploy the highest yield result"*.** He made
+the move `(ve)` had explicitly reserved for him, and the two changes fit
+together rather than cancelling.
+
+**I MEASURED THE SLOT FIX AT THE WRONG BAR, and found it only at the deploy
+readback.** My study hardcoded `32.0`; `(ve)` had moved her live bar to
+`MUM_RSI_MAX=36.0` the day before, inside the 28 commits this pass rebased
+past. So every number above described a book the fleet was no longer running —
+the **fifth retyped constant of the day, and the only one that drifted under a
+LIVE REAL-MONEY book inside 24 hours.** The study now reads `RSI_MAX` off the
+carrier (`live_bar()`), so it cannot happen again.
+
+Re-measured at the config actually shipped (12 slots, top-40 crypto):
+
+| bar | mean%/trade | t | trades/day |
+|---|---|---|---|
+| **32** | **+0.202** | **+3.21** | 6.36 |
+| 36 (as running) | +0.026 | +0.47 | 8.82 |
+
+More trades, no edge — exactly what `(ve)` predicted a bar past the peak would
+do, now measured on the live configuration rather than forecast.
+
+**WHY THIS IS NOT AN OVERRIDE OF `(ve)`.** It loosened the bar because the book
+was taking ZERO trades — the problem was SUPPLY, and the bar was the only dial
+anyone had reached for. The same day it turned out to be the wrong dial: her
+cap was refusing **367 of 651** signals on her own coins. With slots and
+universe carrying the supply job, the bar no longer has to, so it returns to
+the peak **two independent measurements agree on** — `(un)`/`(tr)`'s
+dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
+(+0.163%/trade, t=+3.22; interior — 35 reads +1.43 and 38 goes NEGATIVE).
+`(ve)`'s note is KEPT in the code rather than deleted: it records why 36
+existed and it was right on its own terms. What changed is not the verdict on
+36, but the reason it was needed.
+
 ### THE NON-CRYPTO HALF — SHIPPED ON REAFFIRMATION, WITH ITS PRICE STATED
 
 Her rule on the **21 liquid non-crypto markets she could not see** measures

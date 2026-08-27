@@ -896,7 +896,35 @@ class OversoldRebound(Carrier):
     #: tape has not been offering, on a book that had taken ZERO trades since
     #: going live on 25-Aug. `MUM_RSI_MAX` makes it tunable without a deploy so
     #: the next move is his, not a code push.
-    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "36.0"))
+    #:
+    #: [2026-08-28 (vd)] **BACK TO 32.0 — Eamon: *"deploy the highest yield
+    #: result"*. He made the move (ve) reserved for him, and the two changes
+    #: fit together rather than cancelling.**
+    #:
+    #: (ve) loosened this bar because the book was taking ZERO trades — the
+    #: problem was SUPPLY, and a looser bar was the only dial anyone had
+    #: reached for. The same day it turned out to be the wrong dial: her cap
+    #: was refusing **367 of 651** signals on her own coins, and the real
+    #: supply fix was 4 -> 12 slots plus 13 -> 40 crypto names, which takes her
+    #: from 1.58 to 6.36 trades/day **at a bar of 32**. Supply solved, the bar
+    #: no longer has to carry that job, so it returns to its measured peak.
+    #:
+    #: THE NUMBER, at the config now shipped (12 slots, top-40 crypto, 180d of
+    #: her own rule and bracket replayed at her real cap):
+    #:     bar 32 -> +0.202%/trade, t=+3.21, 6.36/day
+    #:     bar 36 -> +0.026%/trade, t=+0.47, 8.82/day
+    #: More trades, no edge — exactly what (ve) predicted a bar past the peak
+    #: would do, now measured on the live configuration rather than forecast.
+    #: TWO INDEPENDENT MEASUREMENTS AGREE ON 32: (un)/(tr)'s dose-response
+    #: (+0.111%/trade, cluster-t +2.44) and this pass's slot/universe sweep
+    #: (+0.163%/trade, t=+3.22 at 4 slots; the peak is interior, 35 reads
+    #: t=+1.43 and 38 goes NEGATIVE).
+    #:
+    #: (ve)'s note above is KEPT rather than deleted: it records why 36 existed
+    #: and it was right on its own terms — a forward test, never evidence. What
+    #: changed is not the verdict on 36 but the reason it was needed.
+    #: `MUM_RSI_MAX` still tunes it without a deploy, in either direction.
+    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "32.0"))
     #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
     #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
     #: carrier whose signals dict happens to carry rsi/uptrend for OTHER
