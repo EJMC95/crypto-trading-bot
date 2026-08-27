@@ -56,6 +56,11 @@ SELFTEST_MODULES = [
     # offline and pure (classify + snapshot round-trip, no git, no DB).
     # Registered in the same commit that adds the tool, per this guard's own
     # rule — a --selftest nobody runs is the shape it exists to prevent.
+    # [2026-08-27 (ut)] the shared TAPE CACHE. SELFTEST_MODULES and not
+    # ENFORCED_AUDITS: its --selftest is offline and pure (an injected fetcher,
+    # a temp dir, a frozen clock), while a scan would hit the venue. Registered
+    # in the same commit that adds the tool, per this guard's own rule.
+    "scripts.tape_cache",
     "scripts.session_commit",
     # [2026-08-19 (qg)] the MUTATION HARNESS. Same shape as session_commit
     # above — a hand-rolled step that every session re-implements and
