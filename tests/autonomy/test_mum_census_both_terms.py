@@ -480,3 +480,125 @@ def test_it_is_publish_only():
             if isinstance(n, ast.Attribute) and n.attr in maps:
                 assert id(n) in stores, \
                     f"{fn.name} READS b.{n.attr} — a counter grew a consumer"
+
+
+# ---------------------------------------------------------------------------
+# [(vm)] THE GAUGE MUST REACH THE ARM THAT HOLDS THE MONEY.
+#
+# The first cut of this wave shipped the gauge into `lighter_family_bot` alone,
+# and 👩 mum's LIVE row runs `lighter_avo_live_bot` — so it reached her $1,000
+# SHADOW and not the $300 of real money it was built for. Verified in the live
+# payload an hour after the deploy: shadow `outside_uptrend_n 5 · both_terms_n
+# 0`, live arm ABSENT.
+#
+# That is the class `(vh)` named the same morning — "find a plausible
+# mechanism, verify it in ONE file, ship without asking which code path the
+# affected book actually runs" — recurring inside the wave that named it. So
+# this pins the PROPERTY (both arms gauge the term) rather than either
+# instance, and it fails the day a third host appears without it.
+# ---------------------------------------------------------------------------
+
+def test_both_arms_gauge_the_trend_term_not_just_the_shadow():
+    import ast as _ast
+    import pathlib as _p
+
+    root = _p.Path(__file__).resolve().parents[2]
+    hosts = {
+        "lighter_family_bot.py": "the SHADOW books",
+        "lighter_avo_live_bot.py": "the three REAL-MONEY books",
+    }
+    missing = []
+    for fname, who in hosts.items():
+        src = (root / fname).read_text()
+        tree = _ast.parse(src)
+        # the two published counters must be built somewhere in this host
+        for field in ("outside_uptrend_n", "both_terms_n"):
+            found = any(
+                isinstance(n, _ast.Constant) and n.value == field
+                for n in _ast.walk(tree))
+            if not found:
+                missing.append(f"{fname} ({who}) never publishes {field!r}")
+        # ...and gated on the CARRIER's own flag, never on a bot id: 🙏 SwingDip
+        # publishes `uptrend` too and REQUIRES it, so "outside" inverts there.
+        #
+        # BY AST, NOT BY SUBSTRING. The first cut of this assertion was
+        # `"UPTREND_BLOCKS" in src` and a mutation round showed it VACUOUS:
+        # the name also appears in the comment explaining the gate, so
+        # replacing the real `if getattr(strategy, "UPTREND_BLOCKS", False):`
+        # with `if True:` left it green. That is `(uk)`'s defect — "a
+        # substring the comment also carried" — reproduced hours after the
+        # entry recording it. So: find the If whose TEST names the flag and
+        # require the counters to be built INSIDE it.
+        gated = False
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.If):
+                continue
+            if "UPTREND_BLOCKS" not in _ast.unparse(node.test):
+                continue
+            body = " ".join(_ast.unparse(n) for n in node.body)
+            if "outside_uptrend_n" in body and "both_terms_n" in body:
+                gated = True
+        assert gated, (
+            f"{fname} builds the trend counters outside an "
+            "`if ... UPTREND_BLOCKS` guard — on a carrier that REQUIRES an "
+            "uptrend the count means the opposite, and the semantics belong "
+            "to the strategy, not the dict's shape")
+    assert not missing, (
+        "the trend gauge does not reach every arm:\n  " + "\n  ".join(missing))
+
+
+def test_the_live_host_admits_only_a_real_bool_as_an_uptrend_reading():
+    """A `None` coerced to False publishes a fabricated PASS on the exact term
+    a widening is argued from — so the live host must test `isinstance(...,
+    bool)`, not truthiness. Pinned by AST so a rewrite to `if sig.get(...)` is
+    caught rather than read as equivalent."""
+    import ast as _ast
+    import pathlib as _p
+
+    src = (_p.Path(__file__).resolve().parents[2]
+           / "lighter_avo_live_bot.py").read_text()
+    tree = _ast.parse(src)
+    guarded = False
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.Call):
+            continue
+        if getattr(node.func, "id", None) != "isinstance":
+            continue
+        if len(node.args) != 2:
+            continue
+        txt = _ast.unparse(node.args[0])
+        if "uptrend" in txt and _ast.unparse(node.args[1]) == "bool":
+            guarded = True
+    assert guarded, (
+        "the live host does not admit `uptrend` through isinstance(..., bool) "
+        "— a None read as False is a fabricated pass on the binding term")
+
+
+def test_the_live_spend_census_says_what_its_days_to_gate_is_made_of():
+    """`days_to_gate_obs` is the BIRTH COUNTDOWN, and on a book with no closes
+    it is a floor that can never bind: mum published 28.1 having never traded.
+
+    It is deliberately NOT nulled — `audit_book_spend` treats a `None` field as
+    MISSING and would redden the build on all three real-money rows for a
+    reporting improvement. The basis is published beside it instead, so the
+    floor is legible as one. This pins that the pair travels together: a number
+    without its basis is the ambiguity this exists to remove."""
+    import ast as _ast
+    import pathlib as _p
+
+    src = (_p.Path(__file__).resolve().parents[2]
+           / "lighter_avo_live_bot.py").read_text()
+    for field in ("days_to_gate_obs", "days_to_gate_basis", "closes_obs"):
+        assert any(
+            isinstance(n, _ast.Constant) and n.value == field
+            for n in _ast.walk(_ast.parse(src))), \
+            f"the live spend census does not publish {field!r}"
+    # and the guard's own contract is unchanged: the field stays PRESENT
+    import scripts.audit_book_spend as sp
+    assert "days_to_gate_obs" in sp.REQUIRED_FIELDS
+    assert sp.birth_census({"bot": "x", "extra": {"spend": {
+        "markets_scanned": 23, "n_eff": 1.0, "sides": "long",
+        "gross_x": 10.0, "days_to_gate_obs": None,
+        "days_to_gate_basis": "birth_window", "closes_obs": 0}}}), \
+        "a null days_to_gate must still be REFUSED as a missing field — that " \
+        "is why the basis is published instead of nulling the number"

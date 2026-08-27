@@ -669,7 +669,8 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
 
 
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
-                ungraded, entries_shut, last_open_ts, last_close_ts, t_now):
+                ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
+                strategy=None, uptrend=None, enter=None):
     """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
     directional row.
 
@@ -710,6 +711,25 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
         out["rsi_med"] = round(vals[len(vals) // 2], 1)
         out["rsi_read"] = len(vals)
         out["near_bar"] = sum(1 for v in vals if v < rsi_bar + 8)
+    # [(vm)] THE TREND TERM, ALONE. `census_no_entry_why` can only report
+    # `uptrend_blocked` once RSI has ALSO passed, so whenever RSI is the
+    # tighter half the NOT-uptrend conjunct counts ZERO — and 👩 mum's widening
+    # could not be priced, because nobody could say how many near-bar coins are
+    # even outside an uptrend. Measured on her SHADOW arm the hour this
+    # shipped: `outside_uptrend_n 5 · both_terms_n 0` against `rsi_min 35.3 <
+    # rsi_bar 36.0` — the RSI half is MET and the TREND half is what binds.
+    # Gated on `UPTREND_BLOCKS` because 🙏 SwingDip publishes `uptrend` too and
+    # REQUIRES it, so "outside" means the opposite there: the semantics belong
+    # to the carrier, never to the dict's shape. REPORTED — no gate reads it.
+    try:
+        if getattr(strategy, "UPTREND_BLOCKS", False):
+            if uptrend:
+                out["outside_uptrend_n"] = sum(
+                    1 for u in uptrend.values() if not u)
+            if enter:
+                out["both_terms_n"] = sum(1 for e in enter.values() if e)
+    except Exception:  # noqa: BLE001 — a gauge must never break a live loop
+        pass
     for key, ts in (("idle_open_h", last_open_ts),
                     ("idle_close_h", last_close_ts)):
         if ts:
@@ -1118,6 +1138,12 @@ def main(_ctx=None, once=False):
         last_rsi = {str(k): float(v)
                     for k, v in (state.get("last_rsi") or {}).items()
                     if isinstance(v, (int, float))}
+        # [(vm)] the trend-term gauge. NOT restored from state, unlike
+        # `last_rsi`: a stale uptrend verdict from a previous boot would be
+        # counted as this loop's reading of a term the operator is about to
+        # argue a widening from. Empty until the scan fills it, and ABSENT
+        # rather than zero in the census when it is.
+        last_uptrend, last_enter = {}, {}
         last_open_ts = [float(state.get("last_open_ts") or 0.0)]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
@@ -1555,6 +1581,30 @@ def main(_ctx=None, once=False):
                     "gross_x": gross_x(),
                     "days_to_gate_obs": round(
                         max(0.0, 30.0 - (t0 - born_ts) / 86400.0), 1),
+                    # [(vm)] WHAT THAT NUMBER IS MADE OF. It is the birth
+                    # countdown, and on a book with NO closes that is a floor
+                    # which can never bind: 👩 mum published `28.1` on 27-Aug
+                    # having never traded, i.e. "28 days to the gate" where the
+                    # honest answer is "unknown — at rate 0 she never arrives".
+                    # It is not fabricated (the comment above always called it
+                    # a floor) but it was UNREADABLE as one, and it is what
+                    # keeps `audit_book_spend` green on exactly the book I22
+                    # was written to catch.
+                    #
+                    # NOT published as null, deliberately, and this is the
+                    # measurement that decided it: `audit_book_spend` treats
+                    # `spend.get(f) is None` as a MISSING FIELD and fails, so
+                    # nulling it reddens the build on all three real-money
+                    # books for a reporting improvement. Instead the BASIS is
+                    # published beside it, so `birth_window` with `closes_obs:
+                    # 0` reads as the floor it is and cannot be mistaken for a
+                    # measured trajectory. Whether the guard should REFUSE that
+                    # state is Eamon's call, not a side effect of a telemetry
+                    # pass — REPORTED, and it is now visible enough to decide.
+                    "days_to_gate_basis": ("measured_rate"
+                                           if (st.get("closed") or 0)
+                                           else "birth_window"),
+                    "closes_obs": int(st.get("closed") or 0),
                 },
                 "initial_equity": base_eq,
                 # [2026-08-16 (no)] THE VENUE'S OWN MARGIN TRUTH. Until now
@@ -1601,7 +1651,8 @@ def main(_ctx=None, once=False):
                       if c in NONCRYPTO_EFFECTIVE and c not in nc_verdicts]
                      if nc_verdicts else None),
                     entries_shut, last_open_ts[0],
-                    (closed_win[-1].get("ts") if closed_win else None), t0),
+                    (closed_win[-1].get("ts") if closed_win else None), t0,
+                    strategy=S, uptrend=last_uptrend, enter=last_enter),
             }
             payload.update(extra_extra or {})
             try:
@@ -2161,6 +2212,20 @@ def main(_ctx=None, once=False):
                 # that it did not clear it ((rr)'s reading, at this book).
                 if sig and isinstance(sig.get("rsi"), (int, float)):
                     last_rsi[sym] = float(sig["rsi"])
+                # [(vm)] THE TREND TERM, on the arm that holds real money.
+                # (vm) shipped this gauge into `lighter_family_bot` and 👩 mum's
+                # LIVE row runs THIS file, so it reached her $1,000 shadow and
+                # not the $300 of real money it was built for — the (vh) class
+                # in the very wave that named it: verify the mechanism in one
+                # file, ship without asking which arm executes it. Captured
+                # from the SAME `sig` in the SAME pass, no second walk.
+                # `uptrend` is admitted only as a real bool: a None coerced to
+                # False would publish a fabricated PASS on the exact term a
+                # widening is argued from.
+                if sig and isinstance(sig.get("uptrend"), bool):
+                    last_uptrend[sym] = sig["uptrend"]
+                if sig is not None:
+                    last_enter[sym] = bool(sig.get("enter"))
                 if not sig or not sig.get("enter"):
                     # [2026-08-26] the ONE census owner: 👩 mum's sub-bar RSI
                     # refused by the NOT-uptrend half now reads
