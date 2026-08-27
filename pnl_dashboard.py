@@ -2079,6 +2079,9 @@ PIPE_PAIR_REASON = {
     "policy_unstamped": PIPE_MEASURE,
     # every one of these needs a human to change something in the tree/config.
     "live_row_dark": PIPE_WIRE,
+    # [(va)] the control arm's publisher is dead — the fix is the stopped or
+    # crash-looping shadow SERVICE, not anything in the pair's config.
+    "shadow_row_dark": PIPE_WIRE,
     "policy_mismatch": PIPE_WIRE,
     "parity_unreadable": PIPE_WIRE,
     "capacity_mismatch": PIPE_WIRE,

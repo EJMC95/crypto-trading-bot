@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-27 16:13 Sydney (06:13Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-27 17:18 Sydney (07:18Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -74,8 +74,27 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (69 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut))
+## Shipped today (88 commit(s), entries (tq), (tr), (ts), (tt), (tu), (tv), (tw), (ua), (ub), (uc), (ud), (uf), (ug), (ui), (uj), (uk), (ul), (um), (un), (uo), (uq), (ur), (us), (ut), (uu), (uv), (uw), (uy), (uz))
 
+- `62488dc` Mum is slow not stuck: her RSI bar is the measured peak, the universe widening is refuted by resampling, and the tape fetches once (uz)
+- `656fd01` Mum is SLOW not stuck, and her shipped RSI bar is the measured peak — widening past 32 costs expectancy (ut)
+- `67145a2` The venue tape, fetched once: a durable cache of CLOSED bars — 1804x on re-run, 0 requests (ut)
+- `a8dc14c` Record the inert-sort fix + correct (ts)'s order-independence claim in place; renumbered (uw) -> (uy) on a cross-branch collision (uy)
+- `e89aff0` Kill the second survivor: pin the extractor's row scoping (uw)
+- `67208d2` Close the mutation survivor: the contract test's roster must not be emptiable (uw)
+- `34846c4` The (ts) sort was inert: _close_rank read the DB column, not the key the publisher emits (uw)
+- `c03a5c1` Register audit_ledger_records' selftest — its own guard caught the omission on first CI, because the file was untracked locally (tw)
+- `2cab26d` Merge remote-tracking branch 'origin/main'
+- `dbb3fba` Georgia's exit is not the lever: 48 configurations on her own 212 entries, zero with a positive mean (ux, uw)
+- `4cab777` [deploy-live] Events are not trades: the real-money books published phantom losses, and the class behind six defects gets its guard (tw)
+- `b088376` Pre-registration snapshot: georgia's replay-vs-record reconciliation bars, committed before any result exists (uw)
+- `6f99b16` Fidelity: evaluate georgia's rule on the live CandleCache's own 300-bar span, not a growing full-history prefix (uv)
+- `2268279` The arms ran different entry policies and neither stamped it: max_entries_per_hour joins the shared stamp (uv)
+- `088e70c` Pre-registration snapshot: georgia's entry-first verdict bars, committed before any result exists (uv)
+- `54fa128` [deploy-live] The ':None' collision: a real losing trade was one halt event from being silently zeroed (tv)
+- `37d14a4` Merge remote-tracking branch 'origin/main'
+- `e344e09` Four refusals with evidence: (tr)'s cell verdicts survive the corrected estimator, 32 is at the optimum, georgia cannot diversify, the arity guard is not worth shipping (uu)
+- `70a5968` Regenerate HANDOFF — I11's regenerate-last half, skipped at this session's start and stale by ten entries (ut)
 - `2fcb366` Register audit_bus_contract in ENFORCED_AUDITS — a guard whose scan runs nowhere is the (gk) shape (ut)
 - `82935a9` A cross-read payload without updated+ttl_sec is unconsumable by design: ratchet the class coin-quality opened (ut)
 - `b15d4b1` Record the recorded-cost unlock + correct (ur)'s cost number in place; renumbered (us) -> (ut) on a cross-branch collision (ut)

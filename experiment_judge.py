@@ -1699,6 +1699,12 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
     fields (fleet_bus): a waived divergence does not block, is republished on
     the entry as `policy_waived`, and is refused outright where either arm's
     value is unreadable. A pair with no waiver behaves exactly as before."""
+    # [(va)] normalised at the point of USE, not at `pair_census`, so BOTH
+    # entry points are total — the judge's own selftest and the pair tests call
+    # this function directly, and a normalisation one level up would leave the
+    # direct callers on the raw shape (which is how the two `now` types coexisted
+    # unnoticed in the first place).
+    now = _epoch(now)
     live_bot, shadow_bot = pspec["live_bot"], pspec["shadow_bot"]
     st = {"live_bot": live_bot, "shadow_bot": shadow_bot,
           "pnl_form": pspec["pnl_form"], "candidate": None, "hold": None}
@@ -1753,7 +1759,16 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                 ts = parse_ts(row.get("updated_at") or row.get("updated"))
                 if ts is None:
                     return False
-                age = now_ts() - ts
+                # [(va)] the clock it was HANDED, not the wall clock. In
+                # production these are the same object (`run_once` passes
+                # `now = now_ts()`), so this changes no verdict — but it makes
+                # the gate DETERMINISTIC, and it had to: the in-module
+                # selftest drives t0 = 1_800_000_000.0, ~12.2M seconds in the
+                # FUTURE of wall clock, so every age came out NEGATIVE and the
+                # bar passed for any horizon. That selftest could not exercise
+                # this gate in either direction — and it would have silently
+                # flipped on 2027-01-15, when t0 becomes the past.
+                age = now - ts
             return float(age) <= PAIR_ROW_STALE_S
         except (TypeError, ValueError):
             return False
@@ -1765,6 +1780,31 @@ def _pair_precheck(pair_id, pspec, rows, bot_rows, now):
                    f"lesson: a rule keyed to a list goes stale on every "
                    f"slot swap)",
                    "the live row publishes fresh again")
+    # [(va)] I1 AT THE CONTROL ARM. `live_row_dark` was the ONLY liveness
+    # check in the whole precheck, so every rung below read the SHADOW row's
+    # last known values with no evidence anything still writes them — and
+    # `fetch_bot_pnl` upserts on a bot primary key, so a dead publisher's final
+    # row persists forever rather than ageing out. MEASURED by driving this
+    # function: a shadow row TEN DAYS stale returns verdicts BYTE-IDENTICAL to
+    # a fresh one — caps 5v6 publishes `capacity_mismatch` (which the
+    # dashboard files under PIPE_WIRE, "a session can clear this week", so it
+    # sends someone to align caps against a corpse), and caps 5v5 publishes
+    # `idle`, i.e. JUDGEABLE. The second is the dangerous one: `idle` is the
+    # state a real comparison starts from. Nor do the rungs in front of
+    # capacity help — `_latest_policy_stamp` has no recency window at all, so a
+    # dead arm still yields a policy stamp and parity passes on it.
+    # A false certification, not merely a wrong bar, which is why it is
+    # fail-CLOSED here rather than reported downstream (I1: establish that
+    # something still WRITES the payload before interpreting what it says).
+    if not _fresh(shadow_row):
+        return _un("shadow_row_dark",
+                   f"{shadow_bot} absent or stale in bot_pnl — the CONTROL "
+                   f"arm's publisher is not writing, and every rung below "
+                   f"this one would read its last known values as current "
+                   f"(the paired bar is only as live as its control)",
+                   "the shadow row publishes fresh again — if it does not, "
+                   "the shadow service is stopped or crash-looping and that "
+                   "is the thing to fix, not the pair's caps")
     # P1 — policy parity, from the arms' OWN close stamps (the shared
     # policy_stamp builder is the one source; a spec-side field list would
     # miss exactly the live-only divergences F1 is made of).
@@ -1965,10 +2005,27 @@ def _pair_power(rows, live_bot, shadow_bot, pspec, now, window_d=14.0):
         return None
 
 
+def _epoch(now):
+    """`now` as EPOCH SECONDS, whichever way a caller expresses it.
+
+    [(va)] ONE boundary, one meaning. This parameter had TWO live shapes and
+    nothing noticed, because until this commit `_fresh` ignored it and read the
+    wall clock: `run_once` passes `now_ts()` (a float) and the pipeline-card
+    fixture passes a `datetime`. The moment the freshness gate actually READ
+    the argument, the datetime path raised inside `_fresh`'s `except
+    (TypeError, ValueError)` and every pair in that fixture went `live_row_dark`
+    — a type ambiguity failing CLOSED, which is the safe direction and still a
+    defect. Normalised here rather than in `_fresh` so every rung below shares
+    one meaning; anything that is neither raises, rather than degrading."""
+    return now.timestamp() if hasattr(now, "timestamp") else float(now)
+
+
 def pair_census(rows, bot_rows, now):
     """Every JUDGED_PAIRS entry -> its published state. The farmer entry is
     OVERWRITTEN by the serial machine's own state in save() — the machine
-    is senior for the lane it actually runs."""
+    is senior for the lane it actually runs.
+
+    `now` is epoch seconds or a datetime; see `_epoch`."""
     out = {}
     for pid, pspec in (getattr(_bus, "JUDGED_PAIRS", {}) or {}).items():
         try:
