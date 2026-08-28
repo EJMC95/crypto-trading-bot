@@ -131,15 +131,25 @@ def test_both_hosts_resolve_the_universe_through_one_owner():
 
 
 # ------------------------------------------------------------- blast radius
-@pytest.mark.parametrize("bot", ["freqtrade-avo-maria", "freqtrade-georgia"])
-def test_the_widening_is_scoped_to_mum(bot):
+@pytest.mark.parametrize("bot", ["freqtrade-georgia"])
+def test_the_widening_never_leaks_to_an_unmeasured_book(bot):
     """THE REGRESSION ARM. A supply fix for one book must not re-aim another —
-    and the first cut of this change silently widened 🙏 avo, who is live."""
+    the first cut of this change silently widened 🙏 avo, who is live.
+
+    [2026-08-28 (vd)] RE-AIMED, not relaxed. 🙏 avo is now widened ON PURPOSE
+    (Eamon: *"widen what we know works"*) at her own stricter $0.5M floor, so
+    she leaves this list. 🔮 georgia STAYS: (ux) measured `trend_breakout` —
+    154 of her 212 real entries — DEAD against matched-random, and (uw) found
+    no exit configuration rescues it. Widening a book whose dominant sleeve has
+    no measured entry edge buys more no-edge trades (I19).
+
+    The property this arm defends is unchanged: a widening reaches exactly the
+    books somebody measured, and never leaks by default.
+    """
     other, mum = _s(bot), _s(MUM)
     assert fam.crypto_width(bot) == 0, f"{bot} gained a crypto widening"
     assert fam.noncrypto_extra(bot) == [], f"{bot} gained non-crypto names"
     assert len(fam.carrier_universe(other)) < len(fam.carrier_universe(mum))
-    assert other.max_open != mum.max_open or bot == MUM
 
 
 def test_mum_is_the_one_that_widened():
@@ -241,7 +251,9 @@ def test_the_crypto_floor_is_per_carrier_and_defaults_off():
     a book that never asked for one — the one direction a universe change must
     never move ((hk): a dark organ must not shrink a book's universe)."""
     assert fam.crypto_min_vol_m("freqtrade-mum") == pytest.approx(0.1)
-    for other in ("freqtrade-avo-maria", "freqtrade-georgia",
+    # avo carries her OWN floor (0.5) since (vd) and is asserted separately in
+    # `test_avo_widened_at_a_stricter_floor_and_georgia_is_untouched`.
+    for other in ("freqtrade-georgia",
                   "crypto-intraday-15m", "NEVER_SEEN", ""):
         assert fam.crypto_min_vol_m(other) == 0.0, (
             f"{other} must be unaffected — 0.0 means no floor")
@@ -299,3 +311,35 @@ def test_the_rank_bound_survives_as_a_safety_cap():
     n = fam.crypto_width("freqtrade-mum")
     assert n >= 120, "the rank bound must not re-impose the old limit"
     assert n <= 400, "an unbounded rank is a scout glitch with no ceiling"
+
+
+def test_avo_widened_at_a_stricter_floor_and_georgia_is_untouched():
+    """[2026-08-28 (vd)] Eamon: *"widen what we know works"*.
+
+    🙏 avo joins the widening at $0.5M, not mum's $0.1M: she holds 3.5 DAYS
+    against mum's 12h and clips $684 against $250, so a thinner book costs her
+    more. WHAT IT BUYS IS DECIDABILITY, NOT EDGE — (qu) measured her entry's
+    excess over matched-random as ~zero at 5d, where her hold lands — and her
+    own pre-registered 50-close criterion is ~116 days away at 0.43 closes/day
+    while she sits idle 38.7h with 2 of 5 slots free.
+
+    🔮 georgia is deliberately NOT widened: (ux) measured `trend_breakout` —
+    154 of her 212 real entries — DEAD against random, and (uw) found no exit
+    configuration rescues it. Widening a book whose dominant sleeve has no
+    measured entry edge buys more no-edge trades, which is the I19 trap.
+    """
+    assert fam.crypto_min_vol_m("freqtrade-avo-maria") == pytest.approx(0.5)
+    assert fam.crypto_width("freqtrade-avo-maria") >= 120
+    assert fam.crypto_min_vol_m("freqtrade-mum") == pytest.approx(0.1)
+    assert fam.crypto_min_vol_m("freqtrade-georgia") == 0.0, (
+        "georgia must stay unwidened — her dominant sleeve is measured DEAD")
+    assert fam.crypto_width("freqtrade-georgia") == 0
+
+
+def test_avos_floor_is_stricter_than_mums():
+    """The ordering IS the argument — a longer hold at a bigger clip needs a
+    deeper book. If these ever equalise, one of them was set without reason."""
+    assert (fam.crypto_min_vol_m("freqtrade-avo-maria")
+            > fam.crypto_min_vol_m("freqtrade-mum")), (
+        "avo holds 7x longer at 2.7x the clip and must not sit on a thinner "
+        "floor than mum")

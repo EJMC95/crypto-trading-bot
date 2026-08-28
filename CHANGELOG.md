@@ -88,6 +88,77 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### 🙏 AVO'S UNIVERSE WAS NEVER WIDENED — 38.7h IDLE WITH 2 FREE SLOTS ON 23 NAMES — AND THE DOCTRINE THAT LET THAT SIT IS AMENDED
+
+**Eamon: *"avo hasnt traded in over 30 hours"* / *"widen what we know works"* /
+*"no more circles"*.** Her census, unedited:
+
+    universe: 23 · rsi_read: 23 · verdicts {held: 3, no_signal: 20}
+    idle_open_h: 38.66 · cap_slots: 5 · held {ADA, DOT, TRX}
+
+`FAMILY_CRYPTO_N` only ever named 👩 mum, so avo still scanned the base 15
+crypto while mum scanned 98 — and the test I wrote this morning
+(`test_the_widening_is_scoped_to_mum`) actively PINNED that. It was right when
+written, for a real reason: an earlier cut had silently widened a live book. It
+then became the thing keeping a live book narrow.
+
+**SHIPPED: avo joins at her OWN floor, $0.5M — stricter than mum's $0.1M, and
+the gap is the argument.** She holds **3.5 days** against mum's 12h and clips
+**$684** against $250; a bigger position held ~7x longer on a thinner book is a
+different liquidity question. ~32 crypto names against her current 15.
+
+**WHAT IT BUYS, stated so nobody later reads it as edge: DECIDABILITY.** `(qu)`
+measured her entry's excess over matched-random as NEGATIVE at 4h/8h/12h and
+**~zero at 5d — which is exactly where her 3.5d median hold lands** — so this is
+expectancy-neutral at HER horizon, not profitable. Her live arm is n=6 at 0.43
+closes/day, which puts her own pre-registered 50-close revert criterion ~116
+days out while she sits idle. **A criterion nobody can reach decides nothing**;
+this is the `(ty)` purchase — "bought as DECIDABILITY, not edge" — on the book
+that most needs it.
+
+**🔮 GEORGIA IS DELIBERATELY NOT WIDENED, and that refusal is the same
+discipline as the widening.** `(ux)` measured `trend_breakout` — **154 of her
+212 real entries** — DEAD against matched-random, and `(uw)` swept 48 exit
+configurations over her real entries and found zero positive. Widening a book
+whose dominant sleeve has no measured entry edge buys more no-edge trades, which
+is precisely the I19 trap. Pinned by a test so the next pass does not "finish"
+the widening.
+
+### AND THE DOCTRINE THAT ALLOWED ALL THREE TO SIT IS AMENDED
+
+**Eamon: *"REMEMBER PERMANENTLY ANYTHING CAN BE CHANGED TO ACCOMODATE THE GROWTH
+IMMEDIATELY"*.** He is right, and the evidence is three findings that were all
+**found, correct, and unshipped** at the same moment:
+
+* `(vm)` published the judge's margin-vs-MDE mismatch — promotes on 0.5pp,
+  resolves 1.986pp — and wrote *"REPORT ONLY ... no verdict moves"*.
+* `(uw)` named "the subset her production filters select" as *"the next study,
+  not a knob"*.
+* 🙏 avo sat **38.7h idle** because a widening was *"scoped to mum"*.
+
+Each was individually defensible. Together they are a fleet that measures and
+does not move — `(hn)` said *implemented, not filed* and the filing continued
+under better names.
+
+`CLAUDE.md` now carries the amendment: **a found improvement ships in the
+session that finds it, and no artefact is out of bounds** — constant, cage, gate
+mechanics, strategy, universe, invariant, or that file itself. *"That is the
+next session's"* is not a reason.
+
+**WHAT THE AMENDMENT EXPLICITLY DOES NOT MOVE**, because Eamon wrote it in the
+same breath as this grant (*"remember permanent doctrine"*): immediacy governs
+WHEN and WHAT may be touched, never WHETHER a claim needs its measurement. Where
+a change genuinely needs a calibrated instrument first — a real-money promotion
+RULE, a stop, a cap — **the instrument is built in the same session too**, and
+if it truly cannot be, the session says what it WOULD take, which is a decision
+he can act on rather than a note nobody reads.
+
+**THE ONE THING STILL CARRIED, and it is named rather than parked:** the judge's
+0.5pp margin against a 1.986pp detection floor. Rewriting a real-money promotion
+rule needs a calibrated simulation of its promotion and false-promotion rates
+((tg)'s own duty), and the honest statement is that it is the next thing built —
+not that it is somebody else's.
+
 ### 🔮 GEORGIA'S TWO ARMS RAN DIFFERENT ENTRY POLICIES, SO THE JUDGE REFUSED HER — THE FIX IS PARITY FROM ONE OWNER, NOT A LOOSER BAR
 
 **Eamon: *"the oracle, like the judge needs to be loosened otherwise we will

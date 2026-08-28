@@ -158,7 +158,8 @@ CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 #: matched random-entry null, both halves negative.** "Scan all markets" is
 #: measured POSITIVE on crypto and measured NEGATIVE here, so the two halves of
 #: that instruction are answered differently and the reason is a number (I19).
-FAMILY_CRYPTO_N = os.environ.get("FAMILY_CRYPTO_N", "freqtrade-mum:200")
+FAMILY_CRYPTO_N = os.environ.get(
+    "FAMILY_CRYPTO_N", "freqtrade-mum:200,freqtrade-avo-maria:200")
 
 #: [2026-08-28 (vd)] THE RANK CAP IS REPLACED BY A MEASURED LIQUIDITY FLOOR.
 #: Eamon: *"unconstrain the bots universe and stop this persistent limitations"*.
@@ -191,8 +192,23 @@ FAMILY_CRYPTO_N = os.environ.get("FAMILY_CRYPTO_N", "freqtrade-mum:200")
 #: 200 so the floor binds instead of the rank, while a scout glitch still
 #: cannot hand a book 500 names. Universe width is capacity, so this is
 #: ordinary tuning and the era does NOT reset ((hc)).
+#: [2026-08-28 (vd)] 🙏 avo joins at a STRICTER floor than mum, and the gap
+#: is deliberate: she holds **3.5 days** against mum's 12h and clips
+#: **$684** against mum's $250. A bigger position held ~7x longer on a
+#: thinner book is a different liquidity question, so her floor is $0.5M
+#: (~32 crypto names, 2x her current 15) rather than mum's $0.1M (~67).
+#:
+#: WHAT THIS BUYS, stated honestly: **decidability, not edge.** (qu)
+#: measured her entry's excess over matched-random as NEGATIVE at 4h/8h/12h
+#: and **~zero at 5d — which is where her 3.5d median hold actually lands**,
+#: so widening is expectancy-neutral at HER horizon rather than profitable.
+#: Her live arm sits at n=6 and 0.43 closes/day: her own pre-registered
+#: 50-close revert criterion ((qu)) is ~116 days away, and she has been idle
+#: **38.7h with 2 of 5 slots free** and 20 of 23 names giving no signal.
+#: A criterion nobody can reach decides nothing — this is the (ty) purchase
+#: ("bought as DECIDABILITY, not edge") on the book that most needs it.
 FAMILY_CRYPTO_MIN_VOL_M = os.environ.get(
-    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1")
+    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1,freqtrade-avo-maria:0.5")
 
 
 def crypto_min_vol_m(bot, raw=None):

@@ -2072,6 +2072,42 @@ All new bots:
   amendment, it is a leak** — and the OFFENSE tier exists precisely
   because doctrine that only ever tightens becomes a museum of avoided
   losses.
+  **[AMENDED 28-Aug (vd), Eamon: *"when solutions and progressions are
+  found - REMEMBER PERMANENTLY ANYTHING CAN BE CHANGED TO ACCOMODATE THE
+  GROWTH IMMEDIATELY"*.] A FOUND IMPROVEMENT SHIPS IN THE SESSION THAT
+  FINDS IT — THE SURFACE IS FULLY DELEGATED AND NOTHING IS PARKED.**
+  `(hn)` already said growth findings are implemented not filed, and the
+  fleet kept filing them anyway — under better names. The three that
+  prompted this were all sitting FOUND and UNSHIPPED: `(vm)` published the
+  judge's margin/MDE mismatch and wrote *"REPORT ONLY ... no verdict
+  moves"*; `(uw)` named "the subset her production filters select" as
+  *"the next study, not a knob"*; 🙏 avo sat **38.7h idle with 2 of 5
+  slots free** on a universe nobody had widened because the widening was
+  *"scoped to mum"*. Each was correct in isolation and collectively they
+  are a fleet that measures and does not move.
+  **SO: there is no artefact that is out of bounds to change** — a
+  constant, a cage, a gate's mechanics, a strategy, a universe, an
+  invariant, this file. If a session finds the thing that unblocks
+  growth, it changes it now, in that session, and records the number.
+  "That is the next session's" and "that is a separate build" are not
+  reasons; they are how a found fix becomes an unfound one.
+  **WHAT DOES NOT CHANGE, because Eamon wrote it himself in the same
+  breath as this grant ("remember permanent doctrine"): the core below.**
+  Immediacy governs WHEN and WHAT may be touched — never WHETHER a claim
+  needs its measurement. The measurement is usually minutes; the delay
+  this amendment kills is the one that costs days. Where a change
+  genuinely needs a calibrated instrument before it is safe (a
+  real-money promotion RULE, a stop, a cap), **the instrument is built in
+  the same session too** rather than named as future work — and if it
+  truly cannot be, the session says so plainly and says what it WOULD
+  take, which is a decision Eamon can act on rather than a note nobody
+  reads.
+  ENFORCED BY: `scripts/audit_recurrence.py::audit` (a subject the
+  changelog keeps returning to is a fix that was found and not shipped),
+  `scripts/session_state.py::carried_status` (a CARRIED row whose
+  `closes_when` predicate already passes reddens CI, so a shipped-but-
+  unclosed item cannot sit).
+
   **THE PERMANENT DOCTRINE — "remember permanent doctrine", and this is
   it. None of the following is amendable by this grant, by a later grant,
   or by a doc edit, and a session that finds itself arguing one of them
