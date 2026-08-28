@@ -59,10 +59,29 @@ sys.path.insert(0, str(ROOT))
 #: shipped inside the file whose own docstring quotes "a check that inspects
 #: nothing reports clean". Caught only by the mutation round (I3).
 #:
-#: The sibling worktrees a run must still not walk are OUTSIDE this ROOT, so
-#: `rglob` never reaches them and no skip entry is needed for them at all
+#: [2026-08-28 (vr)] THE SIBLING-WORKTREE HALF, CORRECTED IN PLACE per I12.
+#: The note above read "the sibling worktrees a run must still not walk are
+#: OUTSIDE this ROOT, so `rglob` never reaches them" — TRUE for a session
+#: running INSIDE `.claude/worktrees/<name>`, and FALSE for one running in the
+#: MAIN worktree, where `.claude/worktrees/*` is *under* ROOT and `rglob` walks
+#: straight into it. Measured: this guard failed on
+#: `.claude/worktrees/hatchlings/scripts/claims_ledger.py:230` — another
+#: session's private file, on a defect the reporting session could not fix.
+#: That is the THIRD time this class has shipped ((um) fixed it in the letter
+#: guard, (vl) in the quarantine-order guard nine hours later)
 #: ([[a-guard-that-walks-sibling-worktrees]]).
+#:
+#: The RELATIVE-path form fixes both configurations at once, which is why the
+#: absolute form had to be removed rather than restored: run from inside
+#: `hatchlings` and ROOT *is* that worktree, so no rel path ever starts with
+#: `.claude/worktrees` and the skip is correctly INERT (the guard stays live on
+#: its own files — the vacuity the note above was written about). Run from the
+#: main tree and every sibling worktree's files DO start with it, and are
+#: skipped. A session is never turned red by work that is not its own, and is
+#: never let off its own.
 SKIP_PARTS = (".venv", "__pycache__", "build", ".git", "node_modules")
+#: Matched as a PREFIX of the path relative to ROOT, never as a bare part.
+SKIP_PREFIXES = ((".claude", "worktrees"),)
 
 
 def _script_modules():
@@ -88,6 +107,8 @@ def _violations():
     for f in sorted(ROOT.rglob("*.py")):
         rel = f.relative_to(ROOT)
         if any(p in SKIP_PARTS for p in rel.parts):
+            continue
+        if any(rel.parts[:len(pre)] == pre for pre in SKIP_PREFIXES):
             continue
         # A module inside scripts/ gets its own dir on sys.path[0].
         if f.parent == ROOT / "scripts":

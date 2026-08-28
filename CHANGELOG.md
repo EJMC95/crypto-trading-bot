@@ -98,6 +98,18 @@ family book: the others predate I22 and are GRANDFATHERED, so publishing for
 them would invite the n_eff-equals-symbol-count trap. Dashboard row registered
 (`LABELS`/`DESCRIPTIONS`/`FREQTRADE`) so it is visible from its first publish.
 
+**AND A THIRD SIBLING-WORKTREE GUARD, FIXED IN PASSING.**
+`test_no_silent_kill_switch_import_of_a_scripts_module` landed today and walked
+`.claude/worktrees/*`, so it failed on
+`.claude/worktrees/hatchlings/scripts/claims_ledger.py:230` — another session's
+private file, a defect the reporting session cannot fix. Its own note said
+siblings are "OUTSIDE this ROOT", which is true from INSIDE a worktree and
+false from the MAIN one. The RELATIVE-path skip fixes both at once: inert when
+ROOT *is* the worktree (so the guard stays live on its own files — the vacuity
+its note was written about), skipping when ROOT is the main tree. `(um)` and
+`(vl)` fixed this same class today; this is the third. Positive control run: the
+guard still fails on a real in-tree violation.
+
 **REAL MONEY WAS NOT MOVED, and the arithmetic is why.** georgia's live arm is
 **−$49.36 = −17.2% drawdown**, past the **15%** bar the go-live gate itself
 uses, and the evidence board's 0.75× clip cut was verified CORRECT (its bar is
