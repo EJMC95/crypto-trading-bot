@@ -468,7 +468,8 @@ OVERTRADE_DEFAULT = 15
 # stale duplicate and is filtered out here so it can never skew totals or the
 # grid — independent of whether the Postgres table has been pruned yet.
 # Freqtrade fleet bots (July 2026)
-FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"}
+FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria",
+             "freqtrade-georgia", "freqtrade-georgia-v3"}
 CURRENT_BOTS = set(EXPECTED) | VARIANT_ONLY | SCANNERS | STOCKS | FREQTRADE
 
 # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows. When a bot trades on Lighter
@@ -540,6 +541,7 @@ LABELS = {
     "freqtrade-dad":               "👨 Dad — breakout rider",
     "freqtrade-avo-maria":         "🙏 Avo Maria — dip buyer",
     "freqtrade-georgia":           "🔮 Georgia — day trader",
+    "freqtrade-georgia-v3":        "🔭 Georgia v3 — impulse fade",
     # [2026-07-21] 🏛️ the Parliament — last 8 Australian PMs: 6 books here,
     # Keating (scanners+ML) and Howard (ecosystem brain) are its organs.
     "pm-albanese":                 "🏗️ Albanese — trend rider",
@@ -557,6 +559,7 @@ DESCRIPTIONS = {
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
     "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 6 slots; LIVE clips = equity × gross_x ÷ 5 slots, levered 1.4× of a 1.5× drawdown budget (funded + levered 21-Aug (sr); slot swap 13-Aug)",
     "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",
+    "freqtrade-georgia-v3": "ImpulseFade · 15m — NEW ENTRY (vr), not a rearrangement of v1: fades a ≥3.0×ATR14 drop over 4 bars, bracket tp 2.0% / sl −1.5% / 4h max hold, crypto-only. The only candidate of ten surviving every horizon against matched-random (+0.140%..+0.178%/trade, t_cl +2.49..+6.01); shipped at the plateau INTERIOR, never the grid edge. HYPOTHESIS-grade — replay only, its own ledger decides · $50 × 5 slots",
     "crypto-trend-daily":  "daily 50/200-EMA golden cross — long through uptrends, cash after the death cross; holds for weeks",
     "crypto-intraday-15m": "DayTraderV5Gated · 1h — Georgia's engine at the validated 1h settings · 29 pairs, 5 slots",
     "crypto-swing-daily":  "SwingDipV1 · 1d — the validated daily dip-buyer · 29 pairs, 8 slots",

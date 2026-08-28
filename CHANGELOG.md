@@ -85,6 +85,19 @@ max_hold-dominated; the second half is materially weaker than the first
 replay-grade hypothesis is worth.** v1 keeps trading untouched as the control
 arm — "see if it's better" needs both books running.
 
+**SHIPPED WITH IT, because a book that reddens CI on its first publish is not
+built.** `spend_extra` + `BOOK_BORN_TS` give the row its I22 census every loop
+(`markets_scanned` 15, `sides` long, `gross_x` 1.0, and `days_to_gate_obs` NULL
+with a DECLARED basis while `closes_obs == 0` — the `(vn)` honest-unknown path,
+never a floor that cannot bind). `n_eff` degrades to **1.0** — "assume ONE bet"
+— which is the conservative direction and roughly true for 15 crypto majors
+(I22 measured 8 crypto markets at 1.35 bets); claiming unmeasured
+diversification is the one error a spend census must not make, and the negative
+control proves the audit still refuses it. The map is deliberately NOT every
+family book: the others predate I22 and are GRANDFATHERED, so publishing for
+them would invite the n_eff-equals-symbol-count trap. Dashboard row registered
+(`LABELS`/`DESCRIPTIONS`/`FREQTRADE`) so it is visible from its first publish.
+
 **REAL MONEY WAS NOT MOVED, and the arithmetic is why.** georgia's live arm is
 **−$49.36 = −17.2% drawdown**, past the **15%** bar the go-live gate itself
 uses, and the evidence board's 0.75× clip cut was verified CORRECT (its bar is

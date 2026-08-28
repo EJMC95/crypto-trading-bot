@@ -286,6 +286,61 @@ def carrier_universe(s, raw=None):
 # the L4 stake multipliers) was structurally impossible for the running
 # fleet. See EVIDENCE_AND_LEARNING_REVIEW_2026-07-15.md items 1-2.
 
+#: [2026-08-28 (vr)] I22 BIRTH STAMPS. A book born on or after 20-Aug must
+#: publish `extra.spend` every loop or `audit_book_spend` reddens the build.
+#: The family's OTHER books predate I22 and are GRANDFATHERED in that audit, so
+#: this map is deliberately NOT "every book" — it is the set that owes a census,
+#: and a new family book added later belongs here on the day it is registered.
+#: A DURABLE constant, never a process-start time: a restart must not reset a
+#: book's age and hand it a fresh 30-day runway it has not earned.
+BOOK_BORN_TS = {
+    "freqtrade-georgia-v3": 1787875200.0,        # 2026-08-28T00:00:00Z
+}
+
+
+def spend_extra(b, now_ts=None):
+    """[(vr)] I22: what this book spends of the ecosystem, published every loop.
+
+    Returns {} for a book that predates I22 — those are GRANDFATHERED in
+    `audit_book_spend`, and publishing a census for them would invite the
+    n_eff-equals-symbol-count trap the audit exists to catch.
+
+    `n_eff` DEGRADES TO 1.0 — "assume ONE bet" — and that is the conservative
+    direction rather than a shortcut: I22 measured 8 crypto markets at **1.35**
+    independent bets, and this book is pinned to 15 crypto majors (`coins=COINS`),
+    so its true independence is near 1 and never near its symbol count. Claiming
+    diversification that was not measured is the one error a spend census must
+    not make. Measuring it properly (`fleet_bus.basket_n_eff` over the held
+    basket's own returns, the 🙏 avo pattern) is the declared follow-up.
+    """
+    born = BOOK_BORN_TS.get(b.bot)
+    if born is None:
+        return {}
+    now_ts = time.time() if now_ts is None else now_ts
+    closes = int(getattr(b, "n_closed", 0) or 0)
+    age_d = max(0.0, (now_ts - born) / 86400.0)
+    return {"spend": {
+        "markets_scanned": len(carrier_universe(b.s)),
+        "markets_held": b.broker.open_count(),
+        "n_eff": 1.0,
+        "sides": "long",
+        "gross_x": 1.0,                 # family shadow books are unlevered
+        "closes_obs": closes,
+        # [(vn)] NULL when there is no rate, and that is the HONEST answer:
+        # `days_to_gate_obs` is `(2/S_d)^2` and a book with ZERO closes has no
+        # S_d, so any number is a floor that can never bind. The guard admits a
+        # DECLARED unknown (this basis + `closes_obs == 0`) and still refuses a
+        # bare one, so "no rate yet" and "missing field" stay distinguishable.
+        "days_to_gate_obs": (round(max(0.0, 30.0 - age_d), 1)
+                             if closes else None),
+        "days_to_gate_basis": (
+            "birth countdown to the 30-day window bar; the book's own rate "
+            "supersedes it once its ledger can carry an S_d"
+            if closes else
+            "no closes yet — no S_d, so no (2/S_d)^2 exists to report"),
+    }}
+
+
 def ledger_tag(tag):
     """The enter_tag the brain sees for this book's closes (and the key the
     stake-multiplier lookup must use — same function, so they can't drift)."""
@@ -2991,6 +3046,7 @@ def main():
                            "btc_regime_up": regime,
                            "skipped_unlisted": b.s.skipped,
                            **_control_extra(b), **_census_extra(b),
+                           **spend_extra(b, t0),
                            **_census_series_extra(b, t0)})
             except Exception:  # noqa: BLE001
                 pass
