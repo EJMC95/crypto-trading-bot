@@ -900,10 +900,40 @@ def is_phantom_close(r):
     same reason and must stay in the sample) and never timestamp inversion
     (verified to hit a real economic close). Fail-open: anything unparseable
     is NOT a phantom — this filter must never be able to silently shrink a
-    graded sample beyond its exact signature."""
+    graded sample beyond its exact signature.
+
+    [2026-08-28 (vd)] IT SPEAKS BOTH LEDGER SHAPES NOW, and the single-shape
+    version was a loaded gun pointed at every future consumer.
+
+    `bot_pnl_store.fetch_paper_trades` NORMALISES its rows to the freqtrade
+    shape — `profit_abs` / `open_rate` (bot_pnl_store.py:91,104) — which is what
+    this predicate was written against. The public `/trades.json` endpoint
+    serves the RAW column names, `pnl_abs` / `entry_price`. So on a feed row
+    `r.get("profit_abs")` is None -> `float(None or 0.0) == 0.0` is TRUE, and
+    `r.get("open_rate")` is None is TRUE: **every single feed row classified as
+    a phantom.**
+
+    That is not hypothetical. A sweep of this class recommended adding this
+    filter to `scripts/ceiling.py`, which reads `/trades.json` — shipping that
+    recommendation verbatim would have blanked the sample for every book in the
+    fleet. It was caught because a probe of mine returned "9000 phantoms of
+    9000 rows", a number absurd enough to disbelieve.
+
+    Accepting both shapes makes the next consumer correct BY CONSTRUCTION
+    rather than correct if it happens to read the right feed. Key PRESENCE
+    selects the shape, never the value: a DB row legitimately carries
+    `open_rate: None` for a missing fill price, so falling back on a None VALUE
+    would silently re-read the wrong column on exactly the rows that matter.
+
+    DB-shape behaviour is unchanged byte-for-byte — pinned by a test that runs
+    both shapes over the same rows and asserts an identical verdict set.
+    """
     try:
-        return (float(r.get("profit_abs") or 0.0) == 0.0
-                and r.get("open_rate") is None)
+        if "profit_abs" in r or "open_rate" in r:      # the normalised shape
+            pnl, rate = r.get("profit_abs"), r.get("open_rate")
+        else:                                          # the raw /trades.json shape
+            pnl, rate = r.get("pnl_abs"), r.get("entry_price")
+        return float(pnl or 0.0) == 0.0 and rate is None
     except (TypeError, ValueError):
         return False
 

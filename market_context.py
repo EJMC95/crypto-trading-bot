@@ -718,11 +718,45 @@ def coin_quality():
                 FROM venue_orders WHERE at > now() - interval '14 days'
                 GROUP BY coin""")
             venue_rows = cur.fetchall()
+            # [2026-08-28 (vd)] HALT EVENTS OUT OF A REAL-MONEY ENTRY GATE, and
+            # this one leans the RELEASE way.
+            #
+            # This aggregate feeds `coin-vetoes` (rule at L463: `closes >= 5 and
+            # stops/closes >= 0.5`), which all THREE live books consume at the
+            # entry site (lighter_avo_live_bot.py:2073 -> `coin_veto` -> the
+            # entry is refused). It counted halt/flatten EVENTS as closes.
+            #
+            # THE DIRECTION IS THE WHOLE POINT. A phantom's reason is
+            # `long_daily_loss`, which does NOT match `%stop%` — verified — so
+            # it raises the DENOMINATOR and never the numerator. Two effects,
+            # both loosening: the 5-close floor is reached sooner, and the 50%
+            # bar is pushed further away. A coin whose true record is 3 stops in
+            # 5 closes (60%, VETOED) reads 3 of 7 (43%, ADMITTED) after two
+            # halts. Absence of evidence must never authorise an entry (the (hs)
+            # fail-closed-in-the-widening-direction rule).
+            #
+            # MEASURED TODAY on the live ledger: the veto set is `['XAG']` with
+            # AND without the 13 — no coin added or removed, closest approach is
+            # SOL at 10.4%. So this buys ZERO expectancy today and is shipped as
+            # correctness, not as a win. What it does move is real: `BRENTOIL`
+            # goes 5 -> 4 closes, i.e. back BELOW the floor it only reached on a
+            # halt event.
+            #
+            # `side <> 'skip'` joins it because this was the one ledger reader in
+            # the fleet carrying neither filter.
+            #
+            # The predicate is the phantom signature spelled in SQL rather than
+            # an import (this runs inside a `cur.execute`), so it is a SECOND
+            # COPY OF A RULE — pinned against the owner by
+            # `tests/autonomy/test_coin_quality_phantoms.py`, which drives both
+            # over the same live rows and fails if they ever disagree ((hj)).
             cur.execute("""
                 SELECT split_part(pair, '/', 1), count(*),
                        sum(case when pnl_abs > 0 then 1 else 0 end),
                        sum(case when reason like '%%stop%%' then 1 else 0 end)
                 FROM paper_trades WHERE closed_at > (now() - interval '30 days')::text
+                  AND side IS DISTINCT FROM 'skip'
+                  AND NOT (pnl_abs = 0 AND entry_price IS NULL)
                 GROUP BY 1""")
             paper_rows = cur.fetchall()
         return _fold_coin_quality(venue_rows, paper_rows)

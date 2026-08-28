@@ -88,6 +88,84 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### HALT EVENTS WERE LOOSENING A REAL-MONEY ENTRY GATE — AND THE FIX THE SWEEP RECOMMENDED WOULD HAVE BLANKED THE FLEET'S ENTIRE LEDGER
+
+**Eamon: *"permission to fix what you find out and get these bots running
+smoothly again"*.** A fan-out of five diagnostic lenses died on the weekly
+subagent limit with 3 of 17 agents finished; what follows is those three,
+re-verified BY HAND, because every adversarial referee in that run also died
+and an unrefereed finding is a hypothesis.
+
+**THE ONE THAT MATTERS: `market_context.coin_quality` feeds `coin-vetoes`, and
+all THREE live real-money books read it at the entry site**
+(`lighter_avo_live_bot.py:2073` -> `coin_veto` -> the entry is refused). It was
+the fleet's ONLY ledger reader carrying neither a `side <> 'skip'` filter nor an
+event filter.
+
+**THE DIRECTION IS THE FINDING, not the magnitude.** The rule is
+`closes >= 5 AND stops/closes >= 0.5`, and a phantom's reason is
+`long_daily_loss` — which does **not** match `'%stop%'` (verified). So a halt
+event lands in the DENOMINATOR and never the numerator, and both consequences
+loosen: the 5-close floor arrives sooner, the 50% bar recedes. **A coin whose
+true record is 3 stops of 5 closes (60%, VETOED) reads 3 of 7 (43%, ADMITTED)
+after two halts.** Absence of evidence authorising an entry is exactly the (hs)
+fail-closed rule pointed the wrong way.
+
+**Priced honestly: ZERO expectancy today.** Veto set is `['XAG']` with AND
+without the 13; nothing added, nothing removed; closest approach SOL at 10.4%.
+Shipped as CORRECTNESS, not as a win. What did move is the mechanism caught in
+the act: **`BRENTOIL` goes 5 -> 4 closes**, i.e. back below a floor it had only
+reached on a halt event.
+
+**AND A PROPOSED FIX FROM THE SAME SWEEP IS REFUTED — it would have been a
+fleet-wide outage of every graded sample.** The sweep recommended adding
+`is_phantom_close` to `scripts/ceiling.py`, which reads the public
+`/trades.json`. But:
+
+| | P&L field | entry-price field |
+|---|---|---|
+| `bot_pnl_store.fetch_paper_trades` (normalised) | `profit_abs` | `open_rate` |
+| `/trades.json` (raw columns) | `pnl_abs` | `entry_price` |
+
+`is_phantom_close` read only the first shape. On a feed row `r.get("profit_abs")`
+is None -> `float(None or 0.0) == 0.0` is TRUE, and `open_rate` is None is TRUE
+— **every single feed row classifies as a phantom.** Shipping that
+recommendation verbatim would have emptied the sample for every book in the
+fleet.
+
+It was caught by a probe of mine that returned **"9000 phantoms of 9000 rows"** —
+a number absurd enough to disbelieve. Two bugs in my own probe (that one, plus
+`/trades.json` ignoring `offset`, so I read the same page nine times) are what
+exposed a live trap in somebody else's recommendation. **The lesson is not
+"check your probe" — it is that a number too clean to be true is data.**
+
+`is_phantom_close` now speaks **both shapes**, selected by key PRESENCE rather
+than by value — a DB row legitimately carries `open_rate: None` for a missing
+fill, so falling back on a None VALUE would silently re-read the wrong column on
+exactly the rows that matter. DB behaviour is byte-identical, pinned by driving
+both shapes over the same 3,332 live rows: **13 phantoms, same trade_ids, both
+ways.** The next consumer is now correct by construction instead of correct if
+it happens to read the right feed.
+
+The SQL clause is unavoidably a second copy of the owner's rule (it lives inside
+a `cur.execute`), so it is drift-guarded rather than trusted:
+`tests/autonomy/test_coin_quality_phantoms.py` drives BOTH over the same live
+ledger and fails if they ever disagree on a real row. Mutations 3 of 3 red (drop
+either SQL clause; re-introduce the single-shape owner bug), comment-reword
+control green.
+
+**STILL UNSHIPPED AND NAMED SO THEY ARE NOT LOST** — each measured by the sweep,
+none yet re-verified by me, so none is being acted on tonight:
+`experiment_judge.arm_trades` (no exit filter on the sample that IS the
+promotion decision — phantoms understate a live arm by 1.03pp/14d and 2.85pp/7d
+against a 0.5pp margin, in the PROMOTIONAL direction); `bot_learn._fetch_trades`
+(the brain publishes 🙏 avo at 33.3% win rate where the truth is 83.3%, and a
+sensitivity run puts a 0.75x live clip cut 26 halt-events away on a bucket
+holding ONE real trade); `fleet_proprioception.grade_live`; `fleet_radar`
+(inverts avo's triage from `starved` to `plausible`); `pnl_dashboard
+.fetch_bot_quality`. **`scripts/ceiling.py` is on that list too — but it must be
+fixed with the shape trap in mind, not with the sweep's original wording.**
+
 ### THE PHANTOM FILTER I SHIPPED THIS MORNING WAS INERT IN PRODUCTION, AND MY OWN TEST CERTIFIED IT
 
 **Eamon: *"fix"*.** The first thing to fix was mine.
