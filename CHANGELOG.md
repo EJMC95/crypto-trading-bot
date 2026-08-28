@@ -88,6 +88,69 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### A DURABLE VERDICT WITH A PER-LOOP REASON — THE THIRD COMPUTED-AND-DROPPED DEFECT IN ONE DAY, AND EAMON NAMED THE CLASS BEFORE I FINISHED FIXING IT
+
+**Eamon: *"stop things falling back to zero every loop everywhere, all the
+time, this is meant to be a progression fleet not a restart fleet"*.** He is
+right, and the instance was in the fix I had shipped ten minutes earlier.
+
+`scan_verdict` is DURABLE ON PURPOSE — kept across loops and restored across
+restarts, because this book decides on a slow candle and publishes every 90s:
+*"a per-CYCLE census would read 'nothing evaluated' on ~159 of every 160 loops,
+which is exactly the silence it exists to break."* I added
+`_LAST_REJECT.clear()` to the per-loop counter block **three lines above the
+comment listing precisely which things must not be reset there.**
+
+Result on the live row: **`venue_reject: 1` beside `venue_reject_why: null`** —
+the verdict outlived its reason, which is the exact ambiguity the field was
+added to remove. Fixed: the reason is durable like the verdict it explains, and
+its `at` stamp is what makes an old rejection readable as old. **Clearing is not
+how you express staleness; a timestamp is.**
+
+That is three in one day — `fleet_allocation`'s `n_phantom` computed and
+dropped, `bot_learn`'s receipt absent entirely, and now a reason cleared out
+from under its own verdict. The shape is always the same: **the thing that
+records is on a different clock from the thing it records about.**
+
+### GEORGIA: TWO CUTS BUILT, TWO CUTS WITHDRAWN — THE CAP STAYS AT 5
+
+**Eamon: *"adjust georgia to when she recorded wins"*, then *"what if the cap
+was 5?"*.** Both cuts are recorded because each looked convincing and each was
+wrong for a DIFFERENT reason.
+
+Her shadow by CONFIG ERA, each era's worst close dropped:
+
+| era | n | $ | mean% | ex-worst% |
+|---|---|---|---|---|
+| cap2 + trail2.5 | 141 | +11.19 | +0.122 | +0.139 |
+| cap2 + trail3.5 | 22 | +4.66 | **+0.423** | **+0.682** |
+| cap3 + trail3.5 | 47 | −3.16 | −0.146 | **+0.274** |
+| cap5 + trail3.5 (now) | 13 | −3.92 | −0.603 | −0.435 |
+
+* **CUT 1 (5 -> 2) died on CONCENTRATION.** The rank>=3 signal behind it was
+  **87% one row** — a −19.506% close on a −5% stop, a 4x stop breach from the
+  go-live hour. Permutation P=0.0244 and still wrong: *a permutation on the GAP
+  is structurally blind to whether one observation carries the split.*
+* **CUT 2 (5 -> 3) died on POWER.** It rested on the 13 closes above at
+  t=−1.66 — which decides nothing — against `(vb)`'s 1,816-entry grading where
+  ranks 1-5 are ALL positive. Treating a one-day forward sample as if it
+  outranked that was the error, and Eamon caught it by asking the right
+  question rather than accepting the change.
+
+**WHY 5 IS THE RIGHT DEFAULT WHILE THE QUESTION IS UNDECIDED:** the cap is the
+one gate that cuts her CLOSE RATE for no quality reason, and she needs 30
+in-era closes to be gradeable at all. At an undecidable difference the setting
+that produces evidence FASTER wins — I17's feed-first rule, and the same reason
+`(sv)` and `(ve)` raised it.
+
+**AND "WHEN SHE RECORDED WINS" IS NOT A CONFIG.** The trail stays at 3.5x:
+cap2+trail3.5 (+0.423%) beats cap2+trail2.5 (+0.122%) on her own ledger, and a
+difference-in-differences against the untouched `range_on` control puts the
+20-Aug trail move at **P=0.349**. `(uw)` settles it from the other side — every
+one of its 48 exit cells is positive in its first half and negative in its
+second **with configuration held FIXED**, so the decline is not in the settings
+at all. Reverting them would be cargo-culting the settings of a good tape.
+
 ### 👩 MUM WAS BLOCKED BY THE VENUE, NOT BY HER CODE — AND A GEORGIA CUT WAS BUILT, MEASURED SIGNIFICANT, AND REVERTED ON ONE ROW
 
 **Eamon: *"i want Avo trading as she should ... mum v2 trading as she should ...

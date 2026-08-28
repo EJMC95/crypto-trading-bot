@@ -95,6 +95,10 @@ def test_the_cap_is_the_measured_value():
     +0.084%/trade and 344 days-to-gate; cap 5 = +0.108% and 187. Uncapped is
     WORSE than both (+0.063%, 538d), which is why this is a number and not
     `None`."""
+    # [2026-08-28 (vd)] STAYS 5. Two cuts (->2, ->3) were built and withdrawn
+    # today: the first was 87% one broken row, the second rested on 13 closes
+    # at t=-1.66 against (vb)'s 1,816-entry grading. At an undecidable
+    # difference the setting that produces evidence FASTER wins (I17).
     assert _georgia().MAX_ENTRIES_PER_HOUR == 5, \
         "the measured step is 3 -> 5; rank 6+ is negative"
 

@@ -1302,32 +1302,37 @@ class DayTraderGated(Carrier):
     # NOT an era reset: a rate limiter is capacity, capacity is ordinary tuning
     # ((hc)). SHADOW-SCOPED by construction — the live host enforces no
     # throttle at all ((uv)), so this moves the shadow arm only.
-    #: [2026-08-28 (vd)] STAYS AT 5 — a 5 -> 2 cut was built, measured, and
-    #: REVERTED before it shipped. Recorded so nobody re-proposes it.
+    #: [2026-08-28 (vd)] STAYS AT 5 — and TWO cuts were built and withdrawn
+    #: today, both on samples too small to carry them. Recorded so a third
+    #: session does not re-derive the same dead end.
     #:
-    #: `(sv)` pre-registered this exact follow-through: the cap censors its own
-    #: evidence, so raising it generates the rank-3 sample that grades the next
-    #: step. The sample arrived — 61 ranked closes across both arms — and read:
+    #: Her shadow's ledger by CONFIG ERA, each era's single worst close dropped
+    #: (one -19.506% stop-breach row has mis-steered this decision twice):
     #:
-    #:     rank<=2  n=55  -0.305%/trade      rank>=3  n=6  -3.891%/trade
-    #:     gap -3.585pp, 20,000-shuffle permutation P = 0.0244
+    #:     era                       n      $     mean%    ex-worst%
+    #:     cap2 + trail2.5         141  +11.19   +0.122      +0.139
+    #:     cap2 + trail3.5          22   +4.66   +0.423      +0.682
+    #:     cap3 + trail3.5          47   -3.16   -0.146      +0.274
+    #:     cap5 + trail3.5 (now)    13   -3.92   -0.603      -0.435
     #:
-    #: Significant, pre-registered, and WRONG. **One row is 87% of it**: a
-    #: single NEAR close at **-19.506% on a -5% stoploss** — a 4x stop BREACH
-    #: from the 22-Aug go-live hour, already known anomalous. Drop it and
-    #: rank>=3 reads -0.768%; drop two and it is -0.462%, against rank<=2's
-    #: -0.305%. There is no rank effect here, only a broken row.
+    #: CUT 1 (5 -> 2) died on concentration: the rank>=3 signal behind it was
+    #: **87% one broken row** (permutation P=0.0244 and still wrong).
+    #: CUT 2 (5 -> 3) died on POWER: it rested on the 13 closes above at
+    #: t=-1.66, which decides nothing, against `(vb)`'s 1,816-entry grading
+    #: where ranks 1-5 are ALL positive. A one-day forward sample does not
+    #: overturn that, and treating it as if it did was the error.
     #:
-    #: It also contradicts the larger measurement it would have overturned:
-    #: `(vb)` graded rank over 1,816 entries and found ranks 1-5 ALL positive
-    #: with rank 3 her BEST (+0.313%, t_cl +2.44) and the cliff at rank 6.
+    #: WHY 5 IS THE RIGHT DEFAULT WHILE UNDECIDED: the cap is the one gate that
+    #: cuts her CLOSE RATE for no quality reason, and she needs 30 in-era
+    #: closes to be gradeable at all. At an undecidable difference, the setting
+    #: that produces evidence faster wins — I17's feed-first rule, and the same
+    #: reason `(sv)` and `(ve)` raised it in the first place.
     #:
-    #: THE LESSON, because the permutation test is what nearly did it: a
-    #: permutation on the GAP answers "is this split unlikely by chance" and is
-    #: BLIND to whether one observation carries the split. `(po)`'s top-3 drop
-    #: test is the arm that catches it, and it must run BEFORE any cut, not
-    #: after. Cutting to 2 would also have re-censored the very evidence (vb)
-    #: raised the cap to obtain — the I17 starvation shape.
+    #: THE TRAIL ALSO STAYS AT 3.5x: cap2+trail3.5 (+0.423%) beats
+    #: cap2+trail2.5 (+0.122%) on her own ledger, and a difference-in-
+    #: differences against the untouched `range_on` control put the 20-Aug
+    #: trail move at P=0.349 — indistinguishable from noise. Reverting it would
+    #: be cargo-culting the settings of a good tape.
     MAX_ENTRIES_PER_HOUR = int(os.environ.get(
         "GEORGIA_MAX_ENTRIES_PER_HOUR", "5"))
 

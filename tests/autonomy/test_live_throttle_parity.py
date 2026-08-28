@@ -95,7 +95,7 @@ def test_both_arms_stamp_the_SAME_cap_for_georgia():
     # [2026-08-28 (vd)] STAYS 5. A cut to 2 was measured (permutation P=0.0244)
     # and REVERTED: one NEAR close at -19.506% on a -5% stop is 87% of the
     # signal. See the constant's own note.
-    assert cap == 5, f"georgia's cap moved to {cap} — re-read (vb) and (vd)"
+    assert cap == 5, f"georgia's cap stays 5 — re-read (vd)"
     shadow = fam.policy_stamp(geo, "lighter_shadow", "list", cap)
     live = fam.policy_stamp(geo, "lighter_live", "diversified", cap)
     assert shadow["max_entries_per_hour"] == live["max_entries_per_hour"] == 5, (
@@ -182,3 +182,43 @@ def test_the_reject_holder_is_reachable_from_the_publisher():
                     for t in n.targets if isinstance(t, ast.Name)}
     assert "_LAST_REJECT" in module_level, (
         "_LAST_REJECT must be module-level or _publish_row cannot see it")
+
+
+def test_the_reject_reason_is_durable_like_the_verdict_it_explains():
+    """[2026-08-28 (vd)] THE DESYNC THIS SHIPPED WITH, caught on the live row.
+
+    `scan_verdict` is durable BY DESIGN — kept across loops and restored across
+    restarts, because this book decides on a slow candle and publishes every
+    90s ("a per-CYCLE census would read 'nothing evaluated' on ~159 of every
+    160 loops"). The first cut added `_LAST_REJECT.clear()` to the per-loop
+    counter block — three lines above the comment saying exactly which things
+    must NOT be reset there.
+
+    Result on the live row: `venue_reject: 1` beside `venue_reject_why: null`.
+    The verdict outlived its reason, which is the precise ambiguity the field
+    was added to remove. The `at` stamp is what makes a stale reason readable
+    as stale; clearing is not.
+    """
+    src = (ROOT / "lighter_avo_live_bot.py").read_text()
+    # AST, not a substring: my first cut asserted `"_LAST_REJECT.clear()" not
+    # in src` and failed on its OWN comment explaining the bug. A page-wide
+    # substring scan is not a structural claim
+    # ([[a-substring-test-is-not-a-wiring-test]]).
+    tree = ast.parse(src)
+    clears = [n for n in ast.walk(tree)
+              if isinstance(n, ast.Call)
+              and isinstance(n.func, ast.Attribute) and n.func.attr == "clear"
+              and getattr(n.func.value, "id", "") == "_LAST_REJECT"]
+    assert not clears, (
+        f"_LAST_REJECT.clear() is called at line(s) "
+        f"{[c.lineno for c in clears]} — the reason is reset per loop while "
+        f"its verdict is durable, so the row publishes venue_reject with a "
+        f"null reason again")
+    # and the reason must be self-dating, or a durable one is unreadable
+    updates = [n for n in ast.walk(tree)
+               if isinstance(n, ast.Call)
+               and isinstance(n.func, ast.Attribute) and n.func.attr == "update"
+               and getattr(n.func.value, "id", "") == "_LAST_REJECT"]
+    assert updates, "_LAST_REJECT is never populated"
+    assert any(k.arg == "at" for u in updates for k in u.keywords), (
+        "the reason must carry an `at` stamp, or a stale one reads as fresh")

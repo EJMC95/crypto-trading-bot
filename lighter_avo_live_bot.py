@@ -680,6 +680,17 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
 #: which is the same computed-and-dropped defect this file's own `n_phantom`
 #: sibling shipped this morning.
 #:
+#: DURABLE, NOT PER-LOOP — and the first cut got this wrong in a way the file
+#: had already warned about. `scan_verdict` is deliberately kept across loops
+#: and restored across restarts ("a per-CYCLE census would read 'nothing
+#: evaluated' on ~159 of every 160 loops, which is exactly the silence it exists
+#: to break"). I added a `_LAST_REJECT.clear()` into the per-loop counter block
+#: three lines above that very comment, so the VERDICT persisted and its REASON
+#: evaporated on the next pass — the row published `venue_reject: 1` beside
+#: `venue_reject_why: null`, which is the exact ambiguity this field was added
+#: to remove. It is not cleared per loop; the `at` stamp is what makes an old
+#: rejection readable as old.
+#:
 #: WHY IT EXISTS: 👩 mum published `venue_reject: 1` and nothing else while
 #: Lighter refused EVERY order she placed —
 #:   code=20558 "You are accessing Lighter from a restricted jurisdiction"
@@ -1324,9 +1335,6 @@ def main(_ctx=None, once=False):
         brain_gated_tags = []
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
-        # [(vd)] reset the module-level reject holder per loop, like every
-        # other counter here — a stale reason must never outlive its pass.
-        _LAST_REJECT.clear()
         coin_vetoed = {}
         live_scale = 1.0
         # [(st)] NOT scan_verdict / last_rsi / last_open_ts / closed_win: this
