@@ -749,7 +749,9 @@ def verify_alerts(cur, errors):
                                      f"⚠️ LIVE row {bot} has no bot_pnl row at "
                                      f"all — check the Railway service"))
                     continue
-                age_s, equity = float(row[0]), row[1]
+                # clamp: a row written after this txn's `now()` snapshot
+                # yields a negative epoch, which printed as "-0 min old"
+                age_s, equity = max(0.0, float(row[0])), row[1]
                 eq = f" (${equity:,.2f} real)" if equity is not None else ""
                 # The outage's DURATION, from the durable equity series — the
                 # number an operator actually needs. "It recovered" without a
