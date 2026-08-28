@@ -986,8 +986,28 @@ def run_once(publish=False):
     # matter ((hj)). Fail-OPEN — if the gate is unreachable the sample is
     # unchanged rather than blanked, because an allocation that silently sees
     # nothing is worse than one that sees a few phantom rows.
+    #
+    # [2026-08-28 (vf)] THE `sys.path` INSERT IS LOAD-BEARING AND ITS ABSENCE
+    # SHIPPED. `golive_readiness` lives under `scripts/`, which is NOT on the
+    # path in the freqtrade image, so the bare `from golive_readiness import`
+    # this block was written with raised ModuleNotFoundError, hit the fail-open
+    # `except`, and published `n_phantom: None` — the filter was inert in
+    # production for its whole first deploy while 🙏 avo kept publishing
+    # `n=15, claim +0.194%/trade` off a true traded sample of SIX.
+    #
+    # It passed locally because pytest puts `scripts/` on the path, and it
+    # passed `--selftest` because the other two `golive_readiness` importers in
+    # this file (`era_rows`, `GOLIVE_MIN_CLOSES`) DO insert the path and had
+    # already mutated `sys.path` for the process. So the bug was ORDER
+    # DEPENDENT: correct in any run that happened to grade an era first, wrong
+    # in the publish path that does not. Pinned now by an EXECUTION test in a
+    # clean subprocess — the AST test that shipped beside the defect asserted
+    # the import STRING was present and called, which a broken import satisfies
+    # perfectly ([[a-substring-test-is-not-a-wiring-test]]).
     n_phantom = 0
     try:
+        sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "scripts"))
         from golive_readiness import is_phantom_close
         _keep = [t for t in trades if not is_phantom_close(t)]
         n_phantom = len(trades) - len(_keep)
@@ -1011,6 +1031,18 @@ def run_once(publish=False):
     payload = build(books)
     payload["excluded_retired"] = n_retired
     payload["zero_close_books"] = sorted(zero_close)
+    # [2026-08-28 (vf)] PUBLISH THE REFUSAL COUNT — this organ was blind to its
+    # own filter. `n_phantom` was computed and DROPPED, so a run that excluded
+    # 13 halt events and a run whose import failed and excluded ZERO published
+    # byte-identical payloads. That ambiguity is what let the broken import
+    # above sit live: the only way to notice was to spot that 🙏 avo still read
+    # `n=15` when her true traded sample is 6.
+    #
+    # `0` means the filter ran and found nothing; `None` means it could not
+    # run. Those must never be the same byte-string (I1/I18, and the standing
+    # [[guards-blind-to-their-own-refusals]] lesson — measured there as 0 of 20
+    # rows accumulating a census).
+    payload["n_phantom"] = n_phantom
     # [(kc)] Say WHICH sample the ranked claim is computed on. Three organs
     # grade this fleet on three different samples — allocation pools all-time,
     # golive_readiness scopes to the policy era, the brain decays at a 14d

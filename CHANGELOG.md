@@ -88,6 +88,93 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### THE PHANTOM FILTER I SHIPPED THIS MORNING WAS INERT IN PRODUCTION, AND MY OWN TEST CERTIFIED IT
+
+**Eamon: *"fix"*.** The first thing to fix was mine.
+
+`(vd)` added a phantom-close filter to `fleet_allocation` and I reported it as
+delivered. It was never running. The live payload, read back:
+
+    fleet-allocation  updated 2026-08-28T03:35Z
+      freqtrade-avo-maria-lighter   n=15   claim=0.001939   <- unchanged
+
+**`n=15` is the receipt.** Her true traded sample is SIX; if the filter had run
+she would read `n=6` and `claim=None`. It published the pre-fix number for its
+whole first deploy, on the book the fix was FOR.
+
+**THE MECHANISM — an order-dependent import.** `golive_readiness` lives under
+`scripts/`, which is not on `sys.path` in the freqtrade image. Both of this
+file's OTHER importers of that module insert the path first (lines 934, 1061);
+mine did not. So:
+
+    $ python3 -c "from golive_readiness import is_phantom_close"
+    ModuleNotFoundError: No module named 'golive_readiness'
+
+It raised, hit the fail-OPEN `except`, and the sample passed through untouched.
+It was correct in any process that graded an era first — that importer mutates
+`sys.path` for everyone — and wrong in the publish path, which does not. **A
+bug that depends on call order is one that passes every time you check it by
+hand.**
+
+**WHY NOTHING CAUGHT IT — three failures, and each is a named trap:**
+* **The test was an AST test.** It asserted the import STRING was present and
+  that `is_phantom_close` was called. **A permanently-broken import satisfies
+  both.** [[a-substring-test-is-not-a-wiring-test]], written by me, violated by
+  me, inside the commit that cited it.
+* **pytest puts `scripts/` on the path.** The harness answered the question the
+  code was supposed to answer — the stub-encodes-the-assumption trap.
+* **`--selftest` exited 0** because the fail-open `except` is silent by design.
+
+**AND THE ORGAN WAS BLIND TO ITS OWN REFUSAL.** `n_phantom` was computed and
+then **dropped** — never written to the payload. So a run excluding 13 halt
+events and a run whose import failed and excluded ZERO published byte-identical
+output. That ambiguity is the whole reason this sat live: the only way to see
+it was to notice avo's `n` had not moved. Now `payload["n_phantom"]` publishes,
+and **`0` (ran, found none) and `None` (could not run) are distinguishable** —
+the [[guards-blind-to-their-own-refusals]] lesson, at the organ that ranks
+capital.
+
+**FIXED, and the guard is an EXECUTION test this time.** It spawns a clean
+interpreter, hands the REAL `run_once` a ledger of 12 real rows + 3 phantoms,
+and asserts `n_phantom=3, n=12`. A test that performs the path insert *itself*
+would prove only that the module is importable somehow, which was never in
+doubt. Plus an AST arm that fails any FUTURE bare `from golive_readiness
+import` with no path insert in its own `try` — the class, not the instance.
+(`dd_bound`'s importer is exempt by construction: it resolves by explicit file
+path, which is why the born-dark correction wrote it that way.)
+
+**Mutations, 4 of 4 red — including M1, the exact defect that shipped:**
+
+| mutation | verdict |
+|---|---|
+| remove the `sys.path` insert (**the shipped bug**) | RED |
+| fail-open sets `n_phantom=0` instead of `None` | RED |
+| stop publishing `n_phantom` | RED |
+| filter keeps phantoms | RED |
+| no-op comment change (control) | green, correctly |
+
+**THE TRANSFERABLE RULE:** *a fail-open `except` around an import is a silent
+kill switch for the feature inside it.* Fail-open is right here — an allocation
+that silently sees nothing beats one that sees a few phantoms — but it means
+the import's failure is indistinguishable from success unless the organ
+**publishes whether the thing ran**. Any fail-open guard must publish its own
+liveness, or it is not a guard, it is a hope.
+
+### AND THE LIVE TRIO'S DEPLOY STATE, CHECKED RATHER THAN ASSUMED
+
+Prompted by mum stamping `fdca864b` while 🙏 avo and 🔮 georgia stamp
+`50154a4e` — a split the `[deploy-live-mum]` marker creates by design, but one
+worth reading rather than waving through, because a fix that never reaches a
+container is this fleet's most-repeated failure.
+
+`audit_code_currency`: both are **DEFERRED by 9 commits, all mum-scoped**, and
+— the half that mattered — **georgia's running build already contains her own
+`(vn)` lockout latch** (`guard_until` present ×6) **and the 5-bar
+`GEORGIA_SLGUARD_STOP_BARS`**. Verified by reading her actual build's blob, not
+by trusting the changelog. Her lockout fix is live; the leads I named last
+night are genuinely spent, and the diagnosis has to move on rather than repeat
+them. All three rows fresh (45–61s) and none halted at the time of writing.
+
 ### THE OBVIOUS FINDING: THE ORGAN THAT RANKS CAPITAL WAS COUNTING HALT EVENTS AS TRADES
 
 **Eamon: *"fix obvious findings"*.** Looking at why 👩 mum has not opened and

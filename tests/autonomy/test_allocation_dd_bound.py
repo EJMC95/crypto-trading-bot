@@ -185,3 +185,116 @@ def test_build_populates_the_bound_on_every_record():
     assert "dd_bound" in books["freqtrade-mum-lighter"], "field never written"
     assert books["freqtrade-mum-lighter"]["dd_bound"]["max_scale"] == pytest.approx(3.75)
     assert books["NEVER_SEEN"]["dd_bound"] is None
+
+
+# ------------------------------------------- the import must RESOLVE, not exist
+def _clean_run(body):
+    """Run `body` in a CLEAN interpreter from the repo root.
+
+    THE WHOLE POINT: pytest puts `scripts/` on sys.path, so every in-process
+    assertion about `from golive_readiness import ...` is answered by the test
+    harness rather than by the code. The container has no such help.
+    """
+    import subprocess
+    return subprocess.run([sys.executable, "-c", body], cwd=str(ROOT),
+                          capture_output=True, text=True, timeout=180)
+
+
+def test_the_phantom_import_resolves_in_a_clean_interpreter():
+    """[2026-08-28 (vf)] THE REGRESSION ARM FOR A DEFECT THAT SHIPPED LIVE.
+
+    `run_once` imported `is_phantom_close` with a BARE
+    `from golive_readiness import ...`. That module lives under `scripts/`,
+    which is not on the path in the freqtrade image, so the import raised
+    ModuleNotFoundError, hit the fail-open `except`, and the filter was inert
+    in production — 🙏 avo kept publishing `n=15, claim +0.194%/trade` off a
+    true traded sample of SIX.
+
+    It passed locally for two compounding reasons, and neither is a property of
+    the code: pytest adds `scripts/` to the path, and this file's two OTHER
+    `golive_readiness` importers DO insert the path, so any run that graded an
+    era first left `sys.path` already mutated. The bug was ORDER DEPENDENT.
+
+    The test that shipped beside the defect asserted the import string was
+    present and called — which a permanently-broken import satisfies perfectly.
+    This one EXECUTES it ([[a-substring-test-is-not-a-wiring-test]]).
+
+    AND IT DRIVES THE REAL `run_once`, not a re-enactment of its import: a test
+    that performs the path insert ITSELF proves only that the module is
+    importable somehow, which was never in doubt. This hands the function a
+    ledger containing three phantom rows and asserts they do not reach the
+    claim — the production path, end to end.
+    """
+    r = _clean_run(
+        "import fleet_allocation as fa\n"
+        "REAL = {'bot': 'freqtrade-georgia-lighter', 'profit_ratio': -0.004,\n"
+        "        'profit_abs': -1.2, 'open_rate': 0.31, 'close_rate': 0.30,\n"
+        "        'closed_at': '2026-08-27T10:00:00Z',\n"
+        "        'opened_at': '2026-08-27T09:00:00Z'}\n"
+        "PH = {'bot': 'freqtrade-georgia-lighter', 'profit_ratio': 0.0,\n"
+        "      'profit_abs': 0.0, 'open_rate': None, 'close_rate': None,\n"
+        "      'closed_at': '2026-08-27T11:00:00Z',\n"
+        "      'opened_at': '2026-08-27T11:00:00Z'}\n"
+        "class S:\n"
+        "    def fetch_paper_trades(self, limit=None):\n"
+        "        return [dict(REAL) for _ in range(12)] + [dict(PH) for _ in range(3)]\n"
+        "    def fetch_bot_pnl(self, *a, **k): return []\n"
+        "fa.store = S()\n"
+        "p = fa.run_once(publish=False)\n"
+        "rec = (p.get('books') or {}).get('freqtrade-georgia-lighter') or {}\n"
+        "print('RESULT', p.get('n_phantom'), rec.get('n'))\n")
+    assert "RESULT 3 12" in r.stdout, (
+        "run_once did not exclude the 3 phantom rows from a clean "
+        f"interpreter — this is the production path:\n{r.stdout}\n{r.stderr}")
+
+
+def test_a_bare_golive_import_cannot_reach_run_once_again():
+    """The CLASS, not the instance. Every `from golive_readiness import ...`
+    inside this module must be preceded, in its own `try` block, by the
+    `sys.path` insert that makes it resolvable. A fourth site written without
+    it fails here instead of failing silently in production.
+
+    `dd_bound`'s importer is exempt BY CONSTRUCTION: it resolves the module by
+    explicit file path (`spec_from_file_location`), which needs no path insert
+    — the born-dark correction above is why it is written that way.
+    """
+    import ast
+    src = (ROOT / "fleet_allocation.py").read_text()
+    tree = ast.parse(src)
+    bad = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        block = node.body
+        inserts = [n for n in ast.walk(ast.Module(body=block, type_ignores=[]))
+                   if isinstance(n, ast.Attribute) and n.attr == "insert"]
+        for n in ast.walk(ast.Module(body=block, type_ignores=[])):
+            if isinstance(n, ast.ImportFrom) and n.module == "golive_readiness":
+                if not inserts:
+                    bad.append((n.lineno, [a.name for a in n.names]))
+    assert not bad, (
+        "a `from golive_readiness import` with no sys.path insert in the same "
+        f"try block — it will ModuleNotFoundError in the image: {bad}")
+
+
+def test_the_organ_publishes_whether_the_filter_ran():
+    """0 (ran, found none) and None (could not run) must not be the same
+    byte-string. The defect above was invisible precisely because `n_phantom`
+    was computed and dropped, so the payload could not distinguish them
+    ([[guards-blind-to-their-own-refusals]])."""
+    import ast
+    src = (ROOT / "fleet_allocation.py").read_text()
+    assert 'payload["n_phantom"] = n_phantom' in src, (
+        "run_once computes n_phantom but never publishes it")
+    tree = ast.parse(src)
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "run_once")
+    # The fail-open branch must assign None, never 0 — a 0 there would claim
+    # the filter ran clean when it never ran at all.
+    handlers = [h for n in ast.walk(fn) if isinstance(n, ast.Try)
+                for h in n.handlers]
+    assigns_none = any(
+        isinstance(s, ast.Assign) and getattr(s.targets[0], "id", "") == "n_phantom"
+        and isinstance(s.value, ast.Constant) and s.value.value is None
+        for h in handlers for s in ast.walk(h))
+    assert assigns_none, "the fail-open path must set n_phantom=None, not 0"
