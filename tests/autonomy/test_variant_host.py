@@ -56,12 +56,32 @@ def loaded(book=None, **env):
         os.environ["FAMILY_LIVE_BOOK"] = book
     for k, v in env.items():
         os.environ[k] = v
+    # [2026-08-28 (vd)] AN env-DRIVEN CONSTANT IN `lighter_family_bot` IS SET
+    # DIRECTLY, NEVER BY RELOADING THAT MODULE — and the first cut did reload
+    # it, which broke two tests in ANOTHER file.
+    #
+    # `importlib.reload(lighter_family_bot)` rebuilds its CLASS OBJECTS, so a
+    # strategy instance another test module imported at collection time stops
+    # being an `isinstance` of the new `DayTraderGated` — and `atr_stop_dist`
+    # gates on exactly that. The two `test_live_exit_parity` failures passed in
+    # isolation and failed in the suite, which is the signature of reload
+    # contamination rather than a real defect.
+    #
+    # Setting the attribute is equivalent for the constant under test and
+    # touches no class identity.
+    import lighter_family_bot as _fam
     import lighter_avo_live_bot as m
+    _sleeves = getattr(_fam, "SLEEVES_OFF", None)
+    if "GEORGIA_SLEEVES_OFF" in env:
+        _fam.SLEEVES_OFF = frozenset(
+            x.strip() for x in env["GEORGIA_SLEEVES_OFF"].split(",") if x.strip())
     try:
         yield importlib.reload(m)
     finally:
         os.environ.clear()
         os.environ.update(saved)
+        if _sleeves is not None:
+            _fam.SLEEVES_OFF = _sleeves
         importlib.reload(m)
 
 
@@ -464,7 +484,13 @@ def test_georgia_boots_and_completes_a_cycle_as_HERSELF():
     """One real cycle. She must publish to HER row, restore HER state key, and
     never touch Avo's — the whole point of the variant host, driven rather than
     asserted about a constant."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
@@ -485,7 +511,13 @@ def test_georgia_sizes_off_HER_geometry_not_avos():
     """`clip = equity * gross_x / max_open`. The number is hers because
     `S.max_open` is hers — this drives it rather than trusting the formula,
     which is how a variant host silently trades the wrong book's size."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
@@ -506,7 +538,13 @@ def test_her_cycle_publishes_the_leverage_and_scan_blocks():
     liquidation arithmetic on the row so a setting's consequences are readable
     every loop instead of re-argued; `(st)` put the scan verdicts there so
     `open: 0` is never byte-identical between "quiet" and "shut"."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
@@ -740,7 +778,13 @@ def test_entry_rank_is_born_at_the_open_and_reaches_the_close():
     instrument the verify pass caught. DECLARED divergence, pinned by name:
     the live host enforces no hourly throttle, so live rank is the UNCENSORED
     within-hour ordinal."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             # a STALE bucket from a previous hour, restored at boot: without
             # the reset, ranks continue from 7 and the first open stamps 8 —
@@ -809,7 +853,13 @@ def test_mum_control_pair_settles_through_the_one_owner():
 def test_a_non_control_book_payload_does_not_move():
     """{} for avo/georgia — the control block must not appear on books that
     run no control arm, or every grader learns a phantom key."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
@@ -845,7 +895,13 @@ def test_an_unmeasured_stop_fill_counts_in_its_own_bucket_never_zero():
     optimistic direction — the exact number a future gross ceiling consumes.
     The stub venue measures nothing, so a driven stop close must land in
     `unmeasured_n`, leave n=0/p90=None, and stamp no per-close bps."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
@@ -873,7 +929,13 @@ def test_an_unmeasured_stop_fill_counts_in_its_own_bucket_never_zero():
 def test_a_zero_dollar_no_entry_close_is_tagged_non_economic():
     """The phantom signature at the write site: $0.00 AND no entry price —
     never the reason string, which a REAL forced-flatten loss shares."""
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5") as m:
+    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
+    # sizing/rank/stop geometry, which is a different question from which
+    # sleeves may trade. Opting out explicitly beats re-writing the fixture
+    # around `range_on`, and it keeps the geometry assertions honest if the
+    # sleeve policy changes again.
+    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
+                GEORGIA_SLEEVES_OFF="") as m:
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)

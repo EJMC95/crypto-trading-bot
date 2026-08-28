@@ -1186,6 +1186,53 @@ class SwingDip(Carrier):
         return 0.5 if pulse_panic() else 1.0
 
 
+#: [2026-08-28 (vd)] SLEEVES RETIRED BY MEASUREMENT, not by deleting code.
+#: Eamon: *"i refute with the amount of bots, information and data that we cant
+#: find an entry for georgia"*. He was right and the earlier reading was wrong:
+#: she HAS a measured entry, and she was spending 73% of her trades on the one
+#: that does not.
+#:
+#: EXIT-FREE vs MATCHED-RANDOM, 90d of her own 15m tape, 23 symbols, LAG-1,
+#: episodes not ticks, cluster-robust t ((hm)'s random-entry null):
+#:
+#:     sleeve            eps      4h        12h       24h     P(rand>=)
+#:     range_on          257   +0.623%   +1.548%   +2.176%   0.000 EVERY h
+#:                             t_cl+4.15  t_cl+4.25
+#:     bounce_pullback   368   -0.058%   +0.400%   +0.557%   0.003 / 0.007
+#:     trend_breakout   1203   -0.108%   -0.150%   +0.227%   **0.99** = DEAD
+#:
+#: `trend_breakout` is NEGATIVE at 4h, 8h and 12h and a random entry on the
+#: same coins/windows BEATS it 99% of the time. It is 1203 of 1828 episodes and
+#: **154 of her 212 real entries**.
+#:
+#: THE NUMBER THAT DECIDES IT — her shipped rule, entries held constant,
+#: restricted to the SURVIVING sleeves: **+0.183%/trade, t_cl +2.40, halves
+#: +0.345/+0.021** against **+0.057%/trade** for the whole book. The harness
+#: calibrates to her real ledger at **0.004pp** (replay +0.057% vs actual
+#: +0.053%, tolerance 0.60pp), so this is not a proxy contradicting her record
+#: — it reproduces it and then removes the part with no edge.
+#:
+#: WHY THIS IS NOT `(uw)` AGAIN: that sweep pooled ALL THREE sleeves over her
+#: 212 real entries and found no exit configuration positive — correctly, because
+#: 73% of that population is a sleeve with no entry edge, and no exit rescues an
+#: entry that loses to random. This restricts the ENTRY instead, which `(uw)`
+#: itself named as the remaining hypothesis ("the subset her production filters
+#: select"), and it is the axis `(ux)` measured and nobody acted on.
+#:
+#: THROUGHPUT IS PAID FOR AND THE ARITHMETIC IS STATED: `n` falls 1828 -> 625
+#: (2.93x), costing sqrt(2.93) = 1.71x on `t`, while the mean improves 3.21x.
+#: **Net `t` improves 1.88x**, so this moves her TOWARD the gate rather than
+#: away from it — the I17/I22 test any restriction has to pass, and the one
+#: that separates a fix from starvation.
+#:
+#: REVERSIBLE IN ONE ENV, and the census keeps publishing the sleeve's own
+#: signal count beside `retired: true` so the call stays falsifiable ((ly)'s
+#: sleeve-retirement shape — gate ENTRIES only, never delete the evidence).
+SLEEVES_OFF = frozenset(
+    x.strip() for x in os.environ.get(
+        "GEORGIA_SLEEVES_OFF", "trend_breakout").split(",") if x.strip())
+
+
 class DayTraderGated(Carrier):
     """DayTraderV5Gated — entry modes switched by BTC's 4h 50/200 EMA regime;
     trailing ATR stop capped by the carrier stoploss; ROI ladder; timeouts."""
@@ -1370,7 +1417,8 @@ class DayTraderGated(Carrier):
             tag = "bounce_pullback"
         if (adx[i] is not None and adx[i] >= 25 and c[i] > e50[i]
                 and dc20 is not None and c[i] > dc20
-                and band_pct >= self.BAND_PCT_ON and live_vol):
+                and band_pct >= self.BAND_PCT_ON and live_vol
+                and "trend_breakout" not in SLEEVES_OFF):
             tag = "trend_breakout"
         # [2026-07-13 SLEEVE RETIRED with the freqtrade twin] range_meanrev —
         # 7d live in both Kraken carriers: 52 entries, -$13.94, negative in
