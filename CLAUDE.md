@@ -583,6 +583,62 @@ to the same standard as a cold one, and to keep shipping — a change judged
 against the right baseline is the fleet's only way to compound.
   ENFORCED BY: `fleet_proprioception.py::grade_live`, `scripts/study_do_our_changes_hurt_2026-08-27.py::peak_arm`, `scripts/study_do_our_changes_hurt_2026-08-27.py::K`
 
+### I26 · A STARVED BOOK IS A COST, AND "UNPROVEN" IS NOT A REASON TO REFUSE A BOUNDED WIDENING — THE BURDEN OF PROOF SITS ON THE REFUSAL
+**Eamon, 28-Aug:** *"we should be exploring further not tighter"* / *"lets make
+sure we dont have another day of going around in circles"*. He is right, and
+the mechanism is structural rather than anyone's mood.
+
+**REFUSING IS CHEAP AND ALWAYS LOOKS RIGOROUS. WIDENING NEEDS A CONTROL, A
+PERMUTATION TEST AND A CONCENTRATION CHECK.** The two are not symmetric in
+effort, so doctrine drifts tighter one invariant at a time — exactly the
+"museum of avoided losses" the OFFENSE tier's own preamble warned about, now
+measured at book scale.
+
+**THE DAY THAT PROVED IT.** Three live books, and every one was starved by a
+LIST rather than by a rule:
+* 👩 mum scanned **40** crypto names while the venue listed **127**. Her cell
+  fired **0 times in 7 days** on her list and **15** at a measured $0.1M floor.
+  She was live for three days with nothing to buy, and every explanation
+  offered — the RSI bar, the NOT-uptrend conjunct, the long budget — was wrong.
+* 🙏 avo scanned **23** while mum scanned 98, idle **38.7h** with 2 of 5 slots
+  free. The mechanism to widen her already existed; what kept her narrow was
+  **a test written that same morning** (`test_the_widening_is_scoped_to_mum`)
+  which pinned her exclusion. It was correct when written and became the thing
+  holding a live book down.
+* 🔮 georgia had two cuts proposed at her in one afternoon, both withdrawn.
+
+**THE RULE.** For a change that is **REVERSIBLE and BOUNDED** — a universe, a
+floor, a cap, a slot count, anything with an env revert and a registry cage —
+on a book that **cannot currently be graded**:
+* **the default is SHIP WITH A PRE-REGISTERED REVERT CRITERION**, not
+  prove-then-ship. The measurement happens FORWARD on the book's own ledger,
+  which is better evidence than any replay (I14) and is how the fleet's best
+  work already happened ((ro) mum v2, (qu) avo's 50-close criterion, (ve)'s cap
+  raise shipped explicitly to GENERATE the sample that grades it);
+* **an expectancy-NEUTRAL widening on a starved book is strictly POSITIVE**,
+  because decidability is the binding constraint (I17/I22) and a book that
+  cannot reach its own bar earns nothing by staying narrow. `(ty)` priced this
+  correctly — *"bought as DECIDABILITY, not edge"* — and it is the standard.
+* **REFUSING such a widening requires a MEASURED HARM, not the absence of a
+  proven benefit.** "Unproven" describes almost every good change before it
+  ships. A refusal must name the number that makes it worse — dead markets
+  below a measured slippage cliff, a sign-flipping sample, a stop it cannot
+  reach — or it is not a refusal, it is inertia with a citation.
+
+**WHAT THIS DOES NOT TOUCH, and the boundary is the same one as always:** real
+money still needs its measured number and expectancy price (I19); the go-live
+gate, the judge's evidence requirement and the safety rails are untouched; and
+a refusal WITH a measured harm remains a first-class outcome — three shipped
+today (rank-120 admits $0-volume markets; two georgia cuts died on
+concentration and on power). **This raises the bar on refusals; it does not
+lower the bar on evidence.**
+
+**AND A PIN IS NOT A REASON.** A test that asserts a book's CURRENT narrowness
+is a snapshot, not a property — when it blocks a widening, the question is
+whether the widening is right, never whether the pin exists. Re-aim it and say
+so, as `test_the_widening_never_leaks_to_an_unmeasured_book` now does.
+  ENFORCED BY: `scripts/audit_stuck_vs_slow.py::STATES`, `scripts/audit_stuck_vs_slow.py::MIN_STUCK_PUBLISHES`
+
 <!-- INVARIANTS:END -->
 
 

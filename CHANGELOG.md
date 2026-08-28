@@ -88,6 +88,64 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### I26 — THE BURDEN OF PROOF MOVES ONTO THE REFUSAL, AND THE GUARD THAT POLICES DOCTRINE COULD NOT SEE IT
+
+**Eamon, 28-Aug: *"we should be exploring further not tighter"* / *"make sure
+the amendments to rules and restrictions and constraints is fixed and put in
+the doctrine"*.** He is right, and the mechanism is structural rather than
+anyone's mood.
+
+**REFUSING IS CHEAP AND ALWAYS LOOKS RIGOROUS; WIDENING NEEDS A CONTROL, A
+PERMUTATION TEST AND A CONCENTRATION CHECK.** The two are not symmetric in
+effort, so doctrine drifts tighter one invariant at a time. Today made it
+measurable: **all three live books were starved by a LIST rather than a rule.**
+👩 mum scanned 40 crypto names of 127 and her cell fired **0 times in 7 days**
+on that list against **15** at a measured floor. 🙏 avo scanned 23 and idled
+**38.7h** with 2 of 5 slots free — held there by a test written that same
+morning, which was correct when written and became the thing keeping a live
+book narrow.
+
+**I26 SHIPPED.** For a REVERSIBLE, BOUNDED change on a book that cannot
+currently be graded: the default is **ship with a pre-registered revert
+criterion**, an expectancy-NEUTRAL widening on a starved book is **strictly
+positive** because decidability is the binding constraint (I17/I22), and —
+the sharp end — **refusing such a widening requires a MEASURED HARM, not the
+absence of a proven benefit.** "Unproven" describes almost every good change
+before it ships; a refusal must name the number that makes it worse, or it is
+inertia with a citation.
+
+It does not touch real money's duty (I19), the go-live gate, the judge's
+evidence requirement or the rails. **It raises the bar on refusals; it does not
+lower the bar on evidence** — and three refusals WITH measured harm shipped
+today and stand (rank-120 admits $0-volume markets; two georgia cuts died on
+concentration and on power).
+
+### AND THE GUARD COULD NOT SEE THE INVARIANT — 27 CHARACTERS OUTSIDE ITS OWN MARKERS
+
+`audit_doctrine_enforcement` parses only the region between
+`<!-- INVARIANTS:BEGIN -->` and `<!-- INVARIANTS:END -->`. I26 was appended
+before the "Acknowledged recurrence" heading and landed **27 characters AFTER
+the END marker**. The file held 26 invariants; the audit reported a clean
+**25** — and passed.
+
+**So the newest doctrine had NO enforcement checking at all**, which is the
+exact sentence at the top of CLAUDE.md ("a doctrine with neither declaration
+fails") defeated by position rather than by content. It is also the
+inspects-nothing-reports-clean class landing on the one guard whose entire job
+is to prevent it.
+
+FIXED BOTH WAYS: I26 moved inside the markers (26 invariants, 25 enforced), and
+the audit now **counts headings across the WHOLE document** and fails naming any
+id that sits outside the block. Two selftest arms: a stray invariant must FAIL,
+and an all-inside document must stay clean — because an arm that only ever
+fires is a blocker, not a guard.
+
+**THE TRANSFERABLE SHAPE, and it is the third time today:** a check with a
+BOUNDED scope reports clean on everything outside that bound, and the bound is
+invisible in the output. `(qz)` is the truncated-`head` version, the vacuous
+worktree-skip is the sweep version, and this is the marker version. **Whenever
+a check reports a count, compare it to the population — the gap is the finding.**
+
 ### A DURABLE VERDICT WITH A PER-LOOP REASON — THE THIRD COMPUTED-AND-DROPPED DEFECT IN ONE DAY, AND EAMON NAMED THE CLASS BEFORE I FINISHED FIXING IT
 
 **Eamon: *"stop things falling back to zero every loop everywhere, all the
