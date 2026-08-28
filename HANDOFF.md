@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-28 09:17 Sydney (23:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-28 10:14 Sydney (00:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,10 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (62 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vd), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
+## Shipped today (64 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vd), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
 
+- `cfdfeae` The allocation clamp gets a per-book bound; the born-dark guard caught the import version first (vd)
+- `550be55` Regenerate HANDOFF — I11's regenerate-last half (vd)
 - `aa7e0ed` The recorded cost gets its first consumer: carry publishes it beside the proxy that stands in for it (vd)
 - `10b05c4` [deploy-live-mum] Both arms to 36 — Eamon's call; shipped as the default so they pair by construction (vd)
 - `0934efc` [deploy-live-mum] Mum's bar returns to its measured peak 36->32: supply is fixed by slots+universe, so the bar no longer has to carry that job (vd)
