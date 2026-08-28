@@ -88,6 +88,71 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### 👩 MUM IS TRADING — AND EAMON WAS RIGHT THAT 🔮 GEORGIA HAS AN ENTRY: SHE SPENT 73% OF HER TRADES ON THE ONE THAT DOESN'T
+
+**👩 MUM OPENED HER FIRST REAL-MONEY POSITION.** `open=1`, `held {"JTO":
+"oversold-rebound"}`, equity $299.59 — on the exact coin the venue refused an
+hour earlier. The chain end-to-end: supply widened (universe 13 -> 98), the
+jurisdiction block found in the container log and fixed by Eamon at the venue,
+the service restarted, and her v2 sleeve took the trade.
+
+**AND THE REFUTATION LANDED.** Eamon: *"i refute with the amount of bots,
+information and data that we cant find an entry for georgia"*. He was right, and
+my "no lever is available" was wrong in a checkable way. Fresh exit-free test vs
+MATCHED-RANDOM, 90d of her own 15m tape, 23 symbols, LAG-1, episodes not ticks,
+cluster-robust t:
+
+| sleeve | episodes | 4h | 12h | 24h | P(rand>=) |
+|---|---|---|---|---|---|
+| `range_on` | 257 | **+0.623%** t_cl **+4.15** | **+1.548%** t_cl **+4.25** | +2.176% | **0.000 at EVERY horizon** |
+| `bounce_pullback` | 368 | −0.058% | +0.400% | +0.557% | 0.003 / 0.007 |
+| **`trend_breakout`** | **1203** | −0.108% | −0.150% | +0.227% | **0.99 = DEAD** |
+
+**A random entry on the same coins and windows beats `trend_breakout` 99% of the
+time** — and it is 1203 of 1828 episodes and **154 of her 212 real entries**.
+
+**MY OWN "HORIZON MISMATCH" STORY IS REFUTED TOO**, and this is why it matters:
+I had written that `range_on`'s edge lives at 24h while she holds 2.5h, so she
+could not reach it. She reaches it at **4h with t_cl +4.15**. The edge is at
+EVERY horizon; the sleeve mix was the problem all along.
+
+**THE NUMBER THAT DECIDES IT** — her SHIPPED rule, entries held constant,
+restricted to the surviving sleeves: **+0.183%/trade, t_cl +2.40, halves
++0.345/+0.021**, against **+0.057%** for the whole book. The harness calibrates
+to her real ledger at **0.004pp** (replay +0.057% vs actual +0.053%, tolerance
+0.60pp), so this is not a proxy contradicting her record — it REPRODUCES it and
+then removes the part with no edge.
+
+**WHY THIS IS NOT `(uw)` RE-RUN.** That sweep pooled all three sleeves over her
+212 real entries and found zero of 48 exit configurations positive — correctly,
+because 73% of that population has no entry edge and **no exit rescues an entry
+that loses to random**. This restricts the ENTRY, which `(uw)` itself named as
+the one remaining hypothesis and left as "the next study".
+
+**SHIPPED: `SLEEVES_OFF`, default `trend_breakout`.** Entry-gated only, one env
+to revert (`GEORGIA_SLEEVES_OFF`), census keeps publishing so the call stays
+falsifiable — the `(ly)` sleeve-retirement shape, never a code deletion.
+
+**THE THROUGHPUT PRICE IS PAID AND STATED:** `n` falls 1828 -> 625 (2.93x),
+costing sqrt(2.93) = **1.71x** on `t`, while the mean improves **3.21x**. Net
+**`t` improves 1.88x** — so this moves her TOWARD the gate, not away from it,
+which is the I17/I22 test any restriction must pass and the line between a fix
+and starvation.
+
+**TWO FIXTURE DEFECTS FOUND ON THE WAY, both mine:**
+* `loaded()` reloads the live runner but NOT `lighter_family_bot`, so an
+  env-driven constant living in the strategy module could not be exercised at
+  all — a blind spot in the file whose own docstring already records one reload
+  bug.
+* The obvious fix — reload family too — **broke two tests in another file**.
+  `importlib.reload` rebuilds CLASS OBJECTS, so a strategy instance imported at
+  collection time stops being an `isinstance` of the new `DayTraderGated`, and
+  `atr_stop_dist` gates on exactly that. They passed in isolation and failed in
+  the suite: the signature of reload contamination, not a real defect. The
+  constant is now SET, never reloaded.
+
+Mutations 2/2 red through `scripts/mutate.py`.
+
 ### I26 — THE BURDEN OF PROOF MOVES ONTO THE REFUSAL, AND THE GUARD THAT POLICES DOCTRINE COULD NOT SEE IT
 
 **Eamon, 28-Aug: *"we should be exploring further not tighter"* / *"make sure
