@@ -460,10 +460,59 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None,
     correct for the LIVE control arm, which runs env defaults and whose rows
     predate the receipt. Pass levers to count ONLY closes the arm PROVED it ran
     them on (see ran_candidate).
+
+    [2026-08-28 (vd)] HALT EVENTS ARE NOT TRADES, AND THIS IS THE SAMPLE THE
+    PROMOTION DECISION IS MADE ON.
+
+    The only filter here was `profit_ratio is None`, and a phantom close — a
+    halt/flatten EVENT with $0.00 P&L and no entry price — carries
+    `profit_ratio = 0.0`, so every one of them passed straight into `sh_h`/
+    `lv_h`, the per-half paired bar that IS the promotion, and into fade-watch.
+
+    The judge's own PUBLISHED power block already excludes them (avo live reads
+    `n=6`, georgia `n=51`), because `_pair_power` applies the pair's
+    `strip_exits`. But `_pair_power`'s docstring says it is *"REPORT ONLY ...
+    nothing gates on it"* — so the number the operator READS was clean while the
+    number that DECIDES was not. That is the (gk)/(iz) shape: a defense that
+    exists in the report and not in the actuator.
+
+    DIRECTION, which is why it is worth touching a promotion gate at all: a
+    0.0% row pulls a losing arm's mean toward zero and raises `n`, shrinking
+    SE — so phantoms flatter whichever arm holds them, in the PROMOTIONAL
+    direction. Priced on avo's pair: the shipped shadow-vs-live gap reads
+    -0.4566pp over 14d against a phantom-filtered -1.4825pp (delta 1.03pp), and
+    -0.3485 vs -3.2004 over 7d (delta 2.85pp) — against a `MARGIN_PP` of 0.5,
+    i.e. 2.1x and 5.7x the bar.
+
+    EXPECTANCY TODAY: ZERO, verified rather than assumed. Every pair is
+    `unjudgeable` or `stood_down` (avo live n=6, mum n=0, georgia blocked on
+    `policy_stamp_required`, farmer retired), so no promotion is reachable. The
+    exposure is the next winning live arm that halts.
+
+    WHAT IS DELIBERATELY **NOT** DONE HERE, with the number that refuses it:
+    the pair specs also declare `strip_exits = ("daily_loss", "kill_switch",
+    "v1_legacy")`, and a sweep recommended applying those here too. **Refused.**
+    `strip_exits` removes REAL forced-flatten LOSSES, not just events —
+    measured on georgia's live arm, phantom-filtering alone gives
+    **n=57, -0.1768%/trade**, and adding `strip_exits` gives
+    **n=51, +0.0535%/trade**. It FLIPS A LOSING REAL-MONEY ARM POSITIVE by
+    discarding six trades that cost real dollars. Whether a forced flatten
+    belongs in a promotion sample is a genuine policy question with a measured
+    sign change attached; it is not a correctness fix and must not ride in on
+    one.
     """
+    try:
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "scripts"))
+        from golive_readiness import is_phantom_close as _phantom
+    except Exception:                                        # noqa: BLE001
+        _phantom = None
     out = []
     for r in rows or []:
         if str(r.get("bot")) != bot or r.get("profit_ratio") is None:
+            continue
+        if _phantom is not None and _phantom(r):
             continue
         if levers is not None and not ran_candidate(r, levers):
             continue

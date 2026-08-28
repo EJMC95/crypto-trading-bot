@@ -517,6 +517,47 @@ def _fetch_trades():
             trades.extend(t for t in paper if not t.get("is_open"))
     except Exception:
         pass
+    # [2026-08-28 (vd)] HALT EVENTS OUT OF THE BRAIN — it sizes REAL MONEY now.
+    #
+    # A $0.00 close with no entry price is a halt/flatten EVENT. Since (so)/(sp)
+    # every living book reads this brain through `fleet_bus.brain_clip`, clamped
+    # [1/6.7, 6.7], and that includes the three live real-money rows — so a
+    # bucket statistic built here is a real-money position size.
+    #
+    # MEASURED on the live ledger, and it is not a rounding error: 🙏 avo's card
+    # reads **n=15, wins=5, win rate 33.3%** where her true traded record is
+    # **n=6, wins=5, 83.3%** — a 50pp error on a real-money book, because 9 of
+    # her 15 rows are halt events. 🔮 georgia reads 44.3% against a true 47.4%.
+    #
+    # WHY A PHANTOM IS WORSE HERE THAN A WRONG NUMBER: it is FREE `n` carrying
+    # no information, and almost every bar in `qualify_v3` is size-driven —
+    # `min_n`, `soft_n`, the `n_eff` floors, the Wilson upper bound, and the EB
+    # posterior's shrinkage weight are all satisfied FASTER by rows that say
+    # nothing. Only the `t` bar and `pnl_w < 0` resist, and one real loss
+    # supplies both. A sensitivity run puts a **0.75x clip cut** on georgia's
+    # `long` bucket 26 halt-events away, on a bucket whose only real content is
+    # a single -$0.84 close. Zero multiplier flips today (0 of 76 buckets), so
+    # this is shipped as CORRECTNESS, not as a measured win.
+    #
+    # Filtered HERE and never inside `fetch_paper_trades`: that reader is the
+    # raw ledger, and `fetch_paper_aggregate`'s own event subtraction plus the
+    # dashboard's `record.events` counter legitimately need the rows.
+    #
+    # The `sys.path` insert is load-bearing — `golive_readiness` lives under
+    # `scripts/`, which is not on the path in the freqtrade image. Omitting it
+    # is a silent kill switch: the import raises, this `except` swallows it, and
+    # the filter is inert while looking shipped. That exact defect reached
+    # production in `fleet_allocation` earlier today; it is guarded now by
+    # `tests/autonomy/test_scripts_import_resolvability.py`.
+    try:
+        import os
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "scripts"))
+        from golive_readiness import is_phantom_close
+        trades = [t for t in trades if not is_phantom_close(t)]
+    except Exception:                                        # noqa: BLE001
+        pass
     return trades
 
 

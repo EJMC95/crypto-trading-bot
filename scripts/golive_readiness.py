@@ -927,12 +927,28 @@ def is_phantom_close(r):
 
     DB-shape behaviour is unchanged byte-for-byte — pinned by a test that runs
     both shapes over the same rows and asserts an identical verdict set.
+
+    AND A ROW MUST POSITIVELY CARRY ONE OF THE TWO SHAPES TO BE JUDGED AT ALL.
+    The first cut of the widening fell through to the raw branch for a row with
+    NEITHER shape's keys, read two absent fields as `None`, and returned True —
+    so **every key-less row was classified as a phantom and dropped.** The
+    experiment judge's own `--selftest` caught it within the minute: its
+    synthetic rows carry `profit_ratio` and `close_ts` and no price fields, so
+    the paired bar collapsed to `n_shadow 0 / n_live 0` and the promotion
+    assertion failed.
+
+    That is this docstring's fail-open promise violated by its own
+    implementation, and it is the direction that matters — a filter able to
+    silently shrink a graded sample is strictly worse than one that misses a few
+    events. Unparseable now means NOT a phantom, as promised.
     """
     try:
         if "profit_abs" in r or "open_rate" in r:      # the normalised shape
             pnl, rate = r.get("profit_abs"), r.get("open_rate")
-        else:                                          # the raw /trades.json shape
+        elif "pnl_abs" in r or "entry_price" in r:     # the raw /trades.json shape
             pnl, rate = r.get("pnl_abs"), r.get("entry_price")
+        else:
+            return False                               # neither shape: fail OPEN
         return float(pnl or 0.0) == 0.0 and rate is None
     except (TypeError, ValueError):
         return False

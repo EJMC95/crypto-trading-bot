@@ -88,6 +88,96 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### THE BRAIN THAT SIZES REAL MONEY AND THE JUDGE THAT PROMOTES TO IT WERE BOTH COUNTING HALT EVENTS — AND WIDENING THE FILTER BROKE IT IN THE ONE DIRECTION THAT MATTERS
+
+**Eamon: *"If it improves the numbers then deploy it"*.** Stated plainly first,
+because it governs what follows: **none of this adds expectancy.** It stops the
+fleet deciding on wrong inputs. The one number that genuinely improves is a
+live book's published win rate.
+
+**`bot_learn` — the brain sizes REAL MONEY** (`fleet_bus.brain_clip`, every
+living book, clamped [1/6.7, 6.7]) and its ledger read had no event filter at
+all: `fetch_paper_trades` then `extend(... if not t.get("is_open"))`. Measured:
+
+| | with halt events | true |
+|---|---|---|
+| 🙏 avo live | n=15, wins=5, **33.3%** | n=6, wins=5, **83.3%** |
+| 🔮 georgia live | n=61, 44.3% | n=57, 47.4% |
+
+**A 50pp win-rate error on a real-money book.** The mechanism is worse than the
+number: a phantom is FREE `n` carrying no information, and nearly every bar in
+`qualify_v3` is size-driven — `min_n`, `soft_n`, the `n_eff` floors, the Wilson
+upper bound, the EB shrinkage weight — so rows that say nothing satisfy them
+FASTER. Only the `t` bar and `pnl_w < 0` resist, and one real loss supplies
+both.
+
+**`experiment_judge.arm_trades` — the sample the PROMOTION is decided on.** Its
+only filter was `profit_ratio is None`, and a phantom carries `0.0`. The
+judge's own PUBLISHED power block already excluded them (avo live reads `n=6`,
+georgia `n=51`) because `_pair_power` applies `strip_exits` — but that
+function's docstring says it is *"REPORT ONLY ... nothing gates on it"*. **The
+number the operator READS was clean while the number that DECIDES was not**:
+the (gk)/(iz) shape, a defense living in the report and not the actuator.
+
+**EXPECTANCY TODAY IS ZERO ON BOTH, verified rather than asserted** — and one
+of the sweep's reasons was WRONG, so it is corrected here rather than repeated.
+It claimed published mults are `{}`; they are not. Three books carry
+multipliers — 🧘 douglas `short-impulse` 0.75, 🌾 carry `long` 0.75, 🎫 taker
+`short-divergence` 0.75 — and the finding survives for a better reason: **none
+of the three is a live book and none carries a phantom row**, so no multiplier
+moves. Every judged pair is `unjudgeable` or `stood_down`, so no promotion is
+reachable either.
+
+**REFUSED, WITH THE NUMBER — the other half of the judge fix.** The sweep also
+recommended applying each pair's `strip_exits` in `arm_trades`. On 🔮 georgia's
+LIVE arm: phantom-filtering alone gives **n=57, −0.1768%/trade**; adding
+`strip_exits` gives **n=51, +0.0535%/trade**. It **flips a losing real-money
+arm positive** by discarding six trades that cost real dollars. Whether a
+forced flatten belongs in a promotion sample is a genuine policy question with
+a measured sign change attached — it is not a correctness fix and must not ride
+in on one. Pinned by a test so a later pass cannot "complete" the job.
+
+### THE WIDENING BROKE THE PREDICATE'S OWN FAIL-OPEN PROMISE, AND THE JUDGE'S SELFTEST CAUGHT IT IN A MINUTE
+
+Teaching `is_phantom_close` both ledger shapes, the first cut fell through to
+the raw branch for a row carrying NEITHER shape's keys, read two absent fields
+as `None`, and returned **True** — so **every key-less row was classified as a
+phantom and dropped.** `experiment_judge --selftest` failed immediately: its
+synthetic rows carry `profit_ratio` and `close_ts` and no price fields, so the
+paired bar collapsed to `n_shadow 0 / n_live 0`.
+
+That is this function's own docstring — *"anything unparseable is NOT a phantom
+— this filter must never be able to silently shrink a graded sample"* —
+violated by its own implementation, in the dangerous direction. **A filter that
+can drop rows it does not understand is strictly worse than one that misses a
+few events**, because what it shrinks is a GRADED sample and the graders govern
+real money. A row must now POSITIVELY carry one of the two shapes to be judged
+at all. Contract pinned at 8 cases; live ledger still reads exactly 13.
+
+**The repo's own guard caught this, not me** — which is the entire argument for
+running selftests on modules you did not think you were touching.
+
+### AND I HAND-ROLLED THE MUTATION ROUND AFTER MY OWN NOTES SAY NOT TO
+
+The round reported 5 kills and then reddened its own CONTROL — a comment
+reword, which must never fail. In isolation the control passed. The cause:
+`mut()` cleared `tests/autonomy/__pycache__`, and **on this Mac
+`sys.pycache_prefix` points at `~/Library/Caches/com.apple.python`, so
+`rm -rf __pycache__` inside the repo is the NULL ACTION.** The control ran
+against the *previous* mutation's cached bytecode.
+
+`scripts/mutate.py` exists precisely for this, its docstring names this exact
+failure as having bitten **five times before**, and my own memory says *"use
+`scripts/mutate.py`, don't hand-roll"*. I hand-rolled, and reproduced bug #1
+verbatim. Every mutation below is re-run through the harness — which sets
+`PYTHONDONTWRITEBYTECODE=1`, scores on exit code rather than grep, asserts the
+mutation actually applied, refuses to score a mutant that will not compile, and
+verifies green before AND after restoring.
+
+**A mutation round scored against stale bytecode proves nothing in either
+direction** — including the kills. That is why they are re-run rather than
+reported.
+
 ### HALT EVENTS WERE LOOSENING A REAL-MONEY ENTRY GATE — AND THE FIX THE SWEEP RECOMMENDED WOULD HAVE BLANKED THE FLEET'S ENTIRE LEDGER
 
 **Eamon: *"permission to fix what you find out and get these bots running
