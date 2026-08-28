@@ -153,6 +153,27 @@ path, which is why the born-dark correction wrote it that way.)
 | filter keeps phantoms | RED |
 | no-op comment change (control) | green, correctly |
 
+**VERIFIED BY READBACK, not by the green run** (04:07:47Z, the organ's first
+publish after the deploy):
+
+    n_phantom: 13
+      freqtrade-avo-maria-lighter   n=15 -> 6    claim 0.001939 -> 0.0   claim_era -> None
+      freqtrade-georgia-lighter     n=61 -> 57   mean -0.00165 -> -0.00177
+
+**`n_phantom: 13` is independent corroboration**, not just a receipt: it lands
+on exactly the population the winners' docket measured (🙏 avo 9, 🔮 georgia 4),
+so the signature is matching the rows it was built for and no others.
+
+**ONE IMPRECISION IN `(vd)` CORRECTED IN PLACE per I12** — that entry says avo's
+claim goes to *"NONE"*. The published `claim` is **0.0**; it is `claim_era` that
+is **None**. The meaning was right (she holds no claim) and the number this
+whole fix was about is right, but **0.0 and None are deliberately different in
+this organ** — `(ua)` made the distinction load-bearing (floored-zero vs
+no-opinion, and `claim_era` is the only field a consumer may act on, (lx)) —
+and this is the exact class `scripts/claims_ledger.py` exists to catch. Quoting
+a field by the wrong value is how a number drifts for five days and is then
+found by accident.
+
 **THE TRANSFERABLE RULE:** *a fail-open `except` around an import is a silent
 kill switch for the feature inside it.* Fail-open is right here — an allocation
 that silently sees nothing beats one that sees a few phantoms — but it means
