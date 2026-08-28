@@ -88,6 +88,43 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### THE BRAIN COULD NOT BE VERIFIED FROM OUTSIDE AT ALL — SO THE MONITOR ARMED ON IT COULD ONLY EVER TIME OUT
+
+The deploy readback for the brain fix failed, and the reason was not the deploy.
+I armed a watch for 🙏 avo's card to drop from `n=15` to `n=6` in the brain
+payload. It ran ~50 minutes, emitted nothing, and expired.
+
+**The key I was reading does not exist.** `brain` publishes `runs`, `vitals`,
+`venue_ab`, `diagnoses`, `hypotheses`, `mult_streaks` — and **not one carries a
+per-book sample size**. There was never an `n` to watch. Third probe of mine
+today aimed at a key-path I had not verified first, and the honest reading is
+that the monitor proved nothing in either direction.
+
+**The deploy DID land** — checked properly instead: `audit_code_currency` puts
+every organ row CURRENT at `166a2a7`, and `fleet_allocation` (same container,
+same class of fix) publishes `n_phantom: 13`.
+
+**But the underlying problem is the organ's, not the probe's.** A brain run that
+excluded 13 halt events and a run whose import failed and excluded ZERO publish
+byte-identical payloads. That is the same ambiguity that let the inert filter sit
+live in `fleet_allocation` for a whole deploy this morning — **one organ over,
+found by trying to verify the fix rather than by reading the code.**
+
+SHIPPED: `bot_learn` publishes `vitals.sample.phantom_excluded`. **0 means the
+filter ran and found nothing; None means it could not run**, and the fail path
+sets None precisely so those never collapse into one byte-string
+([[guards-blind-to-their-own-refusals]]). Reported, never a gate (I15).
+
+Mutations 3 of 3 red through `scripts/mutate.py`: drop the published field;
+make the fail path publish `0` instead of `None`; make the filter keep
+everything.
+
+**THE TRANSFERABLE RULE, and it is the second time today it has cost a
+readback:** *before arming a watch on a payload, fetch it once and confirm the
+field you intend to watch is actually in it.* A monitor that cannot observe its
+condition is indistinguishable from a condition that never occurs — and both
+look like patience.
+
 ### THE BRAIN THAT SIZES REAL MONEY AND THE JUDGE THAT PROMOTES TO IT WERE BOTH COUNTING HALT EVENTS — AND WIDENING THE FILTER BROKE IT IN THE ONE DIRECTION THAT MATTERS
 
 **Eamon: *"If it improves the numbers then deploy it"*.** Stated plainly first,
