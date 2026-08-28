@@ -201,7 +201,7 @@ def _clean_run(body):
 
 
 def test_the_phantom_import_resolves_in_a_clean_interpreter():
-    """[2026-08-28 (vf)] THE REGRESSION ARM FOR A DEFECT THAT SHIPPED LIVE.
+    """[2026-08-28 (vd)] THE REGRESSION ARM FOR A DEFECT THAT SHIPPED LIVE.
 
     `run_once` imported `is_phantom_close` with a BARE
     `from golive_readiness import ...`. That module lives under `scripts/`,

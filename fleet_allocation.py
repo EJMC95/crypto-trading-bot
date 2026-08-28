@@ -987,7 +987,7 @@ def run_once(publish=False):
     # unchanged rather than blanked, because an allocation that silently sees
     # nothing is worse than one that sees a few phantom rows.
     #
-    # [2026-08-28 (vf)] THE `sys.path` INSERT IS LOAD-BEARING AND ITS ABSENCE
+    # [2026-08-28 (vd)] THE `sys.path` INSERT IS LOAD-BEARING AND ITS ABSENCE
     # SHIPPED. `golive_readiness` lives under `scripts/`, which is NOT on the
     # path in the freqtrade image, so the bare `from golive_readiness import`
     # this block was written with raised ModuleNotFoundError, hit the fail-open
@@ -1031,7 +1031,7 @@ def run_once(publish=False):
     payload = build(books)
     payload["excluded_retired"] = n_retired
     payload["zero_close_books"] = sorted(zero_close)
-    # [2026-08-28 (vf)] PUBLISH THE REFUSAL COUNT — this organ was blind to its
+    # [2026-08-28 (vd)] PUBLISH THE REFUSAL COUNT — this organ was blind to its
     # own filter. `n_phantom` was computed and DROPPED, so a run that excluded
     # 13 halt events and a run whose import failed and excluded ZERO published
     # byte-identical payloads. That ambiguity is what let the broken import

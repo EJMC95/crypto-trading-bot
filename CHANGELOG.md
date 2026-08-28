@@ -153,6 +153,64 @@ path, which is why the born-dark correction wrote it that way.)
 | filter keeps phantoms | RED |
 | no-op comment change (control) | green, correctly |
 
+**THE CLASS IS NOW SWEPT, AND EXACTLY ONE INSTANCE EXISTED.** An AST sweep of
+every module OUTSIDE `scripts/` that imports a `scripts/` module inside a
+swallowing `try`:
+
+| site | form | verdict |
+|---|---|---|
+| `fleet_allocation.py:1011` | bare | **the defect above** |
+| `evidence_board.py:608` | bare + `scripts.<mod>` fallback | **NOT a defect** |
+| `scripts/evidence_review.py`, `scripts/claims_ledger.py` | bare | **NOT defects** |
+
+**`evidence_board` is fine and must not be "fixed".** Its handler falls back to
+`from scripts.golive_readiness import ...`, which resolves as a namespace
+package from the repo root — verified by driving it: `_GATE_MAX_DD = 0.15` at
+import time. The two `scripts/`→`scripts/` imports resolve because Python puts
+a script's own directory on `sys.path[0]`. **Naming the non-defects is half the
+work**; a sweep that reports four hits and lets the next session "fix" three
+working call sites is worse than no sweep ((gl): a detector that overstates is
+one the operator learns to ignore).
+
+Guarded tree-wide by `tests/autonomy/test_scripts_import_resolvability.py`,
+which accepts BOTH remediations (the `sys.path` insert and the namespace
+fallback) so neither is quietly outlawed later. Zero violations at ship, so it
+reddens on a NEW instance rather than carrying a backlog — the (mz) rule that a
+guard failing on pre-existing debt gets exempted within a day.
+
+**AND THE GUARD WAS VACUOUS ON ITS FIRST WRITE — caught by the mutation round,
+which is the only reason this paragraph is not a lie.** Its skip list matched
+`".claude/worktrees"` against the ABSOLUTE path, and this repo *lives* at
+`…/.claude/worktrees/hatchlings` — so **every file matched the skip and the
+sweep visited ZERO**. It reported clean; both mutations of the real code stayed
+GREEN. I shipped "a check that inspects nothing reports clean" inside the file
+whose own docstring quotes that rule.
+
+Its `can_actually_find_one` arm passed throughout, because that arm exercises
+the **predicate** against a synthetic string and never touches the **file
+walk**. **Predicate coverage and sweep coverage are different properties and
+each needs its own assertion** — so `test_the_sweep_actually_walks_the_tree`
+now asserts a floor on files visited AND names the two modules the guard exists
+to police. Mutation-verified 4 of 4, the sharpest being a restoration of the
+original absolute-path skip: RED, `visited only 0 files`. Paths are matched
+relative to ROOT now, which also makes the whole class of
+[[a-guard-that-walks-sibling-worktrees]] unreachable — sibling worktrees are
+outside ROOT, so `rglob` never reaches them and no skip entry is needed at all.
+
+**AND I TOOK A LETTER THAT WAS NOT MINE.** The code comments and commit
+message for this fix cited **`(vf)`** — which is a SIBLING session's 27-Aug
+entry (*"🔮 georgia was being size-cut on money her strategy never lost"*). My
+work belongs under `(vd)`, where its subsections already sat. Corrected in the
+three code/test sites.
+
+Note what did NOT catch it: `audit_changelog_letters` passed, reporting *"461
+python files' citations all resolve"* — and it was right. **`(vf)` resolves; it
+just resolves to somebody else's entry.** A citation guard can check that a
+letter EXISTS, never that it is the one you meant. That is the same shape as
+this file's own opening caveat about declared-enforcement checks, and the
+mitigation is the one the letter rule already states and I skipped: **grep the
+letter before you use it**, not after.
+
 **VERIFIED BY READBACK, not by the green run** (04:07:47Z, the organ's first
 publish after the deploy):
 
