@@ -88,6 +88,63 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### THE CARRIED LIST — RUN, AND HONESTLY PART-DONE
+
+**Eamon: *"run the 13 fixes in handoff now"*.** 13 carried items: **3 are
+OPERATOR-owned** (capital-allocation policy — moving money between books is
+I16's call, not a session's), and of the 10 session-owned, **3 are waiting on
+time or on already-refuted evidence** (🔮 georgia's both dials are measured dead
+pending rank-3 rows; the breakout clock's 48->96h evidence died to
+leave-one-symbol-out).
+
+**FIVE WERE DISPATCHED AS MEASUREMENTS AND NONE RAN — the account hit a weekly
+usage limit (resets 1-Sep 18:00 Sydney) and all six agents errored.** Recorded
+rather than quietly reported as done: `funding-studies-inherit-the-rank-universe`,
+`taker-divergence-stop-unpriced`, `brain-mults-are-two-opinions-wide`,
+`brain-mult-transition-oscillation` and `taker-replay-blind-to-breakoutup` are
+**still carried, untouched**. Their reasons for being open are unchanged.
+
+**ONE WAS COMPLETED — the session half named inside an OPERATOR item.**
+`allocation-clamp-is-a-per-position-bound-doing-per-book-duty` says in its own
+words that a session can *"derive the per-book bound the drawdown bar implies
+and publish it beside the claim, so the ceiling stops being a single number
+shared by books with different stops."* Done:
+
+`fleet_allocation.dd_bound()` publishes `{stop, bar, max_scale}` per book, where
+`max_scale = GOLIVE_MAX_DD / |stop|` — the `(sr)` shape generalised. **It
+matters because maxDD is the only go-live bar that is NOT clip-invariant**
+((hl) measured per-trade % invariance for the other five), so scaling a book
+moves its drawdown against a fixed bar while leaving mean, `t` and the halves
+untouched. Measured:
+
+| book | stop | max scale before the 15% bar |
+|---|---|---|
+| 👩 mum | 4% | **3.75x** |
+| 🔮 georgia | 5% | 3.00x |
+| 🙏 avo | 10% | **1.50x** |
+
+**The shared 4.0 ceiling permits 2.7x more than the tightest book can take.**
+That is the item's claim, now a number rather than an assertion. The three
+values reproduce `(sr)`'s independently-pinned figures exactly — derived from
+the stops, not copied from them. REPORTED, NEVER A BAR (I15); the clamp itself
+is untouched and remains the operator's.
+
+**AND THE BORN-DARK GUARD CAUGHT MY FIRST ATTEMPT, which is the more useful
+half.** It imported each book's module to read the stop constant — no drift,
+and wrong: `fleet_allocation` runs in the freqtrade image, which does not COPY
+`lighter_family_bot`, so in production every family lookup would have failed
+inside its own `try/except` and every family book would silently have got no
+bound (the 17-Jul brain_stats class). Worse, `audit_image_imports` could see
+only the STATIC import — the dynamic `importlib.import_module` calls for the
+other books were **invisible to it** and would have shipped born-dark with
+nothing reporting it. **A retyped constant a guard CAN check beats an import it
+cannot**, so the stops are now a declared BRIDGE in the
+`fleet_manifest.design_for` shape: a book's own published `policy.stoploss`
+wins, and each bridge entry goes quiet the day its book publishes one (three
+do today — the three live arms). Pinned by
+`tests/autonomy/test_allocation_dd_bound.py`, 15 tests including the
+regression arm that fails if any bot module is imported here again.
+
 ### THE RECORDED COST GETS ITS FIRST CONSUMER — THE READ IS NO LONGER INERT
 
 `(ut)` unlocked `coin-quality` after seven weeks and shipped `recorded_cost_bps`

@@ -664,9 +664,143 @@ def _f(v):
     return f if f == f else None                      # NaN is not a number
 
 
+#: [2026-08-28 (vd)] THE PER-BOOK BOUND THE DRAWDOWN BAR IMPLIES.
+#:
+#: The `[PROBE_FLOOR, SCALE_CEIL]` clamp is ONE number shared by books with
+#: very different stops — a per-POSITION slippage bound doing a per-BOOK job.
+#: It matters because **maxDD is the only go-live bar that is NOT clip-invariant**
+#: ((hl) measured per-trade % invariance for the other five), so scaling a book
+#: scales its drawdown against a fixed 15% bar while leaving `mean`, `t` and the
+#: halves untouched. Measured: ⚖️ Counterweight breaches the bar at **3.06x**,
+#: comfortably INSIDE the shared 4.0 ceiling.
+#:
+#: This publishes, per book, the scale at which its OWN stop reaches the gate's
+#: OWN bar — the `GROSS_X_MAX = 0.15/|stop|` shape (sr) derived for 🙏 avo,
+#: generalised. Both constants are IMPORTED, never retyped: the bar from
+#: `golive_readiness`, the stop from the book's own module.
+#:
+#: REPORTED, NEVER A BAR (I15). Moving the clamp moves money between books and
+#: is an operator call (I16) — this makes the number visible so that call is
+#: made against arithmetic instead of a single shared constant. Unknown stop ->
+#: `None`, NEVER a permissive default: a missing bound that reads as "no limit"
+#: is the same defect the whole item is about.
+def dd_bound(bot, extra=None):
+    """`{stop, max_scale, bar}` for `bot`, or None when its stop is unknown.
+
+    `extra` is the book's own published payload when the caller has it — its
+    `policy.stoploss` is authoritative over the bridge table below.
+    """
+    try:
+        bar = _golive_max_dd()
+        stop = _stop_for(bot, extra)
+        if bar is None or stop is None or stop <= 0:
+            # Distinguish "no stop BY DESIGN" from "we could not find one".
+            # Both refuse to give a bound; only one of them is a gap.
+            return ({"stop": None, "bar": bar, "max_scale": None,
+                     "why": "no position stop by design — its bar-breach "
+                            "point comes from REALISED drawdown, not a stop"}
+                    if bot in NO_STOP_BY_DESIGN else None)
+        return {"stop": round(stop, 4), "bar": bar,
+                "max_scale": round(bar / stop, 2)}
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
+def _golive_max_dd():
+    """The gate's own bar, imported. None if the grader is unreachable."""
+    try:
+        import importlib.util
+        import os as _os
+        p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                          "scripts", "golive_readiness.py")
+        spec = importlib.util.spec_from_file_location("_gl_dd", p)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return float(m.GOLIVE_MAX_DD)
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
+#: Row -> the module attribute that owns its catastrophic/hard stop. Family
+#: books carry it on the strategy object; the rest name an env-backed constant.
+#: A row absent here yields None, which is the fail-safe direction.
+#: A BRIDGE, not a source of truth — the `fleet_manifest.design_for` pattern.
+#: A book's OWN published `policy.stoploss` always wins; each entry here goes
+#: quiet the day its book learns to publish one. Measured 28-Aug: exactly THREE
+#: books publish theirs, and they are the three live ones.
+#:
+#: **THESE ARE LITERALS ON PURPOSE, and that is a deliberate reversal.** The
+#: first cut imported each book's module and read the constant — no drift, but
+#: `audit_image_imports` immediately failed the build: `fleet_allocation` runs
+#: in the freqtrade image, which does not COPY `lighter_family_bot`, so in
+#: production the lookup would have failed inside its own `try/except` and
+#: EVERY family book would silently have got no bound. That is the born-dark
+#: class exactly ((17-Jul brain_stats postmortem): a guarded import turns a
+#: missing file into a degraded fallback instead of a crash).
+#:
+#: Worse, the guard could only see the STATIC import. The dynamic
+#: `importlib.import_module` calls for the other books were invisible to it and
+#: would have been born-dark with NOTHING reporting it. So the import approach
+#: was not merely wrong here, it was wrong in a way this fleet cannot detect.
+#: A retyped constant that a guard CAN check beats an import that it cannot.
+_STOP_BRIDGE = {
+    "perps-funding-lighter-lshadow": 0.10,   # FUNDING_HARD_STOP
+    "band-garrett-lshadow": 0.10,            # same host, same constant
+    "band-kelly-lshadow": 0.05,              # KELLY_HARD_STOP (MY_HARD_STOP)
+    "nav-cook-lshadow": 0.05,                # COOK hard stop
+    "freqtrade-mum-lshadow": 0.04,           # mirrors her live arm
+    "freqtrade-avo-maria-lshadow": 0.10,
+    "freqtrade-georgia-lshadow": 0.05,
+    # The three LIVE arms publish `policy.stoploss` and so normally resolve
+    # from their own payload — these are the fallback for a loop that has the
+    # row name but not its `extra` (which is the organ's usual case, since it
+    # builds from the trade ledger). Both paths must agree; the test drives
+    # the published value through and asserts it WINS over these.
+    "freqtrade-mum-lighter": 0.04,
+    "freqtrade-avo-maria-lighter": 0.10,
+    "freqtrade-georgia-lighter": 0.05,
+}
+
+#: Books with NO position stop by design, and therefore NO stop-derived bound.
+#: ⚖️ Counterweight's xsect legs carry none — mirroring its validated parent's
+#: replay fidelity — so its 15%-bar breach point (measured 3.06x) comes from its
+#: REALISED drawdown, not from a stop. Declared rather than silently `None`, so
+#: a reader can tell "no stop by design" from "we could not find it": both
+#: return None here, and only this list says which is which.
+NO_STOP_BY_DESIGN = frozenset({
+    "perps-funding-spread-lshadow", "perps-funding-spread-lighter",
+})
+
+
+def _stop_for(bot, extra=None):
+    """|stop| as a fraction for `bot`. **The book's OWN publication wins.**
+
+    Order: its published `policy.stoploss`, then the declared bridge above.
+    None if neither knows — never a guess, and never a shared default, because
+    a missing bound that reads as "no limit" is the defect this whole feature
+    is about.
+    """
+    pol = (extra or {}).get("policy") if isinstance(extra, dict) else None
+    if isinstance(pol, dict) and pol.get("stoploss") is not None:
+        try:
+            v = abs(float(pol["stoploss"]))
+            if v > 0:
+                return v
+        except (TypeError, ValueError):
+            pass
+    v = _STOP_BRIDGE.get(bot)
+    try:
+        return abs(float(v)) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def build(books, book_usd=BOOK_USD):
     """The published payload. Pure — the selftest drives it with no DB."""
     alloc = allocate(books, book_usd=book_usd)
+    for rec in (alloc or {}).values() if isinstance(alloc, dict) else (alloc or []):
+        if isinstance(rec, dict) and rec.get("bot"):
+            rec["dd_bound"] = dd_bound(rec["bot"])
     return {
         "updated": _iso(),
         "ttl_sec": TTL_SEC,
