@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-08-28 10:14 Sydney (00:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-08-28 18:55 Sydney (08:55Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,25 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (64 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vd), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
+## Shipped today (81 commit(s), entries (tv), (tw), (ut), (uu), (uv), (uw), (uy), (uz), (va), (vb), (vc), (vd), (ve), (vf), (vg), (vh), (vj), (vk), (vl), (vm), (vn))
 
+- `db33bf5` [deploy-live-georgia] Her entry edge is real and she spent 73% of trades on the sleeve without it: trend_breakout retired, t improves 1.88x (vd)
+- `29135cd` wip: georgia sleeve retire (vd)
+- `f288116` I26: the burden of proof moves onto the refusal; and the doctrine guard could not see it, 27 chars outside its own markers (vd)
+- `d22fdbb` [deploy-live] A durable verdict with a per-loop reason: stop the census falling back to zero; and two georgia cuts withdrawn (vd)
+- `e361bc9` [deploy-live] Mum was blocked by the venue not her code; name the refusal on the row, and revert a georgia cut that was 87% one broken trade (vd)
+- `2372e30` [deploy-live-taker] Avo's universe was never widened - 38.7h idle on 23 names; and the doctrine that let three found fixes sit is amended (vd)
+- `ce80755` [deploy-live-georgia] Her two arms ran different entry policies so the judge refused: parity from one owner, no bar moved (vd)
+- `7a79cbb` [deploy-live-mum] Mum's list was dry, not her rule: the rank cap becomes a measured $0.1M floor and her 7d supply goes 0 -> 15 (vd)
+- `47e9489` Record the brain sample receipt and the monitor that could never have fired (vd)
+- `876f5b2` The brain publishes its own sample receipt: verifying the phantom fix from outside was impossible, which is why the monitor could only time out (vd)
+- `166a2a7` Halt events out of the brain that sizes real money and the judge that promotes to it; strip_exits refused with the sign flip it causes (vd)
+- `0d86c5f` Halt events were loosening the live coin veto; and the phantom owner now speaks both ledger shapes, which refutes a proposed fix that would have blanked every sample (vd)
+- `04b3385` Sweep the silent-kill-switch import class tree-wide; the guard was vacuous on its first write and a mutation caught it; wrong letter citations corrected (vd)
+- `7a25581` Readback receipt: n_phantom=13, avo n 15->6, claim -> 0.0; and (vd)'s 'claim NONE' corrected to the field it actually moved (vf)
+- `4199bca` The phantom filter I shipped this morning was inert: a bare import of a scripts/ module, and my own AST test certified it (vf)
+- `91233b9` The organ that ranks capital was counting halt events as trades: 9 of avo's 15 closes were phantoms, claim +0.194% -> none (vd)
+- `8ac3a86` Regenerate HANDOFF (vd)
 - `cfdfeae` The allocation clamp gets a per-book bound; the born-dark guard caught the import version first (vd)
 - `550be55` Regenerate HANDOFF — I11's regenerate-last half (vd)
 - `aa7e0ed` The recorded cost gets its first consumer: carry publishes it beside the proxy that stands in for it (vd)
