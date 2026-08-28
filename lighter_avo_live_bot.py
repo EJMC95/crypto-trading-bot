@@ -672,9 +672,29 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
     return reason
 
 
+#: [2026-08-28 (vd)] THE VENUE'S OWN WORDS FOR THE LAST REFUSED ENTRY.
+#:
+#: MODULE-level on purpose: the reject happens in `main`'s entry loop and the
+#: census is built in `_publish_row`, which cannot see a local. The first cut
+#: put it in `main` — computed, and structurally unable to reach the payload,
+#: which is the same computed-and-dropped defect this file's own `n_phantom`
+#: sibling shipped this morning.
+#:
+#: WHY IT EXISTS: 👩 mum published `venue_reject: 1` and nothing else while
+#: Lighter refused EVERY order she placed —
+#:   code=20558 "You are accessing Lighter from a restricted jurisdiction"
+#: A live book that CANNOT TRADE AT ALL read as a quiet book with no signal,
+#: and the only record was a log line inside a container
+#: ([[a-venue-403-kills-a-live-book-silently]], measured there at 8.2h dark).
+#: I8: a detector must name the object the operator can act on — a jurisdiction
+#: block is an OPERATOR action with the VENUE, and no code may route around it,
+#: so the row carries the venue's own code and message verbatim.
+_LAST_REJECT = {}
+
+
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
-                strategy=None, uptrend=None, enter=None):
+                strategy=None, uptrend=None, enter=None, last_reject=None):
     """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
     directional row.
 
@@ -707,6 +727,11 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
         out["entries_shut"] = entries_shut
     if ungraded:
         out["ungraded"] = sorted(ungraded)
+    # [(vd)] the venue's verbatim refusal, when there was one this loop. Absent
+    # when nothing was refused — never an empty dict, which would read as
+    # "refused, reason unknown" (I8: unknown degrades to the honest absence).
+    if last_reject:
+        out["venue_reject_why"] = dict(last_reject)
     vals = sorted(v for v in rsi_readings.values()
                   if isinstance(v, (int, float)))
     if vals and rsi_bar:
@@ -1299,6 +1324,9 @@ def main(_ctx=None, once=False):
         brain_gated_tags = []
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
+        # [(vd)] reset the module-level reject holder per loop, like every
+        # other counter here — a stale reason must never outlive its pass.
+        _LAST_REJECT.clear()
         coin_vetoed = {}
         live_scale = 1.0
         # [(st)] NOT scan_verdict / last_rsi / last_open_ts / closed_win: this
@@ -1723,7 +1751,8 @@ def main(_ctx=None, once=False):
                      if nc_verdicts else None),
                     entries_shut, last_open_ts[0],
                     (closed_win[-1].get("ts") if closed_win else None), t0,
-                    strategy=S, uptrend=last_uptrend, enter=last_enter),
+                    strategy=S, uptrend=last_uptrend, enter=last_enter,
+                    last_reject=(_LAST_REJECT or None)),
             }
             payload.update(extra_extra or {})
             try:
@@ -2456,6 +2485,26 @@ def main(_ctx=None, once=False):
                     res = venue.market_open(sym, True, size)
                 except Exception as e:  # noqa: BLE001
                     _verdict(sym, "venue_reject")
+                    # [2026-08-28 (vd)] NAME THE REJECTION, ON THE ROW.
+                    #
+                    # 👩 mum published `venue_reject: 1` and nothing else while
+                    # the venue was refusing EVERY order she placed:
+                    #   code=20558 "You are accessing Lighter from a restricted
+                    #   jurisdiction"
+                    # A live book that CANNOT TRADE AT ALL read as a quiet book
+                    # with no signal, and the only record was a log line inside
+                    # a container. That is the [[a-venue-403-kills-a-live-book-
+                    # silently]] class — measured there at 8.2h dark with
+                    # nothing paged — and an anonymous counter is exactly the
+                    # `{open: 0}` ambiguity I18 exists to remove.
+                    #
+                    # I8: a detector must name the object the operator can act
+                    # on. A jurisdiction block is an OPERATOR action with the
+                    # VENUE — no code change can or should route around it — so
+                    # the row must carry the venue's own code and words rather
+                    # than a count somebody has to go and interpret.
+                    _LAST_REJECT.update(sym=sym, why=str(e)[:240],
+                                        at=iso(t_now))
                     _PRINT(f"[avo-live] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
                 fpx, meas, src = _real_fill(sym, is_ask=False, fallback=px,

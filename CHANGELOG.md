@@ -88,6 +88,77 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### 👩 MUM WAS BLOCKED BY THE VENUE, NOT BY HER CODE — AND A GEORGIA CUT WAS BUILT, MEASURED SIGNIFICANT, AND REVERTED ON ONE ROW
+
+**Eamon: *"i want Avo trading as she should ... mum v2 trading as she should ...
+and georgia doing the same"* / *"fix the preventing"*.**
+
+**MUM: LIGHTER WAS REFUSING HER ORDERS.** Her census said `venue_reject: 1` and
+nothing else. The container log said what the row could not:
+
+    open JTO failed: VenueError("order failed JTO: code=20558
+      message='You are accessing Lighter from a restricted jurisdiction.'")
+
+**She was not quiet. She was blocked.** She found a valid signal, sized it,
+reached the venue, and was refused — every loop. Nothing in her strategy, her
+universe, the RSI bar, the NOT-uptrend conjunct, the fleet long budget (9 of 20,
+green) or any change made today was involved. 🙏 avo and 🔮 georgia were
+unaffected on the same venue at the same minute, so it is scoped to that service
+/ sub-account.
+
+**NOT ROUTED AROUND, deliberately and permanently.** A jurisdiction block is a
+venue TERMS boundary; engineering past one is not on the table at any priority.
+Eamon resolved it at the venue — the correct and only fix.
+
+**WHAT CODE OWED HERE: making it impossible to miss again.** The row now
+publishes `scan.venue_reject_why` — the venue's own `sym`, code and message,
+verbatim — because `venue_reject: 1` is byte-identical between "one odd
+rejection" and "this book cannot trade at all"
+([[a-venue-403-kills-a-live-book-silently]], measured there at 8.2h dark with
+nothing paged). Absent when nothing was refused, never an empty dict: unknown
+degrades to the honest absence, never to a guess (I8).
+
+**AND THE HOLDER WAS UNPUBLISHABLE ON ITS FIRST CUT** — populated in `main`'s
+entry loop while the census is built in `_publish_row`, so it could never reach
+the payload. That is the identical computed-and-dropped shape as this morning's
+`n_phantom`, twice in one day, and it is why `_LAST_REJECT` is module-level with
+a test that asserts exactly that.
+
+### AND THE GEORGIA CUT I ALMOST SHIPPED — PRE-REGISTERED, SIGNIFICANT, AND WRONG
+
+`(sv)` pre-registered the follow-through: the cap censors its own evidence, so
+raising it generates the rank-3 sample that grades the next step. The sample
+arrived — 61 ranked closes across both arms — and it looked decisive:
+
+    rank<=2  n=55  -0.305%/trade        rank>=3  n=6  -3.891%/trade
+    gap -3.585pp   20,000-shuffle permutation P = 0.0244
+
+`GEORGIA_MAX_ENTRIES_PER_HOUR` 5 -> 2 was written, tested and green.
+**Then the concentration check killed it.** One row is **87%** of the entire
+effect: a single NEAR close at **-19.506% on a -5% stoploss** — a 4x stop
+BREACH from the 22-Aug go-live hour, already known anomalous. Drop it and
+rank>=3 reads **-0.768%**; drop two and **-0.462%**, against rank<=2's -0.305%.
+There is no rank effect, only a broken row.
+
+It would also have overturned a far larger measurement: `(vb)` graded rank over
+1,816 entries and found ranks 1-5 ALL positive, rank 3 her BEST (+0.313%,
+t_cl +2.44), with the cliff at rank 6 — and cutting to 2 would have re-censored
+the very evidence `(ve)` raised the cap to obtain (the I17 starvation shape).
+
+**THE TRANSFERABLE LESSON, and it is about the test that nearly did it: a
+permutation on the GAP answers "is this split unlikely by chance" and is
+STRUCTURALLY BLIND to whether one observation carries the split.** `(po)`'s
+top-3 drop test is the arm that catches it, and it must run BEFORE a cut, not
+after. Reverted, with the numbers in the constant's own note so the next session
+does not re-derive it.
+
+**GEORGIA'S HONEST STATE, unchanged by any of today's work:** `(uw)` swept 48
+exit configurations over her 212 real entries — zero positive, zero
+both-halves-positive — and `(ux)` measured `trend_breakout`, 154 of those 212
+entries, DEAD against matched-random. Her arms are now policy-aligned so the
+judge can finally read her, and no tuning lever on the two axes is available.
+That makes her an I17 keep-or-decide question, which is Eamon's, on evidence.
+
 ### 🙏 AVO'S UNIVERSE WAS NEVER WIDENED — 38.7h IDLE WITH 2 FREE SLOTS ON 23 NAMES — AND THE DOCTRINE THAT LET THAT SIT IS AMENDED
 
 **Eamon: *"avo hasnt traded in over 30 hours"* / *"widen what we know works"* /

@@ -1302,6 +1302,32 @@ class DayTraderGated(Carrier):
     # NOT an era reset: a rate limiter is capacity, capacity is ordinary tuning
     # ((hc)). SHADOW-SCOPED by construction — the live host enforces no
     # throttle at all ((uv)), so this moves the shadow arm only.
+    #: [2026-08-28 (vd)] STAYS AT 5 — a 5 -> 2 cut was built, measured, and
+    #: REVERTED before it shipped. Recorded so nobody re-proposes it.
+    #:
+    #: `(sv)` pre-registered this exact follow-through: the cap censors its own
+    #: evidence, so raising it generates the rank-3 sample that grades the next
+    #: step. The sample arrived — 61 ranked closes across both arms — and read:
+    #:
+    #:     rank<=2  n=55  -0.305%/trade      rank>=3  n=6  -3.891%/trade
+    #:     gap -3.585pp, 20,000-shuffle permutation P = 0.0244
+    #:
+    #: Significant, pre-registered, and WRONG. **One row is 87% of it**: a
+    #: single NEAR close at **-19.506% on a -5% stoploss** — a 4x stop BREACH
+    #: from the 22-Aug go-live hour, already known anomalous. Drop it and
+    #: rank>=3 reads -0.768%; drop two and it is -0.462%, against rank<=2's
+    #: -0.305%. There is no rank effect here, only a broken row.
+    #:
+    #: It also contradicts the larger measurement it would have overturned:
+    #: `(vb)` graded rank over 1,816 entries and found ranks 1-5 ALL positive
+    #: with rank 3 her BEST (+0.313%, t_cl +2.44) and the cliff at rank 6.
+    #:
+    #: THE LESSON, because the permutation test is what nearly did it: a
+    #: permutation on the GAP answers "is this split unlikely by chance" and is
+    #: BLIND to whether one observation carries the split. `(po)`'s top-3 drop
+    #: test is the arm that catches it, and it must run BEFORE any cut, not
+    #: after. Cutting to 2 would also have re-censored the very evidence (vb)
+    #: raised the cap to obtain — the I17 starvation shape.
     MAX_ENTRIES_PER_HOUR = int(os.environ.get(
         "GEORGIA_MAX_ENTRIES_PER_HOUR", "5"))
 

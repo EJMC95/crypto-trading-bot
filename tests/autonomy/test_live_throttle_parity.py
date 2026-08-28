@@ -92,7 +92,10 @@ def test_both_arms_stamp_the_SAME_cap_for_georgia():
     rather than asserted about it."""
     geo = next(s for s in fam.live_strategies() if s.bot == "freqtrade-georgia")
     cap = fam.throttle_cap(geo)
-    assert cap == 5, f"georgia's measured cap moved to {cap} — re-read (ve)"
+    # [2026-08-28 (vd)] STAYS 5. A cut to 2 was measured (permutation P=0.0244)
+    # and REVERTED: one NEAR close at -19.506% on a -5% stop is 87% of the
+    # signal. See the constant's own note.
+    assert cap == 5, f"georgia's cap moved to {cap} — re-read (vb) and (vd)"
     shadow = fam.policy_stamp(geo, "lighter_shadow", "list", cap)
     live = fam.policy_stamp(geo, "lighter_live", "diversified", cap)
     assert shadow["max_entries_per_hour"] == live["max_entries_per_hour"] == 5, (
@@ -130,3 +133,52 @@ def test_no_stale_claim_that_this_host_has_no_throttle(stale):
     about a real-money entry path."""
     assert stale not in _live_src(), (
         f"stale claim still in the live host: {stale!r}")
+
+
+# ------------------------------------------- the venue's refusal must be named
+def test_a_venue_refusal_is_named_on_the_row():
+    """[2026-08-28 (vd)] 👩 mum published `venue_reject: 1` and nothing else
+    while Lighter refused EVERY order she placed:
+
+        code=20558 "You are accessing Lighter from a restricted jurisdiction"
+
+    A live book that COULD NOT TRADE AT ALL was byte-identical to a quiet book
+    with no signal, and the only record was a log line inside a container —
+    [[a-venue-403-kills-a-live-book-silently]], measured there at 8.2h dark
+    with nothing paged.
+
+    I8: a detector must name the object the operator can act on. A jurisdiction
+    block is an OPERATOR action WITH THE VENUE — no code may route around it —
+    so the row carries the venue's own code and message verbatim.
+    """
+    import lighter_avo_live_bot as live
+    c = live.scan_census({"BTC": "venue_reject"}, {"BTC": 30.0}, 36.0,
+                         ["BTC"], {}, None, None, None, None, 0,
+                         last_reject={"sym": "JTO", "why": "code=20558 x",
+                                      "at": "2026-08-28T06:36:19Z"})
+    assert c["venue_reject_why"]["sym"] == "JTO"
+    assert "20558" in c["venue_reject_why"]["why"]
+
+
+def test_no_refusal_publishes_NO_key_rather_than_an_empty_one():
+    """An empty dict would read as 'refused, reason unknown'. Absent means
+    nothing was refused — unknown degrades to the honest absence (I8)."""
+    import lighter_avo_live_bot as live
+    c = live.scan_census({"BTC": "no_signal"}, {"BTC": 50.0}, 36.0,
+                         ["BTC"], {}, None, None, None, None, 0)
+    assert "venue_reject_why" not in c
+
+
+def test_the_reject_holder_is_reachable_from_the_publisher():
+    """THE DEFECT THIS ALMOST SHIPPED WITH. The reject happens in `main`'s
+    entry loop; the census is built in `_publish_row`. The first cut made the
+    holder a `main` local, so it was populated and structurally unable to reach
+    the payload — the same computed-and-dropped shape as this morning's
+    `n_phantom`. Module scope is what makes it publishable."""
+    import ast
+    src = (ROOT / "lighter_avo_live_bot.py").read_text()
+    tree = ast.parse(src)
+    module_level = {t.id for n in tree.body if isinstance(n, ast.Assign)
+                    for t in n.targets if isinstance(t, ast.Name)}
+    assert "_LAST_REJECT" in module_level, (
+        "_LAST_REJECT must be module-level or _publish_row cannot see it")
