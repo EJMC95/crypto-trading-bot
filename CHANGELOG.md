@@ -1,3 +1,124 @@
+## 2026-08-28 (vr) — 🔮 GEORGIA v3 IS BUILT, AND IT IS A NEW ENTRY BECAUSE EVERY AXIS ON v1 IS NOW MEASURED CLOSED — INCLUDING THE SLEEVE SURGERY I PROPOSED THAT MORNING
+
+**Eamon, 28-Aug:** *"Can you make Georgia live money go to Georgia v3"* / *"We
+clearly need to advance her progression"* / *"Build v3 onto main and shadow
+firstly, secondly explore new entry thesis and see if it's better."*
+
+**THERE WAS NO GEORGIA v3.** Verified across code, docs, the changelog and all
+four sibling worktrees. She had never been versioned — she still ran her
+original `DayTraderGated`. The fleet's only versioning precedent is 👩 mum:
+v1 retired `(rd)`, revived as v2 `(ro)`. So v3 had to be built, and the first
+question was what it should BE.
+
+**THE MORNING'S RECOMMENDATION WAS SLEEVE SURGERY, AND THIS ENTRY REFUTES IT.**
+The daily review proposed keeping `range_on` (which `(ux)` rated a strong
+survivor) and dropping `trend_breakout`. The obvious rescue for `(uw)`'s I14
+rejection of `(ux)` was that `(uw)` used ledger figures containing halt
+EVENTS, which `(vf)` established are not trades. **Stripping them changes the
+live numbers and not the verdict** — LIVE range_on −0.490% → +0.007%, and
+pooled over BOTH arms ex-halt:
+
+| sleeve | n | mean | t_cl | halves |
+|---|---|---|---|---|
+| `range_on` | 67 | **−0.056%** | −0.37 | +0.006 / **−0.115** |
+| `trend_breakout` | 196 | **+0.065%** | +0.43 | +0.036 / +0.093 |
+
+`(ux)` claimed range_on excess **+0.672%..+2.300%, t_cl +3.40..+4.28**; her
+record gives **−0.056% at t=−0.37**. The proxy is wrong about her real entries
+and neither sleeve has an edge to concentrate into. **`(uw)`'s call stands, on
+better evidence than it was made on** — and the recommendation I published
+that morning is withdrawn by the measurement I ran to support it.
+
+**SO EVERY AXIS ON v1 IS CLOSED**: diversification `(uu)`, exits `(uw)` (48
+configurations, ZERO positive), entry filter `(tp)`, rank/selection `(vb)`, and
+now sleeves. There is no v3 available as a MODIFICATION of her.
+
+**THE SEARCH** — `scripts/study_georgia_v3_entry_2026-08-28.py`. Ten candidate
+entries, graded EXIT-FREE (`(qu)`: an entry that cannot beat random with no
+exit cannot be rescued by one) against MATCHED-RANDOM `(hm)`, LAG-1, episodes
+not ticks, cluster-robust by coin-day. Bar raised to **t_cl ≥ 2.0** from
+`(ux)`'s 1.5 — precisely because that bar produced a measured false positive.
+
+**`impulse_fade_3.0` was the only candidate surviving at EVERY horizon** —
++0.140/+0.128/+0.141/+0.178 %/trade at t_cl +6.01/+3.90/+3.28/+2.49. A
+plateau, not a cell.
+
+**BOTH CONTROLS BEHAVED, which is what makes the DEAD verdicts mean anything.**
+A random signal read DEAD at all four horizons (the harness does not
+manufacture significance) and a planted +1.0% drift was recovered at +1.046%,
+t=+26.4 (it can see a real edge — the `(om)` lesson that a gate which never
+opens is trivially stable and useless). The continuation shape `donch_high_48`
+— `trend_breakout`'s own family — read **DEAD and NEGATIVE**, independently
+corroborating `(ux)` from the opposite direction.
+
+**THE BRACKET IS THE PLATEAU INTERIOR, NEVER THE GRID MAXIMUM `(gx)`.** 46 of
+48 (tp × sl × hold) cells clear mean>0, t≥2.0 and both halves, so the result is
+not bracket-sensitive. The best cell (tp 3.0%, t=+7.12) is at the GRID EDGE and
+is deliberately **not** taken. Shipped: **tp 2.0% / sl −1.5% / 4h**, crypto-only,
+close-only triggers — **n=1940, +0.151%/trade, t_cl +6.09, halves +0.237/+0.066,
+win 55%**.
+
+**I20 — THE SUPPLY IS NOT SPOKEN FOR, checked not assumed.** 🧘 book-douglas
+already fades impulses; his cell is >2.5×ATR24 on **1h**, this is ≥3.0×ATR14 on
+**15m**, and only **4.4%** of these episodes are also flagged by a
+Douglas-shaped 1h fade. Differentiated by timeframe and threshold, not by a new
+row id.
+
+**I22 — IT IS DECIDABLE, which is the whole point.** v1's disease is not that
+she loses, it is that she cannot be graded: **t=0.27 after 212 closes**. Here
+S_d=0.1165 ⇒ n_req=295 for t=2.0; the bot's own `signals()` supplies **22.2
+episodes/day** across its 15 crypto names, giving **~13 days to the gate**
+against I22's 60-day bar.
+
+**FIDELITY: the bot's own `signals()` was driven over the real 15m tape and
+yields 1,973 episodes against the study's 1,940** — the 1.7% gap is the study's
+horizon truncation. The shipped rule IS the measured rule, which is the check
+`(uw)` had to add three times before its own numbers held.
+
+**HYPOTHESIS-GRADE, AND IT SHIPS TO SHADOW ONLY.** Every number above is a
+REPLAY, and this entry's own headline is that a replay edge did not survive
+georgia's real entries. The same risk applies here in full: no slot contention,
+throttle, long budget, coin veto or StoplossGuard is modelled; the exit mix is
+max_hold-dominated; the second half is materially weaker than the first
+(+0.237 → +0.066); and 🧘 Douglas, the living book on a related thesis, reads
+**−0.813%/trade at t=−2.77** on its own ledger. **$1,000 of paper is what a
+replay-grade hypothesis is worth.** v1 keeps trading untouched as the control
+arm — "see if it's better" needs both books running.
+
+**REAL MONEY WAS NOT MOVED, and the arithmetic is why.** georgia's live arm is
+**−$49.36 = −17.2% drawdown**, past the **15%** bar the go-live gate itself
+uses, and the evidence board's 0.75× clip cut was verified CORRECT (its bar is
+now derived — 15% × $287.02 = $43.05 — exactly as `(vf)` built it). Two things
+were checked and found NOT to be defects: her manual-trade P&L is already
+excluded from `pnl_abs` (`lighter_avo_live_bot.py:1388` subtracts
+`MANUAL_PNL_USD`), so she is not being punished for Eamon's fills; and
+`stale_candle` refusing 64% of her scans is a 15m book on a ~5min loop, not
+starvation. Go-live remains an explicit operator act — this builds the
+candidate, it does not promote it.
+
+## 2026-08-28 (vq) — THE DAILY REVIEW HAD NO VERIFIER FOR ITS OWN REAL-MONEY LIVENESS ALERT, SO IT REPUBLISHED A RECOVERED OUTAGE AS A LIVE ONE
+
+🔮 georgia's LIVE real-money row froze **27-Aug 14:03:31Z for 8.28 hours**
+(28-Aug 00:03 → 08:20 Sydney), measured from the durable `<bot>:equity` series.
+👩 mum and 🙏 avo published continuously through the same window, so it was
+row-specific, not a fleet or DB outage. **She held ZERO positions across the
+whole gap** — verified directly — so no real money was left unmanaged.
+
+**THE DEFECT IS IN THE REVIEWER.** `stale-live:` keys had no verifier, so
+`evidence_review` fell through to its `unknown` branch and republished the
+ALERT'S OWN TEXT — *"last published 381 min ago"* — as an ACTIVE finding at
+08:30 the next morning, ten hours after the row had recovered. **That is I1
+exactly**: a frozen row and a healthy one are byte-identical unless something
+reads the age, and the one alert class guarding real-money liveness was the
+class with no verifier.
+
+Shipped: a verifier that re-measures the row's CURRENT age; **imports the
+cadence bar from `market_context` by IDENTITY** (`LIVE_CADENCE_SEC` — a second
+copy of a threshold is a second rule, `(hj)`); reports the **worst publish gap
+in the window** so "recovered" carries a duration; and **fails CLOSED three
+ways** — no threshold owner, no `bot_pnl` row, or unreadable history all stay
+`active`, never `resolved`. **5 mutations, 5 killed.**
+
 ## 2026-08-28 (vd) — 👩 MUM'S SUPPLY: THE CAP WAS THE BINDING CONSTRAINT, NOT THE MARKET COUNT — 4 → 12 SLOTS AND 13 → 40 CRYPTO, SHIPPED TOGETHER BECAUSE NEITHER WORKS ALONE
 
 **Eamon, 28-Aug: *"fix mums supply"* → *"she definitely needs to scan all

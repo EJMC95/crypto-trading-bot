@@ -1066,6 +1066,136 @@ class OversoldRebound(Carrier):
         return None
 
 
+class ImpulseFade(Carrier):
+    """🔮 georgia v3 — IMPULSE FADE, 15m, bracketed, crypto-only.
+
+    [2026-08-28 (vr)] Eamon: *"Build v3 onto main and shadow firstly, secondly
+    explore new entry thesis and see if it's better."*
+
+    **WHY A NEW THESIS WAS THE ONLY MOVE LEFT, and it is measured.** Every axis
+    on georgia v1 (`DayTraderGated`) is closed: diversification unavailable
+    `(uu)`; exits refused `(uw)` (48 configurations over her own 212 entries,
+    ZERO with a positive mean); the entry FILTER refuted-as-overfit `(tp)`;
+    rank/selection worked `(vb)`. The last open idea was SLEEVE SURGERY — keep
+    `range_on`, drop `trend_breakout` — on the strength of `(ux)`. It was
+    REFUSED 28-Aug on her own record: `(uw)` had rejected `(ux)` using ledger
+    figures that included halt EVENTS, which `(vf)` established are not trades,
+    so the obvious rescue was to strip them. Stripping them moves LIVE range_on
+    -0.490% -> +0.007% and changes NOTHING. Pooled over BOTH arms, ex-halt:
+
+        range_on        n=67   -0.056%/trade   t_cl -0.37
+        trend_breakout  n=196  +0.065%/trade   t_cl +0.43
+
+    Neither sleeve has an edge to concentrate into, and the proxy is simply
+    wrong about her real entries. So v3 is a NEW ENTRY, not a rearrangement.
+
+    **THE THESIS, and the search that found it** —
+    `scripts/study_georgia_v3_entry_2026-08-28.py`. Ten candidate entries were
+    graded EXIT-FREE (`(qu)`'s rule: an entry that cannot beat random with no
+    exit cannot be rescued by one) against MATCHED-RANDOM entries `(hm)`,
+    LAG-1, episodes-not-ticks, cluster-robust by coin-day. Fade a >=3.0x ATR14
+    impulse measured over 4 bars was the only candidate SURVIVING AT EVERY
+    HORIZON — a plateau, not a cell:
+
+        h=4h  +0.140%  t_cl +6.01      h=12h +0.141%  t_cl +3.28
+        h=8h  +0.128%  t_cl +3.90      h=24h +0.178%  t_cl +2.49
+
+    BOTH CONTROLS BEHAVED, which is what makes the DEAD verdicts mean
+    something: a random signal read dead at all four horizons, and a planted
+    +1.0% drift was recovered at +1.046% (t=+26.4). The continuation shape —
+    `donch_high_48`, i.e. `trend_breakout`'s own family — read DEAD and
+    NEGATIVE, independently corroborating `(ux)` from the other direction.
+
+    **THE BRACKET IS THE PLATEAU INTERIOR, NEVER THE GRID MAXIMUM `(gx)`.**
+    46 of 48 (tp x sl x hold) cells clear mean>0, t>=2.0 and both halves, so
+    the result is not bracket-sensitive. The best cell (tp 3.0%, t=+7.12) sits
+    at the GRID EDGE and is deliberately NOT taken — shipping a swept grid's
+    maximum is how an `(oe)` artifact gets deployed (🧭 nav-cook's
+    `HORIZON_PLATEAU_S`, 👩 mum's 24h, the same discipline). Shipped cell,
+    crypto-only, close-only triggers:
+
+        tp 2.0% / sl -1.5% / max_hold 4h
+        n=1940  +0.151%/trade  t_cl +6.09  halves +0.237/+0.066  win 55%
+
+    **I20 — THE SUPPLY IS NOT SPOKEN FOR.** 🧘 book-douglas already fades
+    impulses, so this was checked rather than assumed: his cell is >2.5x ATR24
+    on 1h, this one is >=3.0x ATR14 on 15m, and only **4.4%** of these episodes
+    are also flagged by a Douglas-shaped 1h fade. Differentiated by timeframe
+    and threshold, not by a new row id.
+
+    **I22 — IT IS DECIDABLE, which is the entire point.** georgia v1's disease
+    is not that she loses, it is that she cannot be graded: t=0.27 after 212
+    closes. Here S_d = 0.1165, so n_req for t=2.0 is 295 closes; at 5 slots on
+    a 4h hold the supply caps at 30/day, giving **~10 days to the gate** against
+    I22's 60-day bar. The question becomes answerable in a fortnight.
+
+    **HYPOTHESIS-GRADE, AND SAID SO — this is the caveat that matters.** Every
+    number above is a REPLAY. This session's own headline finding is that
+    `(ux)`'s replay edge did not survive georgia's real entries, and the same
+    risk applies here with full force: no slot contention, throttle, long
+    budget, coin veto or StoplossGuard is modelled, and the exit mix is
+    max_hold-dominated. The second half is also materially weaker than the
+    first (+0.237 -> +0.066), so the edge is decaying on the tape it was found
+    on. And the one LIVING book trading a related thesis, 🧘 Douglas, is
+    -0.813%/trade at t=-2.77 on its own ledger. **That is precisely why this
+    ships to SHADOW and nowhere near real money**: $1,000 of paper is what a
+    replay-grade hypothesis is worth, and its own record is what will decide
+    it. Reversible via `GEORGIA_V3_RETIRED_OVERRIDE`.
+    """
+
+    #: Flat take-profit. A single rung: exit at any age once +2.0% is there.
+    roi = {0: 0.020}
+    protections = {"cooldown_candles": 1}
+    #: ATR14 + the 4-bar lookback need far less, but the study emitted from a
+    #: 210-bar warmup and a live book always has full history, so the shipped
+    #: floor is set where the measurement was made rather than at the minimum
+    #: the arithmetic allows.
+    min_bars = 210
+
+    #: The impulse bar, in ATRs, and the window it is measured over. 3.0 is the
+    #: measured cell; 2.0 also survives (weaker, +0.085% t=+4.87 at 4h) and is
+    #: the documented loosening if supply is ever the binding constraint.
+    Z_ATR = float(os.environ.get("GEORGIA_V3_Z_ATR", "3.0"))
+    LOOK_BARS = int(os.environ.get("GEORGIA_V3_LOOK_BARS", "4"))
+    #: 4h on 15m bars — the plateau INTERIOR (8h/12h/24h also clear).
+    MAX_HOLD_MIN = int(os.environ.get("GEORGIA_V3_MAX_HOLD_MIN", "240"))
+
+    def signals(self, bars, extra):
+        c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
+        if len(c) < self.min_bars:
+            return None
+        i = len(c) - 1
+        if i < self.LOOK_BARS:
+            return None
+        atr = atr_series(h, l, c, 14)
+        a = atr[i]
+        # A dark/short ATR is "no reading", never "no impulse": returning None
+        # books `no_read` in the census rather than `no_signal`, so a warmup
+        # gap cannot masquerade as a verdict the rule never gave ((st)).
+        if a is None or a <= 0:
+            return None
+        drop = c[i - self.LOOK_BARS] - c[i]
+        enter = (drop >= self.Z_ATR * a and v[i] > 0)
+        # No exit SIGNAL by design — the bracket predefined at entry IS the
+        # exit rule (roi / stop / max_hold), the same discipline 👩 mum v2 and
+        # 🧘 Douglas ship. The exit sweep that argued for anything richer was
+        # refused on georgia v1 at `(uw)`.
+        return {"enter": "impulse-fade" if enter else None,
+                "exit": False, "exit_reason": "bracket",
+                "atr_mult": (drop / a) if a else None}
+
+    def stake_mult(self, tag, bars):
+        return 1.0                      # constant clip — consistency is structural
+
+    def custom_exit(self, tag, age_min, profit):
+        """The 4h cap. It is the plateau INTERIOR and it is also what makes the
+        book decidable: at a 4h hold five slots supply ~30 closes/day, which is
+        the whole `days_to_gate ~10` argument above."""
+        if age_min >= self.MAX_HOLD_MIN:
+            return "max_hold"
+        return None
+
+
 class MomoBreakout(Carrier):
     """MomoBreakoutV1 — Donchian breakout above the 200-EMA (validated on 4h)."""
     roi = {}
@@ -1541,6 +1671,18 @@ STRATEGIES = [
              style="swing-dip-4h"),
     DayTraderGated("freqtrade-georgia", tf="15m", stoploss=-0.05, max_open=5,
                    style="daytrader-15m"),
+    # [2026-08-28 (vr)] 🔮 georgia v3 — the IMPULSE FADE book. A NEW ENTRY on
+    # her timeframe, not a rearrangement of v1: every axis on v1 is measured
+    # closed (see ImpulseFade's docstring for the five, including the sleeve
+    # surgery refused the same day on her own ex-halt record).
+    # `coins=COINS` PINS it crypto-only — `carrier_universe` returns `s.coins`
+    # verbatim when set, and the study measured crypto at +0.205%/trade against
+    # +0.141% pooled with non-crypto, so this is the measured cell and not a
+    # convenience. v1 keeps trading UNTOUCHED as the control arm: the whole
+    # point is "see if it's better", which needs both books running.
+    # stoploss -1.5% and max_open 5 are the shipped bracket's own terms.
+    ImpulseFade("freqtrade-georgia-v3", tf="15m", stoploss=-0.015, max_open=5,
+                style="impulse-fade-15m", coins=COINS),
     DayTraderGated("crypto-intraday-15m", tf="1h", stoploss=-0.12, max_open=5,
                    style="daytrader-1h", coins=WIDE_COINS),
     SwingDip("crypto-swing-daily", tf="1d", stoploss=-0.10, max_open=8,
