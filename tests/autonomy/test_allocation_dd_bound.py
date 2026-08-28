@@ -127,3 +127,61 @@ def test_the_books_own_publication_beats_the_bridge():
 def test_a_junk_payload_falls_back_rather_than_inventing(payload):
     d = fa.dd_bound("freqtrade-mum-lighter", payload)
     assert d is not None and d["stop"] == pytest.approx(0.04)
+
+
+# ------------------------------------------- phantom closes out of the claim
+def test_the_allocation_organ_excludes_phantom_closes():
+    """[28-Aug (vd)] THE THIRD GRADER FINALLY AGREES WITH THE OTHER TWO.
+
+    A $0.00 close with no entry price is a halt/flatten EVENT, not a trade.
+    `golive_readiness` has excluded them since (th) and the winners' docket
+    since 26-Aug; THIS organ — the one that ranks CAPITAL — did not.
+
+    Measured on the live ledger the day this shipped: 13 phantom rows on
+    exactly the two real-money books (🙏 avo 9, 🔮 georgia 4). Avo's published
+    claim was **+0.194%/trade on n=15**; her true traded n is **6**, below this
+    organ's own MIN_N floor, so the honest claim is NONE. Phantoms lift a
+    losing book's mean toward zero AND raise n (shrinking SE), so they inflate
+    the lower bound from both directions — on the books most likely to have
+    them, since only real money halts.
+    """
+    src = (ROOT / "fleet_allocation.py").read_text()
+    assert "from golive_readiness import is_phantom_close" in src, (
+        "the organ must use the GATE'S signature, not its own copy")
+    tree = __import__("ast").parse(src)
+    called = any(
+        isinstance(n, __import__("ast").Call)
+        and getattr(n.func, "id", None) == "is_phantom_close"
+        for n in __import__("ast").walk(tree))
+    assert called, "is_phantom_close imported but never applied"
+
+
+def test_the_phantom_signature_has_one_owner():
+    """Identity, not a lookalike — two copies would let the graders drift
+    apart on exactly the rows that matter ((hj))."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_gl2", ROOT / "scripts" / "golive_readiness.py")
+    gl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gl)
+    assert gl.is_phantom_close({"profit_abs": 0.0, "open_rate": None}) is True
+    assert gl.is_phantom_close({"profit_abs": -3.87, "open_rate": 0.31}) is False
+
+
+def test_build_populates_the_bound_on_every_record():
+    """DRIVE `build()`, not just `dd_bound()`. The first cut read `rec["bot"]`
+    while the records are KEYED by bot, so the payload published `dd_bound:
+    null` on every book while the unit test stayed green — a defect only the
+    real publisher could show ([[test-consumers-against-publisher-built-payloads]])."""
+    # The REAL input shape: {bot: [per-trade pct, ...]}. My first fixture
+    # passed record dicts and blew up inside `sample_stats` — the
+    # stub-encodes-the-assumption trap, caught by running it.
+    pcts = [0.004, -0.002, 0.006, 0.001, -0.003,
+            0.002, 0.005, -0.001, 0.003, 0.002, 0.004, -0.002]
+    alloc = {"freqtrade-mum-lighter": list(pcts), "NEVER_SEEN": list(pcts)}
+    out = fa.build(alloc)
+    assert out is not None
+    books = out["books"]
+    assert "dd_bound" in books["freqtrade-mum-lighter"], "field never written"
+    assert books["freqtrade-mum-lighter"]["dd_bound"]["max_scale"] == pytest.approx(3.75)
+    assert books["NEVER_SEEN"]["dd_bound"] is None

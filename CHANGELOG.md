@@ -88,6 +88,70 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### THE OBVIOUS FINDING: THE ORGAN THAT RANKS CAPITAL WAS COUNTING HALT EVENTS AS TRADES
+
+**Eamon: *"fix obvious findings"*.** Looking at why 👩 mum has not opened and
+🔮 georgia is not winning turned up a third thing neither of them was about, on
+the book that IS winning.
+
+**A $0.00 close with no entry price is a halt/flatten EVENT, not a trade.**
+`golive_readiness` has excluded them by signature since (th); the winners'
+docket since 26-Aug, whose own note measured the population — **13 rows on
+exactly the two REAL-MONEY books**. `fleet_allocation` — *the organ that
+decides where the next dollar goes* — was still counting them.
+
+Measured on the live ledger:
+
+| book | with phantoms | without |
+|---|---|---|
+| 🙏 avo (LIVE) | n=**15**, mean +0.684%, **claim +0.194%/trade** | n=**6** — below MIN_N, **claim NONE** |
+| 🔮 georgia (LIVE) | n=61, mean −0.165% | n=57, mean −0.177% (claim 0.0 either way) |
+
+**Nine of avo's fifteen "closes" were halt events.** Her true traded sample is
+SIX — below this organ's own luck floor — so the honest claim is *none at all*,
+and it was publishing **+0.194%/trade**. The bias runs one way by construction:
+a $0.00 row pulls a losing mean toward zero AND raises `n`, shrinking SE, so it
+lifts the lower bound from both directions — on precisely the books most likely
+to have them, since **only real money halts**. Fixed by IDENTITY IMPORT of the
+gate's own `is_phantom_close` ((hj)), fail-OPEN.
+
+**AND THE PER-BOOK DRAWDOWN BOUND NOW ACTUALLY PUBLISHES.** The first cut read
+`rec["bot"]` while the records are KEYED by bot, so the payload carried
+`dd_bound: null` on every book while the unit test stayed green. Driving the
+REAL `build()` is what showed it — 11 of 20 books now carry a bound
+([[test-consumers-against-publisher-built-payloads]], again).
+
+### WHY MUM STILL HAS NOT OPENED — AND IT IS NOT THE BAR OR THE UNIVERSE
+
+Her census, live: `rsi_bar 36.0 · rsi_min 21.2 · universe 73 · verdicts
+{no_signal: 70, uptrend_blocked: 1, noncrypto_ungated: 1, no_read: 1}`.
+
+**Exactly ONE coin of 73 sits below her bar, and it is in an uptrend, so her
+NOT-uptrend term refuses it.** The universe widening 13 -> 73 bought almost
+nothing, and the reason is I22's own arithmetic: **crypto RSI is ~one bet**
+(N_eff ~1.5 measured 27-Aug). When the market is not oversold, NOTHING is —
+73 correlated names are not 73 chances. `rsi_med` reads 56.4.
+
+So her binding constraint is **the CONJUNCTION**, not either term: in a rising
+tape the oversold names are the ones still trending up, which is exactly what
+`uptrend_blocked` counts. Widening `MUM_RSI_MAX` cannot reach it — the row has
+recorded this shape once before ("the conjunct counts ZERO"). **No change
+shipped for her here: the honest reading is that her cell is rare by
+construction and 19 of her 73 names are ungraded non-crypto that admit nothing
+until the oracle grades them.**
+
+### AND WHY GEORGIA IS NOT WINNING — TWO NUMBERS, NEITHER OF THEM ENTRY QUALITY
+
+`shut_now: "cooldown"`, `entries_shut_reason_30d: {cooldown: 4,
+protections_locked: 9}` — **13 lockouts, 2.77h of a 13.2h span = 21% of her
+life shut**, on top of `live_clip_scale 0.75`. And her exit attribution over 61
+live closes puts **10 daily-loss closes at −12.81%** against `roi` exits at
++11.75% over 5. She is not losing on entries; she is losing on forced flattens
+and then being locked out of the recovery. Recorded, NOT acted on: changing a
+protection on a real-money book needs its own measurement and expectancy price
+(I19), and her carried item already has a pre-registered study waiting on
+rank-3 rows.
+
 ### THE CARRIED LIST — RUN, AND HONESTLY PART-DONE
 
 **Eamon: *"run the 13 fixes in handoff now"*.** 13 carried items: **3 are

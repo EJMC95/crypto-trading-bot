@@ -798,9 +798,16 @@ def _stop_for(bot, extra=None):
 def build(books, book_usd=BOOK_USD):
     """The published payload. Pure — the selftest drives it with no DB."""
     alloc = allocate(books, book_usd=book_usd)
-    for rec in (alloc or {}).values() if isinstance(alloc, dict) else (alloc or []):
-        if isinstance(rec, dict) and rec.get("bot"):
-            rec["dd_bound"] = dd_bound(rec["bot"])
+    # The records are KEYED by bot rather than carrying it as a field — the
+    # first cut read `rec["bot"]` and silently populated nothing, which is why
+    # the payload published `dd_bound: null` on every book while the function
+    # itself tested green. Driving the real `build()` is what caught it; the
+    # unit test alone could not.
+    _items = (alloc or {}).items() if isinstance(alloc, dict) else \
+             ((r.get("bot"), r) for r in (alloc or []) if isinstance(r, dict))
+    for _bot, rec in _items:
+        if isinstance(rec, dict) and _bot:
+            rec["dd_bound"] = dd_bound(_bot)
     return {
         "updated": _iso(),
         "ttl_sec": TTL_SEC,
@@ -958,6 +965,35 @@ def run_once(publish=False):
     if store is None:
         return None
     trades, n_retired = _living(store.fetch_paper_trades(limit=8000))
+    # [2026-08-28 (vd)] PHANTOM CLOSES OUT — THE THIRD GRADER FINALLY AGREES
+    # WITH THE OTHER TWO, and this one ranks CAPITAL.
+    #
+    # A $0.00 close with NO entry price is a halt/flatten EVENT, not a trade.
+    # `golive_readiness` has excluded them by signature since (th); the winners'
+    # docket since 26-Aug, whose own note measured the population: 13 rows on
+    # precisely the two REAL-MONEY books (🙏 avo 9, 🔮 georgia 4). This organ —
+    # the one that decides where the next dollar goes — was still counting them.
+    #
+    # WHY IT BIASES THE WRONG WAY, and why it matters more here than anywhere:
+    # a claim is `mean - t_crit * SE`. A $0.00 row pulls a LOSING book's mean
+    # toward zero AND raises `n`, which shrinks SE — so it lifts the lower bound
+    # from both directions at once. Phantoms make a losing book look more
+    # deserving of capital, on the books most likely to have them (only real
+    # money halts).
+    #
+    # IDENTITY IMPORT, never a re-implementation: a second copy of that
+    # signature would let the graders drift apart on exactly the rows that
+    # matter ((hj)). Fail-OPEN — if the gate is unreachable the sample is
+    # unchanged rather than blanked, because an allocation that silently sees
+    # nothing is worse than one that sees a few phantom rows.
+    n_phantom = 0
+    try:
+        from golive_readiness import is_phantom_close
+        _keep = [t for t in trades if not is_phantom_close(t)]
+        n_phantom = len(trades) - len(_keep)
+        trades = _keep
+    except Exception:                                    # noqa: BLE001
+        n_phantom = None
     rows_by_bot = {}
     for t in trades:
         bot = t.get("bot")
