@@ -168,6 +168,26 @@ if MULT_ENGINE not in ("v2", "v3"):
 HALF_LIFE_DAYS = float(os.environ.get("BRAIN_HALF_LIFE_DAYS", "14"))
 VITALS_KEY = "brain-vitals"
 
+#: [2026-08-28 (vd)] THE BRAIN'S SAMPLE RECEIPT — how many halt/flatten EVENTS
+#: `_fetch_trades` dropped on the last run.
+#:
+#: It exists because verifying the phantom fix from outside was IMPOSSIBLE: the
+#: brain publishes `runs`, `vitals`, `venue_ab`, `diagnoses`, `hypotheses` and
+#: `mult_streaks`, and not one of them carries a per-book sample size. A run
+#: that excluded 13 events and a run whose import failed and excluded ZERO
+#: published byte-identical payloads — so a monitor armed on this organ could
+#: only ever time out, which is exactly what happened.
+#:
+#: `fleet_allocation` learned this the same day and publishes `n_phantom`; this
+#: is the same receipt one organ over. **0 means the filter ran and found
+#: nothing; None means it could not run.** Those must never be the same
+#: byte-string ([[guards-blind-to-their-own-refusals]]).
+#:
+#: REPORTED, never a gate (I15): nothing reads it to decide anything. It is here
+#: so the next person can answer "is the brain's sample clean?" without reading
+#: the source and guessing.
+_PHANTOM_EXCLUDED = None
+
 # [2026-07-14b DIAGNOSIS LAYER] Discriminate WHERE a negative sleeve loses:
 # entry quality / exit path / fee bleed / regime timing / venue execution.
 # Born from the 92-run "tighten the 'flip' entry gates" artifact — the brain
@@ -549,15 +569,19 @@ def _fetch_trades():
     # the filter is inert while looking shipped. That exact defect reached
     # production in `fleet_allocation` earlier today; it is guarded now by
     # `tests/autonomy/test_scripts_import_resolvability.py`.
+    global _PHANTOM_EXCLUDED
     try:
         import os
         import sys as _sys
         _sys.path.insert(0, os.path.join(os.path.dirname(
             os.path.abspath(__file__)), "scripts"))
         from golive_readiness import is_phantom_close
-        trades = [t for t in trades if not is_phantom_close(t)]
+        _kept = [t for t in trades if not is_phantom_close(t)]
+        _PHANTOM_EXCLUDED = len(trades) - len(_kept)
+        trades = _kept
     except Exception:                                        # noqa: BLE001
-        pass
+        # None, never 0 — see the note on the constant.
+        _PHANTOM_EXCLUDED = None
     return trades
 
 
@@ -1494,6 +1518,8 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                 urgent_now.append(key)
     vitals = {"engine": engine, "priors": priors_out,
               "urgent": urgent_now,
+              # [(vd)] the sample receipt — see _PHANTOM_EXCLUDED.
+              "sample": {"phantom_excluded": _PHANTOM_EXCLUDED},
               # [2026-07-28 AUDIT FIX] strongest evidence first, EITHER
               # direction — ascending-t sorted reduce-warming first and cut
               # expand-warming entries at the [:20] cap, burying exactly what

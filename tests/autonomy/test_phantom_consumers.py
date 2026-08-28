@@ -174,3 +174,61 @@ def test_the_brain_actually_reaches_real_money():
     src = (ROOT / "fleet_bus.py").read_text()
     assert "def brain_clip" in src
     assert "MULT_CEIL" in src and "MULT_FLOOR" in src
+
+
+# ------------------------------------------- the brain publishes its own receipt
+def test_the_brain_publishes_how_many_events_it_dropped():
+    """[2026-08-28 (vd)] VERIFYING THE BRAIN FIX FROM OUTSIDE WAS IMPOSSIBLE,
+    and that is why this exists.
+
+    The brain publishes `runs`, `vitals`, `venue_ab`, `diagnoses`, `hypotheses`
+    and `mult_streaks` — not one carries a per-book sample size. So a run that
+    excluded 13 halt events and a run whose import failed and excluded ZERO
+    produced byte-identical payloads. A monitor armed on this organ could only
+    ever time out, which is precisely what happened.
+
+    `fleet_allocation` publishes `n_phantom` for the same reason. This is that
+    receipt one organ over: 0 = ran and found none, None = could not run.
+    """
+    src = (ROOT / "bot_learn.py").read_text()
+    assert '"phantom_excluded": _PHANTOM_EXCLUDED' in src, (
+        "the brain drops halt events but publishes no receipt saying so")
+    assert "_PHANTOM_EXCLUDED = None" in src, (
+        "the receipt must START as None — a 0 default would claim the filter "
+        "ran clean on a run where it never ran at all")
+
+    r = _clean(
+        "import sys, types\n"
+        "PH = {'bot':'x','profit_abs':0.0,'open_rate':None,'pnl_pct':0.0,\n"
+        "      'is_open':False,'reason':'long_daily_loss'}\n"
+        "REAL = {'bot':'x','profit_abs':-1.2,'open_rate':0.31,'pnl_pct':-0.004,\n"
+        "        'is_open':False,'reason':'long_stop_loss'}\n"
+        "m = types.ModuleType('bot_pnl_store')\n"
+        "m.fetch_paper_trades = lambda limit=None: "
+        "[dict(REAL) for _ in range(5)] + [dict(PH) for _ in range(4)]\n"
+        "sys.modules['bot_pnl_store'] = m\n"
+        "import bot_learn\n"
+        "assert bot_learn._PHANTOM_EXCLUDED is None\n"
+        "bot_learn._fetch_trades()\n"
+        "print('RECEIPT', bot_learn._PHANTOM_EXCLUDED)\n")
+    assert "RECEIPT 4" in r.stdout, (
+        f"the receipt did not count the 4 halt events:\n{r.stdout}\n{r.stderr}")
+
+
+def test_zero_and_none_are_distinguishable_on_the_receipt():
+    """The whole point of the receipt. If the fail path set 0 the payload could
+    not tell 'clean sample' from 'filter never ran' — which is the ambiguity
+    that let a dead filter sit live in `fleet_allocation` for a whole deploy."""
+    import ast
+    src = (ROOT / "bot_learn.py").read_text()
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "_fetch_trades")
+    handlers = [h for n in ast.walk(fn) if isinstance(n, ast.Try)
+                for h in n.handlers]
+    assigns_none = any(
+        isinstance(s, ast.Assign)
+        and any(getattr(t, "id", "") == "_PHANTOM_EXCLUDED" for t in s.targets)
+        and isinstance(s.value, ast.Constant) and s.value.value is None
+        for h in handlers for s in ast.walk(h))
+    assert assigns_none, (
+        "the fail-open path must set _PHANTOM_EXCLUDED = None, never 0")
