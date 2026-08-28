@@ -158,7 +158,58 @@ CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 #: matched random-entry null, both halves negative.** "Scan all markets" is
 #: measured POSITIVE on crypto and measured NEGATIVE here, so the two halves of
 #: that instruction are answered differently and the reason is a number (I19).
-FAMILY_CRYPTO_N = os.environ.get("FAMILY_CRYPTO_N", "freqtrade-mum:40")
+FAMILY_CRYPTO_N = os.environ.get("FAMILY_CRYPTO_N", "freqtrade-mum:200")
+
+#: [2026-08-28 (vd)] THE RANK CAP IS REPLACED BY A MEASURED LIQUIDITY FLOOR.
+#: Eamon: *"unconstrain the bots universe and stop this persistent limitations"*.
+#:
+#: A rank cap is an arbitrary number; a volume floor is a measured one. 👩 mum's
+#: cell (`rsi < RSI_MAX` AND NOT 1h-uptrend) was measured on 30d of Lighter's
+#: own 1h tape across every crypto market on the venue, and the shipped top-40
+#: had gone **completely dry**:
+#:
+#:     policy                coins   7d episodes   30d episodes   min $vol
+#:     rank <= 40 (was)         39         0            207       $333,301
+#:     vol >= $1.0M             21         0            107      $1,071,987
+#:     vol >= $0.5M             32         0            173        $501,031
+#:     vol >= $0.1M  <- now     67        15            405        $101,213
+#:     vol >= $0.05M            80        31            534         $51,814
+#:     rank <= 120             119        55            783             $0
+#:
+#: **The drought was the LIST, not the rule** — her cell fired 15 times in the
+#: 7 days her top-40 produced NOTHING. She has been live 3 days with 0 opens
+#: and that is why.
+#:
+#: WHY $0.1M AND NOT rank-120, which looks 3.7x better: rank-120 admits markets
+#: with **$0/day volume** — 52 of that 120 sit below `(qq)`'s measured
+#: slippage cliff (mean 17.49bps, p90 **398bps** under $0.1M/day). That is not
+#: supply, it is noise bought at a spread, and I19 prices a widening in
+#: expectancy rather than in trade count. The floor is DERIVED from that
+#: measurement, so the cheapest admitted coin sits just ABOVE the cliff.
+#:
+#: `FAMILY_CRYPTO_N` survives as a SAFETY BOUND, not the selector — raised to
+#: 200 so the floor binds instead of the rank, while a scout glitch still
+#: cannot hand a book 500 names. Universe width is capacity, so this is
+#: ordinary tuning and the era does NOT reset ((hc)).
+FAMILY_CRYPTO_MIN_VOL_M = os.environ.get(
+    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1")
+
+
+def crypto_min_vol_m(bot, raw=None):
+    """Per-carrier crypto volume floor in $M/day, or 0.0 when unset.
+
+    0.0 means "no floor", which is what every carrier except 👩 mum runs — this
+    must not silently narrow a book that never asked for a floor.
+    """
+    raw = FAMILY_CRYPTO_MIN_VOL_M if raw is None else raw
+    for part in str(raw or "").split(","):
+        name, _, v = part.partition(":")
+        if name.strip() == bot:
+            try:
+                return max(0.0, float(v.strip()))
+            except (TypeError, ValueError):
+                return 0.0
+    return 0.0
 
 
 def crypto_width(bot, raw=None):
@@ -196,7 +247,8 @@ def carrier_universe(s, raw=None):
     if n > len(COINS):
         try:
             import fleet_bus
-            wide = [c for c in (fleet_bus.scout_universe() or [])
+            wide = [c for c in (fleet_bus.scout_universe(
+                        min_vol_m=crypto_min_vol_m(s.bot)) or [])
                     if fleet_bus.is_crypto(c)][:n]
         except Exception:                                   # noqa: BLE001
             wide = []

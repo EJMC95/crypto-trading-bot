@@ -143,7 +143,12 @@ def test_the_widening_is_scoped_to_mum(bot):
 
 
 def test_mum_is_the_one_that_widened():
-    assert fam.crypto_width(MUM) == 40
+    # [2026-08-28 (vd)] 40 -> 200. The rank cap is no longer the SELECTOR — a
+    # measured $0.1M/day volume floor is (see `crypto_min_vol_m`). This value
+    # survives only as a safety bound on a scout glitch, so it is asserted as a
+    # RANGE: pinning it to a literal again would re-impose the limit the floor
+    # exists to replace.
+    assert 120 <= fam.crypto_width(MUM) <= 400
     assert len(fam.noncrypto_extra(MUM)) >= 15
     u = fam.carrier_universe(_s(MUM))
     assert len(u) > len(fam.COINS) + len(fam.NONCRYPTO_UNIVERSE)
@@ -228,3 +233,69 @@ def test_crypto_width_parsing(raw, bot, want):
 ])
 def test_noncrypto_extra_parsing(raw, bot, want):
     assert fam.noncrypto_extra(bot, raw) == want
+
+
+# ------------------------------------------- the rank cap becomes a vol floor
+def test_the_crypto_floor_is_per_carrier_and_defaults_off():
+    """[2026-08-28 (vd)] A floor that leaked onto another carrier would NARROW
+    a book that never asked for one — the one direction a universe change must
+    never move ((hk): a dark organ must not shrink a book's universe)."""
+    assert fam.crypto_min_vol_m("freqtrade-mum") == pytest.approx(0.1)
+    for other in ("freqtrade-avo-maria", "freqtrade-georgia",
+                  "crypto-intraday-15m", "NEVER_SEEN", ""):
+        assert fam.crypto_min_vol_m(other) == 0.0, (
+            f"{other} must be unaffected — 0.0 means no floor")
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("freqtrade-mum:0.1", 0.1), ("freqtrade-mum:0", 0.0),
+    ("a:1,freqtrade-mum:0.25,b:2", 0.25),
+    ("freqtrade-mum:junk", 0.0), ("freqtrade-mum:-5", 0.0),
+    ("", 0.0),
+    # NOT (None, 0.0): `raw=None` means "read the module default", which is
+    # 0.1 for mum. My first cut asserted 0.0 here and was simply wrong about
+    # the function's own contract — the parametrisation caught it.
+    (None, 0.1),
+])
+def test_the_floor_parses_junk_to_no_floor(raw, expected):
+    """Fail OPEN: an unparseable env must mean NO floor, never a floor that
+    silently deletes the universe."""
+    assert fam.crypto_min_vol_m("freqtrade-mum", raw) == pytest.approx(expected)
+
+
+def test_the_floor_actually_reaches_the_scout():
+    """THE WIRING, not the constant. A floor computed and never passed is the
+    registered-but-inert failure (I18) — and it is invisible, because the
+    universe still looks plausible."""
+    import ast
+    src = (ROOT / "lighter_family_bot.py").read_text()
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "carrier_universe")
+    passed = False
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Call)
+                and getattr(node.func, "attr", "") == "scout_universe"):
+            for kw in node.keywords:
+                if kw.arg == "min_vol_m":
+                    passed = True
+    assert passed, (
+        "carrier_universe calls scout_universe WITHOUT min_vol_m — the floor "
+        "is computed and never applied")
+
+
+def test_a_dark_scout_still_cannot_narrow_her():
+    """The fail-safe the floor must not break: an empty/dark read returns the
+    CONFIGURED list, never a shrunken one."""
+    s = next(x for x in fam.live_strategies() if x.bot == "freqtrade-mum")
+    uni = fam.carrier_universe(s)
+    for major in ("BTC", "ETH", "SOL", "XRP", "ADA"):
+        assert major in uni, f"{major} dropped from mum's universe"
+    assert len(uni) >= len(fam.COINS)
+
+
+def test_the_rank_bound_survives_as_a_safety_cap():
+    """`FAMILY_CRYPTO_N` is no longer the selector but must still bound a
+    scout glitch — 200 lets the floor bind while capping a runaway read."""
+    n = fam.crypto_width("freqtrade-mum")
+    assert n >= 120, "the rank bound must not re-impose the old limit"
+    assert n <= 400, "an unbounded rank is a scout glitch with no ceiling"

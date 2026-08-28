@@ -88,6 +88,78 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### 👩 MUM WAS NOT BROKEN AND WAS NOT SLOW — HER LIST WAS DRY. THE RANK CAP BECOMES A MEASURED LIQUIDITY FLOOR, AND HER 7-DAY SUPPLY GOES 0 -> 15
+
+**Eamon: *"deploy and unconstrain the bots universe and stop this persistent
+limitations of the bots"* / *"id like to see mum start trading"*.** He is right,
+and the measurement says so in one table.
+
+**FIRST, WHAT SHE IS NOT.** Every earlier explanation on this row was wrong, and
+each was checked rather than assumed:
+* **Not the RSI bar.** Her census reads `rsi_min 20.5` against a bar of 36 —
+  coins ARE below it.
+* **Not the fleet long budget.** `fleet_risk` reads **9 of 20**, light green,
+  mode enforce, `clip_scale 1.0`.
+* **Not the NOT-uptrend conjunct.** The uptrend "rescue" tiers were REFUSED with
+  numbers at `(tr)` (C1/C2 trailing-negative, C4 decayed to t_cl −3.0), and
+  re-proposing a refused cell is the circle this fleet keeps paying for.
+* **Not a bug in her rule at all.** On 30d of Lighter's own 1h tape her cell
+  fires **6.90 episodes/day** across 34 of 40 coins — which independently
+  reproduces `(un)`'s 6.05/day.
+
+**THE ACTUAL CAUSE: her top-40 went dry, and the tape says so exactly.**
+
+| window | episodes | eps/day |
+|---|---|---|
+| last 3d | **0** | 0.00 |
+| last 7d | **0** | 0.00 |
+| full 30d | 207 | 6.90 |
+
+All 207 fell in the first 23 days. **She has been live 3 days into a 7-day
+drought on her own list** — behaving perfectly, with nothing to buy.
+
+**AND THE DROUGHT IS THE LIST, NOT THE CELL.** Same rule, same tape, widened:
+
+| policy | coins | 7d eps | 7d coins | 30d eps | min $vol |
+|---|---|---|---|---|---|
+| rank <= 40 (was) | 39 | **0** | 0 | 207 | $333,301 |
+| vol >= $1.0M | 21 | 0 | 0 | 107 | $1,071,987 |
+| vol >= $0.5M | 32 | 0 | 0 | 173 | $501,031 |
+| **vol >= $0.1M (shipped)** | **67** | **15** | **6** | **405** | $101,213 |
+| vol >= $0.05M | 80 | 31 | 11 | 534 | $51,814 |
+| rank <= 120 | 119 | 55 | 18 | 783 | **$0** |
+
+**SHIPPED: the rank cap stops being the selector and a MEASURED volume floor
+takes over** — `FAMILY_CRYPTO_MIN_VOL_M`, mum at $0.1M/day, every other carrier
+at 0.0 (no floor, unchanged). `FAMILY_CRYPTO_N` 40 -> 200 survives only as a
+safety bound on a scout glitch, and its test now asserts a RANGE rather than a
+literal so the old limit cannot be re-imposed by a pin.
+
+**WHY $0.1M AND NOT rank-120, which looks 3.7x better — the refusal is the
+discipline.** Rank-120 admits markets with **$0/day volume**; 52 of that 120 sit
+below `(qq)`'s measured slippage cliff, where fills run a mean **17.49bps** and
+a p90 of **398bps**. That is not supply, it is noise bought at a spread, and I19
+prices a widening in expectancy rather than in trade count. The floor is DERIVED
+from that cliff, so the cheapest admitted coin sits just ABOVE it.
+
+**THE NON-CRYPTO HALF IS INERT AND THAT IS THE ORACLE, NOT HER.** Her census
+`both_terms_n: 3` with `noncrypto_ungated: 3` — and the arithmetic closes
+(67 no_signal + 2 uptrend_blocked + 3 ungated + 1 no_read = 73), so **every coin
+satisfying her full entry right now is an ungated non-crypto name.** The oracle
+names the reason per symbol, and it is arithmetic rather than policy: `MRNA
+9<203 · SMIC 10<203 · SOXL 66<203 · DRAM 78<203 · NBIS 80<203 · US100 100<203 ·
+CBRS 106<203 · MRVL 107<203 · MU 116<203 · STRC 162<203 · IWM 178<203 · WTI
+191<203 · XCU 200<203 · INTC 200<203 · SNDK 200<203`. EMA200 needs 203 daily
+bars; several of these are months from having them. **So the 19 non-crypto names
+this morning's widening added are inert supply and will stay inert** — they
+inflate her published `universe: 73` by 35% over what is actionable, which is
+the `(hl)` skip-census shape and is named here rather than left to be
+rediscovered.
+
+Era NOT reset — universe width is capacity, i.e. ordinary tuning ((hc)) — and
+`carrier_universe` remains ONE owner, so the shadow twin and the real-money arm
+widen together and stay a matched pair.
+
 ### THE BRAIN COULD NOT BE VERIFIED FROM OUTSIDE AT ALL — SO THE MONITOR ARMED ON IT COULD ONLY EVER TIME OUT
 
 The deploy readback for the brain fix failed, and the reason was not the deploy.
