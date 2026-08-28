@@ -105,6 +105,10 @@ from lighter_family_bot import (
     # [(ti)] the ONE policy-stamp builder, shared with the shadow host so
     # judge v2's parity precheck compares like with like.
     policy_stamp,
+    # [2026-08-28 (vd)] the ONE owner of the hourly entry throttle, imported so
+    # this host ENFORCES the same cap the shadow does instead of declaring a
+    # divergence. A second copy of the cap is a second policy ((hj)).
+    throttle_cap,
     # [2026-08-26] the ONE census owner for a no-entry verdict (mum's
     # uptrend_blocked split) — imported, never re-typed ((hj)).
     census_no_entry_why,
@@ -1942,13 +1946,15 @@ def main(_ctx=None, once=False):
             POLICY_SIG_FIELDS and requires a `lenses` key these stamps
             deliberately lack, so family stamps are structurally invisible
             to `stamped_policy_boundary` and adding a field moves no era."""
-            # [(uv)] `max_entries_per_hour=None` is this host ANSWERING, not
-            # declining to: it enforces no hourly throttle (see the entry
-            # loop's own comment — live rank is the UNCENSORED within-hour
-            # ordinal), while the shadow's `DayTraderGated` caps at 3. Passing
-            # the strategy's own cap here would stamp a throttle this host does
-            # not apply, which is why the argument is the HOST's to answer.
-            return {**policy_stamp(S, "lighter_live", "diversified", None),
+            # [(uv), CORRECTED IN PLACE 2026-08-28 (vd)] This passed
+            # `max_entries_per_hour=None` because the host genuinely enforced no
+            # throttle, and the note said stamping the strategy's cap "would
+            # stamp a throttle this host does not apply". Both halves are now
+            # false: the host ENFORCES `throttle_cap(S)` in the entry loop, so
+            # the stamp reports what it applies. The argument is still the
+            # HOST's to answer — the answer changed, not the contract.
+            return {**policy_stamp(S, "lighter_live", "diversified",
+                                   throttle_cap(S)),
                     "brain_gate": "row+shadow", "coin_veto": True}
 
         def _flatten_all(why):
@@ -2393,6 +2399,44 @@ def main(_ctx=None, once=False):
                 if stake < MIN_CLIP_USD:
                     _verdict(sym, "clip_below_min")
                     continue
+                # [2026-08-28 (vd)] THE HOURLY THROTTLE — ENFORCED HERE,
+                # NOT JUST DECLARED. Eamon: *"please fix permanently"*.
+                #
+                # This host used to enforce NO throttle and stamp
+                # `max_entries_per_hour=None` honestly, which left 🔮 georgia's
+                # pair `unjudgeable:policy_mismatch` — live None vs shadow 5 —
+                # so the ONLY designed path from her shadow's evidence to more
+                # real money was structurally shut. A paired bar across two
+                # different ENTRY policies is not a comparison, and the judge
+                # was right to refuse it.
+                #
+                # MEASURED, on the two arms' own ledgers: entries per ACTIVE
+                # hour run shadow {1: 108h, 2: 44h, 3: 4h} — at-or-over the cap
+                # in 2.6% of hours — against live {1: 16h, 2: 5h, 3: 3h, 4: 1h,
+                # 9: 1h} = 19.2%, **reaching NINE in a single hour**. Her own
+                # ledger prices the marginal entry: rank 1 −0.443%/trade (n=24),
+                # rank 2 +0.828% (n=9), rank 3 −7.752% (n=3).
+                #
+                # DIRECTION IS RESTRICT-ONLY, which is why it ships without a
+                # forward test: the live arm can only ever take FEWER entries
+                # than before, and it converges onto the cap the shadow was
+                # MEASURED at ((ve) 3 -> 5 on the rank-3 sample). Aligning to
+                # the measured policy is not a widening and costs no expectancy
+                # the shadow has not already paid.
+                #
+                # PERMANENT BY CONSTRUCTION: the cap comes from
+                # `lighter_family_bot.throttle_cap` — the same call the shadow's
+                # `throttle_ok` makes — so the two arms cannot drift apart again
+                # without changing one owner. `None` (any non-DayTrader book)
+                # leaves this host byte-identical to before.
+                _cap = throttle_cap(S)
+                if _cap is not None:
+                    _hb_now = int(t0 // 3600)
+                    if state.get("rank_bucket") != _hb_now:
+                        state["rank_bucket"], state["rank_n"] = _hb_now, 0
+                    if int(state.get("rank_n") or 0) >= _cap:
+                        _verdict(sym, "throttled")
+                        continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
                 if not rails.notional_ok(open_ntl, stake):
                     _verdict(sym, "notional_cap")
@@ -2436,12 +2480,15 @@ def main(_ctx=None, once=False):
                 # [(th)] entry_rank, born at the OPEN like the shadow's (sv)
                 # stamp — the close can only copy what the open recorded. The
                 # clock-hour bucket lives in the durable state so a mid-hour
-                # restart cannot under-rank. DECLARED PORT DIVERGENCE: this
-                # host enforces NO hourly throttle (the shadow's
-                # MAX_ENTRIES_PER_HOUR censors its ranks), so live rank is the
-                # UNCENSORED within-hour ordinal — a rank study must read the
-                # two arms accordingly. Non-DayTrader books stamp None, never
-                # a fake 1 ((sv)).
+                # restart cannot under-rank.
+                # [2026-08-28 (vd)] CORRECTED IN PLACE per I12 — this read
+                # "DECLARED PORT DIVERGENCE: this host enforces NO hourly
+                # throttle ... so live rank is the UNCENSORED within-hour
+                # ordinal", and that is no longer true of this file. The
+                # throttle is ENFORCED above from `throttle_cap`, the shadow's
+                # own owner, so both arms' ranks are now censored at the SAME
+                # cap and a rank study may read them alike. Non-DayTrader books
+                # stamp None, never a fake 1 ((sv)).
                 if isinstance(S, DayTraderGated):
                     _hb = int(t0 // 3600)
                     if state.get("rank_bucket") != _hb:

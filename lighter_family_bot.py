@@ -1556,10 +1556,15 @@ def throttle_cap(strategy):
     loop does not apply, or miss one it does.
 
     NOTE it is keyed on the STRATEGY CLASS, which is only half the question —
-    the other half belongs to the HOST. Georgia's live arm runs this very
-    `DayTraderGated` and enforces NO throttle, which is why `policy_stamp`
-    takes the cap as an argument each host answers for itself rather than
-    deriving it here.
+    the other half belongs to the HOST. `policy_stamp` therefore takes the cap
+    as an argument each host answers for itself rather than deriving it here.
+
+    [2026-08-28 (vd)] CORRECTED IN PLACE per I12: this said "Georgia's live arm
+    runs this very `DayTraderGated` and enforces NO throttle". It does now —
+    `lighter_avo_live_bot` imports THIS function and gates its entry loop on
+    it, which is what closed her pair's `unjudgeable:policy_mismatch`. The
+    host-answers-for-itself contract is unchanged and is why both arms can be
+    read from one owner without either assuming the other.
     """
     return (strategy.MAX_ENTRIES_PER_HOUR
             if isinstance(strategy, DayTraderGated) else None)

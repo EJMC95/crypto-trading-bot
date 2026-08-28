@@ -88,6 +88,68 @@ dose-response (+0.111%/trade, cluster-t +2.44) and this pass's sweep
 existed and it was right on its own terms. What changed is not the verdict on
 36, but the reason it was needed.
 
+### 🔮 GEORGIA'S TWO ARMS RAN DIFFERENT ENTRY POLICIES, SO THE JUDGE REFUSED HER — THE FIX IS PARITY FROM ONE OWNER, NOT A LOOSER BAR
+
+**Eamon: *"the oracle, like the judge needs to be loosened otherwise we will
+never get lift off"* / *"please fix permanently"*.** He is right that the
+promotion path was shut. He is right that it needed fixing. It did not need
+loosening, and the judge's own published state says why:
+
+    georgia  phase=unjudgeable
+      reason: policy_mismatch
+      detail: arms diverge on ['max_entries_per_hour']:
+              live={'max_entries_per_hour': None}  shadow={'max_entries_per_hour': 5}
+
+**A paired bar across two different ENTRY policies is not a comparison.** The
+judge was correct to refuse, and the live host was correct to stamp `None` — it
+genuinely enforced no throttle. The defect was the DIVERGENCE, not the gate that
+noticed it.
+
+**MEASURED, on the two arms' own ledgers — entries per ACTIVE hour:**
+
+| arm | distribution | at-or-over the cap |
+|---|---|---|
+| shadow | {1: 108h, 2: 44h, 3: 4h} | **2.6%** |
+| live | {1: 16h, 2: 5h, 3: 3h, 4: 1h, **9: 1h**} | **19.2%** |
+
+The live arm reached **nine entries in a single hour**. Her own ledger prices
+the marginal one: rank 1 −0.443%/trade (n=24), rank 2 +0.828% (n=9), rank 3
+**−7.752%** (n=3).
+
+**SHIPPED: the live host now ENFORCES `lighter_family_bot.throttle_cap` — the
+shadow's own owner — and stamps what it enforces.** RESTRICT-ONLY, which is why
+it ships without a forward test: the live arm can only ever take FEWER entries,
+converging on the cap the shadow was MEASURED at ((ve) 3 -> 5). Aligning to the
+measured policy is not a widening and costs no expectancy the shadow has not
+already paid. 🙏 avo and 👩 mum resolve to `None` and are byte-identical.
+
+**PERMANENT BY CONSTRUCTION, which is the whole point:** both arms read ONE
+owner, so they cannot drift apart again without somebody editing it. A
+host-local copy of the cap would be a second policy ((hj)) — and a second copy
+is exactly how this divergence was born.
+
+**AND NO EVIDENCE BAR MOVED.** `MARGIN_PP`, the per-half floors, the both-halves
+rung, `MIN_CLOSES` — untouched. *Evidence is senior to permission* is permanent
+doctrine and this change does not touch it; it removes a PLUMBING blocker that
+was masquerading as an evidence problem.
+
+**THE REAL BAR PROBLEM IS NAMED HERE AND NOT SILENTLY FIXED.** `(vm)` already
+published it and left it: the judge promotes on a **0.5pp** margin while its
+binding rung can only resolve **1.986pp** on georgia (1.658pp on avo) — a **4x
+gap**, so the test is under-powered for the effect it claims to detect and
+`paired_eval` was deliberately left untouched. That IS a real "never get lift
+off" mechanism. **Rewriting a real-money promotion rule needs a calibrated
+simulation of its promotion and false-promotion rates** ((tg)'s own duty:
+measured number + expectancy price), and shipping one on intuition at the end of
+a session is how a gate gets broken quietly. It is the next build, stated as
+carried rather than done.
+
+**THREE STALE COMMENTS CORRECTED IN PLACE (I12)** — each claimed "this host
+enforces NO hourly throttle" on a real-money entry path that now does, including
+the pinned test that REQUIRED the live host to answer `None`. That test's
+property is preserved and its assertion inverted: each host must ANSWER with a
+real expression, and a hard-coded `None` on either side is now the failure.
+
 ### 👩 MUM WAS NOT BROKEN AND WAS NOT SLOW — HER LIST WAS DRY. THE RANK CAP BECOMES A MEASURED LIQUIDITY FLOOR, AND HER 7-DAY SUPPLY GOES 0 -> 15
 
 **Eamon: *"deploy and unconstrain the bots universe and stop this persistent

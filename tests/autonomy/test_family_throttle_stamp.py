@@ -139,9 +139,27 @@ def test_each_host_actually_passes_its_own_answer_at_the_call_site():
     live = _stamp_call(ROOT / "lighter_avo_live_bot.py")
     assert len(live) == 1, f"expected one live stamp call, got {len(live)}"
     larg = live[0].args[3]
-    assert isinstance(larg, ast.Constant) and larg.value is None, \
-        "the live host must answer None — it enforces no hourly throttle; " \
-        "passing the strategy's cap would stamp a throttle it does not apply"
+    # [2026-08-28 (vd)] THIS ASSERTION IS INVERTED, and the reason is the whole
+    # point of the change. It used to require the live host to answer `None`,
+    # justified as "it enforces no hourly throttle; passing the strategy's cap
+    # would stamp a throttle it does not apply". Both clauses were true when
+    # written and are false now: `lighter_avo_live_bot` imports `throttle_cap`
+    # and GATES its entry loop on it, so the honest answer changed with the
+    # behaviour.
+    #
+    # That divergence is what held 🔮 georgia's pair at
+    # `unjudgeable:policy_mismatch` (live None vs shadow 5) — the only designed
+    # route from her shadow's evidence to more real money.
+    #
+    # THE PROPERTY THIS TEST PROTECTS IS UNCHANGED: each host must ANSWER with
+    # a real expression rather than a silent `None` that makes both arms
+    # compare equal and slip the parity rung. A literal `None` on either side is
+    # now the failure, because neither host may claim a policy it does not run.
+    assert isinstance(larg, ast.Call) and isinstance(larg.func, ast.Name) \
+        and larg.func.id == "throttle_cap", \
+        "the live host must answer with throttle_cap(S) — it ENFORCES that cap " \
+        "in its entry loop, and a hard-coded None re-opens the policy_mismatch " \
+        "that made georgia's pair unjudgeable"
 
 
 def test_the_builder_requires_the_answer_rather_than_defaulting_it():
