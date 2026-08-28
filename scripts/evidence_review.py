@@ -234,6 +234,18 @@ except Exception:      # noqa: BLE001 — a degraded list, never a lost report
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from fleet_books import DECLARED_LIVE, ROW_ENTRY   # noqa: E402
 
+# [2026-08-28] The `stale-live:` verifier's threshold is IMPORTED from the
+# publisher that fires the alert, never restated here. `market_context` owns
+# the per-book cadence; a second copy of it in this file is a second rule, and
+# the one that drifts is always the copy ((hj): pin re-use by identity).
+# Import failure leaves the names None and the verifier FAILS CLOSED — a
+# real-money liveness alert we cannot re-measure must never publish "resolved".
+try:
+    from market_context import (LIVE_CADENCE_SEC,      # noqa: E402
+                                DEFAULT_LIVE_LIMIT)
+except Exception:                                      # pragma: no cover
+    LIVE_CADENCE_SEC, DEFAULT_LIVE_LIMIT = None, None
+
 LIVE_ROWS = DECLARED_LIVE
 # The `-lshadow` CONTROL arm of a row that is ALREADY LIVE is not a go-live
 # candidate — it is the twin of a bot that already went. It also fails the
@@ -303,6 +315,7 @@ def alert_key_kind(key):
     k = str(key or "")
     for prefix, kind in (("disloc:", "disloc"), ("census:", "census"),
                          ("factor-sample:", "factor"), ("veto:", "veto"),
+                         ("stale-live:", "stale_live"),
                          ("live-shadow-gap", "live_shadow")):
         if k.startswith(prefix):
             return kind
@@ -704,6 +717,68 @@ def verify_alerts(cur, errors):
                           else "resolved")
                 verdicts.append((key, status, "; ".join(notes) or
                                  "no live rows declared"))
+            elif kind == "stale_live":
+                # [2026-08-28] THE INCIDENT THIS CLOSES: 🔮 georgia's LIVE
+                # real-money row froze 27-Aug 14:03Z for 8.28h. The alert fired
+                # twice (dedup_h=6) and this review had NO verifier for the key
+                # shape, so it echoed the alert's own text — "last published 381
+                # min ago" — as an ACTIVE finding at 08:30 the next morning,
+                # when the row had been publishing again for ten hours.
+                #
+                # [I1] LIVENESS BEFORE SEMANTICS. The alert's message carries
+                # the age AT FIRING and nothing else, so echoing it cannot
+                # distinguish "this real-money book is down RIGHT NOW" from "it
+                # recovered overnight" — the two are byte-identical to a reader,
+                # which is the whole of I1. Re-measure the row's age instead.
+                bot = key.split(":", 1)[1]
+                if LIVE_CADENCE_SEC is None:
+                    # FAIL CLOSED: no threshold owner, no verdict. Never
+                    # "resolved" on a real-money liveness key we cannot check.
+                    verdicts.append((key, "active",
+                                     f"⚠️ CANNOT VERIFY {bot}: market_context "
+                                     f"(the cadence owner) did not import — "
+                                     f"treat as unverified, not as healthy"))
+                    continue
+                limit_s = LIVE_CADENCE_SEC.get(bot, DEFAULT_LIVE_LIMIT)
+                cur.execute("SELECT extract(epoch FROM (now()-updated_at)),"
+                            " equity FROM bot_pnl WHERE bot=%s", (bot,))
+                row = cur.fetchone()
+                if not row or row[0] is None:
+                    # A live row that has VANISHED is worse than a stale one.
+                    verdicts.append((key, "active",
+                                     f"⚠️ LIVE row {bot} has no bot_pnl row at "
+                                     f"all — check the Railway service"))
+                    continue
+                age_s, equity = float(row[0]), row[1]
+                eq = f" (${equity:,.2f} real)" if equity is not None else ""
+                # The outage's DURATION, from the durable equity series — the
+                # number an operator actually needs. "It recovered" without a
+                # duration cannot be told from "it never really broke".
+                gap_note = ""
+                try:
+                    cur.execute(
+                        "SELECT ts FROM bot_state_history WHERE key=%s"
+                        " AND ts > now() - interval '%s days' ORDER BY ts",
+                        (f"{bot}:equity", ALERT_WINDOW_D))
+                    ts = [r[0] for r in cur.fetchall()]
+                    worst = max(((b - a_).total_seconds()
+                                 for a_, b in zip(ts, ts[1:])), default=0.0)
+                    if worst > limit_s:
+                        gap_note = (f"; worst publish gap in the last "
+                                    f"{ALERT_WINDOW_D}d was {worst/3600:.2f}h")
+                except Exception:
+                    gap_note = "; publish-gap history unreadable"
+                if age_s > limit_s:
+                    verdicts.append((key, "active",
+                                     f"⚠️ STILL STALE — LIVE bot {bot}{eq} last "
+                                     f"published {age_s/60:.0f} min ago (limit "
+                                     f"{limit_s/60:.0f}); check the Railway "
+                                     f"service{gap_note}"))
+                else:
+                    verdicts.append((key, "resolved",
+                                     f"RECOVERED — {bot}{eq} is publishing now "
+                                     f"({age_s/60:.0f} min old, limit "
+                                     f"{limit_s/60:.0f}){gap_note}"))
             else:
                 verdicts.append((key, "active",
                                  f"no verifier for this key shape — {a.get('msg','')[:120]}"))
@@ -2010,6 +2085,79 @@ def selftest():
     #     every mapped row must be one the arm-drift query actually SELECTs, or
     #     the section silently reports nothing for it
     assert set(ROW_ENTRY) >= set(LIVE_ROWS), "both real-money rows must be mapped"
+
+    # ---- [2026-08-28] the `stale-live:` verifier -------------------------
+    # THE INCIDENT: 🔮 georgia's LIVE real-money row froze 27-Aug 14:03Z for
+    # 8.28h. This review had no verifier for the key shape, so it republished
+    # the alert's own "381 min ago" text the next morning — ten hours after the
+    # row had recovered. A reader could not tell a live outage from a healed
+    # one, which is exactly what I1 says is impossible without reading age.
+    assert alert_key_kind("stale-live:freqtrade-georgia-lighter") == \
+        "stale_live", "a real-money liveness alert must route to a verifier"
+    assert alert_key_kind("stale-live:anything") != "unknown"
+
+    # [(hj)] the cadence bar is the PUBLISHER's, pinned by IDENTITY. A restated
+    # copy would stay green here while drifting from the alert that fires.
+    import market_context as _mc
+    assert LIVE_CADENCE_SEC is _mc.LIVE_CADENCE_SEC, \
+        "the stale-live threshold must BE market_context's, not a copy"
+    assert DEFAULT_LIVE_LIMIT is _mc.DEFAULT_LIVE_LIMIT
+
+    class _StubCur:
+        """Answers by SQL shape so the verifier can be driven with no DB."""
+        def __init__(self, age_s, have_row=True):
+            self.age_s, self.have_row, self._r = age_s, have_row, None
+
+        def execute(self, sql, params=()):
+            if "FROM bot_state WHERE" in sql:
+                self._r = ({"alerts": [{
+                    "ts": dt.datetime.now(dt.timezone.utc).timestamp(),
+                    "key": "stale-live:freqtrade-georgia-lighter",
+                    "msg": "⚠️ LIVE bot ... 381 min ago", "severity": "warn",
+                }]}, None) if params[0] == ALERTS_KEY else None
+            elif "FROM bot_pnl" in sql:
+                self._r = (self.age_s, 237.66) if self.have_row else None
+            elif "bot_state_history" in sql:
+                self._r = []
+            else:
+                self._r = None
+
+        def fetchone(self):
+            return self._r if isinstance(self._r, tuple) else self._r
+
+        def fetchall(self):
+            return self._r if isinstance(self._r, list) else []
+
+    def _verdict(age_s, have_row=True):
+        errs = []
+        v = verify_alerts(_StubCur(age_s, have_row), errs)
+        assert not errs, errs
+        return [x for x in v if x[0].startswith("stale-live:")][0]
+
+    #     RECOVERED: a row publishing inside its cadence is resolved, and the
+    #     note says so in words rather than echoing the alert's stale number.
+    _k, _st, _why = _verdict(60.0)
+    assert _st == "resolved" and "RECOVERED" in _why, (_st, _why)
+    assert "381" not in _why, "the verdict must not echo the alert's old age"
+
+    #     STILL STALE: a genuinely frozen real-money row stays active.
+    _k, _st, _why = _verdict(9 * 3600.0)
+    assert _st == "active" and "STILL STALE" in _why, (_st, _why)
+
+    #     FAIL CLOSED, both ways. A live row with NO bot_pnl row at all is
+    #     worse than a stale one and must never read "resolved"...
+    _k, _st, _why = _verdict(60.0, have_row=False)
+    assert _st == "active" and "no bot_pnl row" in _why, (_st, _why)
+    #     ...and neither may a missing threshold owner. This is the arm that
+    #     stops an ImportError from turning into a vacuous all-clear on the one
+    #     alert class that guards real money.
+    _saved = globals()["LIVE_CADENCE_SEC"]
+    try:
+        globals()["LIVE_CADENCE_SEC"] = None
+        _k, _st, _why = _verdict(60.0)
+        assert _st == "active" and "CANNOT VERIFY" in _why, (_st, _why)
+    finally:
+        globals()["LIVE_CADENCE_SEC"] = _saved
 
     # the gate is IMPORTED, never redefined here — the whole point of (fk)
     assert not any(k.startswith("GATE_MIN") for k in globals()), \
