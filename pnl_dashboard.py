@@ -814,15 +814,31 @@ def fetch_rows(hidden=None):
             cur.execute("SELECT to_regclass('public.bot_pnl') AS t")
             if cur.fetchone()["t"] is None:
                 return {}  # table not created yet (no bot has published)
-            cur.execute("SELECT * FROM bot_pnl")
+            hidden_ids = (
+                sorted(hidden.keys()) if isinstance(hidden, dict) else sorted(hidden or [])
+            )
+            q = (
+                "SELECT bot, updated_at, status, equity, pnl_abs, pnl_pct, "
+                "open_trades, closed_trades, wins, losses, extra, pnl_daily "
+                "FROM bot_pnl"
+            )
+            where = []
+            params = []
+            if RETIRED_ROWS:
+                where.append("bot <> ALL(%s)")
+                params.append(sorted(RETIRED_ROWS))
+            if hidden_ids:
+                where.append("bot <> ALL(%s)")
+                params.append(hidden_ids)
+            if where:
+                q += " WHERE " + " AND ".join(where)
+            cur.execute(q, params)
             # Drop legacy pre-rename rows so stale duplicates never reach the
             # grid, totals, or the /pnl.json feed. Venue-variant rows
             # (<base>-lighter/-ltest/-lshadow) pass when their base is a current
             # bot, so a live/shadow Lighter bot shows up automatically.
             return {r["bot"]: r for r in cur.fetchall()
-                    if r["bot"] not in RETIRED_ROWS
-                    and r["bot"] not in hidden
-                    and (r["bot"] in CURRENT_BOTS
+                    if (r["bot"] in CURRENT_BOTS
                          or venue_variant(r["bot"])[0] in CURRENT_BOTS)}
     finally:
         conn.close()
@@ -2970,7 +2986,7 @@ def age_str(updated_at, threshold=STALE_SECONDS):
     now = dt.datetime.now(dt.timezone.utc)
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=dt.timezone.utc)
-    secs = (now - updated_at).total_seconds()
+    secs = max(0.0, (now - updated_at).total_seconds())
     stale = secs > threshold
     if secs < 90:
         return f"{int(secs)}s ago", stale
