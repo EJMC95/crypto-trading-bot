@@ -505,6 +505,20 @@ done &
     sleep "${CLAIMS_INTERVAL_SEC:-21600}"
   done ) &
 
+# 🚀 Bezos shadow book (Lighter-only). Runs the proven Douglas engine with a
+# Day-1 flywheel profile (wrapper-owned defaults, env-overridable).
+( sleep 390
+  while true; do
+    if [ "${BEZOS_ENABLED:-1}" = "0" ]; then
+      echo "[supervisor] bezos disabled (BEZOS_ENABLED=0); sleeping 60s"
+      sleep 60
+      continue
+    fi
+    VENUE=lighter_shadow python3 /freqtrade/lighter_book_bezos_bot.py || true
+    echo "[supervisor] bezos exited — restarting in 30s"
+    sleep 30
+  done ) &
+
 # [2026-07-21 PARLIAMENT] 🏛️ the six-layer PM shadow fleet (operator ask:
 # comprehensive self-evolving system, bots named for the last 8 Australian
 # PMs). ONE asyncio process carrying all six layers: Lighter-only data,

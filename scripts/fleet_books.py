@@ -66,6 +66,7 @@ ROW_ENTRY = {
     "book-grimes-lshadow": "lighter_book_grimes_bot.py",
     "book-schwager-lshadow": "lighter_book_schwager_bot.py",
     "book-hull-lshadow": "lighter_book_hull_bot.py",
+    "book-bezos-lshadow": "lighter_book_bezos_bot.py",
     # [2026-08-18] 🪁 band-kelly — the MIRROR book, mapped the day the row
     # was born, per the (jb) gate, PRE-provision so the FIRST stamped
     # publish is already covered.

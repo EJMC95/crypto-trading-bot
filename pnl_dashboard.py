@@ -390,6 +390,7 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # service (book-<surname>-shadow). Shadow-only; bases never
                 # publish.
                 "book-douglas", "book-grimes", "book-schwager", "book-hull",
+                "book-bezos",
                 # [2026-08-18] 🪁 band-kelly — the MIRROR book (operator:
                 # "does the exact opposite of all of the major losing
                 # sequences"; lighter_band_kelly_bot.py, service
@@ -441,6 +442,9 @@ OVERTRADE_LIMIT = {
                                    # day can flip-and-refill more than 15
     "book-douglas":          30,   # 🧘 The Zone — 1h impulse fades, ~12h max
                                    # hold; a violent day can cycle 4 slots
+    "book-bezos":            36,   # 🚀 Jeff Bezos-inspired Day-1 flywheel
+                                   # profile: lower trigger + shorter holds can
+                                   # cycle faster than Douglas under stress.
     "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
@@ -523,6 +527,7 @@ LABELS = {
     "band-garrett":                "🛢️ Garrett — thin-tier funding band",
     "book-kiyosaki":               "🏦 Rich Dad — cash-flow doctrine book",
     "book-douglas":                "🧘 The Zone — discipline book",
+    "book-bezos":                 "🚀 Day 1 — Bezos-inspired flywheel book",
     "book-grimes":                 "📐 The Technician — quantified-edge book",
     "book-schwager":               "🧙 The Wizard — ride-winners book",
     "book-hull":                   "🧮 The Professor — cost-of-carry book",
@@ -577,6 +582,7 @@ DESCRIPTIONS = {
     "band-barnes":          "three funding sleeves under one $1k roof — carry harvest (≥20% TRUE, decay-paid discipline, $80×4), funding-extreme directional (top |APR|, 10% stop, $40×4), x-sect L/S rank (K=5/side, $33 legs, 24h rebalance) · closes tagged per sleeve · config FROZEN 30d from birth ((hm))",
     "book-kiyosaki":        "Rich Dad Poor Dad as rules — holds only funding-RECEIVING positions (assets), delta-neutral modelled so P&L is pure cash flow; sells a position the moment it persists as a liability; decay-closes only after income repays all costs (pay yourself first); entries must repay their round trip within the payback bar (financial literacy)",
     "book-douglas":         "Trading in the Zone as rules — fades extreme 1h impulses (>2.5×ATR24) with a bracket predefined at entry (stop 1.0×/target 1.5×ATR, 12h expiry, never widened); same size every trade, outcomes cannot alter execution; publishes its rolling 20-trade sample in R-multiples",
+    "book-bezos":           "Jeff Bezos-inspired Day 1 flywheel expression — runs on the proven Douglas execution engine with higher-liquidity intake and faster cycle defaults (lower impulse bar, asymmetric bracket, shorter hold), Lighter-only shadow and env-only profile",
     "book-grimes":          "The Art & Science of TA as rules — a structural setup roster (pullback/failtest/keltner; breakout is Schwager's supply) behind a rolling replay gate: a setup may enter only while its trailing 120d record on the venue's own tape clears the bar (n≥20, net>0, t≥0.5); the scorecard is published every loop",
     "book-schwager":        "Market Wizards as rules — 4h Donchian-20 breakouts with EMA20>50 confirm; cut losses at 2×ATR, ride winners on a wide 3.5×ATR chandelier trail, NO profit target and NO pyramid (measured and refuted); one position per coin",
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",

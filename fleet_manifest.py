@@ -228,6 +228,16 @@ DESIGN = {
                  "own rule — the market does not know about your last trade — "
                  "beat the first reading of him.",
     },
+    "book-bezos-lshadow": {
+        "emoji": "🚀", "name": "Day 1",
+        "design": "A Bezos-inspired Day-1 flywheel built from the proven "
+                  "Douglas execution engine: high-liquidity intake, faster "
+                  "decision cadence, and asymmetric bracket payoff.",
+        "flies_when": "its faster profile creates clean, gradeable closes "
+                      "without sacrificing bracket discipline on live tape.",
+        "floor": "Lighter-only shadow expression, env-only profile, and the "
+                 "same fail-safe publishing/sole-writer contracts as Douglas.",
+    },
     "book-grimes-lshadow": {
         "emoji": "📐", "name": "The Technician",
         "design": "Ship the TEST, not the setup: a roster behind a rolling "
