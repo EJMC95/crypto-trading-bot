@@ -69,6 +69,8 @@ Read-only. Touches no bot, no DB, no network.
 import os
 import re
 import sys
+import json
+import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOW = os.path.join(ROOT, ".github", "workflows", "railway-redeploy.yml")
@@ -120,6 +122,75 @@ DEPLOY_COVERAGE_OK = {
 def _read(p):
     with open(p, encoding="utf-8") as f:
         return f.read()
+
+
+def _norm_cmd(s):
+    """Whitespace-normalized command string."""
+    return " ".join(str(s or "").strip().split())
+
+
+def _dockerfile_cmd(dockerfile, root=ROOT, read=_read, exists=os.path.exists):
+    """Last CMD in a Dockerfile, normalized to shell-form text."""
+    path = os.path.join(root, dockerfile)
+    if not exists(path):
+        return None
+    cmd = None
+    for raw in read(path).splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not line.upper().startswith("CMD "):
+            continue
+        body = line[4:].strip()
+        if body.startswith("["):
+            try:
+                arr = json.loads(body)
+            except Exception:  # noqa: BLE001
+                arr = None
+            if isinstance(arr, list) and all(isinstance(x, str) for x in arr):
+                cmd = " ".join(arr)
+            else:
+                cmd = body
+        else:
+            cmd = body
+    out = _norm_cmd(cmd) if cmd else None
+    # Dockerfile (base image) deliberately carries a placeholder CMD that
+    # instructs Railway users to set startCommand in service TOML/UI.
+    if out and "Set this service\\'s Start Command in Railway" in out:
+        return None
+    return out
+
+
+def railway_toml_issues(files=None, root=ROOT, read=_read,
+                        exists=os.path.exists, listdir=os.listdir):
+    """[(file, reason), ...] for Railway TOML drift/missing command issues."""
+    if files is None:
+        files = sorted(
+            f for f in listdir(root)
+            if f.startswith("railway.") and f.endswith(".toml")
+        )
+    out = []
+    for fn in files:
+        p = os.path.join(root, fn)
+        try:
+            data = tomllib.loads(read(p))
+        except Exception as e:  # noqa: BLE001
+            out.append((fn, f"unparseable TOML ({type(e).__name__})"))
+            continue
+        build = data.get("build") if isinstance(data, dict) else None
+        deploy = data.get("deploy") if isinstance(data, dict) else None
+        df = (build or {}).get("dockerfilePath")
+        sc = (deploy or {}).get("startCommand")
+        if not isinstance(df, str) or not df.strip():
+            out.append((fn, "missing build.dockerfilePath"))
+            continue
+        if not isinstance(sc, str) or not sc.strip():
+            out.append((fn, "missing deploy.startCommand"))
+            continue
+        dcmd = _dockerfile_cmd(df.strip(), root=root, read=read, exists=exists)
+        if dcmd and _norm_cmd(sc) != dcmd:
+            out.append((fn, f"startCommand mismatch (toml={_norm_cmd(sc)!r}, docker={dcmd!r})"))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -668,6 +739,13 @@ def arm_pairing_orphans(src=None, pairs=None):
 
 
 def main():
+    rt = railway_toml_issues()
+    if rt:
+        print("RAILWAY-TOML DRIFT — each railway.*.toml must carry an explicit "
+              "deploy.startCommand aligned with its Dockerfile CMD.")
+        for fn, why in rt:
+            print(f"  {fn:<28} {why}")
+        return 1
     filters = workflow_filters()
     globs = workflow_paths()
     if not filters or globs is None:
@@ -1139,6 +1217,28 @@ def _selftest():
     assert dockerfile_census() == [], (
         "the shipped tree carries an UNROUTED image — run this script without "
         f"--selftest for the fix menu: {dockerfile_census()}")
+
+    # Railway TOML parity checks (explicit startCommand + docker CMD alignment)
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        r = os.path.join(d, "railway.good.toml")
+        dg = os.path.join(d, "Dockerfile.good")
+        with open(dg, "w", encoding="utf-8") as f:
+            f.write('FROM x\nCMD ["python","good.py"]\n')
+        with open(r, "w", encoding="utf-8") as f:
+            f.write('[build]\ndockerfilePath="Dockerfile.good"\n'
+                    '[deploy]\nstartCommand="python good.py"\n')
+        assert railway_toml_issues(root=d, files=["railway.good.toml"]) == [], \
+            "matching startCommand/CMD should pass"
+        with open(r, "w", encoding="utf-8") as f:
+            f.write('[build]\ndockerfilePath="Dockerfile.good"\n[deploy]\n')
+        miss = railway_toml_issues(root=d, files=["railway.good.toml"])
+        assert len(miss) == 1 and "missing deploy.startCommand" in miss[0][1], miss
+        with open(r, "w", encoding="utf-8") as f:
+            f.write('[build]\ndockerfilePath="Dockerfile.good"\n'
+                    '[deploy]\nstartCommand="python other.py"\n')
+        mm = railway_toml_issues(root=d, files=["railway.good.toml"])
+        assert len(mm) == 1 and "mismatch" in mm[0][1], mm
 
     print("audit_deploy_coverage _selftest OK "
           "(parser + COPY reconstruction + declared-prefix + live-bot marker gate "

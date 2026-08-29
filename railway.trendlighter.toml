@@ -6,10 +6,10 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile.trendlighter"
-# Dockerfile.trendlighter bakes CMD ["python","lighter_trend_bot.py"], so no
-# [deploy].startCommand is needed — just image + restart policy below.
+# Keep startCommand explicit and aligned with Dockerfile.trendlighter CMD.
 
 [deploy]
+startCommand = "python lighter_trend_bot.py"
 # Restart on any exit (crash or otherwise), no retry cap. Every Tide Rider safety
 # rail — catastrophic stop, death-cross exit, daily-loss flatten, kill-switch
 # flatten — runs IN-PROCESS each loop, and a live 1x long perp has NO resting stop
