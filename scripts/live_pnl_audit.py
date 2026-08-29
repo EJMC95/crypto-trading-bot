@@ -50,6 +50,11 @@ import subprocess
 import sys
 import urllib.request
 
+try:
+    from fleet_books import DECLARED_LIVE as EXPECTED_LIVE_ROWS
+except Exception:  # noqa: BLE001
+    EXPECTED_LIVE_ROWS = ()
+
 DASH = "https://pnl-dashboard-production-858c.up.railway.app"
 
 #: Liveness bars (seconds). LIVE rows loop at 300s; a 30-min silence on real
@@ -108,6 +113,29 @@ def live_rows(pnl):
         if ((b.get("extra") or {}).get("venue")) == "lighter_live":
             out.append(b)
     return sorted(out, key=lambda b: b.get("bot") or "")
+
+
+def _get_path(d, path):
+    cur = d
+    for k in path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def _present(v):
+    return v not in (None, "", [], {})
+
+
+def live_roster_findings(pnl):
+    expected = sorted(str(x) for x in (EXPECTED_LIVE_ROWS or ()))
+    if not expected:
+        return []
+    got = sorted(str((b or {}).get("bot")) for b in live_rows(pnl) if (b or {}).get("bot"))
+    if got == expected:
+        return []
+    return [f"live roster mismatch — expected {expected} but feed shows {got}"]
 
 
 def stale_rows(pnl):
@@ -273,6 +301,8 @@ def sync_findings(pnl, trades, bus, now, repo_root=None,
     surfaced every run but not a red build (ages, spreads, proxies)."""
     reds, ambers = [], []
 
+    reds += live_roster_findings(pnl)
+
     for row, age, bar in stale_rows(pnl):
         name = row.get("bot")
         if age is None:
@@ -342,6 +372,64 @@ def sync_findings(pnl, trades, bus, now, repo_root=None,
     return reds, ambers
 
 
+def coverage_matrix(pnl, trades, bus):
+    lives = live_rows(pnl)
+    trades = trades or []
+    live_ids = {str((b or {}).get("bot")) for b in lives if (b or {}).get("bot")}
+    live_trades = [r for r in trades if str((r or {}).get("bot")) in live_ids]
+
+    def row_cov(paths):
+        if not lives:
+            return 0, 0
+        n = 0
+        for r in lives:
+            if any(_present(_get_path(r, p)) for p in paths):
+                n += 1
+        return n, len(lives)
+
+    def trade_cov(paths):
+        if not live_trades:
+            return 0, 0
+        n = 0
+        for r in live_trades:
+            if any(_present(_get_path(r, p)) for p in paths):
+                n += 1
+        return n, len(live_trades)
+
+    def bus_cov(paths):
+        ok = any(_present(_get_path(bus or {}, p)) for p in paths)
+        return (1 if ok else 0), 1
+
+    checks = [
+        ("Trading fees", "trade", ("fee", "fees", "commission", "cost_fee")),
+        ("Slippage/spread", "row", ("extra.stop_overshoot.n", "extra.entry_vetoes.coin_veto")),
+        ("Partial fills", "trade", ("filled", "filled_size", "partial_fill", "fill_ratio")),
+        ("Latency / signal→execution", "trade", ("signal_ts", "signal_at", "decision_ts")),
+        ("Minimum order sizing", "row", ("extra.clip_usd", "extra.cap_usd")),
+        ("Funding rate visibility", "trade", ("funding_rate", "funding_apr", "entry_apr", "exit_apr")),
+        ("Delisted/unavailable pair handling", "trade", ("reason",)),
+        ("Position/open-trade limits", "row", ("extra.max_open", "open_trades")),
+        ("Max leverage / liquidation telemetry", "row", ("extra.leverage.set", "extra.leverage.liq_gap_pct")),
+        ("Max daily-loss lockout", "row", ("extra.entry_vetoes.halt_days_30d", "extra.entry_vetoes.shut_now")),
+        ("Max drawdown shutdown hooks", "row", ("extra.entry_vetoes.lockout_hours_30d", "extra.entry_vetoes.entries_shut_reason_30d")),
+        ("Kill switch / protections lock", "row", ("extra.entry_vetoes.entries_shut_reason_30d", "extra.entry_vetoes.locked_until")),
+        ("No trading on stale data", "row", ("extra.scan.stale_candle", "extra.scan.no_bars")),
+        ("API/retry failure telemetry", "row", ("extra.scan.failed", "extra.scan.unpriceable")),
+        ("Execution prices recorded", "trade", ("entry_price", "exit_price")),
+        ("Risk-adjusted metrics source", "bus", ("golive_readiness.books",)),
+    ]
+    out = []
+    for name, scope, paths in checks:
+        if scope == "row":
+            have, total = row_cov(paths)
+        elif scope == "trade":
+            have, total = trade_cov(paths)
+        else:
+            have, total = bus_cov(paths)
+        out.append({"name": name, "scope": scope, "have": have, "total": total})
+    return out
+
+
 # ------------------------------------------------------------------- report
 
 def _syd(now):
@@ -396,6 +484,24 @@ def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
                    f"| {s['mean_pct']:+.3f} | {ttxt} "
                    f"| {100*s['wins']/s['n']:.0f}% |")
     out.append(f"| **fleet** |  | **{fleet_total:+.2f}** |  |  |  |")
+
+    out.append("\n## Live robustness/execution coverage matrix\n")
+    out.append("| check | coverage | status |")
+    out.append("|---|---:|---|")
+    for c in coverage_matrix(pnl, trades, bus):
+        if c["total"] <= 0:
+            cov = "0/0"
+            st = "🟡 no live sample"
+        elif c["have"] == c["total"]:
+            cov = f"{c['have']}/{c['total']}"
+            st = "✅ present"
+        elif c["have"] == 0:
+            cov = f"{c['have']}/{c['total']}"
+            st = "🔴 missing"
+        else:
+            cov = f"{c['have']}/{c['total']}"
+            st = "🟡 partial"
+        out.append(f"| {c['name']} | {cov} | {st} |")
 
     gov = governor_state(bus)
     out.append("\n## What is restricting live size right now\n")

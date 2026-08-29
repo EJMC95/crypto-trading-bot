@@ -194,6 +194,19 @@ def test_sync_findings_red_and_amber_split():
     assert any("truncation" in a for a in ambers2)
 
 
+def test_live_roster_mismatch_is_red():
+    old = lpa.EXPECTED_LIVE_ROWS
+    try:
+        lpa.EXPECTED_LIVE_ROWS = (
+            "freqtrade-avo-maria-lighter",
+            "freqtrade-georgia-lighter",
+        )
+        reds, _ = lpa.sync_findings(PNL, TRADES, BUS, NOW, trades_limit=5000)
+        assert any("live roster mismatch" in r.lower() for r in reds)
+    finally:
+        lpa.EXPECTED_LIVE_ROWS = old
+
+
 def test_render_carries_the_findings_and_the_attribution():
     reds, ambers = lpa.sync_findings(PNL, TRADES, BUS, NOW,
                                      trades_limit=5000)
@@ -201,6 +214,7 @@ def test_render_carries_the_findings_and_the_attribution():
     assert "FROZEN" in rep and "nav-cook-lshadow" in rep
     assert "ATTESTATION NOT LANDED" in rep
     assert "-100.46" in rep  # the live trio's combined pnl_abs
+    assert "Live robustness/execution coverage matrix" in rep
 
 
 def test_fail_closed_on_dark_feed_exit_2(tmp_path):
