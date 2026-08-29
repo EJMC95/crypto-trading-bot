@@ -837,8 +837,11 @@ def fetch_rows(hidden=None):
             # grid, totals, or the /pnl.json feed. Venue-variant rows
             # (<base>-lighter/-ltest/-lshadow) pass when their base is a current
             # bot, so a live/shadow Lighter bot shows up automatically.
+            hidden_set = set(hidden_ids)
             return {r["bot"]: r for r in cur.fetchall()
-                    if (r["bot"] in CURRENT_BOTS
+                    if r["bot"] not in RETIRED_ROWS
+                    and r["bot"] not in hidden_set
+                    and (r["bot"] in CURRENT_BOTS
                          or venue_variant(r["bot"])[0] in CURRENT_BOTS)}
     finally:
         conn.close()
