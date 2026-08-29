@@ -94,6 +94,26 @@ def reason_stats(rows: list[dict]):
     return out
 
 
+def reason_edge(stats):
+    if not stats:
+        return {
+            "best_reason": None,
+            "best_usd": 0.0,
+            "worst_reason": None,
+            "worst_usd": 0.0,
+            "reason_n": 0,
+        }
+    best = max(stats.items(), key=lambda kv: kv[1]["usd"])
+    worst = min(stats.items(), key=lambda kv: kv[1]["usd"])
+    return {
+        "best_reason": best[0],
+        "best_usd": float(best[1]["usd"]),
+        "worst_reason": worst[0],
+        "worst_usd": float(worst[1]["usd"]),
+        "reason_n": len(stats),
+    }
+
+
 def hold_ratio(stats):
     earners = [k for k, v in stats.items() if v["usd"] > 0]
     losers = [k for k, v in stats.items() if v["usd"] < 0]
@@ -118,6 +138,7 @@ def slice_stats(rows: list[dict]):
         v for k, v in rs.items()
         if is_stop_reason(k)
     ]
+    edge = reason_edge(rs)
     return {
         "n": len(rows),
         "usd": sum(pnls),
@@ -126,6 +147,11 @@ def slice_stats(rows: list[dict]):
         "hold_ratio": hold_ratio(rs),
         "stop_n": sum(v["n"] for v in stop),
         "stop_usd": sum(v["usd"] for v in stop),
+        "best_reason": edge["best_reason"],
+        "best_usd": edge["best_usd"],
+        "worst_reason": edge["worst_reason"],
+        "worst_usd": edge["worst_usd"],
+        "reason_n": edge["reason_n"],
     }
 
 
@@ -268,6 +294,37 @@ def render_before_after(before_rows, after_rows):
     return "\n".join(out) + "\n"
 
 
+def bot_edge_label(row):
+    far = row["far"]
+    if far["n"] == 0:
+        return "no measured edge yet (no closes)"
+    best_reason = far.get("best_reason")
+    best_usd = float(far.get("best_usd") or 0.0)
+    worst_reason = far.get("worst_reason")
+    worst_usd = float(far.get("worst_usd") or 0.0)
+    if not best_reason or best_usd <= 0:
+        return "edge not established (no net-positive exit family)"
+    msg = f"{best_reason} (${best_usd:+.2f})"
+    if worst_reason and worst_usd < 0 and worst_reason != best_reason:
+        msg += f"; main drag: {worst_reason} (${worst_usd:+.2f})"
+    return msg
+
+
+def render_edges(rows):
+    out = []
+    out.append("# What's each bot's edge")
+    out.append("")
+    out.append("| bot | far n | far $ | best edge family | edge summary |")
+    out.append("|---|---:|---:|---|---|")
+    for r in sorted(rows, key=lambda x: (-float((x.get('far') or {}).get('best_usd') or 0.0), x["bot"])):
+        far = r["far"]
+        best_reason = far.get("best_reason") or "—"
+        out.append(
+            f"| {r['bot']} | {far['n']} | {far['usd']:+.2f} | {best_reason} | {bot_edge_label(r)} |"
+        )
+    return "\n".join(out) + "\n"
+
+
 def selftest():
     now = dt.datetime(2026, 1, 10, tzinfo=dt.timezone.utc)
     def row(bot, reason, pnl, pct, open_h, close_h):
@@ -292,6 +349,8 @@ def selftest():
     rows = run_audit(p, t, close_n=10)
     d = {r["bot"]: r for r in rows}
     assert d["b1"]["far"]["n"] == 62
+    assert d["b1"]["far"]["best_reason"] == "decay_paid"
+    assert d["b1"]["far"]["worst_reason"] == "short_flip"
     assert d["b1"]["far"]["hold_ratio"] and d["b1"]["far"]["hold_ratio"] >= 3.0
     assert d["b1"]["far"]["stop_n"] == 12 and d["b1"]["far"]["stop_usd"] < 0
     assert any("stops are net negative" in a for a in d["b1"]["advisories"])
@@ -302,6 +361,8 @@ def selftest():
     assert tops and tops[0]["bot"] == "b1"
     before_after = render_before_after(rows, rows)
     assert "| b1 |" in before_after and "Δ impact" in before_after
+    edges = render_edges(rows)
+    assert "# What's each bot's edge" in edges and "decay_paid" in edges
     print("study_entry_exit_stoploss_fleet selftest OK")
     return 0
 
@@ -314,6 +375,7 @@ def main(argv=None):
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--compare-before", default=None)
     ap.add_argument("--compare-after", default=None)
+    ap.add_argument("--edge-report", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
@@ -329,7 +391,7 @@ def main(argv=None):
     trades_payload = fetch_json(args.trades_json) or {}
     trades = trades_payload if isinstance(trades_payload, list) else (trades_payload.get("trades") or [])
     rows = run_audit(pnl, trades, close_n=max(1, args.close_n))
-    txt = render(rows, close_n=max(1, args.close_n))
+    txt = render_edges(rows) if args.edge_report else render(rows, close_n=max(1, args.close_n))
     print(txt)
     if args.json_out:
         with open(args.json_out, "w") as f:

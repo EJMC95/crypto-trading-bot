@@ -48,6 +48,8 @@ def test_far_close_and_advisories():
     assert by["b1"]["close"]["n"] == 10
     assert by["b1"]["far"]["stop_n"] == 12
     assert by["b1"]["far"]["stop_usd"] < 0
+    assert by["b1"]["far"]["best_reason"] == "decay_paid"
+    assert by["b1"]["far"]["worst_reason"] == "short_flip"
     assert by["b1"]["far"]["hold_ratio"] is not None and by["b1"]["far"]["hold_ratio"] >= 3.0
     assert by["b1"]["impact"] > 0
     assert any("stops are net negative" in a for a in by["b1"]["advisories"])
@@ -146,3 +148,36 @@ def test_cli_compare_before_after(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "# Before vs after" in r.stdout
     assert "| b1 | 3.00 | 1.00 | -2.00 | -10.00 | -2.00 | +8.00 | -0.200 | +0.100 |" in r.stdout
+
+
+def test_cli_edge_report_mode(tmp_path):
+    pnl = tmp_path / "pnl.json"
+    trades = tmp_path / "trades.json"
+    pnl.write_text(json.dumps({"bots": [{"bot": "b1"}]}))
+    trades.write_text(
+        json.dumps(
+            {
+                "trades": [
+                    _row("b1", "long_tp", 2.0, 0.02, 0, 2),
+                    _row("b1", "long_sl", -1.0, -0.01, 3, 4),
+                ]
+            }
+        )
+    )
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "study_entry_exit_stoploss_fleet.py"),
+            "--pnl-json",
+            str(pnl),
+            "--trades-json",
+            str(trades),
+            "--edge-report",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "# What's each bot's edge" in r.stdout
+    assert "| b1 | 2 | +1.00 | tp | tp ($+2.00); main drag: sl ($-1.00) |" in r.stdout
