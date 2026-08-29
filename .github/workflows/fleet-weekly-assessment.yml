@@ -81,6 +81,15 @@ jobs:
             python3 scripts/study_entry_exit_stoploss_fleet.py 2>&1 || echo '(entry/exit audit read failed)'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: What's each bot's edge (best-vs-worst exit families)
+        run: |
+          set -euo pipefail
+          {
+            echo '## ⚔️ What is each bot edge'
+            echo '```'
+            python3 scripts/study_entry_exit_stoploss_fleet.py --edge-report 2>&1 || echo '(edge report read failed)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Entry/exit/stop/loss lens selftest
         run: python3 scripts/study_entry_exit_stoploss_fleet.py --selftest
 
