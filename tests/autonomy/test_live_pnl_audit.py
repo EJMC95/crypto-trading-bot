@@ -215,6 +215,7 @@ def test_render_carries_the_findings_and_the_attribution():
     assert "ATTESTATION NOT LANDED" in rep
     assert "-100.46" in rep  # the live trio's combined pnl_abs
     assert "Live robustness/execution coverage matrix" in rep
+    assert "Telemetry gaps by live bot (actionable)" in rep
     assert "Progression estimates (advisory)" in rep
     assert "Net progression score" in rep
 
@@ -228,6 +229,46 @@ def test_progression_estimates_shape_and_bounds():
     assert 0.0 <= pe["net_progress_pct"] <= 100.0
     assert 0.0 <= pe["optimization_headroom_pct"] <= 100.0
     assert pe["trend"] in {"early-stage", "moderate", "strong"}
+
+
+def test_telemetry_gap_details_are_per_bot_actionable():
+    rows = lpa.live_telemetry_gap_details(PNL, TRADES, BUS)
+    by_bot = {r["bot"]: r for r in rows}
+    assert "freqtrade-avo-maria-lighter" in by_bot
+    assert by_bot["freqtrade-avo-maria-lighter"]["trade_rows"] >= 1
+    # some telemetry is intentionally missing in fixture; report must list gaps
+    assert "partial-fills" in by_bot["freqtrade-georgia-lighter"]["missing"]
+
+
+def test_before_after_scoreboard_detects_widening_and_tightening():
+    before_pnl = json.loads(json.dumps(PNL))
+    # lower old clips/scales so now reads as widened
+    before_pnl["bots"][0]["extra"]["clip_usd"] = 100.0
+    before_pnl["bots"][0]["extra"]["entry_vetoes"]["live_clip_scale"] = 0.50
+    before_pnl["bots"][1]["extra"]["clip_usd"] = 250.0
+    before_pnl["bots"][1]["extra"]["entry_vetoes"]["live_clip_scale"] = 1.00
+    before_pnl["bots"][2]["extra"]["clip_usd"] = 712.5
+    before_pnl["bots"][2]["extra"]["entry_vetoes"]["live_clip_scale"] = 1.00
+
+    table = lpa.live_before_after_scoreboard(
+        PNL, TRADES, BUS, NOW, "weekly",
+        before_pnl=before_pnl, before_trades=TRADES, before_bus=BUS)
+    by_bot = {r["bot"]: r for r in table}
+    assert by_bot["freqtrade-avo-maria-lighter"]["clip_dir"] == "widened"
+    assert by_bot["freqtrade-georgia-lighter"]["clip_dir"] == "tightened"
+    assert by_bot["freqtrade-avo-maria-lighter"]["scale_dir"] == "widened"
+    assert by_bot["freqtrade-georgia-lighter"]["scale_dir"] == "tightened"
+
+
+def test_render_includes_before_after_scoreboard_when_prior_given():
+    before_pnl = json.loads(json.dumps(PNL))
+    before_pnl["bots"][0]["extra"]["clip_usd"] = 100.0
+    reds, ambers = lpa.sync_findings(PNL, TRADES, BUS, NOW, trades_limit=5000)
+    rep = lpa.render(
+        PNL, TRADES, BUS, "weekly", NOW, reds, ambers,
+        before_pnl=before_pnl, before_trades=TRADES, before_bus=BUS)
+    assert "Before vs now (weekly) — widening/tightening scoreboard" in rep
+    assert "freqtrade-avo-maria-lighter" in rep
 
 
 def test_fail_closed_on_dark_feed_exit_2(tmp_path):
@@ -263,6 +304,8 @@ def test_workflow_runs_the_script_with_gha_and_repo_root():
     assert "scripts/live_pnl_audit.py" in t
     assert "--gha" in t
     assert "--repo-root" in t, "queue-sweep proxy needs the checkout"
+    assert "study_entry_exit_stoploss_fleet.py" in t
+    assert "--edge-report" in t
     m = re.search(r"fetch-depth:\s*0", t)
     assert m, "queue-sweep proxy dates OPERATOR_QUEUE.md from git history"
 

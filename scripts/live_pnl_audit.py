@@ -465,13 +465,133 @@ def progression_estimates(pnl, trades, bus, reds, ambers):
     }
 
 
+def _live_row_by_bot(pnl):
+    return {str((b or {}).get("bot")): b for b in live_rows(pnl) if (b or {}).get("bot")}
+
+
+def _window_stats_for_live(trades, days, now, bots):
+    win = window_rows(trades, days, now)
+    out = {}
+    for bot in bots:
+        out[bot] = book_stats(win.get(bot, []))
+    return out
+
+
+def _param(row, path, default=None):
+    v = _get_path(row or {}, path)
+    return default if v is None else v
+
+
+def _as_float(v):
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+
+def _direction(a, b):
+    aa, bb = _as_float(a), _as_float(b)
+    if aa is None or bb is None:
+        return "—"
+    d = bb - aa
+    if abs(d) < 1e-12:
+        return "flat"
+    return "widened" if d > 0 else "tightened"
+
+
+def _delta_fmt(a, b, places=2):
+    aa, bb = _as_float(a), _as_float(b)
+    if aa is None or bb is None:
+        return "—"
+    d = bb - aa
+    return f"{bb:.{places}f} ({d:+.{places}f})"
+
+
+def live_telemetry_gap_details(pnl, trades, bus):
+    """Per-live-bot telemetry gaps so matrix misses are actionable."""
+    lives = live_rows(pnl)
+    trade_by_bot = {}
+    for r in trades or []:
+        bot = str((r or {}).get("bot") or "")
+        if bot:
+            trade_by_bot.setdefault(bot, []).append(r)
+    out = []
+    for row in lives:
+        bot = str(row.get("bot"))
+        rows = trade_by_bot.get(bot, [])
+        gaps = []
+        checks = [
+            ("fees", any(_present(_get_path(t, k)) for t in rows for k in ("fee", "fees", "commission", "cost_fee"))),
+            ("slippage/spread", any(_present(_get_path(row, k)) for k in ("extra.stop_overshoot.n", "extra.entry_vetoes.coin_veto"))),
+            ("partial-fills", any(_present(_get_path(t, k)) for t in rows for k in ("filled", "filled_size", "partial_fill", "fill_ratio"))),
+            ("latency stamps", any(_present(_get_path(t, k)) for t in rows for k in ("signal_ts", "signal_at", "decision_ts"))),
+            ("funding stamps", any(_present(_get_path(t, k)) for t in rows for k in ("funding_rate", "funding_apr", "entry_apr", "exit_apr"))),
+            ("leverage/liq telemetry", any(_present(_get_path(row, k)) for k in ("extra.leverage.set", "extra.leverage.liq_gap_pct"))),
+            ("drawdown lockout telemetry", any(_present(_get_path(row, k)) for k in ("extra.entry_vetoes.lockout_hours_30d", "extra.entry_vetoes.entries_shut_reason_30d"))),
+            ("stale-data telemetry", any(_present(_get_path(row, k)) for k in ("extra.scan.stale_candle", "extra.scan.no_bars"))),
+            ("api-failure telemetry", any(_present(_get_path(row, k)) for k in ("extra.scan.failed", "extra.scan.unpriceable"))),
+        ]
+        for nm, ok in checks:
+            if not ok:
+                gaps.append(nm)
+        out.append({"bot": bot, "trade_rows": len(rows), "missing": gaps})
+    return out
+
+
+def live_before_after_scoreboard(now_pnl, now_trades, now_bus, now, window,
+                                 before_pnl=None, before_trades=None, before_bus=None):
+    """Compare live-bot metrics/params now vs before when prior snapshots exist."""
+    now_rows = _live_row_by_bot(now_pnl)
+    before_rows = _live_row_by_bot(before_pnl or {})
+    bots = sorted(set(now_rows) | set(before_rows))
+    days = WINDOWS[window]
+    now_stats = _window_stats_for_live(now_trades, days, now, bots)
+    before_stats = _window_stats_for_live(before_trades or [], days, now, bots)
+    out = []
+    for bot in bots:
+        nr = now_rows.get(bot, {})
+        br = before_rows.get(bot, {})
+        ne = nr.get("extra") or {}
+        be = br.get("extra") or {}
+        clip_b = _param({"extra": be}, "extra.clip_usd")
+        clip_n = _param({"extra": ne}, "extra.clip_usd")
+        scale_b = _param({"extra": be}, "extra.entry_vetoes.live_clip_scale")
+        scale_n = _param({"extra": ne}, "extra.entry_vetoes.live_clip_scale")
+        lev_b = _param({"extra": be}, "extra.leverage.set")
+        lev_n = _param({"extra": ne}, "extra.leverage.set")
+        nst, bst = now_stats.get(bot, {}), before_stats.get(bot, {})
+        out.append({
+            "bot": bot,
+            "clip_dir": _direction(clip_b, clip_n),
+            "scale_dir": _direction(scale_b, scale_n),
+            "lev_dir": _direction(lev_b, lev_n),
+            "clip": _delta_fmt(clip_b, clip_n, places=2),
+            "clip_scale": _delta_fmt(scale_b, scale_n, places=2),
+            "leverage": _delta_fmt(lev_b, lev_n, places=2),
+            "open_trades": _delta_fmt(br.get("open_trades"), nr.get("open_trades"), places=0),
+            "pnl_abs": _delta_fmt(br.get("pnl_abs"), nr.get("pnl_abs"), places=2),
+            "n_trades": _delta_fmt(bst.get("n"), nst.get("n"), places=0),
+            "mean_pct": _delta_fmt(bst.get("mean_pct"), nst.get("mean_pct"), places=3),
+            "t_stat": _delta_fmt(None if math.isnan(bst.get("t", float("nan"))) else bst.get("t"),
+                                 None if math.isnan(nst.get("t", float("nan"))) else nst.get("t"),
+                                 places=2),
+            "fleet_clip_scale": _delta_fmt(
+                _get_path(before_bus or {}, "fleet_risk.clip_scale"),
+                _get_path(now_bus or {}, "fleet_risk.clip_scale"),
+                places=2,
+            ),
+        })
+    return out
+
+
 # ------------------------------------------------------------------- report
 
 def _syd(now):
     return (now + dt.timedelta(hours=10)).strftime("%d-%b %H:%M AEST")
 
 
-def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
+def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None,
+           before_pnl=None, before_trades=None, before_bus=None):
     days = WINDOWS[window]
     out = []
     out.append(f"# Live P&L audit — {window} — "
@@ -538,6 +658,13 @@ def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
             st = "🟡 partial"
         out.append(f"| {c['name']} | {cov} | {st} |")
 
+    out.append("\n## Telemetry gaps by live bot (actionable)\n")
+    out.append("| bot | trade rows | missing telemetry |")
+    out.append("|---|---:|---|")
+    for g in live_telemetry_gap_details(pnl, trades, bus):
+        miss = ", ".join(g["missing"]) if g["missing"] else "none"
+        out.append(f"| {g['bot']} | {g['trade_rows']} | {miss} |")
+
     pe = progression_estimates(pnl, trades, bus, reds, ambers)
     out.append("\n## Progression estimates (advisory)\n")
     out.append("| metric | value |")
@@ -549,6 +676,19 @@ def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
     out.append(f"| Coverage checks (full / partial / missing / no-sample) | "
                f"{pe['checks_full']} / {pe['checks_partial']} / "
                f"{pe['checks_missing']} / {pe['checks_no_sample']} |")
+
+    if before_pnl is not None:
+        out.append(f"\n## Before vs now ({window}) — widening/tightening scoreboard\n")
+        out.append("| bot | clip_usd | clip_dir | live_clip_scale | scale_dir | leverage | lev_dir | "
+                   "open_trades | pnl_abs | n_trades | mean %/t | t-stat | fleet clip_scale |")
+        out.append("|---|---:|---|---:|---|---:|---|---:|---:|---:|---:|---:|---:|")
+        for r in live_before_after_scoreboard(
+                pnl, trades, bus, now, window, before_pnl, before_trades, before_bus):
+            out.append(
+                f"| {r['bot']} | {r['clip']} | {r['clip_dir']} | {r['clip_scale']} | {r['scale_dir']} "
+                f"| {r['leverage']} | {r['lev_dir']} | {r['open_trades']} | {r['pnl_abs']} "
+                f"| {r['n_trades']} | {r['mean_pct']} | {r['t_stat']} | {r['fleet_clip_scale']} |"
+            )
 
     gov = governor_state(bus)
     out.append("\n## What is restricting live size right now\n")
@@ -581,6 +721,12 @@ def main(argv=None):
     ap.add_argument("--trades-json",
                     default=f"{DASH}/trades.json?source=paper&limit=5000")
     ap.add_argument("--bus-json", default=f"{DASH}/bus.json")
+    ap.add_argument("--before-pnl-json", default=None,
+                    help="optional prior /pnl.json snapshot for before-vs-now table")
+    ap.add_argument("--before-trades-json", default=None,
+                    help="optional prior /trades.json snapshot for before-vs-now table")
+    ap.add_argument("--before-bus-json", default=None,
+                    help="optional prior /bus.json snapshot for before-vs-now table")
     ap.add_argument("--window", choices=sorted(WINDOWS), default="daily")
     ap.add_argument("--trades-limit", type=int, default=5000,
                     help="the limit the trades URL carries, for the "
@@ -618,7 +764,13 @@ def main(argv=None):
     reds, ambers = sync_findings(
         pnl, trades, bus, now, repo_root=args.repo_root,
         trades_limit=args.trades_limit if trades else None)
-    report = render(pnl, trades, bus, args.window, now, reds, ambers)
+    before_pnl = fetch_json(args.before_pnl_json) if args.before_pnl_json else None
+    before_trades_payload = fetch_json(args.before_trades_json) if args.before_trades_json else None
+    before_trades = (before_trades_payload or {}).get("trades") if args.before_trades_json else None
+    before_bus = fetch_json(args.before_bus_json) if args.before_bus_json else None
+    report = render(
+        pnl, trades, bus, args.window, now, reds, ambers,
+        before_pnl=before_pnl, before_trades=before_trades, before_bus=before_bus)
     print(report)
 
     if args.gha:
