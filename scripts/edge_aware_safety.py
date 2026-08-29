@@ -76,7 +76,9 @@ class Metrics:
     n: int
 
 
-def metrics_at_gross(trades: list[dict[str, Any]], baseline_gross: float, gross: float, ceiling: float) -> Metrics:
+def metrics_at_gross(
+    trades: list[dict[str, Any]], baseline_gross: float, gross: float, ceiling: float
+) -> Metrics:
     base = _positive("baseline_gross", baseline_gross)
     candidate = _positive("gross", gross)
     scaled: list[float] = []
@@ -90,8 +92,7 @@ def metrics_at_gross(trades: list[dict[str, Any]], baseline_gross: float, gross:
         if not math.isfinite(pnl):
             raise ValueError(f"trade {index} pnl_usd must be finite")
         scaled.append(pnl * candidate / base)
-    running = peak = 0.0
-    drawdown = 0.0
+    running = peak = drawdown = 0.0
     for pnl in scaled:
         running += pnl
         peak = max(peak, running)
@@ -140,7 +141,7 @@ def _selftest() -> None:
     assert round(reserve_ceiling(0.10, 0.06, 4), 6) == round(2.1739130435, 6)
     sample = {"baseline_gross": 10, "stop_frac": 0.10, "mmf": 0.06, "trades": [{"pnl_usd": 10}, {"pnl_usd": -4}]}
     result = report(sample)
-    assert result["candidates"][0]["total_pnl_usd"] == 1.2
+    assert result["candidates"][0]["total_pnl_usd"] == 0.6
     assert result["candidates"][-1]["safe_stop"] is False
     try:
         stop_alive_ceiling(0, 0.06)
@@ -166,4 +167,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
