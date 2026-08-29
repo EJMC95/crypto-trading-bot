@@ -180,7 +180,52 @@ def test_cli_edge_report_mode(tmp_path):
     )
     assert r.returncode == 0, r.stderr
     assert "# What's each bot's edge" in r.stdout
-    assert "| b1 | 2 | +1.00 | tp | tp ($+2.00); main drag: sl ($-1.00) |" in r.stdout
+    assert "| b1 | 2 | +1.00 | long_tp | long_tp ($+2.00); main drag: long_sl ($-1.00) |" in r.stdout
+
+
+def test_fallback_pnl_key_and_live_base_alias_resolution():
+    pnl = {
+        "bots": [
+            {"bot": "freqtrade-georgia-lighter", "base_bot": "freqtrade-georgia"},
+        ]
+    }
+    trades = [
+        {
+            "bot": "freqtrade-georgia",
+            "reason": "long_tp",
+            "pnl": 2.5,
+            "profit_percent": 0.01,
+            "opened_at": "2026-01-01T00:00:00+00:00",
+            "closed_at": "2026-01-01T01:00:00+00:00",
+        }
+    ]
+    out = audit.run_audit(pnl, trades, close_n=10)
+    assert len(out) == 1
+    assert out[0]["bot"] == "freqtrade-georgia-lighter"
+    assert out[0]["far"]["n"] == 1
+    assert out[0]["far"]["usd"] == 2.5
+    assert out[0]["far"]["mean_pct"] == 1.0
+
+
+def test_alias_fallback_refuses_ambiguous_base_rows():
+    pnl = {
+        "bots": [
+            {"bot": "freqtrade-georgia-lighter", "base_bot": "freqtrade-georgia"},
+            {"bot": "freqtrade-georgia-lshadow", "base_bot": "freqtrade-georgia"},
+        ]
+    }
+    trades = [
+        {
+            "bot": "freqtrade-georgia",
+            "reason": "long_tp",
+            "pnl": 3.0,
+            "opened_at": "2026-01-01T00:00:00+00:00",
+            "closed_at": "2026-01-01T01:00:00+00:00",
+        }
+    ]
+    out = {r["bot"]: r for r in audit.run_audit(pnl, trades, close_n=10)}
+    assert out["freqtrade-georgia-lighter"]["far"]["n"] == 0
+    assert out["freqtrade-georgia-lshadow"]["far"]["n"] == 0
 
 
 def test_cli_fails_loud_when_sources_unreadable(tmp_path):

@@ -17,6 +17,9 @@ STOP_SUFFIXES = (
     "sl", "stop", "stop_loss", "trailing_stop_loss", "trail", "ghoststop",
     "hard_stop", "catastrophic_stop",
 )
+PNL_ABS_KEYS = ("pnl_abs", "pnl", "profit_abs", "profit", "realized", "pnl_usd")
+PNL_PCT_KEYS = ("pnl_pct", "pnl_percent", "profit_pct", "profit_percent")
+BOT_SUFFIXES = ("-lighter", "-lshadow", "-ltest")
 
 
 def fetch_json(path_or_url: str):
@@ -72,6 +75,44 @@ def _f(x):
         return None
 
 
+def trade_pnl_abs(row: dict):
+    for k in PNL_ABS_KEYS:
+        v = _f((row or {}).get(k))
+        if v is not None:
+            return v
+    return None
+
+
+def trade_pnl_pct(row: dict):
+    for k in PNL_PCT_KEYS:
+        v = _f((row or {}).get(k))
+        if v is not None:
+            return v
+    return None
+
+
+def _strip_bot_suffix(bot: str) -> str:
+    s = str(bot or "").strip()
+    for suf in BOT_SUFFIXES:
+        if s.endswith(suf):
+            return s[: -len(suf)]
+    return s
+
+
+def bot_aliases(bot: str, base_bot: str | None = None) -> list[str]:
+    out = []
+    for raw in (bot, base_bot):
+        s = str(raw or "").strip()
+        if not s:
+            continue
+        if s not in out:
+            out.append(s)
+        t = _strip_bot_suffix(s)
+        if t and t not in out:
+            out.append(t)
+    return out
+
+
 def reason_stats(rows: list[dict]):
     per = {}
     for r in rows:
@@ -79,9 +120,9 @@ def reason_stats(rows: list[dict]):
         per.setdefault(k, []).append(r)
     out = {}
     for reason, g in per.items():
-        pnls = [_f(x.get("pnl_abs")) for x in g]
+        pnls = [trade_pnl_abs(x) for x in g]
         pnls = [x for x in pnls if x is not None]
-        pcts = [_f(x.get("pnl_pct")) for x in g]
+        pcts = [trade_pnl_pct(x) for x in g]
         pcts = [x for x in pcts if x is not None]
         hs = [hold_h(x) for x in g]
         hs = [x for x in hs if x is not None]
@@ -129,9 +170,9 @@ def hold_ratio(stats):
 
 
 def slice_stats(rows: list[dict]):
-    pnls = [_f(r.get("pnl_abs")) for r in rows]
+    pnls = [trade_pnl_abs(r) for r in rows]
     pnls = [x for x in pnls if x is not None]
-    pcts = [_f(r.get("pnl_pct")) for r in rows]
+    pcts = [trade_pnl_pct(r) for r in rows]
     pcts = [x for x in pcts if x is not None]
     rs = reason_stats(rows)
     stop = [
@@ -219,11 +260,31 @@ def bot_rows(trades):
 
 
 def run_audit(pnl, trades, close_n=30):
-    active = sorted({(b or {}).get("bot") for b in (pnl or {}).get("bots", []) if (b or {}).get("bot")})
+    entries = [b for b in (pnl or {}).get("bots", []) if isinstance(b, dict) and b.get("bot")]
+    active = sorted({str((b or {}).get("bot")) for b in entries if (b or {}).get("bot")})
+    alias_counts = {}
+    by_entry = {str(e["bot"]): e for e in entries}
+    for e in entries:
+        primary = str(e.get("bot") or "")
+        for a in bot_aliases(primary, e.get("base_bot")):
+            if a == primary:
+                continue
+            alias_counts[a] = alias_counts.get(a, 0) + 1
     by_bot = bot_rows(trades)
     rows = []
     for bot in active:
         series = by_bot.get(bot, [])
+        if not series:
+            e = by_entry.get(bot) or {}
+            for a in bot_aliases(bot, e.get("base_bot")):
+                if a == bot:
+                    continue
+                if alias_counts.get(a, 0) != 1:
+                    continue
+                alt = by_bot.get(a, [])
+                if alt:
+                    series = alt
+                    break
         far = slice_stats(series)
         close = slice_stats(series[-close_n:])
         rows.append({
