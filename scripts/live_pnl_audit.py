@@ -430,6 +430,41 @@ def coverage_matrix(pnl, trades, bus):
     return out
 
 
+def progression_estimates(pnl, trades, bus, reds, ambers):
+    """Advisory progression optics from measurable report surfaces only."""
+    checks = coverage_matrix(pnl, trades, bus)
+    n = len(checks)
+    full = sum(1 for c in checks if c["total"] > 0 and c["have"] == c["total"])
+    partial = sum(1 for c in checks if c["total"] > 0 and 0 < c["have"] < c["total"])
+    missing = sum(1 for c in checks if c["total"] > 0 and c["have"] == 0)
+    no_sample = sum(1 for c in checks if c["total"] <= 0)
+
+    cov_score = 100.0 if n == 0 else 100.0 * (full + 0.5 * partial) / n
+    reliability_drag = min(80.0, 10.0 * len(reds) + 3.0 * len(ambers))
+    headroom = max(0.0, min(100.0, 100.0 - cov_score + 5.0 * missing + 2.0 * no_sample))
+    net_progress = max(0.0, cov_score - reliability_drag)
+
+    if net_progress >= 70:
+        trend = "strong"
+    elif net_progress >= 45:
+        trend = "moderate"
+    else:
+        trend = "early-stage"
+
+    return {
+        "checks_total": n,
+        "checks_full": full,
+        "checks_partial": partial,
+        "checks_missing": missing,
+        "checks_no_sample": no_sample,
+        "coverage_score_pct": cov_score,
+        "reliability_drag_pct": reliability_drag,
+        "optimization_headroom_pct": headroom,
+        "net_progress_pct": net_progress,
+        "trend": trend,
+    }
+
+
 # ------------------------------------------------------------------- report
 
 def _syd(now):
@@ -502,6 +537,18 @@ def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
             cov = f"{c['have']}/{c['total']}"
             st = "🟡 partial"
         out.append(f"| {c['name']} | {cov} | {st} |")
+
+    pe = progression_estimates(pnl, trades, bus, reds, ambers)
+    out.append("\n## Progression estimates (advisory)\n")
+    out.append("| metric | value |")
+    out.append("|---|---:|")
+    out.append(f"| Telemetry coverage score | {pe['coverage_score_pct']:.1f}% |")
+    out.append(f"| Reliability drag (current red/amber load) | -{pe['reliability_drag_pct']:.1f}% |")
+    out.append(f"| Net progression score | {pe['net_progress_pct']:.1f}% ({pe['trend']}) |")
+    out.append(f"| Optimization headroom estimate | {pe['optimization_headroom_pct']:.1f}% |")
+    out.append(f"| Coverage checks (full / partial / missing / no-sample) | "
+               f"{pe['checks_full']} / {pe['checks_partial']} / "
+               f"{pe['checks_missing']} / {pe['checks_no_sample']} |")
 
     gov = governor_state(bus)
     out.append("\n## What is restricting live size right now\n")

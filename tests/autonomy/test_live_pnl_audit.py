@@ -215,6 +215,19 @@ def test_render_carries_the_findings_and_the_attribution():
     assert "ATTESTATION NOT LANDED" in rep
     assert "-100.46" in rep  # the live trio's combined pnl_abs
     assert "Live robustness/execution coverage matrix" in rep
+    assert "Progression estimates (advisory)" in rep
+    assert "Net progression score" in rep
+
+
+def test_progression_estimates_shape_and_bounds():
+    reds, ambers = lpa.sync_findings(PNL, TRADES, BUS, NOW, trades_limit=5000)
+    pe = lpa.progression_estimates(PNL, TRADES, BUS, reds, ambers)
+    assert pe["checks_total"] > 0
+    assert 0.0 <= pe["coverage_score_pct"] <= 100.0
+    assert 0.0 <= pe["reliability_drag_pct"] <= 80.0
+    assert 0.0 <= pe["net_progress_pct"] <= 100.0
+    assert 0.0 <= pe["optimization_headroom_pct"] <= 100.0
+    assert pe["trend"] in {"early-stage", "moderate", "strong"}
 
 
 def test_fail_closed_on_dark_feed_exit_2(tmp_path):
