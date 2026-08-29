@@ -42,7 +42,7 @@ SELFTEST_MODULES = [
     # run rows and commit paths as arguments); the SCAN runs in
     # fleet-weekly-assessment.yml beside audit_code_currency, which is where
     # "which commit is running, and was it graded" is the actual subject.
-    "scripts.audit_ci_coverage",
+    "scripts.audit_ci_coverage", "scripts.edge_aware_safety",
     # [2026-08-17 (pp)] the weekly scoreboard's exposure flag. SELFTEST_MODULES
     # for the same reason as audit_ci_coverage above: its verdict reads the LIVE
     # bus (`fleet_risk.long_positions`), which moves with every fill and no code
