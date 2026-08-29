@@ -465,6 +465,51 @@ def progression_estimates(pnl, trades, bus, reds, ambers):
     }
 
 
+def _first_backticked(txt):
+    i = txt.find("`")
+    if i < 0:
+        return None
+    j = txt.find("`", i + 1)
+    if j < 0:
+        return None
+    return txt[i + 1:j]
+
+
+def top_next_actions(reds, ambers):
+    """Return up to 3 concrete next actions from current findings."""
+    actions = []
+
+    def add(msg):
+        if msg and msg not in actions and len(actions) < 3:
+            actions.append(msg)
+
+    for r in reds:
+        if "FROZEN" in r or "publishes NO age" in r:
+            bot = _first_backticked(r) or "stale row"
+            add(f"Redeploy `{bot}` now, then verify `extra.build` readback on /pnl.json.")
+        if "manual_pnl_usd=0.0" in r or "attestation VALUE has not landed" in r:
+            bot = _first_backticked(r) or "live bot"
+            add(f"Set `{bot}` manual-PnL env attestation and verify it publishes back live.")
+        if "live roster mismatch" in r.lower():
+            add("Reconcile `DECLARED_LIVE` with venue-truth live rows in this run.")
+
+    for a in ambers:
+        if "distinct build stamps" in a:
+            add("Deploy the live trio together to one build stamp (clear rollout laggard).")
+        if "docket ask on" in a:
+            add("Close the oldest docket ask (or set a new date) so it stops aging in-place.")
+        if "OPERATOR_QUEUE.md untouched" in a:
+            add("Run/update the daily queue sweep so decided items stop reading as open.")
+        if "truncation signature" in a:
+            add("Raise trades limit for monthly reads before trusting full-window totals.")
+
+    if not actions and (reds or ambers):
+        add("Review current sync findings and close the top blocking item in this cycle.")
+    if not actions:
+        add("No blocking actions — keep compare-mode cadence and watch for new drift.")
+    return actions[:3]
+
+
 def _live_row_by_bot(pnl):
     return {str((b or {}).get("bot")): b for b in live_rows(pnl) if (b or {}).get("bot")}
 
@@ -676,6 +721,10 @@ def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None,
     out.append(f"| Coverage checks (full / partial / missing / no-sample) | "
                f"{pe['checks_full']} / {pe['checks_partial']} / "
                f"{pe['checks_missing']} / {pe['checks_no_sample']} |")
+
+    out.append("\n## Top 3 next actions (duh list)\n")
+    for idx, action in enumerate(top_next_actions(reds, ambers), start=1):
+        out.append(f"{idx}. {action}")
 
     if before_pnl is not None:
         out.append(f"\n## Before vs now ({window}) — widening/tightening scoreboard\n")

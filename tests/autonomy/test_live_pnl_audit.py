@@ -218,6 +218,7 @@ def test_render_carries_the_findings_and_the_attribution():
     assert "Telemetry gaps by live bot (actionable)" in rep
     assert "Progression estimates (advisory)" in rep
     assert "Net progression score" in rep
+    assert "Top 3 next actions (duh list)" in rep
 
 
 def test_progression_estimates_shape_and_bounds():
@@ -271,6 +272,23 @@ def test_render_includes_before_after_scoreboard_when_prior_given():
     assert "freqtrade-avo-maria-lighter" in rep
 
 
+def test_top_next_actions_prioritizes_deploy_attestation_and_rollout():
+    reds = [
+        "`freqtrade-georgia-lighter` FROZEN 2.0h (bar 0.5h) — status still reads `online`",
+        "`freqtrade-avo-maria-lighter` carries 1 unattributed flatten close(s) (ETH) with manual_pnl_usd=0.0",
+    ]
+    ambers = [
+        "the LIVE trio serves 2 distinct build stamps (a: b/c; d: e) — laggard",
+        "docket ask on `book-grimes-lshadow` (zero_ledger) has been open 15.8d — keep-or-retire (I17)",
+    ]
+    acts = lpa.top_next_actions(reds, ambers)
+    assert 1 <= len(acts) <= 3
+    joined = " ".join(acts).lower()
+    assert "redeploy" in joined
+    assert "attestation" in joined
+    assert "build stamp" in joined or "deploy the live trio together" in joined
+
+
 def test_fail_closed_on_dark_feed_exit_2(tmp_path):
     dark = tmp_path / "dark.json"
     dark.write_text("{}")
@@ -304,10 +322,16 @@ def test_workflow_runs_the_script_with_gha_and_repo_root():
     assert "scripts/live_pnl_audit.py" in t
     assert "--gha" in t
     assert "--repo-root" in t, "queue-sweep proxy needs the checkout"
+    assert "--before-pnl-json .audit_before/pnl.json" in t
+    assert "--before-trades-json .audit_before/trades.json" in t
+    assert "--before-bus-json .audit_before/bus.json" in t
     assert "study_entry_exit_stoploss_fleet.py" in t
     assert "--edge-report" in t
     m = re.search(r"fetch-depth:\s*0", t)
     assert m, "queue-sweep proxy dates OPERATOR_QUEUE.md from git history"
+    assert "actions/upload-artifact@v4" in t
+    assert "name: live-pnl-audit-snapshots" in t
+    assert "workflow live-pnl-audit.yml" in t
 
 
 def test_workflow_does_not_mask_the_exit_code():
