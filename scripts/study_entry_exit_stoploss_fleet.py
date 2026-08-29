@@ -26,11 +26,11 @@ def fetch_json(path_or_url: str):
                 path_or_url, headers={"User-Agent": "fleet-entry-exit-audit"}
             )
             with urllib.request.urlopen(req, timeout=60) as r:
-                return json.loads(r.read())
+                return json.loads(r.read()), None
         with open(path_or_url) as f:
-            return json.load(f)
-    except Exception:
-        return None
+            return json.load(f), None
+    except Exception as e:
+        return None, str(e)
 
 
 def parse_ts(ts):
@@ -387,8 +387,20 @@ def main(argv=None):
             a = json.load(f)
         print(render_before_after(b.get("rows") or [], a.get("rows") or []))
         return 0
-    pnl = fetch_json(args.pnl_json) or {}
-    trades_payload = fetch_json(args.trades_json) or {}
+    pnl, pnl_err = fetch_json(args.pnl_json)
+    trades_payload, trades_err = fetch_json(args.trades_json)
+    if pnl is None:
+        print(f"ERROR: unable to read pnl source: {args.pnl_json} ({pnl_err})")
+        return 2
+    if trades_payload is None:
+        print(f"ERROR: unable to read trades source: {args.trades_json} ({trades_err})")
+        return 2
+    if not isinstance(pnl, dict):
+        print(f"ERROR: pnl source must be a JSON object with a bots list: {args.pnl_json}")
+        return 2
+    if not isinstance(trades_payload, (dict, list)):
+        print(f"ERROR: trades source must be a JSON object/list: {args.trades_json}")
+        return 2
     trades = trades_payload if isinstance(trades_payload, list) else (trades_payload.get("trades") or [])
     rows = run_audit(pnl, trades, close_n=max(1, args.close_n))
     txt = render_edges(rows) if args.edge_report else render(rows, close_n=max(1, args.close_n))

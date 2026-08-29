@@ -181,3 +181,21 @@ def test_cli_edge_report_mode(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "# What's each bot's edge" in r.stdout
     assert "| b1 | 2 | +1.00 | tp | tp ($+2.00); main drag: sl ($-1.00) |" in r.stdout
+
+
+def test_cli_fails_loud_when_sources_unreadable(tmp_path):
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "study_entry_exit_stoploss_fleet.py"),
+            "--pnl-json",
+            str(tmp_path / "missing_pnl.json"),
+            "--trades-json",
+            str(tmp_path / "missing_trades.json"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 2
+    assert "ERROR: unable to read pnl source" in r.stdout
