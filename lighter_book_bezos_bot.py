@@ -28,6 +28,7 @@ os.environ.setdefault("DOUGLAS_ALLOW_NONCRYPTO", "0")
 import lighter_book_douglas_bot as core  # noqa: E402
 
 core.BOT = "book-bezos"
+core.START_EQUITY = float(os.environ.get("BEZOS_START_EQUITY_USD", "100"))
 
 
 def main() -> None:
