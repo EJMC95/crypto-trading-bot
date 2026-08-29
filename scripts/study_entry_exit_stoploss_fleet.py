@@ -147,6 +147,36 @@ def advisories(far, close):
     return out
 
 
+def impact_score(row: dict) -> float:
+    far = row["far"]
+    close = row["close"]
+    score = 0.0
+    if far["n"] == 0:
+        return 0.0
+    if far["single_exit"] and far["usd"] < 0:
+        score += 2.0
+    if far["stop_n"] >= 5 and far["stop_usd"] < 0:
+        score += min(4.0, abs(far["stop_usd"]) / 2.0)
+    if far["hold_ratio"] is not None and far["hold_ratio"] >= 3.0:
+        score += min(3.0, (far["hold_ratio"] - 2.0))
+    if close["n"] >= 10 and far["mean_pct"] is not None and close["mean_pct"] is not None:
+        drift = far["mean_pct"] - close["mean_pct"]
+        if drift > 0.2:
+            score += min(3.0, drift * 4.0)
+    return round(score, 3)
+
+
+def top_issues(rows: list[dict], limit=10):
+    ranked = []
+    for r in rows:
+        s = impact_score(r)
+        if s <= 0:
+            continue
+        ranked.append({"bot": r["bot"], "impact": s, "advisories": r["advisories"]})
+    ranked.sort(key=lambda x: (-x["impact"], x["bot"]))
+    return ranked[:max(1, int(limit))]
+
+
 def bot_rows(trades):
     out = {}
     for r in trades or []:
@@ -175,6 +205,7 @@ def run_audit(pnl, trades, close_n=30):
             "far": far,
             "close": close,
             "advisories": advisories(far, close),
+            "impact": impact_score({"far": far, "close": close}),
         })
     return rows
 
@@ -185,9 +216,9 @@ def render(rows, close_n=30):
     out.append("")
     out.append(f"Eagle lens = full history; Gecko lens = last {close_n} closes.")
     out.append("")
-    out.append("| bot | far n | far $ | far mean% | close n | close $ | close mean% | stop $ far | hold ratio far | advisories |")
-    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
-    for r in rows:
+    out.append("| bot | impact | far n | far $ | far mean% | close n | close $ | close mean% | stop $ far | hold ratio far | advisories |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|")
+    for r in sorted(rows, key=lambda x: (-x["impact"], x["bot"])):
         f = r["far"]
         c = r["close"]
         fm = "—" if f["mean_pct"] is None else f"{f['mean_pct']:+.3f}"
@@ -195,7 +226,44 @@ def render(rows, close_n=30):
         hr = "—" if f["hold_ratio"] is None else f"{f['hold_ratio']:.2f}x"
         adv = "; ".join(r["advisories"][:2])
         out.append(
-            f"| {r['bot']} | {f['n']} | {f['usd']:+.2f} | {fm} | {c['n']} | {c['usd']:+.2f} | {cm} | {f['stop_usd']:+.2f} | {hr} | {adv} |"
+            f"| {r['bot']} | {r['impact']:.2f} | {f['n']} | {f['usd']:+.2f} | {fm} | {c['n']} | {c['usd']:+.2f} | {cm} | {f['stop_usd']:+.2f} | {hr} | {adv} |"
+        )
+    ranked = top_issues(rows, limit=5)
+    if ranked:
+        out.append("")
+        out.append("## Highest-impact issues")
+        out.append("")
+        for i, r in enumerate(ranked, 1):
+            out.append(f"{i}. `{r['bot']}` impact={r['impact']:.2f} — {r['advisories'][0]}")
+    return "\n".join(out) + "\n"
+
+
+def _by_bot(rows):
+    return {str((r or {}).get("bot")): r for r in rows or [] if (r or {}).get("bot")}
+
+
+def render_before_after(before_rows, after_rows):
+    b = _by_bot(before_rows)
+    a = _by_bot(after_rows)
+    bots = sorted(set(b) | set(a))
+    out = []
+    out.append("# Before vs after")
+    out.append("")
+    out.append("| bot | impact before | impact after | Δ impact | far $ before | far $ after | Δ far $ | close mean% before | close mean% after |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for bot in bots:
+        br = b.get(bot)
+        ar = a.get(bot)
+        bi = 0.0 if not br else float(br.get("impact") or 0.0)
+        ai = 0.0 if not ar else float(ar.get("impact") or 0.0)
+        bf = 0.0 if not br else float((br.get("far") or {}).get("usd") or 0.0)
+        af = 0.0 if not ar else float((ar.get("far") or {}).get("usd") or 0.0)
+        bcm = None if not br else (br.get("close") or {}).get("mean_pct")
+        acm = None if not ar else (ar.get("close") or {}).get("mean_pct")
+        bcm_t = "—" if bcm is None else f"{float(bcm):+.3f}"
+        acm_t = "—" if acm is None else f"{float(acm):+.3f}"
+        out.append(
+            f"| {bot} | {bi:.2f} | {ai:.2f} | {ai - bi:+.2f} | {bf:+.2f} | {af:+.2f} | {af - bf:+.2f} | {bcm_t} | {acm_t} |"
         )
     return "\n".join(out) + "\n"
 
@@ -230,6 +298,10 @@ def selftest():
     assert any("single-exit losing profile" in a for a in d["b2"]["advisories"])
     assert d["b3"]["far"]["n"] == 0
     assert d["b3"]["advisories"][0].startswith("no closes yet")
+    tops = top_issues(rows, limit=2)
+    assert tops and tops[0]["bot"] == "b1"
+    before_after = render_before_after(rows, rows)
+    assert "| b1 |" in before_after and "Δ impact" in before_after
     print("study_entry_exit_stoploss_fleet selftest OK")
     return 0
 
@@ -240,10 +312,19 @@ def main(argv=None):
     ap.add_argument("--trades-json", default=f"{DASH}/trades.json?source=paper&limit=5000")
     ap.add_argument("--close-n", type=int, default=30)
     ap.add_argument("--json-out", default=None)
+    ap.add_argument("--compare-before", default=None)
+    ap.add_argument("--compare-after", default=None)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.compare_before and args.compare_after:
+        with open(args.compare_before) as f:
+            b = json.load(f)
+        with open(args.compare_after) as f:
+            a = json.load(f)
+        print(render_before_after(b.get("rows") or [], a.get("rows") or []))
+        return 0
     pnl = fetch_json(args.pnl_json) or {}
     trades_payload = fetch_json(args.trades_json) or {}
     trades = trades_payload if isinstance(trades_payload, list) else (trades_payload.get("trades") or [])

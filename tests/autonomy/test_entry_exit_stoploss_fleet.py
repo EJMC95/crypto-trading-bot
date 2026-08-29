@@ -49,6 +49,7 @@ def test_far_close_and_advisories():
     assert by["b1"]["far"]["stop_n"] == 12
     assert by["b1"]["far"]["stop_usd"] < 0
     assert by["b1"]["far"]["hold_ratio"] is not None and by["b1"]["far"]["hold_ratio"] >= 3.0
+    assert by["b1"]["impact"] > 0
     assert any("stops are net negative" in a for a in by["b1"]["advisories"])
     assert any("top loser exits far earlier" in a for a in by["b1"]["advisories"])
 
@@ -57,6 +58,8 @@ def test_far_close_and_advisories():
 
     assert by["b3"]["far"]["n"] == 0
     assert by["b3"]["advisories"][0].startswith("no closes yet")
+    tops = audit.top_issues(out, limit=2)
+    assert tops[0]["bot"] == "b1"
 
 
 def test_cli_json_output_and_selftest(tmp_path):
@@ -94,3 +97,52 @@ def test_cli_json_output_and_selftest(tmp_path):
     )
     assert s.returncode == 0, s.stderr
     assert "selftest OK" in s.stdout
+
+
+def test_cli_compare_before_after(tmp_path):
+    before = tmp_path / "before.json"
+    after = tmp_path / "after.json"
+    before.write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {
+                        "bot": "b1",
+                        "impact": 3.0,
+                        "far": {"usd": -10.0},
+                        "close": {"mean_pct": -0.2},
+                    }
+                ]
+            }
+        )
+    )
+    after.write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {
+                        "bot": "b1",
+                        "impact": 1.0,
+                        "far": {"usd": -2.0},
+                        "close": {"mean_pct": 0.1},
+                    }
+                ]
+            }
+        )
+    )
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "study_entry_exit_stoploss_fleet.py"),
+            "--compare-before",
+            str(before),
+            "--compare-after",
+            str(after),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "# Before vs after" in r.stdout
+    assert "| b1 | 3.00 | 1.00 | -2.00 | -10.00 | -2.00 | +8.00 | -0.200 | +0.100 |" in r.stdout
