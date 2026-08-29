@@ -3154,8 +3154,13 @@ def main(_ctx=None):
         pnl_abs = ((equity - live_baseline - capital_adjust["total"]
                     - CAPITAL_ADJUST_USD)
                    if (equity is not None and live_baseline is not None) else None)
-        pnl_pct = ((pnl_abs / live_baseline)
-                   if (pnl_abs is not None and live_baseline) else None)
+        # [(vv)] denominator is CONTRIBUTED capital (baseline + deposits),
+        # matching the pattern in lighter_avo_live_bot.py:1486.
+        _contrib = (live_baseline + capital_adjust["total"]
+                    + CAPITAL_ADJUST_USD) if live_baseline is not None else None
+        pnl_pct = ((pnl_abs / _contrib)
+                   if (pnl_abs is not None and _contrib and _contrib > 0)
+                   else None)
         # [2026-07-17 AUDIT] The meta WRITE's return was discarded. save_state
         # "Never raises" — it returns False (bot_pnl_store.py:222). So a write
         # that failed after a successful market_open lost that position's meta

@@ -2724,6 +2724,7 @@ def main():
                 try:
                     store.publish(b.bot_id, status="halted", equity=b.equity(),
                                   pnl_abs=b.equity() - START_EQUITY,
+                                  pnl_pct=(b.equity() / START_EQUITY - 1.0),
                                   closed_trades=b.n_closed, wins=b.n_wins,
                                   losses=b.n_closed - b.n_wins,
                                   extra={"mode": mode, "venue": mode,
@@ -3032,6 +3033,7 @@ def main():
                 store.publish(
                     b.bot_id, status="online", equity=b.equity(),
                     pnl_abs=b.equity() - START_EQUITY,
+                    pnl_pct=(b.equity() / START_EQUITY - 1.0),
                     open_trades=b.broker.open_count(),
                     closed_trades=b.n_closed, wins=b.n_wins,
                     losses=b.n_closed - b.n_wins,
