@@ -72,6 +72,17 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: The guard must still be able to see (negative fixtures)
         run: python3 scripts/ceiling.py --selftest
+      - name: Eagle + gecko entry/exit/stop/loss lens (fleetwide)
+        run: |
+          set -euo pipefail
+          {
+            echo '## 🦅🦎 Entry/exit/stop/loss — far + close lens'
+            echo '```'
+            python3 scripts/study_entry_exit_stoploss_fleet.py 2>&1 || echo '(entry/exit audit read failed)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Entry/exit/stop/loss lens selftest
+        run: python3 scripts/study_entry_exit_stoploss_fleet.py --selftest
 
   code-currency:
     runs-on: ubuntu-latest

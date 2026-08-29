@@ -1,0 +1,96 @@
+import datetime as dt
+import json
+import pathlib
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import study_entry_exit_stoploss_fleet as audit  # noqa: E402
+
+
+def _row(bot, reason, pnl, pct, o, c):
+    z = dt.timezone.utc
+    t0 = dt.datetime(2026, 1, 1, tzinfo=z)
+    return {
+        "bot": bot,
+        "reason": reason,
+        "pnl_abs": pnl,
+        "pnl_pct": pct,
+        "opened_at": (t0 + dt.timedelta(hours=o)).isoformat(),
+        "closed_at": (t0 + dt.timedelta(hours=c)).isoformat(),
+    }
+
+
+def test_stop_suffix_detection_and_reason_parsing():
+    assert audit.is_stop_reason("long-breakoutup_trailing_stop_loss")
+    assert audit.is_stop_reason("short-divergence_sl")
+    assert not audit.is_stop_reason("long-breakoutup_tp")
+    assert audit.exit_reason({"reason": "", "tag": "short-divergence_tp"}) == "tp"
+
+
+def test_far_close_and_advisories():
+    rows = []
+    for i in range(20):
+        rows.append(_row("b1", "decay_paid", 2.0, 0.01, i, i + 60))
+    for i in range(30):
+        rows.append(_row("b1", "short_flip", -1.0, -0.004, i, i + 8))
+    for i in range(12):
+        rows.append(_row("b1", "short_sl", -0.5, -0.003, i, i + 1))
+    rows.append(_row("b2", "only_exit", -1.0, -0.01, 0, 12))
+
+    pnl = {"bots": [{"bot": "b1"}, {"bot": "b2"}, {"bot": "b3"}]}
+    out = audit.run_audit(pnl, rows, close_n=10)
+    by = {r["bot"]: r for r in out}
+
+    assert by["b1"]["far"]["n"] == 62
+    assert by["b1"]["close"]["n"] == 10
+    assert by["b1"]["far"]["stop_n"] == 12
+    assert by["b1"]["far"]["stop_usd"] < 0
+    assert by["b1"]["far"]["hold_ratio"] is not None and by["b1"]["far"]["hold_ratio"] >= 3.0
+    assert any("stops are net negative" in a for a in by["b1"]["advisories"])
+    assert any("top loser exits far earlier" in a for a in by["b1"]["advisories"])
+
+    assert by["b2"]["far"]["single_exit"] is True
+    assert any("single-exit losing profile" in a for a in by["b2"]["advisories"])
+
+    assert by["b3"]["far"]["n"] == 0
+    assert by["b3"]["advisories"][0].startswith("no closes yet")
+
+
+def test_cli_json_output_and_selftest(tmp_path):
+    pnl = tmp_path / "pnl.json"
+    trades = tmp_path / "trades.json"
+    out = tmp_path / "out.json"
+    pnl.write_text(json.dumps({"bots": [{"bot": "b1"}]}))
+    trades.write_text(json.dumps({"trades": [_row("b1", "long_tp", 1.0, 0.01, 0, 2)]}))
+
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "study_entry_exit_stoploss_fleet.py"),
+            "--pnl-json",
+            str(pnl),
+            "--trades-json",
+            str(trades),
+            "--json-out",
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "| b1 |" in r.stdout
+    payload = json.loads(out.read_text())
+    assert payload["rows"][0]["bot"] == "b1"
+
+    s = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "study_entry_exit_stoploss_fleet.py"), "--selftest"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert s.returncode == 0, s.stderr
+    assert "selftest OK" in s.stdout
