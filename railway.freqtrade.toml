@@ -7,6 +7,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.freqtrade"
 
 [deploy]
+startCommand = "sh /freqtrade/run_all.sh"
 # Always restart the freqtrade bots service on any exit (crash or otherwise),
 # with no retry cap — keep it running indefinitely.
 restartPolicyType = "always"

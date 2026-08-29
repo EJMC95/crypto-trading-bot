@@ -50,6 +50,11 @@ import subprocess
 import sys
 import urllib.request
 
+try:
+    from fleet_books import DECLARED_LIVE as EXPECTED_LIVE_ROWS
+except Exception:  # noqa: BLE001
+    EXPECTED_LIVE_ROWS = ()
+
 DASH = "https://pnl-dashboard-production-858c.up.railway.app"
 
 #: Liveness bars (seconds). LIVE rows loop at 300s; a 30-min silence on real
@@ -108,6 +113,29 @@ def live_rows(pnl):
         if ((b.get("extra") or {}).get("venue")) == "lighter_live":
             out.append(b)
     return sorted(out, key=lambda b: b.get("bot") or "")
+
+
+def _get_path(d, path):
+    cur = d
+    for k in path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def _present(v):
+    return v not in (None, "", [], {})
+
+
+def live_roster_findings(pnl):
+    expected = sorted(str(x) for x in (EXPECTED_LIVE_ROWS or ()))
+    if not expected:
+        return []
+    got = sorted(str((b or {}).get("bot")) for b in live_rows(pnl) if (b or {}).get("bot"))
+    if got == expected:
+        return []
+    return [f"live roster mismatch — expected {expected} but feed shows {got}"]
 
 
 def stale_rows(pnl):
@@ -273,6 +301,8 @@ def sync_findings(pnl, trades, bus, now, repo_root=None,
     surfaced every run but not a red build (ages, spreads, proxies)."""
     reds, ambers = [], []
 
+    reds += live_roster_findings(pnl)
+
     for row, age, bar in stale_rows(pnl):
         name = row.get("bot")
         if age is None:
@@ -342,13 +372,271 @@ def sync_findings(pnl, trades, bus, now, repo_root=None,
     return reds, ambers
 
 
+def coverage_matrix(pnl, trades, bus):
+    lives = live_rows(pnl)
+    trades = trades or []
+    live_ids = {str((b or {}).get("bot")) for b in lives if (b or {}).get("bot")}
+    live_trades = [r for r in trades if str((r or {}).get("bot")) in live_ids]
+
+    def row_cov(paths):
+        if not lives:
+            return 0, 0
+        n = 0
+        for r in lives:
+            if any(_present(_get_path(r, p)) for p in paths):
+                n += 1
+        return n, len(lives)
+
+    def trade_cov(paths):
+        if not live_trades:
+            return 0, 0
+        n = 0
+        for r in live_trades:
+            if any(_present(_get_path(r, p)) for p in paths):
+                n += 1
+        return n, len(live_trades)
+
+    def bus_cov(paths):
+        ok = any(_present(_get_path(bus or {}, p)) for p in paths)
+        return (1 if ok else 0), 1
+
+    checks = [
+        ("Trading fees", "trade", ("fee", "fees", "commission", "cost_fee")),
+        ("Slippage/spread", "row", ("extra.stop_overshoot.n", "extra.entry_vetoes.coin_veto")),
+        ("Partial fills", "trade", ("filled", "filled_size", "partial_fill", "fill_ratio")),
+        ("Latency / signal→execution", "trade", ("signal_ts", "signal_at", "decision_ts")),
+        ("Minimum order sizing", "row", ("extra.clip_usd", "extra.cap_usd")),
+        ("Funding rate visibility", "trade", ("funding_rate", "funding_apr", "entry_apr", "exit_apr")),
+        ("Delisted/unavailable pair handling", "trade", ("reason",)),
+        ("Position/open-trade limits", "row", ("extra.max_open", "open_trades")),
+        ("Max leverage / liquidation telemetry", "row", ("extra.leverage.set", "extra.leverage.liq_gap_pct")),
+        ("Max daily-loss lockout", "row", ("extra.entry_vetoes.halt_days_30d", "extra.entry_vetoes.shut_now")),
+        ("Max drawdown shutdown hooks", "row", ("extra.entry_vetoes.lockout_hours_30d", "extra.entry_vetoes.entries_shut_reason_30d")),
+        ("Kill switch / protections lock", "row", ("extra.entry_vetoes.entries_shut_reason_30d", "extra.entry_vetoes.locked_until")),
+        ("No trading on stale data", "row", ("extra.scan.stale_candle", "extra.scan.no_bars")),
+        ("API/retry failure telemetry", "row", ("extra.scan.failed", "extra.scan.unpriceable")),
+        ("Execution prices recorded", "trade", ("entry_price", "exit_price")),
+        ("Risk-adjusted metrics source", "bus", ("golive_readiness.books",)),
+    ]
+    out = []
+    for name, scope, paths in checks:
+        if scope == "row":
+            have, total = row_cov(paths)
+        elif scope == "trade":
+            have, total = trade_cov(paths)
+        else:
+            have, total = bus_cov(paths)
+        out.append({"name": name, "scope": scope, "have": have, "total": total})
+    return out
+
+
+def progression_estimates(pnl, trades, bus, reds, ambers):
+    """Advisory progression optics from measurable report surfaces only."""
+    checks = coverage_matrix(pnl, trades, bus)
+    n = len(checks)
+    full = sum(1 for c in checks if c["total"] > 0 and c["have"] == c["total"])
+    partial = sum(1 for c in checks if c["total"] > 0 and 0 < c["have"] < c["total"])
+    missing = sum(1 for c in checks if c["total"] > 0 and c["have"] == 0)
+    no_sample = sum(1 for c in checks if c["total"] <= 0)
+
+    cov_score = 100.0 if n == 0 else 100.0 * (full + 0.5 * partial) / n
+    reliability_drag = min(80.0, 10.0 * len(reds) + 3.0 * len(ambers))
+    headroom = max(0.0, min(100.0, 100.0 - cov_score + 5.0 * missing + 2.0 * no_sample))
+    net_progress = max(0.0, cov_score - reliability_drag)
+
+    if net_progress >= 70:
+        trend = "strong"
+    elif net_progress >= 45:
+        trend = "moderate"
+    else:
+        trend = "early-stage"
+
+    return {
+        "checks_total": n,
+        "checks_full": full,
+        "checks_partial": partial,
+        "checks_missing": missing,
+        "checks_no_sample": no_sample,
+        "coverage_score_pct": cov_score,
+        "reliability_drag_pct": reliability_drag,
+        "optimization_headroom_pct": headroom,
+        "net_progress_pct": net_progress,
+        "trend": trend,
+    }
+
+
+def _first_backticked(txt):
+    i = txt.find("`")
+    if i < 0:
+        return None
+    j = txt.find("`", i + 1)
+    if j < 0:
+        return None
+    return txt[i + 1:j]
+
+
+def top_next_actions(reds, ambers):
+    """Return up to 3 concrete next actions from current findings."""
+    actions = []
+
+    def add(msg):
+        if msg and msg not in actions and len(actions) < 3:
+            actions.append(msg)
+
+    for r in reds:
+        if "FROZEN" in r or "publishes NO age" in r:
+            bot = _first_backticked(r) or "stale row"
+            add(f"Redeploy `{bot}` now, then verify `extra.build` readback on /pnl.json.")
+        if "manual_pnl_usd=0.0" in r or "attestation VALUE has not landed" in r:
+            bot = _first_backticked(r) or "live bot"
+            add(f"Set `{bot}` manual-PnL env attestation and verify it publishes back live.")
+        if "live roster mismatch" in r.lower():
+            add("Reconcile `DECLARED_LIVE` with venue-truth live rows in this run.")
+
+    for a in ambers:
+        if "distinct build stamps" in a:
+            add("Deploy the live trio together to one build stamp (clear rollout laggard).")
+        if "docket ask on" in a:
+            add("Close the oldest docket ask (or set a new date) so it stops aging in-place.")
+        if "OPERATOR_QUEUE.md untouched" in a:
+            add("Run/update the daily queue sweep so decided items stop reading as open.")
+        if "truncation signature" in a:
+            add("Raise trades limit for monthly reads before trusting full-window totals.")
+
+    if not actions and (reds or ambers):
+        add("Review current sync findings and close the top blocking item in this cycle.")
+    if not actions:
+        add("No blocking actions — keep compare-mode cadence and watch for new drift.")
+    return actions[:3]
+
+
+def _live_row_by_bot(pnl):
+    return {str((b or {}).get("bot")): b for b in live_rows(pnl) if (b or {}).get("bot")}
+
+
+def _window_stats_for_live(trades, days, now, bots):
+    win = window_rows(trades, days, now)
+    out = {}
+    for bot in bots:
+        out[bot] = book_stats(win.get(bot, []))
+    return out
+
+
+def _param(row, path, default=None):
+    v = _get_path(row or {}, path)
+    return default if v is None else v
+
+
+def _as_float(v):
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+
+def _direction(a, b):
+    aa, bb = _as_float(a), _as_float(b)
+    if aa is None or bb is None:
+        return "—"
+    d = bb - aa
+    if abs(d) < 1e-12:
+        return "flat"
+    return "widened" if d > 0 else "tightened"
+
+
+def _delta_fmt(a, b, places=2):
+    aa, bb = _as_float(a), _as_float(b)
+    if aa is None or bb is None:
+        return "—"
+    d = bb - aa
+    return f"{bb:.{places}f} ({d:+.{places}f})"
+
+
+def live_telemetry_gap_details(pnl, trades, bus):
+    """Per-live-bot telemetry gaps so matrix misses are actionable."""
+    lives = live_rows(pnl)
+    trade_by_bot = {}
+    for r in trades or []:
+        bot = str((r or {}).get("bot") or "")
+        if bot:
+            trade_by_bot.setdefault(bot, []).append(r)
+    out = []
+    for row in lives:
+        bot = str(row.get("bot"))
+        rows = trade_by_bot.get(bot, [])
+        gaps = []
+        checks = [
+            ("fees", any(_present(_get_path(t, k)) for t in rows for k in ("fee", "fees", "commission", "cost_fee"))),
+            ("slippage/spread", any(_present(_get_path(row, k)) for k in ("extra.stop_overshoot.n", "extra.entry_vetoes.coin_veto"))),
+            ("partial-fills", any(_present(_get_path(t, k)) for t in rows for k in ("filled", "filled_size", "partial_fill", "fill_ratio"))),
+            ("latency stamps", any(_present(_get_path(t, k)) for t in rows for k in ("signal_ts", "signal_at", "decision_ts"))),
+            ("funding stamps", any(_present(_get_path(t, k)) for t in rows for k in ("funding_rate", "funding_apr", "entry_apr", "exit_apr"))),
+            ("leverage/liq telemetry", any(_present(_get_path(row, k)) for k in ("extra.leverage.set", "extra.leverage.liq_gap_pct"))),
+            ("drawdown lockout telemetry", any(_present(_get_path(row, k)) for k in ("extra.entry_vetoes.lockout_hours_30d", "extra.entry_vetoes.entries_shut_reason_30d"))),
+            ("stale-data telemetry", any(_present(_get_path(row, k)) for k in ("extra.scan.stale_candle", "extra.scan.no_bars"))),
+            ("api-failure telemetry", any(_present(_get_path(row, k)) for k in ("extra.scan.failed", "extra.scan.unpriceable"))),
+        ]
+        for nm, ok in checks:
+            if not ok:
+                gaps.append(nm)
+        out.append({"bot": bot, "trade_rows": len(rows), "missing": gaps})
+    return out
+
+
+def live_before_after_scoreboard(now_pnl, now_trades, now_bus, now, window,
+                                 before_pnl=None, before_trades=None, before_bus=None):
+    """Compare live-bot metrics/params now vs before when prior snapshots exist."""
+    now_rows = _live_row_by_bot(now_pnl)
+    before_rows = _live_row_by_bot(before_pnl or {})
+    bots = sorted(set(now_rows) | set(before_rows))
+    days = WINDOWS[window]
+    now_stats = _window_stats_for_live(now_trades, days, now, bots)
+    before_stats = _window_stats_for_live(before_trades or [], days, now, bots)
+    out = []
+    for bot in bots:
+        nr = now_rows.get(bot, {})
+        br = before_rows.get(bot, {})
+        ne = nr.get("extra") or {}
+        be = br.get("extra") or {}
+        clip_b = _param({"extra": be}, "extra.clip_usd")
+        clip_n = _param({"extra": ne}, "extra.clip_usd")
+        scale_b = _param({"extra": be}, "extra.entry_vetoes.live_clip_scale")
+        scale_n = _param({"extra": ne}, "extra.entry_vetoes.live_clip_scale")
+        lev_b = _param({"extra": be}, "extra.leverage.set")
+        lev_n = _param({"extra": ne}, "extra.leverage.set")
+        nst, bst = now_stats.get(bot, {}), before_stats.get(bot, {})
+        out.append({
+            "bot": bot,
+            "clip_dir": _direction(clip_b, clip_n),
+            "scale_dir": _direction(scale_b, scale_n),
+            "lev_dir": _direction(lev_b, lev_n),
+            "clip": _delta_fmt(clip_b, clip_n, places=2),
+            "clip_scale": _delta_fmt(scale_b, scale_n, places=2),
+            "leverage": _delta_fmt(lev_b, lev_n, places=2),
+            "open_trades": _delta_fmt(br.get("open_trades"), nr.get("open_trades"), places=0),
+            "pnl_abs": _delta_fmt(br.get("pnl_abs"), nr.get("pnl_abs"), places=2),
+            "n_trades": _delta_fmt(bst.get("n"), nst.get("n"), places=0),
+            "mean_pct": _delta_fmt(bst.get("mean_pct"), nst.get("mean_pct"), places=3),
+            "t_stat": _delta_fmt(None if math.isnan(bst.get("t", float("nan"))) else bst.get("t"),
+                                 None if math.isnan(nst.get("t", float("nan"))) else nst.get("t"),
+                                 places=2),
+            "fleet_clip_scale": _delta_fmt(
+                _get_path(before_bus or {}, "fleet_risk.clip_scale"),
+                _get_path(now_bus or {}, "fleet_risk.clip_scale"),
+                places=2,
+            ),
+        })
+    return out
+
+
 # ------------------------------------------------------------------- report
 
 def _syd(now):
     return (now + dt.timedelta(hours=10)).strftime("%d-%b %H:%M AEST")
 
 
-def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
+def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None,
+           before_pnl=None, before_trades=None, before_bus=None):
     days = WINDOWS[window]
     out = []
     out.append(f"# Live P&L audit — {window} — "
@@ -397,6 +685,60 @@ def render(pnl, trades, bus, window, now, reds, ambers, trades_limit=None):
                    f"| {100*s['wins']/s['n']:.0f}% |")
     out.append(f"| **fleet** |  | **{fleet_total:+.2f}** |  |  |  |")
 
+    out.append("\n## Live robustness/execution coverage matrix\n")
+    out.append("| check | coverage | status |")
+    out.append("|---|---:|---|")
+    for c in coverage_matrix(pnl, trades, bus):
+        if c["total"] <= 0:
+            cov = "0/0"
+            st = "🟡 no live sample"
+        elif c["have"] == c["total"]:
+            cov = f"{c['have']}/{c['total']}"
+            st = "✅ present"
+        elif c["have"] == 0:
+            cov = f"{c['have']}/{c['total']}"
+            st = "🔴 missing"
+        else:
+            cov = f"{c['have']}/{c['total']}"
+            st = "🟡 partial"
+        out.append(f"| {c['name']} | {cov} | {st} |")
+
+    out.append("\n## Telemetry gaps by live bot (actionable)\n")
+    out.append("| bot | trade rows | missing telemetry |")
+    out.append("|---|---:|---|")
+    for g in live_telemetry_gap_details(pnl, trades, bus):
+        miss = ", ".join(g["missing"]) if g["missing"] else "none"
+        out.append(f"| {g['bot']} | {g['trade_rows']} | {miss} |")
+
+    pe = progression_estimates(pnl, trades, bus, reds, ambers)
+    out.append("\n## Progression estimates (advisory)\n")
+    out.append("| metric | value |")
+    out.append("|---|---:|")
+    out.append(f"| Telemetry coverage score | {pe['coverage_score_pct']:.1f}% |")
+    out.append(f"| Reliability drag (current red/amber load) | -{pe['reliability_drag_pct']:.1f}% |")
+    out.append(f"| Net progression score | {pe['net_progress_pct']:.1f}% ({pe['trend']}) |")
+    out.append(f"| Optimization headroom estimate | {pe['optimization_headroom_pct']:.1f}% |")
+    out.append(f"| Coverage checks (full / partial / missing / no-sample) | "
+               f"{pe['checks_full']} / {pe['checks_partial']} / "
+               f"{pe['checks_missing']} / {pe['checks_no_sample']} |")
+
+    out.append("\n## Top 3 next actions (duh list)\n")
+    for idx, action in enumerate(top_next_actions(reds, ambers), start=1):
+        out.append(f"{idx}. {action}")
+
+    if before_pnl is not None:
+        out.append(f"\n## Before vs now ({window}) — widening/tightening scoreboard\n")
+        out.append("| bot | clip_usd | clip_dir | live_clip_scale | scale_dir | leverage | lev_dir | "
+                   "open_trades | pnl_abs | n_trades | mean %/t | t-stat | fleet clip_scale |")
+        out.append("|---|---:|---|---:|---|---:|---|---:|---:|---:|---:|---:|---:|")
+        for r in live_before_after_scoreboard(
+                pnl, trades, bus, now, window, before_pnl, before_trades, before_bus):
+            out.append(
+                f"| {r['bot']} | {r['clip']} | {r['clip_dir']} | {r['clip_scale']} | {r['scale_dir']} "
+                f"| {r['leverage']} | {r['lev_dir']} | {r['open_trades']} | {r['pnl_abs']} "
+                f"| {r['n_trades']} | {r['mean_pct']} | {r['t_stat']} | {r['fleet_clip_scale']} |"
+            )
+
     gov = governor_state(bus)
     out.append("\n## What is restricting live size right now\n")
     out.append(f"- fleet clip_scale **{gov['fleet_clip_scale']}** "
@@ -428,6 +770,12 @@ def main(argv=None):
     ap.add_argument("--trades-json",
                     default=f"{DASH}/trades.json?source=paper&limit=5000")
     ap.add_argument("--bus-json", default=f"{DASH}/bus.json")
+    ap.add_argument("--before-pnl-json", default=None,
+                    help="optional prior /pnl.json snapshot for before-vs-now table")
+    ap.add_argument("--before-trades-json", default=None,
+                    help="optional prior /trades.json snapshot for before-vs-now table")
+    ap.add_argument("--before-bus-json", default=None,
+                    help="optional prior /bus.json snapshot for before-vs-now table")
     ap.add_argument("--window", choices=sorted(WINDOWS), default="daily")
     ap.add_argument("--trades-limit", type=int, default=5000,
                     help="the limit the trades URL carries, for the "
@@ -465,7 +813,13 @@ def main(argv=None):
     reds, ambers = sync_findings(
         pnl, trades, bus, now, repo_root=args.repo_root,
         trades_limit=args.trades_limit if trades else None)
-    report = render(pnl, trades, bus, args.window, now, reds, ambers)
+    before_pnl = fetch_json(args.before_pnl_json) if args.before_pnl_json else None
+    before_trades_payload = fetch_json(args.before_trades_json) if args.before_trades_json else None
+    before_trades = (before_trades_payload or {}).get("trades") if args.before_trades_json else None
+    before_bus = fetch_json(args.before_bus_json) if args.before_bus_json else None
+    report = render(
+        pnl, trades, bus, args.window, now, reds, ambers,
+        before_pnl=before_pnl, before_trades=before_trades, before_bus=before_bus)
     print(report)
 
     if args.gha:

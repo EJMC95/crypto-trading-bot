@@ -33,8 +33,15 @@ import hashlib
 _DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 _conn = None
+_conn_last_ping_ts = 0.0
 _warned = False
 _table_ready = False
+try:
+    _CONN_PING_EVERY_S = max(
+        0.0, float(os.environ.get("BOT_PNL_CONN_PING_EVERY_S", "15"))
+    )
+except (TypeError, ValueError):
+    _CONN_PING_EVERY_S = 15.0
 
 
 def _warn_once(msg):
@@ -46,7 +53,7 @@ def _warn_once(msg):
 
 def _get_conn():
     """Return a live connection, or None if unavailable (no raise)."""
-    global _conn
+    global _conn, _conn_last_ping_ts
     if not _DATABASE_URL:
         _warn_once("DATABASE_URL not set")
         return None
@@ -57,9 +64,13 @@ def _get_conn():
         return None
     if _conn is not None:
         try:
-            # cheap liveness check
+            now = time.time()
+            if (now - _conn_last_ping_ts) < _CONN_PING_EVERY_S:
+                return _conn
+            # cheap liveness check (throttled to avoid pinging every loop)
             with _conn.cursor() as cur:
                 cur.execute("SELECT 1")
+            _conn_last_ping_ts = now
             return _conn
         except Exception:
             try:
@@ -67,9 +78,11 @@ def _get_conn():
             except Exception:
                 pass
             _conn = None
+            _conn_last_ping_ts = 0.0
     try:
         _conn = psycopg2.connect(_DATABASE_URL, connect_timeout=5)
         _conn.autocommit = True
+        _conn_last_ping_ts = time.time()
         return _conn
     except Exception as e:
         _warn_once(f"connect failed ({e})")

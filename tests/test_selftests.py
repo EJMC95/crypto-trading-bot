@@ -200,6 +200,7 @@ SELFTEST_MODULES = [
     "scripts.session_state",
     "scripts.study_exit_sweep",
     "scripts.study_stop_reclaim",
+    "scripts.study_entry_exit_stoploss_fleet",
     "scripts.study_trail_sweep",
     "scripts.study_depth_vs_volume",
     # [2026-07-30 (hf)] LEDGER INTEGRITY — is a book's ledger ONE book's record?

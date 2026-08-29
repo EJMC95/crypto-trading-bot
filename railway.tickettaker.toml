@@ -27,6 +27,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.avolive"
 
 [deploy]
+startCommand = "python -u lighter_avo_live_bot.py"
 # Restart on any exit, no retry cap. The book's exits — stop, ROI ladder,
 # exit signal, delist give-up, daily-loss flatten, kill-switch flatten — all
 # run IN-PROCESS, and a live perp has NO resting stop on Lighter's book. The

@@ -194,6 +194,19 @@ def test_sync_findings_red_and_amber_split():
     assert any("truncation" in a for a in ambers2)
 
 
+def test_live_roster_mismatch_is_red():
+    old = lpa.EXPECTED_LIVE_ROWS
+    try:
+        lpa.EXPECTED_LIVE_ROWS = (
+            "freqtrade-avo-maria-lighter",
+            "freqtrade-georgia-lighter",
+        )
+        reds, _ = lpa.sync_findings(PNL, TRADES, BUS, NOW, trades_limit=5000)
+        assert any("live roster mismatch" in r.lower() for r in reds)
+    finally:
+        lpa.EXPECTED_LIVE_ROWS = old
+
+
 def test_render_carries_the_findings_and_the_attribution():
     reds, ambers = lpa.sync_findings(PNL, TRADES, BUS, NOW,
                                      trades_limit=5000)
@@ -201,6 +214,79 @@ def test_render_carries_the_findings_and_the_attribution():
     assert "FROZEN" in rep and "nav-cook-lshadow" in rep
     assert "ATTESTATION NOT LANDED" in rep
     assert "-100.46" in rep  # the live trio's combined pnl_abs
+    assert "Live robustness/execution coverage matrix" in rep
+    assert "Telemetry gaps by live bot (actionable)" in rep
+    assert "Progression estimates (advisory)" in rep
+    assert "Net progression score" in rep
+    assert "Top 3 next actions (duh list)" in rep
+
+
+def test_progression_estimates_shape_and_bounds():
+    reds, ambers = lpa.sync_findings(PNL, TRADES, BUS, NOW, trades_limit=5000)
+    pe = lpa.progression_estimates(PNL, TRADES, BUS, reds, ambers)
+    assert pe["checks_total"] > 0
+    assert 0.0 <= pe["coverage_score_pct"] <= 100.0
+    assert 0.0 <= pe["reliability_drag_pct"] <= 80.0
+    assert 0.0 <= pe["net_progress_pct"] <= 100.0
+    assert 0.0 <= pe["optimization_headroom_pct"] <= 100.0
+    assert pe["trend"] in {"early-stage", "moderate", "strong"}
+
+
+def test_telemetry_gap_details_are_per_bot_actionable():
+    rows = lpa.live_telemetry_gap_details(PNL, TRADES, BUS)
+    by_bot = {r["bot"]: r for r in rows}
+    assert "freqtrade-avo-maria-lighter" in by_bot
+    assert by_bot["freqtrade-avo-maria-lighter"]["trade_rows"] >= 1
+    # some telemetry is intentionally missing in fixture; report must list gaps
+    assert "partial-fills" in by_bot["freqtrade-georgia-lighter"]["missing"]
+
+
+def test_before_after_scoreboard_detects_widening_and_tightening():
+    before_pnl = json.loads(json.dumps(PNL))
+    # lower old clips/scales so now reads as widened
+    before_pnl["bots"][0]["extra"]["clip_usd"] = 100.0
+    before_pnl["bots"][0]["extra"]["entry_vetoes"]["live_clip_scale"] = 0.50
+    before_pnl["bots"][1]["extra"]["clip_usd"] = 250.0
+    before_pnl["bots"][1]["extra"]["entry_vetoes"]["live_clip_scale"] = 1.00
+    before_pnl["bots"][2]["extra"]["clip_usd"] = 712.5
+    before_pnl["bots"][2]["extra"]["entry_vetoes"]["live_clip_scale"] = 1.00
+
+    table = lpa.live_before_after_scoreboard(
+        PNL, TRADES, BUS, NOW, "weekly",
+        before_pnl=before_pnl, before_trades=TRADES, before_bus=BUS)
+    by_bot = {r["bot"]: r for r in table}
+    assert by_bot["freqtrade-avo-maria-lighter"]["clip_dir"] == "widened"
+    assert by_bot["freqtrade-georgia-lighter"]["clip_dir"] == "tightened"
+    assert by_bot["freqtrade-avo-maria-lighter"]["scale_dir"] == "widened"
+    assert by_bot["freqtrade-georgia-lighter"]["scale_dir"] == "tightened"
+
+
+def test_render_includes_before_after_scoreboard_when_prior_given():
+    before_pnl = json.loads(json.dumps(PNL))
+    before_pnl["bots"][0]["extra"]["clip_usd"] = 100.0
+    reds, ambers = lpa.sync_findings(PNL, TRADES, BUS, NOW, trades_limit=5000)
+    rep = lpa.render(
+        PNL, TRADES, BUS, "weekly", NOW, reds, ambers,
+        before_pnl=before_pnl, before_trades=TRADES, before_bus=BUS)
+    assert "Before vs now (weekly) — widening/tightening scoreboard" in rep
+    assert "freqtrade-avo-maria-lighter" in rep
+
+
+def test_top_next_actions_prioritizes_deploy_attestation_and_rollout():
+    reds = [
+        "`freqtrade-georgia-lighter` FROZEN 2.0h (bar 0.5h) — status still reads `online`",
+        "`freqtrade-avo-maria-lighter` carries 1 unattributed flatten close(s) (ETH) with manual_pnl_usd=0.0",
+    ]
+    ambers = [
+        "the LIVE trio serves 2 distinct build stamps (a: b/c; d: e) — laggard",
+        "docket ask on `book-grimes-lshadow` (zero_ledger) has been open 15.8d — keep-or-retire (I17)",
+    ]
+    acts = lpa.top_next_actions(reds, ambers)
+    assert 1 <= len(acts) <= 3
+    joined = " ".join(acts).lower()
+    assert "redeploy" in joined
+    assert "attestation" in joined
+    assert "build stamp" in joined or "deploy the live trio together" in joined
 
 
 def test_fail_closed_on_dark_feed_exit_2(tmp_path):
@@ -236,8 +322,16 @@ def test_workflow_runs_the_script_with_gha_and_repo_root():
     assert "scripts/live_pnl_audit.py" in t
     assert "--gha" in t
     assert "--repo-root" in t, "queue-sweep proxy needs the checkout"
+    assert "--before-pnl-json .audit_before/pnl.json" in t
+    assert "--before-trades-json .audit_before/trades.json" in t
+    assert "--before-bus-json .audit_before/bus.json" in t
+    assert "study_entry_exit_stoploss_fleet.py" in t
+    assert "--edge-report" in t
     m = re.search(r"fetch-depth:\s*0", t)
     assert m, "queue-sweep proxy dates OPERATOR_QUEUE.md from git history"
+    assert "actions/upload-artifact@v4" in t
+    assert "name: live-pnl-audit-snapshots" in t
+    assert "workflow live-pnl-audit.yml" in t
 
 
 def test_workflow_does_not_mask_the_exit_code():

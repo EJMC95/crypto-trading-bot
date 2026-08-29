@@ -93,6 +93,7 @@ import fleet_bus as _bus            # [(su)] the ONE owner of the basket math
 import fleet_tuning as tuning
 from lighter_family_bot import (
     STRATEGIES, CandleCache, COINS, NONCRYPTO_UNIVERSE, carrier_universe,
+    crypto_min_vol_m,
     regime_inputs_for, btc_regime_up, btc_tide_up, noncrypto_regimes,
     noncrypto_entry_blocked, brain_entry_gated, brain_clip_for,
     ledger_reason, ledger_tag,
@@ -774,6 +775,56 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                     ("idle_close_h", last_close_ts)):
         if ts:
             out[key] = round(max(0.0, (t_now - float(ts))) / 3600.0, 2)
+    return out
+
+
+def progression_block(stats, closed_win, born_ts, now_ts, target_closes=30):
+    """Progress telemetry for live bars: closes velocity and ETA to target."""
+    out = {"target_closes": int(target_closes),
+           "closed_total": int((stats or {}).get("closed") or 0)}
+    out["closes_remaining"] = max(0, out["target_closes"] - out["closed_total"])
+    age_days = max(0.0, (float(now_ts) - float(born_ts)) / 86400.0) if born_ts else 0.0
+    out["age_days"] = round(age_days, 2)
+    if age_days > 0 and out["closed_total"] > 0:
+        life_rate = out["closed_total"] / age_days
+        out["close_rate_day_life"] = round(life_rate, 3)
+        out["days_to_target_life"] = round(out["closes_remaining"] / life_rate, 1) \
+            if out["closes_remaining"] > 0 else 0.0
+    else:
+        out["close_rate_day_life"] = None
+        out["days_to_target_life"] = None
+    cutoff = float(now_ts) - 7.0 * 86400.0
+    recent = [r for r in (closed_win or [])
+              if isinstance(r, dict) and isinstance(r.get("ts"), (int, float))
+              and float(r["ts"]) >= cutoff]
+    out["closed_7d"] = len(recent)
+    if out["closed_7d"] > 0:
+        rate7 = out["closed_7d"] / 7.0
+        out["close_rate_day_7d"] = round(rate7, 3)
+        out["days_to_target_7d"] = round(out["closes_remaining"] / rate7, 1) \
+            if out["closes_remaining"] > 0 else 0.0
+    else:
+        out["close_rate_day_7d"] = None
+        out["days_to_target_7d"] = None
+    return out
+
+
+def universe_expand_candidates(bot, current_universe, limit=10):
+    """Top liquid Lighter candidates not currently scanned by this arm."""
+    try:
+        ranked = _bus.scout_universe(min_vol_m=crypto_min_vol_m(bot), limit=200) or []
+        ranked = [c for c in ranked if _bus.is_crypto(c)]
+    except Exception:  # noqa: BLE001
+        ranked = []
+    have = {str(c) for c in (current_universe or [])}
+    out = []
+    for coin in ranked:
+        c = str(coin)
+        if c in have:
+            continue
+        out.append(c)
+        if len(out) >= max(0, int(limit)):
+            break
     return out
 
 
@@ -1652,6 +1703,9 @@ def main(_ctx=None, once=False):
                 # published — 0.0 must be visibly "none attested", never
                 # byte-identical to "the field does not exist" (I18).
                 "manual_pnl_usd": round(MANUAL_PNL_USD, 2),
+                # Live progression toward gradeable evidence (close-count bars):
+                # velocity + ETA from lifetime and trailing-7d rates.
+                "progression": progression_block(st, closed_win, born_ts, t0),
                 # [(te)] THE I22 SPEND CENSUS, published every loop —
                 # audit_book_spend's first real test was this host's own two
                 # variants born after the 20-Aug cutoff. n_eff is the last
@@ -1761,6 +1815,11 @@ def main(_ctx=None, once=False):
                     (closed_win[-1].get("ts") if closed_win else None), t0,
                     strategy=S, uptrend=last_uptrend, enter=last_enter,
                     last_reject=(_LAST_REJECT or None)),
+                # Advisory only: top liquid Lighter markets this arm is not
+                # currently scanning (for measured universe-evolution reviews).
+                "evolve": {
+                    "expand_candidates": universe_expand_candidates(BOT, universe),
+                },
             }
             payload.update(extra_extra or {})
             try:
