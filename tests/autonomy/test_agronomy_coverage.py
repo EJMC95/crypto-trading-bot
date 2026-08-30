@@ -47,6 +47,9 @@ AGRONOMY_COVERAGE_OK = {
         "NOT A BOOK — a market-data publisher. It holds no position, has no "
         "entry rule and no lever surface, so every one of this organ's six "
         "checks is undefined for it (the ROSTER_NON_BOOKS shape (kx)).",
+    "book-bezos-lshadow":
+        "thin wrapper over lighter_book_douglas_bot with a smaller starting "
+        "equity; its BookSpec is identical to douglas and would duplicate it.",
 }
 
 
