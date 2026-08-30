@@ -666,7 +666,11 @@ STOCK_STALE_SECONDS = 26 * 3600
 # outage still shows, but a normal 5-min cadence does not read as "down".
 SLOW_LOOP = {"perps-donchian-breakout",
              "perps-funding-carry",  # 5-min loop: funding only changes hourly
-             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria"}  # freqtrade 5m bots
+             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria",
+             # [2026-08-29] georgia and georgia-v3 run the same 300s loop as
+             # mum/avo via lighter_avo_live_bot.py — without this their -lighter
+             # rows got the 180s default and showed stale every cycle.
+             "freqtrade-georgia", "freqtrade-georgia-v3"}  # freqtrade 5m bots
 SLOW_LOOP_STALE_SECONDS = 15 * 60
 # The listing sniper publishes once per scan cycle, and every ~5th cycle is a
 # full exchange-list reload that can run 8-9 minutes when slow exchanges hit
@@ -692,6 +696,13 @@ VARIANT_STALE_SECONDS = {
     # go-live rests on). ~2 missed publishes, matching the Funding Farmer's.
     "lighter-ticket-taker-lighter":  15 * 60,
     "lighter-ticket-taker-lshadow":  15 * 60,
+    # [2026-08-29] Live family bots publish telemetry every TELEMETRY_SECONDS
+    # (60s default) with trading passes at LOOP_SECONDS (300s).  ~5 missed
+    # telemetry publishes ≈ one full trading loop, so 6min keeps them fresh
+    # on the dashboard without false staleness alarms.
+    "freqtrade-mum-lighter":         6 * 60,
+    "freqtrade-avo-maria-lighter":   6 * 60,
+    "freqtrade-georgia-lighter":     6 * 60,
 }
 
 
@@ -3552,17 +3563,26 @@ def render():
     # get a muted line so the compressed gate ladder is visible at a glance.
     live_total_line = ""
     if n_live_bots:
+        # Return % across the live fleet: pnl / contributed capital.
+        # Contributed = equity - pnl_abs for each bot (what the operator put in).
+        _live_contrib = sum(
+            max((r.get("equity") or 0) - (r.get("pnl_abs") or 0), 0.01)
+            for r in live_rows if r.get("equity") is not None)
+        _live_pct = (f' ({pct(live_pnl / _live_contrib)})'
+                     if _live_contrib > 0 else "")
         live_total_line += (
             f'<span style="border:1px solid #1a7f37;border-radius:6px;padding:2px 9px;'
             f'background:#1a7f3718;font-weight:600">🟢 LIVE · Lighter '
             f'<b>{money(live_equity)}</b> eq · '
-            f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
+            f'<b class="{cls(live_pnl)}">{money(live_pnl)}{_live_pct}</b> P&amp;L · '
             f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span>')
     if n_shadow_bots:
+        _sh_start = n_shadow_bots * PAPER_START_EQUITY
+        _sh_pct = (f' ({pct(shadow_pnl / _sh_start)})' if _sh_start > 0 else "")
         live_total_line += (
             f'<span class="muted" style="border:1px solid #30363d;border-radius:6px;'
             f'padding:2px 9px">shadow/testnet <b class="{cls(shadow_pnl)}">'
-            f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
+            f'{money(shadow_pnl)}{_sh_pct}</b> · {n_shadow_bots} bot'
             f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
 
     # [2026-08-04 (iy)] The legacy paper-cohort spans render ONLY when their
