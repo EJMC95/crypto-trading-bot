@@ -277,6 +277,23 @@ POLICY_ERA = {
         "book from 13-Jul for a STRATEGY change — a book can have an earlier "
         "hypothesis era than its accounting era, and the later of the two is "
         "what a promotion sample may use."),
+    # [2026-08-26] EXACT-KEY on purpose (era_base matches exact before the
+    # suffix strip): the LIVE row only. The shadow twin keeps 17-Jul — its
+    # ledger always ran the declared policy; scoping both would discard the
+    # 195-close sample that IS the go-live case.
+    "freqtrade-georgia-lighter": (
+        "2026-08-26",
+        "live-host exit parity fix: for its first 4 days on the (ta) "
+        "sub-account the live arm ran WITHOUT DayTraderGated's trailing ATR "
+        "ratchet (fixed -5% stop instead; 0 trailing closes in 51 vs the "
+        "shadow's 106 of 207) and WITHOUT the trend_breakout veto on the "
+        "range_top exit signal (24 of 51 closes were "
+        "long-trend-breakout_range_top at 15m median hold — a combination "
+        "the shadow's ledger cannot book at all). That sample is a different "
+        "exit policy in kind, not this book's record; pooling it into the "
+        "fixed arm's grade is the silent-pooling hazard the (hm) bracket "
+        "precedent names. The row was FLAT at the boundary, so no straddlers "
+        "exist."),
     "freqtrade-dad": (
         "2026-07-17",
         "family book, same lighter_family_bot accrual fix, 4 closes opened "
@@ -690,6 +707,128 @@ def retired_sleeves(extra):
         return frozenset()
 
 
+def published_class_screen(extra):
+    """A book's OWN declared instrument-class screen: True / False / None.
+
+    THE ONE OWNER of "what class screen does this book publish". `(pf)` gave
+    the retrofitted books the declaration and `(pj)` finished the roster;
+    `audit_book_overlap.living_gates` reads the same field to answer a
+    DIFFERENT question (is this book a rival for that supply?) and imports this
+    rather than carrying its own copy — `(hj)`'s rule, and the direction
+    `audit_ledger_integrity` already established (a script imports the shipped
+    owner, never the reverse).
+
+    TWO PUBLISH SHAPES, both accepted: top level (💸 Farmer, 🛢️ Garrett) or
+    under `caps` (🌾 carry, 🎸 Barnesy, 🏦 Rich Dad). `(pj)` records what
+    knowing only one of them cost — a guard hours old reddening a book that had
+    done nothing wrong.
+
+    THREE-VALUED, and the third value is load-bearing. `None` means the book
+    does not publish a screen, and it must NOT be read as either answer: an
+    unpublished screen may neither manufacture a finding nor erase one (I6, and
+    `(ph)`'s corollary). A non-bool value — `"true"`, `1`, `[]` — is `None`,
+    not truthy: `(ph)` found that exact hole in its own first draft.
+    """
+    try:
+        e = extra if isinstance(extra, dict) else {}
+        caps = e.get("caps") if isinstance(e.get("caps"), dict) else {}
+        co = e.get("crypto_only", caps.get("crypto_only"))
+        return co if isinstance(co, bool) else None
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def class_split(rows, screen, is_crypto=None, pair_of=None):
+    """The graded sample split by instrument class — REPORTED, never a bar.
+
+    [2026-08-17] WHY THIS EXISTS. `(pf)` measured that 9 of 🌾 carry's 10
+    graded closes and 9 of 9 of 🎸 Barnes's are instruments their own screens
+    stopped admitting on 13-Aug `(lk)`/`(lv)`, and named the right response in
+    its own words: *"REPORT the class split beside the pooled grade, do not
+    re-cut the sample."* It then shipped the DECLARATION (`caps.crypto_only`)
+    and left the report — so the split stayed *derivable* and the docket item
+    an operator actually acts on still showed the pooled number alone. Both
+    that review and this one re-derived it by hand from the raw ledger.
+
+    That is the same defect the cluster-`t` publish closed one field over, and
+    the argument transfers verbatim: **a number a decision depends on must be
+    READABLE, not recomputable.** Measured on the live payload the day this
+    shipped, era-scoped through this module's own `era_rows`:
+
+        book                          pooled          still-tradeable
+        ⚖️ perps-funding-spread     n=91  −$31.16     n=70  +$5.32
+        🎯 lighter-perp-sniper      n=29   −$3.08     n=6   +$2.21
+        🌾 perps-funding-carry      n=10  −$15.45     n=1   −$0.49
+        🎸 band-barnes              n=9    −$1.45     n=0
+
+    Four books on the decision docket, two of them POSITIVE on the population
+    they can still enter. Retiring either on the pooled number is an I17 call
+    made on a policy the book no longer runs.
+
+    **THIS DOES NOT MOVE ANY SAMPLE, ERA OR BAR.** `BAR_NAMES` is untouched and
+    `grade()` never sees this. `(pf)` ruled the era stays put — CLAUDE.md names
+    a universe change as ordinary tuning, and a narrowing is that act mirrored;
+    re-cutting here would make the 30-day bar unreachable by design. The
+    blessed precedent is `(jg)`/`(ki)` on ⚖️ Counterweight: report beside, do
+    not re-cut.
+
+    `screen` is the book's own `published_class_screen`, and the three values
+    route differently — this is the whole reason it is passed rather than
+    inferred:
+      * `True`  — the off-class rows are a REMOVED population. Decision-relevant.
+      * `False` — the book deliberately trades both `(pj)`; descriptive only.
+      * `None`  — unpublished. Descriptive only, and explicitly NOT a finding.
+
+    FAIL-SILENT, in the only safe direction: no classifier, or one that raises,
+    publishes NOTHING rather than a guess. An absence here must read as "could
+    not classify", which is why `off_class.n == 0` is published whenever the
+    classifier DID run — `{}` and `{n: 0}` are the byte-identical pair I18
+    exists to separate, and here they are the difference between "this verdict
+    is clean" and "nobody looked".
+
+    `pair_of` extracts the pair from a row, defaulting to `r[6]` — the grader's
+    row shape with the pair appended. Passed explicitly by consumers whose rows
+    are shaped differently, the `drop_retired_sleeves` contract.
+    """
+    if is_crypto is None or not rows:
+        return None
+    get = pair_of if pair_of is not None else (
+        lambda r: r[6] if len(r) > 6 else None)
+    cry, oth = [], []
+    try:
+        for r in rows:
+            (cry if is_crypto(get(r)) else oth).append(r)
+    except Exception:      # noqa: BLE001 — a lost annotation, never a guess
+        return None
+
+    def _side(rs):
+        if not rs:
+            return {"n": 0, "net_usd": 0.0}
+        st = stats([(r[0], r[1], r[2]) for r in rs])
+        if st.get("n", 0) < 2:
+            return {"n": st.get("n", 0),
+                    "net_usd": round(sum((r[1] or 0) for r in rs), 2)}
+        return {"n": st["n"], "net_usd": round(st["realised_usd"], 2),
+                "mean_pct": round(100 * st["mean_pct"], 3),
+                "t": round(st["t"], 2)}
+
+    out = {"screen": screen, "on_class": _side(cry), "off_class": _side(oth)}
+    # The one sentence a reader needs, spelled out rather than left to be
+    # inferred from two dicts — (I8) a report whose consumer is a decision must
+    # name the thing the decision is about.
+    if screen is True and out["off_class"]["n"]:
+        out["why"] = (
+            f"{out['off_class']['n']} of {len(rows)} graded closes are "
+            f"instruments this book's own published screen now REFUSES "
+            f"({out['off_class']['net_usd']:+.2f} of "
+            f"{out['on_class']['net_usd'] + out['off_class']['net_usd']:+.2f}). "
+            f"On what it can still enter: n={out['on_class']['n']}, "
+            f"{out['on_class']['net_usd']:+.2f}. The era is deliberately NOT "
+            f"re-cut ((pf)); this is reported beside the pooled grade so an "
+            f"I17 call is not made on a policy the book no longer runs.")
+    return out
+
+
 def drop_retired_sleeves(rows, retired, tag_of=None):
     """(kept, dropped_by_sleeve) — rows minus those a RETIRED sleeve produced.
 
@@ -754,6 +893,67 @@ def drop_retired_sleeves(rows, retired, tag_of=None):
     return kept, dropped
 
 
+def is_phantom_close(r):
+    """[2026-08-25 (th)] True for a ledger row that is a halt/flatten EVENT
+    wearing a close's shape: exactly $0.00 P&L with NO entry price. The
+    signature — never the reason string (a real forced-flatten loss keys the
+    same reason and must stay in the sample) and never timestamp inversion
+    (verified to hit a real economic close). Fail-open: anything unparseable
+    is NOT a phantom — this filter must never be able to silently shrink a
+    graded sample beyond its exact signature.
+
+    [2026-08-28 (vd)] IT SPEAKS BOTH LEDGER SHAPES NOW, and the single-shape
+    version was a loaded gun pointed at every future consumer.
+
+    `bot_pnl_store.fetch_paper_trades` NORMALISES its rows to the freqtrade
+    shape — `profit_abs` / `open_rate` (bot_pnl_store.py:91,104) — which is what
+    this predicate was written against. The public `/trades.json` endpoint
+    serves the RAW column names, `pnl_abs` / `entry_price`. So on a feed row
+    `r.get("profit_abs")` is None -> `float(None or 0.0) == 0.0` is TRUE, and
+    `r.get("open_rate")` is None is TRUE: **every single feed row classified as
+    a phantom.**
+
+    That is not hypothetical. A sweep of this class recommended adding this
+    filter to `scripts/ceiling.py`, which reads `/trades.json` — shipping that
+    recommendation verbatim would have blanked the sample for every book in the
+    fleet. It was caught because a probe of mine returned "9000 phantoms of
+    9000 rows", a number absurd enough to disbelieve.
+
+    Accepting both shapes makes the next consumer correct BY CONSTRUCTION
+    rather than correct if it happens to read the right feed. Key PRESENCE
+    selects the shape, never the value: a DB row legitimately carries
+    `open_rate: None` for a missing fill price, so falling back on a None VALUE
+    would silently re-read the wrong column on exactly the rows that matter.
+
+    DB-shape behaviour is unchanged byte-for-byte — pinned by a test that runs
+    both shapes over the same rows and asserts an identical verdict set.
+
+    AND A ROW MUST POSITIVELY CARRY ONE OF THE TWO SHAPES TO BE JUDGED AT ALL.
+    The first cut of the widening fell through to the raw branch for a row with
+    NEITHER shape's keys, read two absent fields as `None`, and returned True —
+    so **every key-less row was classified as a phantom and dropped.** The
+    experiment judge's own `--selftest` caught it within the minute: its
+    synthetic rows carry `profit_ratio` and `close_ts` and no price fields, so
+    the paired bar collapsed to `n_shadow 0 / n_live 0` and the promotion
+    assertion failed.
+
+    That is this docstring's fail-open promise violated by its own
+    implementation, and it is the direction that matters — a filter able to
+    silently shrink a graded sample is strictly worse than one that misses a few
+    events. Unparseable now means NOT a phantom, as promised.
+    """
+    try:
+        if "profit_abs" in r or "open_rate" in r:      # the normalised shape
+            pnl, rate = r.get("profit_abs"), r.get("open_rate")
+        elif "pnl_abs" in r or "entry_price" in r:     # the raw /trades.json shape
+            pnl, rate = r.get("pnl_abs"), r.get("entry_price")
+        else:
+            return False                               # neither shape: fail OPEN
+        return float(pnl or 0.0) == 0.0 and rate is None
+    except (TypeError, ValueError):
+        return False
+
+
 def era_rows(bot, rows, parse=None, detail=False):
     """(era_scoped, all_time, era_iso) — THE SINGLE OWNER of "which of a book's
     trades describe the book as it runs today".
@@ -806,11 +1006,19 @@ def era_rows(bot, rows, parse=None, detail=False):
         why = declared_why
     p = _era_parse(parse)
     all_time = [(r[0], r[1], r[2]) for r in rows]
-    scoped = [(r[0], r[1], r[2]) for r in rows
-              if in_era(r[3] if len(r) > 3 else None, era_epoch, p)]
+    # [2026-08-17] Also kept in FULL row shape, so a consumer needing a column
+    # `stats()` does not take (the pair, for `class_split`) selects the
+    # era-scoped set from THIS owner instead of re-deriving the predicate.
+    # Re-filtering outside would be a second copy of the very plumbing `(hq)`
+    # was extracted to prevent — importing the scoring while re-deriving the
+    # sample is how the review and the grader disagreed about one book.
+    scoped_rows = [r for r in rows
+                   if in_era(r[3] if len(r) > 3 else None, era_epoch, p)]
+    scoped = [(r[0], r[1], r[2]) for r in scoped_rows]
     if not detail:
         return scoped, all_time, era_iso
-    return {"scoped": scoped, "all_time": all_time, "iso": era_iso,
+    return {"scoped": scoped, "scoped_rows": scoped_rows,
+            "all_time": all_time, "iso": era_iso,
             "epoch": era_epoch, "source": source, "why": why,
             "declared_since": declared_iso, "declared_why": declared_why,
             "stamp_since": st_iso, "stamp_run_n": st_n,
@@ -826,6 +1034,66 @@ def era_rows(bot, rows, parse=None, detail=False):
 #: legs close in a batch and their returns share that instant's move — the
 #: single largest source of dependence in this fleet's ledgers.
 CLUSTER_WINDOW_S = 60.0
+
+
+def cluster_se(values, keys):
+    """(se_cr, n_clusters, max_cluster) for the mean of `values` clustered by
+    `keys` — THE ONE OWNER OF THE ARITHMETIC. `(None, G, m)` on a shape this
+    estimator cannot judge.
+
+        SE_cr = sqrt( G/(G-1) * sum_g ( sum_{i in g} (x_i - xbar) )^2 ) / n
+
+    [2026-08-26] EXTRACTED, because the owner could only be reached through ONE
+    hard-coded cluster DEFINITION. `cluster_stats` builds its groups internally
+    by scanning timestamps against `CLUSTER_WINDOW_S`, so a study that needs to
+    cluster by coin, coin-day or entry-day had no way in and re-implemented the
+    estimator instead. Two did — `study_mum_supply_2026-08-26.py` and
+    `study_sniper_exit_shape_2026-08-20.py` — and their own docstrings say so
+    ("same estimator as golive_readiness.cluster_stats, generalised to an
+    arbitrary cluster key"). That is "A SECOND COPY OF A RULE IS A SECOND RULE"
+    arriving through a real gap in the interface rather than through
+    carelessness, which is why the fix is an entry point and not a scolding.
+
+    THEY HAD ALREADY DRIFTED, and it is the dangerous direction. MEASURED the
+    day this shipped, on a near-cancelling sample whose honest iid t is 1.94:
+
+        study_mum_supply copy    t_cluster = 2.38e+16
+        study_sniper_exit copy   t_cluster = 2.38e+16
+        this owner               t_cluster = None      <- fails CLOSED
+
+    Both copies reproduce the `(kg)` degenerate-t pathology (win 100%, t=6.1e15)
+    that the guard below was written to kill — a fix made once and left undone
+    in two places. Not contrived for this fleet either: the guard fires when a
+    cluster's demeaned values cancel, which is the DESIGN of a delta-neutral
+    basket. ⚖️ Counterweight closes ten hedged legs in one instant.
+
+    Fail-CLOSED on G < 2 (a single cluster has no between-cluster variation, so
+    any value would be invented) and on a near-zero `se_cr`, which is not
+    evidence of enormous significance but a shape this estimator cannot judge.
+    Absent means "not computable", never "fine".
+    """
+    try:
+        n = len(values)
+        if n < 2 or len(values) != len(keys):
+            return None, 0, 0
+        mean = sum(values) / n
+        sums, sizes = {}, {}
+        for x, k in zip(values, keys):
+            sums[k] = sums.get(k, 0.0) + (x - mean)
+            sizes[k] = sizes.get(k, 0) + 1
+        g = len(sums)
+        if g < 2:
+            return None, g, (max(sizes.values()) if sizes else 0)
+        meat = sum(v * v for v in sums.values())
+        se_cr = math.sqrt((g / (g - 1.0)) * meat) / n
+        var = sum((x - mean) ** 2 for x in values) / (n - 1)
+        se_iid = math.sqrt(var) / math.sqrt(n) if var > 0 else 0.0
+        # THE (kg) DEGENERACY GUARD, now in the ONE place every caller reaches.
+        if not (se_cr > 0) or (se_iid > 0 and se_cr < se_iid * 1e-6):
+            return None, g, max(sizes.values())
+        return se_cr, g, max(sizes.values())
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return None, 0, 0
 
 
 def cluster_stats(rows, mean, sd, n):
@@ -868,11 +1136,15 @@ def cluster_stats(rows, mean, sd, n):
                 cur, cur_ts = [r[0]], ts
         if cur:
             groups.append(cur)
-        g = len(groups)
-        if g < 2:
+        # [2026-08-26] THE ARITHMETIC IS `cluster_se`'s, not a second copy —
+        # this function's job is the batched-close CLUSTER DEFINITION and
+        # nothing else. Flatten the groups it built into (value, key) pairs and
+        # hand them over, so a bug fixed there is fixed for every caller.
+        vals = [x for grp in groups for x in grp]
+        gkeys = [i for i, grp in enumerate(groups) for _ in grp]
+        se_cr, g, max_batch = cluster_se(vals, gkeys)
+        if se_cr is None:
             return None
-        meat = sum((sum(x - mean for x in grp)) ** 2 for grp in groups)
-        se_cr = math.sqrt((g / (g - 1.0)) * meat) / n
         se_iid = sd / math.sqrt(n)
         # DEGENERACY GUARD. When the batches' deviations cancel, `meat` goes to
         # ~0 and this would report an astronomically large `t_cluster` and
@@ -881,10 +1153,8 @@ def cluster_stats(rows, mean, sd, n):
         # exactly-cancelling case by accident. A near-zero between-batch
         # variance is not evidence of enormous significance; it is a shape
         # this estimator cannot judge, so it fails CLOSED like the G<2 case.
-        if not (se_cr > 0) or se_cr < se_iid * 1e-6:
-            return None
         return {"n_clusters": g,
-                "max_batch": max(len(x) for x in groups),
+                "max_batch": max_batch,
                 "t_cluster": round(mean / se_cr, 2),
                 "n_eff": round(n * (se_iid / se_cr) ** 2, 1),
                 "window_s": CLUSTER_WINDOW_S}
@@ -924,7 +1194,12 @@ def stats(rows, book_usd=None):
         dd = min(dd, eq - peak)
     wins = sum(1 for x in pct if x > 0)
     realised = sum(r[1] or 0 for r in rows)
+    # [2026-08-20 (tz)] `se_pct` — computed one line above inside `t` and then
+    # thrown away, which is why the horizon could only ask "is the mean
+    # negative?" and never "is it negative BEYOND NOISE?". Published so a
+    # verdict can be power-aware. Reported, never a bar.
     out.update(days=days, mean_pct=mean, t=t, h1=h1, h2=h2,
+               se_pct=(sd / math.sqrt(n)) if n > 1 and sd > 0 else None,
                # [2026-08-06 (kw)] The cluster-robust read of `t`, beside it.
                # REPORTED, NEVER A BAR: `BAR_NAMES` is the published contract
                # and `grade()` is byte-unchanged, exactly as (kg) did with
@@ -1275,6 +1550,43 @@ HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 # A verdict can flip on one trade, so a single reading is noise. The book must
 # hold a stuck verdict for DOCKET_DAYS, and the clock RESETS the moment the
 # verdict changes — a book that recovers leaves the docket and starts over.
+#: [2026-08-20 (tz)] The one-sided bar the horizon uses to ask whether a
+#: negative mean is negative BEYOND NOISE. The SAME standard `fleet_allocation`
+#: applies to feed a book, deliberately: the fleet should not doubt a book on
+#: one bar and feed it on another.
+#:
+#: [2026-08-20] AND THE SAME INSTRUMENT, not merely the same number. `horizon_crit`
+#: below defers to `fleet_allocation.t_crit`, so a thin sample is doubted with a
+#: WIDER interval — which in this direction means a book is far harder to route
+#: onto the retirement docket on a handful of trades. This constant survives as
+#: the large-sample limit and the env lever, exactly as it does over there.
+HORIZON_Z = float(os.environ.get("GOLIVE_HORIZON_Z", "1.28"))
+
+
+def horizon_crit(n):
+    """The critical value for a sample of `n`, from the ONE owner of that rule.
+
+    Imported lazily because `fleet_allocation` imports `era_rows` from THIS
+    module (inside a function, so there is no cycle at import time — but a
+    module-level import here would create one).
+
+    FAILS CLOSED IN THE FEED DIRECTION: any import or arithmetic trouble returns
+    the large-sample floor, which is the SMALLEST value this can legitimately
+    take, so the upper bound is as tight as it ever gets and `mean_excluded`
+    is at its most permissive... which is the wrong way round for a retirement
+    verdict. So the caller must treat a None as "not excluded" — see
+    `gate_horizon`. A second copy of the t rule is deliberately NOT provided:
+    that would be a second rule ((hj)), and the two would drift exactly where it
+    matters least visibly.
+    """
+    try:
+        from fleet_allocation import t_crit             # noqa: PLC0415
+    except Exception:                                   # noqa: BLE001
+        return None
+    try:
+        return t_crit(n, floor=HORIZON_Z)
+    except Exception:                                   # noqa: BLE001
+        return None
 DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: Verdicts that mean "not on a path to the gate at the current trajectory".
 #: `no_rate` is deliberately NOT here unconditionally — a newborn book is
@@ -1283,7 +1595,94 @@ DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: joins only once the book has HAD its window and still cannot produce a rate
 #: (see `_docket_stuck`), which is I17's own wording — "still undecidable at
 #: the floor after its window".
+#: [2026-08-20 (tz)] `underpowered` is DELIBERATELY ABSENT from this tuple, and
+#: that absence is the whole point of the verdict. A book whose mean is negative
+#: but whose sample cannot EXCLUDE a positive mean has not been measured to
+#: fail — it has not been measured. Docketing it starts a keep-or-retire clock
+#: on noise, and the clock is what reaches the operator.
 DOCKET_VERDICTS = ("unreachable", "undecidable")
+
+#: [2026-08-17] BOOKS WHOSE KEEP-OR-RETIRE CALL IS ALREADY MADE, WITH A DATE.
+#:
+#: THE INCIDENT. Measured on the live payload: of the SEVEN matured docket
+#: items, **two were already decided** — 🌾 carry `DECIDED-WAIT 5-Aug, ride to
+#: ~30-Aug` and ⚖️ Counterweight `~28-Aug`, both recorded in OPERATOR_QUEUE.md
+#: with options, evidence and a date. The docket re-asked for those calls every
+#: publish anyway, because it can see a verdict and not a decision. That is 29%
+#: of the docket as pure noise, on the surface whose entire job is to be acted
+#: on — the cry-wolf failure `(gl)` names and `(lh)` re-learned: *"a detector
+#: that flags everything trains the operator to ignore it."*
+#:
+#: THIS IS A DEFERRAL, NOT A SILENCER, and three properties keep it one:
+#:   1. **It EXPIRES.** Past its date the book returns to the docket carrying
+#:      `decision_overdue`, which is louder than the verdict it replaced. A
+#:      deferral that outlived its date would be exactly the silencer this must
+#:      not become.
+#:   2. **The clock keeps running underneath.** `seen` is unaffected, so when a
+#:      deferred book returns its `days_held` is honest rather than restarted.
+#:   3. **Fail toward ESCALATION.** An unparseable or missing date defers
+#:      NOTHING. Every other fail-safe in this file leans toward silence
+#:      because the cost of a false alarm is attention; here the cost of
+#:      silence is a book nobody decides, so the direction inverts.
+#:
+#: Each entry names the date, the reason, and WHERE the decision is recorded —
+#: an entry that cannot be traced to an operator act is not a decision, it is
+#: someone's opinion, and this table would become the way to hide a book.
+DECIDED_UNTIL = {
+    "perps-funding-carry": (
+        "2026-08-30",
+        "DECIDED-WAIT 5-Aug (operator, option A): ride the era window to "
+        "~30-Aug; both widening levers refused on measurement ((it)). "
+        "OPERATOR_QUEUE.md item 2.",
+    ),
+    "perps-funding-spread": (
+        "2026-08-28",
+        "Pre-registered in (jg)'s OWN revert criterion and carried in "
+        "CLAUDE.md: deciding early is the (hs)/(ia) trap in reverse. "
+        "OPERATOR_QUEUE.md item 2.",
+    ),
+}
+
+
+def decided_until(bot, now=None, parse=None):
+    """(deferred, until_iso, why) — is this book's call already made, with a
+    date that has not passed yet? See `DECIDED_UNTIL`.
+
+    Keyed the same way as `POLICY_ERA`: exact match first, then ONE suffix
+    strip — 💸 the Farmer is itself named after the venue suffix, so a double
+    strip scopes the live row and silently misses its twin `(hc)`.
+    """
+    key = None
+    if bot in DECIDED_UNTIL:
+        key = bot
+    else:
+        base = str(bot).rsplit("-", 1)[0]
+        if base in DECIDED_UNTIL:
+            key = base
+    if key is None:
+        return False, None, None
+    until, why = DECIDED_UNTIL[key]
+    p = parse or parse_stamp
+    try:
+        due = p(until)
+        cur = p(now) if isinstance(now, str) else now
+        if due is None or cur is None:
+            return False, until, why          # unreadable -> ESCALATE
+        # NAIVE-vs-AWARE, and it is not a nicety: `parse_stamp` returns a NAIVE
+        # datetime for a bare `"2026-08-30"` and an AWARE one for a full stamp,
+        # so comparing them raises TypeError — which the guard below would
+        # swallow into "escalate". Caught by this function's own selftest on
+        # its first run: every entry failed open and the table would have
+        # looked configured while deferring nothing, the registered-but-inert
+        # shape (I18). Declared dates are UTC calendar days by convention.
+        from datetime import timezone as _tz
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=_tz.utc)
+        if cur.tzinfo is None:
+            cur = cur.replace(tzinfo=_tz.utc)
+        return (cur < due), until, why
+    except Exception:      # noqa: BLE001
+        return False, until, why              # unreadable -> ESCALATE
 #: [(lf)] THE CLOCKS LIVE IN THEIR OWN KEY, and that is a correctness choice
 #: rather than tidiness. `save_state` replaces a payload WHOLESALE, so while the
 #: seen-map rode inside `golive-readiness` a single unreadable prior forced a
@@ -1500,10 +1899,84 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     out["rate_cpd"] = _fin(rate, 2)
 
     mean = s.get("mean_pct")
+
+    # [2026-08-20 (tz)] THE MEAN BAR IS POWER-GATED NOW, and this is a
+    # CORRECTNESS fix rather than a softening.
+    #
+    # This branch used to declare `unreachable` — "more of the same closes
+    # cannot flip mean/t/halves" — on `mean <= 0` ALONE, at ANY n. That claim
+    # is simply FALSE on a thin sample: with n=10 and a wide SE, a mean of
+    # −0.155% is entirely consistent with a true mean of +2%, and more closes
+    # can absolutely flip it. Measured the day this shipped, 🌾 carry — the
+    # fleet's best-evidenced book — carried `unreachable` on **n=10**.
+    #
+    # It matters because `unreachable` is in DOCKET_VERDICTS: it starts I17's
+    # keep-or-retire clock. So the pipeline read `mean <= 0 on any n` ->
+    # unreachable -> docket -> retire, and a book could be routed toward
+    # retirement by nothing more than noise on ten trades.
+    #
+    # The honest test is whether the data EXCLUDES a positive mean: the
+    # one-sided UPPER bound `mean + z*se` at the same z=1.28 the fleet already
+    # uses for I16's lower bound. Upper bound still above zero => the book is
+    # UNDERPOWERED, not unreachable; it needs closes, not a verdict. Only when
+    # the upper bound sits at or below zero has the sample actually ruled a
+    # positive mean out.
+    se = s.get("se_pct")
+    # [2026-08-20] the critical value comes from the SAMPLE, via the allocation
+    # organ's single owner of that rule. `None` (import unavailable) means the
+    # sample has NOT been shown to exclude a positive mean — absence of the
+    # instrument is never evidence for a retirement verdict (I6).
+    hcrit = horizon_crit(n)
+    upper = ((mean + hcrit * se)
+             if (mean is not None and se and hcrit is not None) else None)
+    # Has the SAMPLE excluded a positive mean? An unmeasurable SE (n<2, zero
+    # dispersion) is NOT an exclusion — absence of evidence never promotes a
+    # book toward the docket (I6).
+    mean_excluded = upper is not None and upper <= 0
+    if not bars["mean"] and not mean_excluded and bars["maxdd"]:
+        # Enough closes to DECIDE the sign, at the current mean and dispersion:
+        # se must fall below |mean|/z, and se scales as 1/sqrt(n).
+        n_dec = None
+        try:
+            if mean < 0:
+                n_dec = int(math.ceil(
+                    n * ((hcrit or HORIZON_Z) * se / abs(mean)) ** 2))
+        except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+            n_dec = None
+        # [2026-08-20] `upper` may be None here — the branch is reached whenever
+        # the sample has NOT been shown to exclude a positive mean, and "no
+        # upper bound could be computed" is one of those ways (n<2, zero
+        # dispersion, or the critical-value owner absent from this image). The
+        # first draft formatted it unconditionally and raised TypeError on
+        # exactly the fail-closed path it exists to serve, which is the (po)
+        # shape: the safe branch was the untested one. Found by its own
+        # mutation test on the day it was written.
+        ub = f"{100 * upper:+.3f}%" if upper is not None else "un-computable"
+        out.update(
+            verdict="underpowered",
+            n_req_decide=n_dec,
+            why=(f"mean {100 * mean:+.3f}% is below the bar but its upper "
+                 f"bound {ub} is still ABOVE zero — this sample "
+                 f"has not excluded a positive mean, so more closes CAN flip "
+                 f"it. Needs ~{n_dec} closes to decide the sign"
+                 if n_dec else
+                 f"mean {100 * mean:+.3f}% is below the bar but its upper "
+                 f"bound ({ub}) is not at or below zero — not yet decidable"))
+        if rate and rate > 0 and n_dec and n_dec > n:
+            out["eta_days"] = _fin((n_dec - n) / rate, 1)
+        return out
+
+    # Genuinely unreachable: the sample has EXCLUDED a positive mean, or the
+    # in-era drawdown is blown (which cannot un-blow at any n).
     if not bars["mean"] or not bars["maxdd"]:
         parts = []
         if not bars["mean"]:
-            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
+            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
+                         f"{100 * upper:+.3f}% <= 0 — the sample has EXCLUDED "
+                         "a positive mean, so more of the same closes cannot "
+                         "flip mean/t/halves"
+                         if upper is not None else
+                         f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
                          "same closes cannot flip mean/t/halves")
         if not bars["maxdd"]:
             dd = s.get("max_dd_frac")
@@ -1833,10 +2306,16 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             since = was["since"]
         else:
             since = now_iso              # new spell (or a changed reason)
+        # [2026-08-17] The clock is recorded BEFORE the deferral check, so a
+        # deferred book's `days_held` stays honest when its date passes — see
+        # `DECIDED_UNTIL` property 2. Deferring is not a reason to forget.
         seen[bot] = {"reason": reason, "since": since}
         held = _days_between(since, now_iso)
         if held is None or held < docket_days:
             continue
+        deferred, _until, _why_dec = decided_until(bot, now_iso)
+        if deferred:
+            continue                         # already decided, date not passed
         hz = c.get("hz") or {}
         docket.append({
             "book": bot, "reason": reason, "since": since,
@@ -1846,7 +2325,21 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "since_is_floor": False,
             "n": c.get("n"), "mean_pct": c.get("mean_pct"), "t": c.get("t"),
             "raw_days": hz.get("raw_days"),
-            "why": hz.get("why") or "",
+            # [2026-08-17] The class split rides on the DOCKET ITEM, not only
+            # on the book payload, because this is the surface an operator acts
+            # on and the two are read by different people at different times.
+            # Only when it is decision-relevant — `class_split` sets `why` only
+            # for a book whose OWN published screen (True) now refuses part of
+            # its own graded sample. A book that deliberately trades both
+            # classes, or publishes no screen, adds nothing here: an
+            # unpublished screen may not manufacture a finding (I6/(ph)).
+            "class_split": ((c.get("class_split") or {})
+                            if (c.get("class_split") or {}).get("why")
+                            else None),
+            "why": " · ".join(
+                x for x in (hz.get("why") or "",
+                            (c.get("class_split") or {}).get("why") or "")
+                if x),
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
             # as a to-do list for the next session.
@@ -1858,6 +2351,17 @@ def decision_docket(current, prior, now_iso, docket_days=None):
                      "keep-or-retire (I17) — an operator decision, not a "
                      "tuning pass"),
         })
+        # [2026-08-17] A deferral that has EXPIRED is louder than the verdict
+        # it replaced, not quieter — `DECIDED_UNTIL` property 1. The book is
+        # already in the docket above (the deferral no longer skipped it); this
+        # says WHY it is worse than an ordinary entry: a decision was made, a
+        # date was set, and the date has passed.
+        if _until and not deferred:
+            docket[-1]["decision_overdue"] = {"due": _until, "why": _why_dec}
+            docket[-1]["asks"] = (
+                f"OVERDUE — a decision was recorded for this book with a date "
+                f"of {_until} and that date has passed. {_why_dec} Re-decide "
+                f"or set a new date; it is not a tuning pass either way.")
     # [(lu)] BATCH-STAMP DISCLOSURE. A clock in a batch reports its age as a
     # FLOOR.
     #
@@ -1978,6 +2482,13 @@ def book_payload(s):
     # choice to leave the gate on the iid value is deliberate and untouched.
     if isinstance(s.get("cluster"), dict):
         out["cluster"] = s["cluster"]
+    # [2026-08-17] The instrument-class split, on the same footing and for the
+    # same reason as `cluster` above: a number the keep-or-retire decision
+    # depends on, which two consecutive reviews had to re-derive from the raw
+    # ledger because the grader would not say it. See `class_split` — REPORTED,
+    # never a bar, and it moves no sample.
+    if isinstance(s.get("class_split"), dict):
+        out["class_split"] = s["class_split"]
     return out
 
 
@@ -2082,8 +2593,138 @@ def _selftest_sleeves():
     assert dropped6 == {"xsect": 49}
 
 
+def _selftest_class_split():
+    """[2026-08-17] The class split. See `class_split` for the incident.
+
+    The shapes that matter are the THREE-VALUED screen and the fail-silent
+    direction: a wrong split riding on a keep-or-retire call is worse than no
+    split at all, and `{}` vs `{n: 0}` is the I18 pair this exists to separate.
+    """
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+    def row(pct, usd, i, pair):
+        return (pct, usd, t0 + timedelta(days=i), None, None, None, pair)
+
+    # 🌾 carry's shape: one crypto close, nine off-class ones the screen refuses
+    rows = [row(-0.0016, -0.49, 0, "KAITO/USDC")] + [
+        row(-0.002, -1.66, i + 1, p) for i, p in enumerate(
+            ["WTI/USD", "WTI/USD", "WTI/USD", "WTI/USD", "SPCX/USD",
+             "SPCX/USD", "SKHY/USDC", "SKHY/USDC", "SKHY/USDC"])]
+    crypto = {"KAITO"}
+
+    def isc(pair):
+        return str(pair or "").split("/")[0].upper() in crypto
+
+    cs = class_split(rows, True, is_crypto=isc)
+    assert cs["on_class"]["n"] == 1 and cs["off_class"]["n"] == 9, cs
+    assert "REFUSES" in cs["why"], "a screened book's off-class rows are named"
+    assert cs["screen"] is True
+
+    # screen False (💸 Farmer, 🛢️ Garrett after (pj)) — the book trades both on
+    # purpose, so the split is descriptive and must NOT read as a finding.
+    cs_f = class_split(rows, False, is_crypto=isc)
+    assert cs_f["off_class"]["n"] == 9 and "why" not in cs_f, \
+        "a book that deliberately trades both classes has no removed population"
+    # screen None (unpublished) — same: may not manufacture a finding (I6).
+    cs_n = class_split(rows, None, is_crypto=isc)
+    assert cs_n["screen"] is None and "why" not in cs_n
+
+    # A CLEAN book still publishes `off_class.n == 0`. This is the whole I18
+    # point: absent means "nobody classified", 0 means "classified, none off".
+    clean = class_split([row(0.01, 1.0, i, "BTC/USDC") for i in range(4)],
+                        True, is_crypto=lambda p: True)
+    assert clean["off_class"] == {"n": 0, "net_usd": 0.0}, clean
+    assert "why" not in clean, "a clean sample is not a finding"
+
+    # FAIL-SILENT, both ways: no classifier, and one that raises.
+    assert class_split(rows, True, is_crypto=None) is None
+    def _boom(_p):
+        raise RuntimeError("scout dark")
+    assert class_split(rows, True, is_crypto=_boom) is None, \
+        "a raising classifier publishes nothing, never a guess"
+    assert class_split([], True, is_crypto=isc) is None
+
+    # `published_class_screen` — both publish shapes, and the third value.
+    assert published_class_screen({"crypto_only": True}) is True
+    assert published_class_screen({"caps": {"crypto_only": True}}) is True
+    assert published_class_screen({"crypto_only": False}) is False
+    assert published_class_screen({"caps": {}}) is None
+    assert published_class_screen({}) is None
+    assert published_class_screen(None) is None
+    for junk in ("true", 1, [], {}):
+        assert published_class_screen({"crypto_only": junk}) is None, \
+            f"a non-bool screen is UNKNOWN, never truthy: {junk!r}"
+
+    # THE BAR SET IS UNTOUCHED — this is reported, never graded.
+    s = stats([(0.01, 1.0, t0), (0.02, 2.0, t0 + timedelta(days=1)),
+               (0.03, 3.0, t0 + timedelta(days=2))])
+    s["class_split"] = cs
+    assert "class_split" not in BAR_NAMES
+    assert set(bar_map(s)) == set(BAR_NAMES), "class split adds no bar"
+    assert book_payload(s)["class_split"] is cs, "published on the payload"
+
+
+def _selftest_decided_until():
+    """[2026-08-17] The docket deferral. See `DECIDED_UNTIL` for the incident.
+
+    The three properties that keep this a deferral rather than a silencer are
+    what the assertions are about: it expires, the clock survives it, and an
+    unreadable date escalates instead of hiding a book.
+    """
+    NOW = "2026-08-17T00:00:00+00:00"
+    LATER = "2026-09-15T00:00:00+00:00"
+
+    def stuck(v="unreachable"):
+        return {"hz": {"verdict": v, "why": "w"}, "n": 9, "t": -4.0}
+
+    live = {"perps-funding-carry-lshadow": stuck(),      # DECIDED to 30-Aug
+            "band-barnes-lshadow": stuck()}              # no decision on file
+    old = "2026-08-01T00:00:00+00:00"
+    prior = {b: {"reason": "unreachable", "since": old} for b in live}
+
+    dock, seen = decision_docket(live, prior, NOW)
+    books = {d["book"] for d in dock}
+    assert books == {"band-barnes-lshadow"}, \
+        f"a decided book with an unexpired date is deferred, not docketed: {books}"
+    # PROPERTY 2 — the clock keeps running underneath the deferral.
+    assert seen["perps-funding-carry-lshadow"]["since"] == old, \
+        "deferring must not restart the clock"
+
+    # PROPERTY 1 — past the date it comes BACK, and louder.
+    dock2, _ = decision_docket(live, prior, LATER)
+    by = {d["book"]: d for d in dock2}
+    assert "perps-funding-carry-lshadow" in by, "an expired deferral returns"
+    od = by["perps-funding-carry-lshadow"].get("decision_overdue")
+    assert od and od["due"] == "2026-08-30", od
+    assert "OVERDUE" in by["perps-funding-carry-lshadow"]["asks"]
+    # and the book that was never deferred carries no overdue marker
+    assert "decision_overdue" not in by["band-barnes-lshadow"]
+    # the honest clock survives to the far side
+    assert by["perps-funding-carry-lshadow"]["days_held"] > 40
+
+    # PROPERTY 3 — an unreadable date ESCALATES. This direction is the whole
+    # safety of the table: every other fail-safe here leans toward silence.
+    d, u, w = decided_until("perps-funding-carry-lshadow", "not-a-timestamp")
+    assert d is False and u == "2026-08-30" and w, (d, u, w)
+    # a book with no entry is never deferred
+    assert decided_until("band-barnes-lshadow", NOW) == (False, None, None)
+    # keyed like POLICY_ERA: exact, then ONE suffix strip (never two)
+    assert decided_until("perps-funding-carry", NOW)[0] is True
+    assert decided_until("perps-funding-carry-lshadow", NOW)[0] is True
+    assert decided_until("perps-funding", NOW) == (False, None, None), \
+        "a double strip would scope the wrong book (hc)"
+    # every declared entry carries a date AND a traceable reason
+    for k, (dt, why) in DECIDED_UNTIL.items():
+        assert parse_stamp(dt) is not None, f"{k}: unparseable date {dt!r}"
+        assert why and "OPERATOR_QUEUE" in why or "CLAUDE.md" in why, \
+            f"{k}: a deferral must name where the decision is recorded"
+
+
 def _selftest():
     _selftest_sleeves()
+    _selftest_class_split()
+    _selftest_decided_until()
     from datetime import datetime, timedelta, timezone
     t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
@@ -2599,7 +3240,10 @@ def _selftest():
           "declared-vs-stamp max, MTM drawdown: worse-of, floors, "
           "no-series no-op, gate horizon: ready/on-track/floor/no-rate/"
           "unreachable-mean/unreachable-dd/undecidable-cap/unprojectable/"
-          "fail-closed junk + the n*(T/t)^2 pin)")
+          "fail-closed junk + the n*(T/t)^2 pin, class split: three-valued "
+          "screen, both publish shapes, clean-vs-unclassified, fail-silent, "
+          "adds no bar, docket deferral: expires-and-returns-louder, clock "
+          "survives, unreadable date escalates, one-suffix key)")
 
 
 def main():
@@ -2670,6 +3314,20 @@ def main():
               "clean-looking 'READY: none' over zero rows is the one output "
               "this grader must never produce.", file=sys.stderr)
         return 2
+    # [2026-08-25 (th)] THE PHANTOM SIGNATURE — a $0.00 close with NO entry
+    # price is a halt/flatten EVENT, not a trade (avo carried 9 of 13, five
+    # with closed_at before opened_at, one on a coin the book cannot hold).
+    # Excluded by SIGNATURE, never by reason string — georgia's TRX −$3.87
+    # `daily_loss` is a REAL forced-flatten loss and stays in the sample.
+    # Belt to the write-site tag (`extra.non_economic`); measured effect:
+    # georgia n 46→42, mean +0.1535%→+0.1681%, t unchanged 0.680 — the era
+    # is NOT invalidated (no P&L value moves; this is hygiene, not an
+    # accounting-basis change).
+    _phantoms = sum(1 for r in rows if is_phantom_close(r))
+    if _phantoms:
+        rows = [r for r in rows if not is_phantom_close(r)]
+        print(f"(phantom closes excluded by signature: {_phantoms} — "
+              f"$0.00 with no entry price)")
     books = {}
     for r in rows:
         bot = str(r.get("bot"))
@@ -2715,15 +3373,38 @@ def main():
     # unreadable summary leaves the map empty, which excludes NOTHING and grades
     # exactly as before. Fetched once, outside the loop.
     _sleeve_retired, _sleeve_err = {}, None
+    # [2026-08-17] The same sweep also collects each book's DECLARED class
+    # screen, for `class_split`. One fetch, two derivations — and the screen
+    # map is deliberately three-valued (see `published_class_screen`), so a
+    # book absent from `bot_pnl` reads None and its split is descriptive only,
+    # never a finding.
+    _class_screen = {}
     try:
         for _r in (store.fetch_bot_pnl() or []):
             _rs = retired_sleeves(_r.get("extra"))
             if _rs:
                 _sleeve_retired[str(_r.get("bot"))] = _rs
+            _class_screen[str(_r.get("bot"))] = published_class_screen(
+                _r.get("extra"))
     except Exception as e:      # noqa: BLE001 — a lost filter, never a lost grade
         _sleeve_err = f"{type(e).__name__}: {e}"
         print(f"sleeve sweep skipped (grading every sleeve): {_sleeve_err}",
               file=sys.stderr)
+    # The classifier is the venue's own answer via the scout `(ki)`/`(lc)`, and
+    # it is resolved ONCE here rather than per book. A dark or absent
+    # `fleet_bus` leaves it None and every split is simply not published —
+    # fail-SILENT, because the alternative is a guessed classification riding
+    # on a keep-or-retire decision (I6: an absence is evidence only against a
+    # control group, and there is none here).
+    _is_crypto = None
+    try:
+        import fleet_bus as _fb           # COPY'd into the freqtrade image
+        _is_crypto = getattr(_fb, "is_crypto", None)
+    except Exception:      # noqa: BLE001
+        _is_crypto = None
+    if _is_crypto is None:
+        print("class split unavailable (no fleet_bus.is_crypto) — grades "
+              "unchanged, splits omitted", file=sys.stderr)
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
         quads, integ_eps = [], []
@@ -2746,8 +3427,12 @@ def main():
             # which `era_rows` now reads to derive the LATEST policy boundary.
             # [(nk)] the sleeve tag rides at [5]: `drop_retired_sleeves` reads
             # it. Appended rather than inserted — `era_rows` indexes [0..4].
+            # [2026-08-17] the PAIR rides at [6] for `class_split`. Appended
+            # rather than inserted — `era_rows` indexes [0..4] and
+            # `drop_retired_sleeves` reads [5].
             quads.append((r.get("profit_ratio"), r.get("profit_abs"), ts,
-                          r.get("open_ts"), r.get("extra"), r.get("enter_tag")))
+                          r.get("open_ts"), r.get("extra"), r.get("enter_tag"),
+                          r.get("pair")))
         # [(nk)] COMPOSITION BEFORE TIME. A retired sleeve's trades are not this
         # book's record at all, so they are removed before the era boundary is
         # derived — otherwise a dead sleeve's policy stamps could still choose
@@ -2770,6 +3455,15 @@ def main():
         # appear, showing its era bars dark, or narrowing the window would
         # silently REMOVE the frontrunner from the report instead of demoting it.
         s, s_all = stats(parsed), stats(parsed_all)
+        # [2026-08-17] Attached to the ERA-SCOPED sample only, and rides on `s`
+        # exactly as `cluster`/`mtm` do so `book_payload` stays the one place
+        # that decides what is published. The all-time sample deliberately gets
+        # none: its whole point is the pooled reading the era replaced, and a
+        # class split on it would invite the two corrections to be combined by
+        # hand into a third number nobody measured.
+        s["class_split"] = class_split(
+            ed.get("scoped_rows") or [], _class_screen.get(bot),
+            is_crypto=_is_crypto)
         if s_all.get("n", 0) < a.min_closes:
             # [2026-08-06 (kv)] BELOW THE FLOOR IS NOT INVISIBLE ANY MORE.
             # `continue` used to be the whole story, and it hid exactly the
@@ -2798,9 +3492,14 @@ def main():
             # equities-regime (0 closes ever, ~17.2 closes/yr) is the fleet's
             # standing I17 case and it lives HERE, not in `books`. Excluding
             # them would rebuild the very blind spot (kv) closed.
+            # [2026-08-17] BELOW-FLOOR BOOKS CARRY IT TOO, and this is the
+            # branch that matters most: 🎸 Barnes lands here (9 closes after
+            # the retired sleeve drops) and it is one of the four books whose
+            # docket verdict is computed on a removed population.
             _docket_now[bot] = {"hz": hz_f, "era_days": _era_age_d(_era_ep),
                                 "n": s.get("n", 0),
-                                "mean_pct": s.get("mean_pct"), "t": s.get("t")}
+                                "mean_pct": s.get("mean_pct"), "t": s.get("t"),
+                                "class_split": s.get("class_split")}
             payload_floor[bot] = {"n_alltime": s_all.get("n", 0),
                                   "why_absent": f"below --min-closes "
                                                 f"({a.min_closes})",
@@ -2895,7 +3594,8 @@ def main():
         # not be able to answer falsely.
         _docket_now[bot] = {"hz": hz, "era_days": _era_age_d(_era_ep),
                             "n": s.get("n", 0), "mean_pct": s.get("mean_pct"),
-                            "t": s.get("t")}
+                            "t": s.get("t"),
+                            "class_split": s.get("class_split")}
         verdict = "READY" if ok else "; ".join(fails[:2])
         flag = ""
         if ok and not ok_old:
@@ -2929,6 +3629,18 @@ def main():
             _h = hz["verdict"] + (f" {hz['eta']}" if hz.get("eta") else "") \
                 + (f" ({hz['binding']})" if hz.get("binding") else "")
             flag += f"   [horizon: {_h}]"
+        # [2026-08-17] The class split reaches the TERMINAL too, not only the
+        # payload — a verdict computed on a population the book no longer
+        # admits has to be visible to whoever is reading this table, which is
+        # how `(pf)` found it in the first place. Only when decision-relevant
+        # (`class_split` sets `why` for a published-True screen with off-class
+        # rows); an unpublished or deliberately-mixed book adds nothing here.
+        _cs = s.get("class_split") or {}
+        if _cs.get("why"):
+            flag += (f"   [class: {_cs['off_class']['n']} of {s.get('n', 0)} "
+                     f"closes are OFF-SCREEN ({_cs['off_class']['net_usd']:+.2f}); "
+                     f"on-screen n={_cs['on_class']['n']} "
+                     f"{_cs['on_class']['net_usd']:+.2f}]")
         if s.get("n", 0) < 2:
             print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
                   f"{'-':>6s} {'-':>7s} {'-':>8s} {'-':>8s} {'-':>7s}  "

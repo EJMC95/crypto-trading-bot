@@ -98,7 +98,7 @@ MULT_SOFT_N = 15      # era trades before a 0.75x may publish
 # inheritance, no urgent path — see EXP_* there). v3-ONLY: the
 # BRAIN_MULT_ENGINE=v2 kill switch zeroes the expand side too, and this
 # dedicated switch stands down just the widening while reductions keep
-# working. Consumers clamp at fleet_bus.MULT_CEIL (1.5) and only SHADOW
+# working. Consumers clamp at fleet_bus.MULT_CEIL (2.0 since (sm)) and only SHADOW
 # books read mults — no live bot consumes them.
 # [2026-07-21 AUDIT FIX] accept the full stand-down synonym set (+strip):
 # the original `!= "off"` meant BRAIN_MULT_EXPAND=false / 0 / no / disabled
@@ -167,6 +167,26 @@ if MULT_ENGINE not in ("v2", "v3"):
     MULT_ENGINE = "v3"
 HALF_LIFE_DAYS = float(os.environ.get("BRAIN_HALF_LIFE_DAYS", "14"))
 VITALS_KEY = "brain-vitals"
+
+#: [2026-08-28 (vd)] THE BRAIN'S SAMPLE RECEIPT — how many halt/flatten EVENTS
+#: `_fetch_trades` dropped on the last run.
+#:
+#: It exists because verifying the phantom fix from outside was IMPOSSIBLE: the
+#: brain publishes `runs`, `vitals`, `venue_ab`, `diagnoses`, `hypotheses` and
+#: `mult_streaks`, and not one of them carries a per-book sample size. A run
+#: that excluded 13 events and a run whose import failed and excluded ZERO
+#: published byte-identical payloads — so a monitor armed on this organ could
+#: only ever time out, which is exactly what happened.
+#:
+#: `fleet_allocation` learned this the same day and publishes `n_phantom`; this
+#: is the same receipt one organ over. **0 means the filter ran and found
+#: nothing; None means it could not run.** Those must never be the same
+#: byte-string ([[guards-blind-to-their-own-refusals]]).
+#:
+#: REPORTED, never a gate (I15): nothing reads it to decide anything. It is here
+#: so the next person can answer "is the brain's sample clean?" without reading
+#: the source and guessing.
+_PHANTOM_EXCLUDED = None
 
 # [2026-07-14b DIAGNOSIS LAYER] Discriminate WHERE a negative sleeve loses:
 # entry quality / exit path / fee bleed / regime timing / venue execution.
@@ -517,6 +537,51 @@ def _fetch_trades():
             trades.extend(t for t in paper if not t.get("is_open"))
     except Exception:
         pass
+    # [2026-08-28 (vd)] HALT EVENTS OUT OF THE BRAIN — it sizes REAL MONEY now.
+    #
+    # A $0.00 close with no entry price is a halt/flatten EVENT. Since (so)/(sp)
+    # every living book reads this brain through `fleet_bus.brain_clip`, clamped
+    # [1/6.7, 6.7], and that includes the three live real-money rows — so a
+    # bucket statistic built here is a real-money position size.
+    #
+    # MEASURED on the live ledger, and it is not a rounding error: 🙏 avo's card
+    # reads **n=15, wins=5, win rate 33.3%** where her true traded record is
+    # **n=6, wins=5, 83.3%** — a 50pp error on a real-money book, because 9 of
+    # her 15 rows are halt events. 🔮 georgia reads 44.3% against a true 47.4%.
+    #
+    # WHY A PHANTOM IS WORSE HERE THAN A WRONG NUMBER: it is FREE `n` carrying
+    # no information, and almost every bar in `qualify_v3` is size-driven —
+    # `min_n`, `soft_n`, the `n_eff` floors, the Wilson upper bound, and the EB
+    # posterior's shrinkage weight are all satisfied FASTER by rows that say
+    # nothing. Only the `t` bar and `pnl_w < 0` resist, and one real loss
+    # supplies both. A sensitivity run puts a **0.75x clip cut** on georgia's
+    # `long` bucket 26 halt-events away, on a bucket whose only real content is
+    # a single -$0.84 close. Zero multiplier flips today (0 of 76 buckets), so
+    # this is shipped as CORRECTNESS, not as a measured win.
+    #
+    # Filtered HERE and never inside `fetch_paper_trades`: that reader is the
+    # raw ledger, and `fetch_paper_aggregate`'s own event subtraction plus the
+    # dashboard's `record.events` counter legitimately need the rows.
+    #
+    # The `sys.path` insert is load-bearing — `golive_readiness` lives under
+    # `scripts/`, which is not on the path in the freqtrade image. Omitting it
+    # is a silent kill switch: the import raises, this `except` swallows it, and
+    # the filter is inert while looking shipped. That exact defect reached
+    # production in `fleet_allocation` earlier today; it is guarded now by
+    # `tests/autonomy/test_scripts_import_resolvability.py`.
+    global _PHANTOM_EXCLUDED
+    try:
+        import os
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "scripts"))
+        from golive_readiness import is_phantom_close
+        _kept = [t for t in trades if not is_phantom_close(t)]
+        _PHANTOM_EXCLUDED = len(trades) - len(_kept)
+        trades = _kept
+    except Exception:                                        # noqa: BLE001
+        # None, never 0 — see the note on the constant.
+        _PHANTOM_EXCLUDED = None
     return trades
 
 
@@ -1453,6 +1518,8 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                 urgent_now.append(key)
     vitals = {"engine": engine, "priors": priors_out,
               "urgent": urgent_now,
+              # [(vd)] the sample receipt — see _PHANTOM_EXCLUDED.
+              "sample": {"phantom_excluded": _PHANTOM_EXCLUDED},
               # [2026-07-28 AUDIT FIX] strongest evidence first, EITHER
               # direction — ascending-t sorted reduce-warming first and cut
               # expand-warming entries at the [:20] cap, burying exactly what

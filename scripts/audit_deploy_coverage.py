@@ -69,6 +69,8 @@ Read-only. Touches no bot, no DB, no network.
 import os
 import re
 import sys
+import json
+import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOW = os.path.join(ROOT, ".github", "workflows", "railway-redeploy.yml")
@@ -120,6 +122,75 @@ DEPLOY_COVERAGE_OK = {
 def _read(p):
     with open(p, encoding="utf-8") as f:
         return f.read()
+
+
+def _norm_cmd(s):
+    """Whitespace-normalized command string."""
+    return " ".join(str(s or "").strip().split())
+
+
+def _dockerfile_cmd(dockerfile, root=ROOT, read=_read, exists=os.path.exists):
+    """Last CMD in a Dockerfile, normalized to shell-form text."""
+    path = os.path.join(root, dockerfile)
+    if not exists(path):
+        return None
+    cmd = None
+    for raw in read(path).splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not line.upper().startswith("CMD "):
+            continue
+        body = line[4:].strip()
+        if body.startswith("["):
+            try:
+                arr = json.loads(body)
+            except Exception:  # noqa: BLE001
+                arr = None
+            if isinstance(arr, list) and all(isinstance(x, str) for x in arr):
+                cmd = " ".join(arr)
+            else:
+                cmd = body
+        else:
+            cmd = body
+    out = _norm_cmd(cmd) if cmd else None
+    # Dockerfile (base image) deliberately carries a placeholder CMD that
+    # instructs Railway users to set startCommand in service TOML/UI.
+    if out and "Set this service\\'s Start Command in Railway" in out:
+        return None
+    return out
+
+
+def railway_toml_issues(files=None, root=ROOT, read=_read,
+                        exists=os.path.exists, listdir=os.listdir):
+    """[(file, reason), ...] for Railway TOML drift/missing command issues."""
+    if files is None:
+        files = sorted(
+            f for f in listdir(root)
+            if f.startswith("railway.") and f.endswith(".toml")
+        )
+    out = []
+    for fn in files:
+        p = os.path.join(root, fn)
+        try:
+            data = tomllib.loads(read(p))
+        except Exception as e:  # noqa: BLE001
+            out.append((fn, f"unparseable TOML ({type(e).__name__})"))
+            continue
+        build = data.get("build") if isinstance(data, dict) else None
+        deploy = data.get("deploy") if isinstance(data, dict) else None
+        df = (build or {}).get("dockerfilePath")
+        sc = (deploy or {}).get("startCommand")
+        if not isinstance(df, str) or not df.strip():
+            out.append((fn, "missing build.dockerfilePath"))
+            continue
+        if not isinstance(sc, str) or not sc.strip():
+            out.append((fn, "missing deploy.startCommand"))
+            continue
+        dcmd = _dockerfile_cmd(df.strip(), root=root, read=read, exists=exists)
+        if dcmd and _norm_cmd(sc) != dcmd:
+            out.append((fn, f"startCommand mismatch (toml={_norm_cmd(sc)!r}, docker={dcmd!r})"))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -622,10 +693,20 @@ def covered(svc, rel, filters=_UNSET, globs=_UNSET):
 #: "does this FILE have a deploy route?" and `lighter_funding_bot.py` does — to
 #: the LIVE service. A per-file question cannot express a per-PAIR invariant.
 #: {live service: control service} — both must appear in the same decide branch.
-PAIRED_ARMS = {"trail-blazer-live": "funding-farmer-shadow"}
+#: [2026-08-22 (tb)] EMPTY, and that is a finding rather than a deletion. The
+#: pair this protected was the Farmer's live/shadow A/B, and (ta) retired the
+#: LIVE arm — so there is no experiment left whose two halves could drift, the
+#: 🧪 judge stands down, and `trail-blazer-live` now runs 🔮 georgia. Keeping
+#: the old entry would assert a pairing between georgia's live service and the
+#: Farmer's shadow, which is not merely stale but WRONG.
+#: The MECHANISM stays verified: `arm_pairing_orphans` takes its pairs as an
+#: argument now, so the selftest drives it on a fixture pair and an empty
+#: registry cannot make this guard vacuously green ((po): a check that inspects
+#: nothing reports clean).
+PAIRED_ARMS = {}
 
 
-def arm_pairing_orphans(src=None):
+def arm_pairing_orphans(src=None, pairs=None):
     """[(live, control, why)] for every arm pair that is not deployed together.
 
     Textual on purpose: the decide step is shell, and what must hold is that the
@@ -637,7 +718,7 @@ def arm_pairing_orphans(src=None):
         with open(os.path.join(ROOT, WORKFLOW)) as fh:
             src = fh.read()
     out = []
-    for live, ctrl in sorted(PAIRED_ARMS.items()):
+    for live, ctrl in sorted((PAIRED_ARMS if pairs is None else pairs).items()):
         if live not in src:
             out.append((live, ctrl, f"{live} is not routed by the workflow at all"))
             continue
@@ -658,6 +739,13 @@ def arm_pairing_orphans(src=None):
 
 
 def main():
+    rt = railway_toml_issues()
+    if rt:
+        print("RAILWAY-TOML DRIFT — each railway.*.toml must carry an explicit "
+              "deploy.startCommand aligned with its Dockerfile CMD.")
+        for fn, why in rt:
+            print(f"  {fn:<28} {why}")
+        return 1
     filters = workflow_filters()
     globs = workflow_paths()
     if not filters or globs is None:
@@ -813,24 +901,29 @@ def main():
 
 def _extract_live_marker_block():
     """The decide step's OPT-IN live-bot marker logic, lifted verbatim from the
-    workflow: the lines from `msgs="$(git log ...` through the fi that closes the
-    trail-blazer-live (Farmer) block. Returns the raw lines (list). Raises if the
-    gate is missing/unclosed — a real-money deploy gate that vanished must not
-    read as 'nothing to test'."""
+    workflow: the lines from `msgs="$(git log ...` through the fi that closes
+    the LAST live rule (👩 mum's, `mum-live`, since (te)). Returns the raw
+    lines (list). Raises if the gate is missing/unclosed — a real-money deploy
+    gate that vanished must not read as 'nothing to test'.
+
+    [(te)] The closing sentinel used to be `trail-blazer-live`, and adding
+    mum's rule AFTER georgia's silently fell outside the extracted block — the
+    selftest's own missing-needle check is what caught it, which is exactly
+    the 'refusing to vouch' arm doing its job."""
     lines = _read(WORKFLOW).splitlines()
     try:
         start = next(i for i, l in enumerate(lines) if 'msgs="$(git log' in l)
     except StopIteration:
         raise AssertionError("live-bot marker block not found (no `msgs=$(git log` "
                              "line) — the opt-in real-money deploy gate may be gone")
-    block, seen_farmer = [], False
+    block, seen_last = [], False
     for l in lines[start:]:
         block.append(l)
-        if "trail-blazer-live" in l:
-            seen_farmer = True
-        if seen_farmer and l.strip() == "fi":
+        if "mum-live" in l:
+            seen_last = True
+        if seen_last and l.strip() == "fi":
             return block
-    raise AssertionError("live-bot marker block never closed (no Farmer `fi`)")
+    raise AssertionError("live-bot marker block never closed (no mum `fi`)")
 
 
 def _marker_logic_selftest():
@@ -850,8 +943,16 @@ def _marker_logic_selftest():
     joined = "\n".join(block)
     # sanity: we grabbed the REAL gate, not a gutted stub (else a mutation that
     # deletes the block would make the behavioral cases vacuously pass)
-    for needle in ("[deploy-live-taker]", "[deploy-live-farmer]", "[deploy-live]",
-                   "tide-rider-lighter-live", "trail-blazer-live", "live_all"):
+    # [(tb)] `[deploy-live-farmer]` is GONE from this list because the Farmer
+    # has no live arm any more. The two real-money markers are the taker's
+    # (🙏 Avo) and georgia's, and they gate DIFFERENT SERVICES OFF THE SAME
+    # IMAGE — which is precisely why one-at-a-time still has to be provable.
+    # [(te)] 👩 mum joins the live cohort: three books, one image, three
+    # markers — one-at-a-time now has three ways to be wrong.
+    for needle in ("[deploy-live-taker]", "[deploy-live-georgia]",
+                   "[deploy-live-mum]", "[deploy-live]",
+                   "tide-rider-lighter-live", "trail-blazer-live", "mum-live",
+                   "live_all"):
         assert needle in joined, f"marker gate missing {needle!r} — refusing to vouch"
     indent = min(len(l) - len(l.lstrip()) for l in block if l.strip())
     body = [l[indent:] if len(l) >= indent else l for l in block]
@@ -867,30 +968,39 @@ def _marker_logic_selftest():
         assert r.returncode == 0, f"decide bash failed ({r.returncode}): {r.stderr}"
         return r.stdout.strip()
 
-    # [2026-07-30 (hi)] `F` is now the Farmer's BRANCH OUTPUT, not one service:
-    # its two experiment arms are appended together so neither can ship alone.
-    # Every expectation below that previously read "trail-blazer-live" therefore
-    # reads both — and that is the assertion, not a fixture accommodation: a
-    # farmer deploy that emits only the live service is the arm-drift bug.
-    T = "tide-rider-lighter-live"
-    F = "trail-blazer-live,funding-farmer-shadow"
+    # [2026-08-22 (tb)] THE LIVE PAIR IS NOW 🙏 Avo + 🔮 georgia, AND THEY SHARE
+    # ONE IMAGE. `lighter_avo_live_bot.py` is a variant host ((sx)), so the same
+    # changed file can deploy either book — the marker is the ONLY thing that
+    # separates them, which makes these cases load-bearing rather than
+    # bookkeeping. 💸 the Farmer has no live arm at all since (ta): its file set
+    # moves SHADOW services only, and its old marker is now inert for live.
+    T = "tide-rider-lighter-live"      # 🙏 Avo Maria
+    G = "trail-blazer-live"            # 🔮 georgia — same service, new book (ta)
+    M = "mum-live"                     # 👩 mum — third book, own service (te)
     cases = [
-        # HAZARD — an unmarked push must NEVER deploy a real-money book
-        ("lighter_funding_bot.py", "fix funding slope", ""),
-        ("lighter_ticket_taker.py", "tweak taker", ""),
+        # HAZARD — an unmarked push must NEVER deploy a real-money book, and
+        # this is sharper than before: one file now feeds THREE live services.
+        ("lighter_avo_live_bot.py", "tweak the shared runner", ""),
+        ("lighter_family_bot.py", "strategy tweak", ""),
         ("venues/safety.py", "rails tweak", ""),
-        (f"lighter_funding_bot.py\nvenues/safety.py", "Farmer WIP (dark)", ""),
-        # intended deploys
-        ("lighter_funding_bot.py", "ship [deploy-live-farmer]", F),
-        ("lighter_funding_bot.py", "both [deploy-live]", F),
-        ("lighter_ticket_taker.py", "ship [deploy-live-taker]", T),
-        ("lighter_ticket_taker.py", "ship [deploy-live]", T),
-        ("venues/safety.py", "shared [deploy-live]", f"{T},{F}"),
-        # isolation: a bot-only [deploy-live] must NOT restart the other bot
-        ("lighter_funding_bot.py", "farmer-only [deploy-live]", F),
-        ("lighter_ticket_taker.py", "taker-only [deploy-live]", T),
+        ("lighter_avo_live_bot.py\nvenues/safety.py", "live WIP (dark)", ""),
+        # ONE BOOK AT A TIME, off the same image
+        ("lighter_avo_live_bot.py", "ship [deploy-live-taker]", T),
+        ("lighter_avo_live_bot.py", "ship [deploy-live-georgia]", G),
+        ("lighter_family_bot.py", "georgia only [deploy-live-georgia]", G),
+        ("lighter_avo_live_bot.py", "ship [deploy-live-mum]", M),
+        ("lighter_family_bot.py", "mum only [deploy-live-mum]", M),
+        # ...and [deploy-live] still takes all three, deliberately
+        ("lighter_avo_live_bot.py", "all [deploy-live]", f"{T},{G},{M}"),
+        ("venues/safety.py", "shared [deploy-live]", f"{T},{G},{M}"),
+        # THE FARMER HAS NO LIVE ARM. Its old marker must move NOTHING live —
+        # if this ever returns a service, the retirement has been undone by a
+        # routing edit rather than by a decision.
+        ("lighter_funding_bot.py", "old habit [deploy-live-farmer]", ""),
+        ("lighter_funding_bot.py", "farmer [deploy-live]", ""),
+        ("lighter_funding_bot.py", "unmarked funding fix", ""),
         # wrong marker for the changed file does nothing
-        ("lighter_funding_bot.py", "wrong [deploy-live-taker]", ""),
+        ("lighter_avo_live_bot.py", "wrong [deploy-live-farmer]", ""),
     ]
     for changed, msgs, exp in cases:
         got = decide(changed, msgs)
@@ -1054,25 +1164,26 @@ def _selftest():
     # slower route and reads as covered to every per-file check.
     with open(os.path.join(ROOT, WORKFLOW)) as _fh:
         _wf = _fh.read()
-    assert arm_pairing_orphans(_wf) == [], (
-        "the shipped workflow does not deploy the Farmer's two arms together: "
-        f"{arm_pairing_orphans(_wf)}")
-    _gone = arm_pairing_orphans(_wf.replace("funding-farmer-shadow", ""))
+    # Whatever is REGISTERED must hold in the shipped workflow. Today that set
+    # is empty ((tb)) and this assertion is trivially true — which is exactly
+    # why the three fixture cases below drive the MECHANISM on a synthetic pair
+    # instead. An empty registry must not be able to make this guard report
+    # clean over nothing ((po)).
+    assert arm_pairing_orphans(_wf) == [], arm_pairing_orphans(_wf)
+
+    _FIX = {"live-svc": "ctrl-svc"}
+    _ok = 'if x; then\n  svcs="$svcs,live-svc,ctrl-svc"\nfi\n'
+    assert arm_pairing_orphans(_ok, _FIX) == [], "paired-together must pass"
+    _gone = arm_pairing_orphans('svcs="$svcs,live-svc"\n', _FIX)
     assert len(_gone) == 1 and "NO deploy route" in _gone[0][2], _gone
-    # [2026-08-18 (pt)] The split fixture must now strip TWO pairings, not one.
-    # The dispatch branch gained its own `svcs=` line naming both arms (a
-    # dispatch that names the live arm appends its control arm), so removing
-    # only the push branch's adjacent pair no longer produces the split
-    # condition — `together` was still satisfied by the dispatch line and this
-    # negative fixture silently had nothing to detect.
-    _split_src = _wf.replace(
-        "trail-blazer-live,funding-farmer-shadow", "trail-blazer-live")
-    _split_src = "\n".join(
-        ln for ln in _split_src.splitlines()
-        if not ("svcs=" in ln and "funding-farmer-shadow" in ln
-                and "trail-blazer-live" in ln))
+    _unrouted = arm_pairing_orphans("# nothing here\n", _FIX)
+    assert len(_unrouted) == 1 and "not routed" in _unrouted[0][2], _unrouted
+    # the middle state, and the whole reason this guard exists: BOTH routed,
+    # but on different pushes — drift by a slower route, invisible to every
+    # per-file check.
     _split = arm_pairing_orphans(
-        _split_src + "\n# funding-farmer-shadow mentioned but never appended\n")
+        'if a; then\n  svcs="$svcs,live-svc"\nfi\n'
+        'if b; then\n  svcs="$svcs,ctrl-svc"\nfi\n', _FIX)
     assert len(_split) == 1 and "same decide branch" in _split[0][2], _split
     for _live, _ctrl in PAIRED_ARMS.items():
         assert _live != _ctrl and _ctrl, (_live, _ctrl)
@@ -1106,6 +1217,28 @@ def _selftest():
     assert dockerfile_census() == [], (
         "the shipped tree carries an UNROUTED image — run this script without "
         f"--selftest for the fix menu: {dockerfile_census()}")
+
+    # Railway TOML parity checks (explicit startCommand + docker CMD alignment)
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        r = os.path.join(d, "railway.good.toml")
+        dg = os.path.join(d, "Dockerfile.good")
+        with open(dg, "w", encoding="utf-8") as f:
+            f.write('FROM x\nCMD ["python","good.py"]\n')
+        with open(r, "w", encoding="utf-8") as f:
+            f.write('[build]\ndockerfilePath="Dockerfile.good"\n'
+                    '[deploy]\nstartCommand="python good.py"\n')
+        assert railway_toml_issues(root=d, files=["railway.good.toml"]) == [], \
+            "matching startCommand/CMD should pass"
+        with open(r, "w", encoding="utf-8") as f:
+            f.write('[build]\ndockerfilePath="Dockerfile.good"\n[deploy]\n')
+        miss = railway_toml_issues(root=d, files=["railway.good.toml"])
+        assert len(miss) == 1 and "missing deploy.startCommand" in miss[0][1], miss
+        with open(r, "w", encoding="utf-8") as f:
+            f.write('[build]\ndockerfilePath="Dockerfile.good"\n'
+                    '[deploy]\nstartCommand="python other.py"\n')
+        mm = railway_toml_issues(root=d, files=["railway.good.toml"])
+        assert len(mm) == 1 and "mismatch" in mm[0][1], mm
 
     print("audit_deploy_coverage _selftest OK "
           "(parser + COPY reconstruction + declared-prefix + live-bot marker gate "

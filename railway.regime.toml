@@ -6,5 +6,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.regime"
 
 [deploy]
+startCommand = "sh /freqtrade/run_regime.sh"
 # Restart on any exit (crash or otherwise), no retry cap — keep it running.
 restartPolicyType = "always"

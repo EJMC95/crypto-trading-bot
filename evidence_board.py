@@ -73,16 +73,44 @@ evidence review, and the operator's phone. Fail-silent; backtests inert
 import json
 import math
 import os
+import sys
 import time
 import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
 
+# [2026-08-26] THE ERA RULE IS IMPORTED, NEVER RE-DERIVED HERE — the (hn)
+# identity-import pattern `scripts/evidence_review.py` already follows for the
+# gate itself. `scripts/golive_readiness.py` is the ONE owner of which sample
+# describes a book as it runs today; this organ reads that owner's KEY, its
+# TTL, its published bar names and its own staleness helper, and computes no
+# era of its own. A second copy of a rule is a second rule.
+#
+# The MODULE ships in this image (Dockerfile.freqtrade COPYs it to
+# /freqtrade/scripts/golive_readiness.py and PYTHONPATH=/freqtrade), so the
+# import is HARD rather than try/except-guarded: a silent fallback here would
+# be the born-dark class, and `scripts/audit_image_imports.py` is what keeps
+# the COPY honest. Importing it is side-effect-free — the module's top level is
+# stdlib only (it defers bot_pnl_store / experiment_judge to call sites).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+try:                                     # repo root / image root on sys.path
+    import scripts.golive_readiness as golive
+except ImportError:                      # run from inside scripts/
+    import golive_readiness as golive    # noqa: F401
+
 try:
     import fleet_tuning as tuning     # the growth rail (optional import)
 except Exception:  # noqa: BLE001
     tuning = None
+
+# The grader's own bot_state key and its own freshness budget. NOT retyped:
+# `(mw)` moved that TTL 86400 -> 43200 because a frozen gate must not read
+# fresh for a day, and a constant copied here would have missed that move.
+GOLIVE_KEY = golive.KEY
+GOLIVE_MAX_AGE_S = golive.TTL_SEC
 
 BOARD_KEY = "evidence-board"
 INTERVAL = int(os.environ.get("EVBOARD_INTERVAL_SEC", "600"))
@@ -504,7 +532,14 @@ PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
 # is still the defect; so is moving a book the grade cannot see.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "perps-funding-lighter-lighter,freqtrade-avo-maria-lighter").split(",")
+    # [2026-08-22 (tb)] 💸 the Farmer's live row is retired ((ta)) and 🔮
+    # georgia took its sub-account, so the cohort follows the money. A retired
+    # row here is not merely stale: `test_live_clip_cohort` treats it as a
+    # defect, because the board would keep sizing a book that cannot trade.
+    # [2026-08-25 (te)] 👩 mum joins — live on her own sub-account, consuming
+    # `live.mum.clip_scale` through the variant host's `_clip_scale_now`.
+    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter,"
+    "freqtrade-mum-lighter").split(",")
     if s.strip()}
 # Per-row ARM: the lever each live row actually reads. The Farmer keeps
 # `live.clip_scale` — renaming a lever a real-money consumer is reading today
@@ -513,7 +548,21 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
 # lever, which is the pre-(nj) behaviour and is fail-safe rather than silent.
 FARMER_ROW = "perps-funding-lighter-lighter"
 LIVE_CLIP_LEVERS = {FARMER_ROW: "live.clip_scale",
-                    "freqtrade-avo-maria-lighter": "live.avo.clip_scale"}
+                    "freqtrade-avo-maria-lighter": "live.avo.clip_scale",
+                    # [(sx)] 🔮 georgia's arm, mapped ahead of her funding.
+                    # This map only says WHICH lever a row would use; the
+                    # board still acts on `LIVE_ROWS` alone, and she is
+                    # deliberately NOT in it until she is actually live and
+                    # consuming — the 17-Jul rule ("a row belongs there iff it
+                    # is live AND consumes the lever"). Add her via
+                    # EVBOARD_LIVE_ROWS on the day she is funded.
+                    "freqtrade-georgia-lighter": "live.georgia.clip_scale",
+                    # [2026-08-25] 👩 mum's arm, mapped ahead of her funding —
+                    # the (sx) pattern verbatim: the map says WHICH lever, the
+                    # board acts on LIVE_ROWS alone, and she joins that via
+                    # EVBOARD_LIVE_ROWS only on the day she is live and
+                    # consuming. Runbook: MUM_GOLIVE_RUNBOOK.md.
+                    "freqtrade-mum-lighter": "live.mum.clip_scale"}
 
 
 def live_clip_lever(bot):
@@ -521,6 +570,18 @@ def live_clip_lever(bot):
     the shared lever (the old behaviour), never to a guess — I8."""
     return LIVE_CLIP_LEVERS.get(str(bot), "live.clip_scale")
 LIVE_MIN_CLOSED = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED", "30"))
+#: [(vf)] The exit families that are FORCED FLATTENS rather than the strategy's
+#: own result. Sourced from fleet_bus so the board and the judge cannot drift
+#: about what counts as a trade; the literal is the fail-safe for a dark import
+#: and is deliberately the SAME tuple.
+try:                                     # pragma: no cover - import shape
+    from fleet_bus import JUDGED_PAIRS as _JP
+    _STRIP_EXITS = tuple(sorted({r for p in (_JP or {}).values()
+                                 for r in (p.get("strip_exits") or ())})) \
+        or ("daily_loss", "kill_switch", "v1_legacy")
+except Exception:                        # noqa: BLE001
+    _STRIP_EXITS = ("daily_loss", "kill_switch", "v1_legacy")
+
 LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10/7d hurts
 LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
 LIVE_DD_MIN = float(os.environ.get("EVBOARD_LIVE_DD_MIN", "-0.02"))      # 7d fleet dd
@@ -540,6 +601,17 @@ LIVE_LADDER = [1.0, 1.25, 1.5]
 #            LIVE_SLOW_TOL) AND >=1 row PROVES it: >=LIVE_MIN_CLOSED
 #            lifetime closes, >=LIVE_MIN_CLOSED_7D closes in the window,
 #            positive 7d realized. Dark window = no up-scale (fail-closed).
+#: [(vf)] The gate's OWN drawdown failure line, imported not re-typed — a second
+#: copy of the rule that governs real money is a second rule. None if unreadable,
+#: in which case the flat backstop below stands unchanged (fail toward today).
+try:                                     # pragma: no cover - import shape
+    from golive_readiness import GOLIVE_MAX_DD as _GATE_MAX_DD
+except Exception:                        # noqa: BLE001
+    try:
+        from scripts.golive_readiness import GOLIVE_MAX_DD as _GATE_MAX_DD
+    except Exception:                    # noqa: BLE001
+        _GATE_MAX_DD = None
+
 LIVE_DOWN_HARD = float(os.environ.get("EVBOARD_LIVE_DOWN_HARD",
                                       str(2 * LIVE_DOWN_PNL)))
 LIVE_SLOW_TOL = float(os.environ.get("EVBOARD_LIVE_SLOW_TOL", "1"))
@@ -683,20 +755,72 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     # window drops every row back to the old lifetime rule. The DOWN reflex
     # runs on whatever rows ARE visible — a vanished bot_pnl row must never
     # disarm the tighten side (it only blocks the expand side, below).
+    def _designed_stop_usd(r):
+        """[(vf)] ONE ORDINARY STOP-OUT on this book, in dollars, from the row's
+        OWN published fields — or None when they are not all readable.
+
+        `equity x gross_x x |stoploss| / max_open` is the loss the book is
+        DESIGNED to take when a single slot stops. A down-reflex whose bar sits
+        below that fires on the book's own design rather than on its risk —
+        exactly the I7 shape ("a trigger a book satisfies structurally is not a
+        measurement"), at a live actuator that shrinks real money.
+
+        MEASURED 27-Aug against the shipped $10 bar: 🙏 avo $68.09 (6.8x the
+        bar), 👩 mum $30.00 (3.0x), 🔮 georgia $24.79 (2.5x). So the fleet's
+        BEST book — +$16.46 over the same 7d — sat one ordinary stop-out from
+        being cut to 0.75x. The bar was written when the live books were ~$60
+        at 1x leverage and never moved when they were funded and levered."""
+        try:
+            e = float(r.get("equity") or 0.0)
+            x = (r.get("extra") or {})
+            gx = float(((x.get("leverage") or {}).get("set")) or 0.0)
+            sl = abs(float(((x.get("policy") or {}).get("stoploss")) or 0.0))
+            n = int(x.get("cap_slots") or x.get("max_open") or 0)
+            if e > 0 and gx > 0 and sl > 0 and n > 0:
+                return e * gx * sl / n
+        except (TypeError, ValueError):
+            pass
+        return None
+
     def _hurt_why(b, r):
         life = float(r.get("pnl_abs") or 0)
+        # the bar is the WORSE of the flat floor and this book's own designed
+        # stop-out: never looser than the operator's floor, never so tight that
+        # one designed loss trips it. Unreadable fields keep the flat floor.
+        _ds = _designed_stop_usd(r)
+        bar = max(LIVE_DOWN_PNL, _ds) if _ds else LIVE_DOWN_PNL
         w = (window or {}).get(b) if window else None
         if w is not None:
             wp = float(w.get("pnl") or 0)
-            if wp <= -LIVE_DOWN_PNL:
-                return f"{b} 7d ${wp:+.2f}"
+            if wp <= -bar:
+                _sx = float(w.get("stripped_pnl") or 0.0)
+                _sd = int(w.get("stripped_days") or 0)
+                _note = (f" [excl {_sd}d of halts ${_sx:+.2f}]"
+                         if w.get("stripped_n") else "")
+                return f"{b} 7d ${wp:+.2f} vs bar ${bar:.2f}{_note}"
             if int(w.get("closes") or 0) == 0:
                 return (f"{b} ${life:+.2f} (mark)"
-                        if life <= -LIVE_DOWN_PNL else None)
-            if life <= -LIVE_DOWN_HARD:
-                return f"{b} lifetime ${life:+.2f} (backstop)"
+                        if life <= -bar else None)
+            # [(vf)] THE LIFETIME BACKSTOP IS THE GATE'S OWN DRAWDOWN LINE,
+            # not a flat $20. `LIVE_DOWN_HARD` never heals — a book down more
+            # than it trades perfectly for a week and stays cut, which is the
+            # exact failure `fetch_realized_window`'s own docstring was written
+            # to end ("lifetime pnl_abs anchors never heal"). Worse, the flat
+            # bar is unrelated to book size: $20 is 7% of 🔮 georgia's book and
+            # would be 2% of a $1,000 one. The fleet ALREADY declares where a
+            # book is in trouble — `golive_readiness.GOLIVE_MAX_DD`, the 15%
+            # bar that governs real money — so an actuator stricter than that
+            # is stricter than the gate it serves. Measured 27-Aug: georgia
+            # -$39.12 on a $287.02 book = 13.6%, INSIDE the 15% the gate
+            # allows, yet the flat backstop had her permanently restricted.
+            _hard = LIVE_DOWN_HARD
+            _start = float(r.get("equity") or 0.0) - life
+            if _start > 0 and _GATE_MAX_DD:
+                _hard = max(_hard, _start * float(_GATE_MAX_DD))
+            if life <= -_hard:
+                return f"{b} lifetime ${life:+.2f} vs ${_hard:.2f} (backstop)"
             return None
-        return f"{b} ${life:+.2f}" if life <= -LIVE_DOWN_PNL else None
+        return f"{b} ${life:+.2f}" if life <= -bar else None
 
     hurt = [w for b, r in sorted(rows.items()) for w in [_hurt_why(b, r)] if w]
     if gap or hurt:
@@ -1088,10 +1212,171 @@ def book_mtm_pnl(row):
     return None if val != val else val        # NaN is not evidence either
 
 
-def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None):
+# ---------------------------------------------------------------------------
+# [2026-08-26] THE PROFIT TERM READS THE ERA, AND SATURATION READS DEMAND
+# ---------------------------------------------------------------------------
+# `(hs)` added a profit term so that saturation ALONE could not widen a book's
+# capacity. It fixed the trigger and left two holes underneath it, and both
+# were live on 🌾 carry the day this was written:
+#
+#   FAULT A — THE WRONG SAMPLE. `book_mtm_pnl` reads `pnl_abs`, which is
+#   ALL-TIME. Carry's all-time read **+$63.11** and authorised the ratchet
+#   `carry.max_positions` 12 -> 14 -> 16 -> 18, while the sample the GO-LIVE
+#   GATE itself uses to describe the book as it runs today read **n=13, mean
+#   -0.218%/trade, t=-4.82** — five of six bars dark. The `(hc)` era
+#   precondition sits in FRONT of the six bars and had never reached this
+#   actuator, so the rail scaled a book the fleet's own grader calls a loser
+#   on a number the grader has formally withdrawn. Worse, ~$13 of that
+#   all-time accrual is recorded PHANTOM (pre-basis-fix over-accrual, (nc)),
+#   so the authorising figure was partly out of era AND partly not real.
+#
+#   FAULT B — THE TRIGGER FIRES ON A DRAINING BOOK. `open_n >= cap` is ALSO
+#   true when the cap was ratcheted DOWN under open positions. Carry held 18
+#   against a published cap of 16: the bot's own guard is
+#   `len(positions) < MAX_POSITIONS`, so it could not enter at all. That is an
+#   overhang draining, not a book asking for room — and widening there grants
+#   capacity the book is not even seeking.
+#
+# Corroborating both: carry's own census read `eligible: 0` of 228 scanned.
+# The binding constraint was SUPPLY, not capacity (I18) — the rail was moving
+# the one knob that could not matter.
+#
+# THREE TERMS, ALL RESTRICT-ONLY. Every one of them can only ever DECLINE a
+# widening this branch would otherwise have made; none can authorise one it
+# would have refused. The MTM term from `(hs)` is KEPT rather than replaced —
+# it closes I9's realised-blind spot on OPEN positions, which an era-scoped
+# realised sample cannot see, so the two are complements.
+#
+# THE DISCRIMINATOR for Fault B is `open_n == cap`: AT capacity (every slot
+# full, the next candidate turned away) versus OVER it (an overhang the book
+# is winding down and cannot add to). Chosen over "can the book enter?"
+# because it is readable from the published row alone and needs no model of
+# each bot's entry guard. DECLARED CONSEQUENCE: ⚖️ Counterweight publishes its
+# cap as `caps.k` — PAIRS — while `open_trades` counts LEGS (10 open against
+# k=5), so the two are not in the same unit and equality can never hold there.
+# That branch therefore goes quiet on that book, which is the correct
+# direction twice over: I7 already ruled that an always-in book's fullness
+# restates its DESIGN and observes nothing, and `(hs)`'s own measurement is
+# that ratchet running to the cage ceiling on a losing book. Reversing it is a
+# one-line change once the book publishes a cap in the same unit as
+# `open_trades` (it already emits `caps.legs`), and that is deliberately left
+# as a decision rather than taken silently here.
+#: WHERE A BOOK PUBLISHES ITS OWN CENSUS, in preference order. Handled
+#: EXPLICITLY rather than guessed: 🌾 carry emits `extra.scan` (`scan_census`),
+#: and `extra.census` is carried for the books that name it that way. A book
+#: publishing NEITHER has UNKNOWN demand and gets no capacity widening — I18's
+#: rule that a component must publish its own census at its own bar, in the
+#: only direction that is safe: `open == cap` alone is byte-identical between
+#: "turning candidates away" and "structurally full with nothing to take".
+BOOK_CENSUS_FIELDS = ("scan", "census")
+#: The census bucket that means "passes every gate, not held" — i.e. exactly
+#: the candidates a bigger cap would let the book take. `scan_census` pins this
+#: name against the bot's REAL candidate expression in its own selftest.
+BOOK_SUPPLY_KEY = "eligible"
+
+
+def book_supply(row):
+    """(eligible, field) — candidates this book's OWN census says it is
+    turning away, or (None, field-or-None) when that cannot be read.
+
+    None is the fail-CLOSED answer and the caller declines to widen on it:
+    unknown demand must never authorise more exposure. `field` names where the
+    census was found (or would have been), so the hold item can tell an
+    operator which payload to look at rather than only that something is
+    missing (I8).
+    """
+    extra = row.get("extra") if isinstance(row, dict) else None
+    if not isinstance(extra, dict):
+        return None, None
+    for field in BOOK_CENSUS_FIELDS:
+        cens = extra.get(field)
+        if not isinstance(cens, dict) or BOOK_SUPPLY_KEY not in cens:
+            continue
+        val = cens.get(BOOK_SUPPLY_KEY)
+        # A COUNT, strictly. `scan_census` emits a Python int and JSON keeps it
+        # one, so a string, a bool or a NaN is a SHAPE CHANGE in the publisher,
+        # not a number — and `int("3")` would have quietly authorised a
+        # widening off one. An integral float is accepted because a payload can
+        # legitimately round-trip 3 as 3.0; a fractional one cannot be a count.
+        if isinstance(val, bool) or not isinstance(val, (int, float)):
+            return None, field           # present but unreadable -> unknown
+        if val != val or val in (float("inf"), float("-inf")):   # NaN / inf
+            return None, field
+        if float(val) != int(val):
+            return None, field
+        n = int(val)
+        return (n if n >= 0 else None), field
+    return None, None
+
+
+def era_capacity_claim(golive_state, bot, now_ts=None):
+    """(ok, detail) — does the GO-LIVE GRADER's OWN era-scoped sample say this
+    book is currently making money? Fail-CLOSED in the widening direction.
+
+    The era is NOT computed here. `scripts/golive_readiness.py` owns it, and
+    this reads the verdict that owner PUBLISHED — the same contract
+    `fleet_immune` uses for `golive-readiness.books.<bot>.integrity`. The
+    payload's top-level per-book numbers ARE the era-scoped sample whenever the
+    book declares an era, and the whole ledger otherwise, which is in both
+    cases "the sample the gate uses to describe this book as it runs today".
+
+    The bar is the gate's OWN `mean` bar, read out of the published `bars` map
+    rather than recomputed from `mean_pct`: `bar_map` is selftest-bound to
+    `grade`, so reading the map is reading the rule. `bars.get("mean") is True`
+    is deliberately strict — a JSON bool survives the round trip, and anything
+    else (a string, a number, a missing key) is unreadable, not permission.
+
+    Every uncertainty returns False: no payload, a publish that cannot be
+    PROVEN fresh, no books map, an unknown book, a truncated bar map. A book
+    the grader has never heard of is the purest form of "absence of evidence",
+    and this is a capacity widening.
+    """
+    if not isinstance(golive_state, dict) or not golive_state:
+        return False, "golive-readiness dark"
+    now_dt = None
+    if now_ts is not None:
+        try:
+            now_dt = datetime.fromtimestamp(float(now_ts), timezone.utc)
+        except (TypeError, ValueError, OSError, OverflowError):
+            return False, "unreadable clock"
+    # the GRADER's own staleness helper: positive proof of freshness or False
+    if not golive.publish_is_fresh(golive_state, GOLIVE_MAX_AGE_S, now_dt):
+        return False, (f"golive-readiness not proven fresh "
+                       f"(<{GOLIVE_MAX_AGE_S / 3600.0:.0f}h)")
+    books = golive_state.get("books")
+    if not isinstance(books, dict):
+        return False, "golive-readiness carries no books map"
+    rec = books.get(bot)
+    if not isinstance(rec, dict):
+        return False, f"no graded record for {bot}"
+    bars = rec.get("bars")
+    if not isinstance(bars, dict) or any(b not in bars for b in golive.BAR_NAMES):
+        return False, "graded record carries no complete bar map"
+    n, mean, t = rec.get("n"), rec.get("mean_pct"), rec.get("t")
+
+    def _num(v, fmt=""):
+        # A `null` in any published field must not crash the organ that
+        # renders the refusal — and `format(3.5, 'd')` raises, so the width is
+        # never applied to a value whose type was not checked first.
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return "n/a"
+        if v != v:                                        # NaN
+            return "n/a"
+        return format(v, fmt) if fmt else str(v)
+
+    tag = (f"era n={_num(n)} mean {_num(mean, '+.3f')}%/trade "
+           f"t {_num(t, '+.2f')}")
+    if bars.get("mean") is not True:
+        return False, f"era record NOT positive — {tag}"
+    return True, tag
+
+
+def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None,
+                     golive_state=None):
     """Board-authored BOOK levers. Returns (levers, items).
 
-    Pure apart from the injected `tuning_mod` (the registry + current values),
+    Pure apart from the injected `tuning_mod` (the registry + current values)
+    and `golive` (the go-live grader's PUBLISHED payload, `golive-readiness`),
     so it selftests offline. Guards, each of which exists for a reason:
 
       * NEVER re-assert a lever proprioception currently grades HURTING —
@@ -1099,7 +1384,14 @@ def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None)
         under a widening does not get widened again on the next quiet cycle.
       * ONE step per book per cycle, clamped by the registry. The rail moves
         at the speed evidence accumulates, not at the speed of a loop.
-      * SATURATION needs the book to be AT its cap, not near it.
+      * SATURATION needs the book to be exactly AT its cap — not near it, and
+        not OVER it. Over the cap is an overhang draining, not demand.
+      * A CAPACITY widening must clear THREE terms, all restrict-only: the
+        grader's own era-scoped record positive (`era_capacity_claim`), the
+        book's own census showing candidates it is turning away
+        (`book_supply`), and mark-to-market P&L positive (`book_mtm_pnl`,
+        (hs)). `golive_state=None` — the DEFAULT — is a dark grader and
+        widens nothing: the caller hands it the payload deliberately.
       * STARVATION needs BOTH no open positions AND no closes in the window —
         a book that is holding is not starved, it is patient.
       * A book missing from `bot_rows` (dead row, stale publish) proposes
@@ -1181,25 +1473,74 @@ def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None)
                                            now_ts=now_ts)
         if cap_lever and cap and open_n >= int(cap):
             # [2026-07-31 (hs)] SATURATION IS NOT EVIDENCE THE BOOK IS WORKING.
-            # See the BOOK_AUTHOR header for the measurement that forced this.
-            # Fail-CLOSED: an unreadable pnl_abs declines the widening.
+            # [2026-08-26] ...AND NEITHER IS AN OVERHANG, NOR AN ALL-TIME
+            # NUMBER THE GO-LIVE GATE HAS WITHDRAWN. See the block above
+            # `book_supply` for the measurement that forced all three terms.
+            # Fail-CLOSED on every one: unreadable declines the widening.
+            _cap_i = int(cap)
             book_pnl = book_mtm_pnl(r)
-            if book_pnl is None or book_pnl <= 0:
+            _era_ok, _era_why = era_capacity_claim(golive_state, bot, now_ts)
+            _supply, _cens_field = book_supply(r)
+            if open_n > _cap_i:
+                # FAULT B. The message states the ARITHMETIC and names BOTH
+                # causes, because they are not distinguishable from the row
+                # and a detector that asserts the wrong one is one the
+                # operator learns to ignore (I8): 🌾 carry really was an
+                # OVERHANG (cap ratcheted 18 -> 16 under 18 open positions,
+                # and its guard is `len(positions) < MAX_POSITIONS`), while
+                # ⚖️ Counterweight is a UNIT MISMATCH (10 legs against k=5
+                # pairs) and is not over capacity at all.
+                _why = (f"OVERHANG/UNIT: open {open_n} > published cap "
+                        f"{_cap_i}, so the book is not AT capacity")
+                _fix = ("no widening: capacity growth requires open == cap. "
+                        "Over the cap is either an overhang draining under a "
+                        "ratcheted-down cap (the book cannot enter) or a cap "
+                        "published in different units from open_trades "
+                        "(⚖️ publishes k=PAIRS against a LEG count) — neither "
+                        "is a book asking for room")
+            elif not _era_ok:
+                # FAULT A: the profit term must read the sample the GO-LIVE
+                # GATE uses, not the all-time total. Carry: all-time +$63.11,
+                # era n=13 / mean -0.218%/trade / t=-4.82.
+                _why = (f"at cap {open_n}/{_cap_i} but the GO-LIVE GRADER's "
+                        f"record refuses it — {_era_why}")
+                _fix = ("no widening: capacity growth requires the grader's "
+                        "own era-scoped record to be positive; all-time P&L is "
+                        "not the sample that describes this book today (hc)")
+            elif not _supply:
+                # I18: the binding constraint is SUPPLY, not capacity. Carry
+                # read `eligible: 0` of 228 scanned while the rail widened it.
+                _shown = ("unknown (no census published)" if _supply is None
+                          and _cens_field is None else
+                          ("unreadable" if _supply is None
+                           else f"{_supply}"))
+                _why = (f"at cap {open_n}/{_cap_i} but eligible supply is "
+                        f"{_shown}"
+                        f"{'' if _cens_field is None else f' (extra.{_cens_field})'}")
+                _fix = ("no widening: a book with no candidates it can name is "
+                        "SUPPLY-bound, not capacity-bound (I18) — publish a "
+                        f"census carrying `{BOOK_SUPPLY_KEY}` to make this "
+                        "decidable")
+            elif book_pnl is None or book_pnl <= 0:
                 _shown = "unreadable" if book_pnl is None else f"${book_pnl:.2f}"
+                _why = (f"at cap {open_n}/{_cap_i} but MTM P&L is {_shown}")
+                _fix = ("no widening: capacity growth requires the book to be "
+                        "in profit mark-to-market")
+            else:
+                _why = _fix = None
+                _step(cap_lever,
+                      f"AT CAP {open_n}/{_cap_i}, {_supply} eligible waiting, "
+                      f"{_era_why}, MTM +${book_pnl:.2f}")
+            if _why is not None:
                 items.append({
                     "key": f"board:book-{cap_lever}-held",
                     "severity": "info",     # NOT warn: the board phone-pushes
                                             # warn/action, and an always-in
                                             # book trips this EVERY cycle.
-                    "msg": (f"⚖️ {bot} saturated at {open_n}/{int(cap)} but "
-                            f"MTM P&L is {_shown} — {cap_lever} held at {cap:g}"),
-                    "proposal": (f"no widening: capacity growth requires the "
-                                 f"book to be in profit mark-to-market"),
+                    "msg": (f"⚖️ {bot} {_why} — {cap_lever} held at {cap:g}"),
+                    "proposal": _fix,
                     "lever": cap_lever, "direction": "hold",
                     "ts": now_ts, "source": "board"})
-            else:
-                _step(cap_lever,
-                      f"SATURATED at {open_n}/{int(cap)}, MTM +${book_pnl:.2f}")
         else:
             # [(hw)] the clock is THIS book's, derived from its own pace —
             # see book_starved_h. `age_days` comes off the row when the
@@ -1443,10 +1784,16 @@ def run_once():
     # on the naive promotion screen) and the whole Parliament section were
     # silently inert, and only worked when fetch_states FAILED and _g fell
     # through to per-key load_state. Exactly the shape of a dark consumer.
+    # [2026-08-26] `golive-readiness` JOINS THE BATCH in the same commit as the
+    # consumer that reads it. `fleet_immune` learned this the hard way at (hh):
+    # a scanner whose key is not on the fetch list is inert, and inert here
+    # means the capacity author's era term never fires — which, being
+    # fail-CLOSED, would silently freeze the branch rather than silently widen
+    # it. Both directions are wrong; the key is fetched.
     _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
              "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census",
              "impl-shortfall", "fleet-proprioception",
-             "fleet-radar", "parliament", "parliament-tuning"]
+             "fleet-radar", "parliament", "parliament-tuning", GOLIVE_KEY]
     _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     _ok = bool(_b)
     def _g(k):
@@ -1501,7 +1848,8 @@ def run_once():
     # quiet book from a dead one.
     prior_books = (prior.get("books") or {})
     book_levers, book_items = synthesize_books(
-        bot_rows, prior_books, prop_b, now, tuning_mod=tuning)
+        bot_rows, prior_books, prop_b, now, tuning_mod=tuning,
+        golive_state=_g(GOLIVE_KEY))
     synth += book_items
     books_out = {}
     for _bot in BOOK_AUTHOR:
@@ -1551,7 +1899,12 @@ def run_once():
     live_window = None
     try:
         if hasattr(store, "fetch_realized_window"):
-            live_window = store.fetch_realized_window(sorted(LIVE_ROWS), days=7)
+            # [(vf)] A FORCED FLATTEN IS NOT A TRADING OUTCOME. The families
+            # come from `fleet_bus.JUDGED_PAIRS[*]["strip_exits"]` — the ONE
+            # place the fleet already declares "halt events, not candidate
+            # outcomes" — rather than a second list typed here.
+            live_window = store.fetch_realized_window(
+                sorted(LIVE_ROWS), days=7, exclude_reasons=_STRIP_EXITS)
     except Exception:  # noqa: BLE001
         live_window = None
     # [2026-08-16 (nj)] PER-ROW from here down: one decision, one arm, one
@@ -2418,22 +2771,51 @@ def _selftest():
 
     _bnow = 2_000_000.0
     _CB = "perps-funding-carry-lshadow"
+
+    # [2026-08-26] THE GRADER'S PAYLOAD IS PUBLISHER-BUILT, never hand-typed:
+    # real rows -> the real `stats()` -> the real `book_payload()`. A fixture
+    # written by whoever wrote the consumer is the (hj) class, and this
+    # consumer reads a `bars` map it does not own.
+    def _gl(pcts, bot=_CB, age_s=0.0, span_days=40.0):
+        from datetime import timedelta
+        t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        step = timedelta(days=span_days / max(1, len(pcts) - 1))
+        rows = [(p, p * 10.0, t0 + i * step) for i, p in enumerate(pcts)]
+        return {"updated": datetime.fromtimestamp(_bnow - age_s,
+                                                  timezone.utc).isoformat(),
+                "ttl_sec": golive.TTL_SEC, "bar_names": list(golive.BAR_NAMES),
+                "books": {bot: golive.book_payload(golive.stats(rows))}}
+
+    # deliberately NOISY (not a constant series): a zero-variance fixture
+    # gives t = 1e16 and would hide a formatting or sign defect in the tag.
+    _GL_OK = _gl([0.012, 0.008] * 20)      # era-scoped record positive
+    _GL_BAD = _gl([-0.012, -0.008] * 20)   # era-scoped record negative
+    assert _GL_OK["books"][_CB]["bars"]["mean"] is True, _GL_OK
+    assert _GL_BAD["books"][_CB]["bars"]["mean"] is False, _GL_BAD
+
     # [2026-07-31 (hs)] `pnl_abs` is REQUIRED on a saturation fixture now: the
     # capacity branch is fail-closed without it. +65.62 is 🌾 carry's real
     # published figure the hour the rule was written, not a round number.
+    # [2026-08-26] ...and so is a CENSUS: a book that cannot name a candidate
+    # it is turning away is supply-bound, not capacity-bound (I18). `scan` /
+    # `eligible` are `funding_carry_bot.scan_census`'s own field names.
     _sat = [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
-             "pnl_abs": 65.62}]
+             "pnl_abs": 65.62, "extra": {"scan": {"eligible": 3}}}]
 
-    # SATURATED at the cap -> widen the CAPACITY lever exactly one step
+    # THE POSITIVE CONTROL. AT the cap (not over), the grader's own era-scoped
+    # record positive, real eligible supply, MTM positive -> widen the
+    # CAPACITY lever exactly one step. A rule that can only ever refuse is
+    # a disabled branch, not a guard, so this assertion is load-bearing.
     _T.vals = {}
-    lv, it = synthesize_books(_sat, {}, {}, _bnow, tuning_mod=_T)
+    lv, it = synthesize_books(_sat, {}, {}, _bnow, tuning_mod=_T,
+                              golive_state=_GL_OK)
     assert lv.get("carry.max_positions", {}).get("value") == 14, lv
     assert it and it[0]["direction"] == "expand"
 
     # BELOW the cap -> say nothing. "Near" is not "at".
     lv, _ = synthesize_books(
         [{"bot": _CB, "open_trades": 11, "closed_trades": 80}], {}, {}, _bnow,
-        tuning_mod=_T)
+        tuning_mod=_T, golive_state=_GL_OK)
     assert lv == {}, "a book with a free slot is not saturated"
 
     # HURTING -> never re-assert, even while saturated (restrict-first)
@@ -2441,22 +2823,96 @@ def _selftest():
     # publishes it and as synthesize_proprioception reads it. A fixture that
     # invents a key would make this assertion prove nothing.
     lv, _ = synthesize_books(_sat, {}, {"verdicts": {
-        "carry.max_positions": {"verdict": "hurting"}}}, _bnow, tuning_mod=_T)
+        "carry.max_positions": {"verdict": "hurting"}}}, _bnow, tuning_mod=_T,
+        golive_state=_GL_OK)
     assert lv == {}, "a lever graded hurting must not be widened again"
     # a HELPING verdict must NOT block the widening (symmetry check — an
     # over-broad filter here would freeze the rail permanently)
     lv, _ = synthesize_books(_sat, {}, {"verdicts": {
-        "carry.max_positions": {"verdict": "helping"}}}, _bnow, tuning_mod=_T)
+        "carry.max_positions": {"verdict": "helping"}}}, _bnow, tuning_mod=_T,
+        golive_state=_GL_OK)
     assert lv.get("carry.max_positions", {}).get("value") == 14, \
         "only HURTING blocks; helping must still widen"
 
     # AT the registry bound -> nothing to say (clamp makes the step a no-op)
     _T.vals = {"carry.max_positions": 20}
     lv, _ = synthesize_books(
-        [{"bot": _CB, "open_trades": 20, "closed_trades": 80}], {}, {}, _bnow,
-        tuning_mod=_T)
+        [{"bot": _CB, "open_trades": 20, "closed_trades": 80,
+          "pnl_abs": 65.62, "extra": {"scan": {"eligible": 3}}}], {}, {},
+        _bnow, tuning_mod=_T, golive_state=_GL_OK)
     assert lv == {}, "at the cage bound the author proposes nothing"
     _T.vals = {}
+
+    # ---- [2026-08-26] THE ERA TERM, THE DRAIN TERM, THE SUPPLY TERM -------
+    # THE INCIDENT, exactly as it stood on the live bus: 🌾 carry holding 18
+    # against a published cap of 16, all-time pnl_abs +$63.11 (~$13 of it
+    # phantom), era-scoped n=13 / mean -0.218%/trade / t=-4.82, census
+    # `eligible: 0`. `fleet_tuning` carried carry.max_positions=18, set_by
+    # evidence-board, reason "SATURATED at 18/16, MTM +$63.11".
+    _carry_live = [{"bot": _CB, "open_trades": 18, "closed_trades": 104,
+                    "pnl_abs": 63.11,
+                    "extra": {"caps": {"max_positions": 16},
+                              "scan": {"scanned": 228, "eligible": 0,
+                                       "held": 18, "waiting": 3}}}]
+    lv, it = synthesize_books(_carry_live, {}, {}, _bnow, tuning_mod=_T,
+                              golive_state=_gl([-0.00218] * 13, span_days=21.7))
+    assert lv == {}, f"the live carry case must be REFUSED, not widened: {lv}"
+    _held = [i for i in it if i.get("direction") == "hold"]
+    assert _held and _held[0]["lever"] == "carry.max_positions", it
+    assert "OVERHANG" in _held[0]["msg"], _held[0]["msg"]
+
+    # each term must be the SOLE reason in some case, or it is decoration
+    def _row(open_n=16, cap=16, pnl=63.11, elig=3, census=True):
+        e = {"caps": {"max_positions": cap}}
+        if census:
+            e["scan"] = {"eligible": elig}
+        return [{"bot": _CB, "open_trades": open_n, "closed_trades": 104,
+                 "pnl_abs": pnl, "extra": e}]
+
+    # (a) AT cap, supply, MTM +  ->  only the ERA record refuses
+    lv, it = synthesize_books(_row(), {}, {}, _bnow, tuning_mod=_T,
+                              golive_state=_GL_BAD)
+    assert lv == {}, "an era-negative book must not be widened"
+    assert any("era record NOT positive" in i["msg"] for i in it), it
+    # ...and with the SAME row and a POSITIVE era record it widens: the term
+    # discriminates, it does not just refuse.
+    lv, _ = synthesize_books(_row(), {}, {}, _bnow, tuning_mod=_T,
+                             golive_state=_GL_OK)
+    # NOTE the step comes off the REGISTRY's current value (env_default 12),
+    # while SATURATION is judged against the cap the BOOK published (16) —
+    # two different sources on purpose, per the published-cap block below.
+    assert lv.get("carry.max_positions", {}).get("value") == 14, lv
+    # (b) AT cap, era +, MTM +  ->  only SUPPLY refuses
+    for _elig, _cens in ((0, True), (None, False)):
+        lv, it = synthesize_books(_row(elig=_elig, census=_cens), {}, {}, _bnow,
+                                  tuning_mod=_T, golive_state=_GL_OK)
+        assert lv == {}, f"eligible={_elig} census={_cens} must not widen"
+        assert any("supply" in i["msg"] for i in it), it
+    # (c) OVER cap with everything else green -> draining, not demand
+    lv, it = synthesize_books(_row(open_n=18), {}, {}, _bnow, tuning_mod=_T,
+                              golive_state=_GL_OK)
+    assert lv == {}, "a book OVER its cap is draining, not seeking room"
+    assert any("OVERHANG" in i["msg"] for i in it), it
+
+    # A DARK / STALE / SILENT grader authorises nothing (fail-CLOSED).
+    for _bad, _tag in (
+            (None, "dark"), ({}, "empty"),
+            ({"books": {_CB: _GL_OK["books"][_CB]}}, "no stamp"),
+            (_gl([0.012, 0.008] * 20, age_s=golive.TTL_SEC + 1), "stale"),
+            (_gl([0.012, 0.008] * 20, bot="some-other-book"), "book absent")):
+        lv, _ = synthesize_books(_row(), {}, {}, _bnow, tuning_mod=_T,
+                                 golive_state=_bad)
+        assert lv == {}, f"a {_tag} golive payload must not widen: {lv}"
+    # ...and the DEFAULT is dark: a caller that forgets the payload widens
+    # nothing rather than falling back to the all-time number.
+    lv, _ = synthesize_books(_row(), {}, {}, _bnow, tuning_mod=_T)
+    assert lv == {}, "golive_state defaults to dark, and dark never widens"
+
+    # THE ERA RULE IS THE GRADER'S, BY IDENTITY — not a copy living here.
+    import scripts.golive_readiness as _grid
+    assert golive.era_rows is _grid.era_rows, \
+        "evidence_board must read the ONE owner of the era rule"
+    assert GOLIVE_KEY == _grid.KEY and GOLIVE_MAX_AGE_S == _grid.TTL_SEC
 
     # STARVED: 0 open AND no new closes for the window -> the ladder WANTS to
     # loosen the gate — and since (mv) the cage refuses it: `carry.enter_apr`
@@ -2501,14 +2957,15 @@ def _selftest():
     _T.vals = {"carry.max_positions": 18}       # registry thinks 18...
     lv, _ = synthesize_books(
         [{"bot": _CB, "open_trades": 12, "closed_trades": 80, "pnl_abs": 65.62,
-          "extra": {"caps": {"max_positions": 12}}}],   # ...the BOOK runs 12
-        {}, {}, _bnow, tuning_mod=_T)
+          "extra": {"caps": {"max_positions": 12},          # ...the BOOK runs 12
+                    "scan": {"eligible": 3}}}],
+        {}, {}, _bnow, tuning_mod=_T, golive_state=_GL_OK)
     assert lv.get("carry.max_positions", {}).get("value") == 20, \
         "saturation must be judged against the cap the BOOK published"
     lv, _ = synthesize_books(
         [{"bot": _CB, "open_trades": 12, "closed_trades": 80, "pnl_abs": 65.62,
-          "extra": {"caps": {"max_positions": 18}}}],
-        {}, {}, _bnow, tuning_mod=_T)
+          "extra": {"caps": {"max_positions": 18}, "scan": {"eligible": 3}}}],
+        {}, {}, _bnow, tuning_mod=_T, golive_state=_GL_OK)
     assert lv == {}, "published cap 18 with 12 open is NOT saturated"
     _T.vals = {}
 
@@ -2516,50 +2973,52 @@ def _selftest():
     # The incident: ⚖️ Counterweight, always-in, saturated on EVERY cycle by
     # construction, ratcheted fundspread.k 5 -> 8 -> 12 (the cage ceiling)
     # while carrying -$27.75. Gross exposure $200 -> $480 on a losing book.
+    # Realised read +$7.29 on the SAME book and would have authorised it.
+    #
+    # [2026-08-26] THE WORKED EXAMPLE MOVED TO 🌾 carry, and the reason is a
+    # DECLARED consequence of the drain discriminator rather than a weakening.
+    # ⚖️ publishes its cap as `caps.k` — PAIRS — while `open_trades` counts
+    # LEGS (live: 10 open, k=5), so `open_n == cap` can never hold there and
+    # the capacity branch is now quiet on that book. That is the correct
+    # direction twice (I7: an always-in book's fullness restates its design;
+    # (hs): the ratchet ran to the cage ceiling on a losing book), and it is
+    # asserted below rather than left to be discovered. The MTM term itself is
+    # unchanged and is pinned here on a book the branch CAN reach.
     _SB = "perps-funding-spread-lshadow"
+    _spread_row = [{"bot": _SB, "open_trades": 10, "closed_trades": 48,
+                    "pnl_abs": 40.0, "extra": {"caps": {"k": 5}}}]
+    lv, _ = synthesize_books(_spread_row, {}, {}, _bnow, tuning_mod=_T,
+                             golive_state=_gl([0.012, 0.008] * 20, bot=_SB))
+    assert lv == {}, ("⚖️'s cap is in PAIRS and open_trades in LEGS — the "
+                      "capacity branch must stay quiet there (declared)")
 
-    def _spread(pnl, open_n=24, cap=12):
-        row = {"bot": _SB, "open_trades": open_n, "closed_trades": 48,
-               "extra": {"caps": {"k": cap}}}
-        if pnl is not None:
-            row["pnl_abs"] = pnl
-        return [row]
-
-    # the measured case: saturated AND losing -> HOLD, and say so
-    lv, it = synthesize_books(_spread(-27.75), {}, {}, _bnow, tuning_mod=_T)
+    # the MTM term still WORKS — a profit term, not a disabled branch. Same
+    # row as the positive control above, only the sign of pnl_abs differs.
+    lv, it = synthesize_books(_row(pnl=-27.75), {}, {}, _bnow, tuning_mod=_T,
+                              golive_state=_GL_OK)
     assert lv == {}, "a saturated LOSING book must not be widened"
     _held = [i for i in it if i.get("direction") == "hold"]
-    assert _held and _held[0]["lever"] == "fundspread.k", it
+    assert _held and _held[0]["lever"] == "carry.max_positions", it
+    assert "MTM P&L is $-27.75" in _held[0]["msg"], _held[0]["msg"]
     assert _held[0]["severity"] == "info", \
         "the board phone-pushes warn/action; an always-in book trips this " \
         "every cycle, so it must not page"
 
-    # the rule still WORKS — this is a profit term, not a disabled branch
-    # NOTE the step comes off the REGISTRY's current value (env_default 5
-    # since the 4-Aug (jg) revert of the (fz) widening), while SATURATION is
-    # judged against the cap the book published (12) — two different sources
-    # on purpose, per the block above.
-    lv, _ = synthesize_books(_spread(+40.0), {}, {}, _bnow, tuning_mod=_T)
-    assert lv.get("fundspread.k", {}).get("value") == 6, lv
-
-    # REALISED-ONLY WOULD HAVE WIDENED IT. Counterweight's realised P&L was
-    # +$7.29 against a -$27.75 mark-to-market total. If this rule ever reads a
-    # realised field instead of pnl_abs, this assertion is what fails.
-    lv, _ = synthesize_books(_spread(-27.75), {}, {}, _bnow, tuning_mod=_T)
-    assert "fundspread.k" not in lv, \
-        "the term must read MTM pnl_abs, never realised P&L (the (hl) blind spot)"
-
-    # FAIL-CLOSED in the widening direction: no/­unreadable/NaN pnl -> hold
+    # REALISED-ONLY WOULD HAVE WIDENED IT (the (hl) blind spot). If this rule
+    # ever reads a realised field instead of pnl_abs, this is what fails.
+    # FAIL-CLOSED in the widening direction: no/unreadable/NaN pnl -> hold
     for _bad in (None, "n/a", float("nan"), True):
-        _rows = _spread(0.0)
+        _rows = _row(pnl=0.0)
         if _bad is None:
             _rows[0].pop("pnl_abs")
         else:
             _rows[0]["pnl_abs"] = _bad
-        lv, _ = synthesize_books(_rows, {}, {}, _bnow, tuning_mod=_T)
+        lv, _ = synthesize_books(_rows, {}, {}, _bnow, tuning_mod=_T,
+                                 golive_state=_GL_OK)
         assert lv == {}, f"unreadable pnl_abs ({_bad!r}) must not widen"
     # exactly break-even is not evidence of a working book either
-    lv, _ = synthesize_books(_spread(0.0), {}, {}, _bnow, tuning_mod=_T)
+    lv, _ = synthesize_books(_row(pnl=0.0), {}, {}, _bnow, tuning_mod=_T,
+                             golive_state=_GL_OK)
     assert lv == {}, "0.0 is not a profitable book"
 
     # THE ASYMMETRY IS DELIBERATE: the profit term guards CAPACITY only. A
@@ -2595,10 +3054,12 @@ def _selftest():
     # A MISSING ROW proposes nothing. Absence of evidence is not "widen" —
     # this is the guard that stops a publish outage from ratcheting every
     # book wider on every cycle.
-    lv, _ = synthesize_books([], _prior, {}, _bnow, tuning_mod=_T)
+    lv, _ = synthesize_books([], _prior, {}, _bnow, tuning_mod=_T,
+                             golive_state=_GL_OK)
     assert lv == {}, "no row -> no opinion"
     # a dark rail proposes nothing either
-    assert synthesize_books(_sat, {}, {}, _bnow, tuning_mod=None) == ({}, [])
+    assert synthesize_books(_sat, {}, {}, _bnow, tuning_mod=None,
+                            golive_state=_GL_OK) == ({}, [])
 
     # every authored lever must be on the books lane and writable by US —
     # a lane/author drift here would be dropped silently by write_levers.
@@ -2608,7 +3069,8 @@ def _selftest():
         assert _tn._author_may_write(_lever, "lighter-books", "evidence-board")
 
     print("evidence_board selftest OK (+ alerts-feed bloodstream: cadence-safe, "
-          "dark=warn, unstamped=info, producer ttl rules; BOOK author: saturate/starve/hurting-refusal/bound/missing-row)")
+          "dark=warn, unstamped=info, producer ttl rules; BOOK author: "
+          "at-cap/era-scoped/supply/drain/starve/hurting-refusal/bound/missing-row)")
 
 
 if __name__ == "__main__":

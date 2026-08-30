@@ -19,6 +19,10 @@ records them since 2026-07-15), so "slipping on exits" is answerable, not
 guessed.
 
 VERDICTS (per-trade gap = live − shadow, weighted by paired closes):
+  stood_down     the LIVE arm is retired ((uk)) — no execution to measure, so
+                 the number is reported and the verdict refused. Ranked FIRST:
+                 it and `insufficient` are both silence, but only one of them
+                 means "stop waiting". Fires no push and no proposal.
   insufficient   too few overlapping coins/closes to judge (stays quiet)
   clean          |gap| <= CLEAN_PP — live executes as well as the model
   live-ahead     gap > +CLEAN_PP — live BEATS shadow (real, seen 15-Jul)
@@ -43,6 +47,26 @@ try:
     import fleet_proposals as fprop      # organ proposal channel (optional)
 except Exception:  # noqa: BLE001
     fprop = None
+
+try:
+    # [(uk)] `live_arm_retired` — the fleet's ONE answer to "is this live arm
+    # retired?", already read twice by experiment_judge. Optional-guarded to
+    # match `fleet_proposals` above (this organ ships in the freqtrade image,
+    # which DOES carry fleet_bus). A dark import degrades to NOT-retired,
+    # i.e. to today's behaviour: the loud direction, never a silenced book.
+    import fleet_bus as _fb
+except Exception:  # noqa: BLE001
+    _fb = None
+
+
+def _live_retired(row=None):
+    """True when this organ's LIVE arm has been retired by the fleet."""
+    if _fb is None or not hasattr(_fb, "live_arm_retired"):
+        return False
+    try:
+        return bool(_fb.live_arm_retired(row or LIVE))
+    except Exception:  # noqa: BLE001
+        return False
 
 KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
@@ -89,7 +113,7 @@ def _iso(ts=None):
 # pure computation (selftested offline)
 # ---------------------------------------------------------------------------
 
-def compute_shortfall(per_coin, xp_running=False, drift=None):
+def compute_shortfall(per_coin, xp_running=False, drift=None, retired=False):
     """per_coin: {coin: {'live': {'avg_pct', 'n', 'entry', 'exit'},
                          'shadow': {'avg_pct', 'n', 'entry', 'exit'}}}.
     Returns the overall weighted gap (live − shadow, in pp/trade), the
@@ -149,7 +173,28 @@ def compute_shortfall(per_coin, xp_running=False, drift=None):
     entry_slip = round(sum(entry_slips) / sum(dw), 1) if dw else None
     exit_slip = round(sum(exit_slips) / sum(dw), 1) if dw else None
 
-    if n_overlap < MIN_COINS or tot_w < MIN_CLOSES:
+    if retired:
+        # [2026-08-27 (uk)] THE LIVE ARM IS RETIRED — there is no execution to
+        # measure, so the verdict is refused and the number reported. Ranked
+        # FIRST, above `insufficient`, on purpose: both produce silence, but
+        # they are not the same silence. `insufficient` says "the window is
+        # thin, wait"; `stood_down` says "this pair no longer exists, stop
+        # waiting" — and a payload that cannot tell those apart is the
+        # `{open: 0}` ambiguity ((lv)) at the fleet's only execution
+        # instrument. It matters here because the window DRAINS: the Farmer's
+        # last closes were its own retirement flatten, so within 7 days this
+        # organ would have fallen to `insufficient` and gone quiet for a
+        # reason that reads identical to a slow week.
+        #
+        # The verdict also stops the two ACTUATOR paths in run_once — the
+        # slip streak (and the phone push it earns) and the RESTRICT proposals
+        # on `live.funding.*` — because both are claims about a book that has
+        # been flat since 22-Aug. `live-slipping` was true of the retirement
+        # flatten and of nothing else: four forced market exits compared with
+        # a shadow twin that kept trading. This organ's own order-slip read
+        # said the opposite the whole time (live 0.63bps vs shadow 1.08bps).
+        verdict = "stood_down"
+    elif n_overlap < MIN_COINS or tot_w < MIN_CLOSES:
         verdict = "insufficient"
     elif drift:
         # [2026-07-17 ARM DRIFT] The two arms are running DIFFERENT CODE, so
@@ -182,10 +227,19 @@ def compute_shortfall(per_coin, xp_running=False, drift=None):
     else:
         verdict = "live-slipping"
 
-    return {"gap_pp": gap, "verdict": verdict, "n_overlap": n_overlap,
-            "paired_closes": tot_w, "coins": coins,
-            "entry_slip_bps": entry_slip, "exit_slip_bps": exit_slip,
-            "xp_running": bool(xp_running), "drift": drift or None}
+    out = {"gap_pp": gap, "verdict": verdict, "n_overlap": n_overlap,
+           "paired_closes": tot_w, "coins": coins,
+           "entry_slip_bps": entry_slip, "exit_slip_bps": exit_slip,
+           "xp_running": bool(xp_running), "drift": drift or None}
+    if retired:
+        # Name the object the reader has to act on (I8): which row, and what
+        # would bring the pair back. `live_arm_retired` is the owner of the
+        # answer; this is its receipt on the payload.
+        out["stood_down"] = {"live_bot": LIVE, "shadow_bot": SHADOW,
+                             "why": "live arm retired",
+                             "wake_when": "the arm's override env is set, or "
+                                          "SHORTFALL_LIVE names a living row"}
+    return out
 
 
 def _slip_bps(lv, sh):
@@ -454,7 +508,8 @@ def run_once():
         _drift = arm_drift(store.fetch_bot_pnl() or [])
     except Exception:      # noqa: BLE001 — a dark sensor accuses nobody
         _drift = None
-    rep = compute_shortfall(_fetch_per_coin(), xp_running=xp, drift=_drift)
+    rep = compute_shortfall(_fetch_per_coin(), xp_running=xp, drift=_drift,
+                            retired=_live_retired())
     # [2026-07-17] the real execution read: decision-vs-fill on ONE order.
     # Replaces the withdrawn averaged-price decomposition (see _slip_bps).
     _os = _fetch_order_slip()
@@ -719,10 +774,54 @@ def _selftest():
     # and it must not phone: run_once's streak only counts 'live-slipping'
     assert r_d["verdict"] != "live-slipping"
 
+    # ---- [(uk)] STOOD DOWN: a retired live arm has no execution to measure --
+    # The exact live shape that motivated this: a gap well past CLEAN_PP with
+    # ample coins and closes — i.e. every ingredient of `live-slipping` — on a
+    # pair whose live arm has been flat since its retirement flatten.
+    r_ret = compute_shortfall(slip, retired=True)
+    assert r_ret["verdict"] == "stood_down", r_ret
+    # report the NUMBER, refuse the VERDICT (the arm-drift contract, reused)
+    assert r_ret["gap_pp"] == r2["gap_pp"], "report the NUMBER, refuse the VERDICT"
+    assert r_ret["coins"] == r2["coins"], "the per-coin breakdown still publishes"
+    # it must not phone and must not propose: both ride run_once's streak,
+    # which only counts 'live-slipping'
+    assert r_ret["verdict"] != "live-slipping"
+    # I8 — name the object the reader acts on, and the way back
+    assert r_ret["stood_down"]["live_bot"] == LIVE
+    assert r_ret["stood_down"]["shadow_bot"] == SHADOW
+    assert "wake_when" in r_ret["stood_down"]
+    # RANKED FIRST — above every other refusal, and above `insufficient`.
+    # A drained window on a retired pair must say "stop waiting", not "wait".
+    assert compute_shortfall(thin, retired=True)["verdict"] == "stood_down"
+    assert compute_shortfall({}, retired=True)["verdict"] == "stood_down"
+    assert compute_shortfall(_pair, retired=True,
+                             drift={"live": "a", "shadow": "b"}
+                             )["verdict"] == "stood_down"
+    assert compute_shortfall(_pair, retired=True,
+                             xp_running=True)["verdict"] == "stood_down"
+    # ...and it changes NOTHING while the arm is live: default is False, and
+    # every verdict above must be reachable exactly as before.
+    assert "stood_down" not in compute_shortfall(slip)
+    assert compute_shortfall(slip)["verdict"] == "live-slipping"
+    assert compute_shortfall(clean)["verdict"] == "clean"
+    # the resolver degrades to NOT-retired on a dark/absent fleet_bus — the
+    # loud direction. A silenced living book is the failure that matters.
+    _saved, globals()["_fb"] = _fb, None
+    try:
+        assert _live_retired("perps-funding-lighter-lighter") is False
+        assert _live_retired("anything-at-all") is False
+    finally:
+        globals()["_fb"] = _saved
+    # and with the real module present it agrees with the single owner
+    if _fb is not None and hasattr(_fb, "live_arm_retired"):
+        assert _live_retired("a-row-that-does-not-exist") is False, \
+            "an unknown row is NOT retired — a typo must never silence a book"
+
     print("implementation_shortfall selftest OK (xp-contaminated control arm, "
           "clean/slipping/ahead/"
           "insufficient, one-arm ignored, entry+exit decomposition long+short, "
-          "arm-drift: fires on 2 differing builds, silent on same/unstamped/absent)")
+          "arm-drift: fires on 2 differing builds, silent on same/unstamped/absent, "
+          "stood_down: ranked first, number kept, verdict refused, inert while live)")
 
 
 if __name__ == "__main__":

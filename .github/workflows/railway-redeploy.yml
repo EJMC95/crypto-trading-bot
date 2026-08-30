@@ -77,6 +77,7 @@ on:
       - 'Dockerfile.schwager'
       - 'lighter_book_hull_bot.py'
       - 'Dockerfile.hull'
+      - 'lighter_book_bezos_bot.py'
       # [2026-08-18] 🪁 band-kelly — the MIRROR book (band-kelly-shadow).
       # paths: entries land at BIRTH (harmless before the decide rule
       # exists — the job runs and selects nothing); the decide rule below
@@ -144,10 +145,20 @@ on:
       - 'fleet_radar.py'
       - 'fleet_allocation.py'
       # 🚦 go-live grader — COPY'd into Dockerfile.freqtrade + looped in
-      # run_all.sh (`--publish`, 6-hourly) as of 2026-07-30. It is the ONLY
-      # file under `scripts/` that ships in an image, which is exactly why it
-      # needs an explicit entry here and in the service grep below.
+      # run_all.sh (`--publish`, 6-hourly) as of 2026-07-30. `scripts/` is NOT
+      # copied wholesale, so every file under it that ships in an image needs
+      # an explicit entry HERE and in the service grep below — both lists
+      # bind, and a file in one and not the other cannot deploy.
+      # [(vm), corrected in place: this said golive_readiness was "the ONLY
+      # file under scripts/ that ships in an image" and that is now false —
+      # the wins docket and the claims ledger joined it the day the win side
+      # finally got a schedule.]
       - 'scripts/golive_readiness.py'
+      # [(vm)] 🏆 the winners' docket (I21) had existed since 18-Aug in NO image
+      # and NO loop; 📒 the claims ledger is the record that reddens a build
+      # when a number quoted in doctrine drifts from the organ that owns it.
+      - 'scripts/winners_docket.py'
+      - 'scripts/claims_ledger.py'
       - 'experiment_judge.py'
       - 'strategy_incubator.py'
       - 'implementation_shortfall.py'
@@ -233,7 +244,11 @@ jobs:
             # Manual dispatch can still deploy freqtrade-bots ON PURPOSE (e.g. when
             # we intentionally ship a strategy change and accept one paper-DB reset).
             svcs="${DISPATCH_SVCS:-freqtrade-bots,pnl-dashboard}"
-            case ",$svcs," in *,trail-blazer-live,*) case ",$svcs," in *,funding-farmer-shadow,*) :;; *) svcs="$svcs,funding-farmer-shadow";; esac;; esac
+            # [(tb)] the auto-pair is GONE: trail-blazer-live runs georgia now,
+            # and her control arm is freqtrade-georgia-lshadow inside the shared
+            # family-lighter-shadow service — pairing there would redeploy six
+            # unrelated shadow books on every georgia fix. Dispatch the Farmer's
+            # shadow explicitly when it needs code.
           else
             # Diff the WHOLE push (before..after), not just the last commit —
             # a multi-commit push ending in a docs commit was deploying nothing.
@@ -253,7 +268,7 @@ jobs:
             # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
             # Keep in sync with the `paths:` filter above — both gate the same
             # deploy. scripts/audit_deploy_coverage.py enforces both against the Dockerfiles.
-            if echo "$changed" | grep -qE '^(user_data/|venues/|parliament/|parliament_main\.py$|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|fleet_proposals\.py$|fleet_radar\.py$|fleet_allocation\.py$|scripts/golive_readiness\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$)'; then
+            if echo "$changed" | grep -qE '^(user_data/|venues/|parliament/|parliament_main\.py$|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|fleet_proposals\.py$|fleet_radar\.py$|fleet_allocation\.py$|scripts/golive_readiness\.py$|scripts/winners_docket\.py$|scripts/claims_ledger\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$|lighter_book_bezos_bot\.py$)'; then
               svcs="freqtrade-bots"
             fi
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$|fleet_watchdog_svc\.py$)'; then
@@ -292,7 +307,11 @@ jobs:
             # A change here that does not deploy is a blind spot on real money.
             # [2026-07-17] This service had NO deploy rule at all; market_context.py
             # had only ever shipped via a manual `railway up`.
-            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$|requirements\.txt$)'; then
+            # [2026-08-27 (uk)] fleet_bus.py joins this image's trigger set:
+            # the divergence check now reads `live_arm_retired` from it, so a
+            # retirement declared in fleet_bus that does not reach THIS service
+            # leaves the check firing on a corpse — which is the bug (uk) fixed.
+            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|fleet_bus\.py$|venues/|cleanup_legacy_bots\.py$|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}market-context"
             fi
             # [2026-07-30] THE SHADOW BOOKS. Each ships its own image, and each
@@ -465,6 +484,39 @@ jobs:
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"
               echo "-> live-taker marker: including tide-rider-lighter-live (REAL MONEY)"
             fi
+            # [2026-08-22 (sx)] 🔮 georgia's live arm. SAME IMAGE, SAME FILE SET
+            # — lighter_avo_live_bot.py is a VARIANT HOST now, so georgia's
+            # service runs the identical container with FAMILY_LIVE_BOOK=
+            # freqtrade-georgia and her own GEORGIA_* env + sub-account.
+            #
+            # Its OWN marker, deliberately: `[deploy-live-georgia]`. Two live
+            # books that share an image must still be deployable one at a time,
+            # or every georgia fix restarts Avo (and a restart wipes
+            # memory-only halts — see the flatten-halt-redeploy incident).
+            # `[deploy-live]` still takes both, which is what live_all means.
+            #
+            # The service does not exist until Eamon creates it; the resolve
+            # step reports an unresolvable name as an ::error:: and fails, so
+            # this rule stays commented until then — a warn-only rule is not a
+            # guard ((gl)), and a red build on a service nobody has made yet is
+            # noise. UNCOMMENT WITH THE SERVICE, in the same commit.
+            # [(tb) ACTIVATED] The service is `trail-blazer-live` — converted in
+            # place at (ta) rather than newly created, so no API key was ever
+            # read or moved. Service names in this fleet have never matched
+            # their books; this is the third slot to change hands.
+            if echo "$changed" | grep -qE "$taker_files" \
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-georgia]'; }; then
+              svcs="${svcs:+$svcs,}trail-blazer-live"
+              echo "-> live-georgia marker: including trail-blazer-live (REAL MONEY, runs georgia)"
+            fi
+            # 👩 mum's live arm — same image/file set, own marker so three
+            # live books deploy one at a time. ACTIVATED 25-Aug with the
+            # service (provisioned by one-shot dispatch, Eamon's launch order).
+            if echo "$changed" | grep -qE "$taker_files" \
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-mum]'; }; then
+              svcs="${svcs:+$svcs,}mum-live"
+              echo "-> live-mum marker: including mum-live (REAL MONEY, runs mum)"
+            fi
             # [2026-07-30 (hi)] THE EXPERIMENT'S TWO ARMS MUST DEPLOY TOGETHER.
             # `funding-farmer-shadow` — the CONTROL arm of the promotion pipeline
             # — appeared nowhere in this workflow, only in a comment inside
@@ -483,11 +535,18 @@ jobs:
             # the judge's comment says must not become a soft one); only the
             # deploy CLOCK is joined.
             # `audit_deploy_coverage.py --arms` enforces the pairing.
-            if echo "$changed" | grep -qE "$farmer_files" \
-               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-farmer]'; }; then
-              svcs="${svcs:+$svcs,}trail-blazer-live,funding-farmer-shadow"
-              echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"
-              echo "-> ...and funding-farmer-shadow, its CONTROL arm (arm-drift)"
+            # [2026-08-22 (tb)] THE FARMER HAS NO LIVE ARM ANY MORE, so this
+            # rule no longer gates real money. `trail-blazer-live` runs 🔮
+            # georgia from (ta); the Farmer's SHADOW book keeps trading as an
+            # ordinary $1k shadow and therefore gets an ordinary UNMARKED
+            # route, exactly like band-garrett-shadow below it.
+            #
+            # The `[deploy-live-farmer]` marker is retained as a NO-OP alias so
+            # an old habit or an old runbook line cannot silently deploy
+            # nothing AND cannot deploy the wrong book: it now moves the shadow
+            # arm only, which is what the name will mean from here.
+            if echo "$changed" | grep -qE "$farmer_files"; then
+              svcs="${svcs:+$svcs,}funding-farmer-shadow"
             fi
             # [(lr) ACTIVATED] 🛢️ Garrett — Farmer's file set, no marker.
             # MUST sit after farmer_files is assigned (empty grep = always).

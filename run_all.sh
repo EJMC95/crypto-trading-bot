@@ -460,6 +460,65 @@ done &
     sleep "${GOLIVE_INTERVAL_SEC:-21600}"
   done ) &
 
+# [2026-08-27 (vm) THE LEDGER OF CLAIMS + THE WINNERS' DOCKET] 🧾 the number a
+# doctrine leans on, recomputed against the organ that owns it -> bot_state
+# 'claims-ledger'. THE ASYMMETRY THIS CLOSES, measured the day it shipped: the
+# FAULT side runs 25 invariants, 29 audits and 152 autonomy tests, while the
+# WIN side is ONE script — winners_docket.py — that appears in no workflow and
+# no loop here and has therefore NEVER RUN on a schedule since 18-Aug. That is
+# the (gk) shape (a rule nobody runs is not a control) on the one instrument
+# that can say a thing is WORKING. Both ride this loop now.
+# Six-hourly beside the go-live grader above, and for the same reason: the
+# claims are about 30-day bars, so nothing here moves faster than that.
+# PUBLISH-ONLY — moves no capital, writes no lever, promotes nothing; a STALE
+# verdict means a SENTENCE needs correcting (I12), never that a gate moved.
+# THE `[ -f ]` GUARD IS NOT DEFENSIVE PADDING. `scripts/` is not COPY'd into
+# this image wholesale — `Dockerfile.freqtrade` names golive_readiness.py file
+# by file — so until these two get their own COPY lines these paths do not
+# exist here, and `|| true` would swallow the failure into silence, which is
+# exactly the 16-Jul event_sentinel born-dark incident. An absent file now says
+# so ONCE PER LOOP, in words that name the fix, and the loop self-heals the
+# moment the COPY lands. `scripts/audit_claim_freshness.py` fails the build on
+# the same condition — audit_image_imports cannot see it, because its
+# `repo_modules()` enumerates ROOT-level .py only and filters `scripts/` out
+# before the run-path check.
+( sleep 75
+  while true; do
+    if [ -f /freqtrade/scripts/claims_ledger.py ]; then
+      python3 /freqtrade/scripts/claims_ledger.py --publish || true
+    else
+      echo "[claims-ledger] BORN DARK — not in this image. Dockerfile.freqtrade needs: COPY scripts/claims_ledger.py /freqtrade/scripts/claims_ledger.py"
+    fi
+    # No --publish flag exists on the docket (it is read-only by construction
+    # and not this loop's file to change), so this run prints its verdict to
+    # the container log. WHAT PUBLISHING WOULD NEED, precisely, so the next
+    # session does not re-derive it: a `KEY`/`TTL_SEC` pair, a `build()` that
+    # returns `report()`'s survivors plus `updated`+`ttl_sec` (the bus contract
+    # audit_bus_contract enforces), a `--publish` branch calling
+    # `store.save_state`, and argparse in place of the `"--selftest" in
+    # sys.argv` check its __main__ block uses today.
+    if [ -f /freqtrade/scripts/winners_docket.py ]; then
+      python3 /freqtrade/scripts/winners_docket.py || true
+    else
+      echo "[winners-docket] BORN DARK — not in this image. Dockerfile.freqtrade needs: COPY scripts/winners_docket.py /freqtrade/scripts/winners_docket.py"
+    fi
+    sleep "${CLAIMS_INTERVAL_SEC:-21600}"
+  done ) &
+
+# 🚀 Bezos shadow book (Lighter-only). Runs the proven Douglas engine with a
+# Day-1 flywheel profile (wrapper-owned defaults, env-overridable).
+( sleep 390
+  while true; do
+    if [ "${BEZOS_ENABLED:-1}" = "0" ]; then
+      echo "[supervisor] bezos disabled (BEZOS_ENABLED=0); sleeping 60s"
+      sleep 60
+      continue
+    fi
+    VENUE=lighter_shadow python3 /freqtrade/lighter_book_bezos_bot.py || true
+    echo "[supervisor] bezos exited — restarting in 30s"
+    sleep 30
+  done ) &
+
 # [2026-07-21 PARLIAMENT] 🏛️ the six-layer PM shadow fleet (operator ask:
 # comprehensive self-evolving system, bots named for the last 8 Australian
 # PMs). ONE asyncio process carrying all six layers: Lighter-only data,

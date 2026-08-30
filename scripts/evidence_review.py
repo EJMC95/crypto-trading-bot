@@ -113,15 +113,60 @@ try:                                     # run as a script (sys.path[0]=scripts/
     from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                   GOLIVE_MIN_DAYS, bar_map, book_payload,
                                   drop_retired_sleeves, era_rows, gate_horizon,
-                                  grade, retired_sleeves, same_pair_overlaps,
-                                  stats)
+                                  grade, is_phantom_close, retired_sleeves,
+                                  same_pair_overlaps, stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
     from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                           GOLIVE_MIN_DAYS, bar_map,
                                           book_payload, drop_retired_sleeves,
                                           era_rows, gate_horizon, grade,
-                                          retired_sleeves, same_pair_overlaps,
-                                          stats)
+                                          is_phantom_close, retired_sleeves,
+                                          same_pair_overlaps, stats)
+
+
+def sql_row_is_phantom(pnl_abs, entry_price):
+    """[2026-08-26 daily review, 2nd pass] Is this `paper_trades` row a
+    halt/flatten EVENT wearing a close's shape?
+
+    THE DETECTION IS NOT RE-TYPED HERE. This shapes a SQL row into the two
+    fields `golive_readiness.is_phantom_close` reads and delegates, because a
+    second copy of that signature is a second rule and the two would drift on
+    exactly the rows that matter (CLAUDE.md). The `(th)` gate has filtered
+    these since 25-Aug; `winners_docket` since this morning; THIS script did
+    not, which is why the class was still open.
+
+    THE INCIDENT: 13 rows of exactly $0.00 with no entry price — all of them
+    on the two REAL-MONEY books (🙏 avo-lighter 9, 🔮 georgia-lighter 4,
+    every one tagged `long_daily_loss`) — were counted as trades by BOTH
+    live-money sections of this review. It published `💰 LIVE
+    freqtrade-avo-maria-lighter: n=13` on the same page as its own go-live
+    grader's n=4, and its divergence detector averaged 9 zeros into Avo's
+    live per-trade return, reporting a +0.822%/trade book as +0.253% and a
+    gap of -0.023pp instead of +0.546pp. Zeros do not merely dilute the mean:
+    they shrink the sample variance, so a gap detector fed them is biased
+    toward the all-clear it is supposed to be able to withhold.
+    """
+    return is_phantom_close({"profit_abs": pnl_abs, "open_rate": entry_price})
+
+
+def live_lens_rollup(rows):
+    """[(lens, pnl_abs, entry_price)] -> [(lens, n, net)] desc by n, phantoms
+    dropped.
+
+    EXTRACTED because a mutation round proved it: with this inline in
+    `scan_new_evidence` the phantom filter on the 💰 LIVE section was
+    unreachable from any test — deleting it left the suite GREEN, on the one
+    section of this report that names real money. Same lesson the band-kelly
+    dispersion counter taught the same morning.
+    """
+    agg = {}
+    for lens, pnl_abs, entry_price in rows:
+        if sql_row_is_phantom(pnl_abs, entry_price):
+            continue
+        n, net = agg.get(lens, (0, 0.0))
+        agg[lens] = (n + 1, net + float(pnl_abs or 0.0))
+    return sorted(((k, v[0], round(v[1], 2)) for k, v in agg.items()),
+                  key=lambda r: r[1], reverse=True)
 
 # Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
 # than the real closes bar, or a genuine candidate is hidden before it is graded.
@@ -189,6 +234,18 @@ except Exception:      # noqa: BLE001 — a degraded list, never a lost report
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from fleet_books import DECLARED_LIVE, ROW_ENTRY   # noqa: E402
 
+# [2026-08-28] The `stale-live:` verifier's threshold is IMPORTED from the
+# publisher that fires the alert, never restated here. `market_context` owns
+# the per-book cadence; a second copy of it in this file is a second rule, and
+# the one that drifts is always the copy ((hj): pin re-use by identity).
+# Import failure leaves the names None and the verifier FAILS CLOSED — a
+# real-money liveness alert we cannot re-measure must never publish "resolved".
+try:
+    from market_context import (LIVE_CADENCE_SEC,      # noqa: E402
+                                DEFAULT_LIVE_LIMIT)
+except Exception:                                      # pragma: no cover
+    LIVE_CADENCE_SEC, DEFAULT_LIVE_LIMIT = None, None
+
 LIVE_ROWS = DECLARED_LIVE
 # The `-lshadow` CONTROL arm of a row that is ALREADY LIVE is not a go-live
 # candidate — it is the twin of a bot that already went. It also fails the
@@ -199,9 +256,25 @@ LIVE_ROWS = DECLARED_LIVE
 # row is `perps-funding-lighter-lighter` — two occurrences — so a bare
 # `.replace("-lighter","-lshadow")` yields `perps-funding-lshadow-lshadow`,
 # a row that does not exist, and the real twin sails through the gate scan.
-LIVE_TWINS = frozenset(
-    (r[:-len("-lighter")] + "-lshadow") if r.endswith("-lighter") else r
-    for r in LIVE_ROWS)
+def shadow_twin(row):
+    """The `-lshadow` CONTROL arm of a live row — the ONE owner of that rewrite.
+
+    [2026-08-26 daily review] Made a function because both consumers used to
+    hand-type their shadow arm and BOTH had rotted the moment the live roster
+    changed: `live_shadow_gap`'s shadow defaulted to the FARMER's twin while
+    its live side is `LIVE_ROWS[0]`, so after 💸 the Farmer's live arm retired
+    ((ta)) and 🙏 Avo/🔮 Georgia/👩 mum took the sub-accounts, the review was
+    differencing AVO'S LIVE ARM against THE FARMER'S SHADOW BOOK and printing
+    it as "Farmer live-vs-shadow ... no divergence". A cross-book subtraction
+    cannot detect a live book drifting from its control, and it reported an
+    all-clear while doing it. Deriving the twin makes that unrepresentable.
+    """
+    return (row[:-len("-lighter")] + "-lshadow") if row.endswith("-lighter") else row
+
+
+# The `-lshadow` CONTROL arm of a row that is ALREADY LIVE is not a go-live
+# candidate — see the note above.
+LIVE_TWINS = frozenset(shadow_twin(r) for r in LIVE_ROWS)
 
 # [2026-08-02] The entry file whose build id each graded row stamps, so the
 # review can compare a RUNNING container against the repo. See
@@ -242,6 +315,7 @@ def alert_key_kind(key):
     k = str(key or "")
     for prefix, kind in (("disloc:", "disloc"), ("census:", "census"),
                          ("factor-sample:", "factor"), ("veto:", "veto"),
+                         ("stale-live:", "stale_live"),
                          ("live-shadow-gap", "live_shadow")):
         if k.startswith(prefix):
             return kind
@@ -614,11 +688,99 @@ def verify_alerts(cur, errors):
                 verdicts.append((key, "active" if sym in coins else "resolved",
                                  coins.get(sym, f"{sym} no longer vetoed")))
             elif kind == "live_shadow":
-                gap = live_shadow_gap(cur)
-                verdicts.append((key, "resolved" if abs(gap["gap_pp"]) < 2.0 else "active",
-                                 f"per-trade gap {gap['gap_pp']:+.3f}pp "
-                                 f"(live {gap['live_pct']:+.3f}% n={gap['live_n']} vs "
-                                 f"shadow {gap['shadow_pct']:+.3f}% n={gap['shadow_n']})"))
+                # [2026-08-27] EVERY live row, against ITS OWN twin — the same
+                # rule the `live-shadow` evidence section adopted on 26-Aug.
+                # THE INCIDENT: that pass fixed the evidence section and the
+                # helper (which grew a required `live` argument) and left THIS
+                # call on the old one-book signature, so the verifier raised
+                # TypeError and the key published "verification failed" — an
+                # alert that can never be verified is an alert nobody reads.
+                # The class, not the instance: a hand-typed book here would go
+                # stale on the next slot swap exactly as the old one did.
+                notes, worst, measurable = [], 0.0, 0
+                for _live in DECLARED_LIVE:
+                    g = live_shadow_gap(cur, _live)
+                    if not g["live_n"] or not g["shadow_n"]:
+                        notes.append(f"{_live}: insufficient paired closes "
+                                     f"(live n={g['live_n']}, "
+                                     f"shadow n={g['shadow_n']})")
+                        continue
+                    measurable += 1
+                    worst = max(worst, abs(g["gap_pp"]))
+                    notes.append(f"{_live}: {g['gap_pp']:+.3f}pp "
+                                 f"(live {g['live_pct']:+.3f}% n={g['live_n']} vs "
+                                 f"shadow {g['shadow_pct']:+.3f}% n={g['shadow_n']})")
+                # FAIL-CLOSED: with nothing measurable the gap is UNKNOWN, and
+                # an unknown must never publish as "resolved" — that is the
+                # vacuous all-clear this key exists to make impossible.
+                status = ("active" if not measurable or worst >= 2.0
+                          else "resolved")
+                verdicts.append((key, status, "; ".join(notes) or
+                                 "no live rows declared"))
+            elif kind == "stale_live":
+                # [2026-08-28] THE INCIDENT THIS CLOSES: 🔮 georgia's LIVE
+                # real-money row froze 27-Aug 14:03Z for 8.28h. The alert fired
+                # twice (dedup_h=6) and this review had NO verifier for the key
+                # shape, so it echoed the alert's own text — "last published 381
+                # min ago" — as an ACTIVE finding at 08:30 the next morning,
+                # when the row had been publishing again for ten hours.
+                #
+                # [I1] LIVENESS BEFORE SEMANTICS. The alert's message carries
+                # the age AT FIRING and nothing else, so echoing it cannot
+                # distinguish "this real-money book is down RIGHT NOW" from "it
+                # recovered overnight" — the two are byte-identical to a reader,
+                # which is the whole of I1. Re-measure the row's age instead.
+                bot = key.split(":", 1)[1]
+                if LIVE_CADENCE_SEC is None:
+                    # FAIL CLOSED: no threshold owner, no verdict. Never
+                    # "resolved" on a real-money liveness key we cannot check.
+                    verdicts.append((key, "active",
+                                     f"⚠️ CANNOT VERIFY {bot}: market_context "
+                                     f"(the cadence owner) did not import — "
+                                     f"treat as unverified, not as healthy"))
+                    continue
+                limit_s = LIVE_CADENCE_SEC.get(bot, DEFAULT_LIVE_LIMIT)
+                cur.execute("SELECT extract(epoch FROM (now()-updated_at)),"
+                            " equity FROM bot_pnl WHERE bot=%s", (bot,))
+                row = cur.fetchone()
+                if not row or row[0] is None:
+                    # A live row that has VANISHED is worse than a stale one.
+                    verdicts.append((key, "active",
+                                     f"⚠️ LIVE row {bot} has no bot_pnl row at "
+                                     f"all — check the Railway service"))
+                    continue
+                # clamp: a row written after this txn's `now()` snapshot
+                # yields a negative epoch, which printed as "-0 min old"
+                age_s, equity = max(0.0, float(row[0])), row[1]
+                eq = f" (${equity:,.2f} real)" if equity is not None else ""
+                # The outage's DURATION, from the durable equity series — the
+                # number an operator actually needs. "It recovered" without a
+                # duration cannot be told from "it never really broke".
+                gap_note = ""
+                try:
+                    cur.execute(
+                        "SELECT ts FROM bot_state_history WHERE key=%s"
+                        " AND ts > now() - interval '%s days' ORDER BY ts",
+                        (f"{bot}:equity", ALERT_WINDOW_D))
+                    ts = [r[0] for r in cur.fetchall()]
+                    worst = max(((b - a_).total_seconds()
+                                 for a_, b in zip(ts, ts[1:])), default=0.0)
+                    if worst > limit_s:
+                        gap_note = (f"; worst publish gap in the last "
+                                    f"{ALERT_WINDOW_D}d was {worst/3600:.2f}h")
+                except Exception:
+                    gap_note = "; publish-gap history unreadable"
+                if age_s > limit_s:
+                    verdicts.append((key, "active",
+                                     f"⚠️ STILL STALE — LIVE bot {bot}{eq} last "
+                                     f"published {age_s/60:.0f} min ago (limit "
+                                     f"{limit_s/60:.0f}); check the Railway "
+                                     f"service{gap_note}"))
+                else:
+                    verdicts.append((key, "resolved",
+                                     f"RECOVERED — {bot}{eq} is publishing now "
+                                     f"({age_s/60:.0f} min old, limit "
+                                     f"{limit_s/60:.0f}){gap_note}"))
             else:
                 verdicts.append((key, "active",
                                  f"no verifier for this key shape — {a.get('msg','')[:120]}"))
@@ -628,20 +790,38 @@ def verify_alerts(cur, errors):
     return verdicts
 
 
-def live_shadow_gap(cur, live=LIVE_ROWS[0], shadow="perps-funding-lighter-lshadow",
-                    days=14):
+def live_shadow_gap(cur, live, shadow=None, days=14):
     """Per-trade pnl_pct gap. Per-trade, NEVER equity — the arms hold different
-    capital ($100 live vs $1,000 shadow), so an equity-% gap compares nothing."""
+    capital ($100 live vs $1,000 shadow), so an equity-% gap compares nothing.
+
+    `shadow` DEFAULTS TO THIS ROW'S OWN TWIN and must never be another book's
+    (see `shadow_twin`) — a cross-book difference is not a divergence signal.
+    """
+    shadow = shadow or shadow_twin(live)
+    if shadow == live:
+        raise ValueError(f"{live}: no distinct shadow twin")
     out = {}
     for role, bot in (("live", live), ("shadow", shadow)):
-        cur.execute(f"""SELECT count(*), avg(pnl_pct)
+        # Rows, not an aggregate: the phantom test is the GATE'S, and it reads
+        # a row. Averaging in SQL would force a re-typed predicate here — the
+        # second-copy failure. These sets are ~hundreds of rows per book.
+        # [(tu)] `entry_price` is the COLUMN. It is NOT a key inside `extra`,
+        # and reading it as one made the phantom signature a tautology — see
+        # `sql_row_is_phantom`.
+        cur.execute(f"""SELECT pnl_pct, pnl_abs, entry_price
                           FROM paper_trades
                          WHERE bot=%s AND pnl_abs IS NOT NULL
                            AND {CA} > now() - interval '%s days'""",
                     (bot, days))
-        n, avg = cur.fetchone()
-        out[f"{role}_n"] = n or 0
-        out[f"{role}_pct"] = float(avg or 0.0) * 100.0
+        # [(tu)] a NULL `pnl_pct` is SKIPPED, never coerced to 0.0. The WHERE
+        # clause admits it (it filters on pnl_abs alone) and the SQL `avg()`
+        # this replaced ignored NULLs by definition, so coercing re-introduced
+        # exactly the zero-dilution bias the phantom filter above exists to
+        # remove — in the same function, on the same mean.
+        pcts = [float(pct) for pct, pabs, entry in cur.fetchall()
+                if pct is not None and not sql_row_is_phantom(pabs, entry)]
+        out[f"{role}_n"] = len(pcts)
+        out[f"{role}_pct"] = (statistics.fmean(pcts) if pcts else 0.0) * 100.0
     out["gap_pp"] = out["live_pct"] - out["shadow_pct"]
     return out
 
@@ -667,10 +847,13 @@ def scan_new_evidence(cur, errors):
 
     with Section(errors, "live-rows"):
         for bot in LIVE_ROWS:
-            cur.execute("""SELECT split_part(reason,'_',1), count(*), sum(pnl_abs)
-                             FROM paper_trades WHERE bot=%s AND pnl_abs IS NOT NULL
-                            GROUP BY 1 ORDER BY 2 DESC""", (bot,))
-            by_lens = [(r[0], r[1], round(float(r[2]), 2)) for r in cur.fetchall()]
+            # Rows, not an aggregate — see `sql_row_is_phantom`. This section
+            # reported 9 of 🙏 Avo's halt events as a `long` lens worth $0.00.
+            cur.execute("""SELECT split_part(reason,'_',1), pnl_abs,
+                                  entry_price
+                             FROM paper_trades WHERE bot=%s AND pnl_abs IS NOT NULL""",
+                        (bot,))
+            by_lens = live_lens_rollup(cur.fetchall())
             if by_lens:
                 tot_n = sum(r[1] for r in by_lens)
                 tot = sum(r[2] for r in by_lens)
@@ -885,11 +1068,22 @@ def scan_new_evidence(cur, errors):
                                  "by books with NO measured claim")
 
     with Section(errors, "live-shadow"):
-        g = live_shadow_gap(cur)
-        items.append(f"📏 Farmer live-vs-shadow per-trade gap {g['gap_pp']:+.3f}pp "
-                     f"(live {g['live_pct']:+.3f}% n={g['live_n']}, "
-                     f"shadow {g['shadow_pct']:+.3f}% n={g['shadow_n']}) — "
-                     f"{'DIVERGING' if abs(g['gap_pp']) >= 2 else 'no divergence'}")
+        # EVERY live row against ITS OWN twin — never a hand-typed pair, and
+        # never row[0] alone: after the (ta)/(tb) swap the fleet has THREE
+        # live books, and a single hardcoded line both compared the wrong
+        # books and left two real-money rows unwatched.
+        for live in DECLARED_LIVE:
+            g = live_shadow_gap(cur, live)
+            if not g["live_n"] or not g["shadow_n"]:
+                items.append(f"📏 {live} live-vs-shadow: insufficient paired "
+                             f"closes (live n={g['live_n']}, "
+                             f"shadow n={g['shadow_n']}) — no verdict")
+                continue
+            items.append(f"📏 {live} live-vs-shadow per-trade gap "
+                         f"{g['gap_pp']:+.3f}pp "
+                         f"(live {g['live_pct']:+.3f}% n={g['live_n']}, "
+                         f"shadow {g['shadow_pct']:+.3f}% n={g['shadow_n']}) — "
+                         f"{'DIVERGING' if abs(g['gap_pp']) >= 2 else 'no divergence'}")
 
     with Section(errors, "arm-drift"):
         # [2026-08-13 (ma)] the Taker pair -> the Avo pair (slot swap). The
@@ -897,16 +1091,17 @@ def scan_new_evidence(cur, errors):
         # family container) so their build ids will always differ — that is
         # the (fd) FILE-SET shape, not drift; arm_drift_line's build_n field
         # is what keeps that readable.
+        # [2026-08-26] DERIVED from the live roster, not hand-typed. The old
+        # literal pair list still named the RETIRED Farmer arms and covered
+        # only Avo, so 🔮 Georgia and 👩 mum — both carrying real money since
+        # (tb)/(te) — had no arm-drift check at all.
+        _pairs = [(r, shadow_twin(r)) for r in DECLARED_LIVE]
+        _rows = sorted({x for pair in _pairs for x in pair})
         cur.execute("""SELECT bot, extra->>'build', extra->>'build_n' FROM bot_pnl
-                        WHERE bot IN ('perps-funding-lighter-lighter',
-                                      'perps-funding-lighter-lshadow',
-                                      'freqtrade-avo-maria-lighter',
-                                      'freqtrade-avo-maria-lshadow')""")
+                        WHERE bot = ANY(%s)""", (_rows,))
         b = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
-        for live, shadow, name in (
-                ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow", "Farmer"),
-                ("freqtrade-avo-maria-lighter", "freqtrade-avo-maria-lshadow", "Avo")):
-            items.append(arm_drift_line(name, b.get(live), b.get(shadow)))
+        for live, shadow in _pairs:
+            items.append(arm_drift_line(live, b.get(live), b.get(shadow)))
 
     with Section(errors, "head-drift"):
         # Same rows, different question: is the CONTAINER carrying what has
@@ -1543,6 +1738,271 @@ def selftest():
     assert action_items(["🧬 Farmer arms AGREE: live abc vs shadow abc"]) == []
     assert len(action_items(["🧬 Taker arms DIVERGE: live abc vs shadow def"])) == 1
 
+    # ---- [2026-08-26] A LIVE ROW IS DIFFERENCED AGAINST ITS OWN TWIN ------
+    # THE INCIDENT: `live_shadow_gap`'s live side was LIVE_ROWS[0] while its
+    # shadow side was the hardcoded string 'perps-funding-lighter-lshadow'.
+    # When 💸 the Farmer's LIVE arm retired ((ta)) and 🙏 Avo / 🔮 Georgia /
+    # 👩 mum took the sub-accounts, LIVE_ROWS[0] became Avo — so the review
+    # subtracted THE FARMER'S SHADOW BOOK from AVO'S LIVE ARM and published
+    # it as "Farmer live-vs-shadow ... no divergence". The one instrument
+    # meant to catch a live book drifting from its control was comparing two
+    # unrelated books, and its all-clear was structurally unearnable.
+    for _live in DECLARED_LIVE:
+        _tw = shadow_twin(_live)
+        assert _tw != _live and _tw.endswith("-lshadow"), _tw
+        assert _tw.rsplit("-", 1)[0] == _live.rsplit("-", 1)[0], \
+            f"{_live} paired with a DIFFERENT book's shadow: {_tw}"
+    assert shadow_twin("freqtrade-avo-maria-lighter") == \
+        "freqtrade-avo-maria-lshadow"
+    # the (co) suffix trap: replace() is global, and the Farmer's live row
+    # carries '-lighter' TWICE — only the SUFFIX may be rewritten.
+    assert shadow_twin("perps-funding-lighter-lighter") == \
+        "perps-funding-lighter-lshadow"
+    # every live row is watched, not just row[0] — Georgia and mum were unwatched
+    assert len(DECLARED_LIVE) >= 1
+    assert set(LIVE_TWINS) == {shadow_twin(r) for r in DECLARED_LIVE}
+
+    # THE WIRING, not just the helper. Asserting shadow_twin() in isolation
+    # leaves the real defect alive: `live_shadow_gap` could still hardcode a
+    # foreign shadow and every helper assertion above would stay green. (A
+    # mutation round proved exactly that — restoring the hardcoded Farmer
+    # twin passed this selftest until this block existed.) So drive the
+    # function with a recording cursor and read back WHICH BOTS it queried.
+    class _RecCur:
+        """Rows are (pnl_pct, pnl_abs, entry_price) — the shape the fixed
+        `live_shadow_gap` reads. `rows` defaults to two real closes."""
+
+        def __init__(self, rows=None):
+            self.seen = []
+            self.rows = rows if rows is not None else [(0.01, 1.0, 100.0)]
+
+        def execute(self, _sql, params):
+            self.seen.append(params[0])
+
+        def fetchall(self):
+            return list(self.rows)
+
+    _rc = _RecCur()
+    live_shadow_gap(_rc, "freqtrade-avo-maria-lighter")
+    assert _rc.seen == ["freqtrade-avo-maria-lighter",
+                        "freqtrade-avo-maria-lshadow"], _rc.seen
+    _rc2 = _RecCur()
+    live_shadow_gap(_rc2, "freqtrade-georgia-lighter")
+    assert _rc2.seen == ["freqtrade-georgia-lighter",
+                         "freqtrade-georgia-lshadow"], _rc2.seen
+    # and a row with no distinct twin must REFUSE rather than self-compare
+    try:
+        live_shadow_gap(_RecCur(), "some-book-lshadow")
+        raise AssertionError("a row with no distinct twin must raise")
+    except ValueError:
+        pass
+
+    # ---- [2026-08-27] THE VERIFIER BRANCH IS DRIVEN, NOT JUST THE HELPER --
+    # THE INCIDENT: the 26-Aug pass above gave `live_shadow_gap` a REQUIRED
+    # `live` argument and updated the evidence section to iterate every live
+    # row — but left `verify_alerts`'s own call on the old one-book signature.
+    # It raised TypeError on the very next run and the 'live-shadow-gap' key
+    # published "verification failed", i.e. the alert meant to catch a live
+    # book drifting from its control could not be verified at all. Every
+    # assertion above stayed GREEN, because they all drive the HELPER and
+    # nothing drove the CALLER. So: drive `verify_alerts` itself, and read
+    # back both the status and WHICH BOTS the branch queried.
+    class _AlertCur:
+        """Serves bot_state reads, then the gap queries, off one cursor.
+
+        `rows` is the LIVE arm's ledger; `shadow_rows` the twin's (defaulting
+        to the same), so a divergence can actually be constructed — feeding
+        one row-set to both arms pins the gap at 0.00pp and makes the
+        DIVERGING branch unreachable from any test.
+        """
+
+        def __init__(self, rows, shadow_rows=None):
+            self.rows = rows
+            self.shadow_rows = rows if shadow_rows is None else shadow_rows
+            self.seen, self._next, self._arm = [], None, None
+
+        def execute(self, sql, params=None):
+            if "bot_state" in sql:
+                key = params[0]
+                payload = ({"alerts": [{"key": "live-shadow-gap",
+                                        "ts": dt.datetime.now(
+                                            dt.timezone.utc).timestamp(),
+                                        "msg": "x"}]}
+                           if key == ALERTS_KEY else None)
+                self._next = [(payload, dt.datetime.now(dt.timezone.utc))] \
+                    if payload else []
+            else:
+                self.seen.append(params[0])
+                self._arm = params[0]
+                self._next = None
+
+        def fetchone(self):
+            return self._next[0] if self._next else None
+
+        def fetchall(self):
+            return list(self.shadow_rows
+                        if str(self._arm).endswith("-lshadow") else self.rows)
+
+    _ac = _AlertCur([(0.01, 1.0, 100.0)])
+    _errs = []
+    _v = verify_alerts(_ac, _errs)
+    assert not _errs, f"the live-shadow verifier must not fail soft: {_errs}"
+    _ls = [x for x in _v if x[0] == "live-shadow-gap"]
+    assert len(_ls) == 1, _v
+    # EVERY declared live row is queried against its own twin — not row[0]
+    _want = [b for r in DECLARED_LIVE for b in (r, shadow_twin(r))]
+    assert _ac.seen == _want, f"{_ac.seen} != {_want}"
+    assert _ls[0][1] == "resolved", _ls          # a 0.00pp gap resolves
+    for _r in DECLARED_LIVE:
+        assert _r in _ls[0][2], f"{_r} missing from the verdict note"
+
+    # FAIL-CLOSED: nothing measurable must NOT read "resolved". A phantom-only
+    # ledger ($0.00, no entry price) leaves n=0 on both arms, and the old
+    # branch would have divided that into a clean all-clear.
+    _ac0 = _AlertCur([(0.0, 0.0, None)])
+    _v0 = verify_alerts(_ac0, [])
+    _ls0 = [x for x in _v0 if x[0] == "live-shadow-gap"][0]
+    assert _ls0[1] == "active", \
+        f"an unmeasurable gap must never publish resolved: {_ls0}"
+
+    # and a real divergence still fires: live +5.0%/trade vs shadow +1.0% is
+    # a 4.00pp gap, twice the 2.0pp bar. Without this the branch could be
+    # pinned at "resolved" and every assertion above would stay green.
+    _acd = _AlertCur([(0.05, 1.0, 100.0)], shadow_rows=[(0.01, 1.0, 100.0)])
+    _vd = verify_alerts(_acd, [])
+    _lsd = [x for x in _vd if x[0] == "live-shadow-gap"][0]
+    assert _lsd[1] == "active", _lsd
+    assert "+4.000pp" in _lsd[2], _lsd
+
+    # ---- [2026-08-26, 2nd pass] HALT EVENTS ARE NOT TRADES ----------------
+    # THE INCIDENT: this script had NO phantom-close filter while
+    # `golive_readiness` has had one since (th) and `winners_docket` gained
+    # one this morning — so the class was closed in two graders and left open
+    # in the one that writes the report the operator reads. Both live-money
+    # sections counted 13 halt/flatten rows ($0.00, no entry price, all on the
+    # two REAL-MONEY books) as trades.
+    assert sql_row_is_phantom(0.0, None) is True
+    # a REAL scratch trade has an entry price and must SURVIVE — the
+    # counterfactual that a too-broad "drop every $0.00 row" filter fails
+    # [(tu)] a FLOAT, which is what the `entry_price` column actually yields —
+    # the hand-typed "100" was a shape this query can never emit ((hj)).
+    assert sql_row_is_phantom(0.0, 100.0) is False
+    # the real one, from the live ledger: band-kelly 1000PEPE 22-Aug, a
+    # converged round trip that scratched flat and MUST survive the filter
+    assert sql_row_is_phantom(0.0, 0.004083) is False
+    # a real forced-flatten LOSS keys the same `long_daily_loss` reason and
+    # must survive: the signature is $0.00 AND no entry price, never the reason
+    assert sql_row_is_phantom(-30.96, None) is False
+    assert sql_row_is_phantom(-30.96, 100.0) is False
+    # and it is the GATE'S detection, not a re-typed copy. [(tu)] The old
+    # assertion here compared two BOOLEANS, which a faithful re-typed copy
+    # satisfies exactly — a mutation replacing the delegation with an inline
+    # `float(pnl_abs or 0) == 0.0 and entry is None` SURVIVED it. Pin the CALL.
+    assert sql_row_is_phantom(0.0, None) is \
+        is_phantom_close({"profit_abs": 0.0, "open_rate": None})
+    import ast as _ast0
+    import pathlib as _pl0
+    _srcp = _pl0.Path(__file__).read_text(encoding="utf-8")
+    _pf = next(n for n in _ast0.walk(_ast0.parse(_srcp))
+               if isinstance(n, _ast0.FunctionDef)
+               and n.name == "sql_row_is_phantom")
+    assert any(isinstance(n, _ast0.Call) and isinstance(n.func, _ast0.Name)
+               and n.func.id == "is_phantom_close" for n in _ast0.walk(_pf)), \
+        "sql_row_is_phantom stopped delegating — a second copy of the gate's " \
+        "signature is a second rule, and the two drift on the rows that matter"
+
+    # [(tu)] THE SOURCE FIELD, which is what actually shipped broken. Both
+    # queries read `extra->>'entry_price'` — a JSONB key NO writer sets
+    # (bot_pnl_store publishes `entry_price` as its own column and `extra` as a
+    # separate JSONB). Measured over 3,235 ledger rows, 26-Jun..26-Aug:
+    # `extra.entry_price` non-null in ZERO. So the third tuple slot was NULL on
+    # every real row, `open_rate is None` was a tautology, and the signature
+    # degenerated from "$0.00 AND no entry price" to "$0.00" — the exact
+    # too-broad filter the counterfactual above forbids. It read CORRECTLY on
+    # the day (halt events are $0.00 anyway) and would have silently deleted
+    # the next genuine scratch close; band-kelly booked one on 22-Aug
+    # (1000PEPE `short-snap_conv`, entry 0.004083, pnl $0.00).
+    # No fixture can catch this — `_RecCur` never executes SQL — so the guard
+    # is on the QUERY TEXT, tied to the publisher's own schema. It reads the
+    # module's STRING CONSTANTS via AST, never the raw source: a page-wide
+    # substring scan matches this very comment, which is the (po) trap (three
+    # tests in one session failed on the sentence promising the property).
+    # scoped to strings that ARE queries, which also excludes this guard's own
+    # search literal — a whole-module scan matches itself, the same self-
+    # reference that just made the first draft of this assertion fail.
+    _sql = [n.value for n in _ast0.walk(_ast0.parse(_srcp))
+            if isinstance(n, _ast0.Constant) and isinstance(n.value, str)
+            and "paper_trades" in n.value]
+    assert not any("extra->>'entry_price'" in q for q in _sql), \
+        "entry_price is a COLUMN, not a key in extra — reading it as JSONB " \
+        "makes the phantom test a tautology that drops real scratch trades"
+    _pt = [q for q in _sql if "entry_price" in q]
+    assert len(_pt) == 2, \
+        f"expected both phantom-filtered queries to select the entry_price " \
+        f"column, found {len(_pt)}"
+    _store_src = (_pl0.Path(__file__).resolve().parents[1]
+                  / "bot_pnl_store.py").read_text(encoding="utf-8")
+    assert "ADD COLUMN IF NOT EXISTS entry_price" in _store_src, \
+        "the publisher no longer declares entry_price as a column — re-derive " \
+        "where the phantom signature's entry price comes from before trusting it"
+
+    # THE WIRING, not just the helper. Drive the real function with Avo's real
+    # 23/24-Aug shape — 9 phantom halts + 4 traded closes — and read the
+    # published numbers back. Before the fix this returned n=13 and a mean
+    # diluted by nine zeros.
+    _avo_live = [(0.0, 0.0, None)] * 9 + [(0.008, 0.13, 100.0)] * 4
+    _gc = _RecCur(_avo_live)
+    _g = live_shadow_gap(_gc, "freqtrade-avo-maria-lighter")
+    assert _g["live_n"] == 4, f"halt events counted as trades: {_g['live_n']}"
+    assert abs(_g["live_pct"] - 0.8) < 1e-9, _g["live_pct"]
+    # ALL-phantom must read n=0 (no verdict), never n=9 at a 0.00% mean —
+    # a book that only halted has produced no evidence, not flat evidence
+    _gz = live_shadow_gap(_RecCur([(0.0, 0.0, None)] * 9),
+                          "freqtrade-georgia-lighter")
+    assert _gz["live_n"] == 0 and _gz["live_pct"] == 0.0, _gz
+    # [(tu)] A NULL `pnl_pct` IS SKIPPED, NOT COUNTED AS A 0.00% TRADE. The
+    # WHERE clause admits such a row (it filters on pnl_abs alone) and the SQL
+    # `avg()` this replaced ignored NULLs by definition — so coercing with
+    # `float(pct or 0.0)` re-introduced the very zero-dilution bias the phantom
+    # filter three lines up exists to remove, in the same mean. One real close
+    # at +2% plus one NULL-pct row must read n=1 / +2.00%, never n=2 / +1.00%.
+    _gn = live_shadow_gap(_RecCur([(0.02, 1.0, 100.0), (None, 5.0, 100.0)]),
+                          "freqtrade-georgia-lighter")
+    assert _gn["live_n"] == 1, f"a NULL pnl_pct was counted as a trade: {_gn}"
+    assert abs(_gn["live_pct"] - 2.0) < 1e-9, _gn
+
+    # The 💰 LIVE section is the OTHER site, and it needed EXTRACTING before a
+    # test could reach it: a mutation round deleting its phantom filter left
+    # the whole suite green while it was inline in `scan_new_evidence`.
+    # Avo's real 26-Aug ledger: 9 `long_daily_loss` halts + 4 real closes.
+    _avo_rows = ([("long", 0.0, None)] * 9
+                 + [("long-dip-in-uptrend", 0.1287, 100.0)] * 4)
+    _roll = live_lens_rollup(_avo_rows)
+    assert _roll == [("long-dip-in-uptrend", 4, 0.51)], _roll
+    assert not any(lens == "long" for lens, _n, _net in _roll), \
+        "halt events published as a 'long' lens on a REAL-MONEY row"
+    assert sum(n for _l, n, _net in _roll) == 4, _roll
+    # a real forced-flatten LOSS on the same reason survives, and so does a
+    # genuine scratch trade — the too-broad filter must fail here
+    _keep = live_lens_rollup([("long", -30.96, None), ("long", 0.0, 100.0)])
+    assert _keep == [("long", 2, -30.96)], _keep
+    # ordering contract: biggest n first (the report reads left to right)
+    assert [n for _l, n, _x in live_lens_rollup(
+        [("a", 1.0, 1.0)] + [("b", 1.0, 1.0)] * 3)] == [3, 1]
+
+    # WIRING: the section must CALL the extracted helper. Asserting the helper
+    # alone is what let the inline copy rot — an AST check, not a substring
+    # (the incident text above contains the name too).
+    import ast as _ast
+    import pathlib as _pathlib
+    _src = _pathlib.Path(__file__).read_text(encoding="utf-8")
+    _fn = next(n for n in _ast.walk(_ast.parse(_src))
+               if isinstance(n, _ast.FunctionDef) and n.name == "scan_new_evidence")
+    _calls = {n.func.id for n in _ast.walk(_fn)
+              if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)}
+    assert "live_lens_rollup" in _calls, \
+        "scan_new_evidence stopped routing the LIVE section through the filter"
+
     # ---- [2026-08-02] CONTAINER vs REPO ----------------------------------
     # THE INCIDENT: on 2-Aug both Farmer arms reported `705425a83422` while the
     # repo predicted `30bf230bd5fb` at the same build_n=15. `arm_drift_line`
@@ -1628,6 +2088,79 @@ def selftest():
     #     the section silently reports nothing for it
     assert set(ROW_ENTRY) >= set(LIVE_ROWS), "both real-money rows must be mapped"
 
+    # ---- [2026-08-28] the `stale-live:` verifier -------------------------
+    # THE INCIDENT: 🔮 georgia's LIVE real-money row froze 27-Aug 14:03Z for
+    # 8.28h. This review had no verifier for the key shape, so it republished
+    # the alert's own "381 min ago" text the next morning — ten hours after the
+    # row had recovered. A reader could not tell a live outage from a healed
+    # one, which is exactly what I1 says is impossible without reading age.
+    assert alert_key_kind("stale-live:freqtrade-georgia-lighter") == \
+        "stale_live", "a real-money liveness alert must route to a verifier"
+    assert alert_key_kind("stale-live:anything") != "unknown"
+
+    # [(hj)] the cadence bar is the PUBLISHER's, pinned by IDENTITY. A restated
+    # copy would stay green here while drifting from the alert that fires.
+    import market_context as _mc
+    assert LIVE_CADENCE_SEC is _mc.LIVE_CADENCE_SEC, \
+        "the stale-live threshold must BE market_context's, not a copy"
+    assert DEFAULT_LIVE_LIMIT is _mc.DEFAULT_LIVE_LIMIT
+
+    class _StubCur:
+        """Answers by SQL shape so the verifier can be driven with no DB."""
+        def __init__(self, age_s, have_row=True):
+            self.age_s, self.have_row, self._r = age_s, have_row, None
+
+        def execute(self, sql, params=()):
+            if "FROM bot_state WHERE" in sql:
+                self._r = ({"alerts": [{
+                    "ts": dt.datetime.now(dt.timezone.utc).timestamp(),
+                    "key": "stale-live:freqtrade-georgia-lighter",
+                    "msg": "⚠️ LIVE bot ... 381 min ago", "severity": "warn",
+                }]}, None) if params[0] == ALERTS_KEY else None
+            elif "FROM bot_pnl" in sql:
+                self._r = (self.age_s, 237.66) if self.have_row else None
+            elif "bot_state_history" in sql:
+                self._r = []
+            else:
+                self._r = None
+
+        def fetchone(self):
+            return self._r if isinstance(self._r, tuple) else self._r
+
+        def fetchall(self):
+            return self._r if isinstance(self._r, list) else []
+
+    def _verdict(age_s, have_row=True):
+        errs = []
+        v = verify_alerts(_StubCur(age_s, have_row), errs)
+        assert not errs, errs
+        return [x for x in v if x[0].startswith("stale-live:")][0]
+
+    #     RECOVERED: a row publishing inside its cadence is resolved, and the
+    #     note says so in words rather than echoing the alert's stale number.
+    _k, _st, _why = _verdict(60.0)
+    assert _st == "resolved" and "RECOVERED" in _why, (_st, _why)
+    assert "381" not in _why, "the verdict must not echo the alert's old age"
+
+    #     STILL STALE: a genuinely frozen real-money row stays active.
+    _k, _st, _why = _verdict(9 * 3600.0)
+    assert _st == "active" and "STILL STALE" in _why, (_st, _why)
+
+    #     FAIL CLOSED, both ways. A live row with NO bot_pnl row at all is
+    #     worse than a stale one and must never read "resolved"...
+    _k, _st, _why = _verdict(60.0, have_row=False)
+    assert _st == "active" and "no bot_pnl row" in _why, (_st, _why)
+    #     ...and neither may a missing threshold owner. This is the arm that
+    #     stops an ImportError from turning into a vacuous all-clear on the one
+    #     alert class that guards real money.
+    _saved = globals()["LIVE_CADENCE_SEC"]
+    try:
+        globals()["LIVE_CADENCE_SEC"] = None
+        _k, _st, _why = _verdict(60.0)
+        assert _st == "active" and "CANNOT VERIFY" in _why, (_st, _why)
+    finally:
+        globals()["LIVE_CADENCE_SEC"] = _saved
+
     # the gate is IMPORTED, never redefined here — the whole point of (fk)
     assert not any(k.startswith("GATE_MIN") for k in globals()), \
         "a second copy of the go-live gate is a second RULE"
@@ -1648,7 +2181,12 @@ def selftest():
     # doubles as the suffix-only-rewrite regression check (its base contains
     # "-lighter", the case a global replace mangles); the second twin tracks
     # the live slot's CURRENT occupant ((ma): taker -> avo, 13-Aug).
-    assert "perps-funding-lighter-lshadow" in LIVE_TWINS
+    # [(tb)] was `perps-funding-lighter-lshadow` — the twin of a live row that
+    # retired at (ta). The PROPERTY being pinned is the suffix rewrite (a bare
+    # str.replace on the Farmer's row produced `perps-funding-lshadow-lshadow`,
+    # see the note above), so it is re-pinned on a CURRENT live row.
+    assert "freqtrade-georgia-lshadow" in LIVE_TWINS
+    assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
     assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
     assert not (LIVE_TWINS & set(LIVE_ROWS)), "twins must be distinct from live rows"
 

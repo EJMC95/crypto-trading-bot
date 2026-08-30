@@ -126,6 +126,26 @@ def audit(text, root=None):
         return ["CLAUDE.md has no INVARIANTS block (markers missing or empty)"], inv
     if not inv:
         return ["the INVARIANTS block declares no invariants"], inv
+    # [2026-08-28 (vd)] AN INVARIANT WRITTEN OUTSIDE THE MARKERS WAS SILENTLY
+    # IGNORED — the exact hole this guard exists to close, in the guard itself.
+    #
+    # I26 was appended immediately BEFORE the "Acknowledged recurrence" heading
+    # and landed 27 characters AFTER `<!-- INVARIANTS:END -->`. `parse()` reads
+    # only the bounded block, so the new doctrine had NO enforcement checking
+    # at all — and this audit reported a clean 25 while the file held 26. A
+    # doctrine the guard cannot see is doctrine with no teeth, which is the
+    # sentence at the top of CLAUDE.md.
+    #
+    # Cheap to detect and impossible to argue with: count the headings in the
+    # WHOLE document and compare. Naming the stray ids matters more than the
+    # count — "26 in the file, 25 audited" sends the reader hunting (I8).
+    strays = [m.group(1) for m in RE_HEAD.finditer(text)
+              if m.group(1) not in {e["id"] for e in inv}]
+    if strays:
+        bad.append(
+            f"invariant(s) {sorted(set(strays))} sit OUTSIDE the "
+            f"{BEGIN}/{END} markers and are NOT audited — move them inside, "
+            f"or they are doctrine with no enforcement checking")
     seen = {}
     for e in inv:
         tag = f"{e['id']} ({e['title'][:44]})"
@@ -215,6 +235,21 @@ prose after
     neither = f"{BEGIN}\n### I1 · A RULE\njust prose\n{END}"
     b, _ = audit(neither)
     assert b and "no ENFORCED BY" in b[0], b
+
+    # [(vd)] AN INVARIANT OUTSIDE THE MARKERS FAILS. Without this arm the guard
+    # passes on a doc whose newest doctrine it cannot see — which is exactly
+    # what happened to I26 on the day this was added.
+    stray = (f"{BEGIN}\n### I1 · IN\n  ENFORCED BY: `scripts/"
+             f"audit_doctrine_enforcement.py`\n{END}\n"
+             f"### I2 · OUTSIDE\n  ENFORCED BY: `scripts/"
+             f"audit_doctrine_enforcement.py`\n")
+    b, _ = audit(stray)
+    assert b and "OUTSIDE" in b[0] and "I2" in b[0], b
+    # and a doc with everything inside must stay clean, or the arm is a blocker
+    ok_all = (f"{BEGIN}\n### I1 · IN\n  ENFORCED BY: `scripts/"
+              f"audit_doctrine_enforcement.py`\n{END}\n")
+    b, _ = audit(ok_all)
+    assert not b, b
 
     # a BROKEN enforcement reference fails — this is the arm that catches a
     # guard being deleted or renamed out from under its doctrine

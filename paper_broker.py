@@ -33,15 +33,22 @@ class PaperBroker:
         self.fee = float(fee_bps) / 10_000.0   # 4 bps = 0.04% per side
         self.realized = 0.0
         self.fees = 0.0
+        self._unrealized = 0.0
+        self._unrealized_dirty = False
         # coin -> (signed_size, entry_price)
         self.pos: dict[str, tuple[float, float]] = {}
         # coin -> last seen price (for mark-to-market)
         self.marks: dict[str, float] = {}
 
+    def _mark_unrealized_dirty(self) -> None:
+        self._unrealized_dirty = True
+
     # -- price feed ---------------------------------------------------------
     def mark(self, coin: str, price: float) -> None:
         if price and price > 0:
             self.marks[coin] = float(price)
+            if coin in self.pos:
+                self._mark_unrealized_dirty()
 
     # -- order entry --------------------------------------------------------
     def close(self, coin: str, price: float) -> float:
@@ -53,6 +60,7 @@ class PaperBroker:
         self.realized += pnl
         self.fees += abs(size) * price * self.fee
         self.marks[coin] = price
+        self._mark_unrealized_dirty()
         return pnl
 
     def open(self, coin: str, is_long: bool, size: float, price: float) -> None:
@@ -65,6 +73,7 @@ class PaperBroker:
         self.pos[coin] = (signed, price)
         self.fees += abs(signed) * price * self.fee
         self.marks[coin] = price
+        self._mark_unrealized_dirty()
 
     # -- persistence ---------------------------------------------------------
     def to_state(self) -> dict:
@@ -89,19 +98,24 @@ class PaperBroker:
             pos = {str(c): (float(v[0]), float(v[1]))
                    for c, v in (state.get("pos") or {}).items()}
             marks = {str(c): float(p) for c, p in (state.get("marks") or {}).items()}
-        except Exception:
+        except (TypeError, ValueError, KeyError, IndexError):
             return False
         self.start, self.realized, self.fees = start, realized, fees
         self.pos, self.marks = pos, marks
+        self._mark_unrealized_dirty()
         return True
 
     # -- reporting ----------------------------------------------------------
     def unrealized(self) -> float:
-        tot = 0.0
-        for coin, (size, entry) in self.pos.items():
-            mark = self.marks.get(coin, entry)
-            tot += size * (mark - entry)
-        return tot
+        if self._unrealized_dirty:
+            tot = 0.0
+            marks = self.marks
+            for coin, (size, entry) in self.pos.items():
+                mark = marks.get(coin, entry)
+                tot += size * (mark - entry)
+            self._unrealized = tot
+            self._unrealized_dirty = False
+        return self._unrealized
 
     def equity(self) -> float:
         return self.start + self.realized - self.fees + self.unrealized()

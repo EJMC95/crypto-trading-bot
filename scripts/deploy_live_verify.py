@@ -66,10 +66,17 @@ PNL_URL = "https://pnl-dashboard-production-858c.up.railway.app/pnl.json"
 #: real money — (hi) joined the arms' deploy clock — so it takes the ordinary
 #: path here: the refusal is about real money, not about markers.)
 LIVE_SERVICES = {
-    "trail-blazer-live": ("perps-funding-lighter-lighter", "[deploy-live-farmer]"),
+    # [2026-08-25] 🔮 georgia runs `trail-blazer-live` since the (ta)/(tb) slot
+    # conversion — this map still described the Farmer three days later (the
+    # thirteenth "who is live" registry, found by the mum go-live gap audit).
+    # Her own marker; `[deploy-live-farmer]` is a no-op alias that moves only
+    # the shadow arm now (see railway-redeploy.yml).
+    "trail-blazer-live": ("freqtrade-georgia-lighter", "[deploy-live-georgia]"),
     # [2026-08-13 (ma)] the slot's THIRD occupant: 🙏 Avo Maria's row, same
     # service, same marker gate.
     "tide-rider-lighter-live": ("freqtrade-avo-maria-lighter", "[deploy-live-taker]"),
+    # [2026-08-25 (te)] 👩 mum — fresh sub-account, own service, own marker.
+    "mum-live": ("freqtrade-mum-lighter", "[deploy-live-mum]"),
 }
 
 # Bounded foreground polling — a CLI a human sits in front of, never a wakeup

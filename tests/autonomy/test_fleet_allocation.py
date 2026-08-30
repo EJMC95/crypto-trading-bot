@@ -14,9 +14,14 @@ The two failure classes these tests exist to prevent:
   * AN ORGAN THAT INVENTS AN OPINION — with no measured claim anywhere the
     output must be EXACTLY the flat allocation, not a plausible-looking split.
 """
+import ast
+import pathlib
+
 import pytest
 
 import fleet_allocation as alloc
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.autonomy
 
@@ -123,6 +128,154 @@ class TestTheContract:
         assert "fleet_allocation.py --publish" in (root / "run_all.sh").read_text()
 
 
+def test_the_era_headline_counts_a_field_that_exists_by_then():
+    """`n_with_era_claim` must be computed AFTER the era twins are filled.
+
+    [2026-08-26] THE DEFECT. `build()` computes `by_class` — including
+    `n_with_era_claim` — and the era twin is filled later, in `run_once`,
+    because it needs the ledger rows and the era owner's import. `build` cannot
+    know it, so it sets every `claim_era` to None first ((lx)). The counter
+    therefore ran over a column that was None on every book by construction,
+    and could only ever report ZERO whatever the data said.
+
+    Measured live: `freqtrade-avo-maria-lighter` published
+    `claim_era: 0.000174` — a real positive era-scoped claim — beside a
+    headline reading `n_with_era_claim: 0`. The payload contradicted itself.
+
+    Two halves pinned: the aggregator counts era claims when they are present,
+    and `run_once` recomputes the headline after filling them.
+    """
+    # --- half one: the aggregator itself can count an era claim -------------
+    books = {"a": [0.03, 0.01, 0.02, 0.04] * 5, "b": [-0.02, -0.01] * 10}
+    rows = alloc.allocate(books, book_usd=1000.0)
+    before = alloc.class_totals(rows, books)
+    assert sum(c["n_with_era_claim"] for c in before.values()) == 0, \
+        "fixture must start with no era claims, or it proves nothing"
+    alloc.set_era_twin(rows["a"], 12, 0.004)
+    after = alloc.class_totals(rows, books)
+    assert sum(c["n_with_era_claim"] for c in after.values()) == 1, \
+        "the aggregator does not see a filled era twin"
+
+    # --- half two: run_once recomputes it AFTER the fill --------------------
+    # Structural, because the ordering IS the defect — an aggregator that works
+    # in isolation is exactly what shipped, and it still published zero.
+    src = (ROOT / "fleet_allocation.py").read_text()
+    tree = ast.parse(src)
+    fn = [f for f in ast.walk(tree)
+          if isinstance(f, ast.FunctionDef) and f.name == "run_once"][0]
+    fill_line = None
+    recompute_line = None
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Call) and getattr(node.func, "id", "")
+                == "set_era_twin"):
+            fill_line = max(fill_line or 0, node.lineno)
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                # NOTE the quote form: `ast.unparse` emits SINGLE quotes,
+                # so matching on `["by_class"]` finds nothing and this fails
+                # for the wrong reason. Match the KEY, not a spelling.
+                if (isinstance(t, ast.Subscript)
+                        and "by_class" in ast.unparse(t)):
+                    recompute_line = max(recompute_line or 0, node.lineno)
+    assert fill_line, "run_once no longer fills the era twin"
+    assert recompute_line, (
+        "run_once never recomputes by_class — the headline is whatever "
+        "build() computed before any claim_era existed, i.e. always zero")
+    assert recompute_line > fill_line, (
+        f"by_class is recomputed at line {recompute_line} but the era twins "
+        f"are filled at {fill_line} — the counter still precedes its data")
+
+
+def test_the_gate_publishes_the_capital_it_withholds():
+    """The era gate is not capital-conserving, and the payload must say so.
+
+    [2026-08-26] `target_usd` is conserved BY CONSTRUCTION — the split never
+    proposes spending more, only spending it differently. The era gate ((lx))
+    is not: a book it declines is held at flat, and the surplus the tilt took
+    from every OTHER book to fund that expansion is returned to nobody. So the
+    two published halves of the allocation do not add up.
+
+    `(oy)` published the gated outcome PER BOOK for exactly this reason and
+    left the fleet-level number underived. Measured on the live payload the day
+    this shipped: sum(target_usd) $19,999.96 vs $18,848.30 reachable —
+    **$1,151.66, 5.8% of fleet capital**, with 3 books `expansion_gated` and 16
+    sitting at 0.9279x flat to fund a bonus that was refused.
+
+    Pinned in BOTH directions, because a number that is always positive is not
+    a measurement: a gated book produces a withholding, and an ungated fleet
+    produces exactly zero.
+    """
+    books = {"a": [0.03, 0.01, 0.02, 0.04] * 5, "b": [-0.02, -0.01] * 10,
+             "c": [0.0005, -0.0005] * 10}
+    rows = alloc.allocate(books, book_usd=1000.0)
+    # `a` is the claimant, so the tilt puts it above flat.
+    for b in rows:
+        alloc.set_era_twin(rows[b], None, None)   # writes scale_effective too
+    assert rows["a"]["expansion_gated"], (
+        "fixture must produce a gated claimant, or it proves nothing: "
+        f"{ {b: (rows[b]['target_usd'], rows[b]['scale_effective']) for b in rows} }")
+    g = alloc.gate_totals(list(rows.values()))
+    assert g["n_expansion_gated"] == 1, g
+    assert g["n_unpriced"] == 0, g
+    assert g["withheld_usd"] > 0, (
+        "a declined expansion withholds real capital and the headline read "
+        f"zero: {g}")
+    # ...and it is exactly what the gate refused, not an approximation.
+    refused = rows["a"]["target_usd"] - rows["a"]["current_usd"]
+    assert abs(g["withheld_usd"] - refused) < 0.02, (g, refused)
+
+    # THE OTHER DIRECTION: grant the era claim and the leak must vanish.
+    alloc.set_era_twin(rows["a"], 12, 0.004)
+    g2 = alloc.gate_totals(list(rows.values()))
+    assert g2["n_expansion_gated"] == 0 and g2["withheld_usd"] == 0.0, (
+        "with nothing gated the allocation closes exactly, and a headline that "
+        f"still reports a leak is manufacturing one: {g2}")
+
+
+def test_an_unpriceable_row_is_counted_not_swallowed():
+    """A row whose effective scale cannot be computed falls back to its raw
+    target — and says so. ((kw)/I4: a dark computation must never be
+    byte-identical to a clean one.)"""
+    junk = {"target_usd": 1500.0, "current_usd": None,
+            "scale_effective": None, "expansion_gated": False}
+    g = alloc.gate_totals([junk])
+    assert g["n_unpriced"] == 1, g
+    assert g["withheld_usd"] == 0.0 and g["target_effective_usd"] == 1500.0, (
+        "an unpriceable row must fall back to its raw target rather than "
+        f"reading as $1,500 withheld: {g}")
+
+
+def test_the_fleet_gate_headline_is_computed_after_the_era_fill():
+    """Same ordering constraint as `n_with_era_claim`, same reason.
+
+    [2026-08-26] `scale_effective` and `expansion_gated` are written when
+    `claim_era` becomes known. A fleet-level total computed before that fill
+    would see every book ungated and report a leak of exactly zero — the (ua)
+    defect in a second field, which is why it is pinned rather than assumed.
+    """
+    src = (ROOT / "fleet_allocation.py").read_text()
+    fn = [f for f in ast.walk(ast.parse(src))
+          if isinstance(f, ast.FunctionDef) and f.name == "run_once"][0]
+    fill_line = gate_line = None
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "set_era_twin"):
+            fill_line = max(fill_line or 0, node.lineno)
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                # `ast.unparse` emits SINGLE quotes — match the KEY, never a
+                # spelling (the trap this file already walked into once).
+                if isinstance(t, ast.Subscript) and "'gate'" in ast.unparse(t):
+                    gate_line = min(gate_line or 10**9, node.lineno)
+    assert fill_line, "run_once no longer fills the era twin"
+    assert gate_line, (
+        "run_once never publishes the fleet gate total — the leak the payload "
+        "exists to make readable is underived again")
+    assert gate_line > fill_line, (
+        f"payload['gate'] is set at line {gate_line} but the era twins are "
+        f"filled at {fill_line} — it would report a leak of zero always")
+
+
 class TestTheEvidenceRecordIsPublished:
     """[2026-08-05 (kc)] The payload used to publish {n, claim, class,
     target_usd, current_usd, delta_usd, undecided} and nothing else, so two
@@ -139,10 +292,63 @@ class TestTheEvidenceRecordIsPublished:
         r = alloc.allocate({"w": [0.02, 0.01, 0.03, -0.005] * 8},
                            book_usd=1000.0)["w"]
         assert r["mean_pct"] is not None and r["se_pct"] is not None
+        # [2026-08-20] through the PUBLISHED `crit`, not a retyped constant.
+        # The critical value varies with n now, so this test used to hold only
+        # because the module happened to use the same number the test typed —
+        # which is the second-rule shape it was written to forbid. Rebuilding
+        # from the payload alone is the stronger claim, and it is the one a
+        # reader with only /bus.json can actually check.
+        assert r["crit"] is not None, "the payload must say what it judged at"
         assert abs(r["claim"] - max(0.0, r["mean_pct"]
-                                    - alloc.Z_LOWER * r["se_pct"])) < 1e-6, \
-            ("mean_pct/se_pct must describe the SAME sample the claim was "
+                                    - r["crit"] * r["se_pct"])) < 1e-5, \
+            ("mean_pct/se_pct/crit must describe the SAME sample the claim was "
              "ranked on — if they cannot rebuild it, they are a second rule")
+
+    def test_the_critical_value_is_derived_from_the_sample_not_fixed(self):
+        """The cliff's replacement: a thinner sample must be doubted MORE.
+
+        With a constant z this was flat, and the only protection against a
+        lucky 3-close book was a hard n>=20 cliff that also deleted every
+        genuine claim below it (measured: three living books, and FIVE
+        `claim_era: None`s including the fleet's top-ranked book).
+        """
+        thin = alloc.allocate({"a": [0.03, 0.01, 0.02, 0.04] * 3},
+                              book_usd=1000.0)["a"]
+        thick = alloc.allocate({"a": [0.03, 0.01, 0.02, 0.04] * 30},
+                               book_usd=1000.0)["a"]
+        assert thin["crit"] > thick["crit"], (thin["crit"], thick["crit"])
+        assert thick["crit"] >= alloc.Z_LOWER, "the floor must still bind"
+
+    def test_a_floored_claim_still_publishes_its_bound_and_its_distance(self):
+        """`claim: 0.0` was byte-identical for 15 of 19 live books whose bounds
+        ran from -0.02% to -0.64%. The ordering was computed and discarded one
+        character before the payload."""
+        r = alloc.allocate({"a": [0.02, -0.018, 0.021, -0.019, 0.001] * 6},
+                           book_usd=1000.0)["a"]
+        assert r["claim"] == 0.0
+        assert r["bound_pct"] is not None and r["bound_pct"] < 0.0
+        assert r["n_req_claim"] and r["n_req_claim"] > r["n"], \
+            "a positive-mean book below the bar must say how far it has to go"
+        lost = alloc.allocate({"a": [-0.02, -0.01, -0.03, 0.0] * 6},
+                              book_usd=1000.0)["a"]
+        assert lost["n_req_claim"] is None, \
+            "more of a negative sample never reaches a claim — say so"
+
+    def test_the_distance_to_a_claim_honours_the_luck_floor(self):
+        """A book cannot hold a claim below MIN_N however good its arithmetic
+        looks, so a smaller `n_req_claim` would be a lie about what it needs."""
+        r = alloc.allocate({"a": [0.01, 0.02]}, book_usd=1000.0)["a"]
+        assert r["n_req_claim"] == alloc.MIN_N, (r["n_req_claim"], alloc.MIN_N)
+
+    def test_the_luck_floor_is_the_winners_docket_floor(self):
+        """10, and it is doctrine (I21), not a tunable. The t critical value
+        widens a thin interval but cannot repair a variance estimate built from
+        three numbers — measured: a 3-close era sample at t=33 yields a bound of
+        +2.97%/trade, which would outrank every living book in the fleet."""
+        assert alloc.MIN_N >= 10, alloc.MIN_N
+        streak = alloc.allocate({"a": [0.031, 0.030, 0.032]},
+                                book_usd=1000.0)["a"]
+        assert streak["claim"] == 0.0 and streak["undecided_why"] == "below-min-n"
 
     def test_no_opinion_reaches_the_payload_as_none_never_as_zero(self):
         """lower_bound's own rule — 'no opinion' and 'measured zero' must not

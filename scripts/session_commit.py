@@ -59,6 +59,7 @@ all came from the ones sharing the main worktree.
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -143,7 +144,66 @@ def removed_entry_headers(diff_text):
     # `+##`, and reporting the minus alone blocks ordinary reshuffles. A guard
     # that fires on the normal case is one the next session learns to bypass,
     # which is how a real deletion then walks through ((gl)).
-    return [h for h in removed if h not in added]
+    still_gone = [h for h in removed if h not in added]
+    if not still_gone:
+        return []
+    # [2026-08-26] AN ENTRY CORRECTED IN PLACE IS NOT A DELETED ONE EITHER, and
+    # this guard was blocking the thing I12 REQUIRES. Correcting an entry edits
+    # its TITLE, so the old header line vanishes and a new one appears — which
+    # this read as a deletion and refused. Two pieces of the repo's own doctrine
+    # were in direct conflict; measured on the (ub) correction, which the tool
+    # refused outright while every entry was still present.
+    #
+    # The exemption borrows `audit_changelog_letters`' OWN predicate rather than
+    # re-deriving it — one owner for "is this an in-place correction", or the
+    # two guards drift exactly where it matters least visibly ((hj)). Both
+    # signals are required there and both are required here: the letter must
+    # survive, the titles must still be recognisably the same entry, AND the
+    # diff must declare the correction. The (nx) incident it exists for is
+    # untouched: a `perl -pi` letter-rename changes the LETTER, so the removed
+    # header finds no same-letter partner and is still reported.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from audit_changelog_letters import (CORRECTED, same_entry,
+                                             renumbered_pairs)
+    except Exception:                                    # noqa: BLE001
+        return still_gone            # no predicate -> report, never excuse
+    letter = re.compile(r"^## \S+ \(([a-z]+)\)")
+    by_letter = {}
+    for h in added:
+        m = letter.match(h)
+        if m:
+            by_letter.setdefault(m.group(1), []).append(h)
+    # [2026-08-26] A RENUMBERED ENTRY IS NOT A DELETED ONE — the second shape
+    # this guard was blocking, and the one the letter convention MANDATES.
+    # A cross-branch collision is resolved by moving the uncited entry to a free
+    # letter, so its header leaves one letter and reappears under another. That
+    # is byte-indistinguishable from the `(nx)` sweep, where a `perl -pi`
+    # rewrote another session's letter and lost 90 lines — the title is
+    # unchanged in BOTH. So the exemption cannot rest on the titles: it rests on
+    # the DECLARATION the convention already requires ("a renumber is recorded
+    # INLINE in the moved entry"), which the sweep does not have and cannot
+    # accidentally acquire. Declaration AND structural match, both required, the
+    # same shape as the correction escape below. Measured on the collision
+    # `(ue)` was renumbered by, where the tool refused a move it required.
+    moves = renumbered_pairs(diff_text)
+    corrected = bool(CORRECTED.search(diff_text or ""))
+    out = []
+    for h in still_gone:
+        m = letter.match(h)
+        src = m.group(1) if m else None
+        # (1) declared renumber: the header reappears under the DESTINATION
+        #     letter this diff names as the move's target.
+        if src and any(f == src and any(same_entry(h, t)
+                                        for t in by_letter.get(t_l, []))
+                       for f, t_l in moves):
+            continue
+        # (2) declared in-place correction: same letter, edited title.
+        if corrected and any(same_entry(h, t)
+                             for t in by_letter.get(src, []) if src):
+            continue
+        out.append(h)
+    return out
 
 
 def verify_readback(snap, index=None):
@@ -196,9 +256,25 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Commit explicit paths from a shared worktree, safely.")
     ap.add_argument("-m", "--message", help="commit message")
-    ap.add_argument("--shared", nargs="*", default=[],
+    # [2026-08-22 (ta)] `action="extend"`, NOT the default store.
+    #
+    # MEASURED, on this tool, in the session that added this line: with
+    # `nargs="*"` and the default store action, a SECOND `--shared` flag
+    # silently REPLACES the first, so
+    #     --shared CHANGELOG.md --shared CLAUDE.md
+    # committed CLAUDE.md and dropped the changelog entry entirely — no error,
+    # no warning, exit 0. This tool's whole reason to exist is that work does
+    # not silently go missing in a shared worktree, and its own argument parser
+    # was a way for work to silently go missing.
+    #
+    # The read-back caught it (the printed stat listed 9 files and the
+    # changelog was not among them), which is the guard working — but a receipt
+    # you have to read carefully is a worse guard than a flag that cannot lose
+    # a file. Both spellings now work: repeated flags accumulate, and several
+    # paths after one flag still work as documented.
+    ap.add_argument("--shared", nargs="*", default=[], action="extend",
                     help=f"explicitly include a shared doctrine file "
-                         f"({', '.join(SHARED_DOCTRINE)})")
+                         f"({', '.join(SHARED_DOCTRINE)}); repeatable")
     ap.add_argument("--dry-run", action="store_true",
                     help="show what would be committed, commit nothing")
     ap.add_argument("--selftest", action="store_true")
@@ -390,6 +466,70 @@ def selftest():
         "--- a/x\n+++ b/x\n+## 2026-08-16 (nx) — only additions\n") == [], \
         "an ADDED header is not a deletion"
     assert removed_entry_headers("") == [] and removed_entry_headers(None) == []
+
+    # [2026-08-26] AN I12 IN-PLACE CORRECTION IS NOT A DELETION — and the (nx)
+    # incident this guard exists for must still be caught. Both pinned here,
+    # because an exemption nobody tests is how a guard quietly stops guarding.
+    _corr = ("-## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE, and the "
+             "debut it was buying is measurably a fade\n"
+             "+## 2026-08-26 (ub) — THE SNIPER WAS ON THE WRONG SIDE, and the "
+             "debut fade it was flipped on is mostly CALENDAR\n"
+             "+**CORRECTED IN PLACE per I12** after an adversarial review.\n")
+    assert removed_entry_headers(_corr) == [], \
+        "a declared in-place correction of the SAME letter must not read as a deletion"
+    # same edit WITHOUT the declaration -> still reported (both signals required)
+    assert removed_entry_headers(
+        _corr.replace("**CORRECTED IN PLACE per I12**", "just tidying")), \
+        "an undeclared title rewrite must still be reported"
+    # the (nx) incident: a LETTER RENAME over someone else's entry. The removed
+    # header finds no same-letter partner, so the declaration cannot excuse it.
+    assert removed_entry_headers(
+        "-## 2026-08-16 (nv) — THEIR ENTRY, ninety lines of it\n"
+        "+## 2026-08-16 (nx) — THEIR ENTRY, ninety lines of it\n"
+        "+CORRECTED IN PLACE\n") == [
+            "## 2026-08-16 (nv) — THEIR ENTRY, ninety lines of it"], \
+        "a letter-rename must never be excused as a correction — this is (nx)"
+    # two DIFFERENT entries sharing a letter must not excuse each other
+    assert removed_entry_headers(
+        "-## 2026-08-26 (ub) — the sniper was on the wrong side of its thesis\n"
+        "+## 2026-08-26 (ub) — carry's persistence gate moves to twelve hours\n"
+        "+CORRECTED IN PLACE\n"), \
+        "an unrelated entry on the same letter is a race, not a correction"
+    # [2026-08-26] A DECLARED RENUMBER IS NOT A DELETION — the second shape,
+    # and the one the letter convention MANDATES on a cross-branch collision.
+    _ren = ("-## 2026-08-26 (uc) — THE THIRD ENTOMBMENT: a surge/young pending "
+            "symbol that stops qualifying is never offered again\n"
+            "+## 2026-08-26 (ue) — THE THIRD ENTOMBMENT: a surge/young pending "
+            "symbol that stops qualifying is never offered again\n"
+            "+**RENUMBERED (uc) -> (ue) at push time.**\n")
+    assert removed_entry_headers(_ren) == [], \
+        "a declared renumber must not read as a deletion — the convention " \
+        "requires the move and this tool was refusing it"
+    # ...and every signal is load-bearing. Drop the declaration and it is the
+    # (nx) sweep again, byte-for-byte: same title, new letter, no statement.
+    assert removed_entry_headers(
+        _ren.replace("**RENUMBERED (uc) -> (ue) at push time.**", "tidying")), \
+        "an UNDECLARED letter move is exactly (nx) and must still be reported"
+    # a declaration naming a DIFFERENT pair cannot excuse this move
+    assert removed_entry_headers(
+        _ren.replace("RENUMBERED (uc) -> (ue)", "RENUMBERED (qk) -> (ql)")), \
+        "the declaration must name the letter that actually moved"
+    # A DECLARATION BELONGING TO SOMEONE ELSE'S MOVE MUST NOT EXCUSE THIS ONE.
+    # Realistic, not contrived: renumber notes live in entry BODIES forever
+    # (main carries "RENUMBERED (sq) -> (tt)" inside (tt)), so any diff that
+    # touches CHANGELOG.md can pick up a stale one. The declared SOURCE letter
+    # must be the letter that actually left. Found by a mutation that survived
+    # the first draft of these tests.
+    assert removed_entry_headers(
+        _ren.replace("RENUMBERED (uc) -> (ue)", "RENUMBERED (xa) -> (ue)")), \
+        "a renumber declared for a DIFFERENT source letter must not excuse " \
+        "this removal — the destination alone is not the claim"
+    # a declared renumber whose title is a DIFFERENT entry is a race, not a move
+    assert removed_entry_headers(
+        "-## 2026-08-26 (uc) — the third entombment on the perp sniper\n"
+        "+## 2026-08-26 (ue) — carry's persistence gate moves to twelve hours\n"
+        "+RENUMBERED (uc) -> (ue)\n"), \
+        "an unrelated entry at the destination letter is a race, not a renumber"
     assert removed_entry_headers("-## not-a-date (xx) — junk") == [
         "## not-a-date (xx) — junk"], "shape-matched on the header prefix"
     # a MOVED entry appears as both - and + : not a deletion

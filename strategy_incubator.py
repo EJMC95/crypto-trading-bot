@@ -32,6 +32,13 @@ invention of new ones. Nothing here bypasses NO_REAL_MONEY or the judge.
 
 Publishes bot_state 'strategy-incubator' (leaderboard + elite) and appends
 to 'xp-queue'. Run-once; run_all.sh loops it. --selftest is offline.
+
+[2026-08-27] AND IT NOW HAS A WIRE ON THE TAKER SIDE TOO. A STABLE champion
+is PROPOSED to `tuning-proposals`, where the scout tuner replay-gates it —
+see THE WIRE below `assess_champion` for why that channel and not
+`fleet_tuning.write_levers`, and for the three preconditions. Still zero
+actuator: proposals enact nothing, and this author cannot reach a `live.*`
+lever at all (`fleet_proposals` fails CLOSED on the live lane).
 """
 import json
 import math
@@ -62,6 +69,11 @@ try:
     import fleet_proprioception as proprio   # outcome grades (optional import)
 except Exception:  # noqa: BLE001
     proprio = None
+
+try:
+    import fleet_proposals as fprop          # the organs' proposal channel
+except Exception:  # noqa: BLE001
+    fprop = None                             # dark channel proposes nothing
 
 KEY = "strategy-incubator"
 QUEUE_KEY = "xp-queue"
@@ -115,7 +127,11 @@ EDGE_MARGIN = _env_f("INCUBATOR_EDGE_MARGIN", EDGE_TRADES * TRADE_SWING)
 # TAKER genes: (tt attr, lever, discrete allele grid within registry bounds).
 # The grid is the search space; offspring are points on it.
 TAKER_GENES = {
-    "BRK_RANGE": ("taker.brk_range", [0.90, 0.93, 0.95, 0.97]),
+    # [2026-08-20 (sk)] the 0.97 allele is gone — see the cage note in
+    # fleet_tuning. An allele the registry clamps is a gene that silently
+    # breeds to a different value than the one scored, and this one bred
+    # TIGHTER than the operator's default on a lens the replay cannot fill.
+    "BRK_RANGE": ("taker.brk_range", [0.90, 0.93, 0.95]),
     "DIP_RANGE": ("taker.dip_range", [0.05, 0.08, 0.11, 0.15]),
     "MOMO_CHG": ("taker.momo_chg", [3.0, 4.0, 5.0, 6.0]),
     # [2026-07-17] DIV_GAP_PP was the one taker lever in the fleet_tuning
@@ -131,7 +147,8 @@ TAKER_GENES = {
     "DIV_GAP_PP": ("taker.div_gap_pp", [37.5, 50.0, 62.5, 75.0, 87.5]),
     "TAKE_PROFIT": ("taker.tp", [0.03, 0.04, 0.05, 0.06]),
     "STOP_LOSS": ("taker.sl", [-0.04, -0.03, -0.02]),
-    "MAX_HOLD_H": ("taker.max_hold_h", [24.0, 48.0, 72.0]),
+    # [(sk)] the 24h allele is gone with the cage — see BRK_RANGE above.
+    "MAX_HOLD_H": ("taker.max_hold_h", [48.0, 72.0]),
 }
 # The gene whose alleles the TAPE must be long enough to exercise (see
 # reachable_genes) — a hold >= the span never fires.
@@ -206,6 +223,67 @@ def t90(df):
     return _T90[df - 1] if df <= len(_T90) else bs.Z80
 
 
+#: [2026-08-26] THE UP-REGIME RESOLVER — built ONCE PER CYCLE in run_once and
+#: threaded through rank() into evaluate()'s three replays.
+#:
+#: WHY IT EXISTS, and why its absence made every hatchling stillborn:
+#: `lighter_ticket_replay.replay(up_resolver=None)` forces `up=False` for the
+#: breakout lens, so the taker's relabel to `breakoutup` NEVER fires and that
+#: lens cannot appear in the report at all (`rp.UNREACHABLE_WITHOUT_RESOLVER`
+#: says so in the harness's own words). `lighter_scout_tuner` passes a resolver
+#: and reads the whole book; this organ did not, and scored a DIFFERENT BOOK
+#: from the one the taker runs — the tuner's baseline over production's own
+#: 2200-snapshot window read +$22.21 with `breakoutup` contributing +$34.39
+#: over 22 closes, while the incubator's IDENTICAL default genome read
+#: -$62.02. An $84.23 gap against gates that are $3.50 (half) and $7.00 (edge)
+#: wide, and the population died at every one: h1>0 in 0 of 1519 genotypes,
+#: both_halves_pos 0, elite 0. Lowering HALF_MARGIN to $0.00 still yielded
+#: zero survivors — the bars were never the cause, the BASIS was.
+#:
+#: BUILT ONCE, NOT PER GENOTYPE: a cycle scores ~1519 genotypes x 3 replays,
+#: and the resolver fetches daily candles per symbol. Per-genotype construction
+#: would be ~4500 builds of the same object.
+#:
+#: WHY THIS IS A LOCAL BUILDER RATHER THAN AN IMPORT OF THE TUNER'S. The RULE
+#: is `rp.daily_up_resolver` and it is IMPORTED, never re-implemented — no
+#: second copy of the regime logic exists here. What is local is the gate:
+#: `lighter_scout_tuner.build_up_resolver` is guarded by the TUNER's own
+#: `SCOUT_TUNER_UP_RESOLVER` switch and logs under the tuner's name, so
+#: importing it would (a) give this organ no kill switch of its own and
+#: (b) let one organ's kill switch silently revert ANOTHER organ's fitness to
+#: the exact defect above, unannounced ([[a-kill-switch-must-reach-the-consumer]],
+#: I8 on the log line). The two builders are ~6 lines of tape traversal each.
+UP_RESOLVER_ON = os.environ.get(
+    "INCUBATOR_UP_RESOLVER", "1").strip().lower() not in ("0", "off", "false", "no")
+
+
+def tape_symbols(tape):
+    """Every symbol the tape ever ticketed, sorted. Pure — selftested."""
+    return sorted({t.get("sym") for _, p in (tape or [])
+                   for arr in ((p or {}).get("tickets") or {}).values()
+                   for t in (arr or []) if isinstance(t, dict) and t.get("sym")})
+
+
+def build_up_resolver(tape, _factory=None):
+    """Per-cycle `up(sym, ts)` resolver over every symbol the tape ticketed.
+
+    Returns None on ANY trouble — the caller must treat that as REDUCED
+    COVERAGE (breakout/breakoutup unreachable), never as an error. `_factory`
+    is injectable so the selftest never touches the network."""
+    if not (UP_RESOLVER_ON and tape):
+        return None
+    try:
+        syms = tape_symbols(tape)
+        if not syms:
+            return None
+        make = _factory or rp.daily_up_resolver
+        return make(syms, tape[0][0].timestamp(), tape[-1][0].timestamp())
+    except Exception as exc:      # noqa: BLE001 — coverage is best-effort
+        print(f"[incubator] up-resolver unavailable: {type(exc).__name__}: {exc}",
+              flush=True)
+        return None
+
+
 def live_lenses(lens_fwd, realised=None):
     """The lenses the LIVE taker is currently ALLOWED to fill (2026-07-17).
 
@@ -235,6 +313,43 @@ def live_lenses(lens_fwd, realised=None):
     return set(LENS_GENE) - tt.vetoed_lenses(lens_fwd, realised=realised)
 
 
+def scored_lens_set(allowed, mults_payload=None, bot_row=None):
+    """The lenses whose P&L may ENTER the fitness — `allowed` plus, when it is
+    not self-vetoed, the taker-internal `breakoutup`.
+
+    WHY IT IS A SEPARATE SET FROM `allowed`. `LENS_GENE` is a map of lens -> the
+    ENTRY GENE that acts on that lens ALONE, and `breakoutup` has no gene of its
+    own: it is a RELABELLED SUBSET of the breakout population, admitted through
+    the same `BRK_RANGE` bar in `tt.incredible` and renamed afterwards. Adding
+    it to `LENS_GENE` would therefore make `evolvable_genes` drop `BRK_RANGE`
+    whenever EITHER name is vetoed, which is a tightening nobody measured. So
+    the scored set widens and the gene map does not.
+
+    THE VETO IS THE TAKER'S, ASYMMETRIC, AND IMPORTED — never re-derived here.
+    `lighter_ticket_taker` relabels BEFORE it applies `lens_vetoed` (see the
+    entry loop's "(dk) breakout_up RELABEL — BEFORE the veto"), which is exactly
+    how the up-regime subset escapes the broad `breakout` veto and keeps
+    filling. So a vetoed `breakout` does NOT imply a vetoed `breakoutup`, and
+    gating this on `breakout in allowed` would reproduce the defect in
+    production, where the brain vetoes breakout/dip/momentum and only
+    `divergence` survives. `breakoutup` earns its own veto from its own
+    `long-breakoutup` closes via `tt.breakoutup_self_vetoed`, which is
+    restrict-only and fail-OPEN on a missing/thin grade.
+
+    FRESHNESS IS THE CALLER'S JOB — that function's own docstring says so
+    ("The CALLER owns freshness"), mirroring the lens-forward read. Pass `{}`
+    (or None) for a dark/stale brain stake-mults payload and nothing is vetoed,
+    documented degrade. Pure — selftested."""
+    out = set(allowed or ())
+    try:
+        if not tt.breakoutup_self_vetoed(mults_payload,
+                                         bot_row if bot_row is not None else tt.BOT_ROW):
+            out.add("breakoutup")
+    except Exception:      # noqa: BLE001 — fail-OPEN, matching the taker
+        out.add("breakoutup")
+    return out
+
+
 def fresh_lens_fwd(state, now):
     """The brain's lens grades if they are FRESH, else {} (which vetoes
     nothing). Mirrors the tuner's lf_fresh check. Pure — selftested."""
@@ -245,6 +360,94 @@ def fresh_lens_fwd(state, now):
             u = u.replace(tzinfo=timezone.utc)
         if (now - u.timestamp()) <= float((state or {}).get("ttl_sec") or 0):
             return (state or {}).get("lenses") or {}
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return {}
+
+
+#: [2026-08-26] THE ONE HALF THAT COULD NOT BE WIRED IN THIS PASS — DECLARED,
+#: not taken silently.
+#:
+#: `tt.breakoutup_self_vetoed` needs the RAW brain stake-mults payload: it
+#: reads the bucket's `n` as well as its `mult`, and `fleet_bus.brain_mults`
+#: drops `n` on the way through the [MULT_FLOOR, MULT_CEIL] clamp, so no
+#: mediated accessor can answer the question. Reading that key here is exactly
+#: the taker's own (dm) pattern — a BOOLEAN veto, never a size — and the fleet
+#: guard `tests/autonomy/test_brain_sizing_reaches_every_book.py` requires any
+#: such reader to be DECLARED in its `RAW_READ_OK` map with a reason (the taker
+#: is the one entry there today). That test file was outside this pass's
+#: ownership, so the read is WITHHELD rather than smuggled past a substring
+#: scan by importing the key from elsewhere.
+#:
+#: CONSEQUENCE, stated rather than discovered later: the self-veto is fail-OPEN
+#: here, so a `breakoutup` the brain has DECISIVELY graded a loser still enters
+#: this organ's fitness. That is strictly better than the defect it replaces
+#: (the lens was excluded ALWAYS, winner or loser) and strictly worse than the
+#: taker's own behaviour. It is published in the funnel every cycle so it
+#: cannot rot into folklore.
+#:
+#: TO CLOSE IT, two lines: add `"strategy_incubator.py"` to that guard's
+#: `RAW_READ_OK` with the taker's reason, then make `stake_mults_payload()`
+#: return the brain's stake-mults bot_state payload and flip the flag. The
+#: KEY STRING is deliberately absent from this module: that guard is a plain
+#: substring scan over the file text, so even naming the key in prose trips
+#: it — which is itself the honest signal that the declaration is owed.
+#: [(uc)] CLOSED. `strategy_incubator.py` is declared in that guard's
+#: `RAW_READ_OK` with the taker's own reason, so the read below is legitimate
+#: and the consequence above no longer stands: a `breakoutup` the brain has
+#: decisively graded a loser is now excluded from this organ's fitness, exactly
+#: as the taker excludes it from its fills. The funnel still publishes the
+#: state every cycle — `wired` now — because a flag that stops being reported
+#: is a flag nobody can check.
+BRKUP_VETO_WIRED = True
+
+
+def stake_mults_payload():
+    """The brain's raw per-close-tag grades, or {} on any trouble.
+
+    Fail-OPEN by construction (a dark/unreadable brain vetoes NOTHING), which
+    matches `tt.breakoutup_self_vetoed`'s own documented degrade — the two
+    consumers must not disagree about what an absent grade means. Freshness is
+    the CALLER's job and is applied by `fresh_stake_mults`.
+
+    Keyed by the literal, matching this module's own `brain-lens-forward` read
+    rather than inventing a constant the taker does not export —
+    `lighter_ticket_taker` names the same key inline at its own read site, so a
+    shared constant would have to be added there, to a file this change has no
+    reason to touch. The RULE is imported (the veto itself is
+    `tt.breakoutup_self_vetoed`); only the key name is repeated.
+
+    BOUND TO A NAME ON PURPOSE, rather than returned inline: the guard that
+    licenses this read finds it by walking assignments whose value mentions the
+    key, then proves the bound name never reaches a multiplication or a
+    clip/stake/notional target. A bare `return store.load_state(...)` binds
+    nothing, so the guard reads the declaration as stale and — worse — its
+    sizing arms have no name to track through this file. Binding it keeps the
+    guard EFFECTIVE here instead of blind.
+    """
+    try:
+        raw_mults = store.load_state("brain-stake-mults") or {}
+    except Exception:                      # noqa: BLE001 — a veto read is
+        raw_mults = {}                     # an enhancement, never a dependency
+    return raw_mults
+
+
+def fresh_stake_mults(state, now):
+    """The brain's stake-mults payload if FRESH, else {} (vetoes nothing).
+
+    `tt.breakoutup_self_vetoed` states that the CALLER owns freshness, and the
+    taker's own read allows a 26000s fallback TTL — mirrored here rather than
+    invented, so the two consumers cannot disagree about what 'fresh' means.
+    A future-dated stamp reads NOT fresh (the taker's `0 <= age` guard).
+    Pure — selftested."""
+    try:
+        u = datetime.fromisoformat(str((state or {}).get("updated"))
+                                   .replace("Z", "+00:00"))
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=timezone.utc)
+        age = now - u.timestamp()
+        if 0 <= age <= float((state or {}).get("ttl_sec") or 26000):
+            return state or {}
     except (ValueError, TypeError, AttributeError):
         pass
     return {}
@@ -407,8 +610,19 @@ REGISTER_TOP_N = int(os.environ.get("INCUBATOR_REGISTER_TOP_N", "24"))
 # [2026-07-29] RESEARCH SPACE — exploring BEYOND the registry cage.
 #
 # WHY THIS IS SAFE, and the reasoning must survive: the incubator has NO
-# ACTUATOR. Its only consumer is the dashboard (verified: nothing outside
-# pnl_dashboard.py reads bot_state 'strategy-incubator'). The fleet_tuning
+# ACTUATOR. ~~Its only consumer is the dashboard (verified: nothing outside
+# pnl_dashboard.py reads bot_state 'strategy-incubator')~~
+# **[2026-08-27 CORRECTED IN PLACE per I12 — that parenthesis is no longer
+# true and a session acting on it would draw the wrong conclusion about this
+# very paragraph.** The STABLE champion is now PROPOSED to the scout tuner
+# through `fleet_proposals` (see THE WIRE, below `assess_champion`). The
+# headline survives exactly as written and is the reason the wire is safe: a
+# proposal enacts nothing — the tuner replay-gates every entry against the
+# recorded tape before any lever moves, and no proposal from this author can
+# reach a `live.*` lever. **What the wire makes load-bearing is the sentence
+# after next**: the out-of-cage FRONTIER is now the one thing in this file
+# that must never be proposed, and `champion_proposal` refuses it twice over
+# (`is_enactable`, then a per-gene clamp re-derivation).] The fleet_tuning
 # cages bound what the SCOUT TUNER may ENACT on the shadow taker; they were
 # never a bound on what this organ may MEASURE. Clamping the search to them
 # bought no safety and cost the whole out-of-cage question.
@@ -431,12 +645,17 @@ REGISTER_TOP_N = int(os.environ.get("INCUBATOR_REGISTER_TOP_N", "24"))
 # to the cage exactly.
 RESEARCH_MODE = os.environ.get("INCUBATOR_RESEARCH", "on").lower() != "off"
 RESEARCH_GENES = {
+    # [(sk)] UNCHANGED, deliberately: RESEARCH grids are required to extend
+    # BEYOND the cage (`is_enactable` is what gates action, and the selftest
+    # fails a research grid that never leaves it). Only TAKER_GENES — the
+    # ENACTABLE pool — lost the alleles the (sk) cage now refuses.
     "BRK_RANGE":   ("taker.brk_range",   [0.85, 0.90, 0.93, 0.95, 0.97, 0.99]),
     "DIP_RANGE":   ("taker.dip_range",   [0.03, 0.05, 0.08, 0.11, 0.15, 0.20]),
     "MOMO_CHG":    ("taker.momo_chg",    [2.0, 3.0, 4.0, 5.0, 6.0, 8.0]),
     "DIV_GAP_PP":  ("taker.div_gap_pp",  [25.0, 37.5, 50.0, 62.5, 75.0, 87.5, 100.0]),
     "TAKE_PROFIT": ("taker.tp",          [0.02, 0.03, 0.04, 0.05, 0.06, 0.08]),
     "STOP_LOSS":   ("taker.sl",          [-0.06, -0.04, -0.03, -0.02, -0.015]),
+    # [(sk)] UNCHANGED for the same reason as BRK_RANGE above.
     "MAX_HOLD_H":  ("taker.max_hold_h",  [12.0, 24.0, 48.0, 72.0, 96.0]),
 }
 
@@ -539,6 +758,38 @@ def joint_space_size(genes):
     return n
 
 
+def explore_stride(size):
+    """A step coprime to `size`, near `size/phi` — the additive-recurrence
+    (golden-ratio) choice.
+
+    [(uc)] WHY A STRIDE AT ALL. `explore_slice` used to walk CONTIGUOUS
+    indices, and the in-cage subspace is contiguous under the same mixed-radix
+    odometer, so a slice either landed inside it or missed it entirely.
+    Measured on the shipped grids: only 5,760 of 226,800 research genotypes
+    (2.54%) are fully in-cage, every enactable index lies in [47167, 179883],
+    and **107 of 152 cycles per orbit produced ZERO enactable genotypes** —
+    about 4.5 days at hourly cadence during which the mechanism added to make
+    gene INTERACTIONS reachable could not contribute a single gamete. The live
+    cursor sat in one of those dead stretches when this was found.
+
+    Coprimality is the whole safety of it: a stride sharing a factor with
+    `size` walks a SUBGROUP and would silently make part of the space
+    unreachable forever — strictly worse than the dead stretches it replaces.
+    With gcd == 1 the walk still visits every index exactly once per period, so
+    coverage is unchanged and only the ORDER moves; each slice is now spread
+    across the whole space, so every cycle carries in-cage and out-of-cage
+    genotypes in roughly their population proportion.
+    """
+    if size <= 2:
+        return 1
+    start = max(1, int(size / 1.618033988749895))
+    for off in range(size):                       # terminates: gcd(1,size)==1
+        cand = ((start + off - 1) % size) + 1     # in [1, size]
+        if math.gcd(cand, size) == 1:
+            return cand
+    return 1
+
+
 def explore_slice(genes, cursor, n):
     """(population, next_cursor, space_size) — the next `n` genotypes of the
     JOINT gene product, walked deterministically from `cursor` and wrapping.
@@ -547,7 +798,13 @@ def explore_slice(genes, cursor, n):
     stable across cycles and processes: the cursor means the same thing next
     hour as it did this hour. `n <= 0` explores nothing (a clean kill switch);
     a space smaller than `n` is returned once, whole, with the cursor advanced
-    modulo the space so coverage keeps its meaning. Pure — selftested."""
+    modulo the space so coverage keeps its meaning. Pure — selftested.
+
+    [(uc)] The walk is STRIDED (see `explore_stride`), not contiguous, so a
+    slice samples the whole space instead of one contiguous block of it. The
+    cursor still means the same thing across cycles — the stride is derived
+    from `size` alone, so an unchanged gene set gives an unchanged sequence.
+    """
     if not genes or n <= 0:
         return [], int(cursor or 0), joint_space_size(genes or {})
     names = sorted(genes)
@@ -555,15 +812,16 @@ def explore_slice(genes, cursor, n):
     size = joint_space_size(genes)
     start = int(cursor or 0) % size
     take = min(n, size)
+    stride = explore_stride(size)
     pop = []
     for k in range(take):
-        idx = (start + k) % size
+        idx = (start + k * stride) % size
         gt, rem = {}, idx
         for name, grid in zip(names, grids):
             gt[name] = grid[rem % len(grid)]
             rem //= len(grid)
         pop.append(gt)
-    return dedupe(pop), (start + take) % size, size
+    return dedupe(pop), (start + take * stride) % size, size
 
 
 def dedupe(pop):
@@ -638,20 +896,26 @@ def genotype_to_levers(genotype, genes):
 # fitness (taker: replay over the tape)
 # ---------------------------------------------------------------------------
 
-def evaluate(genotype, tape, lenses=None):
+def evaluate(genotype, tape, lenses=None, up_resolver=None):
     """Fitness of a TAKER genotype = replayed MARKED net over the tape (see
     _marked), with a both-halves-positive flag (an offspring that only wins
     one lucky half is not fit), the closed-trade COUNT (the real evidence
     unit) and a lower confidence bound. `lenses` restricts the score to the
-    lenses the live taker may actually fill. Patches tt bars, restores."""
+    lenses the live taker may actually fill. Patches tt bars, restores.
+
+    `up_resolver` is the cycle's ONE resolver (see build_up_resolver) and is
+    passed to EVERY replay here — the full tape and both halves. Passing it to
+    some and not others would grade a genotype's halves on different lens
+    COVERAGE from its own total, which is worse than being blind three times.
+    None is the pre-2026-08-26 behaviour: breakout/breakoutup unreachable."""
     saved = {g: getattr(tt, g) for g in genotype}
     try:
         for g, v in genotype.items():
             setattr(tt, g, v)
-        full = rp.replay(tape)
+        full = rp.replay(tape, up_resolver=up_resolver)
         mid = len(tape) // 2
-        h1 = _marked(rp.replay(tape[:mid]), lenses) if mid else 0.0
-        h2 = _marked(rp.replay(tape[mid:]), lenses) if mid else 0.0
+        h1 = _marked(rp.replay(tape[:mid], up_resolver=up_resolver), lenses) if mid else 0.0
+        h2 = _marked(rp.replay(tape[mid:], up_resolver=up_resolver), lenses) if mid else 0.0
     finally:
         for g, v in saved.items():
             setattr(tt, g, v)
@@ -665,8 +929,9 @@ def evaluate(genotype, tape, lenses=None):
             "both_halves_pos": h1 >= HALF_MARGIN and h2 >= HALF_MARGIN}
 
 
-def rank(population, tape, lenses=None):
-    scored = [{"genotype": gt, **evaluate(gt, tape, lenses)} for gt in population]
+def rank(population, tape, lenses=None, up_resolver=None):
+    scored = [{"genotype": gt, **evaluate(gt, tape, lenses, up_resolver=up_resolver)}
+              for gt in population]
     # [2026-07-17] fittest = highest LOWER BOUND, not the highest point
     # estimate. Ranking a population by its max point estimate IS the winner's
     # curse this file's header warns about; net only breaks ties between
@@ -757,6 +1022,191 @@ def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
     return (True, streak, stable, "stable" if stable else "candidate",
             f"beats default ${edge:+.2f}, both halves ≥ ${HALF_MARGIN:g}, "
             f"streak {streak}/{PERSIST_CYCLES}")
+
+
+# ---------------------------------------------------------------------------
+# THE WIRE (2026-08-27) — the champion reaches the tuner's replay gate
+# ---------------------------------------------------------------------------
+# Until today this organ computed a valid, clamped, in-cage lever dict every
+# single cycle and handed it TO NOBODY. Measured by AST over 423 .py files:
+# `genotype_to_levers` had exactly TWO call sites in the whole tree, both
+# inside this file's own `_selftest`. The breeding, the joint-space sweep, the
+# funnel, the cage analysis and the anti-overfit champion gate all ran, and
+# their output could not reach a single bot. Reproduction with no gametes.
+#
+# THE CHANNEL IS `fleet_proposals.propose`, NEVER `fleet_tuning.write_levers`,
+# and that IS the safety of it: a proposal ENACTS NOTHING. The scout tuner
+# picks it up on its next cycle and gates it through ITS OWN replay over the
+# recorded tape (restrict = not-worse on both halves; expand = the full winner
+# bar with the brain's lens veto senior; <=3 enactments per cycle; bounded,
+# TTL'd, auto-reverting). Writing the lever directly would hand an UNREPLAYED
+# genotype to a running book — an authority this organ has never had and does
+# not gain here. The author lane confirms it in the other direction: driven,
+# `_author_may_propose("taker.tp", "strategy-incubator")` is True (shadow lane,
+# fail-open) and every `live.*` lever is False (fail-closed), so this wire is
+# structurally incapable of reaching real money.
+#
+# THREE PRECONDITIONS, each load-bearing and each pinned by a test:
+#   1. STABLE ONLY, never the fittest of the cycle. `assess_champion` crowns a
+#      `candidate` on one reading and `stable` only after PERSIST_CYCLES
+#      independent cycles on the SAME genotype. One reading is a max over
+#      ~1500 genotypes — the winner's curse `rank()` exists to avoid.
+#   2. ENACTABLE ONLY, re-checked HERE rather than inherited from the caller.
+#      DRIVEN on the live FRONTIER genotype (26-Aug): `genotype_to_levers`
+#      returns SEVEN levers and silently CLAMPS FOUR of them — BRK_RANGE
+#      0.97->0.95, DIV_GAP_PP 100->87.5, MAX_HOLD_H 24->48, STOP_LOSS
+#      -0.015->-0.02 — i.e. it would propose a configuration that was never
+#      scored. That is the (sk) BRK_RANGE lesson already recorded in
+#      TAKER_GENES. A clamp mismatch on ANY gene refuses the WHOLE proposal
+#      rather than dropping that one lever: a partial genotype was not scored
+#      either.
+#   3. AN HONEST DIRECTION, read from its OWNER. The tuner DISQUALIFIES a
+#      proposal whose declared direction disagrees with the one it re-derives,
+#      so a stale second copy of the tighter-direction map would leave this
+#      channel looking alive and enacting nothing, forever, silently.
+#
+# EXPECT NOTHING TO ENACT TODAY, and that is the correct state, not a defect:
+# the live champion is `tentative` with streak 0 and a weak half, `elite` is
+# [] and the enactable-and-both-halves population is 0. The wire is NECESSARY
+# AND NOT SUFFICIENT. What ships today is that when a champion does persist,
+# it reaches a gate instead of a dashboard card — and that the state is
+# PUBLISHED every cycle (`proposal` on the payload), because an empty channel
+# is byte-identical between "nothing qualified" and "the wire is broken" —
+# the (lv) `{open: 0}` ambiguity in a new costume.
+PROPOSE_ON = os.environ.get("INCUBATOR_PROPOSE", "on").lower() != "off"
+PROPOSE_AUTHOR = "strategy-incubator"
+
+
+def _tighter_map():
+    """{lever: "up"|"down"} — which way is TIGHTER for each lever the tuner
+    will consume, READ FROM ITS OWNER (`lighter_scout_tuner.PROPOSAL_TAKER`)
+    and never copied. A second copy of this map would be a second rule, and
+    wrong is SILENT here: the tuner disqualifies a proposal whose declared
+    direction disagrees with its own re-derivation, so a drifted copy makes
+    the channel look alive while enacting nothing.
+
+    Returns None — never {} — when unreadable, so the caller REFUSES rather
+    than proposing a direction it could not derive. Fail-safe direction: a
+    dark map proposes nothing.
+
+    Read PROPOSAL_TAKER and nothing else from that module. In particular do
+    NOT reach for its `DEFAULTS`: it snapshots them from `tt` at ITS import,
+    and this organ patches `tt` attributes during `evaluate`, so the value
+    there depends on when the import happened. `current` is passed in by the
+    caller for exactly that reason."""
+    try:
+        import lighter_scout_tuner as _tuner
+        m = {lever: tighter
+             for lever, (_attr, tighter) in _tuner.PROPOSAL_TAKER.items()
+             if tighter in ("up", "down")}
+        return m or None
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def _money(x):
+    return f"${x:+.2f}" if isinstance(x, (int, float)) else "$?"
+
+
+def champion_proposal(champion, current, tighter=None, genes=None):
+    """What the STABLE champion asks the scout tuner to replay-gate.
+
+    Returns the publishable VIEW — `{"levers": {...}, "refused": str|None,
+    ...}` — where `levers` is ready for `fleet_proposals.propose` and is `{}`
+    whenever anything at all disqualifies the cycle. `refused` always carries
+    the reason, because an empty channel with no reason is the failure this
+    wire exists to end.
+
+    `current` is {gene: the taker's own running value} — the same module attrs
+    the tuner captures as its DEFAULTS. DECLARED LIMIT: the tuner re-derives
+    direction against `DEFAULTS + this cycle's own sweep bars`, so if its
+    sweep has already moved an attr PAST the champion's allele in the same
+    cycle, our declared direction and its derived one disagree and it
+    disqualifies the entry (logged there, enacted nowhere). That fails toward
+    refusal, which is the safe side, and `current` is published here so the
+    disagreement is diagnosable rather than mysterious.
+
+    Pure — no store, no clock, no network."""
+    genes = genes or TAKER_GENES
+    view = {"author": PROPOSE_AUTHOR, "levers": {}, "refused": None,
+            "no_consumer": [], "current": {}, "genotype_levers": {}}
+    if not PROPOSE_ON:
+        view["refused"] = "disabled by INCUBATOR_PROPOSE=off"
+        return view
+    gt = (champion or {}).get("genotype")
+    if not isinstance(gt, dict) or not gt:
+        view["refused"] = "no champion this cycle"
+        return view
+    if not champion.get("stable"):
+        view["refused"] = (
+            f"champion is not STABLE (streak {int(champion.get('streak') or 0)}"
+            f"/{PERSIST_CYCLES}) — one cycle's fittest is a max over the "
+            f"population, not evidence")
+        return view
+    # PRECONDITION 2, both halves. `is_enactable` is fail-CLOSED on an unknown
+    # gene or an unclampable value; the per-gene loop below then re-derives the
+    # clamp itself, so this never rests on a caller having filtered `scored`.
+    if not is_enactable(gt, genes):
+        view["refused"] = ("champion genotype is NOT ENACTABLE — an "
+                           "out-of-cage allele would clamp to a value that "
+                           "was never scored")
+        return view
+    levers = genotype_to_levers(gt, genes)
+    view["genotype_levers"] = dict(levers)
+    for g, v in sorted(gt.items()):
+        lever = (genes.get(g) or (None,))[0]
+        if lever is None or levers.get(lever) != v:
+            view["genotype_levers"] = {}
+            view["refused"] = (
+                f"clamp mismatch on {g}={v!r} — refusing the WHOLE genotype; "
+                f"a partial one was never scored either")
+            return view
+    if not tighter:
+        view["refused"] = ("no direction map (lighter_scout_tuner."
+                           "PROPOSAL_TAKER unreadable) — a direction that "
+                           "cannot be derived must not be declared")
+        return view
+
+    reason = (f"bred champion, stable {int(champion.get('streak') or 0)}/"
+              f"{PERSIST_CYCLES} cycles — replay net "
+              f"{_money(champion.get('net'))} vs default "
+              f"{_money((champion.get('net') or 0) - (champion.get('vs_default') or 0))}")
+    evidence = (f"incubator replay over the recorded scout tape: "
+                f"{int(champion.get('closes') or 0)} closes, lower bound "
+                f"{_money(champion.get('lcb'))}, halves "
+                f"{_money(champion.get('h1'))}/{_money(champion.get('h2'))}; "
+                f"bars closes>={MIN_CLOSES} half>=${HALF_MARGIN:g} "
+                f"edge>=${EDGE_MARGIN:g}")
+    out, no_consumer = {}, []
+    for g, v in sorted(gt.items()):
+        lever = genes[g][0]
+        t = tighter.get(lever)
+        if t is None:
+            # DECLARED, not silently dropped: the tuner's PROPOSAL_TAKER
+            # deliberately omits tp/sl ("their direction semantics are not
+            # monotone"), so proposing them would fill the channel with
+            # entries no consumer reads — the registered-but-inert shape.
+            no_consumer.append(lever)
+            continue
+        cur = current.get(g)
+        view["current"][g] = cur
+        if cur is None or v == cur:
+            continue                      # already there — nothing to ask for
+        out[lever] = {
+            "value": v,
+            "direction": ("restrict" if (t == "up" and v > cur)
+                          or (t == "down" and v < cur) else "expand"),
+            "reason": reason, "evidence": evidence}
+    view["no_consumer"] = sorted(no_consumer)
+    if not out:
+        view["refused"] = ("champion matches the taker's running "
+                           "configuration on every consumable lever — "
+                           "nothing to propose")
+        return view
+    view["levers"] = out
+    view["lanes"] = sorted({(tuning.LEVERS.get(l) or {}).get("lane")
+                            for l in out} - {None})
+    return view
 
 
 # ---------------------------------------------------------------------------
@@ -1145,7 +1595,11 @@ def run_once():
 
     # --- TAKER breeding (shadow-only, replay-scored) -----------------------
     leaderboard, champion = [], None
-    scored_lenses = set(LENS_GENE)      # fail-safe open: veto nothing
+    # fail-safe OPEN: veto nothing, and score `breakoutup` (a dark brain
+    # vetoes nothing, exactly as the taker's own read degrades)
+    scored_lenses = scored_lens_set(set(LENS_GENE))
+    funnel = {"scored_this_cycle": False,
+              "why": "tape too short — no genotype was scored"}
     if len(tape) >= MIN_SNAPS:
         tape_hours = ((tape[-1][0] - tape[0][0]).total_seconds() / 3600.0
                       if len(tape) >= 2 else 0.0)
@@ -1169,7 +1623,21 @@ def run_once():
                 tt.BOT + "-lighter", sides=tt.restricted_sides()) or {}
         except Exception:                       # noqa: BLE001
             _realised = {}
-        allowed = scored_lenses = live_lenses(lens_fwd, realised=_realised)
+        allowed = live_lenses(lens_fwd, realised=_realised)
+        # [2026-08-26] `breakoutup` joins the SCORED set (see scored_lens_set):
+        # a relabelled subset of breakout, vetoed only by its OWN closes via the
+        # taker's `breakoutup_self_vetoed`. Freshness is the caller's job, so it
+        # is checked HERE and the payload is passed in — a dark or stale grade
+        # vetoes nothing, the taker's own degrade. See BRKUP_VETO_WIRED for why
+        # that payload is empty today and what closes it.
+        scored_lenses = scored_lens_set(
+            allowed, fresh_stake_mults(stake_mults_payload(), now), tt.BOT_ROW)
+        if not BRKUP_VETO_WIRED and "breakoutup" in scored_lenses:
+            print("[incubator] breakoutup SELF-VETO UNWIRED (fail-OPEN) — its "
+                  "grade needs the RAW brain stake-mults payload, whose reader "
+                  "must be declared in the fleet's raw-read guard; the lens is "
+                  "scored regardless of that grade. See BRKUP_VETO_WIRED.",
+                  flush=True)
         genes, gene_dropped = evolvable_genes(genes, allowed)
         if gene_dropped:
             print(f"[incubator] lens veto — brain grades "
@@ -1177,6 +1645,16 @@ def run_once():
                   f"size; genes {gene_dropped} dropped and their fills "
                   f"excluded from fitness (breeding a vetoed lens optimizes a "
                   f"bot that does not exist)", flush=True)
+        # DECLARED, not silent: `breakoutup` fills through BRK_RANGE, so when
+        # the broad `breakout` veto drops that gene the lens is SCORED but not
+        # EVOLVABLE — its P&L is a constant across the population rather than a
+        # search direction. Visible every cycle instead of inferred later.
+        if "breakoutup" in scored_lenses and "BRK_RANGE" in gene_dropped:
+            print("[incubator] breakoutup is SCORED but not EVOLVABLE this "
+                  "cycle — its entry gene BRK_RANGE was dropped with the "
+                  "vetoed `breakout` lens it shares, so its fills enter the "
+                  "fitness at the module default bar and move with no allele",
+                  flush=True)
         prior_elite = conform([e.get("genotype") for e in
                                (prior.get("elite") or [])], genes)
         seeds = seed_population(genes)
@@ -1200,7 +1678,16 @@ def run_once():
               f"cursor -> {explore_cursor}/{space_size} = "
               f"{100.0 * min(explore_cursor or space_size, space_size) / space_size:.0f}% "
               f"of the legal space swept)", flush=True)
-        scored = rank(population, tape, allowed)
+        # [2026-08-26] ONE resolver for the whole cycle — ~1519 genotypes x 3
+        # replays share it, and every comparison in this cycle is therefore
+        # scored on identical lens coverage. None = REDUCED COVERAGE, said out
+        # loud, never an error (build_up_resolver's contract).
+        up_res = build_up_resolver(tape)
+        if up_res is None and UP_RESOLVER_ON:
+            print("[incubator] REDUCED COVERAGE — breakout/breakoutup cannot "
+                  "appear in this cycle's replays; every genotype is scored on "
+                  "the remaining lenses only.", flush=True)
+        scored = rank(population, tape, scored_lenses, up_resolver=up_res)
         # [2026-07-29] stamp every result with whether it could EVER ship.
         for s in scored:
             s["enactable"] = is_enactable(s["genotype"])
@@ -1238,6 +1725,56 @@ def run_once():
         print(f"[incubator] gametes: {len(leaderboard)}/{len(scored)} genotypes "
               f"viable (>= {MIN_GT_CLOSES} closes AND both halves >= "
               f"${HALF_MARGIN:.2f})", flush=True)
+        # [2026-08-26] THE FUNNEL. `elite: []` used to be byte-identical
+        # between "the population died at a gate" and "the surface is
+        # negative", and `assess_champion`'s failing-bar `why` was printed to
+        # stdout and never published — so answering the operator's first
+        # question required a code run against the live tape. It is now on the
+        # payload every cycle. CUMULATIVE, in select_elite's own order, so the
+        # counts are readable as a funnel and each step is <= the one above it.
+        _closes_ok = [s for s in scored if s["closes"] >= MIN_GT_CLOSES]
+        _halves_ok = [s for s in _closes_ok if s["both_halves_pos"]]
+        _enact_ok = [s for s in _halves_ok if s["enactable"]]
+        funnel = {
+            "scored_this_cycle": True,
+            "generated": len(population),
+            "scored": len(scored),
+            "closes_ok": len(_closes_ok),
+            "both_halves_pos": len(_halves_ok),
+            "enactable": len(_enact_ok),
+            "elite": len(leaderboard),
+            # side counts (NOT part of the cumulative chain — an independent
+            # read of each bar over the whole scored population)
+            "any_closes": sum(1 for s in scored if s["closes"] > 0),
+            "enactable_all": len(enactable),
+            "bars": {"min_gt_closes": MIN_GT_CLOSES,
+                     "half_margin": round(HALF_MARGIN, 4),
+                     "edge_margin": round(EDGE_MARGIN, 4),
+                     "min_closes": MIN_CLOSES,
+                     "min_tape_hours": MIN_TAPE_HOURS,
+                     "elite_n": ELITE_N},
+            # the champion's verdict IN THE PAYLOAD, not only on stdout
+            "champion_is": bool(is_champ),
+            "champion_why": str(why),
+            "champion_confidence": conf,
+            "default_net": round(float(default_net), 3),
+            # coverage + scope: what the fitness was computed OVER
+            "up_resolver": up_res is not None,
+            "unreachable_lenses": ([] if up_res is not None
+                                   else sorted(rp.UNREACHABLE_WITHOUT_RESOLVER)),
+            "lenses_scored": sorted(scored_lenses),
+            "genes_evolvable": sorted(genes),
+            "genes_dropped": list(gene_dropped),
+            # a DECLARED gap, published so it cannot rot into folklore — see
+            # BRKUP_VETO_WIRED for the two lines that close it
+            "breakoutup_veto": ("wired" if BRKUP_VETO_WIRED else
+                                "unwired — fail-OPEN; the raw brain grade is "
+                                "not read here (see BRKUP_VETO_WIRED)"),
+        }
+        print(f"[incubator] 🧪 funnel: generated {funnel['generated']} -> "
+              f"closes>={MIN_GT_CLOSES} {funnel['closes_ok']} -> both_halves "
+              f"{funnel['both_halves_pos']} -> enactable {funnel['enactable']} "
+              f"-> elite {funnel['elite']} | champion: {why}", flush=True)
         # [2026-07-22] the PROSPECT REGISTER: every genotype this cycle
         # scored, merged into the durable across-cycles list (see
         # update_prospects) — the population is no longer discarded at
@@ -1340,6 +1877,42 @@ def run_once():
                                  "candidates": candidates_now,
                                  "source": "strategy-incubator"})
 
+    # --- THE WIRE: the STABLE champion -> the tuner's replay gate ----------
+    # See the block above `champion_proposal`. This proposes; it never enacts.
+    proposal = champion_proposal(champion,
+                                 {g: getattr(tt, g) for g in TAKER_GENES},
+                                 _tighter_map())
+    _plevers = proposal.get("levers") or {}
+    proposal["sent"] = False
+    if _plevers:
+        if fprop is None:
+            proposal["refused"] = ("fleet_proposals unimportable — the "
+                                   "channel is dark, nothing was proposed")
+        else:
+            try:
+                _sent = fprop.propose(_plevers, set_by=PROPOSE_AUTHOR,
+                                      now_ts=now)
+            except Exception as _pe:            # noqa: BLE001
+                _sent, proposal["error"] = None, repr(_pe)[:160]
+            proposal["sent"] = bool(_sent)
+            if not _sent:
+                # a failed durable write is the landed-signal contract saying
+                # NO (fleet_proposals returns None) — never report it as sent
+                proposal["refused"] = ("propose() did not land — dark DB, or "
+                                       "nothing survived the registry/author "
+                                       "filter at the channel")
+    if proposal["sent"]:
+        print(f"[incubator] 🗳️  proposed {len(_plevers)} lever(s) to the scout "
+              f"tuner's replay gate: "
+              f"{ {k: v['value'] for k, v in _plevers.items()} } "
+              f"(directions "
+              f"{ {k: v['direction'] for k, v in _plevers.items()} }) — "
+              f"the tuner gates each through its own replay; this enacts "
+              f"nothing", flush=True)
+    else:
+        print(f"[incubator] 🗳️  proposed nothing: {proposal.get('refused')}",
+              flush=True)
+
     # the incubator's OWN proposed ledger stamps birth time; the queue copy
     # stays exactly {name, levers} (the judge's contract, untouched)
     proposed_all = ((prior.get("proposed") or [])
@@ -1351,7 +1924,13 @@ def run_once():
         # [2026-07-17] what the fitness was actually scored on — a champion
         # means nothing without the lens set the live taker could fill.
         "lenses_scored": sorted(scored_lenses),
-        "lenses_vetoed": sorted(set(LENS_GENE) - scored_lenses),
+        # [2026-08-26] over the TAKER's full lens set, not just the gene map:
+        # `breakoutup` has no entry gene of its own, so `set(LENS_GENE)` could
+        # never report it as vetoed and a self-veto was invisible here.
+        "lenses_vetoed": sorted(set(tt.ALL_LENSES) - scored_lenses),
+        # [2026-08-26] the per-gate population counts + the champion's failing
+        # bar (see the funnel build in the breeding block).
+        "funnel": funnel,
         "proposed": proposed_all,
         # [2026-07-22] the PROSPECT REGISTER (operator: "no list of the
         # prospective bots its created and their stats") — both substrates:
@@ -1389,6 +1968,16 @@ def run_once():
         # should be made from.
         "frontier": frontier,
         "cage_analysis": cages,
+        # [2026-08-27] THE WIRE, published every cycle whether or not it fired.
+        # `levers` is what went to `tuning-proposals`, `sent` whether the write
+        # landed, `refused` the reason it did not, `no_consumer` the levers the
+        # tuner's own PROPOSAL_TAKER declines to read (tp/sl), and `current`
+        # the taker values the directions were derived against. Published
+        # because `{levers: {}}` is otherwise byte-identical between "no
+        # champion persisted" and "the channel is broken" — the (lv) rule.
+        # This organ still ENACTS NOTHING: the scout tuner replay-gates each
+        # entry, and no proposal from this author can reach a live.* lever.
+        "proposal": proposal,
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -1548,13 +2137,18 @@ def _selftest():
     breed(c2, narrow)                                # must not raise
     assert conform([None, "nope", 42], TAKER_GENES) == []
     assert conform(None, TAKER_GENES) == []
-    held = conform([{"MAX_HOLD_H": 72.0}], reachable_genes(TAKER_GENES, 43.0)[0])
+    held = conform([{"MAX_HOLD_H": 72.0}], reachable_genes(TAKER_GENES, 60.0)[0])
     assert held[0]["MAX_HOLD_H"] == 72.0, "off-grid allele in force is kept"
 
     # [2026-07-17] IMB-10: unreachable max-hold alleles dropped, and only those
-    g2, dropped = reachable_genes(TAKER_GENES, 43.0)
-    assert dropped == [48.0, 72.0], dropped
-    assert g2["MAX_HOLD_H"][1] == [24.0], g2["MAX_HOLD_H"]
+    # [2026-08-20 (sk)] span re-anchored 43h -> 60h. The grid lost its 24h rung
+    # with the registry cage (the breakoutup ratchet fix), so a 43h span now
+    # makes EVERY allele unreachable and trips the never-strip-bare branch —
+    # which would have left this block asserting a different property than the
+    # one it was written for. 60h keeps the shape: 48 reachable, 72 not.
+    g2, dropped = reachable_genes(TAKER_GENES, 60.0)
+    assert dropped == [72.0], dropped
+    assert g2["MAX_HOLD_H"][1] == [48.0], g2["MAX_HOLD_H"]
     assert g2["TAKE_PROFIT"] == TAKER_GENES["TAKE_PROFIT"], "other genes intact"
     assert reachable_genes(TAKER_GENES, 200.0)[1] == [], "all reachable -> no-op"
     assert reachable_genes(TAKER_GENES, 0.0)[1] == [], "unknown span -> no-op"
@@ -1602,7 +2196,7 @@ def _selftest():
     # identical, so the sort key is the only variable.
     _saved_replay = rp.replay
     try:
-        def _fake_replay(tape):
+        def _fake_replay(tape, up_resolver=None, **_kw):
             # DIV_GAP_PP 37.5 = never fires; 50.0 = defers a $50 loss past the
             # tape's end; 62.5 = the real tape's shape, honestly closed.
             bar = getattr(tt, "DIV_GAP_PP")
@@ -1629,6 +2223,117 @@ def _selftest():
         assert _defr["net"] == -10.0 and _defr["lcb"] < 0, _defr
     finally:
         rp.replay = _saved_replay
+
+    # [2026-08-26] THE UP-RESOLVER IS THREADED, and the fitness MOVES with it.
+    # A substring test would pass against a resolver that is built and dropped,
+    # so this drives the real evaluate() with a fake replay that reports a
+    # DIFFERENT book depending on whether it received one — the shape of the
+    # live defect (breakoutup unreachable ⇒ 39% of the book invisible).
+    _saved_replay = rp.replay
+    try:
+        def _cov_replay(tape, up_resolver=None, **_kw):
+            if up_resolver is None:          # the pre-fix world
+                return {"lenses": {"divergence": {"pnl_usd": [-1.0] * 4,
+                                                  "net": -4.0}},
+                        "open": [], "closed_net": -4.0, "unrealized": 0.0}
+            return {"lenses": {"divergence": {"pnl_usd": [-1.0] * 4, "net": -4.0},
+                               "breakoutup": {"pnl_usd": [5.0] * 4, "net": 20.0}},
+                    "open": [], "closed_net": 16.0, "unrealized": 0.0}
+        rp.replay = _cov_replay
+        _lenses = {"divergence", "breakoutup"}
+        _blind = evaluate({"DIV_GAP_PP": 62.5}, [1, 2], _lenses)
+        _seen = evaluate({"DIV_GAP_PP": 62.5}, [1, 2], _lenses,
+                         up_resolver=(lambda s, t: True))
+        assert _blind["net"] == -4.0 and _seen["net"] == 16.0, (_blind, _seen)
+        assert _seen["closes"] == 8 and _blind["closes"] == 4
+        # BOTH halves must carry the resolver too — a half scored blind against
+        # a full-coverage total is the deferral trap in coverage clothing.
+        assert _seen["h1"] == 16.0 and _seen["h2"] == 16.0, _seen
+        # ...and rank must forward it, not swallow it.
+        _rk = rank([{"DIV_GAP_PP": 62.5}], [1, 2], _lenses,
+                   up_resolver=(lambda s, t: True))
+        assert _rk[0]["net"] == 16.0, _rk
+    finally:
+        rp.replay = _saved_replay
+
+    # the resolver's own contract: kill switch reaches it, junk degrades to
+    # None (REDUCED COVERAGE), and it is built from the tape's own symbols.
+    class _T:                               # minimal (dt, payload) tape shape
+        def __init__(self, ts):
+            self._ts = ts
+
+        def timestamp(self):
+            return self._ts
+    # ZEC appears ONLY in the LAST snapshot — a resolver built from the first
+    # row alone would silently leave that coin unresolvable for the whole
+    # cycle, so the fixture has to be able to see the difference.
+    _tape = [(_T(0.0), {"tickets": {"breakout": [{"sym": "SOL"}, {"sym": None}],
+                                    "dip": [{"sym": "BTC"}], "momentum": None}}),
+             (_T(60.0), {"tickets": {"breakout": [{"sym": "SOL"},
+                                                  {"sym": "ZEC"}]}})]
+    assert tape_symbols(_tape) == ["BTC", "SOL", "ZEC"], tape_symbols(_tape)
+    assert tape_symbols([]) == [] and tape_symbols(None) == []
+    _built = []
+
+    def _fac(syms, lo, hi):
+        _built.append((tuple(syms), lo, hi))
+        return lambda s, t: True
+    assert build_up_resolver(_tape, _factory=_fac) is not None
+    assert _built == [(("BTC", "SOL", "ZEC"), 0.0, 60.0)], _built
+    assert build_up_resolver([], _factory=_fac) is None      # empty tape
+    assert build_up_resolver([(_T(0.0), {})], _factory=_fac) is None  # no syms
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("candles down")
+    assert build_up_resolver(_tape, _factory=_boom) is None, \
+        "any trouble must degrade to None, never raise"
+    # the KILL SWITCH must reach the builder. It is read at import, so the env
+    # form is exercised by the pytest guard (fresh interpreter); here the
+    # resolved flag is flipped, which is the value the builder actually reads.
+    global UP_RESOLVER_ON
+    _sw = UP_RESOLVER_ON
+    try:
+        UP_RESOLVER_ON = False
+        _built.clear()
+        assert build_up_resolver(_tape, _factory=_fac) is None, \
+            "INCUBATOR_UP_RESOLVER=0 must turn the resolver off"
+        assert _built == [], "a disabled resolver must not even be constructed"
+    finally:
+        UP_RESOLVER_ON = _sw
+
+    # [2026-08-26] the SCORED lens set: breakoutup rides in on its own veto,
+    # never on the scout's `breakout` grade (the taker relabels BEFORE it
+    # vetoes, so the two are independent), and it never enters LENS_GENE.
+    _row = real_tt.BOT_ROW
+
+    def _mults(tag):
+        return {"mults": {_row: {"long-breakoutup": tag}}}
+    assert "breakoutup" in scored_lens_set({"breakout", "divergence"}, {}, _row)
+    assert "breakoutup" in scored_lens_set({"divergence"}, {}, _row), \
+        "a vetoed `breakout` must NOT veto `breakoutup` — the taker relabels first"
+    assert "breakoutup" in scored_lens_set(set(), None, _row)      # dark => open
+    assert "breakoutup" not in scored_lens_set(
+        {"breakout"}, _mults({"mult": 0.5, "n": 99}), _row), "decisive self-veto"
+    assert "breakout" in scored_lens_set(
+        {"breakout"}, _mults({"mult": 0.5, "n": 99}), _row), \
+        "the self-veto is breakoutup's alone — it must not touch `breakout`"
+    assert "breakoutup" in scored_lens_set(
+        {"breakout"}, _mults({"mult": 0.75, "n": 99}), _row), "mild => collect"
+    assert scored_lens_set({"dip"}, {}, _row) >= {"dip"}, "allowed is preserved"
+    assert "breakoutup" not in LENS_GENE and set(LENS_GENE) == {
+        "breakout", "dip", "momentum", "divergence"}, LENS_GENE
+
+    # freshness is the CALLER's job, and this is the caller's read
+    assert fresh_stake_mults({"updated": _iso(now_ts()), "ttl_sec": 600,
+                              "mults": {}}, now_ts()).get("mults") == {}
+    assert fresh_stake_mults({"updated": _iso(now_ts() - 9999), "ttl_sec": 600},
+                             now_ts()) == {}, "stale => {} => vetoes nothing"
+    assert fresh_stake_mults({"updated": _iso(now_ts() + 9999), "ttl_sec": 600},
+                             now_ts()) == {}, "future stamp => not fresh"
+    assert fresh_stake_mults({"updated": "junk"}, now_ts()) == {}
+    assert fresh_stake_mults(None, now_ts()) == {}
+    # no ttl_sec => the taker's own 26000s fallback, mirrored not invented
+    assert fresh_stake_mults({"updated": _iso(now_ts() - 100)}, now_ts()) != {}
 
     # GAMETE SELECTION: the noise genotype the champion gate rejects must not
     # BREED either, and an unmeasurable genotype is not a gamete however fit.
@@ -1819,7 +2524,17 @@ def _selftest():
     # kill switch + empty genes claim nothing and cannot raise
     assert explore_slice(_g2, 0, 0)[0] == []
     assert explore_slice({}, 0, 10)[0] == []
-    assert explore_slice(_g2, None, 2)[1] == 2, "None cursor starts at 0"
+    # [(uc)] a None cursor still means 0 — asserted by EQUIVALENCE now rather
+    # than by the arithmetic `== 2`, which silently pinned the CONTIGUOUS walk
+    # and broke the moment the stride landed. The property was never "the next
+    # cursor is 2"; it was "None is treated as 0", and this says exactly that.
+    assert explore_slice(_g2, None, 2) == explore_slice(_g2, 0, 2), \
+        "None cursor must behave identically to 0"
+    # ...and the walk is STRIDED, not contiguous: on a space of 6 a contiguous
+    # take of 2 would advance the cursor to 2. It must not.
+    _sz6 = joint_space_size(_g2)
+    assert math.gcd(explore_stride(_sz6), _sz6) == 1, "stride must be coprime"
+    assert explore_slice(_g2, 0, 2)[1] == (2 * explore_stride(_sz6)) % _sz6
 
     # [2026-07-29] RESEARCH SPACE — search beyond the cage, but NEVER let an
     # out-of-cage genotype become something a human might act on.

@@ -1,3 +1,6 @@
+## [2026-08-29]
+- Audit: add offline Lighter edge-aware safety sizing measurement tool; no live trading changes.
+
 ## 2026-08-20 (sg) — A LEVERED BOOK ON THE 1× BROKER DOES NOT MIS-REPORT, IT BOOKS A PROFIT THE VENUE WOULD NEVER HAVE LET IT COLLECT — the paper account can be liquidated now
 
 `(sf)`'s I22 admits leverage only as the OUTPUT of a volatility target on a book

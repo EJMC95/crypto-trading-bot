@@ -133,6 +133,7 @@ Usage:
     python lighter_band_kelly_bot.py --selftest                    # offline
 """
 import argparse
+import math
 import os
 import sys
 import time
@@ -450,19 +451,72 @@ def build_state(positions, recent, pend, noconv, enter_bps_eff, last_ts,
             "saved_ts": float(now if now is not None else time.time())}
 
 
+def holdwatch_accumulate(hw_stats, horizon_s, x):
+    """Fold ONE forward sample into the hold-watch accumulator, in place.
+
+    Pure but for the dict it is handed: no clock, no state, no I/O — so the
+    thing `holdwatch_block` reports on is testable, which it was not while
+    this arithmetic lived inline in the loop. The first mutation round after
+    the dispersion fields shipped proved the point: zeroing the `n2`
+    increment SURVIVED, because nothing outside `main()` could reach it, and
+    a dispersion that silently never accumulates is precisely the field
+    reading `None` forever while looking healthy (I1/I23)."""
+    b = hw_stats.setdefault(str(int(horizon_s)), {"n": 0, "sum": 0.0})
+    b["n"] = int(b.get("n") or 0) + 1
+    b["sum"] = float(b.get("sum") or 0.0) + x
+    # dispersion, on its OWN counter — a bucket restored from before this
+    # field existed has `n` without `sumsq`, and dividing the new sumsq by
+    # the old n would understate sd on the longest-running horizons.
+    b["n2"] = int(b.get("n2") or 0) + 1
+    b["sum2"] = float(b.get("sum2") or 0.0) + x
+    b["sumsq"] = float(b.get("sumsq") or 0.0) + x * x
+    b["wins"] = int(b.get("wins") or 0) + (1 if x > 0 else 0)
+    return b
+
+
 def holdwatch_block(hw_stats):
     """Published every loop: mean EXTRA % the mirror would have earned by
     holding on past its own exit, per horizon. REPORTED, never a bar — and
-    n is published beside every mean so a thin cell reads as thin (I15)."""
+    n is published beside every mean so a thin cell reads as thin (I15).
+
+    [2026-08-26] IT NOW PUBLISHES ITS DISPERSION, and that is the whole point
+    of the field. The expansion review read `+60m mean +0.291%` against a
+    `conv` exit realising −0.186%/trade (n=200, t=−3.38) and could not say
+    whether the gap was an edge or noise, because the accumulator kept only
+    `n` and `sum` — a mean with no sd is a number no decision can be made on
+    (I23: the thing that decides must measure the thing it decides about).
+    `sd_pct`/`t`/`win_pct` ride beside it now, so the exit re-spec this field
+    exists to justify becomes a query rather than another session's guess.
+
+    BACKWARD-COMPATIBLE BY CONSTRUCTION: a durable `hw_stats` restored from
+    before this change carries `n`/`sum` and no `sumsq`, so dispersion is
+    counted over its OWN sample `n2` and reported as None until n2 >= 2 —
+    never over a mismatched n, which would understate sd on exactly the
+    horizons with the longest history."""
     out = {"note": "extra %/trade from holding PAST the ghost's exit; "
-                   "telemetry only, no position differs because of it",
+                   "telemetry only, no position differs because of it. "
+                   "t is over n2 (samples carrying dispersion); the mean is "
+                   "vs a MID while the exit was a VWAP, so it is optimistic "
+                   "by ~half the spread — reported, never a bar (I15).",
            "horizons_s": list(HOLD_HORIZONS_S)}
     for h in HOLD_HORIZONS_S:
         b = (hw_stats or {}).get(str(int(h))) or {}
         n = int(b.get("n") or 0)
-        out[f"+{int(h // 60)}m"] = {
-            "n": n,
-            "mean_pct": round(b["sum"] / n, 4) if n else None}
+        n2 = int(b.get("n2") or 0)
+        cell = {"n": n,
+                "mean_pct": round(b["sum"] / n, 4) if n else None,
+                "n2": n2, "sd_pct": None, "t": None, "win_pct": None}
+        if n2 >= 2:
+            m2 = b.get("sumsq")
+            mean2 = (b.get("sum2") or 0.0) / n2
+            if m2 is not None:
+                var = (m2 - n2 * mean2 * mean2) / (n2 - 1)
+                sd = math.sqrt(var) if var > 0 else 0.0
+                cell["sd_pct"] = round(sd, 4)
+                cell["t"] = (round(mean2 / (sd / math.sqrt(n2)), 2)
+                             if sd > 0 else None)
+            cell["win_pct"] = round(100.0 * int(b.get("wins") or 0) / n2, 1)
+        out[f"+{int(h // 60)}m"] = cell
     return out
 
 
@@ -526,6 +580,8 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
             venue="lighter", shadow=True, side=pos["side"],
             entry_price=entry_px, exit_price=exit_px,
             extra={"family": pos.get("family") or "snap",
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "ghost_side": pos.get("ghost_side"),
                    "ghost_entry": pos.get("ghost_entry"),
                    "dev_at_entry_bps": pos.get("dev_at_entry"),
@@ -537,7 +593,23 @@ def _close(bot_id, key, pos, reason, exit_px, pnl, dev_now=None):
         pass
 
 
-def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
+def _deployed(positions):
+    """This book's currently-deployed gross, for the (sp) brain gross bound."""
+    return sum(float(p.get("notional") or 0.0) for p in positions.values())
+
+
+#: [(sp)] TWO FAMILIES, ONE BUDGET. kelly is the only wired book whose sleeves
+#: run different clips, so its designed gross is the SUM of the two rather than
+#: one `cap x clip` — computed here so the bound moves with either sleeve's
+#: config instead of being retyped as a number that drifts. Both sleeves draw
+#: on it, which is correct: they share one $1,000 book.
+_GROSS_CAP = ((CLIP_USD * MAX_POSITIONS + DIP_CLIP_USD * DIP_MAX_POSITIONS)
+              * getattr(fleet_bus, "BRAIN_GROSS_X", 2.0)
+              if fleet_bus is not None else None)
+
+
+def _open_mirror(positions, coin, dev_bps, bv, t0, ref, notional=None,
+                 brain_mult=1.0):
     """Open one mirror position at MY side's book-walked VWAP. SIGNATURE IS
     THE CONSISTENCY RULE: no streak, no last-outcome, no equity parameter
     exists, so size cannot vary with results without changing this
@@ -554,9 +626,11 @@ def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
         return None
     if my_slip > MY_MAX_SLIP_BPS:
         return None
+    ntl = CLIP_USD if notional is None else float(notional)
     positions[coin] = {"coin": coin, "family": "snap",
                        "side": side, "ghost_side": g_side,
-                       "notional": CLIP_USD, "size": CLIP_USD / my_fill,
+                       "notional": ntl, "size": ntl / my_fill,
+                       "brain_mult": brain_mult,
                        "entry": my_fill, "ghost_entry": g_fill,
                        "last_px": my_fill, "opened_ts": t0,
                        "dev_at_entry": round(dev_bps, 1),
@@ -565,7 +639,7 @@ def _open_mirror(positions, coin, dev_bps, bv, t0, ref):
     return positions[coin]
 
 
-def _open_dip(positions, sym, bv, t0, ticket):
+def _open_dip(positions, sym, bv, t0, ticket, notional=None, brain_mult=1.0):
     """Open one dipfade mirror SHORT at MY side's book-walked VWAP. Same
     consistency-rule signature discipline as _open_mirror: no streak, no
     outcome, no equity input. The ghost's entry is the same mark the taker
@@ -577,10 +651,12 @@ def _open_dip(positions, sym, bv, t0, ticket):
         return None
     if my_slip > MY_MAX_SLIP_BPS:
         return None
+    ntl = DIP_CLIP_USD if notional is None else float(notional)
     positions[sym] = {"coin": sym, "family": "dip",
                       "side": "short", "ghost_side": "long",
-                      "notional": DIP_CLIP_USD,
-                      "size": DIP_CLIP_USD / my_fill,
+                      "notional": ntl,
+                      "size": ntl / my_fill,
+                      "brain_mult": brain_mult,
                       "entry": my_fill, "ghost_entry": bv.get("buy_vwap"),
                       "last_px": my_fill, "opened_ts": t0,
                       "range_pos": ticket.get("range_pos"),
@@ -837,14 +913,40 @@ def main():
             if coin not in crypto_ok:
                 census["noncrypto"] += 1
                 continue
-            pos = _open_mirror(positions, coin, dev_bps, bv, t0, r)
+            # [2026-08-20 (so)] the brain sizes MY leg, keyed on the SAME
+            # `<side>-snap` _close publishes. Two fidelity rules, both learned
+            # by this book at (qj): the GHOST's gate above is priced at the
+            # ghost's own $10 clip and is untouched here — resizing my leg must
+            # never change which events the ghost is deemed to have taken — and
+            # MY book must be RE-WALKED at the sized clip, because my entry IS
+            # a VWAP and my slip gate is what keeps a big clip out of a thin
+            # coin. Fail-CLOSED: no re-walk, no entry.
+            _side = mirror_side(dev_bps)
+            _clip, _bm = (fleet_bus.brain_clip(
+                bot_id, f"{_side}-snap", CLIP_USD,
+                deployed_usd=_deployed(positions),
+                gross_cap_usd=_GROSS_CAP)
+                if fleet_bus is not None else (CLIP_USD, 1.0))
+            bv_m = bv
+            if _bm != 1.0:
+                try:
+                    bv_m = ghost.book_view(ctx, coin, _clip)
+                except Exception:  # noqa: BLE001
+                    bv_m = None
+                if not bv_m:
+                    census["resize_blind"] = census.get("resize_blind", 0) + 1
+                    continue
+            pos = _open_mirror(positions, coin, dev_bps, bv_m, t0, r,
+                               notional=_clip, brain_mult=_bm)
             if pos is None:
                 census["my_slip"] += 1
                 continue
             pend[coin] = 0
             census["opened"] += 1
             print(f"[{now_iso()}] OPEN {coin} {pos['side'].upper()} "
-                  f"${CLIP_USD:.0f} @ {pos['entry']:.6g} | dev "
+                  f"${_clip:.0f}"
+                  f"{'' if _bm == 1.0 else f' (brain {_bm:.2f}x)'}"
+                  f" @ {pos['entry']:.6g} | dev "
                   f"{dev_bps:+.1f}bps (gate {enter_bps_eff:.0f}) | riding "
                   f"the {'premium' if dev_bps > 0 else 'discount'} the ghost "
                   f"would fade")
@@ -876,21 +978,32 @@ def main():
                        if p.get("family") == "dip") >= DIP_MAX_POSITIONS:
                     census["dip_capped"] += 1
                     break
+                # [(so)] same rule on the probe sleeve, its own bucket
+                # (`short-dip`) — this is the sleeve admitted on an operator
+                # override of the I16 floor at n=13, so it is exactly the one
+                # whose size should follow its record as the record arrives.
+                _dclip, _dbm = (fleet_bus.brain_clip(
+                    bot_id, "short-dip", DIP_CLIP_USD,
+                    deployed_usd=_deployed(positions),
+                    gross_cap_usd=_GROSS_CAP)
+                    if fleet_bus is not None else (DIP_CLIP_USD, 1.0))
                 try:
                     if not ctx.supports(sym):
                         continue
-                    bv_d = ghost.book_view(ctx, sym, DIP_CLIP_USD)
+                    bv_d = ghost.book_view(ctx, sym, _dclip)
                 except Exception:  # noqa: BLE001
                     bv_d = None
                 if bv_d is None:
                     continue
-                pos = _open_dip(positions, sym, bv_d, t0, tk)
+                pos = _open_dip(positions, sym, bv_d, t0, tk,
+                                notional=_dclip, brain_mult=_dbm)
                 if pos is None:
                     census["dip_slip"] += 1
                     continue
                 dip_cd[sym] = t0
                 census["dip_opened"] += 1
-                print(f"[{now_iso()}] OPEN {sym} SHORT ${DIP_CLIP_USD:.0f} "
+                print(f"[{now_iso()}] OPEN {sym} SHORT ${_dclip:.0f}"
+                      f"{'' if _dbm == 1.0 else f' (brain {_dbm:.2f}x)'} "
                       f"[dipfade probe] range_pos "
                       f"{tk.get('range_pos')} chg {tk.get('chg_pct')}% | "
                       f"the ghost the taker vetoed buys the dip; the "
@@ -908,9 +1021,7 @@ def main():
                 _x = holdwatch_extra(_rec.get("side"), _rec.get("exit_px"), _px)
                 if _x is None:
                     break
-                _b = hw_stats.setdefault(str(int(_h)), {"n": 0, "sum": 0.0})
-                _b["n"] += 1
-                _b["sum"] += _x
+                holdwatch_accumulate(hw_stats, _h, _x)
                 _rec.setdefault("done", []).append(_h)
         holdwatch = [r for r in holdwatch
                      if len(r.get("done") or ()) < len(HOLD_HORIZONS_S)
@@ -1044,8 +1155,30 @@ def _selftest():
     # 5) CONSISTENCY RULE: _open_mirror's signature carries no streak, no
     #    outcome, no equity — size cannot vary with results without
     #    changing this function's shape (the douglas pin, kept).
+    #    [(so)] `notional`/`brain_mult` join the whitelist and the ban stays:
+    #    the brain's scale is a per-(book, side) function of >=30 closes over
+    #    >=3 runs, identical for every trade in a cycle, so it cannot express
+    #    "I just lost, bet differently" — which is the thing this pin exists
+    #    to forbid and which THIS book's parent measured at +$27.01 -> -$11.32.
     params = list(inspect.signature(_open_mirror).parameters)
-    assert params == ["positions", "coin", "dev_bps", "bv", "t0", "ref"], params
+    assert params == ["positions", "coin", "dev_bps", "bv", "t0", "ref",
+                      "notional", "brain_mult"], params
+    for _banned in ("streak", "last_pnl", "last_outcome", "equity", "wins",
+                    "losses", "cooldown", "consecutive", "drawdown"):
+        assert _banned not in params, _banned
+        assert _banned not in list(inspect.signature(_open_dip).parameters), \
+            f"_open_dip grew a '{_banned}' input"
+    # the size defaults to the book's own clip, so an un-sized caller is
+    # byte-identical to the pre-(so) book, and the fees/size follow the SIZED
+    # notional rather than the constant.
+    _pb = _open_mirror({}, "BM", 75.0,
+                       {"mid": 100.0, "buy_vwap": 100.0, "sell_vwap": 100.0,
+                        "buy_slip_bps": 1.0, "sell_slip_bps": 1.0,
+                        "spread_bps": 2.0}, 5.0, 99.2,
+                       notional=CLIP_USD * 2, brain_mult=2.0)
+    assert _pb["notional"] == CLIP_USD * 2 and _pb["brain_mult"] == 2.0
+    assert abs(_pb["size"] - (CLIP_USD * 2) / 100.0) < 1e-12, \
+        "size must follow the SIZED notional, not the constant clip"
     # and it fills at MY side's vwap, slip-gated
     ps = {}
     bv = {"mid": 100.0, "buy_vwap": 100.02, "sell_vwap": 99.98,
@@ -1077,7 +1210,8 @@ def _selftest():
     assert dip_exit(dpos, 100.5, DIP_MAX_HOLD_S) == "maxhold"
     import inspect as _insp
     assert list(_insp.signature(_open_dip).parameters) == [
-        "positions", "sym", "bv", "t0", "ticket"]      # consistency rule
+        "positions", "sym", "bv", "t0", "ticket",
+        "notional", "brain_mult"]                      # consistency rule
     dbv = {"mid": 100.0, "buy_vwap": 100.02, "sell_vwap": 99.98,
            "buy_slip_bps": 2.0, "sell_slip_bps": 2.0, "spread_bps": 4.0}
     got_d = _open_dip({}, "B", dbv, 5.0, {"range_pos": 0.03})
@@ -1105,6 +1239,62 @@ def _selftest():
     assert hb["+15m"]["n"] == 2 and abs(hb["+15m"]["mean_pct"] - 1.5) < 1e-9
     assert hb["+30m"]["n"] == 0 and hb["+30m"]["mean_pct"] is None
     assert list(hb["horizons_s"]) == list(HOLD_HORIZONS_S)
+    # [2026-08-26] DISPERSION. The mean alone could not say whether +60m's
+    # +0.291% beat the conv exit's −0.186% or was noise; these pin the
+    # answer's shape. A LEGACY bucket (n/sum, no n2) must report the mean and
+    # decline the statistic — never compute sd over a mismatched n.
+    assert hb["+15m"]["n2"] == 0
+    assert hb["+15m"]["sd_pct"] is None and hb["+15m"]["t"] is None, \
+        "a pre-dispersion bucket must not invent a statistic"
+    assert hb["+15m"]["win_pct"] is None
+    _s = [1.0, 2.0, 3.0, -1.0]          # mean +1.25, sd 1.7078, t +1.4640
+    _hw = {"900": {"n": len(_s), "sum": sum(_s), "n2": len(_s),
+                   "sum2": sum(_s), "sumsq": sum(x * x for x in _s),
+                   "wins": sum(1 for x in _s if x > 0)}}
+    hb2 = holdwatch_block(_hw)["+15m"]
+    assert abs(hb2["mean_pct"] - 1.25) < 1e-9
+    assert abs(hb2["sd_pct"] - 1.7078) < 1e-3, hb2["sd_pct"]
+    assert abs(hb2["t"] - 1.46) < 0.02, hb2["t"]
+    assert abs(hb2["win_pct"] - 75.0) < 1e-9, hb2["win_pct"]
+    # a MIXED bucket — legacy samples plus new ones — reports the mean over
+    # every sample and the statistic over the dispersion-carrying subset only.
+    hb3 = holdwatch_block({"900": {"n": 10, "sum": 20.0, "n2": len(_s),
+                                   "sum2": sum(_s),
+                                   "sumsq": sum(x * x for x in _s),
+                                   "wins": 3}})["+15m"]
+    assert hb3["n"] == 10 and abs(hb3["mean_pct"] - 2.0) < 1e-9
+    assert hb3["n2"] == 4 and abs(hb3["sd_pct"] - 1.7078) < 1e-3, \
+        "sd must be over n2, never over n"
+    assert abs(hb3["win_pct"] - 75.0) < 1e-9, \
+        "win_pct is 3 of n2=4, never 3 of n=10 — the mixed-bucket trap"
+    # the ACCUMULATOR itself, reachable because it is no longer inline in the
+    # loop: every sample must move n AND n2, or the dispersion reads None
+    # forever while the mean looks healthy.
+    _acc = {}
+    for _v in (1.0, 2.0, 3.0, -1.0):
+        holdwatch_accumulate(_acc, 900.0, _v)
+    assert _acc["900"]["n"] == 4 and _acc["900"]["n2"] == 4, \
+        "a sample that does not move n2 makes the statistic unreachable"
+    assert abs(_acc["900"]["sum"] - 5.0) < 1e-9
+    assert abs(_acc["900"]["sum2"] - 5.0) < 1e-9
+    assert abs(_acc["900"]["sumsq"] - 15.0) < 1e-9
+    assert _acc["900"]["wins"] == 3, "a negative sample is not a win"
+    _accb = holdwatch_block(_acc)["+15m"]
+    assert abs(_accb["mean_pct"] - 1.25) < 1e-9 and abs(_accb["t"] - 1.46) < 0.02, \
+        "accumulator and reporter must agree end to end"
+    # a LEGACY bucket keeps accumulating without inventing history
+    _leg = {"900": {"n": 6, "sum": 12.0}}
+    holdwatch_accumulate(_leg, 900.0, 2.0)
+    assert _leg["900"]["n"] == 7 and _leg["900"]["n2"] == 1, \
+        "n2 counts only what carries dispersion, never the legacy backlog"
+    # zero-variance and single-sample cells decline rather than divide by zero
+    assert holdwatch_block({"900": {"n": 1, "sum": 1.0, "n2": 1, "sum2": 1.0,
+                                    "sumsq": 1.0, "wins": 1}})["+15m"]["t"] is None
+    _flat = {"900": {"n": 3, "sum": 6.0, "n2": 3, "sum2": 6.0,
+                     "sumsq": 12.0, "wins": 3}}
+    assert holdwatch_block(_flat)["+15m"]["sd_pct"] == 0.0
+    assert holdwatch_block(_flat)["+15m"]["t"] is None, \
+        "zero dispersion is not infinite significance"
     _st = build_state({}, [], {}, {}, 60.0, 0.0, now=1.0,
                       holdwatch=[{"coin": "X"}], hw_stats={"900": {"n": 1, "sum": 2.0}})
     assert _st["holdwatch"] and _st["hw_stats"], "the watch must survive a restart"

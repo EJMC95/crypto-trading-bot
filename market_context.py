@@ -83,6 +83,7 @@ from collections import deque
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import fleet_bus
 import funding_basis
 from venues.symbol_map import from_lighter
 
@@ -98,12 +99,29 @@ BINANCE_WS = "wss://fstream.binance.com/ws/!forceOrder@arr"
 
 LOOP_SECONDS = int(os.environ.get("MCTX_LOOP_SECONDS", "300"))
 QUALITY_EVERY_H = float(os.environ.get("MCTX_QUALITY_EVERY_H", "6"))
+
+#: TTL on the `coin-quality` payload, and it has ONE owner because a retyped
+#: constant is a constant that drifts. [27-Aug] Written as a module constant
+#: after a mutation round: the publish-side TTL was inline and the test
+#: RECOMPUTED it with its own literal, so halving the real one left the test
+#: green — a test that re-implements the publisher's arithmetic is not testing
+#: the publisher. 2.5 refresh periods: one skipped tick must NOT blind every
+#: consumer, a dead collector MUST.
+COIN_QUALITY_TTL_SEC = int(QUALITY_EVERY_H * 3600 * 2.5)
 TOP_N = int(os.environ.get("MCTX_TOP_N", "60"))   # bound the state row size
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)])
 log = logging.getLogger(BOT)
+
+
+class _RetiredArm(Exception):
+    """[(uk)] Sentinel: the divergence check's live arm is retired, so there
+    is nothing to measure. Raised to unwind the check's own body and caught
+    ABOVE the broad handler, so a deliberate skip is never logged as a fault.
+    Not an error condition — see the block at `evaluate_alerts`."""
+
 
 # Binance futures symbol -> fleet symbol (strip USDT; k-prefix the 1000x memes)
 _BINANCE_MAP = {"1000BONK": "kBONK", "1000SHIB": "kSHIB", "1000PEPE": "kPEPE",
@@ -470,11 +488,48 @@ def evaluate_evidence(quality):
     # alerting on noise (the 13-Jul +5.4% firing was the old ratio artifact:
     # live 9W/0L on its 3 slots vs shadow 15W/5L on 8, same-coin closes
     # near-identical — SOL +$0.19 live vs +$0.27 shadow).
+    #
+    # [2026-08-27 (uk)] A RETIRED ARM HAS NO EXECUTION TO DIVERGE FROM, and
+    # this check could not tell. `LIVE` below is a hardcoded row, and it was
+    # retired 22-Aug ((ta)) — but its last four closes are the RETIREMENT
+    # FLATTEN itself (`short_retired` on ETH/BTC/SOL/XAU at 04:01-04:02Z),
+    # four forced market exits booked at whatever the book was down, against
+    # a shadow twin that kept trading normally. The 7d window read that as
+    # -2.223pp of "execution divergence" and fired `live-shadow-gap`, which
+    # `evidence_board.synthesize_live` consumes as a ROWS-FREE `gap` — so
+    # `if gap or hurt:` cut EVERY live row's clip to 0.75x for five days,
+    # including 👩 mum, who has never taken a trade in her life. Measured
+    # cost at the moment this shipped: $88.12 + $91.23 + $178.13 = $357.48 of
+    # clip withheld across the trio, by a book that has been flat since 22-Aug.
+    # The organ's OWN numbers said the opposite (live slip 0.63bps vs shadow
+    # 1.08bps — live fills BETTER).
+    #
+    # The declaration already existed and already had two consumers
+    # (`experiment_judge` reads it twice, which is why 🧪 the judge next door
+    # correctly published `farmer: {phase: "stood_down"}` throughout). This
+    # check just never asked. Fail-safe direction is `live_arm_retired`'s, not
+    # ours: an unknown row is NOT retired, so a typo can never silence a
+    # living book's divergence alert — the loud direction is the safe one.
+    # The alert self-clears within `EVBOARD_LIVE_GAP_FRESH_H` (6h) once
+    # `last_seen` stops being refreshed; nothing has to un-fire it.
+    LIVE, SHAD = "perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"
+    # Guarded OUTSIDE the try, deliberately: a `raise` inside it would land in
+    # the `except` below and log "divergence check failed" — a DELIBERATE skip
+    # reading as a fault is the same class as a check that inspects nothing and
+    # reports clean. A retired arm is a decision, not an error, and the log
+    # line says which.
+    _retired = fleet_bus.live_arm_retired(LIVE)
+    if _retired:
+        log.info("divergence check SKIPPED: %s is a retired live arm — no "
+                 "execution to diverge from; alert not fired (any standing "
+                 "one ages out of the board's freshness window on its own)",
+                 LIVE)
     try:
+        if _retired:
+            raise _RetiredArm(LIVE)
         conn2 = store._get_conn()
         if conn2 is None:
             raise LookupError("no DB connection")
-        LIVE, SHAD = "perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"
         with conn2.cursor() as cur:
             # closed_at is TEXT (iso); seen_at is a real TIMESTAMPTZ stamped at
             # insert (== close publication time) — filter on that.
@@ -499,6 +554,11 @@ def evaluate_evidence(quality):
                                 f"{gap:+.2%} across {n_overlap} overlapping coins "
                                 f"({tot_w} paired closes) — execution divergence "
                                 f"worth investigating")
+    except _RetiredArm:
+        # Caught BEFORE the broad handler on purpose. A deliberate skip must
+        # never surface as "divergence check failed": the reason it did not
+        # run is the finding, and a fault log here would hide it.
+        pass
     except Exception as e:  # noqa: BLE001
         log.warning("divergence check failed: %s", e)
 
@@ -538,10 +598,16 @@ def evaluate_evidence(quality):
 # last publish carried no venue: both are louder, different failures, and
 # neither is quieter than the old dict's silent skip.
 LIVE_CADENCE_SEC = {
-    "perps-funding-lighter-lighter": 1200,    # 💸 Funding Farmer — 300s loop
+    # [2026-08-25] 💸 Farmer's live row RETIRED+PRUNED ((ta)/(tb)); 🔮 georgia
+    # runs that sub-account at the same 300s loop → same limit. Found by this
+    # module's own selftest going red on main after the prune.
+    "freqtrade-georgia-lighter":     1200,
     # [2026-08-13 (ma)] 🎫 Ticket Taker's live row RETIRED with the Avo slot
     # swap; 🙏 Avo Maria took the sub-account. Same 300s loop → same limit.
     "freqtrade-avo-maria-lighter":   1200,
+    # [2026-08-25 (te)] 👩 mum — live, own sub-account, 300s loop. Added WITH
+    # the launch (the (tb) lesson: this dict learns the hard way otherwise).
+    "freqtrade-mum-lighter":         1200,
 }
 # Any live row NOT named above is still watched, at a deliberately slack bar —
 # an unknown cadence earns a late page, never no page.
@@ -652,11 +718,45 @@ def coin_quality():
                 FROM venue_orders WHERE at > now() - interval '14 days'
                 GROUP BY coin""")
             venue_rows = cur.fetchall()
+            # [2026-08-28 (vd)] HALT EVENTS OUT OF A REAL-MONEY ENTRY GATE, and
+            # this one leans the RELEASE way.
+            #
+            # This aggregate feeds `coin-vetoes` (rule at L463: `closes >= 5 and
+            # stops/closes >= 0.5`), which all THREE live books consume at the
+            # entry site (lighter_avo_live_bot.py:2073 -> `coin_veto` -> the
+            # entry is refused). It counted halt/flatten EVENTS as closes.
+            #
+            # THE DIRECTION IS THE WHOLE POINT. A phantom's reason is
+            # `long_daily_loss`, which does NOT match `%stop%` — verified — so
+            # it raises the DENOMINATOR and never the numerator. Two effects,
+            # both loosening: the 5-close floor is reached sooner, and the 50%
+            # bar is pushed further away. A coin whose true record is 3 stops in
+            # 5 closes (60%, VETOED) reads 3 of 7 (43%, ADMITTED) after two
+            # halts. Absence of evidence must never authorise an entry (the (hs)
+            # fail-closed-in-the-widening-direction rule).
+            #
+            # MEASURED TODAY on the live ledger: the veto set is `['XAG']` with
+            # AND without the 13 — no coin added or removed, closest approach is
+            # SOL at 10.4%. So this buys ZERO expectancy today and is shipped as
+            # correctness, not as a win. What it does move is real: `BRENTOIL`
+            # goes 5 -> 4 closes, i.e. back BELOW the floor it only reached on a
+            # halt event.
+            #
+            # `side <> 'skip'` joins it because this was the one ledger reader in
+            # the fleet carrying neither filter.
+            #
+            # The predicate is the phantom signature spelled in SQL rather than
+            # an import (this runs inside a `cur.execute`), so it is a SECOND
+            # COPY OF A RULE — pinned against the owner by
+            # `tests/autonomy/test_coin_quality_phantoms.py`, which drives both
+            # over the same live rows and fails if they ever disagree ((hj)).
             cur.execute("""
                 SELECT split_part(pair, '/', 1), count(*),
                        sum(case when pnl_abs > 0 then 1 else 0 end),
                        sum(case when reason like '%%stop%%' then 1 else 0 end)
                 FROM paper_trades WHERE closed_at > (now() - interval '30 days')::text
+                  AND side IS DISTINCT FROM 'skip'
+                  AND NOT (pnl_abs = 0 AND entry_price IS NULL)
                 GROUP BY 1""")
             paper_rows = cur.fetchall()
         return _fold_coin_quality(venue_rows, paper_rows)
@@ -780,8 +880,23 @@ def main():
         if time.time() - last_quality >= QUALITY_EVERY_H * 3600:
             q = coin_quality()
             if q:
+                # [27-Aug] `updated` + `ttl_sec` ARE THE BUS CONTRACT, and
+                # omitting them made this payload PERMANENTLY UNCONSUMABLE.
+                # `fleet_bus.is_fresh` reads `payload["updated"]` and
+                # `payload["ttl_sec"]` and returns False on any exception, so a
+                # `{ts, coins}` payload can never be fresh — which is the
+                # structural reason nothing in the fleet had ever read the
+                # fleet's OWN measured execution cost. Measured 27-Aug: this
+                # key held 135 coins with real `spread_bps`/`slip_bps`, while
+                # the books that needed it gated on a 24h-turnover PROXY and a
+                # study reconstructed the same quantity with Roll's estimator
+                # and overstated the good names 5-12x. `ts` is kept beside the
+                # new fields so any existing reader is untouched.
+                _now_iso = datetime.now(timezone.utc).isoformat()
                 store.save_state("coin-quality",
-                                 {"ts": datetime.now(timezone.utc).isoformat(),
+                                 {"ts": _now_iso,
+                                  "updated": _now_iso,
+                                  "ttl_sec": COIN_QUALITY_TTL_SEC,
                                   "coins": q})
                 log.info("coin-quality table refreshed: %d coins", len(q))
             try:

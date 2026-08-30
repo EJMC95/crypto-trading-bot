@@ -218,3 +218,119 @@ class TestTheSmallGCorrection:
         assert abs(s["cluster"]["t_cluster"] - uncorrected) > 0.05, (
             "corrected and uncorrected t are indistinguishable in this "
             "fixture — it cannot pin the factor")
+
+
+class TestTheEstimatorHasExactlyOneOwner:
+    """[2026-08-26] THE OWNER WAS UNREACHABLE WITH ANY OTHER CLUSTER KEY, so
+    two studies re-implemented it — and both had already drifted.
+
+    `cluster_stats` builds its groups INTERNALLY by scanning timestamps against
+    `CLUSTER_WINDOW_S`, i.e. it hard-codes the batched-close cluster
+    DEFINITION. A study clustering by coin, coin-day or entry-day had no way in
+    and wrote the estimator again. Two did, and said so in their own
+    docstrings — this is "A SECOND COPY OF A RULE IS A SECOND RULE" arriving
+    through a real gap in the interface, which is why the fix is an entry point
+    (`cluster_se(values, keys)`) rather than a rule about copying.
+
+    THE DRIFT, measured the day this shipped, on a near-cancelling sample whose
+    honest iid t is 1.94:
+
+        study_mum_supply copy    t_cluster = 2.38e+16
+        study_sniper_exit copy   t_cluster = 2.38e+16
+        golive_readiness owner   t_cluster = None      <- fails CLOSED
+
+    Both copies reproduced the `(kg)` degenerate-t pathology (win 100%,
+    t=6.1e15) the owner's guard exists to kill — a fix made once and left
+    undone in two places. Not a contrived shape for this fleet: the guard fires
+    when a cluster's demeaned values cancel, which is the DESIGN of a
+    delta-neutral basket. ⚖️ Counterweight closes ten hedged legs in one instant.
+    """
+
+    #: near-cancelling: each cluster's demeaned values sum to ~DELTA, so the
+    #: between-cluster variance underflows toward zero while the iid t is
+    #: unremarkable. This is the shape, not a magic number.
+    DELTA = 1e-7
+
+    def _degenerate(self):
+        vals, keys = [], []
+        for gi in range(8):
+            vals += [1.5, -0.5 + self.DELTA]
+            keys += [gi, gi]
+        return vals, keys
+
+    def test_the_degenerate_sample_is_refused_not_reported_as_enormous(self):
+        vals, keys = self._degenerate()
+        n = len(vals); mean = sum(vals) / n
+        sd = math.sqrt(sum((x - mean) ** 2 for x in vals) / (n - 1))
+        iid = mean / (sd / math.sqrt(n))
+        assert 1.5 < iid < 2.5, (
+            f"fixture must look UNREMARKABLE on the honest statistic or it "
+            f"proves nothing: iid t={iid}")
+        se, G, _mx = g.cluster_se(vals, keys)
+        assert se is None, (
+            f"the (kg) degeneracy was reported as a number, not refused: "
+            f"se={se} would give t={mean / se if se else 'n/a'}")
+        assert G == 8, G
+
+    def test_an_ordinary_clustered_sample_still_gets_a_number(self):
+        """The guard must be inert where there is no degeneracy — a refusal
+        that fires on healthy data is worse than none."""
+        vals = [1.2, 1.4, 0.3, 0.5, -0.4, -0.2, 0.9, 1.1]
+        keys = [0, 0, 1, 1, 2, 2, 3, 3]
+        se, G, mx = g.cluster_se(vals, keys)
+        assert se is not None and se > 0, (se, G)
+        assert G == 4 and mx == 2, (G, mx)
+
+    def test_a_single_cluster_is_refused_deliberately_not_by_crashing(self):
+        """The FULL tuple, not just the None.
+
+        A mutation that deletes the `G < 2` branch SURVIVED the first draft of
+        this test: with the branch gone the code divides by `g - 1 == 0`, the
+        blanket `except` swallows it, and `None` comes back anyway. Identical
+        first element, entirely different reason — "refused because a single
+        cluster has no between-cluster variation" vs "crashed and said
+        nothing". The cluster count is what separates them: the deliberate path
+        reports G=1 and the real max cluster size; the exception path reports
+        zeros. (I3: the mutation is what graded this test, not re-reading it.)
+        """
+        assert g.cluster_se([1.0, 2.0, 3.0], [0, 0, 0]) == (None, 1, 3)
+
+    def test_cluster_stats_delegates_rather_than_re_deriving(self):
+        """Pinned by the CALL, by AST. A boolean-equality assertion is
+        satisfied by a re-typed copy — that exact mutation SURVIVED a round in
+        `(tu)`, so the check is that the call site exists, not that two numbers
+        agree."""
+        import ast
+        src = (_ROOT / "scripts" / "golive_readiness.py").read_text()
+        fn = [f for f in ast.walk(ast.parse(src))
+              if isinstance(f, ast.FunctionDef) and f.name == "cluster_stats"][0]
+        calls = [n for n in ast.walk(fn)
+                 if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", "") == "cluster_se"]
+        assert calls, (
+            "cluster_stats no longer calls cluster_se — the batched-close path "
+            "has its own copy of the arithmetic again")
+        # ...and it must not have kept a second copy beside the call.
+        body = ast.unparse(fn)
+        assert "g / (g - 1.0)" not in body and "G / (G - 1" not in body, (
+            "cluster_stats still contains the sandwich arithmetic — a call "
+            "PLUS a copy is still a copy")
+
+    @pytest.mark.parametrize("script,fname", [
+        ("study_mum_supply_2026-08-26.py", "cluster_t"),
+        ("study_sniper_exit_shape_2026-08-20.py", "cluster_t"),
+    ])
+    def test_every_study_copy_delegates_to_the_owner(self, script, fname):
+        """A study may own its CLUSTER KEY; it may not own the ESTIMATOR."""
+        import ast
+        src = (_ROOT / "scripts" / script).read_text()
+        fn = [f for f in ast.walk(ast.parse(src))
+              if isinstance(f, ast.FunctionDef) and f.name == fname]
+        assert fn, f"{script} no longer defines {fname}"
+        body = ast.unparse(fn[0])
+        assert "cluster_se" in body, (
+            f"{script}::{fname} re-implements the estimator instead of "
+            f"delegating to golive_readiness.cluster_se")
+        # the sandwich correction must not ALSO be present locally
+        assert "(G - 1" not in body and "(g - 1" not in body, (
+            f"{script}::{fname} still carries the sandwich arithmetic itself")

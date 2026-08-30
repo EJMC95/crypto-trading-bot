@@ -65,6 +65,62 @@ COIN_COOLDOWN_SEC = float(os.environ.get("PARL_COIN_COOLDOWN_SEC", "3600"))
 SIGNAL_TTL_SEC = float(os.environ.get("PARL_SIGNAL_TTL_SEC", "900"))
 DEFAULT_SLIP_BPS = float(os.environ.get("PARL_DEFAULT_SLIP_BPS", "5"))
 
+# --------------------------- the entry census ---------------------------------
+# [2026-08-27 (vm)] THE PM BOOKS PUBLISHED NO CENSUS. Their whole account of a
+# quiet cycle was `last_skip` — ONE string, the LAST refusal of the LAST symbol
+# — so `pm-albanese` and `pm-turnbull` sat `undecidable` at ~2,500 days to the
+# 30-close bar with nothing in the payload saying whether the signals never
+# arrived, the confirm leg killed them, the ML gate did, or every slot was
+# already full. Those are four different actions and one string could not tell
+# them apart.
+#
+# STAGES ARE IN GATE ORDER and are filled BY the gates themselves (the 🎯
+# sniper's per-source funnel rule): a stage counts the candidates that REACHED
+# it and were turned away there, so the first non-zero refusal after `scanned`
+# names the gate that killed the cycle, and the partition holds:
+#   scanned == no_signal + confirming + <every block> + opened
+CENSUS_STAGES = ("scanned", "no_signal", "confirming", "no_bars",
+                 "venue_stress", "fleet_veto", "slots_full", "held_sym",
+                 "embargoed", "daily_halt", "capped", "blocked_other",
+                 "gated", "ml_gate", "unpriceable", "opened")
+
+#: `_entry_blocked`'s own reason strings -> census stage. The reason strings
+#: stay the record (`last_skip` still publishes them verbatim); the STAGE names
+#: are the fleet's declared refusal vocabulary
+#: (`bot_pnl_store.CENSUS_REFUSALS`) wherever one fits EXACTLY, because only a
+#: declared word can win `census_window`'s `binding_gate` — an undeclared name
+#: is reported under `unclassified` and can never be named as the killing gate.
+#:   stale-data       -> no_bars    (the candle/stat layer has nothing fresh)
+#:   venue-stress     -> venue_stress   [undeclared, see below]
+#:   fleet-long-budget-> fleet_veto
+#:   max-open         -> slots_full
+#:   already-in       -> held_sym
+#:   cooldown         -> embargoed  (the per-coin re-entry embargo)
+#:   notional-cap     -> capped
+#: FOUR STAGES KEEP AN HONEST UNDECLARED NAME — `venue_stress`, `daily_halt`,
+#: `ml_gate` and `blocked_other`. No declared word means those things, and
+#: lumping them into a near-miss (all four into `gated`, say) would make the
+#: binding gate NAME THE WRONG FIX, which is strictly worse than an
+#: unclassified count that abstains. The counts are published either way; what
+#: they cannot do is win `binding_gate`. Closing that is one line in
+#: `bot_pnl_store.CENSUS_REFUSALS` and belongs to whoever owns that file —
+#: DECLARED here rather than worked around, and pinned by
+#: `tests/autonomy/test_mute_row_census.py` so the split stays visible.
+#: A reason string this map has never seen lands in `blocked_other`, visibly,
+#: instead of vanishing or inflating whichever bucket happened to be last.
+#: Census rows a 24h window needs at a PM book's cadence (`run_forever`'s 60s
+#: default => 1,440) plus 50% headroom for restarts. `census_window`'s own
+#: default assumes a 30s loop, so it would fetch twice what these books can use
+#: once a minute, per book, forever. If a faster cadence ever makes it bind,
+#: `census_window` reports `truncated` ((qz)) rather than letting a sampled
+#: window read as an exhaustive one.
+CENSUS_LIMIT = 2200
+
+CENSUS_BLOCK = {"stale-data": "no_bars", "venue-stress": "venue_stress",
+                "fleet-long-budget": "fleet_veto", "max-open": "slots_full",
+                "already-in": "held_sym", "cooldown": "embargoed",
+                "daily-halt": "daily_halt", "notional-cap": "capped"}
+
 # Tunable per-bot parameters and their HARD bounds — the registry the tuners
 # clamp to (fleet_tuning doctrine: a lever can only move inside its bounds,
 # and expiry reverts to baseline).
@@ -152,6 +208,11 @@ def _utc_day() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+def new_census() -> dict:
+    """A zeroed funnel over CENSUS_STAGES, in gate order. Pure."""
+    return {k: 0 for k in CENSUS_STAGES}
+
+
 class PMBot:
     def __init__(self, base_id: str, strategy: str, data, bus, db, ml,
                  howard=None):
@@ -181,6 +242,10 @@ class PMBot:
         self.halted_today = False
         self._restored = False
         self.last_skip = ""                        # observability: why no trade
+        # [(vm)] the per-cycle entry funnel. Bound HERE, not at the top of
+        # cycle(), so a book that never reaches its entry phase publishes an
+        # honest all-zero funnel instead of KeyError-ing inside publish().
+        self.census = new_census()
         self.fund_realized = 0.0                   # funding accrued, book-life
         self._fund_ts = None                       # last accrual timestamp
 
@@ -325,24 +390,36 @@ class PMBot:
         """Strategy-specific (sym, direction, primary_signal) candidates."""
         out = []
         bar = self.params["entry_bar"]
+        # [(vm)] the compound `if` below is SPLIT one stage per line. Same
+        # predicate, same order, same result — the census now counts the gate
+        # itself instead of a lookalike written beside it ((hj)).
+        cen = self.census
         for (topic, sym), sig in list(self.signals.items()):
-            if topic != self.primary_topic or sig["strength"] < bar:
+            if topic != self.primary_topic:
+                continue          # another lens's signal: not this book's scan
+            cen["scanned"] += 1
+            if sig["strength"] < bar:
+                cen["no_signal"] += 1
                 continue
             direction = sig["direction"]
             if direction == 0:
+                cen["no_signal"] += 1
                 continue
             if self.strategy == "trend":
                 burst = self._fresh_signal("signals.momentum_burst", sym)
                 if burst is None or burst["direction"] != direction:
+                    cen["confirming"] += 1
                     continue
             elif self.strategy == "breakout":
                 vol = self._fresh_signal("signals.volume_spike", sym)
                 if sig["strength"] < 0.5 and (
                         vol is None or vol["direction"] != direction):
+                    cen["confirming"] += 1
                     continue
             elif self.strategy == "meanrev":
                 reg = self._fresh_signal("signals.volatility_regime", sym)
                 if reg is not None and reg["meta"].get("regime") == "expanding":
+                    cen["confirming"] += 1
                     continue
             elif self.strategy == "funding":
                 st = self.data.stats(sym) or {}
@@ -353,6 +430,7 @@ class PMBot:
                 # book moving more than 0.1%/day, i.e. essentially all of
                 # them, and starved the Funding Diplomat at birth.
                 if abs(st.get("chg") or 0.0) > 2.0:
+                    cen["confirming"] += 1
                     continue
             out.append((sym, direction, sig))
         return out
@@ -361,6 +439,7 @@ class PMBot:
         why = self._entry_blocked(sym, direction)
         if why:
             self.last_skip = f"{sym}:{why}"
+            self.census[CENSUS_BLOCK.get(why, "blocked_other")] += 1
             return False
         # [2026-07-28 BRAIN ACTS, Parliament lane] the brain's ACTIONABLE
         # regime_gate finding finally has a consumer here — pm-gillard's
@@ -376,6 +455,7 @@ class PMBot:
             try:
                 if fleet_bus.entry_regime_gated(self.bot_id, _gate_tag):
                     self.last_skip = f"{sym}:brain-regime-gate"
+                    self.census["gated"] += 1
                     return False
             except Exception:  # noqa: BLE001
                 pass
@@ -385,6 +465,7 @@ class PMBot:
         if ready:
             if p_win < self.params["ml_gate"]:
                 self.last_skip = f"{sym}:ml-gate({p_win:.2f})"
+                self.census["ml_gate"] += 1
                 return False
             if p_win < 0.55:
                 stake_mult = 0.6            # tepid conviction -> smaller clip
@@ -399,8 +480,16 @@ class PMBot:
         # expand mults in all six PM books on the very day the operator
         # mandated the widening. Cap at the bus's own documented consumer
         # ceiling (1.5 — fleet_bus.MULT_CEIL), floor unchanged.
+        # [2026-08-20 (sn)] BOTH ends come from the bus now. The ceiling was
+        # already read from it; the floor was a hardcoded 0.3, so when the
+        # range went to 6.7x EITHER WAY (Eamon's ask) these books could have
+        # expressed the raise and not the matching cut — an asymmetry that
+        # silently makes the brain's protective side weaker here than
+        # everywhere else. `MAX_NOTIONAL` below still re-checks the REAL
+        # multiplied clip, which is what keeps the wider ceiling safe here.
         _ceil = getattr(fleet_bus, "MULT_CEIL", 1.5) if fleet_bus else 1.5
-        usd = ORDER_USD * max(0.3, min(_ceil, stake_mult))
+        _floor = getattr(fleet_bus, "MULT_FLOOR", 0.3) if fleet_bus else 0.3
+        usd = ORDER_USD * max(_floor, min(_ceil, stake_mult))
         # [2026-07-28 AUDIT FIX] re-check the cap with the REAL clip:
         # _entry_blocked gated on flat ORDER_USD but the brain mult can size
         # this entry up to 1.5x — the exact never-count*current-clip class
@@ -408,9 +497,14 @@ class PMBot:
         # (3 x $37.50 < $150) but armed the day PARL_ORDER_USD/MAX_OPEN move.
         if self._open_notional() + usd > MAX_NOTIONAL:
             self.last_skip = f"{sym}:notional-cap(mult)"
+            self.census["capped"] += 1
             return False
         px = self._fill_px(sym, direction > 0)
         if px is None:
+            # [(vm)] the ONE refusal that never wrote a `last_skip` either —
+            # a candidate that cleared every gate and had no price died
+            # completely silently. `unpriceable` is the fleet's word for it.
+            self.census["unpriceable"] += 1
             return False
         size = usd / px
         self.broker.open(sym, direction > 0, size, px)
@@ -435,6 +529,7 @@ class PMBot:
                 "usd": usd, "p_win": p_win})
         log.info("%s OPEN %s %s @%.6g ($%.0f, p=%.2f)", self.bot_id, tag,
                  sym, px, usd, p_win)
+        self.census["opened"] += 1
         return True
 
     # -- exits ----------------------------------------------------------------
@@ -554,6 +649,15 @@ class PMBot:
         if not self._restored:
             return
         eq = self.broker.equity()
+        # [(vm)] accumulate FIRST, then read the window, so this cycle's
+        # refusals are inside the number the row publishes. Publish-only:
+        # neither call reads a gate and no gate reads either of them.
+        try:
+            store.snapshot_census(self.bot_id, self.census)
+            census_24h = store.census_window(self.bot_id, hours=24,
+                                             limit=CENSUS_LIMIT)
+        except Exception:  # noqa: BLE001
+            census_24h = None
         try:
             store.publish(
                 self.bot_id, status="online", equity=round(eq, 2),
@@ -572,6 +676,17 @@ class PMBot:
                        "held": {s: (self.open_meta.get(s) or {}).get(
                                     "tag", "long")
                                 for s in self.broker.pos},
+                       # [2026-08-27 (vm)] `last_skip` is ONE string — the LAST
+                       # refusal of the LAST symbol — and it was this book's
+                       # entire account of a quiet cycle. It stays (it names
+                       # the SYMBOL, which the census cannot), now beside the
+                       # funnel that says how many died at each gate, and the
+                       # same funnel SUMMED over the trailing day. `None` —
+                       # never a zero-filled dict — when the history is dark
+                       # or empty, because a fabricated zero reads as
+                       # "measured, nothing refused" (I1).
+                       "scan": self.census,
+                       "census_24h": census_24h or None,
                        "last_skip": self.last_skip})
         except Exception:  # noqa: BLE001
             pass
@@ -659,6 +774,11 @@ class PMBot:
             elif sym not in self.open_meta:
                 # position without meta (state drift) — flatten defensively
                 self._close_naked(sym)
+        # [(vm)] ONE cycle's entry funnel — zeroed here, immediately before
+        # the gates that fill it, so the census published below describes THIS
+        # cycle and never accumulates in memory. The trailing-day totals are
+        # `census_window`'s job, off the durable series, not this dict's.
+        self.census = new_census()
         for sym, direction, sig in self._candidates():
             self._try_enter(sym, direction, sig)
         self.publish()

@@ -69,10 +69,89 @@ SOFT_T = -0.7
 EXP_SOFT_POST_WR = 0.55      # 1.25x: shrunk wr above this...
 EXP_SOFT_W_LO = 0.50         # ...with even the pessimistic bound past coin-flip
 EXP_SOFT_T = 2.0             # ...and PnL positive at >= 2 sigma
-EXP_HARD_POST_WR = 0.60      # 1.5x: the ceiling step
+EXP_HARD_POST_WR = 0.60      # 1.5x
 EXP_HARD_W_LO = 0.55
 EXP_HARD_T = 2.5
+# [2026-08-20 (sm)] 2.0x — THE CEILING STEP, and the reason it exists.
+#
+# **Operator: "training wheels need to go off and they need to start growing
+# and learning with the brain that has every loss we've had or win and can let
+# the bots adjust themselves accordingly."** Until now the ladder stopped at
+# 1.5x, so the brain — which holds every close this fleet has ever made — could
+# never express more than "half again" about a book however overwhelming its
+# own evidence. 👩 mum measures +4.658%/trade and the most the brain could ever
+# say about her was 1.5x. That is a training wheel, not a bar.
+#
+# THE BAR IS SET WHERE THIS FLEET'S OWN HISTORY PUTS IT. `t >= 3.5` is not a
+# round number: it sits ABOVE every headline this fleet has re-measured and
+# lost (🧙 Schwager t=1.88 -> "not established"; 📐 Grimes' keltner t=0.49;
+# 🧘 Douglas t=0.50) and at-or-below the two that SURVIVED re-measurement
+# (🧮 Hull t=+3.92 on n=50, 🌾 carry t=3.10 on n=101). A tier that doubles a
+# stake should clear the level where this fleet's claims have historically
+# stopped dissolving, and 2.5 is demonstrably not that level.
+#
+# It is deliberately HARDER than the tier below on every axis — win rate,
+# Wilson lower bound, t AND the decayed-evidence floor — so the ladder is
+# monotone in strictness, which the selftest pins. SHADOW BOOKS ONLY: no live
+# bot reads a brain multiplier, and `fleet_bus.allowed()` clamps every consumer.
+EXP_MAX_POST_WR = 0.65       # 2.0x
+EXP_MAX_W_LO = 0.60
+EXP_MAX_T = 3.5
+
+# [2026-08-20 (sn)] **THE RANGE REACHES 6.7x, BOTH WAYS. Eamon, explicitly:
+# "The brain needs to be able to go to 6.7x specifically either way now."**
+#
+# The rungs above 2.0x and below 0.5x are DATA rather than another six
+# if-blocks, for one reason: the ladder must be checked STRONGEST-BAR FIRST or
+# a tag that clears 6.7x is silently handed 1.25x, and an ordering bug in a
+# hand-written chain is invisible. As a table, "monotone in strictness" and
+# "checked strongest-first" are both one assertion each — and they are pinned.
+#
+# Each tuple is (mult, post_wr bar, wilson bar, t bar, n_eff floor). The
+# expand side reads `>` on post/wilson and `>=` on t; the reduce side reads
+# `<` and `<=`. The two are mirrors: the condemnation side uses the
+# OPTIMISTIC Wilson bound (benefit of the doubt before shrinking someone),
+# the expand side the PESSIMISTIC one (a raise must survive the worst
+# plausible read) — the (bh) asymmetry, unchanged and now extended.
+#
+# WHAT REACHING THE TOP WOULD COST, said out loud rather than discovered
+# later. Only the FAMILY books and the Parliament consume a brain multiplier
+# (🌾 carry, 🎫 the taker and ⚖️ Counterweight do not, and no live bot does).
+# For a family book that is $50 x 5 slots = $250 gross at 1.0x and **$1,675 on
+# a $1,000 book at 6.7x — about 1.7x equity**. The Parliament re-checks its own
+# MAX_NOTIONAL against the real multiplied clip, so it is already guarded.
+# And the go-live drawdown bar interacts directly: %-drawdown scales with the
+# stake, so a book above **15/6.7 = 2.24%** measured maxDD would breach the
+# 15% bar at full size. Neither is a reason not to have the range — they are
+# what the range means, and they belong beside it.
+#
+# IT SHIPS INERT. The top rung needs t >= 8.0 on n_eff >= 80; the best book in
+# this fleet's history is 🧮 Hull at t=+3.92 on n=50, and 🌾 carry at t=3.10.
+# Nothing is close. That is the point of a ceiling: it is where evidence COULD
+# take a book, not a value anybody set.
+EXPAND_LADDER = (
+    #  mult   post   w_lo    t    n_eff
+    (   6.7,  0.75,  0.70,  8.0,  80.0),
+    (   4.5,  0.72,  0.66,  6.0,  60.0),
+    (   3.0,  0.68,  0.63,  4.5,  45.0),
+    (   2.0,  EXP_MAX_POST_WR,  EXP_MAX_W_LO,  EXP_MAX_T,  30.0),
+)
+#: The mirror, below the existing 0.5x rung. Reaching a deep CUT is allowed on
+#: slightly thinner evidence than the matching raise (n_eff 30/45/60 against
+#: 45/60/80): protecting a book earlier is the asymmetry this fleet already
+#: keeps everywhere else, and 1/6.7 is 6.7x "the other way" exactly.
+REDUCE_LADDER = (
+    #      mult   post   w_hi     t    n_eff
+    (1.0 / 6.7,  0.19,  0.34,  -4.0,  60.0),
+    (1.0 / 4.5,  0.22,  0.37,  -3.0,  45.0),
+    (1.0 / 3.0,  0.25,  0.40,  -2.0,  30.0),
+)
 MIN_N_EFF_HARD = 18.0        # decayed evidence floor under the raw n>=30 floor
+# [(sm)] the 2.0x step needs MORE decayed evidence than 1.5x, not the same
+# amount: a book can hold a high `t` on a thin decayed sample, and doubling a
+# stake off forgotten trades is the shape this floor exists to refuse.
+MIN_N_EFF_MAX = 30.0         # the 2.0x rung's floor; the table below owns
+                             # every rung above it
 MIN_N_EFF_SOFT = 9.0         # under the raw n>=15 floor
 KAPPA_MIN, KAPPA_MAX = 5.0, 15.0
 # Family condemnation (soft tier only): when the tag's OWN family is big
@@ -291,6 +370,14 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
     if stats["pnl_w"] >= 0:
         if not expand:
             return None, ev
+        # [(sm)/(sn)] the ceiling steps FIRST — the ladder is walked
+        # strongest-bar down, so a tag that clears 6.7x is never silently
+        # handed 1.25x. Table-driven so that ordering is a property of the
+        # data and not of a hand-written chain.
+        for _m, _pw, _wl, _t, _ne in EXPAND_LADDER:
+            if (n >= min_n and n_eff >= _ne and stats["pnl_w"] > 0
+                    and post > _pw and w_lo > _wl and t >= _t):
+                return _m, ev
         if (n >= min_n and n_eff >= MIN_N_EFF_HARD and stats["pnl_w"] > 0
                 and post > EXP_HARD_POST_WR and w_lo > EXP_HARD_W_LO
                 and t >= EXP_HARD_T):
@@ -300,6 +387,16 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
                 and t >= EXP_SOFT_T):
             return 1.25, ev
         return None, ev
+    # [(sn)] the DEEP cuts first, same strongest-bar-down rule as the expand
+    # side. Above the existing 0.5x block so the ordering is total; the 0.5x
+    # rung and its EMER fast-path below are untouched.
+    for _m, _pw, _wh, _t, _ne in REDUCE_LADDER:
+        if (n >= min_n and n_eff >= _ne
+                and post < _pw and w_hi < _wh and t <= _t):
+            ev["urgent"] = bool(n >= EMER_N and n_eff >= EMER_N_EFF
+                                and post < EMER_POST_WR and w_hi < EMER_W_HI
+                                and t <= EMER_T)
+            return _m, ev
     if (n >= min_n and n_eff >= MIN_N_EFF_HARD
             and post < HARD_POST_WR and w_hi < HARD_W_HI and t <= HARD_T):
         # Emergency fast-path: overwhelming evidence skips the streak gate.
@@ -449,7 +546,16 @@ def _selftest():
     bad = weighted_bucket([mk(-3, d % 10, -0.02) for d in range(34)]
                           + [mk(2, d % 10, 0.01) for d in range(4)], now)
     m, ev = qualify_v3(bad, eb_prior([], [], []))
-    assert m == 0.5, (m, ev)
+    # [2026-08-20 (sn)] WAS 0.5 — this case now reaches the 1/3 rung, and the
+    # change is the instruction working rather than a regression. Its own
+    # evidence is overwhelming (t=-9.16, post_wr 0.157, Wilson UPPER 0.202 on
+    # n_eff 37.3): before the range reached 6.7x either way, the deepest the
+    # brain could cut a bleeder like this was HALF, whatever it knew. It clears
+    # 1/3 (post<0.25, w_hi<0.40, t<=-2.0, n_eff>=30) and stops there because
+    # n_eff 37.3 is short of the 45 and 60 the deeper rungs require — the
+    # evidence floor doing exactly its job.
+    assert m == round(1.0 / 3.0, 10) or abs(m - 1.0 / 3.0) < 1e-9, (m, ev)
+    assert ev["t"] < -4 and ev["n_eff"] < 45, ev
     # ...never emits anything above 0.75 (reduce-only grid), and never
     # fires on a small noisy sample even when the point estimate looks bad.
     noisy = weighted_bucket([mk(-1, 1)] * 7 + [mk(1.5, 1)] * 3, now)
@@ -483,8 +589,11 @@ def _selftest():
                                 for i in range(30)], now)
     assert qualify_v3(mediocre, (0.85, KAPPA_MAX, "tag-family"),
                       expand=True)[0] is None
-    # Reduce side is untouched by the expand switch: the bleeder still 0.5x.
-    assert qualify_v3(bad, eb_prior([], [], []), expand=True)[0] == 0.5
+    # Reduce side is untouched by the EXPAND SWITCH — that is the property
+    # here, not the value: throwing the expand kill switch must not change
+    # what a bleeder gets. [(sn)] the value is now 1/3, and it is the SAME
+    # either way, which is what this line has always been about.
+    assert qualify_v3(bad, eb_prior([], [], []), expand=True)[0] == m
 
     # Family condemnation: weak own dollars (t between FAM_T and HARD_T)
     # fire ONLY when the tag family is big and bad — and never on the
@@ -503,9 +612,20 @@ def _selftest():
     # bleeder from above is NOT (streak gate still applies to it).
     disaster = weighted_bucket([mk(-2.0, 0.2)] * 42 + [mk(1.0, 0.2)] * 4, now)
     m_d, ev_d = qualify_v3(disaster, eb_prior([], [], []))
-    assert m_d == 0.5 and ev_d["urgent"] is True, ev_d
+    # [(sn)] 1/4.5 now, not 0.5 — and the pair below is the property worth
+    # having: `disaster` (t=-13.95, n_eff 46.0) is cut DEEPER than `bad`
+    # (t=-9.16, n_eff 37.3). Before the range reached 6.7x either way both got
+    # exactly HALF, so the brain could see the difference between them and had
+    # no way to say it.
+    assert abs(m_d - 1.0 / 4.5) < 1e-9 and ev_d["urgent"] is True, (m_d, ev_d)
     m_b, ev_b = qualify_v3(bad, eb_prior([], [], []))
-    assert m_b == 0.5 and ev_b["urgent"] is False, ev_b
+    # [(sn)] the ordinary bleeder is 1/3 now, and still NOT urgent — the
+    # streak gate applies to it. The deep rungs inherit the same EMER test as
+    # the 0.5x rung, so "how deep" and "how fast" stay independent.
+    assert abs(m_b - 1.0 / 3.0) < 1e-9 and ev_b["urgent"] is False, ev_b
+    assert m_d < m_b, (
+        "the worse bleeder must be cut deeper — if these collapse to one "
+        "value the ladder has stopped discriminating and the range is decoration")
 
     # Episodes: 3 tight emissions + one after a gap = 2 episodes.
     f = episode_firsts([0, 60, 120, 9000])

@@ -137,6 +137,193 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # are untouched by this change.
 MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (px): 2e6 -> 1e6]
 
+# [2026-08-20 (sk)] THE TURNOVER FLOOR IS A PROXY, AND THE THING IT PROXIES FOR
+# IS NOW MEASURED — so the book stops refusing on an unmeasured quantity.
+#
+# The floor above exists for one stated reason: *"per-book slippage here is
+# unmeasured"* ([[lighter-slippage-is-per-book-not-per-venue]]). That is a
+# defensible place to START and an indefensible place to STAY. Measured
+# 2026-08-20 with `scripts/study_depth_vs_volume.py`, which walks the LIVE book
+# both ways for THIS book's own clip through `venues.shadow.fill_from_book` (the
+# same fill model `_perp_leg_fill` uses — imported, not re-implemented):
+#
+#   20 books cleared the 20% TRUE APR bar. The $1M floor refused SIXTEEN.
+#   Every one of the sixteen filled an $80 clip out of visible depth, and
+#   every one repaid its measured round trip inside the max hold:
+#
+#     UNITREE  1162% apr  $858k vol  34.8bps RT  payback   2.6h   REFUSED
+#     KAITO     131% apr  $226k vol   7.6bps RT  payback   5.0h   REFUSED
+#     ZRO       123% apr  $543k vol  18.0bps RT  payback  12.9h   REFUSED
+#     XMR        55% apr  $934k vol   5.1bps RT  payback   8.2h   REFUSED
+#     EWY        23% apr  $692k vol   2.8bps RT  payback  10.7h   REFUSED
+#     ---- and what the floor ADMITTED, for contrast ----
+#     PUMP       20% apr  $4.8M vol   9.4bps RT  payback  40.7h   admitted
+#
+#   XMR is a THIRD of PUMP's turnover and costs it 5.1bps against PUMP's 9.4;
+#   UNITREE repays 15x faster and is refused. On a clip this size turnover does
+#   not predict cost — the $80 clip fills at the TOP LEVEL on 19 of the 20
+#   (`lvls 1/1`), because the floor is protecting against a size this book has
+#   never traded. **The gate was admitting the slowest-paying carries in the
+#   venue and refusing the fastest.**
+#
+# SO THE FLOOR BECOMES A FAST PATH, NOT A VERDICT. A book at or above it is
+# admitted exactly as before — zero behaviour change on everything that already
+# passes. A book BELOW it gets one question it could never previously be asked:
+# *can this clip actually be filled, and does the carry repay what the fill
+# costs?* Admission requires BOTH, and the payback horizon is the bound.
+#
+# BETTER IN BOTH DIRECTIONS, which is the I19 shape rather than a widening. At
+# the shipped 48h bound the measured venue admits UNITREE/KAITO/ZRO/XMR/EWY and
+# eleven more, and REFUSES FOLKS ($1,198 of turnover, 53.9h) and RAIL ($490,
+# 66.8h) — the two books nobody could trade — where the flat floor refused them
+# for the wrong reason and took fourteen good books with it.
+#
+# FAIL-CLOSED, because this AUTHORISES an entry rather than restricting one (the
+# `lens_wins` precedent, I15): no book, unfillable depth, an unreadable rate, a
+# venue error, or an exhausted probe budget all mean REFUSE. The flat floor is
+# the resting state and `CARRY_DEPTH_ADMIT=0` restores it exactly.
+#
+# THE OBVIOUS OBJECTION, MEASURED AND REFUSED. "A $2,785-a-day book cannot be
+# tradeable" — it is, and STBL is the proof: 24h turnover $2,785, VISIBLE
+# resting depth $202,292, i.e. **2,529x this book's clip**, round trip 7.3bps.
+# Turnover measures how often somebody trades; depth measures whether YOU can.
+# On the whole admitted set (2026-08-20) the median coverage is 2,529x the clip
+# and the MINIMUM is 34x (H100, the widest spread in the venue at 272bps — and
+# priced correctly, because at 3331% APR it still repays in 7.2h). Not one
+# admitted book fails to fill FIVE times the clip out of visible depth. A
+# coverage floor was drafted and then dropped: the measurement says it binds on
+# nothing, and a gate that refuses nothing is a gate that only looks careful.
+#
+# COST IS BOUNDED. The probe is a REST book read, so it runs ONLY for a coin
+# that is already hot, already persistent and already class-admitted but below
+# the floor — the smallest set that can change a decision — under a per-loop
+# budget. Beyond the budget a coin is thin, as before.
+PAYBACK_MAX_H = float(os.environ.get("CARRY_PAYBACK_MAX_H", "48"))
+DEPTH_ADMIT = os.environ.get("CARRY_DEPTH_ADMIT", "1").strip().lower() \
+    not in ("0", "off", "false", "no")
+DEPTH_PROBE_BUDGET = int(os.environ.get("CARRY_DEPTH_PROBE_BUDGET", "24"))
+
+
+def _cost_now(syms=None):
+    """The fleet's OWN RECORDED execution cost for this book's cell, or None.
+
+    [2026-08-28 (vd)] `{n, median_half_bps, worst, worst_bps}` — the median
+    half-spread across the coins this book is holding or could hold, read from
+    `fleet_bus.recorded_cost_bps` (folded from `venue_orders.spread_bps`, the
+    fleet's own fills). REPORTED, NEVER A BAR: no caller gates on this, and
+    that is deliberate — moving the entry rule needs its own measurement and
+    expectancy price (I19), while PUBLISHING the number costs nothing and makes
+    `min_vol` falsifiable for the first time.
+
+    Fail-safe in the one direction that matters: any doubt is `None`, never
+    0.0. A cost that reads as FREE would authorise exactly the books this is
+    meant to warn about.
+    """
+    try:
+        import fleet_bus
+        held = list(syms) if syms else []
+        if not held:
+            try:
+                held = [c for c in (fleet_bus.scout_universe() or [])][:40]
+            except Exception:                               # noqa: BLE001
+                held = []
+        vals = []
+        for c in held:
+            h = fleet_bus.recorded_half_spread_bps(c)
+            if h is not None:
+                vals.append((float(h), c))
+        if not vals:
+            return None
+        vals.sort()
+        mid = vals[len(vals) // 2][0]
+        worst = vals[-1]
+        return {"n": len(vals), "median_half_bps": round(mid, 2),
+                "worst": worst[1], "worst_bps": round(worst[0], 2)}
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
+def rt_cost_bps(book, notional):
+    """Measured adverse cost of getting `notional` IN and OUT, in bps of mid.
+
+    THE ONE OWNER of this arithmetic — `scripts/study_depth_vs_volume.py`
+    imports it rather than keeping a copy, so the study cannot disagree with
+    the gate about what a fill costs (the second-copy-of-a-rule trap).
+
+    Both legs are charged against the SAME mid, which is the reference
+    `_perp_leg_fill` already uses ("the slippage reference is the LIVE-BOOK MID
+    from the same snapshot as the fill"), and price improvement is floored at
+    zero per leg, matching that function's conservative convention.
+
+    -> None when the visible book cannot fill the clip. UNFILLABLE is a
+    VERDICT, never a large number: a book that cannot fill us has no price.
+    """
+    from venues.shadow import fill_from_book
+    bids = (book or {}).get("bids") or []
+    asks = (book or {}).get("asks") or []
+    if not bids or not asks:
+        return None
+    mid = (bids[0][0] + asks[0][0]) / 2.0
+    if mid <= 0 or notional <= 0:
+        return None
+    size = notional / mid
+    buy = fill_from_book(book, True, size)
+    sell = fill_from_book(book, False, size)
+    if not buy or not sell:
+        return None
+    return (max(0.0, buy[0] - mid) + max(0.0, mid - sell[0])) / mid * 1e4
+
+
+def payback_hours(rt_bps, true_apr):
+    """Hours of funding at `true_apr` (a fraction, e.g. 0.20) that repay an
+    `rt_bps` round trip. None when either input cannot answer the question."""
+    if rt_bps is None or true_apr is None:
+        return None
+    apr = abs(float(true_apr))
+    if apr <= 0:
+        return None
+    return (float(rt_bps) / 1e4) / (apr / float(HOURS_PER_YEAR))
+
+
+def depth_admits(ctx, coin, true_apr, notional, budget=None,
+                 payback_max_h=None):
+    """Can this sub-floor coin be filled, and does the carry repay the fill?
+
+    -> (admit: bool, detail: dict). FAIL-CLOSED on every uncertainty: this
+    function's True is an authorisation to open a position.
+    """
+    d = {"coin": coin, "rt_bps": None, "payback_h": None, "why": None}
+    cap = PAYBACK_MAX_H if payback_max_h is None else payback_max_h
+    if not DEPTH_ADMIT:
+        d["why"] = "disabled"
+        return False, d
+    if budget is not None and budget.get("left", 0) <= 0:
+        d["why"] = "probe-budget"
+        return False, d
+    if budget is not None:
+        budget["left"] -= 1
+        budget["used"] = budget.get("used", 0) + 1
+    try:
+        book = ctx.venue.orderbook(coin)
+    except Exception as e:                                       # noqa: BLE001
+        d["why"] = f"book-error:{type(e).__name__}"
+        return False, d
+    bps = rt_cost_bps(book, notional)
+    if bps is None:
+        d["why"] = "unfillable"
+        return False, d
+    d["rt_bps"] = round(bps, 2)
+    ph = payback_hours(bps, true_apr)
+    if ph is None:
+        d["why"] = "no-payback"
+        return False, d
+    d["payback_h"] = round(ph, 2)
+    if ph > cap:
+        d["why"] = "payback-too-slow"
+        return False, d
+    d["why"] = "depth-admitted"
+    return True, d
+
 # Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
 # HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
 # compares against — `_basis()` below rescales them per venue. Hyperliquid's
@@ -342,7 +529,8 @@ def _basis(mode):
 # on their own, so auto-revert is the resting state"). Shipped broken in
 # (fz); it was inert only because nothing authored the lane yet.
 _ENV_DEFAULTS = {"ENTER_APR": ENTER_APR, "MAX_POSITIONS": MAX_POSITIONS,
-                 "MIN_DAY_VOLUME": MIN_DAY_VOLUME}
+                 "MIN_DAY_VOLUME": MIN_DAY_VOLUME,
+                 "PAYBACK_MAX_H": PAYBACK_MAX_H}
 
 
 def apply_tuning():
@@ -358,7 +546,7 @@ def apply_tuning():
     the gate through the same single path main() uses, and the basis
     selftest keeps exercising the real call site.
     """
-    global ENTER_APR, MAX_POSITIONS, MIN_DAY_VOLUME
+    global ENTER_APR, MAX_POSITIONS, MIN_DAY_VOLUME, PAYBACK_MAX_H
     if tuning is None:
         return {}
     moved = {}
@@ -370,7 +558,14 @@ def apply_tuning():
                         # module constant at the call site, or the lever is
                         # registered-but-inert: the exact failure the
                         # `lighter-books` lane was created to prevent.
-                        ("carry.min_vol", "MIN_DAY_VOLUME")):
+                        ("carry.min_vol", "MIN_DAY_VOLUME"),
+                        # [2026-08-20 (sk)] the measured half of the liquidity
+                        # gate. `carry.min_vol` can only ever TIGHTEN toward
+                        # the old floor (cage hi = the old default), so without
+                        # this the rail had no lever that could OPEN the book's
+                        # intake at all — reach in the growth direction, which
+                        # is the half I18 is about.
+                        ("carry.payback_max_h", "PAYBACK_MAX_H")):
         cur = globals()[attr]
         try:
             val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])
@@ -572,7 +767,7 @@ def takeover_step(store, bot_id, now):
 
 
 def scan_census(fund, positions, hot_since, t0, H, enter_apr,
-                min_vol=None, persist_h=None, class_ok=None):
+                min_vol=None, persist_h=None, class_ok=None, depth_ok=None):
     """WHY DID NOTHING OPEN? -> a per-gate count of the loop's own decisions.
 
     [2026-08-02] THE INCIDENT. This book opened nothing for ~50h while holding
@@ -602,13 +797,22 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
     Bucket order mirrors the gate order deliberately, so `thin` means "hot but
     too illiquid" rather than "illiquid", which is the distinction that made
     the incident legible.
+
+    [2026-08-20 (sk)] `depth_ok(coin, f) -> bool` is the measured liquidity
+    escape (see `depth_admits`). It is consulted ONLY for a coin that clears
+    every OTHER gate and fails on turnover alone — the smallest set whose
+    decision it can change, which is also what bounds its REST cost. A coin it
+    admits leaves `thin` for the later gates and is counted in
+    `depth_admitted`, a SUB-COUNT like `waiting_admissible` and never a bucket:
+    the mutually-exclusive partition above is untouched by construction. With
+    no `depth_ok` supplied the census is byte-identical to before it existed.
     """
     min_vol = MIN_DAY_VOLUME if min_vol is None else min_vol
     persist_h = PERSIST_H if persist_h is None else persist_h
     class_ok = _class_ok if class_ok is None else class_ok
     out = {"scanned": len(fund or {}), "held": 0, "thin": 0,
            "cold": 0, "waiting": 0, "noncrypto": 0, "eligible": 0,
-           "waiting_admissible": 0}
+           "waiting_admissible": 0, "depth_admitted": 0}
     nxt = None
     for c, f in (fund or {}).items():
         if c in (positions or {}):
@@ -616,9 +820,20 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
             continue
         if abs(f["rate"] * H) < enter_apr:
             out["cold"] += 1
-        elif f["vol"] < min_vol:
+            continue
+        # [(sk)] turnover is a FAST PATH now, not a verdict. A sub-floor coin
+        # is asked the question the floor was standing in for — but only once
+        # it would otherwise be eligible, so a coin still waiting out its
+        # persistence never costs a book read.
+        thin = f["vol"] < min_vol
+        waiting = (t0 - (hot_since or {}).get(c, t0)) < persist_h * 3600.0
+        if thin and depth_ok is not None and not waiting and class_ok(c):
+            if depth_ok(c, f):
+                thin = False
+                out["depth_admitted"] += 1
+        if thin:
             out["thin"] += 1
-        elif (t0 - (hot_since or {}).get(c, t0)) < persist_h * 3600.0:
+        elif waiting:
             out["waiting"] += 1
             # [18-Aug (qc)] `next` may only promise a coin the class screen
             # will ADMIT once its persistence completes. The screen sits
@@ -1199,6 +1414,10 @@ def main():
                                "accrued": round(pos.get("accrued") or 0.0, 4),
                                "fees": round(pos.get("fees") or 0.0, 4),
                                "notional": pos.get("notional"),
+                               # [(so)] I22 receipts: the two independent
+                               # scales this stake was sized by.
+                               "alloc_scale": pos.get("alloc_scale"),
+                               "brain_mult": pos.get("brain_mult"),
                                "held_h": round(held_h, 2)},
                         venue=venue_tag, shadow=shadow_tag)
                 except Exception:
@@ -1251,14 +1470,98 @@ def main():
             # taking down trading, which is the inverse of why it was added.
             # Degrades to a zeroed census (every key present, so the log line
             # and `extra.scan` stay well-formed) and never to a partial dict.
+            # [(sk)] ONE liquidity decision per coin per loop, shared by the
+            # census and the candidate expression below. Two separate probes
+            # would be two REST reads AND — worse — two chances to disagree
+            # about the same coin, which is exactly the drift the census's own
+            # contract forbids ("a census that can drift from the gate it
+            # explains is worse than no census at all"). The budget lives here
+            # so it is per-LOOP rather than per-call.
+            _alloc = (fleet_bus.allocation_scale(bot_id)
+                      if fleet_bus is not None else None) or 1.0
+            # [2026-08-20 (so)] the brain's scale, ON TOP of the allocation
+            # organ's — two different questions, deliberately composed. The
+            # allocation organ asks "how much of the fleet's capital does this
+            # BOOK deserve?"; the brain asks "how has this book's own
+            # (side, exit) evidence been going?" — and this book is the one
+            # whose sided flips lose (-$17.32) while its decay_paid family
+            # earns (+$71.42), so it is exactly the shape a per-side scale can
+            # act on.
+            # ONE notional for the whole loop, taken over BOTH sides: the
+            # depth probe below prices the clip it is admitting, and the (sk)
+            # census contract forbids the census and the gate pricing
+            # different numbers. A per-side clip would price one and enter the
+            # other. `min` over the sides is the same rule ⚖️ takes for the
+            # same reason — see fleet_bus.brain_mult_multi.
+            # [(sp)] ...and the BOOK-LEVEL GROSS BOUND on the product. This
+            # book is the measured worst case of the whole (so) change:
+            # 300 x alloc 4.0 x brain 6.7 x 12 slots = **$96,480 gross on a
+            # $1,000 paper book**, 96x its own equity. Delta-neutral or not,
+            # its modelled `HEDGE_COST * notional` is calibrated at $300 and is
+            # fiction at $8,040 — the P&L would be optimistic in exactly the
+            # direction that makes a bad book look gradeable. The bound trims
+            # only the brain's INCREASE (fleet_bus.brain_clip_multi), so with a
+            # neutral or reducing brain this line is byte-identical to (so).
+            _base = NOTIONAL * _alloc
+            _notional, _bmult = (
+                fleet_bus.brain_clip_multi(
+                    [(bot_id, "short"), (bot_id, "long")], _base,
+                    deployed_usd=sum(float(p.get("notional") or 0.0)
+                                     for p in positions.values()),
+                    gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                            NOTIONAL),
+                    # ONE clip sizes every entry this loop opens — the depth
+                    # probe has to price the clip it is admitting, so the
+                    # notional is hoisted above the census. Without `slots`
+                    # the bound is evaluated once and applied up to 12 times.
+                    slots=max(1, MAX_POSITIONS - len(positions)))
+                if fleet_bus is not None else (_base, 1.0))
+            _probe = {"left": DEPTH_PROBE_BUDGET, "used": 0}
+            _depth_memo = {}
+            _depth_recs = []
+
+            def _depth_ok(c, f, _memo=_depth_memo, _b=_probe, _n=_notional):
+                if c not in _memo:
+                    try:
+                        ok, det = depth_admits(ctx, c, abs(f["rate"] * _H), _n,
+                                               budget=_b)
+                    except Exception:  # noqa: BLE001
+                        ok, det = False, {"why": "probe-error"}
+                    _memo[c] = ok
+                    # [(sk)] RECEIPTS, the (eu) §B pattern — recorded for
+                    # ADMITTED **and** REFUSED coins, because a gate profiled
+                    # only on what it let through cannot say where its bound
+                    # should sit. Without these the new lever is a cage nobody
+                    # can ever measure, which is the failure
+                    # `audit_lever_authority` exists to name.
+                    if det.get("payback_h") is not None:
+                        _depth_recs.append(det)
+                    if ok:
+                        print(f"[{now_iso()}] DEPTH-ADMIT {c} "
+                              f"vol ${f.get('vol', 0):,.0f} < floor "
+                              f"${MIN_DAY_VOLUME:,.0f} | rt {det.get('rt_bps')}"
+                              f"bps | payback {det.get('payback_h')}h "
+                              f"<= {PAYBACK_MAX_H:.0f}h", flush=True)
+                return _memo[c]
+
             try:
                 _cens = scan_census(fund, positions, hot_since, t0,
-                                    _H, _enter_apr)
+                                    _H, _enter_apr, depth_ok=_depth_ok)
             except Exception:  # noqa: BLE001
                 _cens = {"scanned": len(fund or {}), "held": 0, "thin": 0,
                          "cold": 0, "waiting": 0, "noncrypto": 0,
                          "eligible": 0, "waiting_admissible": 0,
-                         "error": "census failed"}
+                         "depth_admitted": 0, "error": "census failed"}
+            _cens["depth_probes"] = _probe["used"]
+            # FORWARD MOTION rule 1: confirm the change in the live payload.
+            # The three cheapest probes of the loop, admitted or not — enough
+            # to read the gate's bite without turning the row into a log.
+            if _depth_recs:
+                _cens["depth_seen"] = [
+                    {"c": r["coin"], "bps": r["rt_bps"],
+                     "pay_h": r["payback_h"], "why": r["why"]}
+                    for r in sorted(_depth_recs,
+                                    key=lambda r: r["payback_h"])[:3]]
 
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
@@ -1268,15 +1571,21 @@ def main():
                 # arm is shadow-only by construction (the HL arm exits at
                 # boot; VENUE=lighter_shadow is the only mode that runs this
                 # loop), so no real money can reach it. Dark bus -> 1.0.
-                _alloc = (fleet_bus.allocation_scale(bot_id)
-                          if fleet_bus is not None else None) or 1.0
-                _notional = NOTIONAL * _alloc
+                # `_alloc` / `_notional` are hoisted above the census — the
+                # depth probe needs the clip it is pricing, and the clip must
+                # be the one this loop would actually send.
                 candidates = sorted(
                     ((c, f) for c, f in fund.items()
-                     if c not in positions and f["vol"] >= MIN_DAY_VOLUME
+                     if c not in positions
                      and abs(f["rate"] * _H) >= _enter_apr
                      and (t0 - hot_since.get(c, t0)) >= PERSIST_H * 3600.0
-                     and _class_ok(c)),      # [(lk)] crypto perps only
+                     and _class_ok(c)                # [(lk)] crypto perps only
+                     # [(sk)] turnover OR measured depth. Ordered last and
+                     # memoised, so the book read happens only for a coin that
+                     # has already cleared every other gate. Reads the SAME
+                     # `_depth_ok` the census used, so the row's `scan` can
+                     # never describe a different decision than the one taken.
+                     and (f["vol"] >= MIN_DAY_VOLUME or _depth_ok(c, f))),
                     key=lambda cf: -abs(cf[1]["rate"]))
                 for coin, f in candidates[:MAX_POSITIONS - len(positions)]:
                     apr = f["rate"] * _H
@@ -1293,6 +1602,14 @@ def main():
                         "accrued": 0.0,
                         "fees": perp_open_cost + HEDGE_COST * _notional,
                         "entry_apr": apr,
+                        # [(so)] I22 receipt — the two scales that produced
+                        # this notional, recorded SEPARATELY. Multiplied
+                        # together they are unattributable, and this book
+                        # already carries the allocation organ's scale, so a
+                        # single blended number would make the next reader
+                        # guess which organ moved.
+                        "alloc_scale": round(_alloc, 4),
+                        "brain_mult": round(_bmult, 4),
                     }
                     print(f"[{now_iso()}] OPEN {coin} {side} ${_notional:.0f} "
                           f"| funding {apr:+.1%} APR "
@@ -1311,6 +1628,20 @@ def main():
                     open_trades=len(positions),
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": "dry-run", "open_pnl": round(open_pnl, 2),
+                           # [2026-08-27 (vk)] ONE FIELD, ONE MEANING — or
+                           # else SAY which meaning. This row's `pnl_abs` is
+                           # REALISED-ONLY while its `equity` includes
+                           # `open_pnl` too, so `equity - START - pnl_abs`
+                           # reads +$16.63 here and EXACTLY 0.0000 on all 19
+                           # other shadow rows. That is deliberate for a
+                           # funding book (accrual is not realised until the
+                           # leg closes) and it was UNDECLARED, so a consumer
+                           # summing `pnl_abs` fleet-wide silently understated
+                           # the fleet by that amount with nothing to detect
+                           # it by. The reconciling term was already published
+                           # beside it; only the DECLARATION was missing.
+                           # ((gl): publish the band, not just the floor.)
+                           "pnl_basis": "realised",
                            # [2026-07-30] the EFFECTIVE cap this loop is
                            # running, so the board can SEE saturation
                            # instead of inferring it from occupancy alone —
@@ -1356,7 +1687,41 @@ def main():
                                     # collisions undetectable, and this one
                                     # now DIFFERS from 🏦 Rich Dad's 6h on
                                     # the shared cell
-                                    "persist_h": PERSIST_H},
+                                    "persist_h": PERSIST_H,
+                                    # [(sk)] the liquidity gate is TWO numbers
+                                    # now — the turnover fast path above and
+                                    # the measured-payback escape. Both are
+                                    # published, because a reader who sees
+                                    # only `min_vol` would mis-derive which
+                                    # coins this book can take (the (lz)/(pf)
+                                    # unpublished-gate class).
+                                    "payback_max_h": (PAYBACK_MAX_H
+                                                      if DEPTH_ADMIT else None),
+                                    "depth_admit": DEPTH_ADMIT,
+                                    # [2026-08-28 (vd)] THE MEASURED COST,
+                                    # BESIDE THE PROXY THAT STANDS IN FOR IT.
+                                    # `(px)` shipped `min_vol` declaring
+                                    # "per-book slippage here is unmeasured" —
+                                    # and it was being measured the whole time:
+                                    # `venues/shadow` has written `spread_bps`
+                                    # to `venue_orders` since 9-Jul (3,230
+                                    # rows), folded onto `coin-quality` (135
+                                    # coins), and NOTHING could read it because
+                                    # the payload shipped without
+                                    # `updated`/`ttl_sec` and so failed
+                                    # `is_fresh` forever ((ut)).
+                                    #
+                                    # This is the FIRST CONSUMER of that read,
+                                    # and it is REPORTED, NEVER A BAR (I15):
+                                    # it changes no entry, no exit and no
+                                    # sizing. Publishing it is what makes the
+                                    # proxy falsifiable — a reader can now see
+                                    # whether the turnover floor is screening
+                                    # for the cost it claims to.
+                                    # `None` on any doubt, NEVER 0.0: an
+                                    # unmeasured cost that reads as free is
+                                    # the same defect pointed the other way.
+                                    "cost_bps": _cost_now()},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation
@@ -1416,7 +1781,19 @@ def main():
                 # book to a fresh PERSIST_H wait on every boot.
                 store.save_state(bot_id, {"positions": positions, "hot_since": hot_since,
                                            "last_ts": last_ts,
-                                           "saved_ts": time.time()})
+                                           "saved_ts": time.time(),
+                                           # [(sk)] the `state:` source
+                                           # `audit_lever_authority` profiles
+                                           # `carry.payback_max_h` against
+                                           "depth_scan": {
+                                               "payback_h": [
+                                                   r["payback_h"]
+                                                   for r in _depth_recs],
+                                               "rt_bps": [
+                                                   r["rt_bps"]
+                                                   for r in _depth_recs
+                                                   if r.get("rt_bps")
+                                                   is not None]}})
             except Exception:
                 pass
 

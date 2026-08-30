@@ -36,6 +36,39 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+#: Directories the citation scan must never descend into.
+#: [2026-08-27 (um)] `.claude/worktrees` is where `new_session_worktree.sh` puts
+#: every concurrent session's private branch, and that script ASSERTS the path
+#: is git-ignored. So this walk was reading files git itself excludes from the
+#: current branch — code on OTHER branches, mid-write, citing letters those
+#: branches have and this one does not.
+#: THE COST: any session could be turned RED by another session's uncommitted
+#: work, on a failure it had no way to fix because the file was not its own.
+#: Measured the day this shipped: 4 sibling worktrees, 3 dangling hits from
+#: a branch whose own CHANGELOG carries the entry they cite. That is exactly the
+#: cry-wolf trap this repo has already paid for ((gl): "a guard whose only
+#: output is a warning on a passing run is not a guard"; (mz): a guard that
+#: reddens on a pre-existing backlog gets exempted within a day and then guards
+#: nothing). Scoped to the worktree root ONLY, not all of `.claude` — hooks and
+#: settings there are this branch's own files and must still be scanned.
+SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__"}
+SKIP_RELPATHS = {os.path.join(".claude", "worktrees")}
+
+
+def walk_py(root):
+    """Every .py in `root` that belongs to THIS branch's tree."""
+    for _root, _dirs, _files in os.walk(root):
+        _dirs[:] = [d for d in _dirs if d not in SKIP_DIRS]
+        rel = os.path.relpath(_root, root)
+        if any(rel == s or rel.startswith(s + os.sep) for s in SKIP_RELPATHS):
+            _dirs[:] = []
+            continue
+        for f in _files:
+            if f.endswith(".py"):
+                yield os.path.join(_root, f)
+
+
 CHANGELOG = os.path.join(ROOT, "CHANGELOG.md")
 
 # Measured 2026-07-29: >=07-18 isolates the current sequence from the 17-Jul
@@ -317,6 +350,35 @@ def same_entry(a, b):
         None, str(a or ""), str(b or "")).ratio() >= SAME_ENTRY_RATIO
 
 
+#: [2026-08-26] An entry that declares its own RENUMBER, naming BOTH letters.
+#: The convention's rule 4 already requires the move to be recorded inline in
+#: the moved entry — this is that record, made machine-readable so a guard can
+#: tell a declared move from a silent sweep. Accepts `->`, an arrow, or the
+#: word "to", because three past entries used three of those spellings.
+RENUMBERED = re.compile(
+    r"RENUMBER(?:ED)?\s*\(?([a-z]{1,3})\)?\s*(?:->|→|to)\s*\(?([a-z]{1,3})\)?",
+    re.I)
+
+
+def renumbered_pairs(text):
+    """-> {(from_letter, to_letter)} declared in `text`.
+
+    [2026-08-26] WHY THIS IS NOT AN EXACT-TITLE MATCH, which is the obvious
+    implementation and is UNSAFE. A renumber moves a header from one letter to
+    another with the TITLE UNCHANGED — and so does the `(nx)` incident, where a
+    `perl -pi -e 's/(nv)/(nx)/g'` rewrote ANOTHER session's `(nv)` entry to
+    `(nx)` and destroyed 90 lines. Both look identical to a title comparison.
+
+    The one thing that separates them is that a legitimate renumber is
+    DECLARED, in the moved entry, by a human decision about which entry is
+    cited; the sweep is silent by construction. So the declaration is the
+    discriminator, exactly as `CORRECTED` is for an in-place correction — and
+    like that one it is required TOGETHER with a structural match, never alone.
+    """
+    return {(m.group(1).lower(), m.group(2).lower())
+            for m in RENUMBERED.finditer(str(text or ""))}
+
+
 def corrected_letters(text):
     """-> {letter} whose OWN entry body declares an in-place correction.
 
@@ -485,11 +547,7 @@ def main():
     # code and never reached this file. Known letters come from the WHOLE
     # changelog, not the >=ERA_START window: citing an older entry is normal.
     _known = {l for _, l, _ in HEADER.findall(_raw)}
-    _py = []
-    for _root, _dirs, _files in os.walk(ROOT):
-        _dirs[:] = [d for d in _dirs
-                    if d not in {".git", ".venv", "node_modules", "__pycache__"}]
-        _py += [os.path.join(_root, f) for f in _files if f.endswith(".py")]
+    _py = [p for p in walk_py(ROOT)]
     dangling = dangling_code_citations(sorted(_py), _known)
     if dangling:
         print("\nCHANGELOG CITATION IN CODE RESOLVES TO NO ENTRY — a reader "
@@ -690,9 +748,60 @@ def _selftest():
     _n = next_free(claimed_letters(_real_txt))
     assert _n not in claimed_letters(_real_txt), _n
 
+    # ---- [(um)] THE WALK MUST NOT READ OTHER SESSIONS' WORKTREES ----------
+    # CONSTRUCTED, not observed. The first version of this check ran against
+    # the live tree and passed with the skip REMOVED — because the sibling
+    # worktree's dangling citation had transiently cleared, so "green" said
+    # nothing about the fix. (po): empty output is not a negative result until
+    # the check has been seen to produce a positive one. So build the
+    # condition: a repo-shaped tmp dir with one ordinary file and one file
+    # inside `.claude/worktrees`, and assert the walk sees exactly the first.
+    import shutil
+    import tempfile
+    _tmp = tempfile.mkdtemp(prefix="acl_walk_")
+    try:
+        os.makedirs(os.path.join(_tmp, "scripts"))
+        _wt = os.path.join(_tmp, ".claude", "worktrees", "other-session",
+                           "scripts")
+        os.makedirs(_wt)
+        _mine = os.path.join(_tmp, "scripts", "mine.py")
+        _theirs = os.path.join(_wt, "theirs.py")
+        # a hook living directly under `.claude` — THIS branch's own file, and
+        # the reason the skip is scoped to the worktree root rather than to
+        # `.claude` wholesale. Without this case a too-broad skip passes.
+        os.makedirs(os.path.join(_tmp, ".claude", "hooks"))
+        _hook = os.path.join(_tmp, ".claude", "hooks", "hook.py")
+        for _p in (_mine, _theirs, _hook):
+            with open(_p, "w", encoding="utf-8") as _fh:
+                # ASSEMBLED, never written literally: a whole-file scan
+                # matches the guard's own source, so a literal fixture makes
+                # this file flag ITSELF — the (po) trap, inside the guard
+                # written to avoid it. Caught by running the guard after the
+                # test passed.
+                _fh.write("# [2026-08-27 " + "(zz)" + "] a citation\n")
+        _seen = sorted(walk_py(_tmp))
+        assert _seen == sorted([_mine, _hook]), _seen
+        # POSITIVE CONTROL: without the skip the walk MUST find the worktree
+        # file — otherwise this test would pass on a walk that finds nothing.
+        _saved = set(SKIP_RELPATHS)
+        SKIP_RELPATHS.clear()
+        try:
+            _both = sorted(walk_py(_tmp))
+            assert _both == sorted([_mine, _hook, _theirs]), _both
+        finally:
+            SKIP_RELPATHS.update(_saved)
+        # and the dangling-citation arm genuinely fires on that file, so the
+        # skip is suppressing a REAL finding rather than a hypothetical one
+        assert dangling_code_citations([_theirs], {"f" + "a"}), \
+            "the citation arm must flag the worktree file when it is scanned"
+        assert not dangling_code_citations([_mine], {"zz"}), \
+            "a known letter must not be reported as dangling"
+    finally:
+        shutil.rmtree(_tmp, ignore_errors=True)
+
     print(f"audit_changelog_letters selftest OK (fires on a duplicate; ignores "
-          f"the pre-{ERA_START} restart era and letterless headers; sees "
-          f"{len(real)} real entries)")
+          f"the pre-{ERA_START} restart era and letterless headers; skips "
+          f"sibling worktrees; sees {len(real)} real entries)")
     return 0
 
 

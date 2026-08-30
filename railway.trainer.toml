@@ -6,5 +6,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.trainer"
 
 [deploy]
+startCommand = "sh /app/trainer_entry.sh"
 # Long-running scheduler loop; restart on any exit so the learning loop stays up.
 restartPolicyType = "always"

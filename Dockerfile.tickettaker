@@ -37,8 +37,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 #   venues/       : LighterClient (signer, market_open/close, positions),
 #                   SafetyRails (kill switch, notional cap, equity guard),
 #                   ShadowBroker, symbol_map (the fleet<->native round trip)
+#   fleet_bus     : the brain's stake-multiplier accessor (2026-08-20 (so)) —
+#                   `brain_clip` sizes each entry by the brain's per-(side,
+#                   lens) evidence. UNGUARDED like the rest, so this COPY is
+#                   load-bearing on both arms.
 COPY lighter_ticket_taker.py bot_pnl_store.py paper_broker.py fleet_tuning.py \
-     funding_basis.py ./
+     funding_basis.py fleet_bus.py ./
 COPY venues/ ./venues/
 COPY tickettaker_loop.sh ./tickettaker_loop.sh
 RUN chmod +x /app/tickettaker_loop.sh

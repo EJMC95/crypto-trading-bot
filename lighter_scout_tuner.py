@@ -151,7 +151,19 @@ SWEEP_TP = [0.03, 0.04, 0.05, 0.06]
 # (lighter_ticket_taker.py:171), and simply never proposes a different one.
 # Restore the grid with TUNER_SWEEP_SL only if a tail-bearing tape exists.
 SWEEP_SL = [float(os.environ.get("TUNER_SWEEP_SL", "-0.03"))]
-SWEEP_HOLD = [24.0, 48.0, 72.0]
+# [2026-08-20 (sk)] THE 24h RUNG IS GONE, and its removal is the durable half
+# of the breakoutup ratchet fix rather than a bounds tidy-up. This sweep's
+# replay CANNOT FILL breakoutup (`lighter_ticket_replay.py:206` refuses every
+# breakout entry), so on that lens a candidate's delta is exactly $0.00 —
+# restrict passes `not_worse` for free while expand can never clear
+# MARGIN_HALF. A rung BELOW the module default therefore had a one-way path
+# into the live lever, and it took it: measured on the bus 20-Aug,
+# `taker.max_hold_h` sat at 24.0, set by this tuner from an event-sentinel
+# proposal, on the book's ONLY living lens. The registry cage now stops at the
+# default (lo 48.0) so the rung could not enact anyway; deleting it here means
+# the sweep stops SPENDING a replay slot on a candidate the cage will refuse,
+# and stops advertising a value this file may not have.
+SWEEP_HOLD = [48.0, 72.0]
 
 # [2026-07-21 ORGAN PROPOSALS] levers this tuner will consider when another
 # organ proposes them (fleet_proposals), with each attr's TIGHTER direction —
@@ -186,14 +198,60 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+#: [2026-08-20] The per-cycle up-regime resolver, set once in `run_once` and
+#: read by EVERY comparison below through `replay_with` — the single choke
+#: point, so no walk can be graded on different coverage from its own baseline.
+#:
+#: WHY IT EXISTS: `lighter_ticket_replay` forced the breakout lens inert (it
+#: could not reproduce `up_read`'s candle-EMA regime), so the taker's
+#: `breakoutup` lens — **14 of 36 closes in the 7 days to 20-Aug, and the
+#: book's largest earner** — could not appear in ANY replay. This organ then
+#: published `baseline_net: -19.97` for a book whose row read **+$30.11**, and
+#: every lever candidate here was scored against that losing 61% subset. With
+#: the resolver the same tape reads -$12.31 realised and +$29.26 open: a
+#: **$34.90** correction to the number this file compares everything against.
+#:
+#: FAIL-SAFE: a resolver that cannot be built stays None, which is exactly the
+#: old behaviour — never a crash, never a walk graded on half a book without
+#: saying so (the cycle payload carries `coverage`). Kill switch:
+#: SCOUT_TUNER_UP_RESOLVER=0.
+_UP_RESOLVER = None
+
+UP_RESOLVER_ON = os.environ.get(
+    "SCOUT_TUNER_UP_RESOLVER", "1").strip().lower() not in ("0", "off", "false", "no")
+
+
+def build_up_resolver(tape):
+    """Per-cycle resolver over every symbol the tape ever ticketed. Returns
+    None on any trouble — the caller must treat that as reduced coverage, not
+    as an error."""
+    if not (UP_RESOLVER_ON and tape):
+        return None
+    try:
+        syms = sorted({t.get("sym") for _, p in tape
+                       for arr in (p.get("tickets") or {}).values()
+                       for t in (arr or []) if t.get("sym")})
+        if not syms:
+            return None
+        return rp.daily_up_resolver(syms, tape[0][0].timestamp(),
+                                    tape[-1][0].timestamp())
+    except Exception as exc:      # noqa: BLE001 — coverage is best-effort
+        print(f"[scout-tuner] up-resolver unavailable: {type(exc).__name__}: {exc}")
+        return None
+
+
 def replay_with(tape, bars):
     """Replay the tape with tt module bars temporarily patched. Pure w.r.t.
-    module state: always restores, even on error."""
+    module state: always restores, even on error.
+
+    Uses the cycle's `_UP_RESOLVER` so a candidate and its baseline are always
+    scored over the SAME lens coverage — comparing a full-coverage candidate
+    against a blind baseline would be worse than being blind twice."""
     saved = {k: getattr(tt, k) for k in bars}
     try:
         for k, v in bars.items():
             setattr(tt, k, v)
-        return rp.replay(tape)
+        return rp.replay(tape, up_resolver=_UP_RESOLVER)
     finally:
         for k, v in saved.items():
             setattr(tt, k, v)
@@ -695,7 +753,13 @@ def send_push(title, body):
 
 
 def run_once():
+    global _UP_RESOLVER
     tape, used = rp.load_tape(source="auto")
+    _UP_RESOLVER = build_up_resolver(tape)
+    if _UP_RESOLVER is None and UP_RESOLVER_ON:
+        print("[scout-tuner] REDUCED COVERAGE — breakout/breakoutup cannot "
+              "appear in this cycle's replays; walks are scored on the "
+              "divergence subset only.")
     if len(tape) < MIN_SNAPS:
         print(f"[scout-tuner] {now_iso()} tape too short "
               f"({len(tape)}/{MIN_SNAPS} snapshots, {used}) — skipping")
@@ -819,6 +883,10 @@ def run_once():
         "tape": {"snapshots": baseline["snapshots"], "span": baseline["span"],
                  "source": used},
         "baseline_net": baseline["closed_net"],
+        # I18: say which BOOK this baseline covers. `baseline_net` was quoted
+        # for a year as if it described the taker; without the resolver it
+        # describes the taker minus its biggest lens.
+        "coverage": (baseline.get("coverage") or {}),
         "baseline_lenses": {l: {k: s.get(k) for k in ("seen", "taken", "closed", "net")}
                             for l, s in (baseline.get("lenses") or {}).items()},
         "enacted": now_set, "log": (log4 + log5 + log1 + log2 + log3)[:20],
@@ -1371,6 +1439,35 @@ def _selftest():
     assert "taker.sl" not in _mapped and len(_mapped) == 2, _mapped
     for v in TOP_N_LADDER[2]:
         assert tuning.clamp(TOP_N_LADDER[0], v) == v
+
+    # ---------------------------------------------------------------- (2026-08-20)
+    # EVERY comparison in this file runs through `replay_with`, so the cycle's
+    # up-regime resolver MUST reach it. Unpinned, dropping the kwarg silently
+    # reverts the organ to grading the taker's divergence-only subset — the
+    # exact defect this wiring exists to fix, and one that leaves no trace in
+    # any output except a baseline that looks plausible and is wrong.
+    global _UP_RESOLVER
+    _seen = {}
+    _saved_replay, _saved_res = rp.replay, _UP_RESOLVER
+    try:
+        def _spy(tape, **kw):
+            _seen.update(kw)
+            return {"lenses": {}, "closed_net": 0.0, "open": [], "unrealized": 0.0,
+                    "snapshots": 0, "span": None, "stress_vetoed_cycles": 0,
+                    "bars": {}, "coverage": {}}
+        rp.replay = _spy
+        _UP_RESOLVER = "SENTINEL"
+        replay_with([], {"TAKE_PROFIT": tt.TAKE_PROFIT})
+        assert _seen.get("up_resolver") == "SENTINEL", (
+            "replay_with must forward the cycle's up_resolver; got %r" % (_seen,))
+        _seen.clear()
+        _UP_RESOLVER = None
+        replay_with([], {"TAKE_PROFIT": tt.TAKE_PROFIT})
+        assert "up_resolver" in _seen and _seen["up_resolver"] is None, (
+            "a None resolver must still be passed EXPLICITLY, so the reduced "
+            "coverage is recorded rather than defaulted into")
+    finally:
+        rp.replay, _UP_RESOLVER = _saved_replay, _saved_res
 
     print("scout_tuner selftest OK (ladders, veto, win-widen, lose-reject, "
           "floor-release, anti-overfit sweep gate, proprioception "

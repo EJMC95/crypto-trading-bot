@@ -121,7 +121,53 @@ START_EQUITY = 1000.0
 # the 30-name configured list, so no scout book is added: the cage-safe
 # equivalent of the 0 switch ([20,90] cannot hold 0 and audit_lever_bounds
 # requires the default inside the cage).
-UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "30"))
+#
+# [2026-08-27 WIDENED 30 -> 40 — THE FIRST VALUE THAT DOES ANYTHING.] At 30
+# this knob was STRUCTURALLY INERT and the file said so above: the configured
+# core is 30 names, so `len(out) >= width` on the top-up's first pass and the
+# scout adds ZERO. The live row is the receipt — `caps.universe_n: 30` beside
+# `caps.universe: 25` (prune_dead drops 5 names the venue no longer lists).
+# 31 is the first width that admits a single scout book; 40 is the first that
+# admits a MEANINGFUL cross-section, and the supply exhausts at 36, so this is
+# a ONE-STEP move with no headroom behind it.
+#
+# WHY THIS IS NOT THE (jg) REVERT AGAIN. (jg) reverted 60 -> 30 because the
+# wide set pulled in NON-CRYPTO books whose funding dispersion is ~9x crypto's
+# — its evidence window (31-Jul -> 5-Aug) IS the non-crypto window, and that
+# confound is now CLOSED IN CODE: `resolve_universe` runs
+# `fleet_bus.crypto_only()` on the top-up since (ki), so the population (jg)
+# measured is structurally unreachable from here. What (jg) reverted alongside
+# it — K 8 -> 5 — is the term that moved gross exposure, and K is UNTOUCHED.
+#
+# MEASURED (the widening's own numbers, per I19):
+#   * adds 10 CRYPTO names — FARTCOIN, GRAM, HBAR, LIT, PUMP, TAO, TRUMP, UNI,
+#     ZEC, ZRO — taking the tradeable universe 25 -> 35;
+#   * ZERO expectancy cost BY CONSTRUCTION: gross is `2 * K * clip`, and K,
+#     clip, leg count (10) cadence (24h) and hold are all unchanged. This
+#     changes only WHICH names fill the same ten slots — the (hl) rule that a
+#     per-trade % is invariant to what the selector RANKS, not what it holds;
+#   * carry received over the same 10 legs 75.3%/yr -> 171.4%/yr (2.28x);
+#   * per-basket price sd 0.11642 -> 0.16827 (+45%); carry/noise 0.01773 ->
+#     0.02791 (+57%); days-to-|t|=2 12,730 rebalances (~35 years) -> 5,137
+#     (~14 years).
+#
+# THE HONEST LIMIT, stated rather than buried: ~14 years is STILL NOT
+# DECIDABLE. This makes the book earn more per unit of the noise it already
+# carries; it does NOT make it gradeable, and nothing here should be read as
+# moving ⚖️ toward the gate.
+#
+# K STAYS 5 — measured as the optimum AT the widened universe, so this is a
+# refusal with evidence rather than an omission (carry/noise: K=3 0.02463,
+# K=5 0.02791, K=8 0.02680, K=12 0.02012). Do NOT walk `fundspread.k`.
+#
+# I18 NOTE, the next gate behind this one: `UNIVERSE_MIN_VOL_M` below is a
+# BARE LITERAL — unregistered, unreachable by the rail. If the top-up ever
+# needs to reach deeper than 40 names, that floor is what binds next.
+#
+# NOTE FOR THE REGISTRY: `fleet_tuning.LEVERS["fundspread.universe_n"]`
+# carries `env_default` and `audit_lever_bounds`'s drift arm FAILS when it
+# disagrees with the literal below. It must read 40.
+UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "40"))
 # Minimum 24h $M turnover for a scout-added book. Kept well above dust: this
 # book always holds BOTH sides, so an illiquid leg it cannot exit is a real
 # cost, unlike the Farmer's single-sided carry.
@@ -154,6 +200,11 @@ ORDER_USD = float(os.environ.get("FUNDSPREAD_ORDER_USD", "20"))
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDSPREAD_DAILY_LOSS", "0.05"))
 LOOP_SECONDS = int(os.environ.get("FUNDSPREAD_LOOP_SECONDS", "300"))
 SAMPLE_SECONDS = 3300           # ~hourly funding samples (one per venue period)
+# [(vm)] census rows a 24h window needs at THIS book's cadence + 50% headroom.
+# `census_window`'s default assumes a 30s loop (~2,880 rows); this book runs at
+# 300s, so the default would fetch ~10x what it can use every loop. DERIVED, so
+# a cadence change carries the window; `truncated` reports it if it ever binds.
+CENSUS_LIMIT = max(200, int(1.5 * 24 * 3600 / max(1.0, LOOP_SECONDS)))
 MIN_COVERAGE = LOOKBACK_H // 2  # doctrine: rank only with >=half-window history
 # [2026-07-17 BASIS FIX] Lighter quotes an 8h rate — was annualised as hourly
 # (8x). Logging-only here, but a log that lies is how the fleet believed the
@@ -377,6 +428,157 @@ def resolve_universe(configured, width, min_vol_m, current_time=None):
     return out
 
 
+def crypto_only_now():
+    """This book's DECLARED class screen, derived from its two entry paths.
+
+    [2026-08-17] ⚖️ Counterweight was the last book still printing `class
+    screen UNPUBLISHED`, and it is the one where the declaration is worth the
+    most: era-scoped, its 21 off-class legs carry **−$36.48** while its 70
+    on-class legs read **+$5.32** — a book on the decision docket as
+    `unreachable` since 6-Aug whose still-tradeable population is POSITIVE.
+
+    IT WAS MISSED TWICE FOR THE SAME STRUCTURAL REASON. `(pf)` declared the
+    retrofitted carry books and `(pj)` finished "the last three" — but both
+    worked from `audit_book_overlap.living_gates`, which only sees books that
+    publish an `enter_apr`. A cross-sectional book has no entry apr, so it was
+    never in the list of the unpublished and could not be. A detector's roster
+    is part of the detector.
+
+    **DERIVED, NOT ASSERTED, AND HONEST ABOUT BEING PARTIAL.** Two paths admit
+    a coin here and only one is screened: `resolve_universe` filters the
+    scout's TOP-UP crypto-only `(ki)` and deliberately does NOT filter the
+    configured core (*"it is the backtested list ... those names are never
+    dropped"*). So the truthful value is the conjunction — the screen holds
+    only while the core itself is all-crypto. It is today (30 names, every one
+    crypto) and every off-class leg this book has ever traded arrived by
+    top-up, which is why the population really is removed. Put a non-crypto
+    name in `FUNDSPREAD_COINS` and this correctly flips to `False` on its own,
+    rather than a hardcoded `True` quietly lying — the drift `(pj)`'s
+    `test_the_declaration_tracks_the_switch_not_a_literal` exists to catch.
+
+    Fail-OPEN to `None` (unpublished, the third value): a dark `fleet_bus`
+    cannot classify the core, and an unpublished screen may neither
+    manufacture a finding nor erase one (I6, `(ph)`'s rule).
+    """
+    try:
+        return all(bool(fleet_bus.is_crypto(str(c).strip().upper()))
+                   for c in COINS if str(c).strip())
+    except Exception:      # noqa: BLE001
+        return None
+
+
+# --------------------------- the rank, and its census -------------------------
+# [2026-08-27 (vm)] THIS BOOK PUBLISHED NO CENSUS AT ALL. It is a LIVING row on
+# the decision docket at `undecidable` — and its payload carried `caps`, a
+# `held` map and `ff_overlap`, i.e. what it HOLDS and nothing about what it
+# TURNED AWAY. So "why does this book almost never close?" had no answer in the
+# payload, and the two candidate answers are opposite actions: a rebalance that
+# is being SKIPPED (too few rankable coins — a supply/coverage problem, fixable)
+# and a rebalance that runs and re-selects the SAME 2K legs (a rank that does
+# not churn — an edge/decidability problem, not fixable by more coins).
+#
+# The two functions below are the book's REAL ranking gate, lifted out of the
+# rebalance branch verbatim so the census is filled BY the admission path and
+# cannot drift from it ((hj) — a second copy of a rule is a second rule). The
+# loop calls them ONCE per loop; the rebalance branch consumes what they
+# returned rather than re-deriving it, so the published census is the exact
+# selection the book acted on and never a lookalike computed beside it.
+#
+# BUCKET NAMES ARE THE FLEET'S DECLARED VOCABULARY (`bot_pnl_store`'s
+# CENSUS_DENOMINATORS / CENSUS_REFUSALS), not this file's private words, so
+# `census_window`'s `binding_gate` can name the gate that killed the loop. In
+# particular `cold` is a mid-pack coin — rankable, and its funding rank simply
+# is not extreme enough to earn a leg — which is exactly what `cold` means in
+# every other funding book here.
+def rank_scores(coins, supports, fund_hist, floor, min_coverage=None,
+                census=None):
+    """{coin: trailing MEAN hourly funding rate} for every RANKABLE coin.
+
+    Rankable = the venue supports it AND at least `min_coverage` samples of its
+    funding sit inside the lookback window (`floor` = its left edge, epoch
+    seconds). Pure — `supports` is a predicate, `fund_hist` the caller's
+    rolling window. Fills three census buckets when given one: `scanned` (the
+    resolved universe), `unsupported` and `short_history`."""
+    min_coverage = MIN_COVERAGE if min_coverage is None else min_coverage
+    cen = census if census is not None else {}
+    cen["scanned"] = len(coins or ())
+    cen.setdefault("unsupported", 0)
+    cen.setdefault("short_history", 0)
+    scores = {}
+    for coin in (coins or ()):
+        if not supports(coin):
+            cen["unsupported"] += 1
+            continue
+        rs = [r for t, r in (fund_hist or {}).get(coin, []) if t >= floor]
+        if len(rs) >= min_coverage:
+            scores[coin] = sum(rs) / len(rs)
+        else:
+            cen["short_history"] += 1
+    return scores
+
+
+def rank_targets(scores, k=None, census=None):
+    """{coin: is_short} the rank WANTS held: LONG the k most-negative funding
+    coins (longs receive), SHORT the k most-positive.
+
+    `{}` when fewer than 2k coins are rankable — the whole rebalance is skipped
+    in that case, which is the book's own behaviour and NOT a per-coin refusal,
+    so those coins land in `waiting` rather than `cold`: they are not too
+    mid-pack to trade, they are waiting for a quorum. Fills `waiting`, `cold`
+    (rankable, mid-pack, not selected) and `eligible` (the 2k legs)."""
+    k = K if k is None else k
+    cen = census if census is not None else {}
+    cen.setdefault("waiting", 0)
+    cen.setdefault("cold", 0)
+    cen.setdefault("eligible", 0)
+    if len(scores) < 2 * k:
+        cen["waiting"] += len(scores)
+        return {}
+    ranked = sorted(scores, key=scores.get)      # most negative first
+    want = {c: False for c in ranked[:k]}        # LONG  (receive <0)
+    want.update({c: True for c in ranked[-k:]})  # SHORT (receive >0)
+    cen["eligible"] += len(want)
+    cen["cold"] += len(scores) - len(want)
+    return want
+
+
+def rank_census(funnel, scan, want, held):
+    """The published `scan` — the liveness verdict FIRST (I1), then the gate
+    funnel `rank_scores`/`rank_targets` just filled, then the turnover counts
+    that answer the question this book's row could not.
+
+    `scan`: "fresh" once the ranking window is populated, "warming" while the
+    book is still filling it, "dark" when funding could not be read at all. A
+    verdict, deliberately a STRING: `snapshot_census` cannot sum it and counts
+    it under `_dropped`, which is correct — a verdict summed over 24h is a fake
+    measurement (the 🎯 sniper's `sources.*.scan` rule).
+
+    `retained` / `rotating` / `entering` are the CHURN, and they are the whole
+    decidability story of an always-in book: one holding the same 2K legs every
+    rebalance closes nothing, which is how a row reaches 2,500 days to a
+    30-close bar with every gate working exactly as designed. They are OVERLAY
+    counts, not buckets — the partition is
+    `scanned == unsupported + short_history + waiting + cold + eligible`, and
+    `held` sits outside it because a held coin is still ranked (unlike every
+    entry-gated book here, where held is skipped first).
+
+    DECLARED: `retained`/`rotating`/`entering` are not in the fleet's declared
+    refusal vocabulary and so are REPORTED by `census_window` under
+    `unclassified` rather than allowed to win `binding_gate`. That is correct
+    and deliberate — none of the three is a refusal, and a turnover count
+    winning "the gate that killed this loop" would be exactly the wrong
+    instruction."""
+    held = set(held or ())
+    want_set = set(want or {})
+    out = {"scan": scan}
+    out.update(funnel or {})
+    out["held"] = len(held)
+    out["retained"] = len(held & want_set)
+    out["rotating"] = len(held - want_set)
+    out["entering"] = len(want_set - held)
+    return out
+
+
 def lighter_backfill(market_id, hours):
     """Bootstrap the ranking window from LIGHTER'S OWN SETTLED funding series
     (/api/v1/fundings) — the venue this book actually trades and earns on.
@@ -440,7 +642,7 @@ def fresh_mid(ctx, coin):
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
-                  reason, shadow, notional=None):
+                  reason, shadow, notional=None, extra=None):
     # [2026-08-20 (sc)] pnl_pct WAS PRICE-ONLY ON A FUNDING BOOK, AND THE GO-LIVE
     # GATE GRADES ON pnl_pct. The caller computes `total = price_pnl + accr`, so
     # `pnl_abs` has always carried funding while this percentage discarded it —
@@ -487,6 +689,11 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
             # tested — the price PATH cannot be joined to the trade.
             # Telemetry only; no gate moves.
             entry_price=ent_px, exit_price=exit_px,
+            # [(so)] I22 receipts (notional + the scales that produced it).
+            # This book had NO `extra` at all, so its every sizing term was
+            # unrecorded — the allocation organ has been rewriting its clip
+            # since (jr) and no close could say by how much.
+            extra=(extra or None),
             venue="lighter", shadow=shadow)
     except Exception:  # noqa: BLE001
         pass
@@ -683,7 +890,12 @@ def main():
                  price_pnl, accr, reason)
         _record_close(bot_id, coin, m.get("entry"), m.get("opened_ts"), px,
                       total, was_long=not m.get("is_short"), reason=reason,
-                      shadow=shadow_tag, notional=m.get("notional"))
+                      shadow=shadow_tag, notional=m.get("notional"),
+                      extra={"notional": m.get("notional"),
+                             "alloc_scale": m.get("alloc_scale"),
+                             "brain_mult": m.get("brain_mult"),
+                             "accrued": round(accr, 6),
+                             "price_pnl": round(price_pnl, 6)})
         meta.pop(coin, None)
 
     while True:
@@ -706,12 +918,60 @@ def main():
         # clip; held legs keep their entry size). The live arm's clip stays
         # PINNED at GOLIVE_ORDER_USD per (ia) — capital levers do not reach
         # real money, and the allocation organ doubly so. Dark bus -> 1.0.
+        # [2026-08-20 (so)] and the BRAIN's scale beside it, same arm, same
+        # NEW-entries-only rule. Two properties carry this one:
+        #  * ONE scale for BOTH legs. This book is DOLLAR-NEUTRAL by
+        #    construction — one clip opens a long leg and a short leg — while
+        #    the brain buckets its closes per side (`long`, `short`). Sizing
+        #    the legs by their own mults would quietly turn the fleet's
+        #    canonical spread book into a directional one wearing a spread
+        #    book's name, so the sides are combined (min) and the pair takes
+        #    one number. `fleet_bus.brain_mult_multi` owns that rule.
+        #  * The LIVE arm is untouched, per (ia): its clip is PINNED at
+        #    GOLIVE_ORDER_USD because that is the config both validations
+        #    cleared, and capital levers do not reach real money on this book.
+        # Measured the day this shipped, and it is why the wiring is not
+        # theoretical: the brain had been asking this exact book to size its
+        # long side at 0.75 for **91 consecutive runs** (n=48, t=-1.38) into a
+        # consumer that did not exist.
+        # Both default to 1.0 on the LIVE arm and on a dark bus, so the
+        # receipt below is always well-formed — a missing name here would
+        # NameError inside the entry loop, i.e. telemetry taking down trading.
+        _alloc = _bmult = 1.0
+        # [(sp)] THE BRAIN MAY ONLY MOVE THIS CLIP WHILE THE BOOK IS FLAT.
+        # This book is DOLLAR-NEUTRAL and its rebalance keeps held legs
+        # (`if c in meta: continue`), so a clip that changes mid-life leaves
+        # generations of legs at different sizes. Measured by the audit: one
+        # mult step from 1.0 to 6.7 replacing a single short leg leaves shorts
+        # at 4x$20 + $536 against longs at 5x$20 — **$570 of net directional
+        # delta on a book that models zero price exposure.** The (sp) gross
+        # bound caps the magnitude and cannot fix the ASYMMETRY, because the
+        # asymmetry is between generations, not between sides.
+        # Gating on flatness is exact: every leg of a generation is then sized
+        # by one number. The ALLOCATION organ is deliberately NOT gated here —
+        # it has rebound this clip every loop since (jr) and narrowing that is
+        # a separate change with a separate owner; what this refuses to do is
+        # make a pre-existing asymmetry 6.7x wider.
+        _brain_ok = not meta
         if not _is_live and fleet_bus is not None:
             _alloc = fleet_bus.allocation_scale(bot_id) or 1.0
-            _target = ctx.order_usd(ORDER_USD, own=True) * _alloc
+            _base = ctx.order_usd(ORDER_USD, own=True) * _alloc
+            # [(sp)] the BOOK-LEVEL GROSS BOUND on the product. Both legs of
+            # every pair draw on ONE budget — `K * 2` legs is this book's real
+            # position count, and using K alone would let the bound be breached
+            # by exactly the factor that makes it a spread book. Trims only the
+            # brain's increase, so a neutral or reducing brain is unaffected.
+            _target, _bmult = (fleet_bus.brain_clip_multi(
+                [(bot_id, "long"), (bot_id, "short")], _base,
+                deployed_usd=sum(float(m.get("notional") or 0.0)
+                                 for m in meta.values()),
+                gross_cap_usd=fleet_bus.brain_gross_cap(K * 2, ORDER_USD),
+                # one `order_usd` sizes every leg of the rebalance below, so
+                # the bound has to know it is sizing 2K of them at once.
+                slots=K * 2) if _brain_ok else (_base, 1.0))
             if abs(_target - order_usd) > 1e-9:
-                log.info("allocation scale %.2fx: clip %.2f -> %.2f",
-                         _alloc, order_usd, _target)
+                log.info("allocation %.2fx x brain %.2fx: clip %.2f -> %.2f",
+                         _alloc, _bmult, order_usd, _target)
                 order_usd = _target
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
@@ -741,7 +1001,12 @@ def main():
                        # [2026-07-30] effective cap — see funding_carry_bot
                        "caps": {"k": K, "legs": 2 * K,
                                 "universe_n": UNIVERSE_N,
-                                "universe": len(COINS)},
+                                "universe": len(COINS),
+                                # [(ru)] see `crypto_only_now` — DERIVED from
+                                # the core + the (ki) top-up screen, so it
+                                # tracks the switch rather than asserting a
+                                # literal. None = unpublished, never a guess.
+                                "crypto_only": crypto_only_now()},
                                      "style": "xsect-funding-spread"})
             except Exception:  # noqa: BLE001
                 pass
@@ -792,26 +1057,32 @@ def main():
                     * funding_basis.to_hourly(rate, "lighter") * notional * dt_h
 
         # ---- rebalance on schedule -----------------------------------------
+        # ---- rank the cross-section — EVERY loop, acted on only at rebalance -
+        # [2026-08-27 (vm)] this derivation used to live INSIDE the rebalance
+        # branch, so the book's own ranking was invisible for 23 of every 24
+        # hours and the row could not say why nothing turned over. It is the
+        # SAME code (same `t0`, same `floor`, same `fund_hist`), lifted into
+        # two pure functions and called once per loop; the rebalance branch
+        # below consumes exactly what it returned. PUBLISH-ONLY: nothing acts
+        # on `scores`/`want` outside `if t0 >= next_reb`, so no entry, exit,
+        # threshold or size moves — only the census now exists on quiet loops.
+        _funnel = {}
+        floor = t0 - LOOKBACK_H * 3600
+        scores = rank_scores(COINS, ctx.supports, fund_hist, floor,
+                             census=_funnel)
+        want = rank_targets(scores, census=_funnel)
+        census = rank_census(_funnel, ("fresh" if want else "warming"),
+                             want, meta)
+
         if next_reb is None:
             next_reb = t0            # first loop rebalances immediately
         if t0 >= next_reb:
             while next_reb <= t0:
                 next_reb += REBALANCE_H * 3600
-            floor = t0 - LOOKBACK_H * 3600
-            scores = {}
-            for coin in COINS:
-                if not ctx.supports(coin):
-                    continue
-                rs = [r for t, r in fund_hist.get(coin, []) if t >= floor]
-                if len(rs) >= MIN_COVERAGE:
-                    scores[coin] = sum(rs) / len(rs)
-            if len(scores) < 2 * K:
+            if not want:
                 log.warning("rebalance skipped: only %d/%d coins rankable",
                             len(scores), 2 * K)
             else:
-                ranked = sorted(scores, key=scores.get)      # most negative first
-                want = {c: False for c in ranked[:K]}        # LONG  (receive <0)
-                want.update({c: True for c in ranked[-K:]})  # SHORT (receive >0)
                 for c in list(meta):
                     if want.get(c) != meta[c].get("is_short"):
                         close_position(c, "rebalance")
@@ -834,12 +1105,23 @@ def main():
                                # the clip this leg was opened at — the
                                # `open_notional()` doctrine, applied to grading.
                                "notional": float(order_usd),
+                               # [(so)] and the two scales that produced it,
+                               # recorded SEPARATELY — multiplied together
+                               # they are unattributable, and this book
+                               # carries both organs.
+                               "alloc_scale": round(_alloc, 4),
+                               "brain_mult": round(_bmult, 4),
                                "opened_ts": t0, "accrued": 0.0}
                     log.info("OPEN %s %s $%.0f @ %.6g (%dh mean %+.1f%% apr)",
                              c, "SHORT" if is_short else "LONG", order_usd,
                              meta[c]["entry"], LOOKBACK_H, scores[c] * H * 100)
-                lo = {c: f"{scores[c]*H*100:+.0f}%" for c in ranked[:K]}
-                hi = {c: f"{scores[c]*H*100:+.0f}%" for c in ranked[-K:]}
+                # `want` is the rank's own verdict, so the log is derived
+                # from it rather than from a second sort of `scores` — the
+                # `ranked` local moved into `rank_targets` with the rule.
+                lo = {c: f"{scores[c]*H*100:+.0f}%"
+                      for c, is_s in want.items() if not is_s}
+                hi = {c: f"{scores[c]*H*100:+.0f}%"
+                      for c, is_s in want.items() if is_s}
                 log.info("REBALANCE done | LONG %s | SHORT %s | next %s",
                          lo, hi, datetime.fromtimestamp(
                              next_reb, tz=timezone.utc).isoformat())
@@ -856,6 +1138,17 @@ def main():
 
         # ---- publish + persist ----------------------------------------------
         open_accr = sum((meta.get(c) or {}).get("accrued", 0.0) for c in meta)
+        # [2026-08-27 (vm)] accumulate the census FIRST, then read the window,
+        # so THIS loop's refusals are inside the number the row publishes.
+        # Both calls never raise (store contract) and neither gates anything:
+        # publish-only, and it must stay that way — a counter that grows a
+        # consumer becomes a gate.
+        try:
+            store.snapshot_census(bot_id, census)
+            census_24h = store.census_window(bot_id, hours=24,
+                                             limit=CENSUS_LIMIT)
+        except Exception:  # noqa: BLE001
+            census_24h = None
         try:
             store.publish(
                 bot_id, status="online",
@@ -879,9 +1172,26 @@ def main():
                        # fourth I had already counted as done.
                        "caps": {"k": K, "legs": 2 * K,
                                 "universe_n": UNIVERSE_N,
-                                "universe": len(COINS)},
+                                "universe": len(COINS),
+                                # [(ru)] see `crypto_only_now` — DERIVED from
+                                # the core + the (ki) top-up screen, so it
+                                # tracks the switch rather than asserting a
+                                # literal. None = unpublished, never a guess.
+                                "crypto_only": crypto_only_now()},
                        "held": {c: ("S" if m.get("is_short") else "L")
                                 for c, m in meta.items()},
+                       # [2026-08-27 (vm)] WHY DID NOTHING TURN OVER? This row
+                       # published what it HOLDS and nothing about what the
+                       # rank turned away, on a book sitting `undecidable` at
+                       # ~2,500 days to the 30-close bar. `scan` is this loop's
+                       # funnel (liveness verdict first, then one counter per
+                       # gate stage, filled by the ranking functions
+                       # themselves); `census_24h` is the same funnel SUMMED
+                       # over the trailing day, so `retained: 10` finally has a
+                       # denominator in loops. `None` — never a zero-filled
+                       # dict — when the history is dark or empty (I1).
+                       "scan": census,
+                       "census_24h": census_24h or None,
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(open_accr, 4),
                        "ff_overlap": f"{ff_overlap}/{len(meta)}" if meta else "0/0",
@@ -1105,6 +1415,47 @@ def _selftest():
         assert K == GOLIVE_K, "live must PIN K back to the validated value"
     finally:
         globals()["K"] = _saved_k
+
+    # ---- [(vm)] the rank census: partition, churn, and the skip branch ----
+    # Runs in the CONTAINER, where pytest does not.
+    _now = 1_000_000.0
+    _floor = _now - LOOKBACK_H * 3600
+    _hist = {}
+    for _i, _c in enumerate(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
+                             "K_", "L"]):
+        _hist[_c] = [[int(_floor + 60 * j), (_i - 5) * 1e-5]
+                     for j in range(MIN_COVERAGE)]
+    _hist["THIN"] = [[int(_floor + 60), 1e-5]]          # under MIN_COVERAGE
+    _hist["OLD"] = [[int(_floor - 7200), 1e-5]] * MIN_COVERAGE   # pre-window
+    _coins = list(_hist) + ["GONE"]
+    _sup = lambda c: c != "GONE"                        # noqa: E731
+    _fun = {}
+    _sc = rank_scores(_coins, _sup, _hist, _floor, census=_fun)
+    assert _fun["scanned"] == len(_coins), _fun
+    assert _fun["unsupported"] == 1, _fun
+    assert _fun["short_history"] == 2, _fun     # THIN (few) + OLD (all stale)
+    _wt = rank_targets(_sc, census=_fun)
+    assert len(_wt) == 2 * K, _wt
+    assert sum(1 for v in _wt.values() if v) == K, _wt
+    assert _fun["eligible"] == 2 * K and _fun["waiting"] == 0
+    assert (_fun["scanned"] == _fun["unsupported"] + _fun["short_history"]
+            + _fun["waiting"] + _fun["cold"] + _fun["eligible"]), \
+        "the census buckets must PARTITION the scanned universe"
+    # the skip branch: too few rankable => no targets, and they WAIT rather
+    # than read as mid-pack (`cold`), which would name the wrong gate.
+    _fun2 = {}
+    _sc2 = rank_scores(["A", "B"], _sup, _hist, _floor, census=_fun2)
+    assert rank_targets(_sc2, census=_fun2) == {}
+    assert _fun2["waiting"] == 2 and _fun2["cold"] == 0, _fun2
+    # churn: an always-in book that re-selects its own legs closes NOTHING,
+    # and that is the whole 2,500-day story.
+    _cen = rank_census(_fun, "fresh", _wt, set(_wt))
+    assert list(_cen)[0] == "scan", "the liveness verdict comes FIRST (I1)"
+    assert _cen["retained"] == 2 * K and _cen["rotating"] == 0 \
+        and _cen["entering"] == 0, _cen
+    _cen2 = rank_census(_fun, "fresh", _wt, {"ZZZ"})
+    assert _cen2["rotating"] == 1 and _cen2["entering"] == 2 * K, _cen2
+    assert rank_census({}, "dark", {}, {})["scan"] == "dark"
 
     print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/"
           "ledger-row/universe-widening; go-live gate: opt-in, ready, "

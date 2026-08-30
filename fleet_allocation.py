@@ -81,17 +81,78 @@ KEY = "fleet-allocation"
 # 5400 = 3 missed cycles, the fleet's usual staleness slack.
 TTL_SEC = int(os.environ.get("ALLOC_TTL_SEC", "5400"))       # 3 x 1800s loop
 
-# One-sided Z for the lower bound. 1.28 = 90%: deliberately gentler than the
-# go-live gate's t>=2.0, because this decides where to LEARN next, not what may
-# hold real money. Using the gate's bar here would starve every undecided book
-# and the fleet would stop discovering anything.
+# The ONE standard of evidence, as a confidence level rather than a critical
+# value. 90% one-sided: deliberately gentler than the go-live gate's t>=2.0,
+# because this decides where to LEARN next, not what may hold real money. Using
+# the gate's bar here would starve every undecided book and the fleet would stop
+# discovering anything. `golive_readiness`'s horizon power gate reads THIS
+# constant, so the fleet applies one standard whether it is feeding a book or
+# doubting one (I17's amended text, now shared in code rather than in prose).
+CONF = float(os.environ.get("ALLOC_CONF", "0.90"))
+# The large-sample limit of that confidence level, and the FLOOR on the critical
+# value. 1.2816 is what `t_crit` converges to as n grows; keeping it as a floor
+# means `ALLOC_Z_LOWER` stays a live lever that can only make the bound
+# STRICTER, never looser than the sample itself supports (the cage principle —
+# a lever whose only reachable direction is "loosen past the evidence" is not a
+# lever, it is a hole).
 Z_LOWER = float(os.environ.get("ALLOC_Z_LOWER", "1.28"))
 # The probe floor, as a fraction of the flat book size. A book cannot earn
 # evidence with no capital.
 PROBE_FLOOR = float(os.environ.get("ALLOC_PROBE_FLOOR", "0.25"))
-# Books below this many closes are UNDECIDED — they get the probe floor and no
-# more, whatever their mean looks like.
-MIN_N = int(os.environ.get("ALLOC_MIN_N", "20"))
+#: [2026-08-20] THE LUCK FLOOR — 20 -> 10, and it is a COMPUTABILITY floor now,
+#: not a decidability verdict.
+#:
+#: What it used to be: `n >= 20 or the claim is 0.0, whatever the mean looks
+#: like`. That is a CLIFF, and it was a SECOND penalty for a small sample on top
+#: of the standard error, which already does exactly that job — and does it
+#: continuously. Measured on the live payload the day this changed: three living
+#: books held a genuinely positive lower bound and published 0.000 because of
+#: it (🙏 avo shadow n=17 bound +0.362%/trade at t=1.92; its live twin n=4; 👩
+#: mum n=7), and — the half that actually matters — FIVE books published
+#: `claim_era: None` for the same reason, including 🌾 carry, the fleet's
+#: highest-ranked book. `claim_era` is the ONLY field a consumer may act on
+#: ((lx)), so a cliff on the ERA sample, which is by construction the smaller
+#: one, made the organ structurally incapable of ever feeding anything:
+#: `n_with_era_claim` had been **0 across the whole fleet**, every day, since
+#: the era twin shipped.
+#:
+#: Why 10 and not 0: measured in the same pass, a RETIRED book's 3-close era
+#: sample (perps-donchian-breakout-lshadow, three near-identical wins, t=33)
+#: yields a bound of **+2.97%/trade** with no floor at all — it would have
+#: outranked every living book in the fleet on three trades. The t critical
+#: value widens the interval for a thin sample but it cannot repair a VARIANCE
+#: ESTIMATE built from three numbers.
+#:
+#: 10 is not a new invention: it is the winners' docket's own luck floor (I21 —
+#: *"the n>=10 floor, not BH, is what stops a consistent 3-close streak from
+#: outranking evidence"*), so the two instruments that rank books now agree.
+MIN_N = int(os.environ.get("ALLOC_MIN_N", "10"))
+
+#: [2026-08-20 (tz)] HOW HARD EVIDENCE TILTS THE SPLIT — and why it is a TILT
+#: rather than the whole split.
+#:
+#: The original rule was `share = claim / total_claim`, which is WINNER-TAKE-ALL
+#: whenever claims are sparse, because every unclaimed book contributes 0 to
+#: both sides. Measured on the live payload the day this shipped: ONE book held
+#: a claim of 0.0015 and took **$13,366 of $19,000**, two books held 78% of the
+#: fleet's capital, and **17 of 19 books were cut to the 25% probe floor** —
+#: including SIX with positive measured means (👩 mum +4.66%/trade, 🙏 avo
+#: +1.09%, its live twin +0.82%, 🏛️ albanese +0.28%, 💸 the Farmer's shadow
+#: +0.14% on n=195, 📊 georgia +0.12% on n=141).
+#:
+#: That is not conservatism, it is STARVATION, and it is self-fulfilling: a book
+#: held at the floor accumulates evidence more slowly, so its bound stays wide,
+#: so it stays at the floor. I17 already names the principle — *"a book cannot
+#: earn evidence with no capital"* — and the split was violating it while the
+#: floor was busy honouring it.
+#:
+#: So the FLAT allocation is the prior and evidence tilts it: the best-evidenced
+#: book earns `1 + TILT` times an unclaimed book's weight, and nothing is
+#: starved because a rival has a claim. At the default a claimant gets 2x the
+#: weight of a book with no opinion — a real, bounded reward for evidence.
+#: Set to 0 for a pure flat split; the old winner-take-all is NOT reachable by
+#: any setting, deliberately.
+CLAIM_TILT = float(os.environ.get("ALLOC_CLAIM_TILT", "1.0"))
 BOOK_USD = float(os.environ.get("ALLOC_BOOK_USD", "1000"))
 
 # Class membership is by the SIGNAL the book trades, not by its name. Funding
@@ -143,6 +204,101 @@ def book_class(bot):
     return "funding" if any(m in b for m in FUNDING_MARKERS) else "directional"
 
 
+def _betacf(a, b, x, itmax=200, eps=3e-14):
+    """Continued fraction for the incomplete beta (Lentz). Stdlib only."""
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    if abs(d) < 1e-300:
+        d = 1e-300
+    d = 1.0 / d
+    h = d
+    for m in range(1, itmax + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-300:
+            d = 1e-300
+        c = 1.0 + aa / c
+        if abs(c) < 1e-300:
+            c = 1e-300
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-300:
+            d = 1e-300
+        c = 1.0 + aa / c
+        if abs(c) < 1e-300:
+            c = 1e-300
+        d = 1.0 / d
+        delt = d * c
+        h *= delt
+        if abs(delt - 1.0) < eps:
+            break
+    return h
+
+
+def _betainc(a, b, x):
+    """Regularized incomplete beta I_x(a, b)."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbeta = (math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+             + a * math.log(x) + b * math.log1p(-x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return math.exp(lbeta) * _betacf(a, b, x) / a
+    return 1.0 - math.exp(lbeta) * _betacf(b, a, 1.0 - x) / b
+
+
+def _t_cdf(t, df):
+    """P(T <= t) for Student's t with `df` degrees of freedom."""
+    x = df / (df + t * t)
+    p = 0.5 * _betainc(df / 2.0, 0.5, x)
+    return 1.0 - p if t > 0 else p
+
+
+def t_crit(n, conf=None, floor=None):
+    """The one-sided critical value this fleet applies to a sample of size `n`.
+
+    [2026-08-20] WHY THIS EXISTS, and why a constant was wrong.
+
+    The bound was `mean - 1.28*SE` at every sample size. 1.28 is the NORMAL
+    quantile — the value a t-interval converges to as n grows — so applying it
+    to n=4 or n=17 understates what a finite sample costs. The interval was too
+    NARROW on exactly the books the fleet most needed to be careful about, and
+    the mitigation in place for that was a hard `n >= 20` cliff, which does not
+    widen anything: it deletes the estimate. One instrument was too generous and
+    the other too blunt, and together they produced a table of zeros.
+
+    The t critical value is the instrument that already does this job correctly
+    and continuously: 1.533 at n=5, 1.337 at n=17, 1.290 at n=101, 1.2816 in the
+    limit. A thin sample is doubted MORE, and it is doubted by an amount the
+    sample itself determines rather than by a threshold someone picked.
+
+    `floor` (default `Z_LOWER`) keeps the env lever live in the STRICT direction
+    only — see the constant's own note. Fails toward the STRICTER value: any
+    arithmetic trouble returns the floor rather than a guess, because the guess
+    would be in the direction of handing out a claim.
+    """
+    conf = CONF if conf is None else conf
+    floor = Z_LOWER if floor is None else floor
+    try:
+        df = int(n) - 1
+        if df < 1:
+            return None                 # no dispersion estimate exists at n<2
+        lo, hi = 0.0, 200.0
+        for _ in range(200):            # bisection: ~1e-58, far past need
+            mid = (lo + hi) / 2.0
+            if _t_cdf(mid, df) < conf:
+                lo = mid
+            else:
+                hi = mid
+        return max(floor, (lo + hi) / 2.0)
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return floor
+
+
 def sample_stats(pcts):
     """(n, mean, se) for a per-trade return sample, or None when the sample
     cannot support a bound (n<2 or variance below the floor).
@@ -172,18 +328,39 @@ def sample_stats(pcts):
     return n, mean, math.sqrt(var / n)
 
 
-def lower_bound(pcts, z=Z_LOWER):
+def bound_and_crit(pcts, z=None):
+    """(lower bound, critical value) — computed TOGETHER, in one place.
+
+    [2026-08-20] This function exists because of a mutation that survived. The
+    first draft had `allocate` call `t_crit(n)` a second time to publish the
+    `crit` field, so reverting `lower_bound` to a constant left the payload
+    still advertising a t value it had not used — the published evidence would
+    have described a different judgement than the published claim, silently.
+    That is the second-copy-of-a-rule shape ((hj)) in miniature, inside a single
+    file, and only a mutation exposed it (I3).
+    """
+    st = sample_stats(pcts)
+    if st is None:
+        return None, None
+    n, mean, se = st
+    crit = t_crit(n) if z is None else z
+    if crit is None:                     # unreachable behind sample_stats' n>=2
+        return None, None
+    return mean - crit * se, crit
+
+
+def lower_bound(pcts, z=None):
     """One-sided lower confidence bound on mean per-trade return.
 
     Returns None when the sample cannot support one (n<2 or zero variance) —
     NEVER 0.0, because "no opinion" and "measured zero" must not collapse into
     the same number. Callers treat None as undecided.
+
+    [2026-08-20] `z=None` means DERIVE IT FROM THE SAMPLE (`t_crit`), which is
+    the correct instrument and the default. An explicit `z` is honoured so a
+    test can pin a value; production never passes one.
     """
-    st = sample_stats(pcts)
-    if st is None:
-        return None
-    _n, mean, se = st
-    return mean - z * se
+    return bound_and_crit(pcts, z=z)[0]
 
 
 def claims(books):
@@ -200,6 +377,47 @@ def claims(books):
         lb = lower_bound(pcts) if n >= MIN_N else None
         out[bot] = max(0.0, lb) if lb is not None else 0.0
     return out
+
+
+def n_req_claim(n, mean, se, conf=None):
+    """How many closes this book needs before its OWN bound clears zero.
+
+    [2026-08-20] THE FEED-DIRECTION NUMBER. `claim: 0.0` is the same byte for a
+    book 46 closes away from a claim and one that will never have one, and a
+    table of identical zeros is why this organ read as broken. Operator, the day
+    this shipped: *"If everything is 0.000 then you've missed something."*
+
+    Holding the sample's mean and dispersion fixed, `se` scales as 1/sqrt(n), so
+    the bound clears zero once `n > (crit * sd / mean)^2`. `crit` itself depends
+    on n, so iterate — it converges in a handful of passes because the critical
+    value moves far more slowly than n.
+
+    None when no amount of MORE OF THE SAME SAMPLE gets there (mean <= 0), which
+    is the honest answer: that book does not need closes, it needs a different
+    result. Never a promise — it is the floor of a projection, on the (ks)
+    horizon's own terms, and nothing consumes it.
+    """
+    try:
+        if not mean or mean <= 0 or not se or se <= 0 or n < 2:
+            return None
+        sd = se * math.sqrt(n)
+        need = n
+        for _ in range(12):
+            crit = t_crit(max(2, int(math.ceil(need))), conf=conf)
+            if crit is None:
+                return None
+            nxt = (crit * sd / mean) ** 2
+            if abs(nxt - need) < 0.5:
+                need = nxt
+                break
+            need = nxt
+        # The FLOOR binds too: a book cannot hold a claim below MIN_N however
+        # good its arithmetic looks, so reporting a smaller number would be a
+        # lie about what the book actually needs.
+        need = max(int(math.ceil(need)), MIN_N)
+        return need if need > n else n
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return None
 
 
 def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
@@ -219,11 +437,22 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
     base = book_usd * max(0.0, min(1.0, floor))
     surplus = total - base * len(bots)
     cl = claims(books)
-    tot_claim = sum(cl.values())
+    # [(tz)] EVIDENCE TILTS THE FLAT SPLIT; IT DOES NOT REPLACE IT. Weights are
+    # `1 + TILT * (claim / best_claim)`, so a book with no opinion still carries
+    # weight 1 and cannot be defunded by a rival's claim. With no claims
+    # anywhere every weight is 1 and this is EXACTLY the flat allocation, which
+    # is the promise the docstring above already made and the old
+    # `claim / total_claim` kept only in the degenerate all-zero case.
+    best = max(cl.values()) if cl else 0.0
+    if best > 0:
+        w = {b: 1.0 + CLAIM_TILT * (cl[b] / best) for b in bots}
+    else:
+        w = {b: 1.0 for b in bots}
+    tot_w = sum(w.values())
     out = {}
     for b in bots:
         n = len([p for p in (books[b] or []) if p is not None])
-        share = (cl[b] / tot_claim) if tot_claim > 0 else (1.0 / len(bots))
+        share = w[b] / tot_w if tot_w > 0 else (1.0 / len(bots))
         target = base + surplus * share
         # [2026-08-05 (kc)] THE EVIDENCE RECORD. `mean` and `se` were computed
         # one line inside `lower_bound` and thrown away, so two books failing
@@ -247,6 +476,20 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
             why = "bound<=0"
         else:
             why = None
+        # [2026-08-20] THE UN-TRUNCATED BOUND, and the distance to a claim.
+        # `claim` is `max(0, bound)` and must stay that way — a book cannot
+        # claim negative capital, and that field is the published contract every
+        # consumer reads. But truncating at zero threw the ORDERING away: on the
+        # live payload 15 of 19 books published byte-identical `0.0` while their
+        # bounds ranged from -0.02% (📊 georgia, 46 closes from a claim) to
+        # -0.64% (🏛️ albanese). Same number, entirely different situations, and
+        # no reader could tell them apart. The information was computed and
+        # discarded one character before the payload.
+        #
+        # REPORTED, NEVER RANKED — I15's warning is that a demoted-but-reported
+        # statistic migrates into an actuator, so `claim` stays the only field
+        # the split reads and these ship beside it as evidence.
+        raw_bound, crit = bound_and_crit(books[b])
         out[b] = {
             "n": n,
             "class": book_class(b),
@@ -256,6 +499,15 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
             # through to the payload boundary instead of stopping at it).
             "mean_pct": round(st[1], 8) if st else None,
             "se_pct": round(st[2], 8) if st else None,
+            # The bound BEFORE `max(0, ...)`. None only when no bound exists.
+            "bound_pct": round(raw_bound, 8) if raw_bound is not None else None,
+            # The critical value this sample was actually judged at, so the
+            # published claim is reproducible without re-deriving the rule.
+            "crit": round(crit, 4) if crit is not None else None,
+            # Closes needed for this book's own bound to clear zero, at its
+            # measured mean and dispersion. None = a positive mean is not what
+            # this sample has, so more of it will not get there.
+            "n_req_claim": (n_req_claim(st[0], st[1], st[2]) if st else None),
             "target_usd": round(target, 2),
             "current_usd": round(book_usd, 2),
             "delta_usd": round(target - book_usd, 2),
@@ -342,18 +594,227 @@ def class_totals(alloc, books):
             "n_with_era_claim": sum(
                 1 for b in rows if (alloc[b].get("claim_era") or 0) > 0),
         }
+        out[cls].update(gate_totals([alloc[b] for b in rows]))
     return out
+
+
+def gate_totals(recs):
+    """{target_effective_usd, withheld_usd, n_expansion_gated, n_unpriced} for
+    a set of published book rows — what the era gate ACTUALLY leaves on the
+    table, in dollars.
+
+    [2026-08-26] `(oy)` published the gated outcome PER BOOK because a payload
+    must not be byte-identical between "this book will be scaled up 4x" and
+    "this book will be left at flat". That closed the per-book question and
+    left the FLEET-level one open, and the fleet-level one is a different
+    number with a different owner:
+
+    `target_usd` is conserved by construction — the split never proposes
+    spending more, only spending it differently. **The gate is not.** A book
+    the era declines is held at flat, and the surplus the tilt took from every
+    OTHER book to fund that expansion is returned to nobody. So the two halves
+    of the published allocation do not add up, and nothing said so.
+
+    MEASURED on the live payload the day this shipped: `sum(target_usd)` =
+    $19,999.96 against $18,848.30 actually reachable — **$1,151.66, 5.8% of
+    fleet capital, withheld**. Three books were `expansion_gated`
+    (🙏 avo shadow, 🎫 the Taker, 🌾 carry — the fleet's three best-evidenced
+    shadow books, every one of them era-scoped at a MEASURED zero rather than
+    a floor), and the sixteen books with no claim at all sat at **0.9279x**
+    flat: below the prior, to fund a bonus that was refused.
+
+    PUBLISH-ONLY, and deliberately NOT a redistribution. Returning the refused
+    surplus is a real improvement in the FEED direction (I17 as amended) and it
+    is also a sizing change on three shadow books, so it is priced and decided
+    on a published number rather than shipped inside the pass that found it —
+    the (oy) scope, one layer up. The three candidate rules and why none is
+    obviously right are recorded in the changelog entry, so the next pass
+    starts from the analysis instead of re-deriving it.
+
+    `n_unpriced` is the receipt ((kw)/I4): a row whose effective scale could
+    not be computed falls back to its raw target, and a dark computation must
+    not be byte-identical to a clean one.
+    """
+    eff = 0.0
+    gated = unpriced = 0
+    for r in recs:
+        raw = _f(r.get("target_usd"))
+        s = _f(r.get("scale_effective"))
+        base = _f(r.get("current_usd"))
+        if s is None or base is None:
+            unpriced += 1
+            eff += raw or 0.0
+        else:
+            eff += s * base
+        if r.get("expansion_gated"):
+            gated += 1
+    tot = sum((_f(r.get("target_usd")) or 0.0) for r in recs)
+    return {"target_effective_usd": round(eff, 2),
+            "withheld_usd": round(tot - eff, 2),
+            "n_expansion_gated": gated,
+            "n_unpriced": unpriced}
+
+
+def _f(v):
+    """float or None — never a coercion that turns junk into a dollar."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f else None                      # NaN is not a number
+
+
+#: [2026-08-28 (vd)] THE PER-BOOK BOUND THE DRAWDOWN BAR IMPLIES.
+#:
+#: The `[PROBE_FLOOR, SCALE_CEIL]` clamp is ONE number shared by books with
+#: very different stops — a per-POSITION slippage bound doing a per-BOOK job.
+#: It matters because **maxDD is the only go-live bar that is NOT clip-invariant**
+#: ((hl) measured per-trade % invariance for the other five), so scaling a book
+#: scales its drawdown against a fixed 15% bar while leaving `mean`, `t` and the
+#: halves untouched. Measured: ⚖️ Counterweight breaches the bar at **3.06x**,
+#: comfortably INSIDE the shared 4.0 ceiling.
+#:
+#: This publishes, per book, the scale at which its OWN stop reaches the gate's
+#: OWN bar — the `GROSS_X_MAX = 0.15/|stop|` shape (sr) derived for 🙏 avo,
+#: generalised. Both constants are IMPORTED, never retyped: the bar from
+#: `golive_readiness`, the stop from the book's own module.
+#:
+#: REPORTED, NEVER A BAR (I15). Moving the clamp moves money between books and
+#: is an operator call (I16) — this makes the number visible so that call is
+#: made against arithmetic instead of a single shared constant. Unknown stop ->
+#: `None`, NEVER a permissive default: a missing bound that reads as "no limit"
+#: is the same defect the whole item is about.
+def dd_bound(bot, extra=None):
+    """`{stop, max_scale, bar}` for `bot`, or None when its stop is unknown.
+
+    `extra` is the book's own published payload when the caller has it — its
+    `policy.stoploss` is authoritative over the bridge table below.
+    """
+    try:
+        bar = _golive_max_dd()
+        stop = _stop_for(bot, extra)
+        if bar is None or stop is None or stop <= 0:
+            # Distinguish "no stop BY DESIGN" from "we could not find one".
+            # Both refuse to give a bound; only one of them is a gap.
+            return ({"stop": None, "bar": bar, "max_scale": None,
+                     "why": "no position stop by design — its bar-breach "
+                            "point comes from REALISED drawdown, not a stop"}
+                    if bot in NO_STOP_BY_DESIGN else None)
+        return {"stop": round(stop, 4), "bar": bar,
+                "max_scale": round(bar / stop, 2)}
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
+def _golive_max_dd():
+    """The gate's own bar, imported. None if the grader is unreachable."""
+    try:
+        import importlib.util
+        import os as _os
+        p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                          "scripts", "golive_readiness.py")
+        spec = importlib.util.spec_from_file_location("_gl_dd", p)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return float(m.GOLIVE_MAX_DD)
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
+#: Row -> the module attribute that owns its catastrophic/hard stop. Family
+#: books carry it on the strategy object; the rest name an env-backed constant.
+#: A row absent here yields None, which is the fail-safe direction.
+#: A BRIDGE, not a source of truth — the `fleet_manifest.design_for` pattern.
+#: A book's OWN published `policy.stoploss` always wins; each entry here goes
+#: quiet the day its book learns to publish one. Measured 28-Aug: exactly THREE
+#: books publish theirs, and they are the three live ones.
+#:
+#: **THESE ARE LITERALS ON PURPOSE, and that is a deliberate reversal.** The
+#: first cut imported each book's module and read the constant — no drift, but
+#: `audit_image_imports` immediately failed the build: `fleet_allocation` runs
+#: in the freqtrade image, which does not COPY `lighter_family_bot`, so in
+#: production the lookup would have failed inside its own `try/except` and
+#: EVERY family book would silently have got no bound. That is the born-dark
+#: class exactly ((17-Jul brain_stats postmortem): a guarded import turns a
+#: missing file into a degraded fallback instead of a crash).
+#:
+#: Worse, the guard could only see the STATIC import. The dynamic
+#: `importlib.import_module` calls for the other books were invisible to it and
+#: would have been born-dark with NOTHING reporting it. So the import approach
+#: was not merely wrong here, it was wrong in a way this fleet cannot detect.
+#: A retyped constant that a guard CAN check beats an import that it cannot.
+_STOP_BRIDGE = {
+    "perps-funding-lighter-lshadow": 0.10,   # FUNDING_HARD_STOP
+    "band-garrett-lshadow": 0.10,            # same host, same constant
+    "band-kelly-lshadow": 0.05,              # KELLY_HARD_STOP (MY_HARD_STOP)
+    "nav-cook-lshadow": 0.05,                # COOK hard stop
+    "freqtrade-mum-lshadow": 0.04,           # mirrors her live arm
+    "freqtrade-avo-maria-lshadow": 0.10,
+    "freqtrade-georgia-lshadow": 0.05,
+    # The three LIVE arms publish `policy.stoploss` and so normally resolve
+    # from their own payload — these are the fallback for a loop that has the
+    # row name but not its `extra` (which is the organ's usual case, since it
+    # builds from the trade ledger). Both paths must agree; the test drives
+    # the published value through and asserts it WINS over these.
+    "freqtrade-mum-lighter": 0.04,
+    "freqtrade-avo-maria-lighter": 0.10,
+    "freqtrade-georgia-lighter": 0.05,
+}
+
+#: Books with NO position stop by design, and therefore NO stop-derived bound.
+#: ⚖️ Counterweight's xsect legs carry none — mirroring its validated parent's
+#: replay fidelity — so its 15%-bar breach point (measured 3.06x) comes from its
+#: REALISED drawdown, not from a stop. Declared rather than silently `None`, so
+#: a reader can tell "no stop by design" from "we could not find it": both
+#: return None here, and only this list says which is which.
+NO_STOP_BY_DESIGN = frozenset({
+    "perps-funding-spread-lshadow", "perps-funding-spread-lighter",
+})
+
+
+def _stop_for(bot, extra=None):
+    """|stop| as a fraction for `bot`. **The book's OWN publication wins.**
+
+    Order: its published `policy.stoploss`, then the declared bridge above.
+    None if neither knows — never a guess, and never a shared default, because
+    a missing bound that reads as "no limit" is the defect this whole feature
+    is about.
+    """
+    pol = (extra or {}).get("policy") if isinstance(extra, dict) else None
+    if isinstance(pol, dict) and pol.get("stoploss") is not None:
+        try:
+            v = abs(float(pol["stoploss"]))
+            if v > 0:
+                return v
+        except (TypeError, ValueError):
+            pass
+    v = _STOP_BRIDGE.get(bot)
+    try:
+        return abs(float(v)) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def build(books, book_usd=BOOK_USD):
     """The published payload. Pure — the selftest drives it with no DB."""
     alloc = allocate(books, book_usd=book_usd)
+    # The records are KEYED by bot rather than carrying it as a field — the
+    # first cut read `rec["bot"]` and silently populated nothing, which is why
+    # the payload published `dd_bound: null` on every book while the function
+    # itself tested green. Driving the real `build()` is what caught it; the
+    # unit test alone could not.
+    _items = (alloc or {}).items() if isinstance(alloc, dict) else \
+             ((r.get("bot"), r) for r in (alloc or []) if isinstance(r, dict))
+    for _bot, rec in _items:
+        if isinstance(rec, dict) and _bot:
+            rec["dd_bound"] = dd_bound(_bot)
     return {
         "updated": _iso(),
         "ttl_sec": TTL_SEC,
         "advisory": True,
         "moves_capital": False,
-        "rule": (f"claim = max(0, mean - {Z_LOWER}*SE) on per-trade %, "
+        "rule": (f"claim = max(0, mean - t*SE) on per-trade %, t = one-sided "
+                 f"Student-t at {CONF:.0%} on n-1 df (floor {Z_LOWER}), "
                  f"n>={MIN_N}; every book keeps a {PROBE_FLOOR:.0%} probe "
                  f"floor; total capital is conserved"),
         "n_books": len(alloc),
@@ -504,6 +965,55 @@ def run_once(publish=False):
     if store is None:
         return None
     trades, n_retired = _living(store.fetch_paper_trades(limit=8000))
+    # [2026-08-28 (vd)] PHANTOM CLOSES OUT — THE THIRD GRADER FINALLY AGREES
+    # WITH THE OTHER TWO, and this one ranks CAPITAL.
+    #
+    # A $0.00 close with NO entry price is a halt/flatten EVENT, not a trade.
+    # `golive_readiness` has excluded them by signature since (th); the winners'
+    # docket since 26-Aug, whose own note measured the population: 13 rows on
+    # precisely the two REAL-MONEY books (🙏 avo 9, 🔮 georgia 4). This organ —
+    # the one that decides where the next dollar goes — was still counting them.
+    #
+    # WHY IT BIASES THE WRONG WAY, and why it matters more here than anywhere:
+    # a claim is `mean - t_crit * SE`. A $0.00 row pulls a LOSING book's mean
+    # toward zero AND raises `n`, which shrinks SE — so it lifts the lower bound
+    # from both directions at once. Phantoms make a losing book look more
+    # deserving of capital, on the books most likely to have them (only real
+    # money halts).
+    #
+    # IDENTITY IMPORT, never a re-implementation: a second copy of that
+    # signature would let the graders drift apart on exactly the rows that
+    # matter ((hj)). Fail-OPEN — if the gate is unreachable the sample is
+    # unchanged rather than blanked, because an allocation that silently sees
+    # nothing is worse than one that sees a few phantom rows.
+    #
+    # [2026-08-28 (vd)] THE `sys.path` INSERT IS LOAD-BEARING AND ITS ABSENCE
+    # SHIPPED. `golive_readiness` lives under `scripts/`, which is NOT on the
+    # path in the freqtrade image, so the bare `from golive_readiness import`
+    # this block was written with raised ModuleNotFoundError, hit the fail-open
+    # `except`, and published `n_phantom: None` — the filter was inert in
+    # production for its whole first deploy while 🙏 avo kept publishing
+    # `n=15, claim +0.194%/trade` off a true traded sample of SIX.
+    #
+    # It passed locally because pytest puts `scripts/` on the path, and it
+    # passed `--selftest` because the other two `golive_readiness` importers in
+    # this file (`era_rows`, `GOLIVE_MIN_CLOSES`) DO insert the path and had
+    # already mutated `sys.path` for the process. So the bug was ORDER
+    # DEPENDENT: correct in any run that happened to grade an era first, wrong
+    # in the publish path that does not. Pinned now by an EXECUTION test in a
+    # clean subprocess — the AST test that shipped beside the defect asserted
+    # the import STRING was present and called, which a broken import satisfies
+    # perfectly ([[a-substring-test-is-not-a-wiring-test]]).
+    n_phantom = 0
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "scripts"))
+        from golive_readiness import is_phantom_close
+        _keep = [t for t in trades if not is_phantom_close(t)]
+        n_phantom = len(trades) - len(_keep)
+        trades = _keep
+    except Exception:                                    # noqa: BLE001
+        n_phantom = None
     rows_by_bot = {}
     for t in trades:
         bot = t.get("bot")
@@ -521,6 +1031,18 @@ def run_once(publish=False):
     payload = build(books)
     payload["excluded_retired"] = n_retired
     payload["zero_close_books"] = sorted(zero_close)
+    # [2026-08-28 (vd)] PUBLISH THE REFUSAL COUNT — this organ was blind to its
+    # own filter. `n_phantom` was computed and DROPPED, so a run that excluded
+    # 13 halt events and a run whose import failed and excluded ZERO published
+    # byte-identical payloads. That ambiguity is what let the broken import
+    # above sit live: the only way to notice was to spot that 🙏 avo still read
+    # `n=15` when her true traded sample is 6.
+    #
+    # `0` means the filter ran and found nothing; `None` means it could not
+    # run. Those must never be the same byte-string (I1/I18, and the standing
+    # [[guards-blind-to-their-own-refusals]] lesson — measured there as 0 of 20
+    # rows accumulating a census).
+    payload["n_phantom"] = n_phantom
     # [(kc)] Say WHICH sample the ranked claim is computed on. Three organs
     # grade this fleet on three different samples — allocation pools all-time,
     # golive_readiness scopes to the policy era, the brain decays at a 14d
@@ -531,6 +1053,38 @@ def run_once(publish=False):
         if rec is None:
             continue
         set_era_twin(rec, *_era_twin(b, rs))
+    # [2026-08-26] RECOMPUTE THE HEADLINE, because it was counting a field that
+    # did not exist yet.
+    #
+    # `build()` computes `by_class` — including `n_with_era_claim` — and the era
+    # twin is filled HERE, afterwards, because it needs the ledger rows and the
+    # era owner's import. `build` cannot know it, so it sets every `claim_era`
+    # to None first ((lx)). So the counter ran over a column that was None on
+    # every book, by construction, and `n_with_era_claim` could only ever be
+    # ZERO — whatever the data said.
+    #
+    # MEASURED the day this was found: `freqtrade-avo-maria-lighter` published
+    # `claim_era: 0.000174` — a real, positive, era-scoped claim — while the
+    # headline beside it read `n_with_era_claim: 0`. The payload contradicted
+    # itself in the one field a reader checks first.
+    #
+    # It is exactly the failure `(ua)` was written about, one layer up: that
+    # entry quoted this zero as evidence that no book COULD qualify, and the
+    # cliff it removed was a real cause — but even with the cliff gone the
+    # number could not move, because the count precedes the data. A headline
+    # that cannot be non-zero is not a measurement. Corrected in place per I12.
+    payload["by_class"] = class_totals(payload["books"], books)
+    # ...and the same number at the FLEET level, for the same reason. `by_class`
+    # splits it funding/directional; the leak is a property of the whole
+    # allocation, and a reader checking whether the organ's own arithmetic
+    # closes should not have to add two dicts together to find out.
+    payload["gate"] = gate_totals(list(payload["books"].values()))
+    payload["gate"]["target_usd"] = round(
+        sum((_f(r.get("target_usd")) or 0.0)
+            for r in payload["books"].values()), 2)
+    payload["gate"]["books_below_flat"] = sum(
+        1 for r in payload["books"].values()
+        if (_f(r.get("scale_effective")) or 1.0) < 1.0)
     # The go-live verdict is IMPORTED, never re-derived here — allocation is a
     # different question and must not become a second gate. Optional by design:
     # that module is the other half of the fleet's grading surface and this
@@ -645,9 +1199,17 @@ def _selftest():
     # different sample than the one that was ranked.
     ev = allocate({"w": [0.02, 0.01, 0.03, -0.005] * 8}, book_usd=1000.0)["w"]
     assert ev["mean_pct"] is not None and ev["se_pct"] is not None
+    # [2026-08-20] reproduce through the PUBLISHED `crit`, not through the
+    # module constant. The critical value now varies with n, so a reader with
+    # only the payload must still be able to rebuild the ranked number — that
+    # is what makes `crit` load-bearing rather than decorative.
+    assert ev["crit"] is not None
     assert abs(ev["claim"] - max(0.0, ev["mean_pct"]
-                                 - Z_LOWER * ev["se_pct"])) < 1e-6, \
+                                 - ev["crit"] * ev["se_pct"])) < 1e-5, \
         "the published claim must be reproducible from the published stats"
+    assert abs(ev["bound_pct"] - (ev["mean_pct"]
+                                  - ev["crit"] * ev["se_pct"])) < 1e-5, \
+        "bound_pct must be the SAME bound, before the max(0, .) truncation"
     # a claim ALWAYS sits below its own sample mean — this is what red-lines
     # any estimator (pooling, shrinkage, a rate multiplier) that would hand a
     # book a claim its own sample cannot support.
@@ -657,6 +1219,50 @@ def _selftest():
     # "no opinion" must reach the payload as None, never as 0.0 --------------
     thin_ev = allocate({"t": [0.01, 0.02]}, book_usd=1000.0)["t"]
     assert thin_ev["claim"] == 0.0 and thin_ev["undecided_why"] == "below-min-n"
+
+    # --- [2026-08-20] THE CRITICAL VALUE IS THE T VALUE, NOT A CONSTANT ------
+    # Pinned against the PUBLISHED table. A future "simplification" back to a
+    # bare 1.28 reddens here, which is the whole point of writing the numbers
+    # down rather than trusting the implementation.
+    for df, want in ((1, 3.0777), (2, 1.8856), (5, 1.4759), (10, 1.3722),
+                     (16, 1.3368), (30, 1.3104), (100, 1.2901)):
+        got = t_crit(df + 1, floor=0.0)
+        assert abs(got - want) < 5e-4, f"t_crit df={df}: {got} vs {want}"
+    assert abs(t_crit(10_000_001, floor=0.0) - 1.2816) < 1e-3, \
+        "t must converge to the normal quantile in the large-sample limit"
+    # MONOTONE: a thinner sample is doubted MORE. This is the property the whole
+    # change rests on — it is what lets the n>=20 cliff go away safely.
+    crits = [t_crit(k, floor=0.0) for k in (3, 5, 10, 20, 50, 200)]
+    assert all(a > b for a, b in zip(crits, crits[1:])), crits
+    assert t_crit(1) is None, "n<2 has no dispersion estimate, so no bound"
+    # The env lever may only TIGHTEN — never loosen past what n supports.
+    assert t_crit(500, floor=2.0) == 2.0
+    assert t_crit(3, floor=1.28) > 1.28
+
+    # --- the same sample, judged honestly, still ranks above a luckier one ---
+    # n=17 at t=1.92 keeps a claim (the live 🙏 avo shadow shape); n=3 at a
+    # freak t does NOT, because MIN_N stops it before the statistics (I21).
+    lucky = allocate({"three": [0.031, 0.030, 0.032],
+                      "seventeen": [0.03, 0.01, 0.02, 0.04, 0.005] * 3 + [0.02, 0.03]},
+                     book_usd=1000.0)
+    assert lucky["three"]["claim"] == 0.0, \
+        "a 3-close streak must not out-claim a measured book (I21's floor)"
+    assert lucky["seventeen"]["claim"] > 0.0
+    assert lucky["seventeen"]["target_usd"] > lucky["three"]["target_usd"]
+
+    # --- the FEED number: a zero claim must say what the book NEEDS ---------
+    # 15 of 19 live books published byte-identical 0.0; this is what makes them
+    # distinguishable without turning a report into a bar.
+    near = allocate({"near": [0.02, -0.018, 0.021, -0.019, 0.001] * 6},
+                    book_usd=1000.0)["near"]
+    assert near["claim"] == 0.0 and near["bound_pct"] is not None
+    assert near["bound_pct"] < 0, "a floored claim must still publish its bound"
+    assert near["n_req_claim"] and near["n_req_claim"] > near["n"], \
+        "a positive-mean book below the bar must publish its distance to it"
+    loser = allocate({"loser": [-0.02, -0.01, -0.03, 0.0] * 6},
+                     book_usd=1000.0)["loser"]
+    assert loser["n_req_claim"] is None, \
+        "a negative mean needs a different result, not more closes — say so"
     flat_ev = allocate({"f": [0.01] * 30}, book_usd=1000.0)["f"]
     assert flat_ev["mean_pct"] is None and flat_ev["se_pct"] is None, \
         "zero variance is NO OPINION — it must not publish a mean"

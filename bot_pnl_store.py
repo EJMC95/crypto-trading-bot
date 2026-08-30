@@ -33,8 +33,15 @@ import hashlib
 _DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 _conn = None
+_conn_last_ping_ts = 0.0
 _warned = False
 _table_ready = False
+try:
+    _CONN_PING_EVERY_S = max(
+        0.0, float(os.environ.get("BOT_PNL_CONN_PING_EVERY_S", "15"))
+    )
+except (TypeError, ValueError):
+    _CONN_PING_EVERY_S = 15.0
 
 
 def _warn_once(msg):
@@ -46,7 +53,7 @@ def _warn_once(msg):
 
 def _get_conn():
     """Return a live connection, or None if unavailable (no raise)."""
-    global _conn
+    global _conn, _conn_last_ping_ts
     if not _DATABASE_URL:
         _warn_once("DATABASE_URL not set")
         return None
@@ -57,9 +64,13 @@ def _get_conn():
         return None
     if _conn is not None:
         try:
-            # cheap liveness check
+            now = time.time()
+            if (now - _conn_last_ping_ts) < _CONN_PING_EVERY_S:
+                return _conn
+            # cheap liveness check (throttled to avoid pinging every loop)
             with _conn.cursor() as cur:
                 cur.execute("SELECT 1")
+            _conn_last_ping_ts = now
             return _conn
         except Exception:
             try:
@@ -67,9 +78,11 @@ def _get_conn():
             except Exception:
                 pass
             _conn = None
+            _conn_last_ping_ts = 0.0
     try:
         _conn = psycopg2.connect(_DATABASE_URL, connect_timeout=5)
         _conn.autocommit = True
+        _conn_last_ping_ts = time.time()
         return _conn
     except Exception as e:
         _warn_once(f"connect failed ({e})")
@@ -1326,12 +1339,20 @@ def fetch_paper_aggregate(bot):
                 """
                 SELECT COALESCE(SUM(pnl_abs), 0.0),
                        COUNT(*),
-                       COUNT(*) FILTER (WHERE pnl_abs > 0)
+                       COUNT(*) FILTER (WHERE pnl_abs > 0),
+                       COUNT(*) FILTER (WHERE pnl_abs = 0
+                                     OR extra->>'non_economic' = 'true')
                 FROM paper_trades WHERE bot = %s
                 """,
                 (bot,),
             )
-            realized, closed, wins = cur.fetchone()
+            # 4th column is a CANDIDATE count, not a verdict: `is_non_economic`
+            # still decides. It exists so a clean book pays ONE round trip —
+            # the contract `test_a_clean_book_is_untouched_and_asks_no_second_query`
+            # pins, and which the first draft of this pass broke.
+            _agg = cur.fetchone() or (0.0, 0, 0, 0)
+            realized, closed, wins = _agg[0], _agg[1], _agg[2]
+            _cand = int(_agg[3] or 0) if len(_agg) > 3 else 0
         closed = int(closed or 0)
         wins = int(wins or 0)
         realized = float(realized or 0.0)
@@ -1352,6 +1373,46 @@ def fetch_paper_aggregate(bot):
         # a cheap way to avoid scanning a whole ledger to ask it. Fail-OPEN is
         # inherited: an unparseable row is ADMITTED, so this can never silently
         # shrink a book's totals beyond the declared windows.
+        # [2026-08-27 (tw)] EVENTS ARE NOT TRADES — the same withholding
+        # shape as the quarantine pass below, and for the same reason. A
+        # halt/flatten row has no basis (no entry price, no P&L) and was
+        # counted here as a CLOSE and, via `losses = closed - wins`, as a
+        # LOSS: 🙏 avo published 3W/10L over 13 "closes" on a book that had
+        # taken 4 real trades. The book re-seeds these counters from this
+        # aggregate at every boot, so the miscount was self-healing in the
+        # wrong direction.
+        #
+        # SQL narrows to CANDIDATES cheaply; `is_non_economic` DECIDES. The
+        # predicate is written once, in the owner ((hj)) — an earlier draft
+        # of this pass re-expressed it as a SQL FILTER and immediately
+        # drifted from it (three of the five funding-form keys), which is
+        # the second-copy failure in miniature.
+        #
+        # `realized` is deliberately NOT adjusted: an event's P&L is 0.00 by
+        # definition, so equity and pnl_abs cannot move — only the COUNTS.
+        try:
+            with conn.cursor() as cur:
+                if not _cand:
+                    raise StopIteration           # no candidates: no 2nd query
+                cur.execute(
+                    "SELECT pnl_abs, entry_price, extra FROM paper_trades "
+                    "WHERE bot = %s AND (pnl_abs = 0 "
+                    "      OR extra->>'non_economic' = 'true')",
+                    (bot,),
+                )
+                cand = cur.fetchall()
+            n_events = sum(1 for _p, _e, _x in cand
+                           if is_non_economic(_p, _e, _x))
+            if n_events:
+                closed -= n_events
+                # an event never has pnl > 0, so it was never in `wins`;
+                # subtracting it from `closed` alone is what turns a phantom
+                # LOSS back into nothing at all.
+        except StopIteration:
+            pass
+        except Exception as e:  # noqa: BLE001
+            _warn_once(f"paper-aggregate event filter failed ({e})")
+
         try:
             q_pairs = sorted({str(qp) for qp, qb, _lo, _hi, _why
                               in LEDGER_QUARANTINE if qb in str(bot or "")})
@@ -1476,6 +1537,84 @@ LEDGER_QUARANTINE = (
      "fabricated by a test run with DATABASE_URL exported: fixture entry "
      "100.01, +5.09% in 2.2s; not a trade (qc)"),
 )
+
+
+# The funding form: a funding book books ACCRUAL, never a price, so its
+# price-free rows are real trades and must never match the event signature.
+_FUNDING_FORM = ("entry_apr", "exit_apr", "accrued", "held_h", "fees")
+
+
+def is_non_economic(pnl_abs, entry_price, extra):
+    """True when a ledger row records an EVENT, not a TRADE.
+
+    [2026-08-27 (tw)] A daily-loss halt flattens positions the book cannot
+    attest — no entry basis, no P&L — and `publish_paper_trade` wrote them
+    into the closed-trade ledger anyway. `fetch_paper_aggregate` then counted
+    every one as a CLOSE and, because `losses = closed - wins`, as a LOSS.
+
+    Measured on the two real-money books: 🙏 avo published **3W / 10L on 13
+    closes** where the book had taken **4 real trades (3W / 1L)** — 9 of 13
+    "trades" were the 23/24-Aug flatten events — and 🔮 georgia 24W / 28L on
+    52 where the real record is 24W / 24L. The dashboard, the daily review
+    and every W/L reader has been reading a real-money book's record with
+    phantom losses in it, and the book itself re-seeds those counters from
+    this aggregate at every boot.
+
+    THE DISTINCTION IS NOT THE REASON STRING, and that is the whole care
+    needed here: `daily_loss` appears on BOTH. georgia's 25-Aug rail closed
+    five REAL positions at real prices for -$30.96, and her 22-Aug TRX
+    -$3.87 is a real forced flatten; those are losses the book genuinely
+    took and they MUST stay in the sample. The events are the rows with **no
+    basis at all**:
+
+      * `extra.non_economic is True` — the (th) write-site marker. This is
+        the forward CONTRACT and the only exact test.
+      * the LEGACY BRIDGE, declared rather than permanent: pnl == 0 AND no
+        entry price AND no funding form. The 13 rows above predate the
+        marker and no DB row carries it yet, so without this they would
+        stay miscounted forever.
+
+    The bridge's blast radius was MEASURED before it shipped, not assumed:
+    fleet-wide, `pnl == 0 AND entry_price IS NULL` matches **exactly those
+    13 rows and nothing else**. Funding books are the population that could
+    have been hurt — they legitimately record no price — and they have
+    **zero** zero-P&L rows (carry 0 of 105, farmer-shadow 0 of 215, garrett
+    0 of 56), so the conjunction cannot fire on them today. `_FUNDING_FORM`
+    makes that structural rather than lucky: a row carrying accrual
+    telemetry is a funding TRADE whatever its P&L rounds to.
+
+    Fail-OPEN on anything unparseable — a row that cannot be classified is
+    ADMITTED as a trade. A filter that swallows what it cannot read would
+    silently shrink the samples it touches, which is the disease and not the
+    cure (`is_quarantined`'s contract, verbatim, for the same reason).
+    """
+    try:
+        # ABSENT and UNREADABLE are different, and collapsing them is the
+        # same class again: `extra if isinstance(extra, dict) else {}` reads
+        # a malformed extra as "no funding telemetry", which is an
+        # ASSUMPTION about data it could not parse. None is genuinely empty;
+        # anything else non-dict is unreadable, so fail-OPEN and admit.
+        if extra is None:
+            ex = {}
+        elif isinstance(extra, dict):
+            ex = extra
+        else:
+            return False
+        if ex.get("non_economic") is True:
+            return True
+        # `float(pnl_abs or 0.0)` would coerce a MISSING P&L to zero — the
+        # very "fabricate what you do not know" class this owner exists to
+        # close, reproduced inside it. Caught by its own test before it
+        # shipped. An unknown P&L is NOT a zero P&L: admit the row.
+        if pnl_abs is None or float(pnl_abs) != 0.0:
+            return False
+        if entry_price is not None:
+            return False
+        if any(k in ex for k in _FUNDING_FORM):
+            return False
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def is_quarantined(bot, pair, closed_at):
@@ -1811,7 +1950,7 @@ if __name__ == "__main__":
 # never-raise pattern as everything above.
 
 
-def fetch_realized_window(bots, days=7):
+def fetch_realized_window(bots, days=7, exclude_reasons=None):
     """[2026-07-16 LIVE-LANE BALANCE] Per-bot realized P&L over the trailing
     window, straight from the paper_trades ledger: {bot: {"pnl", "closes"}}.
     Bots with no closes in the window get {"pnl": 0.0, "closes": 0} — present,
@@ -1827,15 +1966,51 @@ def fetch_realized_window(bots, days=7):
         _ensure_paper_trades_table(conn)
         from datetime import datetime, timedelta, timezone
         cut = (datetime.now(timezone.utc) - timedelta(days=float(days))).isoformat()
-        out = {str(b): {"pnl": 0.0, "closes": 0} for b in bots}
+        out = {str(b): {"pnl": 0.0, "closes": 0,
+                        "stripped_pnl": 0.0, "stripped_n": 0,
+                        "stripped_days": 0} for b in bots}
+        # [(vf)] A HALT IS AN EVENT, NOT A TRADE — and it was being counted as
+        # several. `exclude_reasons` names the exit families that are FORCED
+        # flattens rather than the strategy's own outcome; the fleet already
+        # owns this vocabulary as `fleet_bus.JUDGED_PAIRS[*]["strip_exits"]`,
+        # and the caller passes it rather than this module re-typing it.
+        # MEASURED on 🔮 georgia, 27-Aug: her 7d window read **-$36.96** and
+        # the evidence board cut her live clip to 0.75x on it — but **-$34.83
+        # of that was 10 halt rows spanning 6 events, five of them closed at
+        # ONE timestamp** (25-Aug 12:08). Her strategy's own 7d result was
+        # **-$2.13**, comfortably inside the bar. One bad afternoon, counted
+        # five times, shrank a real-money book.
+        # WHAT IS STRIPPED IS REPORTED, never silently dropped: the caller
+        # gets the excluded sum, row count and DISTINCT DAY count back, so a
+        # book that is genuinely halting often is still visible as such.
+        _ex = [str(r) for r in (exclude_reasons or []) if str(r)]
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0) FROM paper_trades "
-                "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
-                "AND closed_at >= %s GROUP BY bot",
-                (list(out), cut))
-            for b, n, s in cur.fetchall():
-                out[str(b)] = {"pnl": float(s or 0.0), "closes": int(n or 0)}
+            if _ex:
+                _like = "(" + " OR ".join(["reason ILIKE %s"] * len(_ex)) + ")"
+                cur.execute(
+                    "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0), "
+                    "COUNT(*) FILTER (WHERE " + _like + "), "
+                    "COALESCE(SUM(pnl_abs) FILTER (WHERE " + _like + "), 0), "
+                    "COUNT(DISTINCT LEFT(closed_at, 10)) "
+                    "  FILTER (WHERE " + _like + ") "
+                    "FROM paper_trades "
+                    "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
+                    "AND closed_at >= %s GROUP BY bot",
+                    tuple(f"%{r}%" for r in _ex) * 3 + (list(out), cut))
+                for b, n, tot, xn, xp, xd in cur.fetchall():
+                    out[str(b)] = {"pnl": float(tot or 0.0) - float(xp or 0.0),
+                                   "closes": int(n or 0) - int(xn or 0),
+                                   "stripped_pnl": float(xp or 0.0),
+                                   "stripped_n": int(xn or 0),
+                                   "stripped_days": int(xd or 0)}
+            else:
+                cur.execute(
+                    "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0) FROM paper_trades "
+                    "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
+                    "AND closed_at >= %s GROUP BY bot",
+                    (list(out), cut))
+                for b, n, s in cur.fetchall():
+                    out[str(b)].update(pnl=float(s or 0.0), closes=int(n or 0))
         return out
     except Exception as e:  # noqa: BLE001
         _warn_once(f"realized-window read failed ({e})")
@@ -2110,6 +2285,284 @@ def snapshot_equity(bot, equity, open_trades=None, realized=None):
         except (TypeError, ValueError):
             pass
     return save_history(str(bot) + ":equity", row)
+
+
+# --------------------------------------------------------------------------
+# census accumulation [2026-08-27 (vm)] — MAKE EVERY REFUSAL COUNTABLE
+#
+# MEASURED 27-Aug: not ONE of the 20 book rows on /pnl.json publishes a
+# time-accumulated counter. Every `scan` / `census` / `slot_census` in this
+# fleet is built fresh at the top of a loop, published, and destroyed — so the
+# 🎫 taker's `slot_census {offered: 4, slots_full: 4}`, the evidence its
+# position cap binds, is a sample of **n=1 CYCLE**. A gate that refuses without
+# counting cannot be priced, and I19 will not bank a widening that has no
+# number, so no loosening ever ships: the fleet is blind to its own refusals
+# and blindness resolves RESTRICTIVELY.
+#
+# This is the same shape `snapshot_equity` fixed for equity ((hl)): the books
+# already publish the number every loop, and bot_pnl is ONE UPSERTED ROW, so
+# there is no series and nothing can be summed over time. This starts the
+# series for censuses.
+#
+# PUBLISH-ONLY, and it must stay that way: nothing here reads a gate, and no
+# gate reads anything here. A counter that grows a consumer becomes a gate.
+
+#: Keys `census_window` OWNS in its own return value. A census bucket sharing
+#: one of these names cannot be stored (it would be silently overwritten by
+#: the rollup's own field at read time, which is the (hj) second-copy failure
+#: wearing a dict key), so `snapshot_census` refuses it at WRITE time and
+#: counts it as dropped — visible, rather than shadowed.
+CENSUS_RESERVED = ("loops", "hours", "binding_gate", "dropped",
+                   "unclassified", "truncated")
+
+#: Underscore-reserved, so it can never collide with a real bucket: how many
+#: fields of THIS loop's census were not countable. Always stamped, including
+#: when it is 0 — I1's rule at field scale, an ABSENT key means "written by a
+#: build older than (vm)", never "nothing was dropped".
+CENSUS_DROPPED_KEY = "_dropped"
+
+#: DECLARED NON-REFUSALS — a key here can never be `binding_gate`. Two kinds,
+#: and the distinction is the point: DENOMINATORS (the population a gate was
+#: applied to — `scanned`, `offered`, `signal`) and OUTCOMES (the candidate got
+#: through — `eligible`, `opened`). `held` sits here deliberately: "the book
+#: already owns this coin" is the book WORKING, not a gate starving it; the
+#: refusal that matters when every slot is taken is `slots_full` / `capped`,
+#: which are declared below. Read off the living books' own census literals
+#: (🧮 hull, 🏦 kiyosaki, 🌾 carry, 📐 grimes, 🧘 douglas, 🪁 kelly, 🧭 cook,
+#: 🎫 taker, 🎯 sniper) — not invented.
+CENSUS_DENOMINATORS = frozenset({
+    "scanned", "universe", "offered", "watching", "events", "signal",
+    "signal_capable", "fresh", "pending", "held", "in_band", "eligible",
+    "opened", "admitted", "entries", "class_ok", "waiting_admissible",
+    "depth_admitted", "depth_probes", "probes", "dip_opened", "dip_tickets",
+    "n", "total",
+})
+
+#: DECLARED REFUSALS — a candidate reached this bucket and was turned away.
+#: These are the only keys `binding_gate` may name. Same provenance as above.
+CENSUS_REFUSALS = frozenset({
+    "thin", "cold", "deep", "waiting", "noncrypto", "below_band", "above_band",
+    "below_gate", "adverse_basis", "slow_payback", "no_bars", "no_book",
+    "no_signal", "quiet", "ungraded_skip", "gated", "capped", "unpriceable",
+    "unsupported", "ref_blind", "resize_blind", "confirming", "embargoed",
+    "ghost_slip", "my_slip", "slip", "preipo", "slots_full", "lens_once",
+    "held_sym", "candle_err", "short_history", "stale_pending", "stops_blind",
+    "trend_dark", "fleet_veto", "repeat", "dip_capped", "dip_cooldown",
+    "dip_slip",
+    # [(vm)] 🏛️ the Parliament's four, added the same day its books gained a
+    # census. They are NOT folded into the near-miss `gated`, and the reason is
+    # the whole value of `binding_gate`: measured while the mapping was being
+    # tightened, 9 `stale-data` refusals lost to 3 slot refusals and the gate
+    # reported `slots_full` — naming the wrong fix. An undeclared refusal
+    # abstains (it is summed and listed in `unclassified`); a MIS-declared one
+    # sends the operator at the wrong knob, which is worse than silence.
+    "venue_stress", "daily_halt", "ml_gate", "blocked_other",
+})
+
+
+def _census_number(v):
+    """Coerce ONE census field to a storable count, else None (= not countable).
+
+    A bool is a count (🎯 the sniper publishes `capped: False`, and summing it
+    answers "how many loops was this capped?"). A STRING IS NOT, even when it
+    parses as one: `scan: "fresh"` and `"protections_locked"` are VERDICTS, and
+    `float()`-ing a verdict is how a string becomes a fake measurement — the one
+    thing a counter must never do. Non-finite floats are dropped rather than
+    stored, per I5, via the existing `_finite_or_none` owner."""
+    if isinstance(v, bool):
+        return int(v)
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        f = _finite_or_none(v)
+        return None if f is None else round(f, 4)
+    return None
+
+
+def _census_epoch(ts):
+    """`fetch_state_history`'s iso stamp -> epoch seconds, or None. Never raises.
+    A naive stamp is read as UTC (the fleet's internal clock, per CLAUDE.md);
+    a stamp we cannot parse returns None and its sample is EXCLUDED, because a
+    sample that cannot be placed on the clock cannot be placed in a window."""
+    if ts is None:
+        return None
+    try:
+        import datetime as _dt
+        s = str(ts).strip().replace("Z", "+00:00")
+        d = _dt.datetime.fromisoformat(s)
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=_dt.timezone.utc)
+        return d.timestamp()
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def snapshot_census(bot, census):
+    """[2026-08-27 (vm)] Append ONE loop's refusal census for `bot` to
+    bot_state_history under '<bot>:census'. Never raises; a dark DB is a no-op
+    returning False. Modelled on `snapshot_equity` — same seam, same contract,
+    same retention (`save_history` age-prunes every ~200th write; do NOT add a
+    second retention path).
+
+    Accepts any flat-ish dict of counters. Nested ONE level is flattened —
+    `{"verdicts": {"no_signal": 22}}` becomes `verdicts.no_signal: 22` — because
+    that shape is common here (🎯 the sniper's per-source census, 📐 grimes's
+    scorecard) and a nested dict is unsummable. Deeper nests are DROPPED.
+
+    Anything not countable (a string verdict, a list, a deeper nest, a
+    non-finite float, a name reserved by `census_window`) is dropped from the
+    stored row and counted under `_dropped`. Dropping SILENTLY would be its own
+    defect — "this census is not fully countable" is exactly the kind of fact
+    this fleet has repeatedly paid for not publishing — so the count rides with
+    the row and `census_window` sums it back out.
+
+    Returns save_history's bool. PUBLISH-ONLY: reads no gate, moves no lever."""
+    try:
+        items = list((census or {}).items())
+    except (AttributeError, TypeError):
+        return False
+    row = {}
+    dropped = 0
+    for k, v in items:
+        key = str(k)
+        if key.startswith("_") or key in CENSUS_RESERVED:
+            dropped += 1
+            continue
+        if isinstance(v, dict):
+            for k2, v2 in v.items():
+                sub = str(k2)
+                n = _census_number(v2)
+                if sub.startswith("_") or n is None:
+                    dropped += 1      # incl. every deeper nest
+                    continue
+                row[key + "." + sub] = n
+            continue
+        n = _census_number(v)
+        if n is None:
+            dropped += 1
+            continue
+        row[key] = n
+    row[CENSUS_DROPPED_KEY] = dropped
+    return save_history(str(bot) + ":census", row)
+
+
+def _binding_gate(sums):
+    """(winning refusal key or None, sorted list of unclassifiable keys).
+
+    A key must be a DECLARED refusal to win. A wrong guess here is worse than
+    no answer — calling `scanned` the binding gate would send a session to
+    widen the universe of a book whose slots are full — so a key in neither
+    declared set is EXCLUDED and REPORTED rather than assumed. That is why the
+    caller gets `unclassified` back: `binding_gate: None` then separates
+    "nothing was refused" from "nothing here could be read as a refusal".
+    Gauges land here on purpose (🪁 kelly's `dev_p98_bps`): their SUM is
+    meaningless and must never be read as a count of anything."""
+    cands, unclassified = [], []
+    for k, v in sums.items():
+        leaf = k.rsplit(".", 1)[-1]     # classify on the leaf; a parent is a group
+        if leaf in CENSUS_DENOMINATORS:
+            continue
+        if leaf not in CENSUS_REFUSALS:
+            unclassified.append(k)
+            continue
+        try:
+            n = float(v)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:                       # a bucket that refused nothing never wins
+            cands.append((k, n))
+    if not cands:
+        return None, sorted(unclassified)
+    # largest first, then lexicographic so a tie is DETERMINISTIC rather than
+    # dict-order (which would make the same window report two answers).
+    return min(cands, key=lambda kv: (-kv[1], kv[0]))[0], sorted(unclassified)
+
+
+def census_window(bot, hours=24, limit=None):
+    """[2026-08-27 (vm)] The read side of `snapshot_census`: every numeric
+    census field SUMMED over the trailing `hours`, so a refusal finally has a
+    denominator. Never raises.
+
+    Returns {} on empty/dark history — NOT a zero-filled dict, and this is the
+    whole point of the work. A fabricated `{"slots_full": 0}` reads as
+    *measured, nothing refused* when the truth is *no data*, which is I1 at
+    counter scale: a frozen row and a healthy one are byte-identical if you
+    only compare content.
+
+    Beside the sums:
+      loops        -- samples that went into it. 4 refusals in 1 loop and 4 in
+                      500 are the same integer and opposite facts.
+      hours        -- the ACTUAL span, first sample to last, NEVER the
+                      requested one. A book that has published for 20 minutes
+                      must not claim a 24h rate. One sample spans 0.0; a rate
+                      is undefined on one loop and 24.0 would be a lie.
+      binding_gate -- the declared refusal bucket holding the largest share, or
+                      None when nothing was refused. See `_binding_gate`.
+      dropped      -- summed `_dropped`: fields this census could not count.
+      unclassified -- keys that are neither a declared denominator nor a
+                      declared refusal, so they were kept OUT of binding_gate.
+      truncated    -- the fetch hit its own row limit, so the window is a
+                      SAMPLE and not the whole span. A result exactly equal to
+                      its own limit is a truncation signature ((qz)) — reported
+                      rather than left to look like an exhaustive read.
+
+    PUBLISH-ONLY: this is a report. No gate may consume it."""
+    try:
+        hours = float(hours)
+    except (TypeError, ValueError):
+        return {}
+    if not math.isfinite(hours) or hours <= 0:
+        return {}
+    if limit is None:
+        # ~120 samples/hour covers a 30s loop; the fleet's fastest book (🧲's
+        # mirror) runs 90s. Capped so a wide window cannot become a heavy query.
+        limit = min(5000, max(200, int(hours * 120)))
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return {}
+    rows = fetch_state_history(str(bot) + ":census", limit=limit)
+    if not rows:
+        return {}
+    cutoff = time.time() - hours * 3600.0
+    sums, stamps, loops, dropped = {}, [], 0, 0
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        ts = _census_epoch(r.get("ts"))
+        # rows arrive NEWEST FIRST, but an unparseable stamp must skip the row
+        # rather than end the walk — one bad stamp would otherwise truncate the
+        # window to whatever preceded it, silently.
+        if ts is None or ts < cutoff:
+            continue
+        payload = r.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        loops += 1
+        stamps.append(ts)
+        for k, v in payload.items():
+            key = str(k)
+            n = _census_number(v)
+            if n is None:
+                continue
+            if key == CENSUS_DROPPED_KEY:
+                dropped += int(n)
+                continue
+            if key.startswith("_"):
+                continue
+            sums[key] = sums.get(key, 0) + n
+    if not loops:
+        return {}
+    out = {k: (round(v, 4) if isinstance(v, float) else v)
+           for k, v in sums.items()}
+    gate, unclassified = _binding_gate(sums)
+    out["loops"] = loops
+    out["hours"] = round((max(stamps) - min(stamps)) / 3600.0, 4)
+    out["binding_gate"] = gate
+    out["dropped"] = dropped
+    out["unclassified"] = unclassified
+    out["truncated"] = len(rows) >= limit
+    return out
 
 
 def save_history(key, payload):

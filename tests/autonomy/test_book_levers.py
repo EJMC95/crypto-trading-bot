@@ -54,7 +54,7 @@ BOOK_LEVERS = [
     # slots and went 98.9h without an OPEN because only 14 of 203 books clear
     # $2M of 24h turnover (median book $0.043M); its own hot list was 13-16x
     # below the floor and KAITO missed by $2,000.
-    "carry.min_vol",
+    "carry.min_vol", "carry.payback_max_h",
     # [2026-08-03] FOUND BY THE COMPLETENESS TEST BELOW ON ITS FIRST RUN, not
     # by a human: `disloc.exit_bps` — the fleet's FIRST exit lever, shipped
     # (gu) 30-Jul — was registered on this lane and listed nowhere here, so it
@@ -372,7 +372,24 @@ def test_optimised_defaults_are_what_shipped():
     # 30-name hand list, so no scout book is added. This pin exists to make a
     # SILENT revert visible; a documented one moves the pin with its reason.
     assert spread.K == 5
-    assert spread.UNIVERSE_N == 30
+    # [2026-08-27 (uc)] UNIVERSE_N 30 -> 40 — the pin moves WITH ITS REASON,
+    # which is the escape this test's own comment above provides for exactly
+    # this case. At 30 the lever was STRUCTURALLY INERT: the core is 30 names,
+    # so `len(out) >= width` on the first pass and the scout top-up added ZERO
+    # (the bot's own file said so). 31 is the first width that admits anything;
+    # supply exhausts at 36, so 40 is the whole reachable move.
+    #
+    # WHY THIS IS NOT THE (jg) REVERT COMING BACK — the two are different
+    # changes and the confound is closed in code: (fz) moved K AND the universe
+    # together and its loss window IS the non-crypto window, while
+    # `resolve_universe` has crypto-screened the top-up since (ki), so width 40
+    # cannot re-admit SOXL. K is UNCHANGED at 5 and that is now measured rather
+    # than inherited: at the widened universe the carry/noise ratio reads
+    # K=3 0.02463 · K=5 0.02791 · K=8 0.02680 · K=12 0.02012, so the plateau
+    # centre the (ia) validation cleared is also the measured optimum here.
+    # Exposure is untouched by construction: gross is 2*K*clip, and the
+    # widening moves neither term nor the leg count.
+    assert spread.UNIVERSE_N == 40
     # Snap Back's gate was 40x its own median residual.
     assert disloc.ENTER_PCT == 0.98 and disloc.UNIVERSE_N == 40
     # Index Rider carried the fleet's LARGEST clip on a book with zero closes.

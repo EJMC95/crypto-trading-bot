@@ -64,6 +64,33 @@ FUNDING_BOOKS = ("funding", "carry", "kiyosaki", "hull", "garrett")
 OUTCOME_EXITS = ("tp", "take_profit", "roi", "stop", "sl", "stoploss",
                  "sell_into_strength", "range_top", "take_pro")
 
+#: [I21] THE PRE-REGISTERED FOLLOW-THROUGHS — and the reason this table exists.
+#: I21's own words: a bucket held only by the multiplicity referee is
+#: pre-registered and then "graded on closes AFTER registration, t>=2 on the
+#: fresh sample alone, NEVER by re-mining the window that generated them."
+#: Nothing enforced that. Measured 21-Aug, three days after the (qd)
+#: registration: 🎫 taker `exit:hold` reached n=62 pooled (t=3.53, p=0.0004)
+#: and the docket printed it under PROVEN WINNING — on a window whose first 53
+#: closes ARE the hypothesis. That headline is the re-mining I21 forbids, on
+#: the one instrument that exists to say a thing is proven. Its fresh sample
+#: was n=9: above the t-bar (t=2.99) but BELOW the MIN_N floor, so the honest
+#: verdict was "not yet decidable", one close away — a materially different
+#: statement. The sibling registration moved the other way: 🙏 avo pooled
+#: t=1.48 while its fresh 2 closes read t=-0.19, and pooling was propping the
+#: registration figure (t=2.31) up rather than testing it.
+#: A registration is a COMMITMENT, so this table is append-mostly: `since` and
+#: the at-registration statistics are the record and must not be edited to
+#: match a later reading. Retire a row only when its verdict is CONFIRMED or
+#: REFUTED on the fresh sample, and say which in the changelog.
+PRE_REGISTERED = {
+    ("lighter-ticket-taker-lshadow", "exit", "hold"): dict(
+        since="2026-08-18T11:29:15+00:00", n=53, t=2.65, mean_pct=0.836,
+        source="(qd)/I21 — the winners' docket's own first live run"),
+    ("freqtrade-avo-maria-lshadow", "book", "*"): dict(
+        since="2026-08-18T11:29:15+00:00", n=12, t=2.31, mean_pct=1.313,
+        source="(qd)/I21 — the winners' docket's own first live run"),
+}
+
 
 # ---------------------------------------------------------------- statistics
 def _betacf(a, b, x, itmax=200, eps=3e-12):
@@ -166,11 +193,26 @@ def era_scoped_rows(trades):
 
     Row: dict(pct, abs, closed, opened, exit, tag). Buckets are built from
     these, so every bucket inherits the gate's sample definition exactly.
+
+    [2026-08-26 daily review] PHANTOM CLOSES are excluded through the gate's
+    own `is_phantom_close` (identity import — a second copy of that signature
+    would be a second rule, and the two graders would drift apart on the exact
+    rows that matter). The referee was admitting halt/flatten EVENTS as trades
+    on precisely the two REAL-MONEY books: 13 such rows —
+    `freqtrade-avo-maria-lighter` 9, `freqtrade-georgia-lighter` 4 — which put
+    a real-money row on the docket's "ON THEIR WAY" list at n=13/t=1.46 when
+    its true traded n is 4, below the MIN_N floor. Nine $0.00 rows do not just
+    inflate n; they shrink the sample variance, so they bias `t` UPWARD — the
+    referee erred toward calling a real-money book a winner. `golive_readiness`
+    has filtered these since (th) and the docket did not, so the fleet's two
+    graders disagreed about the same real-money ledger.
     """
     by_bot = defaultdict(list)
     for r in trades:
         bot = r.get("bot")
         if not bot or bot in LEGACY_BOTS or r.get("is_open"):
+            continue
+        if gr.is_phantom_close(r):
             continue
         pct = r.get("profit_ratio")
         closed = _parse_ts(r.get("close_ts"))
@@ -237,6 +279,48 @@ def buckets_of(by_bot):
     return {k: out[k] for k in best.values()}
 
 
+def followthrough(key, rows):
+    """[I21] The pre-registered test: the FRESH closes alone, never the pooled.
+
+    Returns None for a bucket that was never pre-registered. Otherwise a dict
+    carrying the registration record and the fresh-sample verdict, plus the two
+    readings that decided the 21-Aug call and would otherwise be invisible:
+    `tag_share` (the fresh sample was 9 of 9 ONE tag, i.e. a different mixture
+    from the one registered) and `days` (6 of those 9 closed inside a single
+    UTC day, so they are not 9 independent draws — the (ky)/(kw) clustering
+    shape). Both are REPORTED, never bars: this returns a verdict, and a
+    verdict computed on a sample below MIN_N is `undecided` by the same I16
+    floor that keeps a lucky 3-close streak away from the referee.
+    """
+    reg = PRE_REGISTERED.get(key)
+    if not reg:
+        return None
+    since = _parse_ts(reg["since"])
+    fresh = [r for r in rows if since is not None and r["closed"] > since]
+    out = dict(reg=reg, n=len(fresh))
+    if not fresh:
+        out.update(verdict="undecided", why="no closes since registration")
+        return out
+    pcts = [r["pct"] * 100 for r in fresh]
+    t = t_stat(pcts)
+    tags = defaultdict(int)
+    for r in fresh:
+        tags[r["tag"] or "-"] += 1
+    out.update(t=round(t, 2), mean_pct=round(sum(pcts) / len(pcts), 3),
+               total=round(sum(r["abs"] for r in fresh), 2),
+               p=t_sf(t, len(pcts) - 1),
+               tag_share=round(max(tags.values()) / len(fresh), 2),
+               days=len({r["closed"].date() for r in fresh}))
+    if len(fresh) < MIN_N:
+        out.update(verdict="undecided",
+                   why=f"fresh n={len(fresh)} < MIN_N {MIN_N} (I16 floor)")
+    elif t >= 2.0:
+        out.update(verdict="confirmed", why="t >= 2.0 on the fresh sample alone")
+    else:
+        out.update(verdict="not_confirmed", why="t < 2.0 on the fresh sample alone")
+    return out
+
+
 def grade_buckets(bk):
     graded = {}
     for key, rows in bk.items():
@@ -253,6 +337,7 @@ def grade_buckets(bk):
             rate_30d=round(n / span_d * 30, 1),
             drift=(key[2].startswith("short") or key[2] == "short")
             and not any(f in key[0] for f in FUNDING_BOOKS),
+            prereg=followthrough(key, rows),
         )
     return graded
 
@@ -262,6 +347,12 @@ def report(graded, fdr=FDR):
     winners = bh_survivors(tested, fdr)
     lines = [f"WINNERS' DOCKET — {len(tested)} buckets tested (era-scoped, "
              f"quarantine-filtered, n>={MIN_N}), BH at FDR {fdr}"]
+    # [I21] A pre-registered bucket may NOT be crowned on the pooled window —
+    # that window contains the closes that generated the hypothesis. It stays
+    # in `tested` (so m is unchanged and no other bucket's BH threshold moves
+    # in its favour) and is decided below, on its fresh sample alone.
+    held = sorted(k for k in winners if k in PRE_REGISTERED)
+    winners = {k for k in winners if k not in PRE_REGISTERED}
     if winners:
         lines.append("\nPROVEN WINNING (survives the referee):")
         for k in sorted(winners, key=lambda k: graded[k]["p"]):
@@ -277,8 +368,30 @@ def report(graded, fdr=FDR):
                          + (f"  ⚠ {','.join(stamps)}" if stamps else ""))
     else:
         lines.append("\nPROVEN WINNING: none — no bucket survives the referee today.")
+    reg_keys = [k for k in graded if k in PRE_REGISTERED]
+    if reg_keys:
+        lines.append("\nPRE-REGISTERED FOLLOW-THROUGH (I21 — graded on closes "
+                     "AFTER registration, never on the window that generated "
+                     "the hypothesis):")
+        for k in sorted(reg_keys):
+            g = graded[k]
+            ft = g["prereg"]
+            r = ft["reg"]
+            lines.append(f"  {k[0]} [{k[1]}:{k[2]}]  registered {r['since'][:10]} "
+                         f"at n={r['n']} t={r['t']} mean={r['mean_pct']:+.3f}%")
+            lines.append(f"      pooled (NOT the test): n={g['n']} t={g['t']} "
+                         f"mean={g['mean_pct']:+.3f}% p={g['p']:.4f}"
+                         + ("  <- would have been crowned PROVEN on the "
+                            "re-mined window" if k in held else ""))
+            if ft["n"]:
+                lines.append(f"      FRESH: n={ft['n']} t={ft['t']} "
+                             f"mean={ft['mean_pct']:+.3f}% ${ft['total']:+.2f} "
+                             f"p={ft['p']:.4f} · {ft['days']} close-day(s), "
+                             f"dominant tag {ft['tag_share']:.0%}")
+            lines.append(f"      => {ft['verdict'].upper()} — {ft['why']}")
     near = [(k, g) for k, g in graded.items()
-            if k not in winners and g["t"] >= NEAR_T and g["mean_pct"] > 0]
+            if k not in winners and k not in PRE_REGISTERED
+            and g["t"] >= NEAR_T and g["mean_pct"] > 0]
     near.sort(key=lambda kg: kg[1]["p"])
     if near:
         lines.append("\nON THEIR WAY (t >= 1, not yet proven — n needed at t-bar 2.0):")

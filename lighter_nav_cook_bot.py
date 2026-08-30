@@ -152,6 +152,40 @@ MAX_POSITIONS = int(os.environ.get("COOK_MAX_POSITIONS", "4"))
 MAX_ENTRY_SLIP_BPS = float(os.environ.get("COOK_MAX_SLIP_BPS", "30"))
 MIN_VOL_M = float(os.environ.get("COOK_MIN_VOL_M", "0.5"))
 
+# [2026-08-26] THE UNIVERSE WIDTH IS THIS BOOK'S OWN KNOB NOW — a DECOUPLING,
+# not a widening, and the default is chosen so that today's behaviour does not
+# move by one byte.
+#
+# THE COUPLING THAT WAS HERE: `resolve_universe` passed `ghost.UNIVERSE_N` —
+# the RETIRED dislocation module's constant (`lighter_dislocation_bot.py`,
+# `DISLOC_UNIVERSE_N`, default 40). **`lighter_band_kelly_bot` reads the SAME
+# constant**, so moving it to change THIS book's width would silently have
+# changed 🪁 band-kelly's too: two books, one knob, and nothing in either file
+# said so. band-kelly is 6.9 days into a 30-day (hm) window with a measured
+# verdict of NO CHANGE, and a policy move there forfeits the whole sample — so
+# the shared constant was a live hazard, not a tidiness question.
+#
+# band-kelly KEEPS reading `ghost.UNIVERSE_N`, deliberately: its whole claim is
+# "the ghost's own rules, sign-flipped", it imports the ghost's config
+# wholesale, and its own tests pin that import identity. It is not this file's
+# to change. What this line buys is that Cook's width is now independently
+# movable WITHOUT touching band-kelly.
+#
+# NOT A WIDENING, AND NOT AN INVITATION TO ONE. The value is the ghost's
+# current 40, so the resolved universe is byte-identical to the pre-decoupling
+# path (driven and compared in `tests/autonomy/test_cook_universe_decoupled.py`
+# and in `_selftest` below). Cook is days into its own 30-day window on a
+# founding claim of n=216/+0.367%/trade; a width change is a SEPARATE, LATER,
+# evidence-backed act (I19 — a widening is paid for in expectancy) and this is
+# only its prerequisite.
+#
+# NOTE the registered lever `disloc.universe_n` reaches NEITHER book: it is
+# applied by the retired ghost's own `apply_tuning`, which never runs because
+# that bot is idled — registered, caged, and structurally unreachable (I18's
+# "a lever with no reader" in its purest form). So the env var below is the
+# only reachable control on this width, which is why it must be Cook's own.
+UNIVERSE_N = int(os.environ.get("COOK_UNIVERSE_N", "40"))
+
 # Load-bearing, not cosmetic: `(qq)` measured the fleet's own fills at a MEAN
 # 17.49 bps and a p90 of 398 bps below $0.1M. This band lives in non-crypto
 # books, which are the fat-tail end of that distribution.
@@ -284,8 +318,12 @@ def resolve_universe(held):
     `(hk)`: a coin leaving the list keeps its exit, its stop and its clock.
     The scan is UNSCREENED — the class screen applies at the ENTRY SITE only,
     because the residual distribution the band is measured against is the
-    unscreened one."""
-    out = list(ghost.resolve_universe(list(ghost.COINS), ghost.UNIVERSE_N,
+    unscreened one.
+
+    The RESOLVER is the ghost's (one owner, never a second copy of the rule);
+    the WIDTH is this book's own `UNIVERSE_N`, because `ghost.UNIVERSE_N` is
+    shared with 🪁 band-kelly — see the constant's own note."""
+    out = list(ghost.resolve_universe(list(ghost.COINS), UNIVERSE_N,
                                       MIN_VOL_M))
     have = set(out)
     for c in held or ():
@@ -312,16 +350,109 @@ def sample_block(recent):
             "sum_usd": round(sum(r.get("pnl") or 0.0 for r in rows), 2)}
 
 
-def build_state(positions, recent, pend, last_ts, now=None):
+def build_state(positions, recent, pend, last_ts, now=None,
+                realized=0.0, n_closed=0, n_wins=0):
     """The persistence blob — ONE builder. `pend` is the confirm counter, so a
-    restart cannot skip the 2-loop confirm the measurement was made under."""
+    restart cannot skip the 2-loop confirm the measurement was made under.
+
+    [2026-08-20] `realized` / `n_closed` / `n_wins` ARE PERSISTED, and were
+    not. `main()` read all three out of this blob at boot (`st.get("n_closed")`)
+    and this builder never put them in — so every restart silently reset the
+    book's entire realised record to zero. MEASURED on the live row the day it
+    was found: the dashboard published `closed_trades: 0`, `pnl_abs: 0.0`,
+    `equity: 1000.00` while this book's own ledger held **34 closes and
+    -$3.80**. That is I4's silent-write-failure shape with the sign reversed —
+    not a write that fails, a field that was never written — and it is
+    load-bearing well beyond display: `golive_readiness`, `fleet_allocation`
+    and the horizon sweep all read the row, so the book was structurally
+    invisible to every organ that grades it."""
     return {"positions": positions, "recent": recent, "pend": pend,
-            "last_ts": last_ts,
+            "last_ts": last_ts, "realized": float(realized),
+            "n_closed": int(n_closed), "n_wins": int(n_wins),
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, recent, open_pnl, realized):
-    """The published `extra` — ONE builder ((hj))."""
+def offuniverse_census(rows, universe, lo_bps, hi_bps, min_vol_m,
+                       class_of=None, excluded=(7,)):
+    """Band activity on coins this book does NOT scan — REPORT ONLY.
+
+    [2026-08-20] THE STALL THIS BOOK COULD NOT EXPLAIN. `resolve_universe`
+    filters by VOLUME before the scan, so a dislocation on a sub-floor coin
+    never reaches `census` at all. `in_band: 0` was therefore byte-identical
+    between "the band is quiet" and "the band is busy with names I do not
+    scan", and distinguishing them took a manual tape replay. That is (lv)/I18
+    one layer earlier than usual — at the universe filter, not the entry gate.
+
+    MEASURED the day this shipped: over 23.9h the [45,60)bps band produced
+    **252 confirmed in-band events and this book could trade 3**. H100 alone
+    was 174 of them at **$0.02M** volume; UNITREE/CXMT/MRNA/ANSEM are class 7
+    (pre-IPO). Every one is refused by a screen this book MEASURED and should
+    keep — the `(qq)` fill study puts the fleet's own slippage at a mean
+    17.49bps and p90 398bps below $0.1M, and pre-IPO is the band's only
+    NEGATIVE class (-0.165%, n=45). So this counts them; it must never admit
+    them.
+
+    Pure and total: no I/O, and an unreadable row is skipped rather than
+    guessed at. `class_of` is injectable so the selftest needs no bus.
+    """
+    seen = {str(s).strip().upper() for s in (universe or ())}
+    out = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0, "top": []}
+    for r in rows or ():
+        try:
+            raw = r.get("sym")
+            if raw is None:
+                continue          # `str(None)` is "NONE" — truthy, and a coin
+                                  # that does not exist. Caught by the selftest.
+            sym = str(raw).strip().upper()
+            prem = float(r.get("prem_bps"))
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not sym or not (lo_bps <= abs(prem) < hi_bps):
+            continue
+        if sym in seen:
+            continue                      # already counted by the real census
+        out["in_band"] += 1
+        vol = r.get("vol_m")
+        vol = float(vol) if isinstance(vol, (int, float)) else None
+        try:
+            cls = class_of(sym) if class_of else None
+        except Exception:      # noqa: BLE001
+            cls = None         # unknown class -> falls through to thin/other,
+                               # never raises out of a REPORTING helper
+        if cls in excluded:
+            out["preipo"] += 1
+            why = "preipo"
+        elif vol is not None and vol < min_vol_m:
+            out["thin"] += 1
+            why = "thin"
+        else:
+            # In the band, not excluded, not thin — and still not scanned.
+            # That is the ONE bucket worth an operator's attention here,
+            # because it is the only one this book's own rules do not explain.
+            out["other"] += 1
+            why = "unscanned"
+        if len(out["top"]) < 5:
+            out["top"].append({"sym": sym, "prem_bps": round(prem, 1),
+                               "vol_m": vol, "why": why})
+    return out
+
+
+def build_extra(census, positions, recent, open_pnl, realized,
+                offuniverse=None):
+    """The published `extra` — ONE builder ((hj)).
+
+    [25-Aug (tk)] `offuniverse` joins the SIGNATURE. (sq) shipped the census
+    and threaded it into the publish CALL (`offuniverse=_offuni`) without
+    adding the parameter here, so every publish raised TypeError, the
+    handler printed one log line, and the bot traded on MUTE — the row froze
+    4.5 days behind `status:"online"` while the process was healthy. The
+    selftest now drives this builder with the loop's exact call shape so a
+    signature/call drift fails offline instead of silencing the row. None
+    degrades to the zeros-with-error shape — absent is the ambiguity the
+    census exists to remove ((sq))."""
+    if offuniverse is None:
+        offuniverse = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0,
+                       "top": [], "error": True}
     return {
         "mode": "dry-run",
         "venue": "lighter",
@@ -343,7 +474,13 @@ def build_extra(census, positions, recent, open_pnl, realized):
             "gross_max_usd": CLIP_USD * MAX_POSITIONS,
             "max_entry_slip_bps": MAX_ENTRY_SLIP_BPS,
             "min_vol_m": MIN_VOL_M,
-            "universe_n": ghost.UNIVERSE_N,
+            # TWO NUMBERS, NOT ONE SHARED CONSTANT. `universe_n` is THIS
+            # book's width; `ghost_universe_n` is the retired ghost's constant
+            # that 🪁 band-kelly still resolves against. They are equal today
+            # by choice, and the row is where a future divergence becomes
+            # visible instead of being inferred from two source files.
+            "universe_n": UNIVERSE_N,
+            "ghost_universe_n": ghost.UNIVERSE_N,
             "confirm_loops": CONFIRM_LOOPS,
             "confirm_s": CONFIRM_LOOPS * LOOP_SECONDS,
             "study_confirm_s": STUDY_CONFIRM_S,
@@ -353,6 +490,7 @@ def build_extra(census, positions, recent, open_pnl, realized):
                           % GATE_HI_BPS,
         },
         "scan": census,
+        "offuniverse": offuniverse,
         "sample": sample_block(recent),
         "thesis": {
             "cell": "dislocation mirror, residual band [%.0f,%.0f) bps"
@@ -389,6 +527,8 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
             side=pos["side"],
             entry_price=pos.get("entry"), exit_price=exit_px,
             extra={"dev_entry_bps": pos.get("dev_entry_bps"),
+                   # [(so)] I22 receipt: the brain scale this stake was sized at.
+                   "brain_mult": pos.get("brain_mult"),
                    "dev_exit_bps": (round(dev_now, 1)
                                     if dev_now is not None else None),
                    "ghost_side": pos.get("ghost_side"),
@@ -399,16 +539,24 @@ def _close(bot_id, coin, pos, reason, exit_px, pnl, dev_now=None):
         print("[%s] ledger write failed for %s: %s" % (now_iso(), coin, exc))
 
 
-def _open(positions, coin, dev_bps, bv, t0, cls=None):
+def _open(positions, coin, dev_bps, bv, t0, cls=None, notional=None,
+          brain_mult=1.0):
     """Open the mirror leg. Entry price is the REAL side's VWAP for my clip —
-    a long pays the ask walk, a short earns the bid walk."""
+    a long pays the ask walk, a short earns the bid walk.
+
+    [(so)] `bv` must be the book view walked for `notional`, not for the flat
+    clip: the whole point of this entry price is that it pays the walk, so a
+    brain-scaled clip priced off the base clip's VWAP would book a fill the
+    venue never offered. The caller re-walks; this asserts nothing it cannot
+    see, which is why the caller's re-walk is fail-CLOSED."""
     side = mirror_side(dev_bps)
     px = bv["buy_vwap"] if side == "long" else bv["sell_vwap"]
     if not px or px <= 0:
         return False
     positions[coin] = {
         "coin": coin, "side": side, "entry": px, "last_px": px,
-        "notional": CLIP_USD, "t0": t0,
+        "notional": CLIP_USD if notional is None else float(notional),
+        "brain_mult": brain_mult, "t0": t0,
         "dev_entry_bps": round(dev_bps, 1),
         "ghost_side": ghost_side(dev_bps),
         "cls": cls,
@@ -439,6 +587,41 @@ def main():
     realized = float(st.get("realized") or 0.0)
     n_closed = int(st.get("n_closed") or 0)
     n_wins = int(st.get("n_wins") or 0)
+
+    # [2026-08-27 (vk)] AND THE RECORD THE (sa) FIX COULD NOT RECOVER.
+    # (sa) made these three fields PERSIST; it could not restore the 34
+    # closes already lost to the restarts before it. So this row kept
+    # publishing `closed_trades: 3 / pnl_abs: -5.82 / equity: 994.18`
+    # against its OWN ledger's 37 closes / -$9.62 — the row overstating
+    # equity by $3.80 and disagreeing with every ledger-reading grader
+    # (golive_readiness, fleet_allocation, the horizon sweep all read the
+    # ROW). Persisting a counter forward does not repair a counter that
+    # started wrong.
+    #
+    # `fetch_paper_aggregate` is the fleet's existing answer — its whole
+    # docstring is "lets a bot recover its cumulative totals after a
+    # local-file wipe" — and this book simply never called it. It is
+    # quarantine- and event-filtered ((tw)), so it returns the ADMISSIBLE
+    # record rather than a raw row count.
+    #
+    # ADOPT-ON-MORE, never overwrite: the ledger is the durable record, so
+    # it may only ever RAISE these counters. A ledger read that is short
+    # (a partial fetch, a filtered window, a DB blip returning None) can
+    # therefore never shrink a book's own history — the failure direction
+    # that would turn a recovery into the very data loss it repairs.
+    try:
+        _agg = store.fetch_paper_aggregate(bot_id)
+        if _agg and int(_agg.get("closed") or 0) > n_closed:
+            print("[%s] counters BEHIND the ledger (%d closed vs %d) — "
+                  "adopting the ledger's record: realized %+.2f -> %+.2f"
+                  % (now_iso(), n_closed, int(_agg["closed"]),
+                     realized, float(_agg.get("realized") or 0.0)))
+            realized = float(_agg.get("realized") or 0.0)
+            n_wins = int(_agg.get("wins") or 0)
+            n_closed = int(_agg["closed"])
+    except Exception as e:  # noqa: BLE001
+        print("[%s] ledger re-seed skipped (%s) — keeping persisted counters"
+              % (now_iso(), e))
 
     while True:
         t0 = time.time()
@@ -476,6 +659,13 @@ def main():
         census = {"scanned": len(universe), "ref_blind": 0 if ref else 1,
                   "no_book": 0, "held": 0, "in_band": 0, "below_band": 0,
                   "above_band": 0, "preipo": 0, "confirming": 0,
+                  # [(so)] a candidate the brain resized and whose book could
+                  # not then be re-walked at the sized clip. Its own bucket
+                  # because "we could not price the SIZE" is a different
+                  # refusal from "the venue has no book" and from "too thin" —
+                  # collapsing it into either makes a brain-scale problem read
+                  # as a venue problem for as long as it lasts.
+                  "resize_blind": 0,
                   "slip": 0, "capped": 0, "opened": 0}
 
         for coin in universe:
@@ -550,18 +740,72 @@ def main():
                 census["capped"] += 1
                 continue
             side = mirror_side(dev_bps)
-            slip = (bv.get("buy_slip_bps") if side == "long"
-                    else bv.get("sell_slip_bps"))
+            # [2026-08-20 (so)] the brain sizes this entry, keyed on the SAME
+            # `<side>-navband` _close publishes. A resized clip must be
+            # RE-WALKED before it is priced or gated: this book's entry is a
+            # VWAP through the real book and its slip gate is the one thing
+            # standing between it and a thin coin, so pricing a 2x clip off
+            # the 1x walk would understate both. Fail-CLOSED — no re-walk, no
+            # entry.
+            _clip, _bm = (fleet_bus.brain_clip(
+                bot_id, "%s-navband" % side, CLIP_USD,
+                deployed_usd=sum(p.get("notional") or 0.0
+                                 for p in positions.values()),
+                gross_cap_usd=fleet_bus.brain_gross_cap(MAX_POSITIONS,
+                                                        CLIP_USD))
+                if fleet_bus is not None else (CLIP_USD, 1.0))
+            bv_e = bv
+            if _bm != 1.0:
+                try:
+                    bv_e = ghost.book_view(ctx, coin, _clip)
+                except Exception:  # noqa: BLE001
+                    bv_e = None
+                if not bv_e:
+                    census["resize_blind"] += 1
+                    continue
+            slip = (bv_e.get("buy_slip_bps") if side == "long"
+                    else bv_e.get("sell_slip_bps"))
             if slip is None or slip > MAX_ENTRY_SLIP_BPS:
                 census["slip"] += 1
                 continue
-            if _open(positions, coin, dev_bps, bv, t0, cls=cls):
+            if _open(positions, coin, dev_bps, bv_e, t0, cls=cls,
+                     notional=_clip, brain_mult=_bm):
                 census["opened"] += 1
                 pend.pop(coin, None)
-                print("[%s] OPEN %s %s dev %+.1fbps clip $%.0f"
-                      % (now_iso(), coin, side, dev_bps, CLIP_USD))
+                print("[%s] OPEN %s %s dev %+.1fbps clip $%.0f%s"
+                      % (now_iso(), coin, side, dev_bps, _clip,
+                         "" if _bm == 1.0 else " (brain %.2fx)" % _bm))
 
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())
+        # I18: the OFF-UNIVERSE band view. Fail-safe — a dark bus yields [] and
+        # the block reports zeros rather than vanishing, because a MISSING block
+        # would reintroduce the very ambiguity it exists to remove.
+        # [2026-08-21] THE WHOLE BLOCK IS INSIDE THE TRY, not just the fetch.
+        # Shipped 20-Aug with only the `scout_prem_outliers()` call guarded —
+        # but `class_of` below calls `fleet_bus.venue_class()`, which does I/O,
+        # and it sat OUTSIDE. A REPORTING block must never be able to take a
+        # trading loop down, and this one could: nav-cook stopped publishing at
+        # the deploy that carried it and was dark for 11.5h while every other
+        # service in the same run stayed fresh. Whatever the proximate throw,
+        # the shape was mine — a census is worth exactly zero trades, so it
+        # gets zero authority to interrupt one.
+        try:
+            _rows = (fleet_bus.scout_prem_outliers()
+                     if fleet_bus is not None else [])
+            _offuni = offuniverse_census(
+                _rows, universe, GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                class_of=((lambda s: fleet_bus.venue_class(s))
+                          if (fleet_bus is not None and not ALLOW_PREIPO)
+                          else None),
+                excluded=tuple(EXCLUDED_CLASSES))
+        except Exception as _exc:      # noqa: BLE001
+            # Zeros, never absent: a MISSING block reintroduces the ambiguity
+            # this exists to remove, so it reports "I could not look" instead.
+            print("[%s] offuniverse census failed (reporting only, book "
+                  "unaffected): %s" % (now_iso(), _exc))
+            _offuni = {"in_band": 0, "thin": 0, "preipo": 0, "other": 0,
+                       "top": [], "error": True}
+
         equity = START_EQUITY + realized + open_pnl
         try:
             # "online", NOT "running": the watchdog's NOT-ONLINE check accepts
@@ -575,7 +819,8 @@ def main():
                 pnl_pct=(equity - START_EQUITY) / START_EQUITY,
                 open_trades=len(positions), closed_trades=n_closed,
                 wins=n_wins, losses=max(0, n_closed - n_wins),
-                extra=build_extra(census, positions, recent, open_pnl, realized),
+                extra=build_extra(census, positions, recent, open_pnl,
+                                  realized, offuniverse=_offuni),
             )
             store.snapshot_equity(bot_id, equity, len(positions), realized)
         except Exception as exc:  # noqa: BLE001
@@ -583,7 +828,9 @@ def main():
 
         try:
             saved = store.save_state(
-                bot_id, build_state(positions, recent, pend, t0))
+                bot_id, build_state(positions, recent, pend, t0,
+                                    realized=realized, n_closed=n_closed,
+                                    n_wins=n_wins))
             if saved is False:
                 # I4: never discard a persistence result.
                 print("[%s] STATE NOT PERSISTED — positions/clock at risk"
@@ -689,6 +936,17 @@ def _selftest():
     st = build_state({}, [], {}, 1.0, now=2.0)
     assert st["saved_ts"] == 2.0 and st["pend"] == {}
 
+    # [2026-08-20] THE REALISED RECORD MUST SURVIVE A RESTART (I4). main()
+    # reads all four of these back out of the blob at boot; a builder that
+    # drops them republishes a traded book as a virgin one — which is exactly
+    # what the live row did (closed_trades 0 against a 34-close ledger).
+    st = build_state({"X": {}}, [], {}, 1.0, now=2.0,
+                     realized=-3.8, n_closed=34, n_wins=11)
+    for k, v in (("realized", -3.8), ("n_closed", 34), ("n_wins", 11)):
+        assert st[k] == v, "%s must persist — a restart resets the book's record" % k
+    # ...and the round trip must reconstruct them the way main() does.
+    assert int(st.get("n_closed") or 0) == 34 and float(st.get("realized") or 0) == -3.8
+
     # NO LEVERAGE, NO REAL MONEY: this module must never size off equity or
     # touch a live venue mode.
     # Token built at RUNTIME: a literal here would make the scan match its own
@@ -703,6 +961,153 @@ def _selftest():
 
     sb = sample_block([{"pnl": 1.0, "pct": 0.01}, {"pnl": -0.5, "pct": -0.005}])
     assert sb["n"] == 2 and sb["win"] == 0.5
+    # ---------------------------------------------------------------- (2026-08-20)
+    # THE OFF-UNIVERSE BAND CENSUS. This exists because `in_band: 0` could not
+    # distinguish "band quiet" from "band busy with names I do not scan", and
+    # telling them apart took a manual tape replay.
+    _uni = ["SOXL", "SNDK"]
+    _rows = [
+        {"sym": "SOXL", "prem_bps": 50.0, "vol_m": 1.7},    # IN universe -> skip
+        {"sym": "H100", "prem_bps": 52.0, "vol_m": 0.02},   # thin
+        {"sym": "H100b", "prem_bps": -47.0, "vol_m": 0.02},  # thin, negative side
+        {"sym": "UNITREE", "prem_bps": 55.0, "vol_m": 0.80},  # pre-IPO
+        {"sym": "WIDE", "prem_bps": 120.0, "vol_m": 9.0},   # out of band -> skip
+        {"sym": "NARROW", "prem_bps": 12.0, "vol_m": 9.0},  # out of band -> skip
+        {"sym": "ODD", "prem_bps": 50.0, "vol_m": 9.0},     # liquid, not excluded
+        {"sym": None, "prem_bps": 50.0},                    # junk -> skipped
+        {"sym": "NOPREM", "vol_m": 9.0},                    # no premium -> skipped
+    ]
+    _cls = {"UNITREE": 7}.get
+    _o = offuniverse_census(_rows, _uni, GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                            class_of=_cls, excluded=(7,))
+    assert _o["in_band"] == 4, _o          # H100, H100b, UNITREE, ODD
+    assert _o["thin"] == 2, _o
+    assert _o["preipo"] == 1, _o
+    assert _o["other"] == 1, _o
+    assert _o["thin"] + _o["preipo"] + _o["other"] == _o["in_band"], (
+        "every off-universe in-band coin must land in exactly one bucket, or "
+        "the block can silently lose a reason — the defect it exists to remove")
+    assert all(t["sym"] != "SOXL" for t in _o["top"]), \
+        "a coin the book DOES scan is already in `census` and must not be counted twice"
+
+    # It must be TOTAL on junk, not merely not-crash: a dark/garbled bus is the
+    # normal failure here and must report zeros, never vanish.
+    _z = offuniverse_census([], [], GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M)
+    assert _z == {"in_band": 0, "thin": 0, "preipo": 0, "other": 0, "top": []}, _z
+    assert offuniverse_census(None, None, GATE_LO_BPS, GATE_HI_BPS,
+                              MIN_VOL_M)["in_band"] == 0
+    assert offuniverse_census([{"junk": 1}, 7, None], [], GATE_LO_BPS,
+                              GATE_HI_BPS, MIN_VOL_M)["in_band"] == 0
+
+    # A REPORTING HELPER MAY NEVER RAISE. [2026-08-21] The 20-Aug ship guarded
+    # only the bus FETCH; `class_of` does I/O and sat outside it, so a census
+    # could interrupt a trading loop. nav-cook went dark for 11.5h at that
+    # deploy while all 18 other services in the same run stayed fresh. This
+    # arm drives the exact path: a class_of that throws must degrade the coin
+    # to "unknown", never propagate.
+    def _boom(_s):
+        raise RuntimeError("venue_class exploded")
+    _r = offuniverse_census([{"sym": "AAA", "prem_bps": 50.0, "vol_m": 9.0}],
+                            [], GATE_LO_BPS, GATE_HI_BPS, MIN_VOL_M,
+                            class_of=_boom, excluded=(7,))
+    assert _r["in_band"] == 1 and _r["other"] == 1, (
+        "a throwing class_of must degrade to unknown, not raise: %r" % (_r,))
+
+    # THE PUBLISH CALL SHAPE, driven end-to-end. [25-Aug (tk)] (sq) threaded
+    # `offuniverse=_offuni` into the publish CALL without adding the
+    # parameter to build_extra's SIGNATURE, so every publish raised
+    # TypeError, the loop's own handler printed one line, and the bot traded
+    # MUTE for 4.5 days behind status:"online" — a consumer tested against a
+    # payload its publisher never built ((hj)), in reverse. This drives the
+    # builder with the LOOP'S exact keyword shape; a future drift between
+    # call and signature fails here, offline, instead of on the row.
+    _extra = build_extra({"scanned": 0}, {}, [], 0.0, 0.0, offuniverse=_o)
+    assert _extra["offuniverse"] is _o, \
+        "the census must reach the row verbatim"
+    _extra_dark = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)
+    assert _extra_dark["offuniverse"].get("error") is True and \
+        _extra_dark["offuniverse"]["in_band"] == 0, (
+        "no census given must publish the zeros-with-error shape — absent "
+        "is the ambiguity the block exists to remove: %r"
+        % (_extra_dark["offuniverse"],))
+
+    # REPORT-ONLY, structurally. This block names coins the book refuses ON
+    # PURPOSE; if it ever reached a gate it would become a widening of two
+    # MEASURED screens. Pinned by AST so a future edit cannot quietly wire it.
+    import ast as _ast
+    _tree = _ast.parse(open(__file__).read())
+    for _fn in _ast.walk(_tree):
+        if isinstance(_fn, _ast.FunctionDef) and _fn.name in ("cook_exit",
+                                                              "class_ok"):
+            _calls = {getattr(n.func, "id", None)
+                      for n in _ast.walk(_fn) if isinstance(n, _ast.Call)}
+            assert "offuniverse_census" not in _calls, (
+                "%s must never consult the off-universe census — it is a "
+                "REPORT, and its coins are excluded by measurement" % _fn.name)
+
+    # ---------------------------------------------------------------- (2026-08-26)
+    # THE UNIVERSE WIDTH IS DECOUPLED FROM 🪁 band-kelly'S. Driven, not
+    # asserted from the source text: `resolve_universe` is called with a
+    # RECORDING stand-in for the ghost's resolver, so the width it actually
+    # passes is observed. At the env default that width must equal the ghost's
+    # own constant (byte-identical behaviour — the whole point of the change),
+    # and moving Cook's knob must move THAT number while leaving the ghost's
+    # constant — the one band-kelly resolves against — untouched.
+    _seen, _vol = [], []
+
+    def _rec(configured, width, min_vol_m, current_time=None):
+        _seen.append(width)
+        _vol.append(min_vol_m)
+        return ["AAA", "BBB"]
+
+    _real_resolve = ghost.resolve_universe
+    _ghost_before = ghost.UNIVERSE_N
+    _cook_before = UNIVERSE_N
+    try:
+        ghost.resolve_universe = _rec
+        assert resolve_universe([]) == ["AAA", "BBB"]
+        assert _seen == [_cook_before], _seen
+        assert _cook_before == _ghost_before, (
+            "the shipped default must be the ghost's own value or the "
+            "decoupling silently CHANGED the book: cook=%r ghost=%r"
+            % (_cook_before, _ghost_before))
+        # THE WIDTH IS NOT THE ONLY ARGUMENT ON THE LINE THAT WAS REWRITTEN.
+        # `MIN_VOL_M` is load-bearing — (qq) measured the fleet's own fills at
+        # a MEAN 17.49bps / p90 398bps below $0.1M against a band whose edge
+        # is ~37bps — and a stub that merely ACCEPTS the floor cannot see it
+        # zeroed. Recorded and compared, so it can.
+        assert _vol == [MIN_VOL_M] and MIN_VOL_M > 0.0, (
+            "the resolve site must hand over this book's own volume floor: "
+            "passed=%r MIN_VOL_M=%r" % (_vol, MIN_VOL_M))
+        globals()["UNIVERSE_N"] = _cook_before + 25
+        resolve_universe([])
+        assert _seen[-1] == _cook_before + 25, (
+            "COOK_UNIVERSE_N must reach the resolve site: %r" % (_seen,))
+        assert ghost.UNIVERSE_N == _ghost_before, (
+            "moving Cook's width must NOT move the ghost's constant — "
+            "band-kelly resolves against it")
+        # AND THE ROW IS READ WHILE THE KNOB IS MOVED. Checking caps only at
+        # the DEFAULT cannot distinguish "Cook's width" from "the shared
+        # constant" — the two are equal by choice, so the field would look
+        # right today and lie the moment Cook moves. Measured: with the
+        # default-only check, re-pointing `universe_n` at `ghost.UNIVERSE_N`
+        # survived this selftest.
+        _moved = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)["caps"]
+        assert _moved["universe_n"] == _cook_before + 25, (
+            "caps.universe_n must FOLLOW this book's knob, not restate the "
+            "shared constant: %r" % (_moved["universe_n"],))
+        assert _moved["ghost_universe_n"] == _ghost_before, (
+            "caps.ghost_universe_n must stay the GHOST's number: %r"
+            % (_moved["ghost_universe_n"],))
+    finally:
+        globals()["UNIVERSE_N"] = _cook_before
+        ghost.resolve_universe = _real_resolve
+    # ...and both numbers reach the row, so a future divergence is readable
+    # rather than inferred from two source files.
+    _caps = build_extra({"scanned": 0}, {}, [], 0.0, 0.0)["caps"]
+    assert _caps["universe_n"] == UNIVERSE_N, _caps
+    assert _caps["ghost_universe_n"] == ghost.UNIVERSE_N, _caps
+
     print("nav-cook selftest OK")
 
 

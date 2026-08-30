@@ -224,6 +224,9 @@ import urllib.request
 
 B = "https://mainnet.zklighter.elliot.ai"
 CACHE = os.path.join(os.path.dirname(__file__), ".lighterfund_cache.json")
+# [(su)] bumped when the cached SHAPE changes, so a stale file is refetched
+# rather than silently answering a question it has no data for.
+CACHE_SCHEMA = 2
 
 # ---- live-bot config mirrored (lighter_funding_bot.py tuned defaults) -------
 ORDER_USD = 25.0
@@ -297,9 +300,33 @@ def fetch_fundings(mid, days):
     return {t: v for t, v in out.items() if t >= cutoff}
 
 
-def fetch_candles(mid, days):
-    """Hourly OHLC, paged backward (500-bar cap per call). -> {hour_ts: (o,h,l,c)}."""
-    out, end, cutoff = {}, int(time.time()), int(time.time()) - days * 86400
+def fetch_candles(mid, days, with_volume=False):
+    """Hourly OHLC, paged backward (500-bar cap per call).
+    -> {hour_ts: (o,h,l,c)}, or ({ohlc}, {hour_ts: quote_volume}) when
+    `with_volume` is set.
+
+    THE DEFAULT SHAPE IS UNCHANGED ON PURPOSE. Seven scripts import this
+    function and unpack its result directly (`v[3]`, `set(fund) & set(cand)`,
+    `{"cand": fetch_candles(...)}`); returning a tuple unconditionally would
+    have bound a 2-tuple to `cand` in every one of them and replayed nonsense
+    — silently, because a dict and a tuple both iterate. That is the same
+    hazard as widening the OHLC tuple, one level up, and I walked into it
+    before catching it. Volume is OPT-IN.
+
+    [2026-08-22 (su)] THE VOLUME WAS BEING THROWN AWAY, and it is the live
+    bot's BINDING entry gate. `lighter_funding_bot.MIN_VOL` is $10M/day and —
+    measured on the venue 22-Aug — only **11 of 212 active markets clear it**,
+    while this loader selects the top-N BY RANK: 14 of the top 25 and 39 of the
+    top 50 sit below the floor. So every gate verdict this harness has ever
+    printed, including the table quoted at the live bot's own ENTER_APR, was
+    measured on a population the live book mostly refuses. The candle rows
+    already carried `V` (quote volume); nothing kept it.
+
+    Returned as a SEPARATE map rather than a 5-tuple: `run()` unpacks
+    `_o, hi, lo, close = c` and widening that tuple would silently break every
+    caller that does the same."""
+    out, vol = {}, {}
+    end, cutoff = int(time.time()), int(time.time()) - days * 86400
     seen_oldest = None
     while True:
         cs = _get("/api/v1/candles", market_id=mid, resolution="1h",
@@ -308,13 +335,23 @@ def fetch_candles(mid, days):
         if not cs:
             break
         for c in cs:
-            out[int(c["t"]) // 1000] = (float(c["o"]), float(c["h"]),
-                                        float(c["l"]), float(c["c"]))
+            ts = int(c["t"]) // 1000
+            out[ts] = (float(c["o"]), float(c["h"]),
+                       float(c["l"]), float(c["c"]))
+            # "V" is quote volume; "v" is base. A missing key stays ABSENT so
+            # `vol24` can report UNKNOWN rather than a fabricated zero — a
+            # zero would read as "below the floor", i.e. a confident refusal
+            # built from no data (I8).
+            if c.get("V") is not None:
+                vol[ts] = float(c["V"])
         oldest = min(int(c["t"]) // 1000 for c in cs)
         if oldest <= cutoff or (seen_oldest is not None and oldest >= seen_oldest):
             break
         seen_oldest, end = oldest, oldest - 3600
-    return {t: v for t, v in out.items() if t >= cutoff}
+    ohlc = {t: v for t, v in out.items() if t >= cutoff}
+    if not with_volume:
+        return ohlc
+    return ohlc, {t: v for t, v in vol.items() if t >= cutoff}
 
 
 def load(days, universe_n, refresh):
@@ -340,9 +377,18 @@ def load(days, universe_n, refresh):
     """
     if os.path.exists(CACHE) and not refresh:
         d = json.load(open(CACHE))
-        if d.get("days") >= days and d.get("universe_n") >= universe_n:
+        # [(su)] SCHEMA GATE. A cache built before volume was kept has no
+        # `vol` map, and serving it would answer the min-vol question with
+        # "no market ever clears the floor" — a confident wrong answer from a
+        # stale file, which is exactly the universe trap above in a new
+        # costume. An old cache is REFETCHED, loudly, never silently reused.
+        if d.get("schema") != CACHE_SCHEMA:
+            print(f"  [cache] schema {d.get('schema')} != {CACHE_SCHEMA} "
+                  f"(volume was added) — REFETCHING")
+        elif d.get("days") >= days and d.get("universe_n") >= universe_n:
             mk = {s: {"fund": {int(k): v for k, v in m["fund"].items()},
-                      "cand": {int(k): tuple(v) for k, v in m["cand"].items()}}
+                      "cand": {int(k): tuple(v) for k, v in m["cand"].items()},
+                      "vol": {int(k): v for k, v in (m.get("vol") or {}).items()}}
                   for s, m in d["mk"].items()}
             if len(mk) > universe_n:
                 print(f"  [cache] holds {len(mk)} books (built at "
@@ -357,7 +403,8 @@ def load(days, universe_n, refresh):
     for o in liquid[:universe_n]:
         sym, mid = o["symbol"], o["market_id"]
         try:
-            fund, cand = fetch_fundings(mid, days), fetch_candles(mid, days)
+            fund = fetch_fundings(mid, days)
+            cand, vol = fetch_candles(mid, days, with_volume=True)
         except Exception as e:
             print(f"  {sym}: fetch failed ({e}) — skipped")
             continue
@@ -365,13 +412,34 @@ def load(days, universe_n, refresh):
         if len(common) < 24 * 20:
             print(f"  {sym}: only {len(common)}h of paired history — skipped")
             continue
-        mk[sym] = {"fund": fund, "cand": cand}
+        mk[sym] = {"fund": fund, "cand": cand, "vol": vol}
         print(f"  {sym:12s} {len(common):5d}h paired "
               f"({(max(common)-min(common))/86400:.0f}d)")
-    json.dump({"days": days, "universe_n": universe_n,
-               "mk": {s: {"fund": m["fund"], "cand": m["cand"]} for s, m in mk.items()}},
+    json.dump({"schema": CACHE_SCHEMA, "days": days, "universe_n": universe_n,
+               "mk": {s: {"fund": m["fund"], "cand": m["cand"], "vol": m["vol"]}
+                      for s, m in mk.items()}},
               open(CACHE, "w"))
     return mk
+
+
+def vol24(m, t):
+    """Trailing 24h QUOTE volume for market `m` at hour `t`, or None.
+
+    [(su)] The point-in-time reconstruction the fleet had declared impossible.
+    `(ny)` recorded "point-in-time volume is not reconstructable, so that cell
+    is a drifting sensitivity, never a second headline" — true of the
+    orderBookDetails snapshot, and NOT true of the candle tape, which carries
+    quote volume per hour and pages back 438 days. Summing the trailing 24
+    hourly bars gives the same quantity the venue's `daily_quote_token_volume`
+    reports, at any historical hour.
+
+    Returns None when fewer than 20 of the 24 hours are present — UNKNOWN, so
+    a caller can refuse rather than treat a data gap as a thin market."""
+    v = m.get("vol") or {}
+    if not v:
+        return None
+    got = [v[h] for h in range(t - 23 * 3600, t + 3600, 3600) if h in v]
+    return sum(got) if len(got) >= 20 else None
 
 
 # [2026-07-25 SLOPE-GATE STUDY] the live bot's funding-SLOPE entry gate (enter
@@ -396,7 +464,7 @@ def _in_restart_window(t, restarts_per_day, window_h=1.0):
 
 
 def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
-        decay_persist_h=0):
+        decay_persist_h=0, max_same_side=None):
     """Replay the live bot's rules over [t0,t1). Returns a result dict.
 
     entry_ok: optional (sym, hour_ts) -> bool predicate consulted ONLY at the
@@ -404,6 +472,14 @@ def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
     reproduces the unfiltered behaviour exactly — position management, funding
     accrual and every exit path are never filtered, so an open position is
     always managed even if its coin later fails the predicate.
+
+    max_same_side: [2026-08-22 (su) CONCENTRATION hook] refuse an entry that
+    would take the count of SAME-DIRECTION open positions above this. None
+    (default) reproduces the unfiltered behaviour exactly. Modelled because the
+    live book is structurally always net-short — positive funding is far more
+    common than negative, so it shorts the payer every time and its four
+    "positions" measured N_eff 1.389 (crypto leg 1.11). Entry-side only: an
+    open position is always managed, exactly like `entry_ok`.
 
     decay_persist_h: [2026-07-30 DECAY-EXIT STUDY hook] the cold exit fires
     only after the rate has read decayed (|apr| < exit_apr) for MORE than
@@ -495,7 +571,12 @@ def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
                 hot[sym] = hot.get(sym) or t
             else:
                 hot[sym] = None
-            if (len(pos) < MAX_OPEN and hot.get(sym)
+            _side_full = False
+            if max_same_side is not None:
+                _want_short = apr > 0
+                _side_full = sum(1 for q in pos.values()
+                                 if q["short"] == _want_short) >= max_same_side
+            if (len(pos) < MAX_OPEN and hot.get(sym) and not _side_full
                     and (t - hot[sym]) / 3600.0 >= PERSIST_H
                     and t >= cool.get(sym, 0)
                     and (entry_ok is None or entry_ok(sym, t))):

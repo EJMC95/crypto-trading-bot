@@ -168,7 +168,21 @@ DASH_PASS = os.environ.get("DASH_PASS", "")
 # names only. Operator side: stop the 4 family Railway services (ONLY_BOT
 # mum/dad/avo-maria/georgia); the main container drops its 4 spot bots on
 # this deploy.
-RETIRED_ROWS = {"perps-donchian-breakout",
+RETIRED_ROWS = {
+                # [2026-08-22 (ta)/(tb)] 💸 the Funding Farmer's LIVE arm.
+                # Horizon `unreachable` on BOTH arms at the fleet's own grader
+                # (live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65).
+                # 🔮 georgia took the sub-account by converting the SAME
+                # service in place, so leaving this row visible would
+                # DOUBLE-COUNT the same real money — the identical reason
+                # `crypto-trend-daily-lighter` had to be retired when 🎫 the
+                # Taker took its slot (17-Jul). Hidden only AFTER the flatten
+                # published `extra.retired.open == 0`, because /pnl.json is
+                # filtered by this very set and hiding it earlier blinds the
+                # feed the flatten is verified on.
+                # Its SHADOW twin is NOT retired and keeps trading.
+                "perps-funding-lighter-lighter",
+                "perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 # [2026-08-15 (nf)] THE RED-STOP SLATE — seven I17 calls made
@@ -376,6 +390,7 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # service (book-<surname>-shadow). Shadow-only; bases never
                 # publish.
                 "book-douglas", "book-grimes", "book-schwager", "book-hull",
+                "book-bezos",
                 # [2026-08-18] 🪁 band-kelly — the MIRROR book (operator:
                 # "does the exact opposite of all of the major losing
                 # sequences"; lighter_band_kelly_bot.py, service
@@ -427,6 +442,9 @@ OVERTRADE_LIMIT = {
                                    # day can flip-and-refill more than 15
     "book-douglas":          30,   # 🧘 The Zone — 1h impulse fades, ~12h max
                                    # hold; a violent day can cycle 4 slots
+    "book-bezos":            36,   # 🚀 Jeff Bezos-inspired Day-1 flywheel
+                                   # profile: lower trigger + shorter holds can
+                                   # cycle faster than Douglas under stress.
     "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
@@ -454,7 +472,8 @@ OVERTRADE_DEFAULT = 15
 # stale duplicate and is filtered out here so it can never skew totals or the
 # grid — independent of whether the Postgres table has been pruned yet.
 # Freqtrade fleet bots (July 2026)
-FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"}
+FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria",
+             "freqtrade-georgia", "freqtrade-georgia-v3"}
 CURRENT_BOTS = set(EXPECTED) | VARIANT_ONLY | SCANNERS | STOCKS | FREQTRADE
 
 # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows. When a bot trades on Lighter
@@ -508,6 +527,7 @@ LABELS = {
     "band-garrett":                "🛢️ Garrett — thin-tier funding band",
     "book-kiyosaki":               "🏦 Rich Dad — cash-flow doctrine book",
     "book-douglas":                "🧘 The Zone — discipline book",
+    "book-bezos":                 "🚀 Day 1 — Bezos-inspired flywheel book",
     "book-grimes":                 "📐 The Technician — quantified-edge book",
     "book-schwager":               "🧙 The Wizard — ride-winners book",
     "book-hull":                   "🧮 The Professor — cost-of-carry book",
@@ -526,6 +546,7 @@ LABELS = {
     "freqtrade-dad":               "👨 Dad — breakout rider",
     "freqtrade-avo-maria":         "🙏 Avo Maria — dip buyer",
     "freqtrade-georgia":           "🔮 Georgia — day trader",
+    "freqtrade-georgia-v3":        "🔭 Georgia v3 — impulse fade",
     # [2026-07-21] 🏛️ the Parliament — last 8 Australian PMs: 6 books here,
     # Keating (scanners+ML) and Howard (ecosystem brain) are its organs.
     "pm-albanese":                 "🏗️ Albanese — trend rider",
@@ -541,8 +562,9 @@ LABELS = {
 DESCRIPTIONS = {
     "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; carries its OWN random-entry control arm · $50 × 4 slots",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
-    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 4 slots; LIVE clips = equity÷4 (slot swap 13-Aug)",
+    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 6 slots; LIVE clips = equity × gross_x ÷ 5 slots, levered 1.4× of a 1.5× drawdown budget (funded + levered 21-Aug (sr); slot swap 13-Aug)",
     "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",
+    "freqtrade-georgia-v3": "ImpulseFade · 15m — NEW ENTRY (vr), not a rearrangement of v1: fades a ≥3.0×ATR14 drop over 4 bars, bracket tp 2.0% / sl −1.5% / 4h max hold, crypto-only. The only candidate of ten surviving every horizon against matched-random (+0.140%..+0.178%/trade, t_cl +2.49..+6.01); shipped at the plateau INTERIOR, never the grid edge. HYPOTHESIS-grade — replay only, its own ledger decides · $50 × 5 slots",
     "crypto-trend-daily":  "daily 50/200-EMA golden cross — long through uptrends, cash after the death cross; holds for weeks",
     "crypto-intraday-15m": "DayTraderV5Gated · 1h — Georgia's engine at the validated 1h settings · 29 pairs, 5 slots",
     "crypto-swing-daily":  "SwingDipV1 · 1d — the validated daily dip-buyer · 29 pairs, 8 slots",
@@ -560,6 +582,7 @@ DESCRIPTIONS = {
     "band-barnes":          "three funding sleeves under one $1k roof — carry harvest (≥20% TRUE, decay-paid discipline, $80×4), funding-extreme directional (top |APR|, 10% stop, $40×4), x-sect L/S rank (K=5/side, $33 legs, 24h rebalance) · closes tagged per sleeve · config FROZEN 30d from birth ((hm))",
     "book-kiyosaki":        "Rich Dad Poor Dad as rules — holds only funding-RECEIVING positions (assets), delta-neutral modelled so P&L is pure cash flow; sells a position the moment it persists as a liability; decay-closes only after income repays all costs (pay yourself first); entries must repay their round trip within the payback bar (financial literacy)",
     "book-douglas":         "Trading in the Zone as rules — fades extreme 1h impulses (>2.5×ATR24) with a bracket predefined at entry (stop 1.0×/target 1.5×ATR, 12h expiry, never widened); same size every trade, outcomes cannot alter execution; publishes its rolling 20-trade sample in R-multiples",
+    "book-bezos":           "Jeff Bezos-inspired Day 1 flywheel expression — runs on the proven Douglas execution engine with higher-liquidity intake and faster cycle defaults (lower impulse bar, asymmetric bracket, shorter hold), Lighter-only shadow and env-only profile",
     "book-grimes":          "The Art & Science of TA as rules — a structural setup roster (pullback/failtest/keltner; breakout is Schwager's supply) behind a rolling replay gate: a setup may enter only while its trailing 120d record on the venue's own tape clears the bar (n≥20, net>0, t≥0.5); the scorecard is published every loop",
     "book-schwager":        "Market Wizards as rules — 4h Donchian-20 breakouts with EMA20>50 confirm; cut losses at 2×ATR, ride winners on a wide 3.5×ATR chandelier trail, NO profit target and NO pyramid (measured and refuted); one position per coin",
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
@@ -643,7 +666,11 @@ STOCK_STALE_SECONDS = 26 * 3600
 # outage still shows, but a normal 5-min cadence does not read as "down".
 SLOW_LOOP = {"perps-donchian-breakout",
              "perps-funding-carry",  # 5-min loop: funding only changes hourly
-             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria"}  # freqtrade 5m bots
+             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria",
+             # [2026-08-29] georgia and georgia-v3 run the same 300s loop as
+             # mum/avo via lighter_avo_live_bot.py — without this their -lighter
+             # rows got the 180s default and showed stale every cycle.
+             "freqtrade-georgia", "freqtrade-georgia-v3"}  # freqtrade 5m bots
 SLOW_LOOP_STALE_SECONDS = 15 * 60
 # The listing sniper publishes once per scan cycle, and every ~5th cycle is a
 # full exchange-list reload that can run 8-9 minutes when slow exchanges hit
@@ -669,6 +696,13 @@ VARIANT_STALE_SECONDS = {
     # go-live rests on). ~2 missed publishes, matching the Funding Farmer's.
     "lighter-ticket-taker-lighter":  15 * 60,
     "lighter-ticket-taker-lshadow":  15 * 60,
+    # [2026-08-29] Live family bots publish telemetry every TELEMETRY_SECONDS
+    # (60s default) with trading passes at LOOP_SECONDS (300s).  ~5 missed
+    # telemetry publishes ≈ one full trading loop, so 6min keeps them fresh
+    # on the dashboard without false staleness alarms.
+    "freqtrade-mum-lighter":         6 * 60,
+    "freqtrade-avo-maria-lighter":   6 * 60,
+    "freqtrade-georgia-lighter":     6 * 60,
 }
 
 
@@ -797,14 +831,33 @@ def fetch_rows(hidden=None):
             cur.execute("SELECT to_regclass('public.bot_pnl') AS t")
             if cur.fetchone()["t"] is None:
                 return {}  # table not created yet (no bot has published)
-            cur.execute("SELECT * FROM bot_pnl")
+            hidden_ids = (
+                sorted(hidden.keys()) if isinstance(hidden, dict) else sorted(hidden or [])
+            )
+            q = (
+                "SELECT bot, updated_at, status, equity, pnl_abs, pnl_pct, "
+                "open_trades, closed_trades, wins, losses, extra, pnl_daily "
+                "FROM bot_pnl"
+            )
+            where = []
+            params = []
+            if RETIRED_ROWS:
+                where.append("bot <> ALL(%s)")
+                params.append(sorted(RETIRED_ROWS))
+            if hidden_ids:
+                where.append("bot <> ALL(%s)")
+                params.append(hidden_ids)
+            if where:
+                q += " WHERE " + " AND ".join(where)
+            cur.execute(q, params)
             # Drop legacy pre-rename rows so stale duplicates never reach the
             # grid, totals, or the /pnl.json feed. Venue-variant rows
             # (<base>-lighter/-ltest/-lshadow) pass when their base is a current
             # bot, so a live/shadow Lighter bot shows up automatically.
+            hidden_set = set(hidden_ids)
             return {r["bot"]: r for r in cur.fetchall()
                     if r["bot"] not in RETIRED_ROWS
-                    and r["bot"] not in hidden
+                    and r["bot"] not in hidden_set
                     and (r["bot"] in CURRENT_BOTS
                          or venue_variant(r["bot"])[0] in CURRENT_BOTS)}
     finally:
@@ -2005,6 +2058,466 @@ def golive_card():
         return ""
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-26] 🏭 THE PRODUCTION PIPE — "where does a new book actually get
+# stuck?", answered at a glance instead of by hand-reading /bus.json.
+#
+# Eamon's standing complaint is that the inventions have not produced: no new
+# bot has appeared on the dashboard as a promoted, real-money book. The fleet
+# already publishes every number needed to answer that — across FOUR keys the
+# dashboard fetches anyway — and nobody had joined them.
+#
+# IT LEADS WITH THE PROMOTION PIPE, NOT THE GO-LIVE BARS, and that ordering is
+# the whole point of the card. Leading with the bars shows a dozen books
+# failing on EVIDENCE — the one blocker nobody can clear this week, because it
+# is arithmetic on a sample that does not exist yet. The judge's pairs are
+# where a session can actually move something: on the live payload the day this
+# shipped, three of four pairs were `unjudgeable` on a POLICY STAMP or a scan
+# ORDER, not on performance. That is a wire, and a wire can be closed.
+#
+# So every blocker is sorted into one of three classes, and the class says who
+# owns it:
+#   * MEASUREMENT — no owner needed, the clock does it (closes must accrue).
+#   * DECISION    — owner: Eamon (a keep-or-retire, an override flip).
+#   * WIRE        — a code gap a session can close today.
+# An unrecognised state is UNKNOWN and says so; it never falls into a class it
+# was not measured into (I8: unknown degrades to honest, never to a guess).
+# ---------------------------------------------------------------------------
+
+#: Blocker classes. `done` = not blocked. The tuple is
+#: (label, colour, background, tooltip).
+PIPE_MEASURE, PIPE_DECIDE = "measure", "decide"
+PIPE_WIRE, PIPE_DONE, PIPE_UNKNOWN = "wire", "done", "unknown"
+
+PIPE_CLASS = {
+    PIPE_MEASURE: ("⏳ measure", "#d29922", "rgba(210,153,34,.14)",
+                   "BLOCKED ON A MEASUREMENT — no owner needed, the clock "
+                   "does it: closes have to accrue before anything can be "
+                   "judged."),
+    PIPE_DECIDE: ("🧑 decide", "#8250df", "rgba(130,80,223,.14)",
+                  "BLOCKED ON A DECISION — owner: Eamon. No amount of waiting "
+                  "or coding moves this; it needs a call."),
+    PIPE_WIRE: ("🔌 wire", "#0969da", "rgba(9,105,218,.14)",
+                "BLOCKED ON A WIRE — a code gap someone can close. This is "
+                "the class a session can clear this week."),
+    PIPE_DONE: ("✓ moving", "#1a7f37", "rgba(26,127,55,.16)",
+                "not blocked — this pair is judgeable and running."),
+    PIPE_UNKNOWN: ("? unknown", "#d1242f", "rgba(209,36,47,.14)",
+                   "the judge published a state this card does not recognise. "
+                   "Deliberately NOT filed under a class — an unmapped reason "
+                   "must never render as a known blocker or as progress."),
+}
+
+#: `xp-judge` pairs[*].unjudgeable.reason -> blocker class. Keyed on the
+#: JUDGE'S OWN reason strings (experiment_judge._pair_precheck's `_un(...)`
+#: calls), so a new reason arriving from the publisher renders UNKNOWN rather
+#: than being silently absorbed into whichever class happens to be nearest.
+PIPE_PAIR_REASON = {
+    # the stamp ships with the build; it wakes on the first stamped CLOSE each
+    # side — i.e. it is waiting for trades, not for code.
+    "policy_unstamped": PIPE_MEASURE,
+    # [(vm)] same class, and it must be mapped or the card renders `? unknown`
+    # (red) on a book whose only fault is that it has not traded yet — louder
+    # than the state deserves. 👩 mum has never closed a trade; she wakes on a
+    # TRADE, not on anything in the tree.
+    "no_closes": PIPE_MEASURE,
+    # every one of these needs a human to change something in the tree/config.
+    "live_row_dark": PIPE_WIRE,
+    # [(va)] the control arm's publisher is dead — the fix is the stopped or
+    # crash-looping shadow SERVICE, not anything in the pair's config.
+    "shadow_row_dark": PIPE_WIRE,
+    "policy_mismatch": PIPE_WIRE,
+    "parity_unreadable": PIPE_WIRE,
+    "capacity_mismatch": PIPE_WIRE,
+}
+
+#: `xp-judge` pairs[*].phase -> blocker class, for the phases that carry no
+#: `unjudgeable` block of their own.
+PIPE_PAIR_PHASE = {
+    "stood_down": PIPE_DECIDE,   # wake_when is an operator env flip
+    "idle": PIPE_WIRE,           # judgeable; nothing in the candidate queue
+    "running": PIPE_MEASURE,     # accruing closes toward the paired bar
+    "promoted": PIPE_DONE,
+}
+
+
+def _pipe_syd(iso):
+    """An ISO TIMESTAMP -> 'DD-Mon HH:MM Syd', or None if it is unparseable.
+
+    Sydney-local because Eamon reads it (CLAUDE.md's timezone rule); the
+    payloads themselves stay UTC. Deliberately refuses a BARE DATE — see
+    `_pipe_eta`.
+
+    `tzdata` can be absent on a slim image, so this mirrors
+    `fleet_watchdog_svc._now_op`'s measured fallback rather than inventing a
+    second policy: a fixed +10 stamp, LABELLED `Syd*` so the star says it is
+    right in winter and may be an hour out under daylight saving. The one
+    thing it never does is hand back the bare UTC clock time."""
+    d = _iso_dt(iso)
+    if d is None:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return d.astimezone(ZoneInfo("Australia/Sydney")).strftime(
+            "%d-%b %H:%M Syd")
+    except Exception:  # noqa: BLE001
+        return (d.astimezone(dt.timezone.utc)
+                + dt.timedelta(hours=10)).strftime("%d-%b %H:%M Syd*")
+
+
+def _pipe_eta(eta):
+    """The grader's horizon `eta` -> (text, tooltip-suffix).
+
+    The gate horizon publishes a bare CALENDAR DATE ('2026-11-10'), not an
+    instant, so there is no time-of-day to convert and shifting it into Sydney
+    would invent a day boundary the grader never computed (a UTC date spans two
+    Sydney dates). It is therefore rendered AS PUBLISHED and LABELLED as the
+    grader's UTC calendar date, rather than silently relabelled — the Sydney
+    rule is about never handing over a bare unlabelled time, and a fabricated
+    shift would be worse than an honest label."""
+    if not eta:
+        return None, ""
+    return (str(eta), " The grader publishes this as a UTC calendar date "
+                      "(no time of day), so it is shown unconverted; in "
+                      "Sydney it lands on that date or the one after.")
+
+
+def _pipe_stage(value, unknown_why):
+    """One funnel stage -> its rendered HTML.
+
+    THE TRAP THIS CLOSES: a dark key must render '?', never '0'. 'No book
+    reached the bar' and 'nobody asked' are different findings that look
+    identical once a missing payload is coerced to a number, and the second one
+    silently reads as a healthy measurement. `None` is UNKNOWN."""
+    if value is None:
+        return ('<b style="color:#d1242f" title="UNKNOWN — '
+                + html.escape(str(unknown_why)) + '">?</b>')
+    return f'<b>{int(value)}</b>'
+
+
+def _pipe_funnel(alloc, gl):
+    """-> [(label, value|None, unknown_reason, tooltip)] — the production
+    funnel, every stage from a named publisher field.
+
+    `alloc`/`gl` are the FRESH payloads or None. A stage whose source is dark,
+    stale or missing its field is None (unknown) and is rendered as such."""
+    dark_a = "fleet-allocation is dark or stale — no roster to count"
+    dark_g = "golive-readiness is dark or stale — no grades to count"
+
+    rows_n = alloc.get("n_books") if isinstance(alloc, dict) else None
+    rows_n = rows_n if isinstance(rows_n, int) else None
+
+    # ever-closed = roster minus the organ's own declared zero-close list. An
+    # ABSENT list is unknown; an EMPTY list is a real measurement (no zero-close
+    # books), so `is None` is the test, never truthiness.
+    zc = alloc.get("zero_close_books") if isinstance(alloc, dict) else None
+    closed_n = (rows_n - len(zc)
+                if rows_n is not None and isinstance(zc, list) else None)
+
+    # I16 claims: max(0, mean - 1.28*SE) > 0. If NOT ONE book carries a numeric
+    # `claim`, the field is absent from this payload version and the answer is
+    # unknown — counting zero would assert "no book has evidence".
+    claim_n, saw_claim = None, False
+    books = alloc.get("books") if isinstance(alloc, dict) else None
+    if isinstance(books, dict) and books:
+        n = 0
+        for v in books.values():
+            c = v.get("claim") if isinstance(v, dict) else None
+            if isinstance(c, (int, float)):
+                saw_claim = True
+                if c > 0:
+                    n += 1
+        claim_n = n if saw_claim else None
+
+    # on-track: the grader's OWN horizon verdict, over graded books AND the
+    # below-floor map (a thin book on track is still on track).
+    track_n = None
+    if isinstance(gl, dict):
+        pool = {}
+        for k in ("books", "below_floor"):
+            m = gl.get(k)
+            if isinstance(m, dict):
+                pool.update(m)
+        if pool:
+            track_n = sum(
+                1 for v in pool.values()
+                if isinstance(v, dict)
+                and str((v.get("horizon") or {}).get("verdict")) == "on_track")
+
+    ready = gl.get("ready") if isinstance(gl, dict) else None
+    bar_n = len(ready) if isinstance(ready, list) else None
+
+    return [
+        ("rows", rows_n, dark_a,
+         "living book rows the allocation organ ranks"),
+        ("ever closed", closed_n, dark_a,
+         "rows with at least one closed trade — the rest are undecidable "
+         "until they trade (I17)"),
+        ("measured claim", claim_n, dark_a + " (or no book publishes `claim`)",
+         "books whose I16 lower bound max(0, mean - 1.28*SE) is positive — "
+         "evidence, not a lucky mean"),
+        ("on track", track_n, dark_g,
+         "books the gate horizon projects will reach the bar at their measured "
+         "trajectory"),
+        ("AT THE BAR", bar_n, dark_g,
+         "books passing all six go-live bars right now. Go-live still needs "
+         "Eamon's explicit act."),
+    ]
+
+
+def _pipe_pairs(judge):
+    """-> [(class, pair_id, headline, wake_when, detail)] for every judge pair,
+    WIRE first — the class a session can actually clear this week."""
+    out = []
+    pairs = judge.get("pairs") if isinstance(judge, dict) else None
+    if not isinstance(pairs, dict):
+        return out
+    for pid, p in pairs.items():
+        if not isinstance(p, dict):
+            continue
+        phase = str(p.get("phase") or "")
+        un = p.get("unjudgeable") if isinstance(p.get("unjudgeable"), dict) else None
+        sd = p.get("stood_down") if isinstance(p.get("stood_down"), dict) else None
+        if un:
+            reason = str(un.get("reason") or "")
+            cls = PIPE_PAIR_REASON.get(reason, PIPE_UNKNOWN)
+            head, wake, detail = reason or "unjudgeable", un.get("wake_when"), un.get("detail")
+        elif sd:
+            cls = PIPE_PAIR_PHASE.get(phase, PIPE_UNKNOWN)
+            head = phase or "stood_down"
+            wake, detail = sd.get("wake_when"), sd.get("why")
+            if sd.get("successor"):
+                detail = f'{detail or ""} → {sd["successor"]}'.strip()
+        else:
+            cls = PIPE_PAIR_PHASE.get(phase, PIPE_UNKNOWN)
+            head, wake, detail = phase or "?", None, p.get("note")
+        # the stamp census IS the measurement, so show it where it exists
+        st = p.get("stamps") if isinstance(p.get("stamps"), dict) else None
+        if st:
+            bits = " · ".join(f'{k} {st[k]}' for k in ("live", "shadow") if st.get(k))
+            if bits:
+                detail = f'{detail or ""} [{bits}]'.strip()
+        out.append((cls, str(pid), head, wake, detail))
+    order = {PIPE_WIRE: 0, PIPE_DECIDE: 1, PIPE_MEASURE: 2,
+             PIPE_UNKNOWN: 3, PIPE_DONE: 4}
+    out.sort(key=lambda r: (order.get(r[0], 9), r[1]))
+    return out
+
+
+def pipeline_card():
+    """🏭 The production pipe (bot_state `golive-readiness`, `xp-judge`,
+    `fleet-allocation`, `strategy-incubator` — four keys the dashboard already
+    fetches; no new source, no new deploy rule).
+
+    Read-only and fail-silent, like every other card: it grades nothing,
+    promotes nothing and writes no lever. What it does is JOIN the four organs
+    that between them answer "why has no new bot reached real money?", and
+    order the answer by who can act.
+
+    HONESTY CONTRACT — the reason this card is worth testing at all. Every key
+    may be dark, stale or missing a field, and a missing number here is
+    dangerous in one specific direction: `0 at the bar` is a real and common
+    measurement, so a dark grader coerced to zero renders as a confident,
+    plausible, WRONG reading. So each funnel stage carries its own source and
+    a dark source prints `?` with a tooltip naming what is missing, never a
+    number and never a green state. A payload past `grace × ttl_sec` is
+    treated as dark (I1: liveness before semantics) and said so in the header.
+    The card hides entirely only when ALL FOUR keys are missing — a partially
+    dark fleet is exactly when the unknowns need to be visible."""
+    try:
+        st = fetch_states(["golive-readiness", "xp-judge", "fleet-allocation",
+                           "strategy-incubator"])
+        raw = {k: (st.get(k) if isinstance(st.get(k), dict) else None)
+               for k in ("golive-readiness", "xp-judge", "fleet-allocation",
+                         "strategy-incubator")}
+        if not any(raw.values()):
+            return ""                      # nothing published at all — hide
+        # I1: a stale payload is DARK for every value it would have supplied.
+        stale = [k for k, v in raw.items() if v and not _state_fresh(v)]
+        use = {k: (v if v and _state_fresh(v) else None) for k, v in raw.items()}
+        gl, judge = use["golive-readiness"], use["xp-judge"]
+        alloc, inc = use["fleet-allocation"], use["strategy-incubator"]
+
+        # ---- the funnel -------------------------------------------------
+        cells = []
+        for label, val, why, tip in _pipe_funnel(alloc, gl):
+            cells.append(
+                f'<span title="{html.escape(tip)}">'
+                f'{_pipe_stage(val, why)} '
+                f'<span class="muted">{html.escape(label)}</span></span>')
+        funnel = ('<div style="font-size:.95em;padding:2px 0">'
+                  + ' <span class="muted">&rarr;</span> '.join(cells)
+                  + '</div>')
+
+        # ---- THE PROMOTION PIPE (leads) ---------------------------------
+        rows = []
+        pair_rows = _pipe_pairs(judge)
+        if judge is None:
+            rows.append('<div style="font-size:.85em;color:#d1242f" '
+                        'title="xp-judge is dark or stale, so the promotion '
+                        'pipe cannot be read at all. This is NOT the same as '
+                        '&quot;no pairs are blocked&quot;.">'
+                        'promotion pipe UNKNOWN — xp-judge dark or stale</div>')
+        elif not pair_rows:
+            rows.append('<div style="font-size:.85em;color:#d1242f" '
+                        'title="xp-judge published no `pairs` map — an older '
+                        'payload, or the census did not run. Not a clean '
+                        'pipe.">promotion pipe UNKNOWN — no pairs '
+                        'published</div>')
+        for cls, pid, head, wake, detail in pair_rows:
+            lab, col, bg, tip = PIPE_CLASS[cls]
+            rows.append(
+                '<div style="display:flex;gap:6px;font-size:.85em;padding:1px 0;'
+                'white-space:nowrap">'
+                f'<span title="{html.escape(tip)}" style="width:78px;'
+                f'color:{col};background:{bg};border-radius:3px;padding:0 3px;'
+                f'font-size:.9em;text-align:center">{lab}</span>'
+                f'<span style="width:64px">{html.escape(pid)}</span>'
+                f'<span style="width:130px;color:{col};overflow:hidden;'
+                f'text-overflow:ellipsis">{html.escape(str(head))}</span>'
+                f'<span class="muted" style="flex:1;overflow:hidden;'
+                f'text-overflow:ellipsis"'
+                + (f' title="wake_when: {html.escape(str(wake))}"' if wake else '')
+                + f'>{html.escape(str(detail or ""))}</span></div>')
+            if wake:
+                rows.append(
+                    '<div class="muted" style="font-size:.75em;padding-left:150px;'
+                    'overflow:hidden;text-overflow:ellipsis;white-space:nowrap" '
+                    'title="the judge&#39;s own `wake_when` — what has to '
+                    'become true for this pair to start being judged">wake: '
+                    + html.escape(str(wake)) + '</div>')
+
+        # ---- BLOCKED ON A MEASUREMENT: the ETA'd books ------------------
+        meas = []
+        if gl is None:
+            meas.append('<span style="color:#d1242f" title="golive-readiness '
+                        'is dark or stale — no horizon to read">unknown '
+                        '(grader dark)</span>')
+        else:
+            pool = {}
+            for k in ("books", "below_floor"):
+                m = gl.get(k)
+                if isinstance(m, dict):
+                    pool.update(m)
+            for b, v in sorted(pool.items()):
+                hz = (v.get("horizon") or {}) if isinstance(v, dict) else {}
+                if str(hz.get("verdict")) != "on_track":
+                    continue
+                txt, note = _pipe_eta(hz.get("eta"))
+                lab = (f'{b} &rarr; {html.escape(txt)}' if txt
+                       else f'{b} <span style="color:#d1242f">eta unknown</span>')
+                meas.append(f'<span title="{html.escape(str(hz.get("why") or ""))}'
+                            f'{html.escape(note)}">{lab}</span>')
+            if not meas:
+                meas.append('<span class="muted">none — no book is on track '
+                            'to the bar at its measured trajectory</span>')
+        meas_line = ('<div style="font-size:.8em;padding-top:3px" '
+                     'title="BLOCKED ON A MEASUREMENT — nobody owns these; '
+                     'they need closes. Dates are the grader&#39;s own '
+                     'projection at the measured trajectory, never a promise.">'
+                     '<span class="muted">⏳ measurement:</span> '
+                     + " · ".join(meas) + '</div>')
+
+        # ---- BLOCKED ON A DECISION: the I17 docket ----------------------
+        if gl is None:
+            dec = ('<span style="color:#d1242f">unknown — grader dark or '
+                   'stale</span>')
+        elif not isinstance(gl.get("decision_docket"), list):
+            dec = ('<span style="color:#d1242f" title="this payload carries no '
+                   '`decision_docket` — an older grader, or the docket read '
+                   'failed. Not the same as an empty docket.">unknown — no '
+                   'docket published</span>')
+        else:
+            dk = [d for d in gl["decision_docket"] if isinstance(d, dict)]
+            if not dk:
+                dec = ('<span class="muted">none open</span>')
+            else:
+                held = [d.get("days_held") for d in dk
+                        if isinstance(d.get("days_held"), (int, float))]
+                worst = max(dk, key=lambda d: (d.get("days_held") or 0))
+                oldest = (f'longest {max(held):.0f}d — '
+                          f'{html.escape(str(worst.get("book")))}'
+                          if held else 'age unknown')
+                since = _pipe_syd(worst.get("since"))
+                dec = (f'<b>{len(dk)}</b> book(s) asking keep-or-retire · '
+                       f'{oldest}'
+                       + (f' <span class="muted">(since {html.escape(since)})'
+                          f'</span>' if since else ''))
+                if not gl.get("docket_valid", True):
+                    dec += (' <span style="color:#d29922" title="the grader '
+                            'could not read its own prior docket-seen map, so '
+                            'every clock reads as first-seen today — the ages '
+                            'above are FLOORS.">clocks unverified</span>')
+        dec_line = ('<div style="font-size:.8em;padding-top:1px" '
+                    'title="BLOCKED ON A DECISION — owner: Eamon. I17: a book '
+                    'that cannot reach its own bar is a keep-or-retire call, '
+                    'never another tuning pass.">'
+                    '<span class="muted">🧑 decision (Eamon):</span> '
+                    + dec + '</div>')
+
+        # ---- the incubator: is anything even being bred? ----------------
+        if inc is None:
+            inc_txt = ('<span style="color:#d1242f">unknown — '
+                       'strategy-incubator dark or stale</span>')
+        else:
+            ch = inc.get("champion") if isinstance(inc.get("champion"), dict) else {}
+            fr = inc.get("frontier") if isinstance(inc.get("frontier"), dict) else {}
+            cap = (inc.get("proposal_capacity")
+                   if isinstance(inc.get("proposal_capacity"), dict) else {})
+            el = inc.get("elite")
+            net = ch.get("net")
+            bits = [f'champion {("$" + money(net)) if isinstance(net, (int, float)) else "unknown"}'
+                    f' ({html.escape(str(ch.get("confidence") or "—"))})',
+                    ('frontier enactable '
+                     + ('yes' if fr.get("enactable") is True
+                        else 'no' if fr.get("enactable") is False else 'unknown')),
+                    f'elite {len(el)}' if isinstance(el, list) else 'elite unknown']
+            if cap.get("exhausted") is True:
+                bits.append('<span style="color:#d29922">funding lane '
+                            'EXHAUSTED</span>')
+            elif isinstance(cap.get("untried"), int):
+                bits.append(f'{cap["untried"]} untried')
+            else:
+                bits.append('<span style="color:#d1242f">funding lane '
+                            'unknown</span>')
+            inc_txt = " · ".join(bits)
+        inc_line = ('<div style="font-size:.8em;padding-top:1px" '
+                    'title="the reproduction organ. An empty elite list plus a '
+                    'non-enactable frontier plus an exhausted funding lane '
+                    'means nothing is currently queued to become a new book.">'
+                    '<span class="muted">🧬 breeding:</span> '
+                    + inc_txt + '</div>')
+
+        # ---- header: liveness FIRST (I1) --------------------------------
+        dark = sorted(k for k, v in raw.items() if not v)
+        warn = ""
+        if dark or stale:
+            parts = []
+            if dark:
+                parts.append("dark: " + ", ".join(dark))
+            if stale:
+                parts.append("stale: " + ", ".join(sorted(stale)))
+            warn = (f' · <span style="color:#d1242f" title="Every number this '
+                    f'card would have taken from these keys reads UNKNOWN, not '
+                    f'zero.">{html.escape(" · ".join(parts))}</span>')
+        age = ""
+        _a = _state_age_h(raw.get("xp-judge") or raw.get("golive-readiness"))
+        if _a is not None:
+            age = f' · judge {int(_a * 60)}m ago'
+        return (f'<div class="card"><h2>🏭 Production pipe '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">shadow &rarr; graded &rarr; real money'
+                f'{age}{warn} — read-only; promotes nothing. Blockers are '
+                f'sorted by WHO can clear them: a wire is a code gap, a '
+                f'measurement needs closes, a decision needs Eamon.</div>'
+                f'{funnel}'
+                f'<div class="muted" style="padding-top:4px">promotion pipe '
+                f'(🧪 judge pairs) — wire-blocked first</div>'
+                f'{"".join(rows)}{meas_line}{dec_line}{inc_line}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def brain_card_html():
     """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
     try:
@@ -2126,6 +2639,178 @@ def fetch_open_trades():
 _ENRICH_CACHE = {"ts": 0.0, "data": {}}
 
 
+def fetch_golive_dd():
+    """{bot: {"pct": float|None, "basis": str|None, "why": str|None}} — the
+    go-live drawdown bar, read off the grader's own `golive-readiness` payload.
+
+    [(vj)] THE GRADER IS THE OWNER. `scripts/golive_readiness.py` publishes
+    `max_dd_pct` per book as the WORSE of realised and mark-to-market (I9,
+    (ia)), already a PERCENT (13.1 means 13.1%) — so it must never be passed
+    through `pct()`, which multiplies by 100 and renders +1310.00%. Measured
+    on the live payload: 14 graded books all carry it; the 6 `below_floor`
+    books carry `why_absent` instead ("no closed trades in the ledger"), and
+    the union covers every rendered row.
+
+    A book the grader cannot speak for returns `pct=None` WITH its `why`, so
+    the card can say UNKNOWN rather than omit the line. Absent entirely means
+    the grader is dark — also unknown, never a plausible zero, because `0.0%`
+    drawdown is a real everyday reading on this fleet and would be
+    byte-identical to a dead grader.
+    """
+    st = fetch_states(["golive-readiness"]).get("golive-readiness") or {}
+    out = {}
+    for section in ("books", "below_floor"):
+        for bot, rec in (st.get(section) or {}).items():
+            if not isinstance(rec, dict):
+                continue
+            pct_v = rec.get("max_dd_pct")
+            try:
+                pct_v = float(pct_v) if pct_v is not None else None
+            except (TypeError, ValueError):
+                pct_v = None
+            out[bot] = {"pct": pct_v,
+                        "basis": rec.get("maxdd_basis"),
+                        "why": rec.get("why_absent") or rec.get("mtm_why")}
+    return out
+
+
+# ------------------------------------------------------------- ledger events
+# [2026-08-27 (vm)] THE WINDOW BOUNDARIES ARE DECLARED ONCE. The aggregate
+# FILTERs on them and the candidate query has to place each undecided row in
+# the SAME windows; written twice they would drift — a day apart at a daylight
+# boundary, silently — and the card would count a row in one query's 7d and not
+# the other's. One string, two readers: the (hj) rule at its smallest scale.
+_W_TODAY = "close_ts >= date_trunc('day', now())"
+_W_7D = "close_ts >= now() - interval '7 days'"
+_W_30D = "close_ts >= now() - interval '30 days'"
+
+# The CANDIDATE test — deliberately NOT the verdict. It is the cheap half that
+# narrows a whole ledger to the handful of rows the OWNER then decides on, and
+# it is the same expression `bot_pnl_store.fetch_paper_aggregate` uses for the
+# same job, in that function's own words: "SQL narrows to CANDIDATES cheaply;
+# `is_non_economic` DECIDES".
+_LEDGER_CAND_SQL = "pnl_abs = 0 OR extra->>'non_economic' = 'true'"
+
+
+def _non_economic_owner():
+    """Resolve `bot_pnl_store.is_non_economic` — the ONE owner of the question
+    "is this ledger row an EVENT rather than a TRADE?" ((tw)).
+
+    Returns None when the owner cannot be reached, and `fold_ledger_candidates`
+    then ADMITS every candidate. That is the fail-OPEN direction, and it is the
+    whole reason this is a LOOKUP and not a re-implementation: with no owner the
+    card falls back to exactly its pre-(vm) numbers, never to a silently smaller
+    book. `Dockerfile.dashboard` COPYs `bot_pnl_store.py` (line 9), so this
+    import is not born-dark today; the guard is for the day someone edits that
+    COPY set.
+    """
+    try:
+        from bot_pnl_store import is_non_economic
+        return is_non_economic
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def fold_ledger_candidates(out, cands):
+    """Decide the ledger rows the aggregate deliberately left undecided, and
+    fold the real TRADES back into `out`. Mutates and returns `out`.
+
+    [2026-08-27 (vm)] THE CARD SHOWED EAMON PHANTOM LOSSES ON REAL MONEY.
+    `(tw)` established the defect — a daily-loss halt flattens positions with no
+    entry basis and no P&L, `publish_paper_trade` wrote those EVENTS into the
+    closed-trade ledger as TRADES, and `losses = closed - wins` then counted
+    every one as a LOSS. It fixed the OWNER (`is_non_economic`) and the book's
+    own boot seed (`fetch_paper_aggregate`). It did not fix the DASHBOARD, which
+    is the thing Eamon actually looks at. Measured 27-Aug:
+    `grep -c is_non_economic pnl_dashboard.py` = **0** against 4 hits in the
+    owner, and the two live cards read 🙏 avo **15 closes / 5W / 10L** where the
+    honest record is **6 / 5 / 1**, and 🔮 georgia **60 / 27 / 33** where the row
+    itself reads **56 / 27 / 29**. Nine and four phantom losses, on real money,
+    on the whole reporting surface.
+
+    THE SPLIT IS THE OWNER'S, VERBATIM: SQL narrows to CANDIDATES cheaply
+    (`_LEDGER_CAND_SQL`), `is_non_economic` DECIDES. The predicate is not
+    re-expressed here in SQL or in Python — a second copy of a rule is a second
+    rule ((hj)), and (tw) records that an earlier draft of its own pass
+    re-expressed it as a SQL filter and drifted from it inside one commit.
+
+    FAIL-OPEN IN EVERY DIRECTION, because the defect being repaired is a count
+    that was too BIG and the defect this must never introduce is one that is too
+    SMALL:
+      * no owner (`_non_economic_owner()` is None) ⇒ every candidate is folded
+        back as a trade, so the card degrades to its exact pre-(vm) numbers;
+      * the predicate raising on a row ⇒ that row is ADMITTED;
+      * `bot_trades` ⇒ never a CANDIDATE at all (see the union), because it has
+        no `extra` column to carry the (th) marker, and a table that cannot
+        answer the question must never be answered FOR.
+
+    VISIBILITY, NOT SILENCE: the excluded rows publish as `record.events`,
+    always present and 0 on a clean book. An unexplained drop from 15 closes to
+    6 is a second confusion in place of the first; "6 closed · 9 halt events" is
+    a fact a reader can act on — the same I1 argument the `n_*` counters beside
+    it already make.
+
+    `cands` are the rows of the candidate query: bot, pnl, entry_price, extra,
+    and the three window booleans SQL itself evaluated, so no window boundary is
+    ever recomputed in Python.
+    """
+    decide = _non_economic_owner()
+    for r in (cands or []):
+        bot = r.get("bot")
+        if not bot:
+            continue                       # unkeyable row: nothing to fold into
+        b = out.setdefault(bot, {})
+        rec = b.setdefault("record", {"n": 0, "w": 0, "l": 0,
+                                      "total": 0.0, "events": 0})
+        # a record built by the aggregate above already carries `events`; one
+        # built HERE is a book whose every ledger row was a candidate.
+        rec.setdefault("events", 0)
+        is_event = False
+        if decide is not None:
+            try:
+                is_event = bool(decide(r.get("pnl"), r.get("entry_price"),
+                                       r.get("extra")))
+            except Exception:  # noqa: BLE001
+                is_event = False           # unreadable row ⇒ ADMIT it
+        if is_event:
+            rec["events"] += 1
+            continue
+        # ADMITTED — a real trade the cheap SQL test could not tell apart from
+        # an event (a close that landed exactly flat, or a funding book's
+        # price-free accrual row). It was excluded from the aggregate, so it is
+        # put back here rather than lost.
+        try:
+            # NOT a fabricated zero: a NULL-P&L row cannot BE a candidate (the
+            # union COALESCEs that test to FALSE), so this branch is
+            # unreachable — and if it ever fires, counting the trade and adding
+            # nothing to the sum is the only choice that invents no number.
+            pnl = float(r.get("pnl") or 0.0)
+        except (TypeError, ValueError):
+            pnl = 0.0
+        rec["n"] += 1
+        if pnl > 0:
+            rec["w"] += 1
+        rec["l"] = rec["n"] - rec["w"]
+        rec["total"] = round(float(rec.get("total") or 0.0) + pnl, 2)
+        for flag, n_key, sum_key in (("in_today", "today_n", "today_closed"),
+                                     ("in_7d", "n_7d", "pnl_7d"),
+                                     ("in_30d", "n_30d", "pnl_30d")):
+            if not r.get(flag):
+                continue
+            b[n_key] = int(b.get(n_key) or 0) + 1
+            b[sum_key] = round(float(b.get(sum_key) or 0.0) + pnl, 2)
+        # best/worst are EXTREMA, so they cannot be repaired by subtraction the
+        # way a count can — an event at $0.00 becomes the "worst trade" of an
+        # all-winning book and the "best" of an all-losing one. Excluding then
+        # re-folding is what makes them right; None means the aggregate saw no
+        # admitted rows at all for this bot.
+        b["best_trade"] = (round(pnl, 2) if b.get("best_trade") is None
+                           else round(max(b["best_trade"], pnl), 2))
+        b["worst_trade"] = (round(pnl, 2) if b.get("worst_trade") is None
+                            else round(min(b["worst_trade"], pnl), 2))
+    return out
+
+
 def fetch_ledger_enrich():
     """[2026-07-07 UNIFORM CARDS] One cached ledger pass so EVERY bot's card
     carries the same fields regardless of what its publisher sends:
@@ -2154,29 +2839,104 @@ def fetch_ledger_enrich():
             g = cur.fetchone()
             parts = []
             if g["t1"]:
+                # [(vm)] `bot_trades` CANNOT CARRY THE MARKER — its CREATE has
+                # neither `extra` nor `entry_price` and there is not one
+                # `ALTER TABLE bot_trades` in the tree (checked, whole file).
+                # So it is never a CANDIDATE (`FALSE` below) and every one of
+                # its rows is admitted as a trade without the owner being asked.
+                # That is fail-OPEN made STRUCTURAL rather than incidental: the
+                # tempting `NULL::jsonb, NULL::double precision` alone would
+                # make each of its flat closes look exactly like a halt event
+                # (pnl 0 · no entry price · no funding form) and delete real
+                # freqtrade trades from the record. Nulls are still supplied so
+                # the two branches union; `cand` is what withholds them.
                 parts.append("SELECT bot, pair, profit_abs AS pnl, "
-                             "exit_reason AS reason, close_ts "
+                             "exit_reason AS reason, close_ts, "
+                             "NULL::double precision AS entry_price, "
+                             "NULL::jsonb AS extra, FALSE AS cand "
                              "FROM bot_trades WHERE close_ts IS NOT NULL")
             if g["t2"]:
+                # COALESCE(..., FALSE) is load-bearing: with `pnl_abs` NULL and
+                # no marker the bare OR is NULL, and a NULL `cand` satisfies
+                # neither `WHERE cand` nor `WHERE NOT cand` — the row would fall
+                # out of BOTH queries and vanish from the card. Unknown means
+                # "not a candidate", i.e. keep it.
                 parts.append("SELECT bot, pair, pnl_abs, reason, "
                              "COALESCE(CASE WHEN pg_input_is_valid(closed_at, "
                              "'timestamptz') THEN closed_at::timestamptz END, "
-                             "seen_at) FROM paper_trades")
+                             "seen_at), entry_price, extra, "
+                             f"COALESCE({_LEDGER_CAND_SQL}, FALSE) "
+                             "FROM paper_trades")
             if parts:
                 union = " UNION ALL ".join(parts)
+                # [(vj)] 7d/30d P&L and best/worst join this SAME aggregate.
+                # `card()` read `row["pnl_weekly"]`, `row["pnl_monthly"]`,
+                # `row["best_trade"]` and `row["worst_trade"]` off a bot_pnl row
+                # for weeks — four columns `bot_pnl` HAS NEVER HAD (its 12 are
+                # bot, closed_trades, equity, extra, losses, open_trades,
+                # pnl_abs, pnl_daily, pnl_pct, status, updated_at, wins), each
+                # behind an `is not None` guard, so two card sections were
+                # unreachable dead code on every bot forever. They are the
+                # read-side residue of the 28-Jul doc-truth cleanup, which
+                # struck those exact five names from `publish()`'s docs and
+                # fixed the publisher and the docs but not the consumer.
+                # Derived here from the ledger this pass already scans, so the
+                # numbers are REALISED closes — the same basis as `record`.
+                # [(vm)] `WHERE NOT cand` is the whole reporting fix: the
+                # aggregate now runs over the rows SQL can settle by itself, and
+                # the handful it cannot are decided by the owner and folded back
+                # in below. n/w/l, 7d/30d, today and best/worst all ride this
+                # one aggregate, so all of them are repaired together.
                 cur.execute(
                     f"WITH t AS ({union}) "
                     "SELECT bot, COUNT(*) n, SUM((pnl>0)::int) w, SUM(pnl) total, "
-                    "COALESCE(SUM(pnl) FILTER (WHERE close_ts >= date_trunc('day', now())),0) today_closed, "
-                    "COUNT(*) FILTER (WHERE close_ts >= date_trunc('day', now())) today_n "
-                    "FROM t GROUP BY bot")
+                    f"COALESCE(SUM(pnl) FILTER (WHERE {_W_TODAY}),0) today_closed, "
+                    f"COUNT(*) FILTER (WHERE {_W_TODAY}) today_n, "
+                    f"SUM(pnl) FILTER (WHERE {_W_7D}) pnl_7d, "
+                    f"COUNT(*) FILTER (WHERE {_W_7D}) n_7d, "
+                    f"SUM(pnl) FILTER (WHERE {_W_30D}) pnl_30d, "
+                    f"COUNT(*) FILTER (WHERE {_W_30D}) n_30d, "
+                    "MAX(pnl) best, MIN(pnl) worst "
+                    "FROM t WHERE NOT cand GROUP BY bot")
                 for r in cur.fetchall():
                     b = out.setdefault(r["bot"], {})
                     n, w = int(r["n"]), int(r["w"] or 0)
                     b["record"] = {"n": n, "w": w, "l": n - w,
-                                   "total": round(float(r["total"] or 0), 2)}
+                                   "total": round(float(r["total"] or 0), 2),
+                                   # always present, 0 on a clean book: absent
+                                   # and zero are different states and only one
+                                   # of them means "nothing was withheld".
+                                   "events": 0}
                     b["today_closed"] = round(float(r["today_closed"] or 0), 2)
                     b["today_n"] = int(r["today_n"] or 0)
+
+                    def _num(v):
+                        return round(float(v), 2) if v is not None else None
+                    # n_* rides along so a window with NO closes stays
+                    # distinguishable from one that closed exactly flat — the
+                    # (hf)/I1 shape at the reporting layer, and the whole reason
+                    # this card is being repaired in the first place.
+                    b["pnl_7d"], b["n_7d"] = _num(r["pnl_7d"]), int(r["n_7d"] or 0)
+                    b["pnl_30d"], b["n_30d"] = _num(r["pnl_30d"]), int(r["n_30d"] or 0)
+                    b["best_trade"], b["worst_trade"] = _num(r["best"]), _num(r["worst"])
+                # [(vm)] THE SECOND HALF OF THE OWNER'S PATTERN. The candidates
+                # are a tiny set — (tw) measured the fleet-wide legacy bridge at
+                # exactly 13 rows — so this is a cheap query, and it carries the
+                # window booleans SQL itself evaluated so `fold_ledger_candidates`
+                # never recomputes a boundary in Python.
+                cur.execute(
+                    f"WITH t AS ({union}) "
+                    "SELECT bot, pnl, entry_price, extra, "
+                    f"({_W_TODAY}) in_today, ({_W_7D}) in_7d, "
+                    f"({_W_30D}) in_30d "
+                    "FROM t WHERE cand")
+                fold_ledger_candidates(out, cur.fetchall())
+                # `last_close` is deliberately NOT filtered. It answers "what is
+                # the most recent row this book wrote?", which is a LIVENESS
+                # question (I1) — hiding a halt event there would leave a book
+                # that flattened this morning showing a days-old close and
+                # looking like it simply went quiet. The record says what the
+                # book TRADED; the last-close line says what it last DID.
                 cur.execute(
                     f"WITH t AS ({union}) "
                     "SELECT DISTINCT ON (bot) bot, pair, pnl, reason, close_ts "
@@ -2246,7 +3006,7 @@ def age_str(updated_at, threshold=STALE_SECONDS):
     now = dt.datetime.now(dt.timezone.utc)
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=dt.timezone.utc)
-    secs = (now - updated_at).total_seconds()
+    secs = max(0.0, (now - updated_at).total_seconds())
     stale = secs > threshold
     if secs < 90:
         return f"{int(secs)}s ago", stale
@@ -2360,9 +3120,19 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     _closed = row.get("closed_trades")
     if _closed is None and (en.get("record") or {}).get("n"):
         _closed = en["record"]["n"]
+    # [(vm)] THE WITHHELD ROWS ARE SHOWN, NOT ERASED. `record` now excludes the
+    # basis-free flatten rows a daily-loss halt writes ((tw)), so the count
+    # DROPS on exactly the books that halted — 🙏 avo 15 → 6, 🔮 georgia 60 → 56
+    # — and a reader handed an unexplained drop has been given a second
+    # confusion in place of the first. `record.events` is that explanation, and
+    # it is a real fact about a real-money book: nine halts is news.
+    _events = (en.get("record") or {}).get("events") or 0
+    _ev_txt = (f' · {_events} halt event{"" if _events == 1 else "s"}'
+               if _events else '')
     if _closed is not None or row.get("open_trades") is not None:
         rows.append(f'<div class="row"><span>Trades</span>'
-                    f'<b>{_closed or 0} closed · {row.get("open_trades") or 0} open</b></div>')
+                    f'<b>{_closed or 0} closed · {row.get("open_trades") or 0} open'
+                    f'{_ev_txt}</b></div>')
     if row.get("wins") is not None:
         rows.append(f'<div class="row"><span>Win / Loss</span>'
                     f'<b>{row.get("wins") or 0} / {row.get("losses") or 0}</b></div>')
@@ -2390,23 +3160,49 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
         pnl_daily = en.get("today_equity_delta")
         if pnl_daily is None and en.get("today_n"):
             pnl_daily = en.get("today_closed")
-    pnl_weekly  = row.get("pnl_weekly")
-    pnl_monthly = row.get("pnl_monthly")
+    # [(vj)] FROM THE LEDGER PASS, NOT FROM `row`. These read
+    # `row["pnl_weekly"]`/`row["pnl_monthly"]` — bot_pnl columns that do not
+    # exist — so both lines were unreachable on every bot, forever. REALISED
+    # closes in the window, the same basis as the record line below.
+    pnl_weekly  = en.get("pnl_7d")
+    pnl_monthly = en.get("pnl_30d")
     if pnl_daily is not None:
         rows.append(f'<div class="row"><span>Today P&amp;L (UTC)</span>'
                     f'<b class="{cls(pnl_daily)}">{money(pnl_daily)}</b></div>')
+    # `P&amp;L`, not `P&L` — a raw ampersand is invalid HTML, and it survived
+    # here precisely because these two lines have never rendered: unreachable
+    # code is also unexercised code. The neighbouring "Today P&amp;L" line,
+    # which does render, had it right all along.
     if pnl_weekly is not None:
-        rows.append(f'<div class="row"><span>7d P&L</span>'
+        rows.append(f'<div class="row"><span>7d P&amp;L</span>'
                     f'<b class="{cls(pnl_weekly)}">{money(pnl_weekly)}</b></div>')
     if pnl_monthly is not None:
-        rows.append(f'<div class="row"><span>30d P&L</span>'
+        rows.append(f'<div class="row"><span>30d P&amp;L</span>'
                     f'<b class="{cls(pnl_monthly)}">{money(pnl_monthly)}</b></div>')
-    max_dd = row.get("max_drawdown")
-    if max_dd is not None:
+    # [(vj)] MAX DRAWDOWN IS A GO-LIVE BAR AND IT ALWAYS RENDERS NOW.
+    # It read `row["max_drawdown"]`, a bot_pnl column that has never existed,
+    # so the line was silently absent on every book — and absent is
+    # byte-identical to "this book has no drawdown", on the one number that
+    # governs whether real money is allowed. Sourced from the grader that owns
+    # it (`golive_dd`, the WORSE of realised and MTM); UNKNOWN is stated with
+    # the grader's own reason rather than dropped, because a missing row is
+    # exactly the failure being repaired here.
+    # UNITS: `max_dd_pct` is ALREADY a percent — `pct()` would render 13.1 as
+    # +1310.00%. Formatted directly, and pinned by a test.
+    _dd = en.get("golive_dd")
+    if _dd and _dd.get("pct") is not None:
+        _basis = _dd.get("basis")
+        _bl = f' title="worse of realised and mark-to-market; basis: {_basis}"' \
+            if _basis else ""
         rows.append(f'<div class="row"><span>Max Drawdown</span>'
-                    f'<b style="color:#f85149">{pct(max_dd)}</b></div>')
-    best_trade  = row.get("best_trade")
-    worst_trade = row.get("worst_trade")
+                    f'<b style="color:#f85149"{_bl}>{_dd["pct"]:.1f}%</b></div>')
+    else:
+        _why = (_dd or {}).get("why") or "go-live grader is dark or stale"
+        rows.append(f'<div class="row"><span>Max Drawdown</span>'
+                    f'<b style="color:#8b949e" title="{html.escape(str(_why))}">'
+                    f'unknown</b></div>')
+    best_trade  = en.get("best_trade")
+    worst_trade = en.get("worst_trade")
     if best_trade is not None or worst_trade is not None:
         rows.append(f'<div class="row"><span>Best / Worst trade</span>'
                     f'<b>{money(best_trade)} / {money(worst_trade)}</b></div>')
@@ -2512,12 +3308,30 @@ def render():
         enrich = fetch_ledger_enrich()
     except Exception:  # noqa: BLE001
         enrich = {}
+    # [(vj)] MAX DRAWDOWN REACHES THE CARD. It is one of the six GO-LIVE BARS
+    # and the card read it off `row["max_drawdown"]` — a bot_pnl column that
+    # does not exist — so the line silently never rendered and a reader could
+    # not tell "this book has no drawdown" from "this number was never
+    # computed". IMPORTED, never recomputed: `scripts/golive_readiness.py`
+    # owns this number (the WORSE of realised and MTM, per I9) and a second
+    # computation here would be a second rule ((hj)). The payload was already
+    # fetched twice per render for other cards; it just never reached this
+    # scope.
+    try:
+        for _bot, _dd in fetch_golive_dd().items():
+            enrich.setdefault(_bot, {})["golive_dd"] = _dd
+    except Exception:  # noqa: BLE001
+        pass          # a dark grader leaves `golive_dd` ABSENT -> renders unknown
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
     # [2026-07-30] 🚦 the go-live grader sits directly after the radar: the
     # radar says "is there an edge?", the grader says "has it earned real
     # money?" — the same books, the next question.
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card() + golive_card()
+    # [2026-08-26] 🏭 the production pipe closes the sequence: the radar asks
+    # "is there an edge?", the grader "has it earned real money?", and the pipe
+    # "then why has nothing arrived?" — joining the grader, the judge, the
+    # allocation organ and the incubator into one answer sorted by who can act.
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card() + golive_card() + pipeline_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
@@ -2749,17 +3563,26 @@ def render():
     # get a muted line so the compressed gate ladder is visible at a glance.
     live_total_line = ""
     if n_live_bots:
+        # Return % across the live fleet: pnl / contributed capital.
+        # Contributed = equity - pnl_abs for each bot (what the operator put in).
+        _live_contrib = sum(
+            max((r.get("equity") or 0) - (r.get("pnl_abs") or 0), 0.01)
+            for r in live_rows if r.get("equity") is not None)
+        _live_pct = (f' ({pct(live_pnl / _live_contrib)})'
+                     if _live_contrib > 0 else "")
         live_total_line += (
             f'<span style="border:1px solid #1a7f37;border-radius:6px;padding:2px 9px;'
             f'background:#1a7f3718;font-weight:600">🟢 LIVE · Lighter '
             f'<b>{money(live_equity)}</b> eq · '
-            f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
+            f'<b class="{cls(live_pnl)}">{money(live_pnl)}{_live_pct}</b> P&amp;L · '
             f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span>')
     if n_shadow_bots:
+        _sh_start = n_shadow_bots * PAPER_START_EQUITY
+        _sh_pct = (f' ({pct(shadow_pnl / _sh_start)})' if _sh_start > 0 else "")
         live_total_line += (
             f'<span class="muted" style="border:1px solid #30363d;border-radius:6px;'
             f'padding:2px 9px">shadow/testnet <b class="{cls(shadow_pnl)}">'
-            f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
+            f'{money(shadow_pnl)}{_sh_pct}</b> · {n_shadow_bots} bot'
             f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
 
     # [2026-08-04 (iy)] The legacy paper-cohort spans render ONLY when their
