@@ -303,6 +303,9 @@ SELFTEST_MODULES = [
     "lighter_book_grimes_bot",
     "lighter_book_hull_bot",
     "lighter_book_schwager_bot",
+    # [2026-08-29] 🏭 book-bezos — thin wrapper over lighter_book_douglas_bot;
+    # its selftest delegates to core._selftest() so it is tested via douglas.
+    "lighter_book_bezos_bot",
     # [2026-08-18] 🪁 band-kelly — registered the day it was born; offline
     # (mirror inversion pinned as a property, ghost import identity, both
     # exit ladders, empty-screen universe contract, publish/state builders).

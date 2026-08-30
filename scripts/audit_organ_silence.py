@@ -59,6 +59,9 @@ SILENT_OK = {
     "lighter_ticket_taker.py":
         "already records: it marks its own row status on crash "
         "(the _supervised() wrapper) — the real-money arm had this first.",
+    "lighter_book_bezos_bot.py":
+        "thin wrapper over lighter_book_douglas_bot which has its own "
+        "organ_main error handling; bezos delegates entirely to douglas.",
 }
 
 
