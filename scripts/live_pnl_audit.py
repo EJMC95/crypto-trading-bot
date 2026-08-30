@@ -128,6 +128,15 @@ def _present(v):
     return v not in (None, "", [], {})
 
 
+def _trade_present(t, keys):
+    """A trade-row telemetry key may live at the TOP LEVEL (a real column)
+    or inside the close row's `extra` dict — where the live host stamps
+    execution telemetry by design ([2026-08-30]; /trades.json?source=paper
+    rows carry the full `extra` column). Try both; never anywhere else."""
+    return any(_present(_get_path(t, k)) or _present(_get_path(t, "extra." + k))
+               for k in keys)
+
+
 def live_roster_findings(pnl):
     expected = sorted(str(x) for x in (EXPECTED_LIVE_ROWS or ()))
     if not expected:
@@ -392,7 +401,7 @@ def coverage_matrix(pnl, trades, bus):
             return 0, 0
         n = 0
         for r in live_trades:
-            if any(_present(_get_path(r, p)) for p in paths):
+            if _trade_present(r, paths):
                 n += 1
         return n, len(live_trades)
 
@@ -566,11 +575,11 @@ def live_telemetry_gap_details(pnl, trades, bus):
         rows = trade_by_bot.get(bot, [])
         gaps = []
         checks = [
-            ("fees", any(_present(_get_path(t, k)) for t in rows for k in ("fee", "fees", "commission", "cost_fee"))),
+            ("fees", any(_trade_present(t, ("fee", "fees", "commission", "cost_fee")) for t in rows)),
             ("slippage/spread", any(_present(_get_path(row, k)) for k in ("extra.stop_overshoot.n", "extra.entry_vetoes.coin_veto"))),
-            ("partial-fills", any(_present(_get_path(t, k)) for t in rows for k in ("filled", "filled_size", "partial_fill", "fill_ratio"))),
-            ("latency stamps", any(_present(_get_path(t, k)) for t in rows for k in ("signal_ts", "signal_at", "decision_ts"))),
-            ("funding stamps", any(_present(_get_path(t, k)) for t in rows for k in ("funding_rate", "funding_apr", "entry_apr", "exit_apr"))),
+            ("partial-fills", any(_trade_present(t, ("filled", "filled_size", "partial_fill", "fill_ratio")) for t in rows)),
+            ("latency stamps", any(_trade_present(t, ("signal_ts", "signal_at", "decision_ts")) for t in rows)),
+            ("funding stamps", any(_trade_present(t, ("funding_rate", "funding_apr", "entry_apr", "exit_apr")) for t in rows)),
             ("leverage/liq telemetry", any(_present(_get_path(row, k)) for k in ("extra.leverage.set", "extra.leverage.liq_gap_pct"))),
             ("drawdown lockout telemetry", any(_present(_get_path(row, k)) for k in ("extra.entry_vetoes.lockout_hours_30d", "extra.entry_vetoes.entries_shut_reason_30d"))),
             ("stale-data telemetry", any(_present(_get_path(row, k)) for k in ("extra.scan.stale_candle", "extra.scan.no_bars"))),

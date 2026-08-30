@@ -241,6 +241,34 @@ def test_telemetry_gap_details_are_per_bot_actionable():
     assert "partial-fills" in by_bot["freqtrade-georgia-lighter"]["missing"]
 
 
+def test_trade_telemetry_is_read_from_extra_too():
+    """[2026-08-30] The live host stamps execution telemetry in the close
+    row's `extra` dict (fees/funding_abs/funding_rate/decision_ts/open_lag_s)
+    — /trades.json?source=paper serves the extra column, so the audit must
+    read `extra.<key>` beside the top-level column or it grades real
+    telemetry as a 🔴 gap forever (the exact 0/105 finding of 29-Aug).
+    Shape mirrors the live host's _book_close extra dict, not a lookalike."""
+    stamped = json.loads(json.dumps(TRADES))
+    for t in stamped:
+        if t["bot"] == "freqtrade-georgia-lighter":
+            t["extra"] = {"fees": 0.0, "fee_src": "lighter-zero-fee-ledger",
+                          "funding_abs": -0.0123, "funding_rate": 1.2e-06,
+                          "decision_ts": "2026-08-25T00:14:12+00:00",
+                          "open_lag_s": 0.842}
+    rows = lpa.live_telemetry_gap_details(PNL, stamped, BUS)
+    by_bot = {r["bot"]: r for r in rows}
+    missing = by_bot["freqtrade-georgia-lighter"]["missing"]
+    assert "fees" not in missing            # extra.fees, 0.0 is a reading
+    assert "latency stamps" not in missing  # extra.decision_ts
+    assert "funding stamps" not in missing  # extra.funding_rate
+    # partial fills are deliberately NOT stamped (the venue layer exposes no
+    # fill-size aggregate; fabricating a ratio is the I8 failure) — the gap
+    # must keep reporting so the refusal stays visible.
+    assert "partial-fills" in missing
+    # and the un-stamped bots' gaps are unchanged (no cross-bot bleed)
+    assert "fees" in by_bot["freqtrade-avo-maria-lighter"]["missing"]
+
+
 def test_before_after_scoreboard_detects_widening_and_tightening():
     before_pnl = json.loads(json.dumps(PNL))
     # lower old clips/scales so now reads as widened

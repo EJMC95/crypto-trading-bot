@@ -86,6 +86,27 @@ def test_every_universe_member_gets_a_verdict():
     assert out["universe"] == len(UNI)
 
 
+def test_flat_audit_counts_are_derived_from_the_verdict_census():
+    """[2026-08-30] The live-pnl-audit reads FLAT `extra.scan.no_bars` /
+    `extra.scan.failed` / `extra.scan.unpriceable` (the shadow family's
+    shape) while this host nested everything under verdicts.* — so the
+    real-money rows graded dark on stale-data/api-failure telemetry they
+    were publishing. The flat keys must be the SAME numbers as the census
+    (derived, never a second tally), and 0 must be present (a live reading,
+    not an absence)."""
+    out = avo.scan_census({"BTC": "no_bars", "ETH": "no_bars",
+                           "SPY": "venue_reject", "IWM": "no_mark"},
+                          {}, 42.0, UNI, ["BTC", "ETH", "SPY", "IWM"], None,
+                          None, 0, None, 1000.0)
+    assert out["no_bars"] == out["verdicts"]["no_bars"] == 2
+    assert out["failed"] == out["verdicts"]["venue_reject"] == 1
+    assert out["unpriceable"] == out["verdicts"]["no_mark"] == 1
+    quiet = avo.scan_census({}, {}, 42.0, UNI, [], None, None, 0, None,
+                            1000.0)
+    assert quiet["no_bars"] == 0 and quiet["failed"] == 0
+    assert quiet["unpriceable"] == 0
+
+
 def test_idle_clocks_are_absent_rather_than_zero():
     """`idle_open_h: 0.0` would read as "it opened just now" on a book that
     has never opened anything."""

@@ -734,7 +734,19 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
         counts[verdicts.get(str(sym), "not_evaluated")] = counts.get(
             verdicts.get(str(sym), "not_evaluated"), 0) + 1
     out = {"universe": len(universe), "held": len(held),
-           "verdicts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+           "verdicts": dict(sorted(counts.items(), key=lambda kv: -kv[1])),
+           # [2026-08-30] FLAT compatibility counts, DERIVED from the verdict
+           # census above (never a second tally): the live-pnl-audit's
+           # telemetry matrix reads `extra.scan.no_bars` / `extra.scan.failed`
+           # / `extra.scan.unpriceable` — the shadow family's flat shape —
+           # while this host nested everything under `verdicts.*`, so the
+           # real-money rows graded "no stale-data / api-failure telemetry"
+           # (-24% reliability drag) for data they were already publishing.
+           # 0 is a real reading ("telemetry live, nothing refused"), which is
+           # exactly what the audit's _present() treats as covered.
+           "no_bars": counts.get("no_bars", 0),
+           "failed": counts.get("venue_reject", 0),
+           "unpriceable": counts.get("no_mark", 0)}
     if entries_shut:
         out["entries_shut"] = entries_shut
     if ungraded:
@@ -2022,6 +2034,26 @@ def main(_ctx=None, once=False):
                            # rank is born at the OPEN ((sv)); the pre-(th) 46
                            # georgia closes carry None and always will.
                            "entry_rank": m.get("entry_rank"),
+                           # [2026-08-30] execution telemetry on the CLOSE row
+                           # so the live-pnl-audit's coverage matrix reads real
+                           # data instead of grading these classes dark.
+                           # fees: this ledger books ZERO fees and Lighter is
+                           # MEASURED zero-fee — 0.0 is the honest reading, and
+                           # fee_src names the basis so a future venue fee hike
+                           # is visibly unstamped rather than silently wrong.
+                           "fees": 0.0, "fee_src": "lighter-zero-fee-ledger",
+                           # settled funding this position accrued, the number
+                           # already printed on the CLOSE line above.
+                           "funding_abs": round(float(fund), 6),
+                           # open-site latency + last accrual rate: copied
+                           # from meta, absent (I8) on positions opened before
+                           # this deploy / coins the venue never quoted.
+                           **({"funding_rate": m["funding_rate"]}
+                              if m.get("funding_rate") is not None else {}),
+                           **({"decision_ts": m["decision_ts"]}
+                              if m.get("decision_ts") else {}),
+                           **({"open_lag_s": m["open_lag_s"]}
+                              if m.get("open_lag_s") is not None else {}),
                            **({"non_economic": True} if _phantom else {}),
                            **({"stop_overshoot_bps": _ob}
                               if _ob is not None else {})})
@@ -2241,6 +2273,17 @@ def main(_ctx=None, once=False):
                 m.pop("no_px_since", None)
                 m["last_px"] = px
                 rate = (fund.get(sym) or {}).get("rate")
+                if rate is not None:
+                    # [2026-08-30] last observed funding rate, HOURLY fraction
+                    # (funding_basis owns the venue's units — never rate/8 by
+                    # hand, the (rd)/(ro) 9x trap). Durable on meta so the
+                    # close row can stamp what this position actually accrued
+                    # at; absent for a coin the venue never quoted (I8).
+                    try:
+                        m["funding_rate"] = funding_basis.to_hourly(
+                            rate, "lighter")
+                    except Exception:  # noqa: BLE001
+                        pass
                 if rate is not None and dt_h:
                     # ledger-side funding drag (long pays a positive rate);
                     # EQUITY takes the real charge from the venue itself.
@@ -2549,6 +2592,7 @@ def main(_ctx=None, once=False):
                     _verdict(sym, "size_rounds_to_zero")
                     continue
                 try:
+                    _t_dec = time.time()
                     res = venue.market_open(sym, True, size)
                 except Exception as e:  # noqa: BLE001
                     _verdict(sym, "venue_reject")
@@ -2592,6 +2636,15 @@ def main(_ctx=None, once=False):
                              # position record so it survives a restart and
                              # reaches the close row.
                              "brain_mult": round(bmult, 4),
+                             # [2026-08-30] latency stamps, born at the OPEN
+                             # like entry_rank ((th)): decision_ts is the
+                             # moment the order was submitted, open_lag_s the
+                             # measured submit→fill-read wall time. Copied to
+                             # the close row, never recomputed. Positions
+                             # opened before this deploy have neither (I8).
+                             "decision_ts": iso(datetime.fromtimestamp(
+                                 _t_dec, timezone.utc)),
+                             "open_lag_s": round(time.time() - _t_dec, 3),
                              "clip": round(stake, 2), "last_px": px}
                 # [(th)] entry_rank, born at the OPEN like the shadow's (sv)
                 # stamp — the close can only copy what the open recorded. The
