@@ -1,3 +1,12 @@
+# (vw) 2026-08-30 — THIS WAS A 4-SEGMENT MATRIX AND EVERY RUN IT EVER HAD WAS
+# RED. The segments passed bare root-level .py filenames through the init
+# action's `config: paths:`, and the CodeQL Python extractor walks each
+# include path as a DIRECTORY — so extraction crashed with
+# `NotADirectoryError: [Errno 20] Not a directory: 'fleet_bus.py'` in all
+# four segments, on every run. A guard that has never once run green is not a
+# guard (the (gl) rule in a security-scanner costume). The fix is ONE
+# whole-repo analysis: Python extraction of this tree takes minutes, so the
+# segmentation bought nothing the crash didn't cost.
 name: CodeQL Python Segmented
 
 on:
@@ -15,52 +24,9 @@ permissions:
   security-events: write
 
 jobs:
-  python-segmented:
-    name: python-segmented (${{ matrix.segment.name }})
+  python:
+    name: python (whole repo)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        segment:
-          - name: live-money-core
-            paths: |
-              - lighter_avo_live_bot.py
-              - lighter_family_bot.py
-              - venues
-              - bot_pnl_store.py
-              - fleet_bus.py
-          - name: execution-risk
-            paths: |
-              - lighter_ticket_taker.py
-              - lighter_funding_bot.py
-              - lighter_funding_spread_bot.py
-              - fleet_risk.py
-              - fleet_immune.py
-              - implementation_shortfall.py
-              - paper_broker.py
-          - name: organs
-            paths: |
-              - bot_learn.py
-              - fleet_proprioception.py
-              - experiment_judge.py
-              - event_sentinel.py
-              - lighter_market_scout.py
-              - lighter_scout_tuner.py
-              - strategy_incubator.py
-              - fleet_respiration.py
-              - fleet_regen.py
-              - fleet_clock.py
-              - evidence_board.py
-              - fleet_allocation.py
-              - fleet_radar.py
-          - name: analytics-and-scripts
-            paths: |
-              - scripts
-              - pnl_dashboard.py
-              - market_context.py
-              - market_pulse.py
-              - regime_oracle.py
-              - fleet_watchdog_svc.py
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -70,11 +36,8 @@ jobs:
         with:
           languages: python
           queries: security-and-quality
-          config: |
-            paths:
-            ${{ matrix.segment.paths }}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: /language:python/segment:${{ matrix.segment.name }}
+          category: /language:python

@@ -300,6 +300,10 @@ SELFTEST_MODULES = [
     # Grimes's I20 roster exclusion + replay gate, Schwager's no-pyramid +
     # monotone trail, Hull's band tiling + measured grace).
     "lighter_book_douglas_bot",
+    # [2026-08-30 (vw)] 🚀 book-bezos — the Douglas-engine variant; its
+    # --selftest delegates to the core engine's, registered so the wrapper's
+    # import + profile plumbing is exercised on every push.
+    "lighter_book_bezos_bot",
     "lighter_book_grimes_bot",
     "lighter_book_hull_bot",
     "lighter_book_schwager_bot",

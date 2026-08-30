@@ -39,4 +39,8 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         core._selftest()
         sys.exit(0)
-    main()
+    # (vw) route through the shared organ wrapper so a crash records on the
+    # book's own bot_state key instead of dying silently behind run_all.sh's
+    # `|| true` (audit_organ_silence — I13: a dead loop runs no handler).
+    import bot_pnl_store as store  # noqa: E402
+    sys.exit(store.organ_main("book-bezos", main))

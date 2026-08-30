@@ -539,6 +539,11 @@ BOOKS = {b.row: b for b in [
     _envonly("book-douglas-lshadow", "lighter_book_douglas_bot.py", 8,
              "🧘 The Zone. Bracket predefined at entry and never widened; "
              "clip is structurally constant (no streak/outcome input)."),
+    _envonly("book-bezos-lshadow", "lighter_book_bezos_bot.py", 8,
+             "🚀 Bezos. A VARIANT of the Douglas engine (the Garrett "
+             "pattern): faster impulse bar, asymmetric bracket, 8h hold, "
+             "$100 start. Env-only profile — its knobs are Douglas's, set "
+             "at import; no tuning lane by construction."),
     _envonly("book-grimes-lshadow", "lighter_book_grimes_bot.py", 8,
              "📐 The Technician. Entry is gated by its own rolling replay "
              "scorecard, so its real 'lever' is evidence, not a knob."),

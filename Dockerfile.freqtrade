@@ -125,6 +125,9 @@ COPY scripts/golive_readiness.py /freqtrade/scripts/golive_readiness.py
 COPY scripts/winners_docket.py /freqtrade/scripts/winners_docket.py
 COPY scripts/claims_ledger.py /freqtrade/scripts/claims_ledger.py
 COPY lighter_book_bezos_bot.py /freqtrade/lighter_book_bezos_bot.py
+# (vw) bezos is a VARIANT of the Douglas engine — without this COPY the
+# wrapper import crash-loops forever behind run_all.sh's `|| true` (born-dark).
+COPY lighter_book_douglas_bot.py /freqtrade/lighter_book_douglas_bot.py
 # [2026-07-21] 🏛️ the Parliament — the six-layer PM shadow fleet (six $1k
 # books + scanners + ML + tuners + brain), launched from run_all.sh. Imports
 # bot_pnl_store / fleet_bus / funding_basis / paper_broker — all COPY'd above
