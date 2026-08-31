@@ -1,111 +1,117 @@
 {
- "round": 26,
- "built_at": "2026-08-24T03:00:50+00:00",
+ "round": 27,
+ "built_at": "2026-08-31T07:54:29+00:00",
  "games": [
   {
-   "home": "Brisbane Broncos",
-   "away": "Melbourne Storm",
+   "home": "Canterbury-Bankstown Bulldogs",
+   "away": "Brisbane Broncos",
    "info_confidence": "low",
    "team_lists_confirmed": false,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 7.6,
-    "temp_c": 17.2,
-    "forecast_hour": "2026-08-27T19:00"
+    "wind_kmh": 10.7,
+    "temp_c": 19.5,
+    "forecast_hour": "2026-09-03T19:00"
    },
    "weather_try_mult": 1.0,
-   "baseline_total": 47.7,
-   "adjusted_total": 47.7,
-   "flags": []
-  },
-  {
-   "home": "Manly-Warringah Sea Eagles",
-   "away": "St George Illawarra Dragons",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 7.8,
-    "temp_c": 16.1,
-    "forecast_hour": "2026-08-28T18:00"
-   },
-   "weather_try_mult": 1.0,
-   "baseline_total": 47.3,
-   "adjusted_total": 47.3,
-   "flags": []
-  },
-  {
-   "home": "Penrith Panthers",
-   "away": "Canterbury-Bankstown Bulldogs",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": null,
-   "weather_try_mult": 1.0,
-   "baseline_total": 45.2,
-   "adjusted_total": 45.2,
+   "baseline_total": 45.7,
+   "adjusted_total": 45.7,
    "flags": []
   },
   {
    "home": "Gold Coast Titans",
-   "away": "South Sydney Rabbitohs",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": null,
-   "weather_try_mult": 1.0,
-   "baseline_total": 48.2,
-   "adjusted_total": 48.2,
-   "flags": []
-  },
-  {
-   "home": "Sydney Roosters",
    "away": "Dolphins",
    "info_confidence": "low",
    "team_lists_confirmed": false,
-   "weather": null,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 0,
+    "wind_kmh": 3.1,
+    "temp_c": 22.1,
+    "forecast_hour": "2026-09-04T18:00"
+   },
    "weather_try_mult": 1.0,
    "baseline_total": 49.0,
    "adjusted_total": 49.0,
    "flags": []
   },
   {
+   "home": "South Sydney Rabbitohs",
+   "away": "Sydney Roosters",
+   "info_confidence": "low",
+   "team_lists_confirmed": false,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 48.3,
+   "adjusted_total": 48.3,
+   "flags": []
+  },
+  {
+   "home": "New Zealand Warriors",
+   "away": "Manly-Warringah Sea Eagles",
+   "info_confidence": "low",
+   "team_lists_confirmed": false,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 46.0,
+   "adjusted_total": 46.0,
+   "flags": []
+  },
+  {
    "home": "North Queensland Cowboys",
+   "away": "Canberra Raiders",
+   "info_confidence": "low",
+   "team_lists_confirmed": false,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 47.9,
+   "adjusted_total": 47.9,
+   "flags": []
+  },
+  {
+   "home": "Cronulla-Sutherland Sharks",
+   "away": "Melbourne Storm",
+   "info_confidence": "low",
+   "team_lists_confirmed": false,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 6,
+    "wind_kmh": 18.2,
+    "temp_c": 20.1,
+    "forecast_hour": "2026-09-05T19:00"
+   },
+   "weather_try_mult": 1.0,
+   "baseline_total": 47.9,
+   "adjusted_total": 47.9,
+   "flags": []
+  },
+  {
+   "home": "St George Illawarra Dragons",
+   "away": "Parramatta Eels",
+   "info_confidence": "low",
+   "team_lists_confirmed": false,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 3,
+    "wind_kmh": 10.6,
+    "temp_c": 15.7,
+    "forecast_hour": "2026-09-06T14:00"
+   },
+   "weather_try_mult": 1.0,
+   "baseline_total": 48.0,
+   "adjusted_total": 48.0,
+   "flags": []
+  },
+  {
+   "home": "Penrith Panthers",
    "away": "Wests Tigers",
    "info_confidence": "low",
    "team_lists_confirmed": false,
    "weather": null,
    "weather_try_mult": 1.0,
-   "baseline_total": 49.8,
-   "adjusted_total": 49.8,
-   "flags": []
-  },
-  {
-   "home": "New Zealand Warriors",
-   "away": "Newcastle Knights",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": null,
-   "weather_try_mult": 1.0,
-   "baseline_total": 47.6,
-   "adjusted_total": 47.6,
-   "flags": []
-  },
-  {
-   "home": "Parramatta Eels",
-   "away": "Cronulla-Sutherland Sharks",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 25,
-    "wind_kmh": 9.6,
-    "temp_c": 16.9,
-    "forecast_hour": "2026-08-30T16:00"
-   },
-   "weather_try_mult": 1.0,
-   "baseline_total": 48.1,
-   "adjusted_total": 48.1,
+   "baseline_total": 48.3,
+   "adjusted_total": 48.3,
    "flags": []
   }
  ]

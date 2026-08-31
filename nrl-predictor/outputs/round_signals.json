@@ -1,140 +1,56 @@
 {
  "season": 2026,
- "round": 26,
- "scanned_at": "2026-08-24T02:59:54+00:00",
+ "round": 27,
+ "scanned_at": "2026-08-31T07:53:35+00:00",
  "games": [
   {
-   "home": "Brisbane Broncos",
-   "away": "Melbourne Storm",
-   "home_id": "BRI",
-   "away_id": "MEL",
-   "kickoff": "2026-08-27 19:50:00",
+   "home": "Canterbury-Bankstown Bulldogs",
+   "away": "Brisbane Broncos",
+   "home_id": "CBY",
+   "away_id": "BRI",
+   "kickoff": "2026-09-03 19:50:00",
    "team_lists_confirmed": false,
    "home_17": [],
    "away_17": [],
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 7.6,
-    "temp_c": 17.2,
-    "forecast_hour": "2026-08-27T19:00"
+    "wind_kmh": 10.7,
+    "temp_c": 19.5,
+    "forecast_hour": "2026-09-03T19:00"
    },
    "news": [],
    "team_list_error": "'players'",
    "news_home": [],
    "news_away": []
-  },
-  {
-   "home": "Manly-Warringah Sea Eagles",
-   "away": "St George Illawarra Dragons",
-   "home_id": "MAN",
-   "away_id": "SGI",
-   "kickoff": "2026-08-28 18:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 7.8,
-    "temp_c": 16.1,
-    "forecast_hour": "2026-08-28T18:00"
-   },
-   "news": [],
-   "team_list_error": "'players'",
-   "news_home": [],
-   "news_away": []
-  },
-  {
-   "home": "Penrith Panthers",
-   "away": "Canterbury-Bankstown Bulldogs",
-   "home_id": "PEN",
-   "away_id": "CBY",
-   "kickoff": "2026-08-28 20:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": null,
-   "news": [],
-   "team_list_error": "'players'",
-   "news_home": [],
-   "news_away": [
-    {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - Nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 07:00:00 GMT"
-    }
-   ]
   },
   {
    "home": "Gold Coast Titans",
-   "away": "South Sydney Rabbitohs",
-   "home_id": "GLD",
-   "away_id": "SOU",
-   "kickoff": "2026-08-29 15:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": null,
-   "news": [],
-   "team_list_error": "'players'",
-   "news_home": [],
-   "news_away": [
-    {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - Nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 07:00:00 GMT"
-    }
-   ]
-  },
-  {
-   "home": "Sydney Roosters",
    "away": "Dolphins",
-   "home_id": "SYD",
+   "home_id": "GLD",
    "away_id": "DOL",
-   "kickoff": "2026-08-29 17:30:00",
+   "kickoff": "2026-09-04 18:00:00",
    "team_lists_confirmed": false,
    "home_17": [],
    "away_17": [],
-   "weather": null,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 0,
+    "wind_kmh": 3.1,
+    "temp_c": 22.1,
+    "forecast_hour": "2026-09-04T18:00"
+   },
    "news": [],
    "team_list_error": "'players'",
    "news_home": [],
-   "news_away": [
-    {
-     "headline": "Sea Eagles v Dolphins: Faulalo returns; Stone back on deck - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxONWY0aVpLeVlDVHEtejNKdUt2dGVFOE1MNTlKQUtRV25Rb0s3TTJxNFdIOUliVnZ0YzJvLVVkUkNSZXpHQ0stLTJVQjBZekRPTWg0dzZGWUY5WjRQOTNoRU5tenRBejFIWXpBQWxacGxlTWU4NGE4c2VmOGxtUlJtSEphdldJeERIcG1LNGtmcVRGNU5CeVhyRlFR?oc=5",
-     "published": "Fri, 14 Aug 2026 07:00:00 GMT"
-    },
-    {
-     "headline": "Dragons v Dolphins: King-Togia to start; Katoa returns - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxOTkFfYnVsdEhFRGdjdVNFaG1mTndZelpVOGRMWUFEbzRhLWk5TDVwZjBtX1VWVEp3Z2R0X1lPOW53Rk9WcDJ2UnpfeC1oczFGVmlPNHBNN0paVGRiODJ6SEZuMTh6WnNuZl9mX3QwaG5nblE2RVdwRkFCSllFRDdIR09zQVNUWUhmekJ4ejE2QlpLZFRW?oc=5",
-     "published": "Fri, 31 Jul 2026 07:00:00 GMT"
-    }
-   ]
+   "news_away": []
   },
   {
-   "home": "North Queensland Cowboys",
-   "away": "Wests Tigers",
-   "home_id": "NQL",
-   "away_id": "WST",
-   "kickoff": "2026-08-29 19:35:00",
+   "home": "South Sydney Rabbitohs",
+   "away": "Sydney Roosters",
+   "home_id": "SOU",
+   "away_id": "SYD",
+   "kickoff": "2026-09-04 20:00:00",
    "team_lists_confirmed": false,
    "home_17": [],
    "away_17": [],
@@ -146,10 +62,102 @@
   },
   {
    "home": "New Zealand Warriors",
-   "away": "Newcastle Knights",
+   "away": "Manly-Warringah Sea Eagles",
    "home_id": "NZW",
-   "away_id": "NEW",
-   "kickoff": "2026-08-30 14:00:00",
+   "away_id": "MAN",
+   "kickoff": "2026-09-05 15:00:00",
+   "team_lists_confirmed": false,
+   "home_17": [],
+   "away_17": [],
+   "weather": null,
+   "news": [],
+   "team_list_error": "'players'",
+   "news_home": [
+    {
+     "headline": "Warriors v Knights: Jett Cleary to debut, when they play, kick-off time, team list, injuries, NRL ladder - what to know - RNZ",
+     "flags": [
+      "debut"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxOcVdiWWl0dmMtSG5MYjQ4SkhZQ3pUbVRPa1BzZWNNdEpubGc4X1dWZk5fdldUVXc1czZ1a0lLc1d5MjdWNzVrNVYzNHNvaE5Vc0lHbG1CaDZYTVRjSjRTNzhfM0tMb0RZUjRyQkxVMXZjUzRNT0Z5UDB4WXVuS0V0ajJOcGVUbTlJOXk4Yl9rZjFsU1dBUmY1cngtMDNYTlBGZl9peXpPd0dHMnNOR0xXaXlvUUM4TTRNRFZuY1Yyc1JMZVM0UDEtcmk0S3c3aHY0RWVJbi1Ec01WbmE5MG4tSnVqQlJrSWM?oc=5",
+     "published": "Sat, 29 Aug 2026 06:58:31 GMT"
+    }
+   ],
+   "news_away": []
+  },
+  {
+   "home": "North Queensland Cowboys",
+   "away": "Canberra Raiders",
+   "home_id": "NQL",
+   "away_id": "CAN",
+   "kickoff": "2026-09-05 17:30:00",
+   "team_lists_confirmed": false,
+   "home_17": [],
+   "away_17": [],
+   "weather": null,
+   "news": [],
+   "team_list_error": "'players'",
+   "news_home": [],
+   "news_away": []
+  },
+  {
+   "home": "Cronulla-Sutherland Sharks",
+   "away": "Melbourne Storm",
+   "home_id": "CRO",
+   "away_id": "MEL",
+   "kickoff": "2026-09-05 19:35:00",
+   "team_lists_confirmed": false,
+   "home_17": [],
+   "away_17": [],
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 6,
+    "wind_kmh": 18.2,
+    "temp_c": 20.1,
+    "forecast_hour": "2026-09-05T19:00"
+   },
+   "news": [],
+   "team_list_error": "'players'",
+   "news_home": [],
+   "news_away": []
+  },
+  {
+   "home": "St George Illawarra Dragons",
+   "away": "Parramatta Eels",
+   "home_id": "SGI",
+   "away_id": "PAR",
+   "kickoff": "2026-09-06 14:00:00",
+   "team_lists_confirmed": false,
+   "home_17": [],
+   "away_17": [],
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 3,
+    "wind_kmh": 10.6,
+    "temp_c": 15.7,
+    "forecast_hour": "2026-09-06T14:00"
+   },
+   "news": [],
+   "team_list_error": "'players'",
+   "news_home": [],
+   "news_away": [
+    {
+     "headline": "Eels v Sharks: Walker's on track; Jones, Pollard eye debut - NRL.com",
+     "flags": [
+      "debut"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxQcWxkZlhkNVN6end2cTM5M3dsUVczeFFCRnF6YW5qT0dmY1NvX0NDMFlLLWJOeHphTkw0RFEzSWtnV0F5R1V5V2pObk5tS3JSckV5TWxzekE2YzgyWEZJZ0Q0NUc3bFBBRlFHNlN0MTFXQ1dHcElSc21IcEs0dTR2MEhDMGFMaXk2N1IyMkQ0czA4cFRQMmhJ?oc=5",
+     "published": "Sun, 30 Aug 2026 04:39:24 GMT"
+    }
+   ]
+  },
+  {
+   "home": "Penrith Panthers",
+   "away": "Wests Tigers",
+   "home_id": "PEN",
+   "away_id": "WST",
+   "kickoff": "2026-09-06 16:05:00",
    "team_lists_confirmed": false,
    "home_17": [],
    "away_17": [],
@@ -159,36 +167,15 @@
    "news_home": [],
    "news_away": [
     {
-     "headline": "Knights v Sea Eagles: Best back on deck: Trbojevic returns - NRL.com",
+     "headline": "Cowboys v Wests Tigers: Dearden, Nanai big ins; Aho eyes debut - NRL.com",
      "flags": [
-      "return"
+      "debut"
      ],
      "players": [],
-     "link": "https://news.google.com/rss/articles/CBMimAFBVV95cUxOSXlzUWJhUXV2NFdoc20ybTFqbVNFSXlDZ2RHeVdpelhib2JNZk5XcXBNU1pxT2QyU3lmLXNrNmZDYWlQVHZtRjZ5MFYzNXhqSWNZN1JsZGhqRkxZQlNtUjdfYkgzSFVBWlV1QV9GbjFYMFQyX3ptR19JWlJXeWFPYmk1LTd1WThfSi1wM05iRlJqLUNNOWxhYQ?oc=5",
-     "published": "Sat, 22 Aug 2026 03:34:16 GMT"
+     "link": "https://news.google.com/rss/articles/CBMipgFBVV95cUxOdnZENHFSUXlENENSZ0hTVVVjcVBWX3dKbG10M3FoaUxxU0RaaVlWSDU2WExWbkNlSjAyTFVHeGxTSExsQU9KZ3BSMDF1SkFBamt4S01FaXRmZDFQZGQxZXlHcFkyOW0wVUJRVzdmZjJRazIxblVIVFVCUEhmMmpGVTNJRHZTOExGVnEySGRNcUNhM0pYVkdKazF3U1o1UTNqMm5ZRERn?oc=5",
+     "published": "Sat, 29 Aug 2026 08:15:10 GMT"
     }
    ]
-  },
-  {
-   "home": "Parramatta Eels",
-   "away": "Cronulla-Sutherland Sharks",
-   "home_id": "PAR",
-   "away_id": "CRO",
-   "kickoff": "2026-08-30 16:05:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 25,
-    "wind_kmh": 9.6,
-    "temp_c": 16.9,
-    "forecast_hour": "2026-08-30T16:00"
-   },
-   "news": [],
-   "team_list_error": "'players'",
-   "news_home": [],
-   "news_away": []
   }
  ]
 }

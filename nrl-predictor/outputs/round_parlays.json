@@ -1,23 +1,23 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1509,
-  "fair_price": 6.63,
+  "p_joint": 0.1155,
+  "fair_price": 8.66,
   "legs": [
-   "Manly-Warringah Sea Eagles to win",
    "Penrith Panthers to win",
-   "New Zealand Warriors to win",
+   "Dolphins to win",
+   "Cronulla-Sutherland Sharks to win",
    "North Queensland Cowboys to win"
   ]
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0349,
-  "fair_price": 28.69,
+  "p_joint": 0.0438,
+  "fair_price": 22.83,
   "legs": [
-   "Manly-Warringah Sea Eagles win & Lehi Hopoate try",
    "Penrith Panthers win & Thomas Jenkins try",
-   "New Zealand Warriors win & Alofiana Khan-Pereira try"
+   "Dolphins win & Tevita Naufahu try",
+   "Cronulla-Sutherland Sharks win & Sione Katoa try"
   ]
  }
 ]
