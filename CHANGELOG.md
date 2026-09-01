@@ -53,11 +53,26 @@ nothing on the repo forces the checks before merge.
   moved-to entry carrying the displaced title); re-mutated on three real
   entries, all red, clean green.
 
+* **THE ALWAYS-RED CHECK IS DEFUSED (post-push, on the PR's own first CI
+  round): #238's CodeQL matrix had failed 10 of 10 runs ever** — on main, on
+  schedule, and on the very PRs that introduced it — from TWO defects no code
+  push could outrun: its `config: paths:` lists individual root-level .py
+  files, which the python extractor walks as directories and dies on
+  (`NotADirectoryError: 'paper_broker.py'`), and code scanning is not enabled
+  on the repository, so even a successful analysis is refused at upload. A
+  check that is red regardless of the code trains the operator to merge past
+  red CI — the (gl) rule's mirror image, and part of how this very wipe
+  landed. Rebuilt as one full-tree python job gated on
+  `vars.ENABLE_CODEQL == '1'`: SKIPPED (visible, honest) until Eamon enables
+  code scanning and sets the variable, functional after.
+
 **THE OPERATOR ACTION THIS LEAVES, named because no repo guard can reach it:**
 the checks only bite if the merge button respects them. **Eamon: enable
 required status checks (branch protection) on `main`** for the changelog-check
 workflow — one GitHub setting; until then any external-agent PR can merge past
-a red guard exactly as #237/#238 did.
+a red guard exactly as #237/#238 did. And when you want CodeQL live: enable
+code scanning (Settings → Code security) + set repo variable
+`ENABLE_CODEQL=1`.
 
 **THE REST OF THE 1-SEP AUDIT, so the week's verdicts are on the record:**
 * **The week's positive is real and measured: 👩 mum-lighter is 5 of 6 go-live

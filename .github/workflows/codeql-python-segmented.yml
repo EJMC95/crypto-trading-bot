@@ -1,3 +1,22 @@
+# [2026-09-01 (vw)] CodeQL — REBUILT, and GATED on the repo setting it needs.
+#
+# PR #238 shipped this as a 4-segment matrix whose `config: paths:` listed
+# individual root-level .py files — the CodeQL python extractor walks each
+# entry as a DIRECTORY and dies (`NotADirectoryError: 'paper_broker.py'`),
+# and even past that the upload is refused because CODE SCANNING IS NOT
+# ENABLED on this repository. Measured: 10 of 10 runs FAILED, on main, on
+# schedule and on every PR — including the two PRs that introduced it. A
+# check that is red on every run regardless of the code trains the operator
+# to merge past red CI, which is exactly how the 30/31-Aug changelog wipe
+# landed ((vw)). A born-broken always-red check is worse than none — the
+# (gl) rule's mirror image.
+#
+# SO: one full-tree python analysis (no `paths:` config — the per-file
+# filter is what crashed the extractor, and segmenting ~100 interpreted
+# files bought nothing but 4x the runtime), gated on `vars.ENABLE_CODEQL`.
+# Until Eamon (1) enables code scanning under Settings → Code security and
+# (2) sets the repository variable ENABLE_CODEQL=1, the job SKIPS —
+# visible, honest, and not a standing red. Flip both and it runs for real.
 name: CodeQL Python Segmented
 
 on:
@@ -15,52 +34,13 @@ permissions:
   security-events: write
 
 jobs:
-  python-segmented:
-    name: python-segmented (${{ matrix.segment.name }})
+  python-codeql:
+    name: python-codeql
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        segment:
-          - name: live-money-core
-            paths: |
-              - lighter_avo_live_bot.py
-              - lighter_family_bot.py
-              - venues
-              - bot_pnl_store.py
-              - fleet_bus.py
-          - name: execution-risk
-            paths: |
-              - lighter_ticket_taker.py
-              - lighter_funding_bot.py
-              - lighter_funding_spread_bot.py
-              - fleet_risk.py
-              - fleet_immune.py
-              - implementation_shortfall.py
-              - paper_broker.py
-          - name: organs
-            paths: |
-              - bot_learn.py
-              - fleet_proprioception.py
-              - experiment_judge.py
-              - event_sentinel.py
-              - lighter_market_scout.py
-              - lighter_scout_tuner.py
-              - strategy_incubator.py
-              - fleet_respiration.py
-              - fleet_regen.py
-              - fleet_clock.py
-              - evidence_board.py
-              - fleet_allocation.py
-              - fleet_radar.py
-          - name: analytics-and-scripts
-            paths: |
-              - scripts
-              - pnl_dashboard.py
-              - market_context.py
-              - market_pulse.py
-              - regime_oracle.py
-              - fleet_watchdog_svc.py
+    # Repo variable, set by the operator once code scanning is enabled in
+    # the repository settings — without the setting, upload is refused and
+    # the job can only ever fail.
+    if: ${{ vars.ENABLE_CODEQL == '1' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -70,11 +50,8 @@ jobs:
         with:
           languages: python
           queries: security-and-quality
-          config: |
-            paths:
-            ${{ matrix.segment.paths }}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: /language:python/segment:${{ matrix.segment.name }}
+          category: /language:python

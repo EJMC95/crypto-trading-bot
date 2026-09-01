@@ -149,7 +149,12 @@ immune has **one live page class** → §7 Decision 3.
 1. **Turn on branch protection / required status checks for `main`** (the
    changelog-check workflow at minimum). One GitHub setting. Four red guards
    were merged past this week; the wipe rode in the same door. Until this is
-   on, any external-agent PR can do it again.
+   on, any external-agent PR can do it again. Related, found on this PR's own
+   first CI round: **#238's CodeQL check had failed all 10 runs it ever had**
+   (a crashing per-file `paths:` config + code scanning not enabled on the
+   repo) — an always-red check is what normalises merging past red. Rebuilt
+   as a working full-tree job that SKIPS until you enable code scanning
+   (Settings → Code security) and set repo variable `ENABLE_CODEQL=1`.
 2. **🪁 band-kelly clips $250 → $80 pending its ~18-Sep call.** The grader
    reads `unreachable` (upper bound ≤ 0) and the recent tape is −0.326%/trade;
    at (qj)'s $250 clips that is ~$19/day of burn. Clip is %-invariant to the
