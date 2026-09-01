@@ -375,9 +375,60 @@ def build_state(positions, recent, acted, last_ts, now=None):
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, recent, open_pnl, realized):
+#: [2026-09-01 (vw)] I22 birth stamps for VARIANT books riding this engine.
+#: Douglas itself predates I22 and is GRANDFATHERED in `audit_book_spend` — no
+#: entry here means no census published, which is that exemption working. A
+#: wrapper (🚀 bezos) stamps its OWN birth after import
+#: (`core.BOOK_BORN_TS[core.BOT] = ts`), so the engine stays variant-agnostic.
+#: DURABLE constants, never process-start time: a restart must not hand a book
+#: a fresh 30-day runway it has not earned (the (vr) family precedent).
+BOOK_BORN_TS = {}
+
+
+def spend_extra(n_closed, positions, now_ts=None):
+    """[(vw)] I22: the spend census for a post-I22 variant on this engine —
+    the family bot's `spend_extra` shape ((vr)), field for field, because a
+    second shape would be a second rule.
+
+    `n_eff` DEGRADES TO 1.0 — assume ONE bet — and that is the conservative
+    direction, not a shortcut: this engine trades one crypto impulse cell, so
+    its true independence is near 1 and never near its symbol count; claiming
+    diversification that was not measured is the one error a spend census must
+    not make. `sides` is "both" by construction (the fade shorts up-impulses
+    and longs down-impulses — line one of `impulse_signal`). `gross_x` is the
+    at-full-occupancy figure, clip x slots over starting equity — the number
+    that would have said "5.0" out loud on the $100-equity default PR #238
+    shipped, instead of leaving it to be discovered ((vt))."""
+    born = BOOK_BORN_TS.get(BOT)
+    if born is None:
+        return {}
+    now_ts = time.time() if now_ts is None else now_ts
+    closes = int(n_closed or 0)
+    age_d = max(0.0, (now_ts - born) / 86400.0)
+    return {"spend": {
+        "markets_scanned": int(UNIVERSE_N),
+        "markets_held": len(positions),
+        "n_eff": 1.0,
+        "sides": "both",
+        "gross_x": round(CLIP_USD * MAX_POSITIONS / max(START_EQUITY, 1e-9), 4),
+        "closes_obs": closes,
+        # [(vn)] NULL with a declared basis when there is no rate: a book with
+        # zero closes has no S_d, so any days-to-gate number is a floor that
+        # can never bind — the guard admits the declared unknown and still
+        # refuses a bare one.
+        "days_to_gate_obs": (round(max(0.0, 30.0 - age_d), 1)
+                             if closes else None),
+        "days_to_gate_basis": (
+            "birth countdown to the 30-day window bar; the book's own rate "
+            "supersedes it once its ledger can carry an S_d"
+            if closes else
+            "no closes yet — no S_d, so no (2/S_d)^2 exists to report"),
+    }}
+
+
+def build_extra(census, positions, recent, open_pnl, realized, n_closed=0):
     """The published `extra` — ONE builder ((hj))."""
-    return {
+    out = {
         "mode": "dry-run",
         "venue": "lighter",
         "held": {p["coin"]: ("S" if p["side"] == "short" else "L")
@@ -392,6 +443,10 @@ def build_extra(census, positions, recent, open_pnl, realized):
         "scan": census,
         "sample20": sample20(recent),
     }
+    # [(vw)] {} for an unstamped book (douglas itself), the census for a
+    # stamped variant — see spend_extra.
+    out.update(spend_extra(n_closed, positions))
+    return out
 
 
 # --------------------------- the loop ----------------------------------------
@@ -714,7 +769,8 @@ def main():
                 _price_pnl(p, stops.get(p["coin"]) or 0.0)
                 for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
-            extra = build_extra(census, positions, recent, open_pnl, realized)
+            extra = build_extra(census, positions, recent, open_pnl, realized,
+                                n_closed=n_closed)
             try:
                 store.publish(
                     bot_id, status="online", equity=equity,
@@ -865,6 +921,38 @@ def _selftest():
     assert extra["sample20"]["n"] == 2
     st = store.json_safe(extra)
     assert st["caps"]["clip_usd"] == CLIP_USD
+
+    # 8b) [(vw)] the I22 spend census: SILENT for an unstamped book (douglas
+    # itself is grandfathered), complete for a stamped VARIANT — driven with
+    # BOOK_BORN_TS saved/restored so this passes identically under the 🚀
+    # bezos wrapper, whose import stamps the map before the selftest runs.
+    _saved_born = dict(BOOK_BORN_TS)
+    try:
+        BOOK_BORN_TS.clear()
+        assert spend_extra(5, positions) == {}, \
+            "an unstamped book must publish NO spend census"
+        assert "spend" not in build_extra(cen, positions, rec, 0.0, 0.0,
+                                          n_closed=5)
+        BOOK_BORN_TS[BOT] = time.time() - 5 * 86400        # born 5d ago
+        sp = spend_extra(3, positions)["spend"]
+        for f in ("markets_scanned", "n_eff", "sides", "gross_x",
+                  "days_to_gate_obs"):
+            assert sp.get(f) is not None, f"census missing `{f}`"
+        assert sp["n_eff"] == 1.0, "conservative one-bet floor, never a count"
+        assert sp["sides"] == "both"
+        assert abs(sp["gross_x"]
+                   - CLIP_USD * MAX_POSITIONS / START_EQUITY) < 1e-6
+        assert 24.0 < sp["days_to_gate_obs"] <= 25.5, sp["days_to_gate_obs"]
+        # zero closes: the (vn) declared unknown, never a bare null
+        sp0 = spend_extra(0, positions)["spend"]
+        assert sp0["days_to_gate_obs"] is None
+        assert sp0["closes_obs"] == 0 and "no closes yet" in sp0[
+            "days_to_gate_basis"]
+        assert "spend" in build_extra(cen, positions, rec, 0.0, 0.0,
+                                      n_closed=3)
+    finally:
+        BOOK_BORN_TS.clear()
+        BOOK_BORN_TS.update(_saved_born)
 
     # 9) P&L arithmetic at mark, fees booked both halves
     p9 = _open_position({}, "D", "short", 100.0, 0.01, t, sig_t)

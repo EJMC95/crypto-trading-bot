@@ -300,6 +300,12 @@ SELFTEST_MODULES = [
     # Grimes's I20 roster exclusion + replay gate, Schwager's no-pyramid +
     # monotone trail, Hull's band tiling + measured grace).
     "lighter_book_douglas_bot",
+    # [2026-09-01 (vw)] 🚀 bezos — the Douglas-engine wrapper #238 shipped
+    # unregistered (this guard was red on it from merge day, beside two
+    # others; see (vt)). Its --selftest runs the ENGINE's battery under the
+    # wrapper's own BOT/BOOK_BORN_TS reassignments, which is the point: the
+    # battery must pass identically through the variant.
+    "lighter_book_bezos_bot",
     "lighter_book_grimes_bot",
     "lighter_book_hull_bot",
     "lighter_book_schwager_bot",

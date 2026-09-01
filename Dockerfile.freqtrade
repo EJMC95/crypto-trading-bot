@@ -125,6 +125,13 @@ COPY scripts/golive_readiness.py /freqtrade/scripts/golive_readiness.py
 COPY scripts/winners_docket.py /freqtrade/scripts/winners_docket.py
 COPY scripts/claims_ledger.py /freqtrade/scripts/claims_ledger.py
 COPY lighter_book_bezos_bot.py /freqtrade/lighter_book_bezos_bot.py
+# [2026-09-01 (vw)] 🚀 bezos is a WRAPPER around the Douglas engine, and PR
+# #238 shipped the wrapper without the engine — audit_image_imports flagged it
+# the day it merged (rc=1) and the merge went through anyway, so the bot died
+# on this import every 30s for two days: born dark, the exact class the guard
+# exists for. The engine module rides along; its own service keeps its own
+# image (Dockerfile.douglas) — this copy only feeds the wrapper.
+COPY lighter_book_douglas_bot.py /freqtrade/lighter_book_douglas_bot.py
 # [2026-07-21] 🏛️ the Parliament — the six-layer PM shadow fleet (six $1k
 # books + scanners + ML + tuners + brain), launched from run_all.sh. Imports
 # bot_pnl_store / fleet_bus / funding_basis / paper_broker — all COPY'd above
