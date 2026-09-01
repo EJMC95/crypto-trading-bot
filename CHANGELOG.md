@@ -1,3 +1,84 @@
+## 2026-09-02 (we) — THE ORPHAN HAD NO DETECTOR: the daily review re-derived (wb)'s split brain from the DB alone, and the class now has an executable guard — 7/7 mutations red
+
+The 2-Sep daily evidence review ran against a five-day gap (no review 29-Aug →
+1-Sep) and independently re-derived `(wb)`'s finding from the **database only**,
+with no Railway MCP and no container roster. Recording it because the two paths
+agreeing matters, and because the half `(wb)` left open is the half that stops
+this recurring: **it diagnosed the instance and prepared a support ticket; there
+was still nothing that would CATCH the next one.**
+
+**THE RE-DERIVATION, and it is a structural test rather than a hunch.** A book's
+summary row and that book's own trades are written by the same process through
+the same `_stamp_build` hook, off a per-process `_BUILD_CACHE`. So they agree
+ALWAYS — unless two processes are writing one book. Measured 2-Sep:
+
+    paper_trades.extra.build  = 4d93497e56d5   (b638893..HEAD, 18 commits)
+    bot_pnl.extra.build       = edc3032d1c46   (29135cd..d2c0cb9, pre-28-Aug)
+
+A **60-commit scan** against the image's own COPY set (`Dockerfile.familyshadow`
+omits `fleet_tuning.py`, so 15 files, not the repo tree's 16 — the `(fd)` trap)
+puts those in **DISJOINT, non-adjacent windows**: no commit produces both. Two
+code states, one `svc`. Corroborated three ways — `bot_equity_history` matches
+the live container's log **exactly** (22:07:31Z eq=1026.92 open=12 ↔ log
+`22:12:28Z mum: $1026.92 12 open`) while `bot_pnl` matches neither; the rows
+refresh on a ~9-min cadence that does not align with the container's loop; and
+👩 mum's row reports **9 closes against 56** in her ledger.
+
+**WHY NOTHING CAUGHT IT — three guards green for five days, each for its own
+structural reason, and this is the point of the entry:**
+* `audit_ledger_integrity` tests same-pair POSITION OVERLAP. Two processes whose
+  books never hold one coin at once produce zero overlaps — blind by
+  construction, and it reported `ok` on all four family books throughout.
+* `audit_code_currency` DID fire `BEHIND-OWN`. But a reader who checks it against
+  the running container's own log sees a healthy container trading all four
+  books and files it as the documented cry-wolf class. It was right and was
+  dismissed — twice, including once in this session's own first pass.
+* `evidence_review`'s build-drift arm defers with *"FILE SET, not necessarily
+  code"* whenever `build_n` differs — and for this image it **always** differs
+  (15 vs 16). That arm can never fire on these three books. A bounded check
+  reporting clean outside its bound.
+
+**SHIPPED: `scripts/audit_writer_consistency.py`** — asks the one question none
+of them asks, *does a book's own row carry the same build stamp as its own newest
+close?* Live run: **4 findings, 12 books agree** — and the 12 are the control
+group (I6) that makes the 4 mean something. It also catches the quieter half,
+**ORPHAN-BOOK**: a book whose ledger is moving while it has no summary row at all
+(🔭 georgia-v3, 46 closes, newest 0.6h ago, no row) — invisible to every organ
+that enumerates books from `bot_pnl`. Two regimes: with `DATABASE_URL` it audits
+the fleet, without one it SKIPs clean rather than reddening CI for want of a
+database. Pinned by `tests/autonomy/test_writer_consistency.py`, **7/7 mutations
+red** — including one the first round left ALIVE: the orphan branch lived inside
+the DB walk where no test could reach it, so `classify_orphan` was extracted, and
+it gained the retirement control it always needed (a retired book keeps its
+ledger forever, so the CLOCK is what separates an orphan from a retirement — 🧲
+Snap Back at 670.9h must never be a finding).
+
+**AND THE LOCAL TEST SUITE HAD BEEN RUNNING ZERO TESTS.**
+`scripts/audit_deploy_coverage.py` imports `tomllib` bare — stdlib only on 3.11+.
+CI runs 3.11 so CI stayed green; this repo's `.venv` is **3.9.6**, and
+`tests/autonomy/test_arm_pairing_drift.py` imports that module at scope, so
+**`pytest tests/autonomy/` died at COLLECTION** and a session running the suite
+locally got a stack trace instead of coverage. Measured: before, **0 tests ran**;
+after the shim, **2,977 pass / 3 skip**. `tomli` is the same parser under its
+pre-stdlib name and was already installed; added to `requirements-test.txt`
+behind a `python_version < "3.11"` marker so CI installs nothing new. This is the
+*"a check that inspects nothing reports clean"* class one level up — the guard
+that guards the guards was itself unrunnable, locally, for anyone.
+
+**CARRIED, not closed:** the orphan is still alive ((wc): it survived a region
+migration), so the four family books' ledgers stay two-writer mixtures since
+~28-Aug and every family era decision waits on Railway support. `(wb)`'s
+hardening candidate — requiring a same-`svc` claim takeover to carry a build at
+least as new as the holder's — remains the right durable fix and is still
+unshipped; this guard does not replace it, it makes its absence visible.
+
+**Also verified this run, so it is not re-litigated:** 🎫 the taker's `exit:hold`
+pre-registration is **CONFIRMED on its fresh sample alone** (n=21, t=3.10,
++3.230%/trade, +$49.40, p=0.0028, 9 close-days) while its sibling 🙏 avo is
+NOT_CONFIRMED (fresh n=10, t=0.49) — I21's follow-through working in both
+directions. 🪁 kelly's `(vy)` clip cut is live at `clip_usd 80.0` and 93% of his
+burn predates it (30-Aug −$83.28, 31-Aug −$36.23, 1-Sep **+$9.78**).
+
 ## 2026-09-01 (wd) — EAMON MAKES THE REPO PUBLIC: the security sweeps come back clean, the CodeQL path reopens, and branch protection becomes more urgent, not less
 
 **Eamon, ~23:27Z: the repo's visibility flipped to PUBLIC** ("Check GitHub it
