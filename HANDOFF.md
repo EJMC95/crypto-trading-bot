@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-01 19:17 Sydney (09:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-01 19:33 Sydney (09:33Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,10 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (6 commit(s), entries (vt), (vw))
+## Shipped today (8 commit(s), entries (vt), (vw), (vx))
 
+- `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
+- `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
 - `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
 - `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
 - `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
