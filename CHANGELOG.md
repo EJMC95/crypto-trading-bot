@@ -1,3 +1,59 @@
+## 2026-09-01 (vy) — "PROCEED WITH ALL OF IT": the audit merges, kelly's burn is cut 3x by his own criterion's verdict, and the mmf-aware clip makes 10x compatible with living stops — 5/5 mutations red
+
+**Eamon, 1-Sep:** *"Sensational please proceed with all of it"* — on the (vw)
+audit's decision card and the (vx) edge study. Executed, in order:
+
+* **PR #249 MERGED** (merge commit `bbb9b8e`, full board green: Tests,
+  Changelog check, the rebuilt CodeQL correctly SKIPPING). Main's CI is green
+  for the first time since 30-Aug; the merge's own redeploy starts 🚀 bezos
+  and converges the shadow fleet on the restored tree.
+* **🪁 kelly snap clips $250 → $80** (Decision 2, his word given): the code
+  default reverts to the founding clip. The record since the (qj) risk-up:
+  verdict `unreachable`, recent 140 closes −0.326%/trade ≈ $19/day of burn at
+  $250. Clip is %-invariant to the grade ((hl)) so the ~18-Sep call loses
+  nothing; era NOT reset ((hc)); `KELLY_CLIP_USD` restores any time.
+* **THE MMF-AWARE CLIP (option D of the (vx) card) — live on all three books
+  at the next [deploy-live].** Per coin, restrict-only: when the configured
+  gross exceeds a coin's own stop-alive ceiling `1/(|stop|+mmf)`, the entry
+  scales by `(|stop|+REF)/(|stop|+mmf)` (REF 6%), so every slot carries the
+  REF-tier maintenance+stop budget and the BASKET's stop-death ceiling pins
+  at the REF ceiling — 👩 mum 10.0x, 🔮 georgia 9.09x, 🙏 avo 6.25x — instead
+  of the worst held coin's 4.17x. It does NOT move `GROSS_X` (risk appetite
+  stays Eamon's); it makes his 10x compatible with stops that can actually
+  fire. Absences per the two doctrines: a DARK margin map is NEUTRAL (an
+  organ outage must not resize a book — the bus contract) while a coin
+  MISSING from a populated map degrades to the 20% worst tier ((hs)/I6).
+  The k-alias defect fixed with it: the margin surface keys `1000BONK` where
+  the ledger says `kBONK`, so both k-coins mum traded were invisible to every
+  mmf lookup INCLUDING `worst_mmf` — which therefore understated the worst
+  held margin in the published liq gap. Expectancy price stated (I19): at
+  week-1 mix the >6% names size 0.42–0.65x, forgoing ≈$22 of +$77 — priced
+  against a stop chain that stops being dead code. The factor is stamped on
+  every open and copied to the close row, so day-30 grades the tiers from
+  the ledger. Kill switch `MMF_CLIP_SCALE=off`. Pinned by
+  `tests/autonomy/test_mmf_clip_scale.py` — **5/5 mutations red**, including
+  the named hazard: the brain-expand refusal path rebuilds stake from
+  scratch and was the one path that silently dropped the factor.
+* **THE (ml) STUCK-SERVER CLASS GETS A LEVER THAT ISN'T THE RAILWAY UI**:
+  `railway-redeploy.yml` gains a `restart_services` dispatch input running
+  `railway redeploy` (re-activate the LATEST deployment, no upload) — built
+  because family-lighter-shadow took THREE OK-reported `railway up` runs
+  (646/647/648) while the pre-28-Aug container kept serving. A restart-only
+  dispatch deploys nothing (env-expression sentinel, kept OUT of the decide
+  scalar — which `audit_deploy_coverage` measured at 47 chars under GitHub's
+  validation cap when my first two attempts put it OVER; the guard caught
+  both, the (ls) class working).
+* **⚖️ COUNTERWEIGHT's overdue ~28-Aug read, the decision packet** (the call
+  stays Eamon's per I17): era n=137 since 17-Jul, bars fail t/mean/halves,
+  horizon mean **−1.946%/trade ≤ 0** (the power-gated `unreachable` shape);
+  lifetime **−$35.04**; the (20-Aug) enterable-crypto-subset reading was
+  +$4.80 at block-permuted P=0.175 — not evidence. KEEP: the canonical
+  basket book, mildly positive on what it can still enter. RETIRE: 137
+  in-era closes with a deeply negative mean and 10 always-in slots of
+  budget. One word decides it.
+* NOT taken, restated: no gross change on any live book, no live scan
+  restructure (I25 — the FOGO cell), no ⚖️/📐 retirement without his word.
+
 ## 2026-09-01 (vx) — THE EDGE, EXPLORED: half of 👩 mum's mean is tape and half is her; the brain is one episode of evidence from paying her for it; and the margin tier is the third number the 10× decision was missing
 
 **Eamon, 1-Sep:** *"explore the edge discovered also and how that edge can

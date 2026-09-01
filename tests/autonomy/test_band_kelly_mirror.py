@@ -227,11 +227,19 @@ def test_the_dip_ghost_bracket_matches_the_takers_real_constants():
 
 
 def test_the_risk_up_package_is_the_operators_recorded_shape():
-    """[18-Aug operator decision]: $250x4 snap + $40x2 dip probe + 60bps
-    MY-side slip. The ghost-side event gate stays the ghost's own 30bps —
-    a widened EVENT definition would found the book on events the ghost
-    never took."""
-    assert kelly.CLIP_USD == 250.0 and kelly.MAX_POSITIONS == 4
+    """The operator-recorded sizing package, RE-AIMED per I26 ("a pin is not
+    a reason — when it blocks a change, the question is whether the change is
+    right, never whether the pin exists"):
+      * [18-Aug (qj)] the risk-up: $250x4 snap + $40x2 dip probe + 60bps
+        MY-side slip;
+      * [1-Sep (vy)] the snap clip REVERTS $250 -> $80 on Eamon's
+        "proceed with all of it" — the grader read `unreachable` and the
+        recent 140 closes ran −0.326%/trade ≈ $19/day of burn at $250.
+        %-invariant to the grade ((hl)); era untouched; the rest of the
+        (qj) package (slots, dip probe, slip gates) unchanged.
+    The ghost-side event gate stays the ghost's own 30bps — a widened EVENT
+    definition would found the book on events the ghost never took."""
+    assert kelly.CLIP_USD == 80.0 and kelly.MAX_POSITIONS == 4
     assert kelly.DIP_CLIP_USD == 40.0 and kelly.DIP_MAX_POSITIONS == 2
     assert kelly.MY_MAX_SLIP_BPS == 60.0
     assert ghost_mod.MAX_ENTRY_SLIP_BPS == 30.0, (

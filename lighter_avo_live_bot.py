@@ -378,7 +378,12 @@ def worst_mmf(universe):
         return None
     seen = []
     for sym in universe or ():
+        # [(vy)] k-alias aware — kBONK/kPEPE were invisible to this max and
+        # it therefore UNDERSTATED the worst held margin (see mmf_alias).
         row = rows.get(sym)
+        if row is None:
+            _al = mmf_alias(sym)
+            row = rows.get(_al) if _al else None
         try:
             bps = float((row or {}).get("mmf_bps"))
         except (TypeError, ValueError):
@@ -386,6 +391,90 @@ def worst_mmf(universe):
         if bps > 0:
             seen.append(bps / 10000.0)
     return max(seen) if seen else None
+
+
+#: [2026-09-01 (vy)] MMF-AWARE CLIP — option D of the (vx) sizing card,
+#: executed on Eamon's "proceed with all of it". The (vx) measurement: 63% of
+#: 👩 mum's week-1 P&L sits in ≤6%-mmf coins, the 12% tier is net NEGATIVE,
+#: and her stop-death ceiling collapsed to 4.17x only because the widened
+#: universe admits 20%-mmf coins at full clip. RESTRICT-ONLY, per coin: when
+#: the configured gross exceeds a coin's own stop-alive ceiling
+#: `1/(|stop|+mmf)`, the entry is scaled by `(|stop|+REF)/(|stop|+mmf)` so
+#: every slot carries the REF-tier maintenance+stop budget — the BASKET's
+#: stop-death ceiling then pins at the REF ceiling (mum 10.0x, georgia 9.09x,
+#: avo 6.25x) instead of the worst held coin's. It never touches a coin whose
+#: own ceiling already clears the gross (a 1x shadow-parity book is
+#: byte-identical), never scales UP, and does not move `GROSS_X` — it makes
+#: Eamon's gross compatible with living stops instead of overriding it.
+#: Expectancy price, stated per I19 on the (vx) tier table: at week-1 mix the
+#: >6% names would have sized ~0.42-0.65x, forgoing ≈$22 of the week's +$77 —
+#: against which the stop chain stops being dead code above 4.17x.
+#: `MMF_CLIP_SCALE=off` reverts to the pre-(vy) sizing at the next loop.
+MMF_CLIP_REF = float(os.environ.get("MMF_CLIP_REF", "0.06"))
+MMF_CLIP_UNKNOWN = 0.20
+MMF_CLIP_SCALE = str(os.environ.get("MMF_CLIP_SCALE", "on")).lower() \
+    not in ("off", "0", "no")
+
+
+def mmf_alias(sym):
+    """The venue's margin surface keys 1000x-denominated books `1000BONK`
+    while the trading name is `kBONK` — measured (vx): both k-coins mum
+    traded were 'unknown' to every mmf lookup in this file, including
+    `worst_mmf`, which therefore UNDERSTATED the worst held margin. One
+    resolver, used everywhere a symbol meets the margin map."""
+    s = str(sym or "")
+    if s.startswith("k") and len(s) > 1 and not s[1].islower():
+        return "1000" + s[1:]
+    return None
+
+
+def coin_mmf(sym, rows):
+    """mmf FRACTION for `sym` off a margin map, k-alias aware. None when the
+    coin is not in the map or its row is unreadable."""
+    if not isinstance(rows, dict):
+        return None
+    row = rows.get(sym)
+    if row is None:
+        alias = mmf_alias(sym)
+        row = rows.get(alias) if alias else None
+    try:
+        bps = float((row or {}).get("mmf_bps"))
+    except (TypeError, ValueError):
+        return None
+    return (bps / 10000.0) if bps > 0 else None
+
+
+def mmf_clip_factor(sym, rows, gross=None, stop=None):
+    """-> (factor, mmf). RESTRICT-ONLY (never above 1.0), and the two absence
+    cases are deliberately different, per the bus contract and (hs)/I6:
+      * a DARK/EMPTY map (`rows` falsy) is an organ outage — the factor is
+        NEUTRAL 1.0, because no organ outage may shrink a live book's sizing
+        (the same rule as scout_universe: empty keeps the configured
+        behaviour);
+      * a coin MISSING from a POPULATED map is a real absence against a
+        control group — it degrades CONSERVATIVE to the 20% worst tier,
+        because absence of margin data never buys exposure on a levered
+        real-money book.
+    A coin whose own stop-alive ceiling clears the configured gross is left
+    untouched (factor 1.0) — the protection engages exactly where the stop
+    would die, so a 1x book is byte-identical to the pre-(vy) sizing."""
+    if not MMF_CLIP_SCALE:
+        return 1.0, coin_mmf(sym, rows) if isinstance(rows, dict) else None
+    if not rows:
+        return 1.0, None
+    mmf = coin_mmf(sym, rows)
+    eff = MMF_CLIP_UNKNOWN if mmf is None else mmf
+    sl = abs(float(S.stoploss)) if stop is None else abs(float(stop))
+    g = gross_x() if gross is None else gross
+    try:
+        g = float(g)
+    except (TypeError, ValueError):
+        return 1.0, mmf
+    if g <= 0 or sl <= 0:
+        return 1.0, mmf
+    if g <= 1.0 / (sl + eff) - 1e-9:
+        return 1.0, mmf                      # stop alive anyway — untouched
+    return min(1.0, (sl + MMF_CLIP_REF) / (sl + eff)), mmf
 
 
 def liq_gap_pct(mmf, gross=None):
@@ -1386,6 +1475,7 @@ def main(_ctx=None, once=False):
         brain_gated_tags = []
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
+        mmf_clip_scaled = 0
         coin_vetoed = {}
         live_scale = 1.0
         # [(st)] NOT scan_verdict / last_rsi / last_open_ts / closed_win: this
@@ -1594,6 +1684,9 @@ def main(_ctx=None, once=False):
                     # when unreadable: a fabricated liquidation distance on a
                     # levered real-money row is the one number that must never
                     # be guessed.
+                    # [(vy)] the per-coin clip factor's declaration: on/off
+                    # and the REF tier the basket ceiling pins at.
+                    "mmf_clip": {"on": MMF_CLIP_SCALE, "ref": MMF_CLIP_REF},
                     "mmf": (round(_mmf, 4) if _mmf is not None else None),
                     "liq_gap_pct": liq_gap_pct(_mmf),
                     # Does the book's own stop still fire before the venue
@@ -1671,6 +1764,9 @@ def main(_ctx=None, once=False):
                     # loop. Zero on a book whose cap has room, so non-zero
                     # always means the cap turned a signal away.
                     "notional_cap_skips": notional_cap_skips,
+                    # [(vy)] entries this pass whose clip the per-coin
+                    # mmf factor shrank — see mmf_clip_factor.
+                    "mmf_clip_scaled": mmf_clip_scaled,
                     "coin_veto": {c: coin_vetoed[c]
                                   for c in sorted(coin_vetoed)},
                     "live_clip_scale": live_scale,
@@ -2022,6 +2118,7 @@ def main(_ctx=None, once=False):
                            # rank is born at the OPEN ((sv)); the pre-(th) 46
                            # georgia closes carry None and always will.
                            "entry_rank": m.get("entry_rank"),
+                           "mmf_factor": m.get("mmf_factor"),
                            **({"non_economic": True} if _phantom else {}),
                            **({"stop_overshoot_bps": _ob}
                               if _ob is not None else {})})
@@ -2207,6 +2304,7 @@ def main(_ctx=None, once=False):
         # (so) was written to close.
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
+        mmf_clip_scaled = 0
         cycle_admitted = 0
 
         # ---- manage venue truth: every held position, every cycle ----------
@@ -2313,6 +2411,16 @@ def main(_ctx=None, once=False):
         clip = clip_usd(equity)
         if clip is not None:
             clip = clip * live_scale
+        # [(vy)] one margin-surface read per trading pass, for the per-coin
+        # mmf clip factor. Guarded: a dark bus yields {} and the factor's own
+        # contract makes {} NEUTRAL (an organ outage must not resize a book).
+        try:
+            import fleet_bus as _fb_mmf
+            mmf_rows = _fb_mmf.market_margins()
+            if not isinstance(mmf_rows, dict):
+                mmf_rows = {}
+        except Exception:  # noqa: BLE001
+            mmf_rows = {}
         # [2026-08-18 (pq)] `not halt_blind` — when the daily-halt read failed
         # we do not know whether this book is halted, and "unknown" must not
         # buy. Entries only; the exit/flatten paths above already ran, because
@@ -2445,7 +2553,14 @@ def main(_ctx=None, once=False):
                     _verdict(sym, "brain_gate")
                     brain_gated_tags.append(f"{sym}:{ledger_tag(tag)}")
                     continue
-                stake = clip * S.stake_mult(tag, bars)
+                # [2026-09-01 (vy)] the per-coin mmf clip factor — see
+                # mmf_clip_factor. Applied FIRST so every downstream rail
+                # (brain, MIN_CLIP floor, throttle, notional_ok) sees the
+                # SIZED stake, the (sp) rule.
+                _mf, _mmf_coin = mmf_clip_factor(sym, mmf_rows)
+                if _mf < 1.0:
+                    mmf_clip_scaled += 1
+                stake = clip * S.stake_mult(tag, bars) * _mf
                 # [2026-08-20 (so)] ...and the brain's per-tag scale on top,
                 # across BOTH rows — the same pair, the same `ledger_tag`
                 # identity and the same fail-safe as the regime gate above, so
@@ -2487,7 +2602,10 @@ def main(_ctx=None, once=False):
                 # SO on the row.
                 stake, bmult = brain_clip_for((BOT_ROW, SHADOW_ROW), tag, stake)
                 if bmult > 1.0:
-                    stake, bmult = clip * S.stake_mult(tag, bars), 1.0
+                    # [(vy)] the reset must carry the mmf factor too — without
+                    # it, the one path where the brain tries to EXPAND was the
+                    # one path that silently dropped the margin protection.
+                    stake, bmult = clip * S.stake_mult(tag, bars) * _mf, 1.0
                     brain_expand_refused += 1
                 if stake < MIN_CLIP_USD <= clip * S.stake_mult(tag, bars):
                     brain_floored += 1
@@ -2592,6 +2710,10 @@ def main(_ctx=None, once=False):
                              # position record so it survives a restart and
                              # reaches the close row.
                              "brain_mult": round(bmult, 4),
+                             # [(vy)] the mmf clip factor this entry was
+                             # sized at — carried so the close row can split
+                             # the ledger by tier at day-30.
+                             "mmf_factor": round(_mf, 4),
                              "clip": round(stake, 2), "last_px": px}
                 # [(th)] entry_rank, born at the OPEN like the shadow's (sv)
                 # stamp — the close can only copy what the open recorded. The
