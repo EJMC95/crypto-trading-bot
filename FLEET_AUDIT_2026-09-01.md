@@ -157,8 +157,14 @@ allocation ranking honestly (mum top); immune has **one live page class** →
    first CI round: **#238's CodeQL check had failed all 10 runs it ever had**
    (a crashing per-file `paths:` config + code scanning not enabled on the
    repo) — an always-red check is what normalises merging past red. Rebuilt
-   as a working full-tree job that SKIPS until you enable code scanning
-   (Settings → Code security) and set repo variable `ENABLE_CODEQL=1`.
+   as a working full-tree job that SKIPS until code scanning is enabled.
+   **[(wc) CORRECTED IN PLACE per I12: the enable instruction is WITHDRAWN —
+   the repo is PRIVATE on a personal plan, where GitHub offers code scanning
+   only on public repos. Do NOT set `ENABLE_CODEQL=1`: with scanning
+   unavailable the job would run and fail its upload on every push — the
+   always-red check back again. The gated-skipping state is the correct
+   permanent end state. Branch protection remains the live half of this
+   decision, verified NOT yet in effect 1-Sep 23:17Z (`main` protected:false).]**
 2. **🪁 band-kelly clips $250 → $80 pending its ~18-Sep call.** The grader
    reads `unreachable` (upper bound ≤ 0) and the recent tape is −0.326%/trade;
    at (qj)'s $250 clips that is ~$19/day of burn. Clip is %-invariant to the

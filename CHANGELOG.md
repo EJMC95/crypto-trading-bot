@@ -1,3 +1,46 @@
+## 2026-09-01 (wc) — THE ORPHAN SURVIVES A REGION MIGRATION, AND HALF OF DECISION 1 IS WITHDRAWN: code scanning is plan-blocked on a private personal repo, so ENABLE_CODEQL must stay unset
+
+Eamon: *"Can you assume controls and do for me"* — the last stretch, executed
+to the hard boundary of every tool held, with two findings that change the
+board:
+
+* **THE ORPHAN SURVIVED THE STRONGEST PLATFORM ACTION AVAILABLE.** Railway's
+  own agent executed a service restart AND a full region migration
+  (sfo → iad → sfo, fresh deployment `b9d8754c` healthy at 23:08:01Z, "all
+  old containers tracked and orphaned reaped") — and the receipt failed:
+  14 minutes later the rows still publish the orphan's build and forked
+  state (mum 2-open at 23:22:42Z) while `b9d8754c`'s own logs show the new
+  container trading all four books (georgia-v3 impulse-fade positions, mum
+  12-open at 23:23:00Z). An untracked container is outside the workload set
+  a migration moves — measured now, not assumed. The agent then tried to
+  file a support thread itself (`cs_create_thread`) and the system was
+  unavailable; it confirmed plainly it has NO internal ops channel. **The
+  fix is Eamon's support thread at station.railway.com** — the (wb) ticket
+  text stands, now with the addendum that restart + region migration have
+  both already been tried and failed, so the ask is a scheduler-level
+  force-terminate of the leaked container.
+* **CODE SCANNING IS PLAN-BLOCKED — the (wa) Decision-1 CodeQL half is
+  WITHDRAWN, corrected in place in (wa) and the audit report per I12.** The
+  repo is PRIVATE (`list_repos`: visibility private) on a personal plan,
+  and GitHub offers code scanning only on public repos there — which is
+  ALSO the root cause of #238's CodeQL failing all 10 runs it ever had.
+  Consequences, stated so nobody re-treads them: do NOT enable code
+  scanning (the toggle is not honestly available), and **do NOT set
+  `ENABLE_CODEQL=1`** — verified live by a dispatched run (23:17Z,
+  conclusion `skipped`): with the variable set but scanning unavailable the
+  job would RUN and fail its upload on every push, resurrecting the
+  always-red check (vw) killed. The gated-skipping workflow is the correct
+  PERMANENT end state, not a waiting room. Making a real-money trading
+  fleet's repo public to buy a linter is refused without needing a number.
+* **BRANCH PROTECTION: verified NOT yet in effect** (`main`
+  `protected: false` on the branches API at 23:17Z) — the one remaining
+  click on the whole board, deep link handed over
+  (`settings/branch_protection_rules/new`, pattern `main`, require PR +
+  status checks Tests & Changelog check).
+* Receipts closed in the same pass: 👩 mum's GROSS_X readback landed
+  (`leverage.set 9.5`, deployment `af0160fd`) — all three live books now
+  confirmed on their measured derivations.
+
 ## 2026-09-01 (wb) — THE RAILWAY CONNECTOR LANDS AND BOTH BLOCKED ITEMS MOVE: GROSS_X set and read back on all three live books, and the family "wedge" is an ORPHANED CONTAINER that the fleet's own claim guard cannot beat — the (id) assumption is measured false
 
 Eamon connected the Railway MCP to this session (~22:00Z) and said *"Continue"*
@@ -124,9 +167,13 @@ to the end of what this session's tools can reach:
   session holds** (no branch-protection or repo-variable surface on the
   GitHub MCP; no `gh`). The clicks, so it is a 3-minute job: Settings →
   Branches → Add rule for `main` → require a pull request before merging +
-  require status checks **Tests** and **Changelog check**; Settings → Code
+  require status checks **Tests** and **Changelog check**~~; Settings → Code
   security → enable code scanning; Settings → Actions variables → new repo
-  variable `ENABLE_CODEQL=1` (the rebuilt CodeQL job un-skips itself).
+  variable `ENABLE_CODEQL=1` (the rebuilt CodeQL job un-skips itself)~~.
+  **[(wc) CORRECTED IN PLACE per I12: the code-scanning half is WITHDRAWN —
+  the repo is private on a personal plan where GitHub offers code scanning
+  on public repos only; setting `ENABLE_CODEQL=1` alone would resurrect the
+  always-red check. Branch protection is the only surviving click.]**
 
 ## 2026-09-01 (vz) — THE RESTART LEVER'S FIRST FIRING, MEASURED: the sentinel was unsatisfiable and the lever cannot fix the wedge it was built for — one honest, one fixed, and the live readback lands
 
