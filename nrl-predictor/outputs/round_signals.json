@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 27,
- "scanned_at": "2026-08-31T07:53:35+00:00",
+ "scanned_at": "2026-09-01T12:45:07+00:00",
  "games": [
   {
    "home": "Canterbury-Bankstown Bulldogs",
@@ -9,18 +9,325 @@
    "home_id": "CBY",
    "away_id": "BRI",
    "kickoff": "2026-09-03 19:50:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Connor Tracey",
+     "player_id": 28614,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Jacob Kiraz",
+     "player_id": 28663,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Matt Burton",
+     "player_id": 28814,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Bronson Xerri",
+     "player_id": 28263,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Enari Tuala",
+     "player_id": 23919,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Stephen Crichton",
+     "player_id": 28813,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Lachlan Galvin",
+     "player_id": 47250,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Max King",
+     "player_id": 23418,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Bailey Hayward",
+     "player_id": 34170,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Leo Thompson",
+     "player_id": 31627,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Viliame Kikau",
+     "player_id": 21517,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Jacob Preston",
+     "player_id": 35595,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Jaeman Salmon",
+     "player_id": 26374,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Jake Turpin",
+     "player_id": 26262,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Alekolasimi Jones",
+     "player_id": 49932,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Harry Hayes",
+     "player_id": 35606,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Josh Curran",
+     "player_id": 28453,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Hayze Perham",
+     "player_id": 28464,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Josiah Karapani",
+     "player_id": 35492,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Kotoni Staggs",
+     "player_id": 26156,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Deine Mariner",
+     "player_id": 33757,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Grant Anderson",
+     "player_id": 33447,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Ezra Mam",
+     "player_id": 33065,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Ben Hunt",
+     "player_id": 13914,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Xavier Willison",
+     "player_id": 31347,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Billy Walters",
+     "player_id": 28703,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Payne Haas",
+     "player_id": 25859,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Jaiyden Hunt",
+     "player_id": 30907,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Jordan Riki",
+     "player_id": 29757,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Patrick Carrigan",
+     "player_id": 28411,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Thomas Duffy",
+     "player_id": 37313,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Va'a Semu",
+     "player_id": 47431,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Jack Gosiewski",
+     "player_id": 22750,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Aublix Tawha",
+     "player_id": 44509,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 10.7,
-    "temp_c": 19.5,
+    "wind_kmh": 13.8,
+    "temp_c": 19.7,
     "forecast_hour": "2026-09-03T19:00"
    },
    "news": [],
-   "team_list_error": "'players'",
    "news_home": [],
    "news_away": []
   },
@@ -30,20 +337,337 @@
    "home_id": "GLD",
    "away_id": "DOL",
    "kickoff": "2026-09-04 18:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Keano Kini",
+     "player_id": 37321,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Siale Faeamani",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Jaylan De Groot",
+     "player_id": 37323,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "AJ Brimson",
+     "player_id": 26150,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Phillip Sami",
+     "player_id": 23750,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Jayden Campbell",
+     "player_id": 31082,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Lachlan Ilias",
+     "player_id": 31372,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Moeaki Fotuaika",
+     "player_id": 25860,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Luke Sommerton",
+     "player_id": 35654,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Tino Fa'asuamaleaui",
+     "player_id": 28704,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Kurtis Morrin",
+     "player_id": 33449,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Beau Fermor",
+     "player_id": 29906,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Chris Randall",
+     "player_id": 29825,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Klese Haas",
+     "player_id": 28981,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Cooper Bai",
+     "player_id": 53481,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Bodhi Sharpley",
+     "player_id": 57319,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Sam Verrills",
+     "player_id": 28452,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Hamiso Tabuai-Fidow",
+     "player_id": 29833,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Jamayne Isaako",
+     "player_id": 23815,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Jack Bostock",
+     "player_id": 37436,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Herbie Farnworth",
+     "player_id": 28706,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Tevita Naufahu",
+     "player_id": 53464,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Kodi Nikorima",
+     "player_id": 21474,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Isaiya Katoa",
+     "player_id": 34197,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Thomas Flegler",
+     "player_id": 28204,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Jeremy Marshall-King",
+     "player_id": 23993,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Tom Gilbert",
+     "player_id": 29830,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Max Plath",
+     "player_id": 35310,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Kulikefu Finefeuiaki",
+     "player_id": 35431,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Morgan Knowles",
+     "player_id": 22035,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Kurt Donoghoe",
+     "player_id": 36819,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Ray Stone",
+     "player_id": 26517,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Francis Molo",
+     "player_id": 20827,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Felise Kaufusi",
+     "player_id": 21472,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 3.1,
-    "temp_c": 22.1,
+    "wind_kmh": 7.6,
+    "temp_c": 19.8,
     "forecast_hour": "2026-09-04T18:00"
    },
    "news": [],
-   "team_list_error": "'players'",
    "news_home": [],
-   "news_away": []
+   "news_away": [
+    {
+     "headline": "Titans v Dolphins: Beau's good to go; Cobbo sidelined - NRL.com",
+     "flags": [
+      "out"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMikAFBVV95cUxNQVE0dkJZbjhCTGIyU1VEMlJBVHViSnB0MkJwdUdTSF9xTlBnMmN5NVJSZjd0aWZ3d21XR3lDQzFhTkgxMVl3OU9yeGl4Zno4bkZiSElhZV9IcmlIZ2Uzc09QOUtTVFFtT1RNU3BreUI0cnZfazNOZ0ZQV1FiUUl2NXhEeWNBQk44S2Z1Z0hZVWE?oc=5",
+     "published": "Tue, 01 Sep 2026 09:02:48 GMT"
+    }
+   ]
   },
   {
    "home": "South Sydney Rabbitohs",
@@ -51,12 +675,325 @@
    "home_id": "SOU",
    "away_id": "SYD",
    "kickoff": "2026-09-04 20:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": null,
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Jye Gray",
+     "player_id": 47247,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Alex Johnston",
+     "player_id": 20802,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Latrell Mitchell",
+     "player_id": 22609,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Jack Wighton",
+     "player_id": 19515,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Campbell Graham",
+     "player_id": 23913,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Interchange",
+     "player": "Cody Walker",
+     "player_id": 22612,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Jayden Sullivan",
+     "player_id": 30076,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Tevita Tatola",
+     "player_id": 24761,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Brandon Smith",
+     "player_id": 23735,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Keaon Koloamatangi",
+     "player_id": 29829,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "David Fifita",
+     "player_id": 26200,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Adam Elliott",
+     "player_id": 22605,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Cameron Murray",
+     "player_id": 23476,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Matthew Dufty",
+     "player_id": null,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Lachlan Hubner",
+     "player_id": 35288,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Sean Keppie",
+     "player_id": 28834,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Jamie Humphreys",
+     "player_id": 35633,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Cody Ramsey",
+     "player_id": 29985,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Daniel Tupou",
+     "player_id": 20005,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Fetalaiga Pauga",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Tommy Talau",
+     "player_id": 28822,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Rex Bassingthwaighte",
+     "player_id": 59557,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Reece Foley",
+     "player_id": 48352,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Toby Rodwell",
+     "player_id": 53425,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Spencer Leniu",
+     "player_id": 28815,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Benaiah Ioelu",
+     "player_id": 44856,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Lindsay Collins",
+     "player_id": 23732,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Salesi Foketi",
+     "player_id": 44804,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Egan Butcher",
+     "player_id": 30987,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Connor Watson",
+     "player_id": 22720,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Tom Rodwell",
+     "player_id": 35704,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Taylor Losalu",
+     "player_id": 47347,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "De La Salle Va'a",
+     "player_id": 49114,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Aston Warwick",
+     "player_id": null,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 0,
+    "wind_kmh": 13.0,
+    "temp_c": 16.8,
+    "forecast_hour": "2026-09-04T20:00"
+   },
    "news": [],
-   "team_list_error": "'players'",
    "news_home": [],
    "news_away": []
   },
@@ -66,13 +1003,338 @@
    "home_id": "NZW",
    "away_id": "MAN",
    "kickoff": "2026-09-05 15:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Charnze Nicoll-Klokstad",
+     "player_id": 22069,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Adam Pompey",
+     "player_id": 28725,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Ali Leiataua",
+     "player_id": 37236,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Leka Halasima",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Alofiana Khan-Pereira",
+     "player_id": 35142,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Chanel Harris-Tavita",
+     "player_id": 28262,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Te Maire Martin",
+     "player_id": 22622,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "James Fisher-Harris",
+     "player_id": 22606,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Sam Healey",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Mitchell Barnett",
+     "player_id": 21898,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Eddie Ieremia-Toeava",
+     "player_id": 39738,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Jacob Laban",
+     "player_id": 37907,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Erin Clark",
+     "player_id": 22763,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Makaia Tafua",
+     "player_id": 44975,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Tanner Stowers-Smith",
+     "player_id": 38188,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Demitric Vaimauga",
+     "player_id": 37238,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Morgan Gannon",
+     "player_id": 30750,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Tom Trbojevic",
+     "player_id": 21487,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Jason Saab",
+     "player_id": 28736,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Josh Feledy",
+     "player_id": 44133,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Reuben Garrick",
+     "player_id": 28210,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Lehi Hopoate",
+     "player_id": 47241,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Clayton Faulalo",
+     "player_id": 37233,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Jamal Fogarty",
+     "player_id": 23760,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Simione Laiafi",
+     "player_id": 53887,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Brandon Wakeham",
+     "player_id": 28655,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Nathan Brown",
+     "player_id": 530,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Haumole Olakau'atu",
+     "player_id": 29969,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Ben Trbojevic",
+     "player_id": 30989,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Jake Trbojevic",
+     "player_id": 20586,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Jake Simpkin",
+     "player_id": 30740,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Nicholas Lenaz",
+     "player_id": 38235,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Corey Waddell",
+     "player_id": 28248,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Caleb Navale",
+     "player_id": 45449,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
    "weather": null,
    "news": [],
-   "team_list_error": "'players'",
    "news_home": [
+    {
+     "headline": "Jett's 'mad' debut powers Wahs to top from Ivan and Nate's Panthers - NRL.com",
+     "flags": [
+      "debut"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxOT0Q0RXlocnVhUFNkdWVwc0FDaFJ5SFVuYjZRajdWdFZQMWxyMlVuOGRBMlFTUXlEaDhTbS1YNlo1aXlQcDF0TnpDNnp3LU9KbU11R2xpTEswUVBqMkhYd0N6NzVVbV9OcGZGZG5sYjN6WTFpMlpXVWNoa1c3RWZjdDdJY0h3T3NLWmNwSURqSEVzblU0bFA4?oc=5",
+     "published": "Mon, 31 Aug 2026 02:18:41 GMT"
+    },
+    {
+     "headline": "Mixed feelings for Clearys after Jett\u2019s debut helps Warriors leap-frog Panthers - nine.com.au",
+     "flags": [
+      "debut"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMixgFBVV95cUxNNFpwd002RjB5ZjVGWjhhYXRwLUZwX3ZHd1MxaGYyU0I2WVZnNmRHLWdIOVBOcWlqeUttbnliSy1Sc2xINkVVYjk2cTM5ZjhlbUIxVUNTV29HZkYzclBzek91VHM4TFMwQzZwNThBdV9SYVJYTjZXMXY5UGlSZXJoWTg0dzNYSmtFVHZIR05zVDJvaGtseGlsLVB1OUpVOXRQUjJXMExPWGxLSmVTdDZUcW1EeTg0Ul9rb1VDbFlsWG8xX1V3YXc?oc=5",
+     "published": "Sun, 30 Aug 2026 09:47:16 GMT"
+    },
     {
      "headline": "Warriors v Knights: Jett Cleary to debut, when they play, kick-off time, team list, injuries, NRL ladder - what to know - RNZ",
      "flags": [
@@ -91,12 +1353,319 @@
    "home_id": "NQL",
    "away_id": "CAN",
    "kickoff": "2026-09-05 17:30:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Scott Drinkwater",
+     "player_id": 26828,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Braidon Burns",
+     "player_id": 23409,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Jaxon Purdue",
+     "player_id": 47254,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Tom Chester",
+     "player_id": 33731,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Robert Derby",
+     "player_id": 33578,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Jake Clifford",
+     "player_id": 26274,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Tom Dearden",
+     "player_id": 28479,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Coen Hess",
+     "player_id": 22019,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Reed Mahoney",
+     "player_id": 26162,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Jason Taumalolo",
+     "player_id": 15034,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Heilum Luki",
+     "player_id": 30905,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "John Bateman",
+     "player_id": 17077,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Reuben Cotter",
+     "player_id": 28619,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Soni Luke",
+     "player_id": 32691,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Sam McIntyre",
+     "player_id": 29904,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Thomas Mikaele",
+     "player_id": 28209,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Kaiden Lahrs",
+     "player_id": 49043,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Kaeo Weekes",
+     "player_id": 33751,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Jed Stuart",
+     "player_id": 35673,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Simi Sasagi",
+     "player_id": 30906,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Matthew Timoko",
+     "player_id": 29981,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Xavier Savage",
+     "player_id": 31266,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Ethan Strange",
+     "player_id": 37998,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Coby Black",
+     "player_id": 44988,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Josh Papalii",
+     "player_id": 17155,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Owen Pattie",
+     "player_id": 50791,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Joseph Tapine",
+     "player_id": 20817,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Noah Martin",
+     "player_id": 47243,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Matty Nicholson",
+     "player_id": 19894,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Ata Mariota",
+     "player_id": 33761,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Malachi Smith",
+     "player_id": null,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Joe Roddy",
+     "player_id": null,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Morgan Smithies",
+     "player_id": 28261,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Vena Patuki-Case",
+     "player_id": 47298,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
    "weather": null,
    "news": [],
-   "team_list_error": "'players'",
    "news_home": [],
    "news_away": []
   },
@@ -106,19 +1675,330 @@
    "home_id": "CRO",
    "away_id": "MEL",
    "kickoff": "2026-09-05 19:35:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 6,
-    "wind_kmh": 18.2,
-    "temp_c": 20.1,
-    "forecast_hour": "2026-09-05T19:00"
-   },
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "William Kennedy",
+     "player_id": 2282,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Sione Katoa",
+     "player_id": 24765,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Riley Jones",
+     "player_id": 36840,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Michael Gabrael",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Ronaldo Mulitalo",
+     "player_id": 28465,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Riley Pollard",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Niwhai Puru",
+     "player_id": 35497,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Addin Fonua-Blake",
+     "player_id": 22715,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Hohepa Puru",
+     "player_id": 35545,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Jesse Colquhoun",
+     "player_id": 33732,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Briton Nikora",
+     "player_id": 28205,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Billy Burns",
+     "player_id": 28832,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Cameron McInnes",
+     "player_id": 20170,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Siosifa Talakai",
+     "player_id": 22775,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Toby Rudolf",
+     "player_id": 29765,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Oregon Kaufusi",
+     "player_id": 26516,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Braden Uele",
+     "player_id": null,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Sualauvi Faalogo",
+     "player_id": 35390,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Siulagi Tuimalatu-Brown",
+     "player_id": 54090,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Tyran Wishart",
+     "player_id": 31628,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Nick Meaney",
+     "player_id": 26266,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Moses Leo",
+     "player_id": 53362,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Cameron Munster",
+     "player_id": 20831,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Jahrome Hughes",
+     "player_id": 20275,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Stefano Utoikamanu",
+     "player_id": 29912,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Harry Grant",
+     "player_id": 26157,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Josh King",
+     "player_id": 22716,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Shawn Blore",
+     "player_id": 29962,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Oryn Keeley",
+     "player_id": 33975,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Trent Loiero",
+     "player_id": 30673,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Trent Toelau",
+     "player_id": 35499,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Cooper Clarke",
+     "player_id": 59536,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Jack Hetherington",
+     "player_id": 25770,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Alec MacDonald",
+     "player_id": 31629,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "weather": null,
    "news": [],
-   "team_list_error": "'players'",
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Cowboys v Sharks: Nanai returns; McInnes back on deck - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOeUhVSDh0b2Z5LVY0TWZ5cGRIZ1ZxaFltTWUydXlaUjBNZXAtdnNQYjVLQmVEbTZDX0VZOGxpSHAtRXJpR0h4c2ZmWGpuMVdTOWhfQnlNcXJaMkl1QmlLbkI4eXBVWDQya3VzZGtlcVFXZHpJQXA5YjdoWTk3R3NuU3J0d0J2LUJhVnQ0SjdFWXp5QQ?oc=5",
+     "published": "Fri, 24 Apr 2026 07:00:00 GMT"
+    }
+   ],
    "news_away": []
   },
   {
@@ -127,30 +2007,327 @@
    "home_id": "SGI",
    "away_id": "PAR",
    "kickoff": "2026-09-06 14:00:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
+   "team_lists_confirmed": true,
+   "home_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Daniel Atkinson",
+     "player_id": 31369,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Mathew Feagai",
+     "player_id": 30867,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Moses Suli",
+     "player_id": 23400,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Valentine Holmes",
+     "player_id": 20869,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Tyrell Sloan",
+     "player_id": 31265,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Lyhkan King-Togia",
+     "player_id": 39835,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Kyle Flanagan",
+     "player_id": 26529,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Toby Couchman",
+     "player_id": 35668,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Damien Cook",
+     "player_id": 20227,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Blake Lawrie",
+     "player_id": 23761,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Dylan Egan",
+     "player_id": 38057,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Hamish Stewart",
+     "player_id": 39834,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Loko Jnr Pasifiki Tonga",
+     "player_id": 44820,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Connor Muhleisen",
+     "player_id": 35462,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Ryan Couchman",
+     "player_id": 37441,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Josh Kerr",
+     "player_id": 28099,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Jacob Halangahu",
+     "player_id": 53505,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Apa Twidle",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Brian Kelly",
+     "player_id": 23406,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Will Penisini",
+     "player_id": 31339,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Jordan Samrani",
+     "player_id": 39739,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Josh Addo-Carr",
+     "player_id": 22717,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Ronald Volkman",
+     "player_id": 33452,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Mitchell Moses",
+     "player_id": 20851,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Luca Moretti",
+     "player_id": 34199,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Tallyn Da Silva",
+     "player_id": 39348,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Junior Paulo",
+     "player_id": 20880,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Jack Williams",
+     "player_id": 11994,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Kitione Kautoga",
+     "player_id": 34005,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Saxon Pryke",
+     "player_id": 44709,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Harrison Edwards",
+     "player_id": 33758,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Jack De Belin",
+     "player_id": 17216,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Teancum Brown",
+     "player_id": 53461,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Dylan Walker",
+     "player_id": 20217,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 3,
-    "wind_kmh": 10.6,
-    "temp_c": 15.7,
+    "precip_prob": 5,
+    "wind_kmh": 13.1,
+    "temp_c": 19.5,
     "forecast_hour": "2026-09-06T14:00"
    },
    "news": [],
-   "team_list_error": "'players'",
    "news_home": [],
-   "news_away": [
-    {
-     "headline": "Eels v Sharks: Walker's on track; Jones, Pollard eye debut - NRL.com",
-     "flags": [
-      "debut"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxQcWxkZlhkNVN6end2cTM5M3dsUVczeFFCRnF6YW5qT0dmY1NvX0NDMFlLLWJOeHphTkw0RFEzSWtnV0F5R1V5V2pObk5tS3JSckV5TWxzekE2YzgyWEZJZ0Q0NUc3bFBBRlFHNlN0MTFXQ1dHcElSc21IcEs0dTR2MEhDMGFMaXk2N1IyMkQ0czA4cFRQMmhJ?oc=5",
-     "published": "Sun, 30 Aug 2026 04:39:24 GMT"
-    }
-   ]
+   "news_away": []
   },
   {
    "home": "Penrith Panthers",
@@ -158,24 +2335,327 @@
    "home_id": "PEN",
    "away_id": "WST",
    "kickoff": "2026-09-06 16:05:00",
-   "team_lists_confirmed": false,
-   "home_17": [],
-   "away_17": [],
-   "weather": null,
-   "news": [],
-   "team_list_error": "'players'",
-   "news_home": [],
-   "news_away": [
+   "team_lists_confirmed": true,
+   "home_17": [
     {
-     "headline": "Cowboys v Wests Tigers: Dearden, Nanai big ins; Aho eyes debut - NRL.com",
-     "flags": [
-      "debut"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMipgFBVV95cUxOdnZENHFSUXlENENSZ0hTVVVjcVBWX3dKbG10M3FoaUxxU0RaaVlWSDU2WExWbkNlSjAyTFVHeGxTSExsQU9KZ3BSMDF1SkFBamt4S01FaXRmZDFQZGQxZXlHcFkyOW0wVUJRVzdmZjJRazIxblVIVFVCUEhmMmpGVTNJRHZTOExGVnEySGRNcUNhM0pYVkdKazF3U1o1UTNqMm5ZRERn?oc=5",
-     "published": "Sat, 29 Aug 2026 08:15:10 GMT"
+     "number": 1,
+     "position": "Fullback",
+     "player": "Dylan Edwards",
+     "player_id": 22807,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Thomas Jenkins",
+     "player_id": 34023,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Luke Garner",
+     "player_id": 26267,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Casey McLean",
+     "player_id": 48731,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Brian To'o",
+     "player_id": 28598,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Jack Cole",
+     "player_id": 11801,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Nathan Cleary",
+     "player_id": 22776,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Moses Leota",
+     "player_id": 22777,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Mitch Kenny",
+     "player_id": 28602,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Liam Henry",
+     "player_id": 34024,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Isaiah Papali'i",
+     "player_id": 23403,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Liam Martin",
+     "player_id": 28258,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Lindsay Smith",
+     "player_id": 31080,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Freddy Lussick",
+     "player_id": 29977,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Scott Sorensen",
+     "player_id": 20893,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Luron Patea",
+     "player_id": 47437,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Billy Phillips",
+     "player_id": 49067,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
     }
-   ]
+   ],
+   "away_17": [
+    {
+     "number": 1,
+     "position": "Fullback",
+     "player": "Jahream Bula",
+     "player_id": 37248,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 2,
+     "position": "Winger",
+     "player": "Junior Tupou",
+     "player_id": 32836,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 3,
+     "position": "Centre",
+     "player": "Solomone Saukuru",
+     "player_id": null,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 4,
+     "position": "Centre",
+     "player": "Patrick Herbert",
+     "player_id": 28463,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 5,
+     "position": "Winger",
+     "player": "Jeral Skelton",
+     "player_id": 35666,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 6,
+     "position": "Five-Eighth",
+     "player": "Jarome Luai",
+     "player_id": 24106,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 7,
+     "position": "Halfback",
+     "player": "Jock Madden",
+     "player_id": 30902,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 8,
+     "position": "Prop",
+     "player": "Terrell May",
+     "player_id": 33067,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 9,
+     "position": "Hooker",
+     "player": "Apisai Koroisau",
+     "player_id": 20150,
+     "is_starter": true,
+     "is_spine": true,
+     "status": null
+    },
+    {
+     "number": 10,
+     "position": "Prop",
+     "player": "Fonua Pole",
+     "player_id": 33713,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 11,
+     "position": "2nd Row",
+     "player": "Samuela Fainu",
+     "player_id": 37234,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 12,
+     "position": "2nd Row",
+     "player": "Sione Fainu",
+     "player_id": 35651,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 13,
+     "position": "Lock",
+     "player": "Alex Seyfarth",
+     "player_id": 29823,
+     "is_starter": true,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 14,
+     "position": "Interchange",
+     "player": "Latu Fainu",
+     "player_id": 38051,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 15,
+     "position": "Interchange",
+     "player": "Vaka Aho",
+     "player_id": null,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 16,
+     "position": "Interchange",
+     "player": "Ethan Roberts",
+     "player_id": 53495,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    },
+    {
+     "number": 17,
+     "position": "Interchange",
+     "player": "Bunty Afoa",
+     "player_id": 22795,
+     "is_starter": false,
+     "is_spine": false,
+     "status": null
+    }
+   ],
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 4,
+    "wind_kmh": 12.1,
+    "temp_c": 18.5,
+    "forecast_hour": "2026-09-06T16:00"
+   },
+   "news": [],
+   "news_home": [],
+   "news_away": []
   }
  ]
 }

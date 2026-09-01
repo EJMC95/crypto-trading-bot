@@ -1,8 +1,8 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1155,
-  "fair_price": 8.66,
+  "p_joint": 0.1174,
+  "fair_price": 8.52,
   "legs": [
    "Penrith Panthers to win",
    "Dolphins to win",
@@ -12,8 +12,8 @@
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0438,
-  "fair_price": 22.83,
+  "p_joint": 0.052,
+  "fair_price": 19.24,
   "legs": [
    "Penrith Panthers win & Thomas Jenkins try",
    "Dolphins win & Tevita Naufahu try",

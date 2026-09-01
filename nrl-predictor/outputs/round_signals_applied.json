@@ -1,47 +1,80 @@
 {
  "round": 27,
- "built_at": "2026-08-31T07:54:29+00:00",
+ "built_at": "2026-09-01T12:46:08+00:00",
  "games": [
   {
    "home": "Canterbury-Bankstown Bulldogs",
    "away": "Brisbane Broncos",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 10.7,
-    "temp_c": 19.5,
+    "wind_kmh": 13.8,
+    "temp_c": 19.7,
     "forecast_hour": "2026-09-03T19:00"
    },
    "weather_try_mult": 1.0,
    "baseline_total": 45.7,
    "adjusted_total": 45.7,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Brisbane Broncos: Billy Walters named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
   },
   {
    "home": "Gold Coast Titans",
    "away": "Dolphins",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 3.1,
-    "temp_c": 22.1,
+    "wind_kmh": 7.6,
+    "temp_c": 19.8,
     "forecast_hour": "2026-09-04T18:00"
    },
    "weather_try_mult": 1.0,
    "baseline_total": 49.0,
    "adjusted_total": 49.0,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Gold Coast Titans: Lachlan Ilias named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Gold Coast Titans: Luke Sommerton named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Dolphins: Hamiso Tabuai-Fidow named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Dolphins news: Titans v Dolphins: Beau's good to go; Cobbo sidelined - NRL.com"
+    }
+   ]
   },
   {
    "home": "South Sydney Rabbitohs",
    "away": "Sydney Roosters",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": null,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 0,
+    "wind_kmh": 13.0,
+    "temp_c": 16.8,
+    "forecast_hour": "2026-09-04T20:00"
+   },
    "weather_try_mult": 1.0,
    "baseline_total": 48.3,
    "adjusted_total": 48.3,
@@ -50,69 +83,124 @@
   {
    "home": "New Zealand Warriors",
    "away": "Manly-Warringah Sea Eagles",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
    "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 46.0,
    "adjusted_total": 46.0,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Manly-Warringah Sea Eagles: Tom Trbojevic named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
   },
   {
    "home": "North Queensland Cowboys",
    "away": "Canberra Raiders",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
    "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 47.9,
    "adjusted_total": 47.9,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "North Queensland Cowboys: Tom Dearden named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Canberra Raiders: Ethan Strange named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Canberra Raiders: Coby Black named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
   },
   {
    "home": "Cronulla-Sutherland Sharks",
    "away": "Melbourne Storm",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 6,
-    "wind_kmh": 18.2,
-    "temp_c": 20.1,
-    "forecast_hour": "2026-09-05T19:00"
-   },
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 47.9,
    "adjusted_total": 47.9,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Cronulla-Sutherland Sharks: William Kennedy named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
   },
   {
    "home": "St George Illawarra Dragons",
    "away": "Parramatta Eels",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 3,
-    "wind_kmh": 10.6,
-    "temp_c": 15.7,
+    "precip_prob": 5,
+    "wind_kmh": 13.1,
+    "temp_c": 19.5,
     "forecast_hour": "2026-09-06T14:00"
    },
    "weather_try_mult": 1.0,
    "baseline_total": 48.0,
    "adjusted_total": 48.0,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "St George Illawarra Dragons: Lyhkan King-Togia named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Parramatta Eels: Mitchell Moses named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
   },
   {
    "home": "Penrith Panthers",
    "away": "Wests Tigers",
-   "info_confidence": "low",
-   "team_lists_confirmed": false,
-   "weather": null,
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 4,
+    "wind_kmh": 12.1,
+    "temp_c": 18.5,
+    "forecast_hour": "2026-09-06T16:00"
+   },
    "weather_try_mult": 1.0,
    "baseline_total": 48.3,
    "adjusted_total": 48.3,
-   "flags": []
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Penrith Panthers: Jack Cole named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Penrith Panthers: Mitch Kenny named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Wests Tigers: Apisai Koroisau named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
   }
  ]
 }
