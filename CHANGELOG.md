@@ -43,7 +43,15 @@ nothing on the repo forces the checks before merge.
   the exact repair the guard's FIX text prescribes — would have been refused by
   the guard that prescribed it.
 * Selftests extended and mutation-checked: deletion fires, addition is quiet,
-  a declared renumber is quiet, an undeclared sweep still fires.
+  a declared renumber is quiet, an undeclared sweep still fires. **AND THE
+  MUTATION EARNED ITS KEEP (I3): the arm's first cut was VACUOUS on the real
+  file and every fixture was green.** It excused any letter appearing in a
+  declared renumber — and this file's own prose carries ~48 historical
+  renumber records plus loose English the pattern matches (('sf','sk'),
+  ('ed','get')), so deleting (sf) from the working tree left the guard OK.
+  The excuse is now two-signal like `cross_branch`'s (declaration AND the
+  moved-to entry carrying the displaced title); re-mutated on three real
+  entries, all red, clean green.
 
 **THE OPERATOR ACTION THIS LEAVES, named because no repo guard can reach it:**
 the checks only bite if the merge button respects them. **Eamon: enable

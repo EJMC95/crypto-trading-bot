@@ -426,17 +426,32 @@ def lost_entries(mine, theirs, my_text=None):
     nothing reports clean.
 
     KEYED ON LETTERS, deliberately: a title corrected in place (I12) keeps its
-    letter and must not trip this, and a renumber DECLARES itself
-    (`renumbered_pairs`, the machine-readable rule-4 record) — a letter that
-    moved away under a declaration is not lost. DECLARED LIMIT: pre-era and
+    letter and must not trip this. A renumber DECLARES itself
+    (`renumbered_pairs`, the machine-readable rule-4 record) — but the
+    declaration alone excuses NOTHING, because this file's own prose carries
+    ~48 historical renumber records and loose English that the pattern also
+    matches (measured: a bare `moved_from` set held ('sf','sk') and even
+    ('ed','get'), so the arm's first cut was vacuous for any letter ever
+    named near the word "renumber" — caught by the I3 mutation, not by the
+    green selftest). So the excuse is TWO-signal, the `cross_branch` shape: a
+    declared `(X) -> (Y)` counts only when my tree's (Y) entry carries the
+    SAME TITLE as the (X) entry origin/main lost. DECLARED LIMIT: pre-era and
     letterless headers are outside the key space, so a wipe of ONLY
     pre-18-Jul history would pass this arm; every real wipe removes era
     entries too, and 646 of them stand guard.
     """
     mine_letters = {l for _d, l, _t in mine}
-    moved_from = {frm for frm, _to in renumbered_pairs(my_text)}
-    return [(d, l, t) for d, l, t in theirs
-            if l not in mine_letters and l not in moved_from]
+    mine_by_letter = {l: t for _d, l, t in mine}
+    moved = renumbered_pairs(my_text)
+    out = []
+    for d, l, t in theirs:
+        if l in mine_letters:
+            continue
+        if any(frm == l and same_entry(mine_by_letter.get(to), t)
+               for frm, to in moved):
+            continue                     # a declared move, carried in my tree
+        out.append((d, l, t))
+    return out
 
 
 def cross_branch(mine, theirs, my_text=None):
@@ -751,6 +766,18 @@ def _selftest():
               "## 2026-07-30 (gb) — two\n\n"
               "> RENUMBERED (ga) -> (gb) on a collision\n\nb\n")
     assert lost_entries(scan(_moved)[0], scan(_full)[0], my_text=_moved) == []
+    # ...a declaration whose moved-to entry does NOT carry the displaced title
+    # excuses nothing — the two-signal rule. The first cut of this arm took
+    # the declaration alone, and the real file's ~48 historical renumber
+    # records in prose made it vacuous for any letter near the word
+    # "renumber" (found by the I3 mutation on the real file, not by these
+    # fixtures — which is why this fixture now exists)...
+    _moved_lie = ("## 2026-07-30 (fz) — one\n\nb\n\n"
+                  "## 2026-07-30 (gb) — entirely different\n\n"
+                  "> RENUMBERED (ga) -> (gb)\n\nb\n")
+    assert lost_entries(scan(_moved_lie)[0], scan(_full)[0],
+                        my_text=_moved_lie), \
+        "a renumber declaration without the displaced title is not an excuse"
     # ...an UNDECLARED disappearance still fires (the silent-sweep shape)...
     _swept = ("## 2026-07-30 (fz) — one\n\nb\n\n"
               "## 2026-07-30 (gb) — two\n\nb\n")
