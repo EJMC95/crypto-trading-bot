@@ -8,3 +8,7 @@ coverage>=7.0
 numpy>=1.24 # regime_oracle, market_pulse, brain_stats, … import it at module load
 pandas>=2.0 # regime_oracle imports pandas (hard dep) — needed to run its selftest
 psycopg2-binary>=2.9 # P&L publisher tests import psycopg2
+tomli>=2.0; python_version < "3.11" # audit_deploy_coverage parses railway*.toml;
+# `tomllib` is stdlib only on 3.11+, and CI runs 3.11 — this is for the LOCAL
+# venv (3.9.6), where the bare import took the whole autonomy suite down at
+# collection while CI stayed green.
