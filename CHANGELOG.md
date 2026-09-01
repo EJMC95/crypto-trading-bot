@@ -1,3 +1,62 @@
+## 2026-09-01 (wb) — THE RAILWAY CONNECTOR LANDS AND BOTH BLOCKED ITEMS MOVE: GROSS_X set and read back on all three live books, and the family "wedge" is an ORPHANED CONTAINER that the fleet's own claim guard cannot beat — the (id) assumption is measured false
+
+Eamon connected the Railway MCP to this session (~22:00Z) and said *"Continue"*
+— the two items (wa) had to hand over as UI clicks were executed directly:
+
+* **GROSS_X: SET AND READ BACK.** `set-variables` on the three live services
+  (each auto-redeployed, halt-checked online first): 🔮 **georgia 7.0 — and
+  her row now publishes `stop_reachable: true`**, the first live stop chain
+  since the raise to 10 (all-majors basket, ceiling 9.09); 🙏 **avo 5.3**
+  (all_slots_stop 100% → 53%; her stop revives at the REF tier as the one
+  legacy 20%-mmf position rolls off — the (vy) clip sizes every new entry);
+  👩 **mum 9.5** (deployment `af0160fd` 22:19:50Z; readback lands as her
+  Asia-Southeast container cycles). `GROSS_X_MAX` 10.0 — Eamon's appetite
+  ceiling — untouched, exactly as (wa) recorded. The (wa) "hand the values to
+  Eamon as UI edits" paragraph is superseded by this execution, same day.
+* **THE FAMILY ROOT CAUSE, finally measured — and it re-frames four days of
+  data.** The deployment ledger is CLEAN: `list-deployments` shows every
+  deploy since 28-Aug activating and being cleanly REMOVED by its successor,
+  and the CURRENT deployment's logs show the new build trading all four
+  books (🔮 georgia-v3 opening `impulse-fade` positions — mum $1,026.92 /
+  12 open at 22:12:28Z). Yet /pnl.json's family rows read mum $1,017.07 /
+  2 open on build `edc3032d1c46` at 22:14:48Z, fresh, same `svc` stamp.
+  **Two live processes, one service identity: an ORPHANED CONTAINER from a
+  ~28-Aug deployment that Railway's reaper missed**, below the platform's
+  deployment abstraction (Railway's own agent confirmed the public API has
+  no container roster and no force-kill; DRAIN_INSTANCES reports success).
+  **And the fleet's one-book-one-writer guard is structurally OFF in exactly
+  this state:** `(id)`'s same-svc takeover — built so a redeploy does not
+  stand down against its own dead predecessor — makes BOTH processes read
+  the other's claim as "my own dead replica" and seize it, every loop. The
+  (id) docstring declared the assumption in writing (*"Railway does not run
+  the old and new together"*; *"two live replicas would share a svc and
+  could steal from each other, which is exactly the duplicate-writer state
+  this guard prevents"*) — now measured false the hard way. Consequences,
+  named: **the four family shadow books' ledgers are two-writer mixtures
+  since ~28-Aug** (the (hf) class — a guard cannot un-pool written closes;
+  integrity flags and any era decision wait until the orphan is dead), and
+  seven success-reporting deploys "failed" only in the sense that they could
+  never have worked — there was nothing wrong to redeploy.
+* **THE FIX IS A RAILWAY SUPPORT TICKET (Eamon's account) — prepared
+  verbatim:** *"Service family-lighter-shadow (id
+  53dd877c-f8ff-4d20-a915-29222fe77469), production env
+  (c2570a3c-15c2-4b92-96dc-cff4b10bd252), project Trading Bots
+  (9b3b7d3c-28db-417b-b864-ebc065df851f): an orphaned container from a
+  REMOVED deployment (~28-Aug era; suspects 86db7060 / 740198e4 / 96d0b808 /
+  3baf8be5) is still running below the deployment layer — our database
+  receives writes every minute from the old build while the current
+  deployment 85b35e9a runs correctly. Please check the orchestration layer
+  for lingering instances of this service not belonging to 85b35e9a and
+  force-terminate them."* Once it dies, the current container wins the claim
+  within a loop and the rows flip to the new build — georgia-v3's row
+  included.
+* **Hardening candidate, recorded not shipped:** a same-svc claim takeover
+  could require the taker's BUILD to be at least as new as the holder's, so
+  a future orphan (old build) stands down instead of stealing back. It is
+  one-sided — it protects only after every container runs it — so it
+  prevents the NEXT orphan, not this one; it should ride an ordinary deploy
+  wave, not an emergency one.
+
 ## 2026-09-01 (wa) — "ADDRESS ALL OF THE ABOVE": the sentinel fix proven live, ⚖️ KEPT on its own grader's split with a fresh pre-registered criterion, the GROSS_X derivations handed over, and the family wedge pinned to Railway's side
 
 **Eamon, 1-Sep:** *"Address all of the above"* — on the close-out list (family
@@ -49,9 +108,16 @@ to the end of what this session's tools can reach:
   three family rows publishing fresh. The new code is NOT the cause:
   `lighter_family_bot.py` at HEAD passes its selftest and imports clean
   locally, and no Dockerfile.familyshadow or startCommand change sits in the
-  gap. Railway's ledger is holding a stale deployment active while fresh ones
-  never take over — only the dashboard (service → Deployments → deploy or
-  restart the NEWEST build) can move it. 🔮 georgia-v3's row stays dark until
+  gap. ~~Railway's ledger is holding a stale deployment active while fresh
+  ones never take over — only the dashboard can move it.~~ **[(wb) CORRECTED
+  IN PLACE per I12, hours later with the Railway MCP connected: BOTH halves
+  of that sentence are measured wrong.** The deployment ledger is CLEAN —
+  every deploy activated and was cleanly replaced (DRAIN_INSTANCES completed;
+  the current deployment's own logs show the new build TRADING, georgia-v3
+  included). The stale writer is an **ORPHANED CONTAINER below the deployment
+  abstraction** — a ~28-Aug container Railway's reaper missed, untracked, so
+  no dashboard deploy/restart button reaches it either. See (wb) for the
+  mechanism and the support-ticket fix.] 🔮 georgia-v3's row stays dark until
   it flips; the v3 book meanwhile appears in the grader's `books` map from the
   ledger side, so its closes are accruing invisibly rather than lost.
 * **Branch protection + code scanning (Decision 1) — outside every tool this
