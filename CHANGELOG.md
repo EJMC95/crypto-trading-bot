@@ -1,4 +1,45 @@
+## 2026-09-01 (wd) — EAMON MAKES THE REPO PUBLIC: the security sweeps come back clean, the CodeQL path reopens, and branch protection becomes more urgent, not less
+
+**Eamon, ~23:27Z: the repo's visibility flipped to PUBLIC** ("Check GitHub it
+should be public now") — his deliberate call, made minutes after (wc) recorded
+the private-plan block, and it reverses that entry's premise: (wc)'s *"making
+a real-money trading fleet's repo public to buy a linter is refused"* was
+Lucy's frame, and the owner overrode it with the repository he owns. What a
+public flip demands is not relitigation but a MEASURED sweep of what just
+became world-readable, run immediately:
+
+* **Working tree: CLEAN.** Every literal `postgres://` match is a docstring
+  example, prose, a test fake, or the secret-leak guard's own annotated
+  fixture. No phone numbers or emails in tracked files. No hardcoded API-key
+  shapes. **No `pull_request_target` workflow** — fork PRs (now possible from
+  anyone) get read-only tokens and cannot reach `RAILWAY_TOKEN` or any other
+  secret, per GitHub's default.
+* **Full git history: CLEAN.** Two `git log -G` sweeps over ALL commits —
+  password-embedded DB URLs, and key shapes (AKIA/ghp_/sk_live/xoxb/private
+  key blocks) — matched exactly ONE commit: `9ef3517`, which is the
+  `.gitleaks.toml` DETECTION RULES being added; the matches are the patterns,
+  not credentials. The one real historical leak the fleet knows of lived in
+  `.claude/settings.local.json` (never committed) and the pre-July DB
+  credential is rotated-dead per (kb).
+* **What public turns ON for free:** GitHub's server-side secret scanning +
+  push protection (alerts land in the repo's Security tab — worth one glance),
+  and **code scanning — so the (wc) CodeQL withdrawal reverses**: setting repo
+  variable `ENABLE_CODEQL=1` is back on the board and now SAFE (the gated job
+  un-skips and its upload will succeed). One click, then a dispatched run
+  proves the chain green.
+* **What public makes MORE urgent: branch protection**, still verified NOT in
+  effect (`main` `protected: false` at 23:35Z). A public repo can receive
+  pull requests from any account; the require-PR + required-checks rule is
+  the gate that keeps the next changelog-wipe-class merge out. Still the same
+  one page: `settings/branch_protection_rules/new`, pattern `main`, require
+  PR + checks **Tests** and **Changelog check**.
+* Stated once, eyes open, and not relitigated: the fleet's strategies,
+  doctrine, P&L history, and this changelog are now world-readable — the
+  owner's deliberate trade, made on the record. `/pnl.json` was already
+  unauthenticated by design; nothing new leaks that was not already chosen.
+
 ## 2026-09-01 (wc) — THE ORPHAN SURVIVES A REGION MIGRATION, AND HALF OF DECISION 1 IS WITHDRAWN: code scanning is plan-blocked on a private personal repo, so ENABLE_CODEQL must stay unset
+**[(wd), an hour later: the premise reversed — Eamon made the repo PUBLIC, so the plan-block is void, `ENABLE_CODEQL=1` is safe and back on the board, and the security sweeps that a public flip demands came back clean. The "refused" sentence below stands as the honest record of what was said before the owner decided otherwise.]**
 
 Eamon: *"Can you assume controls and do for me"* — the last stretch, executed
 to the hard boundary of every tool held, with two findings that change the
