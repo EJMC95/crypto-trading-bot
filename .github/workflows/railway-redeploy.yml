@@ -219,6 +219,18 @@ on:
         description: "Comma-separated Railway service names (blank defaults to both)."
         required: false
         default: "freqtrade-bots,pnl-dashboard"
+      # [2026-09-01 (vy)] RESTART, not upload: `railway redeploy` re-activates
+      # the service's LATEST deployment. Built for the (ml) stuck-serving
+      # class — family-lighter-shadow took THREE OK-reported `railway up`
+      # deploys (runs 646/647/648) while the pre-28-Aug container kept
+      # serving; `up` builds a new deployment, and when activation wedges,
+      # only a restart of the deployment (previously: a human in the Railway
+      # UI) swaps the serving container. A restart-only dispatch (services
+      # blank, restart_services set) deploys NOTHING.
+      restart_services:
+        description: "Comma-separated services to RESTART (redeploy latest deployment; no upload)."
+        required: false
+        default: ""
 
 concurrency:
   group: railway-deploy
@@ -237,7 +249,13 @@ jobs:
       - name: Decide which services to deploy
         id: decide
         env:
-          DISPATCH_SVCS: ${{ github.event.inputs.services }}
+          # [(vy)] restart-only dispatch (services blank, restart_services
+          # set) resolves to a single SPACE — truthy past the :-default, and
+          # the deploy loop's xargs-trim skips it, so nothing deploys. Kept
+          # OUT of the run: scalar, which sits 47 chars under GitHub's
+          # validation cap (the (ls) incident class; audit_deploy_coverage
+          # measures it).
+          DISPATCH_SVCS: ${{ (github.event.inputs.restart_services != '' && github.event.inputs.services == '') && ' ' || github.event.inputs.services }}
         run: |
           set -uo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -559,7 +577,9 @@ jobs:
           echo "-> will deploy: ${svcs:-<none>}"
 
       - name: Install Railway CLI
-        if: steps.decide.outputs.services != ''
+        # [(vy)] also needed by a restart-only dispatch, where decide's
+        # services output is deliberately empty.
+        if: steps.decide.outputs.services != '' || github.event.inputs.restart_services != ''
         run: npm install -g @railway/cli
 
       - name: Deploy latest code to services
@@ -649,6 +669,39 @@ jobs:
       # after a deploy that included pnl-dashboard, the serving container's
       # boot time must ADVANCE past this run's start. A separate step so
       # the big decide scalar stays under GitHub's size cap.
+      - name: Restart services (redeploy latest deployment)
+        # [(vy)] the (ml) stuck-serving fix that does not need the Railway UI:
+        # `railway redeploy` re-activates the latest deployment. Measured
+        # need: family-lighter-shadow took three OK-reported `railway up`
+        # runs (646/647/648) while the pre-28-Aug container kept serving —
+        # `up` builds fine and the swap wedges, so the lever is a deployment
+        # restart, not another upload.
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.restart_services != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RESTARTS: ${{ github.event.inputs.restart_services }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set."
+            exit 1
+          fi
+          fail=0
+          IFS=',' read -ra SVCS <<< "$RESTARTS"
+          for raw in "${SVCS[@]}"; do
+            svc="$(echo "$raw" | xargs)"
+            [ -z "$svc" ] && continue
+            echo "::group::railway redeploy --service '$svc'"
+            if railway redeploy --service "$svc" --yes; then
+              echo "OK: '$svc' latest deployment restarted"
+            else
+              echo "::error::restart failed for '$svc' — fallback is the Railway UI restart"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
       - name: Verify the pnl-dashboard READER actually flipped ((ml))
         if: success() && contains(format(',{0},', steps.decide.outputs.services), ',pnl-dashboard,')
         env:
