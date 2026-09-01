@@ -84,11 +84,18 @@ a red guard exactly as #237/#238 did.
   changed here — risk appetite is his ((sr)) — but said plainly: above those
   ceilings the venue liquidates before the stop fires, so the stop chain is
   dead code and the daily halt + liquidation are the only rails.
-* **`family-lighter-shadow` was BEHIND-OWN by 9 commits** (georgia v3 trading
-  but never publishing her row — her census/publish half (1d680db) and #239's
-  pnl_pct fix never reached the container) and **pnl-dashboard serves a
-  pre-#238/#239 boot (30-Aug 02:54)**. Both redeploys dispatched + readback
-  this session, per the (ml) rule.
+* **`family-lighter-shadow` is BEHIND-OWN by 9 commits AND ITS DEPLOYS REPORT
+  OK**: 🔭 georgia v3 has been TRADING since 28-Aug (32 closes) but never
+  publishing her row, because her census/publish half (1d680db) and #239's
+  family pnl_pct never reached the container — while runs 646 and 647 both
+  printed *"OK: 'family-lighter-shadow' deployed"*. That is the (ml)
+  stuck-serving class on a service the workflow's readback step (dashboard-
+  only) does not cover. Re-dispatched this session with a stamp readback; if
+  the stamp does not flip again, the service needs a Railway-side kick —
+  operator action. **[CORRECTED IN PLACE within the audit: the first draft
+  also called pnl-dashboard stale — a timezone misread; its 02:54:20Z boot
+  POSTDATES #239's 02:52:53Z merge and the run-646 readback proved the flip.
+  The dashboard is current; the family container is the one stale server.]**
 * Green and verified: watchdog zero problems, 20/20 rows fresh, risk light
   green (long 9/short 6 vs budget 20), clip_scale 1.0, no quarantined levers,
   every other service CURRENT at HEAD, session_state/recurrence/lever-bounds/
@@ -111,10 +118,14 @@ shipped, reviewed and kept:
   form divided by the baseline alone and overstated returns after any deposit.
 * `lighter_family_bot`: shadow publishes gain `pnl_pct` on both the online and
   halted paths.
-All three are right. At audit time none of it was SERVING — the dashboard's
-container booted 30-Aug 02:54, before the merge, and `family-lighter-shadow`
-was 9 commits behind — the (ml) stale-reader class both times; redeploys
-dispatched in (vw).
+All three are right. **[CORRECTED IN PLACE during the same audit:** the first
+draft of this entry said none of it was serving, off a timezone misread (the
+merge landed 02:52:53Z and the dashboard's boot stamp 02:54:20Z POSTDATES it —
+the workflow's own (ml) readback step verified the flip in run 646's log).
+The dashboard half of #239 IS live. What was not serving was the FAMILY half:
+`family-lighter-shadow` runs a container from before 28-Aug 11:15Z while runs
+646/647 both printed "OK: 'family-lighter-shadow' deployed" — the (ml)
+stuck-serving class on a service the readback step does not cover. See (vw).**]
 
 ## 2026-08-30 (vt) — PR #238's RECORD, written at the 1-Sep audit: 🚀 book-bezos was BORN DEAD — a missing COPY the born-dark guard caught on merge day, with CI already red — plus the telemetry that PR got right
 

@@ -79,17 +79,18 @@ session_state carried rows all honest.
 
 ## 4 · Running smoothly? Two containers were not — both redeploy-dispatched
 
-* **`family-lighter-shadow` was BEHIND-OWN by 9 commits.** 🔭 **georgia-v3 has
-  been TRADING since 28-Aug (32 closes, −$5.33 — decides nothing yet) but
-  never publishing her row**: her publish/census half and #239's pnl_pct fix
-  never reached the container. The (ml) class — deploy said done, container
-  says otherwise.
-* **`pnl-dashboard` serves a 30-Aug 02:54 boot** — before #238/#239 merged, so
-  the bezos registration, the staleness thresholds and the return % totals are
-  not live either.
-
-Both fixes are already ON main; the repair is a redeploy + stamp readback,
-dispatched this session (§6).
+* **`family-lighter-shadow` is BEHIND-OWN by 9 commits — and its deploys
+  REPORT OK.** 🔭 **georgia-v3 has been TRADING since 28-Aug (32 closes,
+  −$5.33 — decides nothing yet) but never publishing her row**: her
+  publish/census half and #239's family pnl_pct never reached the container,
+  while the 30-Aug runs 646 and 647 both printed *"OK: 'family-lighter-shadow'
+  deployed"*. The (ml) stuck-serving class — the workflow's boot-stamp
+  readback covers only the dashboard, so a stuck family service passes green.
+  Re-dispatched this session with a stamp readback; **if it sticks again the
+  service needs a kick from the Railway dashboard — that one is yours.**
+* `pnl-dashboard` itself is CURRENT — its 02:54:20Z boot postdates #239's
+  02:52:53Z merge and run 646's own readback proved the flip. (My first read
+  called it stale off a timezone slip; corrected in place.)
 
 ## 5 · 🚀 book-bezos: born dead three ways, repaired in this PR
 
@@ -176,6 +177,7 @@ immune has **one live page class** → §7 Decision 3.
   the declared-renumber escape (mutation-verified).
 * bezos: engine COPY, $1k standard, I22 census via the engine, organ_main,
   selftest + agronomy registration, deploy-coverage closure.
-* Redeploys dispatched with stamp readback: `family-lighter-shadow` (un-darks
-  georgia-v3's row) and `pnl-dashboard` (#238/#239 fixes go live).
+* `family-lighter-shadow` redeploy dispatched with stamp readback (un-darks
+  georgia-v3's row + lands #239's family pnl_pct); the dashboard verified
+  already current.
 * This report; HANDOFF regenerated; hub updated.
