@@ -139,10 +139,14 @@ whether the bracket earns the row. Kill switch: `BEZOS_ENABLED=0`.
 | 🔭 georgia-v3 | −$5.33 (32 closes) | hypothesis-grade | row visible after the family redeploy |
 | 🚀 bezos | never ran | — | runs after this PR merges |
 
-**The organs:** brain publishes **zero** non-1.0× opinions across 20 books
-(floors question carried in HANDOFF); judge `stood_down` (correct — farmer
-retired; avo pair below its floors); allocation ranking honestly (mum top);
-immune has **one live page class** → §7 Decision 3.
+**The organs:** the brain publishes three reduce opinions (douglas
+short-impulse 0.75×, taker short-divergence 0.75×, georgia-v3's probe 0.75×)
+and no expands — mum's bucket is **`warming: expand`** at episode-t 1.91, one
+small step of evidence from a 1.25× (the (vx) edge study has the full
+decomposition; an earlier draft of this line said "zero opinions" — corrected);
+judge `stood_down` (correct — farmer retired; avo pair below its floors);
+allocation ranking honestly (mum top); immune has **one live page class** →
+§7 Decision 3.
 
 ## 7 · Decisions that are yours, Eamon (nothing here changed by me)
 

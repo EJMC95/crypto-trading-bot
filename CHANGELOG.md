@@ -1,3 +1,48 @@
+## 2026-09-01 (vx) — THE EDGE, EXPLORED: half of 👩 mum's mean is tape and half is her; the brain is one episode of evidence from paying her for it; and the margin tier is the third number the 10× decision was missing
+
+**Eamon, 1-Sep:** *"explore the edge discovered also and how that edge can
+benefit any of the bots."* Full working: `STUDY_EDGE_EXPLORATION_2026-09-01.md`.
+The numbers that decide things:
+* **The edge:** raw +0.643%/trade (n=50, t=+2.41) decomposes against her own
+  (hm) control arm into **+0.337% tape + 0.289pp selection** — and it is
+  breadth, not tail: best trade 11% of total, 28 coins, roi exits +$143 vs
+  the −4% stop's −$58.
+* **The benefit path is already wired:** the brain's watchlist carries her
+  bucket as **`warming: "expand"`** at t=+1.91 on the honest EPISODE basis
+  (n_ep=41 — 50 closes are 41 independent events; my plain-bucket replay
+  read t=2.2 and returned 1.25×, so the gap is the (kw) cluster discipline
+  working for real money, not a defect). Knife-edge quantified: one more
+  stop → t=1.68/no mult; two roi wins hold 1.25×, four reach **1.5×**.
+  Latch = 3 consecutive runs; the rails ((sp)) still dispose. Behind her:
+  avo-shadow t=1.79 and mum-shadow t=1.54, both warming. **[I12: (vw)'s
+  "brain publishes zero non-1.0× opinions" is CORRECTED — it publishes
+  THREE, all reduces (douglas 0.75× streak 161, taker short-divergence
+  0.75× streak 180, and georgia-v3's probe cut to 0.75× this morning at
+  streak 3). The organ moves both ways; my scan misread the nesting.]**
+* **The margin tier is the missing third number in Decision 3:** joined
+  against the venue margin surface, **63% of her P&L sits in ≤6%-mmf coins,
+  the 12% tier is net negative (−$9.61, n=10), and the 20% tier is one hot
+  coin (FOGO +$24.89, n=6)**. Eamon's own `edge_aware_safety` on her tape:
+  cap the scan at mmf ≤6% and the stop-alive ceiling goes **4.17× → 10.0×**
+  — the stop chain revives at the gross she runs (alive with margin at
+  9.5×), price ≈37% of week-1 P&L, almost all FOGO. Four options carded in
+  the study (keep / cap+9.5× / 4.17× / per-coin mmf-aware clip); operator's
+  lane, n=50 is too thin to restructure a live scan today (I25/I26), day-30
+  tier re-run pre-registered.
+* **His `--edge-report` fleet table, decision-relevant rows:** the 🎫
+  taker's best edge family (`long-breakoutup_hold` +$67.88) is exactly the
+  lens the tuner's replay refuses — the carried
+  taker-replay-blind-to-breakoutup item now has its value quantified; 🪁
+  kelly's life is ONE trade with two exits (ghoststop +$455 vs own stop
+  −$461), which reframes the ~18-Sep call as an exit-separation question;
+  georgia-live's top drag is the halt rail, not the strategy, corroborating
+  (vg).
+* **Transfers refused with reasons:** mum's cell into avo (the (qu)
+  criterion owns that call; cells DISJOINT by construction, I20), a second
+  oversold row (I20), any same-day live-scan restructure (I25). What
+  transfers is already transferred: v3 was built on v2's lessons, and the
+  brain sizes both by their records.
+
 ## 2026-09-01 (vw) — THE CHANGELOG WAS WIPED ON MAIN AND NOBODY'S GUARD COULD SAY SO: 655 entries -> 2 lines -> a stale 566-entry copy, restored here, and the class gets its arm
 
 **Eamon's ask, 1-Sep:** *"Fleet wide audit and review of everything ... making
@@ -114,8 +159,10 @@ code scanning (Settings → Code security) + set repo variable
 * Green and verified: watchdog zero problems, 20/20 rows fresh, risk light
   green (long 9/short 6 vs budget 20), clip_scale 1.0, no quarantined levers,
   every other service CURRENT at HEAD, session_state/recurrence/lever-bounds/
-  deploy-coverage/doctrine-enforcement all OK. The brain publishes **zero**
-  non-1.0x opinions across 20 books (floors question stands in HANDOFF).
+  deploy-coverage/doctrine-enforcement all OK. The brain publishes three
+  reduce opinions and no expands — **[CORRECTED IN PLACE by (vx): the first
+  draft said "zero opinions"; the payload nesting was misread. Mum's bucket
+  is `warming: expand` at episode-t 1.91.]**
 
 ## 2026-08-30 (vv) — PR #239's RECORD, written at the 1-Sep audit: the dashboard learns the live family's real cadence, and pnl_pct gets the contributed-capital denominator
 

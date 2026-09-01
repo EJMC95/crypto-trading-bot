@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-01 18:47 Sydney (08:47Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-01 19:17 Sydney (09:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,10 +69,14 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (0 commit(s))
+## Shipped today (6 commit(s), entries (vt), (vw))
 
-_Nothing yet today._
-
+- `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
+- `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
+- `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
+- `e5b7527` Fleet audit 1-Sep: the report, and HANDOFF regenerated (vw)
+- `1a6ec31` book-bezos was born dead three ways: the engine ships, the accidental 5x is gone, and the book joins every registry its birth skipped (vt)
+- `56eb4e7` The changelog was wiped on main and no guard could say so: 655 entries restored, and the class gets its lost-entries arm (vw)
 
 ## How this file stays honest
 
