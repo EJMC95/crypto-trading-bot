@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-01 20:01 Sydney (10:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-01 21:16 Sydney (11:16Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,9 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (15 commit(s), entries (vt), (vw), (vx), (vy), (vz))
+## Shipped today (16 commit(s), entries (vt), (vw), (vx), (vy), (vz))
 
+- `fa10cda` HANDOFF regenerated after (vz)
 - `203d9c4` The restart lever's first firing measured its own sentinel dead: a YAML default made 'blank' unreachable, and the pin that keeps it fixed (vz)
 - `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
 - `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
