@@ -18,7 +18,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from scripts.audit_writer_consistency import classify  # noqa: E402
+from scripts.audit_writer_consistency import (  # noqa: E402
+    ORPHAN_H, classify, classify_orphan,
+)
 
 
 def test_the_2026_09_02_incident_is_a_finding():
@@ -74,3 +76,34 @@ def test_the_detector_has_a_control_group():
     book, or 'everything is flagged' and the finding means nothing."""
     assert classify("aaa", 15, "bbb", 15, 10, 10)[0] == "SPLIT-BRAIN"
     assert classify("aaa", 15, "aaa", 15, 10, 10)[0] == "OK"
+
+
+def test_a_trading_book_with_no_row_is_orphaned():
+    """🔭 georgia-v3's shape, and the half a mutation proved untested: 41 closes,
+    newest 0.4h ago, no bot_pnl row. If this stops firing, a book can trade into
+    a row nothing publishes and no organ will ever enumerate it."""
+    verdict, detail = classify_orphan(0.4, 41)
+    assert verdict == "ORPHAN-BOOK"
+    assert "NO bot_pnl row" in detail
+
+
+def test_a_retired_book_is_never_orphaned():
+    """A retired book keeps its ledger forever. Flagging it would redden this
+    guard on every retirement the fleet has made — the cry-wolf failure that
+    gets a detector ignored ((gl)). The clock is what separates them."""
+    assert classify_orphan(ORPHAN_H + 1, 500)[0] is None
+    assert classify_orphan(670.9, 189)[0] is None   # 🧲 Snap Back, retired 4-Aug
+
+
+def test_orphan_needs_an_actual_ledger():
+    """No closes, or no timestamp, is not an orphan — it is nothing to say."""
+    assert classify_orphan(None, 0)[0] is None
+    assert classify_orphan(1.0, 0)[0] is None
+    assert classify_orphan(None, 10)[0] is None
+
+
+def test_the_orphan_clock_is_the_discriminator():
+    """Same book, same ledger, either side of the bar — the control that proves
+    the clock is doing the work and not the close count."""
+    assert classify_orphan(ORPHAN_H - 0.1, 41)[0] == "ORPHAN-BOOK"
+    assert classify_orphan(ORPHAN_H + 0.1, 41)[0] is None

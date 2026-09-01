@@ -124,6 +124,27 @@ def classify(row_build, row_n, trade_build, trade_n, ledger_n, row_closes):
         f"{ledger_n})")
 
 
+def classify_orphan(last_h, ledger_n):
+    """(verdict, detail) for a book with NO `bot_pnl` row at all. Pure, for the
+    same reason `classify` is: the ORPHAN half is what caught 🔭 georgia-v3, and
+    a branch that only exists inside a DB walk cannot be mutation-tested.
+
+    A book is ORPHANED only while its ledger is still MOVING. A retired book
+    keeps its history forever and must never be a finding — otherwise this
+    guard reddens on every retirement the fleet has ever made, which is the
+    cry-wolf failure ((gl)) that gets a detector switched off.
+    """
+    if last_h is None or ledger_n in (None, 0):
+        return None, "no ledger — nothing to orphan"
+    if last_h > ORPHAN_H:
+        return None, (f"no row, but its newest close is {last_h:.1f}h old "
+                      f"(> {ORPHAN_H:.0f}h) — retired or dormant, not orphaned")
+    return "ORPHAN-BOOK", (
+        f"{ledger_n} closes in its ledger, newest {last_h:.1f}h ago, and NO "
+        "bot_pnl row — invisible to every organ that enumerates books from "
+        "bot_pnl")
+
+
 def audit(conn):
     """Returns (findings, clean, reported) — findings are SPLIT-BRAIN/ORPHAN."""
     findings, clean, reported = [], [], []
@@ -157,12 +178,11 @@ def audit(conn):
             ledger_n, last_h = cur.fetchone()
 
             if bot not in rows:
-                if last_h is not None and last_h <= ORPHAN_H:
-                    findings.append((bot, "ORPHAN-BOOK",
-                                     f"{ledger_n} closes in its ledger, newest "
-                                     f"{last_h:.1f}h ago, and NO bot_pnl row — "
-                                     "invisible to every organ that enumerates "
-                                     "books from bot_pnl"))
+                verdict, detail = classify_orphan(last_h, ledger_n)
+                if verdict:
+                    findings.append((bot, verdict, detail))
+                else:
+                    reported.append((bot, "NO-ROW", detail))
                 continue
 
             row_closes, extra = rows[bot]
