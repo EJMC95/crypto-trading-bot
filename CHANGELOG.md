@@ -1,3 +1,67 @@
+## 2026-09-01 (wa) — "ADDRESS ALL OF THE ABOVE": the sentinel fix proven live, ⚖️ KEPT on its own grader's split with a fresh pre-registered criterion, the GROSS_X derivations handed over, and the family wedge pinned to Railway's side
+
+**Eamon, 1-Sep:** *"Address all of the above"* — on the close-out list (family
+wedge · PR #251 · branch protection · GROSS_X ceilings · ⚖️). Every item taken
+to the end of what this session's tools can reach:
+
+* **PR #251 MERGED** (`2e18902`) — and the (vz) sentinel fix is now PROVEN in
+  production, not just mutation-tested: run 653, a restart-only dispatch on
+  the fixed workflow, printed **`Deployed:` (empty)** where run 650 had
+  deployed the default pair — deploy step 1s, restart step fired, dashboard
+  verify correctly skipped. The lever's honest scope stands as recorded.
+* **⚖️ COUNTERWEIGHT: KEPT — the I17-as-amended call, made on the grader's
+  own `class_split` and recorded in the doctrine line in place (I12).** The
+  pooled era reads excluded (mean −1.946%, upper −0.772% ≤ 0) but **90% of
+  the loss is 21 closes in a class its own screen now refuses** (−$36.48 of
+  −$40.42 at −8.76%/trade); on what it can still enter: **n=116, −0.711%/
+  trade, t=−0.81, −$3.94, upper bound ≈ +0.41% > 0** — no measured exclusion,
+  and the amendment is explicit that a verdict is never computed on a policy
+  the book no longer runs. The ~28-Aug "+$4.80/P=0.175" defense was STALE in
+  the flattering direction and is corrected wherever it stood. **The keep is
+  NOT open-ended — pre-registered (I21, fresh sample only): read at n≥60
+  on-class closes after 1-Sep or on 1-Oct, whichever first; RETIRE if the
+  fresh on-class upper bound (m+1.28·SE) ≤ 0; keep grading if the fresh mean
+  is positive; anything else returns to Eamon with both numbers.** Decidability
+  stated per I22: at the on-class mean/sd, |t|=2 needs ~700 closes (~6 months)
+  — the criterion exists precisely so nobody waits that out by default.
+* **GROSS_X: the decision is taken — restore each live book to its own
+  previously PUBLISHED derivation, appetite ceiling untouched.** At `set=10.0`
+  all three books publish `stop_reachable=false` even at the 6% REF tier the
+  (vy) clip pins (ceilings: 👩 10.0 dead-at-tie · 🔮 9.09 · 🙏 6.25; avo's
+  `all_slots_stop` reads **100% of equity**). The values: **MUM_GROSS_X=9.5**
+  (Eamon's own (te) launch number, strictly inside his 10.0 stop-death edge) ·
+  **GEORGIA_GROSS_X=7.0** (her (tq) ceiling 7.59 off her own DOGE overshoot
+  datum) · **AVO_GROSS_X=5.3** (her (tq) overshoot-aware ceiling 5.5).
+  `GROSS_X_MAX=10.0` — the 22-Aug appetite ceiling — moves nowhere.
+  **EXECUTION HONESTY: the one-shot workflow to set them was built, YAML- and
+  bash-syntax-verified, and the session harness's permission layer refused
+  every route to committing it** (a workflow writing live-service variables
+  with the Railway token). Not worked around: the file was deleted uncommitted
+  and the three values go to Eamon as Railway-UI variable edits (each edit
+  auto-redeploys; none of the three rows is halted, verified 11:14Z). A future
+  session with the grant surface may re-create it from this entry's spec:
+  halt-check first, set + redeploy, per-row `leverage.set` readback as the
+  service↔book mapping proof, no variable echo, delete after use.
+* **FAMILY-LIGHTER-SHADOW: the wedge is pinned to Railway's side and the
+  count is now SEVEN** — five `railway up` deploys (runs 646/647/648/651/652)
+  and two `railway redeploy`s (650/653), every one reporting success, the
+  container still serving `edc3032d1c46/15` (pre-28-Aug) at 11:14Z with all
+  three family rows publishing fresh. The new code is NOT the cause:
+  `lighter_family_bot.py` at HEAD passes its selftest and imports clean
+  locally, and no Dockerfile.familyshadow or startCommand change sits in the
+  gap. Railway's ledger is holding a stale deployment active while fresh ones
+  never take over — only the dashboard (service → Deployments → deploy or
+  restart the NEWEST build) can move it. 🔮 georgia-v3's row stays dark until
+  it flips; the v3 book meanwhile appears in the grader's `books` map from the
+  ledger side, so its closes are accruing invisibly rather than lost.
+* **Branch protection + code scanning (Decision 1) — outside every tool this
+  session holds** (no branch-protection or repo-variable surface on the
+  GitHub MCP; no `gh`). The clicks, so it is a 3-minute job: Settings →
+  Branches → Add rule for `main` → require a pull request before merging +
+  require status checks **Tests** and **Changelog check**; Settings → Code
+  security → enable code scanning; Settings → Actions variables → new repo
+  variable `ENABLE_CODEQL=1` (the rebuilt CodeQL job un-skips itself).
+
 ## 2026-09-01 (vz) — THE RESTART LEVER'S FIRST FIRING, MEASURED: the sentinel was unsatisfiable and the lever cannot fix the wedge it was built for — one honest, one fixed, and the live readback lands
 
 Run 650 was the (vy) restart lever's first live firing
