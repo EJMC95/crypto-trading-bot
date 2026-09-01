@@ -218,7 +218,14 @@ on:
       services:
         description: "Comma-separated Railway service names (blank defaults to both)."
         required: false
-        default: "freqtrade-bots,pnl-dashboard"
+        # [(vz)] default MUST stay "" — the decide step's shell fallback
+        # (`${DISPATCH_SVCS:-freqtrade-bots,pnl-dashboard}`) supplies the
+        # bare-dispatch pair, so behaviour is unchanged; a YAML default here
+        # is filled into EVERY dispatch that omits the input, which made the
+        # restart-only sentinel's `services == ''` test unsatisfiable (run
+        # 650, measured: RESTARTS=family-lighter-shadow still deployed the
+        # default pair). audit_deploy_coverage pins this.
+        default: ""
       # [2026-09-01 (vy)] RESTART, not upload: `railway redeploy` re-activates
       # the service's LATEST deployment. Built for the (ml) stuck-serving
       # class — family-lighter-shadow took THREE OK-reported `railway up`
@@ -227,6 +234,16 @@ on:
       # only a restart of the deployment (previously: a human in the Railway
       # UI) swaps the serving container. A restart-only dispatch (services
       # blank, restart_services set) deploys NOTHING.
+      # [(vz) CORRECTED IN PLACE per I12 — as first shipped that sentence was
+      # FALSE: the services input carried a YAML default, so "blank" was
+      # unreachable and run 650's restart-only dispatch deployed the default
+      # pair anyway (harmless that time; the mechanism was dishonest). Fixed
+      # by moving the default into the shell fallback above. ALSO measured on
+      # run 650: `railway redeploy` cannot fix the family wedge itself — it
+      # re-runs the deployment Railway considers CURRENT, which in the (ml)
+      # class is the stale one; the lever restarts a wedged PROCESS on
+      # current code, it cannot activate a newer deployment that never took
+      # over. That half stays a Railway-UI action.]
       restart_services:
         description: "Comma-separated services to RESTART (redeploy latest deployment; no upload)."
         required: false

@@ -1,3 +1,54 @@
+## 2026-09-01 (vz) — THE RESTART LEVER'S FIRST FIRING, MEASURED: the sentinel was unsatisfiable and the lever cannot fix the wedge it was built for — one honest, one fixed, and the live readback lands
+
+Run 650 was the (vy) restart lever's first live firing
+(`restart_services=family-lighter-shadow`, services omitted), and it measured
+two defects in one run — both mine, both now recorded where the next reader
+hits them:
+
+* **THE RESTART-ONLY SENTINEL NEVER FIRED — a YAML `default:` made it
+  unsatisfiable.** The exclusion is `services == ''` routing a SPACE into
+  `DISPATCH_SVCS`; but the `services` input carried
+  `default: "freqtrade-bots,pnl-dashboard"`, and GitHub fills a default into
+  EVERY dispatch that omits the input — so "blank" was unreachable and the
+  restart-only run still deployed the default pair (log:
+  `Deployed: freqtrade-bots,pnl-dashboard`, then `RESTARTS:
+  family-lighter-shadow`). Harmless that run; dishonest as a mechanism. FIXED
+  by `default: ""` — behaviour-preserving because the bare-dispatch pair
+  already lives in the decide step's own shell fallback
+  (`${DISPATCH_SVCS:-freqtrade-bots,pnl-dashboard}`), which a YAML default
+  silently shadows. The (vy) comment claiming "deploys NOTHING" is corrected
+  in place per I12. GUARDED: `audit_deploy_coverage.restart_sentinel_ok` —
+  the lever implies an empty services default AND the sentinel expression
+  must exist; fixtures in the selftest, and both mutations verified RED (the
+  run-650 default restored on the real file → FAILED with the run-650
+  message; the expression deleted in memory → FAILED). The second mutation is
+  deliberately in-memory — my first one mutated the working file and a
+  reflexive `git checkout` then discarded the uncommitted fix along with the
+  mutation; mutate a copy, not your desk.
+* **`railway redeploy` CANNOT FIX THE (ml) WEDGE IT WAS BUILT FOR — the
+  workflow's own header said so and I built it anyway.** The lever re-runs
+  the deployment Railway considers CURRENT; in the stuck-serving class that
+  IS the stale one ("railway redeploy only re-runs the old one", line 9 of
+  the file). Measured: run 650's redeploy returned OK in 0.9s and 35+ min
+  later all three family rows still publish `edc3032d1c46/15`, fresh
+  (33–158s), no georgia-v3 row — the FIFTH failed CI remedy on this service
+  (3× OK-reported `railway up`, 1× the sentinel-leaked pair deploy, 1× this
+  redeploy). The lever's honest scope: restart a wedged PROCESS on current
+  code. Activating a NEWER deployment that never took over is not reachable
+  from this repo's CI: **family-lighter-shadow is Eamon's Railway-UI action**
+  (open the service → Deployments → deploy/redeploy the newest build), as the
+  (vw) report already flags.
+* **THE (vy) LIVE READBACK LANDED — run 651 (the `[deploy-live]` merge
+  push), completed 09:56Z.** 🙏 avo `56bb4e8ff3c2 → a48641f9c8d0/17` and 🔮
+  georgia `c3587ee36b5b → a48641f9c8d0/17` (same host image, same stamp — the
+  (te) shape), BOTH publishing `leverage.mmf_clip {on: true, ref: 0.06}`; 🪁
+  kelly `9a0325e327a3 → 5a3773cf1e5a/14` with `caps.clip_usd 250 → 80`. 👩
+  mum's stamp is the readback's laggard (deploys last in the decide
+  sequence); verified separately below/next entry if it does not flip.
+  Honest note on my own instrument: the background poll printed `ALLFLIPPED`
+  while mum still read the old stamp — its exit condition was any-3-of-4
+  loose. The receipt above is a direct `/pnl.json` read, not the poll.
+
 ## 2026-09-01 (vy) — "PROCEED WITH ALL OF IT": the audit merges, kelly's burn is cut 3x by his own criterion's verdict, and the mmf-aware clip makes 10x compatible with living stops — 5/5 mutations red
 
 **Eamon, 1-Sep:** *"Sensational please proceed with all of it"* — on the (vw)

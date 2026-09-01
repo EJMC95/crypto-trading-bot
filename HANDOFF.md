@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-01 19:33 Sydney (09:33Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-01 20:01 Sydney (10:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,15 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (8 commit(s), entries (vt), (vw), (vx))
+## Shipped today (15 commit(s), entries (vt), (vw), (vx), (vy), (vz))
 
+- `203d9c4` The restart lever's first firing measured its own sentinel dead: a YAML default made 'blank' unreachable, and the pin that keeps it fixed (vz)
+- `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
+- `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
+- `11cef14` Record (vy): the proceed-with-all execution, and HANDOFF regenerated
+- `65c84fd` A restart lever for the (ml) stuck-server class: railway redeploy via dispatch, no upload, no UI (vy)
+- `fa8821e` Kelly snap clips revert 250 -> 80 on the grader's own verdict - Eamon's call, era untouched (vy)
+- `f3b337a` The mmf-aware clip: 10x becomes compatible with living stops, per coin and restrict-only — 5/5 mutations red (vy)
 - `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
 - `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
 - `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)

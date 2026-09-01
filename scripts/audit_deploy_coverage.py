@@ -372,6 +372,51 @@ def marker_source_ok():
     return True, "live-marker grep reads commit SUBJECTS only (%s)"
 
 
+def restart_sentinel_ok(src=None):
+    """(ok, detail) — the restart-only dispatch must actually deploy nothing.
+
+    [2026-09-01 (vz)] The (vy) restart lever's exclusion is an env-expression
+    sentinel: `services == ''` routes a SPACE into DISPATCH_SVCS so the deploy
+    loop trims it to nothing. As shipped, the `services` input carried a YAML
+    `default:` — GitHub fills a default into EVERY dispatch that omits the
+    input, so `services == ''` was unsatisfiable and run 650's restart-only
+    dispatch (RESTARTS=family-lighter-shadow) still deployed the default pair.
+    Harmless that run; dishonest as a mechanism. The bare-dispatch pair lives
+    in the decide step's shell fallback (`${DISPATCH_SVCS:-...}`) instead,
+    which a defaulted input would silently shadow again. This pins both
+    halves: the lever implies an EMPTY services default, and the sentinel
+    expression itself must still test both inputs.
+    """
+    src = _read(WORKFLOW) if src is None else src
+    if "restart_services:" not in src:
+        return True, "no restart_services input declared — sentinel not needed"
+    blk = re.search(r"\n      services:\n(.*?)\n      restart_services:",
+                    src, re.S)
+    if not blk:
+        return False, ("restart_services input exists but the services input "
+                       "block could not be parsed — the sentinel guard cannot "
+                       "vouch for what it cannot read; failing closed")
+    dm = re.search(r"^\s*default:\s*(.*?)\s*$", blk.group(1), re.M)
+    dval = (dm.group(1).strip().strip('"').strip("'") if dm else "")
+    if dval:
+        return False, (f"the services input default is '{dval}'. With a "
+                       f"restart_services lever it MUST be empty: GitHub "
+                       f"fills a YAML default into every dispatch that omits "
+                       f"the input, so the restart-only sentinel's "
+                       f"`services == ''` test can never fire and a "
+                       f"restart-only dispatch deploys the default pair — "
+                       f"measured on run 650 (2026-09-01). The bare-dispatch "
+                       f"pair belongs in the decide step's shell "
+                       f"`${{DISPATCH_SVCS:-...}}` fallback, which already "
+                       f"carries it.")
+    if not re.search(r"restart_services != ''.*services == ''", src):
+        return False, ("restart_services input exists but the DISPATCH_SVCS "
+                       "sentinel expression (restart_services != '' && "
+                       "services == '') is gone — a restart-only dispatch "
+                       "would deploy the shell-fallback pair again")
+    return True, "restart-only sentinel intact (empty default + expression)"
+
+
 def marker_atoms(pattern):
     """(files, prefixes) — the concrete path atoms inside a `^(a\\.py$|dir/)`
     alternation. File atoms end `$` (unescaped to plain paths); prefix atoms
@@ -759,6 +804,12 @@ def main():
     _mk_ok, _mk_why = marker_source_ok()
     if not _mk_ok:
         print(f"audit_deploy_coverage: FAILED — {_mk_why}")
+        return 1
+    # [(vz)] the restart-only sentinel's precondition — an input default that
+    # looks like convenience silently re-arms "restart deploys everything".
+    _rs_ok, _rs_why = restart_sentinel_ok()
+    if not _rs_ok:
+        print(f"audit_deploy_coverage: FAILED — {_rs_why}")
         return 1
     # [2026-08-04 (jb)] THE IMAGE CENSUS — before any per-file question, is
     # every image in the repo CLAIMED by a deploy story at all? The per-file
@@ -1217,6 +1268,29 @@ def _selftest():
     assert dockerfile_census() == [], (
         "the shipped tree carries an UNROUTED image — run this script without "
         f"--selftest for the fix menu: {dockerfile_census()}")
+
+    # [2026-09-01 (vz)] THE RESTART-ONLY SENTINEL — fixtures first (the
+    # defect must be provable on a src that cannot be fixed out from under
+    # the test), then the real workflow. The defect this pins: a YAML
+    # `default:` on the services input is filled into every dispatch that
+    # omits it, so the sentinel's `services == ''` never fires and a
+    # restart-only dispatch deploys the default pair (run 650, measured).
+    _sv = ("\n      services:\n        required: false\n"
+           "        default: {d}\n      restart_services:\n"
+           "        default: \"\"\n")
+    _expr = "${{ (github.event.inputs.restart_services != '' && github.event.inputs.services == '') && ' ' || github.event.inputs.services }}\n"
+    _bad = _sv.format(d='"freqtrade-bots,pnl-dashboard"') + _expr
+    _ok_src = _sv.format(d='""') + _expr
+    _r, _w = restart_sentinel_ok(_bad)
+    assert _r is False and "default" in _w, (_r, _w)
+    _r, _w = restart_sentinel_ok(_ok_src)
+    assert _r is True, (_r, _w)
+    _r, _w = restart_sentinel_ok(_sv.format(d='""'))  # lever, no expression
+    assert _r is False and "sentinel expression" in _w, (_r, _w)
+    _r, _w = restart_sentinel_ok("on:\n  push:\n")    # no lever -> scoped out
+    assert _r is True, (_r, _w)
+    _r, _w = restart_sentinel_ok()                     # the real workflow
+    assert _r is True, f"shipped workflow fails its own sentinel pin: {_w}"
 
     # Railway TOML parity checks (explicit startCommand + docker CMD alignment)
     import tempfile
