@@ -413,15 +413,50 @@ def corrected_letters(text):
     return out
 
 
+def lost_entries(mine, theirs, my_text=None):
+    """-> [(date, letter, title)] for era entries origin/main carries that this
+    tree has LOST. Pure, so the selftest can drive it.
+
+    [2026-09-01 (vw)] WHY THIS EXISTS. PR #237 squash-merged a branch whose
+    CHANGELOG.md was a 2-line stub, replacing 655 entries; PR #212 then
+    overwrote the stub with a stale 566-entry copy. Eleven days of the fleet's
+    record left main and EVERY guard stayed quiet, because every arm here asks
+    about entries that exist — collisions, citations, glued headers — and none
+    asks whether entries VANISHED. The (po) class: a check that inspects
+    nothing reports clean.
+
+    KEYED ON LETTERS, deliberately: a title corrected in place (I12) keeps its
+    letter and must not trip this, and a renumber DECLARES itself
+    (`renumbered_pairs`, the machine-readable rule-4 record) — a letter that
+    moved away under a declaration is not lost. DECLARED LIMIT: pre-era and
+    letterless headers are outside the key space, so a wipe of ONLY
+    pre-18-Jul history would pass this arm; every real wipe removes era
+    entries too, and 646 of them stand guard.
+    """
+    mine_letters = {l for _d, l, _t in mine}
+    moved_from = {frm for frm, _to in renumbered_pairs(my_text)}
+    return [(d, l, t) for d, l, t in theirs
+            if l not in mine_letters and l not in moved_from]
+
+
 def cross_branch(mine, theirs, my_text=None):
     """-> {letter: (my_title, their_title)} for letters BOTH sides used with
     DIFFERENT titles. Pure, so the selftest can drive it.
 
-    `my_text` (optional) is my full CHANGELOG. When given, a letter whose own
-    entry declares `CORRECTED IN PLACE` is NOT reported — see
-    `corrected_letters` for why that is the one legitimate way to produce this
-    signature, and how narrow the escape is. Omitting it keeps the original
-    strict behaviour, so every existing caller and test is unchanged.
+    `my_text` (optional) is my full CHANGELOG. When given, two narrow escapes
+    apply — each needs TWO signals, so neither can be waved off with prose:
+    * a letter whose own entry declares `CORRECTED IN PLACE` AND whose titles
+      are the same entry edited — see `corrected_letters`;
+    * [2026-09-01 (vw)] a DECLARED RENUMBER: my text records `(X) -> (Y)` AND
+      my tree carries origin/main's displaced (X) entry at (Y) with the same
+      title. This is exactly the repair this guard's own FIX text prescribes
+      ("the other moves to the next free one and records the move inline") —
+      and before this escape existed, the branch PERFORMING that repair was
+      refused by the guard that prescribed it. The (nx) silent-sweep shape
+      still fires: a sweep rewrites letters without a declaration, and a
+      declaration without the matching moved entry excuses nothing.
+    Omitting `my_text` keeps the original strict behaviour, so every existing
+    caller and test is unchanged.
 
     WHY (2026-07-30 (hj)). The in-file check above cannot see the collision
     that actually keeps happening: two sessions on two BRANCHES each pick "the
@@ -437,6 +472,8 @@ def cross_branch(mine, theirs, my_text=None):
     """
     theirs_by_letter = {l: t for _d, l, t in theirs}
     fixed = corrected_letters(my_text) if my_text else set()
+    moved = renumbered_pairs(my_text) if my_text else set()
+    mine_by_letter = {l: t for _d, l, t in mine}
     out = {}
     for _d, letter, title in mine:
         other = theirs_by_letter.get(letter)
@@ -444,6 +481,12 @@ def cross_branch(mine, theirs, my_text=None):
             continue
         if letter in fixed and same_entry(title, other):
             continue                           # a corrected title, not a race
+        # [(vw)] a DECLARED renumber whose moved entry my tree actually holds:
+        # their displaced (letter) entry lives here at (to) under the same
+        # title. Both signals or it still fires — see the docstring.
+        if any(frm == letter and same_entry(mine_by_letter.get(to), other)
+               for frm, to in moved):
+            continue
         out[letter] = (title, other)
     return out
 
@@ -526,6 +569,28 @@ def main():
                   "the move inline. Decide by grepping the tree:\n"
                   "  grep -rn '(<letter>)' --include='*.md' --include='*.py' "
                   "--include='*.yml' .\n")
+            return 1
+        # [2026-09-01 (vw)] THE LOST-ENTRIES ARM. PR #237 replaced this file's
+        # 655 entries with a 2-line stub and every guard stayed green; PR #212
+        # then overwrote the stub with an 11-day-stale copy. The changelog may
+        # only GROW: an era entry origin/main carries and this tree does not is
+        # a deletion, and a deletion is the defect — restore it, or declare the
+        # renumber that moved it.
+        lost = lost_entries(entries, scan(base_text)[0], my_text=_raw)
+        if lost:
+            print(f"\nCHANGELOG ENTRIES LOST vs origin/main — {len(lost)} "
+                  f"entr{'y' if len(lost) == 1 else 'ies'} present there and "
+                  f"missing from this tree. The changelog is the fleet's "
+                  f"record and its sync channel; it only ever grows:\n")
+            for d, letter, title in lost[:12]:
+                print(f"  ({letter})  {d}  {title[:80]}")
+            if len(lost) > 12:
+                print(f"  ... and {len(lost) - 12} more")
+            print("\nFIX: your branch's CHANGELOG.md is stale or was "
+                  "overwritten — rebase it onto origin/main's copy and re-add "
+                  "your own entries on top (see (vw) for the #237/#212 wipe "
+                  "this arm exists for). A deliberate renumber is declared "
+                  "inline: 'RENUMBERED (x) -> (y)'.\n")
             return 1
     if dups:
         print(f"\nDUPLICATE CHANGELOG LETTERS (era >= {ERA_START}) — every "
@@ -669,6 +734,50 @@ def _selftest():
     # the pre-era scope applies here too — 17-Jul's restart must not clash
     _pre = scan("## 2026-07-17 (a) — restart head\n\nb\n")[0]
     assert cross_branch(_pre, scan("## 2026-07-17 (a) — tail\n\nb\n")[0]) == {}
+
+    # ---- [(vw)] THE LOST-ENTRIES ARM: the changelog only grows -------------
+    # Reproduces the #237/#212 shape: entries on origin/main, gone from mine.
+    _full = ("## 2026-07-30 (fz) — one\n\nb\n\n"
+             "## 2026-07-30 (ga) — two\n\nb\n")
+    _wiped = "## 2026-07-30 (fz) — one\n\nb\n"
+    _lost = lost_entries(scan(_wiped)[0], scan(_full)[0])
+    assert [l for _d, l, _t in _lost] == ["ga"], _lost
+    # identical sets and my-side ADDITIONS are quiet — growth is the point
+    assert lost_entries(scan(_full)[0], scan(_full)[0]) == []
+    assert lost_entries(scan(_full + "\n## 2026-07-31 (gb) — three\n\nb\n")[0],
+                        scan(_full)[0]) == []
+    # a DECLARED renumber is not a loss...
+    _moved = ("## 2026-07-30 (fz) — one\n\nb\n\n"
+              "## 2026-07-30 (gb) — two\n\n"
+              "> RENUMBERED (ga) -> (gb) on a collision\n\nb\n")
+    assert lost_entries(scan(_moved)[0], scan(_full)[0], my_text=_moved) == []
+    # ...an UNDECLARED disappearance still fires (the silent-sweep shape)...
+    _swept = ("## 2026-07-30 (fz) — one\n\nb\n\n"
+              "## 2026-07-30 (gb) — two\n\nb\n")
+    assert lost_entries(scan(_swept)[0], scan(_full)[0], my_text=_swept), \
+        "an undeclared disappearance must fire"
+    # ...and the WIPE ITSELF: a stub loses everything
+    assert len(lost_entries(scan("")[0], scan(_full)[0])) == 2
+
+    # ---- [(vw)] cross_branch honours a DECLARED renumber, two signals ------
+    _theirs_fz = scan("## 2026-07-30 (fz) — THE DISPLACED ENTRY\n\nb\n")[0]
+    _mine_rn = ("## 2026-07-30 (fz) — MY OWN DIFFERENT ENTRY\n\nb\n\n"
+                "## 2026-07-30 (gb) — THE DISPLACED ENTRY\n\n"
+                "> RENUMBERED (fz) -> (gb) at the merge\n\nb\n")
+    assert cross_branch(scan(_mine_rn)[0], _theirs_fz,
+                        my_text=_mine_rn) == {}, \
+        "a declared renumber carrying the displaced entry must not clash"
+    # a declaration WITHOUT the matching moved entry excuses nothing
+    _mine_lie = ("## 2026-07-30 (fz) — MY OWN DIFFERENT ENTRY\n\nb\n\n"
+                 "## 2026-07-30 (gb) — SOMETHING ELSE ENTIRELY\n\n"
+                 "> RENUMBERED (fz) -> (gb)\n\nb\n")
+    assert set(cross_branch(scan(_mine_lie)[0], _theirs_fz,
+                            my_text=_mine_lie)) == {"fz"}, \
+        "a renumber declaration without the moved entry is a sweep"
+    # and no declaration at all keeps the original strictness
+    _mine_nd = "## 2026-07-30 (fz) — MY OWN DIFFERENT ENTRY\n\nb\n"
+    assert set(cross_branch(scan(_mine_nd)[0], _theirs_fz,
+                            my_text=_mine_nd)) == {"fz"}
     # fail-SAFE: the baseline arm must never raise, whatever git says here
     _b = _baseline_changelog()
     assert _b is None or isinstance(_b, str), type(_b)
