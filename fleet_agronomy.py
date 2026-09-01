@@ -539,6 +539,14 @@ BOOKS = {b.row: b for b in [
     _envonly("book-douglas-lshadow", "lighter_book_douglas_bot.py", 8,
              "🧘 The Zone. Bracket predefined at entry and never widened; "
              "clip is structurally constant (no streak/outcome input)."),
+    # [2026-09-01 (vw)] 🚀 bezos — registered the day it first actually RAN.
+    # PR #238 put it in fleet_books.ROW_ENTRY and nowhere else; this organ's
+    # coverage test was red on it from merge day (the third of four guards
+    # that merge ignored — see (vt)).
+    _envonly("book-bezos-lshadow", "lighter_book_bezos_bot.py", 8,
+             "🚀 bezos. A wrapper VARIANT of the Douglas engine (env-owned "
+             "profile: impulse 2.2x, asymmetric bracket, 8h hold, $2M floor) "
+             "— same knob surface as its engine, reachable only via env."),
     _envonly("book-grimes-lshadow", "lighter_book_grimes_bot.py", 8,
              "📐 The Technician. Entry is gated by its own rolling replay "
              "scorecard, so its real 'lever' is evidence, not a knob."),
