@@ -170,7 +170,17 @@ LOOP_SECONDS = ghost.LOOP_SECONDS          # 90s — the ghost's own cadence
 # this scales $ throughput ~3.1x on the same measured edge; the accepted
 # price is deeper book-walks (the named KAITO-depth risk), bounded by the
 # widened MY-side slip gate below and visible in the my_slip census.
-CLIP_USD = float(os.environ.get("KELLY_CLIP_USD", "250"))
+# [2026-09-01 (vy)] REVERTED $250 -> $80 (the founding clip), Eamon's call on
+# the (vw)/(vx) audit — "proceed with all of it". The record since the (qj)
+# risk-up: go-live verdict **`unreachable`** (upper bound <= 0), recent 140
+# closes −0.326%/trade ≈ $19/day of burn at $250, lifetime −$156.76 with the
+# whole life one trade wearing two exits (ghoststop +$455 vs own stop −$461).
+# Clip is %-invariant to the grade ((hl)), so this cuts the burn ~3x and
+# costs the ~18-Sep keep-or-retire decision NOTHING — the book keeps trading
+# and its per-trade record keeps accruing on the same edge. Restrict-only,
+# era NOT reset ((hc): capacity change = ordinary tuning). The 18-Aug
+# risk-up rationale above is kept for the record; env restores it any time.
+CLIP_USD = float(os.environ.get("KELLY_CLIP_USD", "80"))
 MAX_POSITIONS = int(os.environ.get("KELLY_MAX_POSITIONS", "4"))
 # MY-side slip tolerance, widened 30 -> 60bps in the same decision: take
 # events the ghost validated even when my clip walks deeper. The GHOST-side
