@@ -292,9 +292,11 @@ def main(argv=None):
             out_pb[vname].append({"bot": key[0], "tag": key[1], "rungs": sorted(pb["rungs"]), "days": pb["days"], "n": pb["n"],
                                   "fwd_pct": fw, "own_mean_pct": own_mean[key] * 100, "uplift": pb["uplift"]})
     if a.out:
-        json.dump({"calibration_ok": ok, "today": [{"bot": k[0], "tag": k[1], "n": n, "mult": m, **ev} for k, (s, n, m, ev) in today.items()],
-                   "forward": out_fwd, "per_bucket": out_pb, "control": ctrl, "agree": agree, "disagree": disagree},
-                  open(a.out, "w"), indent=1, default=str)
+        payload = {"calibration_ok": ok,
+                   "today": [{"bot": k[0], "tag": k[1], "n": n, "mult": m, **ev} for k, (s, n, m, ev) in today.items()],
+                   "forward": out_fwd, "per_bucket": out_pb, "control": ctrl, "agree": agree, "disagree": disagree}
+        with open(a.out, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=1, default=str)
         print(f"\nwrote {a.out}")
     return 0
 
