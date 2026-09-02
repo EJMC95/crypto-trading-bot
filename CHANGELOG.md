@@ -87,10 +87,29 @@ the shape of any rollout — raising TypeError **inside the judge's own
 evaluation**. Caught by driving the mixed case, not by reading the code; the
 fix sorts the ids, which is also byte-identical to the pre-`(xf)` return.
 
-Pinned by `tests/autonomy/test_drift_file_set.py` — 16 tests, **7/7 mutations
-red**, including the tuple-sort crash and a positive control that a genuine
-same-file-set drift still holds a promotion (a gate that never fires is
-trivially safe and useless, I3).
+### AND FIVE LENSES FOUND THREE MORE DEFECTS IN MY FIRST CUT
+
+* **A SHARED DIGEST STOPPED MEANING AGREEMENT.** Keying the build sets by
+  `(count, digest)` and then intersecting the PAIRS meant two arms publishing
+  the SAME digest under different counts no longer read as one deploy line —
+  re-creating the exact false hold this change exists to remove. Agreement is a
+  property of the digest alone.
+* **A SECOND COPY OF THE RULE.** `_row_drift` open-coded its own shared-count
+  test instead of calling the owner it had just declared, and that copy
+  *disarmed on unknown counts* — the one behaviour `stamps_comparable`
+  explicitly forbids. Now driven through the owner, pinned by a test that swaps
+  the owner out and demands the verdict follow.
+* **THE RECEIPT DESCRIBED A DIFFERENT SAMPLE THAN THE VERDICT.**
+  `arm_drift_basis` was computed on the whole ledger while `drift` is
+  window-scoped, so the receipt could contradict the hold it explains. The
+  claim and the basis now come from ONE pass (`_row_drift_verdict`), and both
+  callers compute it on their own window.
+
+Pinned by `tests/autonomy/test_drift_file_set.py` — 19 tests, **10/10
+mutations red**, including the tuple-sort crash, the shared-digest regression,
+the owner-delegation swap, and a positive control that a genuine same-file-set
+drift still holds a promotion (a gate that never fires is trivially safe and
+useless, I3).
 
 ## 2026-09-02 (xe) — 👩 MUM'S HALT-AWARE ENTRY GATE: a leg whose own stop would flatten the whole book is refused, measured neutral in the regime she trades and worth 6pp in the one that halts her
 
@@ -122,9 +141,46 @@ somewhere.
 | trailing 120d, gate ON | **−50.20** | **65.7** | 18 | 27 |
 
 **Inert in the regime she trades, +6.28pp of total return and −4.3pp of
-drawdown in the one that halts her.** RESTRICT-ONLY and FAIL-OPEN: `halt_room`
-returns None on any unreadable input and the gate then does nothing; it can
-only refuse an entry, never size one up, never suppress the halt.
+drawdown in the other.** RESTRICT-ONLY and FAIL-OPEN: `halt_room` returns None
+on any unreadable input and the gate then does nothing; it can only refuse an
+entry, never size one up, never suppress the halt.
+
+### THREE CORRECTIONS FROM AN ADVERSARIAL REVIEW, AND TWO WERE REAL MONEY
+
+Six independent lenses were run over this diff before it shipped. They found
+more than the change did, and the two worst were mine:
+
+* **THE RAIL WOULD HAVE SHUT DOWN 🙏 AVO.** This module is the VARIANT HOST for
+  both live books, and I sized the gate on 👩 mum's geometry alone. Measured at
+  production settings: one slot-stop is **12.5%** of mum's daily allowance at
+  3.75× and **100%** of avo's at her 5× (clip = equity × 5 / 5 slots, −10%
+  stop, 10% leash). Unscoped, the gate would have refused **every avo entry on
+  any day she was fractionally down** — silently stopping the fleet's other
+  real-money book. The (te)/(vh) class exactly: verify a mechanism in one file,
+  ship without asking which arm executes it. FIXED by arming on the book's own
+  geometry (`halt_gate_share`, one stop as a fraction of the whole allowance,
+  armed at ≤50%) — **derived, never a book list**, because a roster rots on the
+  next slot swap and this repo has four entries about that. The row publishes
+  `halt_gate.{armed, stop_share, max_share}` so a disarmed book says so.
+* **THE ROOM WAS SPENT TWICE IN ONE CYCLE.** `equity` is read once per loop, so
+  every candidate in a pass saw the same room: with $2.00 of room and a $1.33
+  stop per leg, TWO legs each passed and jointly breached it. Raised
+  independently by three lenses. FIXED with a within-cycle stop budget.
+* **AND THE ATTRIBUTION I PUBLISHED WAS WRONG.** I wrote that the gain comes
+  from avoiding flattens. **Over the 120d window halts are 18 with the gate and
+  18 without — it prevented ZERO flattens.** The gain is that the 27 refused
+  entries were themselves net losers: the rail declines to open into a day
+  already deep in drawdown, and those are bad entries. Flatten-avoidance is the
+  DESIGN rationale and remains untested. Corrected in the code, the tests and
+  here, because a measured benefit with an invented mechanism is how a rail
+  gets kept for the wrong reason and tuned in the wrong direction.
+
+**DECLARED LIMITS:** the study replays the PCT leash only, while production
+takes the tighter of the leash and the absolute cap — on mum today they
+coincide (~$57 on a $570 book), which is why the numbers stand and would not
+on a book where the cap binds. And 3.75× is not a "validated operating point":
+the study's own decision rule returns NO gross on the 120d window, because the
+cell loses there. See `(xd)`.
 
 **AND IT DROVE OUT A DEFECT IN THE ROW.** The gate needs the halt LEVEL, which
 is the tighter of two rails (the pct leash, the absolute cap). The row's

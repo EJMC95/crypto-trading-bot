@@ -23,9 +23,16 @@ drawdown somewhere.
                           0 entries gated   (INERT in the regime she trades)
     trailing 120d @3.75x: total −56.48% -> −50.20% (+6.28pp),
                           maxDD 70.0 -> 65.7 (−4.3pp), 27 entries gated
-    trailing 120d @9.5x : total −56.48%-class books gate 27 entries; at the
-                          gross she ran until today it is the difference
-                          between one stop and a flatten.
+
+    WHAT THE MEASUREMENT DOES **NOT** SHOW, corrected after adversarial review:
+    over that 120d window HALTS ARE UNCHANGED (18 with the gate, 18 without).
+    The rail prevented no flattens at all. The gain comes from the 27 refused
+    entries being net losers — it declines to open into a day already deep in
+    drawdown, and those are bad entries. Flatten-avoidance is the design
+    rationale and is UNTESTED; entry quality in a drawdown is what was
+    measured. The study also replays the PCT leash only, while production takes
+    the tighter of the leash and the absolute cap (on mum today they coincide
+    at ~$57 on a $570 book, which is why the numbers stand).
 
 THESE TESTS DRIVE THE REAL `main()` one cycle against a stub venue (the (sz)
 boot-smoke harness) rather than reading the source — behaviour, not shape:
@@ -186,7 +193,64 @@ def test_a_junk_cap_does_not_silently_open_the_gate():
     assert out["vetoes"].get("halt_room_skips", 0) >= 1, out["vetoes"]
 
 
-# ---- 10  the halt itself still fires ---------------------------------------
+# ---- 11-14  THE TWO REAL-MONEY DEFECTS AN ADVERSARIAL REVIEW FOUND ---------
+#
+# Both were in the first cut of this rail and both are pinned here.
+
+def test_the_gate_refuses_to_arm_on_a_book_whose_one_stop_is_its_whole_leash():
+    """🙏 avo runs 5 slots at 5x with a -10% stop, so her clip IS her equity and
+    ONE slot-stop is 100% of her daily allowance. This module is the VARIANT
+    HOST for both live books, so a rail sized on 👩 mum's geometry and shipped
+    unscoped would have refused EVERY avo entry on any day she was fractionally
+    down — silently stopping the fleet's other real-money book. Derived from
+    the book's own geometry, never a hardcoded roster."""
+    import importlib
+    import os
+    class _R:
+        max_daily_loss = None
+    for book, var, gx, want_armed in (
+            ("freqtrade-avo-maria", "AVO_GROSS_X", "5.0", False),
+            ("freqtrade-mum", "MUM_GROSS_X", "3.75", True)):
+        with loaded(book, **{var: gx}) as m:
+            importlib.reload(m) if False else None
+            eq = 1000.0
+            share, armed = m.halt_gate_share(m.clip_usd(eq), m.S.stoploss, eq, _R())
+            assert armed is want_armed, (book, share, armed)
+            assert share is not None
+        os.environ.pop(var, None)
+
+
+def test_the_arming_share_is_unmeasurable_rather_than_guessed():
+    with loaded("freqtrade-mum") as m:
+        class _R:
+            max_daily_loss = None
+        for bad in ((None, -0.04, 100.0), (100.0, None, 100.0),
+                    (100.0, -0.04, None), (100.0, -0.04, 0.0),
+                    (0.0, -0.04, 100.0), (100.0, 0.0, 100.0)):
+            share, armed = m.halt_gate_share(bad[0], bad[1], bad[2], _R())
+            assert share is None and armed is False, bad
+
+
+def test_a_second_entry_in_one_cycle_cannot_spend_the_same_room_twice():
+    """`equity` is read ONCE per loop, so without a within-cycle accumulator
+    every candidate saw the same room and k legs each individually "safe"
+    jointly breached it. day-start 220 vs equity 200 leaves $2.00 of room
+    against a $1.33 stop per leg: the first leg fits, the second must not."""
+    out = _cycle(day_start=220.0)
+    assert len(out["venue"].opens) == 1, \
+        f"exactly one leg fits in $2.00 of room at $1.33 a stop: {out['venue'].opens}"
+    assert out["vetoes"].get("halt_room_skips", 0) >= 1, out["vetoes"]
+
+
+def test_the_row_publishes_whether_the_gate_is_armed_and_the_geometry():
+    out = _cycle(day_start=200.0)
+    g = out["vetoes"].get("halt_gate")
+    assert isinstance(g, dict), out["vetoes"]
+    assert g["armed"] is True and 0 < g["stop_share"] < 0.5, g
+    assert g["max_share"] == 0.5
+
+
+# ---- 15  the halt itself still fires ---------------------------------------
 
 def test_the_gate_never_suppresses_the_halt_itself():
     """A real breach must still flatten — the gate sits in front of ENTRIES and
@@ -201,7 +265,7 @@ def test_the_gate_never_suppresses_the_halt_itself():
     assert out["venue"].opens == []
 
 
-# ---- 11-12  the row's `binding` comes from the SAME owner ------------------
+# ---- 16-17  the row's `binding` comes from the SAME owner ------------------
 
 def test_the_row_reports_which_rail_binds_from_the_gates_own_owner():
     """`halt.binding` used to re-derive the tighter-rail comparison inline —

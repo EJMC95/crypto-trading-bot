@@ -627,6 +627,50 @@ def halt_level(day_start_equity, rails):
     return level, binding
 
 
+#: [(xe), corrected after adversarial review] THE GATE ONLY ARMS ON A BOOK
+#: WHOSE GEOMETRY LEAVES IT ROOM TO MEAN ANYTHING. Measured at production
+#: settings: one slot-stop is **12.5%** of 👩 mum's whole daily allowance at
+#: 3.75x, and **100%** of 🙏 avo's at her 5x (clip = equity x 5 / 5 slots, stop
+#: -10%, leash 10%). This module is the VARIANT HOST for both, so a rail sized
+#: on mum's geometry and shipped unscoped would have refused EVERY avo entry on
+#: any day she was even fractionally down — silently stopping the fleet's other
+#: real-money book. That is the (te)/(vh) class exactly: verify the mechanism in
+#: one file, ship without asking which arm executes it.
+#:
+#: DERIVED, NOT A BOOK LIST: a hardcoded roster rots on the next slot swap (this
+#: repo has four entries about that). The share is computed from the book's own
+#: clip, stop and leash every loop, so it self-corrects if Eamon moves a gross.
+HALT_GATE_MAX_STOP_SHARE = float(_env("HALT_GATE_MAX_STOP_SHARE", "0.5"))
+
+
+def halt_gate_share(clip, stop_frac, day_start_equity, rails):
+    """`(share, armed)` — one slot-stop as a fraction of the book's whole daily
+    allowance, and whether the halt-room gate is meaningful at that geometry.
+
+    `(None, False)` when it cannot be computed: the gate then does NOTHING,
+    which is the same fail-open direction as `halt_room` itself. A book whose
+    single stop consumes more than `HALT_GATE_MAX_STOP_SHARE` of its allowance
+    has no room for the rail — for it the gate would not be a tail guard, it
+    would be "stop trading whenever down", which is a different decision and
+    is Eamon's, not a rail's.
+    """
+    try:
+        ds = float(day_start_equity)
+        stake, stop = float(clip), abs(float(stop_frac))
+    except (TypeError, ValueError):
+        return None, False
+    if not (ds > 0) or not (stake > 0) or not (stop > 0):
+        return None, False
+    level, _ = halt_level(ds, rails)
+    if level is None:
+        return None, False
+    allowance = ds - level                     # the whole day's room, flat book
+    if not (allowance > 0):
+        return None, False
+    share = (stake * stop) / allowance
+    return share, share <= HALT_GATE_MAX_STOP_SHARE
+
+
 def halt_room(equity, day_start_equity, rails):
     """Dollars of equity above the daily-halt level, or None when unmeasurable.
 
@@ -1661,6 +1705,7 @@ def main(_ctx=None, once=False):
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
         halt_room_skips = 0
+        halt_gate_stat = None
         mmf_clip_scaled = 0
         coin_vetoed = {}
         live_scale = 1.0
@@ -1991,6 +2036,13 @@ def main(_ctx=None, once=False):
                     # Non-zero means the halt rail turned a signal away before
                     # it could become the trade that ended the day.
                     "halt_room_skips": halt_room_skips,
+                    # [(xe)] WHETHER THE GATE IS ARMED ON THIS BOOK AT ALL, and
+                    # the geometry that decided it. `armed: false` with a
+                    # stop_share near 1.0 means one slot-stop is this book's
+                    # whole daily allowance — the rail would be "stop trading
+                    # whenever down", which is a decision, not a rail. None
+                    # until the first entry candidate of a cycle prices it.
+                    "halt_gate": halt_gate_stat,
                     # [(vy)] entries this pass whose clip the per-coin
                     # mmf factor shrank — see mmf_clip_factor.
                     "mmf_clip_scaled": mmf_clip_scaled,
@@ -2589,6 +2641,12 @@ def main(_ctx=None, once=False):
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
         halt_room_skips = 0
+        halt_gate_stat = None
+        # [(xe)] stop-dollars this cycle has already COMMITTED. `equity` is read
+        # once per loop, so without this every candidate saw the same room and
+        # k legs each individually "safe" could jointly breach it — raised
+        # independently by three review lenses and confirmed against the loop.
+        cycle_stop_committed = 0.0
         mmf_clip_scaled = 0
         cycle_admitted = 0
 
@@ -2994,23 +3052,40 @@ def main(_ctx=None, once=False):
                 # she runs today it is NEUTRAL on the trailing 30d (0 entries
                 # gated, total +28.78% unchanged) and worth +6.28pp of total
                 # return and -4.3pp of max drawdown over the trailing 120d
-                # (27 entries gated, halts unchanged) — i.e. it costs nothing
-                # in the regime she trades and pays in the one that halts her.
-                # Pre-declared rule, in the study: it ships only if it never
-                # lowers 30d total AND lowers halts or drawdown somewhere.
+                # (27 entries gated).
+                #
+                # AND THE ATTRIBUTION IS NOT WHAT THE RATIONALE ABOVE ASSUMES —
+                # corrected after an adversarial review caught it. Over that
+                # 120d window HALTS ARE UNCHANGED, 18 with the gate and 18
+                # without: the rail prevented ZERO flattens. The gain is that
+                # the 27 entries it refused were themselves net losers — it
+                # declines to open into a day already deep enough in drawdown
+                # that one stop would end it, and empirically those are bad
+                # entries. The flatten-avoidance story is the DESIGN rationale
+                # and remains untested; the measured effect is entry quality
+                # in a drawdown. Both are stated because only one is measured.
                 #
                 # RESTRICT-ONLY and FAIL-OPEN: `halt_room` returns None on any
                 # unreadable input and the gate then does nothing. It can only
                 # refuse an entry — never size one up, never suppress a halt.
+                _one_stop = stake * abs(float(S.stoploss))
+                _share, _armed = halt_gate_share(stake, S.stoploss,
+                                                 day_start_equity, rails)
+                halt_gate_stat = {"armed": bool(_armed),
+                                  "stop_share": (round(_share, 4)
+                                                 if _share is not None else None),
+                                  "max_share": HALT_GATE_MAX_STOP_SHARE}
                 _room = halt_room(equity, day_start_equity, rails)
-                if _room is not None and _room < stake * abs(float(S.stoploss)):
+                if _armed and _room is not None and \
+                        (_room - cycle_stop_committed) < _one_stop:
                     _verdict(sym, "halt_room")
                     # I18: `{opened: 0}` must never be byte-identical between
                     # "no signal" and "a rail refused every one of them".
                     halt_room_skips += 1
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} HALT_ROOM_SKIP "
-                           f"(room ${_room:.2f} < one stop ${stake * abs(float(S.stoploss)):.2f} "
-                           f"on a ${stake:.2f} clip)")
+                           f"(room ${_room:.2f} less ${cycle_stop_committed:.2f} "
+                           f"already committed this cycle < one stop "
+                           f"${_one_stop:.2f} on a ${stake:.2f} clip)")
                     continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
                 if not rails.notional_ok(open_ntl, stake):
@@ -3065,6 +3140,9 @@ def main(_ctx=None, once=False):
                              "measured": meas, "fill_src": src})
                 except Exception:  # noqa: BLE001
                     pass
+                # [(xe)] this leg's stop is now part of the day's exposure —
+                # the next candidate in THIS cycle must see it.
+                cycle_stop_committed += _one_stop
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
                              # [(wv)] the bars in force at entry (the judge's

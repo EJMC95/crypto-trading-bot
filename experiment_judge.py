@@ -681,7 +681,8 @@ def _mean_pct(trades):
 
 def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
                 min_closes=None, live_min=None, margin_pp=None,
-                cand_levers=None, drift=None, both_halves=True):
+                cand_levers=None, drift=None, both_halves=True,
+                drift_basis_=None):
     """The promotion bar. Returns a verdict dict; verdict['promote'] is True
     only when the shadow arm is positive AND beats the live arm per-trade by
     margin_pp on the FULL window AND on BOTH halves (the doctrine's
@@ -741,8 +742,17 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     # [(xf)] the BASIS, published on every verdict — "file-set" is a blind
     # spot, not a clean bill of health, and it is the permanent answer on a
     # pair whose arms run from different images.
+    #
+    # TAKEN FROM THE CALLER, which is the only thing that knows how `drift`
+    # was scoped: `_arm_drift_snapshot` windows the row half by `since_ts`,
+    # and computing the receipt here off the UNSCOPED ledger would let it
+    # describe a different sample than the verdict it explains — a receipt
+    # that contradicts its own hold. The whole-ledger fallback is kept ONLY
+    # for callers that pass no drift at all (the selftests and the census),
+    # where there is no scoped sample to disagree with.
     try:
-        v["arm_drift_basis"] = drift_basis(rows, live_bot, shadow_bot)
+        v["arm_drift_basis"] = (drift_basis_ if drift_basis_ is not None
+                                else drift_basis(rows, live_bot, shadow_bot))
     except Exception:      # noqa: BLE001 — a receipt never breaks a verdict
         v["arm_drift_basis"] = None
     if drift:
@@ -1276,7 +1286,12 @@ def growth_promoter(rows, gstate, now, drift=None):
                                   "why": f"release cooldown until "
                                          f"{iso(_num(gstate['cooldown_until']))}"}))
     start = growth_window_start(now)
+    # [(xf)] the receipt is computed on THIS window, the one the verdict below
+    # is computed on — a basis read off the whole ledger could contradict the
+    # hold it claims to explain.
     v = paired_eval(rows, start, now, shadow_bot=SHADOW_BOT, live_bot=LIVE_BOT,
+                    drift_basis_=drift_basis(_rows_since(rows, start),
+                                             LIVE_BOT, SHADOW_BOT),
                     min_closes=GROWTH_MIN_CLOSES, live_min=GROWTH_LIVE_MIN,
                     cand_levers=GROWTH_CAND, drift=drift, both_halves=False)
     v["candidate"] = "growth-levers"
@@ -1378,36 +1393,51 @@ def _row_drift(rows, live=None, shadow=None):
     arms to have stamped rows in the window (an empty set on either side is
     "unknown", never drift), so a rollout cannot make this fire.
     """
+    return _row_drift_verdict(rows, live, shadow)[0]
+
+
+def _row_drift_verdict(rows, live=None, shadow=None):
+    """`(claim | None, basis)` from ONE pass — the claim and the receipt can
+    never describe different samples because they are the same read.
+
+    [2026-09-02 (xf), corrected after adversarial review] Three things this
+    gets right that the first cut did not:
+
+    * **AGREEMENT IS TESTED ON THE DIGEST, never on the (count, digest) pair.**
+      Keying the sets by count and then intersecting the pairs meant two arms
+      publishing the SAME digest under different counts no longer read as one
+      deploy line — re-creating the very false hold this change exists to
+      remove. A shared digest is a shared deploy line, full stop.
+    * **COMPARABILITY GOES THROUGH THE ONE OWNER**,
+      `implementation_shortfall.stamps_comparable`. The first cut open-coded
+      `shared_n` here, which is a second copy of the rule that could drift from
+      the declared owner ((hj)) — and it disarmed itself on unknown counts,
+      the exact behaviour the owner declares must NOT happen.
+    * **IDS ARE SORTED, never the pairs.** An arm mid-rollout carries some rows
+      stamped with `build_n` and some without, so sorting the pairs compares
+      None with an int and raises TypeError inside the judge's own evaluation.
+    """
+    try:
+        from implementation_shortfall import stamps_comparable
+    except Exception:      # noqa: BLE001 — no owner, no claim
+        return None, "unstamped"
     sets = _row_build_sets(rows, live, shadow)
     a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
     if not a or not b:
-        return None                      # unknown is not drift
-    if a & b:
-        return None                      # shared build => same deploy line
-    # [2026-09-02 (xf)] AND A DIFFERENT FILE SET IS NOT DRIFT EITHER. Restrict
-    # the comparison to the `build_n` counts the two arms SHARE: on a pair
-    # whose arms run from different images the counts never overlap, the
-    # digests are not comparable, and claiming drift there held every
-    # evaluation on 👩 mum's lane — the fleet's only live promotion path — with
-    # "no promotion can rest on it". See implementation_shortfall.arm_drift
-    # for the measurement. Same fail-safe as every branch above: an
-    # unanswerable question degrades to SILENCE, never to a claim.
-    shared_n = {n for n, _ in a} & {n for n, _ in b}
-    if not shared_n:
-        return None                      # different FILE SETS, per (fd)
-    a = {(n, i) for n, i in a if n in shared_n}
-    b = {(n, i) for n, i in b if n in shared_n}
-    if not a or not b or (a & b):
-        return None
-    # Sort the IDS, never the (count, id) tuples: an arm mid-rollout carries
-    # SOME rows stamped with `build_n` and some without, so a tuple sort
-    # compares None with an int and raises TypeError inside the judge's own
-    # evaluation. Found by driving the mixed-stamp case, not by reading it.
-    # This is also byte-identical to the pre-(xf) return, which sorted a set
-    # of plain ids.
-    return {"live": sorted(i for _, i in a)[-1],
-            "shadow": sorted(i for _, i in b)[-1],
-            "source": "rows-disjoint"}
+        return None, "unstamped"         # unknown is not drift
+    ids_a, ids_b = {i for _, i in a}, {i for _, i in b}
+    if ids_a & ids_b:
+        return None, "agree"             # shared digest => same deploy line
+    # A DIFFERENT FILE SET IS NOT DRIFT. On a pair whose arms run from
+    # different images no two counts are comparable, the digests answer
+    # "different COPY set" rather than "different code", and claiming drift
+    # there held every evaluation on 👩 mum's lane — the fleet's only live
+    # promotion path — with "no promotion can rest on it".
+    if not any(stamps_comparable(x, y)
+               for x in {n for n, _ in a} for y in {n for n, _ in b}):
+        return None, "file-set"
+    return ({"live": sorted(ids_a)[-1], "shadow": sorted(ids_b)[-1],
+             "source": "rows-disjoint"}, "drift")
 
 
 def drift_basis(rows, live=None, shadow=None):
@@ -1426,15 +1456,7 @@ def drift_basis(rows, live=None, shadow=None):
     REPORTED, NEVER A GATE: nothing branches on this string — it is the
     receipt for a verdict reached elsewhere.
     """
-    sets = _row_build_sets(rows, live, shadow)
-    a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
-    if not a or not b:
-        return "unstamped"
-    if a & b:
-        return "agree"
-    if not ({n for n, _ in a} & {n for n, _ in b}):
-        return "file-set"
-    return "drift"
+    return _row_drift_verdict(rows, live, shadow)[1]
 
 
 def _current_drift(fetch=None):
@@ -2836,9 +2858,12 @@ def run_once():
         # the ROW half is re-scoped to THIS candidate's window, because the
         # growth pair's trailing 2.5d and a candidate's `started` are
         # different samples and a hold must be about the rows this bar uses.
+        _drift_basis = drift_basis(_rows_since(rows, started),
+                                   LIVE_BOT, SHADOW_BOT)
         _drift = _arm_drift_snapshot(rows, since_ts=started,
                                      current=_cur_drift)
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
+                          drift_basis_=_drift_basis,
                           drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
         # ARM DRIFT -> HOLD, exactly as ARM SKEW below and for the same reason:

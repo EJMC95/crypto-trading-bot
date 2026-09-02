@@ -198,7 +198,51 @@ def test_wholly_unstamped_arms_behave_exactly_as_before():
     assert got == {"live": "aaa", "shadow": "ccc", "source": "rows-disjoint"}, got
 
 
-# ---- 16  the positive control: a real drift still holds a promotion --------
+# ---- 16-18  DEFECTS AN ADVERSARIAL REVIEW FOUND IN THE FIRST CUT -----------
+
+def test_a_shared_DIGEST_is_agreement_even_when_the_counts_differ():
+    """The first cut keyed the build sets by (count, digest) and then
+    intersected the PAIRS — so two arms publishing the SAME digest under
+    different counts stopped reading as one deploy line, re-creating the very
+    false hold this change exists to remove. Agreement is a property of the
+    DIGEST alone."""
+    rows = [_row(LIVE, "aaaaaaaaaaaa", 15), _row(SHADOW, "aaaaaaaaaaaa", 16)]
+    assert J._row_drift(rows, LIVE, SHADOW) is None
+    assert J.drift_basis(rows, LIVE, SHADOW) == "agree"
+
+
+def test_comparability_goes_through_the_declared_owner():
+    """`_row_drift` open-coded its own shared-count test in the first cut — a
+    second copy of a rule that disagreed with the owner (it disarmed on unknown
+    counts, which `stamps_comparable` declares must not happen). Driven by
+    swapping the owner out: the judge's verdict must follow it."""
+    import implementation_shortfall as isf
+    rows = [_row(LIVE, "aaa", 17), _row(SHADOW, "bbb", 16)]
+    assert J._row_drift(rows, LIVE, SHADOW) is None          # owner says no
+    real = isf.stamps_comparable
+    try:
+        isf.stamps_comparable = lambda a, b: True            # owner says yes
+        assert J._row_drift(rows, LIVE, SHADOW) is not None
+    finally:
+        isf.stamps_comparable = real
+    assert J._row_drift(rows, LIVE, SHADOW) is None
+
+
+def test_the_claim_and_the_receipt_come_from_one_read():
+    """They are returned by the same pass, so they can never describe
+    different samples."""
+    for rows, want_claim, want_basis in (
+            ([_row(LIVE, "aaa", 15), _row(SHADOW, "bbb", 15)], True, "drift"),
+            ([_row(LIVE, "aaa", 17), _row(SHADOW, "bbb", 16)], False, "file-set"),
+            ([_row(LIVE, "aaa", 15), _row(SHADOW, "aaa", 15)], False, "agree"),
+            ([], False, "unstamped")):
+        claim, basis = J._row_drift_verdict(rows, LIVE, SHADOW)
+        assert bool(claim) is want_claim and basis == want_basis, (rows, basis)
+        assert J._row_drift(rows, LIVE, SHADOW) == claim
+        assert J.drift_basis(rows, LIVE, SHADOW) == basis
+
+
+# ---- 19  the positive control: a real drift still holds a promotion --------
 
 def test_a_same_file_set_drift_still_holds_the_promotion():
     """A gate that never fires is trivially stable and useless. This drives
