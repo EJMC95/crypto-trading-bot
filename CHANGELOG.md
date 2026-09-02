@@ -1,3 +1,36 @@
+## 2026-09-02 (ws) — THE SENTINEL EARNS ITS FEAR THE WAY IT EARNS ITS GREED: one graded bar for both proposal directions
+
+The second further-improvements item, and it is (wp)'s own next-thing-to-
+measure line closed. The event sentinel's risk-ON branch always required a
+playbook that EARNED actuation (n≥10, hit≥0.55 on the organ's own graded
+record); the risk-OFF crouch required NOTHING — any fresh severity-frozen
+event proposed `brk_range 0.97 / momo_chg 6.0 / max_hold_h 24` from
+playbooks the organ's own grades score BELOW A COIN FLIP (crackdown
+0.19/n=85, shock 0.24/n=83, incident 0.34/n=87; pooled 0.33/n=833). The
+design defense was "a free protective crouch" — the tuner's not-worse
+replay gate is senior — and (sk) measured the hole in it: on a lens the
+replay could not fill, restrict enacted at $0.00 for free, and these exact
+proposals walked the taker's only living lens to its tightest cage end and
+held it there. The measured benefit on the other side of the ledger is
+zero: proprioception grades the enacted crouches `neutral`, Σ+$1.89 over 5
+episodes.
+
+SHIPPED: `proposals_for(bias, active, grades)` — the whole actuation
+decision as one pure function, both directions gating on `graded_types`
+(n≥10, hit≥0.55, the risk-ON bar unchanged); `main()` only transmits.
+A below-chance, ungraded, thin (n<10) or stale playbook now proposes
+nothing in EITHER direction, and the organ's own doctrine line — "the
+organ earns actuation with its own graded history" — is true of the fear
+side for the first time. Expectancy price (I19): forgone crouches are
+bounded by the measured Σ+$1.89-over-5-episodes neutral grade ≈ zero;
+what is removed is a structurally-tightening author (the
+museum-of-avoided-losses shape, inside an organ). The tuner's replay gate
+stays senior in both directions — this changes who may ASK, not who
+decides. Selftest drives every branch on publisher-shaped grades ((hj))
+plus an AST pin that `main()` routes through the bar; 3/3 mutations RED
+(gate dropped from the crouch, hit bar → 0, n floor → 0). Deploy:
+freqtrade-bots auto path (the sentinel steers a shadow lane only).
+
 ## 2026-09-02 (wr) — THE CLOCK SPLIT: the breakout trend exit gets its own hold, and `taker.max_hold_h` stops re-clocking an arm it was never measured on
 
 The first item of the further-improvements pass, and it is (wp)'s own

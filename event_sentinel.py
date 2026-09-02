@@ -484,6 +484,62 @@ def _lever(name, default):
         return default
 
 
+# [2026-09-02] ONE GRADED BAR FOR BOTH PROPOSAL DIRECTIONS. The risk-ON branch
+# always required a playbook that EARNED actuation (n>=10, hit>=0.55 on its own
+# graded record); the risk-OFF crouch required nothing — any fresh
+# severity-frozen event proposed it, from playbooks the organ's own grades
+# score BELOW A COIN FLIP (crackdown 0.19/n=85, shock 0.24/n=83, incident
+# 0.34/n=87). Measured cost of the asymmetry, both sides: the enacted crouches
+# grade `neutral` in proprioception (Σ+$1.89 over 5 episodes — no protective
+# benefit), and the (sk) one-way ratchet that held the taker's only living
+# lens at its tightest cage end for weeks was fed by exactly these proposals.
+# "The organ earns actuation with its own graded history" now applies in BOTH
+# directions — a crouch on fear that is measurably anti-signal is not free.
+GRADED_MIN_N = 10
+GRADED_MIN_HIT = 0.55
+
+
+def graded_types(active, grades, min_n=GRADED_MIN_N, min_hit=GRADED_MIN_HIT):
+    """Event types among the fresh, severity-frozen actives whose playbook has
+    earned actuation on its own graded record. `grades` is the payload's
+    `playbook_grades` map ({type: {n, hit_rate}}) — the publisher's own shape,
+    so an ungraded type (n=0, hit_rate None) fails the bar rather than
+    crashing it."""
+    out = set()
+    for e in active or []:
+        if not (e.get("fresh") and e.get("pred")):
+            continue
+        g = grades.get(e.get("type")) or {}
+        if (g.get("n") or 0) >= min_n and (g.get("hit_rate") or 0) >= min_hit:
+            out.add(e["type"])
+    return sorted(out)
+
+
+def proposals_for(bias, active, grades):
+    """The sentinel's whole actuation decision, as data — {lever: spec} or {}.
+    Pure so the selftest can drive every branch; main() only transmits."""
+    evtypes = graded_types(active, grades)
+    if bias <= -0.3 and evtypes:
+        why = (f"risk-off bias {bias:+.2f}, graded playbook "
+               f"({', '.join(evtypes)[:80]})")
+        return {
+            "taker.brk_range":  {"value": 0.97, "direction": "restrict",
+                                 "reason": why, "ttl_sec": 1800},
+            "taker.momo_chg":   {"value": 6.0,  "direction": "restrict",
+                                 "reason": why, "ttl_sec": 1800},
+            "taker.max_hold_h": {"value": 24.0, "direction": "restrict",
+                                 "reason": why, "ttl_sec": 1800},
+        }
+    if bias >= 0.3 and evtypes:
+        return {"taker.momo_chg": {
+            "value": 4.5, "direction": "expand",
+            "reason": f"risk-on bias {bias:+.2f}, graded playbook "
+                      f"({', '.join(evtypes)[:80]})",
+            "evidence": json.dumps(grades)[:280],
+            "ttl_sec": 1800}}
+    return {}
+
+
 def main():
     now = datetime.now(timezone.utc)
     now_ts = now.timestamp()
@@ -651,45 +707,20 @@ def main():
     # [2026-07-21 ORGAN PROPOSALS, operator mandate] the sentinel's bias
     # finally reaches an actuator — as PROPOSALS the scout tuner gates with
     # its own replay evidence (fleet_proposals; nothing here writes a lever).
-    #   RISK-OFF (market_bias <= -0.3 from a severity-frozen event): propose
-    #     tightening the taker's entry bars + shortening max hold for the
-    #     event window. The tuner enacts only if the tape says the
-    #     tightening is not-worse — a free protective crouch, never a paid one.
-    #   RISK-ON (market_bias >= +0.3 AND the playbook class is GRADED
-    #     accurate, n>=10 hit>=0.55): propose widening the momentum bar one
-    #     step; the tuner's winner bar (improve BOTH halves + brain veto
-    #     senior) decides. An ungraded playbook proposes nothing — the organ
-    #     earns actuation with its own graded history.
+    #   BOTH DIRECTIONS gate on the SAME graded bar since 2-Sep (see
+    #     `proposals_for` above): a fresh severity-frozen event proposes only
+    #     when its playbook has EARNED actuation (n>=10, hit>=0.55 on the
+    #     organ's own grades). RISK-OFF tightens the taker's entry bars +
+    #     shortens the divergence hold; RISK-ON widens the momentum bar one
+    #     step. The tuner's replay gate stays senior in both directions.
     # Short TTL (1800s): three missed 10-min cycles and every proposal is
     # gone on its own. Fail-soft: a dark channel drops proposals only.
     _bias = float(sector_bias.get("all", 0.0) or 0.0)
     try:
         import fleet_proposals as fprop
-        if _bias <= -0.3:
-            _evtypes = sorted({e["type"] for e in active
-                               if e.get("fresh") and e.get("pred")})
-            _why = f"risk-off bias {_bias:+.2f} ({', '.join(_evtypes)[:80]})"
-            fprop.propose({
-                "taker.brk_range":  {"value": 0.97, "direction": "restrict",
-                                     "reason": _why, "ttl_sec": 1800},
-                "taker.momo_chg":   {"value": 6.0,  "direction": "restrict",
-                                     "reason": _why, "ttl_sec": 1800},
-                "taker.max_hold_h": {"value": 24.0, "direction": "restrict",
-                                     "reason": _why, "ttl_sec": 1800},
-            }, set_by="event-sentinel", now_ts=now_ts)
-        elif _bias >= 0.3:
-            _graded_ok = [
-                e["type"] for e in active if e.get("fresh") and e.get("pred")
-                and (payload["playbook_grades"].get(e["type"]) or {}).get("n", 0) >= 10
-                and ((payload["playbook_grades"].get(e["type"]) or {})
-                     .get("hit_rate") or 0) >= 0.55]
-            if _graded_ok:
-                fprop.propose({"taker.momo_chg": {
-                    "value": 4.5, "direction": "expand",
-                    "reason": f"risk-on bias {_bias:+.2f}, graded playbook "
-                              f"({', '.join(sorted(set(_graded_ok)))[:80]})",
-                    "evidence": json.dumps(payload["playbook_grades"])[:280],
-                    "ttl_sec": 1800}}, set_by="event-sentinel", now_ts=now_ts)
+        _props = proposals_for(_bias, active, payload["playbook_grades"])
+        if _props:
+            fprop.propose(_props, set_by="event-sentinel", now_ts=now_ts)
     except Exception:
         pass
 
@@ -745,6 +776,36 @@ def main():
 # ---------------------------------------------------------------------------
 
 def _selftest():
+    # [2026-09-02] the proposal decision is one function, graded in BOTH
+    # directions — grades in the payload's OWN shape ({n, hit_rate}), the
+    # (hj) publisher-built rule.
+    _act = [{"type": "geopolitical_shock", "fresh": True, "pred": True}]
+    _below = {"geopolitical_shock": {"n": 83, "hit_rate": 0.24}}
+    _earned = {"geopolitical_shock": {"n": 83, "hit_rate": 0.61}}
+    _ungraded = {"geopolitical_shock": {"n": 0, "hit_rate": None}}
+    _thin = {"geopolitical_shock": {"n": 9, "hit_rate": 1.0}}
+    assert proposals_for(-0.4, _act, _below) == {}, \
+        "a below-coin-flip playbook proposed the crouch — the asymmetry is back"
+    assert proposals_for(-0.4, _act, _ungraded) == {}
+    assert proposals_for(-0.4, _act, _thin) == {}, "n<10 must not actuate"
+    _crouch = proposals_for(-0.4, _act, _earned)
+    assert set(_crouch) == {"taker.brk_range", "taker.momo_chg",
+                            "taker.max_hold_h"}
+    assert all(v["direction"] == "restrict" for v in _crouch.values())
+    assert proposals_for(0.4, _act, _below) == {}
+    _wide = proposals_for(0.4, _act, _earned)
+    assert set(_wide) == {"taker.momo_chg"}
+    assert _wide["taker.momo_chg"]["direction"] == "expand"
+    assert proposals_for(0.1, _act, _earned) == {}, "no bias, no proposal"
+    assert proposals_for(-0.4, [{"type": "geopolitical_shock", "fresh": False,
+                                 "pred": True}], _earned) == {}, \
+        "a stale event must not actuate however well its playbook grades"
+    # ...and main() transmits THIS function's verdict, not a local copy
+    import ast as _ast
+    import inspect as _insp
+    _mn = {n.id for n in _ast.walk(_ast.parse(_insp.getsource(main)))
+           if isinstance(n, _ast.Name)}
+    assert "proposals_for" in _mn, "main() no longer routes through the bar"
     # classification: polarity + require-terms + no false fire
     assert classify("Fed raises rates in surprise hawkish move")[0][0] == "monetary_tightening"
     assert classify("CPI comes in hotter than expected at 4.1%")[0][0] == "inflation_hot"
