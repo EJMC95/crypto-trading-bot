@@ -119,7 +119,7 @@ def noncrypto_extra(bot, raw=None):
     return []
 
 
-#: [2026-09-02 (xh)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
+#: [2026-09-02 (xk)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
 #: extension above, same `"bot:SYM,SYM;bot:SYM"` shape, same per-carrier
 #: scoping and for the same reason: a cut measured on ONE book must not re-aim
 #: two others. Eamon: "if it makes any bot make more money then implement."
@@ -190,7 +190,7 @@ def noncrypto_extra(bot, raw=None):
 FAMILY_NONCRYPTO_EXCLUDE = os.environ.get("FAMILY_NONCRYPTO_EXCLUDE", "")
 
 
-#: [(xh)] The wildcard: `"freqtrade-mum:*"` excludes the carrier's WHOLE
+#: [(xk)] The wildcard: `"freqtrade-mum:*"` excludes the carrier's WHOLE
 #: non-crypto half. It exists so an act can MATCH ITS OWN POPULATION. The
 #: registered claim is about a CLASS — the venue's whole non-crypto half — not
 #: about four tickers, and the sample is every non-crypto close. A symbol list would have been graded on one population and
@@ -373,7 +373,7 @@ def carrier_universe(s, raw=None, held=None):
         if len(wide) >= len(COINS):
             crypto = list(dict.fromkeys(crypto + wide))
     nc = list(NONCRYPTO_UNIVERSE) + noncrypto_extra(s.bot)
-    # [(xh)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
+    # [(xk)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
     # — it can never touch a crypto name, and an unset env subtracts nothing.
     #
     # ENTRY-ONLY, AND THE HELD UNION IS WHAT MAKES IT SO ((hk), and the (ly)
@@ -2859,7 +2859,7 @@ def main():
         books.append(Book(s, venue, listed))
     for b in books:
         b.restore()
-        # [(xh)] RE-RESOLVE AFTER RESTORE, so a per-carrier exclusion is
+        # [(xk)] RE-RESOLVE AFTER RESTORE, so a per-carrier exclusion is
         # ENTRY-ONLY. The universe is built at boot, before any position is
         # known, so a held name under exclusion would leave `b.coins` — and
         # the ZOMBIE GUARD below would then close it `delisted` while the

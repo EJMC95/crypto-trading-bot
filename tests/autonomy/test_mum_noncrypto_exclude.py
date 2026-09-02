@@ -1,4 +1,4 @@
-"""[2026-09-02 (xh)] THE PER-CARRIER NON-CRYPTO EXCLUSION — the mirror of the
+"""[2026-09-02 (xk)] THE PER-CARRIER NON-CRYPTO EXCLUSION — the mirror of the
 (vd) extension, and it must fail in the same directions.
 
 WHY IT EXISTS. Eamon, 2-Sep: *"How do we fix mum"* / *"if it makes any bot make
@@ -202,7 +202,7 @@ def test_the_subtraction_lives_in_the_one_owner():
         "the return must hand back the crypto half unfiltered"
 
 
-# ------------------------------------------------------- (xh) review round two
+# ------------------------------------------------------- (xk) review round two
 # The six below close the defects an adversarial review of this diff found.
 # Each is driven — the shape it guards was reproduced before the guard existed.
 

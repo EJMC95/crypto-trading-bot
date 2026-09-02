@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 01:24 Sydney (15:24Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-03 01:34 Sydney (15:34Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -28,6 +28,11 @@ _Still open because:_ the fresh sample has not accrued. At registration the inst
 The edge audit's hypothesis #2 is a PRE-REGISTERED instrument now (I21): `scripts/study_taker_hold_floor_2026-09-02.py` walks 🎫 the taker's OWN entries through `exit_reason` with a hold floor (no tp/sl/trail before F h) against the shipped rule, paired, calibrated against the realised closes, on the scout tape. Registered 2-Sep 09:30Z. READ: run it with `--fresh` at n>=30 fresh walked closes (~4.7 closes/day -> ~10 days) or on 16-Sep, whichever first. CONFIRMED -> register `TT_MIN_HOLD_H` as a caged shadow-lane lever at the confirmed floor, its own entry, era untouched (an exit bar is not in the (jf) signature); REFUTED -> record it; else record and re-arm once.
 
 _Still open because:_ the fresh sample has not accrued; the read at registration is in the (wy) changelog entry. Declared limit: the replay form of this test (a floor's effect on the ENTRIES it blocks by holding a slot) needs the up-resolver, which this environment's egress refuses — run that half in the container when the walk confirms.
+
+### `mum-noncrypto-sleeve-preregistered-read`  ·  owner: **session**
+👩 mum's NON-CRYPTO sleeve read 7 closes at −0.383%/trade live (−0.540% twin), 5 of 7 `max_hold` losers on both arms — and the SAME DAY an adversarial review REFUTED the mechanism that motivated it and the bar that would have acted on it. The closed-hours story is dead (0 of 10 max_hold losses expired before the underlying reopened; entry-while-OPEN is WORSE). The 7 closes are 4 ENTRY DAYS (3 share one `opened_at`), the upper bound is <=0 only on the iid read (+0.170% day-clustered), and the raw −0.98pp class gap FLIPS to +0.18pp under a close-day effect. PRE-REGISTERED (I21), corrected rule: run `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` at G>=10 distinct ENTRY DAYS on the live arm or on 16-Sep, whichever first. CUT (set FAMILY_NONCRYPTO_EXCLUDE='freqtrade-mum:*' — the whole class, so the act matches the graded population — on mum-live AND family-lighter-shadow so the control twin moves with her) ONLY if the DAY-CLUSTERED upper bound <= 0 AND the sleeve is worse than CRYPTO on matched close-days. KEEP if the sleeve mean > 0. The twin is REPORTED, not a condition. Anything else re-arm once — and note the supported mechanism is a vol/bracket mismatch whose remedy is a class-aware ladder (I26 feed-it), measured on its own, NOT this cut.
+
+_Still open because:_ G is 4; the floor is 10 entry days. The mechanism (`noncrypto_exclude`, per carrier, ENTRY-ONLY, inert at '') shipped with the registration so the cut is one env, not a build, if the corrected read ever passes.
 
 ### `allocation-clamp-is-a-per-position-bound-doing-per-book-duty`  ·  owner: **OPERATOR**
 💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vj)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
@@ -64,10 +69,22 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (2 commit(s))
+## Shipped today (14 commit(s))
 
+- `aceac26` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
+- `26feade` Merge PR #276: (xh) the suite's 8-red floor was the container, and finding that surfaced a live-deploy marker lost to a squash merge on a real-money book
+- `cba6fe6` CodeQL: two dead imports, and `fams` was the intent recorded but never wired
+- `ea31805` (xj) the class-aware ladder is REFUSED, the whole-book one REFUTED, and (xh)'s mechanism shrinks 2.80x -> 1.29x
+- `cbfcdb6` (xh) a live-deploy marker does not survive a squash merge — measured on a real-money book, closed executably
+- `d81f540` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
+- `96cd8a6` the halves default, the dropped cache line, and the crypto CONTROL sweep
+- `66b37a7` C4's own metric was the artifact it existed to prevent — corrected to the aggregate
 - `8b174ba` (xh) the local suite had a standing floor of 8 reds that were not the tree's — a SessionStart hook installs the repo's own declared deps
+- `fd071e4` PRE-REGISTRATION: mum's class-aware ladder study, committed BEFORE the run
 - `98f0a3d` [deploy-live-mum] (xf)(xg) mum's gross 3.75x and her halt-aware entry gate (#271)
+- `f0f998e` CodeQL: drop the now-unused math import from the mum sleeve study
+- `4f7189d` (xg) the grader published a false I17 exclusion; (xf) the mum sleeve mechanism is refuted and its cut rule rewritten
+- `5497e71` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
 
 ## How this file stays honest
 

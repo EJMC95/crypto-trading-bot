@@ -1,6 +1,6 @@
 # 👩 mum — is her ROI ladder mis-calibrated for the non-crypto half?
 
-**Eamon, 2-Sep: "Start it."** — the build `(xh)` named and did not do.
+**Eamon, 2-Sep: "Start it."** — the build `(xk)` named and did not do.
 Instrument: `scripts/study_mum_class_ladder_2026-09-02.py`, pre-registered and
 committed **before** the run. Read-only; moves nothing.
 
@@ -31,9 +31,9 @@ not merely untested.** No individual crypto cell reaches |t|≥2, so the evidenc
 there is a dose-response rather than a single significant cell; the direction
 is unambiguous and it is the wrong one.
 
-## The mechanism `(xh)` recorded is much weaker than its 7 closes implied
+## The mechanism `(xk)` recorded is much weaker than its 7 closes implied
 
-`(xh)` reported realised |return| of **0.623% vs 1.746% (2.80×)** and "5 of 7
+`(xk)` reported realised |return| of **0.623% vs 1.746% (2.80×)** and "5 of 7
 run the 24h cap vs 4 of 52". Those come from **7 realised closes**. On the
 tape — 10,020 non-crypto and 12,418 crypto episodes of her own mechanical
 entry:
@@ -108,6 +108,6 @@ written. 7 of 7 mutations red.
 Her non-crypto sleeve loses on the tape (**−0.2372%/bar-day**, −1331% total
 over 5,612 bar-days) and no ladder in this grid makes it profitable — the best
 cell reduces the loss by ~14%. That is a supply/entry question, not an exit
-one, and it is **not** the `(xh)` cut either: that registration stands
+one, and it is **not** the `(xk)` cut either: that registration stands
 unchanged, still inert, still requiring G≥10 entry days and a day-clustered
 exclusion.

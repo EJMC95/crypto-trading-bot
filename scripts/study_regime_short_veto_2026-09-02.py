@@ -446,7 +446,7 @@ def main(argv=None):
     if a.selftest:
         _selftest()
         return 0
-    # [(xh)] through edge_audit's ONE loader, so the (qz) truncation refusal
+    # [(xk)] through edge_audit's ONE loader, so the (qz) truncation refusal
     # applies here too — a row count equal to the cap is a sampled ledger.
     trades = ea.load_trades(a.ledger, a.limit)
     shaped = ea.shape(trades)
@@ -454,7 +454,7 @@ def main(argv=None):
     if not oracle:
         print("REFUSING: no oracle history — nothing to label against (I1)")
         return 2
-    # [(xh)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
+    # [(xk)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
     # amended at (tt): a pre-registered bucket is decided on closes taken
     # AFTER registration, never by re-mining the window that generated it.
     # `--pooled` is the explicit opt-out and is NOT the registered read.
