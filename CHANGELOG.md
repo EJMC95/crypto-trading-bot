@@ -1,6 +1,6 @@
-## 2026-09-02 (xj) — THE CLASS-AWARE LADDER IS REFUSED, THE WHOLE-BOOK ONE IS REFUTED, AND (xh)'s OWN MECHANISM SHRINKS FROM 2.80× TO 1.29× — plus the guard against denominator shrinkage was itself denominator shrinkage, and it inflated the headline 40×
+## 2026-09-02 (xj) — THE CLASS-AWARE LADDER IS REFUSED, THE WHOLE-BOOK ONE IS REFUTED, AND (xk)'s OWN MECHANISM SHRINKS FROM 2.80× TO 1.29× — plus the guard against denominator shrinkage was itself denominator shrinkage, and it inflated the headline 40×
 
-**Eamon, 2-Sep: *"Start it."*** — the build `(xh)` named and did not do.
+**Eamon, 2-Sep: *"Start it."*** — the build `(xk)` named and did not do.
 Instrument `scripts/study_mum_class_ladder_2026-09-02.py`, **pre-registered and
 committed BEFORE the run** (the (to)/(tq)/(tr) pattern), read-only. Full
 working: `STUDY_MUM_CLASS_LADDER_2026-09-02.md`.
@@ -14,7 +14,7 @@ study_mum_params method). C1 passed — replaying her REAL era entries through
 the shipped ladder reproduces her actual exit mix on **113 of 115** ledger rows
 (worst family 1.8pp against a 20pp tolerance).
 
-**(xh)'s MECHANISM IS MUCH WEAKER THAN ITS SEVEN CLOSES IMPLIED — corrected in
+**(xk)'s MECHANISM IS MUCH WEAKER THAN ITS SEVEN CLOSES IMPLIED — corrected in
 place per I12, in both the carrier note and the sleeve study.** That entry
 recorded realised |return| **0.623% vs 1.746% (2.80×)** and "5 of 7 run the 24h
 cap vs 4 of 52". On the tape the gap is **1.29×** (median favourable excursion
@@ -79,7 +79,7 @@ mismodelled into the verdict.
 **WHAT IS NOT CLOSED.** Her non-crypto sleeve LOSES on the tape
 (**−0.2372%/bar-day**, −1331% total over 5,612 bar-days) and no ladder in this
 grid makes it profitable — the best cell reduces the loss by ~14%. That is a
-supply/entry question, not an exit one. The `(xh)` cut registration is
+supply/entry question, not an exit one. The `(xk)` cut registration is
 UNCHANGED by this: still inert, still requiring G≥10 entry days and a
 day-clustered exclusion, and this study is not evidence for it.
 
@@ -140,12 +140,12 @@ different instance of the same class.
 **BLAST RADIUS, stated honestly rather than as "tooling-only":** the grader
 governs which books reach the retirement docket, so this changes what the fleet
 is told about a book — not what any book trades. `lighter_family_bot.py` (also
-touched in (xh)) IS real-money surface by this file's own audit-scope rule; the
+touched in (xk)) IS real-money surface by this file's own audit-scope rule; the
 live arm is untouched behaviourally there because `held` defaults to `None` and
 the live host passes nothing, and the re-resolve block is in the SHADOW runner's
 `main()`. Both live rows verified byte-identical universes under the default.
 
-## 2026-09-02 (xh) — 👩 MUM'S ONE MEASURED WEAK SPOT IS HER NON-CRYPTO SLEEVE — registered, not cut, with the one-env mechanism that acts on it; and 🙏 avo is refused a hand-placed trade by the venue's own floors
+## 2026-09-02 (xk) — 👩 MUM'S ONE MEASURED WEAK SPOT IS HER NON-CRYPTO SLEEVE — registered, not cut, with the one-env mechanism that acts on it; and 🙏 avo is refused a hand-placed trade by the venue's own floors
 
 **Eamon, 2-Sep: *"How do we fix mum"*, then *"Tell avo to take a long position
 on united stables"*, then *"Continue with all the above — if it makes any bot
@@ -365,6 +365,119 @@ with the day-matched control reading **+0.126pp**.
   second copy had no rule at all), and all three are **fresh-by-default** with
   `--pooled` the explicit, loudly-labelled opt-out.
 
+
+## 2026-09-02 (xh) — THE LOCAL SUITE HAD A STANDING FLOOR OF EIGHT REDS THAT WERE NOT THE TREE'S, SO IT COULD NOT BE USED AS A PRE-PUSH CHECK — AND A BASELINE OF EXPECTED FAILURES IS EXACTLY WHERE THE NINTH HIDES
+
+**Eamon, 2-Sep:** *"Fix the psycopg2 and lighter sdk issue too"*. He is right,
+and the diagnosis is that **nothing in the repo was wrong**: `requirements-test.txt`
+has carried `psycopg2-binary>=2.9` since it was written, `requirements.txt` pins
+`lighter-sdk==1.1.2` (the pin `audit_sdk_pin` enforces and the real-money signer
+binaries ride), and `.github/workflows/tests.yml` installs both — with an
+explicit guard whose own step name is *"The SDK must import — a silent skip is
+the rot this job exists to prevent"*. **The remote SESSION container never ran
+any of it.**
+
+**MEASURED, and the shape is the point.** `python3 -m pytest tests/` in a fresh
+web session reported **8 failures**: seven `ModuleNotFoundError: No module named
+'psycopg2'` in `test_card_record_excludes_events.py`, one
+`VenueError: lighter-sdk missing` in `test_funding_variant.py`. Identical on
+pristine `main` at `4d1de6b` with an empty tree — so every one was the
+environment. After installing the repo's own declared deps: **the entire suite
+is green, zero failures.**
+
+**WHY A KNOWN-RED FLOOR IS A DEFECT AND NOT A NUISANCE.** A suite with eight
+standing reds cannot answer "did my change break anything?" without a human
+re-deciding, every run, which reds are furniture. That judgement had to be made
+**three separate times in one session, the last of them before a REAL-MONEY
+push** — and each time the honest check was to re-run the same eight on
+pristine main and compare. **A red you have learned to ignore is a detector you
+have switched off** — the same class this file already names twice: `(gl)`'s
+warning nobody has to act on, and `(po)`'s check that inspects nothing and
+reports clean.
+
+**SHIPPED: `.claude/hooks/session-start.sh`**, registered as a `SessionStart`
+hook, remote-sessions-only (a local machine has its own venv and a hook that
+installs into it uninvited is a worse bug than the one this closes). It mirrors
+the CI job rather than paraphrasing it, and **the SDK version is never typed
+here** — it is grepped out of `requirements.txt`, because that file is the
+single source of truth `audit_sdk_pin` enforces and a second copy of a version
+that signs real orders is a second rule ((hj)).
+
+**IT ASSERTS BOTH IMPORTS BEFORE EXITING 0**, mirroring CI's own guard: a hook
+that installs nothing and exits 0 is byte-identical to one that worked.
+
+**VALIDATED BY BREAKING WHAT IT REPAIRS (I3), NOT BY READING IT** — and that is
+how the hook's own bug was found. The first draft opened with
+`pip install --upgrade pip`, copied from the CI job. This image's pip is
+**Debian-managed**, so it dies with *"Cannot uninstall pip 24.0, RECORD file not
+found"*, and under `set -euo pipefail` it took the whole hook down — **a session
+would have started with NO deps because of a line that installs none of them.**
+Deleted, with the reason recorded at the line. Then, from a deliberately broken
+environment (both packages uninstalled, the failure reproduced): the hook
+repairs it, prints `psycopg2 2.9.12 · lighter-sdk 1.1.2`, is idempotent on a
+second run, and is a silent exit-0 no-op with `CLAUDE_CODE_REMOTE` unset —
+verified by confirming the deps were STILL absent after the local run, rather
+than by trusting the branch.
+
+**AND THE PASS TURNED UP A LOST REAL-MONEY DEPLOY, which is the more expensive
+half.** With the suite honest, `scripts/audit_code_currency.py` was run against
+the live feed — and refused to report at all, because 🔮 georgia's new
+`freqtrade-georgia-v3-lshadow` row was UNMAPPED in `ROW_ENTRY`. That is the
+`(jb)` gate working as designed (it declines to audit the fleet minus one row),
+and the cost is worth recording: while it refused, nothing could answer *"is
+🙏 avo running the `(xe)` fix?"* on a real-money book. Row mapped; the audit then
+said it plainly — **`freqtrade-avo-maria-lighter` DEFERRED, 14 commits behind,
+"none marked for this marker-gated service"**.
+
+**THE CAUSE: A LIVE-DEPLOY MARKER DOES NOT SURVIVE A SQUASH MERGE.** `(xe)`'s
+commit subject opened with `[deploy-live]`. It merged as #275 **squashed**, and
+a squash subject is generated from the **PULL REQUEST TITLE**, not from the
+branch — so main took `9a667f7 (xe) One position, two spellings: ... (#275)`
+with no marker, and the deploy gate, reading main correctly, shipped nothing.
+👩 mum got the fix only because an unrelated PR an hour later carried
+`[deploy-live-mum]` in its TITLE. **The whole difference between a fixed
+real-money book and an unfixed one was which field the marker was typed into.**
+`(hj)` settled which FIELD the gate reads and pinned it; it could not know which
+subject survives the merge. Corrected in place in CLAUDE.md per I12.
+
+**RECOVERED, not left for the next push:** the documented no-marker route — an
+explicit `workflow_dispatch` of `railway-redeploy.yml` for
+`tide-rider-lighter-live` (avo's live service), after checking the row `online`
+and unhalted. Never an empty commit to kick the gate. **VERIFIED BY STAMP
+READBACK, not by the green run** (run 678, success): avo's row moved to
+`078f894f89d1`/17 — **byte-identical to 👩 mum's**, so both real-money books
+now run the same image carrying `(xe)`, and `liq_mark_blind` is empty on both.
+
+**AND TWO OF THE REPO'S OWN GUARDS CAUGHT THIS PASS'S MISTAKES BEFORE IT
+PUSHED,** which is worth recording because both were mine: mapping
+georgia-v3 in `ROW_ENTRY` immediately reddened
+`test_every_registered_book_is_visible_to_agronomy` — a registered book with
+no `fleet_agronomy` spec — and the new guard's own `--selftest` reddened
+`test_no_unregistered_selftest`. 🔮 georgia v3 is a **living** book
+(ImpulseFade 15m, born `(vr)` 28-Aug), so it gets a real spec rather than an
+exemption, and its cooldown is READ from the carrier (`cooldown_candles 1` on
+15m = **0.25h**) rather than inherited from v1's 1.0h — copying the sibling
+would have misprofiled it by 4x in the organ that asks whether it has room to
+grow, which is the `(sl)`/I23 class that map's own mum entry already records.
+
+**CLOSED EXECUTABLY, because fixing the instance guarantees the return visit:**
+`scripts/audit_live_marker_survives_squash.py`, wired as a PR-only CI job. It is
+**deliberately the weak form** — it never REQUIRES a marker (most changes are
+correctly main-only under `(mm)`) and never guesses the merge method; it fails
+only when a marker present on the branch is absent from the title, which is
+always fixable by editing the title and costs nothing to satisfy. Its `MARKERS`
+list is checked against the literals `railway-redeploy.yml` actually greps for,
+so a new live service cannot be added there and silently escape it. **Driven
+against the real #275 title and its real commit subjects, it reports the drop
+and exits 1** — a guard reproduced on the incident that motivated it, not on a
+fixture of its own invention.
+
+**ALSO IN THIS PASS: the two CodeQL findings `(xe)` landed with.** `File is
+opened but is not closed` at two `open(...).read()` sites in
+`tests/autonomy/test_margin_mark_spelling.py` — real, and mine; both now
+`pathlib.Path(...).read_text()`, which is what the sibling test file already
+used. Main-only, no live deploy: neither change alters a trade any book would
+take, so under `(mm)` it rides the next deploy that does.
 
 ## 2026-09-02 (xg) — 👩 MUM'S HALT-AWARE ENTRY GATE: a leg whose own stop would flatten the whole book is refused, measured neutral in the regime she trades and worth 6pp in the one that halts her
 

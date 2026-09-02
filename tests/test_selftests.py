@@ -43,6 +43,15 @@ SELFTEST_MODULES = [
     # fleet-weekly-assessment.yml beside audit_code_currency, which is where
     # "which commit is running, and was it graded" is the actual subject.
     "scripts.audit_ci_coverage", "scripts.edge_aware_safety",
+    # [2026-09-02 (xh)] the squash-marker guard. SELFTEST_MODULES and NOT the
+    # scan group below, for the same reason as audit_ci_coverage directly
+    # above: its verdict needs a PULL REQUEST TITLE, which is not in the repo,
+    # so there is no standalone scan to run — pointing it at a checkout would
+    # be the vacuous-pass shape. The negative fixtures are offline and pure
+    # (`check` takes a title and subjects as arguments) and one of them drives
+    # the real #275 that motivated it; the SCAN runs in changelog-check.yml,
+    # PR-only, which is where a PR title exists.
+    "scripts.audit_live_marker_survives_squash",
     # [2026-08-17 (pp)] the weekly scoreboard's exposure flag. SELFTEST_MODULES
     # for the same reason as audit_ci_coverage above: its verdict reads the LIVE
     # bus (`fleet_risk.long_positions`), which moves with every fill and no code
