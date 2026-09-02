@@ -117,6 +117,36 @@ def noncrypto_extra(bot, raw=None):
         if name.strip() == bot:
             return [c.strip() for c in syms.split(",") if c.strip()]
     return []
+
+
+#: [2026-09-02 (xa)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
+#: extension above, same `"bot:SYM,SYM;bot:SYM"` shape, same per-carrier
+#: scoping and for the same reason: a cut measured on ONE book must not re-aim
+#: two others. Eamon: "if it makes any bot make more money then implement."
+#: 👩 mum's graded non-crypto sleeve (XAU/QQQ/SPY/XCU — the base list, not the
+#: (vd) extension) read 7 closes at −0.383%/trade on the live arm and −0.54% on
+#: the twin, five of seven `max_hold` losers on both, upper bound at zero — one
+#: measured mechanism behind it: a non-crypto book prints through its
+#: underlying's CLOSED hours, so a 1h oversold read there is a flat tape, not a
+#: dip, and the 24h cap closes it at a loss (I7: a condition a market satisfies
+#: structurally is not a signal). Seven is below the fleet's own 10-close floor
+#: (fleet_allocation.MIN_N), so the cut is PRE-REGISTERED, not applied: default
+#: "" is inert; `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` grades the
+#: read, and the cut is one env when it passes — an EXCLUSION list, never an
+#: edit of the shared NONCRYPTO_UNIVERSE (the (vd) lesson, in the other
+#: direction). Applies to BOTH hosts through `carrier_universe`, so the live
+#: arm and its control twin see the same universe.
+FAMILY_NONCRYPTO_EXCLUDE = os.environ.get("FAMILY_NONCRYPTO_EXCLUDE", "")
+
+
+def noncrypto_exclude(bot, raw=None):
+    """Non-crypto symbols carrier `bot` must NOT scan, or [] when unset."""
+    raw = FAMILY_NONCRYPTO_EXCLUDE if raw is None else raw
+    for group in str(raw or "").split(";"):
+        name, _, syms = group.partition(":")
+        if name.strip() == bot:
+            return [c.strip().upper() for c in syms.split(",") if c.strip()]
+    return []
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 
 #: [2026-08-28 (vd)] PER-CARRIER CRYPTO WIDTH. `"bot:N,bot:N"`; absent = the
@@ -272,6 +302,11 @@ def carrier_universe(s, raw=None):
         if len(wide) >= len(COINS):
             crypto = list(dict.fromkeys(crypto + wide))
     nc = list(NONCRYPTO_UNIVERSE) + noncrypto_extra(s.bot)
+    # [(xa)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
+    # — it can never touch a crypto name, and an unset env subtracts nothing.
+    drop = set(noncrypto_exclude(s.bot))
+    if drop:
+        nc = [c for c in nc if c.upper() not in drop]
     return crypto + list(dict.fromkeys(nc))
 
 

@@ -174,6 +174,26 @@ CARRIED = [
                     "container when the walk confirms.",
         "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 16),
     },
+    {
+        "id": "mum-noncrypto-sleeve-preregistered-read",
+        "owner": "session",
+        "what": "👩 mum's graded NON-CRYPTO sleeve (XAU/QQQ/SPY/XCU) is her one "
+                "measured weak spot: 7 closes at −0.383%/trade on the live arm "
+                "(−0.54% on the twin), 5 of 7 `max_hold` losers on both arms, "
+                "upper bound at zero — below the fleet's own 10-close floor. "
+                "PRE-REGISTERED (I21): run `scripts/study_mum_noncrypto_sleeve_"
+                "2026-09-02.py` at n>=10 non-crypto closes on the live arm or on "
+                "6-Sep, whichever first. CUT (set FAMILY_NONCRYPTO_EXCLUDE="
+                "'freqtrade-mum:<the graded names>' on mum-live AND "
+                "family-lighter-shadow so the control twin moves with her) if "
+                "the live upper bound (m + t_crit*SE) <= 0 AND the twin's mean "
+                "< 0; KEEP if the live mean > 0; anything else re-arm once.",
+        "why_open": "the sample is 7; the floor is 10. The mechanism "
+                    "(`noncrypto_exclude`, per carrier, inert at '') shipped with "
+                    "the registration so the cut is one env, not a build, when "
+                    "the read passes.",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 6),
+    },
     # [2026-08-25 (tc)] `farmer-live-swap-operator-steps` DELETED — spent, and
     # its closes_when could never fire: it watched for a `georgia-live` service
     # while the (tb) plan change converted `trail-blazer-live` IN PLACE (so no

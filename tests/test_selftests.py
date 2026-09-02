@@ -137,6 +137,10 @@ SELFTEST_MODULES = [
     # the public feeds and refuse on a dark one.
     "scripts.study_regime_short_veto_2026-09-02",
     "scripts.study_taker_hold_floor_2026-09-02",
+    # [2026-09-02 (xa)] 👩 mum's non-crypto sleeve read, pre-registered; the
+    # selftest is offline (planted control CUT, placebo KEPT, thin sample
+    # not decidable, the twin-agreement arm).
+    "scripts.study_mum_noncrypto_sleeve_2026-09-02",
     # [2026-08-20 (ru)] the docket class-split evidence. --selftest is offline
     # and pure (the split, the sleeve-tag round-trip, and the calibration gate's
     # fail-closed arms); the SCAN needs the public feeds, so only the fixture
