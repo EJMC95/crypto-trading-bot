@@ -372,7 +372,8 @@ def shortfall_default_pair():
         # (every count 0) keeps the priority pick rather than the first row
         if max(counts.values()) > 0:
             best = max(pairs, key=lambda p: counts[p[0]])
-    except Exception:  # noqa: BLE001 — a dark feed keeps the priority pick
+    except Exception:  # noqa: BLE001
+        # a dark feed keeps the priority pick — deliberate, not a swallow
         pass
     return (best[1], best[2])
 
@@ -1071,6 +1072,7 @@ def cohort_long_state(payload, cohort):
             if lp is not None and lb is not None:
                 return int(lp), int(lb)
         except (TypeError, ValueError):
+            # an unparseable return is skipped, never scored as 0.0
             pass
     try:
         lp = int(p.get("long_positions") or 0)

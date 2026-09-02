@@ -1922,7 +1922,6 @@ def _cohort_long_state(fr, cohort):
     """[(wp)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
     the read degrades to the pooled pair — this site's prior behaviour."""
     try:
-        import fleet_bus
         return fleet_bus.cohort_long_state(fr, cohort)
     except Exception:  # noqa: BLE001
         fr = fr if isinstance(fr, dict) else {}

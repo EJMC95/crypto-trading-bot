@@ -81,7 +81,6 @@ TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
 # live arm is trading at all.
 def _default_pair():
     try:
-        import fleet_bus as _fb
         return _fb.shortfall_default_pair()
     except Exception:  # noqa: BLE001
         return ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow")

@@ -22,7 +22,6 @@ of a retirement; leave garrett in the overlap audit's living funding books;
 keep a carried row for a book that no longer trades.
 """
 import ast
-import os
 import sys
 from pathlib import Path
 

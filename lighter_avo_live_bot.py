@@ -116,8 +116,11 @@ from lighter_family_bot import (
     # [2026-08-27] the ONE owner of a close's identity + open stamp — an
     # unknown open must never claim a colliding ':None' id ((hj)).
     close_identity,
+    # [(wt)] the judge's lever surface + the receipt stamp, from the ONE owner
+    apply_book_levers as _fam_apply_book_levers,
+    mum_bars as _fam_mum_bars,
+    OversoldRebound as _FamOversoldRebound,
 )
-import lighter_family_bot as _fam   # [(wt)] mum_bars / apply_book_levers
 from venues import marks
 from venues.safety import (
     SafetyRails, open_notional, capital_adjusted_day_start, env_prefix)
@@ -788,7 +791,7 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
         # [(wt)] the ENTRY-STAMPED cap governs (the (bw) rule) where the
         # carrier prices its time cap at entry; other carriers unchanged.
         _cap = ((m.get("bars") or {}).get("max_hold_min")
-                if isinstance(strategy, _fam.OversoldRebound) else None)
+                if isinstance(strategy, _FamOversoldRebound) else None)
         reason = (strategy.custom_exit(m.get("tag"), age_min, profit, cap=_cap)
                   if _cap else strategy.custom_exit(m.get("tag"), age_min, profit))
     if not reason and sig and sig.get("exit") \
@@ -2417,9 +2420,11 @@ def main(_ctx=None, once=False):
         # prefix owner), read every loop, env default when none is in force.
         # A no-op for carriers without the knobs (🙏 avo today).
         try:
-            _lv_moved = _fam.apply_book_levers(S, f"live.{_PFX.lower()}.")
-        except Exception:  # noqa: BLE001 — a dark rail runs the env default
-            _lv_moved = {}
+            _fam_apply_book_levers(S, f"live.{_PFX.lower()}.")
+        except Exception:  # noqa: BLE001
+            # a dark rail runs the env default; the overlay is re-derived
+            # from the class defaults every loop, so nothing is left stale
+            pass
         # L2 fleet reads (restrict-only, fail-open) — this is a directional
         # LONG book, so the fleet long budget + symbol cap bind it like every
         # other long book. The SHADOW drawdown governor is deliberately NOT
@@ -2918,7 +2923,7 @@ def main(_ctx=None, once=False):
                              "accrued": 0.0, "size": size,
                              # [(wt)] the bars in force at entry (the judge's
                              # receipt on this arm) + the admitted RSI (I23)
-                             "bars": _fam.mum_bars(S),
+                             "bars": _fam_mum_bars(S),
                              "rsi_entry": (float(sig["rsi"])
                                            if isinstance(sig, dict) and
                                            isinstance(sig.get("rsi"), (int, float))

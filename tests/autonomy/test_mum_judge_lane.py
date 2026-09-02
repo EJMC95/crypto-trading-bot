@@ -24,6 +24,7 @@ on the mum lane; the live host stamping no `bars`.
 """
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -120,12 +121,12 @@ def test_an_open_position_keeps_the_cap_it_was_stamped_with():
 
 
 def test_both_hosts_stamp_the_receipt_and_the_recorded_rsi():
-    fam_src = open(os.path.join(ROOT, "lighter_family_bot.py")).read()
-    live_src = open(os.path.join(ROOT, "lighter_avo_live_bot.py")).read()
+    fam_src = Path(ROOT, "lighter_family_bot.py").read_text()
+    live_src = Path(ROOT, "lighter_avo_live_bot.py").read_text()
     for src in (fam_src, live_src):
         assert '"bars": ' in src and '"rsi_entry"' in src
         assert 'cap=_cap' in src, "the exit must honour the entry-stamped cap"
-    assert "_fam.mum_bars(S)" in live_src and "_fam.apply_book_levers(S" in live_src
+    assert "_fam_mum_bars(S)" in live_src and "_fam_apply_book_levers(S" in live_src
 
 
 def test_the_receipt_gate_accepts_the_stamp_the_hosts_write():
@@ -141,4 +142,5 @@ def test_the_shortfall_organ_and_the_judge_name_the_same_twin():
 
 
 def test_the_family_image_ships_the_lever_surface():
-    assert "fleet_tuning.py" in open(os.path.join(ROOT, "Dockerfile.familyshadow")).read()
+    dockerfile = Path(ROOT, "Dockerfile.familyshadow").read_text()
+    assert "fleet_tuning.py" in dockerfile

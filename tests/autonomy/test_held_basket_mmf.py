@@ -20,6 +20,7 @@ missing `value` as 0 weight (which silently drops the leg).
 """
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -70,7 +71,7 @@ def test_the_stop_is_reachable_on_the_september_basket_and_dead_on_the_bound(mon
 
 
 def test_the_row_publishes_the_held_measurement_beside_the_bound():
-    src = open(A.__file__).read()
+    src = Path(A.__file__).read_text()
     for k in ("mmf_held", "liq_gap_held_pct", "stop_reachable_held",
               "stop_dead_above_held", "leverage_now"):
         assert f'"{k}"' in src, k
