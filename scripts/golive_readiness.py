@@ -1194,6 +1194,59 @@ def stats(rows, book_usd=None):
         dd = min(dd, eq - peak)
     wins = sum(1 for x in pct if x > 0)
     realised = sum(r[1] or 0 for r in rows)
+    # [2026-09-02, edge-audit follow-up] THE SHAPE OF THE EDGE, published so a
+    # monitor can watch the two numbers that decide whether a high-hit-rate
+    # book keeps its profit factor (EDGE_AUDIT_2026-09-02.md section 6.4 on
+    # mum: five stops = 37% of gross wins, avg loss $7.39 vs avg win $3.65, PF
+    # 2.36 carried by an 83% hit rate). Judged against the book's OWN payoff --
+    # break-even hit = 1/(1+payoff) -- never a bare win-rate bar (I15), and the
+    # losing streak against CHANCE for its own hit rate, never against zero.
+    # REPORTED, NEVER A BAR: `BAR_NAMES` and `grade()` are untouched.
+    _aw = [r[1] for r in rows if isinstance(r[1], (int, float)) and r[1] > 0]
+    _al = [r[1] for r in rows if isinstance(r[1], (int, float)) and r[1] < 0]
+    _avg_w = (sum(_aw) / len(_aw)) if _aw else None
+    _avg_l = (abs(sum(_al) / len(_al))) if _al else None
+    _payoff = (_avg_w / _avg_l) if (_avg_w and _avg_l) else None
+    _be = (1.0 / (1.0 + _payoff)) if _payoff else None
+    _trail = pct[-SHAPE_TRAIL_N:]
+    _hit_trail = sum(1 for x in _trail if x > 0) / len(_trail)
+    _run = _mx = 0
+    for _x in pct:
+        _run = _run + 1 if _x <= 0 else 0
+        _mx = max(_mx, _run)
+    _p_loss = 1.0 - wins / n
+    # [2026-09-02, calibrated -- Eamon: "Calibrate accordingly"] the margin in
+    # SAMPLING-NOISE units: how many standard errors the trailing hit rate sits
+    # above the book's own break-even, with the SE taken AT break-even (the
+    # null): sqrt(be*(1-be)/n). Beside it the fleet's OWN critical value for a
+    # sample of `n_trailing` (`horizon_crit`, which defers to
+    # `fleet_allocation.t_crit` -- 1.31 at n=30, floor 1.28), so a monitor asks
+    # "does the trailing window still CLAIM PF > 1?" in the same standard the
+    # allocation organ uses to hand out a claim (I17: one standard of evidence
+    # in both directions). Points were payoff-dependent -- 5pp is 0.58 SE at
+    # mum's payoff and 0.68 SE at avo's; z is not. Both REPORTED, never a bar.
+    _z = None
+    if _be is not None and 0.0 < _be < 1.0 and _trail:
+        _z = (_hit_trail - _be) / math.sqrt(_be * (1.0 - _be) / len(_trail))
+    # [2026-09-02, CALIBRATED OPTIMALLY] the PAGE BOUNDARY -- see `page_boundary`.
+    # The monitor pages when the trailing window's wins sit at or below `k`:
+    # integers on both sides, so no rounding can move a page. `hit_margin_z`
+    # stays REPORTED; it was the rule for a few hours and is no longer.
+    _wins_trail = sum(1 for x in _trail if x > 0)
+    _pb = page_boundary(len(_trail), wins / n, _be)
+    out["shape"] = {
+        "hit": wins / n, "hit_trailing": _hit_trail, "n_trailing": len(_trail),
+        "wins_trailing": _wins_trail,
+        "avg_win_usd": _avg_w, "avg_loss_usd": _avg_l, "payoff": _payoff,
+        "breakeven_hit": _be,
+        "hit_margin": (_hit_trail - _be) if _be is not None else None,
+        "hit_margin_z": _z,
+        "page_wins_max": _pb["k"] if _pb else None,
+        "page_false_rate": _pb["false_rate"] if _pb else None,
+        "page_miss_rate": _pb["miss_rate"] if _pb else None,
+        "streak_now": _run, "streak_max": _mx,
+        "streak_chance": expected_streak(n, _p_loss) if 0.0 < _p_loss < 1.0 else None,
+    }
     # [2026-08-20 (tz)] `se_pct` — computed one line above inside `t` and then
     # thrown away, which is why the horizon could only ask "is the mean
     # negative?" and never "is it negative BEYOND NOISE?". Published so a
@@ -1262,6 +1315,105 @@ def stats(rows, book_usd=None):
                # null visible; it changes no verdict.
                mde80_pct=_mde80(sd, n),
                power_at_half_pct=_power(0.005, sd, n))
+    return out
+
+
+SHAPE_TRAIL_N = 30   #: trailing window for the hit-rate monitor (the gate's own close floor)
+
+
+def binom_cdf(k, n, p):
+    """P(Bin(n, p) <= k), exact (n is a trailing window, never large)."""
+    if k < 0:
+        return 0.0
+    if k >= n:
+        return 1.0
+    return sum(math.comb(n, i) * (p ** i) * ((1.0 - p) ** (n - i)) for i in range(0, k + 1))
+
+
+def page_boundary(n, p_era, p_be):
+    """[2026-09-02, CALIBRATED OPTIMALLY -- Eamon: "Calibrate optimally with
+    findings"] {k, false_rate, miss_rate}: the win count at or below which a
+    trailing window of `n` closes PAGES.
+
+    `k` is the largest win count at which the window is at least as likely
+    under "this book's hit rate has fallen to its break-even `p_be`" as under
+    "it is still the book's own era rate `p_era`" -- the equal-prior
+    likelihood-ratio boundary, which for a binomial is exactly the k that
+    MINIMISES false_rate + miss_rate (pinned by brute force in the selftest).
+    `false_rate` = P(Bin(n, p_era) <= k): a healthy window pages by chance.
+    `miss_rate`  = P(Bin(n, p_be) > k): a break-even window escapes.
+    Both are published beside the boundary, so the cost of every page is a
+    number on the payload rather than an argument in a message. Why this and
+    not a points threshold or the claim bar: measured on 👩 mum's live shape
+    (era hit 83.0%, break-even 66.1%, n=30) the total error is 32.1% for
+    "within 5pp", 31.3% for "z <= t_crit", 27.5% here (false 12.4% / miss
+    15.1%) -- and at this n nothing does better; a longer window is the only
+    lever left, and it buys accuracy with detection lag.
+    A book whose era rate is already at or below break-even has no healthy
+    reference and pages AT break-even (k = floor(n*p_be)); a book that has
+    never lost pages on any loss (k = n-1). None when it cannot be computed."""
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return None
+    if n < 1 or p_be is None or p_era is None or not (0.0 < p_be < 1.0) \
+            or not (0.0 <= p_era <= 1.0):
+        return None
+    if p_era <= p_be:
+        k = int(math.floor(n * p_be))
+    elif p_era >= 1.0:
+        k = n - 1
+    else:
+        a = math.log(p_be / p_era)                    # < 0: a win favours the era rate
+        b = math.log((1.0 - p_be) / (1.0 - p_era))    # > 0: a loss favours break-even
+        # the largest k with LLR(k) >= 0; the tie (LLR exactly 0) belongs to
+        # the page side, and 1e-9 keeps floating point from losing it
+        k = int(math.floor(n * b / (b - a) + 1e-9))
+    k = max(-1, min(n, k))
+    return {"k": k, "false_rate": binom_cdf(k, n, p_era),
+            "miss_rate": 1.0 - binom_cdf(k, n, p_be)}
+
+
+def loss_run_cdf(n, p_loss, k):
+    """P(longest run of losses in n iid trials is < k), exactly.
+
+    Feller's run recurrence: with a(m) = P(no run of k losses in m trials),
+    a(m) = 1 for m < k, a(k) = 1 - p^k, and a(m) = a(m-1) - (1-p) p^k a(m-k-1)
+    for m > k. O(n) per k; no simulation, so the number is reproducible and a
+    consumer never sees two different p95s for the same book."""
+    if k <= 0:
+        return 0.0
+    if k > n:
+        return 1.0
+    p, q = float(p_loss), 1.0 - float(p_loss)
+    pk = p ** k
+    a = [1.0] * (n + 1)
+    a[k] = 1.0 - pk
+    for m in range(k + 1, n + 1):
+        a[m] = a[m - 1] - q * pk * a[m - k - 1]
+    return max(0.0, min(1.0, a[n]))
+
+
+def expected_streak(n, p_loss, draws=None, seed=None):
+    """{p50, p95} of the LONGEST losing run in `n` iid trades at `p_loss`.
+
+    [2026-09-02, edge-audit follow-up] THE OWNER MOVED HERE from
+    scripts/edge_audit.py, which simulated it (2000 draws) and does not ship in
+    any image; the grader does, so this is the copy every organ reads, and the
+    audit imports it back by identity (a second copy of a rule is a second
+    rule, (hj)). Exact rather than simulated: P(L <= k) = loss_run_cdf(n, p,
+    k+1), and the quantile is the smallest k reaching it. A streak means
+    nothing against zero; it means something against what the book's OWN hit
+    rate produces by chance ((vc), I25). `draws`/`seed` are accepted and
+    ignored so the audit's old call sites keep working."""
+    if n is None or n < 2 or p_loss is None or not 0.0 < float(p_loss) < 1.0:
+        return None
+    out = {}
+    for name, q in (("p50", 0.50), ("p95", 0.95)):
+        k = 0
+        while k < n and loss_run_cdf(n, p_loss, k + 1) < q:
+            k += 1
+        out[name] = k
     return out
 
 
@@ -1651,6 +1803,24 @@ DECIDED_UNTIL = {
         "if the fresh on-class upper bound <= 0; keep grading if the fresh "
         "mean > 0; anything else returns to Eamon. CLAUDE.md "
         "acknowledged-recurrence line for perps-funding-spread.",
+    ),
+    "band-kelly": (
+        # [2026-09-02, edge-audit follow-up] THE READ LIVED ONLY IN PROSE.
+        # EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a fresh read on
+        # kelly at the (vy) $80 clip and recorded it nowhere executable -- the
+        # I21 shape ("a defense that lives only in prose is a defense that has
+        # not been written"). Eamon, 2-Sep: "Proceed on all". Recorded here so
+        # the docket, not a reader, asks the question on the date.
+        "2026-10-01",
+        "PRE-REGISTERED 2-Sep (edge audit section 6.1; Eamon 'Proceed on all'): "
+        "the (vy) clip cut ($250 -> $80, 1-Sep) is a survival move, not an "
+        "edge; her all-time upper bound (+0.03% on n=383) has NOT excluded a "
+        "positive mean, so I17-as-amended forbids retiring on it. READ at "
+        "n>=60 fresh closes at the $80 clip (since 1-Sep) or on 1-Oct, "
+        "whichever first: RETIRE if the fresh upper bound (m+1.28*SE) <= 0; "
+        "keep grading if the fresh mean > 0; anything else returns to Eamon. "
+        "EDGE_AUDIT_2026-09-02.md section 6.1; CLAUDE.md band-kelly row; "
+        "HANDOFF row kelly-fresh-read-pre-registered.",
     ),
 }
 
@@ -2493,6 +2663,40 @@ def book_payload(s):
     # choice to leave the gate on the iid value is deliberate and untouched.
     if isinstance(s.get("cluster"), dict):
         out["cluster"] = s["cluster"]
+    # [2026-09-02, edge-audit follow-up] the shape block (see `stats`), in
+    # percentage points and dollars, plus the derived fields a monitor reads:
+    # `hit_margin_pp` = trailing hit rate minus the book's own break-even
+    # (points, REPORTED), `hit_margin_z` (that margin in standard errors,
+    # REPORTED), and -- since the 2-Sep optimal calibration -- the pair the
+    # immune organ actually tests: `wins_trailing` against `page_wins_max`,
+    # with the boundary's own false-page and miss rates beside it.
+    _sh = s.get("shape")
+    if isinstance(_sh, dict):
+        def _r(v, k=2):
+            return round(v, k) if isinstance(v, (int, float)) else None
+        _sc = _sh.get("streak_chance") if isinstance(_sh.get("streak_chance"), dict) else {}
+        out["shape"] = {
+            "hit_pct": _r(100 * _sh["hit"], 1) if _sh.get("hit") is not None else None,
+            "hit_trailing_pct": _r(100 * _sh["hit_trailing"], 1)
+            if _sh.get("hit_trailing") is not None else None,
+            "n_trailing": _sh.get("n_trailing"),
+            "avg_win_usd": _r(_sh.get("avg_win_usd")),
+            "avg_loss_usd": _r(_sh.get("avg_loss_usd")),
+            "payoff": _r(_sh.get("payoff"), 3),
+            "breakeven_hit_pct": _r(100 * _sh["breakeven_hit"], 1)
+            if _sh.get("breakeven_hit") is not None else None,
+            "hit_margin_pp": _r(100 * _sh["hit_margin"], 1)
+            if _sh.get("hit_margin") is not None else None,
+            "hit_margin_z": _r(_sh.get("hit_margin_z")),
+            "wins_trailing": _sh.get("wins_trailing"),
+            "page_wins_max": _sh.get("page_wins_max"),
+            "page_false_rate_pct": _r(100 * _sh["page_false_rate"], 1)
+            if _sh.get("page_false_rate") is not None else None,
+            "page_miss_rate_pct": _r(100 * _sh["page_miss_rate"], 1)
+            if _sh.get("page_miss_rate") is not None else None,
+            "streak_now": _sh.get("streak_now"), "streak_max": _sh.get("streak_max"),
+            "streak_p50_chance": _sc.get("p50"), "streak_p95_chance": _sc.get("p95"),
+        }
     # [2026-08-17] The instrument-class split, on the same footing and for the
     # same reason as `cluster` above: a number the keep-or-retire decision
     # depends on, which two consecutive reviews had to re-derive from the raw
@@ -2676,6 +2880,83 @@ def _selftest_class_split():
     assert book_payload(s)["class_split"] is cs, "published on the payload"
 
 
+def _selftest_shape():
+    """[2026-09-02, edge-audit follow-up] the shape block and the exact streak."""
+    from datetime import datetime as _dt, timedelta as _td
+    import itertools as _it
+    # exact vs brute force on every outcome string for small n
+    for n, p in ((4, 0.5), (6, 0.3), (7, 0.7)):
+        for k in range(1, n + 2):
+            brute = 0.0
+            for outcome in _it.product((0, 1), repeat=n):     # 1 = loss
+                run = mx = 0
+                for o in outcome:
+                    run = run + 1 if o else 0
+                    mx = max(mx, run)
+                if mx < k:
+                    brute += (p ** sum(outcome)) * ((1 - p) ** (n - sum(outcome)))
+            assert abs(loss_run_cdf(n, p, k) - brute) < 1e-12, (n, p, k)
+    es = expected_streak(100, 0.5)
+    assert es["p50"] <= es["p95"] and 5 <= es["p50"] <= 8 and 8 <= es["p95"] <= 12, es
+    assert expected_streak(100, 0.2)["p95"] < expected_streak(100, 0.6)["p95"]
+    assert expected_streak(1, 0.5) is None and expected_streak(50, 0.0) is None
+    # the shape block on a synthetic ledger: 83% hit, wins +3.65, losses -7.39
+    t0 = _dt(2026, 8, 1)
+    rows = []
+    for i in range(60):
+        loss = (i % 6 == 5)          # 10 of 60 lose -> hit 83.3%
+        rows.append(((-0.02 if loss else 0.01), (-7.39 if loss else 3.65),
+                     t0 + _td(hours=6 * i)))
+    st = stats(rows, book_usd=1000.0)
+    sh = st["shape"]
+    assert abs(sh["hit"] - 50 / 60) < 1e-9 and sh["n_trailing"] == SHAPE_TRAIL_N, sh
+    assert abs(sh["avg_win_usd"] - 3.65) < 1e-9 and abs(sh["avg_loss_usd"] - 7.39) < 1e-9
+    assert abs(sh["breakeven_hit"] - 1 / (1 + 3.65 / 7.39)) < 1e-9, sh
+    assert sh["streak_max"] == 1 and sh["streak_now"] == 1, sh   # last row (i=59) loses
+    assert sh["streak_chance"]["p95"] >= 1, sh
+    # [2026-09-02, calibrated] z in SEs at the null (trailing 30 holds 5 losers
+    # -> 25/30), and the critical value from the ONE owner, never a retyped bar
+    _be_fx = 1 / (1 + 3.65 / 7.39)
+    _z_fx = (25 / 30 - _be_fx) / math.sqrt(_be_fx * (1 - _be_fx) / 30)
+    assert abs(sh["hit_margin_z"] - _z_fx) < 1e-9 and 1.8 < _z_fx < 2.0, (sh["hit_margin_z"], _z_fx)
+    # [2026-09-02, CALIBRATED OPTIMALLY] the page boundary IS the argmin of the
+    # total error, brute-forced over every k; its rates are the exact binomial
+    _p_era = 50 / 60
+    _tot = [binom_cdf(k, 30, _p_era) + 1.0 - binom_cdf(k, 30, _be_fx) for k in range(31)]
+    _k_best = min(range(31), key=lambda k: _tot[k])
+    assert sh["page_wins_max"] == _k_best == 22, (sh["page_wins_max"], _k_best)
+    assert sh["wins_trailing"] == 25 and sh["wins_trailing"] > sh["page_wins_max"], sh   # healthy: no page
+    assert abs(sh["page_false_rate"] - binom_cdf(22, 30, _p_era)) < 1e-12
+    assert abs(sh["page_miss_rate"] - (1.0 - binom_cdf(22, 30, _be_fx))) < 1e-12
+    assert 0.10 < sh["page_false_rate"] < 0.13 and 0.15 < sh["page_miss_rate"] < 0.19, sh
+    # brute-force pin over a grid of (n, p_era, p_be): the LR boundary ATTAINS the
+    # minimum total error (a tie at LR = 1 makes two k equally optimal, so the
+    # pin is on the error, not the index)
+    for _n, _pe, _pb in ((30, 0.83, 0.661), (30, 0.30, 0.175), (20, 0.9, 0.5), (50, 0.6, 0.4),
+                         (30, 0.7, 0.5), (12, 0.75, 0.6)):
+        _pbd = page_boundary(_n, _pe, _pb)
+        _tot_k = [binom_cdf(k, _n, _pe) + 1.0 - binom_cdf(k, _n, _pb) for k in range(_n + 1)]
+        assert _pbd["false_rate"] + _pbd["miss_rate"] <= min(_tot_k) + 1e-9, (_n, _pe, _pb, _pbd)
+    # no healthy reference -> page at break-even; a book that never lost pages on any loss
+    assert page_boundary(30, 0.60, 0.661)["k"] == math.floor(30 * 0.661)
+    assert page_boundary(30, 1.0, 0.661)["k"] == 29
+    assert page_boundary(30, 0.8, None) is None and page_boundary(0, 0.8, 0.5) is None
+    bp = book_payload(st)["shape"]
+    assert bp["hit_margin_z"] == round(_z_fx, 2) and "hit_margin_crit" not in bp, bp
+    assert bp["page_wins_max"] == 22 and bp["wins_trailing"] == 25, bp
+    assert bp["page_false_rate_pct"] == round(100 * sh["page_false_rate"], 1), bp
+    assert bp["page_miss_rate_pct"] == round(100 * sh["page_miss_rate"], 1), bp
+    assert bp["hit_pct"] == 83.3 and bp["breakeven_hit_pct"] == round(100 / (1 + 3.65 / 7.39), 1), bp
+    assert bp["hit_margin_pp"] == round(bp["hit_trailing_pct"] - bp["breakeven_hit_pct"], 1) or \
+        abs(bp["hit_margin_pp"] - (bp["hit_trailing_pct"] - bp["breakeven_hit_pct"])) <= 0.11, bp
+    assert bp["streak_p95_chance"] == sh["streak_chance"]["p95"], bp
+    # a thin sample publishes no shape; an all-winning one has no chance streak
+    assert "shape" not in book_payload(stats(rows[:1]))
+    allwin = stats([(0.01, 1.0, t0 + _td(hours=i)) for i in range(5)])
+    assert allwin["shape"]["streak_chance"] is None and allwin["shape"]["payoff"] is None
+    assert allwin["shape"]["hit_margin_z"] is None and allwin["shape"]["page_wins_max"] is None
+
+
 def _selftest_decided_until():
     """[2026-08-17] The docket deferral. See `DECIDED_UNTIL` for the incident.
 
@@ -2736,6 +3017,7 @@ def _selftest():
     _selftest_sleeves()
     _selftest_class_split()
     _selftest_decided_until()
+    _selftest_shape()
     from datetime import datetime, timedelta, timezone
     t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
 

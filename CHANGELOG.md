@@ -1,3 +1,260 @@
+## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
+
+**[LETTERED (xc) at push time: written as (wz), then (xb); (wz), (xa) AND a second (wy) reached main first — PR #269's cohort long budget, PR #268's mum position aliasing, and another session's (wy) — so this session's two entries take (xb) and (xc) in the order they were written; the pushed entries keep their letters.]**
+
+**Eamon, 2-Sep:** *"Calibrate accordingly"*, then *"Calibrate optimally with
+findings"*. (wy) answered the first: it re-measured the I25 margin, found 1.7pp
+inside every band and KEPT it, and moved the shape monitor from "within 5pp" to
+the fleet's claim bar with a stated one-in-four false-page cost. Both were
+calibrations TO A CONSTANT. The second instruction asks what the findings say
+the optimum is — and the answer is that it is not a constant at all.
+
+**1. THE FINDINGS** (3,801 closes / 26 books with ≥40 closes; the NO-CHANGE
+CONTROL is every non-overlapping (motivating window, next window) pair of every
+book with nothing changed between them — `scripts/study_do_our_changes_hurt_2026-08-27.py
+--margin --ledger <trades.json?source=paper dump>`):
+
+| live-lane rule, K=10 | false `bad` | false `good` | `bad` after a HOT motivating window | `good` after a COLD one | power, planted −2pp |
+|---|---|---|---|---|---|
+| fixed 1.7pp vs the same-duration pre-window — (wy) | 13.0% | 11.5% | **21.3%** | **19.2%** | 66% |
+| book mean EXCLUDING the motivating window, margin = `t_crit` × SE — shipped | 14.3% | 10.9% | **16.0%** | **9.9%** | 74% |
+
+* **A fixed margin is a different false rate on every book.** 1.7pp is **2.9 SE**
+  on 👩 mum's live book (sd 1.86pp at n=10 — a verdict nearly unreachable) and
+  **0.7 SE** on a book with sd 8pp (a coin flip). The twin's fixed 0.25pp was
+  **~0.15 SE** of a 10-vs-10 comparison on mum's pair — the control arm, the
+  one baseline that matters, was a coin flip dressed as a control.
+* **The collapse does not shrink with the window.** +1.74 / +1.52 / +1.60 /
+  +1.67pp at K = 10 / 15 / 20 / 30 (SE ≈ 0.5); iid noise would have halved it
+  from K=10 to K=30. The books' means DRIFT, so even a 30-close pre-window is
+  biased when it is selected hot, while the book's FULL era mean has ≈ zero
+  excess in the following window (−0.11pp after hot; the study's own arm 2).
+  That is I25's rule in a number: the counterfactual is the book's mean. The
+  residual false-`bad` above the 10% nominal (14–16%) IS the drift, which only
+  the twin removes — so **the twin decides and the book corroborates.**
+* **Real live/shadow pairs are too thin to validate the twin's noise model**
+  (👩 mum: 3 paired 48h windows, |z| never above the bar; 🙏 avo: none), so the
+  iid standard error is the declared model, floored at 0.25pp against a
+  zero-variance history. A future re-measurement on real pairs is one command.
+* **The monitor, exact binomial, on mum's live shape** (era hit 83.0%,
+  break-even 66.1%, n=30): "within 5pp" pages **5.6%** of healthy windows and
+  MISSES **26.4%** of break-even ones (total 32.1%); "z ≤ the claim bar" pages
+  **23.9%** and misses **7.4%** (31.3%); the likelihood-ratio boundary — page at
+  **≤ 22 of 30 wins** — pages **12.4%** and misses **15.1%** (27.5%), the
+  brute-force minimum of the two errors' sum. At this window length nothing
+  does better; a longer window is the only lever left, and it buys accuracy
+  with detection lag.
+
+**2. WHAT SHIPPED.**
+* **`fleet_proprioception.judge_windows`** (pure; `grade_live` wraps it with
+  the ledger reads): `bad` = the episode's mean below EVERY baseline by that
+  baseline's own margin, **`margin = max(LIVE_MARGIN_PP, crit × SE)`**, `crit`
+  from `fleet_allocation.t_crit` (the one owner — I17: one standard of evidence
+  in both directions), SE from the arm's OWN pre-episode dispersion; `good` is
+  the mirror; anything mixed is `flat`. Baselines: the **TWIN** (required — no
+  control arm ⇒ `recorded`, reason `no-control-arm`) and the **book's era mean
+  EXCLUDING the motivating window** (`book_baseline`, falling back to every
+  pre-episode close and then dropping out at the `MIN_N` floor, so a young book
+  is judged by its twin alone). `LIVE_PRE_MARGIN_PP` is **deleted**;
+  `LIVE_MARGIN_PP` is now the **floor**. Each baseline publishes `mean_pct /
+  margin_pp / se_pp / crit / n / excludes_motivating_window`; the record gains
+  `n_book / mean_pct_book`; the motivating window stays RECORDED
+  (`mean_pct_before`) and is never a baseline.
+* **`golive_readiness.page_boundary`** + `binom_cdf`: the `shape` block gains
+  `wins_trailing`, `page_wins_max`, `page_false_rate`, `page_miss_rate`
+  (payload `..._pct`); `hit_margin_crit` is dropped, `hit_margin_z` stays
+  REPORTED. A book whose era rate is already at or below break-even pages AT
+  break-even; a book that has never lost pages on its first loss. Integers on
+  both sides of the page test, so rounding can never move a page.
+* **`fleet_immune`** pages a LIVE row when `wins_trailing <= page_wins_max` on
+  ≥30 trailing closes, quiet when either is absent (never re-derived, (hj));
+  the page text carries both error rates, so what a page costs is in the page.
+* **the study's `--margin` arm** now grades the SHIPPED `book_gate` on the
+  no-change control (INSIDE / DRIFT / THIN at `TOL_X` = 2× the nominal one-sided
+  rate, exit 2 on DRIFT; `crit=0` is the positive control and reads DRIFT),
+  with the power table beside the false rates; `hot_collapse` stays as the I25
+  reversion's own measurement.
+
+**3. WHAT IT CHANGES LIVE.** No `live.*` lever is open, so no verdict moves
+today; on the monitor both live rows are quiet (👩 mum 25 of 30 against a
+boundary of 22; 🙏 avo's trailing window is 20 closes, under the floor).
+Direction, both halves: fewer false `bad` reverts of a real-money lever (less
+constriction — Eamon's standing mandate) AND fewer false `good`s (a `helping`
+unlock on noise is the I25 trap mirrored). Power on a real −2pp harm ~74% per
+episode on the book gate; the lever verdict still needs `MIN_EPISODES` such
+episodes.
+
+**4. VERIFIED.** `tests/autonomy/test_edge_audit_followups.py` (9 pins,
+consumers driven on the publisher's own payload) — **27/27 mutations red**:
+shadow books flagged · boundary comparison inverted · strict-below instead of
+at-or-below · a missing boundary re-derived as 5pp · streak check removed ·
+run recurrence broken · trailing window is the whole ledger · boundary off by
+one · boundary as the hit-rate midpoint instead of the LR · false rate at
+break-even instead of the era rate · `wins_trailing` over the whole ledger ·
+carried predicate inverted · audit keeps a local copy · margins are the floor
+alone (book, then twin) · a retyped 1.28 for the critical value · book baseline
+includes the motivating window · twin not required · baseline floor back to 3 ·
+the 1.7pp constant resurrected · `bad` on the twin alone (the one survivor of
+the first round — a case the tests had never stated) · `grade_live` feeds the
+motivating window as the baseline · the allocation organ absent passes the pin
+· collapse over cold windows · DRIFT never reported · THIN read as INSIDE · the
+instrument grades a local copy instead of the shipped gate. Module selftests
+green (`golive_readiness`, `fleet_immune`, `fleet_proprioception`); every
+`changelog-check.yml` guard green locally except the sandbox-less gitleaks;
+the full suite's only failures are the sandbox's (no psycopg2 / numpy / lighter
+SDK), each reproduced on pristine main. **DEPLOY: main only** — the three
+organs ride the `freqtrade-bots` auto path; no live row trades differently.
+
+**WHAT REMAINS A JUDGEMENT, NAMED:** `TOL_X` = 2× nominal is a cry-wolf bound,
+not a target; the monitor weights a false page and a missed decay equally
+(equal priors — both rates ride the payload so Eamon can weigh them by eye);
+the trailing window stays 30, the gate's own close floor, and it is the one
+lever that would lower both error rates at the price of lag.
+
+## 2026-09-02 (xb) — THE EDGE AUDIT'S LAST FOUR ITEMS LEAVE THE PROSE: kelly's read is a docket deferral, mum's shape has a monitor, a losing streak is judged against chance, and I25 reaches the live grader's margin
+
+**[RENUMBERED (wx) -> (wy) -> (xb) at push time: another session's (wx) — the douglas guard's bezos defect — reached main first, then another session's (wy) did; the pushed entries keep their letters. Commit subjects on this branch still say (wx) and (wy); the CHANGELOG header is the index.]**
+
+**[SUPERSEDED IN PART the same day by (xc), on Eamon's *"Calibrate optimally with findings"*: the 1.7pp margin this entry re-measured and kept is GONE — the live lane's margins are now derived from each comparison's own noise at the fleet's critical value, against the twin and the book's mean EXCLUDING the motivating window — and the monitor's claim-bar threshold is replaced by the exact minimum-total-error boundary. The measurements below stand; the two constants do not.]**
+
+**Eamon, 2-Sep, asked whether every fix in `EDGE_AUDIT_2026-09-02.md` had been
+completed. The honest answer was no** — the three approved sizing advisements had
+shipped ((wu)) and one recommendation had been closed by another session ((wp)),
+but four items the report raised still lived only as sentences, and two shipped
+changes were described in the report in the shape they were PROPOSED rather than
+the shape they LANDED. **Eamon: *"Proceed on all."*** Nothing here changes what
+any bot trades; one item sizes nothing and grades a live lever more honestly,
+the rest measure and page.
+
+**1. 🪁 KELLY'S PRE-REGISTERED READ IS EXECUTABLE (§6.1).** The report committed
+to a keep-or-retire read at n≥60 fresh closes at the (vy) $80 clip — retire if
+the fresh upper bound (m+1.28·SE) ≤ 0, keep grading if the fresh mean > 0 — and
+recorded it nowhere a machine reads: the I21 shape, *"a defense that lives only
+in prose is a defense that has not been written."* It is now
+`golive_readiness.DECIDED_UNTIL["band-kelly"]` (expires **1-Oct**; the docket
+prints `decision_overdue` past it — the deferral's own it-EXPIRES property) and
+HANDOFF row `kelly-fresh-read-pre-registered` (owner OPERATOR, closes only when
+the entry is removed, i.e. when the decision is recorded). The deferral's
+selftest requires a recorded-where, so the decision is recorded in CLAUDE.md's
+kelly row too. Her all-time upper bound (+0.03% on n=383) has NOT excluded a
+positive mean; I17-as-amended forbids retiring on it today, and the read says so.
+
+**2. THE SHAPE BLOCK, PUBLISHED AND PAGED (§6.4 / §9).** The audit's point on
+👩 mum: five stops were 37% of her gross wins, avg loss $7.39 against avg win
+$3.65, PF 2.36 carried by an **83% hit rate** — so the number that says FIRST
+if she is about to lose her profit factor is her hit rate against her OWN
+break-even (1/(1+payoff) = **66.9%**), never P&L and never a bare win-rate bar
+(I15). `golive_readiness.stats()` now computes and `book_payload` publishes a
+per-book `shape` block: `hit_pct`, `hit_trailing_pct` (trailing 30), `n_trailing`,
+`avg_win_usd`, `avg_loss_usd`, `payoff`, `breakeven_hit_pct`, `hit_margin_pp`,
+`streak_now`, `streak_max`, `streak_p50_chance`, `streak_p95_chance`. REPORTED,
+never a bar — `BAR_NAMES` and `grade()` are untouched. `fleet_immune` reads it
+off the grader's payload (never re-derived) and flags a **LIVE** book (`-lighter`
+rows only — a page on every shadow streak would train Eamon to ignore the pager,
+(gl)) whose trailing hit rate no longer CLAIMS to sit above its own break-even on
+≥30 trailing closes, or whose current losing streak exceeds the p95 chance streak
+for its own hit rate. **[CALIBRATED the same day — Eamon: *"Calibrate
+accordingly"*; corrected in place per I12.]** This shipped first as *"within
+`IMMUNE_SHAPE_HIT_MARGIN_PP` (5pp) of break-even"*, and 5pp was a round number in
+the wrong units: sampling noise on a 30-trade hit rate is **±8.6pp** (one SE at
+mum's 66.9% break-even), so 5pp was 0.58 SE at her payoff and 0.68 SE at avo's,
+and a window at 23/30 — **9.8pp above break-even, 1.14 SE** — read QUIET while it
+no longer showed PF > 1. The grader now publishes `hit_margin_z` (the margin in
+standard errors, SE taken at break-even) beside `hit_margin_crit` — the fleet's
+OWN claim bar for `n_trailing` (`horizon_crit` → `fleet_allocation.t_crit`,
+**1.31 at n=30**, floor 1.28) — and the immune organ fires on `z <= crit`: *the
+last 30 closes no longer claim PF > 1*, in the same standard the allocation
+organ uses to hand out a claim (I17: one standard of evidence in both
+directions). Both are READ off the payload; either absent ⇒ quiet, never
+re-derived. **The cost is stated, not hidden:** a book at mum's current
+**z ≈ +2.0** (trailing-30 hit 83.3% vs a ~66% break-even on today's ledger)
+reads below the bar by chance in roughly one 30-trade window in four — a page
+is *look at the twin* (I25), never a verdict, and the value-normalised dedup
+ledger pages a persisting condition once. Today neither live row is near: mum
+z ≈ +2.0; avo's trailing window is 20 closes, below `SHAPE_MIN_N`.
+
+**3. A STREAK IS JUDGED AGAINST CHANCE, AND THE OWNER IS THE GRADER (§9).**
+`scripts/edge_audit.py` simulated the longest losing run (2,000 draws) and does
+not ship in any image; the grader does. `golive_readiness.expected_streak`
+now computes it EXACTLY — Feller's run recurrence for P(longest run < k), the
+quantile the smallest k reaching it — so no two consumers can see two p95s for
+one book, and the audit imports it back **by identity** (a second copy of a rule
+is a second rule, (hj); pinned). Brute-force-verified against every outcome
+string for small n.
+
+**4. I25 REACHES THE ACTUATOR — `fleet_proprioception.grade_live`.** I25
+measured the defect in one number and recorded it as *latent*: a hot window is
+followed by a **−1.674pp** collapse toward the book's own mean, while the live
+lane judged a change against its PRE-WINDOW with a **0.25pp** margin and let a
+**three-trade** baseline count — so `all()` over one biased element could call a
+change `hurting` by arithmetic and revert a live lever at `get_lever`. Three
+changes, every one in the less-constriction direction (Eamon: *"our focus always
+on growth"*): the pre-window baseline carries its own margin
+`LIVE_PRE_MARGIN_PP` = **1.7pp** (the measured reversion — **RE-MEASURED the same
+day on today's ledger, Eamon: *"Calibrate accordingly"*:** the study's own peak
+arm over 3,801 closes / 26 books with ≥40 closes puts the hot-window collapse at
+**+1.74pp (SE 0.50, n=149 windows) at K=10**, the grader's own baseline floor,
+**+1.52 (0.47) at K=15**, +1.60 (0.46) at K=20 and +1.67 (0.58) at K=30 — (vc)'s
+27-Aug 1.674 reproduces at K=30 to 0.002pp — and **1.7 sits inside every 95%
+band, so the constant STANDS**: moving it to any one K's point estimate would be
+fitting a number with a 0.5pp standard error to two decimals. The study gained
+`--ledger FILE` (a `/trades.json?source=paper` dump, so the measurement needs no
+DATABASE_URL; neither path applies `LEDGER_QUARANTINE`, as on 27-Aug, and the
+loader says so) and a `--margin` arm that grades the constant against the
+measured bands — INSIDE / DRIFT / THIN, exit 2 on DRIFT — so the next
+re-measurement is one command, and the test pins the constant inside the 2-Sep
+bands so an edit to 0.25 or 5.0 reddens); the shadow twin — the
+one control arm that experiences the same reversion — keeps 0.25pp and is
+**REQUIRED** for any verdict (no twin ⇒ `recorded`, reason `no-control-arm`);
+and `LIVE_BASE_MIN_N` is pinned to `fleet_allocation.MIN_N` (**10**, the
+computability floor) instead of 3. The verdict publishes its `baselines`. The
+selftest fixtures moved from 6-trade to 12-trade baselines and gained the I25
+pin: 1.3pp below the pre-window while 1.0pp below the twin now reads **flat**
+where the old margin condemned it. Real evidence still grades: 2.3pp below the
+pre-window and 1.0pp below the twin reads **bad**. No live lever is open today
+((ta) retired the Farmer's lane; the judge's lane moved to mum at (wt)), so this
+changes no verdict on the bus — it changes the next one.
+
+**5. THE REPORT, CORRECTED IN PLACE (I12).** §6.2 and §6.3 read as open
+proposals in their PROPOSED shape (`clip × max(0.25, 1 − maxDD/0.15)` through
+`apply_tuning`, publishing `extra.dd_scale`); what shipped scales only PAST the
+bar, lives in `fleet_bus.brain_clip_multi`, and records on each close's
+`brain_mult` stamp. Both now say so, §5's re-point is marked done by (wp), §8's
+clamp note says where the consequence landed, and §9's gap column carries
+CLOSED on the four rows this entry and (wu)/(wp) closed.
+
+**VERIFIED:** `tests/autonomy/test_edge_audit_followups.py` (8 pins, every
+consumer driven on the publisher's own payload) — **10 of 10 mutations red**:
+shadow books flagged too · margin comparison inverted · streak check removed ·
+pre-window margin back to 0.25 · baseline floor back to 3 · twin no longer
+required · run recurrence broken · trailing window is the whole ledger · carried
+predicate inverted · audit keeps a local copy. Module selftests green
+(`golive_readiness`, `fleet_immune`, `fleet_proprioception`, `session_state`,
+`edge_audit`); every `changelog-check.yml` guard green locally except the
+sandbox-less gitleaks. **DEPLOY: main only** — `fleet_immune`/`fleet_proprioception`/
+`golive_readiness` run in `freqtrade-bots` and ship on the auto path; no live
+row trades differently, so no live restart is dispatched.
+
+~~**STILL OPEN, named:** the I25 calibration is a MEASURED margin, not a
+re-measured one — the 1.674pp is (vc)'s 27-Aug number; re-run
+`scripts/study_do_our_changes_hurt_2026-08-27.py` when the ledger has another
+month and move the constant if the tide moved. The shape monitor's 5pp is a
+judgement, stated as one.~~ **BOTH CLOSED the same day (Eamon: *"Calibrate
+accordingly"*), recorded above in place:** the margin was re-measured on today's
+ledger (1.7 inside every band; instrument `--margin`, exit 2 on DRIFT) and the
+monitor's threshold is the fleet's own claim bar in sampling-noise units, not a
+round number. What remains true: a page the monitor raises is advice to look at
+the twin, not a verdict (I25). Also fixed here, from the CodeQL review on the
+PR: `fleet_proprioception`'s selftest imported `fleet_allocation` a second way
+behind a bare `except: pass` — the identity pin now uses the module-level handle
+and FAILS if the organ is absent instead of passing vacuously (the "check that
+inspects nothing reports clean" shape). **VERIFIED: 19/19 mutations red** — the
+original ten re-run after the change, plus nine on the calibration (z without
+the sqrt; crit a retyped 1.28; the comparison inverted; back to a 5pp points
+threshold; the bar re-derived when the payload has none; the margin edited to
+0.25 and to 5.0; the collapse measured over cold windows; DRIFT never reported;
+THIN read as INSIDE; the absent organ passing the pin).
+
 ## 2026-09-02 (xa) — 👩 MUM'S "BAD DAY" DEEP DIVE: the tape is the tape, the halt is $22 away, and one of her ten real-money legs was running with NO BRACKET because a 1000-market has two names
 
 **[RENUMBERED (wz) -> (xa) at push time** — PR #269 took (wz) on main for the shadow long budget while this PR was open; the cited entry keeps the letter, this one moves.**]**

@@ -85,6 +85,24 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "kelly-fresh-read-pre-registered",
+        "owner": "OPERATOR",
+        "what": "EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-"
+                "retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh "
+                "closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the "
+                "fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh "
+                "mean > 0, anything else returns to Eamon. Her all-time upper "
+                "bound (+0.03% on n=383) has not excluded a positive mean, so "
+                "I17-as-amended forbids retiring on it today.",
+        "why_open": "the read lived only in the report's prose (the I21 shape); "
+                    "it is now the `band-kelly` entry in "
+                    "golive_readiness.DECIDED_UNTIL, so the docket asks on the "
+                    "date. Closes when the decision is recorded and the entry "
+                    "removed.",
+        "closes_when": lambda: not _has("scripts/golive_readiness.py",
+                                        '"band-kelly": ('),
+    },
+    {
         "id": "georgia-v1-preregistered-read-10sep",
         "owner": "session",
         "what": "🔮 georgia v1 was on the (wt) September slate and DEFERRED "

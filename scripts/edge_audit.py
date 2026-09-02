@@ -410,26 +410,13 @@ def risk_metrics(pcts, abss, closes, book_usd=1000.0):
     return out
 
 
-def expected_streak(n, p_loss, draws=2000, seed=11):
-    """Median longest losing run in `n` iid trades at `p_loss`.
-
-    A streak means nothing against zero; it means something against what the
-    book's OWN hit rate produces by chance. This fleet reads streaks as decay
-    routinely, and (vc) measured the arithmetic behind that: a window selected
-    on an extreme is a biased estimator by construction.
-    """
-    if n < 2 or not 0.0 < p_loss < 1.0:
-        return None
-    rnd = random.Random(seed)
-    outs = []
-    for _ in range(draws):
-        best = cur = 0
-        for _ in range(n):
-            cur = cur + 1 if rnd.random() < p_loss else 0
-            best = max(best, cur)
-        outs.append(best)
-    outs.sort()
-    return {"p50": _quantile(outs, 0.50), "p95": _quantile(outs, 0.95)}
+# [2026-09-02, edge-audit follow-up] THE OWNER IS THE GRADER. This file
+# simulated the longest losing run (2000 draws) and does not ship in any image;
+# `golive_readiness.expected_streak` computes it EXACTLY (Feller's run
+# recurrence) and publishes it on every book's `shape` block, so this is the
+# same function by identity -- a second copy of a rule is a second rule ((hj)),
+# and a monitor and an audit must never disagree about chance.
+expected_streak = gr.expected_streak
 
 
 def concentration(rows):
