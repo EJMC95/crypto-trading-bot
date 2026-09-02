@@ -1,4 +1,4 @@
-## 2026-09-02 (wv) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
+## 2026-09-02 (ww) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
 
 **Eamon, 2-Sep: *"Proceed with everything in the organ review."*** The (wp)
 review laid out seven keep-or-retire calls with a recommendation each, two
@@ -150,10 +150,15 @@ stuck-serving class on this service for the SECOND time — and the family bot
 has no `claim_writer`, so the two writers are unguarded. **Consequence,
 stated plainly: the (wp) scan-order parity port never reached the shadow
 twins, so the judge's pair is still unjudgeable, and the mum lever surface in
-this entry will not run there either until the zombie is removed.** No lever
-in this repo swaps a wedged container ((vz): `redeploy` re-runs the CURRENT
-deployment); it is an OPERATOR act in the Railway UI, carried as
-`family-shadow-stale-writer` with the expected stamp to read back.
+this entry will not run there either until the zombie is removed.** **AND THE CONCURRENT SESSION FOUND THE OTHER HALF, (wv), while this entry
+was being written:** the CURRENT container's publish was raising every loop
+(`spend_extra` read `b.bot` on a Book whose attribute is `bot_id`, inside
+the publish site's `except: pass`) — so no post-(vr) container ever
+published a family row, and the zombie's rows were the only fresh ones. Two
+defects, one symptom: a stale instance that could not be seen, and a live
+instance that could not speak. (wv) fixes the publish and kills the
+instance; this entry's carried row `family-shadow-stale-writer` stays until
+the stamp is READ BACK on the feed.
 
 **DEPLOY for this entry.** freqtrade-bots (judge, shortfall, fleet_bus,
 fleet_tuning, incubator, tuner, dashboard lists), family-lighter-shadow
@@ -162,6 +167,60 @@ and band-garrett-shadow (their guards), book-douglas-shadow and
 book-grimes-shadow (their guards), tide-rider-lighter-live / mum-live take the
 live host's `live.mum.*` reader and the breakout clock only from a merge
 carrying `[deploy-live]` in its subject — this PR's title does.
+
+## 2026-09-02 (wv) — THE DASHBOARD'S GEORGIA HOLE: one attribute name killed every family publish for five days, and a stale Railway instance made the fleet look healthy the whole time
+
+**[RENUMBERED (wu) -> (wv) at push time** — PR #263's sizing-rails merge took (wu) on main while this fix was built; the pushed entry keeps the letter per the letter rule.**]**
+
+**Eamon: *"Further fixes to pnl dashboard."*** The visible symptom was the
+watchdog paging `STALE: freqtrade-georgia-lshadow`; the mechanism underneath
+is worth engraving, because THREE defense layers each half-worked and their
+overlap hid a five-day outage:
+
+**THE DEFECT.** `(vr)`'s `spend_extra` (28-Aug 21:24, 🔮 georgia v3's own
+birth commit) read `b.bot` on a Book whose attribute is `bot_id` — the bare
+name lives on the STRATEGY. AttributeError, on EVERY family book, EVERY
+loop. And because the publish site's arguments were built inline INSIDE its
+`except: pass`, the raise silently killed the ENTIRE `bot_pnl` publish for
+all four family books from the first post-(vr) deploy — the fail-open-except
+class the memory index names, verbatim, while the books kept trading and
+saving state.
+
+**WHY NOBODY SAW IT FOR FIVE DAYS.** The rows stayed fresh — because a
+STALE Railway instance of `family-lighter-shadow`, running pre-(vr) code
+(build `edc3032d1c46` = d2c0cb9, 28-Aug 21:09, one commit BEFORE the bug),
+survived ~15 subsequent deploys and kept publishing mum/avo/georgia-v1: the
+(ml) "REMOVED deployment keeps serving" class, on the WRITER side, at 5
+DAYS against (ml)'s 14 hours. 🔮 v3 — absent from that old roster — never
+got a row at all, which also blinded `audit_book_spend` (it reads the feed;
+a missing row is invisible to the auditor built for exactly her). Found by
+`audit_code_currency`: the family stamps resolved to NO commit in 80, then
+to d2c0cb9 at depth 500, `BEHIND-OWN 85`. Today's page fired only because
+Lucy's four deploys in 80 minutes bounced the zombie's slow REST-fallback
+loop past book 3's publish — the outage was found by ITS OWN noise.
+
+**SHIPPED, the class not the instance:**
+* `spend_extra` reads `b.s.bot` (the fix), and `skipped_unlisted` reads
+  `getattr` (a second latent raise-path the new test caught within minutes
+  of existing — populated at boot, absent on a fresh Book);
+* `family_publish_extra` is now THE ONE BUILDER of the published extra,
+  extracted from the publish site so
+  `tests/autonomy/test_family_publish_args.py` drives it for EVERY live
+  strategy against a REAL Book ((hj): publisher-built, never a fixture) —
+  a builder that raises for any book, present or future, reddens CI
+  instead of a row going quietly dark; v3's `spend` census and the elders'
+  grandfathering pinned; 3/3 mutations RED;
+* the publish's `except: pass` keeps never-raise and loses never-SAY: a
+  failed publish now logs `bot_pnl publish FAILED (row going stale)` per
+  book per loop (I4 — a persistent condition must not be a one-shot
+  nothing).
+
+**OPERATOR-VISIBLE CONSEQUENCE once the zombie dies:** v3's row appears on
+the dashboard for the first time (she has traded since 28-Aug with no row),
+v1's staleness page clears, and the family stamps move to HEAD. The zombie
+kill + stamp readback is executed in this same pass and verified on the
+feed, not the deploy log. LIVE rows were never affected (the live host has
+its own publish path — verified by grep and by their 8-9s ages throughout).
 
 ## 2026-09-02 (wu) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
 

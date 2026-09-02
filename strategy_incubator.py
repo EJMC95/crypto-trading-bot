@@ -144,7 +144,7 @@ TAKER_GENES = {
     # [2026-07-17 BASIS FIX] grid /8 with the fleet-wide funding basis — the
     # apr these pp measure was 8x TRUE. Same alleles, true units; every one
     # must stay inside the (also /8) registry bounds 37.5-87.5.
-    # [2026-09-02 (wv)] 25.0 / 0.02 / 24.0 REJOIN the enactable grid with the
+    # [2026-09-02 (ww)] 25.0 / 0.02 / 24.0 REJOIN the enactable grid with the
     # re-decided cages (see fleet_tuning taker.max_hold_h): the only
     # champion-grade genotype on the 2-Sep sweep (sl -0.02 / gap 25 / hold 24
     # / tp 0.02, n=189, lcb +$3.21, both halves) was out of cage on exactly

@@ -52,14 +52,14 @@ FUNDING_BOOKS = [
     # file, so leaving it would keep a dead book contending for supply it can
     # no longer take — the (gl) phantom-rival class with a corpse in it.
     "book-kiyosaki-lshadow",             # 🏦 Rich Dad
-    # 🛢️ band-garrett-lshadow RETIRED 2-Sep (wv) — n=85, t=-2.22, upper
+    # 🛢️ band-garrett-lshadow RETIRED 2-Sep (ww) — n=85, t=-2.22, upper
     # bound -0.455% <= 0 on its own ledger. Removed here for the (pm) reason:
     # this list drives every rivalry count, and a corpse in it keeps
     # contending for supply it can no longer take.
     "book-hull-lshadow",                 # 🧮 Hull ([2M,10M) x [7.8%,20%) — the
                                          # tile between Garrett and the Farmer)
     # 💸 the Farmer: LIVE arm retired 22-Aug (ta), SHADOW twin retired 2-Sep
-    # (wv) — both rows leave the rivalry counts (the (pm) reason).
+    # (ww) — both rows leave the rivalry counts (the (pm) reason).
     "perps-funding-spread-lshadow",      # ⚖️ Counterweight
 ]
 LIVE_BOOKS = {"perps-funding-lighter-lighter"}
@@ -285,7 +285,7 @@ KNOWN_CELL_COLLISIONS = {
     # 34.9d). Its gate now overlaps 🛢️ Garrett's band on [$1M,$2M) x >=20%
     # TRUE — a POPULATED sliver (ROBO/ENA + KAITO's excursions) — so the
     # transitive component fuses all three. DELIBERATE, priced, and NOT the
-    # [2026-09-02 (wv)] THE CARRY/GARRETT COMPONENT IS GONE: 🛢️ Garrett is
+    # [2026-09-02 (ww)] THE CARRY/GARRETT COMPONENT IS GONE: 🛢️ Garrett is
     # RETIRED (n=85, t=-2.22, upper bound -0.455% <= 0 on its own ledger),
     # so the three-book component (carry + Rich Dad + Garrett) and the
     # carry/Garrett sliver key both drop back to the carry/Rich Dad pair

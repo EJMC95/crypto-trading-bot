@@ -74,7 +74,7 @@ except Exception:  # noqa: BLE001
 KEY = "xp-judge"
 TTL_SEC = int(os.environ.get("XPJ_TTL_SEC", "10800"))
 LEVER_TTL = int(os.environ.get("XPJ_LEVER_TTL", "7800"))      # ~2h re-assert
-# [2026-09-02 (wv)] THE SERIAL LANE FOLLOWS THE LIVING PAIR. These were
+# [2026-09-02 (ww)] THE SERIAL LANE FOLLOWS THE LIVING PAIR. These were
 # literals naming 💸 the Farmer's arms, retired 22-Aug — so the fleet's only
 # path from a shadow candidate to real money stood down for 11 days while
 # 👩 mum traded real money with no judge. fleet_bus.living_pair_default is the
@@ -418,7 +418,7 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.mum.rsi_max": "live.mum.rsi_max",
               "xp.mum.max_hold_min": "live.mum.max_hold_min"}
 
-# [2026-09-02 (wv)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
+# [2026-09-02 (ww)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
 # order. The incubator's funding genes are the Farmer's and cannot breed
 # these (its offspring are refused by lane prefix in candidate_pool), so this
 # list is the whole queue until a family-gene incubator exists.

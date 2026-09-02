@@ -1525,7 +1525,7 @@ its row is dashboard-retired regardless; stop the process when found.
   real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
   `live.funding.*` — see growth rail + experiment judge above)
   + **lighter-books (2026-07-30)**.
-  **[2-Sep (wv)] THE JUDGE'S LANE IS 👩 MUM'S** — `xp.mum.rsi_max` /
+  **[2-Sep (ww)] THE JUDGE'S LANE IS 👩 MUM'S** — `xp.mum.rsi_max` /
   `xp.mum.max_hold_min` steer her SHADOW twin (the family host's first lever
   surface: `lighter_family_bot.apply_book_levers` + the `mum_bars` receipt
   both hosts stamp); `live.mum.rsi_max` / `live.mum.max_hold_min` are written

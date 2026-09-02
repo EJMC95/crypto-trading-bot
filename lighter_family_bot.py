@@ -313,7 +313,14 @@ def spend_extra(b, now_ts=None):
     not make. Measuring it properly (`fleet_bus.basket_n_eff` over the held
     basket's own returns, the 🙏 avo pattern) is the declared follow-up.
     """
-    born = BOOK_BORN_TS.get(b.bot)
+    # [2026-09-02] `b.s.bot`, NOT `b.bot` — Book has no `.bot` (its attr is
+    # `bot_id`; the bare name lives on the STRATEGY). As shipped at (vr) this
+    # raised AttributeError on EVERY book EVERY loop, and because the publish
+    # site's args evaluate inside its `except: pass`, it silently killed the
+    # ENTIRE bot_pnl publish for all four family books for five days — the
+    # fail-open-except class, found because 🔮 v3's row never existed and 👩
+    # mum's stamp resolved to a build from one commit BEFORE this function.
+    born = BOOK_BORN_TS.get(b.s.bot)
     if born is None:
         return {}
     now_ts = time.time() if now_ts is None else now_ts
@@ -1911,7 +1918,7 @@ def shadow_scan_order(coins, held, rets):
         return list(coins)
 
 
-#: [2026-09-02 (wv)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
+#: [2026-09-02 (ww)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
 #: judge could not open a family pair because no shadow twin here could run
 #: a candidate: this file never imported fleet_tuning and stamped no `bars`
 #: receipt, so `ran_candidate` (fail-CLOSED) would exclude every close. Two
@@ -2160,6 +2167,35 @@ def _census_extra(b):
 #: history rows, and recomputing that per book per loop buys sums that moved
 #: by exactly one loop. 30 min is the `fleet_allocation` publish cadence.
 CENSUS_ROLLUP_S = float(os.environ.get("FAMILY_CENSUS_ROLLUP_S", "1800"))
+
+
+def family_publish_extra(b, mode, regime, t0):
+    """[2026-09-02] THE ONE BUILDER of a family book's published `extra` —
+    extracted from the publish site so a test can drive it for EVERY live
+    strategy against a real Book. The class this closes: the site's args used
+    to be built inline INSIDE its `except: pass`, so `spend_extra`'s
+    AttributeError ((vr): `b.bot` on an object whose attr is `bot_id`)
+    silently killed all four family books' publishes for five days while
+    the books traded on. Any builder raising for any book now reddens
+    `tests/autonomy/test_family_publish_args.py` instead of a row going
+    quietly stale."""
+    open_accr = sum((m or {}).get("accrued", 0.0) for m in b.meta.values())
+    return {"mode": mode, "venue": mode, "style": b.s.style,
+            "family": True,
+            # [(ne)] the EFFECTIVE cap (the (go) rule: publish the gate in
+            # force, so the row is a receipt)
+            "max_open": b.s.max_open,
+            "held": {c: (m or {}).get("tag") for c, m in b.meta.items()},
+            "fund_realized": round(b.fund_realized, 4),
+            "fund_open": round(open_accr, 4),
+            "btc_regime_up": regime,
+            # getattr, not attribute: `.skipped` is populated by boot's
+            # universe resolution — a builder that raises on a fresh Book is
+            # the exact class this function exists to close
+            "skipped_unlisted": getattr(b.s, "skipped", []),
+            **_control_extra(b), **_census_extra(b),
+            **spend_extra(b, t0),
+            **_census_series_extra(b, t0)}
 
 
 def _census_series_extra(b, t_now):
@@ -3191,7 +3227,6 @@ def main():
                          "universe)", b.bot_id, coin, zpx)
 
             # ---- publish + persist ----
-            open_accr = sum((m or {}).get("accrued", 0.0) for m in b.meta.values())
             try:
                 store.publish(
                     b.bot_id, status="online", equity=b.equity(),
@@ -3200,21 +3235,16 @@ def main():
                     open_trades=b.broker.open_count(),
                     closed_trades=b.n_closed, wins=b.n_wins,
                     losses=b.n_closed - b.n_wins,
-                    extra={"mode": mode, "venue": mode, "style": b.s.style,
-                           "family": True,
-                           # [(ne)] the EFFECTIVE cap (the (go) rule: publish
-                           # the gate in force, so the row is a receipt)
-                           "max_open": b.s.max_open,
-                           "held": {c: (m or {}).get("tag") for c, m in b.meta.items()},
-                           "fund_realized": round(b.fund_realized, 4),
-                           "fund_open": round(open_accr, 4),
-                           "btc_regime_up": regime,
-                           "skipped_unlisted": b.s.skipped,
-                           **_control_extra(b), **_census_extra(b),
-                           **spend_extra(b, t0),
-                           **_census_series_extra(b, t0)})
-            except Exception:  # noqa: BLE001
-                pass
+                    extra=family_publish_extra(b, mode, regime, t0))
+            except Exception as _pe:  # noqa: BLE001
+                # [2026-09-02] never-raise stays (a publish failure must not
+                # kill the trading loop) but never-SAY goes: this exact
+                # `pass` hid five days of spend_extra's AttributeError
+                # killing every family book's publish while the books traded
+                # on. A persistent condition must not be silent (I4) — one
+                # line per book per loop is the floor of visibility.
+                log.warning("%s bot_pnl publish FAILED (row going stale): %s",
+                            b.bot_id, _pe)
             # [2026-08-15 (my)] I9: the MTM equity series for the six family/
             # spot books. The MTM_PENDING exemption ("short holds, |unreal|
             # <= $5.31") was written before 🙏 avo-maria-lshadow became the

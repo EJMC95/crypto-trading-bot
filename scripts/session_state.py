@@ -85,6 +85,25 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "georgia-v1-preregistered-read-10sep",
+        "owner": "session",
+        "what": "🔮 georgia v1 was on the (wt) September slate and DEFERRED "
+                "on Eamon's confirmed date ('On 10 sep'): her cap-5 "
+                "trajectory carries the pre-registered claim "
+                "georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, "
+                "days-to-gate ~187 predicted at a higher mean). ON 10-SEP: "
+                "grade the claim on her post-cap closes ONLY. Prediction "
+                "fails -> retire via lighter_family_bot.RETIRED_BOOKS key "
+                "'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + "
+                "both halves + slate-test update; holds -> record the keep "
+                "with the fresh number. Either way, close this row with the "
+                "verdict.",
+        "why_open": "retiring her before the registration's own read voids "
+                    "it (I21/I25); the docket's ~4,233d pools ~200 pre-cap "
+                    "closes against ~25 post-cap ones.",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 10),
+    },
+    {
         "id": "counterweight-preregistered-fresh-read",
         "owner": "session",
         "what": "⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a "
@@ -249,8 +268,12 @@ CARRIED = [
                 "writer: the (ml)/(vy) stuck-serving class on this service for "
                 "the SECOND time (646/647/648 before), and the family bot has no "
                 "claim_writer, so the two writers are unguarded ((hp) class). "
+                "[(wv), same day] AND the current container could not publish at "
+                "all: spend_extra raised inside the publish site's except: pass "
+                "on every loop since (vr) — fixed at (wv), which also kills the "
+                "instance; this row closes on the feed readback. "
                 "Consequence: the (wp) scan-order parity port, mum v2's post-"
-                "28-Aug fixes and the (wv) lever surface have NOT reached the "
+                "28-Aug fixes and the (ww) lever surface have NOT reached the "
                 "shadow twins; the judge's pair cannot open until they do.",
         "why_open": "no lever in this repo swaps the serving container when "
                     "Railway's activation wedges: `up` builds and the swap "
@@ -260,7 +283,7 @@ CARRIED = [
                     "family-lighter-shadow (or `railway down` the service, "
                     "then `railway up` from clean main), then read back "
                     "extra.build on freqtrade-mum-lshadow — expected "
-                    "9c90be27d763/15 at 6639f1e, or the (wv) image's own id "
+                    "9c90be27d763/15 at 6639f1e, or the (ww) image's own id "
                     "once merged (16 files: fleet_tuning.py joins the COPY set).",
         "subject": ("freqtrade-mum-lshadow", "freqtrade-avo-maria-lshadow"),
         # closes when a human has read the stamp back and recorded it — only
@@ -348,7 +371,7 @@ CARRIED = [
                     "the (tm)-fixed policy — time, not tuning.",
         "closes_when": lambda: False,
     },
-    # [2026-09-02 (wv)] `carry-garrett-ranking-collision` DELETED — 🛢️ Garrett
+    # [2026-09-02 (ww)] `carry-garrett-ranking-collision` DELETED — 🛢️ Garrett
     # retired at (wv) (unreachable, n=85, t=-2.22, ub -0.455%); the component
     # is the carry/Rich Dad pair, already declared in KNOWN_CELL_COLLISIONS
     # with its own ~12-Sep decision point.

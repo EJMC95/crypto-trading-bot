@@ -69,7 +69,7 @@ RETIRED_LIVE_ARMS = {
                "(live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65; "
                "shadow n=161 mean -0.195% t=-0.95 halves +5.71/-18.32). "
                "The shadow twin kept trading as the control arm until "
-               "2-Sep (wv), when the judge's lane moved to mum and the twin "
+               "2-Sep (ww), when the judge's lane moved to mum and the twin "
                "retired on its own record (n=200, t=-2.32, ub -0.233%).",
     },
     "freqtrade-georgia-lighter": {
@@ -338,7 +338,7 @@ def active_price_pairs():
 
 
 def living_pair_default():
-    """[2026-09-02 (wv)] (live_bot, shadow_bot) — THE LIVING PAIR every organ
+    """[2026-09-02 (ww)] (live_bot, shadow_bot) — THE LIVING PAIR every organ
     that pairs a live arm with its shadow twin defaults to: the 🧪 judge's
     serial lane, the 📏 shortfall organ, and their collision check. One owner,
     so the judge and the shortfall organ cannot disagree about which twin is

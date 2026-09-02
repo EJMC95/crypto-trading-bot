@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 16:03 Sydney (06:03Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 16:14 Sydney (06:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `georgia-v1-preregistered-read-10sep`  ·  owner: **session**
+🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
+
+_Still open because:_ retiring her before the registration's own read voids it (I21/I25); the docket's ~4,233d pools ~200 pre-cap closes against ~25 post-cap ones.
 
 ### `counterweight-preregistered-fresh-read`  ·  owner: **session**
 ⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 1-Oct, whichever first. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
@@ -25,9 +30,9 @@ _Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is st
 _Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. [26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, crash-dominated — decides NOTHING either way; 3 of the six (sv) controls have flipped negative, so the 3->4 step is REFUSED on current data and 3->2 reversion equally unsupported. The OTHER half is now MEASURED AND CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 paired, both intrabar conventions) put every widening below the harness's own +0.246pp calibration error, roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees between conventions, and the 1440m max_hold fired 0 of 207 closes ever — exits are a dead dial on this book; the mean lever is ENTRY quality (rank1 +0.023% vs rank2 +0.656% on her own ledger).
 
 ### `family-shadow-stale-writer`  ·  owner: **OPERATOR**
-🩺 family-lighter-shadow's rows (👩 mum-lshadow, 🙏 avo-lshadow — the live pair's CONTROL ARMS) publish build edc3032d1c46/15, which the repo's own audit_code_currency resolves to commit d2c0cb9 (28-Aug, 84 commits behind, 5 touching lighter_family_bot.py). Measured 2-Sep: THREE OK-reported deploys (05:12 run 660, 05:21 run 661, 05:33 dispatch 664 from clean main) each booted a container that runs its loop, and the (vy) restart lever (run 665) ran too — the rows kept the old stamp through all four. A pre-28-Aug container is still the writer: the (ml)/(vy) stuck-serving class on this service for the SECOND time (646/647/648 before), and the family bot has no claim_writer, so the two writers are unguarded ((hp) class). Consequence: the (wp) scan-order parity port, mum v2's post-28-Aug fixes and the (wv) lever surface have NOT reached the shadow twins; the judge's pair cannot open until they do.
+🩺 family-lighter-shadow's rows (👩 mum-lshadow, 🙏 avo-lshadow — the live pair's CONTROL ARMS) publish build edc3032d1c46/15, which the repo's own audit_code_currency resolves to commit d2c0cb9 (28-Aug, 84 commits behind, 5 touching lighter_family_bot.py). Measured 2-Sep: THREE OK-reported deploys (05:12 run 660, 05:21 run 661, 05:33 dispatch 664 from clean main) each booted a container that runs its loop, and the (vy) restart lever (run 665) ran too — the rows kept the old stamp through all four. A pre-28-Aug container is still the writer: the (ml)/(vy) stuck-serving class on this service for the SECOND time (646/647/648 before), and the family bot has no claim_writer, so the two writers are unguarded ((hp) class). [(wv), same day] AND the current container could not publish at all: spend_extra raised inside the publish site's except: pass on every loop since (vr) — fixed at (wv), which also kills the instance; this row closes on the feed readback. Consequence: the (wp) scan-order parity port, mum v2's post-28-Aug fixes and the (ww) lever surface have NOT reached the shadow twins; the judge's pair cannot open until they do.
 
-_Still open because:_ no lever in this repo swaps the serving container when Railway's activation wedges: `up` builds and the swap does not happen, `redeploy` re-runs the CURRENT deployment ((vz)). The act is Eamon's, in the Railway UI: find and remove the extra running instance of family-lighter-shadow (or `railway down` the service, then `railway up` from clean main), then read back extra.build on freqtrade-mum-lshadow — expected 9c90be27d763/15 at 6639f1e, or the (wv) image's own id once merged (16 files: fleet_tuning.py joins the COPY set).
+_Still open because:_ no lever in this repo swaps the serving container when Railway's activation wedges: `up` builds and the swap does not happen, `redeploy` re-runs the CURRENT deployment ((vz)). The act is Eamon's, in the Railway UI: find and remove the extra running instance of family-lighter-shadow (or `railway down` the service, then `railway up` from clean main), then read back extra.build on freqtrade-mum-lshadow — expected 9c90be27d763/15 at 6639f1e, or the (ww) image's own id once merged (16 files: fleet_tuning.py joins the COPY set).
 
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
@@ -49,19 +54,35 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (64 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp))
+## Shipped today (80 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
+- `085a748` Merge origin/main: reconcile with the (wt) September slate and the (wu) rails — georgia's shadow retirement withdrawn (deferred to her 10-Sep read), duplicate guards dropped for the slate's, roster re-aims reverted, letter (ws)->(wv)
+- `9c3b2cb` Merge PR #263: the two sizing rails from the edge audit, reshaped to bite only on measured harm; the brain's expansion floors measured and kept (wu)
+- `ab465ba` HANDOFF regenerated after the third re-merge (wu)
+- `07adc37` Merge origin/main a third time: the (wt) September slate landed; the rails entry keeps (wu)
+- `922016c` The September slate (wt): five I17 retirements on the grader's own verdicts (garrett, douglas, farmer-shadow, nav-cook, grimes), georgia v1 deferred to her pre-registered 10-Sep read, trail-blazer-live stopped — Eamon's delegated docket act
 - `643bc6e` CodeQL hygiene on (wt) and the merged (wp): one import style for the family module, no dead binding, file reads through pathlib, explanatory comments in the two empty excepts, redundant inner imports dropped
+- `83bcbfd` CodeQL hygiene on the floors study: the --out write goes through a with-block (wu)
+- `cd8410c` Port the selftest registration for scripts/study_taker_divergence_stop_2026-09-02 (wu)
 - `7544d84` (wt) the family shadow host is stuck on 28-Aug code: carried as an operator act with the stamp to read back
+- `b0b2340` HANDOFF regenerated after the second re-merge (wu)
+- `5724989` Merge origin/main again: main took (wq)-(ws) and holds (wt) in flight, so the rails entry moves to (wu); the carried list is main's minus the closed floors row
 - `bd1ad2a` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
 - `b7599d4` Renumber (ws) -> (wt): main took (ws) for the sentinel's graded bar while this pass was open
+- `1b12ace` HANDOFF regenerated after closing the floors row (wq)
+- `7dd38b4` The brain's expansion floors, measured before the rails merge: floors KEPT with evidence, the entry's two false sentences corrected in place, the carried row closed (wq)
 - `21283ad` (ws) Proceed with everything in the organ review: five docket retirements, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to mum, and a weekly organ board
 - `6639f1e` The sentinel earns its fear (ws): one graded bar (n>=10, hit>=0.55) for BOTH proposal directions — a below-coin-flip playbook can no longer propose the crouch
 - `7ab31ed` The clock split (wr): the breakout trend exit gets its own BRK_MAX_HOLD_H — taker.max_hold_h steers only the divergence bracket, AST-pinned, behaviour-neutral at ship
+- `694f7c6` HANDOFF regenerated after merging main into the rails branch (wq)
+- `27a3d7b` Merge origin/main into the rails branch: #262 took (wp), so the rails entry moves to (wq) and every citation moves with it
 - `7cb0c7d` The backlog drained (wq): both live books claim-justified (ratchet 2->0), Counterweight fresh-read tripwire, minvol wired into the tp study, the (sk) breakoutup pins re-decided on a sighted gate, divergence stop priced (a refusal)
 - `faf9bc8` [deploy-live] Merge PR #262: (wp) support-system deep dive — cohort long budget, held-basket margin, shadow scan-order parity, living shortfall pair
+- `2165a41` CodeQL hygiene on the rails: three NaN checks through math.isnan, a commented fallback except, an unused test import (wp)
 - `f58ba46` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
 - `7227ca0` Renumber (wo) -> (wp): main took (wo) for the edge audit while this PR waited on CI; citations moved with it (wp)
+- `a0f3426` Regenerate HANDOFF — I11's regenerate-last half (wp)
+- `3aff7bc` The two sizing rails from the edge audit, reshaped to bite only on measured harm: a book past its drawdown bar is scaled, a book whose era bound is measured at zero is not levered (wp)
 - `cf11c48` Merge PR #260: the edge audit — 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wo)
 - `dec9ad4` (wo) the support-system deep dive: cohort long budget, held-basket margin, shadow scan-order parity, a living shortfall pair, Counterweight's date
 - `713c0c0` Kelly's clip was already cut to $80 on 1-Sep (vy): the audit's 'nothing reduces her clip' corrected in place, and her Monte Carlo re-run at the live clip (wo)
