@@ -1,3 +1,102 @@
+## 2026-09-02 (wq) — "IMPLEMENT ALL OF THE ABOVE": the backlog drained — both live books get their justification claims (ratchet 2→0), three carried rows close on measurements, and the (sk) cage pins are re-decided on a sighted gate
+
+**[RENUMBERED (wp) -> (wq) at push time** — PR #262's support-system deep dive took (wp) on main while this pass's suite ran; the pushed entry keeps the letter per the letter rule.**]**
+
+Eamon: *"Implement all of the above"* / *"After that's been fixed look at
+further improvements."* Six items, each with its number:
+
+**1. THE CLAIMS BACKLOG IS ZERO — the guard runs at full strength for the
+first time.** Georgia's retirement took the fleet's only justification claim
+off the roster, leaving BOTH live books as prose nobody could recompute. Two
+rows added to `claims_ledger.CLAIMS`, graded live before shipping:
+`mum-golive-justification` (the (wg) reallocation's argued number — her
+positive edge lower bound, owner `fleet-allocation →
+books.freqtrade-mum-lighter.bound_pct`, live 0.0037 ≈ the quoted +0.366%/t,
+HOLDS) and `avo-live-keep-criterion` (the (qu) keep's tracked pooled mean,
+owner `golive-readiness → books.freqtrade-avo-maria-lshadow.mean_pct`, live
+0.904 vs registered 0.901, HOLDS; criterion resolves ~n=68).
+`audit_claim_freshness.RATCHET` tightens 2 → 0: any live row without a claim
+now fails the push that adds it. The owner-resolution test gained an
+allocation-payload fixture built by that organ's own `run_once` (publisher-
+built, never hand-shaped); 3/3 mutations RED (phantom owner field, dropped
+cover, loosened ratchet).
+
+**2. ⚖️ COUNTERWEIGHT'S PRE-REGISTERED READ IS A TRIPWIRE, NOT A MEMORY.**
+New CARRIED row `counterweight-preregistered-fresh-read` whose predicate
+fires on 1-Oct — CI reds until a session performs the fresh on-class read
+(n≥60 after 1-Sep or the date, retire if fresh upper bound ≤ 0) and records
+the verdict. The date is the backstop; n≥60 earlier is the trigger.
+
+**3. THE $10M FLOOR IS THE FUNDING STUDIES' DEFAULT, AND THE LOADER OWNS
+IT.** `minvol_entry_ok` moved from the gate study into
+`backtest_funding_lighter` (one owner; the gate study imports it by
+IDENTITY), and `study_farmer_take_profit` now applies the live floor at
+every entry BY DEFAULT (`--min-vol 0` reproduces the rank table, labelled) —
+selftest-pinned that the predicate fail-closes on unknown volume and threads
+into all three run() calls. Carried row
+`funding-studies-inherit-the-rank-universe` CLOSED by its own predicate.
+Breadth + persistence stay header-recorded refusals ((vj): floored
+populations n=0 / all-zero arms — a floor wired into an instrument that then
+measures nothing is motion, not growth).
+
+**4. THE (sk) CAGE PINS RE-DECIDED — ON THE PIN'S OWN STATED CONDITION,
+verified live.** The carried row `taker-replay-blind-to-breakoutup` was
+STALE: the durable fix (replay `daily_up_resolver` + the taker's breakoutup
+relabel, forwarded by the tuner and incubator) shipped 20-Aug, and the row's
+predicate watched a string that legitimately survives as the no-resolver
+fallback — the same false-negative sat in
+`test_the_replay_still_cannot_see_the_lens…`, the tripwire that was supposed
+to ring. Measured on the live bus: the tuner's own baseline now fills
+**breakoutup taken=26 closed=23**, so the blind-gate arithmetic (restrict
+free at $0.00, expand unclearable) no longer holds. RE-DECIDED:
+`taker.brk_range` hi 0.95 → 0.97 and `taker.max_hold_h` lo 48 → 24 are
+two-way again — a restrict walk now pays a real replay delta — with the
+un-pin COUPLED TO SIGHT by
+`test_breakoutup_ratchet.test_the_unpin_is_coupled_to_the_gates_sight`
+(re-blind the replay or stop forwarding the resolver and the test demands
+the pins back). `brk_trail`/`brk_sl` STAY pinned: nothing walks them and
+both widenings were measured-and-withheld on their own numbers. No lever
+moves at ship (defaults unchanged); expectancy price zero — this is reach
+returned to a gate that earned it back. The full suite then found the
+SECOND pin of the same decision — `test_lever_version_skew.
+DELIBERATELY_CLAMPED` still asserted 0.97 clamps to 0.95 — and it is
+RE-AIMED at the two levers that stay pinned (brk_trail 0.04→0.06,
+brk_sl −0.05→−0.07), per I26's own rule: when a pin blocks a re-decision,
+the question is whether the decision is right, never whether the pin
+exists.
+
+**5. THE DIVERGENCE STOP IS PRICED, AND THE PRICE IS A REFUSAL WITH
+EVIDENCE.** `scripts/study_taker_divergence_stop_2026-09-02.py` replayed
+503.7h of recorded tape through the taker's own code, `tt.STOP_LOSS` the
+only variable, IMB-10 marked scoring, per-half. Its own calibration gate
+REFUSES to recommend: the book's last REAL divergence close is **20-Aug** —
+the lens is vetoed by its own realised record, so the instrument cannot be
+calibrated against a sample the book can no longer produce. Descriptively
+the only cage-reachable move (sl −0.03 → −0.04) measured **−$2.80**; the
+apparent gains sit beyond the cage (−0.05: +$16.45, −0.06: +$29.96) on div
+n=9–20 with unstable halves — slot reallocation as much as exit value.
+Pricing a stop for a lens the book refuses to trade is not a candidate; if
+the veto lifts on fresh evidence, re-run THEN on the closes that lifted it.
+Carried row `taker-divergence-stop-unpriced` CLOSED (its own text: only a
+measurement closes it). Two instrument defects found by its first run are
+fixed in the file (a fleet-wide ledger limit that missed the taker's own
+12–20 Aug closes; a fake +0.000% printed when `pnl_pcts` is absent).
+
+**6. HOUSEKEEPING.** The dead session's superseded `fleet_watchdog_svc.py`
+draft is discarded from the main worktree (verified byte-for-byte the (wn)
+predecessor first). The `trail-blazer-live` service stop was attempted and
+BLOCKED by the session's permission layer — Eamon's one-liner:
+`railway down --service trail-blazer-live --environment production -y`
+(reversible; the durable retirement is the (wg) code guard either way).
+
+CARRIED: 14 → 11 rows, every close on a measurement or a shipped wiring.
+DEPLOY: freqtrade-bots rides the auto path (fleet_tuning's un-pinned cages
+reach the tuner; `clamp` runs at read so no lever write is needed). No
+real-money service is touched — the taker's `apply_tuning` returns empty on
+the live arm, twice-guarded.
+
+
+
 ## 2026-09-02 (wp) — THE SUPPORT SYSTEM DEEP DIVE: every organ is alive, the candidate line is structurally empty by design, and four of the fleet's own instruments were pointed at the wrong thing — paper positions vetoing real money, a stop-dead page on a basket nobody held, a judge with no pair it could open, an execution organ measuring a retired book
 
 **Eamon, 2-Sep: *"Deep dive into how every organ, scanner, incubator, is

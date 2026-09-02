@@ -112,15 +112,11 @@ def coverage(mk, t0, t1, floor):
             "pct": (100.0 * ok / hrs) if hrs else 0.0}
 
 
-def minvol_entry_ok(mk, floor):
-    """The live bot's MIN_VOL, as an entry predicate. UNKNOWN volume REFUSES —
-    the bot reads a live volume every loop and cannot enter without one, so a
-    data gap must not become a free pass (fail-closed, and it keeps the replay
-    strictly pessimistic rather than strictly optimistic)."""
-    def _ok(sym, t):
-        v = H.vol24(mk[sym], t)
-        return v is not None and v >= floor
-    return _ok
+# [2026-09-02] moved to the LOADER (backtest_funding_lighter.minvol_entry_ok)
+# so every study reusing it gets the honest-population predicate from ONE
+# owner — a second copy of a rule is a second rule ((hj)). Import by IDENTITY
+# so this study's citations keep resolving and cannot drift from the owner.
+minvol_entry_ok = H.minvol_entry_ok
 
 
 def sweep(mk, t0, t1, floor=None):

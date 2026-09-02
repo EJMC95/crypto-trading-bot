@@ -84,6 +84,30 @@ def _has(path, needle):
 # "OPERATOR" = it needs a decision this repo may not make.
 # ---------------------------------------------------------------------------
 CARRIED = [
+    {
+        "id": "counterweight-preregistered-fresh-read",
+        "owner": "session",
+        "what": "⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a "
+                "PRE-REGISTERED read (I21, recorded in CLAUDE.md's "
+                "acknowledged-recurrence line for perps-funding-spread): "
+                "grade the FRESH on-class closes (class_split, closes AFTER "
+                "1-Sep only — never the window that motivated the keep) at "
+                "n>=60 or on 1-Oct, whichever first. RETIRE without further "
+                "debate if the fresh on-class upper bound (m+1.28*SE) <= 0; "
+                "keep grading if the fresh mean > 0; anything else returns "
+                "to Eamon with both numbers.",
+        "why_open": "the read date has not arrived. This row is the tripwire "
+                    "the registration lacked: its predicate fires on 1-Oct, "
+                    "so CI reds until a session actually PERFORMS the read "
+                    "and closes this row with the verdict in the CHANGELOG. "
+                    "If fresh on-class n reaches 60 EARLIER, do the read "
+                    "then — the date is the backstop, not the trigger.",
+        # Deliberately date-only: the predicate firing means the read is DUE,
+        # and the honest way to close the row is to run the read and record
+        # the verdict — deleting it without the verdict is the thing the
+        # preamble says somebody has to justify.
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 1),
+    },
     # [2026-08-25 (tc)] `farmer-live-swap-operator-steps` DELETED — spent, and
     # its closes_when could never fire: it watched for a `georgia-live` service
     # while the (tb) plan change converted `trail-blazer-live` IN PLACE (so no
@@ -94,44 +118,14 @@ CARRIED = [
     # market_context's LIVE_CADENCE_SEC). The row's own text also named two
     # registries that never existed (`fleet_books.LIVE_DEPLOY`,
     # `PROP_LIVE_ROWS`) — corrected in MUM_GOLIVE_RUNBOOK.md's activation list.
-    {
-        "id": "funding-studies-inherit-the-rank-universe",
-        "owner": "session",
-        "what": "(su) found `backtest_funding_lighter` selects its universe by "
-                "RANK while the live bot filters on an absolute $10M/day floor "
-                "only 11 of 212 markets clear — so its verdicts were measured "
-                "on books the book refuses, and the gate table it produced "
-                "INVERTS between universe 25 and 50. The loader now carries "
-                "volume and `study_farmer_gate_minvol_2026-08-22` replays the "
-                "honest population. **Four other scripts reuse that loader and "
-                "have not been re-derived**: study_farmer_take_profit, "
-                "backtest_farmer_breadth_lighter, backtest_funding_persistence "
-                "and backtest_xsect_funding_lighter.",
-        # [(vj)] THE MEASUREMENT IS DONE; THE WIRING IS NOT. All four were
-        # re-run against the live bot's $10M/day floor and each verdict is now
-        # recorded in its own header, so the next session must NOT re-measure:
-        #   * take_profit  — refusal SURVIVES and HARDENS. tp-0.06 goes from
-        #     "beats live on top-25" to LOSING $10-$28 vs live; both-halves
-        #     clears 0 of 60 rows. The universe-dependent sign was itself the
-        #     rank artifact.
-        #   * persistence  — "predictable and it does not matter" SURVIVES and
-        #     HARDENS: its 3 clearing arms go to ZERO at the floor.
-        #   * breadth      — the explore verdict FLIPS to STRUCTURALLY
-        #     UNMEASURABLE: at the live floor the explore slice is n=0,
-        #     byte-identical to baseline on both windows and both slips. Where
-        #     the slice IS populated (no floor) it loses -$0.096 to -$0.117/t.
-        #   * xsect        — NOT AFFECTED; it never calls the rank loader.
-        # So no standing refusal was wrong, and one "it earns" reading was
-        # never measurable at all — which is the (lv) `{n: 0}` ambiguity again.
-        "why_open": "the VERDICTS are now re-derived and recorded in each "
-                    "header; what is still open is the WIRING — these scripts "
-                    "keep selecting by rank, so the next person to run one "
-                    "gets the rank-selected answer unless they pass the floor "
-                    "by hand. Closes when study_farmer_take_profit uses "
-                    "`minvol_entry_ok` itself.",
-        "closes_when": lambda: _has(
-            "scripts/study_farmer_take_profit.py", "minvol_entry_ok"),
-    },
+    # [2026-09-02] `funding-studies-inherit-the-rank-universe` DELETED —
+    # CLOSED by its own predicate: study_farmer_take_profit now applies the
+    # live $10M/day floor by DEFAULT via the loader-owned minvol_entry_ok
+    # (moved into backtest_funding_lighter, one owner; the gate study
+    # imports it by identity). breadth + persistence stay header-recorded
+    # refusals: (vj) measured their floored populations at n=0 / all-zero
+    # arms, so wiring the floor there yields an instrument that measures
+    # nothing; xsect never used the rank loader.
     {
         "id": "allocation-clamp-is-a-per-position-bound-doing-per-book-duty",
         "owner": "OPERATOR",
@@ -208,22 +202,16 @@ CARRIED = [
         # has actually re-decided them rather than inherited them.
         "closes_when": lambda: not _has("bot_learn.py", "PROMOTE_RUNS = 3"),
     },
-    {
-        "id": "taker-replay-blind-to-breakoutup",
-        "owner": "session",
-        "what": "lighter_ticket_replay refuses every breakout entry "
-                "(`_up = False if lens == \"breakout\"`), so the scout tuner's "
-                "gate cannot see the taker's ONLY living lens. (sk) pinned the "
-                "cages shut against the resulting one-way ratchet; the DURABLE "
-                "fix is to give the replay the taker's own breakoutup relabel "
-                "via up_read(), after which the cage pins are a decision to "
-                "re-make on evidence.",
-        "why_open": "changes what the tuner's leaderboard measures — needs its "
-                    "own before/after on the recorded tape, not a refactor.",
-        "closes_when": lambda: not _has(
-            "lighter_ticket_replay.py",
-            '_up = False if lens == "breakout" else None'),
-    },
+    # [2026-09-02] `taker-replay-blind-to-breakoutup` DELETED — BOTH halves
+    # done. The blindness half was fixed 20-Aug (daily_up_resolver + the
+    # relabel, forwarded by the tuner and incubator, selftest-pinned) and
+    # this row never fired because its predicate watched a string that
+    # legitimately survives as the no-resolver fallback. The cage half was
+    # re-decided 2-Sep on LIVE evidence (tuner baseline breakoutup
+    # taken=26 closed=23): brk_range/max_hold_h two-way again, coupled to
+    # sight by test_breakoutup_ratchet.test_the_unpin_is_coupled_to_the_
+    # gates_sight; brk_trail/brk_sl stay pinned (walked by nothing,
+    # widenings measured-and-withheld).
     {
         "id": "breakout-arm-inherits-reversion-clock",
         "owner": "session",
@@ -310,28 +298,20 @@ CARRIED = [
                     "quantity first (the (sk) give_back/mae_ret pattern).",
         "closes_when": lambda: _ratchet_at_or_below("unmeasurable", 0),
     },
-    {
-        "id": "taker-divergence-stop-unpriced",
-        "owner": "session",
-        "what": "🎫 the taker's short-divergence stop (SHADOW arm) reads +28pp "
-                "reclaim excess and +2.10% held at 24h over n=22 — a measured "
-                "SIGNAL with no priced VALUE. lighter_ticket_replay is the "
-                "calibrated instrument; a candle walk is not (it has no short "
-                "branch).",
-        # [(vj)] RE-POINTED. This read "The LIVE taker's ..." and "real-money
-        # row: measure and hand over, never hand-set" — but the taker's LIVE
-        # arm was retired 13-Aug (ma) when 🙏 Avo Maria took its slot, so for a
-        # fortnight the row told the next session it was handling real money
-        # when the only arm still trading is the $1k shadow. That inverts the
-        # standing rule: it made a shadow measurement look untouchable. The
-        # SHADOW arm is unretired and still accruing, so the work is real —
-        # only its subject and its caution were wrong.
-        "why_open": "shadow book, so a session may measure AND act ((kd)); "
-                    "the reason it is open is that nobody has priced it — "
-                    "the replay is the instrument and it has not been run.",
-        "subject": ("lighter-ticket-taker-lshadow",),
-        "closes_when": lambda: False,      # only a measurement closes this
-    },
+    # [2026-09-02] `taker-divergence-stop-unpriced` DELETED — THE MEASUREMENT
+    # WAS RUN (scripts/study_taker_divergence_stop_2026-09-02.py, 503.7h of
+    # recorded tape through the taker's own replay) and the verdict is a
+    # REFUSAL WITH EVIDENCE: (1) the study's own calibration gate refuses —
+    # the book's last REAL divergence close is 20-Aug and the lens is vetoed
+    # by its own realised record, so the instrument cannot be calibrated
+    # against a live sample it can no longer produce; (2) descriptively, the
+    # only cage-reachable move (taker.sl -0.03 -> -0.04) measured NEGATIVE
+    # (-$2.80 full-tape) — the apparent gains live beyond the cage (-0.05:
+    # +$16.45, -0.06: +$29.96) on div n of 9-20 with unstable halves, i.e.
+    # slot-reallocation noise as much as exit value. Pricing a stop for a
+    # lens the book refuses to trade is not a candidate; if the veto ever
+    # lifts on fresh evidence, re-run the study THEN, on the closes that
+    # lifted it.
     {
         "id": "georgia-t-bar",
         "owner": "session",

@@ -77,7 +77,12 @@ DOCKERFILE = os.path.join(ROOT, "Dockerfile.freqtrade")
 #: roster AND took the fleet's only justification claim with her, so the
 #: backlog is STILL 2 — now avo and mum, both unjustified. The value holds;
 #: the basis above is history.
-RATCHET = {"live_rows_without_a_justification_claim": 2}
+#: [2026-09-02, same day] DRAINED TO ZERO — mum-golive-justification and
+#: avo-live-keep-criterion cover both live rows, so the ratchet tightens to
+#: its measured floor. From here ANY live row without a claim fails the push
+#: that adds it, which is the guard working at full strength for the first
+#: time since it shipped.
+RATCHET = {"live_rows_without_a_justification_claim": 0}
 
 #: Distinguishes "read the real thing" from "the read FAILED". `None` is the
 #: fail-closed value an unreadable roster returns, so it cannot double as the
