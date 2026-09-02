@@ -131,11 +131,10 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import math
 import os
 import random
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -162,6 +161,14 @@ SEED = 20260902
 #: ((oe): shipping a swept grid's maximum is how an artifact gets deployed).
 K_GRID = (1.00, 0.75, 0.50, 0.35, 0.25)
 HOLD_GRID = (24, 20, 16, 12, 8)          # bars; 24 = shipped control
+#: C1's comparison set: (family, ledger reasons that belong to it). ONE
+#: declaration the loop actually reads — this started life as a dead `fams`
+#: tuple beside a hand-written loop, i.e. the intent recorded and not wired,
+#: which is how the two drift. `stop` and `stop_loss` are the same family: the
+#: replay emits the first and the ledger carries both.
+EXIT_FAMILIES = (("roi", ("roi",)),
+                 ("max_hold", ("max_hold",)),
+                 ("stop", ("stop", "stop_loss")))
 
 
 # ----------------------------------------------------------------- the rule
@@ -405,20 +412,14 @@ def calibrate(led, mids, ladder, stop, hold):
         return {"ok": False, "why": f"only {matched} ledger rows replayable "
                                     "(<20) — the harness cannot be calibrated",
                 "matched": matched, "unmatched": unmatched}
-    fams = ("roi", "max_hold", "stop", "stop_loss")
     rs, as_ = Counter(rep), Counter(act)
     rows, worst = [], 0.0
-    for f in ("roi", "max_hold"):
-        pr = 100.0 * rs.get(f, 0) / matched
-        pa = 100.0 * as_.get(f, 0) / matched
-        rows.append({"exit": f, "replayed_pct": round(pr, 1),
+    for fam, members in EXIT_FAMILIES:
+        pr = 100.0 * sum(rs.get(m, 0) for m in members) / matched
+        pa = 100.0 * sum(as_.get(m, 0) for m in members) / matched
+        rows.append({"exit": fam, "replayed_pct": round(pr, 1),
                      "actual_pct": round(pa, 1), "gap_pp": round(pr - pa, 1)})
         worst = max(worst, abs(pr - pa))
-    pr = 100.0 * (rs.get("stop", 0) + rs.get("stop_loss", 0)) / matched
-    pa = 100.0 * (as_.get("stop", 0) + as_.get("stop_loss", 0)) / matched
-    rows.append({"exit": "stop", "replayed_pct": round(pr, 1),
-                 "actual_pct": round(pa, 1), "gap_pp": round(pr - pa, 1)})
-    worst = max(worst, abs(pr - pa))
     return {"ok": worst <= CAL_TOL_PP, "worst_gap_pp": round(worst, 1),
             "tol_pp": CAL_TOL_PP, "matched": matched, "unmatched": unmatched,
             "mix": rows,
