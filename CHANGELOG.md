@@ -1,3 +1,97 @@
+## 2026-09-02 (xe) — 👩 MUM'S REAL-MONEY LIQUIDATION READ WAS BLIND TO ONE OF HER TEN LEGS, AND A BLIND LEG IS EXCLUDED FROM `nearest_liq` BY CONSTRUCTION — the (xa) alias seam, one layer up
+
+**Eamon, 2-Sep:** *"Optimise and fix anything need be - she must work."* Found by
+reading her live row rather than the code: `fleet_immune` was paging
+`headroom refused: mark_blind (gap 19.16 stop-widths)` on
+`freqtrade-mum-lighter`, and the margin block underneath it published
+**`liq_mark_blind: ["kPEPE"]`** while the scout was publishing that market's
+mark the whole time (`1000PEPE 0.003407`).
+
+### THE SEAM — three owners, two spellings, one join that missed
+
+A coin has two names (`venues/symbol_map`: fleet `kPEPE` ↔ venue `1000PEPE`).
+
+| step | keyed | since |
+|---|---|---|
+| `venue.positions()` | FLEET (`from_lighter`) | always |
+| the live host's `live_pos` | **VENUE** (`to_lighter`) | **(xa), today** |
+| `marks.stop_marks(venue, coins)` | as passed — its contract says FLEET | always |
+| `margin_state_from`'s positions | FLEET (`_positions_from`) | always |
+
+`(xa)` re-keyed the host's position map to the venue spelling so the exit
+reconciler and the host's meta would agree on one name — correct, and it fixed a
+leg running with no bracket. That dict then flows into `_margin_block`, which
+passed it straight to `stop_marks`, which returned a **venue-keyed** marks map,
+which `margin_state_from` looked up **fleet-keyed**. Every 1000-market missed.
+
+**A blind leg does not merely lose its own number — it is dropped from
+`nearest_liq` entirely**, which is the fail-OPEN hole the `(rb)` comment three
+lines above it exists to close, reopened one layer up. The account then reports
+the closest liquidation among the legs it could price.
+
+### WHAT IT COST TODAY — measured, and honestly: nothing yet
+
+Mum, 10 legs, $541 equity, 6.22× leverage. Her published read was *"nearest
+liquidation: XRP, 77.7% away"*. Resolving the blind leg against the scout's own
+mark puts **kPEPE at 80.0%** — further out than XRP, so the published nearest
+was right by luck of the draw and no danger was hidden on that loop. **That is
+the point, not a reprieve:** the leg was not in the comparison at all, so the day
+it IS the nearest, the account still reads safe. Reproduced against the real
+publisher with a synthetic liq: a leg **1.4% from liquidation** reads
+`nearest = XRP, 77.7% away` under the venue spelling and `nearest = kPEPE, 1.4%`
+under the fleet one — same payload, same code, one key.
+
+### BOTH ENDS FIXED, because one end is a fix and two are a closed class
+
+* **The belt — `lighter_avo_live_bot._margin_block`** now maps its venue-keyed
+  position dict through `from_lighter` before calling `stop_marks`, honouring
+  that function's own documented contract. This is the defect.
+* **The braces — `venues/lighter_client.margin_state_from`** REALIGNS a
+  venue-keyed marks map through the same one owner before the lookup, so no
+  future caller can reopen the class, and **publishes `marks_realigned`** naming
+  the keys that needed it: non-empty means a caller is passing the wrong
+  spelling, so the defect is VISIBLE rather than absorbed (I8). Silent tolerance
+  would have hidden the next instance.
+* **Price safety is structural, not asserted:** `from_lighter` only ever rewrites
+  `1000X → kX` at a **1.0** multiplier, so the realigned mark is the same
+  market's price in the same units the venue quotes `liq` and `entry` in. The
+  raw HL spellings that DO carry a 0.001 price scale (PEPE/SHIB/BONK/FLOKI) are
+  never produced by it — and the `mult == 1.0` guard is now DRIVEN by a test
+  that patches the owner to return a scaled alias and asserts the realignment
+  REFUSES (leaving the leg honestly blind) rather than moving a price by 1000×.
+
+**A genuinely unpriced leg still reports blind** — the realignment closes a
+lookup miss, never a real blind spot.
+
+### SCOPE — checked, not assumed
+
+`lighter_funding_bot` passes `ctx.venue.positions()` at both its margin sites, so
+its keys were fleet-spelled and it was never affected; the four book bots carry
+fleet spelling throughout and no `to_lighter` at all. **The live host is the only
+caller that re-keys, and only since (xa)** — so this is one instance and it is now
+unreachable at the publisher for everyone.
+
+**VERIFIED: 8/8 mutations red** — the host back on the venue spelling (the
+shipped defect) · the alias owner replaced by a hand-rolled `1000`-strip · the
+realignment removed · the realignment absorbed without naming itself · a fleet
+key already present overwritten by the alias · the price-scale guard dropped ·
+`marks_realigned` unpublished · a real blind spot passing as clean. The sixth
+SURVIVED the first round — the guard was unreachable and therefore unverified,
+exactly the vacuous-guard shape (I3) — and the test that drives it was written
+because the mutation found it. Consumers are driven on the payload
+`margin_state_from` itself builds ((hj)), never a hand-written margin dict; the
+call-site pin is AST-shaped and FOLLOWS the variable binding, because a substring
+grep passes on the comment describing the fix ((hp)).
+
+**DEPLOY: BOTH WAYS** ((mm)/(pz) — a real-money correctness fix). Markers
+`[deploy-live-taker]` (🙏 avo, `tide-rider-lighter-live`) and `[deploy-live-mum]`
+(👩 mum, `mum-live`); **not** `[deploy-live]`, which would also restart
+🔮 georgia's retired host for nothing. Neither live row was halted at dispatch
+(`status: online`, `halted: None`) — a restart wipes a memory-only halt
+([[lighter-flatten-silent-halt-redeploy-incident]]). **No trade changes**: on the
+variant host the headroom verdict is telemetry, so this changes what she KNOWS,
+not what she does — the false page stops, and the risk read covers all ten legs.
+
 ## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
 
 **[LETTERED (xc) at push time: written as (wz), then (xb); (wz), (xa) AND a second (wy) reached main first — PR #269's cohort long budget, PR #268's mum position aliasing, and another session's (wy) — so this session's two entries take (xb) and (xc) in the order they were written; the pushed entries keep their letters.]**

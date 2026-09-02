@@ -265,6 +265,46 @@ def margin_state_from(acct, marks=None):
     # dark order book made the whole account look safe. Reproduced against this
     # publisher and the real gate before the key was added.
     blind = []
+    # [2026-09-02] THE MARKS MAP IS REALIGNED TO THE FLEET SPELLING BEFORE USE,
+    # AND A REALIGNMENT IS PUBLISHED RATHER THAN ABSORBED.
+    #
+    # `positions` is keyed by the FLEET symbol (`_positions_from` -> from_lighter:
+    # 1000PEPE -> kPEPE) and `marks.stop_marks`'s contract says its coins are
+    # fleet symbols too. A caller holding VENUE-spelled position keys passes
+    # venue-spelled coins, gets a venue-keyed marks map back, and every
+    # 1000-market then misses this lookup and lands in `blind` -- which drops it
+    # out of `nearest_liq` entirely. MEASURED 2-Sep on 👩 mum's real-money row:
+    # `liq_mark_blind: ["kPEPE"]` on a leg whose mark the scout was publishing
+    # the whole time. The account read "nearest liquidation 77.7% away" over the
+    # 9 legs it could price while a 10th was not in the comparison at all; that
+    # leg happened to sit at 80.0%, so nothing was hidden THAT loop -- but a
+    # blind leg is excluded BY CONSTRUCTION, so the day it is the nearest the
+    # account still reads safe. That is the (rb) fail-OPEN hole this key exists
+    # to close, reopened one layer up.
+    #
+    # Realigning through `from_lighter` is PRICE-SAFE and is not a second copy of
+    # the alias rule: it is the one owner (venues/symbol_map), and its multiplier
+    # is 1.0 for every symbol it rewrites (1000X -> kX, both sides counting
+    # thousands), so the mark it carries is the same market's price in the same
+    # units the venue quotes `liq` and `entry` in. The raw HL spellings that DO
+    # carry a 0.001 price scale (PEPE, SHIB, BONK, FLOKI) are never produced by
+    # `from_lighter`, so this can never silently rescale a price.
+    #
+    # `marks_realigned` names the coins that needed it. Non-empty means a CALLER
+    # is passing the wrong spelling -- the risk read is correct, and the defect
+    # is visible instead of showing up months later as a leg nobody priced (I8:
+    # a detector names the thing the operator can act on).
+    from .symbol_map import from_lighter          # the ONE owner of the alias rule
+    realigned = []
+    if isinstance(marks, dict) and marks:
+        _fixed = {}
+        for _k, _v in marks.items():
+            _fleet, _mult = from_lighter(str(_k))
+            if _fleet != _k and _fleet not in marks and _mult == 1.0:
+                realigned.append(str(_k))
+                _fixed[_fleet] = _v
+            _fixed.setdefault(_k, _v)
+        marks = _fixed
     for coin, rec in positions.items():
         val = rec.get("value")
         if val is not None:
@@ -359,6 +399,9 @@ def margin_state_from(acct, marks=None):
         # byte-identical between "nothing qualified" and "nothing was measured".
         "liq_none": sorted(bounded),
         "liq_mark_blind": sorted(blind),
+        # Published even when empty, the (lv) census rule: an omitted key is
+        # byte-identical between "no caller is confused" and "nobody looked".
+        "marks_realigned": sorted(realigned),
     }
 
 
