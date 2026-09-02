@@ -1,4 +1,4 @@
-## 2026-09-02 (ws) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": five docket retirements in one act, the breakout clock split and the incubator cage re-decided, the judge's lane moved to 👩 mum with the family host's first lever surface, and the organ board made a weekly job
+## 2026-09-02 (wt) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": five docket retirements in one act, the breakout clock split and the incubator cage re-decided, the judge's lane moved to 👩 mum with the family host's first lever surface, and the organ board made a weekly job
 
 **Eamon, 2-Sep: *"Proceed with everything in the organ review."*** The (wp)
 review laid out seven keep-or-retire calls with a recommendation each, two
@@ -25,10 +25,10 @@ collision keys (the component drops to the carry/Rich Dad pair its own
 declaration pre-named); three carried rows about books that no longer trade
 are deleted (`carry-garrett-ranking-collision`, `georgia-t-bar`,
 `ceiling-slots-georgia` — (vj)'s rule; (wq)'s
-letter was taken on main while this pass was open, hence (ws)). Two roster pins were re-aimed per
+letter was taken on main while this pass was open, hence (wt)). Two roster pins were re-aimed per
 I26 rather than kept: `test_red_stop_slate` now proves the shared process
 with mum+avo, `test_georgia_stop_tags` reads the declaration.
-`tests/autonomy/test_docket_retirements_ws.py`. **Kept, as recommended:** 🧭
+`tests/autonomy/test_docket_retirements_wt.py`. **Kept, as recommended:** 🧭
 nav-cook (upper bound −0.02%, marginal, half its sample pre-fix — fed 30
 more closes) and ⚖️ Counterweight (re-read 1-Oct).
 

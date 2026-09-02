@@ -90,7 +90,7 @@ def test_the_stamp_reports_what_is_enforced():
 def test_both_arms_stamp_the_SAME_cap_for_georgia():
     """THE PARITY THE JUDGE ACTUALLY CHECKS, driven through the real builder
     rather than asserted about it."""
-    # [2026-09-02 (ws)] georgia is retired on both arms; the PARITY property is
+    # [2026-09-02 (wt)] georgia is retired on both arms; the PARITY property is
     # about the stamp BUILDER, not the roster, so drive it off the registered
     # DayTraderGated carrier (still the one class that throttles).
     geo = next(s for s in fam.STRATEGIES if s.bot == "freqtrade-georgia")

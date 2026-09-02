@@ -38,7 +38,7 @@ def test_every_live_ladder_book_is_declared_unsweepable():
 
 def test_the_two_known_ladder_books_are_covered():
     """georgia was the book that surfaced this and is RETIRED on both arms
-    since (ws); 👩 mum's OversoldRebound and 🙏 avo maria's SwingDip both
+    since (wt); 👩 mum's OversoldRebound and 🙏 avo maria's SwingDip both
     ride an ROI ladder — naming two living books stops a future reader
     assuming the exclusion was georgia-specific."""
     assert "freqtrade-mum-lshadow" in sweep.UNSWEEPABLE_EXITS

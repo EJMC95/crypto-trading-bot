@@ -218,8 +218,8 @@ CARRIED = [
     # steers only the divergence bracket, and the taker's selftest pins the
     # decoupling by AST. No widening shipped (the 48->96 evidence died to
     # leave-one-symbol-out); behaviour-neutral at ship.
-    # [2026-09-02 (ws)] `ceiling-slots-georgia` DELETED — 🔮 georgia is retired
-    # on BOTH arms now (live (wg), shadow (ws) on the organ-review docket:
+    # [2026-09-02 (wt)] `ceiling-slots-georgia` DELETED — 🔮 georgia is retired
+    # on BOTH arms now (live (wg), shadow (wt) on the organ-review docket:
     # n=232, +0.043%/t, t=0.29, ~4,224 days to the bar), so the throttle
     # step it waited on has no book to land on. (vj)'s rule: a carried row
     # about a book that no longer trades is deleted, not carried.
@@ -273,11 +273,11 @@ CARRIED = [
     # lens the book refuses to trade is not a candidate; if the veto ever
     # lifts on fresh evidence, re-run the study THEN, on the closes that
     # lifted it.
-    # [2026-09-02 (ws)] `georgia-t-bar` DELETED — both her arms are retired
-    # (live (wg); shadow (ws): undecidable at ~4,224 days, the grader's own
+    # [2026-09-02 (wt)] `georgia-t-bar` DELETED — both her arms are retired
+    # (live (wg); shadow (wt): undecidable at ~4,224 days, the grader's own
     # verdict), so the t bar is no longer a question about a trading book.
-    # [2026-09-02 (ws)] `carry-garrett-ranking-collision` DELETED — 🛢️
-    # Garrett retired (ws): unreachable, n=85, -1.090%/t, t=-2.22, upper
+    # [2026-09-02 (wt)] `carry-garrett-ranking-collision` DELETED — 🛢️
+    # Garrett retired (wt): unreachable, n=85, -1.090%/t, t=-2.22, upper
     # bound -0.455%. The component is the carry/Rich Dad pair now, which
     # audit_book_overlap.KNOWN_CELL_COLLISIONS already declares with its
     # own ~12-Sep decision point.

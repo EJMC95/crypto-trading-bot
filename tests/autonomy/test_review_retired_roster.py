@@ -93,7 +93,7 @@ def test_named_retirements_cannot_be_nominated(review, dead):
 
 @pytest.mark.parametrize("alive", [
     # [2026-08-19] freqtrade-mum-lshadow left when mum was RETIRED (I17
-    # no_rate); [2026-09-02 (ws)] it is BACK (mum v2 revived 19-Aug (ro)) and
+    # no_rate); [2026-09-02 (wt)] it is BACK (mum v2 revived 19-Aug (ro)) and
     # freqtrade-georgia-lshadow left — retired on both arms. Two living
     # subjects still exercise the trap; the semantics guarded did not move.
     "freqtrade-mum-lshadow",         # 👩 mum's control arm

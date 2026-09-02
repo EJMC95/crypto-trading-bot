@@ -30,7 +30,7 @@ def test_family_slate_books_are_out_and_greens_stay(monkeypatch):
     # retirement (0 in-era closes ever, ~2.4 closes/30d). The row-scope rule is
     # what this line guards and it is UNCHANGED — two living books still prove
     # the guard did not idle the shared process.
-    # [2026-09-02 (ws)] georgia's shadow joined RETIRED_BOOKS on the docket's
+    # [2026-09-02 (wt)] georgia's shadow joined RETIRED_BOOKS on the docket's
     # own verdict; 👩 mum (v2, alive since (ro)) takes her place as the second
     # living proof that the guard did not idle the shared process.
     for keep in ("freqtrade-avo-maria", "freqtrade-mum"):

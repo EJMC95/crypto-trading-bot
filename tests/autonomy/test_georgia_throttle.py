@@ -150,7 +150,7 @@ def test_the_blast_radius_is_one_living_book():
     users = [s.bot for s in fam.STRATEGIES
              if isinstance(s, fam.DayTraderGated)]
     living = [b for b in users if b not in fam.RETIRED_BOOKS]
-    # [2026-09-02 (ws)] georgia's shadow arm retired too, so the class now
+    # [2026-09-02 (wt)] georgia's shadow arm retired too, so the class now
     # steers ZERO living rows — pinned as the exact user set, so a new carrier
     # adopting DayTraderGated inherits this throttle visibly, not silently.
     assert set(users) == {"freqtrade-georgia", "crypto-intraday-15m"}, users

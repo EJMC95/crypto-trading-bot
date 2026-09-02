@@ -127,7 +127,7 @@ _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
                        # [2026-08-25] 👩 mum's arm, registered WITH its lever
                        # in one commit — the (tb) lesson applied forward
                        # instead of re-learned.
-                       # [2026-09-02 (ws)] 👩 mum's arm SPLITS by name: the
+                       # [2026-09-02 (wt)] 👩 mum's arm SPLITS by name: the
                        # clip scale stays the board's (exact key, listed
                        # FIRST because the first prefix match wins), and
                        # every other live.mum.* lever — the judge-promotable
@@ -230,13 +230,13 @@ LEVERS = {
     "taker.div_gap_pp": {
         # [2026-07-17] bounds /8 with the fleet-wide funding BASIS FIX: the
         # apr these pp are measured against was 8x TRUE. Same bar, true units.
-        # [2026-09-02 (ws)] `lo` 37.5 -> 25.0 — see taker.max_hold_h: the
+        # [2026-09-02 (wt)] `lo` 37.5 -> 25.0 — see taker.max_hold_h: the
         # champion-grade genotype needed gap 25, and the RESEARCH grid already
         # scored it there. Same pre-registered revert.
         "kind": "float", "lo": 25.0, "hi": 87.5, "lane": "lighter-taker",
         "note": "divergence conviction bar (|gap| pp >=); default 62.5", "env_default": 62.5},
     "taker.tp": {
-        # [2026-09-02 (ws)] `lo` 0.03 -> 0.02 — see taker.max_hold_h. The
+        # [2026-09-02 (wt)] `lo` 0.03 -> 0.02 — see taker.max_hold_h. The
         # divergence bracket's tp; the breakout arm has no tp (999). Same
         # pre-registered revert.
         "kind": "float", "lo": 0.02, "hi": 0.06, "lane": "lighter-taker",
@@ -249,7 +249,7 @@ LEVERS = {
         # taker.brk_range directly above. And (wr) SPLIT THE CLOCK the same
         # day: `bull_exit` reads its own `BRK_MAX_HOLD_H`, so this lever now
         # times the DIVERGENCE bracket alone — the lens the tuner's replay can
-        # fill. [(ws)] The incubator's only champion-grade genotype sits at
+        # fill. [(wt)] The incubator's only champion-grade genotype sits at
         # 24h (sl -0.02 / gap 25 / tp 0.02: n=189, lcb +$3.21, halves
         # +$10.27/+$10.79) and was out of cage on this bound and two others
         # (div_gap_pp, tp — moved with it). PRE-REGISTERED REVERT (I26): if
@@ -433,7 +433,7 @@ LEVERS = {
         "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
         "note": "👩 mum live clip multiplier, restrict-only; 1.0 = equity/slots",
         "env_default": 1.0},
-    # [2026-09-02 (ws)] 👩 MUM'S EXPERIMENT/PROMOTION PAIR — the judge's lane
+    # [2026-09-02 (wt)] 👩 MUM'S EXPERIMENT/PROMOTION PAIR — the judge's lane
     # moves to the fleet's living real-money pair. Eamon: "Proceed with
     # everything in the organ review" (the review found the judge had NO
     # pair it could open and the incubator's funding line targeting a lane

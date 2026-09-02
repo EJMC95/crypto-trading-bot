@@ -166,7 +166,7 @@ def carrier_for(bot_row, include_retired=False):
     """The LIVE strategy object whose constants govern this row. Imported, never
     retyped — a retyped constant is a constant that drifts.
 
-    [2026-09-02 (ws)] 🔮 georgia — the book this harness was built for — is
+    [2026-09-02 (wt)] 🔮 georgia — the book this harness was built for — is
     RETIRED on both arms, so by default her row has NO carrier here: a retired
     book's replay is HISTORY and may not stand as a live baseline. Pass
     `include_retired=True` to read the constants off the retired carrier for a

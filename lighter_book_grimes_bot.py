@@ -722,7 +722,7 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
-    # ---- RETIRED 2026-09-02 (ws): the I17 keep-or-retire call on a book
+    # ---- RETIRED 2026-09-02 (wt): the I17 keep-or-retire call on a book
     # with ZERO closes in 19 days — Eamon: "Proceed with everything in the
     # organ review" (2-Sep). The gate never opened on the fixed universe
     # (last scorecard: keltner n=123 t=-0.16, failtest n=373 t=-1.43,
@@ -735,7 +735,7 @@ def main():
     # the process IDLES, never exits. GRIMES_RETIRED_OVERRIDE=run.
     if os.environ.get("GRIMES_RETIRED_OVERRIDE", "").strip().lower() \
             not in ("run", "1", "true") and not args.once:
-        print("book-grimes (📐 The Technician) is RETIRED (2-Sep (ws)): 0 "
+        print("book-grimes (📐 The Technician) is RETIRED (2-Sep (wt)): 0 "
               "closes in 19 days, every setup's gate closed on the fixed "
               "universe — a study, not a book (I22). Idling: no venue calls, "
               "no publishes, ledgers kept. GRIMES_RETIRED_OVERRIDE=run to "

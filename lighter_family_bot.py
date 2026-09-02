@@ -1117,7 +1117,7 @@ class OversoldRebound(Carrier):
         median a 12h hold pays 0.009% of notional; v1's 29-day median hold
         paid ~0.50% before it earned anything. That tax is refused here.
 
-        [(ws)] `cap` is the position's ENTRY-STAMPED bar (the (bw) rule: bars
+        [(wt)] `cap` is the position's ENTRY-STAMPED bar (the (bw) rule: bars
         priced at entry govern the trade), so a judge lever starting or
         fading mid-hold cannot re-time an open position. None = the class
         value, byte-identical to before."""
@@ -1810,7 +1810,7 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
-    # [2026-09-02 (ws)] 🔮 georgia's SHADOW twin — the I17 call, made on the
+    # [2026-09-02 (wt)] 🔮 georgia's SHADOW twin — the I17 call, made on the
     # docket's own verdict after her LIVE arm retired at (wg): `undecidable`,
     # n=232, mean +0.043%/trade, t=0.29, ~4,224 days to the bar at her
     # measured rate (mean far below her own mde80). Positive but ungradeable
@@ -1910,7 +1910,7 @@ def shadow_scan_order(coins, held, rets):
         return list(coins)
 
 
-#: [2026-09-02 (ws)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
+#: [2026-09-02 (wt)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
 #: judge could not open a family pair because no shadow twin here could run
 #: a candidate: this file never imported fleet_tuning and stamped no `bars`
 #: receipt, so `ran_candidate` (fail-CLOSED) would exclude every close. Two
@@ -1957,7 +1957,7 @@ def apply_book_levers(strategy, prefix):
 
 
 def mum_bars(strategy):
-    """[(ws)] THE RECEIPT: the bars IN FORCE at entry, stamped into the
+    """[(wt)] THE RECEIPT: the bars IN FORCE at entry, stamped into the
     position and copied to the close row as `extra.bars` — the judge's
     `ran_candidate` proof that this close was taken under the candidate.
     {} for any carrier without these knobs, so the stamp is never invented."""
@@ -2489,7 +2489,7 @@ class Book:
                 # ONE constant so they cannot disagree.
                 extra={**({"entry_rank": m["entry_rank"]}
                           if m.get("entry_rank") is not None else {}),
-                       # [(ws)] the judge's receipt + the recorded RSI
+                       # [(wt)] the judge's receipt + the recorded RSI
                        **({"bars": m["bars"]}
                           if isinstance(m.get("bars"), dict) and m["bars"] else {}),
                        **({"rsi_entry": m["rsi_entry"]}
@@ -2891,7 +2891,7 @@ def main():
             # so the pre-pass warms nothing new; a coin with no usable bars
             # simply sorts after the measured ones, then hits `no_bars` as
             # before.
-            # [(ws)] the judge's xp.<book>.* levers reach this twin — mum's
+            # [(wt)] the judge's xp.<book>.* levers reach this twin — mum's
             # today; a no-op for carriers without the knobs.
             _moved = apply_book_levers(b.s, f"xp.{b.bot_id.split('-', 1)[-1]}.")
             if _moved:
@@ -3130,7 +3130,7 @@ def main():
                     stop_px = entry_px * (1 - dist)
                 _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
                          "accrued": 0.0, "stop_px": stop_px,
-                         # [(ws)] the bars in force at entry (mum's judge
+                         # [(wt)] the bars in force at entry (mum's judge
                          # receipt) + the RSI this entry was admitted at —
                          # the quantity rsi_max cuts, recorded (I23).
                          "bars": mum_bars(b.s),

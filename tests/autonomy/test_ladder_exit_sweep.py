@@ -22,7 +22,7 @@ import study_ladder_exit_sweep as lad  # noqa: E402
 def test_the_shipped_rule_is_read_from_the_carrier_never_retyped():
     """A retyped constant is a constant that drifts. The ROI ladder and the
     stop cap must come from the live carrier object."""
-    # [2026-09-02 (ws)] georgia is retired on both arms: her row has no LIVE
+    # [2026-09-02 (wt)] georgia is retired on both arms: her row has no LIVE
     # carrier (a retired replay is history, never a baseline) and the
     # constants are still read off the class, never retyped.
     assert lad.carrier_for("freqtrade-georgia-lshadow") is None

@@ -544,7 +544,7 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
-    # ---- RETIRED 2026-09-02 (ws): the I17 keep-or-retire call, made on the
+    # ---- RETIRED 2026-09-02 (wt): the I17 keep-or-retire call, made on the
     # decision docket's own verdict — Eamon: "Proceed with everything in the
     # organ review" (2-Sep), on the review's recommendation. Measured on this
     # book's OWN ledger at the grader: n=81, mean -0.725%/trade, t=-2.54,
@@ -558,7 +558,7 @@ def main():
     # turns into a crash-loop. Ledgers kept. DOUGLAS_RETIRED_OVERRIDE=run.
     if os.environ.get("DOUGLAS_RETIRED_OVERRIDE", "").strip().lower() \
             not in ("run", "1", "true") and not args.once:
-        print("book-douglas (🧘 The Zone) is RETIRED (2-Sep (ws)): n=81, "
+        print("book-douglas (🧘 The Zone) is RETIRED (2-Sep (wt)): n=81, "
               "-0.725%/trade, t=-2.54, upper bound -0.357% <= 0 — the sample "
               "excluded a positive mean (I17). Idling: no venue calls, no "
               "publishes, ledgers kept. DOUGLAS_RETIRED_OVERRIDE=run to "

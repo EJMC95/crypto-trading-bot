@@ -74,7 +74,7 @@ except Exception:  # noqa: BLE001
 KEY = "xp-judge"
 TTL_SEC = int(os.environ.get("XPJ_TTL_SEC", "10800"))
 LEVER_TTL = int(os.environ.get("XPJ_LEVER_TTL", "7800"))      # ~2h re-assert
-# [2026-09-02 (ws)] THE SERIAL LANE FOLLOWS THE LIVING PAIR. These were
+# [2026-09-02 (wt)] THE SERIAL LANE FOLLOWS THE LIVING PAIR. These were
 # literals naming 💸 the Farmer's arms, retired 22-Aug — so the fleet's only
 # path from a shadow candidate to real money stood down for 11 days while
 # 👩 mum traded real money with no judge. fleet_bus.living_pair_default is the
@@ -413,12 +413,12 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               # this mapping a running min_vol spec would _needs_reset as
               # invalid state and promotion could not name its live twin
               "xp.funding.min_vol": "live.funding.min_vol",
-              # [(ws)] 👩 mum's lane — the live twins are judge-owned by
+              # [(wt)] 👩 mum's lane — the live twins are judge-owned by
               # fleet_tuning's prefix map; the board keeps her clip scale.
               "xp.mum.rsi_max": "live.mum.rsi_max",
               "xp.mum.max_hold_min": "live.mum.max_hold_min"}
 
-# [2026-09-02 (ws)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
+# [2026-09-02 (wt)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
 # order. The incubator's funding genes are the Farmer's and cannot breed
 # these (its offspring are refused by lane prefix in candidate_pool), so this
 # list is the whole queue until a family-gene incubator exists.
@@ -920,7 +920,7 @@ LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      # to THIS map — a promotable lever with no organ
                      # release path can no longer arrive silently.
                      "live.funding.min_vol": (10000000.0, "up"),
-                     # [(ws)] 👩 mum's twins: a LOWER rsi bar admits fewer
+                     # [(wt)] 👩 mum's twins: a LOWER rsi bar admits fewer
                      # entries (tighter = down); a SHORTER hold is tighter
                      # (down). Env defaults from lighter_family_bot's class.
                      "live.mum.rsi_max": (36.0, "down"),
@@ -1070,7 +1070,7 @@ def candidate_pool(queue, now=None):
         nm, lv = c.get("name"), c.get("levers") or {}
         if not nm or nm in seen:
             continue
-        # [(ws)] and ONLY this lane's prefix — a funding offspring in the
+        # [(wt)] and ONLY this lane's prefix — a funding offspring in the
         # queue must not burn a serial slot on 👩 mum's lane.
         _pfx = lane_prefix()
         if lv and all(k in XP_TO_LIVE and str(k).startswith(_pfx) for k in lv):
@@ -2974,7 +2974,7 @@ def run_once():
 # ---------------------------------------------------------------------------
 
 def _selftest():
-    """[(ws)] The body below was written when 💸 the Farmer's pair WAS the
+    """[(wt)] The body below was written when 💸 the Farmer's pair WAS the
     machine's default lane; the default is DERIVED now (mum today). Aim the
     machine at the Farmer for the duration so every existing assertion keeps
     testing the property it was written for, then assert the derived lane's
@@ -3133,7 +3133,7 @@ def _selftest_body():
     assert _mm and _mm.group(1) == "on", \
         "FUNDING_SLOPE_GATE source default changed — re-derive slope_gate"
     _src_def["live.funding.slope_gate"] = 1.0
-    # [(ws)] 👩 mum's twins pin to lighter_family_bot's OWN class defaults
+    # [(wt)] 👩 mum's twins pin to lighter_family_bot's OWN class defaults
     _fam_src = _pl.Path(__file__).with_name("lighter_family_bot.py").read_text()
     _mm = _re.search(r'MUM_RSI_MAX"\s*,\s*"([0-9.]+)"', _fam_src)
     assert _mm, "could not read MUM_RSI_MAX default from lighter_family_bot.py"
@@ -3168,7 +3168,7 @@ def _selftest_body():
     _stamp_src = _al_src[_al_src.index("_ACTIVE_BARS.update"):]
     _es_src = _fb_src.split("def entry_stamp", 1)[1].split("\ndef ", 1)[0]
     _es_bars_src = _es_src[_es_src.index('"bars": {'):]
-    # [(ws)] the receipt guard is PER LANE: funding keys against the Farmer
+    # [(wt)] the receipt guard is PER LANE: funding keys against the Farmer
     # host's two stamp sites, mum keys against lighter_family_bot.mum_bars
     # (the ONE stamp both her hosts write) and apply_book_levers (the
     # consumer) — a consumed-but-unreceipted lever is the zero-accrual class.

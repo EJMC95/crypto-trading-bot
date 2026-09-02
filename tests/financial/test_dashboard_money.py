@@ -320,7 +320,7 @@ def test_fetch_rows_variant_passes_while_its_retired_base_row_stays_out(monkeypa
     # [2026-08-19] and mum is now retired too (I17 no_rate), so it moves ONE
     # MORE TIME, to georgia: the fixture must be a book whose -lshadow twin is
     # ALIVE, or it stops testing the double life it exists for.
-    # [2026-09-02 (ws)] and BACK to mum: georgia's shadow retired (both arms),
+    # [2026-09-02 (wt)] and BACK to mum: georgia's shadow retired (both arms),
     # mum v2 was revived 19-Aug (ro) so her -lshadow twin is alive again.
     assert "freqtrade-mum" in pd.CURRENT_BOTS
     assert "freqtrade-mum" in pd.RETIRED_ROWS

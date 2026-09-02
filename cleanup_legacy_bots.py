@@ -69,14 +69,14 @@ LEGACY_BOTS = [
     # in the fleet totals. Reversible via BARNES_RETIRED_OVERRIDE=run, which
     # also stops the prune mattering (the bot re-upserts on its next publish).
     "band-barnes-lshadow",
-    # [2026-09-02 (ws)] the organ-review docket calls — prune half. Ledgers
+    # [2026-09-02 (wt)] the organ-review docket calls — prune half. Ledgers
     # kept (garrett 85, douglas 81, georgia shadow 232 closes; grimes none);
     # the summary rows are pruned so four frozen cards cannot sit in the
     # fleet totals. Reversible per book (GARRETT_/DOUGLAS_/GRIMES_/
     # GEORGIA_SHADOW_RETIRED_OVERRIDE=run) — a resurrected bot re-upserts.
     "band-garrett-lshadow", "book-douglas-lshadow",
     "book-grimes-lshadow", "freqtrade-georgia-lshadow",
-    # [(ws)] 💸 the Farmer's shadow twin — 239 closes KEPT in the ledger
+    # [(wt)] 💸 the Farmer's shadow twin — 239 closes KEPT in the ledger
     "perps-funding-lighter-lshadow",
     "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
     "freqtrade-dad-lshadow",

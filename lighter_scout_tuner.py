@@ -163,7 +163,7 @@ SWEEP_SL = [float(os.environ.get("TUNER_SWEEP_SL", "-0.03"))]
 # default (lo 48.0) so the rung could not enact anyway; deleting it here means
 # the sweep stops SPENDING a replay slot on a candidate the cage will refuse,
 # and stops advertising a value this file may not have.
-# [2026-09-02 (ws)] THE RUNG IS BACK, because the reason above is spent:
+# [2026-09-02 (wt)] THE RUNG IS BACK, because the reason above is spent:
 # `bull_exit` reads its own `BRK_MAX_HOLD_H` now, so this sweep's hold acts on
 # the DIVERGENCE bracket alone — a lens this replay fills (43 taken on the
 # 2-Sep tape) — and the cage `lo` moved to 24 with a pre-registered revert

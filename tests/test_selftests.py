@@ -214,12 +214,12 @@ SELFTEST_MODULES = [
     # actual subject.
     "scripts.audit_operator_name",
     "scripts.ceiling",
-    # [2026-09-02 (ws)] the weekly organ board — grades every organ's payload
+    # [2026-09-02 (wt)] the weekly organ board — grades every organ's payload
     # liveness + consumer reach; its selftest drives the grader on fixtures.
     "scripts.organ_board",
-    # [2026-09-02 (ws)] the divergence-stop study shipped with (wq) on main
+    # [2026-09-02 (wt)] the divergence-stop study shipped with (wq) on main
     # unregistered — main's Tests run went red on this guard; registered here
-    # so the PR carrying (ws) heals it rather than inheriting it.
+    # so the PR carrying (wt) heals it rather than inheriting it.
     "scripts.study_taker_divergence_stop_2026-09-02",
     "fleet_manifest",
     "scripts.session_state",

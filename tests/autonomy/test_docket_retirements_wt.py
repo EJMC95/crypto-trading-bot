@@ -1,4 +1,4 @@
-"""[2026-09-02 (ws)] THE ORGAN-REVIEW DOCKET CALLS, MADE IN ONE ACT.
+"""[2026-09-02 (wt)] THE ORGAN-REVIEW DOCKET CALLS, MADE IN ONE ACT.
 
 Eamon, 2-Sep: *"Proceed with everything in the organ review."* The review laid
 out seven keep-or-retire calls with a recommendation each; four were RETIRE and

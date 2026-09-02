@@ -129,7 +129,7 @@ def test_the_serial_lane_is_derived_from_the_row_it_trades():
     """Not a second hardcoded "farmer" — the pair naming LIVE_BOT as its live
     arm IS the lane, so a slot swap cannot leave the gate aimed at a row the
     machine no longer trades (the defect that produced this whole entry)."""
-    # [(ws)] the DEFAULT lane is the living pair (mum today), derived from
+    # [(wt)] the DEFAULT lane is the living pair (mum today), derived from
     # fleet_bus.living_pair_default; the Farmer's row still resolves to its
     # own lane when asked, which is the property this test pins.
     assert ej.serial_lane_id(FARMER) == "farmer"
@@ -231,7 +231,7 @@ def judged(monkeypatch):
         calls["write_levers"] += 1
         return None
 
-    # [(ws)] the machine's default lane is mum now; this fixture exists to
+    # [(wt)] the machine's default lane is mum now; this fixture exists to
     # drive the PARKED path, so it aims the machine at the Farmer's rows.
     monkeypatch.setattr(ej, "LIVE_BOT", FARMER)
     monkeypatch.setattr(ej, "SHADOW_BOT", fb.JUDGED_PAIRS["farmer"]["shadow_bot"])

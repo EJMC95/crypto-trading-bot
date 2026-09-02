@@ -1965,7 +1965,7 @@ def main():
             "experiment judge's shadow arm. An inherited default must never "
             "decide that. Set VENUE=lighter_live or VENUE=lighter_shadow "
             "explicitly (or pass --once for an offline smoke).")
-    # ---- 🛢️ band-garrett RETIRED 2026-09-02 (ws): the I17 call on the
+    # ---- 🛢️ band-garrett RETIRED 2026-09-02 (wt): the I17 call on the
     # thin-tier variant — Eamon: "Proceed with everything in the organ
     # review" (2-Sep). Measured on its own ledger at the grader: n=85, mean
     # -1.090%/trade, t=-2.22, halves -26.41/+0.92, upper bound -0.455% <= 0
@@ -1979,7 +1979,7 @@ def main():
     if VARIANT == "band-garrett" and not args.once and \
             os.environ.get("GARRETT_RETIRED_OVERRIDE", "").strip().lower() \
             not in ("run", "1", "true"):
-        print("band-garrett (🛢️ Garrett) is RETIRED (2-Sep (ws)): n=85, "
+        print("band-garrett (🛢️ Garrett) is RETIRED (2-Sep (wt)): n=85, "
               "-1.090%/trade, t=-2.22, upper bound -0.455% <= 0 — the sample "
               "excluded a positive mean (I17). Idling: no venue calls, no "
               "publishes, ledgers kept. GARRETT_RETIRED_OVERRIDE=run to "
@@ -1987,7 +1987,7 @@ def main():
         while True:
             time.sleep(3600)
 
-    # ---- 💸 the Farmer's SHADOW twin RETIRED 2026-09-02 (ws), the day the
+    # ---- 💸 the Farmer's SHADOW twin RETIRED 2026-09-02 (wt), the day the
     # judge's lane moved to 👩 mum. Its only remaining job since the live arm
     # retired at (ta) was CONTROL ARM for a judge lane that no longer exists,
     # and its own record is the docket's: n=200, mean -0.525%/trade, t=-2.32,
@@ -2001,7 +2001,7 @@ def main():
             os.environ.get("FARMER_SHADOW_RETIRED_OVERRIDE", "").strip().lower() \
             not in ("run", "1", "true"):
         print("perps-funding-lighter-lshadow (💸 the Farmer's shadow twin) is "
-              "RETIRED (2-Sep (ws)): n=200, -0.525%/trade, t=-2.32, upper bound "
+              "RETIRED (2-Sep (wt)): n=200, -0.525%/trade, t=-2.32, upper bound "
               "-0.233% <= 0 (I17), and the judge's lane it was the control arm "
               "for moved to mum. Idling: no venue calls, no publishes, ledgers "
               "kept. FARMER_SHADOW_RETIRED_OVERRIDE=run to resurrect.",
