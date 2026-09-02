@@ -128,6 +128,12 @@ SELFTEST_MODULES = [
     # SCAN reads the live feed, which moves with every publish and no code
     # change.
     "scripts.audit_stuck_vs_slow",
+    # [2026-09-02] (we)'s split-brain/orphan detector: --selftest is offline &
+    # pure (fixture rows, no DB). It landed on main unregistered the same
+    # night #257 was in flight, so THIS guard first fired on the PR's merged
+    # tree rather than on main's own push — registered here while driving
+    # #257 to green.
+    "scripts.audit_writer_consistency",
     # [2026-07-28] breakout-quality study: --selftest is offline-green &
     # stdlib-only (verified `python -m scripts.analyze_breakout_quality
     # --selftest` on a bare interpreter); registering it here fixes the

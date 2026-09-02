@@ -3609,6 +3609,15 @@ def _selftest():
                 "extra": {"max_open": max_open}}
 
     _lb, _sb = _psp["live_bot"], _psp["shadow_bot"]
+    # 🔮 georgia joined RETIRED_LIVE_ARMS at (wg), which short-circuits every
+    # precheck below to stood_down BEFORE the mechanics under test can run —
+    # CI caught this selftest asserting unjudgeable against her registry state.
+    # Force her live for the mechanics block via her own documented override
+    # (the same pattern (wg) applied to the six pytest suites), restore after;
+    # the stood_down branch is asserted on its own below, against BOTH retired
+    # pairs, so the registry's word is still driven.
+    _geo_ov = os.environ.get("GEORGIA_LIVE_RETIRED_OVERRIDE")
+    os.environ["GEORGIA_LIVE_RETIRED_OVERRIDE"] = "run"
     # dark live row -> live_row_dark (a registry entry must not outlive its
     # row: the audit-scope stale-list class, made a named ageable state)
     _v = _pair_precheck("georgia", _psp, [], [], t0)
@@ -3754,6 +3763,15 @@ def _selftest():
                         [_led(_lb, _stamp), _led(_sb, _match)],
                         [_row(_lb, 5), _row(_sb, 5)], t0)
     assert _v["phase"] == "idle", _v
+    # restore the registry's word: WITHOUT the override georgia's pair
+    # STANDS DOWN — the exact branch CI caught this selftest not knowing.
+    if _geo_ov is None:
+        os.environ.pop("GEORGIA_LIVE_RETIRED_OVERRIDE", None)
+    else:
+        os.environ["GEORGIA_LIVE_RETIRED_OVERRIDE"] = _geo_ov
+    _v = _pair_precheck("georgia", _psp, [], [], t0)
+    assert _v["phase"] == "stood_down", _v
+    assert _v["stood_down"]["successor"] == "freqtrade-mum-lighter", _v
     # retired live arm -> stood_down with wake_when + successor
     _fsp = dict(_bus.JUDGED_PAIRS["farmer"])
     _v = _pair_precheck("farmer", _fsp, [], [], t0)
