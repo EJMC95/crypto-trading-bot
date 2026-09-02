@@ -303,7 +303,9 @@ not evidence.
 The signal. §1a: live-vs-shadow gaps of +0.027pp (mum), −0.094pp (georgia), +0.517pp (avo,
 n=8) on the same coins. The fleet's `implementation_shortfall` organ is `stood_down` (its only
 paired book, the Farmer, retired its live arm), so this audit's pairing is currently the only
-live-vs-mark measurement running. **Recommendation:** point `implementation_shortfall` at the
+live-vs-mark measurement running. **Recommendation — DONE (another session's (wp), 2-Sep):** `fleet_bus.shortfall_default_pair`
+now derives the pair from the registry (the living pair with the most live closes, mum) and
+the organ publishes `arm-drift` instead of `stood_down`. The original ask: point `implementation_shortfall` at the
 mum pair — it is the fleet's only real-money book with a shadow twin and an edge worth
 protecting, and its `gap_pp` is the number that would say first if her fills degrade.
 
@@ -327,23 +329,49 @@ as proposals for approval — none is applied here:
    decision is keep-or-retire, and I17-as-amended requires a measured exclusion (upper bound
    ≤ 0); hers is +0.03% on n=383. Pre-register it: read at n=60 fresh closes at the $80 clip;
    retire if the fresh upper bound ≤ 0, keep grading if the fresh mean > 0.
+   **EXECUTABLE (edge-audit follow-up, 2-Sep):** `golive_readiness.DECIDED_UNTIL["band-kelly"]`
+   (expires 1-Oct; the docket prints `decision_overdue` past it) and the HANDOFF row
+   `kelly-fresh-read-pre-registered`, which closes only when the entry is removed.
 2. **Drawdown-scaled clip as a fleet rail, not a per-book env.** Kelly shows the gap: the 7d
    governor scales the fleet's *live* consumers and the go-live gate *reports* maxDD, but no
    organ reduces a shadow book's clip when its own realised drawdown crosses the bar it is
    graded on. Proposal: `clip × max(0.25, 1 − maxDD/0.15)` applied through `apply_tuning` on
    the books that have a clip lever, published as `extra.dd_scale`. Restrict-only, so it is
    the (kd)-eligible shape once measured.
+   **SHIPPED (wu), reshaped on Eamon's *"don't constrict too much"* — corrected in place (I12):**
+   the rail lives in `fleet_bus.brain_clip_multi` (the accessor every book sizes through), not
+   `apply_tuning`; it is **1.0 all the way to the 15% bar** and falls linearly to 0.25 at twice
+   the bar, so a book inside the range the gate grades it on is never cut; the scale is
+   recorded on each close's `brain_mult` stamp (I23) with the decomposition in
+   `fleet_bus.last_sizing[bot]`, and no row field `extra.dd_scale` was added. Kelly at 28.5%
+   sizes at 0.325×.
 3. **Never lever a negative lower bound.** Already I16 doctrine for the *ceiling*; the brain's
    6.7× *multiplier* and the live `GROSS_X` levers are not gated on it. Proposal: the
    `brain_clip` accessor returns ≤1.0 for any bucket whose book-level LB ≤ 0. Mum's LB is
    +0.366% — she is the only live book that would be eligible for >1× under this rule today,
    and her clip is already half her book.
+   **SHIPPED (wu), fail-open — corrected in place (I12):** the cap fires only when
+   `fleet_allocation` has MEASURED the sized book's era lower bound at or below zero on at
+   least 10 era closes; a dark or thin organ changes nothing, and reductions pass through.
 4. **Mum's stops are her tail.** Five stops = 37% of gross wins; avg loss $7.39 vs avg win
    $3.65 (PF 2.36 comes from the 83% hit rate). At 10× leverage her p95 12-month drawdown is
    15% — exactly the bar. This is not a proposal to change her bracket (the audit has no
    evidence the stop is wrong — (uw)'s exit sweep on georgia showed exits are a dead dial) —
    it is the number to watch: if her win rate reverts toward the fleet's ~50%, PF goes below 1
    at the current avgW/avgL. **Her monitor should be win-rate-vs-83% AND avgW/avgL, not P&L.**
+   **SHIPPED (edge-audit follow-up, 2-Sep) — and CALIBRATED OPTIMALLY the same day (xc):** the
+   grader publishes a per-book `shape` block (hit rate, trailing-30 hit rate and win count, avg
+   win, avg loss, payoff, break-even hit rate = 1/(1+payoff), `hit_margin_pp`, `hit_margin_z`
+   reported, current and max losing streak, the p50/p95 chance streak, and the PAGE BOUNDARY
+   `page_wins_max` with its `page_false_rate_pct` / `page_miss_rate_pct`), and `fleet_immune`
+   pages when a LIVE book's trailing wins sit at or below that boundary — the largest win count
+   at which the window is likelier under a hit rate at the book's break-even than at its own era
+   rate, i.e. the exact minimum of false pages + missed decays — or its streak exceeds the
+   chance p95. Measured on mum's shape (era 83.0%, break-even 66.1%, n=30): "within 5pp" 5.6%
+   false / 26.4% missed (32.1%); "z ≤ the claim bar" 23.9% / 7.4% (31.3%); the boundary, ≤22 of
+   30, **12.4% / 15.1% (27.5%)** — the brute-force minimum at this window length. Judged
+   against the book's own payoff, never a bare win-rate bar (I15); both error rates ride the
+   payload and the page text.
 5. **Correlation limits between books: not binding today.** §8 — daily realised P&L across
    the 18 books is essentially uncorrelated (mean ρ −0.02, N_eff 19.9). The live pair
    (mum + avo) are both long-only, both in the same regime, and co-hold the same coin 72% of
@@ -400,6 +428,9 @@ correlated *drawdowns* is what a shared regime looks like from inside one regime
 and tilts a flat prior (tz). This audit adds nothing to its ranking and one constraint to its
 clamp: a book with LB ≤ 0 AND realised DD > 15% (kelly) should sit at the probe floor
 regardless of its claim — today the organ's 25% floor is a floor, not a ceiling for losers.
+**Addressed at the accessor rather than in the organ (wu):** the two rails apply the
+consequence where sizing happens — kelly's clip scales to 0.325× at 28.5% and reaches the
+0.25 floor at 30% — while the allocation organ's advisory ranking is unchanged.
 
 ---
 
@@ -410,11 +441,11 @@ Most of this exists. The mapping, and the gaps:
 | condition | threshold (objective) | organ that owns it | gap |
 |---|---|---|---|
 | **technical failure** — stale row, dead loop, data delay | `age_sec > ttl_sec` (I1); organ key staleness (I13) | `fleet_watchdog`, `fleet_immune`, `fleet_respiration` | none — this is the fleet's strongest layer |
-| **abnormal slippage** | live-vs-shadow `gap_pp` < −0.25pp sustained over ≥15 paired closes | `implementation_shortfall` | **stood down** — its only pair retired; re-point at mum |
-| **drawdown beyond tested range** | realised or MTM DD > 15% (the gate's bar) → clip to probe floor | gate REPORTS it; the 7d governor scales live clips on FLEET dd | **no organ reduces a shadow book's own clip on its own DD** (kelly, §6.2) |
+| **abnormal slippage** | live-vs-shadow `gap_pp` < −0.25pp sustained over ≥15 paired closes | `implementation_shortfall` | ~~**stood down** — its only pair retired; re-point at mum~~ **CLOSED (wp)**: pair derived from the registry, organ publishes `arm-drift` |
+| **drawdown beyond tested range** | realised or MTM DD > 15% (the gate's bar) → clip to probe floor | gate REPORTS it; the 7d governor scales live clips on FLEET dd | ~~**no organ reduces a shadow book's own clip on its own DD** (kelly, §6.2)~~ **CLOSED (wu)**: `fleet_bus.dd_scale` past the bar |
 | **loss of liquidity** | coin `vol_m` < $0.5M or recorded half-spread > 30bps → entry veto | scout `vols`, `coin-quality` | consumed by some books' `MIN_VOL`; `coin-quality` had no reader until (ut) |
-| **statistically significant decay** | book's trailing-30 mean below its own era mean by > 2×SE, judged vs the shadow twin (I25 — never vs the hot window) | `fleet_proprioception.grade_live` (has the twin baseline) | `LIVE_MARGIN_PP` 0.25pp vs 1.674pp measured reversion — the margin is 6.7× too tight and a 3-trade baseline is allowed (I25 records this as latent) |
-| **normal variance** | losing streak ≤ chance p95 for the book's hit rate and n | *nothing* | `edge_audit.expected_streak` — publish it so a streak is judged against chance, not against zero |
+| **statistically significant decay** | book's trailing-30 mean below its own era mean by > 2×SE, judged vs the shadow twin (I25 — never vs the hot window) | `fleet_proprioception.grade_live` (has the twin baseline) | ~~`LIVE_MARGIN_PP` 0.25pp vs 1.674pp measured reversion — the margin is 6.7× too tight and a 3-trade baseline is allowed (I25 records this as latent)~~ **CLOSED (edge-audit follow-up)**: twin REQUIRED, baseline floor = `fleet_allocation.MIN_N`; **re-measured 2-Sep**: collapse +1.74 / +1.52 / +1.60 / +1.67pp at K = 10 / 15 / 20 / 30 (SE ≈ 0.5) — a collapse that does not shrink with K, i.e. drift; **then CALIBRATED OPTIMALLY (xc)**: the fixed margins are gone — each baseline's margin is its own SE at `t_crit`, the book baseline is the era mean EXCLUDING the motivating window; no-change control false `bad` after a hot window 16.0% (fixed 1.7pp: 21.3%), false `good` after a cold one 9.9% (19.2%); the study's `--margin` arm grades the SHIPPED gate and exits 2 on DRIFT |
+| **normal variance** | losing streak ≤ chance p95 for the book's hit rate and n | ~~*nothing*~~ `golive-readiness.books.<bot>.shape.streak_p95_chance` + `fleet_immune` | ~~`edge_audit.expected_streak` — publish it so a streak is judged against chance, not against zero~~ **CLOSED (edge-audit follow-up)**: exact owner `golive_readiness.expected_streak`, published per book, live books paged beyond p95 |
 | **regime mismatch** | oracle verdict flips against a long-only book's side | `regime_oracle` (consumed by the family bot only) | the live pair is long-only and unconsumed — §7 #3 |
 
 **Distinguishing the four states**, mechanically: *technical* = liveness fails (age); *variance*
@@ -452,6 +483,14 @@ is z=+2.41 against its own claim after 46 closes. **Do not deploy** — and it w
 * `tests/test_selftests.py` — `scripts.edge_audit` registered (SELFTEST_MODULES, not
   ENFORCED_AUDITS — its live arm reads a moving ledger and refuses on a stale grade).
 * No bot configuration was changed. Every proposal is in §6 for approval.
+
+**Follow-up, 2-Sep (Eamon: *"Proceed with advisements"*, then *"Proceed on all"*):**
+§6.2 and §6.3 shipped as the two rails in `fleet_bus.brain_clip_multi` ((wu), reshaped to
+bite only on measured harm); the brain's expansion floors were measured forward and KEPT
+(`scripts/study_brain_floors_2026-09-02.py`); §6.1's pre-registered read, §6.4's monitor,
+§9's chance-streak publication and the I25 margin calibration shipped in the follow-up PR
+(`tests/autonomy/test_edge_audit_followups.py` pins each). §5's re-point was done by (wp).
+Nothing here changes what any bot trades; the two rails size, the rest measures and pages.
 
 **Run it:** `python3 scripts/edge_audit.py` (live) · `--json --out result.json` for the full
 payload · `--stress <bus-history-stress.json>` for the venue-stress split.
