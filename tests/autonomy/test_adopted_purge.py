@@ -23,6 +23,15 @@ os.environ.setdefault("FAMILY_LIVE_BOOK", "freqtrade-avo-maria")
 import lighter_avo_live_bot as L  # noqa: E402
 
 
+def _src(path=None):
+    """Read a source file through a context manager. CodeQL is right that a
+    bare `open(...).read()` leaks the handle, and this is the third round of
+    the same finding across three files — so it is a habit, and the ratchet in
+    `test_no_new_leaked_file_handles` is what stops it being a fourth."""
+    with open(path or L.__file__) as fh:
+        return fh.read()
+
+
 class _Strat:
     stoploss = -0.10
     roi = {0: 0.20, 20160: 0.0}
@@ -88,7 +97,7 @@ def test_the_switch_is_read_from_env_only_never_from_an_organ():
     """It is an OPERATOR assertion ('these are not mine'), so no lever, no bus,
     no brain may set it — the blast radius is a live book at market."""
     import ast
-    src = open(L.__file__).read()
+    src = _src()
     tree = ast.parse(src)
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
@@ -106,7 +115,7 @@ def test_the_switch_is_read_from_env_only_never_from_an_organ():
 def test_it_cannot_reach_the_entry_path():
     """Exits only: a purge switch must never gate, size or admit an entry."""
     import ast
-    tree = ast.parse(open(L.__file__).read())
+    tree = ast.parse(_src())
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name in (
                 "clip_usd", "gross_x", "cap_slots", "vol_target_gross_x"):
