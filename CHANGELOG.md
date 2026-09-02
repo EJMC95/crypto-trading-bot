@@ -1,4 +1,88 @@
-## 2026-09-02 (xh) — THE RAIL SHIPPED AN HOUR AGO AND ITS OWN ARMING WAS INVISIBLE: `halt_gate: null` on a real-money row was byte-identical between "no signal this cycle" and "the gate never ran"
+## 2026-09-02 (xj) — THE TOOL THAT PROVES A LIVE DEPLOY LANDED HAS BEEN BROKEN SINCE (mq) AND NO WORKFLOW HAS EVER RUN IT — the (gk) shape, on the real-money path, found by asking what actually guards a dispatch
+
+**Eamon asked whether the DISPATCH path should carry the same marker discipline
+the push path enforces. The answer is no — and looking established three things
+that matter more than the question.**
+
+**1. THE MARKER IS NOT THE GAP.** A dispatch's service list is taken verbatim,
+but its fallback is `freqtrade-bots,pnl-dashboard` — **no real-money service** —
+so a dispatch cannot deploy live money by accident; someone must type
+`mum-live` or `tide-rider-lighter-live`, which is itself a deliberate act. The
+push path needs a marker precisely because a push is NOT deliberate about which
+services it touches. Adding markers to dispatch would remove the documented
+no-marker escape hatch and buy nothing. **A refusal with a reason (I26).**
+
+**2. THE HALT RULE THE ASK RESTS ON IS STALE — corrected in place per I12.**
+`(pz)` lists, as a mechanic no grant waives, *"a restart wipes memory-only
+halts, so verify neither live row is halted before dispatching"*. **That has not
+described this fleet since `(pq)`, the same day.** Both live hosts persist the
+halt: `bot_pnl_store.save_daily_halt` writes it, `load_daily_halt_checked`
+re-reads it EVERY cycle, a stored `True` re-asserts `halted_today`, it clears
+ONLY on the UTC day roll, and a failed read sets `halt_blind`, which blocks new
+entries fail-CLOSED without pretending to know. A fresh process boots
+`halted_today=False` and re-arms from the database on its first cycle. **A
+restart cannot wipe the halt.** The check is still worth doing — you want to
+know — but the stated MECHANISM is wrong, and a doctrine that no longer
+describes the system is a defect.
+
+**3. THE ACTUAL GAP, AND IT IS THE ONE THIS REPO KEEPS PAYING FOR.**
+`scripts/deploy_live_verify.py` has existed since 5-Aug as the declared proof
+that a live deploy landed — the `extra.build`+`extra.build_n` readback CLAUDE.md
+names as the ONLY proof — it is selftest-registered, and **no workflow has ever
+run it.** That is `(gk)` verbatim: *"the rule governing real money ran only when
+a human typed the command."* Measured today: run 677 deployed `mum-live`, run
+678 (a dispatch nobody in this session triggered) deployed avo's service, and
+**neither was read back by anything**; the one readback that happened was
+hand-rolled in a session that did not know the tool existed.
+
+**AND BECAUSE NOTHING RAN IT, IT WAS BROKEN.** `audit_code_currency.stamps_at`
+has returned `{entry: [(id, n), ...]}` — a LIST, one stamp per file-set variant
+— since `(mq)`. This tool still consumed the old single-tuple shape at three
+sites. Run it and it **crashes** (`IndexError`) printing its own expected
+stamps; get past that and `verify_rows` compares a `str` to a `tuple`, which is
+**always False** — so it would have called a LANDED deploy **NOT-LANDED**. The
+mutation output is the proof: `observed 5daad7847984/17 vs expected
+5daad7847984/17`, two identical strings reported as a mismatch.
+
+**WHY THE GREEN SELFTEST DID NOT CATCH IT — the (hj) rule, half-applied.** Its
+row fixtures are built the way doctrine demands (from the publisher's own
+envelope); its `expected` fixture was **hand-written** in the shape
+`stamps_at` stopped producing. The half that followed the rule survived (mq);
+the half that did not is the half that broke. The owner even ships an `_ids`
+shim *"so a stale caller cannot silently match nothing"* — it knew stale callers
+existed; this one used the raw dict. **A green run verifies a guard EXISTS, not
+that it is CORRECT** — this file's own opening caveat, collected.
+
+**SHIPPED.** `_cands()` normalises both shapes (the owner's own tolerance,
+mirrored); `verify_rows` confirms on ANY candidate, which is what `(mq)`'s
+multi-image variants require; the diff messages name every candidate.
+`verify_batch()` + `--from-services` is the CI entry point, and a new
+`railway-redeploy.yml` step runs it after every deploy — **the live set comes
+from the script's own `LIVE_SERVICES`, so the YAML carries no second copy of
+"which services are real money" ((hj))**, a shadow-only deploy is a clean no-op,
+and `--ref` is the SHA the job actually uploaded rather than a branch name that
+can advance mid-run. It runs AFTER the deploy, so it never blocks one; it says
+whether the container took it.
+
+**Verification.** 5/5 mutations RED, including the exact pre-fix bug and a
+fail-closed hole. The selftest's `expected` fixture is now built by calling the
+real `acc.stamps_at` — **the publisher, not a hand-written lookalike** — and
+pins the shape, a multi-variant match, and the legacy shape. Driven end to end
+against the LIVE feed: both real-money services CONFIRMED at
+`078f894f89d1/17`, computed from each image's own COPY set and agreeing with
+the stamp this session had separately derived from the repo tree — two
+independent derivations. **And proven to go RED (po):** against a fixture whose
+container carries a stale stamp it exits 1 and names the row and both stamps.
+
+## 2026-09-02 (xi) — THE RAIL SHIPPED AN HOUR AGO AND ITS OWN ARMING WAS INVISIBLE: `halt_gate: null` on a real-money row was byte-identical between "no signal this cycle" and "the gate never ran"
+
+**[RENUMBERED (xh) -> (xi) at push time** — a concurrent session landed a
+different (xh) on main while this was being written (the standing floor of
+eight local reds, which independently confirms the 8 pre-existing failures
+this session measured in a pristine worktree). Theirs is cited from FIVE
+tracked files against this one's two, so per the convention the cited entry
+keeps the letter and this one moves. Recorded inline because the citations are
+what break.**]
 
 **Found by reading back the (xg) deploy rather than trusting it.** The stamp
 flipped to `078f894f89d1`/17 exactly as predicted and `halt_room_skips: 0`

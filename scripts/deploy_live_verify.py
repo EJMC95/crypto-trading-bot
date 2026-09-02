@@ -186,7 +186,7 @@ def watch(since_epoch, run_id=None, appear_max_s=RUN_APPEAR_MAX_S,
 # ── VERIFY ──────────────────────────────────────────────────────────────────
 
 def expected_stamps(entries, ref):
-    """{entry: (id, n)} at REF, computed by that checkout's OWN bot_pnl_store
+    """{entry: [(id, n), ...]} at REF, computed by that checkout's OWN bot_pnl_store
     against each image's own COPY set — audit_code_currency's machinery by
     IMPORT, never a re-hash ((hj)/(fd)). A clean throwaway worktree, never the
     local tree: `railway up` from CI ships clean main, and the local desk may
@@ -205,6 +205,27 @@ def expected_stamps(entries, ref):
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", str(wt)],
                            cwd=str(ROOT), capture_output=True, check=False)
+
+
+def _cands(exp):
+    """[(id, n), ...] — the candidate stamps for one entry.
+
+    [(xj)] `audit_code_currency.stamps_at` has returned a LIST since (mq) (an
+    entry that ships in several images has several file-set variants, so
+    several legitimate stamps). This file consumed the OLD single-tuple shape
+    at three sites and nothing caught it, because nothing ran this tool. The
+    owner's own `_ids` carries the same tolerance for the same reason — a
+    stale caller must not silently match nothing.
+    """
+    if not exp:
+        return []
+    if isinstance(exp, tuple) and exp and isinstance(exp[0], str):
+        return [exp]                      # legacy single-tuple
+    out = []
+    for c in exp:
+        if isinstance(c, (tuple, list)) and len(c) >= 2 and c[0]:
+            out.append((c[0], c[1]))
+    return out
 
 
 def verify_rows(rows, service, expected, fresh_s=FRESH_S):
@@ -228,10 +249,10 @@ def verify_rows(rows, service, expected, fresh_s=FRESH_S):
             lines.append(f"  {bot}: unmapped in audit_code_currency.ROW_ENTRY "
                          f"— cannot verify, not counted")
             continue
-        exp = expected.get(entry)
+        cands = _cands(expected.get(entry))
         age, stale = acc._row_age(r)
         agetxt = "?" if age is None else f"{age / 60.0:.1f}m"
-        if not exp or not exp[0]:
+        if not cands:
             pending += 1
             lines.append(f"  {bot}: no expected stamp computable for {entry} — "
                          f"FAIL-CLOSED, cannot confirm against a guess")
@@ -239,7 +260,9 @@ def verify_rows(rows, service, expected, fresh_s=FRESH_S):
         got_id, got_n = ex.get("build"), ex.get("build_n")
         fresh = (stale is False) if stale is not None \
             else (age is not None and age <= fresh_s)
-        if got_id == exp[0] and (got_n is None or int(got_n) == int(exp[1])):
+        hit = any(got_id == c[0] and (got_n is None or int(got_n) == int(c[1]))
+                  for c in cands)
+        if hit:
             if fresh:
                 matched += 1
                 lines.append(f"  {bot}: MATCH {got_id}/{got_n} (age {agetxt})")
@@ -251,18 +274,65 @@ def verify_rows(rows, service, expected, fresh_s=FRESH_S):
                              f"not confirmed")
         else:
             pending += 1
-            if got_n is not None and exp[1] and int(got_n) != int(exp[1]):
-                lines.append(f"  {bot}: build_n {got_n} != expected {exp[1]} — "
+            exp_txt = " or ".join(f"{c[0]}/{c[1]}" for c in cands)
+            if got_n is not None and all(c[1] and int(got_n) != int(c[1])
+                                         for c in cands):
+                lines.append(f"  {bot}: build_n {got_n} != expected "
+                             f"{'/'.join(str(c[1]) for c in cands)} — "
                              f"a different COUNT means a different FILE SET, "
                              f"not drifted code ((fd)); check the image's COPY "
                              f"set before reading this as stale. observed "
-                             f"{got_id}/{got_n} vs expected {exp[0]}/{exp[1]}")
+                             f"{got_id}/{got_n} vs expected {exp_txt}")
             else:
                 lines.append(f"  {bot}: observed {got_id}/{got_n} vs expected "
-                             f"{exp[0]}/{exp[1]} (age {agetxt})")
+                             f"{exp_txt} (age {agetxt})")
     if matched == 0 and pending == 0:
         return "NO-ROWS", lines
     return ("CONFIRMED" if pending == 0 else "PENDING"), lines
+
+
+def verify_batch(a):
+    """[(xj)] THE CI WIRING: verify every REAL-MONEY service in a deployed list.
+
+    `scripts/deploy_live_verify.py` has existed since 5-Aug as the declared
+    proof that a live deploy landed, and **no workflow ever ran it** — the (gk)
+    shape, "the rule governing real money ran only when a human typed the
+    command". It was also BROKEN at HEAD (see `_cands`) and nothing noticed,
+    for exactly that reason. This entry point is what a CI step calls.
+
+    The live set comes from `LIVE_SERVICES` — the owner — so the workflow
+    carries no second copy of "which services are real money" ((hj)). A
+    non-live name in the list is skipped, not an error: the deploy step's
+    list is whatever ran, and most of it is shadow.
+
+    Exit 0 only when every live service verified CONFIRMED. Any NOT-LANDED or
+    unverifiable service exits non-zero — this runs AFTER the deploy, so it
+    never blocks one; it says whether the container took it.
+    """
+    names = [n.strip() for n in (a.from_services or "").split(",") if n.strip()]
+    live = [n for n in names if n in LIVE_SERVICES]
+    skipped = [n for n in names if n not in LIVE_SERVICES]
+    if skipped:
+        print(f"not real money, not verified here: {', '.join(sorted(skipped))}")
+    if not live:
+        print("no real-money service in this deploy — nothing to verify")
+        return 0
+    worst = 0
+    for svc in live:
+        print(f"\n===== verifying {svc} ({LIVE_SERVICES[svc][0]})")
+        sub = argparse.Namespace(**vars(a))
+        sub.service, sub.from_services, sub.verify_only = svc, None, True
+        try:
+            rc = run_flow(sub)
+        except Exception as e:                      # noqa: BLE001
+            print(f"::error::deploy_live_verify crashed verifying {svc}: {e!r}")
+            rc = 2
+        worst = max(worst, rc)
+        if rc != 0:
+            print(f"::error::{svc} did NOT verify (exit {rc}) — the run may be "
+                  f"green while the container is not on the expected stamp "
+                  f"([[railway-cli-frozen-services]]). Read the stamps above.")
+    return worst
 
 
 def _default_ref():
@@ -320,9 +390,10 @@ def run_flow(a):
         return 2
     print(f"expected stamps at {ref}, per image COPY set:")
     for e_ in entries:
-        got = expected.get(e_) or (None, 0)
-        print(f"  {e_}: {got[0]}/{got[1]}")
-        if not got[0]:
+        cands = _cands(expected.get(e_))
+        print(f"  {e_}: " + (" or ".join(f"{c[0]}/{c[1]}" for c in cands)
+                             or "<uncomputable>"))
+        if not cands:
             print("deploy_live_verify: FAIL-CLOSED — an expected stamp could "
                   "not be computed; refusing to verify against a guess.")
             return 2
@@ -465,7 +536,36 @@ def _selftest():
     # measured off the endpoint (bot/extra{build,build_n,svc}/age_sec/stale):
     # the (hj) rule wants the publisher's payload, and acc.rows_from_pnl_json
     # (tested there against that envelope) is the adapter this consumes.
-    expected = {"lighter_funding_bot.py": ("f27e50d805af", 15)}
+    # [(xj)] THE EXPECTED SIDE IS BUILT BY ITS PUBLISHER, NOT BY HAND.
+    # This fixture used to be `{"...": ("f27e50d805af", 15)}` — the shape
+    # `stamps_at` STOPPED returning at (mq) — so the selftest passed green
+    # while the tool crashed (IndexError) on its own print and, worse,
+    # compared a str to a tuple in verify_rows and would have called a LANDED
+    # deploy NOT-LANDED. The row half already followed the (hj) rule; the
+    # expected half did not, and that is exactly the half that broke.
+    _real = acc.stamps_at(ROOT, ["lighter_avo_live_bot.py"],
+                          acc.image_shared_sets())
+    assert _real, ("stamps_at returned nothing — this pin cannot see the "
+                   "publisher's shape, so it must fail rather than pass "
+                   "vacuously ((po))")
+    for _e, _v in _real.items():
+        assert isinstance(_v, list) and _v and all(
+            isinstance(t, tuple) and len(t) == 2 and isinstance(t[0], str)
+            for t in _v), (_e, _v)
+    # and the consumer must CONFIRM against that real shape end to end
+    _ent = "lighter_avo_live_bot.py"
+    _id, _n = _real[_ent][0]
+    _live = {"bot": "freqtrade-mum-lighter", "age_sec": 60, "stale": False,
+             "extra": {"svc": "mum-live", "build": _id, "build_n": _n}}
+    _v2, _L2 = verify_rows([_live], "mum-live", _real)
+    assert _v2 == "CONFIRMED", (_v2, _L2)
+    # a multi-variant entry confirms on ANY of its candidates ((mq))
+    _multi = {_ent: [("aaaaaaaaaaaa", 14), (_id, _n)]}
+    assert verify_rows([_live], "mum-live", _multi)[0] == "CONFIRMED"
+    # the legacy single-tuple shape still works (the owner's own tolerance)
+    assert verify_rows([_live], "mum-live", {_ent: (_id, _n)})[0] == "CONFIRMED"
+
+    expected = {"lighter_funding_bot.py": [("f27e50d805af", 15)]}
     ok = {"bot": "perps-funding-lighter-lighter", "age_sec": 60,
           "stale": False, "extra": {"svc": "trail-blazer-live",
                                     "build": "f27e50d805af", "build_n": 15}}
@@ -537,6 +637,10 @@ if __name__ == "__main__":
                          "after a fetch, else HEAD)")
     ap.add_argument("--pnl-json", default=PNL_URL,
                     help="dashboard feed (file or URL) for the stamp readback")
+    ap.add_argument("--from-services", default=None,
+                    help="comma-separated deployed service names; verify "
+                         "ONLY the real-money ones among them and exit "
+                         "non-zero if any is not CONFIRMED (the CI wiring)")
     ap.add_argument("--verify-only", action="store_true",
                     help="skip the gh run watch; just read the stamp back")
     ap.add_argument("--run-id", default=None,
@@ -549,6 +653,8 @@ if __name__ == "__main__":
     if a.selftest:
         _selftest()
         raise SystemExit(0)
+    if a.from_services is not None:
+        raise SystemExit(verify_batch(a))
     if not a.service:
         ap.error("service is required (or --selftest)")
     raise SystemExit(run_flow(a))

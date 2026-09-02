@@ -745,3 +745,32 @@ jobs:
             echo "::error::pnl-dashboard deploy reported OK but the SERVING container's boot time never advanced past $RUN_START — the (ml) stale-reader class, second measured instance 18-Aug (run 537, 11h-old reader hid the band-kelly row). Re-deploy and read back /watchdog.json."
             exit 1
           fi
+
+      # [2026-09-02 (xj)] VERIFY A REAL-MONEY DEPLOY ACTUALLY LANDED.
+      # `scripts/deploy_live_verify.py` has been the DECLARED proof that a live
+      # deploy landed since 5-Aug — the extra.build+extra.build_n stamp readback
+      # CLAUDE.md names as the only proof — and NO WORKFLOW EVER RAN IT. That is
+      # the (gk) shape: "the rule governing real money ran only when a human
+      # typed the command". Measured the day this shipped: run 677 deployed
+      # mum-live and run 678 deployed avo's service, and NOTHING read either
+      # back; the tool was also BROKEN at HEAD (it consumed a return shape
+      # `audit_code_currency.stamps_at` stopped producing at (mq)) and nothing
+      # noticed, for exactly the same reason.
+      #
+      # It runs AFTER the deploy, so it never blocks one — it says whether the
+      # container took it. The live set comes from the script's own
+      # LIVE_SERVICES map, so this YAML carries no second copy of "which
+      # services are real money" ((hj)); a shadow-only deploy is a clean no-op.
+      # `--ref` is the SHA this job actually uploaded, never a branch name that
+      # could advance mid-run.
+      - name: Verify a REAL-MONEY container took the deploy ((xj))
+        if: success()
+        env:
+          SVCS: ${{ steps.decide.outputs.services }}
+        run: |
+          set -uo pipefail
+          ref="$(git rev-parse HEAD)"
+          echo "verifying real-money services in: ${SVCS:-<none>} (at $ref)"
+          python3 scripts/deploy_live_verify.py \
+            --from-services "${SVCS:-}" --ref "$ref" --verify-timeout 600
+

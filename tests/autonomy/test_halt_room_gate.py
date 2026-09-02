@@ -299,10 +299,10 @@ def test_a_non_numeric_cap_can_no_longer_raise_inside_the_publish_path():
     assert out["pub"]["extra"]["leverage"]["halt"]["binding"] == "pct"
 
 
-# ---- 19-23  (xh) the arming is never byte-identical to "the gate never ran" --
+# ---- 19-23  (xi) the arming is never byte-identical to "the gate never ran" --
 
 def test_a_quiet_cycle_still_publishes_the_arming_from_the_books_own_clip():
-    """[(xh), I18] (xg) published `halt_gate: null` whenever no entry candidate
+    """[(xi), I18] (xg) published `halt_gate: null` whenever no entry candidate
     reached sizing — the normal resting state for a book whose bar is
     `RSI<25 AND NOT uptrend` — so a quiet loop and a gate that never ran were
     the same bytes on a REAL-MONEY row. Observed live on mum minutes after the

@@ -663,7 +663,7 @@ def halt_gate_share(clip, stop_frac, day_start_equity, rails):
         stake, stop = float(clip), abs(float(stop_frac))
     except (TypeError, ValueError):
         return None, False
-    # [(xh), I5] `math.isfinite`, not `> 0`: `inf > 0` is True, so an infinite
+    # [(xi), I5] `math.isfinite`, not `> 0`: `inf > 0` is True, so an infinite
     # clip passed this guard and put a bare `Infinity` on the row. That is not
     # merely an ugly number — `json.dumps` emits it unquoted, Postgres `jsonb`
     # REFUSES the whole write, and this book's entire row would stop publishing.
@@ -688,7 +688,7 @@ def halt_gate_stat_for(clip, stop_frac, day_start_equity, rails, basis):
     the entry site and the publish site can never disagree about whether this
     book is armed ((hj): a second copy of a rule is a second rule).
 
-    [(xh), I18] `basis` names WHICH clip priced it: "candidate" when a real
+    [(xi), I18] `basis` names WHICH clip priced it: "candidate" when a real
     entry candidate reached sizing this cycle, "book_clip" when the row is
     reporting the book's own geometry because no candidate did. (xg) published
     `null` in the second case, which is byte-identical to "the gate never ran"
@@ -2076,7 +2076,7 @@ def main(_ctx=None, once=False):
                     # stop_share near 1.0 means one slot-stop is this book's
                     # whole daily allowance — the rail would be "stop trading
                     # whenever down", which is a decision, not a rail.
-                    # [(xh)] NEVER null on a live row. (xg) left this None
+                    # [(xi)] NEVER null on a live row. (xg) left this None
                     # whenever no entry candidate reached sizing, so a quiet
                     # cycle and a gate that never ran published the same bytes
                     # (I18). The arming does not need a candidate — it is the
