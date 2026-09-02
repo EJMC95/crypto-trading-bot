@@ -1,3 +1,34 @@
+## 2026-09-02 (wx) — THE SLATE'S OWN FIRST DEFECT, FOUND BY ITS OWN PAGE: the douglas guard idled 🚀 bezos, his undeclared tenant, for ~3 hours
+
+**[RENUMBERED (ww) -> (wx) at push time** — PR #265's readback merge took (ww) on main mid-write; the pushed entry keeps the letter.**]**
+
+The (wt) douglas retirement used idle-the-whole-process on the belief the
+module was single-tenant — and 🚀 book-bezos (born 1-Sep) is a VARIANT
+WRAPPER of the douglas engine: it reassigns `core.BOT = "book-bezos"` and
+calls `core.main()`. From the 05:52 slate deploy, every bezos boot in
+`freqtrade-bots` hit the guard, printed "book-douglas (🧘 The Zone) is
+RETIRED" — a banner no `bezos` log filter could ever match — and idled.
+The watchdog's `STALE: book-bezos-lshadow` page at ~3.2h dark is what
+found it. **The (mr) idle-the-whole-process trap, walked into by the very
+entry that cited it**, because nobody grepped the module's importers
+before choosing the retirement scope.
+
+FIXED: the guard keys on the module-level `BOT` (`== "book-douglas"`),
+which a variant reassigns before calling in — so douglas' own service
+stays idled and any tenant, present or future, passes through. Driven,
+not grepped: `test_the_douglas_guard_spares_his_variant_tenant` runs
+`main()` on the variant path with the sleep trapped and demands it get
+PAST the guard; re-process-scoping the guard is mutation-verified RED.
+The other two own-module retirements were RE-CHECKED for tenants the same
+way (grimes: zero importers; nav-cook: one study reading constants) and
+the funding pair was row-scoped by resolved id from the start.
+
+THE RULE THIS ENGRAVES: **retirement scope is chosen by the module's
+IMPORTERS, not by its filename** — `grep -rln "import <module>"` is one
+command and it is the difference between retiring a book and silencing a
+tenant. bezos resumes on the freqtrade-bots redeploy this push triggers;
+verified on his row's age, not the deploy log.
+
 ## 2026-09-02 (ww) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
 
 **Eamon, 2-Sep: *"Proceed with everything in the organ review."*** The (wp)

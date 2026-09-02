@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 16:35 Sydney (06:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 19:04 Sydney (09:04Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -49,8 +49,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (85 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
+## Shipped today (104 commit(s), entries (tg), (vt), (vw), (vx), (vy), (vz), (wa), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
+- `99004c8` The douglas guard spares his tenant (ww): scope by BOT — bezos is a variant of the retired engine and was idled ~3h; retirement scope is chosen by a module's importers
+- `2860c20` Merge PR #265: (ww) readback — family-shadow-stale-writer closed on the feed
+- `39a45ea` The closing note cites (ww), the entry it belongs to — no phantom letter
 - `bf47978` Close family-shadow-stale-writer on the feed readback: family rows on 97dbe3986551/15, mum's 12-position book publishing, georgia-v3's first row
 - `bd524a5` [deploy-live] Merge PR #264: (ww) proceed with everything in the organ review — docket calls reconciled with the (wt) slate, cage re-decided, mum judge lane, weekly organ board
 - `6b24cc1` test_mum_census_both_terms follows the census series through (wv)'s one builder — red on main since the extraction, healed here
@@ -136,6 +139,22 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
+- `bdfc437` Merge PR #252: the address-all-of-the-above records - sentinel proven live, ⚖️ kept on a fresh criterion, GROSS_X handed over, family pinned Railway-side (wa)
+- `2e18902` Merge PR #251: the restart lever's sentinel was dead on arrival - run 650 measured it, one line fixes it, a guard pins it (vz)
+- `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
+- `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
+- `11cef14` Record (vy): the proceed-with-all execution, and HANDOFF regenerated
+- `65c84fd` A restart lever for the (ml) stuck-server class: railway redeploy via dispatch, no upload, no UI (vy)
+- `fa8821e` Kelly snap clips revert 250 -> 80 on the grader's own verdict - Eamon's call, era untouched (vy)
+- `f3b337a` The mmf-aware clip: 10x becomes compatible with living stops, per coin and restrict-only — 5/5 mutations red (vy)
+- `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
+- `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
+- `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
+- `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
+- `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
+- `e5b7527` Fleet audit 1-Sep: the report, and HANDOFF regenerated (vw)
+- `1a6ec31` book-bezos was born dead three ways: the engine ships, the accidental 5x is gone, and the book joins every registry its birth skipped (vt)
+- `56eb4e7` The changelog was wiped on main and no guard could say so: 655 entries restored, and the class gets its lost-entries arm (vw)
 
 ## How this file stays honest
 

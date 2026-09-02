@@ -548,10 +548,17 @@ def main():
     # exclusion, Eamon's delegated docket act ("I give you permission to fix
     # the above"). Era n=81, mean −0.725%/trade, t=−2.54, UPPER BOUND −0.357%
     # ≤ 0 — the sample has EXCLUDED a positive mean; horizon `unreachable`.
-    # Zero open positions at retirement. Idle-the-whole-process (own module +
-    # own service, the 🌊/📊/🧙 shape — never sys.exit, which
-    # restartPolicy=always turns into a crash-loop). Ledgers kept.]
-    if os.environ.get("DOUGLAS_RETIRED_OVERRIDE", "").strip().lower() \
+    # Zero open positions at retirement. Ledgers kept.
+    # [SAME DAY, ~3h LATER — SCOPED TO THE BOOK, because the process was not
+    # only mine: 🚀 book-bezos is a VARIANT WRAPPER of this engine
+    # (`core.main()` after reassigning `core.BOT`), and the process-scoped
+    # guard idled HIM for ~3h behind a "book-douglas is RETIRED" banner no
+    # `bezos` log filter could match — the exact (mr) idle-the-whole-process
+    # trap, walked into by the entry citing it, because nobody grepped the
+    # module's importers before picking the mechanism. The gate now keys on
+    # the module-level BOT, which a variant reassigns before calling in.]
+    if BOT == "book-douglas" \
+            and os.environ.get("DOUGLAS_RETIRED_OVERRIDE", "").strip().lower() \
             not in ("run", "1", "true") and not args.once:
         print("book-douglas (🧘 The Zone) is RETIRED (2-Sep): era n=81, mean "
               "-0.725%/trade, t=-2.54, upper bound -0.357% <= 0 — a measured "
