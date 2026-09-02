@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 04:29 Sydney (18:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-03 04:38 Sydney (18:38Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (24 commit(s))
+## Shipped today (25 commit(s))
 
+- `58de01f` (xl) mum's dip-velocity band: the shape of the fall, shipped inert on a caged shadow lane
 - `669e9a0` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
 - `decd8ee` Merge PR #280: (xj) the drift guard _STOP_BRIDGE promised in writing and never got — plus a carried row that was five days stale
 - `9f0f186` Merge origin/main (xi) into the (xj) branch

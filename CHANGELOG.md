@@ -1,3 +1,75 @@
+## 2026-09-02 (xo) — 👩 MUM'S DAILY HALT COULD NOT FLATTEN A 1000-MARKET, AND THE FAILURE PRINTED AS SAFETY: 84% of a real-money book left unmanaged behind a retry that could never succeed
+
+**Eamon, 2-Sep: *"Mum isn't appearing to be trading? If so can we look for a
+possible bug as avo Maria is going up but mum isn't."*** She was right that
+something was wrong, and it was not the thing that first looked wrong.
+
+**LIVENESS FIRST (I1), and it immediately reframed the question.** Both live
+rows fresh (age 30s / 48s), same build `078f894f89d1` n=17 on both, so this is
+not branch code. 🙏 avo: `online`, +$7.39, 5 open. 👩 mum: **`halted`**. She was
+not failing to find trades — she was shut. Her daily-loss halt fired at
+17:19:45Z on `today_pnl −58.86` against a **$57.00** absolute limit
+(`leverage.halt.binding: "abs"`), last close DOGE `long-oversold-rebound_daily_loss`.
+**That much is a rail working exactly as designed** and needed no fix.
+
+### THE ACTUAL DEFECT, which the halt only exposed
+
+Her row also published **`flatten_incomplete: true`**, and beside it:
+
+    held             : {"1000PEPE": "adopted"}
+    margin.positions : {"kPEPE": {size 129456, value 440.02}}
+    equity           : 521.77
+
+**$440.02 of a $521.77 book — 84% — in one position the halt could not
+close**, on a book whose halted loop `continue`s past the trading pass, so
+that leg had **no roi, no stop and no max_hold either**. The only thing
+touching it was a flatten retry, every 90 seconds, that could never succeed.
+
+**THE CHAIN, and every link is correct in isolation:**
+1. `positions()` keys its map by the **FLEET** symbol (`out[fleet] = rec` via
+   `from_lighter`) — so the venue's `1000PEPE` is filed under `kPEPE`.
+2. `(xa)` normalises the live host's own map to the **VENUE** spelling — a
+   correct fix for a real bracket bug, where a 1000-market was two names in
+   one loop and the reconciler dropped its bracket.
+3. `_flatten_all` iterates that map, so it holds `"1000PEPE"`.
+4. `market_close` looked its position up as `self.positions().get(coin)` — a
+   **MISS**, because the map is keyed `kPEPE`.
+5. A miss returns `None`, and `None` is the documented *"no position"* answer.
+   So the caller logged *"venue reports NO position — leaving meta; retry next
+   cycle (not booking a phantom close)"* — a message written to describe a
+   **safe** outcome — and repeated it forever.
+
+**A lookup that cannot find its own position is indistinguishable from a flat
+book, and the honest-looking log line is what let it run.**
+
+### THE FIX IS AT THE OWNER, because this is the THIRD arm of one confusion
+
+`(xa)` was the bracket, `(xe)` was the mark, this is the flatten. Patching a
+third call site leaves the fourth. `LighterClient.position_of(coin)` now
+answers to **either** spelling — fleet first (so every existing caller is
+byte-identical), venue as the fallback — and `market_close` reads through it.
+`positions()` is the one owner of that map; it now answers to the name its own
+callers hold. Purely additive: an absent coin is still `None`, and `None` still
+means "no position", so nothing books a phantom close.
+
+Pinned by `tests/autonomy/test_flatten_symbol_alias.py`, which drives the real
+method against her actual shape (venue holds `1000PEPE`, map keyed `kPEPE`,
+caller holds `1000PEPE`) and AST-pins that `market_close` never re-introduces a
+raw `positions().get`. 3 of 3 mutations red, including the original bug.
+
+### WHAT THIS DOES NOT CLAIM
+
+The halt itself was correct and is unchanged; `MUM_GROSS_X` stays at the 3.75
+`(xf)` derived. Whether −$58.86 in a day at that gross is expected is a
+separate question this entry does not answer — `entry_vetoes.halt_days_30d`
+reads `daily_halt 1` over her 8.34 days of life, against `(xf)`'s replayed
+expectation of 0 halts/30d at 3.75x, and one day is not a rate. What is fixed
+is that when the halt does fire, it can now actually flatten.
+
+**Also recorded, unfixed:** `stop_overshoot` reads n=6, p90 **51.7bps**, worst
+**62.4bps** — her stops are filling about half a percent worse than the level
+they name. Not this entry's subject; named so it is not lost.
+
 ## 2026-09-02 (xl) — 👩 MUM'S ENTRY HAS INFORMATION AND IT IS NOT THE DEPTH OF THE DIP, IT IS THE SHAPE OF THE FALL: the dip-velocity band, shipped INERT on a caged shadow lane with the judge's own paired bar as the criterion
 
 **Eamon, 2-Sep: *"She needs to be able to jump onto something at the perfect
