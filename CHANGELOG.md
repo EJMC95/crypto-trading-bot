@@ -401,6 +401,16 @@ read-back of that deploy (stamp, `cohorts.shadow.long_budget: 26`, a fresh
 file or the HANDOFF, never assumed. freqtrade-bots only; no live bot file
 changed; main only, no marker.
 
+**READ BACK on the live bus, 10:20Z (20:20 AEST), after PR #269 merged as
+`1c37d6c`:** `cohorts.shadow: {long_budget: 26, long_positions: 18, light:
+green}` · `cohorts.live: {long_budget: 20, long_positions: 11, light: green}`
+(the pooled `light` still yellow — display only, as designed) ·
+`tuning-proposals` fresh at 9.5 min with ZERO proposals — the heartbeat's
+first live beat, an empty channel that is no longer a dark one · `xp-queue`
+carries the six mum offspring `xp-mum-rsi_max-{30,32,34}` and
+`xp-mum-max_hold_min-{720,1080,2160}` for the judge's serial lane. Both
+deploys landed on the payload, not on the run log.
+
 ## 2026-09-02 (wy) — "RUN 2 THROUGH TO 4": the edge audit's two top hypotheses become PRE-REGISTERED instruments — and one is already excluded at 4h on 🎫 the taker's own entries — the incubator breeds for the lane the judge actually runs, and the organ board's two flags close: a proposals channel that could not tell empty from dead, and a light that mixed paper into real money
 
 **Eamon, 2-Sep, after the edge-radar / incubator / organ-board review: *"Run 2
