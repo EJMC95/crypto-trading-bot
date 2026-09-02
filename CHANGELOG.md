@@ -1,3 +1,99 @@
+## 2026-09-02 (wp) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
+
+**Eamon, 2-Sep, on the edge audit's proposals: *"Proceed with advisements."***
+`(wo)` §6 proposed three changes for approval. The first — 🪁 kelly's clip
+$250 → $80 — was already shipped by `(vy)` a day earlier and is corrected in
+place there. These are the other two, and both live in ONE place:
+`fleet_bus.brain_clip_multi`, the accessor every living book already sizes
+through since `(so)`, so no bot changes a line and every book gets both rails
+on its next deploy.
+
+**AND THEN, BEFORE THE PUSH — Eamon: *"Let's make sure we don't constrict too
+much like we have in the past, our focus always on growth."*** He was right
+about the first cut, and it is recorded here because the shape is the general
+one (I26): both rails as first written bit on an ABSENCE. The drawdown scale
+began at HALF the bar, so a book in an ordinary 10% drawdown — INSIDE the range
+the gate grades it on — would have been cut to 0.75 while still earning the
+closes that decide it (I17: a book cannot earn evidence with no capital). And
+the lower-bound cap refused expansion on a DARK allocation organ and on a THIN
+era, so a second organ's outage could veto the brain's own MEASURED t≥2
+expansion, and "no reading yet" read as "no". Neither is a measured harm; both
+are the museum-of-avoided-losses shape. Reshaped as below — each rail now needs
+its number — with the mutations re-run.
+
+**RAIL 1 — THE DRAWDOWN SCALE.** The gate REPORTED each book's max drawdown and
+the 7-day governor scaled the fleet's live clips on FLEET drawdown, but no organ
+reduced a book's OWN clip when its own drawdown crossed the bar it is graded on.
+Measured in `(wo)`: kelly at 27.9% realised / 28.5% MTM against a 15% bar, a
+bootstrap probability of ruin inside 12 months of 1.00, and every entry still
+sized at the full clip. `dd_scale(bot)` reads the gate's own per-book
+`max_dd_pct` — the I9 worse-of-realised/MTM fold, not the realised-only number
+that read 5.3% on a book at 58% MTM — and returns **1.0 all the way to the
+published bar**, then falls linearly to **0.25** (the allocation organ's own
+probe floor, I17) at **twice** the bar. Past the bar is past the tested range:
+that is where the gate itself already says the book failed, and only there.
+**On the live payload the day it shipped:** mum-live 3.8%, avo-live 5.6%, taker
+5.1% → 1.0 and untouchable until 15% · kelly 28.5% → **0.325** · georgia's
+retired live row 58.3% → 0.25. Fail-OPEN: a dark or stale gate, an unknown book
+or a junk number scales NOTHING.
+
+**RAIL 2 — NEVER LEVER A WEAK EDGE.** I16 computes a CEILING only on a positive
+lower bound; nothing applied that to the brain's 6.7× MULTIPLIER. `lb_permits_
+expansion(bot)` now refuses a multiplier above 1.0 **only when `fleet_allocation`
+has measured the sized book's era lower bound at or below zero on at least
+`LB_CAP_MIN_N` = 10 era closes** (`claim_era` 0.0 with `n_era` ≥ 10 — the
+publisher's own era twin, the predicate `allocation_scale` has used since
+`(lx)`, and 10 is the (ua) computability floor, pinned equal to
+`fleet_allocation.MIN_N`). A dark or stale organ, an unknown book, a None or
+NaN claim, a thin era or junk all change NOTHING — the brain's own ladder
+(n≥30 era closes, Wilson lower bound, t≥2.0/2.5, three consecutive runs) is
+already an earned thing and governs alone in every one of those cases.
+Reductions pass through untouched: this rail can only ever make a book SMALLER.
+On the live payload: mum-live `claim_era` +0.003659 on n_era 52 (may expand if
+the brain ever says so), avo-live 0.0 on n_era 11 (may not — the audit's own
+LB −0.316%), kelly 0.0 on 383, taker +0.000727 on 150.
+
+**THE RECEIPT (I23).** The `mult` the accessor hands back is now the EFFECTIVE
+stake multiplier — brain × rails — because that is the quantity that actually
+sized the trade and the ledger's `brain_mult` stamp must record what cut it. The
+decomposition `{brain, lb_capped, dd_pct, dd_scale}` is kept in
+`fleet_bus.last_sizing[bot]` for any publisher that wants to attach it. The rails
+act on the FIRST bucket — the sized book at every call site (avo's live arm
+passes `(BOT_ROW, SHADOW_ROW)`) — and AFTER the `(sp)` gross-cap trim, so the
+trim's never-below-base floor keeps its meaning.
+
+**KILL SWITCH:** `BRAIN_RAILS_MODE=advisory` on a service returns both rails to
+neutral at the accessor, so the switch reaches every consumer without a redeploy
+([[a-kill-switch-must-reach-the-consumer]]). The brain's own clamp and the
+SafetyRails caps are untouched and stay senior.
+
+**MUTATIONS, 8 of 8 RED** (`tests/autonomy/test_brain_sizing_rails.py`, 27
+pins, payloads built by the publishers' own `fleet_allocation.build` /
+`set_era_twin` and `golive_readiness.book_payload`): cap reductions too · drop
+the cap · scale from half the bar · read the realised-only field · rails before
+the trim · remove the probe floor · ignore the kill switch · drop the thin-era
+guard. The rails-before-trim mutation was first written as an edit that did not
+actually reorder the code and SURVIVED — a mutation that changes nothing proves
+nothing — and was redone as a real block move before it counted. `fleet_bus
+--selftest` gained the same cases; its gross-bound and junk blocks install a
+positive era claim for their synthetic books so they keep testing the BRAIN's
+mechanics rather than tripping the cap.
+
+**DEPLOY: main only, by the (mm) rule.** `fleet_bus.py` is in `$_shared`, so
+every shadow service takes the rails on this push. Neither live row would trade
+differently today (both scale 1.0; the brain has no expansion opinion on
+either), so a live restart buys nothing and is not dispatched — the rails ride
+the next live deploy that does qualify. Kelly is the one book the rails bite
+today: her next entries size at 0.325 × $80 ≈ $26 until her drawdown reads
+under 15% again. **The growth half, so this entry is not only a rail:** the
+same audit says where the fleet's evidence actually points — 👩 mum (LB +0.366%,
+robust to concentration and cost), 🎫 the taker's `long-breakoutup` lens on 1–3d
+holds (+2.219%/trade, t=+3.06) — and the brain's expansion ladder has NEVER
+fired for either, because its floors were calibrated for a 1.5× ceiling
+(carried as `brain-mults-are-two-opinions-wide`). That is the next build in the
+win-more direction, and it is a measurement first: how many buckets qualify at
+each floor, and what they earned.
+
 ## 2026-09-02 (wo) — THE EDGE AUDIT: 18 LIVING BOOKS, ZERO SURVIVE MULTIPLICITY, AND EVERY BOOK MINTED ON A PER-TRADE REPLAY NUMBER IS REJECTING IT ON ITS OWN LEDGER — FOUR OF FOUR
 
 **[RENUMBERED THREE TIMES — (wl) → (wm) → (wn) → (wo), at merge:** three sessions pushed inside half an hour and main took each letter first — (wl) the dashboard's capital-move-immune daily P&L, (wm) mum's I21 pre-registration on the winners' docket, (wn) the CI-liveness pager's heartbeat. The pushed entry keeps the letter, per the letters rule; the two CLAUDE.md citations moved with it each time; `git log` subjects keep the old letters and are not a letter index. Same-day instance of the race that rule was written for.]**

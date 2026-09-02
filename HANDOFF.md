@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 14:40 Sydney (04:40Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 14:53 Sydney (04:53Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,12 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (49 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo))
+## Shipped today (53 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp))
 
+- `d1cfd8d` The two sizing rails from the edge audit: a book's own drawdown scales its clip, and the brain may not lever a book whose lower bound is not positive (wp)
+- `cf11c48` Merge PR #260: the edge audit — 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wo)
+- `713c0c0` Kelly's clip was already cut to $80 on 1-Sep (vy): the audit's 'nothing reduces her clip' corrected in place, and her Monte Carlo re-run at the live clip (wo)
+- `aa93e7d` Regenerate HANDOFF after the third main merge (wo)
 - `a46640b` Merge origin/main: (wn) the CI-liveness pager landed first; the edge audit keeps (wo) above it
 - `bdf6689` Renumber (wn) -> (wo): main took (wn) for the CI-liveness pager; citations moved with it (wo)
 - `09e5fc4` (wn) the CI-liveness pager cried wolf 1-in-10: heartbeat rides push CI, LATE warns at 4h, DARK pages at the measured 12h
