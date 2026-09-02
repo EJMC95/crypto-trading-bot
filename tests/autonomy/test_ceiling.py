@@ -140,3 +140,29 @@ def test_the_binding_factor_is_the_LARGEST_headroom_and_the_rest_are_ranked():
     r = C.book_ceiling(closes=GOOD, span_days=40, concurrency=1.0, cap=4,
                        clip=80.0, equity=1000.0, maxdd=0.03)
     assert "CLIP" in r["binding"] and any("SLOTS" in t for t in r["then"])
+
+
+def test_the_ceiling_prices_the_graders_sample_not_the_raw_feed():
+    """[2026-09-02] The public /trades.json feed carries rows the fleet's
+    grader withholds — LEDGER_QUARANTINE rows and phantom halt events. A
+    ceiling priced on them is a ceiling on trades the gate refuses. Pinned
+    against the owners: a quarantined row and a phantom row are dropped, a
+    real one kept. Mutation: remove either filter in `graded_sample` and the
+    corresponding assertion reddens."""
+    import bot_pnl_store as store
+    q_pair, q_bot, lo, _hi, _why = store.LEDGER_QUARANTINE[0]
+    bot = f"{q_bot}-ceiling-test"
+    rows = [
+        {"bot": bot, "pair": q_pair, "pnl_pct": 0.01, "pnl_abs": 1.0,
+         "opened_at": f"{lo}T01:00:00+00:00", "closed_at": f"{lo}T02:00:00+00:00",
+         "reason": "long_x", "entry_price": 1.0},                      # quarantined
+        {"bot": bot, "pair": "ETH", "pnl_pct": 0.0, "pnl_abs": 0.0,
+         "opened_at": "2026-08-21T01:00:00+00:00",
+         "closed_at": "2026-08-21T02:00:00+00:00", "reason": "x"},    # phantom
+        {"bot": bot, "pair": "ETH", "pnl_pct": 0.02, "pnl_abs": 2.0,
+         "opened_at": "2026-08-22T01:00:00+00:00",
+         "closed_at": "2026-08-22T02:00:00+00:00", "reason": "long_x",
+         "entry_price": 1.0},                                          # real
+    ]
+    kept = C.graded_sample(rows, bot)
+    assert len(kept) == 1 and kept[0]["pair"] == "ETH" and kept[0]["pnl_abs"] == 2.0
