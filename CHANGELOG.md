@@ -128,7 +128,10 @@ moving ledger and refuses on a stale grade) · `tests/autonomy/test_edge_audit.p
 (25 pins) · `scripts/ceiling.py` + one pin in `test_ceiling.py` ·
 `EDGE_AUDIT_2026-09-02.md` · CLAUDE.md: the `/trades.json` endpoint line now
 carries the quarantine caveat, and the instrument is in Key Files. **No bot
-configuration changed.**
+configuration changed.** CodeQL's PR review flagged nine hygiene findings on the new
+files — eight bare `open()` calls without a context manager and one unused
+local in `risk_metrics` — all fixed in the same PR before merge (a bot
+finding is a bug report, not a design note).
 ## 2026-09-02 (wm) — 👩 MUM IS PRE-REGISTERED (I21): both docket buckets held "only by the multiplicity referee" now have the instrument that decides them — on fresh closes alone
 
 **Eamon, 2-Sep: *"now check mum is winning too."*** The check ran as a

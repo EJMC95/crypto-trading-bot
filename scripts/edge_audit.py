@@ -129,6 +129,11 @@ def _get(url, timeout=180):
         return json.loads(r.read().decode())
 
 
+def _load_json(path):
+    with open(path) as fh:
+        return json.load(fh)
+
+
 def load(ledger=None, feed=None, bus=None, limit=5000):
     """(trades, books, published_grades). Any of the three may be a local path.
 
@@ -136,7 +141,7 @@ def load(ledger=None, feed=None, bus=None, limit=5000):
     truncation signature ((qz)) and this refuses rather than auditing a
     silently sampled ledger.
     """
-    tr = (json.load(open(ledger)) if ledger
+    tr = (_load_json(ledger) if ledger
           else _get(f"{DASH}/trades.json?source=paper&limit={int(limit)}"))
     trades = tr["trades"] if isinstance(tr, dict) else tr
     if len(trades) >= limit:
@@ -144,9 +149,9 @@ def load(ledger=None, feed=None, bus=None, limit=5000):
             f"REFUSING: the ledger returned exactly its own cap ({len(trades)} "
             f">= limit {limit}) — that is a truncation signature, not a "
             f"complete history. Raise --limit or page per book.")
-    bo = json.load(open(feed)) if feed else _get(f"{DASH}/pnl.json")
+    bo = _load_json(feed) if feed else _get(f"{DASH}/pnl.json")
     books = bo["bots"] if isinstance(bo, dict) and "bots" in bo else bo
-    bu = json.load(open(bus)) if bus else _get(f"{DASH}/bus.json")
+    bu = _load_json(bus) if bus else _get(f"{DASH}/bus.json")
     pub = (bu.get("golive_readiness") or {}) if isinstance(bu, dict) else {}
     return trades, books, pub
 
@@ -354,7 +359,6 @@ def risk_metrics(pcts, abss, closes, book_usd=1000.0):
     dd = 0.0
     peak_at = closes[0]
     trough_at = None
-    worst_recovery = 0.0
     cur_uw_start = None
     uw_seconds = 0.0
     for x, ts in zip(abss, closes):
@@ -1506,7 +1510,8 @@ def _selftest():
     # THIS MODULE MOVES NOTHING. Asserted on its own source, the
     # fleet_allocation pattern: no lever write, no lever read, no order, no
     # publish. A report that can act is not a report.
-    src = open(os.path.abspath(__file__)).read()
+    with open(os.path.abspath(__file__)) as fh:
+        src = fh.read()
     src = src[:src.index("def _selftest")]      # the list below is not a call
     for forbidden in ("write_levers", "get_lever", "market_open",
                       "publish", "set_lever", "market_close"):
@@ -1531,7 +1536,7 @@ def main(argv=None):
         return 0
     stress = None
     if a.stress:
-        raw = json.load(open(a.stress))
+        raw = _load_json(a.stress)
         raw = raw.get("stress", raw) if isinstance(raw, dict) else raw
         stress = sorted((_ts(x["ts"]), x["med_bps"]) for x in raw
                         if _ts(x.get("ts")) and isinstance(x.get("med_bps"), (int, float)))

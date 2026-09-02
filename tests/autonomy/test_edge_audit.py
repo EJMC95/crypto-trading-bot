@@ -49,7 +49,8 @@ def _row(i, pct, usd, pair="X", side=None, reason="long_x", extra=None):
 def test_the_sample_owners_are_imported_by_identity_not_copied():
     """The AST of edge_audit must not DEFINE any of the grader's owner names —
     a local `def era_rows`/`def stats` would be a second rule."""
-    src = open(ea.__file__).read()
+    with open(ea.__file__) as fh:
+        src = fh.read()
     tree = ast.parse(src)
     defined = {n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
     for owner in ("era_rows", "stats", "is_phantom_close",
@@ -63,7 +64,8 @@ def test_the_sample_owners_are_imported_by_identity_not_copied():
 def test_min_n_is_the_allocation_organs_floor_not_a_retyped_constant():
     assert ea.MIN_N is fa.MIN_N or ea.MIN_N == fa.MIN_N
     # mutation: a local literal 10 would still pass ==; pin the SOURCE form
-    src = open(ea.__file__).read()
+    with open(ea.__file__) as fh:
+        src = fh.read()
     assert "MIN_N = fa.MIN_N" in src
 
 
@@ -300,7 +302,8 @@ def test_multiplicity_counts_every_tested_book_in_m():
 # ------------------------------------------------------------ moves nothing
 
 def test_the_audit_moves_nothing():
-    src = open(ea.__file__).read()
+    with open(ea.__file__) as fh:
+        src = fh.read()
     src = src[:src.index("def _selftest")]
     tree = ast.parse(src)
     calls = {n.func.attr for n in ast.walk(tree)
