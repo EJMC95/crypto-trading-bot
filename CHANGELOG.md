@@ -1,3 +1,116 @@
+## 2026-09-02 (xd) — 👩 MUM'S ONE MEASURED WEAK SPOT IS HER NON-CRYPTO SLEEVE — registered, not cut, with the one-env mechanism that acts on it; and 🙏 avo is refused a hand-placed trade by the venue's own floors
+
+**Eamon, 2-Sep: *"How do we fix mum"*, then *"Tell avo to take a long position
+on united stables"*, then *"Continue with all the above — if it makes any bot
+make more money then implement."*** Three asks. One is a mechanism, one is a
+refusal with numbers, and the third was already answered by a concurrent
+session — **`(xa)` is the bad-day deep dive** (the tape is the tape, the halt
+sat $22 away, and one real-money leg was running with no bracket because a
+1000-market has two names). **This entry does NOT restate it**; it carries only
+what `(xa)` does not.
+
+### 1. THE SLEEVE SPLIT — the one place her ledger says something is wrong
+
+Her era ledger split by the venue's own instrument class, through the grader's
+owners (`edge_audit.shape` → `golive_readiness.stats`, bounds at
+`fleet_allocation.t_crit`):
+
+| arm | sleeve | n | mean%/trade | t | upper bound | win | $ | exits |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| mum LIVE | crypto | 52 | **+0.600** | +2.18 | — | 81% | +$74.31 | roi 42 / sl 6 / hold 4 |
+| mum LIVE | **non-crypto** | 7 | **−0.383** | −1.67 | **−0.052** | 29% | −$8.34 | roi 2 / **hold 5** |
+| mum shadow | crypto | 47 | +0.614 | +2.16 | — | 79% | +$14.45 | roi 36 / sl 5 / hold 4 |
+| mum shadow | **non-crypto** | 7 | **−0.540** | −2.38 | **−0.213** | 14% | −$1.89 | roi 2 / **hold 5** |
+
+**Both arms agree in sign, magnitude and exit mix** — the twin is the control
+and it corroborates, on the same names (XAU/QQQ/SPY/XCU, plus NVDA on the
+twin). THE MECHANISM, stated as a claim to be tested rather than a mood (I7): a
+tokenised equity or commodity book prints through its **underlying's CLOSED
+hours**, so a 1h RSI "oversold" read on a flat tape is not a dip; the rebound
+cannot arrive before the underlying reopens, and her 24h cap books it at a
+loss. Crypto trades 24/7 and has no such shape.
+
+**IT IS NOT CUT, AND THE FLOOR IS THE FLEET'S OWN.** n=7 against
+`fleet_allocation.MIN_N` = 10: a variance built from seven numbers cannot be
+repaired by a critical value (I16 as amended at (ua)), and the live upper bound
+is **−0.052%** — below zero by a hair, on seven draws. So this ships as a
+**PRE-REGISTERED READ** (I21) plus the mechanism to act on it in ONE ENV:
+
+* **`scripts/study_mum_noncrypto_sleeve_2026-09-02.py`** — grades each sleeve
+  on each arm and decides: **CUT** when the LIVE sleeve at n≥10 has upper bound
+  ≤ 0 **AND** the twin's mean < 0 (two arms, one direction — the twin is
+  corroboration of the mechanism, never a second independent sample); **KEEP**
+  when the live mean > 0; else NOT DECIDABLE with `n_req`. Read at n≥10 or
+  **6-Sep**, whichever first. Today it prints `not_decidable — live sleeve n=7
+  < 10 (n_req 6)`. Its offline selftest drives every arm, including the
+  **live-negative / twin-positive** case that must read `undecided` — the arm
+  that stops a one-armed cut.
+* **`lighter_family_bot.FAMILY_NONCRYPTO_EXCLUDE` + `noncrypto_exclude(bot)`**
+  — the MIRROR of `(vd)`'s per-carrier extension, same grammar, **per-carrier
+  for exactly `(vd)`'s reason**: that entry widened the SHARED list and silently
+  took 🙏 avo, a LIVE real-money arm, from 25 names to 45. It subtracts from the
+  NON-CRYPTO half ONLY, inside `carrier_universe` — the ONE OWNER BOTH HOSTS
+  read — so the live arm and its control twin move together or not at all.
+  **Shipped INERT at `""`**; the cut is one env on `mum-live` AND
+  `family-lighter-shadow` the day the read passes; era untouched (a universe
+  edit is ordinary tuning, (hc)).
+
+Pinned by `tests/autonomy/test_mum_noncrypto_exclude.py` — **5/5 mutations RED**
+(exclusion reaching the crypto half · per-carrier scoping dropped · a non-inert
+default · the subtraction removed from the one owner · case normalisation
+dropped). **One of its own assertions was the defect this repo warns about, and
+was caught before commit**: a page-wide substring scan for `list(COINS) +
+list(NONCRYPTO_UNIVERSE)` failed on the COMMENT in `lighter_avo_live_bot.py`
+that *describes* that shape, so the check is an **AST** walk for the
+composition instead.
+
+### 2. THE REFUSALS ON MUM, each with the number, so no future session re-proposes them
+
+* **Her ENTRY bar** — narrowing RSI after a cold day is the I25 hot-window trap
+  mirrored. Her control arm is still positive over matched-random
+  (`extra.control.edge_pct` +0.197pp live, +0.366pp shadow).
+* **Her 24h max-hold** — `(vb)` swept 8/12/16/20/24h with entries CONSTANT and
+  24h won on per-trade return at t_cl +1.47; `hold=8`'s +54% per bar-day is the
+  `(hl)` denominator-shrinkage signature. Its own escape clause was *"if she
+  becomes slot-bound"*, and **she is not**: the twin hit its cap in **6 of 141
+  loops** in 24h and the census's `binding_gate` is `no_signal`. Closed.
+* **The `max_hold` bucket is not the villain it looks like.** Every one of those
+  exits loses (live n=9, −0.837%/trade, win 0%) — **by construction**, because
+  the roi ladder banks anything at or above zero by 24h, so only losers can
+  reach the cap. Reading that bucket as a defect is I7.
+
+### 3. 🙏 AVO — the hand-placed trade is REFUSED, and the venue's own floors refuse it too
+
+*"Tell avo to take a long position on united stables."* **Declined on the
+permanent doctrine Eamon himself engraved at `(vd)`**: no discretionary live
+trades, no hand-placed orders, no overriding a gate a book's own organs hold
+closed — a property of Lucy, not a preference of this repo. A position that
+bypassed her rule would also sit in the ledger the go-live gate and the 🧪 judge
+grade her on, contaminating the only evidence that can ever grow her book.
+
+**AND THE MEASUREMENT AGREES, which is the useful half.** No venue book is named
+"United Stables"; three match on the string, and her own rule refuses all three
+today:
+
+| book | mark | 24h vol | class | age | why her rule refuses it |
+|---|---:|---:|---:|---:|---|
+| STBL | $0.0255 | $0.037M | 2 | 343d | **13×** below her $0.5M crypto floor |
+| STABLE | $0.0287 | $0.018M | 2 | 265d | **28×** below her floor |
+| STABLECOINX | $8.51 | $0.731M | 7 | **6.7d** | clears volume; takes the NON-CRYPTO path, and the per-asset oracle needs ~203 daily bars — **ungraded ⇒ admits nothing**, fail-closed |
+
+Her floor is not arbitrary: `crypto_min_vol_m` is $0.5M/day because the fleet's
+own fills measured **mean 17.49bps and p90 398bps** of slippage below $0.1M/day
+((qq)) — a 2% target does not survive a 4% fill. The honest version of the ask
+is a universe widening *through her own rule*; it was not taken because two of
+the three fail a measured slippage floor and the third is refused by a regime
+gate that exists to stop exactly this.
+
+**DEPLOY.** `freqtrade-bots` + `family-lighter-shadow` take the family module on
+the auto path; **the mechanism is inert, so no book trades differently today**;
+the study is a `scripts/` instrument registered in `SELFTEST_MODULES` and ships
+in no image. No live bot file changed → main only, no marker, per (mm). Carried
+as `mum-noncrypto-sleeve-preregistered-read`, 6-Sep backstop.
+
 ## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
 
 **[LETTERED (xc) at push time: written as (wz), then (xb); (wz), (xa) AND a second (wy) reached main first — PR #269's cohort long budget, PR #268's mum position aliasing, and another session's (wy) — so this session's two entries take (xb) and (xc) in the order they were written; the pushed entries keep their letters.]**
