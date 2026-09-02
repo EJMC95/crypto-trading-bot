@@ -278,6 +278,25 @@ def _build_files(entry=None):
     return sorted(set(out), key=_build_rel)
 
 
+def _digest(files):
+    """(id12, n) over name+bytes of `files` — the ONE hashing rule.
+
+    Extracted at [2026-09-02] so `build_compute` and `build_shared_compute`
+    cannot drift apart: a second copy of a rule is a second rule ((hj)), and
+    these two ids are compared against each other by `arm_drift`.
+    """
+    if not files:
+        return None, 0
+    h = hashlib.sha256()
+    for p in files:
+        h.update(_build_rel(p).encode())
+        h.update(b"\0")
+        with open(p, "rb") as fh:
+            h.update(fh.read())
+        h.update(b"\0")
+    return h.hexdigest()[:12], len(files)
+
+
 def build_compute(entry=None):
     """(id12, n_files) — sha256 over name+bytes of a fixed file set.
     None on any read failure: a sensor that cannot see must not vote, and a
@@ -287,17 +306,36 @@ def build_compute(entry=None):
             m = sys.modules.get("__main__")
             entry = getattr(m, "__file__", None)
             entry = os.path.abspath(entry) if entry else None
-        files = _build_files(entry)
-        if not files:
-            return None, 0
-        h = hashlib.sha256()
-        for p in files:
-            h.update(_build_rel(p).encode())
-            h.update(b"\0")
-            with open(p, "rb") as fh:
-                h.update(fh.read())
-            h.update(b"\0")
-        return h.hexdigest()[:12], len(files)
+        return _digest(_build_files(entry))
+    except Exception:      # noqa: BLE001 — never break a publish
+        return None, 0
+
+
+def build_shared_compute():
+    """(id12, n) over the `_BUILD_SHARED` files ALONE — entry module EXCLUDED.
+
+    [2026-09-02] WHY A SECOND STAMP, measured. `build` hashes the entry module
+    PLUS the shared names present, so two arms of ONE book that run DIFFERENT
+    ENTRY FILES in different images can never produce the same id — even at the
+    identical commit. On 👩 mum's pair the family shadow's 16 files are a strict
+    SUBSET of the live host's 17, the only difference being the live entry
+    `lighter_avo_live_bot.py`. `implementation_shortfall.arm_drift` compares
+    `build` and `experiment_judge.paired_eval` HARD-BLOCKS a promotion on a
+    difference, so the judge's serial lane could never promote a cross-image
+    pair, ever — on a guard that was SOUND for the Farmer, whose two arms ran
+    one entry file in two services.
+
+    This id is comparable ACROSS images by construction: `_BUILD_SHARED` is one
+    tuple for the whole fleet, so two arms carrying the same shared files at the
+    same commit agree, and an arm behind on any of them differs.
+
+    DECLARED BLIND SPOT, not hidden: drift confined to a LIVE-ONLY entry module
+    (one not in `_BUILD_SHARED` — `lighter_avo_live_bot.py` is the live case) is
+    invisible here. That is what `build`/`build_n` stay published for, and what
+    `scripts/audit_code_currency.py` resolves per row.
+    """
+    try:
+        return _digest(_build_files(None))
     except Exception:      # noqa: BLE001 — never break a publish
         return None, 0
 
@@ -308,6 +346,18 @@ def build_code_id():
     if _BUILD_CACHE is None:
         _BUILD_CACHE = build_compute()
     return _BUILD_CACHE[0]
+
+
+_BUILD_SHARED_CACHE = None
+
+
+def build_shared_code():
+    """Cached per process, like `build_code_id` — bytes cannot change under a
+    running process. Returns (id12|None, n)."""
+    global _BUILD_SHARED_CACHE
+    if _BUILD_SHARED_CACHE is None:
+        _BUILD_SHARED_CACHE = build_shared_compute()
+    return _BUILD_SHARED_CACHE
 
 
 def build_code_files():
@@ -384,6 +434,14 @@ def _stamp_build(extra):
         n = build_code_files()
         if n:
             out.setdefault("build_n", n)
+        # [2026-09-02] the CROSS-IMAGE-comparable stamp beside the per-image
+        # one — see build_shared_compute for the mum-pair measurement that
+        # forced it. Additive: no consumer of `build` changes meaning.
+        sid, sn = build_shared_code()
+        if sid:
+            out.setdefault("build_shared", sid)
+            if sn:
+                out.setdefault("build_shared_n", sn)
         return out
     except Exception:      # noqa: BLE001
         return extra
