@@ -1673,7 +1673,23 @@ def main(_ctx=None, once=False):
                 fn = getattr(venue, "margin_state", None)
                 if not callable(fn):
                     return None
-                live, blind = marks.stop_marks(venue, list(live_pos or []))
+                # [2026-09-02] FLEET SPELLING, because that is what both ends
+                # of this call use. `live_pos` is keyed the VENUE way since
+                # (xa) (`to_lighter`, so the exit reconciler and the host's
+                # meta agree); `marks.stop_marks` documents its coins as FLEET
+                # symbols and returns them keyed as passed, while
+                # `margin_state_from` keys its positions by the fleet spelling.
+                # Passing the venue spelling straight through therefore blinded
+                # every 1000-market: mum's row published
+                # `liq_mark_blind: ["kPEPE"]` for a leg the scout was pricing,
+                # and a blind leg is excluded from `nearest_liq` outright.
+                # `from_lighter` is the one owner and rewrites at a 1.0 size
+                # multiplier, so no price is rescaled. The publisher realigns a
+                # venue-keyed map too and says so in `marks_realigned` — belt
+                # and braces, and this end is the belt.
+                _fleet = sorted({from_lighter(str(c))[0]
+                                 for c in (live_pos or [])})
+                live, blind = marks.stop_marks(venue, _fleet)
                 st = fn(marks=live or None)
                 if st is not None and blind:
                     st["mark_blind"] = sorted(blind)
