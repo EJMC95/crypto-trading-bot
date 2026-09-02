@@ -273,6 +273,44 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_changelog_letters.py --selftest
 
+  live-marker-survives-squash:
+    name: A live-deploy marker must survive a squash merge
+    # PR-only: the check compares the PULL REQUEST TITLE against the branch's
+    # commit subjects, and on a push there is no title to compare.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Needed to read the branch's own commit subjects. `(hj)` pinned that
+          # the deploy gate reads SUBJECTS; this reads the same field from the
+          # other side of the merge.
+          fetch-depth: 0
+      # [2026-09-02 (xh)] MEASURED ON REAL MONEY. `(xe)`'s commit subject opened
+      # with `[deploy-live]` and it merged as a SQUASH — whose subject is
+      # generated from the PR TITLE, not from the branch. The marker was
+      # dropped, main carried none, and the deploy gate correctly shipped
+      # nothing: 🙏 avo's live arm read `DEFERRED, 14 commits behind` while the
+      # fix sat merged. 👩 mum got it only because an unrelated PR an hour later
+      # happened to carry `[deploy-live-mum]` in its title. The whole difference
+      # was which field the marker was typed into.
+      #
+      # DELIBERATELY THE WEAK FORM: it never REQUIRES a marker (most changes are
+      # correctly main-only under `(mm)`) and never guesses the merge method. It
+      # fails only when a marker on the branch is missing from the title — which
+      # is always fixable by editing the title, and costs nothing to satisfy.
+      - name: A marker in a commit subject must also be in the PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          git log --format='%s' \
+            "origin/${{ github.event.pull_request.base.ref }}..HEAD" \
+            > /tmp/subjects.txt
+          python3 scripts/audit_live_marker_survives_squash.py \
+            --title "$PR_TITLE" --subjects-from /tmp/subjects.txt
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_live_marker_survives_squash.py --selftest
+
   conflict-markers:
     name: No unresolved merge/stash markers in the tree
     runs-on: ubuntu-latest
