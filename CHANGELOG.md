@@ -292,6 +292,23 @@ behind a `python_version < "3.11"` marker so CI installs nothing new. This is th
 *"a check that inspects nothing reports clean"* class one level up — the guard
 that guards the guards was itself unrunnable, locally, for anyone.
 
+**[2026-09-02 later, CORRECTED IN PLACE per I12 — DIRECTION IS LOAD-BEARING
+AND THE FIRST VERSION DID NOT HAVE IT.]** The guard's second live run landed an
+hour after the (wf)/(wh) deploy wave and printed **15 findings, 11 false** —
+every freshly-deployed book's row carried the NEW build over trades still
+stamped with the OLD one, ordinary lag until the book's next close. A bare
+stamp difference is not a split brain; WHICH SIDE IS OLDER is. Hashes are not
+orderable, so ordering now comes from observation — when each build was FIRST
+SEEN trading that service, off the append-only ledger: row-build older ⇒
+SPLIT-BRAIN; row-build newer or unseen ⇒ `REDEPLOY-LAG`, reported only;
+unordered ⇒ `AMBIGUOUS`, a lead not a finding (I6). Live after the fix: the 11
+downgrade, the 3 family SPLIT-BRAINs and the ORPHAN survive — now printing the
+28-Aug-vs-30-Aug first-seen that orders them — and the orphan is confirmed
+STILL ALIVE through the deploy wave. Two more mutation rounds: the inverted
+comparison and the None-branch cry-wolf both redden, and the wiring test had to
+learn to reject a PRESENT kwarg with a CONSTANT value — kwarg-present/value-None
+survived the first round, the vacuous-guard shape one level down.
+
 **CARRIED, not closed:** the orphan is still alive ((wc): it survived a region
 migration), so the four family books' ledgers stay two-writer mixtures since
 ~28-Aug and every family era decision waits on Railway support. `(wb)`'s
