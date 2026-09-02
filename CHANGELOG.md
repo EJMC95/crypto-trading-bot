@@ -1,39 +1,5 @@
-## 2026-09-02 (wj) — "CAN WE UNLOCK HER NOW INSTEAD?" — the latched-lock release valve: a lock stamped by a rail later measured DEFECTIVE no longer outlives its own fix, and 🙏 avo's 04:02:46Z phantom is its first release
-
-**Eamon, ~01:45Z**, on being told avo serves the old bug's tail until 04:02:46Z.
-The answer is yes, and the mechanism deserved to be permanent rather than a
-one-shot: the (vn) latch is durable BY DESIGN (a lock must survive a restart —
-the [[lighter-flatten-silent-halt-redeploy-incident]] class), so a lock STAMPED
-by the defective (wf) denominator ($12.56 bar) held after the corrected rail
-deployed, though a fresh derivation reads ~$12 of realised drawdown against the
-corrected $61 bar. **A measurably-false lock outliving its own fix is the one
-case the latch should not win** — and it is the SECOND phantom-lock event of
-the class (avo's ~103h idle was the first), so the valve is a tool, not a hack.
-
-**THE VALVE — `release_latched_guard(latch, rga)`, pure, called once at the
-boot restore:** `{PFX}_RELEASE_GUARD_AT` names the EXACT expiry (ISO-8601) of
-the ONE lock to release; a stored expiry within ±2s clears the latch, anything
-else is untouched. A future lock computed by the correct rail can never be
-swept: its expiry is its own, and a fresh lock cannot expire on a past stamp.
-Unset, blank or unparseable releases NOTHING — fail-safe toward keeping the
-lock, the same direction every rail read fails. Pinned by
-`tests/autonomy/test_guard_release_valve.py` (8 tests; both declared mutations
-verified red — tolerance 2s→8h and dropped-abs both die on the kept-case that
-stores the expiry BELOW the target). Deployed `[deploy-live-taker]` (avo's
-service only — the code is inert without the env, so mum and georgia buy no
-restart); `AVO_RELEASE_GUARD_AT=2026-09-02T04:02:46+00:00` set on the service,
-release verified on the row, env to be cleared after (a spent valve left set is
-harmless — it can only ever match the one dead stamp — but tidy is tidy).
-
-**THE BOUNDARY, stated because a release valve invites stretching:** this
-releases a lock whose own trigger is FALSE under the corrected rail, at the
-owner's explicit ask, with the corrected rail live and armed underneath ($61
-bar, −10% per-slot stops, daily-loss floor, notional caps all untouched). It is
-NOT a lever for cutting short a TRUE lock — a lock whose trigger still holds
-has a different expiry than any stamp an operator would name, and the
-exact-match rule is what makes that structural rather than aspirational.
-
-## 2026-09-02 (wi) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
+## 2026-09-02 (wj) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
+**[RENUMBERED (wi) → (wj) at the #258 merge — the sibling session's FAMILY_CLEAR_GUARD entry took (wi) on main first. The latched-lock release valve this session built in parallel (its own (wj), 8 tests, 2 mutations red) is WITHDRAWN unmerged: main's (wi) mechanism shipped and deployed first, and a second release valve for one latch is a second copy of a rule ((hj)). Its staged env was blanked; the convergence itself — two sessions independently deriving the same tool within the hour — is the record worth keeping.]**
 
 **Eamon, ~01:00Z: "Optimise mum and avo and make sure both are optimal and
 running smoothly"** — with the material fact that he had executed the
@@ -95,6 +61,61 @@ declined tonight — 9.5 was DERIVED to sit strictly inside her stop-death bar
 deployed capital for pure proximity to liquidation with no expectancy term.
 The arithmetic is his whenever he wants the last half-turn.
 
+## 2026-09-02 (wi) — THE LATCH OUTLIVED ITS BUG: (vn)'s durable lock had no designed release, so avo served a 20-hour sentence for a defect (wf) had already fixed — the (vg) unlock ported to the live arm, 5/5 mutations red
+
+**Eamon, 2-Sep: *"I want avo unlocked and optimised and I want mum now she's
+been given a healthy increase in balance to be optimised and both winning."***
+The state when this session picked it up: `(wf)`'s funded-denominator fix was
+LIVE (build `4690a497e564/17` verified on both rows), `(wh)`'s daily-loss
+floor for mum's funded book was live inside the same deploy — and 🙏 avo was
+STILL `entries_shut`, `locked_until 2026-09-02T04:02:46Z`, because the `(vn)`
+latch is durable BY DESIGN and nothing can release it early. The lock was
+armed at a maxdd reading of **35.23%** that the corrected rail, running live
+at that very moment, scores at **7.25%** against a 20% bar. A protection
+serving a full 20-hour clock on an already-fixed measurement is not a
+protection working; it is the defect's residue running out its lease.
+
+**THE GAP HAS A PAPER TRAIL, and it closed itself in the wrong direction.**
+`(vg)` built `FAMILY_CLEAR_GUARD` — the auditable, opt-in, logs-what-it-cleared
+operator unlock — for the shadow `Book`. Its own `(vh)` correction recorded
+that it "does not unlock the live arm", TRUE at the time because the live arm
+had nothing durable to clear. Then `(vn)` gave the live arm exactly the durable
+latch the tool was built for, and nobody re-ran the sentence. Since that day
+the live trio has had a lock that survives redeploys (correct — a restart must
+never bypass a protection) with **no designed release at all** — the only exit
+was the full `stop` clock, measured this week at 103.8 idle hours.
+
+**SHIPPED: the same tool, same env var, on the live arm — with the one change
+that is the actual engineering.** The family's clear runs in `restore()`, once
+per boot. The live arm's latch restore runs **inside the main loop, every
+iteration** — a straight port therefore re-clears every FRESH lock while the
+env stays set: not an unlock but the slguard/maxdd rails switched off. That
+straight port WAS WRITTEN in this session and caught before commit; the
+`_GUARD_CLEAR_DONE` once-per-process sentinel is what separates the two, and
+`tests/autonomy/test_live_clear_guard.py` pins it by AST (the sentinel must sit
+in the same `if` as the env check, the clear must require a live latch so
+clearing nothing cannot consume the shot, identity is exact-match on
+`{BOT, BOT_ROW}` so `freqtrade-avo` can never clear `freqtrade-avo-maria`, the
+log carries the cause and deadline it dropped). **5/5 mutations red.** While
+the env var stays set every future BOOT still clears — the family tool's
+documented property, so the operating rule is unchanged: set it, verify the
+unlock in the row, remove it.
+
+**WHAT THIS IS NOT: a bypass.** The un-amendable core forbids overriding a
+gate the organs hold closed on evidence. This latch is held closed by a
+measurement `(wf)` already corrected — the corrected rail scores her OPEN on
+the same closes. Clearing it is finishing `(wf)`'s fix, not overruling a rail;
+slguard, maxdd (now correctly denominated), the −10% stop, the daily-loss
+halt, the coin vetoes and SafetyRails all stand untouched.
+
+**MUM, for the record of Eamon's same ask:** already optimised by the
+concurrent session's `(wh)` — her $30 pilot cap now floors under the 10% pct
+leash ($57 on today's $577 book) — and verified here: 12/12 slots deployed,
+gross 9.5x (her (wa) value, inside the 10.0 stop-death edge), clip auto-scaled
+to $447, `cap_usd` equity-scaled to $5,636, unlocked, trading. Her binding
+constraint is signal supply, measured at its optimum in `(uz)`/`(tr)` — the
+honest optimisation for mum today is "nothing further; the rails now match
+her funded size."
 ## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
 
 Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:

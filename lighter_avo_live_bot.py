@@ -182,6 +182,12 @@ BOT_ROW = BOT + "-lighter"            # the LIVE row (venue_variant admits it)
 SHADOW_ROW = BOT + "-lshadow"         # the control arm (family-lighter-shadow)
 STATE_KEY = BOT_ROW + ":live"
 
+#: [2026-09-02] FAMILY_CLEAR_GUARD's once-per-PROCESS sentinel (non-empty =
+#: already cleared this boot). The restore site runs every loop on this arm,
+#: so without this a set env var would re-clear each fresh lock — the rails
+#: switched off, not an unlock. See the clear site in main().
+_GUARD_CLEAR_DONE = []
+
 
 def _env(name, default):
     """`AVO_X` for Avo, `GEORGIA_X` for georgia — one namespace per book, so
@@ -1015,47 +1021,6 @@ def entries_lock(closed, t_now, baseline, latch=None):
     return 0.0, None
 
 
-def release_latched_guard(latch, rga):
-    """[2026-09-02 (wj)] OPERATOR RELEASE VALVE for a latched protections lock.
-
-    The (vn) latch is durable BY DESIGN — a lock must survive a restart, or a
-    redeploy silently un-halts a book ([[lighter-flatten-silent-halt-redeploy
-    -incident]]'s class). The cost of that property surfaced the day the (wf)
-    denominator fix deployed: 🙏 avo's maxdd lock (expiry 04:02:46Z) was
-    STAMPED by the defective rail ($12.56 bar on a $305 funded book) and the
-    latch honoured it after the corrected rail shipped, though a fresh
-    derivation reads ~$12 of realised drawdown against the corrected $61 bar.
-    A measurably-false lock outliving its own fix is the one case the latch
-    should not win — and Eamon asked for the unlock by name.
-
-    `{PFX}_RELEASE_GUARD_AT` names the EXACT expiry (ISO-8601) of the ONE
-    lock to release: a stored expiry within ±2s of it clears the latch;
-    anything else is untouched, so a future lock computed by the correct rail
-    can never be swept (its expiry is its own, and a fresh lock's expiry
-    cannot land on a past stamp). Unset, blank or unparseable releases
-    NOTHING — fail-safe toward keeping the lock. Returns the (possibly
-    cleared) latch; pure, so the tests drive it directly."""
-    rga = (rga or "").strip()
-    try:
-        held = float(latch[0] or 0.0)
-    except (TypeError, ValueError, IndexError):
-        return latch
-    if not (rga and held):
-        return latch
-    try:
-        target = datetime.fromisoformat(
-            rga.replace("Z", "+00:00")).timestamp()
-    except (TypeError, ValueError):
-        return latch
-    if abs(held - target) <= 2.0:
-        print(f"[release-valve] released latched {latch[1]} lock (expiry "
-              f"{iso(datetime.fromtimestamp(held, tz=timezone.utc))}) per "
-              f"{_PFX}_RELEASE_GUARD_AT — operator release of a stale-rail "
-              f"lock", flush=True)
-        return [0.0, None]
-    return latch
-
-
 # --------------------------------------------------------------------------
 # [2026-08-27 (vm)] WHAT THE RAILS COST — the live trio's shut accounting.
 #
@@ -1444,11 +1409,35 @@ def main(_ctx=None, once=False):
         # value this loop computed, the same shape `last_open_ts` uses.
         guard_latch = [float(state.get("guard_until") or 0.0),
                        (state.get("guard_cause") or None)]
-        # [(wj)] the operator release valve — a restored latch naming exactly
-        # the expiry in {PFX}_RELEASE_GUARD_AT is cleared at boot; see the
-        # function's docstring for why this exists and why it matches EXACT.
-        guard_latch = release_latched_guard(
-            guard_latch, _env("RELEASE_GUARD_AT", ""))
+        # [2026-09-02] FAMILY_CLEAR_GUARD, ported to the LIVE arm — the (vg)
+        # tool, SAME env var and SAME per-boot semantics as
+        # lighter_family_bot.Book (the (vh) lesson: two arms re-expressing one
+        # tool must not diverge). WHY NOW: (vn) gave this arm a durable latch;
+        # (vg)'s correction had already recorded that the clear tool "does not
+        # unlock the live arm" — true THEN because there was nothing durable to
+        # clear, and false the day the latch shipped. Measured cost of the gap:
+        # 🙏 avo's latch, armed by the (wf) denominator defect at a reading of
+        # 35.23% that the corrected rail scores at 7.25%, had NO designed
+        # release and served its full clock on a fixed bug.
+        # ONCE PER PROCESS, and the sentinel is load-bearing: unlike the
+        # family's restore() this line runs EVERY loop, so without it a set
+        # env var would re-clear a FRESH lock each iteration — not an unlock
+        # but the rails switched off. The family's per-boot shape is exactly
+        # `not _GUARD_CLEAR_DONE`. Operator-only, opt-in by bot id (bare id or
+        # row id), logs what it cleared — an unlock nobody can see is how a
+        # protection goes missing quietly. Remove the env var after use: while
+        # it stays set, every BOOT still clears (the family tool's documented
+        # property).
+        _clear = {b.strip() for b in
+                  os.environ.get("FAMILY_CLEAR_GUARD", "").split(",")
+                  if b.strip()}
+        if (guard_latch[0] and ({BOT, BOT_ROW} & _clear)
+                and not _GUARD_CLEAR_DONE):
+            _GUARD_CLEAR_DONE.append(t0)
+            _PRINT(f"[avo-live] {iso(t_now)} FAMILY_CLEAR_GUARD: entry lock "
+                   f"dropped by operator (was {guard_latch[1]!r} until "
+                   f"{guard_latch[0]:.0f})")
+            guard_latch = [0.0, None]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
