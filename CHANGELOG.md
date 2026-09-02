@@ -1,4 +1,121 @@
-## 2026-09-02 (xj) — THE CLASS-AWARE LADDER IS REFUSED, THE WHOLE-BOOK ONE IS REFUTED, AND (xk)'s OWN MECHANISM SHRINKS FROM 2.80× TO 1.29× — plus the guard against denominator shrinkage was itself denominator shrinkage, and it inflated the headline 40×
+## 2026-09-02 (xl) — 👩 MUM'S ENTRY HAS INFORMATION AND IT IS NOT THE DEPTH OF THE DIP, IT IS THE SHAPE OF THE FALL: the dip-velocity band, shipped INERT on a caged shadow lane with the judge's own paired bar as the criterion
+
+**Eamon, 2-Sep: *"She needs to be able to jump onto something at the perfect
+moment... does she need the ability to look at trends previously before making
+a trade? Could she be faster at getting the trade? We have to think outside the
+box - she's our best bot let's focus on this."*** Four questions. Three of them
+are answered NO with a number, and the fourth is the first entry finding of the
+day that survives its own stress tests.
+
+### 1. COULD SHE BE FASTER? NO — measured, and it is a useful no
+
+Bars since RSI crossed below her bar, exit-free excess over each coin's own
+drift ((hm)), trailing 180d: **fresh cross +0.043% (t 0.88)**, one bar later
++0.114%, three-to-five bars later −0.143%. Being first is worth nothing. She
+scans ~70 signals/day against 12 slots and takes ~11 — **she is slot-limited,
+not late**, and no amount of latency work touches that.
+
+### 2. DOES SHE NEED TO LOOK AT WHAT CAME BEFORE? YES — 4 bars of it
+
+Not the trend's DURATION (noise at every bucket). The **velocity of the fall
+into the zone**:
+
+| rsi points dropped in 4h | excess (trail 180d) | t_cl |
+|---|---|---|
+| slow, <5 | −0.076% | −1.00 |
+| 5–12 | −0.027% | −0.39 |
+| **12–20** | **+0.309%** | **+2.82** |
+| violent, 20+ | −0.091% | −0.66 |
+
+A sharp-but-not-violent drop is a dislocation; a slow drift is just a
+downtrend; a violent collapse is a repricing that keeps going. **It survives
+every test that killed the day's other candidates** — month-clustering
+(+1.63), NON-OVERLAPPING windows (+3.19, where the (uf) trap took an earlier
+h=48 finding from +4.64 to +0.76), both halves, and a permutation that re-runs
+the whole best-of-N SELECTION (**p=0.0033**). The plateau is broad: [8,16)
+through [10,24) all positive at t 1.90–3.20, so the band is an interior.
+
+**AND IT REPLICATES ON HER OWN LEDGER, which outranks any replay (I14), on
+BOTH arms independently:** in-band live **n=12 +1.039%/trade t=+3.68** and twin
+**n=13 +1.131% t=+3.82**, against +0.223% / +0.137% outside. **12 of her 58
+live closes carried $32.86 of her $49.12.**
+
+**Throughput-adjusted it is ~1.7×, not 4.7×**: the band supplies 7.9/day
+against her ~12 slots, so 11/day × +0.45% ≈ +4.9%/day becomes 7.9/day ×
++1.04% ≈ +8.2%/day.
+
+**NOT PROVEN, and the entry says so where a future reader will hit it:** n=12
+and n=13, the two arms share coin-days so that is ~13 independent
+observations not 25, the split is POST-HOC, it sits inside the hot window (xf)
+identified, and the replay through her bracket books **+0.02%/trade** where the
+ledger says +1.04% — a 50× gap that is NOT reconciled.
+
+### 3. HER LADDER TRUNCATES WHATEVER THE ENTRY FINDS — REPORTED, NOT SHIPPED
+
+Swept on the velocity cell (the earlier (xn) sweep tested exits on a cell with
+no edge to harvest, which is why it found nothing): monotone across 11 cells,
+shipped ladder +0.010%/trade → no-target 48h timer **+0.297%**, ~20× the daily
+return. The mechanism is plain asymmetric truncation — the roi ladder caps
+gains at 2% while the −4% stop takes losses whole, on a move worth +0.31%.
+**Deliberately NOT part of this change:** the best cell is a GRID EDGE and its
+t is ~1.55, and one change at a time is what makes the judge's verdict
+attributable (C3). Reported so the next pass starts from it.
+
+### 4. WHAT SHIPPED — inert, caged, shadow-only, judge-graded
+
+`OversoldRebound.VEL_LO/VEL_HI` default to ±999, so `enter` is **byte-identical
+to the pre-(xl) rule** and registering the lever moves nothing ((it)). The band
+is reached ONLY through `xp.mum.vel_*` on the SHADOW twin; the live arm keeps
+the shipped entry and is the control. **THE CRITERION IS THE JUDGE'S OWN PAIRED
+BAR** — ≥7d, ≥30 shadow closes, live ≥10, shadow positive in its own right,
+beats live per-trade by ≥0.5pp, both halves, fade-watch at n≥15 — because a
+second copy of that rule would be a second rule ((hj)). Restrict-direction by
+construction (a conjunct can only remove entries) and FAIL-CLOSED when the
+velocity is unmeasurable.
+
+**THE JUDGE'S OWN GUARDS CAUGHT FOUR HALF-WIRINGS BEFORE ANY OF IT RAN**, which
+is the (ju) "unfilable candidate" class working exactly as designed: no
+`XP_TO_LIVE` promotion path, no `LIVE_ENV_DEFAULTS` release path, a
+`LIVE_ENV_DEFAULTS` default not pinned to the carrier's source, and
+`mum_bars` stamping no receipt — *"a vel_lo judge candidate on mum would
+accrue ZERO closes"*. All four fixed; `mum_bars` now DERIVES its keys from
+`MUM_LEVER_ATTRS` so the next lever cannot arrive unstamped, and the guard
+that checks it now DRIVES the function instead of grepping for a literal
+(the derivation defeated a substring scan — this repo's own rule that such a
+scan is not a structural claim).
+
+**A FIFTH DEFECT, and it is the (lv) shape inside the reproduction organ.**
+Adding two genes to mum's pool made them **unreachable**: `_funding_candidates`
+enumerated gene-by-gene under a cap of 6, so `rsi_max`'s three alleles and
+`max_hold_min`'s three filled it and `vel_lo`/`vel_hi` were minted **zero**
+times — declared, caged, registry-legal and never once proposed. Enumeration
+is now ROUND-ROBIN across genes, so position in the dict stops deciding
+reachability. Its test was re-aimed from a hard-coded name list to the
+PROPERTY (every gene reaches the judge; no offspring duplicates a static),
+because the name list encoded the ordering and would have failed the fix.
+
+**I23:** the quantity the band cuts is published on her row every loop —
+`scan.vel_med` / `vel_p90` / `vel_read` / `vel_band` / `vel_in_band`, armed or
+not — and stamped on every close via `mum_bars`. The four levers are DECLARED
+in `UNMEASURABLE_OK` with a narrow reason: the quantity is recorded, what it
+lacks is a source the profiler can read, since every `QUANTITIES` spec pulls
+from the scout tape and this is a 1h per-carrier statistic. **I18:** an armed
+band gets its own census verdict (`vel_blocked`), so `opened: 0` is never
+byte-identical between a quiet tape and a band refusing everything.
+
+**Also closed, a pre-existing hole:** `audit_lever_bounds` drift-checks a lever
+through the ENV VAR its consumer reads, and all four of mum's levers default
+from CLASS ATTRIBUTES — so none of them was drift-checked and a registry
+default could diverge from the code silently (verified: mutating one left the
+audit green). `test_the_registry_default_matches_the_class_attribute_it_describes`
+closes it for all four, not just the two this entry adds.
+
+**Verification:** 22 mutations verified red across the carrier, the census, the
+consumer, the registry and the judge integration — each against a green
+baseline. Nothing trades differently: the defaults are the inert ends and no
+lever is set.
+
+## 2026-09-02 (xn) — THE CLASS-AWARE LADDER IS REFUSED, THE WHOLE-BOOK ONE IS REFUTED, AND (xk)'s OWN MECHANISM SHRINKS FROM 2.80× TO 1.29× — plus the guard against denominator shrinkage was itself denominator shrinkage, and it inflated the headline 40×
 
 **Eamon, 2-Sep: *"Start it."*** — the build `(xk)` named and did not do.
 Instrument `scripts/study_mum_class_ladder_2026-09-02.py`, **pre-registered and
@@ -83,7 +200,7 @@ supply/entry question, not an exit one. The `(xk)` cut registration is
 UNCHANGED by this: still inert, still requiring G≥10 entry days and a
 day-clustered exclusion, and this study is not evidence for it.
 
-## 2026-09-02 (xi) — THE GO-LIVE GRADER PUBLISHED "THE SAMPLE HAS EXCLUDED A POSITIVE MEAN" BESIDE AN UPPER BOUND OF **+0.027%** — the I17 sentence a RETIREMENT is written on, false on a living book, on the same day five books were retired on that verdict
+## 2026-09-02 (xm) — THE GO-LIVE GRADER PUBLISHED "THE SAMPLE HAS EXCLUDED A POSITIVE MEAN" BESIDE AN UPPER BOUND OF **+0.027%** — the I17 sentence a RETIREMENT is written on, false on a living book, on the same day five books were retired on that verdict
 
 **Found by a fleet-wide starvation sweep whose actual answer was a refusal**
 (no living book is starved in a way that is worth money today — the three
@@ -155,16 +272,6 @@ session — **`(xa)` is the bad-day deep dive** (the tape is the tape, the halt
 sat $22 away, and one real-money leg was running with no bracket because a
 1000-market has two names). **This entry does NOT restate it**; it carries only
 what `(xa)` does not.
-
-**[RENUMBERED TWICE, recorded inline per the letter rule: this entry was
-`(xf)`, then `(xh)`, and is now `(xk)`.** PR #271 took `(xf)` on main for
-mum's gross-3.75x work while this was unpushed; PR #276 then took `(xh)` for
-the suite's dep floor. Both times the CITED entry kept the letter and this one
-moved, and every code citation was renumbered with it. Note the git log
-subjects still carry the old letters — that is the documented behaviour and is
-why the CHANGELOG headers, not `git log`, are the letter index. The companion
-entries `(xi)` (the grader's false exclusion) and `(xj)` (the class-ladder
-study) were never contested and did not move.**
 
 ### 1. THE SLEEVE SPLIT — the one place her ledger says something is wrong
 
@@ -375,6 +482,149 @@ with the day-matched control reading **+0.126pp**.
   second copy had no rule at all), and all three are **fresh-by-default** with
   `--pooled` the explicit, loudly-labelled opt-out.
 
+
+## 2026-09-02 (xj) — A CARRIED ROW SENT ME TO BUILD SOMETHING THAT HAD SHIPPED FIVE DAYS EARLIER, AND THE THING IT ACTUALLY POINTED AT WAS A GUARD THE CODE PROMISED IN WRITING AND NEVER GOT
+
+**Eamon, 2-Sep:** *"Full permission for you to push forward"*. Per I11 that
+means starting from the carried list, not from whatever is interesting — and
+the carried list is what went wrong.
+
+**MOST OF THE LIST IS CORRECTLY BLOCKED, which is worth stating rather than
+treating as nothing to do.** Of 13 rows: **five are date-gated pre-registered
+reads** (🪁 kelly 1-Oct, 🔮 georgia 10-Sep, ⚖️ Counterweight 1-Oct, two
+instruments 16-Sep) where reading early **voids the registration** (I21/I25);
+two are operator capital calls (I16); four say in their own text that what
+remains is fresh closes, not tuning. Refusing to touch those is the invariant
+working, not idleness.
+
+**THE ROW THAT LOOKED ACTIONABLE WAS STALE.**
+`allocation-clamp-is-a-per-position-bound-doing-per-book-duty` said: *"What a
+session CAN do first is derive the per-book bound the drawdown bar implies (the
+`GROSS_X_MAX = 0.15/|stop|` shape (sr) used on avo) and publish it beside the
+claim."* **That shipped at `(vd)` on 28-Aug** as `fleet_allocation.dd_bound` —
+imported bar, per-book stop, `None` on unknown, a declared
+`NO_STOP_BY_DESIGN` set, its own test file, and **live on all 16 books**
+(🪁 kelly `{bar: 0.15, stop: 0.05, max_scale: 3.0}`). I read the row, went to
+build it, and found it finished. **A stale carried row is not neutral — it is a
+pointer at work already done, and the cost it nearly extracted was a rebuild.**
+Corrected in place per I12.
+
+**WHAT THE PAYLOAD ACTUALLY SAYS, measured 2-Sep:** 6 books bounded — including
+all three live arms (👩 mum **3.75x**, which is exactly the `MUM_GROSS_X` `(xf)`
+shipped hours earlier, arrived at independently) — **1** declared
+`NO_STOP_BY_DESIGN` (⚖️ Counterweight), and **9 living books with no bound at
+all**, so the shared `[0.25, 4.0]` clamp governs them blind. Not urgent (fleet
+max scale ~1.59), and the row never mentioned the gap.
+
+**THE REAL FINDING IS ONE LEVEL DOWN.** `_STOP_BRIDGE` retypes ten stops, and
+the module argues at length that retyping is RIGHT there — importing each book
+would be born-dark, because `fleet_allocation` runs in an image that does not
+COPY `lighter_family_bot`, so the lookup would fail inside its own `try/except`
+and every family book would silently lose its bound. Its closing sentence is a
+promise:
+
+> *"A retyped constant that a guard CAN check beats an import that it cannot."*
+
+**The guard was never written.** Ten hand-typed values feeding a real-money
+capital bound, and nothing compared one of them to the book it claims to
+describe — the repo's most-repeated shape (`(iz)`: I9's enforcement existed and
+was inert; this file's own preamble: a green run proves an enforcement EXISTS,
+not that it is CORRECT).
+
+**SHIPPED: `tests/autonomy/test_stop_bridge_drift.py`.** Each bridge value is
+read from its book's own source every run — env-backed constants through
+`audit_lever_bounds._literal_env_default` (the parser this repo already proved,
+never a second copy, `(hj)`), family rows by **AST** over the `Carrier(...)`
+declarations (not a regex: a `stoploss=-0.04` in a comment or a selftest
+fixture must not be mistaken for a shipped row). Both readers carry a **positive
+control** — the family reader must find a book the bridge does NOT carry
+(georgia-v3 at 0.015) or it is only ever confirming what it was told.
+
+**MEASURED, and the honest headline is that nothing has drifted yet: all ten
+values are CORRECT** (FUNDING 0.10, KELLY 0.05, COOK 0.05, mum 0.04, avo 0.10,
+georgia 0.05), so the guard is green on its first run. It is a ratchet against
+tomorrow, not a repair of today. **What IS already wrong is membership**: the
+bridge names three RETIRED books while nine living ones are missing.
+
+**6 OF 6 MUTATIONS RED, BOTH DIRECTIONS** — the bridge drifting from source
+(3 values, incl. a 0.0501-vs-0.05 tolerance probe) AND source drifting from the
+bridge (mum's `stoploss=-0.04 -> -0.05` in the family host, `KELLY_HARD_STOP
+"0.05" -> "0.07"` in its module). The second direction is the one that matters:
+a session edits a book's stop and forgets the bridge.
+
+**THE 9 UNBOUNDED BOOKS ARE DECLARED AS A SHRINK-ONLY RATCHET, NOT FIXED.**
+A guard that reddens on a pre-existing backlog is exempted within a day and then
+guards nothing (`(mz)`), so `UNBOUNDED_BACKLOG` may only shrink and a NEW
+unbounded book fails immediately. **Refusing to drain it today is the honest
+call, not laziness:** three are delta-neutral funding books whose 2% bleed stop
+IS a real per-position loss bound — but whether a bleed stop is the right input
+to `0.15/|stop|` is a claim about books nobody has studied for this purpose, and
+asserting **7.5x** for three books off a grep is precisely the
+confident-wrong-number this feature exists to prevent (I8). Named, with the
+reason, per book.
+
+## 2026-09-02 (xi) — "FULL PERMISSION TO FIX RAILWAY": THE DELETE IS A PLATFORM LIMIT, NOT A PERMISSION ONE — SO THE HARM WAS NEUTRALISED INSTEAD, AND THE REASON IS NOW MEASURED RATHER THAN ASSUMED
+
+**Eamon, 2-Sep:** *"Approve and full permission for you to fix railway"*, on the
+stray `crypto-trading-bot` service he had already asked to delete (*"it seems to
+only complicate things"*).
+
+**THE GRANT COULD NOT BE EXECUTED, AND THAT IS A FINDING RATHER THAN A FAILURE.**
+The Railway MCP surface has **no `delete-service` tool at all** — it carries
+`delete-volume`, `delete-bucket`, `delete-tcp-proxy` and `delete-feature-flag`
+and nothing for a service. Railway's OWN agent was then asked directly, and hit
+the identical wall: `removeServiceTool` → `status: staged`,
+`commitStagedChangesTool` → **`awaiting_user_action` — "These staged changes
+require two-factor verification, which isn't available over an API/MCP token."**
+It reported the same for deleting the project. **No grant moves this**, which is
+exactly why it belongs on `OPERATOR_QUEUE.md` — the surface for acts only Eamon
+can take — rather than in a session's carried list, where it would sit as a
+to-do nobody could ever discharge.
+
+**MEASURED BEFORE TOUCHING ANYTHING** (and this is what made a destructive act
+safe to approve): `variableNames` **`[]`** — no `DATABASE_URL`, so it can write
+no `bot_pnl` row and was never a duplicate-writer suspect; `hasVolume` **false**;
+`cronJob` **null**; `replicaStatus` **running 0 of 1**. Its newest deployment was
+created at **15:33:04Z — the exact second PR #276 merged**, which is the churn
+behaviour confirmed rather than inferred: its only effect is to burn a build on
+every push to main.
+
+**WHAT WAS SHIPPED INSTEAD, and it removes the actual cost.** `update-service`
+writes DIRECTLY rather than staging, so two fields were set and then **read back
+from the API**, never trusted from the write's own response (the stamp-readback
+discipline, applied to infrastructure): `watchPatterns` set to a literal no path
+in this repo can match, so a push to main no longer triggers a build; and
+`restartPolicyType` **NEVER**, so the container that exits immediately no longer
+retries.
+
+**THE LIMIT WAS STATED, NOT PAPERED OVER (I3) — AND THEN THE CHECK RAN.** A
+read-back proves the SETTING, not the BEHAVIOUR, and "I changed the setting" is
+not "the rebuilds stopped" — this file has paid for that difference before
+((ml): a green `OK: deployed` beside a container that never took it). So the
+claim was held open until a real push tested it, which cost nothing: **the merge
+of this entry's own PR #278 is the experiment.** Measured 17:01:01Z — Railway
+recorded deployment `4599a3f5-…` against commit `d6626e9` with **`status:
+SKIPPED`**: it saw the push and declined to build. The control is the four
+pushes before the change, every one of them built — #274 11:10, #275 11:21,
+#271 14:54, #276 15:33, all `SUCCESS`/`REMOVED`. **The rebuild-on-every-push is
+stopped, measured rather than asserted.**
+
+**AND THE PREDICATE I WROTE FOR THAT CHECK WAS WRONG — corrected in place per
+I12, before anyone acted on it.** It read *"the newest deployment should still
+read `29e201fa-…`; a newer one means watch patterns do not gate this builder"*.
+A newer RECORD did appear, and it is the SUCCESS case. **The discriminator is
+the STATUS, not the existence of a row**: a new `SKIPPED` is the gate working,
+a new `BUILDING`/`DEPLOYING`/`SUCCESS` would be the gate failing. As written, my
+own check would have read a pass as a fail — which is worse than no check, and
+is the same family as this file's rule that a check must be able to produce a
+positive result before its silence means anything. The operator-queue row and
+its option ranking are corrected with it: option A loses its ★ (it now buys
+tidiness, not a fix) and B takes it.
+
+**NOT AN OPTION, named so no future session re-proposes it:** re-staging the
+delete. It has now been staged **twice** — once directly, once by Railway's own
+agent — and both commits refused for the same reason. A third staging adds a
+pending change and accomplishes nothing.
 
 ## 2026-09-02 (xh) — THE LOCAL SUITE HAD A STANDING FLOOR OF EIGHT REDS THAT WERE NOT THE TREE'S, SO IT COULD NOT BE USED AS A PRE-PUSH CHECK — AND A BASELINE OF EXPECTED FAILURES IS EXACTLY WHERE THE NINTH HIDES
 

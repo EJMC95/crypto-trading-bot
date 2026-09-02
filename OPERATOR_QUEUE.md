@@ -12,6 +12,100 @@ Recommended options are marked ★.
 
 ---
 
+## ⚡ NEW 2-Sep · THE STRAY `crypto-trading-bot` SERVICE — the harm is NEUTRALISED; only the tidy-up is left, and it is PROVEN operator-only
+
+**Eamon, 2-Sep:** *"Delete it — it seems to only complicate things"*, then
+*"Approve and full permission for you to fix railway"*. This row exists because
+the second grant could not be executed, and the reason is now measured rather
+than assumed.
+
+**WHAT IT IS.** Project `supportive-healing` (id `8240709f-…`, created 30-Aug by
+accident), one service `crypto-trading-bot` (id `8f66b1b5-…`), source
+`EJMC95/crypto-trading-bot@main` on the RAILPACK auto-builder. Measured on the
+API before touching anything:
+
+| property | value | what it means |
+|---|---|---|
+| `variableNames` | **`[]`** | no `DATABASE_URL` — it cannot write a `bot_pnl` row, so it is not a fleet writer and never was a duplicate-writer suspect |
+| `hasVolume` | **false** | nothing to lose |
+| `cronJob` | **null** | not scheduled |
+| `replicaStatus` | **running 0 of 1** | it builds and exits immediately |
+| newest deployment | **15:33:04Z** | the exact second PR #276 merged — the churn behaviour, confirmed |
+
+So its only effect is to burn a build on **every push to main**.
+
+**WHY IT IS OPERATOR-ONLY, and this is the part worth recording.** The Railway
+MCP surface has **no `delete-service` tool at all** — it carries
+`delete-volume`, `delete-bucket`, `delete-tcp-proxy` and `delete-feature-flag`
+and nothing for a service. Railway's OWN agent was then asked directly and hit
+the same wall: `removeServiceTool` returned `status: staged`, and
+`commitStagedChangesTool` returned **`awaiting_user_action` — "These staged
+changes require two-factor verification, which isn't available over an API/MCP
+token."** It said the same of deleting the project. **This is a platform limit,
+not a missing permission and not a tooling gap** — no grant Eamon issues can
+move it, which is why it belongs on this surface rather than in a session's
+to-do list.
+
+**WHAT WAS DONE INSTEAD, 2-Sep, and it removes the actual cost.**
+`update-service` writes DIRECTLY rather than staging, so two fields were set and
+**read back from the API** to confirm (never trusting the write's own response):
+
+* `watchPatterns = ["__stray_service_disabled_never_matches__/**"]` — no path in
+  this repo can match it, so a push to main no longer triggers a build;
+* `restartPolicyType = NEVER` — the container that exits immediately no longer
+  retries.
+
+**THE LIMIT WAS STATED, THEN THE CHECK RAN AND CAME BACK POSITIVE — 17:01Z.**
+The read-back proved the SETTING; the merge of PR #278 minutes later proved the
+BEHAVIOUR, at no extra cost. Railway recorded deployment `4599a3f5-…` against
+commit `d6626e9` with **`status: SKIPPED`** — it saw the push and declined to
+build. Every push before the change built: #274 11:10, #275 11:21, #271 14:54,
+#276 15:33, all `SUCCESS`/`REMOVED`. **The rebuild-on-every-push is stopped,
+measured.**
+
+**AND MY OWN PREDICATE WAS WRONG, corrected in place per I12 before anyone
+acts on it.** This row originally said to check that *"the newest deployment
+should still read `29e201fa-…`; a newer one means watch patterns are not
+gating this builder"*. A newer RECORD did appear — and it is the success case,
+not the failure case. **The right predicate is the STATUS, not the presence of
+a row:** a new `SKIPPED` record is the gate working; a new `BUILDING`,
+`DEPLOYING` or `SUCCESS` record would be the gate failing. A check whose
+stated pass condition would have read a success as a failure is worse than no
+check, which is why this is corrected rather than quietly left.
+
+### A — Apply the staged deletion in the dashboard (one click, ends it)
+**The ★ is REMOVED, on the evidence above.** It was recommended when the
+rebuilds were still assumed to be running; they are now measured stopped, so
+this buys tidiness rather than anything operational. Keep it if an inert
+service on the account bothers you; skip it freely if it does not.
+Railway → project `supportive-healing` → the staged-changes panel → **Apply**,
+then 2FA. **Two changes are staged**, both from Railway's own agent: the service
+removal AND a GitHub source disconnect. Applying either is sufficient to stop
+the rebuilds permanently; applying the removal also frees the project, which can
+then be deleted from its own settings page (also dashboard + 2FA).
+**Cost: ~30 seconds.** It remains the only path that actually ends the row —
+everything else leaves an inert service on the account — but it is no longer
+buying a fix, because the fix already landed.
+
+### B ★ — Leave it neutralised and do nothing
+Now the recommended option, because the cost it was weighed against has been
+measured away: no builds (proven — `SKIPPED` at 17:01Z), no replicas, no
+variables, no volume. The service simply sits there. Choose this if the
+dashboard trip is not worth 30 seconds — but note the row then never closes, and
+a future session will re-discover the service and re-investigate it, which is
+the recurrence this queue exists to prevent.
+
+### C — Delete the whole project
+Same dashboard + 2FA path as A, one step further. Nothing else lives in
+`supportive-healing`, so this is the tidiest end state. Only do it after A.
+
+**NOT AN OPTION, and named so nobody re-proposes it:** re-staging the delete
+from a session. It has now been staged twice (once by me, once by Railway's
+agent) and both times the commit refused for the same reason. A third staging
+adds a pending change and changes nothing.
+
+---
+
 ## ⚡ NEW 19-Aug · THE UNDECIDABILITY SLATE — was five I17 calls + one restrict-only cap, from the fleet-wide audit `(qk)`; **C (👩 mum) EXECUTED 19-Aug `(rd)`** and left at the 19-Aug review sweep, four calls + the cap remain
 
 **Full evidence: `FLEET_AUDIT_2026-08-19.md`.** The audit's headline is that
