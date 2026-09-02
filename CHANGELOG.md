@@ -1,3 +1,57 @@
+## 2026-09-02 (wv) — THE DASHBOARD'S GEORGIA HOLE: one attribute name killed every family publish for five days, and a stale Railway instance made the fleet look healthy the whole time
+
+**[RENUMBERED (wu) -> (wv) at push time** — PR #263's sizing-rails merge took (wu) on main while this fix was built; the pushed entry keeps the letter per the letter rule.**]**
+
+**Eamon: *"Further fixes to pnl dashboard."*** The visible symptom was the
+watchdog paging `STALE: freqtrade-georgia-lshadow`; the mechanism underneath
+is worth engraving, because THREE defense layers each half-worked and their
+overlap hid a five-day outage:
+
+**THE DEFECT.** `(vr)`'s `spend_extra` (28-Aug 21:24, 🔮 georgia v3's own
+birth commit) read `b.bot` on a Book whose attribute is `bot_id` — the bare
+name lives on the STRATEGY. AttributeError, on EVERY family book, EVERY
+loop. And because the publish site's arguments were built inline INSIDE its
+`except: pass`, the raise silently killed the ENTIRE `bot_pnl` publish for
+all four family books from the first post-(vr) deploy — the fail-open-except
+class the memory index names, verbatim, while the books kept trading and
+saving state.
+
+**WHY NOBODY SAW IT FOR FIVE DAYS.** The rows stayed fresh — because a
+STALE Railway instance of `family-lighter-shadow`, running pre-(vr) code
+(build `edc3032d1c46` = d2c0cb9, 28-Aug 21:09, one commit BEFORE the bug),
+survived ~15 subsequent deploys and kept publishing mum/avo/georgia-v1: the
+(ml) "REMOVED deployment keeps serving" class, on the WRITER side, at 5
+DAYS against (ml)'s 14 hours. 🔮 v3 — absent from that old roster — never
+got a row at all, which also blinded `audit_book_spend` (it reads the feed;
+a missing row is invisible to the auditor built for exactly her). Found by
+`audit_code_currency`: the family stamps resolved to NO commit in 80, then
+to d2c0cb9 at depth 500, `BEHIND-OWN 85`. Today's page fired only because
+Lucy's four deploys in 80 minutes bounced the zombie's slow REST-fallback
+loop past book 3's publish — the outage was found by ITS OWN noise.
+
+**SHIPPED, the class not the instance:**
+* `spend_extra` reads `b.s.bot` (the fix), and `skipped_unlisted` reads
+  `getattr` (a second latent raise-path the new test caught within minutes
+  of existing — populated at boot, absent on a fresh Book);
+* `family_publish_extra` is now THE ONE BUILDER of the published extra,
+  extracted from the publish site so
+  `tests/autonomy/test_family_publish_args.py` drives it for EVERY live
+  strategy against a REAL Book ((hj): publisher-built, never a fixture) —
+  a builder that raises for any book, present or future, reddens CI
+  instead of a row going quietly dark; v3's `spend` census and the elders'
+  grandfathering pinned; 3/3 mutations RED;
+* the publish's `except: pass` keeps never-raise and loses never-SAY: a
+  failed publish now logs `bot_pnl publish FAILED (row going stale)` per
+  book per loop (I4 — a persistent condition must not be a one-shot
+  nothing).
+
+**OPERATOR-VISIBLE CONSEQUENCE once the zombie dies:** v3's row appears on
+the dashboard for the first time (she has traded since 28-Aug with no row),
+v1's staleness page clears, and the family stamps move to HEAD. The zombie
+kill + stamp readback is executed in this same pass and verified on the
+feed, not the deploy log. LIVE rows were never affected (the live host has
+its own publish path — verified by grep and by their 8-9s ages throughout).
+
 ## 2026-09-02 (wu) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
 
 **[RENUMBERED TWICE AT MERGE TIME, 2-Sep: (wp) → (wq) → (wu).** #262 — the support-system deep dive — landed on main first carrying `(wp)`, and its code cites it; while this branch re-merged, a second session landed `(wq)`, `(wr)` and `(ws)` on main and holds `(wt)` in flight — so the pushed entries keep their letters and this one moves again (letter rule 3). Every citation of THIS entry moved with it: the `fleet_bus.py` rails comment, the CLAUDE.md brain-stake-mults bullet, the PR title. The three commit subjects keep `(wp)` — git subjects are immutable, and the letter rule already says the commit log is not a letter index; grep the CHANGELOG headers.]**

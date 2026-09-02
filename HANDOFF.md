@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 15:51 Sydney (05:51Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 16:12 Sydney (06:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `georgia-v1-preregistered-read-10sep`  ·  owner: **session**
+🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
+
+_Still open because:_ retiring her before the registration's own read voids it (I21/I25); the docket's ~4,233d pools ~200 pre-cap closes against ~25 post-cap ones.
 
 ### `counterweight-preregistered-fresh-read`  ·  owner: **session**
 ⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 1-Oct, whichever first. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
@@ -49,8 +54,11 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (72 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu))
+## Shipped today (91 commit(s), entries (tg), (vt), (vw), (vx), (vy), (vz), (wa), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu))
 
+- `21f2cd3` The dashboard's georgia hole (wv): spend_extra's b.bot killed every family publish for five days behind a stale Railway writer — one builder, driven for every book, publish failures now log
+- `9c3b2cb` Merge PR #263: the two sizing rails from the edge audit, reshaped to bite only on measured harm; the brain's expansion floors measured and kept (wu)
+- `ab465ba` HANDOFF regenerated after the third re-merge (wu)
 - `07adc37` Merge origin/main a third time: the (wt) September slate landed; the rails entry keeps (wu)
 - `922016c` The September slate (wt): five I17 retirements on the grader's own verdicts (garrett, douglas, farmer-shadow, nav-cook, grimes), georgia v1 deferred to her pre-registered 10-Sep read, trail-blazer-live stopped — Eamon's delegated docket act
 - `83bcbfd` CodeQL hygiene on the floors study: the --out write goes through a with-block (wu)
@@ -123,6 +131,22 @@ _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~1
 - `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
+- `bdfc437` Merge PR #252: the address-all-of-the-above records - sentinel proven live, ⚖️ kept on a fresh criterion, GROSS_X handed over, family pinned Railway-side (wa)
+- `2e18902` Merge PR #251: the restart lever's sentinel was dead on arrival - run 650 measured it, one line fixes it, a guard pins it (vz)
+- `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
+- `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
+- `11cef14` Record (vy): the proceed-with-all execution, and HANDOFF regenerated
+- `65c84fd` A restart lever for the (ml) stuck-server class: railway redeploy via dispatch, no upload, no UI (vy)
+- `fa8821e` Kelly snap clips revert 250 -> 80 on the grader's own verdict - Eamon's call, era untouched (vy)
+- `f3b337a` The mmf-aware clip: 10x becomes compatible with living stops, per coin and restrict-only — 5/5 mutations red (vy)
+- `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
+- `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
+- `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
+- `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
+- `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
+- `e5b7527` Fleet audit 1-Sep: the report, and HANDOFF regenerated (vw)
+- `1a6ec31` book-bezos was born dead three ways: the engine ships, the accidental 5x is gone, and the book joins every registry its birth skipped (vt)
+- `56eb4e7` The changelog was wiped on main and no guard could say so: 655 entries restored, and the class gets its lost-entries arm (vw)
 
 ## How this file stays honest
 
