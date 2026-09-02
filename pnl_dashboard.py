@@ -4209,12 +4209,20 @@ ORGAN_SPECS = [
     # CI, deploys AND the Actions-hosted watchdog all dead at once), so the
     # only detector that survives it is THIS service. fleet-watchdog.yml
     # writes this key on its hourly cron regardless of pushes (no false page
-    # on a quiet no-push day); ttl 3900 = one beat + cron jitter, so DARK
-    # (3x = 3.25h) means three missed beats. CRITICAL deliberately — I13:
+    # on a quiet no-push day), and since 2-Sep every main-push CI run beats
+    # it too (changelog-check.yml piggyback), so the age measures "any
+    # Actions delivery". ttl 14400 = the MEASURED bar, not the nominal cron:
+    # GitHub starves free-tier `schedule` events (198 gaps measured 18-Aug ->
+    # 2-Sep: p90 3.33h, p95 5.77h, max 21.52h — the old 3900s ttl paged DARK
+    # on 10.1% of ordinary intervals while push CI ran fine through every
+    # one). FRESH < 4h · LATE 4-12h (visible, unpaged) · DARK > 12h pages —
+    # 0 of 999 merged-stream gaps reach it. One story with
+    # fleet_watchdog_svc.ACTIONS_HB_MAX_S = 3x this ttl (pinned by
+    # tests/autonomy/test_actions_heartbeat.py). CRITICAL deliberately — I13:
     # the key joins the pageable set the day it is born, and
     # fleet_watchdog_svc.actions_heartbeat_problem adds the diagnosis line
     # (check Actions runs + Settings/Billing) beside the generic ORGAN DARK.
-    ("actions-heartbeat",  "🛰️ GitHub Actions heartbeat — CI/deploy liveness", True, 3900),
+    ("actions-heartbeat",  "🛰️ GitHub Actions heartbeat — CI/deploy liveness", True, 14400),
     ("evidence-board",     "⚖️ Evidence board — scoring/synthesis",  True,  1800),
     ("market-pulse",       "🫀 Market Pulse — news/social mood",     True,  2700),
     ("learning-brain",     "🧠 Brain — hypotheses/diagnosis",        True,  26000),

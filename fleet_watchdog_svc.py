@@ -82,10 +82,62 @@ def send_push(title, body, priority="urgent", tags="rotating_light"):
 # DB read is the pager's own path and must not depend on the vitals surface
 # it backstops.
 ACTIONS_HB_KEY = "actions-heartbeat"
-# 3 missed hourly beats + cron jitter = 3.25h. Kept equal to 3x the
-# ORGAN_SPECS/payload ttl (3900s) so the vitals card's DARK and this page
-# fire together, telling one story.
-ACTIONS_HB_MAX_S = int(os.environ.get("WATCHDOG_ACTIONS_HB_MAX_SEC", "11700"))
+# [2026-09-02] THE PAGE BAR IS SET FROM THE MEASURED DELIVERY DISTRIBUTION,
+# NOT FROM THE NOMINAL CRON — and the beat no longer rides the cron alone.
+# The old single bar ("3 missed hourly beats + jitter" = 11700s) assumed
+# GitHub delivers `schedule` events roughly hourly. Measured over 198
+# consecutive scheduled deliveries (18-Aug -> 2-Sep,
+# `gh run list --workflow=fleet-watchdog.yml`):
+#     median 0.99h · p90 3.33h · p95 5.77h · max 21.52h
+#     20 of 198 gaps (10.1%) exceeded the old 3.25h bar
+# — so the pager fired on one ordinary interval in ten, and worse, its
+# diagnosis ("CI AND deploys dead") was FALSE each time: push-triggered
+# workflows ran fine straight through every one of those gaps (entries
+# landed on main on 27/28-Aug while the cron sat 21.5h starved). Scheduler
+# starvation delays only `schedule` events; a lockout kills everything.
+# TWO CHANGES CLOSE IT TOGETHER:
+#   * the beat is also written by every main-push CI run (changelog-check.yml
+#     piggyback step, src-stamped), so its age measures "any Actions
+#     delivery", the quantity the diagnosis actually claims. Merged-stream
+#     control over the same tape (1,000 runs, 26-Aug -> 2-Sep): max gap
+#     8.39h, 0 of 999 over 12h — where the schedule-only stream ran five
+#     7-21.5h gaps the same week.
+#   * two rungs. LATE (>= ACTIONS_HB_LATE_S, 4h = the vitals ttl) is a
+#     WARNING — visible on /watchdog.json and the vitals card, never paged.
+#     DARK (>= ACTIONS_HB_MAX_S, 12h = 3x ttl, one story with the organ
+#     page) pages: 12h of NO deliveries of any kind is the lockout/outage
+#     class, permanent until a human acts, and 0 of 999 merged gaps reach
+#     it. The trade is stated: a real lockout is detected in up to 12h
+#     rather than 3.25h — on a bar whose page the operator can finally
+#     trust, which is the property that makes detection real ((gl): a
+#     pager that cries wolf is not detection).
+ACTIONS_HB_LATE_S = int(os.environ.get("WATCHDOG_ACTIONS_HB_LATE_SEC", "14400"))
+ACTIONS_HB_MAX_S = int(os.environ.get("WATCHDOG_ACTIONS_HB_MAX_SEC", "43200"))
+
+
+def actions_heartbeat_late(hb, read_ok, now_ts):
+    """warning-string or None — the LATE rung. Pure, like its sibling below.
+
+    Fires only in the band (LATE, MAX]: beyond MAX the page owns the story and
+    a warning beside a problem would be two lines about one fault. Absent key,
+    failed read and junk stamps are deliberately NOT warned here — each of
+    those already has an owner in actions_heartbeat_problem.
+    """
+    if not read_ok or not isinstance(hb, dict) or not hb:
+        return None
+    try:
+        u = dt.datetime.fromisoformat(str(hb.get("updated")).replace("Z", "+00:00"))
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=dt.timezone.utc)
+        age = now_ts - u.timestamp()
+    except Exception:  # noqa: BLE001
+        return None                     # the unreadable stamp is a PAGE, below
+    if ACTIONS_HB_LATE_S < age <= ACTIONS_HB_MAX_S:
+        return (f"github actions slow: last beat {age / 3600:.1f}h ago "
+                f"(scheduled deliveries measured p95 5.8h on the free tier; "
+                f"pages as DARK at {ACTIONS_HB_MAX_S / 3600:.0f}h)")
+    return None
+
 
 
 def actions_heartbeat_problem(hb, read_ok, uptime_s, now_ts):
@@ -396,6 +448,11 @@ def run_loop(dash):
                     _hb, _hb_ok, time.time() - started_ts, time.time())
                 if _hb_p:
                     problems.append(_hb_p)
+                # the LATE rung: a visible warning while deliveries are merely
+                # starved, so the DARK page above stays trustworthy.
+                _hb_w = actions_heartbeat_late(_hb, _hb_ok, time.time())
+                if _hb_w:
+                    warnings.append(_hb_w)
             except Exception:  # noqa: BLE001
                 pass
             email_armed = bool(report_emailer and report_emailer.smtp_configured())
