@@ -26,6 +26,14 @@ sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 import golive_readiness as gr  # noqa: E402
 
 
+def _src(path):
+    """Read a source file. A helper because CodeQL is right that a bare
+    `open(...).read()` leaks the handle, and three of them in one file is a
+    habit rather than a slip."""
+    with open(path) as fh:
+        return fh.read()
+
+
 ADOPTED = [
     {"enter_tag": "long-adopted"},                 # fetch_paper_trades shape
     {"reason": "long-adopted_daily_loss"},         # raw /trades.json shape
@@ -73,7 +81,7 @@ def test_the_tag_matches_what_the_bot_actually_stamps():
 def test_the_live_host_still_stamps_the_tag_this_filter_keys_on():
     """A drift pin. If `(xa)`'s adoption tag is ever renamed, this filter goes
     silently inert — the registered-but-inert shape (I18)."""
-    src = open(os.path.join(_ROOT, "lighter_avo_live_bot.py")).read()
+    src = _src(os.path.join(_ROOT, "lighter_avo_live_bot.py"))
     assert 'm["tag"] = m.get("tag") or "%s"' % gr.ADOPTED_TAG in src
 
 
@@ -85,12 +93,25 @@ def test_every_grader_consumes_the_filter(mod, attr):
     path = os.path.join(_ROOT, "scripts", mod + ".py")
     if not os.path.exists(path):
         path = os.path.join(_ROOT, mod + ".py")
-    src = open(path).read()
+    src = _src(path)
     assert "is_phantom_close" in src, mod
     assert "is_adopted_close" in src, (
         mod + " filters phantom closes but not adopted ones")
 
 
 def test_golive_readiness_filters_its_own_rows():
-    src = open(os.path.join(_ROOT, "scripts", "golive_readiness.py")).read()
+    src = _src(os.path.join(_ROOT, "scripts", "golive_readiness.py"))
     assert "if not is_adopted_close(r)" in src
+
+
+def test_the_allocation_organ_counts_the_two_exclusions_separately():
+    """[(xq)] `n_phantom` and `n_adopted` are different reasons — a halt event
+    wearing a close's shape, versus a leg the book never opened. Folding both
+    into one published counter makes the number mean two things at once, which
+    is how a reader stops being able to act on it (I8/I18)."""
+    src = _src(os.path.join(_ROOT, "fleet_allocation.py"))
+    assert 'payload["n_adopted"] = n_adopted' in src
+    assert "n_phantom = sum(1 for t in trades if is_phantom_close(t))" in src
+    # and a dark filter blanks BOTH, never leaves one reading 0 (I4/(vd)):
+    # a zero that means "unknown" is the byte-identical trap.
+    assert "n_adopted = None" in src
