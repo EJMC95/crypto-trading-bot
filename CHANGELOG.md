@@ -32,14 +32,29 @@ in this repo can match, so a push to main no longer triggers a build; and
 `restartPolicyType` **NEVER**, so the container that exits immediately no longer
 retries.
 
-**THE LIMIT IS STATED, NOT PAPERED OVER (I3).** A read-back proves the SETTING,
-not the BEHAVIOUR. The check that closes it is free and needs no extra push:
-after the next merge to main, the service's newest deployment should still read
-`29e201fa-…` / 15:33:04Z. **A newer one means watch patterns do not gate this
-builder**, and the queue's option B is then the answer. Recorded that way
-deliberately — "I changed the setting" is not "the rebuilds stopped", and this
-file has paid for that difference before ((ml): a green `OK: deployed` beside a
-container that never took it).
+**THE LIMIT WAS STATED, NOT PAPERED OVER (I3) — AND THEN THE CHECK RAN.** A
+read-back proves the SETTING, not the BEHAVIOUR, and "I changed the setting" is
+not "the rebuilds stopped" — this file has paid for that difference before
+((ml): a green `OK: deployed` beside a container that never took it). So the
+claim was held open until a real push tested it, which cost nothing: **the merge
+of this entry's own PR #278 is the experiment.** Measured 17:01:01Z — Railway
+recorded deployment `4599a3f5-…` against commit `d6626e9` with **`status:
+SKIPPED`**: it saw the push and declined to build. The control is the four
+pushes before the change, every one of them built — #274 11:10, #275 11:21,
+#271 14:54, #276 15:33, all `SUCCESS`/`REMOVED`. **The rebuild-on-every-push is
+stopped, measured rather than asserted.**
+
+**AND THE PREDICATE I WROTE FOR THAT CHECK WAS WRONG — corrected in place per
+I12, before anyone acted on it.** It read *"the newest deployment should still
+read `29e201fa-…`; a newer one means watch patterns do not gate this builder"*.
+A newer RECORD did appear, and it is the SUCCESS case. **The discriminator is
+the STATUS, not the existence of a row**: a new `SKIPPED` is the gate working,
+a new `BUILDING`/`DEPLOYING`/`SUCCESS` would be the gate failing. As written, my
+own check would have read a pass as a fail — which is worse than no check, and
+is the same family as this file's rule that a check must be able to produce a
+positive result before its silence means anything. The operator-queue row and
+its option ranking are corrected with it: option A loses its ★ (it now buys
+tidiness, not a fix) and B takes it.
 
 **NOT AN OPTION, named so no future session re-proposes it:** re-staging the
 delete. It has now been staged **twice** — once directly, once by Railway's own
