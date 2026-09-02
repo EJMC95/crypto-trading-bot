@@ -1,3 +1,87 @@
+## 2026-09-02 (xr) — THE STUCK-FLATTEN PAGE: `flatten_incomplete` was published by both real-money hosts and consumed by NOTHING, which is why (xo) ran 6.9 hours before a human reading a P&L brief found it
+
+**Found while writing the daily brief, on Eamon's *"implement fixes and
+improvements as they come"*.** `(xo)` had already fixed the instance hours
+earlier — a 1000-market that `market_close` could not look up, so 👩 mum's
+daily-loss halt retried against $442 of a $524 real-money book and never
+closed it. This entry is not that fix and does not duplicate it. It closes
+**the class `(xo)` left open**, and the measurement that says the class IS
+open is one grep:
+
+    $ git grep -n flatten_incomplete origin/main -- '*.py'
+    lighter_avo_live_bot.py:2614      "flatten_incomplete": bool(pos)     <- publisher
+    lighter_ticket_taker.py:2382      "flatten_incomplete": bool(_still)  <- publisher
+    lighter_ticket_taker.py:4629      assert ... is True                  <- its own selftest
+    pnl_dashboard.py:190              # ...a comment
+    venues/lighter_client.py:1291     # ...a docstring
+
+**Two real-money-capable hosts publish the condition and nothing reads it.**
+No detector, no page, no dashboard chip. The field has existed since the
+daily-halt path was written; on 2-Sep it was `true` for **6.9 hours** on a
+live book beside `open_trades: 1` and `held: {"1000PEPE": "adopted"}`, and the
+thing that eventually noticed was a person reading the morning P&L email.
+
+**WHY IT WAS INVISIBLE, and why the check has to be out-of-process (I13).**
+Every signal available in-process was behaving exactly as designed:
+* the flatten is an *idempotent retry* — retrying is the correct behaviour;
+* its log line reads like safety — *"venue reports NO position — leaving meta;
+  retry next cycle (not booking a phantom close)"* is CORRECT, and it is the
+  sentence that made 6.9 hours look fine;
+* `status` is `halted`, which is byte-identical between *flattened and resting*
+  and *cannot close 84% of the book* — I1/I18's shape, the same one `(ta)`
+  wrote `extra.retired` for.
+
+And `(xo)`'s fix does not cover the next one: a flatten can fail on a venue
+error, an empty book, a rejected reduce-only, or a spelling nobody has met
+yet. From outside, all of them look identical — a quiet halted row, still
+holding.
+
+**SHIPPED: `fleet_immune.flatten_stuck_sickness`.** A halted book publishing
+`flatten_incomplete: true` for longer than `FLATTEN_STUCK_S` (30 min) pages,
+naming the **service** and the **coins** (I8 — the operator's action is on a
+named Railway service holding named positions, never an opaque row id).
+
+**The design decisions, each one a rule this fleet already paid for:**
+* **PERSISTENCE, not a sighting.** The row carries no "incomplete since", so
+  the organ's own first-seen map IS the sensor — the `app_seen` / `churn_seen`
+  pattern, persisted as `flatten_seen`. Without it every cycle is a first
+  sighting and the detector can never fire (the defect those two carry notes
+  about). A book that CLEARS is forgotten, so the next episode gets a fresh
+  clock rather than paging on sight.
+* **The bar is derived from both ends.** The retry runs every loop (90s–5min),
+  so a healthy flatten clears in a cycle or two; the measured incident ran
+  24,840s. 30 min is far outside normal and far inside the damage — pinned by
+  a test asserting it sits in that gap.
+* **Fail-safe in three directions**: a STALE row is skipped (I1 — a corpse's
+  last word is not a live verdict, and death is the watchdog's job); a row not
+  publishing the key is silent (deploy latency is not sickness — the
+  `headroom_sickness` rule); and **only the literal `True` fires**, so
+  None/absent/`0`/`""`/junk can never manufacture a page on a real-money book.
+* **`FLATTEN_STUCK_OK` is EMPTY and that is the point** — the `BORN_DARK_OK` /
+  `STALE_WRITER_OK` idiom. An entry here would excuse a book from the detector
+  built for it (the `DRIFT_OK` shape, where the carve-out lands on exactly the
+  row most worth watching). The mechanism is proven by `ok=` injection instead.
+
+**VERIFIED, not asserted (I3): 8 of 8 mutations RED** via `scripts/mutate.py`,
+and the two that matter most are the ones that make an enforcement INERT
+rather than wrong — deleting the call from `run_once`, and dropping
+`flatten_seen` from the payload. Both reddened. That is the `(iz)` class the
+top of CLAUDE.md warns about: a declared enforcement that EXISTS and never
+runs (the `(ia)` maxDD bar shipped inert for days behind a bare `except`), so
+the wiring is asserted by AST — a mention in a docstring is not a wiring.
+The consumer key is pinned against **both publishers' ASTs**, so a rename on
+either host reddens the push instead of blinding the detector on the one book
+it was built for. Suite: **3327 passed, 3 skipped**.
+
+**DEPLOY: main only, and stated per (mm).** `fleet_immune.py` is an organ in
+`freqtrade-bots` (auto-deploy `paths:`) and is NOT in `_BUILD_SHARED`, so this
+changes no trade either live book takes and does not disturb their stamps or
+restart their containers. It rides the ordinary organ deploy.
+
+**WHAT THIS DOES NOT CLAIM.** It does not make a flatten succeed — it makes a
+failing one *loud*, in under 30 minutes instead of never. The flatten's own
+correctness is `(xo)`'s fix and the venue's answer.
+
 ## 2026-09-02 (xq) — AN ADOPTED LEG IS NOT THE BOOK'S EVIDENCE: a manual trade Eamon placed by hand was on its way into a real-money book's go-live sample, and (xa)'s tag reached the brain but no grader
 
 **Eamon, 2-Sep: *"It was a manual trade please disregard it ... drop it from
