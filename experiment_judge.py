@@ -738,6 +738,13 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     # Fail-safe toward SILENCE, matching the sensor: `drift` is only ever set on
     # positive evidence (two stamps, both present, both different). Unknown is
     # not drift, or this gate would freeze the queue through every rollout.
+    # [(xf)] the BASIS, published on every verdict — "file-set" is a blind
+    # spot, not a clean bill of health, and it is the permanent answer on a
+    # pair whose arms run from different images.
+    try:
+        v["arm_drift_basis"] = drift_basis(rows, live_bot, shadow_bot)
+    except Exception:      # noqa: BLE001 — a receipt never breaks a verdict
+        v["arm_drift_basis"] = None
     if drift:
         v["arm_drift"] = drift
         v["why"] = (f"ARMS ON DIFFERENT CODE: live={drift.get('live')} "
@@ -1314,15 +1321,29 @@ def _rows_since(rows, since_ts):
 
 
 def _row_build_sets(rows, live=None, shadow=None):
-    """{bot: set(build ids)} over the rows given, ignoring unstamped rows."""
+    """{bot: set((build_n, build))} over the rows given, ignoring unstamped rows.
+
+    [2026-09-02 (xf)] KEYED BY `build_n` AS WELL AS THE DIGEST. A digest is a
+    hash over the `_BUILD_SHARED` files that EXIST in the image ((fd)), so two
+    arms running from different images stamp different ids for the same source
+    — and comparing the digests alone answers "different FILE SET", not
+    "different code". Carrying the count in the key lets `_row_drift` restrict
+    the comparison to the counts the two arms actually share.
+    """
     live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
     out = {live: set(), shadow: set()}
     for r in rows or []:
         b = str(r.get("bot"))
         if b in out:
-            bid = ((r.get("extra") or {}) or {}).get("build")
+            ex = (r.get("extra") or {}) or {}
+            bid = ex.get("build")
             if bid:
-                out[b].add(str(bid))
+                n = ex.get("build_n")
+                try:
+                    n = int(n) if n is not None else None
+                except (TypeError, ValueError):
+                    n = None
+                out[b].add((n, str(bid)))
     return out
 
 
@@ -1363,8 +1384,57 @@ def _row_drift(rows, live=None, shadow=None):
         return None                      # unknown is not drift
     if a & b:
         return None                      # shared build => same deploy line
-    return {"live": sorted(a)[-1], "shadow": sorted(b)[-1],
+    # [2026-09-02 (xf)] AND A DIFFERENT FILE SET IS NOT DRIFT EITHER. Restrict
+    # the comparison to the `build_n` counts the two arms SHARE: on a pair
+    # whose arms run from different images the counts never overlap, the
+    # digests are not comparable, and claiming drift there held every
+    # evaluation on 👩 mum's lane — the fleet's only live promotion path — with
+    # "no promotion can rest on it". See implementation_shortfall.arm_drift
+    # for the measurement. Same fail-safe as every branch above: an
+    # unanswerable question degrades to SILENCE, never to a claim.
+    shared_n = {n for n, _ in a} & {n for n, _ in b}
+    if not shared_n:
+        return None                      # different FILE SETS, per (fd)
+    a = {(n, i) for n, i in a if n in shared_n}
+    b = {(n, i) for n, i in b if n in shared_n}
+    if not a or not b or (a & b):
+        return None
+    # Sort the IDS, never the (count, id) tuples: an arm mid-rollout carries
+    # SOME rows stamped with `build_n` and some without, so a tuple sort
+    # compares None with an int and raises TypeError inside the judge's own
+    # evaluation. Found by driving the mixed-stamp case, not by reading it.
+    # This is also byte-identical to the pre-(xf) return, which sorted a set
+    # of plain ids.
+    return {"live": sorted(i for _, i in a)[-1],
+            "shadow": sorted(i for _, i in b)[-1],
             "source": "rows-disjoint"}
+
+
+def drift_basis(rows, live=None, shadow=None):
+    """Why the drift verdict is what it is: "agree" | "drift" | "file-set" |
+    "unstamped".
+
+    [2026-09-02 (xf)] I18 — a gate that STOPPED gating and a gate with nothing
+    to report must never publish the same byte-string. `_row_drift` degrades to
+    None on three different questions ("the arms match", "one arm is
+    unstamped", "the two images carry different FILE SETS so the digests are
+    not comparable"), and the third is a genuine BLIND SPOT that a reader must
+    be able to see. On 👩 mum's cross-image pair it is the permanent answer, so
+    the row says so instead of publishing the silence that "agree" also
+    produces.
+
+    REPORTED, NEVER A GATE: nothing branches on this string — it is the
+    receipt for a verdict reached elsewhere.
+    """
+    sets = _row_build_sets(rows, live, shadow)
+    a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
+    if not a or not b:
+        return "unstamped"
+    if a & b:
+        return "agree"
+    if not ({n for n, _ in a} & {n for n, _ in b}):
+        return "file-set"
+    return "drift"
 
 
 def _current_drift(fetch=None):

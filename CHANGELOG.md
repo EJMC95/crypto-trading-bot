@@ -1,4 +1,158 @@
-## 2026-09-02 (xb) — "PROCEED WITH OPTIMAL METRICS AND PARAMETERS": 👩 mum's gross 9.5× → 3.75×, on her own cell replayed as a book — and the same replay says yesterday's success was a 30-day hot window on a cell that LOSES over 120 days
+## 2026-09-02 (xf) — THE JUDGE'S DRIFT SENSOR HAD JAMMED THE FLEET'S ONLY PROMOTION LANE: a different FILE SET is not different code, and 👩 mum's two arms can never stamp the same digest
+
+**Found by a near-miss, and the near-miss is the more useful half of this entry.**
+
+### THE NEAR-MISS: I reached for a knob an organ was already turning
+
+Eamon, 2-Sep: *"Let it run, but optimise and enhance as best as possible."* The
+`(xd)` sweep had just measured 👩 mum's RSI bar: **32 beats the shipped 36 on
+total return AND on mean per trade on BOTH windows** (120d +$-3.03 vs -56.48;
+30d +39.20% vs +28.78%), failing only the study's own **supply floor** (78.5%
+and 75.4% of 36's closes/day against a pre-declared >=80%). So the pre-declared
+rule REFUSED it — and I tried to set `MUM_RSI_MAX=32` on the live service
+anyway, and on the shadow twin.
+
+**Both writes were refused by the harness, and both would have caused harm:**
+* the 🧪 judge was **at that moment running experiment `mum-rsi-32`** — its own
+  candidate, `xp.mum.rsi_max = 32.0`, an OPEN lever since 06:36:48Z with a
+  12:21:34Z expiry. Setting 32 on the LIVE arm is a promotion past the paired
+  bar, on the exact value the judge was still gathering evidence for. The judge
+  is the sole writer of `live.mum.*` and that is not a convention, it is the
+  gate;
+* setting it on the SHADOW arm's env would have moved the experiment arm's
+  configuration **underneath the running experiment**, corrupting the sample
+  the judge was accruing.
+
+Two independent instruments had converged on the same candidate — which is a
+good sign for 32 and no licence at all to skip the referee. **THE RULE THIS
+ENGRAVES: before hand-setting any knob, read whether an organ already owns it
+and is mid-experiment** (`xp-judge.current`, `fleet-tuning.levers`). Recorded
+because it was my error, caught by a guard rather than by me.
+
+### WHAT READING THE JUDGE THEN REVEALED
+
+Its `last_eval` on mum's pair read:
+
+    ARMS ON DIFFERENT CODE: live=733ee8665875 shadow=f009aec2315f —
+    this window measures a code delta, not edge; no promotion can rest on it
+
+**And that verdict is structurally permanent.** `build_compute` hashes only the
+`_BUILD_SHARED` names that EXIST in an image ((fd)), and `extra.build_n` is that
+count. 👩 mum's arms run from **different images**: the live arm from
+`Dockerfile.avolive`, the shadow twin inside the freqtrade image. Measured over
+her whole ledger, 2-Sep:
+
+| arm | digests | `build_n` |
+|---|---|---|
+| live | 4 distinct | all **17** |
+| shadow | 9 distinct | **14, 15, 16** |
+| intersection | **EMPTY** | — and it cannot ever be non-empty |
+
+So `_row_drift` returned `rows-disjoint` on every window, `paired_eval` held on
+it every time, and **the fleet's only designed path from shadow evidence to
+real money was closed** — since the judge's lane moved to mum at `(ww)` that
+morning. The Farmer's pair never showed it: both its arms ran the same image.
+
+**THE CLASS WAS ALREADY KNOWN AND ALREADY HANDLED — SOMEWHERE ELSE.**
+`scripts/evidence_review.arm_drift_line` has deferred with *"arms differ on
+FILE SET, not necessarily code"* since 2026-08-01, and `(wb)`'s entry even
+records that arm going blind on this exact image pair. The judge's two sensors
+never got the rule. One class, two organs, opposite failures: one silently
+blind, the other permanently jammed.
+
+**SHIPPED: `implementation_shortfall.stamps_comparable` is the ONE owner** of
+"can these two digests be compared at all" ((hj)), and both drift halves defer
+to SILENCE when they cannot be — which is the sensor's own stated contract
+(*"we only ever claim drift on POSITIVE evidence"*). **Only a KNOWN mismatch
+defers**: an absent or unparseable `build_n` compares exactly as before, so a
+legacy row cannot disarm the sensor — the dead-sensor failure this repo has
+already paid for.
+
+**AND THE BLIND SPOT IS PUBLISHED, NOT SILENT (I18).** `paired_eval` now carries
+`arm_drift_basis` — `agree` | `drift` | `file-set` | `unstamped` — so a pair
+that CANNOT be checked never publishes the same byte-string as a pair that was
+checked and matched. REPORTED, never a gate: nothing branches on it, and a test
+pins that by source.
+
+**WHAT IS GENUINELY LOST, declared:** on a cross-image pair this sensor can no
+longer answer the code question at all. The cover that remains is the judge's
+`cand_levers` receipt gate (a shadow close counts only if its own stamp shows
+it ran the candidate's bars) and the policy-match filter. A digest over
+different file sets never answered it either — the difference is that the row
+now says so.
+
+**AND I BROKE IT MYSELF FIRST.** Keying the build sets by `(build_n, digest)`
+made `sorted()` compare `None` with an `int` on an arm carrying MIXED stamps —
+the shape of any rollout — raising TypeError **inside the judge's own
+evaluation**. Caught by driving the mixed case, not by reading the code; the
+fix sorts the ids, which is also byte-identical to the pre-`(xf)` return.
+
+Pinned by `tests/autonomy/test_drift_file_set.py` — 16 tests, **7/7 mutations
+red**, including the tuple-sort crash and a positive control that a genuine
+same-file-set drift still holds a promotion (a gate that never fires is
+trivially safe and useless, I3).
+
+## 2026-09-02 (xe) — 👩 MUM'S HALT-AWARE ENTRY GATE: a leg whose own stop would flatten the whole book is refused, measured neutral in the regime she trades and worth 6pp in the one that halts her
+
+**Eamon, 2-Sep:** *"Let it run, but optimise and enhance as best as possible."*
+So: no bar moved, no window re-fitted (I25 — and the one dial that measured
+better belongs to the judge, see `(xf)`). What shipped is a rail the book did
+not have.
+
+**THE HAZARD, from `(xa)`'s own reading.** mum's daily-loss halt does not close
+a position — it **FLATTENS every leg** at whatever the mark is and shuts entries
+until the UTC roll. So an entry taken while the book's room to that level is
+smaller than that entry's OWN stop carries the entire book's downside: one −4%
+on the new leg ends the day for all twelve and sells every held dip at the low,
+which is the one loss a buy-oversold-and-wait-24h thesis cannot absorb.
+Measured on her live row at 19:40 Sydney: **$14 above the halt — a 0.42% basket
+move — with 10 legs open, and a fresh entry still admissible.**
+
+**MEASURED BEFORE IT SHIPPED** (`scripts/study_mum_gross_halt_2026-09-02.py
+--sweep`, her own cell replayed as a 12-slot book on the live 64-coin universe,
+calibrated against her shadow twin's ledger). Rule pre-declared in the study:
+ship only if the gate never lowers 30d total AND lowers halts or drawdown
+somewhere.
+
+| window @3.75× | total% | maxDD% | halts | entries gated |
+|---|---|---|---|---|
+| trailing 30d, gate off | +28.78 | 13.17 | 0 | — |
+| trailing 30d, gate ON | **+28.78** | **13.17** | 0 | **0** |
+| trailing 120d, gate off | −56.48 | 70.0 | 18 | — |
+| trailing 120d, gate ON | **−50.20** | **65.7** | 18 | 27 |
+
+**Inert in the regime she trades, +6.28pp of total return and −4.3pp of
+drawdown in the one that halts her.** RESTRICT-ONLY and FAIL-OPEN: `halt_room`
+returns None on any unreadable input and the gate then does nothing; it can
+only refuse an entry, never size one up, never suppress the halt.
+
+**AND IT DROVE OUT A DEFECT IN THE ROW.** The gate needs the halt LEVEL, which
+is the tighter of two rails (the pct leash, the absolute cap). The row's
+`halt.binding` field re-derived that same comparison inline — `(hj)`'s second
+copy of a rule, on a real-money row — and **it could RAISE**: a `max_daily_loss`
+that is not a number made `cap < frac * day_start` throw a TypeError *inside the
+publish path*, i.e. a telemetry field able to take down the loop that publishes
+it. Both now read one owner, `halt_level`, and a **90-cell parity grid** against
+the expression it replaces is identical on every defined input.
+
+**THE PARITY GRID ALSO CAUGHT MY OWN ERROR, which is why it exists.** My first
+draft required `cap > 0` to treat the absolute rail as real. But
+`SafetyRails.daily_loss_hit` trips at `loss >= cap`, so **a cap of $0 halts on
+the first cent and IS the binding rail** — the guard would have handed the gate
+room against a level the actuator had already passed. Reading the code had said
+the guard was harmless; the grid said otherwise.
+
+Published on the row as `entry_vetoes.halt_room_skips` (I18 — `opened: 0` must
+never be byte-identical between "quiet" and "a rail refused everything").
+Pinned by `tests/autonomy/test_halt_room_gate.py` — 13 tests driving the real
+`main()` one cycle against a stub venue, **6/6 mutations red**, each caught by
+the test aimed at it.
+
+## 2026-09-02 (xd) — "PROCEED WITH OPTIMAL METRICS AND PARAMETERS": 👩 mum's gross 9.5× → 3.75×, on her own cell replayed as a book — and the same replay says yesterday's success was a 30-day hot window on a cell that LOSES over 120 days
+
+**[RENUMBERED (xb) -> (xd) at push time** — main took (xb) AND (xc) for the
+edge audit's last items and the live lane's margins while this branch was open;
+the cited entries keep their letters, this one moves.**]**
 
 **Eamon, 2-Sep 20:15 Sydney:** *"Proceed with optimal metrics and parameters"*,
 then 20:40: *"Mum's gone from success yesterday to bleeding today."* The (xa)

@@ -100,8 +100,11 @@ def _mum():
     return next(x for x in fb.STRATEGIES if x.bot == "freqtrade-mum")
 
 
-def prep(tapes, strat):
-    """Per coin: aligned bars + the shipped cell's signal on every warmed bar."""
+def prep(tapes, strat, rsi_max=None):
+    """Per coin: aligned bars + the shipped cell's signal on every warmed bar.
+    `rsi_max` overrides the strategy's bar for the --sweep (the cell's shape is
+    otherwise untouched: NOT-uptrend and v>0 stay exactly as shipped)."""
+    bar = float(strat.RSI_MAX if rsi_max is None else rsi_max)
     out = {}
     for s, bars in tapes.items():
         if len(bars) < S.WARMUP + 30:
@@ -114,7 +117,7 @@ def prep(tapes, strat):
         for i in range(S.WARMUP, len(bars) - 1):
             if None in (rsi[i], e50[i], e200[i]) or not vols[i] > 0:
                 continue
-            if rsi[i] < strat.RSI_MAX and not (e50[i] > e200[i]):
+            if rsi[i] < bar and not (e50[i] > e200[i]):
                 sig[i] = rsi[i]
         out[s] = (bars, sig)
     return out
@@ -127,8 +130,16 @@ def bracket_from(bars, e):
     return r
 
 
-def replay(prepd, strat, gross, frac, t_start, t_end, mark="close"):
-    """One book, one gross, one halt fraction. Returns a dict of measurements."""
+def replay(prepd, strat, gross, frac, t_start, t_end, mark="close",
+           halt_gate=False):
+    """One book, one gross, one halt fraction. Returns a dict of measurements.
+
+    `halt_gate`: the HALT-AWARE ENTRY GATE under test — refuse a NEW entry
+    when the book's remaining room to the daily halt is smaller than one
+    slot-stop (`clip × |stop|`), i.e. when a single stop-out on the new leg
+    would flatten the whole book. Measured, never assumed: on the 30d window
+    at 3.75× it should bind rarely; at 9.5× it is the difference between a
+    stop and a flatten. Counted in `gated_entries`."""
     slots = strat.max_open
     cool_bars = int(strat.protections.get("cooldown_candles", 1)) if \
         isinstance(getattr(strat, "protections", None), dict) else 1
@@ -142,6 +153,7 @@ def replay(prepd, strat, gross, frac, t_start, t_end, mark="close"):
     day, day_start, halted = None, equity, False
     closes, rets = 0, []
     halts, halt_cost, locked_h = 0, 0.0, 0
+    gated = 0
     peak, maxdd = equity, 0.0
     daily = []             # (day, ret)
     for h in hours:
@@ -216,6 +228,11 @@ def replay(prepd, strat, gross, frac, t_start, t_end, mark="close"):
         cands.sort()
         for _, s, k in cands[: slots - len(open_pos)]:
             notional = gross * equity / slots
+            if halt_gate:
+                room = eq_close - day_start * (1.0 - frac)
+                if room < notional * abs(S.STOP):
+                    gated += 1
+                    continue
             open_pos[s] = {"entry": prepd[s][0][k][1], "notional": notional,
                            "k_entry": k}
     days = max(1e-9, (hours[-1] - hours[0]) / 86400.0) if hours else 1e-9
@@ -228,7 +245,69 @@ def replay(prepd, strat, gross, frac, t_start, t_end, mark="close"):
             "halts": halts, "halts_per_30d": halts / days * 30.0,
             "halt_cost_pct": halt_cost * 100.0,
             "locked_frac": locked_h / max(1, len(hours)),
+            "gated_entries": gated,
             "sd_day_pct": sd_day * 100.0}
+
+
+SWEEP_BARS = [25.0, 28.0, 30.0, 32.0, 34.0, 36.0]
+SWEEP_GROSS = [1.0, 3.75]
+
+
+def sweep(tapes, strat):
+    """The --sweep: RSI bar x halt gate x gross x window, one table per window."""
+    shipped = float(strat.RSI_MAX)
+    prepd_by_bar = {b: prep(tapes, strat, rsi_max=b) for b in SWEEP_BARS}
+    out = {}
+    for wname, wdays in WINDOWS.items():
+        t_start = S.NOW - wdays * 86400
+        print(f"\n== SWEEP window {wname} ({wdays}d), frac 0.10, close marks ==")
+        print(f"{'bar':>5} {'gross':>6} {'gate':>5} {'n':>5} {'n/day':>6} {'mean%':>7} "
+              f"{'total%':>8} {'maxDD%':>7} {'halts':>5} {'gated':>5}")
+        for b in SWEEP_BARS:
+            for g in SWEEP_GROSS:
+                for gate in (False, True):
+                    r = replay(prepd_by_bar[b], strat, g, 0.10, t_start, S.NOW,
+                               halt_gate=gate)
+                    out[(wname, b, g, gate)] = r
+                    print(f"{b:>5.0f} {g:>6.2f} {str(gate)[0]:>5} {r['closes']:>5d} "
+                          f"{r['closes_per_day']:>6.2f} {r['mean_pct']:>+7.3f} "
+                          f"{r['total_ret_pct']:>+8.2f} {r['maxdd_pct']:>7.2f} "
+                          f"{r['halts']:>5d} {r['gated_entries']:>5d}")
+    # ---- the bar rule ----------------------------------------------------------
+    print(f"\n== BAR RULE vs shipped {shipped:.0f} (beat on total% AND mean% on BOTH "
+          f"windows, >= 80% of its closes/day; judged at 3.75x, gate off) ==")
+    winners = []
+    for b in SWEEP_BARS:
+        if b == shipped:
+            continue
+        ok = True
+        why = []
+        for wname in WINDOWS:
+            r, r0 = out[(wname, b, 3.75, False)], out[(wname, shipped, 3.75, False)]
+            if not (r["total_ret_pct"] > r0["total_ret_pct"]):
+                ok = False; why.append(f"{wname}: total {r['total_ret_pct']:+.1f} <= {r0['total_ret_pct']:+.1f}")
+            if not (r["mean_pct"] > r0["mean_pct"]):
+                ok = False; why.append(f"{wname}: mean {r['mean_pct']:+.3f} <= {r0['mean_pct']:+.3f}")
+            if r["closes_per_day"] < 0.8 * r0["closes_per_day"]:
+                ok = False; why.append(f"{wname}: supply {r['closes_per_day']:.1f} < 80% of {r0['closes_per_day']:.1f}")
+        print(f"  bar {b:>4.0f}: {'BEATS 36' if ok else 'no — ' + '; '.join(why)}")
+        if ok:
+            winners.append(b)
+    print(f"  -> {'candidate bars: ' + str(winners) if winners else 'no bar beats the shipped one on both windows'}")
+    # ---- the gate rule ---------------------------------------------------------
+    print("\n== GATE RULE (at 3.75x, shipped bar): never lowers 30d total; lowers "
+          "halts or maxDD somewhere ==")
+    g30, g30_0 = out[("trail30d", shipped, 3.75, True)], out[("trail30d", shipped, 3.75, False)]
+    g120, g120_0 = out[("trail120d", shipped, 3.75, True)], out[("trail120d", shipped, 3.75, False)]
+    not_worse = g30["total_ret_pct"] >= g30_0["total_ret_pct"] - 1e-9
+    helps = (g30["halts"] < g30_0["halts"] or g120["halts"] < g120_0["halts"]
+             or g30["maxdd_pct"] < g30_0["maxdd_pct"] or g120["maxdd_pct"] < g120_0["maxdd_pct"])
+    print(f"  30d  total {g30_0['total_ret_pct']:+.2f} -> {g30['total_ret_pct']:+.2f}, halts {g30_0['halts']} -> {g30['halts']}, "
+          f"maxDD {g30_0['maxdd_pct']:.1f} -> {g30['maxdd_pct']:.1f}, gated {g30['gated_entries']}")
+    print(f"  120d total {g120_0['total_ret_pct']:+.2f} -> {g120['total_ret_pct']:+.2f}, halts {g120_0['halts']} -> {g120['halts']}, "
+          f"maxDD {g120_0['maxdd_pct']:.1f} -> {g120['maxdd_pct']:.1f}, gated {g120['gated_entries']}")
+    print(f"  -> gate {'SHIPS' if (not_worse and helps) else 'does NOT ship'}")
+    return 0
 
 
 def main(argv=None):
@@ -239,6 +318,15 @@ def main(argv=None):
                          "carrier_universe (which is the 15-major configured list when "
                          "the scout is dark) — e.g. the scout's crypto books at mum's "
                          "$0.1M floor, the universe her LIVE arm actually scans (94)")
+    ap.add_argument("--sweep", action="store_true",
+                    help="[Eamon 2-Sep: 'let it run, but optimise and enhance'] "
+                         "sweep the RSI bar and the halt-aware entry gate at the "
+                         "SET gross (3.75) and at 1x on both windows. RULE, "
+                         "pre-declared: a bar replaces 36 only if it beats 36 on "
+                         "total%% AND mean%%/trade on BOTH windows with >= 80%% of "
+                         "36's closes/day (supply is not free); the gate ships only "
+                         "if it never lowers total%% on the 30d window at 3.75x and "
+                         "lowers halts or drawdown somewhere. Calibration gate first.")
     a = ap.parse_args(argv)
     os.makedirs(S.CACHE, exist_ok=True)
     strat = _mum()
@@ -273,6 +361,9 @@ def main(argv=None):
         print("REFUSED: the harness does not reproduce the twin's record; nothing "
               "forward-looking is printed (gx).")
         return 2
+
+    if a.sweep:
+        return sweep(tapes, strat)
 
     # ---- the grid ------------------------------------------------------------
     results = {}

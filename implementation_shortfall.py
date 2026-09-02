@@ -437,6 +437,34 @@ def send_push(title, body):
         return False
 
 
+def stamps_comparable(n_live, n_shadow):
+    """Can two `extra.build` digests be compared at all?
+
+    [2026-09-02 (xf)] THE ONE OWNER of the `(fd)` question, so the fleet stops
+    answering it three different ways. `build_compute` hashes only the
+    `_BUILD_SHARED` names that EXIST in the image, so **the same source tree
+    stamps different ids in two images carrying different COPY sets** — and
+    `extra.build_n` is that count. Two stamps are comparable only when the
+    counts match; otherwise the digests answer "different FILE SET", which
+    says nothing about whether the CODE differs.
+
+    `scripts/evidence_review.arm_drift_line` has applied this rule since
+    2026-08-01 ("arms differ on FILE SET, not necessarily code"). The judge's
+    drift sensors did not, and the asymmetry cost the fleet its only live
+    promotion lane — see `arm_drift` below.
+
+    UNKNOWN COUNTS ARE COMPARABLE, deliberately: a missing `build_n` is the
+    pre-(fd) shape, and refusing to compare there would silently disarm the
+    sensor on every legacy row. Only a KNOWN mismatch defers.
+    """
+    if n_live is None or n_shadow is None:
+        return True                       # unknown count: compare as before
+    try:
+        return int(n_live) == int(n_shadow)
+    except (TypeError, ValueError):
+        return True                       # unparseable: do not disarm on junk
+
+
 def arm_drift(rows, live=None, shadow=None):
     """(None | {'live','shadow'}) — are the two arms running DIFFERENT CODE?
 
@@ -477,6 +505,26 @@ def arm_drift(rows, live=None, shadow=None):
     if not ba or not bb:
         return None          # not yet stamped — no claim
     if ba == bb:
+        return None
+    # [2026-09-02 (xf)] DIFFERENT FILE SET IS NOT DRIFT — and claiming it as
+    # drift jammed the fleet's only promotion lane. 👩 mum's pair spans TWO
+    # IMAGES: her live arm runs `Dockerfile.avolive` (build_n 17) and her
+    # shadow twin runs the freqtrade image (build_n 14-16), so their digests
+    # are computed over DIFFERENT FILE SETS and can never be equal. Measured
+    # 2-Sep over her whole ledger: live {4 ids, all n=17} vs shadow {9 ids,
+    # n in 14,15,16} — intersection EMPTY, by construction and forever. The
+    # judge held EVERY evaluation with "ARMS ON DIFFERENT CODE: no promotion
+    # can rest on it", i.e. a structurally-stuck sensor closing the only
+    # designed path from shadow evidence to real money, hours after the lane
+    # moved to mum at (ww).
+    #
+    # This function's own contract is "we only ever claim drift on POSITIVE
+    # evidence"; a digest pair that cannot answer the question is not
+    # positive evidence. It degrades to SILENCE, exactly as an unstamped arm
+    # does — and the judge publishes the BASIS beside the verdict so that
+    # silence is never read as "the arms agree" (I18).
+    if not stamps_comparable(((a.get("extra") or {}) or {}).get("build_n"),
+                             ((b.get("extra") or {}) or {}).get("build_n")):
         return None
     return {"live": ba, "shadow": bb}
 
