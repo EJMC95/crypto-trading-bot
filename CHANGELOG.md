@@ -34,43 +34,41 @@ after the taker, developed in parallel: its path is supply + time, not a rebuild
 No book is minted here (I20/I22 unchanged) — this is a promotion recommendation
 for an existing shadow book, staged for the gate.
 
-## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
+## 2026-09-02 (wh) — 👩 THE TRANSFER OPTIMISED MUM (+57% clip); the daily-loss "floor fix" was REFUTED by a pinned safety test and reverted — her $30 cap is a DELIBERATE fleet dollar rail, and raising it is Eamon's risk call
 
-Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:
-the deposit folded into `capital_adjust`, not P&L, and her clip auto-scaled
-**$288 → $452**, +57% size on the same proven edge — the transfer IS the
-optimisation). This entry is the one rail that did NOT scale with her.
+Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**), and the
+verification is the headline: the deposit folded into `capital_adjust`, not P&L,
+and her clip auto-scaled **$288 → $452**, +57% size per trade on the same proven
+edge. **The transfer IS the optimisation** — mum now earns ~57% more dollars
+automatically, no code required.
 
-**THE FINDING, the (wf) avo pattern at a second rail.** `SafetyRails.max_daily_loss`
-(`LIGHTER_MAX_DAILY_LOSS`, $30) is a PILOT cap from when the live books were
-seed-sized: $30 == 10% of a $300 book, so it COINCIDED with the strategy's own
-`DAILY_LOSS_LIMIT` (10%). The book halts for the day on the TIGHTER of the two —
-and once mum was funded the fixed $30 binds at **5.26%** while her 10% leash
-intends **$57**, so a normal drawdown day would halt her early and forfeit the
-recovery. Same fixed-dollar-vs-funded-equity class as avo's maxdd denominator,
-one rail over; measured, not hypothetical (`halt.abs_usd 30`, `binding: abs` on
-her live row at $570).
+**WHAT I GOT WRONG, recorded because a refuted fix is reported as refuted.** I
+read her daily-loss halt binding at **5.26%** ($30 abs cap on a $570 book) as the
+(wf) fixed-dollar-vs-funded-equity class and shipped a "floor" — `daily_loss_hit`
+tripping at `max(cap, pct×equity)` so the pct leash would govern a funded book.
+**CI caught it**: `tests/real_money/test_safety_rails.py::test_confirm_true_via_
+absolute_rail_even_if_pct_ok` pins that the abs cap is a DELIBERATE *tighter*
+fleet rail — a hard dollar limit that must catch a $31 loss on a $1,000 book even
+though the 5% strategy rail ($50) has not tripped. My floor inverted that and let
+a $31 loss pass. So the 5.26% halt is **not a stale artifact — it is the fleet's
+absolute-dollar cap working as designed**, and the (wf) analogy was wrong (avo's
+maxdd denominator genuinely tracked funded equity; this rail is meant to be
+fixed). Reverted in full (`daily_loss_hit` signature, the host breach call, the
+test). The pinned test did exactly its job — I3, from the outside.
 
-**THE FIX — the pilot cap FLOORS under the pct leash, never a ceiling.**
-`daily_loss_hit(day_start, equity, pct_limit=0.0)` now trips at
-`max(self.max_daily_loss, pct_limit * day_start_equity)`: the cap still protects
-a tiny book (10% of $50 = $5 < the $30 floor) and the pct leash governs a funded
-one (10% of $570 = $57 > $30). Measured after: mum trades through a 7% day and
-still halts at 10%; a genuine 10% day still halts her — the protection is
-RESTORED to her funded scale, not removed. **`pct_limit=0.0` — every caller that
-does not opt in (the funding bot, the taker, the hyperliquid bots) — is
-byte-identical to the old absolute cap**, so the blast radius is exactly the
-family live host, which passes `DAILY_LOSS_LIMIT`. Pinned by
-`tests/autonomy/test_daily_loss_pilot_floor.py` (mutation red: reverting the
-floor to the bare cap reddens the funded-book test). Reaches mum on the same
-`[deploy-live]` dispatch as (wf)/(wg).
+**THE REAL LEVER, and it is Eamon's.** Whether mum halts at 5.26% or a looser
+level is not a bug to fix, it is a cap VALUE to choose: raise her
+`LIGHTER_MAX_DAILY_LOSS` (currently $30) toward, say, $57 (= 10% of $570, matching
+her own strategy rail) if you want her to trade through bigger dollar down-days.
+That LOOSENS a safety cap, so it is a risk-appetite decision, presented not taken
+— per (tg) I may set cap values with a derivation, but loosening a live
+real-money loss cap is yours to say.
 
-DECLARED, not changed: mum's EDGE is untouched — I25 forbids retuning a winner
-on the hot window that flatters it, and her entry/exit were measured at birth.
-Her leverage (9.5×, Eamon's stop-death edge) and the brain's refused 1.25×
-expand are risk-appetite calls, not code fixes: the brain wants to pay her more
-and there is no room under her stop-alive ceiling, which is why CAPITAL, not
-leverage, was the lever — and it is now deployed.
+DECLARED, unchanged: mum's EDGE is untouched (I25 — no retuning a winner on a hot
+window); her leverage (9.5×, your stop-death edge) and the brain's refused 1.25×
+expand are risk-appetite calls, not code fixes — the brain wants to pay her more
+and there is no room under her stop-alive ceiling, which is why CAPITAL was the
+lever, and it is now deployed.
 
 ## 2026-09-02 (wg) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
 
