@@ -37,6 +37,16 @@ LEGACY_BOTS = [
     # is the filter that actually hides her. The 77 real-money closes stay
     # in the ledger as always.
     "freqtrade-georgia-lighter",
+    # [2026-09-02 THE SEPTEMBER SLATE] the prune half of the five I17 calls
+    # (see pnl_dashboard.RETIRED_ROWS for the verdicts, each the grader's own
+    # current number). LEDGERS untouched — this removes only the frozen
+    # summary rows so they cannot go stale and page. georgia v1 is DEFERRED
+    # to her pre-registered 10-Sep read and stays live; her v3 row too.
+    "band-garrett-lshadow",
+    "book-douglas-lshadow",
+    "perps-funding-lighter-lshadow",
+    "nav-cook-lshadow",
+    "book-grimes-lshadow",
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
     # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the

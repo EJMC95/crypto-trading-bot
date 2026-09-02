@@ -133,6 +133,93 @@ that if a lose-often-win-big bucket ever carries a positive era bound at t≥2
 channel this leaves is DECIDABILITY on the positive buckets (I17/I22), not
 looser bars.
 
+## 2026-09-02 (wt) — THE SEPTEMBER SLATE: five I17 calls made under Eamon's delegated grant, one deferral the evidence forced, and the retired live service stopped
+
+**Eamon, 2-Sep: *"I give you permission to fix the above"*** — over the
+docket presented at the end of the further-improvements pass. Every call
+was re-read from the grader's OWN live payload before shipping (all six
+rows fresh, oldest age 2,068s — I1 first), not from (wp)'s snapshot, and
+the numbers held.
+
+**RETIRED, each on a measured exclusion or zero rate (I17-as-amended's own
+bar):**
+* 🛢️ **garrett** (`band-garrett-lshadow`) — `unreachable`: era n=85, mean
+  −1.090%/trade, t=−2.22, **upper bound −0.455% ≤ 0**. The thin-tier
+  founding claim (+$14.83 both halves) did not survive its own ledger.
+  2 open paper positions freeze.
+* 🧘 **douglas** (`book-douglas-lshadow`) — `unreachable`: n=81, −0.725%,
+  t=−2.54, **ub −0.357%**. Zero open positions.
+* 💸 **the Farmer's SHADOW arm** (`perps-funding-lighter-lshadow`) —
+  `unreachable`: n=200+, −0.521%, **ub −0.231%**. Its control-arm duty
+  ended at (ta) (judge lane `stood_down`); 5 paper positions freeze. The
+  LIVE arm's (ta) flatten mechanism is untouched and pinned so.
+* 🧭 **nav-cook** (`nav-cook-lshadow`) — `unreachable`: n=38, −0.193%,
+  **ub −0.020%** — the thinnest exclusion on the slate and still one, on
+  the post-(tz) power-gated verdict; every close since the (sa)
+  confirm-duration fix ran the corrected 600s gate and the mean stayed
+  negative. DECLARED: the [45,60)bps band loses its owner — 🪁 band-kelly's
+  floor is 60bps, so the dislocation tiling now has a hole below it;
+  re-opening that band is a fresh measurement, never a resurrect.
+* 📐 **grimes** (`book-grimes-lshadow`) — `no_rate`: ZERO closes ever, and
+  the (om) fixed-universe study measured the gate's own bar crossed in
+  **0 of 31 retests over 90 days** — waiting cannot decide it. The
+  founding thesis stays honest: none of twelve variants beat random, so
+  the book shipped the TEST, and the test's verdict is that nothing
+  passes. Equity exactly $1000.
+
+**DEFERRED — the refusal the evidence forced: 🔮 georgia v1 stays.** She
+was on the docket (`undecidable`, ~4,233d) and retiring her TODAY would
+void a PRE-REGISTERED prediction eight days before its own read:
+`claims_ledger.georgia-entry-cap-5-days-to-gate` (registered 27-Aug,
+grade_after **10-Sep**) predicts her cap-5 trajectory reaches days-to-gate
+~187 at a higher mean, and the docket's horizon pools ~200 pre-cap closes
+against ~25 post-cap ones — the trajectory the prediction is ABOUT "has
+not had time to exist" (the claim's own words). That is the I21/I25 shape
+(never grade a registration by cutting it off), so the call defers to her
+own read date: prediction fails → retire (the RETIRED_BOOKS key and
+override are named in place); holds → she earned the clock. Her v3
+redesign row (28-Aug, ~10 days to gate) keeps trading either way. The
+deferral is PINNED both directions in `test_september_slate.py` — she can
+be neither swept in early nor quietly kept past a failed read.
+
+**MECHANISMS, per precedent:** own-module books idle-the-whole-process
+(the 🌊/📊/🧙 shape, never sys.exit); the two funding-module arms are
+ROW-scoped by RESOLVED id (`RETIRED_SHADOW_BOOKS` — each service runs one
+bot_id, so idling is row-scoped by construction; the garrett variant and
+farmer shadow idle, an unlisted variant and the live arm do not). Both
+halves shipped for all five (RETIRED_ROWS hides, LEGACY_BOTS prunes);
+ledgers kept; per-book override envs revert. Pinned by
+`tests/autonomy/test_september_slate.py` — the guard tests are DRIVEN,
+not grepped (main() called with sleep trapped), because the first
+mutation round measured a source-level version passing a renamed
+override env; **8/8 mutations RED** across both rounds.
+
+**CLAIMS:** `georgia-golive-justification` retires with its SUBJECT (the
+live deployment it argued for is unwound; it fired correctly at (vm),
+which was its job). Her two LIVING claims stay — the exit-sweep refusal
+and the entry-cap prediction the deferral rests on. Two order/date-pinned
+claims tests re-aimed at fixtures (a test about a mechanism must not
+break when a claim retires).
+
+**ALSO: `trail-blazer-live` is STOPPED** — Eamon's grant covered the
+classifier-blocked one-liner; executed via `railway down`, read back
+`REMOVED` at 05:33:45Z on the deployment list. Tidiness, not the
+retirement: the (ta) code guard stays the durable half and idles any
+resurrected container.
+
+**WHAT THE FLEET LOOKS LIKE AFTER:** the five retired books were a
+combined **−$99.7** of paper P&L producing evidence whose sign their own
+grader had already excluded; the living roster concentrates on the books
+that can still be decided — the live pair (🙏 avo + 👩 mum), georgia's
+two clocks until 10-Sep, the family/carry/counterweight/kelly/hull/
+kiyosaki/taker/sniper shadow set, and the parliament pair. DEPLOY: every
+touched service is on the auto path (band-garrett-shadow,
+book-douglas-shadow, nav-cook-shadow, book-grimes-shadow,
+funding-farmer-shadow, freqtrade-bots, pnl-dashboard);
+`lighter_family_bot.py` is shared live surface but the change is a
+comment-only deferral note for the live image — DEFERRED, no marker, and
+said so.
+
 ## 2026-09-02 (ws) — THE SENTINEL EARNS ITS FEAR THE WAY IT EARNS ITS GREED: one graded bar for both proposal directions
 
 The second further-improvements item, and it is (wp)'s own next-thing-to-

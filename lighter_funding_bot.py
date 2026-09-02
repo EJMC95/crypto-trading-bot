@@ -78,6 +78,35 @@ from venues.safety import capital_adjusted_day_start, open_notional
 VARIANT = os.environ.get("FUNDING_VARIANT", "").strip()
 BOT = VARIANT or "perps-funding-lighter"
 
+# [2026-09-02 THE SHADOW ARMS RETIRE — the I17 calls on the grader's own
+# measured exclusions, Eamon's delegated docket act ("I give you permission
+# to fix the above"). ROW-scoped by construction: each service runs exactly
+# ONE bot_id, so idling the process whose resolved id is in this map silences
+# nothing else. The LIVE arm's (ta) retirement (fleet_bus.RETIRED_LIVE_ARMS)
+# is a different mechanism — it FLATTENS real positions — and is untouched.
+#   perps-funding-lighter-lshadow  💸 the Farmer's shadow twin: era n=200+,
+#       mean −0.521%/trade, upper bound −0.231% ≤ 0 — excluded. Its control-
+#       arm duty ended when the live arm retired ((ta): judge lane
+#       stood_down); 5 open paper positions freeze, the (mr) precedent.
+#   band-garrett-lshadow  🛢️ Garrett: era n=85, mean −1.090%/trade, t=−2.22,
+#       upper bound −0.455% ≤ 0 — excluded. The thin-tier founding claim
+#       (+$14.83 both halves) did not survive contact with its own ledger;
+#       2 open paper positions freeze.
+# Idle, never sys.exit (restartPolicy=always makes an exit a crash-loop).]
+RETIRED_SHADOW_BOOKS = {
+    "perps-funding-lighter-lshadow": "FARMER_SHADOW_RETIRED_OVERRIDE",
+    "band-garrett-lshadow": "GARRETT_RETIRED_OVERRIDE",
+}
+
+
+def shadow_book_retired(bot_id):
+    """True when this process's OWN resolved row is a retired shadow book and
+    its override env is not set. One rule, both variants; the caller idles."""
+    env = RETIRED_SHADOW_BOOKS.get(bot_id)
+    if not env:
+        return False
+    return os.environ.get(env, "").strip().lower() not in ("run", "1", "true")
+
 
 def _standby_key(bot_id):
     """[2026-08-04] The bot_state key a STOOD-DOWN container reports on —
@@ -1969,6 +1998,18 @@ def main():
                         paper_start=START_EQUITY, live_flag=("--live" in sys.argv))
     bot_id = ctx.bot_id
     _SUPERVISOR_BOT_ID = bot_id
+
+    # [2026-09-02] retired SHADOW arms idle here — see RETIRED_SHADOW_BOOKS
+    # at the top of the file for the measured exclusions. Keyed on the
+    # RESOLVED id, so the live arm's own (ta) guard is untouched and a
+    # variant that is not in the map runs exactly as before.
+    if shadow_book_retired(bot_id) and not args.once:
+        print(f"{bot_id} is RETIRED (2-Sep): the grader's era sample has "
+              "EXCLUDED a positive mean (see RETIRED_SHADOW_BOOKS — I17). "
+              "Open paper positions freeze; ledgers kept. Set "
+              f"{RETIRED_SHADOW_BOOKS[bot_id]}=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
     broker = ctx.broker
     dry_run = ctx.dry_run
     # [19-Aug (qi)] own=bool(VARIANT): a VARIANT book's clip is part of its

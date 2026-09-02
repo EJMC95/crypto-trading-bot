@@ -1804,6 +1804,17 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
+    # [2026-09-02] 🔮 georgia v1 was ON the September slate and is DEFERRED,
+    # not retired — a refusal with evidence: her cap-5 trajectory carries a
+    # PRE-REGISTERED prediction (claims_ledger `georgia-entry-cap-5-days-to-
+    # gate`, registered 27-Aug, grade_after 10-Sep, days-to-gate ~187 at a
+    # higher mean) and the docket's ~4,233d horizon pools ~200 pre-cap closes
+    # against ~25 post-cap ones — the trajectory the prediction is ABOUT has
+    # not had time to exist (its own words). Retiring her before her read
+    # date voids a registered prediction, the I21/I25 shape. DECIDE AT THE
+    # 10-Sep GRADE: prediction fails -> retire here (the key is
+    # "freqtrade-georgia", override GEORGIA_RETIRED_OVERRIDE); holds -> she
+    # has earned the clock the prediction promised.
     # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by the operator
     # ("unretire mum and bring her back to life") and she is deliberately NOT
     # listed here. She returns as v2 — a different strategy (OversoldRebound,
