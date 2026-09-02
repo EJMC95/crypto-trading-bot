@@ -181,27 +181,6 @@ CARRIED = [
                     "against real closes instead of a model.",
         "closes_when": lambda: _has("brain_stats.py", "HYSTERESIS"),
     },
-    {
-        "id": "brain-mults-are-two-opinions-wide",
-        "owner": "session",
-        "what": "(so) wired every living book to the brain's stake multiplier, "
-                "including both real-money rows — and on the day it shipped the "
-                "brain had exactly TWO published opinions across twenty books "
-                "(taker short-divergence 0.75, Counterweight long 0.75). The "
-                "plumbing is done; the ORGAN is nearly silent, because a mult "
-                "needs >=30 era closes AND >=3 consecutive runs and most books "
-                "never reach the first. The open question is whether those "
-                "floors are right now that the range is 6.7x either way: a "
-                "floor calibrated for a 1.5x ceiling is not obviously the floor "
-                "for a 6.7x one.",
-        "why_open": "moving a brain floor changes what sizes EVERY book, real "
-                    "money included — it needs its own measurement (how many "
-                    "buckets would qualify at each floor, and what their "
-                    "realised expectancy was), not a judgement call.",
-        # closes when the floors stop being the shipped constants, i.e. someone
-        # has actually re-decided them rather than inherited them.
-        "closes_when": lambda: not _has("bot_learn.py", "PROMOTE_RUNS = 3"),
-    },
     # [2026-09-02] `taker-replay-blind-to-breakoutup` DELETED — BOTH halves
     # done. The blindness half was fixed 20-Aug (daily_up_resolver + the
     # relabel, forwarded by the tuner and incubator, selftest-pinned) and

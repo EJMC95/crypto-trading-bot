@@ -123,6 +123,12 @@ SELFTEST_MODULES = [
     # synthetic rows, and the "moves nothing" source scan. The structural
     # pins live in tests/autonomy/test_edge_audit.py.
     "scripts.edge_audit",
+    # [2026-09-02 (wu)] PORTED from the in-flight health-check branch, the CI-red
+    # rule: (wr) landed this study on main with a --selftest and no registration,
+    # so test_no_unregistered_selftest is red on main itself. Its selftest is
+    # offline and pure (exit 0 here without a DB); registering it here makes this
+    # PR green now and no-ops once main carries the same line.
+    "scripts.study_taker_divergence_stop_2026-09-02",
     # [2026-08-20 (ru)] the docket class-split evidence. --selftest is offline
     # and pure (the split, the sleeve-tag round-trip, and the calibration gate's
     # fail-closed arms); the SCAN needs the public feeds, so only the fixture

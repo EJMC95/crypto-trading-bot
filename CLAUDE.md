@@ -1452,6 +1452,37 @@ its row is dashboard-retired regardless; stop the process when found.
   Enforced fleet-wide by `tests/autonomy/test_brain_sizing_reaches_every_book.py`
   (a roster test, so a NEW book cannot ship deaf) and
   `tests/autonomy/test_brain_ceiling_step.py`.
+  * **[2-Sep (wu)] TWO RAILS SIT INSIDE `brain_clip` NOW — Eamon: *"Proceed with
+    advisements"* on the edge audit ((wo), §6), then *"make sure we don't
+    constrict too much like we have in the past, our focus always on growth"*,
+    which reshaped both before they landed.** Each bites only on a MEASURED
+    harm (I26). (1) **A drawdown scale**: the clip is 1.0 all the way to the
+    gate's 15% bar and falls linearly to 0.25 at TWICE the bar, read from the
+    gate's OWN per-book `max_dd_pct` (the I9 worse-of-realised/MTM fold). Inside
+    the tested range nothing moves. Measured the day it shipped: mum-live 3.8%,
+    avo-live 5.6%, taker 5.1% → 1.0; 🪁 kelly 28.5% → 0.325. Fail-OPEN — a dark
+    gate scales nothing. (2) **Never lever a weak edge**: a multiplier ABOVE 1.0
+    is refused only when `fleet_allocation` has MEASURED the sized book's era
+    bound at or below zero on ≥ 10 era closes (`claim_era` 0.0, `n_era` ≥
+    `LB_CAP_MIN_N`, pinned to `fleet_allocation.MIN_N`). Dark, thin, None or
+    junk change nothing — the brain's own t≥2 ladder governs alone, as it always
+    did; reductions pass through. The returned `mult` is the EFFECTIVE multiplier
+    (brain × rails) so the ledger's `brain_mult` stamp records what actually
+    sized the trade (I23); the decomposition is in `fleet_bus.last_sizing[bot]`.
+    Kill switch `BRAIN_RAILS_MODE=advisory` at the accessor. On the day it shipped
+    NEITHER live row moved, so it went to main only and rides the next live
+    deploy ((mm)). Pinned by `tests/autonomy/test_brain_sizing_rails.py`
+    (8 mutations red).
+    **And the expansion FLOORS were measured the same day, not moved**
+    (`scripts/study_brain_floors_2026-09-02.py`, calibrated 3/3 against the
+    live payload): forward, on living Lighter buckets, every 1.25x/1.5x the
+    ladder would have published earned BELOW the bucket's own mean (−$2.48;
+    the I25 hot-window shape), and dropping the win-rate bars (−$6.5), lowering
+    every t bar (−$2.4) or the n floor (+$6.2, one bucket) does not earn
+    forward either — floors KEPT with evidence. Structural fact recorded: the
+    ladder's win-rate bars alone hold 🌾 carry's `short` (t=2.17) at 1.0x —
+    the I15 shape in an actuator; re-run the instrument, never a bar, if such
+    a bucket ever carries a positive era bound at t≥2.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
 - `signal-bus`, `regime-oracle`, `market-pulse` — published context (funding

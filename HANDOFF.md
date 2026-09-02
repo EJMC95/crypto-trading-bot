@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 15:49 Sydney (05:49Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 15:51 Sydney (05:51Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -18,11 +18,6 @@ _Still open because:_ the clamp is a capital-allocation policy and moving it mov
 The brain's `t` is computed on DOLLARS (`brain_stats.weighted_bucket` reads `profit_abs`), so a bucket MID-TRANSITION is a mixture of two clip scales: sd inflates against mean and `t` falls on a book whose edge has not moved. Predicted shape: a bucket that clears a rung steps back down a rung within ~10 closes, then climbs again. A uniform scale is invariant, so there is no runaway — this is a transient limit cycle, damped by the 14d decay and the 3-run streak gate.
 
 _Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is stateless; the held rung lives in bot_learn's `mult_streaks`), and rewriting the brain's ladder on the same day 13 consumers were wired to it is the untested-rewrite-of-an-authority the doctrine forbids. It is now MEASURABLE for the first time — every close carries its `brain_mult` — so the next pass tests the prediction against real closes instead of a model.
-
-### `brain-mults-are-two-opinions-wide`  ·  owner: **session**
-(so) wired every living book to the brain's stake multiplier, including both real-money rows — and on the day it shipped the brain had exactly TWO published opinions across twenty books (taker short-divergence 0.75, Counterweight long 0.75). The plumbing is done; the ORGAN is nearly silent, because a mult needs >=30 era closes AND >=3 consecutive runs and most books never reach the first. The open question is whether those floors are right now that the range is 6.7x either way: a floor calibrated for a 1.5x ceiling is not obviously the floor for a 6.7x one.
-
-_Still open because:_ moving a brain floor changes what sizes EVERY book, real money included — it needs its own measurement (how many buckets would qualify at each floor, and what their realised expectancy was), not a judgement call.
 
 ### `ceiling-slots-georgia`  ·  owner: **session**
 **(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 days at full occupancy — an 11x speed-up'. Measured: her mean hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE slots need ~46 opens/day. Her signal supplies 40.9/day at best. **Full occupancy is unreachable by construction, and it was never the lever — CLOSES are.** She is flat 68.4% of the time not because something refuses her but because she exits in under 3 hours. (sv) took the one gate that cut closes for no quality reason (the 2/h throttle, +0.633pp in favour of the entry it refused, six splits) from 2 -> 3.
@@ -54,14 +49,27 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (75 commit(s), entries (tg), (vt), (vw), (vx), (vy), (vz), (wa), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp))
+## Shipped today (72 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu))
 
+- `07adc37` Merge origin/main a third time: the (wt) September slate landed; the rails entry keeps (wu)
+- `922016c` The September slate (wt): five I17 retirements on the grader's own verdicts (garrett, douglas, farmer-shadow, nav-cook, grimes), georgia v1 deferred to her pre-registered 10-Sep read, trail-blazer-live stopped — Eamon's delegated docket act
+- `83bcbfd` CodeQL hygiene on the floors study: the --out write goes through a with-block (wu)
+- `cd8410c` Port the selftest registration for scripts/study_taker_divergence_stop_2026-09-02 (wu)
+- `b0b2340` HANDOFF regenerated after the second re-merge (wu)
+- `5724989` Merge origin/main again: main took (wq)-(ws) and holds (wt) in flight, so the rails entry moves to (wu); the carried list is main's minus the closed floors row
+- `1b12ace` HANDOFF regenerated after closing the floors row (wq)
+- `7dd38b4` The brain's expansion floors, measured before the rails merge: floors KEPT with evidence, the entry's two false sentences corrected in place, the carried row closed (wq)
 - `6639f1e` The sentinel earns its fear (ws): one graded bar (n>=10, hit>=0.55) for BOTH proposal directions — a below-coin-flip playbook can no longer propose the crouch
 - `7ab31ed` The clock split (wr): the breakout trend exit gets its own BRK_MAX_HOLD_H — taker.max_hold_h steers only the divergence bracket, AST-pinned, behaviour-neutral at ship
+- `694f7c6` HANDOFF regenerated after merging main into the rails branch (wq)
+- `27a3d7b` Merge origin/main into the rails branch: #262 took (wp), so the rails entry moves to (wq) and every citation moves with it
 - `7cb0c7d` The backlog drained (wq): both live books claim-justified (ratchet 2->0), Counterweight fresh-read tripwire, minvol wired into the tp study, the (sk) breakoutup pins re-decided on a sighted gate, divergence stop priced (a refusal)
 - `faf9bc8` [deploy-live] Merge PR #262: (wp) support-system deep dive — cohort long budget, held-basket margin, shadow scan-order parity, living shortfall pair
+- `2165a41` CodeQL hygiene on the rails: three NaN checks through math.isnan, a commented fallback except, an unused test import (wp)
 - `f58ba46` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
 - `7227ca0` Renumber (wo) -> (wp): main took (wo) for the edge audit while this PR waited on CI; citations moved with it (wp)
+- `a0f3426` Regenerate HANDOFF — I11's regenerate-last half (wp)
+- `3aff7bc` The two sizing rails from the edge audit, reshaped to bite only on measured harm: a book past its drawdown bar is scaled, a book whose era bound is measured at zero is not levered (wp)
 - `cf11c48` Merge PR #260: the edge audit — 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wo)
 - `dec9ad4` (wo) the support-system deep dive: cohort long budget, held-basket margin, shadow scan-order parity, a living shortfall pair, Counterweight's date
 - `713c0c0` Kelly's clip was already cut to $80 on 1-Sep (vy): the audit's 'nothing reduces her clip' corrected in place, and her Monte Carlo re-run at the live clip (wo)
@@ -115,22 +123,6 @@ _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~1
 - `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
-- `bdfc437` Merge PR #252: the address-all-of-the-above records - sentinel proven live, ⚖️ kept on a fresh criterion, GROSS_X handed over, family pinned Railway-side (wa)
-- `2e18902` Merge PR #251: the restart lever's sentinel was dead on arrival - run 650 measured it, one line fixes it, a guard pins it (vz)
-- `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
-- `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
-- `11cef14` Record (vy): the proceed-with-all execution, and HANDOFF regenerated
-- `65c84fd` A restart lever for the (ml) stuck-server class: railway redeploy via dispatch, no upload, no UI (vy)
-- `fa8821e` Kelly snap clips revert 250 -> 80 on the grader's own verdict - Eamon's call, era untouched (vy)
-- `f3b337a` The mmf-aware clip: 10x becomes compatible with living stops, per coin and restrict-only — 5/5 mutations red (vy)
-- `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
-- `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
-- `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
-- `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
-- `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
-- `e5b7527` Fleet audit 1-Sep: the report, and HANDOFF regenerated (vw)
-- `1a6ec31` book-bezos was born dead three ways: the engine ships, the accidental 5x is gone, and the book joins every registry its birth skipped (vt)
-- `56eb4e7` The changelog was wiped on main and no guard could say so: 655 entries restored, and the class gets its lost-entries arm (vw)
 
 ## How this file stays honest
 
