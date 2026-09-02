@@ -538,7 +538,11 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
     # defect, because the board would keep sizing a book that cannot trade.
     # [2026-08-25 (te)] 👩 mum joins — live on her own sub-account, consuming
     # `live.mum.clip_scale` through the variant host's `_clip_scale_now`.
-    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter,"
+    # [2026-09-02 (wl)] 🔮 georgia LEAVES — her live arm retired at (wg) and
+    # the sub-account drained to mum, so the cohort follows the money out
+    # again. Her LIVE_CLIP_LEVERS mapping below stays: the map only says
+    # WHICH lever a row would use, exactly its pre-funding (sx) state.
+    "freqtrade-avo-maria-lighter,"
     "freqtrade-mum-lighter").split(",")
     if s.strip()}
 # Per-row ARM: the lever each live row actually reads. The Farmer keeps

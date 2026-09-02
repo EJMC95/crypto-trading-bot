@@ -336,3 +336,41 @@ def test_money_pct_cls_are_none_safe():
     assert pd.money(1234.5) == "+1,234.50" and pd.money(-3) == "-3.00"
     assert pd.pct(None) == "—" and pd.pct(0.0235) == "+2.35%"
     assert pd.cls(None) == "" and pd.cls(-1) == "neg" and pd.cls(0) == "pos"
+
+
+# ── today's P&L is capital-move-immune ((wl)) ────────────────────────────────
+def test_today_delta_prefers_pnl_abs_endpoints_over_raw_equity():
+    """[2026-09-02 (wl)] A raw equity delta is CAPITAL-BLIND: the (wg)
+    georgia->mum reallocation moved ~$220 and the dashboard's day figure read
+    -220.42 on georgia (the watchdog warned "daily P&L below -100.0" on a
+    withdrawal) and +203.59 on mum, while their pnl_abs deltas — invariant to
+    a fund move because publishers book it as `capital_adjust` — read 0.00 and
+    -16.83. The query must take pnl_abs endpoints FIRST (non-NULL-filtered so
+    one NULL sample cannot re-open the hole) and fall back to equity only when
+    a book has no pnl_abs history. Pins the source: this is SQL text, so the
+    artifact IS the string."""
+    import inspect
+    src = inspect.getsource(pd.fetch_ledger_enrich)
+    # isolate the one statement that computes the day delta
+    i = src.index("AS delta")
+    stmt = src[max(0, i - 800):i]
+    assert "COALESCE(" in stmt, \
+        "the day delta must COALESCE(pnl_abs delta, equity delta)"
+    assert stmt.count("FILTER (WHERE pnl_abs IS NOT NULL)") == 2, \
+        "BOTH pnl_abs endpoints must skip NULL samples or one NULL re-opens the hole"
+    # ORDER matters: pnl_abs endpoints come before the equity fallback
+    first_pnl = stmt.index("array_agg(pnl_abs")
+    first_eq = stmt.index("array_agg(equity")
+    assert first_pnl < first_eq, \
+        "pnl_abs is the preferred basis; equity is only the fallback"
+    # and the delta is newest MINUS oldest: exactly one DESC endpoint and one
+    # ascending endpoint, DESC first as the minuend (two DESCs = 0 forever).
+    # The trailing ")" separates the forms: the ascending one closes directly
+    # after "ts", the DESC one after "DESC".
+    n_desc = stmt.count("array_agg(pnl_abs ORDER BY ts DESC)")
+    n_asc = stmt.count("array_agg(pnl_abs ORDER BY ts)")
+    assert n_desc == 1 and n_asc == 1, \
+        f"need one newest and one oldest pnl_abs endpoint, got DESC={n_desc} ASC={n_asc}"
+    assert stmt.index("array_agg(pnl_abs ORDER BY ts DESC)") < \
+        stmt.index("array_agg(pnl_abs ORDER BY ts)"), \
+        "the newest endpoint is the minuend"

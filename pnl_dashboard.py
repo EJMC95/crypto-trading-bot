@@ -182,6 +182,24 @@ RETIRED_ROWS = {
                 # feed the flatten is verified on.
                 # Its SHADOW twin is NOT retired and keeps trading.
                 "perps-funding-lighter-lighter",
+                # [2026-09-02 (wl)] 🔮 georgia's LIVE arm — retired at (wg)
+                # (Eamon: "retire + reallocate to mum"; in-era n=30 mean
+                # -0.354%/trade t=-1.70, horizon `unreachable`). Hidden only
+                # AFTER the receipt was read on the row, per the Farmer
+                # precedent directly above: open_trades 0 / held {} /
+                # flatten_incomplete false / equity $0.01, and the ~$220
+                # verifiably arrived on mum's row (her equity ~$565 = the (wh)
+                # "funded to $570"). Until this line the drained row still
+                # counted as one of THREE live bots (live_equity carried her
+                # $0.01, live_pnl her -66.6) and the watchdog warned
+                # "halted (daily-loss rule)" at a retirement — I1's
+                # byte-identical-halted trap at the reporting layer. Unlike the
+                # Farmer's slot this service was NOT converted in place: the
+                # host keeps heart-beating her row (entries gated by
+                # fleet_bus.RETIRED_LIVE_ARMS), so the row re-appears in
+                # bot_pnl after every LEGACY_BOTS boot-prune and THIS set is
+                # the operative filter. Her SHADOW twin keeps trading.
+                "freqtrade-georgia-lighter",
                 "perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
@@ -2948,9 +2966,31 @@ def fetch_ledger_enrich():
                         "reason": r["reason"],
                         "ts": r["close_ts"].isoformat() if r["close_ts"] else None}
             if g["t3"]:
+                # [2026-09-02 (wl)] TODAY'S P&L PREFERS THE pnl_abs ENDPOINTS,
+                # equity is the FALLBACK — a raw equity delta is CAPITAL-BLIND.
+                # The publishers book deposits/withdrawals as `capital_adjust`
+                # (the (sr) equity-guard path), so their pnl_abs is invariant
+                # to a fund move while raw equity is not. Measured the day the
+                # (wg) georgia->mum reallocation moved ~$220: georgia's raw
+                # equity delta read **-220.42** (the watchdog warned "daily
+                # P&L below -100.0" on a withdrawal) and mum's read **+203.59**
+                # (a phantom daily GAIN on her card) while their pnl_abs deltas
+                # read 0.00 and -16.83 — the honest day. The endpoints are the
+                # newest/oldest NON-NULL pnl_abs (FILTER), so one NULL sample
+                # cannot silently re-open the equity hole; a book with no
+                # pnl_abs history at all falls back to the equity delta.
+                # Stated cost: a book whose pnl_abs is realised-only loses the
+                # intraday unrealised wiggle (measured $0.11 on carry, the one
+                # such book, the day this shipped) and gains immunity to
+                # capital moves measured at $220/$204 the same day.
                 cur.execute(
-                    "SELECT bot, (array_agg(equity ORDER BY ts DESC))[1] "
-                    "- (array_agg(equity ORDER BY ts))[1] AS delta "
+                    "SELECT bot, COALESCE("
+                    "(array_agg(pnl_abs ORDER BY ts DESC) "
+                    "FILTER (WHERE pnl_abs IS NOT NULL))[1] "
+                    "- (array_agg(pnl_abs ORDER BY ts) "
+                    "FILTER (WHERE pnl_abs IS NOT NULL))[1], "
+                    "(array_agg(equity ORDER BY ts DESC))[1] "
+                    "- (array_agg(equity ORDER BY ts))[1]) AS delta "
                     "FROM bot_equity_history "
                     "WHERE ts >= date_trunc('day', now()) GROUP BY bot")
                 for r in cur.fetchall():

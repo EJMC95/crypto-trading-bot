@@ -1988,6 +1988,37 @@ def main(_ctx=None, once=False):
                 },
             }
             payload.update(extra_extra or {})
+            # [2026-09-02 (wl)] A BUS-RETIRED LIVE ARM PUBLISHES ITS RECEIPT —
+            # the (ta) Farmer parity the (wg) registry mechanism skipped.
+            # Without it `halted` is byte-identical between "lost 5% today"
+            # and "retired 2-Sep" (I1/I18): measured the day after (wg), the
+            # watchdog warned "halted (daily-loss rule): freqtrade-georgia-
+            # lighter" at a retirement, because its retired-note path keys on
+            # `extra.retired` and only the Farmer ever stamped it. The spec is
+            # read from the ONE declaration (fleet_bus.RETIRED_LIVE_ARMS) so
+            # a second copy of the why/override cannot drift, and `open` is
+            # the flatten's own receipt — the field the RETIRED_ROWS deferral
+            # rule reads. Fail direction matches the entry gate: a bus error
+            # stamps NOTHING (a live row must never mislabel itself retired).
+            # Status is forced to "halted" beside the receipt, the Farmer's
+            # published shape — otherwise the arm reads "online" on every
+            # loop its daily halt happens not to be latched.
+            try:
+                _rspec = (_bus.RETIRED_LIVE_ARMS.get(BOT_ROW)
+                          if _bus.live_arm_retired(BOT_ROW) else None)
+            except Exception:  # noqa: BLE001
+                _rspec = None
+            if _rspec:
+                payload["retired"] = {
+                    "since": _rspec.get("since"),
+                    "entry": _rspec.get("entry"),
+                    "why": "live arm retired (fleet_bus.RETIRED_LIVE_ARMS) "
+                           "— not a daily-loss halt",
+                    "open": len(live_pos or {}),
+                    "override": _rspec.get("override"),
+                    "successor": _rspec.get("successor"),
+                }
+                status = "halted"
             try:
                 store.publish(
                     BOT_ROW, status=status,

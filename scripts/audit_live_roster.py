@@ -58,6 +58,8 @@ PROSE_SCOPE = {
 #: Rows that were live and are not any more, with the entry that retired them.
 #: A doc naming one of these inside a live-scope anchor is the defect.
 FORMERLY_LIVE = {
+    "freqtrade-georgia-lighter": "retired 2-Sep (wg) — reallocated to mum; "
+                                 "row hidden (wl)",
     "lighter-ticket-taker-lighter": "retired 13-Aug (ma) — Avo Maria took the slot",
     "crypto-trend-daily-lighter": "retired 17-Jul — the Taker took the slot",
     "equities-momentum-alpaca": "retired 14-Jul",

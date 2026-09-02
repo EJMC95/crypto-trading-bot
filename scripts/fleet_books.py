@@ -173,11 +173,13 @@ NON_BOT_ROWS = {}
 #: `live_rows_from_feed(doc)` first, this only as the fallback.
 DECLARED_LIVE = (
     "freqtrade-avo-maria-lighter",     # 🙏 Avo Maria — (ma) slot swap, 13-Aug
-    # [2026-08-22 (tb)] 🔮 georgia — the (ta) slot swap. She runs on
-    # `trail-blazer-live`, the service 💸 the Farmer gave up: it was converted
-    # in place rather than replaced, so no API key was ever read or moved.
-    # Service names in this fleet have never matched their books.
-    "freqtrade-georgia-lighter",
+    # [2026-09-02 (wl)] 🔮 georgia REMOVED — her live arm retired at (wg)
+    # (Eamon: "retire + reallocate to mum") and the sub-account is drained
+    # (row receipt: open 0, equity $0.01; the ~$220 verified on mum's row).
+    # Her host keeps heart-beating the row with entries gated by
+    # fleet_bus.RETIRED_LIVE_ARMS, and the row itself is hidden from
+    # /pnl.json by RETIRED_ROWS, so the FEED-derived roster agrees with
+    # this declaration once the (wl) dashboard deploy serves.
     # [2026-08-25 (te)] 👩 mum — the FIRST live book born on a FRESH
     # sub-account rather than a converted slot (Eamon created account
     # 281474976496180 and its keys himself; the provisioner carried them

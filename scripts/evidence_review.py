@@ -2185,8 +2185,9 @@ def selftest():
     # retired at (ta). The PROPERTY being pinned is the suffix rewrite (a bare
     # str.replace on the Farmer's row produced `perps-funding-lshadow-lshadow`,
     # see the note above), so it is re-pinned on a CURRENT live row.
-    assert "freqtrade-georgia-lshadow" in LIVE_TWINS
-    assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
+    # [(wl)] was `freqtrade-georgia-lshadow` — the twin of a live row that
+    # retired at (wg); re-pinned on 👩 mum, the current live set's second row.
+    assert "freqtrade-mum-lshadow" in LIVE_TWINS
     assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
     assert not (LIVE_TWINS & set(LIVE_ROWS)), "twins must be distinct from live rows"
 

@@ -69,11 +69,12 @@ OXYGEN_FEEDS = {
 # the dashboard's own cadence record for both rows is VARIANT_STALE_SECONDS
 # (pnl_dashboard.py:405).
 LIVE_BREATHS = {
-    # [2026-08-25] 💸 Farmer's live row RETIRED+PRUNED with the (ta)/(tb)
-    # slot swap; 🔮 georgia breathes on that sub-account at the same 300s
-    # loop. Found by this module's own selftest going red on main after the
-    # prune — the swap's hide+prune half landed without this dict.
-    "freqtrade-georgia-lighter": 1800,
+    # [2026-09-02 (wl)] 🔮 georgia's live row REMOVED — retired at (wg),
+    # hidden + pruned; her bot_pnl row is filtered so she can never breathe,
+    # and a retired name here caps SpO2 below 'healthy' forever (this dict's
+    # own header rule). No successor takes her slot — the funds moved to
+    # 👩 mum's own row below. Found by this module's own selftest going red
+    # on the (wl) prune, the second time it caught this dict, by design.
     # [2026-08-13 (ma)] 🎫 Taker's live row RETIRED with the Avo slot swap;
     # 🙏 Avo Maria breathes on the same sub-account at the same 300s loop.
     "freqtrade-avo-maria-lighter": 1800,
@@ -288,9 +289,9 @@ def _selftest():
     br2 = read_breaths(states_lm, ages_ok, now)
     spo2b, hyp2 = saturation(br2)
     assert "lighter-market" in hyp2 and spo2b < 1.0
-    # total weight = 3+1+1+1 (feeds) + 2+2+2 (live: avo, georgia, mum (te))
-    # = 12; lighter-market=3 stale -> 9/12
-    assert abs(spo2b - 0.75) < 1e-9, spo2b
+    # total weight = 3+1+1+1 (feeds) + 2+2 (live: avo, mum — georgia left
+    # the roster at (wl)) = 10; lighter-market=3 stale -> 7/10
+    assert abs(spo2b - 0.7) < 1e-9, spo2b
 
     # a venue-wide asphyxiation: every Lighter feed + both live bots dark
     dead = {f: {"updated": _iso(now - 99999)} for f in OXYGEN_FEEDS}

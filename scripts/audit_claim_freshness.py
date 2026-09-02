@@ -73,6 +73,10 @@ DOCKERFILE = os.path.join(ROOT, "Dockerfile.freqtrade")
 #: claim row naming the number the swap was argued on. MAY ONLY SHRINK.
 #: Draining it is the job: each entry is a live book whose justification is
 #: prose nobody can recompute.
+#: [2026-09-02 (wl)] re-measured at the georgia retirement: she left the
+#: roster AND took the fleet's only justification claim with her, so the
+#: backlog is STILL 2 — now avo and mum, both unjustified. The value holds;
+#: the basis above is history.
 RATCHET = {"live_rows_without_a_justification_claim": 2}
 
 #: Distinguishes "read the real thing" from "the read FAILED". `None` is the
