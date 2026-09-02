@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 01:24 Sydney (15:24Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-03 02:53 Sydney (16:53Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -64,8 +64,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (2 commit(s))
+## Shipped today (4 commit(s))
 
+- `26feade` Merge PR #276: (xh) the suite's 8-red floor was the container, and finding that surfaced a live-deploy marker lost to a squash merge on a real-money book
+- `cbfcdb6` (xh) a live-deploy marker does not survive a squash merge — measured on a real-money book, closed executably
 - `8b174ba` (xh) the local suite had a standing floor of 8 reds that were not the tree's — a SessionStart hook installs the repo's own declared deps
 - `98f0a3d` [deploy-live-mum] (xf)(xg) mum's gross 3.75x and her halt-aware entry gate (#271)
 

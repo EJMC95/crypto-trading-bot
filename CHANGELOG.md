@@ -1,3 +1,51 @@
+## 2026-09-02 (xi) — "FULL PERMISSION TO FIX RAILWAY": THE DELETE IS A PLATFORM LIMIT, NOT A PERMISSION ONE — SO THE HARM WAS NEUTRALISED INSTEAD, AND THE REASON IS NOW MEASURED RATHER THAN ASSUMED
+
+**Eamon, 2-Sep:** *"Approve and full permission for you to fix railway"*, on the
+stray `crypto-trading-bot` service he had already asked to delete (*"it seems to
+only complicate things"*).
+
+**THE GRANT COULD NOT BE EXECUTED, AND THAT IS A FINDING RATHER THAN A FAILURE.**
+The Railway MCP surface has **no `delete-service` tool at all** — it carries
+`delete-volume`, `delete-bucket`, `delete-tcp-proxy` and `delete-feature-flag`
+and nothing for a service. Railway's OWN agent was then asked directly, and hit
+the identical wall: `removeServiceTool` → `status: staged`,
+`commitStagedChangesTool` → **`awaiting_user_action` — "These staged changes
+require two-factor verification, which isn't available over an API/MCP token."**
+It reported the same for deleting the project. **No grant moves this**, which is
+exactly why it belongs on `OPERATOR_QUEUE.md` — the surface for acts only Eamon
+can take — rather than in a session's carried list, where it would sit as a
+to-do nobody could ever discharge.
+
+**MEASURED BEFORE TOUCHING ANYTHING** (and this is what made a destructive act
+safe to approve): `variableNames` **`[]`** — no `DATABASE_URL`, so it can write
+no `bot_pnl` row and was never a duplicate-writer suspect; `hasVolume` **false**;
+`cronJob` **null**; `replicaStatus` **running 0 of 1**. Its newest deployment was
+created at **15:33:04Z — the exact second PR #276 merged**, which is the churn
+behaviour confirmed rather than inferred: its only effect is to burn a build on
+every push to main.
+
+**WHAT WAS SHIPPED INSTEAD, and it removes the actual cost.** `update-service`
+writes DIRECTLY rather than staging, so two fields were set and then **read back
+from the API**, never trusted from the write's own response (the stamp-readback
+discipline, applied to infrastructure): `watchPatterns` set to a literal no path
+in this repo can match, so a push to main no longer triggers a build; and
+`restartPolicyType` **NEVER**, so the container that exits immediately no longer
+retries.
+
+**THE LIMIT IS STATED, NOT PAPERED OVER (I3).** A read-back proves the SETTING,
+not the BEHAVIOUR. The check that closes it is free and needs no extra push:
+after the next merge to main, the service's newest deployment should still read
+`29e201fa-…` / 15:33:04Z. **A newer one means watch patterns do not gate this
+builder**, and the queue's option B is then the answer. Recorded that way
+deliberately — "I changed the setting" is not "the rebuilds stopped", and this
+file has paid for that difference before ((ml): a green `OK: deployed` beside a
+container that never took it).
+
+**NOT AN OPTION, named so no future session re-proposes it:** re-staging the
+delete. It has now been staged **twice** — once directly, once by Railway's own
+agent — and both commits refused for the same reason. A third staging adds a
+pending change and accomplishes nothing.
+
 ## 2026-09-02 (xh) — THE LOCAL SUITE HAD A STANDING FLOOR OF EIGHT REDS THAT WERE NOT THE TREE'S, SO IT COULD NOT BE USED AS A PRE-PUSH CHECK — AND A BASELINE OF EXPECTED FAILURES IS EXACTLY WHERE THE NINTH HIDES
 
 **Eamon, 2-Sep:** *"Fix the psycopg2 and lighter sdk issue too"*. He is right,
