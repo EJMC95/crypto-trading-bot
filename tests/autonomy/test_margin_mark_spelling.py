@@ -43,6 +43,7 @@ Fixed at the OWNER (`_mark_for`), not at the call site, because
 import ast
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -147,8 +148,7 @@ def test_the_live_host_hands_the_venue_spelling_to_the_margin_block():
     """(xa)'s normalisation is what makes the caller venue-spelled. Read from
     `lighter_avo_live_bot` by AST so a rewrite of that line cannot leave this
     file asserting a premise the host no longer has."""
-    src = open(os.path.join(ROOT, "lighter_avo_live_bot.py"),
-               encoding="utf-8").read()
+    src = Path(ROOT, "lighter_avo_live_bot.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
@@ -239,8 +239,7 @@ def test_the_alias_rule_has_exactly_one_owner():
     """`venues.symbol_map` owns the 1000-market alias. A second copy of that
     rule inside the lookup would be a second rule ((hj)) — and this one sits
     on the path that prices real money."""
-    src = open(os.path.join(ROOT, "venues", "lighter_client.py"),
-               encoding="utf-8").read()
+    src = Path(ROOT, "venues", "lighter_client.py").read_text(encoding="utf-8")
     body = src[src.index("def _mark_for("):]
     body = body[:body.index("\ndef ", 1)]
     assert "to_lighter(" in body, "the lookup must go through the one owner"
