@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 14:09 Sydney (04:09Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 14:11 Sydney (04:11Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,10 +69,14 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (37 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm))
+## Shipped today (41 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn))
 
+- `b874c82` Merge origin/main: mum's (wm) pre-registration landed first; the edge audit keeps (wn) above it
+- `07b609e` Renumber (wm) -> (wn): main took (wm) for mum's I21 pre-registration first; citations moved with it (wn)
+- `6dfbc16` Regenerate HANDOFF after the main merge — I11's regenerate-last half (wm)
 - `af7700b` Merge origin/main: main's (wl) dashboard fix landed first; the edge audit keeps (wm) above it
 - `712c3df` Renumber (wl) -> (wm): main took (wl) for the dashboard fix first; citations moved with it (wm)
+- `9f091f0` (wm) — mum pre-registered on the winners' docket (I21); the snapshot pin re-aimed per I26
 - `c974f7d` Regenerate HANDOFF — I11's regenerate-last half (wl)
 - `acc656a` The edge audit: 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wl)
 - `05985d6` [deploy-live-georgia] (wl) pnl dashboard fix: capital-move-immune daily P&L + georgia's drained live row hidden with the (ta) receipt
