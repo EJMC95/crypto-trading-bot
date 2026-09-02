@@ -310,6 +310,46 @@ JUDGED_PAIRS = {
     },
 }
 
+
+def active_price_pairs():
+    """[2026-09-02 (wp)] The judged pairs whose LIVE arm is still trading —
+    derived from JUDGED_PAIRS + RETIRED_LIVE_ARMS, never a typed list, so a
+    slot swap cannot leave a consumer pointed at a retired row (the
+    audit-scope lesson, four times over). Ordered by registry order, then
+    the caller decides. `live_service` None means the arm has no container
+    (the parked Farmer) and is excluded."""
+    out = []
+    for pid, spec in JUDGED_PAIRS.items():
+        live = spec.get("live_bot")
+        if not live or not spec.get("live_service"):
+            continue
+        if live_arm_retired(live):
+            continue
+        out.append((pid, live, spec.get("shadow_bot"), spec.get("pnl_form")))
+    return out
+
+
+def shortfall_default_pair():
+    """[(wp)] (live_bot, shadow_bot) implementation_shortfall measures when
+    SHORTFALL_LIVE/SHORTFALL_SHADOW are unset. Was a literal naming 💸 the
+    Farmer's live arm, retired 22-Aug — so the fleet's only execution-quality
+    instrument stood down for 11 days while two real-money books traded
+    unmeasured. Prefers the pair with the most LIVE closes on the feed (the
+    one with evidence to pair), and degrades to the first active pair, then
+    to the Farmer literal (stood_down, honestly) when nothing is active."""
+    pairs = active_price_pairs()
+    if not pairs:
+        return ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow")
+    best = pairs[0]
+    try:
+        import bot_pnl_store as _store
+        rows = {r.get("bot"): r for r in (_store.fetch_bot_pnl() or [])}
+        best = max(pairs, key=lambda p: int(
+            (rows.get(p[1]) or {}).get("closed_trades") or 0))
+    except Exception:  # noqa: BLE001 — a dark feed keeps registry order
+        pass
+    return (best[1], best[2])
+
 #: Live-capable books DELIBERATELY outside the judge, each with a reason —
 #: the BORN_DARK_OK idiom. The roster test additionally injects a synthetic
 #: entry so the mechanism is under test whatever this dict holds.
@@ -982,8 +1022,47 @@ def lever_outcome(lever, current_time=None):
         return None
 
 
-def long_entries_blocked(current_time=None):
+def cohort_long_state(payload, cohort):
+    """[2026-09-02 (wp)] (long_positions, long_budget) for ONE budget cohort
+    — `live` (real money) or `shadow` (modelled) — off a fleet-risk payload.
+
+    THE ONE READER of `cohorts`, so five consumers cannot each re-type the
+    fallback. Prefers `payload["cohorts"][cohort]` when both numbers are
+    readable ints; otherwise degrades to the POOLED `long_positions` /
+    `long_budget` pair, byte-identical to every consumer's behaviour before
+    the split (a fleet-risk container still publishing the old shape must
+    keep vetoing exactly as it did — never veto nothing, never veto on a
+    number from the other cohort). A missing budget reads as 10**9, i.e. no
+    veto, matching the consumers' own `_lb = 10**9 if _lb is None` idiom
+    (0 is a REAL budget)."""
+    p = payload if isinstance(payload, dict) else {}
+    c = (p.get("cohorts") or {}).get(str(cohort)) if isinstance(
+        p.get("cohorts"), dict) else None
+    if isinstance(c, dict):
+        try:
+            lp = c.get("long_positions")
+            lb = c.get("long_budget")
+            if lp is not None and lb is not None:
+                return int(lp), int(lb)
+        except (TypeError, ValueError):
+            pass
+    try:
+        lp = int(p.get("long_positions") or 0)
+    except (TypeError, ValueError):
+        lp = 0
+    lb = p.get("long_budget")
+    try:
+        lb = 10 ** 9 if lb is None else int(lb)
+    except (TypeError, ValueError):
+        lb = 10 ** 9
+    return lp, lb
+
+
+def long_entries_blocked(current_time=None, cohort=None):
     """L2 fleet-risk veto: True when the fleet's LONG book is at/over budget.
+
+    [(wp)] `cohort` ("live"|"shadow") reads that cohort's own count via
+    cohort_long_state; None keeps the pooled read for legacy callers.
 
     Uses the side-specific count (long_positions vs long_budget), NOT the
     blended light, so a blown SHORT budget can't freeze long-only spot bots.
@@ -998,6 +1077,9 @@ def long_entries_blocked(current_time=None):
             return False
         if str(p.get("mode")) != "enforce":
             return False
+        if cohort is not None:
+            lp, lb = cohort_long_state(p, cohort)
+            return lp >= lb
         return int(p.get("long_positions", 0)) >= int(p.get("long_budget", 10**9))
     except Exception:
         return False
@@ -1726,6 +1808,42 @@ def pair_corr(a, b):
         return None
     cov = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
     return cov / ((vx ** 0.5) * (vy ** 0.5))
+
+
+def diversified_order(universe, held, rets):
+    """`universe` reordered so the candidate that most REDUCES the held
+    basket's correlation is offered first.
+
+    [2026-09-02 (wp)] MOVED HERE from lighter_avo_live_bot (the live host
+    keeps it as an alias) so the family SHADOW host can run the same rule:
+    the judge read every family pair `unjudgeable:policy_mismatch` on
+    `scan_order` (live=diversified, shadow=list), and the divergence was
+    MEASURED material on 👩 mum — 36 of 53 live entries since 25-Aug had a
+    shadow entry on the same coin within 2h, 7 coins were live-only, 4
+    shadow-only — so the twin was not a control arm (I25) and the judge had
+    no pair it could open. One owner, two hosts.
+
+    FAIL-SAFE IS THE WHOLE CONTRACT: anything unmeasurable keeps its original
+    relative position and sorts AFTER the measured ones, and an empty/held-less
+    /dark read returns the list unchanged — i.e. exactly today's behaviour. A
+    correlation we could not measure must never jump a name up the queue.
+    """
+    try:
+        held = [h for h in (held or []) if rets.get(h)]
+        if not held or not universe:
+            return list(universe)
+        scored = []
+        for i, sym in enumerate(universe):
+            r = rets.get(sym)
+            cs = [c for h in held
+                  if (c := pair_corr(r, rets[h])) is not None] if r else []
+            # unmeasured -> (1, original index): after every measured name,
+            # original order preserved among themselves.
+            scored.append(((0, sum(cs) / len(cs), i) if cs else (1, 0.0, i), sym))
+        scored.sort(key=lambda kv: kv[0])
+        return [s for _, s in scored]
+    except Exception:  # noqa: BLE001 — ordering is an enhancement, never a dependency
+        return list(universe)
 
 
 def basket_n_eff(rets, names):

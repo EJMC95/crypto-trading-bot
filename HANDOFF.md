@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 14:40 Sydney (04:40Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 15:01 Sydney (05:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,24 +69,15 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (49 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo))
+## Shipped today (40 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wp))
 
-- `a46640b` Merge origin/main: (wn) the CI-liveness pager landed first; the edge audit keeps (wo) above it
-- `bdf6689` Renumber (wn) -> (wo): main took (wn) for the CI-liveness pager; citations moved with it (wo)
+- `7227ca0` Renumber (wo) -> (wp): main took (wo) for the edge audit while this PR waited on CI; citations moved with it (wp)
+- `dec9ad4` (wo) the support-system deep dive: cohort long budget, held-basket margin, shadow scan-order parity, a living shortfall pair, Counterweight's date
 - `09e5fc4` (wn) the CI-liveness pager cried wolf 1-in-10: heartbeat rides push CI, LATE warns at 4h, DARK pages at the measured 12h
-- `bd9b07a` CodeQL hygiene on the edge audit: nine findings — eight bare open() calls now use context managers, one unused local removed (wn)
 - `4e65d49` Merge PR #261: CodeQL hygiene on the #257 suites, with its dated (wg) note
-- `8516ff6` Regenerate HANDOFF after the second main merge — I11's regenerate-last half (wn)
-- `b874c82` Merge origin/main: mum's (wm) pre-registration landed first; the edge audit keeps (wn) above it
-- `07b609e` Renumber (wm) -> (wn): main took (wm) for mum's I21 pre-registration first; citations moved with it (wn)
-- `6dfbc16` Regenerate HANDOFF after the main merge — I11's regenerate-last half (wm)
-- `af7700b` Merge origin/main: main's (wl) dashboard fix landed first; the edge audit keeps (wm) above it
 - `65d67c5` the changelog gate counts tests/ as bot-affecting — the CodeQL hygiene pass gets its dated note in (wg)
-- `712c3df` Renumber (wl) -> (wm): main took (wl) for the dashboard fix first; citations moved with it (wm)
 - `9f091f0` (wm) — mum pre-registered on the winners' docket (I21); the snapshot pin re-aimed per I26
 - `c90e359` CodeQL hygiene on the #257 suites: an unused os import and an unclosed file handle
-- `c974f7d` Regenerate HANDOFF — I11's regenerate-last half (wl)
-- `acc656a` The edge audit: 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wl)
 - `05985d6` [deploy-live-georgia] (wl) pnl dashboard fix: capital-move-immune daily P&L + georgia's drained live row hidden with the (ta) receipt
 - `3e15884` Merge PR #258: the (wk) record — the night's cross-session convergences, receipts and withdrawals
 - `0030ce1` Merge remote-tracking branch 'origin/main' into claude/fleet-audit-review-wjz9zy

@@ -519,7 +519,17 @@ def organ_invariants(states, now):
 # (bot -> allowed reasons); a NEW reason on an allowlisted book still pages,
 # and any reason on a non-allowlisted book still pages.
 HEADROOM_OK = {
-    "freqtrade-mum-lighter": {"too_close"},
+    # [(wp)] `liq_unpriced` is STRUCTURAL on a cross-margin book: the venue
+    # prices liquidation at the ACCOUNT level, so per-position `liq` is
+    # absent by construction on most legs (2-Sep: 1 of 11 on mum, 1 of 3 on
+    # avo carried one) and SafetyRails.headroom_check's per-position walk
+    # refuses every loop — it paged both live rows continuously from (th)
+    # onward on a condition their holdings cannot fail to satisfy (I7). The
+    # account-level distance is now MEASURED and published on the row as
+    # `liq_gap_held_pct` / `stop_reachable_held`, which is what this organ
+    # pages on instead. A NEW reason on either row still pages.
+    "freqtrade-mum-lighter": {"too_close", "liq_unpriced"},
+    "freqtrade-avo-maria-lighter": {"liq_unpriced"},
 }
 
 
@@ -557,7 +567,23 @@ def headroom_sickness(bot_rows, ok=None):
                             "detail": f"headroom refused: {why} "
                                       f"(gap {hd.get('gap_stop_widths')} "
                                       f"stop-widths)"})
-        if lev.get("stop_reachable") is False and "stop_dead" not in allowed:
+        # [(wp)] PAGE ON THE MEASUREMENT, REPORT THE BOUND. `stop_reachable`
+        # is the universe-worst margin at full-slot gross (a ceiling, met
+        # structurally: mum's read 0.20 mmf x 9.5x = "DEAD" every loop while
+        # her held basket at 5.6x had ~12% to liquidation against a 4% stop).
+        # When the row publishes `stop_reachable_held` (the held basket at the
+        # venue's own leverage) that is the verdict; a row that has not yet
+        # deployed it keeps the old read, so nothing goes quiet in the window.
+        _held = lev.get("stop_reachable_held")
+        if _held is not None:
+            if _held is False and "stop_dead" not in allowed:
+                out.append({"organ": bot,
+                            "detail": f"protective stop is DEAD on the HELD "
+                                      f"basket at {lev.get('leverage_now')}x "
+                                      f"(ceiling {lev.get('stop_dead_above_held')}, "
+                                      f"mmf_held {lev.get('mmf_held')}) — "
+                                      f"liquidation fires before the stop"})
+        elif lev.get("stop_reachable") is False and "stop_dead" not in allowed:
             out.append({"organ": bot,
                         "detail": f"protective stop is DEAD at gross "
                                   f"{lev.get('set')} (ceiling "
@@ -1613,14 +1639,41 @@ def _selftest():
     assert headroom_sickness([_hrow(
         "freqtrade-mum-lighter",
         {"ok": False, "reason": "too_close", "gap_stop_widths": 1.13})]) == []
+    # [(wp)] liq_unpriced joined mum's structural set (cross-margin: the
+    # venue prices liquidation per ACCOUNT, so per-position liq is absent by
+    # construction); a genuinely NEW reason on her row still pages.
+    assert headroom_sickness([_hrow(
+        "freqtrade-mum-lighter",
+        {"ok": False, "reason": "liq_unpriced", "gap_stop_widths": None})]) == []
     _hs3 = headroom_sickness([_hrow(
         "freqtrade-mum-lighter",
-        {"ok": False, "reason": "liq_unpriced", "gap_stop_widths": None})])
-    assert _hs3 and "liq_unpriced" in _hs3[0]["detail"], _hs3
+        {"ok": False, "reason": "mark_blind", "gap_stop_widths": None})])
+    assert _hs3 and "mark_blind" in _hs3[0]["detail"], _hs3
     # a stale row is a corpse, not a sickness (I1)
     assert headroom_sickness(
         [_hrow("freqtrade-avo-maria-lighter", stop_ok=False,
                age=999999)]) == []
+    # [(wp)] the HELD measurement outranks the universe bound both ways:
+    # bound says DEAD, held says reachable -> silent; bound says fine, held
+    # says DEAD -> pages naming the held numbers; held absent -> the bound.
+    _r = _hrow("freqtrade-x-lighter", stop_ok=False)
+    _r["extra"]["leverage"].update({"stop_reachable_held": True,
+                                    "leverage_now": 5.6, "mmf_held": 0.055})
+    assert headroom_sickness([_r], ok={}) == [], "held reachable must silence"
+    _r2 = _hrow("freqtrade-x-lighter", stop_ok=True)
+    _r2["extra"]["leverage"].update({"stop_reachable_held": False,
+                                     "leverage_now": 9.5, "mmf_held": 0.12,
+                                     "stop_dead_above_held": 6.25})
+    _hs4 = headroom_sickness([_r2], ok={})
+    assert _hs4 and "HELD basket" in _hs4[0]["detail"] \
+        and "9.5" in _hs4[0]["detail"], _hs4
+    _r3 = _hrow("freqtrade-x-lighter", stop_ok=False)
+    _r3["extra"]["leverage"]["stop_reachable_held"] = None
+    assert headroom_sickness([_r3], ok={}), "None held -> the bound pages"
+    # [(wp)] liq_unpriced is DECLARED structural on both cross-margin rows
+    assert headroom_sickness([_hrow(
+        "freqtrade-avo-maria-lighter",
+        {"ok": False, "reason": "liq_unpriced", "gap_stop_widths": 7.98})]) == []
 
     # ---- [2026-07-31 (hu)] STALE WRITER: deployed OK, never landed --------
     # The measured shape: seven services stamped, carry unstamped on an old

@@ -157,6 +157,65 @@ def _fresh(row):
     return bool(row) and (row.get("equity") is not None or row.get("open_trades") is not None)
 
 
+def venue_cohort(venue):
+    """[(wp)] Which budget cohort a row's venue belongs to: real money is
+    `live`, everything modelled is `shadow`. Unknown/None reads `shadow` —
+    the fail-safe direction, because a mis-filed real-money row would then
+    still be counted against the paper budget (over-restricted), never
+    dropped from the live one."""
+    return "live" if str(venue or "") == "lighter_live" else "shadow"
+
+
+def row_longs(r, kind="freqtrade"):
+    """[(wp)] Long-position count of ONE bot_pnl row, by the same rule the
+    budget loop below applies — extracted so the cohort census cannot drift
+    from the pooled count. `freqtrade` rows: `open_pos` tags (a tag naming
+    'short' is a short) else `open_trades`; `perps` rows: `extra.longs` else
+    the held map's L-prefixed sides. Returns 0 for an empty/unreadable row."""
+    if not isinstance(r, dict):
+        return 0
+    extra = r.get("extra") or {}
+    if kind == "perps":
+        held = extra.get("held") or {}
+        _hv = [v for _, v in held_items(held)]
+        return int(extra.get("longs") or 0) or \
+            sum(1 for v in _hv if str(v).upper().startswith("L"))
+    n = int(r.get("open_trades") or 0)
+    if n == 0:
+        return 0
+    pos = extra.get("open_pos") or []
+    return sum(1 for p in pos
+               if "short" not in str(p.get("tag", "")).lower()) if pos else n
+
+
+def cohort_longs(by_bot, freqtrade_bots=None, perps_bots=None):
+    """[(wp)] {"live": n, "shadow": n} — long positions per budget cohort,
+    over the SAME population the pooled count uses, plus the one population
+    it structurally cannot see: a live base's `-lshadow` twin. The pooled
+    loop resolves each base through `authoritative_row` (live > lshadow), so
+    once 👩 mum went live her shadow twin's paper longs counted NOWHERE —
+    while that twin read the pooled count (mostly mum's real positions) and
+    vetoed itself on them. Fresh rows only (I1). Pure; selftested."""
+    out = {"live": 0, "shadow": 0}
+    for name in (FREQTRADE_BOTS if freqtrade_bots is None else freqtrade_bots):
+        r, venue = authoritative_row(name, by_bot)
+        if r:
+            out[venue_cohort(venue)] += row_longs(r, "freqtrade")
+            if venue_cohort(venue) == "live":
+                tw = by_bot.get(name + "-lshadow")
+                if tw and row_fresh(tw):
+                    out["shadow"] += row_longs(tw, "freqtrade")
+    for name in (PERPS_LS_BOTS if perps_bots is None else perps_bots):
+        r, venue = authoritative_row(name, by_bot)
+        if r and row_fresh(r):
+            out[venue_cohort(venue)] += row_longs(r, "perps")
+            if venue_cohort(venue) == "live":
+                tw = by_bot.get(name + "-lshadow")
+                if tw and row_fresh(tw):
+                    out["shadow"] += row_longs(tw, "perps")
+    return out
+
+
 def authoritative_row(base, by_bot):
     """(row, venue) for a directional bot, one row so nothing double-counts:
     live Lighter (real money) > -lshadow (the fleet's modelled Lighter books,
@@ -189,6 +248,21 @@ def authoritative_row(base, by_bot):
 # weighting) both need replay evidence first and are deliberately not here:
 # they change which trades six books take.
 LONG_BUDGET = int(os.environ.get("FLEET_LONG_BUDGET", "20"))
+# [2026-09-02 (wp)] THE LIVE COHORT'S OWN BUDGET. The 20-long budget was
+# written for an all-paper fleet, and it kept counting paper positions after
+# real money arrived: on 2-Sep the pooled count sat AT 20 in 17 of 285
+# five-minute samples (6.0% of the day, every one since 02:02Z) with 6 of the
+# 20 being 🎫 the shadow taker's PAPER longs — and both live books read
+# `fleet_long_veto: true` with slots free (👩 mum 11 of 12, 🙏 avo 3 of 5).
+# A paper position carries no risk to a real-money book and a real position
+# carries none to a paper one, so one count for both is a category error in
+# BOTH directions: real money was starved by paper, and the shadow books were
+# starved of evidence by real money (14 of their 20). The pooled numbers stay
+# published (the light, the dashboard and every old reader keep them); the
+# veto consumers now read `cohorts.<theirs>` via fleet_bus.cohort_long_state
+# and fall back to the pooled pair when the key is absent (deploy latency).
+# Same number by default — a SEPARATE count, not a wider budget.
+LIVE_LONG_BUDGET = int(os.environ.get("FLEET_LIVE_LONG_BUDGET", str(LONG_BUDGET)))
 SHORT_BUDGET = int(os.environ.get("FLEET_SHORT_BUDGET", "12"))
 YELLOW_FRAC = 0.7
 
@@ -393,6 +467,7 @@ def main():
         return
     apply_tuning()
     by_bot = {r["bot"]: r for r in rows}
+    _cohorts = cohort_longs(by_bot)          # [(wp)] live vs shadow longs
 
     fleet_long, fleet_short = 0, 0
     fleet_equity = 0.0
@@ -708,6 +783,15 @@ def main():
         "equity_samples": samples,
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,
+        # [(wp)] the per-cohort split the veto consumers read — see
+        # LIVE_LONG_BUDGET. `long_positions` above stays the POOLED count
+        # (the light, the dashboard and the exposure view are unchanged).
+        "cohorts": {
+            "live": {"long_positions": _cohorts["live"],
+                     "long_budget": LIVE_LONG_BUDGET},
+            "shadow": {"long_positions": _cohorts["shadow"],
+                       "long_budget": LONG_BUDGET},
+        },
         "gross": gross,
         # [2026-08-03 (iv)] PUBLISHED AT LAST. `per_bot` has been computed on
         # every cycle since this organ shipped and thrown away at the publish

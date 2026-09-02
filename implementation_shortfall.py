@@ -70,8 +70,26 @@ def _live_retired(row=None):
 
 KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
-LIVE = os.environ.get("SHORTFALL_LIVE", "perps-funding-lighter-lighter")
-SHADOW = os.environ.get("SHORTFALL_SHADOW", "perps-funding-lighter-lshadow")
+# [2026-09-02 (wp)] THE DEFAULT PAIR IS DERIVED, NOT TYPED. These were
+# literals naming 💸 the Farmer's live arm, retired 22-Aug ((ta)), so the
+# fleet's only execution-quality organ published `stood_down` for 11 days
+# while 👩 mum and 🙏 avo traded real money unmeasured — the fourth time a
+# list-keyed rule rotted on a slot swap (CLAUDE.md audit-scope rule). An env
+# override still wins; absent one, fleet_bus.shortfall_default_pair picks the
+# living pair with the most live closes (mum today), and degrades to the
+# Farmer literal — which then reads `stood_down`, honestly — only when no
+# live arm is trading at all.
+def _default_pair():
+    try:
+        import fleet_bus as _fb
+        return _fb.shortfall_default_pair()
+    except Exception:  # noqa: BLE001
+        return ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow")
+
+
+_DEFAULT_LIVE, _DEFAULT_SHADOW = _default_pair()
+LIVE = os.environ.get("SHORTFALL_LIVE") or _DEFAULT_LIVE
+SHADOW = os.environ.get("SHORTFALL_SHADOW") or _DEFAULT_SHADOW
 # [2026-07-21] the SECOND real-money book joins the order-slip read: the live
 # Ticket Taker publishes real fills (entry + close paths since 17-Jul) but
 # nothing graded them — order_slip was Farmer-only. Same measurement, two more
@@ -712,6 +730,12 @@ def _selftest():
     # non-running judge licenses a verdict.
     _t = 1_784_000_000.0
     _real_ls = store.load_state
+    # [(wp)] the default SHADOW is now the living pair's twin (mum), not the
+    # judge's experiment arm — pin the two equal HERE so the collision branch
+    # is the one under test, exactly as it was when both defaulted to Farmer.
+    global SHADOW
+    _real_shadow = SHADOW
+    SHADOW = XPJ_SHADOW_BOT
 
     def _judge(st):
         store.load_state = lambda k: st if k == "xp-judge" else None
@@ -726,6 +750,7 @@ def _selftest():
         assert _judge(None) is True, "no ledger visible -> assume contaminated"
         assert _judge({"phase": "idle"}) is True, "unstamped -> assume contaminated"
     finally:
+        SHADOW = _real_shadow
         store.load_state = _real_ls
 
     # --- ARM DRIFT (17-Jul) -------------------------------------------------
