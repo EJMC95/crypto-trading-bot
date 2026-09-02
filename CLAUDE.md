@@ -820,7 +820,10 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
   `authoritative_row`, 65-min staleness filter) **[2-Sep (wy): the pooled
   `light` mixes paper into real money — `cohorts.{live,shadow}.light` is each
-  population on its OWN budget (`FLEET_SHADOW_LONG_BUDGET`, default = pooled),
+  population on its OWN budget (`FLEET_SHADOW_LONG_BUDGET`; **(wz): default 26
+  = the shadow cohort's own cap sum, mum's twin 12 + avo's twin 6 + taker 8,
+  pinned to those caps by test — the paper budget never binds below the books'
+  own caps**),
   the evidence board's live UP ladder reads `cohorts.live.light`, and the organ
   board asks "at budget?" per cohort; measured 2-Sep: pooled red 76 of 288
   samples with the live cohort at 15/20 the whole time]** + signal bus + **7d fleet

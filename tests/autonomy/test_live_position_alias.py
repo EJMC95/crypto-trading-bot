@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[2026-09-02 (wz)] ONE POSITION, ONE SPELLING — AND AN UNTRACKED LEG IS
+"""[2026-09-02 (xa)] ONE POSITION, ONE SPELLING — AND AN UNTRACKED LEG IS
 ADOPTED INTO THE BRACKET, NEVER MANAGED FROM AN EMPTY META.
 
 Found in Eamon's "mum doing well, today doesn't seem great — deep dive"
@@ -25,7 +25,7 @@ grep the source:
      `to_lighter` map at the positions read -> RED);
   2  a venue leg with NO meta is adopted: `opened_ts` stamped, tag `adopted`,
      loudly printed (mutation: remove the adoption block -> RED);
-  3  the rescue — a pre-(wz) container's meta stranded under the ALIAS spelling
+  3  the rescue — a pre-(xa) container's meta stranded under the ALIAS spelling
      is merged, not lost (its accrued funding survives) (mutation: remove the
      alias merge -> RED);
   4  an adopted leg OBEYS the bracket: past the time cap it closes
@@ -107,7 +107,7 @@ def test_a_meta_stranded_under_the_alias_spelling_is_merged_not_lost():
     px = _last_close()
     out = _cycle(
         pos={"kPEPE": {"size": 100.0, "entry": px}},
-        # the exact shape a pre-(wz) container leaves behind: the reconciler
+        # the exact shape a pre-(xa) container leaves behind: the reconciler
         # dropped `1000PEPE` and then wrote size/entry/last_px/accrued under
         # the venue's own key, with no tag and no clock.
         meta={"kPEPE": {"entry": px, "size": 100.0, "last_px": px,

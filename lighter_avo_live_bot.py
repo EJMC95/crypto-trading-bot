@@ -1531,7 +1531,7 @@ def main(_ctx=None, once=False):
 
         # ---- venue truth: the positions the exits must manage --------------
         try:
-            # [2026-09-02 (wz)] ONE SPELLING FOR ONE POSITION. `venue.positions()`
+            # [2026-09-02 (xa)] ONE SPELLING FOR ONE POSITION. `venue.positions()`
             # returns FLEET symbols (`from_lighter`: 1000PEPE -> kPEPE) while
             # this host's universe, entries and meta carry the venue's own
             # spelling (the scout's `vols` keys: 1000PEPE). So a 1000-market
@@ -2538,12 +2538,12 @@ def main(_ctx=None, once=False):
                     meta.pop(sym, None)
                 continue
             if not m.get("opened_ts"):
-                # [2026-09-02 (wz)] AN UNTRACKED LEG IS ADOPTED INTO THE
+                # [2026-09-02 (xa)] AN UNTRACKED LEG IS ADOPTED INTO THE
                 # BRACKET, NEVER MANAGED FROM AN EMPTY META. Without an
                 # `opened_ts` the age below reads ZERO every loop, so the
                 # time cap is dead code and the roi ladder never decays — a
                 # real-money position with no exit but the stop. First the
-                # rescue: a pre-(wz) container left meta under the ALIAS
+                # rescue: a pre-(xa) container left meta under the ALIAS
                 # spelling (kPEPE beside pos 1000PEPE); merge it so the
                 # entry/size/accrued it carried are not lost. Then adopt:
                 # the clock starts NOW (honest — the true open is unknown to

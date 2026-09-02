@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 19:35 Sydney (09:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 19:54 Sydney (09:54Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -59,8 +59,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (89 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
+## Shipped today (92 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
+- `da15417` Merge PR #267: (wy) run 2 through 4 — two pre-registered studies, the incubator on the judge's lane, the organ board's two flags closed
+- `34e33ad` CodeQL hygiene on (wy): four file reads through with-blocks, one constant comparison dropped from a test assertion
+- `1b0a4e1` (wy) Run 2 through 4: two pre-registered studies from the edge audit (the taker's 4h hold floor already excluded on its own entries), the incubator breeds for the judge's lane, and the organ board's two flags close
 - `8f90426` HANDOFF regenerated at session end (save)
 - `39311fc` The douglas guard spares his tenant (wx): scope by BOT — bezos is a variant of the retired engine and was idled ~3h; retirement scope is chosen by a module's importers
 - `2860c20` Merge PR #265: (ww) readback — family-shadow-stale-writer closed on the feed
