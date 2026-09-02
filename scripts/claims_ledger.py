@@ -127,6 +127,52 @@ CLAIMS = [
         "covers": ("freqtrade-georgia-lighter",),
     },
     {
+        "id": "mum-golive-justification",
+        "subject": "freqtrade-mum-lighter",
+        "kind": "doctrine",
+        "claim": "👩 mum went live 25-Aug (te) and took georgia's ~$220 at the "
+                 "(wg) reallocation on ONE argument: she is the fleet's only "
+                 "live book with a POSITIVE edge lower bound — quoted "
+                 "+0.366%/trade at (wg), and the number that moved real money "
+                 "between books. Owned by the allocation organ's own bound on "
+                 "her LIVE row (a FRACTION in that payload: 0.0037 = 0.37%). "
+                 "If this drifts materially in either direction the (wg) "
+                 "sentence needs re-reading — downward toward zero, the "
+                 "concentration argument itself is what dissolved.",
+        "number": 0.0037,
+        "tol": 0.0037,
+        "as_of": "2026-09-02",
+        "owner": ("fleet-allocation", "books.freqtrade-mum-lighter.bound_pct"),
+        "owner_ref": 'fleet_allocation.py::KEY = "fleet-allocation"',
+        "grade_after": "2026-09-02",
+        "cites": ("CHANGELOG.md", "CLAUDE.md"),
+        "covers": ("freqtrade-mum-lighter",),
+    },
+    {
+        "id": "avo-live-keep-criterion",
+        "subject": "freqtrade-avo-maria-lshadow",
+        "kind": "doctrine",
+        "claim": "🙏 avo's entry measured edgeless exit-free at (qu) and Eamon "
+                 "KEPT the book live ON THE RECORD with a pre-registered "
+                 "revert criterion — pooled ledger >= +1.649%/trade over the "
+                 "next 50 closes reopens the call (registered at n=18, "
+                 "+0.901%/trade), 'anything less decides nothing'. This row "
+                 "tracks the pooled era mean the criterion reads (PERCENT in "
+                 "that payload) so the doctrine sentence cannot silently "
+                 "drift from the organ: material movement either way means "
+                 "the (qu) block needs a fresh reading, and the criterion "
+                 "resolves around n=68.",
+        "number": 0.90,
+        "tol": 0.60,
+        "as_of": "2026-09-02",
+        "owner": ("golive-readiness",
+                  "books.freqtrade-avo-maria-lshadow.mean_pct"),
+        "owner_ref": 'scripts/golive_readiness.py::KEY = "golive-readiness"',
+        "grade_after": "2026-09-02",
+        "cites": ("CLAUDE.md",),
+        "covers": ("freqtrade-avo-maria-lighter",),
+    },
+    {
         "id": "georgia-exit-sweep-refusal-uw",
         "subject": "freqtrade-georgia-lshadow",
         "kind": "refusal",

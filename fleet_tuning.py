@@ -205,7 +205,16 @@ LEVERS = {
         "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-taker",
         "note": "dip conviction bar (range_pos <=); default 0.05", "env_default": 0.05},
     "taker.brk_range": {
-        "kind": "float", "lo": 0.90, "hi": 0.95, "lane": "lighter-taker",
+        # [2026-09-02] hi 0.95 -> 0.97: the (sk) pin UN-MADE on its own terms.
+        # The pin's condition was the actuator's structural blindness to this
+        # lens; the resolver work gave the tuner's replay the taker's own
+        # breakoutup relabel, and the LIVE tuner baseline now fills it
+        # (breakoutup taken=26 closed=23, read off the bus 2-Sep). A restrict
+        # walk now pays a real replay delta instead of a free $0.00, so the
+        # two-way cage is honest again. See the (sk) block below for the
+        # history and tests/autonomy/test_breakoutup_ratchet.py for the
+        # sight-coupled pin.
+        "kind": "float", "lo": 0.90, "hi": 0.97, "lane": "lighter-taker",
         "note": "breakout conviction bar (range_pos >=); default 0.95", "env_default": 0.95},
     "taker.momo_chg": {
         "kind": "float", "lo": 3.0, "hi": 6.0, "lane": "lighter-taker",
@@ -222,11 +231,25 @@ LEVERS = {
         "kind": "float", "lo": -0.04, "hi": -0.02, "lane": "lighter-taker",
         "note": "stop-loss fraction; default -0.03", "env_default": -0.03},
     "taker.max_hold_h": {
-        "kind": "float", "lo": 48.0, "hi": 72.0, "lane": "lighter-taker",
+        # [2026-09-02] lo 48.0 -> 24.0: same un-pin, same evidence — see
+        # taker.brk_range directly above.
+        "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48", "env_default": 48.0},
     # [2026-08-20 (sk)] THE RESTRICTIVE END OF EVERY BREAKOUTUP CAGE IS NOW
     # PINNED AT THE MODULE DEFAULT, because the actuator that moves these is
     # STRUCTURALLY BLIND to the lens they govern.
+    # [2026-09-02 — PARTIALLY UN-MADE, on the pin's own stated condition.]
+    # The replay gained `daily_up_resolver` + the taker's breakoutup relabel
+    # and the tuner forwards it every cycle (selftest-pinned), so the gate is
+    # SIGHTED: live tuner baseline breakoutup taken=26 closed=23. brk_range
+    # and max_hold_h — the two levers the tuner's ladders actually walk — are
+    # two-way again (see their entries above). brk_trail/brk_sl below STAY
+    # pinned: no ladder touches them (registered for consumption only), so
+    # unpinning would hand reach to nothing, and both of their widenings were
+    # measured and WITHHELD on their own numbers (trail effect below the
+    # harness's +0.508pp calibration drift; the 48h->96h clock gain dies to
+    # leave-one-symbol-out). Wiring them into a ladder is a separate widening
+    # with its own replay-gate design, not this un-pin.
     #
     # MEASURED, on the live bus: `taker.brk_range` sat at **0.97** (cage hi =
     # tightest; default 0.95) and `taker.max_hold_h` at **24.0** (cage lo =
@@ -266,11 +289,14 @@ LEVERS = {
     #
     # THE DURABLE FIX IS UPSTREAM and is NOT in this change: teach
     # `lighter_ticket_replay` the taker's own breakoutup relabel so the gate
-    # can SEE the lens before it is allowed to steer it. Until then, do NOT
-    # add any breakoutup constant to `lighter_scout_tuner`'s PROPOSAL_TAKER /
-    # TAKER_LADDERS / SWEEP_* — that hands more of this book to a blind
-    # actuator. The two levers below are registered for CONSUMPTION only, and
-    # their cages are one-sided at the default for exactly this reason.
+    # can SEE the lens before it is allowed to steer it.
+    # [2026-09-02] THAT FIX HAS SINCE SHIPPED (`daily_up_resolver` + the
+    # relabel, forwarded by the tuner every cycle) and the sighted-gate
+    # un-pin above is its consequence. The two levers below stay registered
+    # for CONSUMPTION only and their cages stay one-sided at the default —
+    # no longer because of blindness, but because nothing walks them (reach
+    # to no actuator) and their widenings were measured and WITHHELD; adding
+    # them to a ladder is a separate, measured decision.
     #
     # [2026-08-20 (sk)] THE BREAKOUT ARM'S TREND EXIT JOINS THE RAIL. Under
     # BULL_MODE `bull_exit()` routes breakout/breakoutup to a DIFFERENT exit

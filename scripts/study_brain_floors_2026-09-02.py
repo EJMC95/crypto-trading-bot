@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """STUDY (read-only, moves nothing): the brain's EXPANSION floors.
 
-[2-Sep (wq)] The edge audit's growth half named this measurement: how many
+[2-Sep (wu)] The edge audit's growth half named this measurement: how many
 (bot, tag) buckets qualify at each expand rung of `brain_stats.EXPAND_LADDER`,
 which bar binds for the ones that do not, and what qualifying buckets earned
 FORWARD — on the trades OPENED in the day after each qualification, which is

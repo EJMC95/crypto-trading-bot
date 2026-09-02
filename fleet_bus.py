@@ -2170,7 +2170,7 @@ if __name__ == "__main__":
     assert brain_mult_multi([(_b, "nope"), (_b, "nope2")], _now) == 1.0, \
         "nobody has an opinion -> neutral"
     assert brain_mult_multi([], _now) == 1.0, "no buckets -> neutral"
-    # [(wq)] THE RAILS. Both fail OPEN. Expansion is refused only when the
+    # [(wu)] THE RAILS. Both fail OPEN. Expansion is refused only when the
     # allocation organ has MEASURED a non-positive era bound (claim_era 0.0 on
     # n_era >= LB_CAP_MIN_N); a dark organ, a None claim or a thin era change
     # nothing. The drawdown scale is 1.0 up to the bar and bites only past it.

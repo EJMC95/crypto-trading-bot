@@ -1,6 +1,6 @@
-## 2026-09-02 (wq) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
+## 2026-09-02 (wu) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
 
-**[RENUMBERED (wp) → (wq) AT MERGE TIME, 2-Sep.** #262 — the support-system deep dive — landed on main first carrying `(wp)`, and its code cites it, so the pushed entry keeps the letter and this one moves (letter rule 3). Every citation of THIS entry moved with it: the `fleet_bus.py` rails comment, the CLAUDE.md brain-stake-mults bullet, the PR title. The three commit subjects keep `(wp)` — git subjects are immutable, and the letter rule already says the commit log is not a letter index; grep the CHANGELOG headers.]**
+**[RENUMBERED TWICE AT MERGE TIME, 2-Sep: (wp) → (wq) → (wu).** #262 — the support-system deep dive — landed on main first carrying `(wp)`, and its code cites it; while this branch re-merged, a second session landed `(wq)`, `(wr)` and `(ws)` on main and holds `(wt)` in flight — so the pushed entries keep their letters and this one moves again (letter rule 3). Every citation of THIS entry moved with it: the `fleet_bus.py` rails comment, the CLAUDE.md brain-stake-mults bullet, the PR title. The three commit subjects keep `(wp)` — git subjects are immutable, and the letter rule already says the commit log is not a letter index; grep the CHANGELOG headers.]**
 
 **Eamon, 2-Sep, on the edge audit's proposals: *"Proceed with advisements."***
 `(wo)` §6 proposed three changes for approval. The first — 🪁 kelly's clip
@@ -132,6 +132,175 @@ that if a lose-often-win-big bucket ever carries a positive era bound at t≥2
 (I16), the first thing re-run is this instrument, never a bar. The growth
 channel this leaves is DECIDABILITY on the positive buckets (I17/I22), not
 looser bars.
+
+## 2026-09-02 (ws) — THE SENTINEL EARNS ITS FEAR THE WAY IT EARNS ITS GREED: one graded bar for both proposal directions
+
+The second further-improvements item, and it is (wp)'s own next-thing-to-
+measure line closed. The event sentinel's risk-ON branch always required a
+playbook that EARNED actuation (n≥10, hit≥0.55 on the organ's own graded
+record); the risk-OFF crouch required NOTHING — any fresh severity-frozen
+event proposed `brk_range 0.97 / momo_chg 6.0 / max_hold_h 24` from
+playbooks the organ's own grades score BELOW A COIN FLIP (crackdown
+0.19/n=85, shock 0.24/n=83, incident 0.34/n=87; pooled 0.33/n=833). The
+design defense was "a free protective crouch" — the tuner's not-worse
+replay gate is senior — and (sk) measured the hole in it: on a lens the
+replay could not fill, restrict enacted at $0.00 for free, and these exact
+proposals walked the taker's only living lens to its tightest cage end and
+held it there. The measured benefit on the other side of the ledger is
+zero: proprioception grades the enacted crouches `neutral`, Σ+$1.89 over 5
+episodes.
+
+SHIPPED: `proposals_for(bias, active, grades)` — the whole actuation
+decision as one pure function, both directions gating on `graded_types`
+(n≥10, hit≥0.55, the risk-ON bar unchanged); `main()` only transmits.
+A below-chance, ungraded, thin (n<10) or stale playbook now proposes
+nothing in EITHER direction, and the organ's own doctrine line — "the
+organ earns actuation with its own graded history" — is true of the fear
+side for the first time. Expectancy price (I19): forgone crouches are
+bounded by the measured Σ+$1.89-over-5-episodes neutral grade ≈ zero;
+what is removed is a structurally-tightening author (the
+museum-of-avoided-losses shape, inside an organ). The tuner's replay gate
+stays senior in both directions — this changes who may ASK, not who
+decides. Selftest drives every branch on publisher-shaped grades ((hj))
+plus an AST pin that `main()` routes through the bar; 3/3 mutations RED
+(gate dropped from the crouch, hit bar → 0, n floor → 0). Deploy:
+freqtrade-bots auto path (the sentinel steers a shadow lane only).
+
+## 2026-09-02 (wr) — THE CLOCK SPLIT: the breakout trend exit gets its own hold, and `taker.max_hold_h` stops re-clocking an arm it was never measured on
+
+The first item of the further-improvements pass, and it is (wp)'s own
+handoff (*"the unblocking work is the carried clock split, not a cage
+edit"*) plus this session's carried row, closed together. `bull_exit()`
+handed the breakout TREND exit — no TP cap, wide stop, trailing give-back,
+a rule built to let a winner run — the REVERSION arm's `MAX_HOLD_H`:
+23–32 of 37 replayed breakout exits were that clock, not the trail, and
+(sk) measured a 24h hold as +0.22..0.57pp WORSE on this arm. So the (wq)
+cage un-pin re-opened a hazard: walking `taker.max_hold_h` down (the very
+value the incubator's best genotype wants — div 25 / hold 24 / tp 0.02,
+n=189, lcb +3.21, both halves, +$46.75 over default) would have cut the
+breakout arm's hold in the same move. (wp) measured exactly that joint
+bind as why the champion gate has never opened.
+
+SHIPPED: `BRK_MAX_HOLD_H` (env `TT_BRK_MAX_HOLD_H`, default inherits the
+operator's `TT_MAX_HOLD_H` then 48 — behaviour-neutral at ship, no lever
+open on the bus, verified). `bull_exit` reads it; `taker.max_hold_h` now
+steers ONLY the divergence bracket — the lens the tuner's replay could
+always fill (42 taken) — and the replay/tuner/proprioception inherit the
+split for free because they call `tt.bull_exit` itself (one owner). The
+decoupling is AST-pinned in the taker's selftest (a substring test would
+pass on "BRK_MAX_HOLD_H" containing "MAX_HOLD_H"); mutation verified —
+re-coupling the tuple reddens the selftest. NO widening ships with it:
+the only 48→96 evidence died to leave-one-symbol-out (+0.78pp → +0.07pp
+ex-HYPE), and the new constant deliberately takes no lever (a knob with
+no ladder and no measured direction is reach nothing has earned — I18's
+own refutation at (tx)).
+
+What this buys, stated as the incubator's own arithmetic: the champion
+genotype's `hold 24` gene is now cage-reachable (lo 24 since (wq)) AND
+collateral-free. Its other two genes stay out of cage (`div_gap 25 < lo
+37.5`, `tp 0.02 < lo 0.03`) — those are single-axis cage decisions with
+their own histories, not touched here without their own measurements.
+CARRIED: 11 → 10 rows. Deploy: freqtrade-bots auto path (shadow only;
+the taker's live arm is retired (ma)).
+
+## 2026-09-02 (wq) — "IMPLEMENT ALL OF THE ABOVE": the backlog drained — both live books get their justification claims (ratchet 2→0), three carried rows close on measurements, and the (sk) cage pins are re-decided on a sighted gate
+
+**[RENUMBERED (wp) -> (wq) at push time** — PR #262's support-system deep dive took (wp) on main while this pass's suite ran; the pushed entry keeps the letter per the letter rule.**]**
+
+Eamon: *"Implement all of the above"* / *"After that's been fixed look at
+further improvements."* Six items, each with its number:
+
+**1. THE CLAIMS BACKLOG IS ZERO — the guard runs at full strength for the
+first time.** Georgia's retirement took the fleet's only justification claim
+off the roster, leaving BOTH live books as prose nobody could recompute. Two
+rows added to `claims_ledger.CLAIMS`, graded live before shipping:
+`mum-golive-justification` (the (wg) reallocation's argued number — her
+positive edge lower bound, owner `fleet-allocation →
+books.freqtrade-mum-lighter.bound_pct`, live 0.0037 ≈ the quoted +0.366%/t,
+HOLDS) and `avo-live-keep-criterion` (the (qu) keep's tracked pooled mean,
+owner `golive-readiness → books.freqtrade-avo-maria-lshadow.mean_pct`, live
+0.904 vs registered 0.901, HOLDS; criterion resolves ~n=68).
+`audit_claim_freshness.RATCHET` tightens 2 → 0: any live row without a claim
+now fails the push that adds it. The owner-resolution test gained an
+allocation-payload fixture built by that organ's own `run_once` (publisher-
+built, never hand-shaped); 3/3 mutations RED (phantom owner field, dropped
+cover, loosened ratchet).
+
+**2. ⚖️ COUNTERWEIGHT'S PRE-REGISTERED READ IS A TRIPWIRE, NOT A MEMORY.**
+New CARRIED row `counterweight-preregistered-fresh-read` whose predicate
+fires on 1-Oct — CI reds until a session performs the fresh on-class read
+(n≥60 after 1-Sep or the date, retire if fresh upper bound ≤ 0) and records
+the verdict. The date is the backstop; n≥60 earlier is the trigger.
+
+**3. THE $10M FLOOR IS THE FUNDING STUDIES' DEFAULT, AND THE LOADER OWNS
+IT.** `minvol_entry_ok` moved from the gate study into
+`backtest_funding_lighter` (one owner; the gate study imports it by
+IDENTITY), and `study_farmer_take_profit` now applies the live floor at
+every entry BY DEFAULT (`--min-vol 0` reproduces the rank table, labelled) —
+selftest-pinned that the predicate fail-closes on unknown volume and threads
+into all three run() calls. Carried row
+`funding-studies-inherit-the-rank-universe` CLOSED by its own predicate.
+Breadth + persistence stay header-recorded refusals ((vj): floored
+populations n=0 / all-zero arms — a floor wired into an instrument that then
+measures nothing is motion, not growth).
+
+**4. THE (sk) CAGE PINS RE-DECIDED — ON THE PIN'S OWN STATED CONDITION,
+verified live.** The carried row `taker-replay-blind-to-breakoutup` was
+STALE: the durable fix (replay `daily_up_resolver` + the taker's breakoutup
+relabel, forwarded by the tuner and incubator) shipped 20-Aug, and the row's
+predicate watched a string that legitimately survives as the no-resolver
+fallback — the same false-negative sat in
+`test_the_replay_still_cannot_see_the_lens…`, the tripwire that was supposed
+to ring. Measured on the live bus: the tuner's own baseline now fills
+**breakoutup taken=26 closed=23**, so the blind-gate arithmetic (restrict
+free at $0.00, expand unclearable) no longer holds. RE-DECIDED:
+`taker.brk_range` hi 0.95 → 0.97 and `taker.max_hold_h` lo 48 → 24 are
+two-way again — a restrict walk now pays a real replay delta — with the
+un-pin COUPLED TO SIGHT by
+`test_breakoutup_ratchet.test_the_unpin_is_coupled_to_the_gates_sight`
+(re-blind the replay or stop forwarding the resolver and the test demands
+the pins back). `brk_trail`/`brk_sl` STAY pinned: nothing walks them and
+both widenings were measured-and-withheld on their own numbers. No lever
+moves at ship (defaults unchanged); expectancy price zero — this is reach
+returned to a gate that earned it back. The full suite then found the
+SECOND pin of the same decision — `test_lever_version_skew.
+DELIBERATELY_CLAMPED` still asserted 0.97 clamps to 0.95 — and it is
+RE-AIMED at the two levers that stay pinned (brk_trail 0.04→0.06,
+brk_sl −0.05→−0.07), per I26's own rule: when a pin blocks a re-decision,
+the question is whether the decision is right, never whether the pin
+exists.
+
+**5. THE DIVERGENCE STOP IS PRICED, AND THE PRICE IS A REFUSAL WITH
+EVIDENCE.** `scripts/study_taker_divergence_stop_2026-09-02.py` replayed
+503.7h of recorded tape through the taker's own code, `tt.STOP_LOSS` the
+only variable, IMB-10 marked scoring, per-half. Its own calibration gate
+REFUSES to recommend: the book's last REAL divergence close is **20-Aug** —
+the lens is vetoed by its own realised record, so the instrument cannot be
+calibrated against a sample the book can no longer produce. Descriptively
+the only cage-reachable move (sl −0.03 → −0.04) measured **−$2.80**; the
+apparent gains sit beyond the cage (−0.05: +$16.45, −0.06: +$29.96) on div
+n=9–20 with unstable halves — slot reallocation as much as exit value.
+Pricing a stop for a lens the book refuses to trade is not a candidate; if
+the veto lifts on fresh evidence, re-run THEN on the closes that lifted it.
+Carried row `taker-divergence-stop-unpriced` CLOSED (its own text: only a
+measurement closes it). Two instrument defects found by its first run are
+fixed in the file (a fleet-wide ledger limit that missed the taker's own
+12–20 Aug closes; a fake +0.000% printed when `pnl_pcts` is absent).
+
+**6. HOUSEKEEPING.** The dead session's superseded `fleet_watchdog_svc.py`
+draft is discarded from the main worktree (verified byte-for-byte the (wn)
+predecessor first). The `trail-blazer-live` service stop was attempted and
+BLOCKED by the session's permission layer — Eamon's one-liner:
+`railway down --service trail-blazer-live --environment production -y`
+(reversible; the durable retirement is the (wg) code guard either way).
+
+CARRIED: 14 → 11 rows, every close on a measurement or a shipped wiring.
+DEPLOY: freqtrade-bots rides the auto path (fleet_tuning's un-pinned cages
+reach the tuner; `clamp` runs at read so no lever write is needed). No
+real-money service is touched — the taker's `apply_tuning` returns empty on
+the live arm, twice-guarded.
+
+
 
 ## 2026-09-02 (wp) — THE SUPPORT SYSTEM DEEP DIVE: every organ is alive, the candidate line is structurally empty by design, and four of the fleet's own instruments were pointed at the wrong thing — paper positions vetoing real money, a stop-dead page on a basket nobody held, a judge with no pair it could open, an execution organ measuring a retired book
 

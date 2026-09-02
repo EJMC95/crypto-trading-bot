@@ -105,7 +105,7 @@ def slice_universe(mk, n):
     return {k: mk[k] for k in list(mk)[:n]}
 
 
-def sweep(mk, label, tp_grid=None, gate=GATE):
+def sweep(mk, label, tp_grid=None, gate=GATE, entry_ok=None):
     """Print the TP sweep for one universe. Returns {(slip, tp): result}."""
     tp_grid = TP_GRID if tp_grid is None else tp_grid
     hours = sorted({t for m in mk.values() for t in m["fund"]})
@@ -127,9 +127,9 @@ def sweep(mk, label, tp_grid=None, gate=GATE):
             base = None
             for tp in tp_grid:
                 bfl.TAKE_PROFIT = tp
-                full = bfl.run(mk, gate, lo, hi + 1)
-                h1 = bfl.run(mk, gate, lo, mid)
-                h2 = bfl.run(mk, gate, mid, hi + 1)
+                full = bfl.run(mk, gate, lo, hi + 1, entry_ok=entry_ok)
+                h1 = bfl.run(mk, gate, lo, mid, entry_ok=entry_ok)
+                h2 = bfl.run(mk, gate, mid, hi + 1, entry_ok=entry_ok)
                 out[(slip_bps, tp)] = full
                 if abs(tp - LIVE_TP) < 1e-9:
                     base = full["pnl"]
@@ -147,14 +147,14 @@ def sweep(mk, label, tp_grid=None, gate=GATE):
     return out
 
 
-def exit_mix(mk, tp, gate=GATE, slip_bps=0.5):
+def exit_mix(mk, tp, gate=GATE, slip_bps=0.5, entry_ok=None):
     """WHERE the trades that no longer reach TP end up instead."""
     hours = sorted({t for m in mk.values() for t in m["fund"]})
     lo, hi = min(hours), max(hours)
     keep_tp, keep_slip = bfl.TAKE_PROFIT, bfl.SLIP
     try:
         bfl.TAKE_PROFIT, bfl.SLIP = tp, slip_bps / 1e4
-        r = bfl.run(mk, gate, lo, hi + 1)
+        r = bfl.run(mk, gate, lo, hi + 1, entry_ok=entry_ok)
     finally:
         bfl.TAKE_PROFIT, bfl.SLIP = keep_tp, keep_slip
     n = r["n"] or 1
@@ -177,6 +177,17 @@ def _selftest():
     assert 0.5 in SLIPS and 5.0 in SLIPS, "both slips or the verdict is partial"
     # the harness must be the PRODUCTION-mirroring one, not a local copy
     assert hasattr(bfl, "run") and hasattr(bfl, "load")
+    # [2026-09-02] the floored-population wiring: the predicate is the
+    # LOADER'S OWN (one owner), it is fail-closed on unknown volume, and the
+    # sweep actually threads it into run() — a default nobody passes through
+    # is the registered-but-inert lever shape.
+    ok = bfl.minvol_entry_ok({"S": {"vol": {}}}, 10e6)
+    assert ok("S", 0) is False, "unknown volume must REFUSE, never pass"
+    import inspect
+    src_sweep = inspect.getsource(sweep)
+    assert src_sweep.count("entry_ok=entry_ok") == 3, \
+        "sweep must thread entry_ok into all three run() calls"
+    assert "entry_ok=entry_ok" in inspect.getsource(exit_mix)
     print("study_farmer_take_profit selftest OK (universe slice, grid/slip "
           "invariants, harness identity)")
 
@@ -184,6 +195,9 @@ def _selftest():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=150)
+    ap.add_argument("--min-vol", type=float,
+                    default=float(os.environ.get("FUNDING_MIN_VOL", "10e6")),
+                    help="live entry floor ($/day); 0 = old rank-only table")
     ap.add_argument("--universe", type=int, default=25)
     ap.add_argument("--refresh", action="store_true")
     ap.add_argument("--selftest", action="store_true")
@@ -192,10 +206,19 @@ def main():
         return _selftest()
 
     narrow = bfl.load(a.days, a.universe, a.refresh)
-    sweep(narrow, f"CANONICAL top-{a.universe} by volume")
+    # [2026-09-02] THE HONEST POPULATION BY DEFAULT — the (su)/(vj) wiring.
+    # The loader selects by RANK; the live Farmer filters on an absolute
+    # $10M/day floor, and (vj) measured that the two disagree on the SIGN of
+    # tp-0.06. The floor is now applied at every entry via the loader's own
+    # predicate (fail-closed on unknown volume). --min-vol 0 reproduces the
+    # old rank-selected table, clearly labelled as such.
+    ok = bfl.minvol_entry_ok(narrow, a.min_vol) if a.min_vol > 0 else None
+    pop = (f"FLOORED >= ${a.min_vol/1e6:.0f}M/day (the live bot's population)"
+           if ok else "RANK-SELECTED (NOT the live population — label only)")
+    sweep(narrow, f"top-{a.universe} by volume | {pop}", entry_ok=ok)
     print("\n\n===== MECHANISM: where do the lost TP exits go? =====")
     for tp in (LIVE_TP, 0.06):
-        exit_mix(narrow, tp)
+        exit_mix(narrow, tp, entry_ok=ok)
     print("\nBOTH HALVES must agree in sign before a TP is believable. None do "
           "— and tp-0.06's sign flips with the universe. See this file's "
           "header for the recorded verdict.")

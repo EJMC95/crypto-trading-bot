@@ -442,6 +442,24 @@ def vol24(m, t):
     return sum(got) if len(got) >= 20 else None
 
 
+def minvol_entry_ok(mk, floor):
+    """The live bot's MIN_VOL, as an entry predicate for `run(entry_ok=...)`.
+
+    [2026-09-02] MOVED HERE from study_farmer_gate_minvol_2026-08-22 so the
+    LOADER owns it — (su) found every study reusing this loader selected its
+    universe by RANK while the live Farmer filters on an absolute $10M/day
+    floor, and the honest-population predicate lived in exactly one study.
+    One owner, every consumer; the gate study now imports this by identity.
+
+    UNKNOWN volume REFUSES — the bot reads a live volume every loop and cannot
+    enter without one, so a data gap must not become a free pass (fail-closed,
+    and it keeps the replay strictly pessimistic rather than optimistic)."""
+    def _ok(sym, t):
+        v = vol24(mk[sym], t)
+        return v is not None and v >= floor
+    return _ok
+
+
 # [2026-07-25 SLOPE-GATE STUDY] the live bot's funding-SLOPE entry gate (enter
 # only while |apr| is still BUILDING, >= its value SLOPE_LOOKBACK_H ago) has NEVER
 # been measured on LIGHTER — it is validated ONLY on Hyperliquid

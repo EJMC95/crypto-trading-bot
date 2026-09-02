@@ -1452,7 +1452,7 @@ its row is dashboard-retired regardless; stop the process when found.
   Enforced fleet-wide by `tests/autonomy/test_brain_sizing_reaches_every_book.py`
   (a roster test, so a NEW book cannot ship deaf) and
   `tests/autonomy/test_brain_ceiling_step.py`.
-  * **[2-Sep (wq)] TWO RAILS SIT INSIDE `brain_clip` NOW — Eamon: *"Proceed with
+  * **[2-Sep (wu)] TWO RAILS SIT INSIDE `brain_clip` NOW — Eamon: *"Proceed with
     advisements"* on the edge audit ((wo), §6), then *"make sure we don't
     constrict too much like we have in the past, our focus always on growth"*,
     which reshaped both before they landed.** Each bites only on a MEASURED

@@ -157,15 +157,18 @@ class TestItShipsInert:
     #: must stay visible and stay asserted: silently dropping the row would
     #: make the next accidental clamp indistinguishable from this intended one.
     #:
-    #: `taker.brk_range` sat at 0.97 — the TIGHTEST end of its old cage, above
-    #: the 0.95 module default — put there by the scout-tuner from an
-    #: event-sentinel proposal, on 🎫 the Ticket Taker's ONLY living lens. The
-    #: tuner's replay cannot fill that lens (`lighter_ticket_replay.py:206`
-    #: refuses every breakout entry), so restrict enacted for free and expand
-    #: was arithmetically impossible: a one-way ratchet. The cage's restrictive
-    #: end is now pinned AT the default, which reverses the lever at the
-    #: consumer with no lever write.
-    DELIBERATELY_CLAMPED = {"taker.brk_range": (0.97, 0.95)}
+    #: [2026-09-02 RE-AIMED — the (sk) condition resolved for the WALKED
+    #: levers.] `taker.brk_range` (0.97 -> 0.95) lived here while the tuner's
+    #: replay was BLIND to breakoutup; the replay gained `daily_up_resolver` +
+    #: the relabel (20-Aug) and the live baseline now fills the lens
+    #: (taken=26/closed=23), so its cage is two-way again and 0.97 passes
+    #: through — asserted by `test_breakoutup_ratchet.UNPINNED`, whose sight
+    #: test demands the pin BACK if the gate ever goes blind. What stays
+    #: deliberately clamped are the UNWALKED trend-exit knobs (no ladder
+    #: reaches them; both widenings measured-and-withheld): a beyond-pin value
+    #: snaps to the pinned default.
+    DELIBERATELY_CLAMPED = {"taker.brk_trail": (0.04, 0.06),
+                            "taker.brk_sl": (-0.05, -0.07)}
 
     @pytest.mark.parametrize("name,value", sorted(OPEN_ON_THE_BUS.items()))
     def test_no_open_lever_skews_under_head(self, name, value):
