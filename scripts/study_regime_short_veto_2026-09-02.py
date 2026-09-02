@@ -419,7 +419,8 @@ def _selftest():
     # the registration carries the commitment fields
     assert PRE_REGISTERED["since"] and PRE_REGISTERED["min_n"] == MIN_N and "ADOPT" in PRE_REGISTERED["rule"]
     # the instrument moves nothing
-    src = open(os.path.abspath(__file__)).read()
+    with open(os.path.abspath(__file__)) as fh:
+        src = fh.read()
     for banned in ("write_levers", "get_lever(", "market_open", "save_state(", "publish("):
         assert banned not in src.replace('("write_levers", "get_lever(", "market_open", "save_state(", "publish(")', ""), banned
     print("study_regime_short_veto selftest OK — labelling (no look-ahead, stale/unknown, "

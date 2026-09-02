@@ -441,7 +441,8 @@ def _selftest():
     assert sp["bands"]["1-4h"]["n"] == 40 and sp["bands"]["1-4h"]["sl_share"] == 1.0
     assert "breakoutup|1-4h" in sp["lens_band"]
     assert PRE_REGISTERED["since"] and PRE_REGISTERED["min_n"] == MIN_N
-    src = open(os.path.abspath(__file__)).read()
+    with open(os.path.abspath(__file__)) as fh:
+        src = fh.read()
     for banned in ("write_levers", "get_lever(", "market_open", "save_state(", "publish("):
         assert src.count(banned) <= 1, banned      # the banned-list line itself
     print("study_taker_hold_floor selftest OK — walk (sl/trail/floor/no-look-ahead), "

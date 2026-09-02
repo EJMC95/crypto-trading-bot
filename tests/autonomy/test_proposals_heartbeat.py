@@ -98,7 +98,8 @@ def test_the_board_reads_a_fresh_empty_channel_as_idle_and_a_stale_one_as_dark()
 
 
 def test_the_sentinel_heartbeats_when_it_proposes_nothing():
-    src = open(os.path.join(ROOT, "event_sentinel.py")).read()
+    with open(os.path.join(ROOT, "event_sentinel.py")) as fh:
+        src = fh.read()
     body = src.split("proposals_for(_bias, active", 1)[1].split("SELF-TUNING", 1)[0]
     assert 'fprop.heartbeat("event-sentinel"' in body, \
         "the sentinel must re-stamp the channel on a cycle with nothing to propose"

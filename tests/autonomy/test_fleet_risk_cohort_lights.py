@@ -47,7 +47,7 @@ def test_each_cohort_is_lit_on_its_own_budget(monkeypatch):
     monkeypatch.setattr(fr, "LIVE_LONG_BUDGET", 20)
     monkeypatch.setattr(fr, "SHADOW_LONG_BUDGET", 20)
     v = fr.cohort_view({"live": 15, "shadow": 21})           # the 2-Sep reading
-    assert v["live"] == {"long_positions": 15, "long_budget": 20, "light": "red" if 15 >= 20 else fr.light_for(15, 20)}
+    assert v["live"] == {"long_positions": 15, "long_budget": 20, "light": fr.light_for(15, 20)}
     assert v["live"]["light"] != "red" and v["shadow"]["light"] == "red"
     # the shadow budget is its OWN number: raising it moves only the shadow light
     monkeypatch.setattr(fr, "SHADOW_LONG_BUDGET", 24)
@@ -79,7 +79,8 @@ def test_real_money_reads_the_live_cohorts_light():
     junk["cohorts"]["live"]["light"] = "purple"
     assert eb._live_light(junk) == "red"          # junk never opens a gate
     assert eb._live_light(None) is None
-    src = open(os.path.join(ROOT, "evidence_board.py")).read()
+    with open(os.path.join(ROOT, "evidence_board.py")) as fh:
+        src = fh.read()
     ladder = src.split("def synthesize_live(", 1)[1].split("def synthesize_expand(", 1)[0]
     assert '_live_light(fleet_risk)) == "green"' in ladder
     assert 'fleet_risk.get("light")) == "green"' not in ladder, "the live ladder read the pooled light"

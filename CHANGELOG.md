@@ -172,7 +172,10 @@ changed and no trade the live books take moves → main only, no marker, per
 `session_state.CARRIED` with 16-Sep backstops; CLAUDE.md's fleet_risk,
 incubator and proposals bullets are corrected in place per I12. Letter: (wx)
 was HEAD's at write time; (wy) is the next free and will be re-checked at
-push.
+push. CodeQL's PR review flagged six hygiene findings on the new files —
+four bare `open()` reads without a context manager and one constant
+comparison in a test assertion — all fixed in the same PR before merge (a
+bot finding is a bug report, not a design note).
 
 ## 2026-09-02 (wx) — THE SLATE'S OWN FIRST DEFECT, FOUND BY ITS OWN PAGE: the douglas guard idled 🚀 bezos, his undeclared tenant, for ~3 hours
 
