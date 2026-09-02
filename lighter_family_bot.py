@@ -119,7 +119,7 @@ def noncrypto_extra(bot, raw=None):
     return []
 
 
-#: [2026-09-02 (xf)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
+#: [2026-09-02 (xh)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
 #: extension above, same `"bot:SYM,SYM;bot:SYM"` shape, same per-carrier
 #: scoping and for the same reason: a cut measured on ONE book must not re-aim
 #: two others. Eamon: "if it makes any bot make more money then implement."
@@ -157,6 +157,26 @@ def noncrypto_extra(bot, raw=None):
 #: remedy that follows is a CLASS-AWARE LADDER OR HOLD (the I26 feed-it
 #: direction), owed its own measurement — not a cut.
 #:
+#: **[(xj)] THAT MEASUREMENT WAS RUN, AND BOTH HALVES OF THE PARAGRAPH ABOVE
+#: ARE CORRECTED IN PLACE per I12.** (1) The 2.8x is a SEVEN-CLOSE artifact.
+#: On 10,020 non-crypto and 12,418 crypto episodes of her own mechanical entry
+#: over the venue's full 1h tape, median favourable excursion is 1.203% vs
+#: 1.554% — **1.29x, not 2.80x** — and at the p90 the non-crypto names move
+#: MORE (2.903% vs 2.744%). **66.0% of them still reach a rung** against
+#: crypto's 74.5%. The ladder is somewhat harder to reach off-class; it is not
+#: "largely unreachable", and that is a far smaller claim than the one this
+#: note recorded. (2) The remedy is REFUSED. Halving the ladder is the best
+#: cell at +0.0325%/bar-day, but shuffling the class labels and re-running the
+#: whole best-of-N selection gives a MEDIAN advantage of +0.0363% against the
+#: real half's +0.0304% (**p=0.5885**) — a randomly-labelled half does better,
+#: so the gain is the selection, not the class. And the CRYPTO control moves
+#: the opposite way, monotone in the dose (-0.022 / -0.080 / -0.176 %/bar-day
+#: at k=0.5/0.35/0.25) on the half that actually earns (+0.0953%/bar-day), so
+#: a WHOLE-BOOK lowering is refuted rather than merely untested. Shortening the
+#: hold is negative everywhere — it converts `roi` exits into `max_hold` ones,
+#: which are negative by construction. Full working:
+#: `STUDY_MUM_CLASS_LADDER_2026-09-02.md`.
+#:
 #: So this stays PRE-REGISTERED and inert (default "" — no book trades
 #: differently today). `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` holds
 #: the corrected rule: G>=10 distinct ENTRY DAYS, a DAY-CLUSTERED upper bound
@@ -170,7 +190,7 @@ def noncrypto_extra(bot, raw=None):
 FAMILY_NONCRYPTO_EXCLUDE = os.environ.get("FAMILY_NONCRYPTO_EXCLUDE", "")
 
 
-#: [(xf)] The wildcard: `"freqtrade-mum:*"` excludes the carrier's WHOLE
+#: [(xh)] The wildcard: `"freqtrade-mum:*"` excludes the carrier's WHOLE
 #: non-crypto half. It exists so an act can MATCH ITS OWN POPULATION. The
 #: registered claim is about a CLASS — the venue's whole non-crypto half — not
 #: about four tickers, and the sample is every non-crypto close. A symbol list would have been graded on one population and
@@ -353,7 +373,7 @@ def carrier_universe(s, raw=None, held=None):
         if len(wide) >= len(COINS):
             crypto = list(dict.fromkeys(crypto + wide))
     nc = list(NONCRYPTO_UNIVERSE) + noncrypto_extra(s.bot)
-    # [(xf)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
+    # [(xh)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
     # — it can never touch a crypto name, and an unset env subtracts nothing.
     #
     # ENTRY-ONLY, AND THE HELD UNION IS WHAT MAKES IT SO ((hk), and the (ly)
@@ -2839,7 +2859,7 @@ def main():
         books.append(Book(s, venue, listed))
     for b in books:
         b.restore()
-        # [(xf)] RE-RESOLVE AFTER RESTORE, so a per-carrier exclusion is
+        # [(xh)] RE-RESOLVE AFTER RESTORE, so a per-carrier exclusion is
         # ENTRY-ONLY. The universe is built at boot, before any position is
         # known, so a held name under exclusion would leave `b.coins` — and
         # the ZOMBIE GUARD below would then close it `delisted` while the

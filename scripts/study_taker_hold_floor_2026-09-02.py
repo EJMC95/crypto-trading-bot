@@ -466,7 +466,7 @@ def main(argv=None):
     if a.selftest:
         _selftest()
         return 0
-    # [(xf)] through edge_audit's ONE loader, so the (qz) truncation refusal
+    # [(xh)] through edge_audit's ONE loader, so the (qz) truncation refusal
     # applies here too — a row count equal to the cap is a sampled ledger.
     trades = ea.load_trades(a.ledger, a.limit)
     shaped = ea.shape(trades)
@@ -474,7 +474,7 @@ def main(argv=None):
     if not tape:
         print("REFUSING: no scout tape — nothing to walk (I1)")
         return 2
-    # [(xf)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
+    # [(xh)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
     # amended at (tt): a pre-registered bucket is decided on closes taken
     # AFTER registration, never by re-mining the window that generated it.
     # `--pooled` is the explicit opt-out and is NOT the registered read.

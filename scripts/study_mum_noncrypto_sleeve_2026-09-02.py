@@ -64,6 +64,20 @@ P=0.227 — noise. **That reframes the remedy from a CUT to a class-aware ladder
 or hold (the I26 feed-it direction), and that remedy owes its own measurement
 before anything ships.**
 
+**[(xj)] IT WAS MEASURED, AND BOTH HALVES ARE CORRECTED IN PLACE per I12.**
+(1) **The 2.80× is a SEVEN-CLOSE artifact.** On 10,020 non-crypto and 12,418
+crypto episodes of her own mechanical entry over the full 1h tape, the gap is
+**1.29×** (median favourable excursion 1.203% vs 1.554%), the non-crypto p90
+is HIGHER (2.903% vs 2.744%), and **66.0% still reach a rung** against crypto's
+74.5%. The direction survives; the size does not. (2) **The remedy is REFUSED.**
+Halving the ladder is the best cell (+0.0325%/bar-day) but shuffling the class
+labels and re-running the whole best-of-N selection gives a MEDIAN advantage of
++0.0363% against the real half's +0.0304% — **p=0.5885**, so the gain is the
+selection procedure, not the class. The CRYPTO control moves the opposite way,
+monotone in the dose (−0.022 / −0.080 / −0.176 %/bar-day at k=0.5/0.35/0.25) on
+the half that actually earns, so a whole-book lowering is **refuted**, not
+merely untested. Full working: `STUDY_MUM_CLASS_LADDER_2026-09-02.md`.
+
 THE PRE-REGISTERED RULE, as corrected (`PRE_REGISTERED`, since 2026-09-02):
 read when the live arm has **G >= MIN_N distinct ENTRY DAYS** on the sleeve —
 the fleet's computability floor applied to the unit of independence, not to
@@ -463,11 +477,11 @@ def main(argv=None):
     if a.selftest:
         _selftest()
         return 0
-    # [(xf)] through edge_audit's ONE loader, so the (qz) truncation refusal
+    # [(xh)] through edge_audit's ONE loader, so the (qz) truncation refusal
     # applies here too — a row count equal to the cap is a sampled ledger.
     trades = ea.load_trades(a.ledger, a.limit)
     shaped = ea.shape(trades)
-    # [(xf)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
+    # [(xh)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
     # amended at (tt): a pre-registered bucket is decided on closes taken
     # AFTER registration, never by re-mining the window that generated it.
     # `--pooled` is the explicit opt-out and is NOT the registered read.

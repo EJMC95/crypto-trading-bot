@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 00:42 Sydney (14:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-03 01:20 Sydney (15:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,15 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (1 commit(s))
+## Shipped today (8 commit(s))
 
+- `d81f540` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
+- `96cd8a6` the halves default, the dropped cache line, and the crypto CONTROL sweep
+- `66b37a7` C4's own metric was the artifact it existed to prevent — corrected to the aggregate
+- `fd071e4` PRE-REGISTRATION: mum's class-aware ladder study, committed BEFORE the run
+- `98f0a3d` [deploy-live-mum] (xf)(xg) mum's gross 3.75x and her halt-aware entry gate (#271)
+- `f0f998e` CodeQL: drop the now-unused math import from the mum sleeve study
+- `4f7189d` (xg) the grader published a false I17 exclusion; (xf) the mum sleeve mechanism is refuted and its cut rule rewritten
 - `5497e71` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
 
 ## How this file stays honest

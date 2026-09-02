@@ -202,7 +202,7 @@ def test_the_horizon_fails_toward_keeping_a_book_when_the_owner_is_missing():
         builtins.__import__ = real
 
 
-# ------------------------------------------------------------------ (xg)
+# ------------------------------------------------------------------ (xi)
 # THE VERDICT MAY NOT ASSERT AN EXCLUSION THE SAMPLE NEVER MADE.
 # The `underpowered` branch is gated on `bars["maxdd"]`, so a book failing the
 # mean bar AND the drawdown bar falls straight through to `unreachable` — and

@@ -2,12 +2,12 @@
 """STUDY: 👩 mum's ROI LADDER IS CALIBRATED ON CRYPTO — does a CLASS-AWARE
 ladder earn more on the non-crypto half, per BAR-DAY, than the shipped one?
 
-[2026-09-02, Eamon: "Start it." — the build (xf) named and did not do.]
+[2026-09-02, Eamon: "Start it." — the build (xh) named and did not do.]
 
 ===========================================================================
-WHY THIS EXISTS, and why it is NOT the cut (xf) registered
+WHY THIS EXISTS, and why it is NOT the cut (xh) registered
 
-`(xf)` proposed excluding mum's non-crypto names, then REFUTED its own
+`(xh)` proposed excluding mum's non-crypto names, then REFUTED its own
 mechanism (closed hours) and found there is no measured exclusion to cut on:
 7 closes are 4 entry days, the day-clustered upper bound is POSITIVE, and the
 raw class gap FLIPS SIGN under a close-day fixed effect. What survived that
@@ -52,7 +52,7 @@ REUSE, NEVER RETYPED ((hj) — a second copy of a rule is a second rule):
     the selftest PINS that at the shipped ladder it is byte-identical to
     `study_mum_supply.bracket_walk` on every real episode. Generalisation is
     only safe if the special case is proved unchanged.
-  * the class axis: `fleet_bus.is_crypto` — the same owner (xf) graded on
+  * the class axis: `fleet_bus.is_crypto` — the same owner (xh) graded on
 
 ===========================================================================
 PRE-REGISTERED — WRITTEN AND COMMITTED BEFORE ANY NUMBER EXISTED (I21/I25)
@@ -430,7 +430,7 @@ def calibrate(led, mids, ladder, stop, hold):
 # --------------------------------------------------------- reachability (L1)
 
 def reachability(eps, ladder, stop, hold):
-    """Per class: can the SHIPPED rungs actually be reached? The (xf)
+    """Per class: can the SHIPPED rungs actually be reached? The (xh)
     mechanism, on hundreds of episodes instead of 7."""
     out = {}
     for cls in ("crypto", "noncrypto"):

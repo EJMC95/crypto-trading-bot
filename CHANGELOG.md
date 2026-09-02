@@ -1,3 +1,88 @@
+## 2026-09-02 (xj) — THE CLASS-AWARE LADDER IS REFUSED, THE WHOLE-BOOK ONE IS REFUTED, AND (xh)'s OWN MECHANISM SHRINKS FROM 2.80× TO 1.29× — plus the guard against denominator shrinkage was itself denominator shrinkage, and it inflated the headline 40×
+
+**Eamon, 2-Sep: *"Start it."*** — the build `(xh)` named and did not do.
+Instrument `scripts/study_mum_class_ladder_2026-09-02.py`, **pre-registered and
+committed BEFORE the run** (the (to)/(tq)/(tr) pattern), read-only. Full
+working: `STUDY_MUM_CLASS_LADDER_2026-09-02.md`.
+
+**WHERE THE POWER CAME FROM.** Her non-crypto ledger is **n=7** — a ladder
+sweep on that is fitting noise, and best-of-N on n=7 is the (uz) premium at its
+worst. So the ledger became the CALIBRATION TARGET, not the estimator, and the
+sample came from regenerating her mechanical entry over the venue's full 1h
+tape: **10,020 non-crypto and 12,418 crypto episodes** (the (un)
+study_mum_params method). C1 passed — replaying her REAL era entries through
+the shipped ladder reproduces her actual exit mix on **113 of 115** ledger rows
+(worst family 1.8pp against a 20pp tolerance).
+
+**(xh)'s MECHANISM IS MUCH WEAKER THAN ITS SEVEN CLOSES IMPLIED — corrected in
+place per I12, in both the carrier note and the sleeve study.** That entry
+recorded realised |return| **0.623% vs 1.746% (2.80×)** and "5 of 7 run the 24h
+cap vs 4 of 52". On the tape the gap is **1.29×** (median favourable excursion
+1.203% vs 1.554%), **the non-crypto p90 is HIGHER** (2.903% vs 2.744%), and
+**66.0% still reach a rung** against crypto's 74.5%. The direction survives;
+the size does not, and "largely unreachable off-class" is not what the tape
+says.
+
+**THE REMEDY IS REFUSED, AND ITS LARGER VERSION IS REFUTED.** `k=0.5` (every
+rung halved) leads at **+0.0325%/bar-day** and +0.0440%/trade, both halves
+positive, cluster-t +1.92, plateau intact — and fails **C6**: shuffling the
+class labels and re-running the entire best-of-N selection gives a **median
+advantage of +0.0363%** against the real half's **+0.0304%**, i.e.
+**p=0.5885**. A randomly-labelled half does BETTER. The advantage is the
+selection, not the class. The CONTROL then closes the larger door: the same
+cells on the CRYPTO half — the profitable one at **+0.0953%/bar-day**, n=12,397
+— move the opposite way, **monotone in the dose**: −0.022 / −0.080 / **−0.176**
+%/bar-day at k=0.5/0.35/0.25. So a whole-book lowering is refuted rather than
+untested. (Stated honestly: no single crypto cell reaches |t|≥2, so that arm is
+a dose-response across four cells, not one significant cell — the direction is
+unambiguous and it is the wrong one.) **The hold is not the lever either**:
+every shortening loses on per-bar-day, because it converts `roi` exits into
+`max_hold` ones (2,284 → 6,662 at h=8) and `max_hold` is negative BY
+CONSTRUCTION (0 positive / 18 negative across 114 era closes).
+
+**THE DEFECT THIS PASS SHIPPED AND CAUGHT, and it is the (hl) guard eating its
+own tail.** C4 declared the verdict metric to be "return per BAR-DAY" precisely
+so a candidate could not win by denominator shrinkage — and the implementation
+was the **mean of per-episode ratios** `ret/(held/24)`, which hands a 1-bar
+winner **24× the weight** of a 24-bar loser. Driven: +2%/1bar and −2%/24bars
+net to zero and score **+23%/day**. It was caught by reading the output, not by
+a test: the run printed **`per-bar-day +1.7173%` beside `%/trade −0.1333%` on
+the same sleeve**, which no honest exposure metric can do. Now the aggregate
+`total return / total bar-days` — the number (hl) actually used — with the old
+statistic KEPT and reported as `mean_ratio` so the artifact stays visible, and
+an exposure ratio printed per cell so a cell that "wins" by holding less is
+legible as such. **The correction moved the headline ~40×**: the first run's
+`k=0.35` read **+1.2992%/bar-day at t=+9.58**, which reads as an overwhelming
+ship; the same cell under the honest metric is **+0.0285%**. Both runs refused
+on C6 — the permutation held the line either way — but a reader seeing only the
+first number would have shipped it.
+
+**REUSE VERIFIED, NOT ASSERTED.** The generalised bracket walk is pinned
+**byte-identical** to `study_mum_supply_2026-08-26.bracket_walk` on 300
+episodes, and the vectorised entry predicate is **DRIVEN** against
+`OversoldRebound.signals` on 140 prefixes — the docstring claimed that
+agreement before the code did, which is the (tt) "a defense that lives only in
+prose has not been written" shape, caught and written. The ladder, stop, hold
+and RSI bar are read from the LIVE CARRIER, never retyped: load-bearing,
+because `RSI_MAX` has moved to **36.0** since those cells were written. 7 of 7
+mutations red; an eighth is recorded as an EQUIVALENT mutant (mum's ladder
+starts at age 0, so `roi_thr`'s initialiser is provably dead) with the
+assumption that makes it so pinned, rather than a test contorted to fake a kill.
+
+**DECLARED, and the one that flatters the candidate goes first:** slot
+contention is NOT simulated, so a faster ladder's freed slot is unpriced.
+Entry is the OPEN of bar `e` and the walk tests that bar's own high/low —
+post-entry prices, so not the (ne) look-ahead. Fill at the rung never the high;
+adverse leg first; price return on both arms so fees and funding cannot be
+mismodelled into the verdict.
+
+**WHAT IS NOT CLOSED.** Her non-crypto sleeve LOSES on the tape
+(**−0.2372%/bar-day**, −1331% total over 5,612 bar-days) and no ladder in this
+grid makes it profitable — the best cell reduces the loss by ~14%. That is a
+supply/entry question, not an exit one. The `(xh)` cut registration is
+UNCHANGED by this: still inert, still requiring G≥10 entry days and a
+day-clustered exclusion, and this study is not evidence for it.
+
 ## 2026-09-02 (xi) — THE GO-LIVE GRADER PUBLISHED "THE SAMPLE HAS EXCLUDED A POSITIVE MEAN" BESIDE AN UPPER BOUND OF **+0.027%** — the I17 sentence a RETIREMENT is written on, false on a living book, on the same day five books were retired on that verdict
 
 **Found by a fleet-wide starvation sweep whose actual answer was a refusal**

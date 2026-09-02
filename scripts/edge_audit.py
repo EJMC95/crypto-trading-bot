@@ -139,7 +139,7 @@ def load_trades(ledger=None, limit=5000):
 
     A row count equal to the cap is a truncation signature, not a complete
     history, so this REFUSES rather than hand a silently sampled ledger to a
-    grader. Split out of `load()` at (xf) because three studies had each
+    grader. Split out of `load()` at (xh) because three studies had each
     re-implemented the fetch and dropped the refusal with it — a second copy
     of a rule is a second rule, and here the second one had no rule at all.
     """
