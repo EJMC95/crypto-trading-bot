@@ -1,3 +1,93 @@
+## 2026-09-02 (xe) — THE SEAM (xa) CLOSED ON ONE SIDE WAS OPEN ON THE OTHER: A 1000-MARKET'S MARK ARRIVED UNDER THE VENUE'S SPELLING AND THE MARGIN BLOCK ASKED FOR THE FLEET'S, SO A PRICED, READABLE REAL-MONEY LEG PUBLISHED AS UNMEASURABLE AND PAGED EVERY LOOP
+
+**Found by the organ board's own follow-up read, not by a failing test** — 👩 mum
+is REAL MONEY and her row had been refusing `headroom` on `mark_blind` since
+`(xa)` deployed this morning.
+
+**THE MECHANISM, and it is `(xa)`'s mirror image rather than its regression.**
+`(xa)` fixed a real defect: the host's universe, `meta` and `held` map carry the
+VENUE's spelling (the scout's `vols` keys: `1000PEPE`) while `venue.positions()`
+returns FLEET symbols (`from_lighter`: `kPEPE`), so a 1000-market was two names
+in one loop and the reconciler dropped its bracket. It normalised the position
+map to the venue spelling — correctly. But `_margin_block` then hands that same
+map to `marks.stop_marks`, which keys its output by **whatever spelling its
+caller gave it**, while `LighterClient._positions_from` keys the margin block by
+the **fleet** symbol. The two met at one expression:
+
+```python
+liq, mark = rec.get("liq"), (marks or {}).get(coin)   # coin is kPEPE
+                                                      # marks holds 1000PEPE
+```
+
+Before `(xa)` both sides were fleet-spelled and it worked by coincidence.
+
+**MEASURED ON THE LIVE ROW, 2-Sep, every field agreeing:**
+
+| field | value | spelling |
+|---|---|---|
+| `held` | `{..., "1000PEPE": "adopted"}` | venue |
+| `margin.positions` | `[..., "kPEPE"]` | fleet |
+| `liq_mark_blind` | `["kPEPE"]` | the one 1000-market of ten legs |
+| `mark_blind` (the caller's own) | **ABSENT** | the order book read FINE |
+| `headroom` | `{"ok": false, "reason": "mark_blind", "gap_stop_widths": 18.66}` | |
+
+`mark_blind` absent beside `liq_mark_blind` populated is the whole diagnosis in
+two keys: the price existed, under the other name.
+
+**TWO COSTS, BOTH REAL, NEITHER A LOSS — and the distinction is the point.**
+1. **The published risk number was computed over a subset.** `nearest_liq` is
+   built from positions that have BOTH a venue liq price and a readable mark, so
+   the blind leg dropped out and the row published the *comfortable* leg's
+   distance (XRP, 0.746 of mark) as the account's nearest. A 1000-market can
+   therefore never BE `nearest_liq`, which makes `too_close` — the one refusal in
+   `headroom_check` that means the money is actually in danger — **structurally
+   unreachable** for such a leg.
+2. **A spelling paged the operator every loop.** `mark_blind` is not in this
+   book's `fleet_immune.HEADROOM_OK` allowlist (mum's declared-structural set is
+   `{too_close, liq_unpriced}`), so `headroom_sickness` fired continuously — the
+   `(gl)` failure the allowlist's own comment names, a detector whose output one
+   learns to ignore.
+
+**WHAT WAS NEVER WRONG, stated so the severity is not overstated:** the VERDICT.
+`mark_blind` is itself a refusal, so the ruin gate declined in the safe direction
+throughout; nothing unsafe was admitted, and on this host the gate is
+publish-only in any case. The number and the reason were wrong; the rail was not.
+
+**FIXED AT THE OWNER, NOT THE CALL SITE.** `venues.lighter_client._mark_for`
+looks the mark up under the fleet spelling FIRST and falls back to
+`symbol_map.to_lighter(coin)` — the ONE owner of the alias rule ((hj)) — so an
+unknown coin maps to itself and this is a byte-for-byte no-op on every market
+that is not a 1000-market. The call-site fix was rejected: `lighter_avo_live_bot`
+and `lighter_funding_bot` carry **byte-identical** `_margin_block` helpers, so
+patching mum's host alone leaves the trap standing for the sibling and for the
+next caller — fixing the instance guarantees the return visit (FORWARD MOTION,
+rule 2). `to_lighter` is definitional, so the fallback can never resolve to a
+DIFFERENT market's price; that is pinned, because this is a real-money price.
+
+**AFTER THE FIX**, on the reproduced live payload: `liq_mark_blind` empties, the
+1000-market enters `nearest_liq` (and on the live geometry it IS the nearest —
+0.10 of mark against XRP's 0.746, i.e. the row had been publishing a number 7x
+more comfortable than the position it could not see), and `headroom` falls
+through to `liq_unpriced`, which mum's allowlist declares as structural on a
+cross-margin book. The page stops because the condition stops, not because a
+reason was allowlisted.
+
+**PINNED** by `tests/autonomy/test_margin_mark_spelling.py` — 10 tests driving
+the whole seam in the host's own order (`stop_marks` -> `margin_state_from` ->
+`headroom_check`) against a venue that quotes books under the venue's spelling,
+which is what the real client does. The three incident tests were confirmed RED
+against the pre-fix expression and GREEN after; the no-regression and
+teeth-kept tests pass in both. **8 mutations, 7 killed**; the survivor
+(`if not marks:` -> `if marks is None:`) is SEMANTICALLY EQUIVALENT — the two
+differ only on `{}`, where both return None — and the None-safety half of that
+guard is separately killed by `if not marks:` -> `if False:`. `HEADROOM_OK` is
+READ in the test, never retyped, so allowlisting `mark_blind` later would fail
+the test that cites the page as this fix's justification.
+
+**DEPLOYED BOTH WAYS** under `(pz)`: `venues/` is in `_BUILD_SHARED`, so every
+image's stamp moves; the live pair (🙏 avo + 👩 mum, one variant host) takes it
+under the marker with a halt check first and a stamp readback after.
+
 ## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
 
 **[LETTERED (xc) at push time: written as (wz), then (xb); (wz), (xa) AND a second (wy) reached main first — PR #269's cohort long budget, PR #268's mum position aliasing, and another session's (wy) — so this session's two entries take (xb) and (xc) in the order they were written; the pushed entries keep their letters.]**
