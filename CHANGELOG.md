@@ -83,6 +83,41 @@ because the mutation found it. Consumers are driven on the payload
 call-site pin is AST-shaped and FOLLOWS the variable binding, because a substring
 grep passes on the comment describing the fix ((hp)).
 
+### AND THE CURRENCY AUDIT WAS BLOCKED, SO NOBODY COULD SEE ANY OF IT
+
+Reaching for `scripts/audit_code_currency.py` to answer *"is my fix actually
+going to land?"* it **exited 1 without auditing a single row**:
+`freqtrade-georgia-v3-lshadow` (🔭 ImpulseFade 15m) was publishing a build stamp
+and was **absent from `fleet_books.ROW_ENTRY`**. That is the `(jb)` unmapped-row
+gate doing exactly its job — an unmapped stamped row is a finding, not a skip —
+and it is also the **cost of leaving that gate red: a fail-closed guard blocks
+the audit it fails**, so from the moment her row was born NOBODY's code currency
+was readable, both real-money rows included. Mapped to `lighter_family_bot.py`,
+the same host as every other family shadow book.
+
+**WHAT THE UNBLOCKED AUDIT THEN SAID, and the first reading of it was WRONG —
+recorded because the correction is the lesson.** It reported both live rows
+`BEHIND-OWN` with *"1 MARKED commit(s) in the gap did not land"*, which reads as
+a marked real-money deploy that silently failed — the `(ml)` class. Checked
+against the workflow before believing it, as this file's own currency rule
+requires, by computing the real `build_compute` at each candidate commit:
+
+| stamp | commit | meaning |
+|---|---|---|
+| `08147b6bc9fb/17` | `80ef8b0` = the (xa) merge | **👩 mum's live container** |
+| `733ee8665875/17` | `1c37d6c`, pre-(xa) | **🙏 avo's live container** |
+| `e313522c54b0/17` | this branch's HEAD | not yet merged |
+
+So **mum is CURRENT and running (xa)'s bracket fix** — her 10:05Z deploy landed,
+and the "marked commit in the gap" is this branch's OWN unmerged (xe). No deploy
+failed. **The real finding is 🙏 avo: 8 commits behind, missing (xa) entirely**,
+because that merge carried `[deploy-live-mum]` alone — correct at the time (mum
+had the orphaned leg) and it left avo exposed to the same unbracketed-leg class
+on any 1000-market she takes. **This entry's own two markers bring her forward.**
+Noted, not changed: run against a feature branch the audit measures containers
+against LOCAL HEAD, so an unmerged marked commit reads as a gap; the CI job runs
+on main, where that cannot happen.
+
 **DEPLOY: BOTH WAYS** ((mm)/(pz) — a real-money correctness fix). Markers
 `[deploy-live-taker]` (🙏 avo, `tide-rider-lighter-live`) and `[deploy-live-mum]`
 (👩 mum, `mum-live`); **not** `[deploy-live]`, which would also restart

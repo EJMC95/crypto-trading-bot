@@ -81,6 +81,15 @@ ROW_ENTRY = {
     "freqtrade-avo-maria-lshadow": "lighter_family_bot.py",
     "freqtrade-dad-lshadow": "lighter_family_bot.py",
     "freqtrade-georgia-lshadow": "lighter_family_bot.py",
+    # [2026-09-02 (xe)] 🔭 georgia v3 (ImpulseFade 15m) — BORN UNMAPPED, and the
+    # (jb) gate caught it exactly as designed: an unmapped stamped row FAILS the
+    # currency audit rather than being skipped, so the whole run exited 1 and
+    # NOBODY's currency could be read — including both real-money rows — from the
+    # moment her row started publishing (svc=family-lighter-shadow,
+    # build=f009aec2315f/16). That is the gate working AND the cost of leaving it
+    # red: a fail-closed guard blocks the audit it fails, so an unmapped row is
+    # not a cosmetic gap. Same host as every other family shadow book.
+    "freqtrade-georgia-v3-lshadow": "lighter_family_bot.py",
     "freqtrade-mum-lshadow": "lighter_family_bot.py",
     "equities-regime-lshadow": "lighter_index_bot.py",
     "lighter-dislocation-lshadow": "lighter_dislocation_bot.py",
