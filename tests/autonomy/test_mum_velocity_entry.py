@@ -138,7 +138,6 @@ def test_an_unmeasurable_velocity_is_ignored_when_inert():
 
 # ------------------------------------------------- 4 · the live arm is safe
 def test_the_live_lever_is_judge_owned():
-    owners = ft.LEVER_AUTHORS if hasattr(ft, "LEVER_AUTHORS") else None
     src = Path(ROOT, "fleet_tuning.py").read_text()
     assert '"live.mum.": "experiment-judge"' in src, (
         "the live.mum.* prefix is no longer bound to the judge — the band "
