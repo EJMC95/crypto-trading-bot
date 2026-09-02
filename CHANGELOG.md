@@ -1,3 +1,41 @@
+## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
+
+Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:
+the deposit folded into `capital_adjust`, not P&L, and her clip auto-scaled
+**$288 → $452**, +57% size on the same proven edge — the transfer IS the
+optimisation). This entry is the one rail that did NOT scale with her.
+
+**THE FINDING, the (wf) avo pattern at a second rail.** `SafetyRails.max_daily_loss`
+(`LIGHTER_MAX_DAILY_LOSS`, $30) is a PILOT cap from when the live books were
+seed-sized: $30 == 10% of a $300 book, so it COINCIDED with the strategy's own
+`DAILY_LOSS_LIMIT` (10%). The book halts for the day on the TIGHTER of the two —
+and once mum was funded the fixed $30 binds at **5.26%** while her 10% leash
+intends **$57**, so a normal drawdown day would halt her early and forfeit the
+recovery. Same fixed-dollar-vs-funded-equity class as avo's maxdd denominator,
+one rail over; measured, not hypothetical (`halt.abs_usd 30`, `binding: abs` on
+her live row at $570).
+
+**THE FIX — the pilot cap FLOORS under the pct leash, never a ceiling.**
+`daily_loss_hit(day_start, equity, pct_limit=0.0)` now trips at
+`max(self.max_daily_loss, pct_limit * day_start_equity)`: the cap still protects
+a tiny book (10% of $50 = $5 < the $30 floor) and the pct leash governs a funded
+one (10% of $570 = $57 > $30). Measured after: mum trades through a 7% day and
+still halts at 10%; a genuine 10% day still halts her — the protection is
+RESTORED to her funded scale, not removed. **`pct_limit=0.0` — every caller that
+does not opt in (the funding bot, the taker, the hyperliquid bots) — is
+byte-identical to the old absolute cap**, so the blast radius is exactly the
+family live host, which passes `DAILY_LOSS_LIMIT`. Pinned by
+`tests/autonomy/test_daily_loss_pilot_floor.py` (mutation red: reverting the
+floor to the bare cap reddens the funded-book test). Reaches mum on the same
+`[deploy-live]` dispatch as (wf)/(wg).
+
+DECLARED, not changed: mum's EDGE is untouched — I25 forbids retuning a winner
+on the hot window that flatters it, and her entry/exit were measured at birth.
+Her leverage (9.5×, Eamon's stop-death edge) and the brain's refused 1.25×
+expand are risk-appetite calls, not code fixes: the brain wants to pay her more
+and there is no room under her stop-alive ceiling, which is why CAPITAL, not
+leverage, was the lever — and it is now deployed.
+
 ## 2026-09-02 (wg) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
 
 Eamon, asked to choose on 🔮 georgia (measured-negative, `unreachable`, bleeding
