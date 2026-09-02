@@ -150,8 +150,17 @@ def test_the_audit_call_site_passes_the_first_seen_ordering():
     calls = [n for n in ast.walk(ast.parse(src))
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Name) and n.func.id == "classify"]
+    def _live_value(call, name):
+        for k in call.keywords:
+            if k.arg == name:
+                # a Constant (None included) is the mutation that survived the
+                # first round: kwarg present, ordering dead. The value must be
+                # a lookup into the first_seen map, not a literal.
+                return (not isinstance(k.value, ast.Constant)
+                        and "first_seen" in ast.unparse(k.value))
+        return False
     wired = [c for c in calls
-             if {"row_build_first_seen", "trade_build_first_seen"}
-             <= {k.arg for k in c.keywords}]
-    assert wired, "no classify() call passes the first-seen ordering — " \
+             if _live_value(c, "row_build_first_seen")
+             and _live_value(c, "trade_build_first_seen")]
+    assert wired, "no classify() call passes a LIVE first-seen ordering — " \
                   "every verdict degrades to AMBIGUOUS and nothing can fire"
