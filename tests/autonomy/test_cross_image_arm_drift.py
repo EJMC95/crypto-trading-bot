@@ -185,3 +185,50 @@ def test_the_hashing_rule_has_exactly_one_owner():
         body = src[src.index(fn):]
         body = body[:body.index("\ndef ", 1)]
         assert "_digest(" in body, f"{fn} must go through the one owner"
+
+
+# ── the ROW half: the path that actually held 👩 mum ─────────────────────────
+#
+# The live payload named it: last_eval.arm_drift.source == "rows-disjoint".
+# `_row_drift` asks whether the arms' in-window BUILD SETS intersect, on the
+# (lf) reasoning that intersecting sets mean "the same deploy sequence". That
+# premise holds only while both arms draw ids from ONE id space — a cross-image
+# pair draws from two, so the sets are disjoint at every commit and the rule
+# read "different code" forever.
+
+import experiment_judge as J   # noqa: E402
+
+
+def _crow(bot, build, n=None, shared=None):
+    x = {"build": build}
+    if n:
+        x["build_n"] = n
+    if shared:
+        x["build_shared"] = shared
+    return {"bot": bot, "close_ts": J.iso(1.7e9), "extra": x}
+
+
+def test_row_drift_does_not_fire_on_a_converged_cross_image_pair():
+    """THE INCIDENT, at the path that produced it."""
+    lb, sb = J.LIVE_BOT, J.SHADOW_BOT
+    # before the shared stamp deploys: differing counts -> not comparable
+    assert J._row_drift([_crow(lb, "02ef", 17), _crow(sb, "aa62", 16)]) is None
+    # after it deploys: the shared ids agree -> positively converged
+    assert J._row_drift([_crow(lb, "02ef", 17, "ss1"),
+                         _crow(sb, "aa62", 16, "ss1")]) is None
+
+
+def test_row_drift_still_catches_a_genuinely_stale_arm():
+    """Teeth kept: an arm behind on SHARED code still claims, and says so."""
+    d = J._row_drift([_crow(J.LIVE_BOT, "02ef", 17, "ss1"),
+                      _crow(J.SHADOW_BOT, "aa62", 16, "ss0")])
+    assert d and d["basis"] == "shared" and d["source"] == "rows-disjoint"
+
+
+def test_row_drift_keeps_both_of_the_lf_cases():
+    """No regression on the rule (lf) shipped, for the pair it was shipped on:
+    disjoint sets in ONE image are drift; a rolling deploy is not."""
+    lb, sb = J.LIVE_BOT, J.SHADOW_BOT
+    assert J._row_drift([_crow(lb, "A", 16), _crow(sb, "B", 16)]), "disjoint = drift"
+    assert J._row_drift([_crow(lb, "A", 16), _crow(lb, "B", 16),
+                         _crow(sb, "A", 16), _crow(sb, "B", 16)]) is None

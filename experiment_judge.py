@@ -1313,16 +1313,33 @@ def _rows_since(rows, since_ts):
     return out
 
 
-def _row_build_sets(rows, live=None, shadow=None):
-    """{bot: set(build ids)} over the rows given, ignoring unstamped rows."""
+def _row_build_sets(rows, live=None, shadow=None, key="build"):
+    """{bot: set(ids)} over the rows given, ignoring unstamped rows.
+
+    [2026-09-02] `key` selects WHICH stamp — `build` (per-image) or
+    `build_shared` (cross-image comparable). See `_row_drift`.
+    """
     live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
     out = {live: set(), shadow: set()}
     for r in rows or []:
         b = str(r.get("bot"))
         if b in out:
-            bid = ((r.get("extra") or {}) or {}).get("build")
+            bid = ((r.get("extra") or {}) or {}).get(key)
             if bid:
                 out[b].add(str(bid))
+    return out
+
+
+def _row_build_counts(rows, live=None, shadow=None):
+    """{bot: set(build_n)} — the FILE COUNT each arm's rows were hashed over."""
+    live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
+    out = {live: set(), shadow: set()}
+    for r in rows or []:
+        b = str(r.get("bot"))
+        if b in out:
+            n = ((r.get("extra") or {}) or {}).get("build_n")
+            if n:
+                out[b].add(int(n))
     return out
 
 
@@ -1357,14 +1374,41 @@ def _row_drift(rows, live=None, shadow=None):
     arms to have stamped rows in the window (an empty set on either side is
     "unknown", never drift), so a rollout cannot make this fire.
     """
-    sets = _row_build_sets(rows, live, shadow)
-    a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
+    lb, sb = live or LIVE_BOT, shadow or SHADOW_BOT
+    # [2026-09-02] PREFER THE CROSS-IMAGE-COMPARABLE STAMP, for the reason the
+    # set rule itself gives: intersecting sets mean "the arms tracked the same
+    # deploy sequence". That premise holds only while both arms draw ids from
+    # ONE id space. A CROSS-IMAGE pair does not: 👩 mum's live arm is
+    # `lighter_avo_live_bot.py` (17 files) and her shadow is
+    # `lighter_family_bot.py` (16, a strict SUBSET), so their `build` sets are
+    # disjoint BY CONSTRUCTION at every commit and this rule read "different
+    # code" forever — hard-blocking every promotion on the fleet's only
+    # shadow->live path. `build_shared` hashes `_BUILD_SHARED` alone, one tuple
+    # fleet-wide, so both arms draw from the SAME space again and the set rule
+    # means what it says.
+    shared = _row_build_sets(rows, lb, sb, key="build_shared")
+    sa, ss = shared[lb], shared[sb]
+    if sa and ss:
+        if sa & ss:
+            return None                  # same shared code => not drift
+        return {"live": sorted(sa)[-1], "shadow": sorted(ss)[-1],
+                "source": "rows-disjoint", "basis": "shared"}
+    sets = _row_build_sets(rows, lb, sb)
+    a, b = sets[lb], sets[sb]
     if not a or not b:
         return None                      # unknown is not drift
     if a & b:
         return None                      # shared build => same deploy line
+    # [(fd)] Ids hashed over DIFFERENT FILE SETS are not comparable, so their
+    # disjointness is not evidence of anything. Same fail-safe direction as the
+    # unstamped case above: claiming drift we cannot establish freezes the
+    # queue on healthy arms, which is exactly what it did.
+    counts = _row_build_counts(rows, lb, sb)
+    ca, cb = counts[lb], counts[sb]
+    if ca and cb and not (ca & cb):
+        return None
     return {"live": sorted(a)[-1], "shadow": sorted(b)[-1],
-            "source": "rows-disjoint"}
+            "source": "rows-disjoint", "basis": "build"}
 
 
 def _current_drift(fetch=None):
