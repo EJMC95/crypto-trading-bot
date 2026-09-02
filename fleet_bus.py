@@ -312,7 +312,7 @@ JUDGED_PAIRS = {
 
 
 def active_price_pairs():
-    """[2026-09-02 (wo)] The judged pairs whose LIVE arm is still trading —
+    """[2026-09-02 (wp)] The judged pairs whose LIVE arm is still trading —
     derived from JUDGED_PAIRS + RETIRED_LIVE_ARMS, never a typed list, so a
     slot swap cannot leave a consumer pointed at a retired row (the
     audit-scope lesson, four times over). Ordered by registry order, then
@@ -330,7 +330,7 @@ def active_price_pairs():
 
 
 def shortfall_default_pair():
-    """[(wo)] (live_bot, shadow_bot) implementation_shortfall measures when
+    """[(wp)] (live_bot, shadow_bot) implementation_shortfall measures when
     SHORTFALL_LIVE/SHORTFALL_SHADOW are unset. Was a literal naming 💸 the
     Farmer's live arm, retired 22-Aug — so the fleet's only execution-quality
     instrument stood down for 11 days while two real-money books traded
@@ -1023,7 +1023,7 @@ def lever_outcome(lever, current_time=None):
 
 
 def cohort_long_state(payload, cohort):
-    """[2026-09-02 (wo)] (long_positions, long_budget) for ONE budget cohort
+    """[2026-09-02 (wp)] (long_positions, long_budget) for ONE budget cohort
     — `live` (real money) or `shadow` (modelled) — off a fleet-risk payload.
 
     THE ONE READER of `cohorts`, so five consumers cannot each re-type the
@@ -1061,7 +1061,7 @@ def cohort_long_state(payload, cohort):
 def long_entries_blocked(current_time=None, cohort=None):
     """L2 fleet-risk veto: True when the fleet's LONG book is at/over budget.
 
-    [(wo)] `cohort` ("live"|"shadow") reads that cohort's own count via
+    [(wp)] `cohort` ("live"|"shadow") reads that cohort's own count via
     cohort_long_state; None keeps the pooled read for legacy callers.
 
     Uses the side-specific count (long_positions vs long_budget), NOT the
@@ -1814,7 +1814,7 @@ def diversified_order(universe, held, rets):
     """`universe` reordered so the candidate that most REDUCES the held
     basket's correlation is offered first.
 
-    [2026-09-02 (wo)] MOVED HERE from lighter_avo_live_bot (the live host
+    [2026-09-02 (wp)] MOVED HERE from lighter_avo_live_bot (the live host
     keeps it as an alias) so the family SHADOW host can run the same rule:
     the judge read every family pair `unjudgeable:policy_mismatch` on
     `scan_order` (live=diversified, shadow=list), and the divergence was

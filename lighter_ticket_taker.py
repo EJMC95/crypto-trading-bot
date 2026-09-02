@@ -146,7 +146,7 @@ BOT_ROW = BOT + _ROW_SUFFIX.get(TT_VENUE, "-lshadow")
 
 
 def _cohort_long_state(fr, cohort):
-    """[(wo)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
+    """[(wp)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
     the read degrades to the pooled pair — this site's prior behaviour."""
     try:
         import fleet_bus
@@ -2662,7 +2662,7 @@ def main(_ctx=None):
             # [2026-07-15 AUDIT FIX] L2 long-budget veto now has a consumer in
             # the RUNNING fleet (it was wired only into the retired Kraken
             # strategies). Fail-safe OPEN: stale/missing state never blocks.
-            # [(wo)] this arm's OWN cohort: the shadow arm reads the paper
+            # [(wp)] this arm's OWN cohort: the shadow arm reads the paper
             # count, a live arm the real-money count. fleet_bus owns the
             # fallback (old-shape payload -> pooled pair, unchanged).
             _lp, _lb = _cohort_long_state(

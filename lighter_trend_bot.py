@@ -773,7 +773,7 @@ def main():
             _fr = store.load_state("fleet-risk") or {}
             _age = (now - datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
-            # [(wo)] shadow cohort; pooled pair when the key is absent.
+            # [(wp)] shadow cohort; pooled pair when the key is absent.
             try:
                 import fleet_bus as _fb
                 _lp, _lb = _fb.cohort_long_state(_fr, "shadow")

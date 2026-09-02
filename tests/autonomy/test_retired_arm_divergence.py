@@ -112,8 +112,8 @@ def test_it_names_the_object_and_the_way_back():
     """I8: a detector whose output is an instruction must name something the
     reader can act on."""
     sd = isf.compute_shortfall(SLIPPING, retired=True)["stood_down"]
-    # [(wo)] the organ's CONFIGURED pair, whatever it is — this pinned the
-    # Farmer literals, i.e. the exact list-keyed rot (wo) removed: the default
+    # [(wp)] the organ's CONFIGURED pair, whatever it is — this pinned the
+    # Farmer literals, i.e. the exact list-keyed rot (wp) removed: the default
     # pair is now derived from the registry, so the receipt names THAT.
     assert sd["live_bot"] == isf.LIVE and sd["shadow_bot"] == isf.SHADOW
     assert sd["why"] and sd["wake_when"]

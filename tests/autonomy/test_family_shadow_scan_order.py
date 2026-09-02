@@ -1,4 +1,4 @@
-"""[2026-09-02 (wo)] THE SHADOW TWIN IS A CONTROL ARM AGAIN.
+"""[2026-09-02 (wp)] THE SHADOW TWIN IS A CONTROL ARM AGAIN.
 
 The judge read every family pair `unjudgeable:policy_mismatch` on
 `scan_order` — live=diversified, shadow=list — so the ONLY path from a

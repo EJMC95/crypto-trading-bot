@@ -1636,7 +1636,7 @@ DECIDED_UNTIL = {
         "OPERATOR_QUEUE.md item 2.",
     ),
     "perps-funding-spread": (
-        # [2026-09-02 (wo)] THE CALL WAS MADE 1-Sep AND THIS TABLE DID NOT
+        # [2026-09-02 (wp)] THE CALL WAS MADE 1-Sep AND THIS TABLE DID NOT
         # KNOW: the docket printed `decision_overdue` (due 28-Aug) for four
         # days after Eamon's KEPT decision ((wa), CLAUDE.md acknowledged-
         # recurrence line) — the deferral's own "it EXPIRES" property

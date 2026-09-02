@@ -158,7 +158,7 @@ def _fresh(row):
 
 
 def venue_cohort(venue):
-    """[(wo)] Which budget cohort a row's venue belongs to: real money is
+    """[(wp)] Which budget cohort a row's venue belongs to: real money is
     `live`, everything modelled is `shadow`. Unknown/None reads `shadow` —
     the fail-safe direction, because a mis-filed real-money row would then
     still be counted against the paper budget (over-restricted), never
@@ -167,7 +167,7 @@ def venue_cohort(venue):
 
 
 def row_longs(r, kind="freqtrade"):
-    """[(wo)] Long-position count of ONE bot_pnl row, by the same rule the
+    """[(wp)] Long-position count of ONE bot_pnl row, by the same rule the
     budget loop below applies — extracted so the cohort census cannot drift
     from the pooled count. `freqtrade` rows: `open_pos` tags (a tag naming
     'short' is a short) else `open_trades`; `perps` rows: `extra.longs` else
@@ -189,7 +189,7 @@ def row_longs(r, kind="freqtrade"):
 
 
 def cohort_longs(by_bot, freqtrade_bots=None, perps_bots=None):
-    """[(wo)] {"live": n, "shadow": n} — long positions per budget cohort,
+    """[(wp)] {"live": n, "shadow": n} — long positions per budget cohort,
     over the SAME population the pooled count uses, plus the one population
     it structurally cannot see: a live base's `-lshadow` twin. The pooled
     loop resolves each base through `authoritative_row` (live > lshadow), so
@@ -248,7 +248,7 @@ def authoritative_row(base, by_bot):
 # weighting) both need replay evidence first and are deliberately not here:
 # they change which trades six books take.
 LONG_BUDGET = int(os.environ.get("FLEET_LONG_BUDGET", "20"))
-# [2026-09-02 (wo)] THE LIVE COHORT'S OWN BUDGET. The 20-long budget was
+# [2026-09-02 (wp)] THE LIVE COHORT'S OWN BUDGET. The 20-long budget was
 # written for an all-paper fleet, and it kept counting paper positions after
 # real money arrived: on 2-Sep the pooled count sat AT 20 in 17 of 285
 # five-minute samples (6.0% of the day, every one since 02:02Z) with 6 of the
@@ -467,7 +467,7 @@ def main():
         return
     apply_tuning()
     by_bot = {r["bot"]: r for r in rows}
-    _cohorts = cohort_longs(by_bot)          # [(wo)] live vs shadow longs
+    _cohorts = cohort_longs(by_bot)          # [(wp)] live vs shadow longs
 
     fleet_long, fleet_short = 0, 0
     fleet_equity = 0.0
@@ -783,7 +783,7 @@ def main():
         "equity_samples": samples,
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,
-        # [(wo)] the per-cohort split the veto consumers read — see
+        # [(wp)] the per-cohort split the veto consumers read — see
         # LIVE_LONG_BUDGET. `long_positions` above stays the POOLED count
         # (the light, the dashboard and the exposure view are unchanged).
         "cohorts": {

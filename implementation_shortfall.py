@@ -70,7 +70,7 @@ def _live_retired(row=None):
 
 KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
-# [2026-09-02 (wo)] THE DEFAULT PAIR IS DERIVED, NOT TYPED. These were
+# [2026-09-02 (wp)] THE DEFAULT PAIR IS DERIVED, NOT TYPED. These were
 # literals naming 💸 the Farmer's live arm, retired 22-Aug ((ta)), so the
 # fleet's only execution-quality organ published `stood_down` for 11 days
 # while 👩 mum and 🙏 avo traded real money unmeasured — the fourth time a
@@ -730,7 +730,7 @@ def _selftest():
     # non-running judge licenses a verdict.
     _t = 1_784_000_000.0
     _real_ls = store.load_state
-    # [(wo)] the default SHADOW is now the living pair's twin (mum), not the
+    # [(wp)] the default SHADOW is now the living pair's twin (mum), not the
     # judge's experiment arm — pin the two equal HERE so the collision branch
     # is the one under test, exactly as it was when both defaulted to Farmer.
     global SHADOW

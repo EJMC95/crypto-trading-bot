@@ -1919,7 +1919,7 @@ def read_quarantine(load_checked, key, tries=3, backoff=2.0, sleep=None):
 
 
 def _cohort_long_state(fr, cohort):
-    """[(wo)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
+    """[(wp)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
     the read degrades to the pooled pair — this site's prior behaviour."""
     try:
         import fleet_bus
@@ -2733,7 +2733,7 @@ def main():
             _fr = store.load_state("fleet-risk") or {}
             _fage = (now - datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
-            # [(wo)] this arm's OWN cohort (shadow twin -> paper count, a
+            # [(wp)] this arm's OWN cohort (shadow twin -> paper count, a
             # live arm -> real-money count); fleet_bus owns the fallback.
             _lp, _lb = _cohort_long_state(
                 _fr, "shadow" if shadow_tag else "live")

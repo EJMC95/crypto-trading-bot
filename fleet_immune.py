@@ -519,7 +519,7 @@ def organ_invariants(states, now):
 # (bot -> allowed reasons); a NEW reason on an allowlisted book still pages,
 # and any reason on a non-allowlisted book still pages.
 HEADROOM_OK = {
-    # [(wo)] `liq_unpriced` is STRUCTURAL on a cross-margin book: the venue
+    # [(wp)] `liq_unpriced` is STRUCTURAL on a cross-margin book: the venue
     # prices liquidation at the ACCOUNT level, so per-position `liq` is
     # absent by construction on most legs (2-Sep: 1 of 11 on mum, 1 of 3 on
     # avo carried one) and SafetyRails.headroom_check's per-position walk
@@ -567,7 +567,7 @@ def headroom_sickness(bot_rows, ok=None):
                             "detail": f"headroom refused: {why} "
                                       f"(gap {hd.get('gap_stop_widths')} "
                                       f"stop-widths)"})
-        # [(wo)] PAGE ON THE MEASUREMENT, REPORT THE BOUND. `stop_reachable`
+        # [(wp)] PAGE ON THE MEASUREMENT, REPORT THE BOUND. `stop_reachable`
         # is the universe-worst margin at full-slot gross (a ceiling, met
         # structurally: mum's read 0.20 mmf x 9.5x = "DEAD" every loop while
         # her held basket at 5.6x had ~12% to liquidation against a 4% stop).
@@ -1639,7 +1639,7 @@ def _selftest():
     assert headroom_sickness([_hrow(
         "freqtrade-mum-lighter",
         {"ok": False, "reason": "too_close", "gap_stop_widths": 1.13})]) == []
-    # [(wo)] liq_unpriced joined mum's structural set (cross-margin: the
+    # [(wp)] liq_unpriced joined mum's structural set (cross-margin: the
     # venue prices liquidation per ACCOUNT, so per-position liq is absent by
     # construction); a genuinely NEW reason on her row still pages.
     assert headroom_sickness([_hrow(
@@ -1653,7 +1653,7 @@ def _selftest():
     assert headroom_sickness(
         [_hrow("freqtrade-avo-maria-lighter", stop_ok=False,
                age=999999)]) == []
-    # [(wo)] the HELD measurement outranks the universe bound both ways:
+    # [(wp)] the HELD measurement outranks the universe bound both ways:
     # bound says DEAD, held says reachable -> silent; bound says fine, held
     # says DEAD -> pages naming the held numbers; held absent -> the bound.
     _r = _hrow("freqtrade-x-lighter", stop_ok=False)
@@ -1670,7 +1670,7 @@ def _selftest():
     _r3 = _hrow("freqtrade-x-lighter", stop_ok=False)
     _r3["extra"]["leverage"]["stop_reachable_held"] = None
     assert headroom_sickness([_r3], ok={}), "None held -> the bound pages"
-    # [(wo)] liq_unpriced is DECLARED structural on both cross-margin rows
+    # [(wp)] liq_unpriced is DECLARED structural on both cross-margin rows
     assert headroom_sickness([_hrow(
         "freqtrade-avo-maria-lighter",
         {"ok": False, "reason": "liq_unpriced", "gap_stop_widths": 7.98})]) == []

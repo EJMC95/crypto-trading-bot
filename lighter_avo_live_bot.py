@@ -400,7 +400,7 @@ def worst_mmf(universe):
 
 
 def held_mmf(positions, rows):
-    """[2026-09-02 (wo)] THE HELD BASKET'S maintenance-margin fraction,
+    """[2026-09-02 (wp)] THE HELD BASKET'S maintenance-margin fraction,
     notional-weighted, or None — the quantity cross-margin liquidation is
     actually computed on. `positions` is the venue margin block's
     `{sym: {"value": notional_usd, ...}}`; `rows` the scout's margin surface.
@@ -678,7 +678,7 @@ _pair_corr = _bus.pair_corr
 basket_n_eff = _bus.basket_n_eff
 
 
-# [2026-09-02 (wo)] ONE owner: fleet_bus.diversified_order — the family
+# [2026-09-02 (wp)] ONE owner: fleet_bus.diversified_order — the family
 # shadow host now runs the same rule, so the judge's parity rung can open.
 # Kept as a module name because the (sr) tests and the entry loop bind it.
 diversified_order = _bus.diversified_order
@@ -1713,7 +1713,7 @@ def main(_ctx=None, once=False):
             # read once per publish and shared by the three fields below.
             _mmf = worst_mmf(universe)
             _stop_ok, _stop_ceiling = stop_reachable(_mmf)
-            # [(wo)] and the MEASURED one: the held basket at the venue's
+            # [(wp)] and the MEASURED one: the held basket at the venue's
             # own leverage (gross/equity off the margin read), never the
             # full-slot bound. None when any leg's margin is unreadable.
             _held_mmf, _held_w = (None, None)
@@ -1805,7 +1805,7 @@ def main(_ctx=None, once=False):
                     # protective stop is dead code. Reported, never a gate.
                     "stop_reachable": _stop_ok,
                     "stop_dead_above": _stop_ceiling,
-                    # [(wo)] THE HELD-BASKET MEASUREMENT beside the bound.
+                    # [(wp)] THE HELD-BASKET MEASUREMENT beside the bound.
                     # `mmf`/`liq_gap_pct`/`stop_reachable` above are the
                     # universe-worst margin at FULL-slot gross — a ceiling
                     # on what this row could ever do. These are what it IS
@@ -2412,7 +2412,7 @@ def main(_ctx=None, once=False):
             fr = store.load_state("fleet-risk") or {}
             age = (t_now - parse_ts(fr.get("updated"))).total_seconds()
             if 0 <= age <= float(fr.get("ttl_sec") or 900):
-                # [(wo)] THE LIVE COHORT'S OWN COUNT. This read `long_positions`,
+                # [(wp)] THE LIVE COHORT'S OWN COUNT. This read `long_positions`,
                 # the POOLED number, so on 2-Sep both real-money books were
                 # vetoed with slots free by a budget 6/20 of which was 🎫 the
                 # shadow taker's PAPER longs. fleet_bus.cohort_long_state is

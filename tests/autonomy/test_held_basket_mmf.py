@@ -1,4 +1,4 @@
-"""[2026-09-02 (wo)] THE STOP-DEAD PAGE WAS FIRING ON A BASKET NOBODY HELD.
+"""[2026-09-02 (wp)] THE STOP-DEAD PAGE WAS FIRING ON A BASKET NOBODY HELD.
 
 MEASURED 2-Sep on both real-money rows: `worst_mmf(universe)` — the worst
 maintenance margin across the ~93 books a row COULD hold — read 0.20 for 👩

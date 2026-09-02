@@ -1862,7 +1862,7 @@ def throttle_cap(strategy):
             if isinstance(strategy, DayTraderGated) else None)
 
 
-#: [2026-09-02 (wo)] THE SHADOW TWINS SCAN IN THE LIVE HOST'S ORDER. Until
+#: [2026-09-02 (wp)] THE SHADOW TWINS SCAN IN THE LIVE HOST'S ORDER. Until
 #: today this host iterated `b.coins` in LIST order while the live host runs
 #: `diversified_order` (the (sr) correlation-first offer), and the judge read
 #: every family pair `unjudgeable:policy_mismatch` on `scan_order` — so the
@@ -1901,7 +1901,7 @@ def shadow_scan_order_stamp():
 
 
 def _cohort_long_state(fr, cohort):
-    """[(wo)] fleet_bus.cohort_long_state with the same image-safety guard
+    """[(wp)] fleet_bus.cohort_long_state with the same image-safety guard
     as the other fleet_bus wrappers in this file: an image built without
     fleet_bus.py degrades to the POOLED pair, byte-identical to before."""
     try:
@@ -2410,7 +2410,7 @@ class Book:
                 # with the live host — judge v2's fairness precheck reads
                 # BOTH arms' stamps, and until this line the shadow stamped
                 # nothing, which made every family pair honestly unjudgeable.
-                # [(wo)] scan order is whatever shadow_scan_order does —
+                # [(wp)] scan order is whatever shadow_scan_order does —
                 # "diversified" by default since the port, "list" under
                 # FAMILY_SHADOW_SCAN_ORDER=list; the stamp and the loop read
                 # ONE constant so they cannot disagree.
@@ -2701,7 +2701,7 @@ def main():
             _upd = datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))
             _age = (now - _upd).total_seconds()
-            # [(wo)] the SHADOW cohort's own count — these books are paper,
+            # [(wp)] the SHADOW cohort's own count — these books are paper,
             # and until this line 14 of their 20-long budget was real money
             # they cannot affect. Old-shape payload -> pooled pair (unchanged).
             _lp, _lb = _cohort_long_state(_fr, "shadow")
@@ -2808,7 +2808,7 @@ def main():
                       "symcap": 0, "throttled": 0, "brain_gate": 0,
                       "opened": 0}
 
-            # [(wo)] offer order = the live host's rule (see SHADOW_SCAN_ORDER).
+            # [(wp)] offer order = the live host's rule (see SHADOW_SCAN_ORDER).
             # Returns come off the same cache the loop reads one line below,
             # so the pre-pass warms nothing new; a coin with no usable bars
             # simply sorts after the measured ones, then hits `no_bars` as

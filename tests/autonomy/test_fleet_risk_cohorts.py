@@ -1,4 +1,4 @@
-"""[2026-09-02 (wo)] PAPER POSITIONS WERE VETOING REAL MONEY, AND REAL MONEY
+"""[2026-09-02 (wp)] PAPER POSITIONS WERE VETOING REAL MONEY, AND REAL MONEY
 WAS VETOING PAPER — one long budget for two kinds of book.
 
 MEASURED ON THE LIVE BUS, 2-Sep: the pooled `long_positions` sat AT the
