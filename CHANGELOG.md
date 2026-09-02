@@ -392,6 +392,12 @@ georgia's pair is `stood_down` BY CONSTRUCTION and her SHADOW twin
 `GEORGIA_LIVE_RETIRED_OVERRIDE=run` on BOTH the trail-blazer-live host AND the
 judge (freqtrade-bots) — a half-set override is a book trading with no judge.
 
+**[2026-09-02, later — CodeQL hygiene on this entry's and (wf)'s suites:** the
+unused `os` import in `test_georgia_live_retired.py` and the unclosed handle in
+`test_avo_maxdd_denominator.py` (its AST pin now reads the source through a
+`with` block). Behaviour-neutral, 23/23 green; recorded here because the
+changelog gate correctly counts `tests/` as bot-affecting.]
+
 **PINNED** by `tests/autonomy/test_georgia_live_retired.py` (13 tests: the
 registry fact, book-scoping — mum/avo read live, the AST wiring of the gate and
 the `entries_shut` reason, no-sys.exit; call-site and registry mutations both

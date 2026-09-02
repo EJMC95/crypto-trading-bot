@@ -115,7 +115,8 @@ def test_a_genuine_twenty_percent_drawdown_still_locks_the_funded_book():
 def test_the_loop_passes_maxdd_ref_to_entries_lock_not_the_raw_baseline():
     """AST pin on the call site. A revert to `entries_lock(..., baseline, ...)`
     — the exact regression this fix undoes — reddens here."""
-    src = open(A.__file__).read()
+    with open(A.__file__) as fh:
+        src = fh.read()
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call)
