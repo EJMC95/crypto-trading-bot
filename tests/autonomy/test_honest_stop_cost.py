@@ -52,7 +52,8 @@ def test_the_floor_is_not_reached_through_a_module_this_image_lacks():
     """`audit_image_imports` caught the first version of this. Keep it caught:
     the real-money image COPYs fleet_bus and not fleet_allocation."""
     import ast
-    src = open(L.__file__).read()
+    with open(L.__file__) as fh:
+        src = fh.read()
     for node in ast.walk(ast.parse(src)):
         if isinstance(node, ast.ImportFrom) and node.module == "fleet_allocation":
             raise AssertionError(
@@ -118,7 +119,8 @@ def test_a_nonfinite_gross_or_stop_is_none_not_an_exception():
 def test_the_row_publishes_both_numbers_under_distinguishable_names():
     """Quiet and dark must not be the same byte-string (I1/I18): a reader has
     to be able to tell 'not measured' from 'measured and equal'."""
-    src = open(L.__file__).read()
+    with open(L.__file__) as fh:
+        src = fh.read()
     assert '"all_slots_stop_pct"' in src
     assert '"all_slots_stop_pct_measured": _honest_stop_cost(ov)' in src
     assert '"overshoot_n"' in src

@@ -735,7 +735,11 @@ def _honest_stop_cost(ov, gx=None, stop=None):
         g = gross_x() if gx is None else float(gx)
         sl = abs(float(S.stoploss)) if stop is None else abs(float(stop))
         out = g * (sl + over)
-        return round(out, 4) if out == out and abs(out) != float("inf") else None
+        # `math.isfinite` rather than the `out == out` NaN idiom used
+        # elsewhere in this file: CodeQL reads the self-comparison as a
+        # defect, and a suppressed finding on a real-money file is a finding
+        # the next reader learns to skip past.
+        return round(out, 4) if math.isfinite(out) else None
     except Exception:  # noqa: BLE001 - a telemetry field never breaks the loop
         return None
 
