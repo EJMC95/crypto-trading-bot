@@ -1,3 +1,59 @@
+## 2026-09-02 (xr) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
+
+**Eamon, 2-Sep: *"get rid of anything adopted from mum or avo"*** — after
+`(xq)` established that an adopted leg is not the book's evidence. He is right
+that they should go, and the reason is stronger than the evidence one.
+
+**MEASURED FIRST, and mum needed nothing.** 👩 mum: **zero** adopted legs
+(her stuck 1000PEPE cleared when Eamon closed it at the venue; her reconcile
+path drops meta without booking a phantom close, exactly as written). 🙏 avo:
+**TAO $235 + TRX $327 = $562 on a $319-equity book**, in 2 of her 5 slots.
+
+**WHY A SLOT IS THE REAL COST, not the P&L.** `SwingDip` has **no time stop**.
+Its exits are a −10% stop and `roi = {0: 0.20, 5760: 0.12, 11520: 0.06,
+20160: 0.0}` — the ladder reaches breakeven at **20,160 minutes = 14 days**. A
+leg sitting between −10% and breakeven therefore occupies a slot for up to a
+fortnight, and an adopted leg's clock starts at ADOPTION, so a container that
+loses meta again restarts it: **an adopted leg whose meta keeps being lost is
+effectively immortal.** Measured on the live row: her last close was **28-Aug,
+five days earlier, with all 5 of 5 slots full.** She was not declining to
+trade — she could not.
+
+**SHIPPED: `<PFX>_FLATTEN_ADOPTED`, and every property of it is a refusal of
+some way this could go wrong.**
+* **DEFAULT OFF, and that is the load-bearing one.** A container that loses
+  its meta re-adopts its OWN positions — the exact case `(xa)` was written for
+  — so a default-on purge liquidates a live book at market during a state
+  incident. This is an OPERATOR assertion ("these are not mine"), never a
+  default.
+* **ENV ONLY.** No lever, no bus, no brain, no organ may set it (AST-pinned).
+  The blast radius is a real-money book at market; that is not a knob the
+  growth rail gets.
+* **JUNK READS OFF** — `1/true/yes/on` and nothing else. A misspelled switch
+  must never flatten a book.
+* **AFTER THE STOP, BEFORE THE ROI LADDER.** A leg genuinely through its stop
+  still books `stop_loss`, because the risk record is what a stop is FOR and a
+  purge must not paper over one. Before roi so it does not wait out 14 days.
+* **EXITS ONLY** — it cannot gate, size or admit an entry (AST-pinned over
+  `clip_usd` / `gross_x` / `cap_slots` / `vol_target_gross_x`).
+
+**AND THE TAG GOT AN OWNER.** `ADOPTED_TAG` now lives in the live host, where
+the tag is actually stamped, and the adoption site reads it. `golive_readiness`
+keeps a second copy **on purpose** — it is graded inside the freqtrade image,
+which does not COPY the live host, so an import is impossible in either
+direction. A second copy of a rule is a second rule ((hj)), so `(xq)`'s
+grep-based drift pin is replaced by an **identity pin**: the two constants must
+be equal, and the host must still stamp from its own.
+
+**Expectancy price (I19):** the two legs are ~flat (+$3.4 combined at the marks
+that motivated this), so the purge costs approximately nothing and returns 2 of
+5 slots to entries her strategy actually chose. It buys DECIDABILITY, not edge
+— and on a book that has closed nothing in five days, decidability is the
+binding constraint (I17/I22).
+
+16 tests, **6/6 mutations red**, including the two that matter: defaulting the
+switch ON, and letting the purge pre-empt a genuine stop.
+
 ## 2026-09-02 (xq) — AN ADOPTED LEG IS NOT THE BOOK'S EVIDENCE: a manual trade Eamon placed by hand was on its way into a real-money book's go-live sample, and (xa)'s tag reached the brain but no grader
 
 **Eamon, 2-Sep: *"It was a manual trade please disregard it ... drop it from

@@ -79,10 +79,19 @@ def test_the_tag_matches_what_the_bot_actually_stamps():
 
 
 def test_the_live_host_still_stamps_the_tag_this_filter_keys_on():
-    """A drift pin. If `(xa)`'s adoption tag is ever renamed, this filter goes
-    silently inert — the registered-but-inert shape (I18)."""
+    """A drift pin, by IDENTITY rather than by grep ((xr)).
+
+    The two constants are a deliberate second copy: `golive_readiness` is
+    graded inside the freqtrade image, which does not COPY the live host, so
+    neither can import the other. A second copy of a rule is a second rule
+    ((hj)) — so pin them EQUAL, and pin that the host still stamps from its
+    own constant. Rename either and this filter goes silently inert (I18).
+    """
+    os.environ.setdefault("FAMILY_LIVE_BOOK", "freqtrade-avo-maria")
+    import lighter_avo_live_bot as host
+    assert host.ADOPTED_TAG == gr.ADOPTED_TAG
     src = _src(os.path.join(_ROOT, "lighter_avo_live_bot.py"))
-    assert 'm["tag"] = m.get("tag") or "%s"' % gr.ADOPTED_TAG in src
+    assert 'm["tag"] = m.get("tag") or ADOPTED_TAG' in src
 
 
 @pytest.mark.parametrize("mod,attr", [
