@@ -719,8 +719,18 @@ def main():
     try:
         import fleet_proposals as fprop
         _props = proposals_for(_bias, active, payload["playbook_grades"])
+        _wrote = None
         if _props:
-            fprop.propose(_props, set_by="event-sentinel", now_ts=now_ts)
+            _wrote = fprop.propose(_props, set_by="event-sentinel", now_ts=now_ts)
+        if _wrote is None:
+            # [2026-09-02 (wy)] NOTHING TO PROPOSE IS STILL A WRITE. propose()
+            # writes only when an entry survives, so a quiet channel aged out
+            # and read DARK on the organ board (3.8h past a 2h TTL, every
+            # proposer alive). This organ runs every 10 min — the fleet's
+            # most frequent proposer — so it is the one that keeps the
+            # channel's `updated` honest: an empty, fresh channel is "nobody
+            # is proposing"; a stale one is "nobody is writing" (I1/I13).
+            fprop.heartbeat("event-sentinel", now_ts=now_ts)
     except Exception:
         pass
 

@@ -1,3 +1,179 @@
+## 2026-09-02 (wy) — "RUN 2 THROUGH TO 4": the edge audit's two top hypotheses become PRE-REGISTERED instruments — and one is already excluded at 4h on 🎫 the taker's own entries — the incubator breeds for the lane the judge actually runs, and the organ board's two flags close: a proposals channel that could not tell empty from dead, and a light that mixed paper into real money
+
+**Eamon, 2-Sep, after the edge-radar / incubator / organ-board review: *"Run 2
+through to 4."*** The review had answered his first question (no new LIVE
+bots today — the live pair is still 👩 mum + 🙏 avo; the two NEW rows were
+SHADOW: 🔮 georgia-v3's first published row after (wv) fixed the family
+publish, and 🚀 bezos, born 1-Sep and idled 3h by the (wx) guard) and his
+second (`ready: []`; nearest mum-live ~25d on the window bar, 🙏 avo-shadow
+~14d on n, the taker 4/6 ~32d — nothing has data for a NEW real-money book,
+and I20/I22 refuse a copy of a running book), and ranked four things that
+CAN move. This entry is items 2–4, in the order given.
+
+### 2a. STUDY — the regime veto on shorts is a PRE-REGISTERED instrument (`scripts/study_regime_short_veto_2026-09-02.py`)
+
+The audit's hypothesis #3, highest prior and lowest cost because it is a
+VETO on existing books rather than a new one: every mixed book's in-era loss
+was its SHORT side in a tape the oracle read `risk-on uptrend`. Built as the
+audit's own test plan, written before the data was looked at (I21): every
+close labelled by the oracle's verdict for ITS coin at the OPEN (binary
+search, never a snapshot after the open; a coin the oracle does not grade
+rides BTC's verdict if crypto — the family bot's own rule, stamped
+`basis: btc-proxy` — and is UNKNOWN otherwise; a verdict >2h old is UNKNOWN);
+`veto` = short in `LONG-window` / long in `SHORT-window`; both sets graded
+through `golive_readiness.stats` with bounds at `fleet_allocation.t_crit(n)`
+— the retirement docket's own critical value, one standard in both directions
+(I17). Controls in `--selftest`: a planted regime effect is CONFIRMED, a
+placebo ledger never is, shuffled labels lose the effect, and the source scan
+proves it moves nothing.
+
+**MEASURED AT REGISTRATION (200h of oracle history, the public bus's cap;
+418 snapshots 25-Aug→2-Sep; BTC `LONG-window` in 418 of 418):** NOT DECIDABLE
+on every book, and the instrument says exactly why —
+
+| book | closes in window | vetoed n | vetoed mean | upper bound | read |
+|---|---:|---:|---:|---:|---|
+| 🪁 kelly | 190 of 390 | **122** | −0.273%/t (t_cl −0.81) | **+0.250%** | undecided — her shorts vs her longs +0.001% |
+| 💸 farmer shadow | 28 of 201 | 26 | −1.292% | **+0.009%** | one close from exclusion; retired at (wt), frozen |
+| 🧘 douglas | 22 of 81 | 18 | −1.070% | +0.029% | retired, frozen |
+| ⚖️ counterweight | 14 of 141 | 9 | +0.128% | +2.46% | n_req 3,041 — undecidable at this rate |
+| 🏛️ albanese | 23 of 51 | 6 | −0.686% | +0.94% | n_req 34 |
+| 🎫 taker | 31 of 150 | **0** | — | — | zero shorts opened in the window |
+
+The direction the audit saw is there (every living vetoed set is negative)
+and NONE has excluded a positive mean. **THE RULE, registered `since
+2026-09-02T09:30Z`:** ADOPT on a book (shadow-first, against its un-gated
+twin) only on closes opened AFTER `since`, vetoed n≥30, upper bound ≤0 AND the
+passed set's mean ≥ the book's own mean (the veto may not be removing the
+winners); REFUTE at n≥30 when the vetoed lower bound ≥0 or the vetoed set
+reads ≥ the passed set on ≥10 passed closes (the crowd was right — the
+audit's own kill condition); else NOT DECIDABLE with `n_req` published.
+Carried as `regime-short-veto-preregistered-read` (read at the first living
+vetoed set to reach n≥30 fresh — kelly's shorts run ~11/day — or 16-Sep).
+**It vetoes nothing**: a side veto on the taker would reset its 30-day clock
+((jf)) and the (wj) runbook forbids that before go-live.
+
+### 2b. STUDY — the taker hold floor is a PRE-REGISTERED instrument, AND ITS 4h FLOOR IS ALREADY EXCLUDED (`scripts/study_taker_hold_floor_2026-09-02.py`)
+
+The audit's hypothesis #2: 1–3d holds +2.219%/t (t=+3.06, n=57) vs 1–4h
+−2.595% (t=−3.19, n=20) — "the edge is continuation past a day; the early
+exits harvest noise" — with its own kill condition: the 1–4h losers are the
+stops, selection on OUTCOME. Two halves, both through the grader's owners:
+
+* **The ledger split, recomputed** (`edge_audit.shape` → `golive_readiness.
+  stats`), with the diagnostic the audit did not print: the 1–4h band is
+  **8 `sl` + 10 `trail` + 2 `tp`** — `sl_share` 0.40. So it is NOT simply the
+  stops; half of it is the trend exit's own give-back firing early.
+* **The counterfactual walk, entries held constant ((gx)):** every taker
+  close inside the 200h scout tape (n=31, all `breakoutup` — the lens the
+  finding lives on) walked forward from ITS OWN entry price through
+  `lighter_ticket_taker.exit_reason` with the trend bars (BRK_SL/BRK_TRAIL/
+  BRK_MAX_HOLD_H), once as shipped and once per floor F∈{4,8,12,24}h during
+  which no tp/sl/trail may fire (the peak still ratchets). **Calibration
+  gate PASSED: shipped-walk mean +0.697% vs realised +0.681%, per-trade |gap|
+  0.36pp, exit agreement 100%** — the walk is the bot.
+
+| floor | paired Δ pp | t | lb | ub | halves | W/L |
+|---|---:|---:|---:|---:|---|---|
+| **4h** | **−0.216** | −1.48 | −0.408 | **−0.025** | −3.8 / −2.9 | 1/3 |
+| 8h | +0.257 | +0.38 | −0.627 | +1.141 | +12.7 / **−4.8** | 3/6 |
+| 12h | −0.635 | −0.70 | −1.825 | +0.554 | −5.2 / −14.5 | 4/10 |
+| 24h | −0.906 | −0.96 | −2.146 | +0.335 | −12.7 / −15.4 | 7/11 |
+
+**The 4h floor — the audit's exact band — has an upper bound below zero on
+the taker's own entries: holding through the first four hours LOSES.** The
+early exits were mostly right. 8h is positive on a mean and h2-negative;
+12h and 24h lose more the longer they hold. Verdict at registration:
+`undecided` (8h's ub > 0 keeps it off `refuted`), and the audit's sentence
+survives only as a DESCRIPTION of the winners — a rule that makes the losers
+hold does not make them winners. **THE RULE, registered `since
+2026-09-02T09:30Z`:** ADOPT a floor F only on FRESH walked closes at n≥30
+when the paired delta's lower bound >0 at t_crit(n) AND both halves ≥0 AND
+the calibration gate passed; REFUTE at n≥30 when every floor's upper bound
+≤0; else NOT DECIDABLE. Judged against the book's own shipped rule on the
+same entries, never against the band that motivated it (I25). Carried as
+`taker-hold-floor-preregistered-read` (n≥30 fresh at ~4.7 closes/day ≈ 10
+days, or 16-Sep). DECLARED LIMIT: the `lighter_ticket_replay` form (a floor's
+effect on the ENTRIES it blocks by holding a slot) needs the up-resolver,
+which this environment's egress refuses (403) — that half runs in the
+container if the walk ever confirms.
+
+### 3. THE INCUBATOR BREEDS FOR THE LANE THE JUDGE RUNS
+
+Measured on the bus 09:06Z: `xp-judge.lanes.serial_lane: "mum"` (since
+(ww)), `strategy-incubator.proposal_capacity: {exhausted: true, generatable:
+4}` with eight Farmer names in lifetime memory — a lane whose shadow arm
+(wt) retired the same day — and `xp-queue.candidates: []`. The judge's
+`candidate_pool` admits a queue proposal ONLY under its own lane's prefix,
+so every offspring the reproduction organ could mint was structurally
+refused: the fleet's only path from an experiment to real money was being
+fed nothing. SHIPPED: `LANE_GENES` keyed on the judge's own `serial_lane`
+(`serial_lane_of`; a dark judge is the Farmer lane, byte-for-byte the old
+names); `MUM_GENES` = `xp.mum.rsi_max` {30, 32, 34} and `xp.mum.max_hold_min`
+{720, 1080, 2160, 2880} — inside the (ww) cages, off the cage edges except
+the two the judge's own hand candidates already test ((gx): a grid-edge
+winner is an artifact), her registry `env_default` (36 / 1440) never
+proposed; the base for a non-Farmer lane is the registry's pinned
+`env_default` (one owner — `audit_lever_bounds` holds it to the consumer's
+code). An unknown lane proposes NOTHING (a 7-day serial slot is never spent
+on a guess). Driven, not grepped: `tests/autonomy/test_incubator_mum_lane.py`
+puts the offspring through `experiment_judge.candidate_pool` on its offline
+lane (mum, deterministic since (wv)) and demands the four NOVEL alleles
+(rsi 30/34, hold 1080/2160) are admitted, the copies of the statics are
+signature-deduped, and a Farmer offspring on her lane is refused — a
+lane-unaware generator turns it red. Cost stated: the judge is SERIAL at
+≥7d per candidate, so four offspring behind three statics is ~7 weeks of
+lane; the queue is capped at 6 and untried-first ordering is unchanged.
+
+### 4. THE TWO ORGAN-BOARD FLAGS
+
+**(a) `tuning_proposals` DARK — 3.8h past a 2h TTL with every proposer
+alive.** `fleet_proposals` promised "the resting state is an empty channel"
+and `propose()` writes only when a stance survives, so a quiet channel aged
+out and was byte-identical to a dead key (I1/I13). `heartbeat(set_by)` —
+the same locked merge with an empty stance set (other authors' live entries
+ride through, expired ones drop, `updated` is NOW) — is called by the
+sentinel, the fleet's 10-min proposer, on every cycle it wrote nothing
+(including a `propose()` whose every entry was dropped). The organ board
+reads a fresh-empty channel `idle`, a stale one `dark`, and the difference
+is now a fact about the writer. `tests/autonomy/test_proposals_heartbeat.py`.
+
+**(b) `fleet_risk` light RED on 21/20 — and the 21 were mostly paper.**
+Composition at 09:06Z: pooled 21 = 👩 mum-live 12 + 🙏 avo-live 3 + 🎫 taker
+6; the SHADOW cohort's 21 = mum's twin 10 + avo's twin 5 + taker 6 (their own
+slot caps sum to 24); the LIVE cohort 15/20. Over the prior 24h the pooled
+light was red in **76 of 288 samples (26% of the day)** — and two things
+read that pooled red: `evidence_board.synthesize_live`'s UP ladder for
+`live.*.clip_scale`, which requires the light GREEN (a real-money up-scale
+gated on paper longs), and the two CONTROL twins, vetoing each other on
+positions their live arms never see with no budget of their own to move.
+(wp) split the veto READS by cohort and left the LIGHT pooled; this is the
+other half: `cohort_view` publishes `cohorts.{live,shadow}.light` on each
+cohort's OWN budget (`FLEET_SHADOW_LONG_BUDGET`, default = the pooled budget
+so nothing moves until set on purpose), `evidence_board._live_light` reads
+the live cohort (pooled fallback on a pre-(wy) payload — never opens on a
+missing field), `organ_board.c_fleet_risk` asks "at budget?" of each cohort
+and names which binds, and the risk HISTORY now carries the cohorts so the
+split is measurable over a day rather than readable this minute. Stated
+plainly: at 15/20 the live cohort reads YELLOW (`YELLOW_FRAC` 0.7 → 14), so
+the board's ladder does not open today either — what changed is that it now
+reads the population real money sits in. The shadow overshoot to 21 is
+batch-fill mechanics (mum's twin enters several per loop against a ≥-budget
+veto) and is not a defect; whether the shadow budget should sit at the
+twins' cap sum is a lever decision with its own entry. `tests/autonomy/
+test_fleet_risk_cohort_lights.py` (cohort lights, the live-light read, the
+board's per-cohort grade, the neutral default).
+
+**DEPLOY.** freqtrade-bots takes the sentinel, proposals, risk, board and
+incubator changes on the merge (its `paths:` carry them). NO live bot file
+changed and no trade the live books take moves → main only, no marker, per
+(mm). The two studies are `scripts/` instruments, registered in
+`SELFTEST_MODULES`, not shipped in any image. Both carried rows are in
+`session_state.CARRIED` with 16-Sep backstops; CLAUDE.md's fleet_risk,
+incubator and proposals bullets are corrected in place per I12. Letter: (wx)
+was HEAD's at write time; (wy) is the next free and will be re-checked at
+push.
+
 ## 2026-09-02 (wx) — THE SLATE'S OWN FIRST DEFECT, FOUND BY ITS OWN PAGE: the douglas guard idled 🚀 bezos, his undeclared tenant, for ~3 hours
 
 **[RENUMBERED (ww) -> (wx) at push time** — PR #265's readback merge took (ww) on main mid-write; the pushed entry keeps the letter.**]**

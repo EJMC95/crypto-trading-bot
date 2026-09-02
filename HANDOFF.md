@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 19:20 Sydney (09:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 19:35 Sydney (09:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -13,6 +13,16 @@ _Still open because:_ retiring her before the registration's own read voids it (
 ⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 1-Oct, whichever first. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
 
 _Still open because:_ the read date has not arrived. This row is the tripwire the registration lacked: its predicate fires on 1-Oct, so CI reds until a session actually PERFORMS the read and closes this row with the verdict in the CHANGELOG. If fresh on-class n reaches 60 EARLIER, do the read then — the date is the backstop, not the trigger.
+
+### `regime-short-veto-preregistered-read`  ·  owner: **session**
+The edge audit's hypothesis #3 is a PRE-REGISTERED instrument now (I21): `scripts/study_regime_short_veto_2026-09-02.py` labels every close by the oracle's verdict for its coin at the OPEN and grades the vetoed set (short in LONG-window / long in SHORT-window) at t_crit(n). Registered 2-Sep 09:30Z. READ: run it with `--fresh` when the largest living vetoed set reaches n>=30 fresh closes (🪁 kelly's shorts run ~11/day; ⚖️ counterweight's ~1/day) or on 16-Sep, whichever first. CONFIRMED -> build the veto shadow-first on THAT book, graded against its un-gated twin, own entry; REFUTED -> record it beside the audit's hypothesis table; else record the numbers and re-arm one more read (P3: at most twice).
+
+_Still open because:_ the fresh sample has not accrued. At registration the instrument read NOT DECIDABLE on every book: the oracle's reachable history is 200h, BTC read LONG-window in 418 of 418 snapshots, and the largest vetoed sets were 🪁 kelly n=122 (-0.273%/t, ub +0.25% — undecided), 💸 farmer-shadow n=26 (ub +0.009%, one close short — retired, frozen) and 🧘 douglas n=18 (ub +0.029% — retired, frozen). The date is the backstop, not the trigger.
+
+### `taker-hold-floor-preregistered-read`  ·  owner: **session**
+The edge audit's hypothesis #2 is a PRE-REGISTERED instrument now (I21): `scripts/study_taker_hold_floor_2026-09-02.py` walks 🎫 the taker's OWN entries through `exit_reason` with a hold floor (no tp/sl/trail before F h) against the shipped rule, paired, calibrated against the realised closes, on the scout tape. Registered 2-Sep 09:30Z. READ: run it with `--fresh` at n>=30 fresh walked closes (~4.7 closes/day -> ~10 days) or on 16-Sep, whichever first. CONFIRMED -> register `TT_MIN_HOLD_H` as a caged shadow-lane lever at the confirmed floor, its own entry, era untouched (an exit bar is not in the (jf) signature); REFUTED -> record it; else record and re-arm once.
+
+_Still open because:_ the fresh sample has not accrued; the read at registration is in the (wy) changelog entry. Declared limit: the replay form of this test (a floor's effect on the ENTRIES it blocks by holding a slot) needs the up-resolver, which this environment's egress refuses — run that half in the container when the walk confirms.
 
 ### `allocation-clamp-is-a-per-position-bound-doing-per-book-duty`  ·  owner: **OPERATOR**
 💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vj)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
@@ -49,8 +59,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (104 commit(s), entries (tg), (vt), (vw), (vx), (vy), (vz), (wa), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
+## Shipped today (89 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
+- `8f90426` HANDOFF regenerated at session end (save)
 - `39311fc` The douglas guard spares his tenant (wx): scope by BOT — bezos is a variant of the retired engine and was idled ~3h; retirement scope is chosen by a module's importers
 - `2860c20` Merge PR #265: (ww) readback — family-shadow-stale-writer closed on the feed
 - `39a45ea` The closing note cites (ww), the entry it belongs to — no phantom letter
@@ -139,22 +150,6 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
-- `bdfc437` Merge PR #252: the address-all-of-the-above records - sentinel proven live, ⚖️ kept on a fresh criterion, GROSS_X handed over, family pinned Railway-side (wa)
-- `2e18902` Merge PR #251: the restart lever's sentinel was dead on arrival - run 650 measured it, one line fixes it, a guard pins it (vz)
-- `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
-- `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
-- `11cef14` Record (vy): the proceed-with-all execution, and HANDOFF regenerated
-- `65c84fd` A restart lever for the (ml) stuck-server class: railway redeploy via dispatch, no upload, no UI (vy)
-- `fa8821e` Kelly snap clips revert 250 -> 80 on the grader's own verdict - Eamon's call, era untouched (vy)
-- `f3b337a` The mmf-aware clip: 10x becomes compatible with living stops, per coin and restrict-only — 5/5 mutations red (vy)
-- `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
-- `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
-- `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
-- `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
-- `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
-- `e5b7527` Fleet audit 1-Sep: the report, and HANDOFF regenerated (vw)
-- `1a6ec31` book-bezos was born dead three ways: the engine ships, the accidental 5x is gone, and the book joins every registry its birth skipped (vt)
-- `56eb4e7` The changelog was wiped on main and no guard could say so: 655 entries restored, and the class gets its lost-entries arm (vw)
 
 ## How this file stays honest
 

@@ -126,6 +126,38 @@ def _author_may_propose(lever, set_by):
     return not (lane == "lighter-live" or str(lever).startswith("live."))
 
 
+def _merged(prev, out, now_ts, ttl):
+    """The locked read->merge->write body shared by propose() and heartbeat():
+    other authors' live entries survive, expired/unregistered ones drop, and
+    `out` (this author's fresh stances — {} for a heartbeat) replaces exactly
+    its own keys. `updated` is stamped NOW either way."""
+    # [2026-07-21, caught by same-day audit] per-LEVER replacement, as
+    # the docstring promises: the first cut dropped ALL of the calling
+    # author's prior proposals (set_by filter), so an organ making two
+    # propose() calls in one cycle silently lost the first. Keys are
+    # '<author>:<lever>', so merged.update(out) replaces exactly the
+    # re-proposed stances; the author's other levers ride to expiry (or
+    # withdraw()).
+    merged = {k: v for k, v in ((prev or {}).get("proposals") or {}).items()
+              if isinstance(v, dict) and k not in out
+              and _alive(v, now_ts) and v.get("lever") in tuning.LEVERS}
+    merged.update(out)
+    if len(merged) > MAX_PROPOSALS:              # newest expiry survives
+        keep = sorted(merged.items(),
+                      key=lambda kv: str(kv[1].get("expires") or ""),
+                      reverse=True)[:MAX_PROPOSALS]
+        merged = dict(keep)
+    horizon = now_ts
+    for v in merged.values():
+        try:
+            horizon = max(horizon, _parse_ts(v.get("expires")))
+        except Exception:
+            horizon = max(horizon, now_ts + ttl)
+    return {"updated": _iso(now_ts),
+            "ttl_sec": int(max(ttl, horizon - now_ts)),
+            "proposals": merged}
+
+
 def propose(proposals, set_by, now_ts=None, ttl_sec=None):
     """Author proposal entries, MERGED with other authors' live proposals
     (same locked read->merge->write pattern as fleet_tuning.write_levers —
@@ -160,51 +192,62 @@ def propose(proposals, set_by, now_ts=None, ttl_sec=None):
     if not out:
         return None
 
-    def _merge(prev):
-        # [2026-07-21, caught by same-day audit] per-LEVER replacement, as
-        # the docstring promises: the first cut dropped ALL of the calling
-        # author's prior proposals (set_by filter), so an organ making two
-        # propose() calls in one cycle silently lost the first. Keys are
-        # '<author>:<lever>', so merged.update(out) replaces exactly the
-        # re-proposed stances; the author's other levers ride to expiry (or
-        # withdraw()).
-        merged = {k: v for k, v in ((prev or {}).get("proposals") or {}).items()
-                  if isinstance(v, dict) and k not in out
-                  and _alive(v, now_ts) and v.get("lever") in tuning.LEVERS}
-        merged.update(out)
-        if len(merged) > MAX_PROPOSALS:              # newest expiry survives
-            keep = sorted(merged.items(),
-                          key=lambda kv: str(kv[1].get("expires") or ""),
-                          reverse=True)[:MAX_PROPOSALS]
-            merged = dict(keep)
-        horizon = now_ts
-        for v in merged.values():
-            try:
-                horizon = max(horizon, _parse_ts(v.get("expires")))
-            except Exception:
-                horizon = max(horizon, now_ts + ttl)
-        return {"updated": _iso(now_ts),
-                "ttl_sec": int(max(ttl, horizon - now_ts)),
-                "proposals": merged}
+    payload_fn = lambda prev: _merged(prev, out, now_ts, ttl)   # noqa: E731
 
     try:
         if store is None:
             return None
         payload = None
         if hasattr(store, "locked_state_update"):
-            payload = store.locked_state_update(KEY, _merge)
+            payload = store.locked_state_update(KEY, payload_fn)
         if payload is None:
             try:
                 prev = store.load_state(KEY) or {}
             except Exception:
                 prev = {}
-            payload = _merge(prev)
+            payload = payload_fn(prev)
             if not store.save_state(KEY, payload):   # landed-signal contract
                 return None
         if hasattr(store, "save_history"):
             store.save_history(KEY, {
                 "updated": payload["updated"], "set_by": set_by,
                 "proposed": {v["lever"]: v["value"] for v in out.values()}})
+        _cache.update(ts=now_ts, payload=payload)
+        return payload
+    except Exception:
+        return None
+
+
+def heartbeat(set_by, now_ts=None):
+    """[2026-09-02 (wy)] RE-STAMP THE CHANNEL WITH NOTHING TO PROPOSE.
+
+    The docstring above says the resting state is an empty channel — and an
+    empty channel is byte-identical to a DEAD one (I1/I13): `propose()` writes
+    only when an entry survives, so the key simply aged out whenever all three
+    proposers had nothing to say, and the organ board read it DARK (measured
+    2-Sep: 3.8h past a 2h TTL with every proposer alive and quiet). This is the
+    write that separates "nobody is proposing" from "nobody is writing": the
+    same locked merge as propose() with an empty stance set, so live entries of
+    every author ride through untouched, expired ones drop, and `updated` is
+    NOW. Returns the payload written, or None (no DB / failed write). Never
+    raises. Called by the sentinel every cycle it proposes nothing."""
+    now_ts = now_ts if now_ts is not None else time.time()
+    ttl = float(TTL_SEC)
+    payload_fn = lambda prev: _merged(prev, {}, now_ts, ttl)   # noqa: E731
+    try:
+        if store is None:
+            return None
+        payload = None
+        if hasattr(store, "locked_state_update"):
+            payload = store.locked_state_update(KEY, payload_fn)
+        if payload is None:
+            try:
+                prev = store.load_state(KEY) or {}
+            except Exception:
+                prev = {}
+            payload = payload_fn(prev)
+            if not store.save_state(KEY, payload):
+                return None
         _cache.update(ts=now_ts, payload=payload)
         return payload
     except Exception:
@@ -328,6 +371,23 @@ def _selftest():
     # author, shadow lanes open to shadow proposers, unlisted author -> no live.
     assert _author_may_propose("taker.momo_chg", "brain")
     assert _author_may_propose("taker.brk_range", "event-sentinel")
+
+    # [2026-09-02 (wy)] HEARTBEAT: an empty stance set still re-stamps the
+    # channel. Another author's LIVE entry survives, an EXPIRED one drops, and
+    # `updated` is NOW — so an empty channel is fresh (idle), never dark.
+    _prev = {"updated": _iso(now - 9000), "ttl_sec": 7200, "proposals": {
+        "brain:taker.momo_chg": {"lever": "taker.momo_chg", "value": 5.0,
+                                 "direction": "restrict", "set_by": "brain",
+                                 "expires": _iso(now + 600)},
+        "brain:taker.brk_range": {"lever": "taker.brk_range", "value": 0.9,
+                                  "direction": "restrict", "set_by": "brain",
+                                  "expires": _iso(now - 60)}}}
+    _hb = _merged(_prev, {}, now, float(TTL_SEC))
+    assert _hb["updated"] == fresh_iso, _hb
+    assert set(_hb["proposals"]) == {"brain:taker.momo_chg"}, _hb
+    assert _is_fresh(_hb, now) and not _is_fresh(_prev, now)
+    assert _merged({}, {}, now, float(TTL_SEC))["proposals"] == {}
+    assert heartbeat("event-sentinel", now_ts=now) is None or True   # never raises
     assert _author_may_propose("taker.div_gap_pp", "fleet-respiration")
     assert _author_may_propose("live.funding.enter_apr", "impl-shortfall")
     assert not _author_may_propose("live.funding.enter_apr", "brain")

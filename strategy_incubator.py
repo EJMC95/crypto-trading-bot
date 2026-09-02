@@ -180,6 +180,53 @@ FUNDING_GENES = {
     # must be structural, not two rolling windows. Selftest pins the absence;
     # re-adding the gene is a deliberate act against a recorded refutation.
 }
+# [2026-09-02 (wy)] 👩 MUM'S GENES — the judge's serial lane moved to the
+# living real-money pair at (ww) and this organ kept minting Farmer offspring
+# for a lane whose shadow arm was retired at (wt): `proposal_capacity` read
+# `exhausted: true` beside a judge reading `serial_lane: mum`, so the
+# reproduction organ fed nothing that could reach real money. Allele grids sit
+# INSIDE the (ww) cages (rsi_max [28, 38], max_hold_min [720, 2880]) and
+# deliberately off the cage EDGES ((gx): a grid-edge winner is an artifact,
+# never a value) except the two edges the judge's own hand candidates already
+# test (hold-720 / hold-2880 — signature-deduped there, so the incubator's
+# copies cost nothing). The judge's statics take rsi 32; the NOVEL alleles this
+# organ adds are rsi 30 / 34 and hold 1080 / 2160. Judge-gated like every
+# funding offspring: no replay exists for mum, so nothing here is pre-scored.
+MUM_GENES = {
+    "rsi_max": ("xp.mum.rsi_max", [30.0, 32.0, 34.0]),
+    "max_hold_min": ("xp.mum.max_hold_min", [720.0, 1080.0, 2160.0, 2880.0]),
+}
+#: judge lane id -> gene grid. The judge publishes `lanes.serial_lane`
+#: ("farmer" | "mum"); an unknown/dark lane proposes NOTHING (fail-closed —
+#: a 7-day serial slot is never spent on a guess about which book is judged).
+LANE_GENES = {"farmer": FUNDING_GENES, "mum": MUM_GENES}
+DEFAULT_LANE = "farmer"       # the pre-(wy) behaviour when the judge is dark
+
+
+def serial_lane_of(judge_state):
+    """The judge's CURRENT serial lane off its own payload, else DEFAULT_LANE.
+    Pure; selftested."""
+    js = judge_state if isinstance(judge_state, dict) else {}
+    lanes = js.get("lanes") if isinstance(js.get("lanes"), dict) else {}
+    lane = lanes.get("serial_lane")
+    return str(lane) if isinstance(lane, str) and lane else DEFAULT_LANE
+
+
+def _lane_base(lane, gene, lever):
+    """The allele an offspring must DIFFER from — the book's real default.
+    Funding keeps its env read (the bot's own env names, IMB-23); mum reads
+    the registry's `env_default`, which audit_lever_bounds pins to the
+    consumer's code, so the two cannot drift apart."""
+    if lane == "farmer":
+        base = {"enter_apr": float(os.environ.get("FUNDING_ENTER_APR", "0.05")),  # /8 basis fix
+                "take_profit": float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04")),
+                "max_hold_h": float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))}
+        return base.get(gene)
+    spec = tuning.LEVERS.get(lever) or {}
+    try:
+        return float(spec.get("env_default"))
+    except (TypeError, ValueError):
+        return None
 
 
 def now_ts():
@@ -1217,20 +1264,23 @@ def champion_proposal(champion, current, tighter=None, genes=None):
 
 # ---------------------------------------------------------------------------
 
-def _funding_candidates(judge_state, incubator_state, hurting=None):
-    """(generatable_count, untried_props) — the SINGLE source of "what funding
-    experiments exist and which are still unminted". funding_proposals() and
-    proposal_capacity() both read it so the emitter and its capacity report
-    can never disagree about whether this organ is sterile. Pure."""
-    # [2026-07-17 IMB-23] the baseline is the funding bot's OWN env defaults
-    # (the same env names it reads), not a hard-coded snapshot: if the
-    # operator drifts an env, an allele equal to the REAL baseline is a
-    # no-op and must be skipped, not proposed as a 7-day experiment. (The
-    # old get_lever `default` dict here was dead code — computed, never
-    # read — and the literals it shadowed could silently diverge.)
-    base = {"enter_apr": float(os.environ.get("FUNDING_ENTER_APR", "0.05")),  # /8 basis fix
-            "take_profit": float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04")),
-            "max_hold_h": float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))}
+def _funding_candidates(judge_state, incubator_state, hurting=None, lane=None):
+    """(generatable_count, untried_props) — the SINGLE source of "what judge
+    experiments exist on the CURRENT lane and which are still unminted".
+    funding_proposals() and proposal_capacity() both read it so the emitter
+    and its capacity report can never disagree about whether this organ is
+    sterile. `lane` defaults to the judge's own `lanes.serial_lane` ((wy)):
+    proposing on a lane the judge is not running burns nothing (its
+    candidate_pool admits only its own prefix) and earns nothing. Pure."""
+    # [2026-07-17 IMB-23] the baseline is the bot's OWN default (the same env
+    # names it reads / the registry's pinned env_default), not a hard-coded
+    # snapshot: if the operator drifts an env, an allele equal to the REAL
+    # baseline is a no-op and must be skipped, not proposed as a 7-day
+    # experiment. (The old get_lever `default` dict here was dead code —
+    # computed, never read — and the literals it shadowed could silently
+    # diverge.)
+    lane = lane or serial_lane_of(judge_state)
+    genes = LANE_GENES.get(lane) or {}
     tried = set()
     for v in (judge_state.get("verdicts") or []):
         nm = v.get("name")
@@ -1240,22 +1290,26 @@ def _funding_candidates(judge_state, incubator_state, hurting=None):
         tried.add(p.get("name"))
     hurting = set(hurting or ())
     props, generatable = [], 0
-    for g, (lever, grid) in FUNDING_GENES.items():
+    for g, (lever, grid) in genes.items():
         if lever.replace("xp.", "live.", 1) in hurting:
             continue      # live lane measured this knob bad — wait it out
+        base = _lane_base(lane, g, lever)
         for allele in grid:
-            if allele == base[g]:
+            if base is not None and allele == base:
                 continue
             generatable += 1
-            name = f"xp-{g}-{allele:g}"
+            # the Farmer keeps its lifetime names (the `proposed` dedup ledger
+            # is keyed on them); every other lane carries its lane in the name
+            name = (f"xp-{g}-{allele:g}" if lane == DEFAULT_LANE
+                    else f"xp-{lane}-{g}-{allele:g}")
             if name in tried:
                 continue
             levers = {lever: allele}
-            props.append({"name": name, "levers": levers})
+            props.append({"name": name, "levers": levers, "lane": lane})
     return generatable, props
 
 
-def funding_proposals(judge_state, incubator_state, hurting=None):
+def funding_proposals(judge_state, incubator_state, hurting=None, lane=None):
     """Novel FUNDING genotypes not already run/queued — proposed for the
     experiment judge's paired bar. Diversity-ordered (single-gene changes
     first). Never pre-scored (no funding replay); the judge is the filter.
@@ -1264,10 +1318,10 @@ def funding_proposals(judge_state, incubator_state, hurting=None):
     live lane just measured that knob bad; don't spend a 7-day judge slot
     re-proposing it while the verdict holds. Restrict-only (only removes
     proposals) and fail-safe (a dark organ skips nothing)."""
-    return _funding_candidates(judge_state, incubator_state, hurting)[1][:6]
+    return _funding_candidates(judge_state, incubator_state, hurting, lane)[1][:6]
 
 
-def proposal_capacity(judge_state, incubator_state, hurting=None):
+def proposal_capacity(judge_state, incubator_state, hurting=None, lane=None):
     """Can this organ still mint a NEW funding experiment? — publish-only.
 
     [2026-07-29] The reproduction organ can go STERILE in total silence, and
@@ -1287,8 +1341,9 @@ def proposal_capacity(judge_state, incubator_state, hurting=None):
     evidence ([[backtest-on-lighter-only]]) — a research decision, not a
     config edit. This function only makes the state VISIBLE so it cannot rot
     unnoticed. Pure; selftested."""
-    gen, props = _funding_candidates(judge_state, incubator_state, hurting)
-    return {"generatable": gen, "untried": len(props),
+    lane = lane or serial_lane_of(judge_state)
+    gen, props = _funding_candidates(judge_state, incubator_state, hurting, lane)
+    return {"lane": lane, "generatable": gen, "untried": len(props),
             "names": [p["name"] for p in props],
             # `gen` is 0 only when every gene is hurting-skipped — a transient
             # organ verdict, not sterility, so it must not read as exhausted.
@@ -1837,12 +1892,13 @@ def run_once():
     # experiments with nobody told. See proposal_capacity().
     capacity = proposal_capacity(judge_state, prior, hurting=hurting)
     if capacity["exhausted"]:
-        print(f"[incubator] ⚠️  FUNDING GENE SPACE EXHAUSTED — all "
-              f"{capacity['generatable']} generatable alleles are already in "
-              f"lifetime `proposed` memory; this organ can mint NO new funding "
-              f"experiment. The judge falls back to 28d retries of decided "
-              f"candidates. Refill needs NEW alleles with Lighter-tape "
-              f"evidence (a research decision, not a config edit).", flush=True)
+        print(f"[incubator] ⚠️  GENE SPACE EXHAUSTED on judge lane "
+              f"'{capacity['lane']}' — all {capacity['generatable']} "
+              f"generatable alleles are already in lifetime `proposed` memory; "
+              f"this organ can mint NO new experiment there. The judge falls "
+              f"back to 28d retries of decided candidates. Refill needs NEW "
+              f"alleles with Lighter-tape evidence (a research decision, not a "
+              f"config edit).", flush=True)
     if hurting:
         print(f"[incubator] 🦾 proprioception hurting levers honored: "
               f"{sorted(hurting)}", flush=True)
@@ -1877,8 +1933,9 @@ def run_once():
         merged = candidates_now + [p for p in props
                                    if p["name"] not in existing]
         candidates_now = merged[:20]
-        print(f"[incubator] proposed {len(props)} funding candidate(s) to "
-              f"xp-queue (judge-gated): {[p['name'] for p in props]}", flush=True)
+        print(f"[incubator] proposed {len(props)} candidate(s) on judge lane "
+              f"'{capacity['lane']}' to xp-queue (judge-gated): "
+              f"{[p['name'] for p in props]}", flush=True)
     store.save_state(QUEUE_KEY, {"updated": _iso(now), "ttl_sec": TTL_SEC,
                                  "candidates": candidates_now,
                                  "source": "strategy-incubator"})
@@ -2049,6 +2106,32 @@ def _selftest():
     for gene, (lever, grid) in TAKER_GENES.items():     # no dead alleles anywhere
         for allele in grid:
             assert tuning.clamp(lever, allele) == allele, (gene, lever, allele)
+
+    # [2026-09-02 (wy)] THE LANE FOLLOWS THE JUDGE. A dark judge is the Farmer
+    # lane (pre-(wy) behaviour, byte-for-byte names); a judge on 👩 mum's lane
+    # gets mum genes ONLY, every allele inside its cage, never her default.
+    assert serial_lane_of({}) == DEFAULT_LANE == "farmer"
+    assert serial_lane_of({"lanes": {"serial_lane": "mum"}}) == "mum"
+    assert serial_lane_of({"lanes": "junk"}) == "farmer"
+    _mum_js = {"lanes": {"serial_lane": "mum"}}
+    _mp = funding_proposals(_mum_js, {})
+    assert _mp and all(list(p["levers"])[0].startswith("xp.mum.") for p in _mp), _mp
+    assert all(p["lane"] == "mum" for p in _mp)
+    for p in _mp:
+        (lever, val), = p["levers"].items()
+        assert tuning.clamp(lever, val) == val, p
+        assert val != tuning.LEVERS[lever]["env_default"], "her default is not an experiment"
+        assert p["name"].startswith("xp-mum-"), p["name"]
+    assert len({p["name"] for p in _mp}) == len(_mp)
+    # a lane the judge does not run proposes NOTHING (never a guess)
+    assert funding_proposals({"lanes": {"serial_lane": "georgia"}}, {}) == []
+    assert proposal_capacity({"lanes": {"serial_lane": "georgia"}}, {})["exhausted"] is False
+    # the Farmer lane is unchanged by the mum grid (its names, its levers)
+    assert all(list(p["levers"])[0].startswith("xp.funding.")
+               for p in funding_proposals({"lanes": {"serial_lane": "farmer"}}, {}))
+    # 🦾 hurting reaches the mum lane through the same xp.->live. rename
+    _mh = funding_proposals(_mum_js, {}, hurting={"live.mum.rsi_max"})
+    assert _mh and not any("rsi_max" in p["name"] for p in _mh), _mh
 
     # funding proposals exclude already-tried names, cap, and map to xp levers
     js = {"verdicts": [{"name": "xp-enter_apr-0.0375"}]}
