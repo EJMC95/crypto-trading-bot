@@ -1,3 +1,103 @@
+## 2026-09-02 (xa) — 👩 MUM'S "BAD DAY" DEEP DIVE: the tape is the tape, the halt is $22 away, and one of her ten real-money legs was running with NO BRACKET because a 1000-market has two names
+
+**[RENUMBERED (wz) -> (xa) at push time** — PR #269 took (wz) on main for the shadow long budget while this PR was open; the cited entry keeps the letter, this one moves.**]**
+
+**Eamon, 2-Sep 19:40 Sydney:** *"Real money mum, doing well last few days now
+today doesn't seem great — can we deep dive."* Read on the live feed at 09:40Z.
+
+### 1. WHAT TODAY IS — measured, not felt
+
+| | number |
+|---|---|
+| day-start equity → now | $580.50 → **$545.70** (−$34.80, **−6.0%**) |
+| of which REALISED (5 closes) | **−$9.44** (WLFI +1.71 roi; JTO −4.09 / QQQ −2.26 / SPY −1.05 / XAU −3.75, all `max_hold` at 24.1h, all opened in ONE 09:03Z batch on 1-Sep) |
+| of which MARK-TO-MARKET on 10 open longs | **≈ −$42.5** (FARTCOIN −$11.5 at −3.98%, PENGU −5.5, TRX −4.7, XRP −4.1, DOGE −3.9, TAO −3.8, kPEPE −3.6, XCU −3.2, TRUMP −3.0, GRAM +0.7) |
+| gross / leverage now | **$3,279 on $545 = 6.0×** (set 9.5×, 10 of 12 slots; `n_eff` **1.94** — ten names, two bets) |
+| BTC over her holds | 78.5k (1-Sep 08Z) → **77.0k** (2-Sep 09Z), −2.0%, no bounce |
+| shadow twin, same day, 1× | **−$0.75 on $1,000** (−0.08%), same coins, same exits |
+| live vs shadow on 31 matched pairs | mean **−0.06pp**, median +0.06pp — execution is not the story |
+
+**The whole difference between the twin's "fine day" and the live row's "bad
+day" is the 6× — same trades, same tape.** Her strategy buys deep-oversold
+coins OUTSIDE an uptrend and waits 24h for the rebound; today the dip kept
+dipping. That is the shape of the book, not a defect: over her 57 closes the
+per-trade mean is +0.588% with sd 1.82%, and a 5-close window at or below
+today's −0.62% has happened **11%** of the time already. I25 applies exactly:
+29-Aug +$40.55 and 31-Aug +$39.40 were HOT windows; the book's own mean, not
+those windows, is the forecast. Go-live grade unchanged: 5 of 6 bars, t=2.43,
+both halves positive (+$50.5 / +$30.5), maxDD 3.8% MTM against a 15% bar,
+window binds until ~27-Sep. Radar `real_edge`; brain `warming: expand`.
+
+**THE NUMBER THAT MATTERS TONIGHT: the daily halt.** `LIGHTER_MAX_DAILY_LOSS=57`
+(Eamon's own 10%-of-$570 setting, (wh)) sits at equity **$523.50**. She is
+**$22.20** above it, and at current gross that is a **0.68% adverse basket
+move** — inside an ordinary crypto hour. The halt path FLATTENS all ten
+positions (`_flatten_all("daily_loss")`) at whatever the low is and blocks
+entries until the UTC day roll — i.e. it sells the dip her thesis is holding
+for. Stated, not changed: the cap value is Eamon's risk call ((wh)), and the
+geometry that makes a ~1% basket move a full flatten is the 9.5× gross he set
+on the record ((th)). Options, for him: (a) leave it — a 10% day-stop on a 6-10×
+book will fire on ordinary days and that is the price of the gross; (b) widen
+the abs cap toward the 15% drawdown bar; (c) lower `MUM_GROSS_X` so the same $
+halt is a larger basket move (at 4.17× the stop chain is alive without the mmf
+clip, (vx)). None of these is code.
+
+### 2. THE DEFECT — a 1000-market is TWO NAMES in one loop, and the bracket lost
+
+`venue.positions()` returns FLEET spellings (`from_lighter`: `1000PEPE` →
+`kPEPE`), while the live host's universe, entries and meta carry the venue's
+own spelling (the scout's `vols` keys). So on a 1000-market the loop held
+`meta["1000PEPE"]` (tag, `opened_ts`, entry bars) and `pos["kPEPE"]` (the
+money). Measured in her container log today:
+
+```
+09:06:52Z OPEN 1000PEPE long $445.33 @ 0.00344 [oversold-rebound]
+09:11:52Z 1000PEPE in meta but NOT on the venue — dropping meta (venue is the record)
+```
+
+From 09:11Z the $442 kPEPE leg (13.5% of her gross) was managed from an EMPTY
+meta: `age_min = (t0 − opened_ts or t0)` reads **zero every loop**, so the 24h
+`max_hold` was dead code, the roi ladder never decayed past its 2.0% first
+rung, and the row's `held` map published `kPEPE: null`. The −4% stop still
+applied (profit-based) — so this was an unbounded HOLD, not an unprotected
+one. **And it had already happened**: 31-Aug `kPEPE +$5.97` and `kBONK +$6.99`
+sit in her ledger as `long_roi` with `opened_at == closed_at` — two of her 57
+gate closes carry no strategy tag and a zero hold. The 🎫 taker closed this
+exact class on 17-Jul (`_live_pos` in `lighter_ticket_taker.py` maps positions
+back through `to_lighter`); the family live host never got it — the (te)
+class again, a fix proven in one file and never asked which other arm executes
+the same seam.
+
+FIXED, three parts, all driven not grepped (`tests/autonomy/
+test_live_position_alias.py`, 5 tests, **3/3 mutations red, each by its own
+test**):
+* **positions are read in ONE spelling** — `pos = {to_lighter(c)[0]: v …}` at
+  the venue-truth read, the taker's pattern, `venues.symbol_map` the one owner;
+* **an untracked venue leg is ADOPTED, never managed from an empty meta** —
+  no `opened_ts` ⇒ the clock starts NOW under tag `adopted`, printed loudly,
+  so stop/roi/max_hold govern from adoption and the close row reads
+  `long-adopted_<exit>` (I23: the brain never grades it in the strategy's
+  bucket; the record names what governed);
+* **the rescue** — a pre-(wz) container leaves meta stranded under the alias
+  spelling (`kPEPE` beside `pos["1000PEPE"]` after the fix); it is merged, its
+  accrued funding kept, then adopted. This is exactly what the running
+  container's state holds for kPEPE right now, so the deploy heals the live
+  orphan on its first loop.
+
+DECLARED: kPEPE's true open is 09:06:52Z; after the deploy its clock reads
+from adoption, so its 24h cap lands ~1h later than the bracket would have.
+The two 31-Aug rows stay in the ledger (real money, real P&L — I14); their
+tag/hold are wrong and are now known to be, which is what this entry is for.
+Also seen in the same log and NOT fixed here: `lighter tx budget exhausted`
+made every fill in the 09:06 loop UNMEASURED (telemetry only, fills real), and
+`lighter_client.py:1189` leaks an un-awaited `OrderApi.trades` coroutine on
+that error path (a RuntimeWarning, no behaviour) — noted for the next client
+pass.
+
+DEPLOY: `[deploy-live-mum]` on the merge subject — she is not halted (checked
+09:41Z, `locked=no`), positions restore from durable state, the (mm) rule
+applies (a real-money leg with no time cap is the harm; the fix changes what
+the book does).
 ## 2026-09-02 (wz) — "IF IT MAKES MORE MONEY AND WINS MORE, IMPLEMENT RIGHT AWAY": the shadow long budget is the cohort's own cap sum — the judge's control twins stop being vetoed on paper their live arms never see
 
 **Eamon, 2-Sep: *"Continue and if it makes more money and wins more implement
