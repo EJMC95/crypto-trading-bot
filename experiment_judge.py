@@ -3361,7 +3361,8 @@ def _selftest_body():
     if _isf_ok:
         # fallback fires: unstamped rows + drifted current builds -> HOLD
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # fallback stays quiet when current builds match (no false hold)
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_same) is None
         # THE 29-Jul REVERSAL, asserted: rows agree on a build, but the arms
@@ -3371,7 +3372,8 @@ def _selftest_body():
         _r_same = [{"bot": LIVE_BOT, "extra": {"build": "x"}},
                    {"bot": SHADOW_BOT, "extra": {"build": "x"}}]
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # ...and converged rows + converged current builds still clear
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_same) is None
         # row-based POSITIVE drift: DISJOINT build sets, the only shape that
@@ -3416,7 +3418,8 @@ def _selftest_body():
         #     the pre-window rows safe.
         assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
                                    fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # D — real drift INSIDE the window is still caught
         _r_inwindow = [
             {"bot": LIVE_BOT, "close_ts": iso(_w0 + 30), "extra": {"build": "p"}},
