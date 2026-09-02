@@ -1,3 +1,94 @@
+## 2026-09-02 (xb) — "PROCEED WITH OPTIMAL METRICS AND PARAMETERS": 👩 mum's gross 9.5× → 3.75×, on her own cell replayed as a book — and the same replay says yesterday's success was a 30-day hot window on a cell that LOSES over 120 days
+
+**Eamon, 2-Sep 20:15 Sydney:** *"Proceed with optimal metrics and parameters"*,
+then 20:40: *"Mum's gone from success yesterday to bleeding today."* The (xa)
+deep dive left two parameters with him — the gross and the daily-loss cap —
+and this is the measurement that decides them, plus the finding it turned up
+on the way.
+
+### 1. THE INSTRUMENT — `scripts/study_mum_gross_halt_2026-09-02.py`
+
+Her SHIPPED cell (`rsi < 36 AND NOT e50>e200 AND v>0`, read off the strategy
+object), LAG-1 entries, one position per coin, 12 slots, the real roi ladder /
+−4% stop / 24h cap (owners imported from `study_mum_supply`), replayed as a
+BOOK with `clip = gross × equity / 12` on the live arm's own 64-coin crypto
+universe (the scout's $0.1M floor, from the bus snapshot; a second run on the
+configured 43 agrees on every verdict). The daily halt is simulated as the
+host runs it: 10% of day-start equity ⇒ flatten every leg at that bar's close,
+entries shut to the UTC roll; equity marked at bar CLOSE (decision) and at
+bar LOW (an upper bound on halts). Grid: gross 1→10 × halt frac 0.10/0.15;
+windows trailing 120d (decision) and 30d (her live regime). **Calibration
+(gx):** at 1× over the shadow twin's window the replay reads **+0.344%/trade
+at 9.3 closes/day** against the twin's ledger +0.494% / 6.0 — inside the
+pre-declared ±0.30pp / ×1.6 gate. Decision rule fixed before the run: the
+largest gross with close-marked maxDD ≤ 15% (the gate's bar) AND ≤ 1 halt per
+30d on the 120d window; the halt frac stays 0.10 unless 0.15 halves halts
+inside the bar.
+
+### 2. WHAT IT MEASURED
+
+**On the 30d window (the regime she went live into):**
+
+| gross | closes/day | mean%/trade | total% | maxDD% | halts/30d (close · low) | halt cost% |
+|---|---|---|---|---|---|---|
+| 1 | 11.1 | +0.253 | +7.2 | 3.6 | 0 · 0 | 0 |
+| **3.75** | 11.1 | +0.253 | **+28.8** | **13.2** | **0 · 0** | 0 |
+| 5 | 11.1 | +0.223 | +33.5 | 20.9 | 1 · 3 | +5.0 |
+| 6 | 11.0 | +0.172 | +27.7 | 24.9 | 3 · 5 | +11.7 |
+| **9.5 (set)** | 10.5 | +0.136 | **+27.7** | **29.3** | **6 · 10** | +14.3 |
+| 10 | 10.4 | +0.139 | +29.5 | 30.6 | 6 · 10 | +13.4 |
+
+At her setting the daily halt fires **six times a month** on close marks (ten
+on lows), the book spends 8% of its hours locked out, and the gross buys
+NOTHING: total return at 9.5× (+27.7%) is BELOW 3.75× (+28.8%) with more than
+twice the drawdown, because every halt realises the dip her thesis is holding
+for. 3.75× is the largest gross inside the 15% bar with zero halts — and it is
+not a new number: it is `0.15 / |stop|`, the all-slots-stop bound
+`fleet_allocation` already publishes as `dd_bound.max_scale`, and the (sr)
+`GROSS_X_MAX` derivation on avo. The halt frac stays 0.10 (at 3.75× both
+fracs read identically).
+
+**On the 120d window the pre-declared rule returns NO gross, and the reason
+is the finding of the day:** at **1×** the cell reads **−0.180%/trade,
+−23.6% total, maxDD 33%** (n=1,673). Nothing passes because the CELL loses
+over that window; no gross fixes a negative cell, it only scales it (9.5× →
+−88.6%, 40 halts). **The last 30 days are a hot window on a cell that is
+negative over four months** — which is exactly what `(vd)` measured on 28-Aug
+(bar 36: +0.026%/trade, t=0.47, versus 32's +0.202) before Eamon set 36 on the
+record, and it is I25 at book scale: yesterday's +$40 days were the window,
+today is the mean. Her live ledger (n=59, +0.53%/trade) is the record (I14),
+it is 8 days old, and the `(wm)` pre-registration grades it on FRESH closes
+only — this entry moves no bar, and says the bar's owner is that read.
+
+### 3. WHAT MOVED, AND WHAT DID NOT
+
+* **`MUM_GROSS_X` 9.5 → 3.75** on `mum-live`, set under Eamon's delegation
+  ((tg): a cap value carries its derivation — above). New entries size at
+  `equity × 3.75 / 12` (~$168 at $537 vs ~$425); the ten open legs are
+  untouched and roll off through their own brackets within 24h, so the cut
+  bites over a day, not at once. Reversible by the same env.
+* **`LIGHTER_MAX_DAILY_LOSS` stays $57** (= 10% of the $570 funded book;
+  the pct rail binds first below $570 anyway).
+* **Strategy bars untouched** (rsi 36, roi ladder, 24h cap, −4% stop): I25
+  forbids retuning a book on the window that motivated it, in either
+  direction, and the judge's `xp.mum.*` lane and the `(wm)` registration own
+  them.
+* **Today, stated plainly for Eamon:** at 20:40 Sydney she is −$42.81 on the
+  day (−7.4%): −$24.50 realised (five 24h timers, one −4% stop on FARTCOIN,
+  one roi) and ≈−$18 marked on ten open longs into BTC 76.5k (−2.6% over the
+  holds). The $57 halt sits **$14 (a 0.42% basket move) away**; if it fires
+  the host flattens all ten at the low. The shadow twin, same cell at 1×,
+  is **+$5.48** on the day — different coins in the diversified order, no
+  leverage. Nothing here is a defect; it is the gross meeting the tape.
+
+DECLARED LIMITS of the replay: slots filled deepest-RSI-first (the live host
+orders by basket correlation — its baskets are less correlated than the
+replay's, so replay halts are an upper bound on that axis); no brain gate,
+no coin veto, no fleet long budget; fills at the bar open/close with no
+slippage (her measured exit gap is −0.8bps, (ro)). The 120d cell result is a
+REPLAY over 1h bars, not her ledger — it agrees with `(vd)`'s independent
+measurement, and it is the reason the `(wm)` fresh-close read matters.
+
 ## 2026-09-02 (xa) — 👩 MUM'S "BAD DAY" DEEP DIVE: the tape is the tape, the halt is $22 away, and one of her ten real-money legs was running with NO BRACKET because a 1000-market has two names
 
 **[RENUMBERED (wz) -> (xa) at push time** — PR #269 took (wz) on main for the shadow long budget while this PR was open; the cited entry keeps the letter, this one moves.**]**
