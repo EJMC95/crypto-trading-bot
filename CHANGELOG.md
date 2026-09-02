@@ -1,3 +1,65 @@
+## 2026-09-02 (wi) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
+
+**Eamon, ~01:00Z: "Optimise mum and avo and make sure both are optimal and
+running smoothly"** — with the material fact that he had executed the
+georgia→mum transfer at 00:30Z, BEFORE #257 merged. That transfer gave 👩 mum
+the exact class #257 fixes on 🙏 avo: her maxdd denominator was her birth seed,
+now ~$220 below her funded book, so her 20% bar read ~$70 against ~$5.4k gross
+(a ~1.3% adverse move = false lock). The authoring session's "mum-live needs no
+restart (byte-identical for her)" was TRUE when written and FALSE after the
+deposit — a deploy plan is a claim about the world, and the world moved.
+
+**THE TAKEOVER, recorded because the mechanics worked:** (1) My conflict
+resolution of their branch (merge main, renumber (wd)→(wf)/(we)→(wg), fix the
+9 code citations, leave the `wd` FIXTURE PARAMS in test_farmer_live_retired
+alone) came out **byte-identical on the code half** to the authoring session's
+own `6ea2664`, pushed two minutes ahead of mine — two independent executions of
+the letter convention converging is the convention being deterministic; mine
+was discarded, theirs won. (2) CI then failed on TWO cross-session interaction
+classes invisible to that session's sandbox: `experiment_judge --selftest`
+asserts georgia-pair MECHANICS (`unjudgeable`/`policy_unstamped`/`idle`) that
+her new `RETIRED_LIVE_ARMS` row short-circuits to `stood_down` — fixed with her
+own documented override around the mechanics block plus a `stood_down`
+assertion beside the farmer's, so the registry's word is itself driven; and
+main's (we) detector (`scripts/audit_writer_consistency.py`) shipped a
+`--selftest` NEVER REGISTERED — it went direct-to-main pre-protection, so
+`test_no_unregistered_selftest` first fired on THIS PR's merged tree while
+**main's own Tests run on `0b36f02` sat red**. Registering it here healed main.
+(3) A THIRD session's (wh) — mum's $30 daily-loss pilot cap flooring under her
+pct leash, the same deposit-fallout class one rail over — landed direct-to-main
+minutes before my merge, so merge commit `9b41ab5` carried BOTH mum rail fixes
+into ONE `[deploy-live]` restart.
+
+**RECEIPTS (run 654, success 01:14:36Z; stamps `a48641f9c8d0` →
+`4690a497e564` on all three live rows, 15 shadow rows on fresh per-image
+builds):** 👩 mum online 12/12, entries open, deposit booked
+`capital_adjust +220.42` with `pnl_abs` clean (+$51.69) and the `pnl_daily`
++$217 deposit echo SELF-CORRECTED to null one loop later; her operative
+daily-loss bar is now max($30, 10%×$572) ≈ **$57**, her intended leash. 🙏 avo
+new build, lock LATCHED to its pre-fix expiry **04:02:46Z** — the (vn) latch
+surviving a restart is the safety property working, so she serves ~2.7h of the
+old bug's tail and then a re-lock needs a REAL $61 drawdown (20% of funded
+$305), not the $12.56 that idled her ~103h. 🔮 georgia $0.01, flat, halted (the
+withdrawal read as a −$220 day — the safe direction); her `live_retired` gate is
+verified in the deployed host (`_retired` ANDed into `entries_ok`) and its label
+is MASKED by `shut_cause`'s halt-first precedence until the daily halt rolls off
+at UTC midnight.
+
+**RECORDED, NOT FIXED — the `halt.binding` label:** on mum it prints `"abs"`
+while the operative bar is the $57 pct term, because the label's comparison
+(`abs if max_daily_loss < pct·day_start`) predates (wh)'s min→max semantics.
+At the (wh) author's own ds=200 test fixture the current label is CONSISTENT,
+so the honest fix needs THEIR label semantics reconciled first — re-running the
+author's check before substituting my own is the (po) rule; a wrong label fix
+pushed to a live host at 01:30 is worse than a recorded nit. Owner: next
+session, one comparison + one test.
+
+**REFUSED WITH THE NUMBER:** mum `GROSS_X` 9.5→10 (Eamon's standing option)
+declined tonight — 9.5 was DERIVED to sit strictly inside her stop-death bar
+((gv): inside, never at), 10.0 IS the declared ceiling, and the step buys +5%
+deployed capital for pure proximity to liquidation with no expectancy term.
+The arithmetic is his whenever he wants the last half-turn.
+
 ## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
 
 Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:

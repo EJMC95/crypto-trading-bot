@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 09:35 Sydney (23:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 11:22 Sydney (01:22Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,19 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (2 commit(s), entries (wb), (wc))
+## Shipped today (13 commit(s), entries (wb), (wc), (wd), (we), (wg), (wh))
 
+- `9b41ab5` [deploy-live] Merge PR #257: avo's maxdd rail reads the funded book + georgia's live arm retired, reallocated to mum (wf)(wg)
+- `ea2d96f` mum's daily-loss pilot cap floors under the pct leash — funded to $570 she halted at 5.26% not 10% (wh)
+- `bdfc309` Drive #257 to green: the judge's own selftest didn't know georgia stands down, and main's (we) detector selftest was never registered
+- `6ea2664` Merge origin/main; renumber my letters (wd->wf avo, we->wg georgia) around the concurrent (wd)/(we) on main
+- `a5b928a` retire georgia's live arm (row-scoped) — Eamon's 'retire + reallocate to mum' call (we)
+- `0b36f02` (we) — the orphan had no detector: the split brain re-derived from the DB alone, and the class gets its guard
+- `681377b` tomllib shim: the local autonomy suite was dying at COLLECTION, so it ran zero tests
+- `2fe4b5f` SPLIT-BRAIN detector: extract classify_orphan so the georgia-v3 half is mutation-testable
+- `5a43ba0` SPLIT-BRAIN detector: a book's summary row must carry the same build stamp as its own newest close
+- `40a311f` avo's maxdd rail was measuring 4% of her book and calling it 20% — funded-equity denominator (wd)
+- `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
 
