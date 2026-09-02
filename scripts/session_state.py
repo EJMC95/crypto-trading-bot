@@ -127,6 +127,53 @@ CARRIED = [
         # preamble says somebody has to justify.
         "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 1),
     },
+    {
+        "id": "regime-short-veto-preregistered-read",
+        "owner": "session",
+        "what": "The edge audit's hypothesis #3 is a PRE-REGISTERED instrument "
+                "now (I21): `scripts/study_regime_short_veto_2026-09-02.py` "
+                "labels every close by the oracle's verdict for its coin at the "
+                "OPEN and grades the vetoed set (short in LONG-window / long in "
+                "SHORT-window) at t_crit(n). Registered 2-Sep 09:30Z. READ: run "
+                "it with `--fresh` when the largest living vetoed set reaches "
+                "n>=30 fresh closes (🪁 kelly's shorts run ~11/day; ⚖️ "
+                "counterweight's ~1/day) or on 16-Sep, whichever first. "
+                "CONFIRMED -> build the veto shadow-first on THAT book, graded "
+                "against its un-gated twin, own entry; REFUTED -> record it "
+                "beside the audit's hypothesis table; else record the numbers "
+                "and re-arm one more read (P3: at most twice).",
+        "why_open": "the fresh sample has not accrued. At registration the "
+                    "instrument read NOT DECIDABLE on every book: the oracle's "
+                    "reachable history is 200h, BTC read LONG-window in 418 of "
+                    "418 snapshots, and the largest vetoed sets were 🪁 kelly "
+                    "n=122 (-0.273%/t, ub +0.25% — undecided), 💸 farmer-shadow "
+                    "n=26 (ub +0.009%, one close short — retired, frozen) and "
+                    "🧘 douglas n=18 (ub +0.029% — retired, frozen). The date "
+                    "is the backstop, not the trigger.",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 16),
+    },
+    {
+        "id": "taker-hold-floor-preregistered-read",
+        "owner": "session",
+        "what": "The edge audit's hypothesis #2 is a PRE-REGISTERED instrument "
+                "now (I21): `scripts/study_taker_hold_floor_2026-09-02.py` walks "
+                "🎫 the taker's OWN entries through `exit_reason` with a hold "
+                "floor (no tp/sl/trail before F h) against the shipped rule, "
+                "paired, calibrated against the realised closes, on the scout "
+                "tape. Registered 2-Sep 09:30Z. READ: run it with `--fresh` at "
+                "n>=30 fresh walked closes (~4.7 closes/day -> ~10 days) or on "
+                "16-Sep, whichever first. CONFIRMED -> register `TT_MIN_HOLD_H` "
+                "as a caged shadow-lane lever at the confirmed floor, its own "
+                "entry, era untouched (an exit bar is not in the (jf) signature); "
+                "REFUTED -> record it; else record and re-arm once.",
+        "why_open": "the fresh sample has not accrued; the read at registration "
+                    "is in the (wy) changelog entry. Declared limit: the "
+                    "replay form of this test (a floor's effect on the ENTRIES "
+                    "it blocks by holding a slot) needs the up-resolver, which "
+                    "this environment's egress refuses — run that half in the "
+                    "container when the walk confirms.",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 16),
+    },
     # [2026-08-25 (tc)] `farmer-live-swap-operator-steps` DELETED — spent, and
     # its closes_when could never fire: it watched for a `georgia-live` service
     # while the (tb) plan change converted `trail-blazer-live` IN PLACE (so no
