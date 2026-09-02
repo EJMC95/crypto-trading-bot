@@ -216,6 +216,19 @@ def cohort_longs(by_bot, freqtrade_bots=None, perps_bots=None):
     return out
 
 
+def cohort_view(cohorts):
+    """[2026-09-02 (wy)] The published `cohorts` map: per cohort its long
+    count, its OWN budget and its OWN light (the same `light_for` ladder the
+    pooled light uses — one rule, two populations). Pure; selftested."""
+    c = cohorts or {}
+    out = {}
+    for name, budget in (("live", LIVE_LONG_BUDGET), ("shadow", SHADOW_LONG_BUDGET)):
+        n = int(c.get(name) or 0)
+        out[name] = {"long_positions": n, "long_budget": budget,
+                     "light": light_for(n, budget)}
+    return out
+
+
 def authoritative_row(base, by_bot):
     """(row, venue) for a directional bot, one row so nothing double-counts:
     live Lighter (real money) > -lshadow (the fleet's modelled Lighter books,
@@ -263,6 +276,23 @@ LONG_BUDGET = int(os.environ.get("FLEET_LONG_BUDGET", "20"))
 # and fall back to the pooled pair when the key is absent (deploy latency).
 # Same number by default — a SEPARATE count, not a wider budget.
 LIVE_LONG_BUDGET = int(os.environ.get("FLEET_LIVE_LONG_BUDGET", str(LONG_BUDGET)))
+# [2026-09-02 (wy)] THE SHADOW COHORT'S OWN BUDGET, env-separable from the
+# pooled number. Measured 2-Sep: the shadow cohort sat at 21 against 20 —
+# every one of the 21 a paper long (👩 mum's twin 10 + 🙏 avo's twin 5 + 🎫
+# the taker 6, whose own slot caps sum to 26), so the two control twins were
+# vetoing each other on positions their live arms never see.
+# [2026-09-02 (wz)] THE DEFAULT IS THE COHORT'S OWN CAP SUM — Eamon: "if it
+# makes more money and wins more implement right away." The number is DERIVED,
+# not chosen: 👩 mum's twin 12 + 🙏 avo's twin 6 + 🎫 the taker 8 = 26, the
+# most longs the living shadow directional books can hold at once, so the
+# paper budget can never bind below the books' own caps — a paper long risks
+# no real money, and the judge's control twins must face the veto their LIVE
+# arms face (the live cohort reads 15/20), not one their live arms never see.
+# Pinned to those three caps by tests/autonomy/test_fleet_risk_cohort_lights.py
+# so a cap change reddens this literal instead of letting it rot. I26: an
+# expectancy-neutral widening on a starved control arm is bought as
+# decidability; the env still overrides in either direction.
+SHADOW_LONG_BUDGET = int(os.environ.get("FLEET_SHADOW_LONG_BUDGET", "26"))
 SHORT_BUDGET = int(os.environ.get("FLEET_SHORT_BUDGET", "12"))
 YELLOW_FRAC = 0.7
 
@@ -786,12 +816,11 @@ def main():
         # [(wp)] the per-cohort split the veto consumers read — see
         # LIVE_LONG_BUDGET. `long_positions` above stays the POOLED count
         # (the light, the dashboard and the exposure view are unchanged).
-        "cohorts": {
-            "live": {"long_positions": _cohorts["live"],
-                     "long_budget": LIVE_LONG_BUDGET},
-            "shadow": {"long_positions": _cohorts["shadow"],
-                       "long_budget": LONG_BUDGET},
-        },
+        # [(wy)] each cohort carries its OWN light: the pooled light mixes
+        # paper into a real-money gate (evidence_board's live UP ladder) and
+        # real money into the paper twins' veto. Consumers of real money read
+        # `cohorts.live.light`; the pooled `light` is unchanged for display.
+        "cohorts": cohort_view(_cohorts),
         "gross": gross,
         # [2026-08-03 (iv)] PUBLISHED AT LAST. `per_bot` has been computed on
         # every cycle since this organ shipped and thrown away at the publish
@@ -818,6 +847,10 @@ def main():
     }
     store.save_state(RISK_KEY, risk_payload)
     store.save_history(RISK_KEY, {"light": light, "long": fleet_long,
+                                  # [(wy)] so the cohort split is MEASURABLE
+                                  # over a day, not only readable this minute
+                                  "cohorts": {k: [v["long_positions"], v["long_budget"], v["light"]]
+                                              for k, v in cohort_view(_cohorts).items()},
                                   "short": fleet_short, "gross": gross,
                                   "hot_pairs": hot_pairs,
                                   "fleet_equity": round(fleet_equity, 2),

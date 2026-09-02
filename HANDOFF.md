@@ -1,13 +1,8 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 19:30 Sydney (09:30Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 19:54 Sydney (09:54Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
-
-### `kelly-fresh-read-pre-registered`  ·  owner: **OPERATOR**
-EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh mean > 0, anything else returns to Eamon. Her all-time upper bound (+0.03% on n=383) has not excluded a positive mean, so I17-as-amended forbids retiring on it today.
-
-_Still open because:_ the read lived only in the report's prose (the I21 shape); it is now the `band-kelly` entry in golive_readiness.DECIDED_UNTIL, so the docket asks on the date. Closes when the decision is recorded and the entry removed.
 
 ### `georgia-v1-preregistered-read-10sep`  ·  owner: **session**
 🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
@@ -18,6 +13,16 @@ _Still open because:_ retiring her before the registration's own read voids it (
 ⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 1-Oct, whichever first. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
 
 _Still open because:_ the read date has not arrived. This row is the tripwire the registration lacked: its predicate fires on 1-Oct, so CI reds until a session actually PERFORMS the read and closes this row with the verdict in the CHANGELOG. If fresh on-class n reaches 60 EARLIER, do the read then — the date is the backstop, not the trigger.
+
+### `regime-short-veto-preregistered-read`  ·  owner: **session**
+The edge audit's hypothesis #3 is a PRE-REGISTERED instrument now (I21): `scripts/study_regime_short_veto_2026-09-02.py` labels every close by the oracle's verdict for its coin at the OPEN and grades the vetoed set (short in LONG-window / long in SHORT-window) at t_crit(n). Registered 2-Sep 09:30Z. READ: run it with `--fresh` when the largest living vetoed set reaches n>=30 fresh closes (🪁 kelly's shorts run ~11/day; ⚖️ counterweight's ~1/day) or on 16-Sep, whichever first. CONFIRMED -> build the veto shadow-first on THAT book, graded against its un-gated twin, own entry; REFUTED -> record it beside the audit's hypothesis table; else record the numbers and re-arm one more read (P3: at most twice).
+
+_Still open because:_ the fresh sample has not accrued. At registration the instrument read NOT DECIDABLE on every book: the oracle's reachable history is 200h, BTC read LONG-window in 418 of 418 snapshots, and the largest vetoed sets were 🪁 kelly n=122 (-0.273%/t, ub +0.25% — undecided), 💸 farmer-shadow n=26 (ub +0.009%, one close short — retired, frozen) and 🧘 douglas n=18 (ub +0.029% — retired, frozen). The date is the backstop, not the trigger.
+
+### `taker-hold-floor-preregistered-read`  ·  owner: **session**
+The edge audit's hypothesis #2 is a PRE-REGISTERED instrument now (I21): `scripts/study_taker_hold_floor_2026-09-02.py` walks 🎫 the taker's OWN entries through `exit_reason` with a hold floor (no tp/sl/trail before F h) against the shipped rule, paired, calibrated against the realised closes, on the scout tape. Registered 2-Sep 09:30Z. READ: run it with `--fresh` at n>=30 fresh walked closes (~4.7 closes/day -> ~10 days) or on 16-Sep, whichever first. CONFIRMED -> register `TT_MIN_HOLD_H` as a caged shadow-lane lever at the confirmed floor, its own entry, era untouched (an exit bar is not in the (jf) signature); REFUTED -> record it; else record and re-arm once.
+
+_Still open because:_ the fresh sample has not accrued; the read at registration is in the (wy) changelog entry. Declared limit: the replay form of this test (a floor's effect on the ENTRIES it blocks by holding a slot) needs the up-resolver, which this environment's egress refuses — run that half in the container when the walk confirms.
 
 ### `allocation-clamp-is-a-per-position-bound-doing-per-book-duty`  ·  owner: **OPERATOR**
 💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vj)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
@@ -54,17 +59,14 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (95 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx), (wy))
+## Shipped today (92 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
-- `31011bc` Merge origin/main into the calibration branch: main's (wx) landed first, this entry moves to (wy)
-- `4a7e809` HANDOFF regenerated after the (wx) calibration
-- `fb25313` Calibrate the two numbers (wx) left as judgements: the I25 margin is re-measured and stands, the shape monitor fires in sampling-noise units against the fleet's own claim bar
+- `da15417` Merge PR #267: (wy) run 2 through 4 — two pre-registered studies, the incubator on the judge's lane, the organ board's two flags closed
+- `34e33ad` CodeQL hygiene on (wy): four file reads through with-blocks, one constant comparison dropped from a test assertion
+- `1b0a4e1` (wy) Run 2 through 4: two pre-registered studies from the edge audit (the taker's 4h hold floor already excluded on its own entries), the incubator breeds for the judge's lane, and the organ board's two flags close
 - `8f90426` HANDOFF regenerated at session end (save)
 - `39311fc` The douglas guard spares his tenant (wx): scope by BOT — bezos is a variant of the retired engine and was idled ~3h; retirement scope is chosen by a module's importers
 - `2860c20` Merge PR #265: (ww) readback — family-shadow-stale-writer closed on the feed
-- `1e726a3` HANDOFF regenerated after merging main (wx)
-- `42d438c` Merge origin/main: #264 (ww) landed under the follow-up branch; the entry keeps (wx)
-- `fdb7182` The edge audit's last four items leave the prose: kelly's read is a docket deferral, mum's shape has a monitor, streaks are judged against chance, I25 reaches the live grader's margin (wx)
 - `39a45ea` The closing note cites (ww), the entry it belongs to — no phantom letter
 - `bf47978` Close family-shadow-stale-writer on the feed readback: family rows on 97dbe3986551/15, mum's 12-position book publishing, georgia-v3's first row
 - `bd524a5` [deploy-live] Merge PR #264: (ww) proceed with everything in the organ review — docket calls reconciled with the (wt) slate, cage re-decided, mum judge lane, weekly organ board

@@ -1,6 +1,6 @@
-## 2026-09-02 (xb) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
+## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
 
-**[LETTERED (xb) at push time: (wz) and (xa) reached main first — PR #269's cohort long budget and PR #268's mum position aliasing — while this was written as (wz); the pushed entries keep their letters.]**
+**[LETTERED (xc) at push time: written as (wz), then (xb); (wz), (xa) AND a second (wy) reached main first — PR #269's cohort long budget, PR #268's mum position aliasing, and another session's (wy) — so this session's two entries take (xb) and (xc) in the order they were written; the pushed entries keep their letters.]**
 
 **Eamon, 2-Sep:** *"Calibrate accordingly"*, then *"Calibrate optimally with
 findings"*. (wy) answered the first: it re-measured the I25 margin, found 1.7pp
@@ -111,11 +111,11 @@ not a target; the monitor weights a false page and a missed decay equally
 the trailing window stays 30, the gate's own close floor, and it is the one
 lever that would lower both error rates at the price of lag.
 
-## 2026-09-02 (wy) — THE EDGE AUDIT'S LAST FOUR ITEMS LEAVE THE PROSE: kelly's read is a docket deferral, mum's shape has a monitor, a losing streak is judged against chance, and I25 reaches the live grader's margin
+## 2026-09-02 (xb) — THE EDGE AUDIT'S LAST FOUR ITEMS LEAVE THE PROSE: kelly's read is a docket deferral, mum's shape has a monitor, a losing streak is judged against chance, and I25 reaches the live grader's margin
 
-**[RENUMBERED (wx) -> (wy) at push time: another session's (wx) — the douglas guard's bezos defect — reached main first; the pushed entry keeps the letter. Commit subjects on this branch still say (wx); the CHANGELOG header is the index.]**
+**[RENUMBERED (wx) -> (wy) -> (xb) at push time: another session's (wx) — the douglas guard's bezos defect — reached main first, then another session's (wy) did; the pushed entries keep their letters. Commit subjects on this branch still say (wx) and (wy); the CHANGELOG header is the index.]**
 
-**[SUPERSEDED IN PART the same day by (xb), on Eamon's *"Calibrate optimally with findings"*: the 1.7pp margin this entry re-measured and kept is GONE — the live lane's margins are now derived from each comparison's own noise at the fleet's critical value, against the twin and the book's mean EXCLUDING the motivating window — and the monitor's claim-bar threshold is replaced by the exact minimum-total-error boundary. The measurements below stand; the two constants do not.]**
+**[SUPERSEDED IN PART the same day by (xc), on Eamon's *"Calibrate optimally with findings"*: the 1.7pp margin this entry re-measured and kept is GONE — the live lane's margins are now derived from each comparison's own noise at the fleet's critical value, against the twin and the book's mean EXCLUDING the motivating window — and the monitor's claim-bar threshold is replaced by the exact minimum-total-error boundary. The measurements below stand; the two constants do not.]**
 
 **Eamon, 2-Sep, asked whether every fix in `EDGE_AUDIT_2026-09-02.md` had been
 completed. The honest answer was no** — the three approved sizing advisements had
@@ -254,6 +254,331 @@ the sqrt; crit a retyped 1.28; the comparison inverted; back to a 5pp points
 threshold; the bar re-derived when the payload has none; the margin edited to
 0.25 and to 5.0; the collapse measured over cold windows; DRIFT never reported;
 THIN read as INSIDE; the absent organ passing the pin).
+
+## 2026-09-02 (xa) — 👩 MUM'S "BAD DAY" DEEP DIVE: the tape is the tape, the halt is $22 away, and one of her ten real-money legs was running with NO BRACKET because a 1000-market has two names
+
+**[RENUMBERED (wz) -> (xa) at push time** — PR #269 took (wz) on main for the shadow long budget while this PR was open; the cited entry keeps the letter, this one moves.**]**
+
+**Eamon, 2-Sep 19:40 Sydney:** *"Real money mum, doing well last few days now
+today doesn't seem great — can we deep dive."* Read on the live feed at 09:40Z.
+
+### 1. WHAT TODAY IS — measured, not felt
+
+| | number |
+|---|---|
+| day-start equity → now | $580.50 → **$545.70** (−$34.80, **−6.0%**) |
+| of which REALISED (5 closes) | **−$9.44** (WLFI +1.71 roi; JTO −4.09 / QQQ −2.26 / SPY −1.05 / XAU −3.75, all `max_hold` at 24.1h, all opened in ONE 09:03Z batch on 1-Sep) |
+| of which MARK-TO-MARKET on 10 open longs | **≈ −$42.5** (FARTCOIN −$11.5 at −3.98%, PENGU −5.5, TRX −4.7, XRP −4.1, DOGE −3.9, TAO −3.8, kPEPE −3.6, XCU −3.2, TRUMP −3.0, GRAM +0.7) |
+| gross / leverage now | **$3,279 on $545 = 6.0×** (set 9.5×, 10 of 12 slots; `n_eff` **1.94** — ten names, two bets) |
+| BTC over her holds | 78.5k (1-Sep 08Z) → **77.0k** (2-Sep 09Z), −2.0%, no bounce |
+| shadow twin, same day, 1× | **−$0.75 on $1,000** (−0.08%), same coins, same exits |
+| live vs shadow on 31 matched pairs | mean **−0.06pp**, median +0.06pp — execution is not the story |
+
+**The whole difference between the twin's "fine day" and the live row's "bad
+day" is the 6× — same trades, same tape.** Her strategy buys deep-oversold
+coins OUTSIDE an uptrend and waits 24h for the rebound; today the dip kept
+dipping. That is the shape of the book, not a defect: over her 57 closes the
+per-trade mean is +0.588% with sd 1.82%, and a 5-close window at or below
+today's −0.62% has happened **11%** of the time already. I25 applies exactly:
+29-Aug +$40.55 and 31-Aug +$39.40 were HOT windows; the book's own mean, not
+those windows, is the forecast. Go-live grade unchanged: 5 of 6 bars, t=2.43,
+both halves positive (+$50.5 / +$30.5), maxDD 3.8% MTM against a 15% bar,
+window binds until ~27-Sep. Radar `real_edge`; brain `warming: expand`.
+
+**THE NUMBER THAT MATTERS TONIGHT: the daily halt.** `LIGHTER_MAX_DAILY_LOSS=57`
+(Eamon's own 10%-of-$570 setting, (wh)) sits at equity **$523.50**. She is
+**$22.20** above it, and at current gross that is a **0.68% adverse basket
+move** — inside an ordinary crypto hour. The halt path FLATTENS all ten
+positions (`_flatten_all("daily_loss")`) at whatever the low is and blocks
+entries until the UTC day roll — i.e. it sells the dip her thesis is holding
+for. Stated, not changed: the cap value is Eamon's risk call ((wh)), and the
+geometry that makes a ~1% basket move a full flatten is the 9.5× gross he set
+on the record ((th)). Options, for him: (a) leave it — a 10% day-stop on a 6-10×
+book will fire on ordinary days and that is the price of the gross; (b) widen
+the abs cap toward the 15% drawdown bar; (c) lower `MUM_GROSS_X` so the same $
+halt is a larger basket move (at 4.17× the stop chain is alive without the mmf
+clip, (vx)). None of these is code.
+
+### 2. THE DEFECT — a 1000-market is TWO NAMES in one loop, and the bracket lost
+
+`venue.positions()` returns FLEET spellings (`from_lighter`: `1000PEPE` →
+`kPEPE`), while the live host's universe, entries and meta carry the venue's
+own spelling (the scout's `vols` keys). So on a 1000-market the loop held
+`meta["1000PEPE"]` (tag, `opened_ts`, entry bars) and `pos["kPEPE"]` (the
+money). Measured in her container log today:
+
+```
+09:06:52Z OPEN 1000PEPE long $445.33 @ 0.00344 [oversold-rebound]
+09:11:52Z 1000PEPE in meta but NOT on the venue — dropping meta (venue is the record)
+```
+
+From 09:11Z the $442 kPEPE leg (13.5% of her gross) was managed from an EMPTY
+meta: `age_min = (t0 − opened_ts or t0)` reads **zero every loop**, so the 24h
+`max_hold` was dead code, the roi ladder never decayed past its 2.0% first
+rung, and the row's `held` map published `kPEPE: null`. The −4% stop still
+applied (profit-based) — so this was an unbounded HOLD, not an unprotected
+one. **And it had already happened**: 31-Aug `kPEPE +$5.97` and `kBONK +$6.99`
+sit in her ledger as `long_roi` with `opened_at == closed_at` — two of her 57
+gate closes carry no strategy tag and a zero hold. The 🎫 taker closed this
+exact class on 17-Jul (`_live_pos` in `lighter_ticket_taker.py` maps positions
+back through `to_lighter`); the family live host never got it — the (te)
+class again, a fix proven in one file and never asked which other arm executes
+the same seam.
+
+FIXED, three parts, all driven not grepped (`tests/autonomy/
+test_live_position_alias.py`, 5 tests, **3/3 mutations red, each by its own
+test**):
+* **positions are read in ONE spelling** — `pos = {to_lighter(c)[0]: v …}` at
+  the venue-truth read, the taker's pattern, `venues.symbol_map` the one owner;
+* **an untracked venue leg is ADOPTED, never managed from an empty meta** —
+  no `opened_ts` ⇒ the clock starts NOW under tag `adopted`, printed loudly,
+  so stop/roi/max_hold govern from adoption and the close row reads
+  `long-adopted_<exit>` (I23: the brain never grades it in the strategy's
+  bucket; the record names what governed);
+* **the rescue** — a pre-(wz) container leaves meta stranded under the alias
+  spelling (`kPEPE` beside `pos["1000PEPE"]` after the fix); it is merged, its
+  accrued funding kept, then adopted. This is exactly what the running
+  container's state holds for kPEPE right now, so the deploy heals the live
+  orphan on its first loop.
+
+DECLARED: kPEPE's true open is 09:06:52Z; after the deploy its clock reads
+from adoption, so its 24h cap lands ~1h later than the bracket would have.
+The two 31-Aug rows stay in the ledger (real money, real P&L — I14); their
+tag/hold are wrong and are now known to be, which is what this entry is for.
+Also seen in the same log and NOT fixed here: `lighter tx budget exhausted`
+made every fill in the 09:06 loop UNMEASURED (telemetry only, fills real), and
+`lighter_client.py:1189` leaks an un-awaited `OrderApi.trades` coroutine on
+that error path (a RuntimeWarning, no behaviour) — noted for the next client
+pass.
+
+DEPLOY: `[deploy-live-mum]` on the merge subject — she is not halted (checked
+09:41Z, `locked=no`), positions restore from durable state, the (mm) rule
+applies (a real-money leg with no time cap is the harm; the fix changes what
+the book does).
+## 2026-09-02 (wz) — "IF IT MAKES MORE MONEY AND WINS MORE, IMPLEMENT RIGHT AWAY": the shadow long budget is the cohort's own cap sum — the judge's control twins stop being vetoed on paper their live arms never see
+
+**Eamon, 2-Sep: *"Continue and if it makes more money and wins more implement
+right away."*** Of what this session measured, ONE thing has a measured
+starvation and no measured harm, and it is shadow-lane: the (wy) cohort split
+showed the SHADOW cohort at **21 against a budget of 20** — 👩 mum's twin 10,
+🙏 avo's twin 5, 🎫 the taker 6, every one a paper long — while the LIVE
+cohort sat at **15/20** and the pooled light read red in **76 of 288
+samples**. So the two CONTROL twins were refusing new longs on a budget their
+live arms never hit. That is the (wp) category error's last costume: the
+judge's paired bar compares a live arm to a twin that is being vetoed when
+the live arm is not, and a control arm under a different veto is not a
+control (I25 — the twin is the baseline that moves with the tide, and only
+if it trades the same supply).
+
+**SHIPPED: `FLEET_SHADOW_LONG_BUDGET` defaults to 26**, and 26 is DERIVED, not
+chosen — the most longs the living shadow directional books can hold at once
+(mum's twin `max_open` 12 + avo's twin's shadow override 6 + the taker's
+`TT_MAX_OPEN` 8), read from those books' own code by
+`test_the_shadow_budget_default_is_the_cohorts_own_cap_sum` so a cap change
+reddens the literal instead of letting it rot. The rule it engraves: **the
+paper budget never binds below the books' own caps** — a paper long risks no
+real money, and the fleet-level budget exists for the cohort that does. The
+LIVE budget is untouched (20) and pinned so. I26 prices it: expectancy-neutral
+(no entry rule moves; the twins take the entries their live arms take), bought
+as DECIDABILITY on the arms the judge grades, revert = set the env to 20.
+
+**WHY THE CODE DEFAULT AND NOT THE RAILWAY VARIABLE:** the connector write
+(`set-variables` on `freqtrade-bots`) was refused by this session's permission
+classifier — recorded, not worked around — so the value ships through main by
+the (jg) route, "the bot's own env default when no lever is open", which is
+the delegated shadow-lane surface (kd). The env still overrides in either
+direction. **What was NOT done, with the numbers:** the taker's 8h hold floor
+(+0.257pp on 31 walked closes, h2 −4.8, lb −0.63) is hypothesis-grade and I19
+refuses it; the regime veto's largest vetoed set (🪁 kelly n=122, ub +0.25%)
+has not excluded a positive mean and its own rule, registered thirty minutes
+earlier, says wait; the brain's 1.25× on mum-live was refused at (wm) with
+numbers and nothing here changes them. **PR #267 (wy) was MERGED** as
+`da15417` under the same grant (20/20 checks; CodeQL's six hygiene threads
+fixed and resolved), so the incubator's mum offspring, the proposals heartbeat
+and the cohort lights ride the freqtrade-bots deploy it triggered; the
+read-back of that deploy (stamp, `cohorts.shadow.long_budget: 26`, a fresh
+`tuning-proposals`, mum candidates in `xp-queue`) is the next line in this
+file or the HANDOFF, never assumed. freqtrade-bots only; no live bot file
+changed; main only, no marker.
+
+## 2026-09-02 (wy) — "RUN 2 THROUGH TO 4": the edge audit's two top hypotheses become PRE-REGISTERED instruments — and one is already excluded at 4h on 🎫 the taker's own entries — the incubator breeds for the lane the judge actually runs, and the organ board's two flags close: a proposals channel that could not tell empty from dead, and a light that mixed paper into real money
+
+**Eamon, 2-Sep, after the edge-radar / incubator / organ-board review: *"Run 2
+through to 4."*** The review had answered his first question (no new LIVE
+bots today — the live pair is still 👩 mum + 🙏 avo; the two NEW rows were
+SHADOW: 🔮 georgia-v3's first published row after (wv) fixed the family
+publish, and 🚀 bezos, born 1-Sep and idled 3h by the (wx) guard) and his
+second (`ready: []`; nearest mum-live ~25d on the window bar, 🙏 avo-shadow
+~14d on n, the taker 4/6 ~32d — nothing has data for a NEW real-money book,
+and I20/I22 refuse a copy of a running book), and ranked four things that
+CAN move. This entry is items 2–4, in the order given.
+
+### 2a. STUDY — the regime veto on shorts is a PRE-REGISTERED instrument (`scripts/study_regime_short_veto_2026-09-02.py`)
+
+The audit's hypothesis #3, highest prior and lowest cost because it is a
+VETO on existing books rather than a new one: every mixed book's in-era loss
+was its SHORT side in a tape the oracle read `risk-on uptrend`. Built as the
+audit's own test plan, written before the data was looked at (I21): every
+close labelled by the oracle's verdict for ITS coin at the OPEN (binary
+search, never a snapshot after the open; a coin the oracle does not grade
+rides BTC's verdict if crypto — the family bot's own rule, stamped
+`basis: btc-proxy` — and is UNKNOWN otherwise; a verdict >2h old is UNKNOWN);
+`veto` = short in `LONG-window` / long in `SHORT-window`; both sets graded
+through `golive_readiness.stats` with bounds at `fleet_allocation.t_crit(n)`
+— the retirement docket's own critical value, one standard in both directions
+(I17). Controls in `--selftest`: a planted regime effect is CONFIRMED, a
+placebo ledger never is, shuffled labels lose the effect, and the source scan
+proves it moves nothing.
+
+**MEASURED AT REGISTRATION (200h of oracle history, the public bus's cap;
+418 snapshots 25-Aug→2-Sep; BTC `LONG-window` in 418 of 418):** NOT DECIDABLE
+on every book, and the instrument says exactly why —
+
+| book | closes in window | vetoed n | vetoed mean | upper bound | read |
+|---|---:|---:|---:|---:|---|
+| 🪁 kelly | 190 of 390 | **122** | −0.273%/t (t_cl −0.81) | **+0.250%** | undecided — her shorts vs her longs +0.001% |
+| 💸 farmer shadow | 28 of 201 | 26 | −1.292% | **+0.009%** | one close from exclusion; retired at (wt), frozen |
+| 🧘 douglas | 22 of 81 | 18 | −1.070% | +0.029% | retired, frozen |
+| ⚖️ counterweight | 14 of 141 | 9 | +0.128% | +2.46% | n_req 3,041 — undecidable at this rate |
+| 🏛️ albanese | 23 of 51 | 6 | −0.686% | +0.94% | n_req 34 |
+| 🎫 taker | 31 of 150 | **0** | — | — | zero shorts opened in the window |
+
+The direction the audit saw is there (every living vetoed set is negative)
+and NONE has excluded a positive mean. **THE RULE, registered `since
+2026-09-02T09:30Z`:** ADOPT on a book (shadow-first, against its un-gated
+twin) only on closes opened AFTER `since`, vetoed n≥30, upper bound ≤0 AND the
+passed set's mean ≥ the book's own mean (the veto may not be removing the
+winners); REFUTE at n≥30 when the vetoed lower bound ≥0 or the vetoed set
+reads ≥ the passed set on ≥10 passed closes (the crowd was right — the
+audit's own kill condition); else NOT DECIDABLE with `n_req` published.
+Carried as `regime-short-veto-preregistered-read` (read at the first living
+vetoed set to reach n≥30 fresh — kelly's shorts run ~11/day — or 16-Sep).
+**It vetoes nothing**: a side veto on the taker would reset its 30-day clock
+((jf)) and the (wj) runbook forbids that before go-live.
+
+### 2b. STUDY — the taker hold floor is a PRE-REGISTERED instrument, AND ITS 4h FLOOR IS ALREADY EXCLUDED (`scripts/study_taker_hold_floor_2026-09-02.py`)
+
+The audit's hypothesis #2: 1–3d holds +2.219%/t (t=+3.06, n=57) vs 1–4h
+−2.595% (t=−3.19, n=20) — "the edge is continuation past a day; the early
+exits harvest noise" — with its own kill condition: the 1–4h losers are the
+stops, selection on OUTCOME. Two halves, both through the grader's owners:
+
+* **The ledger split, recomputed** (`edge_audit.shape` → `golive_readiness.
+  stats`), with the diagnostic the audit did not print: the 1–4h band is
+  **8 `sl` + 10 `trail` + 2 `tp`** — `sl_share` 0.40. So it is NOT simply the
+  stops; half of it is the trend exit's own give-back firing early.
+* **The counterfactual walk, entries held constant ((gx)):** every taker
+  close inside the 200h scout tape (n=31, all `breakoutup` — the lens the
+  finding lives on) walked forward from ITS OWN entry price through
+  `lighter_ticket_taker.exit_reason` with the trend bars (BRK_SL/BRK_TRAIL/
+  BRK_MAX_HOLD_H), once as shipped and once per floor F∈{4,8,12,24}h during
+  which no tp/sl/trail may fire (the peak still ratchets). **Calibration
+  gate PASSED: shipped-walk mean +0.697% vs realised +0.681%, per-trade |gap|
+  0.36pp, exit agreement 100%** — the walk is the bot.
+
+| floor | paired Δ pp | t | lb | ub | halves | W/L |
+|---|---:|---:|---:|---:|---|---|
+| **4h** | **−0.216** | −1.48 | −0.408 | **−0.025** | −3.8 / −2.9 | 1/3 |
+| 8h | +0.257 | +0.38 | −0.627 | +1.141 | +12.7 / **−4.8** | 3/6 |
+| 12h | −0.635 | −0.70 | −1.825 | +0.554 | −5.2 / −14.5 | 4/10 |
+| 24h | −0.906 | −0.96 | −2.146 | +0.335 | −12.7 / −15.4 | 7/11 |
+
+**The 4h floor — the audit's exact band — has an upper bound below zero on
+the taker's own entries: holding through the first four hours LOSES.** The
+early exits were mostly right. 8h is positive on a mean and h2-negative;
+12h and 24h lose more the longer they hold. Verdict at registration:
+`undecided` (8h's ub > 0 keeps it off `refuted`), and the audit's sentence
+survives only as a DESCRIPTION of the winners — a rule that makes the losers
+hold does not make them winners. **THE RULE, registered `since
+2026-09-02T09:30Z`:** ADOPT a floor F only on FRESH walked closes at n≥30
+when the paired delta's lower bound >0 at t_crit(n) AND both halves ≥0 AND
+the calibration gate passed; REFUTE at n≥30 when every floor's upper bound
+≤0; else NOT DECIDABLE. Judged against the book's own shipped rule on the
+same entries, never against the band that motivated it (I25). Carried as
+`taker-hold-floor-preregistered-read` (n≥30 fresh at ~4.7 closes/day ≈ 10
+days, or 16-Sep). DECLARED LIMIT: the `lighter_ticket_replay` form (a floor's
+effect on the ENTRIES it blocks by holding a slot) needs the up-resolver,
+which this environment's egress refuses (403) — that half runs in the
+container if the walk ever confirms.
+
+### 3. THE INCUBATOR BREEDS FOR THE LANE THE JUDGE RUNS
+
+Measured on the bus 09:06Z: `xp-judge.lanes.serial_lane: "mum"` (since
+(ww)), `strategy-incubator.proposal_capacity: {exhausted: true, generatable:
+4}` with eight Farmer names in lifetime memory — a lane whose shadow arm
+(wt) retired the same day — and `xp-queue.candidates: []`. The judge's
+`candidate_pool` admits a queue proposal ONLY under its own lane's prefix,
+so every offspring the reproduction organ could mint was structurally
+refused: the fleet's only path from an experiment to real money was being
+fed nothing. SHIPPED: `LANE_GENES` keyed on the judge's own `serial_lane`
+(`serial_lane_of`; a dark judge is the Farmer lane, byte-for-byte the old
+names); `MUM_GENES` = `xp.mum.rsi_max` {30, 32, 34} and `xp.mum.max_hold_min`
+{720, 1080, 2160, 2880} — inside the (ww) cages, off the cage edges except
+the two the judge's own hand candidates already test ((gx): a grid-edge
+winner is an artifact), her registry `env_default` (36 / 1440) never
+proposed; the base for a non-Farmer lane is the registry's pinned
+`env_default` (one owner — `audit_lever_bounds` holds it to the consumer's
+code). An unknown lane proposes NOTHING (a 7-day serial slot is never spent
+on a guess). Driven, not grepped: `tests/autonomy/test_incubator_mum_lane.py`
+puts the offspring through `experiment_judge.candidate_pool` on its offline
+lane (mum, deterministic since (wv)) and demands the four NOVEL alleles
+(rsi 30/34, hold 1080/2160) are admitted, the copies of the statics are
+signature-deduped, and a Farmer offspring on her lane is refused — a
+lane-unaware generator turns it red. Cost stated: the judge is SERIAL at
+≥7d per candidate, so four offspring behind three statics is ~7 weeks of
+lane; the queue is capped at 6 and untried-first ordering is unchanged.
+
+### 4. THE TWO ORGAN-BOARD FLAGS
+
+**(a) `tuning_proposals` DARK — 3.8h past a 2h TTL with every proposer
+alive.** `fleet_proposals` promised "the resting state is an empty channel"
+and `propose()` writes only when a stance survives, so a quiet channel aged
+out and was byte-identical to a dead key (I1/I13). `heartbeat(set_by)` —
+the same locked merge with an empty stance set (other authors' live entries
+ride through, expired ones drop, `updated` is NOW) — is called by the
+sentinel, the fleet's 10-min proposer, on every cycle it wrote nothing
+(including a `propose()` whose every entry was dropped). The organ board
+reads a fresh-empty channel `idle`, a stale one `dark`, and the difference
+is now a fact about the writer. `tests/autonomy/test_proposals_heartbeat.py`.
+
+**(b) `fleet_risk` light RED on 21/20 — and the 21 were mostly paper.**
+Composition at 09:06Z: pooled 21 = 👩 mum-live 12 + 🙏 avo-live 3 + 🎫 taker
+6; the SHADOW cohort's 21 = mum's twin 10 + avo's twin 5 + taker 6 (their own
+slot caps sum to 24); the LIVE cohort 15/20. Over the prior 24h the pooled
+light was red in **76 of 288 samples (26% of the day)** — and two things
+read that pooled red: `evidence_board.synthesize_live`'s UP ladder for
+`live.*.clip_scale`, which requires the light GREEN (a real-money up-scale
+gated on paper longs), and the two CONTROL twins, vetoing each other on
+positions their live arms never see with no budget of their own to move.
+(wp) split the veto READS by cohort and left the LIGHT pooled; this is the
+other half: `cohort_view` publishes `cohorts.{live,shadow}.light` on each
+cohort's OWN budget (`FLEET_SHADOW_LONG_BUDGET`, default = the pooled budget
+so nothing moves until set on purpose), `evidence_board._live_light` reads
+the live cohort (pooled fallback on a pre-(wy) payload — never opens on a
+missing field), `organ_board.c_fleet_risk` asks "at budget?" of each cohort
+and names which binds, and the risk HISTORY now carries the cohorts so the
+split is measurable over a day rather than readable this minute. Stated
+plainly: at 15/20 the live cohort reads YELLOW (`YELLOW_FRAC` 0.7 → 14), so
+the board's ladder does not open today either — what changed is that it now
+reads the population real money sits in. The shadow overshoot to 21 is
+batch-fill mechanics (mum's twin enters several per loop against a ≥-budget
+veto) and is not a defect; whether the shadow budget should sit at the
+twins' cap sum is a lever decision with its own entry. `tests/autonomy/
+test_fleet_risk_cohort_lights.py` (cohort lights, the live-light read, the
+board's per-cohort grade, the neutral default).
+
+**DEPLOY.** freqtrade-bots takes the sentinel, proposals, risk, board and
+incubator changes on the merge (its `paths:` carry them). NO live bot file
+changed and no trade the live books take moves → main only, no marker, per
+(mm). The two studies are `scripts/` instruments, registered in
+`SELFTEST_MODULES`, not shipped in any image. Both carried rows are in
+`session_state.CARRIED` with 16-Sep backstops; CLAUDE.md's fleet_risk,
+incubator and proposals bullets are corrected in place per I12. Letter: (wx)
+was HEAD's at write time; (wy) is the next free and will be re-checked at
+push. CodeQL's PR review flagged six hygiene findings on the new files —
+four bare `open()` reads without a context manager and one constant
+comparison in a test assertion — all fixed in the same PR before merge (a
+bot finding is a bug report, not a design note).
 
 ## 2026-09-02 (wx) — THE SLATE'S OWN FIRST DEFECT, FOUND BY ITS OWN PAGE: the douglas guard idled 🚀 bezos, his undeclared tenant, for ~3 hours
 

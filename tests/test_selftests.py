@@ -129,6 +129,14 @@ SELFTEST_MODULES = [
     # offline and pure (exit 0 here without a DB); registering it here makes this
     # PR green now and no-ops once main carries the same line.
     "scripts.study_taker_divergence_stop_2026-09-02",
+    # [2026-09-02 (wy)] the two PRE-REGISTERED studies from the edge audit's
+    # hypothesis table (#3 regime veto on shorts, #2 taker hold floor). Both
+    # selftests are offline and pure: synthetic oracle/tape, a positive control
+    # that must CONFIRM, a placebo/falling control that must not, every arm of
+    # each registered rule, and a moves-nothing source scan. The live arms read
+    # the public feeds and refuse on a dark one.
+    "scripts.study_regime_short_veto_2026-09-02",
+    "scripts.study_taker_hold_floor_2026-09-02",
     # [2026-08-20 (ru)] the docket class-split evidence. --selftest is offline
     # and pure (the split, the sleeve-tag round-trip, and the calibration gate's
     # fail-closed arms); the SCAN needs the public feeds, so only the fixture

@@ -839,7 +839,15 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   `learning-brain`, `brain-stake-mults`, `brain-diagnosis`,
   `brain-lens-forward`, `brain-vitals`
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
-  `authoritative_row`, 65-min staleness filter) + signal bus + **7d fleet
+  `authoritative_row`, 65-min staleness filter) **[2-Sep (wy): the pooled
+  `light` mixes paper into real money — `cohorts.{live,shadow}.light` is each
+  population on its OWN budget (`FLEET_SHADOW_LONG_BUDGET`; **(wz): default 26
+  = the shadow cohort's own cap sum, mum's twin 12 + avo's twin 6 + taker 8,
+  pinned to those caps by test — the paper budget never binds below the books'
+  own caps**),
+  the evidence board's live UP ladder reads `cohorts.live.light`, and the organ
+  board asks "at budget?" per cohort; measured 2-Sep: pooled red 76 of 288
+  samples with the live cohort at 15/20 the whole time]** + signal bus + **7d fleet
   drawdown governor** (`clip_scale` 1.0/0.5/0.25 — Ticket Taker consumes,
   gate0 advisory) + **exposure view** (`exposure`: effective-bet count via
   1/HHI, per-symbol pileup, crypto/equity split — advisory, 15-Jul);
@@ -980,9 +988,13 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   snapshot's own age so it never asserts old data as current. → `fleet-regen`
 - `strategy_incubator.py` 🧬 — REPRODUCTION: breeds strategy GENOTYPES
   (crossover+mutation). Taker offspring scored instantly by replay
-  (shadow-only leaderboard); funding offspring PROPOSED to `xp-queue` for the
+  (shadow-only leaderboard); judge-lane offspring PROPOSED to `xp-queue` for the
   experiment judge's identical paired live bar — no offspring shortcuts the
-  gate. Recombines within registry bounds only (invention stays human). →
+  gate. **[2-Sep (wy): the lane FOLLOWS THE JUDGE — `LANE_GENES` keyed on
+  `xp-judge.lanes.serial_lane` (👩 mum's `xp.mum.*` since (ww); the Farmer grid
+  is the dark-judge default), because it kept minting Farmer offspring for a
+  lane whose shadow retired at (wt) and read `exhausted: true` beside a judge
+  on mum.]** Recombines within registry bounds only (invention stays human). →
   `strategy-incubator` + `xp-queue`
 - `fleet_clock.py` 🕐 — CIRCADIAN: the fleet's shared sense of time (trading
   session, thin-liquidity, heavy-job window). Advisory. → `fleet-clock`
@@ -1184,7 +1196,10 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   (21-Jul, operator: "the organs need more ability to implement changes to
   forward onto the tuners to act on"). Any organ proposes a bounded change
   to a REGISTERED lever → `tuning-proposals` (locked multi-author merge,
-  per-proposal expiry, clamped at write AND read, declared
+  per-proposal expiry, clamped at write AND read, **[2-Sep (wy)] a
+  `heartbeat()` the sentinel writes every cycle it proposes nothing — the
+  resting "empty channel" was byte-identical to a dead key and read DARK on
+  the organ board at 3.8h past its 2h TTL (I1/I13)**, declared
   direction restrict|expand). Proposals NEVER enact: the scout tuner gates
   each through ITS OWN replay (restrict = not-worse both halves; expand =
   the full winner bar, brain veto senior, ≤3/cycle, provenance
