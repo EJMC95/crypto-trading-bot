@@ -64,7 +64,10 @@ def test_the_SHADOW_twin_keeps_trading():
 def test_an_unknown_row_is_never_retired():
     """Fail-safe direction is KEEP TRADING: a typo in the table can only fail
     to retire something, never silence a living book."""
-    for row in ("band-garrett-lshadow", "freqtrade-georgia-lighter",
+    # [(we)] freqtrade-georgia-lighter was here as a "definitely live" row — it
+    # is now retired itself (RETIRED_LIVE_ARMS), so 👩 mum's live row takes its
+    # place as the not-retired example.
+    for row in ("band-garrett-lshadow", "freqtrade-mum-lighter",
                 "perps-funding-lighter", "", "perps-funding-lighter-lighterX"):
         assert fb.live_arm_retired(row) is False, row
 

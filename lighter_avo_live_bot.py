@@ -2462,12 +2462,30 @@ def main(_ctx=None, once=False):
                 mmf_rows = {}
         except Exception:  # noqa: BLE001
             mmf_rows = {}
+        # [2026-09-02 (we)] 🔮 georgia's LIVE ARM RETIRED — Eamon's "retire +
+        # reallocate to mum" call on her measured-negative, unreachable in-era
+        # record (n=30 t=-1.70, maxDD 37.6% MTM, ~-$6.4/day; v3 also negative).
+        # BOOK-SCOPED BY CONSTRUCTION: `live_arm_retired(BOT_ROW)` is True only
+        # for a row named in `fleet_bus.RETIRED_LIVE_ARMS`, so 👩 mum and 🙏 avo
+        # (not in the table) read False and are untouched — the registry scopes
+        # it, not a per-book branch here, and a typo can only fail toward
+        # KEEP-TRADING (an unknown row is not retired; a bus error defaults the
+        # same way). Entries ONLY: the exit/flatten paths above always run
+        # (a book must always CLOSE), so any open position winds down on her
+        # own stops/roi — she is flat at retirement. No sys.exit
+        # (restartPolicy=always would crash-loop); she keeps heart-beating and
+        # publishes `entries_shut: live_retired`. Reversible via
+        # GEORGIA_LIVE_RETIRED_OVERRIDE=run on BOTH this host and the judge.
+        try:
+            _retired = bool(_bus.live_arm_retired(BOT_ROW))
+        except Exception:  # noqa: BLE001 — a bus error must not retire a book
+            _retired = False
         # [2026-08-18 (pq)] `not halt_blind` — when the daily-halt read failed
         # we do not know whether this book is halted, and "unknown" must not
         # buy. Entries only; the exit/flatten paths above already ran, because
         # a book must always be able to CLOSE (the Farmer's :2688 rule).
         entries_ok = (pos_readable and equity is not None
-                      and not halt_blind
+                      and not halt_blind and not _retired
                       and clip is not None and clip >= MIN_CLIP_USD
                       and t0 >= locked_until)
         # [(st)] WHEN THE WHOLE SCAN IS SHUT, say which precondition shut it.
@@ -2475,6 +2493,7 @@ def main(_ctx=None, once=False):
         # indistinguishable from a universe with no signal — the same
         # ambiguity one level up from the per-coin census below.
         entries_shut = None if entries_ok else (
+            "live_retired" if _retired else
             "positions_unreadable" if not pos_readable else
             "equity_unreadable" if equity is None else
             "halt_unreadable" if halt_blind else

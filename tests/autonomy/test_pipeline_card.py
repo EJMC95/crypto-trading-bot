@@ -52,9 +52,23 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 
 import experiment_judge as ej           # noqa: E402
 import fleet_allocation as fa           # noqa: E402
+import fleet_bus as _fb                 # noqa: E402
 import golive_readiness as g            # noqa: E402
 import pnl_dashboard as dash            # noqa: E402
 import strategy_incubator as si         # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _georgia_live_for_mechanics(monkeypatch):
+    """[(we)] These card tests use 🔮 georgia as the `policy_mismatch` (WIRE)
+    example and 💸 the farmer as the `stood_down` example, to check the pipeline
+    card sorts blockers by who can clear them. georgia's live arm is now retired
+    (fleet_bus.RETIRED_LIVE_ARMS), which would short-circuit her to `stood_down`
+    before the policy check and collapse the two distinct verdicts into one — so
+    force her live to keep her the policy_mismatch example. Her retirement is
+    owned by test_georgia_live_retired.py."""
+    assert "freqtrade-georgia-lighter" in _fb.RETIRED_LIVE_ARMS  # keep this honest
+    monkeypatch.setenv("GEORGIA_LIVE_RETIRED_OVERRIDE", "run")
 
 #: [2026-08-26] THE WALL CLOCK, not a frozen instant — and this file's own
 #: `_row()` docstring is where the rule comes from: *"a fixture whose verdicts

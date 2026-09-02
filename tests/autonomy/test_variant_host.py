@@ -37,6 +37,18 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 
+@pytest.fixture(autouse=True)
+def _georgia_live_for_mechanics(monkeypatch):
+    """[(we)] georgia's LIVE arm is retired (fleet_bus.RETIRED_LIVE_ARMS;
+    test_georgia_live_retired.py), so her entries are shut by default. This file
+    drives her main() as the vehicle for the variant host's SIZING / rank / stop
+    / close MECHANICS — a different question from whether she may trade — so
+    force the override to keep the vehicle live. `loaded` preserves already-set
+    env vars, so this survives inside its context. Only georgia is affected;
+    mum/avo runs are untouched."""
+    monkeypatch.setenv("GEORGIA_LIVE_RETIRED_OVERRIDE", "run")
+
+
 @contextlib.contextmanager
 def loaded(book=None, **env):
     """Import the live runner as `book` with `env` applied, and put the module

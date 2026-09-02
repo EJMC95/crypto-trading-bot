@@ -1,3 +1,63 @@
+## 2026-09-02 (we) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
+
+Eamon, asked to choose on 🔮 georgia (measured-negative, `unreachable`, bleeding
+~$6.4/day on ~$220): **"Retire + reallocate to mum."** This ships the CODE half —
+her live arm stands down so the sub-account frees; the fund transfer itself is
+Eamon's act in Lighter (I16 / the un-amendable core: fund movement is always his).
+
+**THE EVIDENCE, her own grader's:** in-era (post the 26-Aug exit-parity fix — her
+clean current policy) n=30, mean −0.354%/trade, t=−1.70, maxDD 37.6% MTM, horizon
+`unreachable` (the in-era upper bound −0.081% has already EXCLUDED a positive
+mean, so more of the same closes cannot flip the sign). 67% of the in-era loss is
+one lens (`range-on`, 24 closes, −$26.66, via trailing-stop + daily-loss — while
+its range_top EXIT is itself positive at +$28.13/t=2.61, so it is entry quality,
+not an exit knob). The standing v3 replacement grades negative too (shadow n=41,
+t=−1.58, `unreachable`). Her exits and entry filters were BOTH already measured
+dead ((tm)/(tp)) — which is exactly why this is I17 keep-or-decide, not a tuning
+pass. Meanwhile 👩 mum is the fleet's ONLY live book with a positive edge lower
+bound (+0.366%/trade), capital-capped at ~$363 and maxed on leverage — so moving
+georgia's $220 to mum is capital following measured edge (I16), the honest answer
+to "why isn't the fleet making more".
+
+**THE MECHANISM — the (ta) Farmer precedent, ROW-SCOPED on a SHARED HOST.** She
+shares the variant host with mum and avo, so a stand-down MUST be book-scoped or
+it halts a winner. It is book-scoped BY CONSTRUCTION rather than by a per-book
+branch: `fleet_bus.RETIRED_LIVE_ARMS` gains `freqtrade-georgia-lighter`
+(override `GEORGIA_LIVE_RETIRED_OVERRIDE`, successor `freqtrade-mum-lighter`),
+and the host reads `_bus.live_arm_retired(BOT_ROW)` — True only for a row named
+in that table, so mum and avo read False and trade untouched, and a typo can only
+fail toward KEEP-TRADING (an unknown row is not retired; a bus error defaults the
+same way). It is ENTRIES-ONLY and GRACEFUL: `_retired` is ANDed into the master
+`entries_ok` gate and named first in the `entries_shut` cascade (`live_retired`),
+while the exit/flatten paths above always run — so any open position winds down on
+her own stops/roi (she is FLAT at retirement, so it is a clean immediate stop) and
+the process keeps heart-beating (NO sys.exit — restartPolicy=always would
+crash-loop; the kill switch was rejected for exactly that reason, it boot-refuses
+with SystemExit). The judge and impl-shortfall read the same registry, so
+georgia's pair is `stood_down` BY CONSTRUCTION and her SHADOW twin
+(`freqtrade-georgia-lshadow`) keeps trading as the control arm. Reversible via
+`GEORGIA_LIVE_RETIRED_OVERRIDE=run` on BOTH the trail-blazer-live host AND the
+judge (freqtrade-bots) — a half-set override is a book trading with no judge.
+
+**PINNED** by `tests/autonomy/test_georgia_live_retired.py` (13 tests: the
+registry fact, book-scoping — mum/avo read live, the AST wiring of the gate and
+the `entries_shut` reason, no-sys.exit; call-site and registry mutations both
+verified RED). Six suites that used georgia as a LIVE example were updated the
+honest way — each names why: the mechanics files force her live via the override
+(`test_variant_host`, `test_judge_shadow_liveness`, `test_judge_restart`,
+`test_judge_policy_waiver`, `test_pipeline_card` — she is the vehicle for sizing /
+liveness / waiver / card-sorting machinery, not the subject), and
+`test_farmer_live_retired` swaps her for 👩 mum as its not-retired example.
+
+**DEPLOY:** reaches real money on a `[deploy-live]` dispatch to `trail-blazer-live`
+(georgia's host) + `freqtrade-bots` (the judge); mum-live and tide-rider-live need
+no restart (their behaviour is byte-identical — `live_arm_retired` is False for
+them). Verified by the `extra.build` + `build_n` stamp readback, never a green run.
+Then Eamon moves the ~$220 georgia → mum in Lighter; mum absorbs it cleanly via
+`EQUITY_SCALED_CAP` ((to)), which re-derives her notional cap from live equity
+every loop, so a deposit is never stranded (the (sr) trap avo hit is already closed
+on mum).
+
 ## 2026-09-02 (wd) — 🙏 AVO'S MAXDD RAIL WAS MEASURING 4% OF HER BOOK AND CALLING IT 20% — a frozen birth-seed denominator idled a funded real-money arm ~103h; the risk denominator now tracks the funded book
 
 Eamon: *"Real money bot optimisations, edges, expansion, where can we see the
