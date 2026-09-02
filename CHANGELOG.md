@@ -86,19 +86,52 @@ NaN idioms (now `math.isnan`), one fallback `except` without a comment, one
 unused test import — fixed before merge; a bot finding is a bug report.
 
 **DEPLOY: main only, by the (mm) rule.** `fleet_bus.py` is in `$_shared`, so
-every shadow service takes the rails on this push. Neither live row would trade
-differently today (both scale 1.0; the brain has no expansion opinion on
-either), so a live restart buys nothing and is not dispatched — the rails ride
-the next live deploy that does qualify. Kelly is the one book the rails bite
-today: her next entries size at 0.325 × $80 ≈ $26 until her drawdown reads
-under 15% again. **The growth half, so this entry is not only a rail:** the
-same audit says where the fleet's evidence actually points — 👩 mum (LB +0.366%,
-robust to concentration and cost), 🎫 the taker's `long-breakoutup` lens on 1–3d
-holds (+2.219%/trade, t=+3.06) — and the brain's expansion ladder has NEVER
-fired for either, because its floors were calibrated for a 1.5× ceiling
-(carried as `brain-mults-are-two-opinions-wide`). That is the next build in the
-win-more direction, and it is a measurement first: how many buckets qualify at
-each floor, and what they earned.
+every shadow service takes the rails on this push. Neither live row trades
+differently today — both scale 1.0, and the brain's ONE expansion opinion,
+👩 mum-live `long-oversold-rebound` at **1.25x** (published since run 808,
+t=2.06 against the 2.0 bar), passes both rails unchanged (era bound +0.366%,
+maxDD 3.8%) — so a live restart buys nothing and is not dispatched; the rails
+ride the next live deploy that does qualify. Kelly is the one book the rails
+bite today: her next entries size at 0.325 × $80 ≈ $26 until her drawdown reads
+under 15% again. **[CORRECTED IN PLACE per I12 before this merged: this
+paragraph read "the brain has no expansion opinion on either" and the next one
+read "the brain's expansion ladder has NEVER fired for either" — both false on
+the payload the day they were written; mum-live's 1.25x was seven runs old.]**
+
+**THE GROWTH HALF, MEASURED — `scripts/study_brain_floors_2026-09-02.py`,
+calibrated 3 of 3 against the live brain's own published mults before it was
+allowed to speak ((gx)).** The audit says where the evidence points — 👩 mum
+(LB +0.366%) and 🎫 the taker's `long-breakoutup` — and the carried row
+`brain-mults-are-two-opinions-wide` asked whether the brain's expansion floors,
+written for a 1.5× ceiling, are the right floors for a 6.7× one. TODAY, by the
+owner's own `qualify_v3` over the era-scoped graded ledger: mum-live clears
+1.25x and nothing else does; the taker's `long-breakoutup` (n=115, n_eff 86,
++$53.77) is held at 1.0x by the **win-rate bars** (post_wr 0.529 ≤ 0.55, w_lo
+0.487 ≤ 0.50) with `t` 1.97 a hair under 2.0 as well; 🌾 carry's `short` (n=60,
+t=2.17) is held by the win-rate bars ALONE — the I15 shape, a lose-often-win-big
+bucket that an expand ladder gated on hit rate structurally cannot back, sitting
+in the actuator that has sized real money since (so). FORWARD, the number that
+decides (I25 — judged against each bucket's OWN era mean, on the trades OPENED
+in the day after each qualification, living buckets only, 1-Jul → 2-Sep): under
+the SHIPPED bars every 1.25x/1.5x the ladder would have published on a Lighter
+book earned BELOW that bucket's own mean — the 1.25x rung −2.0pp of excess on
+15 trades, net **−$2.48** of extra P&L — while the control (positive, n≥30, NOT
+qualified: 439 trades) sat +0.05pp above its own mean: qualification selects a
+hot window, and the window reverts. The three pre-declared loosenings do not
+earn either: win-rate bars DROPPED (the I15 fix) **−$6.5** (it admits the
+taker's breakoutup on 6 days → 29 forward trades at −0.789%/trade against its
++1.182% mean, and carry's short on 17 days that produced 2 trades); every `t`
+bar −0.5, −$2.4; n floor 30 → 20, **+$6.2** on ONE bucket (mum-live admitted a
+day earlier). The one large number in the walk — +$435 across the 2.0–4.5x
+rungs — is retired HL-era `perps-donchian-breakout`, alive only in early July
+and a different venue: history, not a Lighter claim. **VERDICT: THE FLOORS ARE
+KEPT**, a refusal with evidence (I19), and the carried row is CLOSED because the
+measurement it asked for was made and decided — not because a floor moved. The
+I15 mechanism is real and costs ~$0 measured forward today; it is recorded so
+that if a lose-often-win-big bucket ever carries a positive era bound at t≥2
+(I16), the first thing re-run is this instrument, never a bar. The growth
+channel this leaves is DECIDABILITY on the positive buckets (I17/I22), not
+looser bars.
 
 ## 2026-09-02 (wp) — THE SUPPORT SYSTEM DEEP DIVE: every organ is alive, the candidate line is structurally empty by design, and four of the fleet's own instruments were pointed at the wrong thing — paper positions vetoing real money, a stop-dead page on a basket nobody held, a judge with no pair it could open, an execution organ measuring a retired book
 

@@ -1473,6 +1473,16 @@ its row is dashboard-retired regardless; stop the process when found.
     NEITHER live row moved, so it went to main only and rides the next live
     deploy ((mm)). Pinned by `tests/autonomy/test_brain_sizing_rails.py`
     (8 mutations red).
+    **And the expansion FLOORS were measured the same day, not moved**
+    (`scripts/study_brain_floors_2026-09-02.py`, calibrated 3/3 against the
+    live payload): forward, on living Lighter buckets, every 1.25x/1.5x the
+    ladder would have published earned BELOW the bucket's own mean (−$2.48;
+    the I25 hot-window shape), and dropping the win-rate bars (−$6.5), lowering
+    every t bar (−$2.4) or the n floor (+$6.2, one bucket) does not earn
+    forward either — floors KEPT with evidence. Structural fact recorded: the
+    ladder's win-rate bars alone hold 🌾 carry's `short` (t=2.17) at 1.0x —
+    the I15 shape in an actuator; re-run the instrument, never a bar, if such
+    a bucket ever carries a positive era bound at t≥2.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
 - `signal-bus`, `regime-oracle`, `market-pulse` — published context (funding
