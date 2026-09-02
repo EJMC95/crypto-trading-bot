@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 16:14 Sydney (06:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 16:35 Sydney (06:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -29,11 +29,6 @@ _Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is st
 
 _Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. [26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, crash-dominated — decides NOTHING either way; 3 of the six (sv) controls have flipped negative, so the 3->4 step is REFUSED on current data and 3->2 reversion equally unsupported. The OTHER half is now MEASURED AND CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 paired, both intrabar conventions) put every widening below the harness's own +0.246pp calibration error, roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees between conventions, and the 1440m max_hold fired 0 of 207 closes ever — exits are a dead dial on this book; the mean lever is ENTRY quality (rank1 +0.023% vs rank2 +0.656% on her own ledger).
 
-### `family-shadow-stale-writer`  ·  owner: **OPERATOR**
-🩺 family-lighter-shadow's rows (👩 mum-lshadow, 🙏 avo-lshadow — the live pair's CONTROL ARMS) publish build edc3032d1c46/15, which the repo's own audit_code_currency resolves to commit d2c0cb9 (28-Aug, 84 commits behind, 5 touching lighter_family_bot.py). Measured 2-Sep: THREE OK-reported deploys (05:12 run 660, 05:21 run 661, 05:33 dispatch 664 from clean main) each booted a container that runs its loop, and the (vy) restart lever (run 665) ran too — the rows kept the old stamp through all four. A pre-28-Aug container is still the writer: the (ml)/(vy) stuck-serving class on this service for the SECOND time (646/647/648 before), and the family bot has no claim_writer, so the two writers are unguarded ((hp) class). [(wv), same day] AND the current container could not publish at all: spend_extra raised inside the publish site's except: pass on every loop since (vr) — fixed at (wv), which also kills the instance; this row closes on the feed readback. Consequence: the (wp) scan-order parity port, mum v2's post-28-Aug fixes and the (ww) lever surface have NOT reached the shadow twins; the judge's pair cannot open until they do.
-
-_Still open because:_ no lever in this repo swaps the serving container when Railway's activation wedges: `up` builds and the swap does not happen, `redeploy` re-runs the CURRENT deployment ((vz)). The act is Eamon's, in the Railway UI: find and remove the extra running instance of family-lighter-shadow (or `railway down` the service, then `railway up` from clean main), then read back extra.build on freqtrade-mum-lshadow — expected 9c90be27d763/15 at 6639f1e, or the (ww) image's own id once merged (16 files: fleet_tuning.py joins the COPY set).
-
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
 
@@ -54,8 +49,13 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (80 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
+## Shipped today (85 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
+- `bf47978` Close family-shadow-stale-writer on the feed readback: family rows on 97dbe3986551/15, mum's 12-position book publishing, georgia-v3's first row
+- `bd524a5` [deploy-live] Merge PR #264: (ww) proceed with everything in the organ review — docket calls reconciled with the (wt) slate, cage re-decided, mum judge lane, weekly organ board
+- `6b24cc1` test_mum_census_both_terms follows the census series through (wv)'s one builder — red on main since the extraction, healed here
+- `8bb645f` Merge origin/main: (wv) landed the family publish fix — my entry moves to (ww) and its stale-writer paragraph cites the root cause
+- `3992544` The dashboard's georgia hole (wv): spend_extra's b.bot killed every family publish for five days behind a stale Railway writer — one builder, driven for every book, publish failures now log
 - `085a748` Merge origin/main: reconcile with the (wt) September slate and the (wu) rails — georgia's shadow retirement withdrawn (deferred to her 10-Sep read), duplicate guards dropped for the slate's, roster re-aims reverted, letter (ws)->(wv)
 - `9c3b2cb` Merge PR #263: the two sizing rails from the edge audit, reshaped to bite only on measured harm; the brain's expansion floors measured and kept (wu)
 - `ab465ba` HANDOFF regenerated after the third re-merge (wu)

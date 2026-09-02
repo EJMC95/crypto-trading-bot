@@ -158,7 +158,13 @@ published a family row, and the zombie's rows were the only fresh ones. Two
 defects, one symptom: a stale instance that could not be seen, and a live
 instance that could not speak. (wv) fixes the publish and kills the
 instance; this entry's carried row `family-shadow-stale-writer` stays until
-the stamp is READ BACK on the feed.
+the stamp is READ BACK on the feed. **READ BACK 06:33Z, after (wv)'s
+deploy: the family rows stamp `97dbe3986551`/15, mum-lshadow publishes the
+12-position book the running container restores (the zombie held 2), and
+georgia-v3-lshadow has a row for the first time — the row is CLOSED. The
+live rows still read `88457127f621` at that moment with the (ww) marker
+deploy in flight; their readback is the next line in this file's history
+or the HANDOFF, whichever the next session reads first.**
 
 **DEPLOY for this entry.** freqtrade-bots (judge, shortfall, fleet_bus,
 fleet_tuning, incubator, tuner, dashboard lists), family-lighter-shadow
