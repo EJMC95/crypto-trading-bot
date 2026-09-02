@@ -138,6 +138,17 @@ def test_a_zero_or_negative_cap_is_a_REAL_rail_and_is_measured_as_one():
         assert m.halt_level(220.0, _Rails(cap=-5.0))[1] == "abs"
 
 
+def test_an_infinite_equity_or_day_start_is_unmeasurable_too():
+    """The `x != x` idiom caught NaN and let INFINITY through; `math.isfinite`
+    catches both. (CodeQL reads a self-comparison as a defect, and it was
+    right that the check was doing less than it looked.)"""
+    with loaded("freqtrade-mum") as m:
+        r = _Rails()
+        assert m.halt_room(float("inf"), 200.0, r) is None
+        assert m.halt_room(200.0, float("inf"), r) is None
+        assert m.halt_level(float("inf"), r) == (None, None)
+
+
 def test_a_rails_object_with_no_cap_attribute_at_all_still_measures():
     with loaded("freqtrade-mum") as m:
         class _Bare:

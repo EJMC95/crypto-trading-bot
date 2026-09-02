@@ -82,6 +82,7 @@ live-entry hygiene the Farmer and the Taker run.
 """
 
 import argparse
+import math
 import os
 import sys
 import time
@@ -608,7 +609,10 @@ def halt_level(day_start_equity, rails):
         ds = float(day_start_equity)
     except (TypeError, ValueError):
         return None, None
-    if ds != ds or not (ds > 0):                    # NaN / non-positive
+    # `math.isfinite` rather than the `x != x` idiom: CodeQL reads a
+    # self-comparison as a defect, and this also rejects an INFINITE day-start,
+    # which the idiom let through.
+    if not math.isfinite(ds) or not (ds > 0):
         return None, None
     level, binding = ds * (1.0 - DAILY_LOSS_LIMIT), "pct"
     cap = getattr(rails, "max_daily_loss", None)
@@ -622,7 +626,7 @@ def halt_level(day_start_equity, rails):
     # and would have let the gate measure room against a level the actuator
     # had already passed; caught by the parity grid against the expression
     # this replaces, not by reading the code.
-    if c is not None and c == c and abs(c) != float("inf") and (ds - c) > level:
+    if c is not None and math.isfinite(c) and (ds - c) > level:
         level, binding = ds - c, "abs"              # tighter rail wins
     return level, binding
 
@@ -686,7 +690,7 @@ def halt_room(equity, day_start_equity, rails):
         eq = float(equity)
     except (TypeError, ValueError):
         return None
-    if eq != eq:                                    # NaN
+    if not math.isfinite(eq):                       # NaN or infinity
         return None
     return eq - level
 
