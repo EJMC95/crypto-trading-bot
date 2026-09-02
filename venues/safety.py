@@ -249,24 +249,16 @@ class SafetyRails:
             return True, "unliquidatable"
         return False, "no_nearest"            # positions held, none priced
 
-    def daily_loss_hit(self, day_start_equity, equity, pct_limit=0.0) -> bool:
+    def daily_loss_hit(self, day_start_equity, equity) -> bool:
         """Absolute-dollar fleet rail for funded modes (the strategies keep
-        their own 5% rail on top).
-
-        [2026-09-02] `max_daily_loss` is a PILOT cap ($30/day when the live
-        books were seed-sized). Once a book is FUNDED it must not UNDERCUT the
-        strategy's own pct leash: 👩 mum funded $300 -> $570 saw the $30 cap
-        bind at 5.26% while her `DAILY_LOSS_LIMIT` of 10% intended $57 — the
-        same fixed-dollar-vs-funded-equity class as 🙏 avo's maxdd denominator.
-        With `pct_limit` the effective threshold is the LOOSER of the pilot cap
-        and `pct_limit * day_start_equity`, so the cap still protects a tiny
-        book and the pct leash governs a funded one; neither tightens the
-        other. `pct_limit=0.0` (every caller that does not pass it) leaves this
-        byte-identical to the old absolute cap."""
+        their own 5% rail on top). DELIBERATELY the TIGHTER of the two: a hard
+        fleet-level dollar cap that catches a loss the pct rail misses on a
+        bigger book (pinned by `test_confirm_true_via_absolute_rail_even_if_
+        pct_ok`). Its VALUE per book is `LIGHTER_MAX_DAILY_LOSS` — raise that to
+        loosen it for a funded book, never the semantics here."""
         if not self.live or not day_start_equity or equity is None:
             return False
-        threshold = max(self.max_daily_loss, pct_limit * day_start_equity)
-        return (day_start_equity - equity) >= threshold
+        return (day_start_equity - equity) >= self.max_daily_loss
 
     def confirm_daily_loss(self, day_start_equity, first_equity, pct_limit,
                            read_equity, delay_s=60):
@@ -300,7 +292,7 @@ class SafetyRails:
             log.warning("confirm read returned None — breach CONFIRMED (fail-safe).")
             return True, first_equity
         if (eq2 <= day_start_equity * (1 - pct_limit)
-                or self.daily_loss_hit(day_start_equity, eq2, pct_limit)):
+                or self.daily_loss_hit(day_start_equity, eq2)):
             return True, eq2
         log.warning("breach NOT confirmed (second read %.2f) — transient print; "
                     "continuing.", eq2)
