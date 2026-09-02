@@ -144,11 +144,18 @@ def test_every_counter_written_is_declared_in_the_initialiser():
                 and isinstance(node.value, ast.Dict)):
             declared = {k.value for k in node.value.keys}
     assert declared, "gate_census is not initialised as a literal dict"
-    written = set()
-    for _ln, cs, _c in _guards():
-        for c in cs:
-            if c.startswith("gate_census["):
-                written.add(c[len("gate_census["):-1].strip("'\""))
+    # EVERY write in the loop, not only the ones inside a continue-guard.
+    # `tickets_in` is incremented at the TOP of the loop body — outside any
+    # guard — and a guards-only scan silently omitted it, so the first version
+    # of this test stayed GREEN while a mutation deleted that key from the
+    # initialiser. Caught by mutation round 2; the narrow scan was the defect.
+    written = set(_census_writes(_entry_loop().body))
+    written = {c[len("gate_census["):-1].strip("'\"")
+               for c in written if c.startswith("gate_census[")}
+    assert "tickets_in" in written, (
+        "the loop no longer counts `tickets_in` — every other counter is read "
+        "against it as the denominator, so losing it makes the census "
+        "uninterpretable")
     missing = written - declared
     assert not missing, (
         f"written but never declared, so the first hit is a KeyError: {missing}")
