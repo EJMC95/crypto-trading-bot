@@ -1,4 +1,4 @@
-"""[2026-09-02 (xa)] THE PER-CARRIER NON-CRYPTO EXCLUSION — the mirror of the
+"""[2026-09-02 (xf)] THE PER-CARRIER NON-CRYPTO EXCLUSION — the mirror of the
 (vd) extension, and it must fail in the same directions.
 
 WHY IT EXISTS. Eamon, 2-Sep: *"How do we fix mum"* / *"if it makes any bot make
@@ -200,3 +200,101 @@ def test_the_subtraction_lives_in_the_one_owner():
     crypto_line = [ln for ln in body.splitlines() if "return crypto" in ln]
     assert crypto_line and "drop" not in crypto_line[0], \
         "the return must hand back the crypto half unfiltered"
+
+
+# ------------------------------------------------------- (xf) review round two
+# The six below close the defects an adversarial review of this diff found.
+# Each is driven — the shape it guards was reproduced before the guard existed.
+
+def test_a_vd_extension_symbol_is_cut_too(monkeypatch):
+    """The cut must reach the PER-CARRIER (vd) extension, not just the base list.
+
+    Her non-crypto half is `NONCRYPTO_UNIVERSE + noncrypto_extra(bot)`, and the
+    graded sample contains extension names, so a cut that reached only the base
+    list would be applied to a narrower population than the one it was measured
+    on — an act that does not match its own evidence.
+    """
+    mum = _s(MUM)
+    monkeypatch.setattr(fam, "FAMILY_NONCRYPTO_EXTRA", f"{MUM}:SOXL,US500")
+    base = fam.carrier_universe(mum)
+    assert "SOXL" in base and "US500" in base, "the extension is not reaching her"
+    monkeypatch.setattr(fam, "FAMILY_NONCRYPTO_EXCLUDE", f"{MUM}:SOXL")
+    after = fam.carrier_universe(mum)
+    assert "SOXL" not in after, "an extension symbol survived the cut"
+    assert "US500" in after, "the cut took an extension name it did not name"
+
+
+def test_a_lowercase_universe_name_is_still_cut(monkeypatch):
+    """The comparison is upper-cased on BOTH sides.
+
+    The env is normalised at parse; the UNIVERSE is not, and the venue has
+    shipped mixed-case symbols. Comparing a normalised env against a raw list
+    silently keeps the name the operator asked to drop.
+    """
+    mum = _s(MUM)
+    monkeypatch.setattr(fam, "NONCRYPTO_UNIVERSE", ["spy", "QQQ"])
+    monkeypatch.setattr(fam, "FAMILY_NONCRYPTO_EXCLUDE", f"{MUM}:SPY")
+    after = fam.carrier_universe(mum)
+    assert "spy" not in after, "a lower-case universe name survived an upper-case cut"
+    assert "QQQ" in after
+
+
+def test_a_held_name_under_exclusion_keeps_its_place(monkeypatch):
+    """ENTRY-ONLY. The cut may not strand or force-close an OPEN position.
+
+    Dropping a held coin from `b.coins` leaves it with no mark, no accrual and
+    no stop, and the shadow host's zombie guard then closes it `delisted` —
+    while the live arm, which has no sweeper, holds the same leg to its
+    bracket. That is the control arm and the real-money arm diverging at the
+    moment of the act, on the one change meant to be identical across both.
+    """
+    mum = _s(MUM)
+    monkeypatch.setattr(fam, "FAMILY_NONCRYPTO_EXCLUDE", f"{MUM}:XAU,QQQ")
+    assert "XAU" not in fam.carrier_universe(mum), "fixture: XAU should be cut"
+    held = fam.carrier_universe(mum, held=["XAU/USDC"])
+    assert "XAU" in held, "a HELD excluded name was dropped — it would be swept"
+    assert "QQQ" not in held, "holding one name un-cut another"
+    # and holding a name never ADDS one that was not in the universe at all
+    assert "NOTACOIN" not in fam.carrier_universe(mum, held=["NOTACOIN"])
+
+
+def test_the_wildcard_cuts_the_whole_noncrypto_half_and_only_that(monkeypatch):
+    """`bot:*` is the registered act, so it must resolve to the class exactly."""
+    mum = _s(MUM)
+    base = fam.carrier_universe(mum)
+    crypto = [c for c in base if c in fam.COINS]
+    monkeypatch.setattr(fam, "FAMILY_NONCRYPTO_EXCLUDE", f"{MUM}:*")
+    after = fam.carrier_universe(mum)
+    assert list(after) == list(crypto), "the wildcard did not resolve to the class"
+    assert after, "the wildcard emptied the book — it must never reach crypto"
+    # bare (no universe offered) it still reads as "something is excluded"
+    assert fam.noncrypto_exclude(MUM, f"{MUM}:*") == [fam.NONCRYPTO_EXCLUDE_ALL]
+    # and it stays per-carrier
+    assert list(fam.carrier_universe(_s(AVO))) == list(fam.carrier_universe(_s(AVO), raw=""))
+
+
+def test_the_wildcard_is_still_entry_only(monkeypatch):
+    mum = _s(MUM)
+    monkeypatch.setattr(fam, "FAMILY_NONCRYPTO_EXCLUDE", f"{MUM}:*")
+    after = fam.carrier_universe(mum, held=["SPY"])
+    assert "SPY" in after, "the wildcard force-closed a held leg"
+    assert "QQQ" not in after
+
+
+def test_the_shadow_host_re_resolves_the_universe_after_restore():
+    """The universe is built BEFORE any position is known.
+
+    So the held union above is unreachable at boot unless the runner asks
+    again once the book is restored. AST: the re-resolve must pass `held`.
+    """
+    with open(os.path.join(ROOT, "lighter_family_bot.py")) as fh:
+        src = fh.read()
+    tree = ast.parse(src)
+    found = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "carrier_universe"):
+            found.append({k.arg for k in node.keywords})
+    assert any("held" in kw for kw in found), (
+        "no carrier_universe(..., held=...) call in the shadow runner — the "
+        "exclusion is not entry-only there and a held leg would be swept")

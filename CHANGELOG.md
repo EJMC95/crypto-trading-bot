@@ -1,3 +1,65 @@
+## 2026-09-02 (xg) — THE GO-LIVE GRADER PUBLISHED "THE SAMPLE HAS EXCLUDED A POSITIVE MEAN" BESIDE AN UPPER BOUND OF **+0.027%** — the I17 sentence a RETIREMENT is written on, false on a living book, on the same day five books were retired on that verdict
+
+**Found by a fleet-wide starvation sweep whose actual answer was a refusal**
+(no living book is starved in a way that is worth money today — the three
+harvest books are at or over cap, 🎫 the taker is the healthiest book in the
+fleet, 🎯 the sniper's `class_ok: 0` is a legitimate post-trade cooldown on a
+two-name cohort, and 🙏 avo's real lockout was diagnosed and shipped this
+morning at (wf)/(wk)). The sweep found this instead.
+
+**THE MECHANISM.** `gate_horizon`'s `underpowered` branch is gated on
+`bars["maxdd"]` (`scripts/golive_readiness.py:2117`), so a book failing the mean
+bar **AND** the drawdown bar skips it and falls through to the `unreachable`
+block — which then asserted *"upper bound X <= 0 — the sample has EXCLUDED a
+positive mean"* **without ever re-reading `mean_excluded`**, the flag computed
+fourteen lines above. The clause branched on "an upper bound could be computed",
+not on whether it excluded anything.
+
+**MEASURED IN THE LIVE PAYLOAD**, `/bus.json` at 2026-09-02T10:43:29Z:
+
+> 🪁 `band-kelly-lshadow` — *"mean −0.179% <= 0, upper bound **+0.027% <= 0** —
+> the sample has EXCLUDED a positive mean"*
+
+That sentence contradicts itself on its face, and it is not cosmetic: it is the
+exact I17-as-amended precondition a keep-or-retire call is written on, and
+**five books were retired on this verdict a few hours earlier ((wt))**. Kelly
+also carries a PRE-REGISTERED read (`DECIDED_UNTIL`, 1-Oct) that turns on
+whether her upper bound has excluded a positive mean — so the falsehood sat
+directly under a scheduled decision.
+
+**THE FIX, and what it deliberately does NOT do.** The VERDICT is unchanged —
+`unreachable` is correct here, because a blown in-era drawdown genuinely cannot
+un-blow at any n. What changes is that the mean clause now branches on
+`mean_excluded`, and when the sample has NOT excluded a positive mean it says so
+and names the drawdown as the binding cause: *"mean −0.179% <= 0 but its upper
+bound +0.027% is still ABOVE zero — the sample has NOT excluded a positive mean,
+so this verdict rests on the drawdown alone and is NOT an I17 exclusion of the
+mean."* The flag is also **PUBLISHED** (`horizon.mean_excluded`) so no consumer
+has to parse the sentence — a docket that string-matches prose is a second copy
+of the rule (I8/(hj)).
+
+**Driven, not asserted:** re-graded through the real `gate_horizon` on the live
+ledger, 🪁 kelly's sentence is corrected and `mean_excluded: False`, while
+🔮 georgia-v3 (ub −0.013%) and ⚖️ Counterweight (ub −0.539%) are **byte-identical
+to before** with `mean_excluded: True` — the fix discriminates rather than
+softening.
+
+**Pinned by `tests/autonomy/test_horizon_power_gate.py`** (3 new tests). The
+fixture is DETERMINISTIC and every precondition is ASSERTED, not skipped: the
+first draft used a seeded random book that reproduced the fail-both state on 9
+of 14 seeds and `skip`ped otherwise — and **a skipped test reads exactly like a
+passing one in the summary line**, which is this repo's own *"a check that
+inspects nothing reports clean"* trap, walked into inside the fix for a
+different instance of the same class.
+
+**BLAST RADIUS, stated honestly rather than as "tooling-only":** the grader
+governs which books reach the retirement docket, so this changes what the fleet
+is told about a book — not what any book trades. `lighter_family_bot.py` (also
+touched in (xf)) IS real-money surface by this file's own audit-scope rule; the
+live arm is untouched behaviourally there because `held` defaults to `None` and
+the live host passes nothing, and the re-resolve block is in the SHADOW runner's
+`main()`. Both live rows verified byte-identical universes under the default.
+
 ## 2026-09-02 (xf) — 👩 MUM'S ONE MEASURED WEAK SPOT IS HER NON-CRYPTO SLEEVE — registered, not cut, with the one-env mechanism that acts on it; and 🙏 avo is refused a hand-placed trade by the venue's own floors
 
 **Eamon, 2-Sep: *"How do we fix mum"*, then *"Tell avo to take a long position
@@ -122,6 +184,102 @@ the auto path; **the mechanism is inert, so no book trades differently today**;
 the study is a `scripts/` instrument registered in `SELFTEST_MODULES` and ships
 in no image. No live bot file changed → main only, no marker, per (mm). Carried
 as `mum-noncrypto-sleeve-preregistered-read`, 6-Sep backstop.
+
+---
+
+### [SAME DAY, CORRECTED IN PLACE per I12] THE MECHANISM ABOVE IS REFUTED, AND THE BAR THAT WOULD HAVE ACTED ON IT WAS WRONG. The cut stays UNAPPLIED; the registration is rewritten around what the sample actually says.
+
+**This entry originally named a mechanism — "a non-crypto book prints through
+its underlying's CLOSED hours, so a 1h oversold read is a flat tape and the 24h
+cap books it at a loss" — and wrote a CUT rule around it. An adversarial review
+of this diff killed both, hours later, and every number below reproduces on an
+independent re-run through the fleet's own owners (`golive_readiness.stats` /
+`cluster_se`, `fleet_allocation.t_crit`, `fleet_bus.is_crypto`).** It is kept
+rather than deleted: a refuted mechanism that is quietly removed is a lesson
+nobody can re-check.
+
+**THE CLAIM DIES ON ITS OWN DISCRIMINATOR.** Of the 10 `max_hold` losses across
+both arms, **ZERO expired before the underlying reopened** — each carried
+27%–96% of its hold inside the open session (SPY/QQQ 390 of ~1443 min; XAU/XCU
+1381–1389 of ~1443). The ONE trade with no open minutes at all (XAU entered Fri
+28-Aug 22:01Z, into the weekend) exited `roi` at **+0.070%** — a win, the
+opposite of the prediction. The direction reverses too: entry-while-underlying-
+OPEN reads **−0.521%/trade** against entry-while-CLOSED **−0.383%**, on each arm
+independently. XAU/XCU trade ~23h on COMEX and carry the two largest live losses.
+
+**AND THERE IS NO MEASURED EXCLUSION, so I17-as-amended forbids the cut.** The
+seven closes are **4 ENTRY DAYS** — three share a byte-identical `opened_at`
+(2026-09-01T09:03:49.764115Z). Clustered, live `t` goes −1.665 → −1.135, and the
+upper bound is ≤ 0 **only on the iid read** (−0.052%): every day-level cluster
+is POSITIVE — **+0.170%** (open-day), **+0.296%** (close-day), **+0.048%**
+(open-instant). The twin's day-clustered ub is −0.002%, i.e. zero.
+
+**GIVEN THE DAY, THE CLASS LABEL CARRIES NO INFORMATION (I25).** The raw
+non-crypto-minus-crypto gap is **−0.983pp** live / −1.045pp shadow and **FLIPS
+SIGN under a close-day fixed effect to +0.184pp / +0.207pp**. On 2-Sep — the day
+carrying 4 of the 7 rows and all the batched losses — the CRYPTO sleeve lost
+**more than twice as much per trade** (live −1.638% vs the non-crypto −0.791%).
+Judging a sleeve on the window that motivated looking at it is exactly the error
+I25 exists to name, and I made it.
+
+**MOST OF THE REST IS SELECTION BY EXIT.** `max_hold` is negative BY
+CONSTRUCTION — the roi ladder's terminal rung is `1440: 0.0` — and measured
+across all 114 era closes on both arms it is **0 positive / 18 negative** while
+`roi` is 81 of 82 positive. The sleeve is 71% `max_hold` against crypto's ~8%.
+**Conditional on reaching the cap, non-crypto does no worse than crypto** (live
+−0.705% vs −1.001%).
+
+**THE MECHANISM THAT *IS* SUPPORTED points the other way.** These names are
+LOW-VOLATILITY against a bracket calibrated on crypto: realised mean |return|
+**0.623% vs 1.746%** (2.80× live, 2.61× shadow) against a first roi rung needing
++2.0% inside 4h, so **5 of 7 run the full 24h cap against 4 of 52 crypto** —
+binomial P(≥5 of 7 at crypto's own rate) = **5.0e-05**, established even at n=7.
+The sleeve resolves as a near-coin-flip at the terminal zero rung. **That
+reframes the remedy from a CUT to a class-aware ladder or hold — the I26 feed-it
+direction — and that remedy owes its own measurement before anything ships.**
+
+**WHAT CHANGED IN CODE.** Nothing trades differently: `FAMILY_NONCRYPTO_EXCLUDE`
+is still `""`. The registration is now strictly HARDER to act on —
+**G ≥ 10 distinct ENTRY DAYS** (the fleet's floor applied to the unit of
+independence, not the close count), a **DAY-CLUSTERED** upper bound ≤ 0, AND the
+sleeve worse than CRYPTO on **matched close-days**; the twin is demoted to
+REPORTED (it shares 6 of 7 coin-days with the live arm — corroboration of
+direction, not independent evidence). Read date 6-Sep → **16-Sep**. Measured
+false-positive rate of the whole rule on a null sleeve, 300 draws: **6.3%**,
+decomposing as 9.7% (the clustered bound's own one-sided level, so `t_crit` is
+calibrated) × 51.0% (the day-matched control, a coin flip on a null). Run
+against the live ledger it now returns `not_decidable — G=4 entry days < 10`
+with the day-matched control reading **+0.126pp**.
+
+**SIX MORE DEFECTS THE SAME REVIEW FOUND IN THIS DIFF, ALL FIXED:**
+* **the act did not match its own population** — `<the graded names>` was a
+  placeholder while `decide()` graded all 30 non-crypto names. The act is now
+  the `*` wildcard (`lighter_family_bot.NONCRYPTO_EXCLUDE_ALL`) = the whole
+  class, which cannot drift when a (vd) extension name crosses the oracle's
+  203-bar floor and starts trading;
+* **the cut would have diverged the two arms AT THE MOMENT OF THE ACT** —
+  dropping a HELD coin from `b.coins` leaves it with no mark, no accrual and no
+  stop, and the shadow host's zombie guard then closes it `delisted` (measured:
+  the twin's ledger carries `delisted: 2`, the live arm's zero) while the live
+  arm holds the same leg to its bracket. `carrier_universe(s, held=...)` plus a
+  re-resolve after `restore()` makes the exclusion **ENTRY-ONLY**, the (ly)
+  convention;
+* **three mutations survived the study's selftest** (`ub_pct<=0`→`mean_pct<=0`,
+  `ub_pct`→`lb_pct`, `t_crit`→1.2816) — the negative-but-unexcluded arm was
+  missing, i.e. the very case the rule is for. Added; 8 of 8 mutations now red;
+* **two mutations survived the exclusion tests** (a (vd) extension name not cut;
+  `c.upper()` dropped from the drop-comparison) — the case test varied the ENV
+  case and never the UNIVERSE case. Both added; 7 of 7 red;
+* **`n_req` printed 6 on a sample of 7 that needed 10** — the power arithmetic
+  answers a different question and comes back below the floor at a large |t|.
+  Floored at `MIN_N`, then superseded entirely by the entry-day bar;
+* **all three of this pass's studies bypassed `edge_audit.load`** and with it the
+  (qz) truncation refusal, and defaulted to the POOLED window with `--fresh`
+  opt-in — the exact (tt) shape I21 was amended to close. `edge_audit.load_trades`
+  is now the ONE loader (a second copy of a rule is a second rule, and this
+  second copy had no rule at all), and all three are **fresh-by-default** with
+  `--pooled` the explicit, loudly-labelled opt-out.
+
 
 ## 2026-09-02 (xe) — THE SEAM (xa) CLOSED ON ONE SIDE WAS OPEN ON THE OTHER: A 1000-MARKET'S MARK ARRIVED UNDER THE VENUE'S SPELLING AND THE MARGIN BLOCK ASKED FOR THE FLEET'S, SO A PRICED, READABLE REAL-MONEY LEG PUBLISHED AS UNMEASURABLE AND PAGED EVERY LOOP
 

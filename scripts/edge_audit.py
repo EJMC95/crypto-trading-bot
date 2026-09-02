@@ -134,12 +134,14 @@ def _load_json(path):
         return json.load(fh)
 
 
-def load(ledger=None, feed=None, bus=None, limit=5000):
-    """(trades, books, published_grades). Any of the three may be a local path.
+def load_trades(ledger=None, limit=5000):
+    """The paper ledger, with the (qz) truncation refusal — the ONE owner.
 
-    `limit` is passed through and CHECKED: a row count equal to the cap is a
-    truncation signature ((qz)) and this refuses rather than auditing a
-    silently sampled ledger.
+    A row count equal to the cap is a truncation signature, not a complete
+    history, so this REFUSES rather than hand a silently sampled ledger to a
+    grader. Split out of `load()` at (xf) because three studies had each
+    re-implemented the fetch and dropped the refusal with it — a second copy
+    of a rule is a second rule, and here the second one had no rule at all.
     """
     tr = (_load_json(ledger) if ledger
           else _get(f"{DASH}/trades.json?source=paper&limit={int(limit)}"))
@@ -149,6 +151,15 @@ def load(ledger=None, feed=None, bus=None, limit=5000):
             f"REFUSING: the ledger returned exactly its own cap ({len(trades)} "
             f">= limit {limit}) — that is a truncation signature, not a "
             f"complete history. Raise --limit or page per book.")
+    return trades
+
+
+def load(ledger=None, feed=None, bus=None, limit=5000):
+    """(trades, books, published_grades). Any of the three may be a local path.
+
+    The ledger half is `load_trades`, which carries the (qz) truncation refusal.
+    """
+    trades = load_trades(ledger, limit)
     bo = _load_json(feed) if feed else _get(f"{DASH}/pnl.json")
     books = bo["bots"] if isinstance(bo, dict) and "bots" in bo else bo
     bu = _load_json(bus) if bus else _get(f"{DASH}/bus.json")

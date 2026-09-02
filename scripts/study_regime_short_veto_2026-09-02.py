@@ -431,11 +431,14 @@ def _selftest():
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--ledger", help="local /trades.json?source=paper dump")
+    ap.add_argument("--limit", type=int, default=5000,
+                    help="ledger row cap; a count equal to it is REFUSED as truncation ((qz))")
     ap.add_argument("--oracle-json", help="local regime-oracle history dump")
     ap.add_argument("--bus-json", help="bus.json base URL (default: the dashboard)")
     ap.add_argument("--hours", type=float, default=MAX_HOURS)
     ap.add_argument("--since", help="ISO stamp: grade only closes OPENED after it (default: none)")
-    ap.add_argument("--fresh", action="store_true", help="grade the registered fresh sample (since PRE_REGISTERED.since)")
+    ap.add_argument("--pooled", action="store_true",
+                    help="grade the WHOLE window instead of the registered fresh sample — NOT the registered read")
     ap.add_argument("--bots", help="comma list of books to grade (default: all)")
     ap.add_argument("--json", help="write the full result here")
     ap.add_argument("--selftest", action="store_true")
@@ -443,14 +446,21 @@ def main(argv=None):
     if a.selftest:
         _selftest()
         return 0
-    tr = ea._load_json(a.ledger) if a.ledger else ea._get(f"{DASH}/trades.json?source=paper&limit=5000")
-    trades = tr["trades"] if isinstance(tr, dict) else tr
+    # [(xf)] through edge_audit's ONE loader, so the (qz) truncation refusal
+    # applies here too — a row count equal to the cap is a sampled ledger.
+    trades = ea.load_trades(a.ledger, a.limit)
     shaped = ea.shape(trades)
     oracle, used = load_oracle(a.oracle_json, a.bus_json, a.hours)
     if not oracle:
         print("REFUSING: no oracle history — nothing to label against (I1)")
         return 2
-    since = _ts(PRE_REGISTERED["since"]) if a.fresh else (_ts(a.since) if a.since else None)
+    # [(xf)] THE REGISTERED READ IS THE FRESH ONE, BY DEFAULT — I21 as
+    # amended at (tt): a pre-registered bucket is decided on closes taken
+    # AFTER registration, never by re-mining the window that generated it.
+    # `--pooled` is the explicit opt-out and is NOT the registered read.
+    since = (_ts(a.since) if a.since else None) if a.pooled else _ts(PRE_REGISTERED["since"])
+    if a.pooled:
+        print("NOTE: --pooled — this is the motivating window, not the registered read (I21).")
     res = run(shaped, oracle, since=since, bots=set(a.bots.split(",")) if a.bots else None)
     res["oracle"]["source"] = used
     res["since"] = since.isoformat() if since else None

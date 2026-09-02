@@ -119,34 +119,85 @@ def noncrypto_extra(bot, raw=None):
     return []
 
 
-#: [2026-09-02 (xa)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
+#: [2026-09-02 (xf)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
 #: extension above, same `"bot:SYM,SYM;bot:SYM"` shape, same per-carrier
 #: scoping and for the same reason: a cut measured on ONE book must not re-aim
 #: two others. Eamon: "if it makes any bot make more money then implement."
-#: 👩 mum's graded non-crypto sleeve (XAU/QQQ/SPY/XCU — the base list, not the
-#: (vd) extension) read 7 closes at −0.383%/trade on the live arm and −0.54% on
-#: the twin, five of seven `max_hold` losers on both, upper bound at zero — one
-#: measured mechanism behind it: a non-crypto book prints through its
-#: underlying's CLOSED hours, so a 1h oversold read there is a flat tape, not a
-#: dip, and the 24h cap closes it at a loss (I7: a condition a market satisfies
-#: structurally is not a signal). Seven is below the fleet's own 10-close floor
-#: (fleet_allocation.MIN_N), so the cut is PRE-REGISTERED, not applied: default
-#: "" is inert; `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` grades the
-#: read, and the cut is one env when it passes — an EXCLUSION list, never an
-#: edit of the shared NONCRYPTO_UNIVERSE (the (vd) lesson, in the other
-#: direction). Applies to BOTH hosts through `carrier_universe`, so the live
-#: arm and its control twin see the same universe.
+#:
+#: **STILL INERT, AND THE MECHANISM THAT MOTIVATED IT IS REFUTED — corrected
+#: in place the same day per I12, because a doctrine note that no longer
+#: describes the system is a defect, not history.** The first version of this
+#: note said 👩 mum's non-crypto sleeve loses because "a non-crypto book prints
+#: through its underlying's CLOSED hours, so a 1h oversold read there is a flat
+#: tape and the 24h cap closes it at a loss". That claim dies on its own
+#: discriminator: of the 10 `max_hold` losses across both arms, ZERO expired
+#: before the underlying reopened (each carried 27%-96% of its hold inside the
+#: open session), the ONE trade with no open minutes at all exited `roi` at
+#: **+0.070%**, and entry-while-OPEN measures WORSE (−0.521%/trade) than
+#: entry-while-CLOSED (−0.383%). XAU/XCU trade ~23h and carry the two largest
+#: live losses.
+#:
+#: WHAT THE SAMPLE ACTUALLY SAYS, re-measured through the fleet's own owners:
+#: the seven closes are **4 entry days** (three share one `opened_at`), and the
+#: upper bound is ≤ 0 only on the iid read — every day-clustered one is
+#: POSITIVE (+0.170% live), so **there is no measured exclusion** and I17-as-
+#: amended forbids the cut. The raw class gap of −0.98pp **flips sign to
+#: +0.18pp** under a close-day fixed effect: on the day carrying most of the
+#: sleeve, CRYPTO lost more than twice as much per trade (I25 — judging a
+#: sleeve on the window that motivated looking at it). And most of the rest is
+#: selection by exit: `max_hold` is negative BY CONSTRUCTION (the roi ladder's
+#: terminal rung is `1440: 0.0`) and measured 0-positive/18-negative across
+#: 114 era closes, while the sleeve is 71% `max_hold` against crypto's ~8%.
+#: Conditional on reaching the cap, non-crypto does no worse.
+#:
+#: THE MECHANISM THAT IS SUPPORTED points the other way: these names are
+#: LOW-VOLATILITY against a bracket calibrated on crypto — realised |return|
+#: 0.623% vs 1.746% (2.8x) against a first roi rung needing +2.0% in 4h, so 5
+#: of 7 run the full cap against 4 of 52 crypto (binomial P=5.0e-05). The
+#: remedy that follows is a CLASS-AWARE LADDER OR HOLD (the I26 feed-it
+#: direction), owed its own measurement — not a cut.
+#:
+#: So this stays PRE-REGISTERED and inert (default "" — no book trades
+#: differently today). `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` holds
+#: the corrected rule: G>=10 distinct ENTRY DAYS, a DAY-CLUSTERED upper bound
+#: at or below zero, AND worse than crypto on matched close-days. The act is
+#: one env (`freqtrade-mum:*`, the whole class, so it matches the graded
+#: population) — an EXCLUSION list, never an edit of the shared
+#: NONCRYPTO_UNIVERSE (the (vd) lesson, in the other direction). Applies to
+#: BOTH hosts through `carrier_universe`, so the live arm and its control twin
+#: see the same universe, and it is ENTRY-ONLY: a HELD name keeps its place
+#: until its own bracket closes it.
 FAMILY_NONCRYPTO_EXCLUDE = os.environ.get("FAMILY_NONCRYPTO_EXCLUDE", "")
 
 
-def noncrypto_exclude(bot, raw=None):
-    """Non-crypto symbols carrier `bot` must NOT scan, or [] when unset."""
+#: [(xf)] The wildcard: `"freqtrade-mum:*"` excludes the carrier's WHOLE
+#: non-crypto half. It exists so an act can MATCH ITS OWN POPULATION. The
+#: registered claim is about a CLASS — the venue's whole non-crypto half — not
+#: about four tickers, and the sample is every non-crypto close. A symbol list would have been graded on one population and
+#: applied to another, and would drift the moment a (vd) extension name crossed
+#: the oracle's 203-bar floor and started trading. `*` cannot drift.
+NONCRYPTO_EXCLUDE_ALL = "*"
+
+
+def noncrypto_exclude(bot, raw=None, universe=None):
+    """Non-crypto symbols carrier `bot` must NOT scan, or [] when unset.
+
+    `"<bot>:*"` means the whole non-crypto half: with `universe` given it
+    resolves to those names, and without it returns `["*"]` so a caller that
+    only asks "is anything excluded?" still sees a truthy answer.
+    """
     raw = FAMILY_NONCRYPTO_EXCLUDE if raw is None else raw
     for group in str(raw or "").split(";"):
         name, _, syms = group.partition(":")
         if name.strip() == bot:
-            return [c.strip().upper() for c in syms.split(",") if c.strip()]
+            out = [c.strip().upper() for c in syms.split(",") if c.strip()]
+            if NONCRYPTO_EXCLUDE_ALL in out:
+                return ([c.upper() for c in universe] if universe is not None
+                        else [NONCRYPTO_EXCLUDE_ALL])
+            return out
     return []
+
+
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 
 #: [2026-08-28 (vd)] PER-CARRIER CRYPTO WIDTH. `"bot:N,bot:N"`; absent = the
@@ -271,7 +322,7 @@ def crypto_width(bot, raw=None):
     return 0
 
 
-def carrier_universe(s, raw=None):
+def carrier_universe(s, raw=None, held=None):
     """The symbols carrier `s` scans. **ONE OWNER, BOTH HOSTS.**
 
     The shadow runner and the live variant host each built
@@ -302,11 +353,23 @@ def carrier_universe(s, raw=None):
         if len(wide) >= len(COINS):
             crypto = list(dict.fromkeys(crypto + wide))
     nc = list(NONCRYPTO_UNIVERSE) + noncrypto_extra(s.bot)
-    # [(xa)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
+    # [(xf)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
     # — it can never touch a crypto name, and an unset env subtracts nothing.
-    drop = set(noncrypto_exclude(s.bot))
+    #
+    # ENTRY-ONLY, AND THE HELD UNION IS WHAT MAKES IT SO ((hk), and the (ly)
+    # sleeve-retirement convention: "a restored position still exits
+    # normally"). A held coin dropped from `b.coins` gets no mark, no accrual
+    # and no stop, and the shadow host's ZOMBIE GUARD then force-closes it as
+    # `delisted` — while the live host, which has no sweeper, holds the same
+    # leg to its bracket. That is the control arm and the real-money arm
+    # diverging AT THE MOMENT OF THE ACT, on the one change meant to be
+    # identical across both. So a name under exclusion that is CURRENTLY HELD
+    # stays in the universe until it closes on its own terms; one position per
+    # coin means keeping it can never re-open an entry.
+    drop = {c.upper() for c in noncrypto_exclude(s.bot, raw, universe=nc)}
     if drop:
-        nc = [c for c in nc if c.upper() not in drop]
+        keep = {str(c).split("/")[0].upper() for c in (held or ())}
+        nc = [c for c in nc if c.upper() not in drop or c.upper() in keep]
     return crypto + list(dict.fromkeys(nc))
 
 
@@ -2776,6 +2839,22 @@ def main():
         books.append(Book(s, venue, listed))
     for b in books:
         b.restore()
+        # [(xf)] RE-RESOLVE AFTER RESTORE, so a per-carrier exclusion is
+        # ENTRY-ONLY. The universe is built at boot, before any position is
+        # known, so a held name under exclusion would leave `b.coins` — and
+        # the ZOMBIE GUARD below would then close it `delisted` while the
+        # LIVE arm, which has no sweeper, held the same leg to its bracket.
+        # Re-resolving with the restored book in hand keeps the two arms
+        # identical through the act; `carrier_universe` stays the one owner.
+        try:
+            _src = carrier_universe(b.s, held=list(b.broker.pos))
+            _listed = [c for c in _src if venue.supports(c)]
+            if set(_listed) != set(b.coins):
+                b.s.skipped = [c for c in _src if c not in _listed]
+                b.coins = _listed
+        except Exception as _ue:                            # noqa: BLE001
+            log.warning("%s universe re-resolve after restore failed: %s",
+                        b.bot_id, _ue)
 
     log.info("=" * 64)
     log.info("FAMILY + SPOT bots on LIGHTER (shadow) | %d books", len(books))

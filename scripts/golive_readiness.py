@@ -2149,22 +2149,48 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
 
     # Genuinely unreachable: the sample has EXCLUDED a positive mean, or the
     # in-era drawdown is blown (which cannot un-blow at any n).
+    #
+    # [2026-09-02 (xg)] THE MEAN CLAUSE BRANCHES ON `mean_excluded`, NOT ON
+    # "an upper bound could be computed". The `underpowered` branch above is
+    # gated on `bars["maxdd"]`, so a book that fails the mean bar AND the
+    # drawdown bar falls through to here even when its upper bound is POSITIVE
+    # — and this clause then asserted "the sample has EXCLUDED a positive
+    # mean" while printing the very number that refutes it. Measured in the
+    # live payload the day this was fixed: 🪁 band-kelly-lshadow published
+    # "upper bound **+0.027% <= 0** — the sample has EXCLUDED a positive
+    # mean", which is self-contradictory on its face. That sentence is the
+    # I17 precondition a RETIREMENT is written on, and five books were retired
+    # on this verdict a few hours earlier ((wt)), so a false one is not a
+    # cosmetic defect. The VERDICT stays `unreachable` — a blown drawdown
+    # genuinely cannot un-blow — but the reason now names the drawdown as the
+    # binding cause instead of claiming an exclusion the sample never made.
     if not bars["mean"] or not bars["maxdd"]:
         parts = []
         if not bars["mean"]:
-            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
-                         f"{100 * upper:+.3f}% <= 0 — the sample has EXCLUDED "
-                         "a positive mean, so more of the same closes cannot "
-                         "flip mean/t/halves"
-                         if upper is not None else
-                         f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
-                         "same closes cannot flip mean/t/halves")
+            if mean_excluded:
+                parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
+                             f"{100 * upper:+.3f}% <= 0 — the sample has EXCLUDED "
+                             "a positive mean, so more of the same closes cannot "
+                             "flip mean/t/halves")
+            elif upper is not None:
+                parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0 but its upper "
+                             f"bound {100 * upper:+.3f}% is still ABOVE zero — "
+                             "the sample has NOT excluded a positive mean, so "
+                             "this verdict rests on the drawdown alone and is "
+                             "NOT an I17 exclusion of the mean")
+            else:
+                parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
+                             "un-computable — no exclusion has been measured; "
+                             "this verdict rests on the drawdown alone")
         if not bars["maxdd"]:
             dd = s.get("max_dd_frac")
             parts.append((f"maxDD {100 * dd:.1f}%" if dd is not None
                           else "maxDD unmeasurable")
                          + " >= bar — a blown in-era drawdown cannot un-blow")
-        out.update(verdict="unreachable",
+        # [(xg)] PUBLISHED, so no consumer has to read the sentence to learn
+        # whether the mean was actually excluded. A retirement docket that
+        # string-matches prose is the second copy of a rule.
+        out.update(verdict="unreachable", mean_excluded=bool(mean_excluded),
                    why="at current trajectory: " + "; ".join(parts))
         return out
 

@@ -195,22 +195,32 @@ CARRIED = [
     {
         "id": "mum-noncrypto-sleeve-preregistered-read",
         "owner": "session",
-        "what": "👩 mum's graded NON-CRYPTO sleeve (XAU/QQQ/SPY/XCU) is her one "
-                "measured weak spot: 7 closes at −0.383%/trade on the live arm "
-                "(−0.54% on the twin), 5 of 7 `max_hold` losers on both arms, "
-                "upper bound at zero — below the fleet's own 10-close floor. "
-                "PRE-REGISTERED (I21): run `scripts/study_mum_noncrypto_sleeve_"
-                "2026-09-02.py` at n>=10 non-crypto closes on the live arm or on "
-                "6-Sep, whichever first. CUT (set FAMILY_NONCRYPTO_EXCLUDE="
-                "'freqtrade-mum:<the graded names>' on mum-live AND "
-                "family-lighter-shadow so the control twin moves with her) if "
-                "the live upper bound (m + t_crit*SE) <= 0 AND the twin's mean "
-                "< 0; KEEP if the live mean > 0; anything else re-arm once.",
-        "why_open": "the sample is 7; the floor is 10. The mechanism "
-                    "(`noncrypto_exclude`, per carrier, inert at '') shipped with "
-                    "the registration so the cut is one env, not a build, when "
-                    "the read passes.",
-        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 6),
+        "what": "👩 mum's NON-CRYPTO sleeve read 7 closes at −0.383%/trade live "
+                "(−0.540% twin), 5 of 7 `max_hold` losers on both arms — and the "
+                "SAME DAY an adversarial review REFUTED the mechanism that "
+                "motivated it and the bar that would have acted on it. The "
+                "closed-hours story is dead (0 of 10 max_hold losses expired "
+                "before the underlying reopened; entry-while-OPEN is WORSE). The "
+                "7 closes are 4 ENTRY DAYS (3 share one `opened_at`), the upper "
+                "bound is <=0 only on the iid read (+0.170% day-clustered), and "
+                "the raw −0.98pp class gap FLIPS to +0.18pp under a close-day "
+                "effect. PRE-REGISTERED (I21), corrected rule: run "
+                "`scripts/study_mum_noncrypto_sleeve_2026-09-02.py` at G>=10 "
+                "distinct ENTRY DAYS on the live arm or on 16-Sep, whichever "
+                "first. CUT (set FAMILY_NONCRYPTO_EXCLUDE='freqtrade-mum:*' — the "
+                "whole class, so the act matches the graded population — on "
+                "mum-live AND family-lighter-shadow so the control twin moves "
+                "with her) ONLY if the DAY-CLUSTERED upper bound <= 0 AND the "
+                "sleeve is worse than CRYPTO on matched close-days. KEEP if the "
+                "sleeve mean > 0. The twin is REPORTED, not a condition. Anything "
+                "else re-arm once — and note the supported mechanism is a "
+                "vol/bracket mismatch whose remedy is a class-aware ladder "
+                "(I26 feed-it), measured on its own, NOT this cut.",
+        "why_open": "G is 4; the floor is 10 entry days. The mechanism "
+                    "(`noncrypto_exclude`, per carrier, ENTRY-ONLY, inert at '') "
+                    "shipped with the registration so the cut is one env, not a "
+                    "build, if the corrected read ever passes.",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 16),
     },
     # [2026-08-25 (tc)] `farmer-live-swap-operator-steps` DELETED — spent, and
     # its closes_when could never fire: it watched for a `georgia-live` service
