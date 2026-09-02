@@ -1,3 +1,38 @@
+## 2026-09-02 (wj) — "CAN WE UNLOCK HER NOW INSTEAD?" — the latched-lock release valve: a lock stamped by a rail later measured DEFECTIVE no longer outlives its own fix, and 🙏 avo's 04:02:46Z phantom is its first release
+
+**Eamon, ~01:45Z**, on being told avo serves the old bug's tail until 04:02:46Z.
+The answer is yes, and the mechanism deserved to be permanent rather than a
+one-shot: the (vn) latch is durable BY DESIGN (a lock must survive a restart —
+the [[lighter-flatten-silent-halt-redeploy-incident]] class), so a lock STAMPED
+by the defective (wf) denominator ($12.56 bar) held after the corrected rail
+deployed, though a fresh derivation reads ~$12 of realised drawdown against the
+corrected $61 bar. **A measurably-false lock outliving its own fix is the one
+case the latch should not win** — and it is the SECOND phantom-lock event of
+the class (avo's ~103h idle was the first), so the valve is a tool, not a hack.
+
+**THE VALVE — `release_latched_guard(latch, rga)`, pure, called once at the
+boot restore:** `{PFX}_RELEASE_GUARD_AT` names the EXACT expiry (ISO-8601) of
+the ONE lock to release; a stored expiry within ±2s clears the latch, anything
+else is untouched. A future lock computed by the correct rail can never be
+swept: its expiry is its own, and a fresh lock cannot expire on a past stamp.
+Unset, blank or unparseable releases NOTHING — fail-safe toward keeping the
+lock, the same direction every rail read fails. Pinned by
+`tests/autonomy/test_guard_release_valve.py` (8 tests; both declared mutations
+verified red — tolerance 2s→8h and dropped-abs both die on the kept-case that
+stores the expiry BELOW the target). Deployed `[deploy-live-taker]` (avo's
+service only — the code is inert without the env, so mum and georgia buy no
+restart); `AVO_RELEASE_GUARD_AT=2026-09-02T04:02:46+00:00` set on the service,
+release verified on the row, env to be cleared after (a spent valve left set is
+harmless — it can only ever match the one dead stamp — but tidy is tidy).
+
+**THE BOUNDARY, stated because a release valve invites stretching:** this
+releases a lock whose own trigger is FALSE under the corrected rail, at the
+owner's explicit ask, with the corrected rail live and armed underneath ($61
+bar, −10% per-slot stops, daily-loss floor, notional caps all untouched). It is
+NOT a lever for cutting short a TRUE lock — a lock whose trigger still holds
+has a different expiry than any stamp an operator would name, and the
+exact-match rule is what makes that structural rather than aspirational.
+
 ## 2026-09-02 (wi) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
 
 **Eamon, ~01:00Z: "Optimise mum and avo and make sure both are optimal and

@@ -1015,6 +1015,47 @@ def entries_lock(closed, t_now, baseline, latch=None):
     return 0.0, None
 
 
+def release_latched_guard(latch, rga):
+    """[2026-09-02 (wj)] OPERATOR RELEASE VALVE for a latched protections lock.
+
+    The (vn) latch is durable BY DESIGN — a lock must survive a restart, or a
+    redeploy silently un-halts a book ([[lighter-flatten-silent-halt-redeploy
+    -incident]]'s class). The cost of that property surfaced the day the (wf)
+    denominator fix deployed: 🙏 avo's maxdd lock (expiry 04:02:46Z) was
+    STAMPED by the defective rail ($12.56 bar on a $305 funded book) and the
+    latch honoured it after the corrected rail shipped, though a fresh
+    derivation reads ~$12 of realised drawdown against the corrected $61 bar.
+    A measurably-false lock outliving its own fix is the one case the latch
+    should not win — and Eamon asked for the unlock by name.
+
+    `{PFX}_RELEASE_GUARD_AT` names the EXACT expiry (ISO-8601) of the ONE
+    lock to release: a stored expiry within ±2s of it clears the latch;
+    anything else is untouched, so a future lock computed by the correct rail
+    can never be swept (its expiry is its own, and a fresh lock's expiry
+    cannot land on a past stamp). Unset, blank or unparseable releases
+    NOTHING — fail-safe toward keeping the lock. Returns the (possibly
+    cleared) latch; pure, so the tests drive it directly."""
+    rga = (rga or "").strip()
+    try:
+        held = float(latch[0] or 0.0)
+    except (TypeError, ValueError, IndexError):
+        return latch
+    if not (rga and held):
+        return latch
+    try:
+        target = datetime.fromisoformat(
+            rga.replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return latch
+    if abs(held - target) <= 2.0:
+        print(f"[release-valve] released latched {latch[1]} lock (expiry "
+              f"{iso(datetime.fromtimestamp(held, tz=timezone.utc))}) per "
+              f"{_PFX}_RELEASE_GUARD_AT — operator release of a stale-rail "
+              f"lock", flush=True)
+        return [0.0, None]
+    return latch
+
+
 # --------------------------------------------------------------------------
 # [2026-08-27 (vm)] WHAT THE RAILS COST — the live trio's shut accounting.
 #
@@ -1403,6 +1444,11 @@ def main(_ctx=None, once=False):
         # value this loop computed, the same shape `last_open_ts` uses.
         guard_latch = [float(state.get("guard_until") or 0.0),
                        (state.get("guard_cause") or None)]
+        # [(wj)] the operator release valve — a restored latch naming exactly
+        # the expiry in {PFX}_RELEASE_GUARD_AT is cleared at boot; see the
+        # function's docstring for why this exists and why it matches EXACT.
+        guard_latch = release_latched_guard(
+            guard_latch, _env("RELEASE_GUARD_AT", ""))
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
