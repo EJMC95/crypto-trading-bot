@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 03:12 Sydney (17:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-03 03:20 Sydney (17:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -66,7 +66,7 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 ## Shipped today (7 commit(s))
 
-- `7a9e9c8` wip
+- `cb4cc5d` (xj) the drift guard _STOP_BRIDGE promised in writing and never got — plus a carried row that was five days stale
 - `d6626e9` Merge PR #278: (xi) the Railway delete is a platform limit, not a permission one — harm neutralised, reason measured
 - `a0361e5` (xi) the Railway delete is a platform limit, not a permission one — harm neutralised, reason measured
 - `26feade` Merge PR #276: (xh) the suite's 8-red floor was the container, and finding that surfaced a live-deploy marker lost to a squash merge on a real-money book

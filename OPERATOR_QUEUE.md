@@ -55,23 +55,41 @@ to-do list.
 * `restartPolicyType = NEVER` — the container that exits immediately no longer
   retries.
 
-**STATED LIMIT (I3):** the read-back proves the SETTING, not yet the BEHAVIOUR.
-The check that closes it is free and needs no extra push — after the next merge
-to main, the service's newest deployment should still read
-`29e201fa-…` / 15:33:04Z. If a newer one appears, watch patterns are not
-gating this builder and option B below becomes the answer.
+**THE LIMIT WAS STATED, THEN THE CHECK RAN AND CAME BACK POSITIVE — 17:01Z.**
+The read-back proved the SETTING; the merge of PR #278 minutes later proved the
+BEHAVIOUR, at no extra cost. Railway recorded deployment `4599a3f5-…` against
+commit `d6626e9` with **`status: SKIPPED`** — it saw the push and declined to
+build. Every push before the change built: #274 11:10, #275 11:21, #271 14:54,
+#276 15:33, all `SUCCESS`/`REMOVED`. **The rebuild-on-every-push is stopped,
+measured.**
 
-### A ★ — Apply the staged deletion in the dashboard (one click, ends it)
+**AND MY OWN PREDICATE WAS WRONG, corrected in place per I12 before anyone
+acts on it.** This row originally said to check that *"the newest deployment
+should still read `29e201fa-…`; a newer one means watch patterns are not
+gating this builder"*. A newer RECORD did appear — and it is the success case,
+not the failure case. **The right predicate is the STATUS, not the presence of
+a row:** a new `SKIPPED` record is the gate working; a new `BUILDING`,
+`DEPLOYING` or `SUCCESS` record would be the gate failing. A check whose
+stated pass condition would have read a success as a failure is worse than no
+check, which is why this is corrected rather than quietly left.
+
+### A — Apply the staged deletion in the dashboard (one click, ends it)
+**The ★ is REMOVED, on the evidence above.** It was recommended when the
+rebuilds were still assumed to be running; they are now measured stopped, so
+this buys tidiness rather than anything operational. Keep it if an inert
+service on the account bothers you; skip it freely if it does not.
 Railway → project `supportive-healing` → the staged-changes panel → **Apply**,
 then 2FA. **Two changes are staged**, both from Railway's own agent: the service
 removal AND a GitHub source disconnect. Applying either is sufficient to stop
 the rebuilds permanently; applying the removal also frees the project, which can
 then be deleted from its own settings page (also dashboard + 2FA).
-**Cost: ~30 seconds. Recommended because it is the only path that actually ends
-the row** — everything else leaves an inert service on the account forever.
+**Cost: ~30 seconds.** It remains the only path that actually ends the row —
+everything else leaves an inert service on the account — but it is no longer
+buying a fix, because the fix already landed.
 
-### B — Leave it neutralised and do nothing
-Legitimate, and it costs nothing measurable now: no builds, no replicas, no
+### B ★ — Leave it neutralised and do nothing
+Now the recommended option, because the cost it was weighed against has been
+measured away: no builds (proven — `SKIPPED` at 17:01Z), no replicas, no
 variables, no volume. The service simply sits there. Choose this if the
 dashboard trip is not worth 30 seconds — but note the row then never closes, and
 a future session will re-discover the service and re-investigate it, which is
