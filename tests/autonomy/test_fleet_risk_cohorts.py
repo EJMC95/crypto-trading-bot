@@ -24,6 +24,7 @@ count a `lighter_live` row into `shadow`.
 import ast
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -164,7 +165,7 @@ def test_every_veto_consumer_asks_for_a_cohort(path, cohort_expr):
     """AST: the live host asks for `live`, the family shadow host for
     `shadow`, and neither re-types the pooled read at the veto site.
     Mutation: put `fr.get("long_positions")` back at the veto."""
-    src = open(os.path.join(_ROOT, path)).read()
+    src = Path(_ROOT, path).read_text()
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
              and str(getattr(n.func, "attr", getattr(n.func, "id", "")))
@@ -176,12 +177,12 @@ def test_every_veto_consumer_asks_for_a_cohort(path, cohort_expr):
 
 def test_the_taker_and_funding_arms_pick_their_cohort_by_venue():
     for path in ("lighter_ticket_taker.py", "lighter_funding_bot.py"):
-        src = open(os.path.join(_ROOT, path)).read()
+        src = Path(_ROOT, path).read_text()
         assert "cohort_long_state" in src, path
         assert '"live"' in src and '"shadow"' in src, path
 
 
 def test_fleet_risk_publishes_the_cohort_block_beside_the_pooled_pair():
-    src = open(os.path.join(_ROOT, "fleet_risk.py")).read()
+    src = Path(_ROOT, "fleet_risk.py").read_text()
     assert '"cohorts": {' in src and '"long_positions": fleet_long' in src
     assert fr.LIVE_LONG_BUDGET >= 0

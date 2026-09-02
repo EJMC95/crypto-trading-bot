@@ -14,6 +14,7 @@ while scanning diversified (or vice versa); let the env kill switch stamp
 import ast
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -60,14 +61,14 @@ def test_a_dark_read_returns_the_list_unchanged(monkeypatch):
 
 
 def test_the_scan_loop_iterates_the_ordered_offer_not_b_coins():
-    src = open(F.__file__).read()
+    src = Path(F.__file__).read_text()
     assert "for coin in shadow_scan_order(b.coins" in src
     assert "            for coin in b.coins:\n                bars = cache.get(coin" not in src
 
 
 def test_the_stamp_and_the_loop_read_one_constant():
     """AST: both helpers reference SHADOW_SCAN_ORDER and nothing else decides."""
-    tree = ast.parse(open(F.__file__).read())
+    tree = ast.parse(Path(F.__file__).read_text())
     fns = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)
            and n.name in ("shadow_scan_order", "shadow_scan_order_stamp")}
     assert set(fns) == {"shadow_scan_order", "shadow_scan_order_stamp"}
@@ -77,7 +78,7 @@ def test_the_stamp_and_the_loop_read_one_constant():
 
 
 def test_the_policy_stamp_site_uses_the_stamp_helper():
-    src = open(F.__file__).read()
+    src = Path(F.__file__).read_text()
     assert 'policy_stamp(self.s, "lighter_shadow",\n' \
            '                                                  shadow_scan_order_stamp(),' in src
     assert '"lighter_shadow",\n                                                  "list",' not in src

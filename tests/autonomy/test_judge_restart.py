@@ -129,7 +129,11 @@ def test_the_serial_lane_is_derived_from_the_row_it_trades():
     """Not a second hardcoded "farmer" — the pair naming LIVE_BOT as its live
     arm IS the lane, so a slot swap cannot leave the gate aimed at a row the
     machine no longer trades (the defect that produced this whole entry)."""
-    assert ej.serial_lane_id() == "farmer"
+    # [(wv)] the DEFAULT lane is the living pair (mum today), derived from
+    # fleet_bus.living_pair_default; the Farmer's row still resolves to its
+    # own lane when asked, which is the property this test pins.
+    assert ej.serial_lane_id(FARMER) == "farmer"
+    assert ej.serial_lane_id() == ej.serial_lane_id(ej.LIVE_BOT) == "mum"
     assert ej.serial_lane_id(GEORGIA) == "georgia"
     assert ej.serial_lane_id("no-such-row") is None
 
@@ -140,7 +144,7 @@ def test_a_retired_arm_parks_only_its_own_lane():
     pairs = {"farmer": {"phase": "stood_down", "stood_down": {"why": "retired"}},
              "georgia": {"phase": "idle"}, "mum": {"phase": "unjudgeable"},
              "avo": {"phase": "idle"}}
-    parked, lane, why = ej.lane_stood_down(pairs, bus=None)
+    parked, lane, why = ej.lane_stood_down(pairs, live_bot=FARMER, bus=None)
     assert parked is True and lane == "farmer" and why["why"] == "retired"
     # ...and the same census, asked about georgia's lane, admits it.
     parked_g, lane_g, why_g = ej.lane_stood_down(pairs, live_bot=GEORGIA, bus=None)
@@ -151,7 +155,7 @@ def test_another_pairs_stand_down_does_not_park_this_lane():
     """The mirror, and the one a naive 'any pair retired' rewrite would fail."""
     pairs = {"farmer": {"phase": "idle"},
              "georgia": {"phase": "stood_down", "stood_down": {"why": "x"}}}
-    parked, lane, _ = ej.lane_stood_down(pairs, bus=None)
+    parked, lane, _ = ej.lane_stood_down(pairs, live_bot=FARMER, bus=None)
     assert parked is False and lane == "farmer"
 
 
@@ -160,7 +164,7 @@ def test_a_dark_census_still_parks_the_retired_lane():
     an empty census must never read as 'nobody is retired' and hand a RETIRED
     REAL-MONEY ARM back to the candidate machine."""
     for census in ({}, None, {"farmer": {"phase": "idle"}}):
-        parked, lane, why = ej.lane_stood_down(census, bus=fb)
+        parked, lane, why = ej.lane_stood_down(census, live_bot=FARMER, bus=fb)
         assert parked is True, (census, "the farmer must stay stood down")
         assert lane == "farmer"
         assert "retired" in str(why.get("why", "")).lower(), why
@@ -172,7 +176,7 @@ def test_lane_census_counts_what_the_judge_is_actually_judging():
     pairs = {"farmer": {"phase": "stood_down"}, "georgia": {"phase": "unjudgeable"},
              "mum": {"phase": "unjudgeable"}, "avo": {"phase": "idle"},
              "ghost": {"phase": "promoted-ish"}}
-    c = ej.lane_census(pairs)
+    c = ej.lane_census(pairs, live_bot=FARMER)
     assert c["live"] == ["avo"] and c["stood_down"] == ["farmer"]
     assert c["unjudgeable"] == ["georgia", "mum"]
     assert c["unknown"] == ["ghost"], "an unmapped phase must not be absorbed"
@@ -227,6 +231,10 @@ def judged(monkeypatch):
         calls["write_levers"] += 1
         return None
 
+    # [(wv)] the machine's default lane is mum now; this fixture exists to
+    # drive the PARKED path, so it aims the machine at the Farmer's rows.
+    monkeypatch.setattr(ej, "LIVE_BOT", FARMER)
+    monkeypatch.setattr(ej, "SHADOW_BOT", fb.JUDGED_PAIRS["farmer"]["shadow_bot"])
     monkeypatch.setattr(ej, "store", store)
     monkeypatch.setattr(ej, "paired_eval", _spy_eval)
     monkeypatch.setattr(ej.tuning, "write_levers", _spy_write)
