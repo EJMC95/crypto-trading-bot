@@ -1,3 +1,61 @@
+## 2026-09-02 (xq) — AN ADOPTED LEG IS NOT THE BOOK'S EVIDENCE: a manual trade Eamon placed by hand was on its way into a real-money book's go-live sample, and (xa)'s tag reached the brain but no grader
+
+**Eamon, 2-Sep: *"It was a manual trade please disregard it ... drop it from
+her trades"*** — 👩 mum's stuck 1000PEPE leg was one HE opened, not one she
+did. She adopted it, which is `(xa)` working as designed. What was not
+designed is where the row was headed.
+
+**`(xa)` STAMPED THE TAG AND NOTHING CONSUMED IT.** An adopted position starts
+its clock at the takeover instant, because the true open is unknown to the
+record — so the row's entry basis and holding period are both fictions of that
+instant, and the P&L it books is whatever happened to the position *before this
+book ever saw it*. `(xa)` says so and keeps it out of the BRAIN's per-tag
+bucket. **Nothing kept it out of the book-level mean, t, halves or maxDD — the
+sample the go-live gate reads**, on a REAL-MONEY book. A finding no gate
+consumes is a note ((gn)'s rule, and this is its fourth costume).
+
+**SHIPPED: `golive_readiness.is_adopted_close`**, beside `is_phantom_close` and
+under its contract verbatim:
+* **exact segment, never a substring** — `<side>-adopted` only, so a strategy
+  whose own name ends in "adopted" cannot collide (mutation-verified: the
+  substring form admits `long-my-adopted`);
+* **speaks BOTH ledger shapes** — `enter_tag` on a `fetch_paper_trades` row,
+  `tag`/`reason` on a raw `/trades.json` one. `(vd)` is the reason this is a
+  bullet and not an afterthought: a single-shape predicate does not half-work,
+  it silently classifies **every** row of the other shape;
+* **fail-CLOSED in the KEEPING direction** — anything unparseable is NOT
+  adopted and stays in the sample. A filter over a graded sample must never be
+  able to shrink it beyond its exact signature;
+* **the split is the owner's** — `bot_pnl_store.split_reason`, imported, not
+  re-implemented (hj), and driven in test against the real function rather than
+  a hand-written fixture.
+
+**All four consumers wired**, because the phantom filter already had four and a
+grader that filters one and not the other grades a sample the gate refuses:
+`golive_readiness` itself, `edge_audit`, `ceiling`, `fleet_allocation`.
+
+**AND A DRIFT PIN ON THE HOST.** The filter keys on a string the live bot
+stamps (`m["tag"] = m.get("tag") or "adopted"`). Rename that and the filter
+goes silently inert — the registered-but-inert shape (I18) — so the test greps
+the host for the literal it depends on, and a rename reddens the push.
+
+**Scope, stated:** this covers the LEDGER. It does not reach the MTM equity
+series, which includes an adopted leg's marks while it is held, so the
+drawdown bar still sees it — named rather than quietly claimed as covered.
+In this instance it is moot: Eamon closed the position at the venue by hand,
+and the host's reconcile path drops meta without booking a close at all
+(*"meta says held, venue says flat — venue is the record"*), so no row was
+ever written. The class remains, and a container that loses its meta re-adopts
+its own position at the next boot for exactly the same reason.
+
+**NOT A LOSS BEING HIDDEN**, which is the standing risk with any ledger filter
+((hr)'s registry says so in its own header): the leg was **−$3.24** on a $524
+book, and the filter is symmetric — an adopted WINNER is excluded on the same
+signature, for the same reason.
+
+21 tests, **6/6 mutations red** (filter dead · raw-feed shape unread · substring
+for segment · `edge_audit` unwired · `ceiling` unwired · host renames the tag).
+
 ## 2026-09-02 (xp) — THE STOP OVERSHOOT IS NOT SLIPPAGE AND NOT LATENCY: a resting venue-side stop is REFUSED with the number, and the ceiling that assumed fire-at-level is now measured
 
 **Eamon: *"Implement fix."*** The fix that shipped is the arithmetic. The

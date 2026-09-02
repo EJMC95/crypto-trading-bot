@@ -893,6 +893,51 @@ def drop_retired_sleeves(rows, retired, tag_of=None):
     return kept, dropped
 
 
+#: [(xq)] The tag `(xa)` stamps on a position the book found at the venue and
+#: did not open. Exactly `<side>-adopted`, so a strategy whose own name ends in
+#: "adopted" cannot collide with it.
+ADOPTED_TAG = "adopted"
+
+
+def is_adopted_close(r):
+    """[(xq)] True for a close of an ADOPTED position — a leg the book found on
+    the venue with no bracket of its own and took over mid-life.
+
+    IT IS NOT THAT BOOK'S EVIDENCE, BY CONSTRUCTION. `(xa)` starts the clock at
+    adoption because the true open is unknown to the record, so the row's entry
+    basis and holding period are both fictions of the takeover instant — the
+    P&L it books is whatever happened to the position before this book ever saw
+    it. `(xa)` already keeps it out of the BRAIN's per-tag bucket; nothing kept
+    it out of the book-level mean, t, halves or drawdown, which is the sample
+    the go-live gate reads. A finding no gate consumes is a note.
+
+    Eamon, 2-Sep: *"It was a manual trade please disregard it ... drop it from
+    her trades"* — 👩 mum adopted a 1000PEPE leg he opened by hand. That is the
+    clearest instance and not the only one: a container that loses its meta
+    re-adopts its own position on the next boot, and that row is equally
+    unmeasurable for the same reason.
+
+    SPEAKS BOTH LEDGER SHAPES ((vd), whose lesson was that a single-shape
+    predicate silently classifies every row of the other shape): `enter_tag` on
+    a `fetch_paper_trades` row, `tag`/`reason` on a raw `/trades.json` one.
+
+    Fail-CLOSED IN THE KEEPING DIRECTION: anything unparseable is NOT adopted
+    and stays in the sample — `is_phantom_close`'s contract verbatim, and for
+    the same reason. A filter over a graded sample must never be able to shrink
+    it beyond its exact signature.
+    """
+    try:
+        from bot_pnl_store import split_reason   # noqa: PLC0415 — one owner
+        raw = r.get("enter_tag") or r.get("tag") or r.get("reason") or ""
+        if not isinstance(raw, str) or not raw:
+            return False
+        direction, _exit = split_reason(raw)
+        parts = str(direction or "").split("-")
+        return len(parts) == 2 and parts[1].lower() == ADOPTED_TAG
+    except Exception:  # noqa: BLE001 — a filter never breaks a grade
+        return False
+
+
 def is_phantom_close(r):
     """[2026-08-25 (th)] True for a ledger row that is a halt/flatten EVENT
     wearing a close's shape: exactly $0.00 P&L with NO entry price. The
@@ -3647,6 +3692,13 @@ def main():
         rows = [r for r in rows if not is_phantom_close(r)]
         print(f"(phantom closes excluded by signature: {_phantoms} — "
               f"$0.00 with no entry price)")
+    # [(xq)] and the ADOPTED legs — a position the book took over mid-life,
+    # whose entry basis and hold are fictions of the takeover instant.
+    _adopted = sum(1 for r in rows if is_adopted_close(r))
+    if _adopted:
+        rows = [r for r in rows if not is_adopted_close(r)]
+        print(f"(adopted closes excluded by tag: {_adopted} — a leg this "
+              f"book found on the venue, not one it opened)")
     books = {}
     for r in rows:
         bot = str(r.get("bot"))

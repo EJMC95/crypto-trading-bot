@@ -1008,8 +1008,9 @@ def run_once(publish=False):
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(
             os.path.abspath(__file__)), "scripts"))
-        from golive_readiness import is_phantom_close
-        _keep = [t for t in trades if not is_phantom_close(t)]
+        from golive_readiness import is_phantom_close, is_adopted_close
+        _keep = [t for t in trades
+                 if not is_phantom_close(t) and not is_adopted_close(t)]
         n_phantom = len(trades) - len(_keep)
         trades = _keep
     except Exception:                                    # noqa: BLE001

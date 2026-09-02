@@ -319,6 +319,7 @@ def graded_sample(rows, bot):
     return [r for r in rows if r.get("bot") == bot
             and _ts(r.get("closed_at")) and _ts(r.get("opened_at"))
             and not gr.is_phantom_close(r)
+            and not gr.is_adopted_close(r)   # (xq)
             and not store.is_quarantined(bot, r.get("pair"), r.get("closed_at"))]
 
 

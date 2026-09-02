@@ -209,7 +209,7 @@ def shape(trades):
         bot = r.get("bot")
         if not bot or r.get("is_open"):
             continue
-        if gr.is_phantom_close(r):
+        if gr.is_phantom_close(r) or gr.is_adopted_close(r):   # (xq)
             continue
         # [2-Sep] THE PUBLIC FEED SKIPS THE QUARANTINE. `fetch_paper_trades`
         # (the grader's read) withholds `LEDGER_QUARANTINE` rows; the public
