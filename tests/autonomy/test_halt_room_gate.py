@@ -297,3 +297,82 @@ def test_a_non_numeric_cap_can_no_longer_raise_inside_the_publish_path():
     out = _cycle(day_start=221.0, cap="nonsense")
     assert out["pub"] is not None, "the row must still publish"
     assert out["pub"]["extra"]["leverage"]["halt"]["binding"] == "pct"
+
+
+# ---- 19-23  (xh) the arming is never byte-identical to "the gate never ran" --
+
+def test_a_quiet_cycle_still_publishes_the_arming_from_the_books_own_clip():
+    """[(xh), I18] (xg) published `halt_gate: null` whenever no entry candidate
+    reached sizing — the normal resting state for a book whose bar is
+    `RSI<25 AND NOT uptrend` — so a quiet loop and a gate that never ran were
+    the same bytes on a REAL-MONEY row. Observed live on mum minutes after the
+    (xg) deploy, which is what motivated this.
+
+    Driven on the RISING tape, where her entry cell cannot fire, with the book
+    HEALTHY (room to spare) so a null arming could only ever be "no signal"."""
+    with loaded("freqtrade-mum", MUM_GROSS_X="2") as m:
+        with _driven(m, tape="breakout") as box:      # rising: her cell can't fire
+            box["rails"].max_daily_loss = 57.0
+            box["state"][m.STATE_KEY] = _state({}, 200.0)
+            m.main(_ctx={"venue": box["venue"], "rails": box["rails"]}, once=True)
+            pubs = [kw for b, kw in box["published"] if b == ROW]
+            assert pubs, "the row must publish"
+            vet = pubs[-1]["extra"]["entry_vetoes"]
+    assert not box["venue"].opens, "fixture check: this cycle must be QUIET"
+    assert vet.get("halt_room_skips", 0) == 0, \
+        "fixture check: the book must be HEALTHY, so silence is the signal " \
+        "and not a halt shutting entries"
+    hg = vet.get("halt_gate")
+    assert hg is not None, "a quiet cycle must not publish a null arming"
+    assert hg["basis"] == "book_clip", hg
+    assert hg["armed"] is True, "mum's geometry arms the gate"
+    assert 0.0 < hg["stop_share"] <= hg["max_share"], hg
+
+
+def test_a_candidate_that_prices_the_gate_wins_over_the_book_clip_fallback():
+    """The fallback must never overwrite a real measurement — when an entry
+    candidate reached sizing this cycle, the row reports THAT pricing."""
+    out = _cycle(day_start=200.0)
+    assert out["venue"].opens, "fixture check: this cycle must price a candidate"
+    hg = out["vetoes"].get("halt_gate")
+    assert hg is not None and hg["basis"] == "candidate", hg
+
+
+def test_the_fallback_is_the_same_owner_the_entry_site_uses():
+    """(hj): a second copy of a rule is a second rule. Both sites must route
+    through `halt_gate_stat_for`, so the row can never claim armed while the
+    actuator refuses nothing (or the reverse)."""
+    import ast
+    src = (ROOT / "lighter_avo_live_bot.py").read_text()
+    tree = ast.parse(src)
+    calls = [n for n in ast.walk(tree)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+             and n.func.id == "halt_gate_stat_for"]
+    assert len(calls) == 2, f"expected the entry site + the publish fallback, got {len(calls)}"
+    bases = sorted(c.args[-1].value for c in calls)
+    assert bases == ["book_clip", "candidate"], bases
+    # and nobody hand-rolls the dict beside it
+    assert src.count('"max_share": HALT_GATE_MAX_STOP_SHARE') == 1, \
+        "the arming dict must be built in exactly one place"
+
+
+def test_an_unreadable_clip_publishes_a_refusal_not_a_fabricated_arming():
+    """`stop_share: null` with `armed: false` says the gate priced itself and
+    could not — which must NOT read as armed, and must not be absent either."""
+    with loaded("freqtrade-mum") as m:
+        for clip in (None, 0.0, -5.0, "junk", float("inf"), float("nan")):
+            hg = m.halt_gate_stat_for(clip, -0.04, 600.0, _Rails(57.0), "book_clip")
+            assert hg["armed"] is False, clip
+            assert hg["stop_share"] is None, clip
+            assert hg["basis"] == "book_clip", clip
+
+
+def test_the_arming_still_fails_open_and_gates_nothing_when_unarmed():
+    """Restrict-only: an unarmed or unpriceable gate refuses no entry. avo is
+    the live proof — one slot-stop is her whole allowance, so she is NOT armed
+    and the rail must be inert on her book."""
+    with loaded("freqtrade-avo-maria") as m:
+        hg = m.halt_gate_stat_for(230.0, -0.10, 230.0,
+                                  _Rails(23.0), "book_clip")
+        assert hg["armed"] is False, hg
+        assert hg["stop_share"] is not None and hg["stop_share"] > hg["max_share"], hg

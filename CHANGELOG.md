@@ -1,3 +1,57 @@
+## 2026-09-02 (xh) — THE RAIL SHIPPED AN HOUR AGO AND ITS OWN ARMING WAS INVISIBLE: `halt_gate: null` on a real-money row was byte-identical between "no signal this cycle" and "the gate never ran"
+
+**Found by reading back the (xg) deploy rather than trusting it.** The stamp
+flipped to `078f894f89d1`/17 exactly as predicted and `halt_room_skips: 0`
+proved the code path live — and `halt_gate` read **`null`**, which is the I18
+ambiguity in the one place it is least affordable: the arming telemetry of a
+rail that governs real money.
+
+**It was not a bug, and checking that took the check the doctrine asks for.**
+The line ordering says the publish (2049) runs BEFORE the gate (3078) inside
+one `while True`, which would make the whole field permanently dead. It does
+not: `_publish_row` is a CLOSURE defined at 1799 and called at **3217**, after
+the entry section, so it reads the pass's values at call time; the loop-scope
+defaults at 1711 exist only so the kill/halt early-publish paths cannot
+`NameError`. **Inferring control flow from line numbers would have had me
+"fix" working code on a live book** — the (po) rule, from the other side.
+
+**The real gap, and it is mine.** `halt_gate_stat` is assigned only when an
+entry candidate reaches sizing. 👩 mum's bar is `RSI(14)<25 AND NOT uptrend`,
+so most cycles price no candidate at all — meaning the field's NORMAL state
+was `null`, and nothing on the row distinguished that from a gate that never
+ran. The arming never needed a candidate: it is the book's own clip, stop and
+daily allowance, every one of which `_publish_row` already holds.
+
+**SHIPPED:** `halt_gate_stat_for(clip, stop, day_start, rails, basis)` — ONE
+owner ((hj)), used by the entry site with `basis: "candidate"` and by the
+publish path with `basis: "book_clip"`. The row is **never null on a live
+book** again, and a reader can tell a real pricing from the book's geometry.
+
+**AND ONE CORRECTNESS FIX IN (xg)'s OWN CODE.** `halt_gate_share` guarded
+`stake > 0`, and **`inf > 0` is True** — an infinite clip passed the guard and
+put a bare `Infinity` on the row. **Stated at its true size, because the first
+draft of this entry overstated it:** `bot_pnl_store.json_safe` already nulls
+non-finite values, so I5's declared boundary holds and no publish would have
+been rejected. This is defence-in-depth at the OWNER, and it makes
+`armed: false` correct by construction rather than by the accident that
+`inf > max_share`. Not a defect caught in production; a guard that was relying
+on a downstream sanitizer it never named.
+
+**Verification.** 5 tests added (23 in the file), **5/5 mutations red**,
+including the two that matter: removing the fallback reddens the BEHAVIOURAL
+quiet-cycle test as well as the shape test, and a fallback that overrides a
+real candidate pricing is caught. **Two of my own test fixtures were wrong
+first** — both asserted a state I had not confirmed the fixture produces (a
+`day_start=600` book is HALTED, not quiet), which is the (po) trap again; the
+quiet case is now the RISING tape, where mum's cell structurally cannot fire,
+with a fixture-check assertion in the test so it cannot pass for the wrong
+reason.
+
+**MAIN ONLY, per (mm).** No trade changes: the gate decision is byte-identical
+on every finite input, and identical on non-finite ones too (`armed` was
+already false there). A real-money container restart buys nothing here, so it
+rides the next deploy that does change what a book does.
+
 ## 2026-09-02 (xg) — 👩 MUM'S HALT-AWARE ENTRY GATE: a leg whose own stop would flatten the whole book is refused, measured neutral in the regime she trades and worth 6pp in the one that halts her
 
 **[RENUMBERED (xe) -> (xg) at push time** — main took (xd) and (xe) while this
