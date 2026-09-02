@@ -56,6 +56,27 @@ maxdd denominator genuinely tracked funded equity; this rail is meant to be
 fixed). Reverted in full (`daily_loss_hit` signature, the host breach call, the
 test). The pinned test did exactly its job — I3, from the outside.
 
+**[AMENDED same day, POST-MERGE — THE REFUTED FIX SHIPPED ANYWAY, for a ~2h
+window, and the record must say so.** Eamon merged PR #257 at `ea2d96f` (00:56Z)
+— the branch tip BEFORE this revert had been pushed — and the merge commit
+(authored by the peer session, which resolved the cross-session conflict and
+never mentions (wh)) carried `[deploy-live]`, so run 654 put the (wh) code on
+ALL THREE live services (readback: every live row on build `4690a497e564`).
+Measured while it was live: main's Tests run went RED on exactly the pinned rail
+test, and 👩 mum's own row published `leverage.halt = {abs_usd: 30, binding:
+"abs"}` while the deployed actuator would confirm a halt only at $56.70 — the
+halt telemetry and the halt actuator disagreeing about the rail that governs
+real money (the I23 shape: the (wh) commit changed the actuator and never the
+publisher). No halt latched inside the window (mum's row reads unhalted, entries
+open). This revert lands POST-merge, rebased onto main, and deploys with
+`[deploy-live-mum]` — mum is the only book whose behavior (wh) changed
+($56.70 → $30 effective; avo's binding rail moved $30.50 → $32 under it, $1.50
+of slack, and she re-tightens for free on her next qualifying deploy per (mm);
+georgia is retired + drained). The transferable lesson beside the refutation:
+**a merge is a deploy decision here — the marker rides the merge subject — so a
+branch whose tip is known-red must say so IN THE PR THREAD before anyone can
+merge it**, because the merge button does not read the branch's later commits.]
+
 **THE REAL LEVER, and it is Eamon's.** Whether mum halts at 5.26% or a looser
 level is not a bug to fix, it is a cap VALUE to choose: raise her
 `LIGHTER_MAX_DAILY_LOSS` (currently $30) toward, say, $57 (= 10% of $570, matching
