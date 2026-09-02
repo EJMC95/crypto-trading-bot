@@ -156,6 +156,16 @@ sat $22 away, and one real-money leg was running with no bracket because a
 1000-market has two names). **This entry does NOT restate it**; it carries only
 what `(xa)` does not.
 
+**[RENUMBERED TWICE, recorded inline per the letter rule: this entry was
+`(xf)`, then `(xh)`, and is now `(xk)`.** PR #271 took `(xf)` on main for
+mum's gross-3.75x work while this was unpushed; PR #276 then took `(xh)` for
+the suite's dep floor. Both times the CITED entry kept the letter and this one
+moved, and every code citation was renumbered with it. Note the git log
+subjects still carry the old letters — that is the documented behaviour and is
+why the CHANGELOG headers, not `git log`, are the letter index. The companion
+entries `(xi)` (the grader's false exclusion) and `(xj)` (the class-ladder
+study) were never contested and did not move.**
+
 ### 1. THE SLEEVE SPLIT — the one place her ledger says something is wrong
 
 Her era ledger split by the venue's own instrument class, through the grader's
