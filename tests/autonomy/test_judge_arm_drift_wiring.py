@@ -37,7 +37,7 @@ class TestTheRule:
     def test_disjoint_sets_are_drift(self):
         rows = [row(L, "A", W0 + 10), row(S, "B", W0 + 20)]
         d = J._row_drift(rows)
-        assert d and d["source"] == "rows-disjoint"
+        assert d and d["source"] == "rows-disjoint" and d["basis"] == "build"
 
     def test_a_rolling_deploy_is_not_drift(self):
         """THE LIVE DEFECT. Both arms cross the same deploy; the slower arm's
@@ -77,7 +77,8 @@ class TestTheContainerHalfIsUntouched:
         pnl = [{"bot": L, "extra": {"build": "x"}},
                {"bot": S, "extra": {"build": "y"}}]
         d = J._arm_drift_snapshot(rows, since_ts=W0, fetch=lambda: pnl)
-        assert d == {"live": "x", "shadow": "y", "source": "bot_pnl-current"}
+        assert d == {"live": "x", "shadow": "y", "source": "bot_pnl-current",
+                     "basis": "build"}
 
     def test_a_dark_fetch_claims_nothing(self):
         def boom():
