@@ -61,9 +61,18 @@ def test_each_cohort_is_lit_on_its_own_budget(monkeypatch):
     assert fr.cohort_view(None)["shadow"]["light"] == "green"
 
 
-def test_the_board_default_shadow_budget_is_the_pooled_one():
-    # behaviour-neutral at ship: nothing moves until the env is set on purpose
-    assert fr.SHADOW_LONG_BUDGET == fr.LONG_BUDGET
+def test_the_shadow_budget_default_is_the_cohorts_own_cap_sum():
+    """[(wz)] 26 = mum's twin 12 + avo's twin 6 + the taker 8 — the most longs
+    the living shadow directional books can hold at once. Read from the books'
+    OWN code so a cap change reddens the literal (a retyped constant drifts)."""
+    import lighter_family_bot as fam
+    import lighter_ticket_taker as tt
+    mum = next(b for b in fam.STRATEGIES if b.bot == "freqtrade-mum")
+    avo_shadow = fam.shadow_max_open_overrides()["freqtrade-avo-maria"]
+    assert fr.SHADOW_LONG_BUDGET == mum.max_open + avo_shadow + tt.MAX_OPEN == 26
+    assert fr.SHADOW_LONG_BUDGET >= fr.LONG_BUDGET, "the paper budget never sits below the pooled one"
+    # the live cohort's budget is untouched by this
+    assert fr.LIVE_LONG_BUDGET == fr.LONG_BUDGET == 20
 
 
 def test_real_money_reads_the_live_cohorts_light():
