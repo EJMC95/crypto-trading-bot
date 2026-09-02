@@ -182,6 +182,12 @@ BOT_ROW = BOT + "-lighter"            # the LIVE row (venue_variant admits it)
 SHADOW_ROW = BOT + "-lshadow"         # the control arm (family-lighter-shadow)
 STATE_KEY = BOT_ROW + ":live"
 
+#: [2026-09-02] FAMILY_CLEAR_GUARD's once-per-PROCESS sentinel (non-empty =
+#: already cleared this boot). The restore site runs every loop on this arm,
+#: so without this a set env var would re-clear each fresh lock — the rails
+#: switched off, not an unlock. See the clear site in main().
+_GUARD_CLEAR_DONE = []
+
 
 def _env(name, default):
     """`AVO_X` for Avo, `GEORGIA_X` for georgia — one namespace per book, so
@@ -1403,6 +1409,35 @@ def main(_ctx=None, once=False):
         # value this loop computed, the same shape `last_open_ts` uses.
         guard_latch = [float(state.get("guard_until") or 0.0),
                        (state.get("guard_cause") or None)]
+        # [2026-09-02] FAMILY_CLEAR_GUARD, ported to the LIVE arm — the (vg)
+        # tool, SAME env var and SAME per-boot semantics as
+        # lighter_family_bot.Book (the (vh) lesson: two arms re-expressing one
+        # tool must not diverge). WHY NOW: (vn) gave this arm a durable latch;
+        # (vg)'s correction had already recorded that the clear tool "does not
+        # unlock the live arm" — true THEN because there was nothing durable to
+        # clear, and false the day the latch shipped. Measured cost of the gap:
+        # 🙏 avo's latch, armed by the (wf) denominator defect at a reading of
+        # 35.23% that the corrected rail scores at 7.25%, had NO designed
+        # release and served its full clock on a fixed bug.
+        # ONCE PER PROCESS, and the sentinel is load-bearing: unlike the
+        # family's restore() this line runs EVERY loop, so without it a set
+        # env var would re-clear a FRESH lock each iteration — not an unlock
+        # but the rails switched off. The family's per-boot shape is exactly
+        # `not _GUARD_CLEAR_DONE`. Operator-only, opt-in by bot id (bare id or
+        # row id), logs what it cleared — an unlock nobody can see is how a
+        # protection goes missing quietly. Remove the env var after use: while
+        # it stays set, every BOOT still clears (the family tool's documented
+        # property).
+        _clear = {b.strip() for b in
+                  os.environ.get("FAMILY_CLEAR_GUARD", "").split(",")
+                  if b.strip()}
+        if (guard_latch[0] and ({BOT, BOT_ROW} & _clear)
+                and not _GUARD_CLEAR_DONE):
+            _GUARD_CLEAR_DONE.append(t0)
+            _PRINT(f"[avo-live] {iso(t_now)} FAMILY_CLEAR_GUARD: entry lock "
+                   f"dropped by operator (was {guard_latch[1]!r} until "
+                   f"{guard_latch[0]:.0f})")
+            guard_latch = [0.0, None]
         baseline = state.get("initial_equity")
         capital_adjust = float((state.get("capital_adjust") or {}).get("total")
                                or 0.0)
