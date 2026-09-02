@@ -1,3 +1,58 @@
+## 2026-09-02 (wi) — THE LATCH OUTLIVED ITS BUG: (vn)'s durable lock had no designed release, so avo served a 20-hour sentence for a defect (wf) had already fixed — the (vg) unlock ported to the live arm, 5/5 mutations red
+
+**Eamon, 2-Sep: *"I want avo unlocked and optimised and I want mum now she's
+been given a healthy increase in balance to be optimised and both winning."***
+The state when this session picked it up: `(wf)`'s funded-denominator fix was
+LIVE (build `4690a497e564/17` verified on both rows), `(wh)`'s daily-loss
+floor for mum's funded book was live inside the same deploy — and 🙏 avo was
+STILL `entries_shut`, `locked_until 2026-09-02T04:02:46Z`, because the `(vn)`
+latch is durable BY DESIGN and nothing can release it early. The lock was
+armed at a maxdd reading of **35.23%** that the corrected rail, running live
+at that very moment, scores at **7.25%** against a 20% bar. A protection
+serving a full 20-hour clock on an already-fixed measurement is not a
+protection working; it is the defect's residue running out its lease.
+
+**THE GAP HAS A PAPER TRAIL, and it closed itself in the wrong direction.**
+`(vg)` built `FAMILY_CLEAR_GUARD` — the auditable, opt-in, logs-what-it-cleared
+operator unlock — for the shadow `Book`. Its own `(vh)` correction recorded
+that it "does not unlock the live arm", TRUE at the time because the live arm
+had nothing durable to clear. Then `(vn)` gave the live arm exactly the durable
+latch the tool was built for, and nobody re-ran the sentence. Since that day
+the live trio has had a lock that survives redeploys (correct — a restart must
+never bypass a protection) with **no designed release at all** — the only exit
+was the full `stop` clock, measured this week at 103.8 idle hours.
+
+**SHIPPED: the same tool, same env var, on the live arm — with the one change
+that is the actual engineering.** The family's clear runs in `restore()`, once
+per boot. The live arm's latch restore runs **inside the main loop, every
+iteration** — a straight port therefore re-clears every FRESH lock while the
+env stays set: not an unlock but the slguard/maxdd rails switched off. That
+straight port WAS WRITTEN in this session and caught before commit; the
+`_GUARD_CLEAR_DONE` once-per-process sentinel is what separates the two, and
+`tests/autonomy/test_live_clear_guard.py` pins it by AST (the sentinel must sit
+in the same `if` as the env check, the clear must require a live latch so
+clearing nothing cannot consume the shot, identity is exact-match on
+`{BOT, BOT_ROW}` so `freqtrade-avo` can never clear `freqtrade-avo-maria`, the
+log carries the cause and deadline it dropped). **5/5 mutations red.** While
+the env var stays set every future BOOT still clears — the family tool's
+documented property, so the operating rule is unchanged: set it, verify the
+unlock in the row, remove it.
+
+**WHAT THIS IS NOT: a bypass.** The un-amendable core forbids overriding a
+gate the organs hold closed on evidence. This latch is held closed by a
+measurement `(wf)` already corrected — the corrected rail scores her OPEN on
+the same closes. Clearing it is finishing `(wf)`'s fix, not overruling a rail;
+slguard, maxdd (now correctly denominated), the −10% stop, the daily-loss
+halt, the coin vetoes and SafetyRails all stand untouched.
+
+**MUM, for the record of Eamon's same ask:** already optimised by the
+concurrent session's `(wh)` — her $30 pilot cap now floors under the 10% pct
+leash ($57 on today's $577 book) — and verified here: 12/12 slots deployed,
+gross 9.5x (her (wa) value, inside the 10.0 stop-death edge), clip auto-scaled
+to $447, `cap_usd` equity-scaled to $5,636, unlocked, trading. Her binding
+constraint is signal supply, measured at its optimum in `(uz)`/`(tr)` — the
+honest optimisation for mum today is "nothing further; the rails now match
+her funded size."
 ## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
 
 Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:
