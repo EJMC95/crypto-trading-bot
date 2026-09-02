@@ -111,6 +111,18 @@ SELFTEST_MODULES = [
     # The --selftest is offline and pure. The live scan runs in CI, in
     # changelog-check.yml's `book-spend` job, with the selftest ahead of it.
     "scripts.audit_book_spend",
+    # [2026-09-02] the EDGE AUDIT. SELFTEST_MODULES and deliberately NOT
+    # ENFORCED_AUDITS, the winners_docket reason: its live arm reads the
+    # public ledger and the live golive-readiness grade, both of which move
+    # with every close and no code change, and its calibration gate REFUSES
+    # (exit 2) on a stale or absent grade — a refusal a CI job must never be
+    # able to read as either pass or defect. The --selftest is offline and
+    # pure: side derivation, concentration on a synthetic tail, the book/clip
+    # scale of the bootstrap, N_eff on perfectly correlated weights, the
+    # fail-closed calibration gate, the quarantine+phantom pipeline on
+    # synthetic rows, and the "moves nothing" source scan. The structural
+    # pins live in tests/autonomy/test_edge_audit.py.
+    "scripts.edge_audit",
     # [2026-08-20 (ru)] the docket class-split evidence. --selftest is offline
     # and pure (the split, the sleeve-tag round-trip, and the calibration gate's
     # fail-closed arms); the SCAN needs the public feeds, so only the fixture

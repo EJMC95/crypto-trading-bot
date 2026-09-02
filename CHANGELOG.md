@@ -1,3 +1,133 @@
+## 2026-09-02 (wl) — THE EDGE AUDIT: 18 LIVING BOOKS, ZERO SURVIVE MULTIPLICITY, AND EVERY BOOK MINTED ON A PER-TRADE REPLAY NUMBER IS REJECTING IT ON ITS OWN LEDGER — FOUR OF FOUR
+
+**Eamon, 2-Sep:** *"Audit whether the bots have a real edge … Identify whether
+profits come from a repeatable signal or from a small number of lucky trades."*
+The full answer is `EDGE_AUDIT_2026-09-02.md`; the instrument is
+`scripts/edge_audit.py`. This entry records what it measured and what it
+changed.
+
+**THE GAP IT FILLS, measured by grepping the tree:** the fleet grades books six
+ways, ranks them on a lower bound, referees winners and prices ceilings — and
+**not one instrument computed a profit factor, Sharpe, Sortino, recovery time,
+loss streak, concentration share, break-even cost or cross-book correlation.**
+So the fleet could say whether a book PASSES and never whether its pass was one
+coin, one week or one trade. The instrument re-implements NOTHING: the sample is
+`golive_readiness.era_rows` + `is_phantom_close` + `drop_retired_sleeves`, the
+statistics are `stats`/`cluster_se`, the critical value is
+`fleet_allocation.t_crit`, the multiplicity rule is `winners_docket.bh_survivors`
+— identity imports, pinned by AST so a local `def stats` reddens the build
+((hj): a second copy of a rule is a second rule). It **moves nothing** —
+asserted on its own source, the `fleet_allocation` pattern.
+
+**THE CALIBRATION GATE IS THE POINT, and it earned its keep on the first run.**
+`calibrate()` compares the module's per-book `n`/`mean`/`t` against the LIVE
+`golive-readiness` payload and REFUSES (exit 2, no report) on any disagreement
+— fail-closed on a dark, undated or stale grade too. First run: **16 of 18
+matched; 🧘 douglas read n=83 here vs n=81 published.** Cause: the public
+`/trades.json?source=paper` (`fetch_paper_rows`) serves every stored row, while
+the grader's read (`fetch_paper_trades`) withholds `LEDGER_QUARANTINE` — so **any
+outside consumer of the public feed grades a sample the fleet's own grader
+refuses.** The two rows were the (pv) frozen-mark ROBO pair. Fixed by importing
+the owner (`bot_pnl_store.is_quarantined`), and — because a found defect ships
+in the session that finds it ((vd)) — **`scripts/ceiling.py` is corrected the
+same way** (`graded_sample`: it read the raw feed, so it priced a ceiling on
+trades the gate refuses; (vd) explains why the phantom filter was correctly NOT
+added there earlier and why it is safe now). The 18th book, 🪁 kelly, was one
+close that landed after the publish instant; the gate now compares on the same
+clock and counts the after-publish rows rather than failing every fast book.
+
+**WHAT IT FOUND — the verdict table is in the report; the headlines:**
+* **Zero of 18 survive Benjamini-Hochberg at FDR 0.05** (`m` = all 18, losers
+  included — a loser tested still spent a test, I21). Zero pass the gate.
+  Realised in-era P&L across the 18: **−$153.90**. By class: 7 `refuted` (mean
+  < 0 with the upper bound ≤ 0 — the (tz) power gate) **−$192**; 3
+  `losing-underpowered` −$147; 3 `concentrated` (mean > 0, ex-top-3 mean ≤ 0)
+  +$4; 5 `positive-unproven` **+$181**.
+* **THE OUT-OF-SAMPLE TEST NOBODY HAD RUN AS ONE TABLE.** The live ledger is
+  OOS by construction. Every book minted on a per-trade founding number is
+  REJECTING it at the fleet's own critical value — **four of four**: 🪁 kelly
+  +0.397% claimed → −0.179% live (n=383, z=+3.55); 🧭 cook +0.367% → −0.193%
+  (n=38, z=+4.22); 🧘 douglas +0.027% → −0.725% (z=+2.64); 🔮 georgia-v3
+  +0.151%/t_cl 6.09 on n=1,940 → **−0.233% after 46 closes and four days**
+  (z=+2.41) — its "46 of 48 bracket cells clear the bar" plateau was a plateau
+  over a fitted tape. The only book above its founding claim is 🙏 avo, whose
+  founding claim ((qu)) was that it had NO edge. **The book holding up best is
+  the one minted with no replay at all** — 👩 mum, hypothesis-grade by
+  declaration, whose live record is the only measurement she ever had.
+* **👩 mum is the fleet's best evidence and is not yet evidence of an edge.**
+  n=52, +0.703%/trade, t=2.73, LB +0.366%, PF 2.36, win 83%, ex-top-3 mean
+  +0.583%, top coin 28% of net, break-even cost 70bps = **4.0×** the measured
+  17.49bps, live-vs-shadow gap **+0.027pp** on 21 coins, bootstrap P(loss)=0 at
+  every horizon and at 3× costs, 5/6 bars. **But her graded era is FOUR DAYS
+  (28-Aug→1-Sep)**, her p-value 0.0043 misses BH only because m=18, and her
+  whole life sits inside the one regime the oracle has recorded. I25: the next
+  window regresses to her mean whatever anyone does.
+* **The one number that changes a decision: 🪁 kelly.** 27.9% realised / 28.5%
+  MTM drawdown against a 15% bar, bootstrap **P(ruin at 12m) = 1.00 as
+  recorded**, short side −$153 on n=192, `converged` exit n=285 at t=−4.21
+  (the ghost's recorded cause of death, in the mirror), founding claim rejected
+  at z=3.55. She is `losing-underpowered` (upper bound +0.03%) so I17's docket
+  does not reach her, and nothing in the fleet reduces a shadow book's clip on
+  its own drawdown. **Proposed, not applied** (Eamon: *"Preserve existing bot
+  configurations and produce proposed changes separately for approval"*): clip
+  $250×4 → $80×4, bounded, reversible, a measured harm per I26.
+* **Execution is not the problem anywhere.** Live arm vs shadow twin, same
+  coins, overlapping window: mum +0.027pp, georgia −0.094pp (the twin loses
+  too), avo +0.517pp (n=8). `implementation_shortfall` is `stood_down` (its only
+  pair retired) — the audit's pairing is currently the fleet's only live-vs-mark
+  measurement; re-point the organ at the mum pair.
+* **Every mixed book's loss is its SHORT side** in a tape the oracle read as
+  `risk-on uptrend` in **413 of 413 snapshots**: farmer −0.640% t=−2.61 (n=182),
+  counterweight −4.044% t=−2.79, garrett −2.409% t=−2.72, kelly −0.410%. The
+  taker's edge is ONE lens on ONE side (`long-breakoutup` +1.312% t=+2.19) and
+  ONE hold band (1–3d +2.219% t=+3.06; 1–4h **−2.595% t=−3.19**).
+* **The regime split cannot be made from this environment, stated not guessed:**
+  the venue's candle endpoint is refused by egress policy (403), the oracle's
+  30-day history is one regime, and venue stress never reached the taker's
+  15bps bar at any trade open. There is no second value to split on. Every
+  positive number is a pass in one rising regime.
+* **Portfolio:** daily realised P&L across the 18 is essentially uncorrelated
+  (mean ρ −0.020, correlation-aware N_eff **19.9**; `fleet_risk` reads 17 longs
+  as 17.0 bets — I22's 1/HHI-over-symbols defect, still live) — but **on 33% of
+  48 trading days more than half the fleet was in drawdown at once**, modal
+  state 8 books underwater, worst day 30-Aug −$81.29, and up to 4 books long
+  ADA simultaneously. Uncorrelated returns with correlated drawdowns is a
+  shared regime seen from inside it.
+* **Streaks are chance:** no book's longest losing run exceeds its own
+  hit-rate's chance median by more than one trade (kelly 10 vs 10, taker 8 vs
+  7). Published so a streak is judged against chance, never against zero.
+
+**THE MONTE CARLO HAD TWO DEFECTS OF MY OWN before it was quotable, recorded
+because both are general:** (1) it summed `pnl_pct` — a return on the CLIP — as
+a return on the BOOK, so garrett's 12-month path read −2,082%; every trade is
+now scaled through the book's own median clip (`median_clip_usd`) and the
+conversion rides on the payload. (2) its "1x" column ADDED the measured cost to
+fills that already carry it (shadow fills walk the book, live fills are real),
+so the base case read a book at twice its loss; `0x` is now the ledger as
+recorded and `1x`/`2x` are "costs 2×/3×". Paths are capped at ruin (−100%) with
+`p_ruin` published, and every horizon carries `extrapolation_x` — 👩 mum's
+12-month median prints +1,709% because 52 trades over four days extrapolated
+**91×** in one regime is what a bootstrap does with a straight face; the report
+treats >10× as not quotable and says why.
+
+**PROPOSALS, none applied (§6 of the report):** kelly's clip; a drawdown-scaled
+clip as a fleet rail (`clip × max(0.25, 1 − maxDD/0.15)` via `apply_tuning`,
+restrict-only); `brain_clip` ≤ 1.0 for any bucket whose book LB ≤ 0 (the
+"never lever a weak edge" rule, which I16 already applies to the ceiling and
+nothing applies to the multiplier); mum's monitor is win-rate-vs-83% and
+avgW/avgL, not P&L; the live pair's 72% coin co-holding is the one correlation
+to cap when the taker joins. Six new hypotheses ranked by mechanism robustness
+with kill conditions, no code (§7) — the highest-prior one is a regime VETO on
+existing books' shorts, not a new book.
+
+**FILES:** `scripts/edge_audit.py` (new; `--selftest` offline; registered in
+`SELFTEST_MODULES`, deliberately not `ENFORCED_AUDITS` — its live arm reads a
+moving ledger and refuses on a stale grade) · `tests/autonomy/test_edge_audit.py`
+(25 pins) · `scripts/ceiling.py` + one pin in `test_ceiling.py` ·
+`EDGE_AUDIT_2026-09-02.md` · CLAUDE.md: the `/trades.json` endpoint line now
+carries the quarantine caveat, and the instrument is in Key Files. **No bot
+configuration changed.**
+
 ## 2026-09-02 (wk) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
 **[RENUMBERED TWICE — (wi) → (wj) → (wk): three sessions worked this hour and main took each letter first ((wi) the clear-guard release, (wj) the taker-successor runbook). Two of this session's cargoes were OVERTAKEN and withdrawn, recorded here per I12: the parallel latched-lock release valve (8 tests, 2 mutations red) — main's (wi) FAMILY_CLEAR_GUARD shipped and deployed first, a second valve for one latch is a second copy of a rule ((hj)); and the safety-rails test re-pin — this session updated test_confirm_true_via_absolute_rail_even_if_pct_ok to the (wh) floor contract to heal main's red, and the fleet then ruled the OTHER way: the failing test was a DELIBERATE pin, (wh) was refuted and reverted, mum's $57 arrived as Eamon's env VALUE with published derivation. The re-pin is dropped and main's original test stands. Two independent sessions converging on the same wrong read of that test, and a third catching both, is the review system working.]**
 
