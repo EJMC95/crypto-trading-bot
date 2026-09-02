@@ -561,17 +561,27 @@ a proper control and is immune — it reverts in step. **The pre-window is not:
 `all()` over one element condemns a change by arithmetic rather than evidence,
 and a `hurting` verdict reverts the lever at `get_lever`. **Latent, not live at
 the time of writing** (all 8 verdicts ride other bases; none is `hurting`).
-**[2-Sep, edge-audit follow-up — CALIBRATED, corrected in place per I12; Eamon: *"Proceed on all"*.]** `fleet_proprioception` now carries the measurement: the
-pre-window baseline has its own margin `LIVE_PRE_MARGIN_PP` = **1.7pp** (the measured
-reversion — **re-measured 2-Sep on today's ledger, Eamon: *"Calibrate accordingly"*:** 3,801
-closes / 26 books, hot-window collapse **+1.74 / +1.52 / +1.60 / +1.67pp at K = 10 / 15 / 20 /
-30**, SE ≈ 0.5pp, so 1.7 sits inside every 95% band and STANDS; the study's `--margin` arm
-grades the constant against the band it measures and exits 2 on DRIFT, so the next
-re-measurement is one command against a `/trades.json?source=paper` dump), the shadow twin keeps 0.25pp and is **REQUIRED** for any verdict (no twin ⇒
-`recorded`, reason `no-control-arm` — the `all()` over one biased element can no longer
-condemn a change), and `LIVE_BASE_MIN_N` is pinned to `fleet_allocation.MIN_N` (10), so a
-three-trade baseline is not a baseline. Every change is in the less-constriction direction;
-what a lever's consumers do with a verdict is untouched.
+**[2-Sep, edge-audit follow-up — CALIBRATED, then CALIBRATED OPTIMALLY; corrected in place per
+I12. Eamon: *"Proceed on all"* → *"Calibrate accordingly"* → *"Calibrate optimally with
+findings"*.]** `fleet_proprioception.grade_live` now judges an episode against the TWIN
+(REQUIRED — no control arm ⇒ `recorded`, reason `no-control-arm`) and against the book's ERA
+MEAN EXCLUDING THE MOTIVATING WINDOW (this rule's own counterfactual), and **every margin is
+DERIVED: the comparison's own standard error at the fleet's critical value**
+(`fleet_allocation.t_crit`, one owner), floored at 0.25pp (`LIVE_MARGIN_PP`) against a
+zero-variance history; `LIVE_BASE_MIN_N` is pinned to `fleet_allocation.MIN_N` (10). The path
+here is the record of why. The first fix gave the pre-window a FIXED margin equal to the mean
+reversion — 1.7pp, re-measured on 3,801 closes / 26 books at **+1.74 / +1.52 / +1.60 / +1.67pp
+for K = 10 / 15 / 20 / 30** (SE ≈ 0.5), a collapse that does NOT shrink with K because the
+books' means drift. But a margin AT the mean is the wrong object: on the no-change control it
+still called a neutral change `bad` **21.3%** of the time after a hot motivating window and
+`good` **19.2%** after a cold one, and 1.7pp was 2.9 SE on mum's live book while 0.7 SE on a
+volatile one — one constant, a different false rate on every book. Derived margins against the
+book's mean read **16.0% / 9.9%** on the same control (nominal 10%; the residual is the drift
+itself, which only the twin removes — so the twin decides and the book corroborates), with
+power on a planted −2pp harm of 74% (was 66%). The instrument
+`scripts/study_do_our_changes_hurt_2026-08-27.py --margin --ledger` runs the SHIPPED
+`book_gate` on the control and grades its false rates (INSIDE / DRIFT / THIN, exit 2 on
+DRIFT). What a lever's consumers do with a verdict is untouched.
 
 **THE RULE:** the counterfactual for any change is the book's own MEAN, or a
 CONTROL ARM that experiences the same reversion — never the window that
@@ -592,7 +602,7 @@ response is NOT to change less. Changing less is what the biased reading argues
 for, and it costs every real improvement. The response is to hold a hot streak
 to the same standard as a cold one, and to keep shipping — a change judged
 against the right baseline is the fleet's only way to compound.
-  ENFORCED BY: `fleet_proprioception.py::grade_live`, `scripts/study_do_our_changes_hurt_2026-08-27.py::peak_arm`, `scripts/study_do_our_changes_hurt_2026-08-27.py::K`, `fleet_proprioception.py::LIVE_PRE_MARGIN_PP`, `scripts/study_do_our_changes_hurt_2026-08-27.py::margin_arm`, `tests/autonomy/test_edge_audit_followups.py::test_i25_pre_window_margin_is_the_measured_reversion_and_twin_is_required`
+  ENFORCED BY: `fleet_proprioception.py::grade_live`, `scripts/study_do_our_changes_hurt_2026-08-27.py::peak_arm`, `scripts/study_do_our_changes_hurt_2026-08-27.py::K`, `fleet_proprioception.py::judge_windows`, `fleet_proprioception.py::book_baseline`, `scripts/study_do_our_changes_hurt_2026-08-27.py::margin_arm`, `tests/autonomy/test_edge_audit_followups.py::test_i25_margins_are_the_books_own_noise_at_the_fleets_critical_value_and_the_twin_is_required`
 
 ### I26 · A STARVED BOOK IS A COST, AND "UNPROVEN" IS NOT A REASON TO REFUSE A BOUNDED WIDENING — THE BURDEN OF PROOF SITS ON THE REFUSAL
 **Eamon, 28-Aug:** *"we should be exploring further not tighter"* / *"lets make

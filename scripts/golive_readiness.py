@@ -1228,13 +1228,22 @@ def stats(rows, book_usd=None):
     _z = None
     if _be is not None and 0.0 < _be < 1.0 and _trail:
         _z = (_hit_trail - _be) / math.sqrt(_be * (1.0 - _be) / len(_trail))
+    # [2026-09-02, CALIBRATED OPTIMALLY] the PAGE BOUNDARY -- see `page_boundary`.
+    # The monitor pages when the trailing window's wins sit at or below `k`:
+    # integers on both sides, so no rounding can move a page. `hit_margin_z`
+    # stays REPORTED; it was the rule for a few hours and is no longer.
+    _wins_trail = sum(1 for x in _trail if x > 0)
+    _pb = page_boundary(len(_trail), wins / n, _be)
     out["shape"] = {
         "hit": wins / n, "hit_trailing": _hit_trail, "n_trailing": len(_trail),
+        "wins_trailing": _wins_trail,
         "avg_win_usd": _avg_w, "avg_loss_usd": _avg_l, "payoff": _payoff,
         "breakeven_hit": _be,
         "hit_margin": (_hit_trail - _be) if _be is not None else None,
         "hit_margin_z": _z,
-        "hit_margin_crit": horizon_crit(len(_trail)) if _z is not None else None,
+        "page_wins_max": _pb["k"] if _pb else None,
+        "page_false_rate": _pb["false_rate"] if _pb else None,
+        "page_miss_rate": _pb["miss_rate"] if _pb else None,
         "streak_now": _run, "streak_max": _mx,
         "streak_chance": expected_streak(n, _p_loss) if 0.0 < _p_loss < 1.0 else None,
     }
@@ -1310,6 +1319,59 @@ def stats(rows, book_usd=None):
 
 
 SHAPE_TRAIL_N = 30   #: trailing window for the hit-rate monitor (the gate's own close floor)
+
+
+def binom_cdf(k, n, p):
+    """P(Bin(n, p) <= k), exact (n is a trailing window, never large)."""
+    if k < 0:
+        return 0.0
+    if k >= n:
+        return 1.0
+    return sum(math.comb(n, i) * (p ** i) * ((1.0 - p) ** (n - i)) for i in range(0, k + 1))
+
+
+def page_boundary(n, p_era, p_be):
+    """[2026-09-02, CALIBRATED OPTIMALLY -- Eamon: "Calibrate optimally with
+    findings"] {k, false_rate, miss_rate}: the win count at or below which a
+    trailing window of `n` closes PAGES.
+
+    `k` is the largest win count at which the window is at least as likely
+    under "this book's hit rate has fallen to its break-even `p_be`" as under
+    "it is still the book's own era rate `p_era`" -- the equal-prior
+    likelihood-ratio boundary, which for a binomial is exactly the k that
+    MINIMISES false_rate + miss_rate (pinned by brute force in the selftest).
+    `false_rate` = P(Bin(n, p_era) <= k): a healthy window pages by chance.
+    `miss_rate`  = P(Bin(n, p_be) > k): a break-even window escapes.
+    Both are published beside the boundary, so the cost of every page is a
+    number on the payload rather than an argument in a message. Why this and
+    not a points threshold or the claim bar: measured on 👩 mum's live shape
+    (era hit 83.0%, break-even 66.1%, n=30) the total error is 32.1% for
+    "within 5pp", 31.3% for "z <= t_crit", 27.5% here (false 12.4% / miss
+    15.1%) -- and at this n nothing does better; a longer window is the only
+    lever left, and it buys accuracy with detection lag.
+    A book whose era rate is already at or below break-even has no healthy
+    reference and pages AT break-even (k = floor(n*p_be)); a book that has
+    never lost pages on any loss (k = n-1). None when it cannot be computed."""
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return None
+    if n < 1 or p_be is None or p_era is None or not (0.0 < p_be < 1.0) \
+            or not (0.0 <= p_era <= 1.0):
+        return None
+    if p_era <= p_be:
+        k = int(math.floor(n * p_be))
+    elif p_era >= 1.0:
+        k = n - 1
+    else:
+        a = math.log(p_be / p_era)                    # < 0: a win favours the era rate
+        b = math.log((1.0 - p_be) / (1.0 - p_era))    # > 0: a loss favours break-even
+        # the largest k with LLR(k) >= 0; the tie (LLR exactly 0) belongs to
+        # the page side, and 1e-9 keeps floating point from losing it
+        k = int(math.floor(n * b / (b - a) + 1e-9))
+    k = max(-1, min(n, k))
+    return {"k": k, "false_rate": binom_cdf(k, n, p_era),
+            "miss_rate": 1.0 - binom_cdf(k, n, p_be)}
 
 
 def loss_run_cdf(n, p_loss, k):
@@ -2604,9 +2666,10 @@ def book_payload(s):
     # [2026-09-02, edge-audit follow-up] the shape block (see `stats`), in
     # percentage points and dollars, plus the derived fields a monitor reads:
     # `hit_margin_pp` = trailing hit rate minus the book's own break-even
-    # (points, REPORTED) and, since the 2-Sep calibration, `hit_margin_z`
-    # (that margin in standard errors) against `hit_margin_crit` (the fleet's
-    # claim bar for `n_trailing`) -- the pair the immune organ actually tests.
+    # (points, REPORTED), `hit_margin_z` (that margin in standard errors,
+    # REPORTED), and -- since the 2-Sep optimal calibration -- the pair the
+    # immune organ actually tests: `wins_trailing` against `page_wins_max`,
+    # with the boundary's own false-page and miss rates beside it.
     _sh = s.get("shape")
     if isinstance(_sh, dict):
         def _r(v, k=2):
@@ -2625,7 +2688,12 @@ def book_payload(s):
             "hit_margin_pp": _r(100 * _sh["hit_margin"], 1)
             if _sh.get("hit_margin") is not None else None,
             "hit_margin_z": _r(_sh.get("hit_margin_z")),
-            "hit_margin_crit": _r(_sh.get("hit_margin_crit"), 3),
+            "wins_trailing": _sh.get("wins_trailing"),
+            "page_wins_max": _sh.get("page_wins_max"),
+            "page_false_rate_pct": _r(100 * _sh["page_false_rate"], 1)
+            if _sh.get("page_false_rate") is not None else None,
+            "page_miss_rate_pct": _r(100 * _sh["page_miss_rate"], 1)
+            if _sh.get("page_miss_rate") is not None else None,
             "streak_now": _sh.get("streak_now"), "streak_max": _sh.get("streak_max"),
             "streak_p50_chance": _sc.get("p50"), "streak_p95_chance": _sc.get("p95"),
         }
@@ -2851,9 +2919,33 @@ def _selftest_shape():
     _be_fx = 1 / (1 + 3.65 / 7.39)
     _z_fx = (25 / 30 - _be_fx) / math.sqrt(_be_fx * (1 - _be_fx) / 30)
     assert abs(sh["hit_margin_z"] - _z_fx) < 1e-9 and 1.8 < _z_fx < 2.0, (sh["hit_margin_z"], _z_fx)
-    assert sh["hit_margin_crit"] == horizon_crit(30) and sh["hit_margin_crit"] >= HORIZON_Z, sh
+    # [2026-09-02, CALIBRATED OPTIMALLY] the page boundary IS the argmin of the
+    # total error, brute-forced over every k; its rates are the exact binomial
+    _p_era = 50 / 60
+    _tot = [binom_cdf(k, 30, _p_era) + 1.0 - binom_cdf(k, 30, _be_fx) for k in range(31)]
+    _k_best = min(range(31), key=lambda k: _tot[k])
+    assert sh["page_wins_max"] == _k_best == 22, (sh["page_wins_max"], _k_best)
+    assert sh["wins_trailing"] == 25 and sh["wins_trailing"] > sh["page_wins_max"], sh   # healthy: no page
+    assert abs(sh["page_false_rate"] - binom_cdf(22, 30, _p_era)) < 1e-12
+    assert abs(sh["page_miss_rate"] - (1.0 - binom_cdf(22, 30, _be_fx))) < 1e-12
+    assert 0.10 < sh["page_false_rate"] < 0.13 and 0.15 < sh["page_miss_rate"] < 0.19, sh
+    # brute-force pin over a grid of (n, p_era, p_be): the LR boundary ATTAINS the
+    # minimum total error (a tie at LR = 1 makes two k equally optimal, so the
+    # pin is on the error, not the index)
+    for _n, _pe, _pb in ((30, 0.83, 0.661), (30, 0.30, 0.175), (20, 0.9, 0.5), (50, 0.6, 0.4),
+                         (30, 0.7, 0.5), (12, 0.75, 0.6)):
+        _pbd = page_boundary(_n, _pe, _pb)
+        _tot_k = [binom_cdf(k, _n, _pe) + 1.0 - binom_cdf(k, _n, _pb) for k in range(_n + 1)]
+        assert _pbd["false_rate"] + _pbd["miss_rate"] <= min(_tot_k) + 1e-9, (_n, _pe, _pb, _pbd)
+    # no healthy reference -> page at break-even; a book that never lost pages on any loss
+    assert page_boundary(30, 0.60, 0.661)["k"] == math.floor(30 * 0.661)
+    assert page_boundary(30, 1.0, 0.661)["k"] == 29
+    assert page_boundary(30, 0.8, None) is None and page_boundary(0, 0.8, 0.5) is None
     bp = book_payload(st)["shape"]
-    assert bp["hit_margin_z"] == round(_z_fx, 2) and bp["hit_margin_crit"] == round(horizon_crit(30), 3), bp
+    assert bp["hit_margin_z"] == round(_z_fx, 2) and "hit_margin_crit" not in bp, bp
+    assert bp["page_wins_max"] == 22 and bp["wins_trailing"] == 25, bp
+    assert bp["page_false_rate_pct"] == round(100 * sh["page_false_rate"], 1), bp
+    assert bp["page_miss_rate_pct"] == round(100 * sh["page_miss_rate"], 1), bp
     assert bp["hit_pct"] == 83.3 and bp["breakeven_hit_pct"] == round(100 / (1 + 3.65 / 7.39), 1), bp
     assert bp["hit_margin_pp"] == round(bp["hit_trailing_pct"] - bp["breakeven_hit_pct"], 1) or \
         abs(bp["hit_margin_pp"] - (bp["hit_trailing_pct"] - bp["breakeven_hit_pct"])) <= 0.11, bp
@@ -2862,7 +2954,7 @@ def _selftest_shape():
     assert "shape" not in book_payload(stats(rows[:1]))
     allwin = stats([(0.01, 1.0, t0 + _td(hours=i)) for i in range(5)])
     assert allwin["shape"]["streak_chance"] is None and allwin["shape"]["payoff"] is None
-    assert allwin["shape"]["hit_margin_z"] is None and allwin["shape"]["hit_margin_crit"] is None
+    assert allwin["shape"]["hit_margin_z"] is None and allwin["shape"]["page_wins_max"] is None
 
 
 def _selftest_decided_until():

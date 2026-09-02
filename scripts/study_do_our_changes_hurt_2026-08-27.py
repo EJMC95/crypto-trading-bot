@@ -188,58 +188,108 @@ def hot_collapse(books, k):
     return st.mean(col), st.stdev(col) / math.sqrt(len(col)), len(col)
 
 
-def margin_arm(books, margin=None, ks=None):
-    """[2026-09-02 -- Eamon: "Calibrate accordingly"] GRADE THE GRADER'S CONSTANT.
+#: how far above the nominal one-sided rate the no-change control may read
+#: before the grader's margin is called DRIFTED: the fleet's books DRIFT (their
+#: means decay), so a book-mean baseline over-calls `bad` a little by
+#: construction; twice nominal is the cry-wolf bound, not a target
+TOL_X = 2.0
 
-    `fleet_proprioception.LIVE_PRE_MARGIN_PP` is the margin the live lane
-    applies to a change judged against its own PRE-WINDOW (I25: the window
-    that motivated a change is selected on an extreme, so the next window
-    reverts by this much with or without the change). The constant must be the
-    MEASURED reversion, so this arm measures it at the grader's own baseline
-    floor (`LIVE_BASE_MIN_N`), at this study's K, and at two wider windows,
-    and says whether the constant sits INSIDE every 95% band or has DRIFTED
-    out of one. Returns {"k": {K: {"collapse_pp", "se_pp", "n", "inside"}},
-    "margin_pp", "verdict"}; `verdict` is INSIDE, DRIFT, or THIN (no window
-    size had `MIN_WINDOWS` hot windows, so nothing was graded).
 
-    Measured 2-Sep on 3,801 closes / 26 books: K=10 +1.74 (SE 0.50), K=15
-    +1.52 (0.47), K=20 +1.60 (0.46), K=30 +1.67 (0.58) -- 1.7 inside every
-    band, so the constant stood.
+def margin_arm(books, ks=None, nominal=None, crit=None, shifts=(-2.0, -4.0, 2.0)):
+    """[2026-09-02 -- Eamon: "Calibrate accordingly", then "Calibrate optimally
+    with findings"] GRADE THE GRADER'S RULE ON THE NO-CHANGE CONTROL.
+
+    The live lane (`fleet_proprioception.judge_windows`) calls a change `bad`
+    when the episode's mean sits below EVERY baseline by that baseline's own
+    DERIVED margin -- the comparison's standard error at the fleet's critical
+    value. Only the BOOK gate can be run on the ledger (no book but the live
+    pairs has a twin), so this arm runs `fleet_proprioception.book_gate` -- the
+    shipped code, never a copy ((hj)) -- over every non-overlapping (motivating
+    window, next window) pair of every book with NO change made between them,
+    and reports the false-`bad` / false-`good` rate, overall and after a HOT /
+    COLD motivating window, beside the power on a planted shift.
+
+    Verdict INSIDE while every graded window size keeps both false rates within
+    `TOL_X` times the nominal one-sided rate (1 - fleet_allocation.CONF); DRIFT
+    beyond it; THIN when no window size has `MIN_WINDOWS` pairs. `crit`
+    overrides the critical value -- crit=0 is the positive control and must
+    read DRIFT. Returns {"k": {K: {...}}, "nominal", "verdict"}.
+
+    Why the book gate is graded and not trusted alone: on 2-Sep it read false
+    bad ~16% / good ~10% at K=10 against a 10% nominal -- above nominal in the
+    `bad` direction because the books drift -- which is why the twin, the only
+    baseline that moves with the tide, is the gate that decides (I25).
     """
     sys.path.insert(0, os.path.dirname(HERE))
     import fleet_proprioception as fp                 # noqa: PLC0415
-    if margin is None:
-        margin = fp.LIVE_PRE_MARGIN_PP
+    import fleet_allocation as fa                     # noqa: PLC0415
+    nominal = (1.0 - fa.CONF) if nominal is None else float(nominal)
     if ks is None:
-        ks = sorted({fp.LIVE_BASE_MIN_N, K, 20, 30})
-    print(f"\n=== ARM 4 — IS THE GRADER'S PRE-WINDOW MARGIN THE MEASURED "
-          f"REVERSION? ===\n  LIVE_PRE_MARGIN_PP = {margin:.2f} pp; the collapse "
-          f"is window mean minus next-window mean, hot windows only")
+        ks = sorted({fp.LIVE_BASE_MIN_N, K})
+    print(f"\n=== ARM 4 — THE LIVE LANE'S BOOK GATE ON THE NO-CHANGE CONTROL ===\n"
+          f"  `bad` = next-window mean below the book's mean (EXCLUDING the motivating "
+          f"window) by its own\n  derived margin = crit x SE (floor {fp.LIVE_MARGIN_PP}pp); "
+          f"nominal one-sided rate {nominal:.0%}, cry-wolf bound {TOL_X:g}x")
     out, graded, drift = {}, 0, False
     for k in ks:
-        m, se, n = hot_collapse(books, k)
-        if m is None or n < MIN_WINDOWS:
-            out[k] = {"collapse_pp": m, "se_pp": se, "n": n, "inside": None}
-            print(f"  K={k:>2}: {n} hot windows -- too few to grade "
-                  f"(need {MIN_WINDOWS})")
+        n = bad = good = hot_n = hot_bad = cold_n = cold_good = 0
+        power = {sh: [0, 0] for sh in shifts}
+        for _bot, v in books.items():
+            ys = [p * 100.0 for _t, p in v]
+            bm = st.mean(ys)
+            i = k
+            while i + k <= len(ys):
+                pre, dur = ys[i - k:i], ys[i:i + k]
+                gate = fp.book_gate(dur, ys[:i - k], ys[:i], crit=crit)
+                if gate is None:
+                    i += k
+                    continue
+                b, mg = gate["mean_pct"], gate["margin_pp"]
+                m_in = st.mean(dur)
+                n += 1
+                ib, ig = m_in < b - mg, m_in > b + mg
+                bad += ib
+                good += ig
+                if st.mean(pre) > bm:
+                    hot_n += 1
+                    hot_bad += ib
+                else:
+                    cold_n += 1
+                    cold_good += ig
+                for sh in shifts:
+                    ms = m_in + sh
+                    power[sh][0] += ms < b - mg
+                    power[sh][1] += ms > b + mg
+                i += k
+        if n < MIN_WINDOWS:
+            out[k] = {"n": n, "inside": None}
+            print(f"  K={k:>2}: {n} pairs -- too few to grade (need {MIN_WINDOWS})")
             continue
-        lo, hi = m - 2 * se, m + 2 * se
-        inside = lo <= margin <= hi
+        fb, fg = bad / n, good / n
+        inside = fb <= TOL_X * nominal and fg <= TOL_X * nominal
         graded += 1
         drift = drift or not inside
-        out[k] = {"collapse_pp": m, "se_pp": se, "n": n, "inside": inside}
-        print(f"  K={k:>2}{' (grader floor)' if k == fp.LIVE_BASE_MIN_N else '':15s}"
-              f" collapse {m:+.3f} pp  SE {se:.3f}  n={n:>4}  "
-              f"95% band [{lo:+.2f}, {hi:+.2f}]  -> margin "
-              f"{'inside' if inside else 'DRIFT'}")
+        out[k] = {"n": n, "false_bad": fb, "false_good": fg,
+                  "hot_bad": hot_bad / hot_n if hot_n else None, "hot_n": hot_n,
+                  "cold_good": cold_good / cold_n if cold_n else None, "cold_n": cold_n,
+                  "power": {sh: {"bad": pb / n, "good": pg / n} for sh, (pb, pg) in power.items()},
+                  "inside": inside}
+        print(f"  K={k:>2}{' (grader floor)' if k == fp.LIVE_BASE_MIN_N else '':15s} n={n:>4}"
+              f"  false bad {fb:5.1%}  false good {fg:5.1%}"
+              f"  | after HOT: bad {out[k]['hot_bad'] if out[k]['hot_bad'] is not None else float('nan'):5.1%}"
+              f" (n={hot_n})  after COLD: good "
+              f"{out[k]['cold_good'] if out[k]['cold_good'] is not None else float('nan'):5.1%} (n={cold_n})"
+              f"  -> {'inside' if inside else 'DRIFT'}")
+        for sh in shifts:
+            pw = out[k]["power"][sh]
+            print(f"{'':>26} planted {sh:+.0f}pp: bad {pw['bad']:5.1%}  good {pw['good']:5.1%}")
     verdict = "DRIFT" if drift else ("INSIDE" if graded else "THIN")
     print(f"  VERDICT: {verdict}"
-          + {"DRIFT": " -- re-derive the constant from the band above and record "
-                      "it in place (I12); never move it to a point estimate with "
-                      "a 0.5pp SE",
-             "THIN": " -- not enough hot windows to grade",
-             "INSIDE": " -- the constant is the measurement"}[verdict])
-    return {"k": out, "margin_pp": margin, "verdict": verdict}
+          + {"DRIFT": " -- the margin no longer holds the false rate under the bound; "
+                      "re-derive the noise model before trusting a verdict (I12)",
+             "THIN": " -- not enough pairs to grade",
+             "INSIDE": " -- the derived margin holds the false rate inside the bound"}[verdict])
+    return {"k": out, "nominal": nominal, "verdict": verdict}
 
 
 def by_book(rows):
@@ -386,8 +436,8 @@ def main():
     ap.add_argument("--peak", action="store_true")
     ap.add_argument("--select", action="store_true")
     ap.add_argument("--margin", action="store_true",
-                    help="grade fleet_proprioception.LIVE_PRE_MARGIN_PP against "
-                         "the measured hot-window collapse (exit 2 on DRIFT)")
+                    help="run fleet_proprioception.book_gate on the no-change "
+                         "control and grade its false-verdict rates (exit 2 on DRIFT)")
     ap.add_argument("--ledger", metavar="FILE",
                     help="a /trades.json?source=paper dump to read instead of "
                          "the DB (the sandbox has no DATABASE_URL)")

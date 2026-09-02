@@ -359,17 +359,19 @@ as proposals for approval — none is applied here:
    evidence the stop is wrong — (uw)'s exit sweep on georgia showed exits are a dead dial) —
    it is the number to watch: if her win rate reverts toward the fleet's ~50%, PF goes below 1
    at the current avgW/avgL. **Her monitor should be win-rate-vs-83% AND avgW/avgL, not P&L.**
-   **SHIPPED (edge-audit follow-up, 2-Sep):** the grader publishes a per-book `shape` block
-   (hit rate, trailing-30 hit rate, avg win, avg loss, payoff, break-even hit rate =
-   1/(1+payoff), `hit_margin_pp`, current and max losing streak, and the p50/p95 chance
-   streak for the book's own hit rate, plus `hit_margin_z` and `hit_margin_crit`), and
-   `fleet_immune` pages when a LIVE book's trailing hit rate no longer CLAIMS to sit above its
-   own break-even — `hit_margin_z` (the margin in standard errors) at or below the fleet's own
-   claim bar `hit_margin_crit` (`t_crit(n)`, 1.31 at n=30) — or its streak exceeds the chance
-   p95. **Calibrated 2-Sep (Eamon: "Calibrate accordingly") from a first cut of "within 5pp"**:
-   5pp was 0.58 SE at mum's payoff and stayed quiet on a 30-trade window 9.8pp above break-even
-   that no longer showed PF > 1. Judged against the book's own payoff, never a bare win-rate
-   bar (I15). Cost stated: at mum's z ≈ +2.0 about one window in four pages by chance.
+   **SHIPPED (edge-audit follow-up, 2-Sep) — and CALIBRATED OPTIMALLY the same day (xb):** the
+   grader publishes a per-book `shape` block (hit rate, trailing-30 hit rate and win count, avg
+   win, avg loss, payoff, break-even hit rate = 1/(1+payoff), `hit_margin_pp`, `hit_margin_z`
+   reported, current and max losing streak, the p50/p95 chance streak, and the PAGE BOUNDARY
+   `page_wins_max` with its `page_false_rate_pct` / `page_miss_rate_pct`), and `fleet_immune`
+   pages when a LIVE book's trailing wins sit at or below that boundary — the largest win count
+   at which the window is likelier under a hit rate at the book's break-even than at its own era
+   rate, i.e. the exact minimum of false pages + missed decays — or its streak exceeds the
+   chance p95. Measured on mum's shape (era 83.0%, break-even 66.1%, n=30): "within 5pp" 5.6%
+   false / 26.4% missed (32.1%); "z ≤ the claim bar" 23.9% / 7.4% (31.3%); the boundary, ≤22 of
+   30, **12.4% / 15.1% (27.5%)** — the brute-force minimum at this window length. Judged
+   against the book's own payoff, never a bare win-rate bar (I15); both error rates ride the
+   payload and the page text.
 5. **Correlation limits between books: not binding today.** §8 — daily realised P&L across
    the 18 books is essentially uncorrelated (mean ρ −0.02, N_eff 19.9). The live pair
    (mum + avo) are both long-only, both in the same regime, and co-hold the same coin 72% of
@@ -442,7 +444,7 @@ Most of this exists. The mapping, and the gaps:
 | **abnormal slippage** | live-vs-shadow `gap_pp` < −0.25pp sustained over ≥15 paired closes | `implementation_shortfall` | ~~**stood down** — its only pair retired; re-point at mum~~ **CLOSED (wp)**: pair derived from the registry, organ publishes `arm-drift` |
 | **drawdown beyond tested range** | realised or MTM DD > 15% (the gate's bar) → clip to probe floor | gate REPORTS it; the 7d governor scales live clips on FLEET dd | ~~**no organ reduces a shadow book's own clip on its own DD** (kelly, §6.2)~~ **CLOSED (wu)**: `fleet_bus.dd_scale` past the bar |
 | **loss of liquidity** | coin `vol_m` < $0.5M or recorded half-spread > 30bps → entry veto | scout `vols`, `coin-quality` | consumed by some books' `MIN_VOL`; `coin-quality` had no reader until (ut) |
-| **statistically significant decay** | book's trailing-30 mean below its own era mean by > 2×SE, judged vs the shadow twin (I25 — never vs the hot window) | `fleet_proprioception.grade_live` (has the twin baseline) | ~~`LIVE_MARGIN_PP` 0.25pp vs 1.674pp measured reversion — the margin is 6.7× too tight and a 3-trade baseline is allowed (I25 records this as latent)~~ **CLOSED (edge-audit follow-up)**: `LIVE_PRE_MARGIN_PP` 1.7pp on the pre-window, twin REQUIRED at 0.25pp, baseline floor = `fleet_allocation.MIN_N`; **re-measured 2-Sep**: collapse +1.74 / +1.52 / +1.60 / +1.67pp at K = 10 / 15 / 20 / 30 (SE ≈ 0.5), 1.7 inside every band — the study's `--margin` arm grades the constant and exits 2 on DRIFT |
+| **statistically significant decay** | book's trailing-30 mean below its own era mean by > 2×SE, judged vs the shadow twin (I25 — never vs the hot window) | `fleet_proprioception.grade_live` (has the twin baseline) | ~~`LIVE_MARGIN_PP` 0.25pp vs 1.674pp measured reversion — the margin is 6.7× too tight and a 3-trade baseline is allowed (I25 records this as latent)~~ **CLOSED (edge-audit follow-up)**: twin REQUIRED, baseline floor = `fleet_allocation.MIN_N`; **re-measured 2-Sep**: collapse +1.74 / +1.52 / +1.60 / +1.67pp at K = 10 / 15 / 20 / 30 (SE ≈ 0.5) — a collapse that does not shrink with K, i.e. drift; **then CALIBRATED OPTIMALLY (xb)**: the fixed margins are gone — each baseline's margin is its own SE at `t_crit`, the book baseline is the era mean EXCLUDING the motivating window; no-change control false `bad` after a hot window 16.0% (fixed 1.7pp: 21.3%), false `good` after a cold one 9.9% (19.2%); the study's `--margin` arm grades the SHIPPED gate and exits 2 on DRIFT |
 | **normal variance** | losing streak ≤ chance p95 for the book's hit rate and n | ~~*nothing*~~ `golive-readiness.books.<bot>.shape.streak_p95_chance` + `fleet_immune` | ~~`edge_audit.expected_streak` — publish it so a streak is judged against chance, not against zero~~ **CLOSED (edge-audit follow-up)**: exact owner `golive_readiness.expected_streak`, published per book, live books paged beyond p95 |
 | **regime mismatch** | oracle verdict flips against a long-only book's side | `regime_oracle` (consumed by the family bot only) | the live pair is long-only and unconsumed — §7 #3 |
 
