@@ -100,7 +100,11 @@ def test_the_overlay_moves_the_instance_never_the_class(monkeypatch):
     assert moved == {"xp.mum.rsi_max": 32.0, "xp.mum.max_hold_min": 720.0}
     assert s.RSI_MAX == 32.0 and s.MAX_HOLD_MIN == 720
     assert cls.RSI_MAX == base_rsi and cls.MAX_HOLD_MIN == base_hold
-    assert fam.mum_bars(s) == {"rsi_max": 32.0, "max_hold_min": 720.0}
+    # [(xl)] the receipt now carries all four of her bars, derived from
+    # MUM_LEVER_ATTRS rather than hand-listed — a candidate on any registered
+    # lever must be provable from the stamp, or it accrues zero closes.
+    assert fam.mum_bars(s) == {"rsi_max": 32.0, "max_hold_min": 720.0,
+                               "vel_lo": -999.0, "vel_hi": 999.0}
     # expiry reverts CLEANLY from the class defaults, never from mutated state
     monkeypatch.setattr(ft, "get_lever", lambda name, default, **kw: default)
     assert fam.apply_book_levers(s, "xp.mum.") == {}

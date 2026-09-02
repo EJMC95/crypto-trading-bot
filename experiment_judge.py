@@ -416,7 +416,14 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               # [(wv)] 👩 mum's lane — the live twins are judge-owned by
               # fleet_tuning's prefix map; the board keeps her clip scale.
               "xp.mum.rsi_max": "live.mum.rsi_max",
-              "xp.mum.max_hold_min": "live.mum.max_hold_min"}
+              "xp.mum.max_hold_min": "live.mum.max_hold_min",
+              # [(xl)] the dip-velocity band. Without these two the
+              # `mum-vel-12-20` candidate cannot name its live twin and the
+              # judge refuses the spec as invalid state — caught by the
+              # judge's OWN selftest the moment the candidate was queued,
+              # which is that guard doing exactly its job.
+              "xp.mum.vel_lo": "live.mum.vel_lo",
+              "xp.mum.vel_hi": "live.mum.vel_hi"}
 
 # [2026-09-02 (ww)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
 # order. The incubator's funding genes are the Farmer's and cannot breed
@@ -428,7 +435,25 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
 #   hold-720   — the plateau's tighter edge (12h): the (ro) carry-tax
 #                argument taken one step further.
 #   hold-2880  — the wider edge (48h): more of the roi ladder's tail.
+#   vel-12-20  — [(xl)] FIRST IN THE QUEUE, because it is the only mum
+#                candidate whose evidence survives the trailing window AND
+#                replicates on her own ledger. The DIP'S VELOCITY: a fall of
+#                12-20 rsi points over 4 bars. Exit-free excess +0.309%/trade
+#                (t_cl +2.82, trailing 180d) against -0.076% for a slow drift
+#                and -0.091% for a violent collapse; survives month-clustering
+#                (+1.63), NON-OVERLAPPING windows (+3.19), both halves, and a
+#                permutation re-running the whole best-of-N selection
+#                (p=0.0033). On her OWN LEDGER (I14, senior to any replay),
+#                both arms independently: in-band live n=12 +1.039%/trade
+#                t=+3.68, twin n=13 +1.131% t=+3.82, against +0.223%/+0.137%
+#                outside. Supply 7.9/day against her ~12 slots, so it costs
+#                little throughput. NOT PROVEN: n=12/13, the arms share
+#                coin-days, the split is post-hoc, and the replay through her
+#                bracket books +0.02%/trade where the ledger says +1.04%.
+#                THE JUDGE'S OWN PAIRED BAR IS THE CRITERION — no second rule.
 MUM_CANDIDATES = [
+    {"name": "mum-vel-12-20",
+     "levers": {"xp.mum.vel_lo": 12.0, "xp.mum.vel_hi": 20.0}},
     {"name": "mum-rsi-32", "levers": {"xp.mum.rsi_max": 32.0}},
     {"name": "mum-hold-720", "levers": {"xp.mum.max_hold_min": 720.0}},
     {"name": "mum-hold-2880", "levers": {"xp.mum.max_hold_min": 2880.0}},
@@ -924,7 +949,20 @@ LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      # entries (tighter = down); a SHORTER hold is tighter
                      # (down). Env defaults from lighter_family_bot's class.
                      "live.mum.rsi_max": (36.0, "down"),
-                     "live.mum.max_hold_min": (1440.0, "down")}
+                     "live.mum.max_hold_min": (1440.0, "down"),
+                     # [(xl)] the dip-velocity band. A HIGHER floor demands a
+                     # faster fall and a LOWER ceiling rejects more violent
+                     # ones, so tighter is "up" for lo and "down" for hi.
+                     # CONSEQUENCE, stated because it is the safe one and a
+                     # future reader may mistake it for a gap: with the env
+                     # defaults at +-infinity, `release_tightens` is FALSE for
+                     # both, so `proposal_fade` can NEVER release this band —
+                     # releasing it would WIDEN a real-money book on restrict
+                     # evidence, which is exactly the inversion that function
+                     # exists to refuse. The release paths that do apply are
+                     # the judge's own fade-watch and lever TTL expiry.
+                     "live.mum.vel_lo": (-999.0, "up"),
+                     "live.mum.vel_hi": (999.0, "down")}
 
 
 def proposal_fade(proposals, live_levers, now):
@@ -3185,6 +3223,15 @@ def _selftest_body():
     _mm = _re.search(r'MAX_HOLD_MIN = (\d+)\s+# 24h', _fam_src)
     assert _mm, "could not read OversoldRebound.MAX_HOLD_MIN from lighter_family_bot.py"
     _src_def["live.mum.max_hold_min"] = float(_mm.group(1))
+    # [(xl)] the velocity band pins to the same class. Both defaults are the
+    # INERT ends (+-infinity); if either ever drifted to a real value, this
+    # map would describe a book that is already filtered and a release could
+    # widen a real-money entry gate.
+    for _lv, _attr in (("live.mum.vel_lo", "VEL_LO"),
+                       ("live.mum.vel_hi", "VEL_HI")):
+        _mm = _re.search(_attr + r' = (-?[0-9.]+)', _fam_src)
+        assert _mm, f"could not read OversoldRebound.{_attr} from lighter_family_bot.py"
+        _src_def[_lv] = float(_mm.group(1))
     for _key, (_v, _dir) in LIVE_ENV_DEFAULTS.items():
         assert _src_def[_key] == _v, (
             f"LIVE_ENV_DEFAULTS[{_key}]={_v} has DRIFTED from the funding bot's "
@@ -3220,12 +3267,34 @@ def _selftest_body():
     # the consumer reads its bars through MUM_LEVER_ATTRS, declared just
     # above the function — the declaration + the body are the consumer
     _ab_src = _fam_src.split("MUM_LEVER_ATTRS = ", 1)[1].split("def mum_bars", 1)[0]
+    # [(xl)] DRIVE THE PUBLISHER WHERE THE IMAGE ALLOWS IT. The text form
+    # below asks whether the literal `"rsi_max":` appears in `mum_bars`, and
+    # (xl) made that function DERIVE its keys from `MUM_LEVER_ATTRS` — which
+    # is strictly more correct (the next lever cannot arrive unstamped) and
+    # defeats a substring scan, the repo's own "a page-wide substring scan is
+    # not a structural claim". So: call the real function on the real carrier
+    # and read its keys. The judge's image need not carry the family bot, so
+    # an ImportError degrades to the text check rather than failing.
+    _mb_keys = None
+    try:
+        import lighter_family_bot as _fammod
+        _mum_s = next(x for x in _fammod.STRATEGIES if x.bot == "freqtrade-mum")
+        _mb_keys = set(_fammod.mum_bars(_mum_s))
+        assert _mb_keys, "mum_bars returned nothing for mum's own carrier"
+    except ImportError:
+        _mb_keys = None
     for _xk in XP_TO_LIVE:
         _bar = _xk.split(".")[-1]
         if _xk.startswith("xp.mum."):
-            assert f'"{_bar}":' in _mb_src, (
-                f"lighter_family_bot.mum_bars stamps no {_bar} receipt — a "
-                f"{_bar} judge candidate on mum would accrue ZERO closes")
+            if _mb_keys is not None:
+                assert _bar in _mb_keys, (
+                    f"lighter_family_bot.mum_bars stamps no {_bar} receipt "
+                    f"(driven: {sorted(_mb_keys)}) — a {_bar} judge candidate "
+                    f"on mum would accrue ZERO closes")
+            else:
+                assert _bar in _mb_src, (
+                    f"lighter_family_bot.mum_bars stamps no {_bar} receipt — a "
+                    f"{_bar} judge candidate on mum would accrue ZERO closes")
             assert f'"{_bar}"' in _ab_src, (
                 f"apply_book_levers does not read {_bar} — registered-but-inert")
             continue

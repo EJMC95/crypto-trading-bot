@@ -454,6 +454,31 @@ LEVERS = {
         "kind": "float", "lo": 720.0, "hi": 2880.0, "lane": "lighter-xp",
         "note": "👩 mum shadow twin's max hold (minutes); env default 1440",
         "env_default": 1440.0},
+    #: [(xl)] THE DIP-VELOCITY BAND, shadow lane. Defaults are +-infinity, so
+    #: a registered-but-unmoved lever changes NOTHING — registering a lever
+    #: moves nothing ((it)). The cages span the MEASURED plateau
+    #: ([8,16) through [10,24), all positive at t 1.90-3.20) and stop at the
+    #: inert end, so the rail can only ever TIGHTEN toward the measured band.
+    "xp.mum.vel_lo": {
+        "kind": "float", "lo": -999.0, "hi": 20.0, "lane": "lighter-xp",
+        "note": "👩 mum twin: MIN rsi points dropped over 4 bars; measured band "
+                "starts 12. env default -999 = no floor (inert)",
+        "env_default": -999.0},
+    "xp.mum.vel_hi": {
+        "kind": "float", "lo": 8.0, "hi": 999.0, "lane": "lighter-xp",
+        "note": "👩 mum twin: MAX rsi points dropped over 4 bars; measured band "
+                "ends 20 (a violent fall keeps falling). env default 999 (inert)",
+        "env_default": 999.0},
+    "live.mum.vel_lo": {
+        "kind": "float", "lo": -999.0, "hi": 20.0, "lane": "lighter-live",
+        "note": "👩 mum LIVE dip-velocity floor — judge-promoted only; "
+                "env default -999 (inert)",
+        "env_default": -999.0},
+    "live.mum.vel_hi": {
+        "kind": "float", "lo": 8.0, "hi": 999.0, "lane": "lighter-live",
+        "note": "👩 mum LIVE dip-velocity ceiling — judge-promoted only; "
+                "env default 999 (inert)",
+        "env_default": 999.0},
     "live.mum.rsi_max": {
         "kind": "float", "lo": 28.0, "hi": 38.0, "lane": "lighter-live",
         "note": "👩 mum LIVE RSI entry bar — judge-promoted only; env default 36",

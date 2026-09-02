@@ -195,6 +195,17 @@ FUNDING_GENES = {
 MUM_GENES = {
     "rsi_max": ("xp.mum.rsi_max", [30.0, 32.0, 34.0]),
     "max_hold_min": ("xp.mum.max_hold_min", [720.0, 1080.0, 2160.0, 2880.0]),
+    # [(xl)] the dip-velocity band. The alleles are the MEASURED plateau
+    # ([8,16) through [10,24) all positive at t 1.90-3.20) — not a range the
+    # rail may roam, which is why the registry cages stop at the same edges.
+    # THE INERT VALUES (-999/999) ARE DELIBERATELY ABSENT. The first draft
+    # included them so a crossover could breed the band back OFF, and the
+    # lane's own test refused that with a better argument: an offspring that
+    # proposes her SHIPPED DEFAULT is not an experiment. Turning the band off
+    # is not a hypothesis the judge needs to test — it is what happens on its
+    # own when a candidate fails the paired bar and the lever expires.
+    "vel_lo": ("xp.mum.vel_lo", [8.0, 10.0, 12.0, 14.0]),
+    "vel_hi": ("xp.mum.vel_hi", [18.0, 20.0, 22.0, 24.0]),
 }
 #: judge lane id -> gene grid. The judge publishes `lanes.serial_lane`
 #: ("farmer" | "mum"); an unknown/dark lane proposes NOTHING (fail-closed —
@@ -1289,11 +1300,21 @@ def _funding_candidates(judge_state, incubator_state, hurting=None, lane=None):
     for p in (incubator_state.get("proposed") or []):
         tried.add(p.get("name"))
     hurting = set(hurting or ())
-    props, generatable = [], 0
+    # [(xl)] ROUND-ROBIN ACROSS GENES, not gene-major. The caller caps the
+    # emitted list, so enumerating gene-by-gene means the FIRST genes fill the
+    # cap and every later one is unreachable — a gene can be declared, caged,
+    # registry-legal and never once proposed. Measured the day mum's lane went
+    # from two genes to four: the cap of 6 was filled by rsi_max's 3 alleles
+    # and max_hold_min's 3, and `vel_lo`/`vel_hi` were minted ZERO times. That
+    # is the (lv) shape — a consumer that runs second behind one which takes
+    # the whole supply — inside the reproduction organ. Interleaving makes
+    # position in the dict stop deciding reachability.
+    per_gene, generatable = [], 0
     for g, (lever, grid) in genes.items():
         if lever.replace("xp.", "live.", 1) in hurting:
             continue      # live lane measured this knob bad — wait it out
         base = _lane_base(lane, g, lever)
+        mine = []
         for allele in grid:
             if base is not None and allele == base:
                 continue
@@ -1304,8 +1325,14 @@ def _funding_candidates(judge_state, incubator_state, hurting=None, lane=None):
                     else f"xp-{lane}-{g}-{allele:g}")
             if name in tried:
                 continue
-            levers = {lever: allele}
-            props.append({"name": name, "levers": levers, "lane": lane})
+            mine.append({"name": name, "levers": {lever: allele}, "lane": lane})
+        if mine:
+            per_gene.append(mine)
+    props = []
+    for i in range(max((len(m) for m in per_gene), default=0)):
+        for m in per_gene:
+            if i < len(m):
+                props.append(m[i])
     return generatable, props
 
 

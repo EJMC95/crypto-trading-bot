@@ -2150,7 +2150,7 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     # Genuinely unreachable: the sample has EXCLUDED a positive mean, or the
     # in-era drawdown is blown (which cannot un-blow at any n).
     #
-    # [2026-09-02 (xi)] THE MEAN CLAUSE BRANCHES ON `mean_excluded`, NOT ON
+    # [2026-09-02 (xm)] THE MEAN CLAUSE BRANCHES ON `mean_excluded`, NOT ON
     # "an upper bound could be computed". The `underpowered` branch above is
     # gated on `bars["maxdd"]`, so a book that fails the mean bar AND the
     # drawdown bar falls through to here even when its upper bound is POSITIVE
@@ -2187,7 +2187,7 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
             parts.append((f"maxDD {100 * dd:.1f}%" if dd is not None
                           else "maxDD unmeasurable")
                          + " >= bar — a blown in-era drawdown cannot un-blow")
-        # [(xi)] PUBLISHED, so no consumer has to read the sentence to learn
+        # [(xm)] PUBLISHED, so no consumer has to read the sentence to learn
         # whether the mean was actually excluded. A retirement docket that
         # string-matches prose is the second copy of a rule.
         out.update(verdict="unreachable", mean_excluded=bool(mean_excluded),

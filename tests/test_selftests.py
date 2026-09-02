@@ -150,7 +150,7 @@ SELFTEST_MODULES = [
     # selftest is offline (planted control CUT, placebo KEPT, thin sample
     # not decidable, the twin-agreement arm).
     "scripts.study_mum_noncrypto_sleeve_2026-09-02",
-    # [2026-09-02 (xj)] 👩 mum's class-aware ladder replay. --selftest is
+    # [2026-09-02 (xn)] 👩 mum's class-aware ladder replay. --selftest is
     # OFFLINE and is the reuse pin: the generalised bracket walk must reduce
     # byte-identically to `study_mum_supply.bracket_walk`, and the vectorised
     # entry predicate is DRIVEN against the carrier's own `signals()` rather

@@ -53,6 +53,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # listed is a finding.
 # ---------------------------------------------------------------------------
 BORN_DARK_OK = {
+    # [2026-09-02 (xl)] the JUDGE's receipt guard imports lighter_family_bot to
+    # DRIVE `mum_bars` instead of grepping it for a literal — (xl) made that
+    # function derive its keys from `MUM_LEVER_ATTRS`, which is strictly more
+    # correct (the next lever cannot arrive unstamped) and defeats a substring
+    # scan, this repo's own "a page-wide substring scan is not a structural
+    # claim". The judge's image deliberately does NOT carry the family module —
+    # that is exactly why every other check in that block reads the file as
+    # TEXT — so the import is inside `_selftest_body`, reachable only under
+    # `--selftest` (never on the container's run path), and is
+    # except-ImportError'd with an explicit documented fallback to the text
+    # check. The driven form runs where both modules exist: the repo, on every
+    # CI push.
+    ("Dockerfile.freqtrade", "lighter_family_bot"):
+        "selftest-only receipt guard: drives mum_bars rather than grepping it, "
+        "except-ImportError'd with a text-check fallback; the judge reads the "
+        "family bot as text in production and never imports it",
     # [2026-07-30 PER-ASSET GATE step 2] the family selftest's DRIFT GUARD
     # (`NONCRYPTO_SYMS == regime_oracle.NONCRYPTO`) imports regime_oracle
     # only to compare two constant sets, guarded by except ImportError with

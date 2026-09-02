@@ -64,7 +64,7 @@ P=0.227 — noise. **That reframes the remedy from a CUT to a class-aware ladder
 or hold (the I26 feed-it direction), and that remedy owes its own measurement
 before anything ships.**
 
-**[(xj)] IT WAS MEASURED, AND BOTH HALVES ARE CORRECTED IN PLACE per I12.**
+**[(xn)] IT WAS MEASURED, AND BOTH HALVES ARE CORRECTED IN PLACE per I12.**
 (1) **The 2.80× is a SEVEN-CLOSE artifact.** On 10,020 non-crypto and 12,418
 crypto episodes of her own mechanical entry over the full 1h tape, the gap is
 **1.29×** (median favourable excursion 1.203% vs 1.554%), the non-crypto p90
