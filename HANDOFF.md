@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 09:35 Sydney (23:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 11:54 Sydney (01:54Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,26 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (2 commit(s), entries (wb), (wc))
+## Shipped today (20 commit(s), entries (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj))
 
+- `0173257` Merge remote-tracking branch 'origin/main' into claude/fleet-audit-review-wjz9zy
+- `9515786` The latched-lock release valve: a lock stamped by a defective rail no longer outlives its own fix — avo's 04:02:46Z phantom is its first release (wj)
+- `85c9f8e` [deploy-live-taker] avo: FAMILY_CLEAR_GUARD release lever for the (vn) latch — armed-by-fixed-defect lock gets a designed exit
+- `6626f39` (wi) — the latch outlived its bug: the (vg) unlock ported to the live arm
+- `1e01a45` FAMILY_CLEAR_GUARD reaches the live arm — once per process, and the sentinel is the point
+- `dd5bb32` Drive #258 to green: the (wh) daily-loss floor left one real-money test pinning the superseded pilot-cap contract — main red on its own direct push
+- `2b6e101` The (wi) record: #257 taken over and deployed to all three live services in one act; avo's unlock stamped 04:02:46Z; binding-label nit recorded (wi)
+- `9b41ab5` [deploy-live] Merge PR #257: avo's maxdd rail reads the funded book + georgia's live arm retired, reallocated to mum (wf)(wg)
+- `ea2d96f` mum's daily-loss pilot cap floors under the pct leash — funded to $570 she halted at 5.26% not 10% (wh)
+- `bdfc309` Drive #257 to green: the judge's own selftest didn't know georgia stands down, and main's (we) detector selftest was never registered
+- `6ea2664` Merge origin/main; renumber my letters (wd->wf avo, we->wg georgia) around the concurrent (wd)/(we) on main
+- `a5b928a` retire georgia's live arm (row-scoped) — Eamon's 'retire + reallocate to mum' call (we)
+- `0b36f02` (we) — the orphan had no detector: the split brain re-derived from the DB alone, and the class gets its guard
+- `681377b` tomllib shim: the local autonomy suite was dying at COLLECTION, so it ran zero tests
+- `2fe4b5f` SPLIT-BRAIN detector: extract classify_orphan so the georgia-v3 half is mutation-testable
+- `5a43ba0` SPLIT-BRAIN detector: a book's summary row must carry the same build stamp as its own newest close
+- `40a311f` avo's maxdd rail was measuring 4% of her book and calling it 20% — funded-equity denominator (wd)
+- `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
 
