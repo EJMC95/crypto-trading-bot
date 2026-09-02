@@ -1636,10 +1636,21 @@ DECIDED_UNTIL = {
         "OPERATOR_QUEUE.md item 2.",
     ),
     "perps-funding-spread": (
-        "2026-08-28",
-        "Pre-registered in (jg)'s OWN revert criterion and carried in "
-        "CLAUDE.md: deciding early is the (hs)/(ia) trap in reverse. "
-        "OPERATOR_QUEUE.md item 2.",
+        # [2026-09-02 (wo)] THE CALL WAS MADE 1-Sep AND THIS TABLE DID NOT
+        # KNOW: the docket printed `decision_overdue` (due 28-Aug) for four
+        # days after Eamon's KEPT decision ((wa), CLAUDE.md acknowledged-
+        # recurrence line) — the deferral's own "it EXPIRES" property
+        # working exactly as designed, on a decision nobody had recorded
+        # here. Corrected in place per I12 to the pre-registered re-read:
+        # n>=60 fresh on-class closes after 1-Sep or 1-Oct, whichever first.
+        "2026-10-01",
+        "KEPT 1-Sep (Eamon, 'Address all of the above' (wa)) under "
+        "I17-as-amended: on-class upper bound (m+1.28*SE ~ +0.41%) has NOT "
+        "excluded a positive mean. PRE-REGISTERED re-read at n>=60 fresh "
+        "on-class closes after 1-Sep or on 1-Oct, whichever first: RETIRE "
+        "if the fresh on-class upper bound <= 0; keep grading if the fresh "
+        "mean > 0; anything else returns to Eamon. CLAUDE.md "
+        "acknowledged-recurrence line for perps-funding-spread.",
     ),
 }
 

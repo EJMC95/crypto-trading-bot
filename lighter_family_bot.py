@@ -1862,6 +1862,58 @@ def throttle_cap(strategy):
             if isinstance(strategy, DayTraderGated) else None)
 
 
+#: [2026-09-02 (wo)] THE SHADOW TWINS SCAN IN THE LIVE HOST'S ORDER. Until
+#: today this host iterated `b.coins` in LIST order while the live host runs
+#: `diversified_order` (the (sr) correlation-first offer), and the judge read
+#: every family pair `unjudgeable:policy_mismatch` on `scan_order` — so the
+#: only path from a shadow candidate to real money had no pair it could
+#: open, and I25's preferred control arm (the twin) was not a control.
+#: MEASURED on 👩 mum since 25-Aug: 36 of 53 live entries had a shadow entry
+#: on the same coin within 2h; 7 coins live-only, 4 shadow-only — material,
+#: not inert, so a waiver was the wrong tool and the port is the right one.
+#: EXPECTANCY-NEUTRAL by construction: for any single candidate every gate,
+#: veto, cap and stake below is byte-identical; only the offer ORDER moves,
+#: and only when a cycle has more qualifying signals than free slots.
+#: `FAMILY_SHADOW_SCAN_ORDER=list` reverts (and stamps "list" again).
+SHADOW_SCAN_ORDER = (os.environ.get("FAMILY_SHADOW_SCAN_ORDER", "diversified")
+                     .strip().lower() or "diversified")
+
+
+def shadow_scan_order(coins, held, rets):
+    """The order this host offers `coins` in. `diversified` -> fleet_bus's
+    correlation-first rule over `rets` ({sym: {ts: ret}}, off the bars the
+    cache already holds); anything else, or an image without fleet_bus, ->
+    the list unchanged. Never raises; ordering is an enhancement."""
+    if SHADOW_SCAN_ORDER != "diversified":
+        return list(coins)
+    try:
+        import fleet_bus
+        return fleet_bus.diversified_order(list(coins), list(held or []),
+                                           rets or {})
+    except Exception:  # noqa: BLE001
+        return list(coins)
+
+
+def shadow_scan_order_stamp():
+    """What the policy stamp says this host does — must agree with
+    shadow_scan_order, which is why both read the same constant."""
+    return "diversified" if SHADOW_SCAN_ORDER == "diversified" else "list"
+
+
+def _cohort_long_state(fr, cohort):
+    """[(wo)] fleet_bus.cohort_long_state with the same image-safety guard
+    as the other fleet_bus wrappers in this file: an image built without
+    fleet_bus.py degrades to the POOLED pair, byte-identical to before."""
+    try:
+        import fleet_bus
+        return fleet_bus.cohort_long_state(fr, cohort)
+    except Exception:  # noqa: BLE001
+        fr = fr if isinstance(fr, dict) else {}
+        _lb = fr.get("long_budget")
+        return (int(fr.get("long_positions") or 0),
+                10**9 if _lb is None else int(_lb))
+
+
 def policy_stamp(strategy, venue, scan_order, max_entries_per_hour):
     """[(ti)] THE ONE BUILDER of the (jf) policy stamp, shared by BOTH arms.
 
@@ -2358,11 +2410,14 @@ class Book:
                 # with the live host — judge v2's fairness precheck reads
                 # BOTH arms' stamps, and until this line the shadow stamped
                 # nothing, which made every family pair honestly unjudgeable.
-                # This host scans in list order (no diversified_order).
+                # [(wo)] scan order is whatever shadow_scan_order does —
+                # "diversified" by default since the port, "list" under
+                # FAMILY_SHADOW_SCAN_ORDER=list; the stamp and the loop read
+                # ONE constant so they cannot disagree.
                 extra={**({"entry_rank": m["entry_rank"]}
                           if m.get("entry_rank") is not None else {}),
                        "policy": policy_stamp(self.s, "lighter_shadow",
-                                                  "list",
+                                                  shadow_scan_order_stamp(),
                                                   throttle_cap(self.s))},
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
@@ -2646,18 +2701,18 @@ def main():
             _upd = datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))
             _age = (now - _upd).total_seconds()
-            _lb = _fr.get("long_budget")
-            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
+            # [(wo)] the SHADOW cohort's own count — these books are paper,
+            # and until this line 14 of their 20-long budget was real money
+            # they cannot affect. Old-shape payload -> pooled pair (unchanged).
+            _lp, _lb = _cohort_long_state(_fr, "shadow")
             if _age <= float(_fr.get("ttl_sec") or 900):
                 if _fr.get("mode") == "enforce":
-                    fleet_long_headroom = max(
-                        0, _lb - int(_fr.get("long_positions") or 0))
-                if (_fr.get("mode") == "enforce"
-                        and (_fr.get("long_positions") or 0) >= _lb):
+                    fleet_long_headroom = max(0, _lb - _lp)
+                if (_fr.get("mode") == "enforce" and _lp >= _lb):
                     fleet_long_veto = True
-                    log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                    log.info("FLEET LONG-BUDGET VETO — %s/%s shadow-cohort longs; "
                              "no new entries this cycle (exits unaffected)",
-                             _fr.get("long_positions"), _fr.get("long_budget"))
+                             _lp, _lb)
                 # [2026-07-15 GAP FIX] fleet drawdown governor — the taker
                 # consumed clip_scale since 14-Jul, the gate0 books stayed
                 # "advisory until ported". Ported: new-entry stakes scale by
@@ -2753,7 +2808,19 @@ def main():
                       "symcap": 0, "throttled": 0, "brain_gate": 0,
                       "opened": 0}
 
-            for coin in b.coins:
+            # [(wo)] offer order = the live host's rule (see SHADOW_SCAN_ORDER).
+            # Returns come off the same cache the loop reads one line below,
+            # so the pre-pass warms nothing new; a coin with no usable bars
+            # simply sorts after the measured ones, then hits `no_bars` as
+            # before.
+            _rets = {}
+            for _c in set(list(b.coins) + list(b.broker.pos)):
+                try:
+                    import fleet_bus as _fb_ret
+                    _rets[_c] = _fb_ret.bar_returns(cache.get(_c, b.s.tf))
+                except Exception:  # noqa: BLE001 — telemetry never breaks the loop
+                    _rets[_c] = {}
+            for coin in shadow_scan_order(b.coins, list(b.broker.pos), _rets):
                 bars = cache.get(coin, b.s.tf)
                 b.scan["scanned"] += 1
                 if not bars or not bars["t"]:

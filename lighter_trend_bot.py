@@ -773,15 +773,20 @@ def main():
             _fr = store.load_state("fleet-risk") or {}
             _age = (now - datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
-            _lb = _fr.get("long_budget")
-            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
+            # [(wo)] shadow cohort; pooled pair when the key is absent.
+            try:
+                import fleet_bus as _fb
+                _lp, _lb = _fb.cohort_long_state(_fr, "shadow")
+            except Exception:  # noqa: BLE001
+                _lb = _fr.get("long_budget")
+                _lp, _lb = (int(_fr.get("long_positions") or 0),
+                            10**9 if _lb is None else int(_lb))
             if (_age <= float(_fr.get("ttl_sec") or 900)
-                    and _fr.get("mode") == "enforce"
-                    and (_fr.get("long_positions") or 0) >= _lb):
+                    and _fr.get("mode") == "enforce" and _lp >= _lb):
                 fleet_long_veto = True
-                log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                log.info("FLEET LONG-BUDGET VETO — %s/%s shadow-cohort longs; "
                          "no new entries this cycle (exits unaffected)",
-                         _fr.get("long_positions"), _fr.get("long_budget"))
+                         _lp, _lb)
         except Exception:  # noqa: BLE001 — fail-safe open
             fleet_long_veto = False
 

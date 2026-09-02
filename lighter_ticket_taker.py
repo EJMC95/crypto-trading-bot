@@ -145,6 +145,19 @@ _ROW_SUFFIX = {"lighter_paper": "-lshadow", "lighter_shadow": "-lshadow",
 BOT_ROW = BOT + _ROW_SUFFIX.get(TT_VENUE, "-lshadow")
 
 
+def _cohort_long_state(fr, cohort):
+    """[(wo)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
+    the read degrades to the pooled pair — this site's prior behaviour."""
+    try:
+        import fleet_bus
+        return fleet_bus.cohort_long_state(fr, cohort)
+    except Exception:  # noqa: BLE001
+        fr = fr if isinstance(fr, dict) else {}
+        _lb = fr.get("long_budget")
+        return (int(fr.get("long_positions") or 0),
+                10**9 if _lb is None else int(_lb))
+
+
 def _standby_key(bot_row):
     """[2026-08-04] The bot_state key a STOOD-DOWN process reports on —
     funding_carry_bot's (ic) pattern, applied to the real-money pair.
@@ -2649,10 +2662,12 @@ def main(_ctx=None):
             # [2026-07-15 AUDIT FIX] L2 long-budget veto now has a consumer in
             # the RUNNING fleet (it was wired only into the retired Kraken
             # strategies). Fail-safe OPEN: stale/missing state never blocks.
-            _lb = fr.get("long_budget")
-            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
-            if (fr.get("mode") == "enforce"
-                    and (fr.get("long_positions") or 0) >= _lb):
+            # [(wo)] this arm's OWN cohort: the shadow arm reads the paper
+            # count, a live arm the real-money count. fleet_bus owns the
+            # fallback (old-shape payload -> pooled pair, unchanged).
+            _lp, _lb = _cohort_long_state(
+                fr, "live" if TT_VENUE == "lighter_live" else "shadow")
+            if fr.get("mode") == "enforce" and _lp >= _lb:
                 long_budget_full = True
     except (ValueError, TypeError):
         gov = 1.0
