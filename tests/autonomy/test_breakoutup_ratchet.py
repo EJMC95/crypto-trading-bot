@@ -30,7 +30,11 @@ was re-decided. So:
     ladders actually walk — are TWO-WAY again. A restrict walk now pays a
     real replay delta; expand can genuinely clear its margin. The un-pin is
     COUPLED TO SIGHT below: re-blind the replay or stop forwarding the
-    resolver and these tests demand the pins back.
+    resolver and these tests demand the pins back. [Same day, later:
+    `max_hold_h` was then DECOUPLED from the breakout arm entirely — the
+    trend exit runs its own `BRK_MAX_HOLD_H` clock (AST-pinned in the
+    taker's selftest), so the lever steers only the divergence bracket,
+    a lens the replay could always fill (42 taken).]
   * `taker.brk_trail` / `taker.brk_sl` STAY pinned — not blindness any more:
     nothing walks them (registered for consumption only, off every ladder),
     and both widenings were measured and WITHHELD on their own numbers

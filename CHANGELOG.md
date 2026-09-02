@@ -1,3 +1,40 @@
+## 2026-09-02 (wr) — THE CLOCK SPLIT: the breakout trend exit gets its own hold, and `taker.max_hold_h` stops re-clocking an arm it was never measured on
+
+The first item of the further-improvements pass, and it is (wp)'s own
+handoff (*"the unblocking work is the carried clock split, not a cage
+edit"*) plus this session's carried row, closed together. `bull_exit()`
+handed the breakout TREND exit — no TP cap, wide stop, trailing give-back,
+a rule built to let a winner run — the REVERSION arm's `MAX_HOLD_H`:
+23–32 of 37 replayed breakout exits were that clock, not the trail, and
+(sk) measured a 24h hold as +0.22..0.57pp WORSE on this arm. So the (wq)
+cage un-pin re-opened a hazard: walking `taker.max_hold_h` down (the very
+value the incubator's best genotype wants — div 25 / hold 24 / tp 0.02,
+n=189, lcb +3.21, both halves, +$46.75 over default) would have cut the
+breakout arm's hold in the same move. (wp) measured exactly that joint
+bind as why the champion gate has never opened.
+
+SHIPPED: `BRK_MAX_HOLD_H` (env `TT_BRK_MAX_HOLD_H`, default inherits the
+operator's `TT_MAX_HOLD_H` then 48 — behaviour-neutral at ship, no lever
+open on the bus, verified). `bull_exit` reads it; `taker.max_hold_h` now
+steers ONLY the divergence bracket — the lens the tuner's replay could
+always fill (42 taken) — and the replay/tuner/proprioception inherit the
+split for free because they call `tt.bull_exit` itself (one owner). The
+decoupling is AST-pinned in the taker's selftest (a substring test would
+pass on "BRK_MAX_HOLD_H" containing "MAX_HOLD_H"); mutation verified —
+re-coupling the tuple reddens the selftest. NO widening ships with it:
+the only 48→96 evidence died to leave-one-symbol-out (+0.78pp → +0.07pp
+ex-HYPE), and the new constant deliberately takes no lever (a knob with
+no ladder and no measured direction is reach nothing has earned — I18's
+own refutation at (tx)).
+
+What this buys, stated as the incubator's own arithmetic: the champion
+genotype's `hold 24` gene is now cage-reachable (lo 24 since (wq)) AND
+collateral-free. Its other two genes stay out of cage (`div_gap 25 < lo
+37.5`, `tp 0.02 < lo 0.03`) — those are single-axis cage decisions with
+their own histories, not touched here without their own measurements.
+CARRIED: 11 → 10 rows. Deploy: freqtrade-bots auto path (shadow only;
+the taker's live arm is retired (ma)).
+
 ## 2026-09-02 (wq) — "IMPLEMENT ALL OF THE ABOVE": the backlog drained — both live books get their justification claims (ratchet 2→0), three carried rows close on measurements, and the (sk) cage pins are re-decided on a sighted gate
 
 **[RENUMBERED (wp) -> (wq) at push time** — PR #262's support-system deep dive took (wp) on main while this pass's suite ran; the pushed entry keeps the letter per the letter rule.**]**

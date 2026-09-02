@@ -212,19 +212,12 @@ CARRIED = [
     # sight by test_breakoutup_ratchet.test_the_unpin_is_coupled_to_the_
     # gates_sight; brk_trail/brk_sl stay pinned (walked by nothing,
     # widenings measured-and-withheld).
-    {
-        "id": "breakout-arm-inherits-reversion-clock",
-        "owner": "session",
-        "what": "bull_exit() hands the breakout TREND exit the reversion arm's "
-                "MAX_HOLD_H. A rule built to let a winner run (no TP cap, wide "
-                "stop, trailing give-back) is timed by a mean-reversion book's "
-                "clock; 23-32 of 37 replayed exits are that clock, not the trail.",
-        "why_open": "splitting it decouples the arm from a lever the rail "
-                    "actively moves, and the only evidence for 48h->96h died "
-                    "to leave-one-symbol-out (+0.78pp -> +0.07pp ex-HYPE).",
-        "closes_when": lambda: _has("lighter_ticket_taker.py",
-                                    "BRK_MAX_HOLD_H"),
-    },
+    # [CLOSED 2026-09-02] breakout-arm-inherits-reversion-clock — the clock is
+    # SPLIT: `BRK_MAX_HOLD_H` (env TT_BRK_MAX_HOLD_H, default inherits
+    # TT_MAX_HOLD_H then 48) now times the trend exit, `taker.max_hold_h`
+    # steers only the divergence bracket, and the taker's selftest pins the
+    # decoupling by AST. No widening shipped (the 48->96 evidence died to
+    # leave-one-symbol-out); behaviour-neutral at ship.
     {
         "id": "ceiling-slots-georgia",
         "owner": "session",

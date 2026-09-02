@@ -821,6 +821,18 @@ def bull_entry_ok(lens, side, ticket, up=None):
 # trailing give-back off the peak, and NO fixed TP cap.
 BRK_TRAIL = float(os.environ.get("TT_BRK_TRAIL", "0.06"))   # trail 6% off peak
 BRK_SL = float(os.environ.get("TT_BRK_SL", "-0.07"))        # wide hard stop
+# [2026-09-02] THE TREND EXIT GETS ITS OWN CLOCK. bull_exit() used to hand the
+# breakout arm the reversion arm's MAX_HOLD_H — a rule built to let a winner
+# run, timed by a mean-reversion book's growth-rail lever (23-32 of 37 replayed
+# breakout exits were that clock, not the trail), and (sk) measured a 24h hold
+# as +0.22..0.57pp WORSE on this arm. Splitting the clock decouples the arm
+# from `taker.max_hold_h`, which now steers ONLY the divergence bracket — the
+# lens the tuner's replay could always fill. Default INHERITS the operator's
+# TT_MAX_HOLD_H env (then 48), so the split is behaviour-neutral at ship; no
+# lever reaches this constant (deliberate: the only widening evidence, 48->96,
+# died to leave-one-symbol-out, +0.78pp -> +0.07pp ex-HYPE).
+BRK_MAX_HOLD_H = float(os.environ.get(
+    "TT_BRK_MAX_HOLD_H", os.environ.get("TT_MAX_HOLD_H", "48")))
 # The scanner sidekick's ADVISORY quality gate: skip a breakout whose
 # breakout_quality() < this. DEFAULT 0.0 = inert (blocks nothing) — the score is
 # CAPTURED on every breakout entry regardless, so the winning threshold can be
@@ -836,7 +848,7 @@ def bull_exit(lens):
     if not BULL_MODE:
         return None, None
     if lens in ("breakout", "breakoutup"):      # (dk) up-regime breakout too
-        return (999.0, BRK_SL, MAX_HOLD_H), BRK_TRAIL
+        return (999.0, BRK_SL, BRK_MAX_HOLD_H), BRK_TRAIL
     return None, 0.0        # divergence: fixed bracket, no trail
 
 
@@ -3899,6 +3911,18 @@ def selftest():
         assert bull_exit("breakoutup")[1] == BRK_TRAIL          # trail, not fixed
         assert bull_exit("breakoutup")[0][1] == BRK_SL          # wide stop
         assert bull_exit("divergence") == (None, 0.0)           # unchanged
+        # [2026-09-02] THE CLOCK SPLIT, pinned by AST not substring (a substring
+        # test passes on "BRK_MAX_HOLD_H" containing "MAX_HOLD_H"): the trend
+        # exit's hold is BRK_MAX_HOLD_H, and the lever-steered MAX_HOLD_H global
+        # is structurally absent from bull_exit — so walking taker.max_hold_h
+        # can never again re-clock the breakout arm.
+        import ast as _ast
+        import inspect as _insp
+        _names = {n.id for n in _ast.walk(_ast.parse(
+            _insp.getsource(bull_exit))) if isinstance(n, _ast.Name)}
+        assert "BRK_MAX_HOLD_H" in _names and "MAX_HOLD_H" not in _names, \
+            "bull_exit re-coupled to the reversion arm's clock"
+        assert bull_exit("breakoutup")[0][2] == BRK_MAX_HOLD_H
     finally:
         globals()["BULL_MODE"] = False
     assert bull_exit("breakoutup") == (None, None)             # off -> module default
