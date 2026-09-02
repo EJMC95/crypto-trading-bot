@@ -98,8 +98,12 @@ def test_every_claims_owner_path_resolves_in_a_publisher_built_payload():
 
 
 def test_a_renamed_organ_field_is_UNRESOLVED_not_silently_matching():
+    # [2026-09-02] a FIXTURE row, not CLAIMS[0] — the live table's order and
+    # grade_after dates move as claims retire, and this test is about the
+    # rename mechanism, not any one claim (it read PENDING the day the
+    # georgia claim retired and mum's newer row became CLAIMS[0]).
     pcts = [0.004, -0.002, 0.011, -0.006, 0.008, 0.001, -0.003, 0.009]
-    row = cl.CLAIMS[0]
+    row = dict(cl._fixture()[0], covers=())
     bot = row["owner"][1].split(".")[1]
     payload = _publisher_payload(bot, pcts)
     payload["books"][bot].pop("t")                      # the organ renames it
@@ -159,19 +163,25 @@ def test_a_drifted_number_reddens():
     assert any("CLAUDE.md" in x for x in lines), lines
 
 
-def test_the_georgia_golive_number_is_the_leak_this_exists_for():
-    """The seeded doctrine row FIRES against the organ's own number.
+def test_a_drifted_doctrine_number_reddens_the_mechanism():
+    """A doctrine row FIRES against the organ's own number.
 
-    Measured 27-Aug: CLAUDE.md/(ta) argues georgia onto a real sub-account at
-    `t = 1.48`; `golive-readiness` publishes 0.62. The payload here is built by
-    the grader's own functions, so this asserts the MECHANISM (a doctrine
-    number graded against its organ) rather than replaying today's live value.
+    [2026-09-02] This test used to hold the LIVE `georgia-golive-justification`
+    row — the claim that fired at (vm) (t 1.48 claimed, 0.62 published, the
+    leak this ledger was built for). That claim retired with the live
+    deployment it argued for ((wg)), so the row here is a FIXTURE shaped
+    exactly like it: same kind, same owner organ, same t-path, same tolerance.
+    The payload is still built by the grader's own functions ((hj)) — this
+    asserts the MECHANISM (a doctrine number graded against its organ), which
+    outlives any one claim.
     """
-    row = next(c for c in cl.CLAIMS
-               if c["id"] == "georgia-golive-justification")
+    row = dict(cl._fixture()[0], id="doctrine-t-drift", kind="doctrine",
+               number=1.48, tol=0.30, cites=("CLAUDE.md",),
+               owner=("golive-readiness", "books.freqtrade-mum-lighter.t"),
+               covers=())
+    assert cl.validate([row]) == [], "the fixture must be a declarable row"
     key, path = row["owner"]
     bot = path.split(".")[1]
-    assert bot == "freqtrade-georgia-lshadow", row["owner"]
     # a flat, noisy book grades well below the claimed 1.48
     flat = _publisher_payload(bot, [0.004, -0.004, 0.005, -0.005, 0.006,
                                     -0.006, 0.004, -0.003, 0.002, -0.002])

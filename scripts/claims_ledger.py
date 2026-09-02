@@ -108,24 +108,16 @@ BUS_JSON = "https://pnl-dashboard-production-858c.up.railway.app/bus.json"
 #             audit_claim_freshness) — empty tuple for a claim about no live row.
 # ---------------------------------------------------------------------------
 CLAIMS = [
-    {
-        "id": "georgia-golive-justification",
-        "subject": "freqtrade-georgia-lshadow",
-        "kind": "doctrine",
-        "claim": "🔮 georgia took 💸 the Farmer's real-money sub-account on "
-                 "22-Aug (ta) with '5 of 6 bars, both halves positive, failing "
-                 "only t (1.48 < 2.0)'. That t is the whole distance between "
-                 "her record and the gate, and it is the number the swap was "
-                 "argued on.",
-        "number": 1.48,
-        "tol": 0.30,
-        "as_of": "2026-08-22",
-        "owner": ("golive-readiness", "books.freqtrade-georgia-lshadow.t"),
-        "owner_ref": 'scripts/golive_readiness.py::KEY = "golive-readiness"',
-        "grade_after": "2026-08-22",
-        "cites": ("CLAUDE.md", "GEORGIA_GOLIVE_RUNBOOK.md"),
-        "covers": ("freqtrade-georgia-lighter",),
-    },
+    # [2026-09-02 RETIRED CLAIM] `georgia-golive-justification` (the (ta)
+    # swap's t=1.48, owner books.freqtrade-georgia-lshadow.t) is REMOVED —
+    # not with the book (georgia v1 is deferred to her 10-Sep read) but with
+    # its SUBJECT: the live deployment the number argued for is unwound
+    # ((wg) retired the live arm, sub-account drained to mum), so the claim
+    # guards a doctrine sentence that no longer decides anything. Its job is
+    # done — it fired correctly at (vm) (published 0.62 against the claimed
+    # 1.48, the leak this ledger was built for). The MECHANISM stays pinned
+    # in test_claims_ledger.test_a_drifted_doctrine_number_reddens_the_mechanism;
+    # her two LIVING claims (exit-sweep refusal, entry-cap prediction) stay.
     {
         "id": "mum-golive-justification",
         "subject": "freqtrade-mum-lighter",

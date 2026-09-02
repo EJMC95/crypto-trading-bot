@@ -722,6 +722,25 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
+    # [2026-09-02 RETIRED — the I17 zero-rate call ((lo)'s class), Eamon's
+    # delegated docket act. ZERO closes ever in 20 days; horizon `no_rate`;
+    # and the (om) fixed-universe study measured the gate's bar crossed in
+    # 0 of 31 retests over 90 days — the book's own rule structurally never
+    # opens, so waiting does not decide it. Zero open positions, equity
+    # exactly $1000. Its founding claim is intact and honest: none of the
+    # twelve pre-declared variants beat random, which is why it shipped the
+    # TEST — and the test's verdict is that nothing passes. Idle-the-whole-
+    # process (own module + own service); ledgers kept.]
+    if os.environ.get("GRIMES_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("book-grimes (📐 The Technician) is RETIRED (2-Sep): 0 closes "
+              "ever, horizon no_rate, gate open in 0 of 31 fixed-universe "
+              "retests over 90d (I17, the zero-rate class). Idling: no venue "
+              "calls, no publishes, ledgers kept. GRIMES_RETIRED_OVERRIDE=run "
+              "to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if _mode != "lighter_shadow":
         raise SystemExit(

@@ -573,6 +573,26 @@ def main():
         _selftest()
         return
 
+    # [2026-09-02 RETIRED — the I17 call on the grader's own measured
+    # exclusion, Eamon's delegated docket act. Era n=38, mean −0.193%/trade,
+    # UPPER BOUND −0.020% ≤ 0 — the thinnest exclusion on the slate, and
+    # still an exclusion: the grader's power-gated `unreachable` (post-(tz),
+    # so this is not the old kill-bias verdict). The (sa) confirm-duration
+    # fix did not repair the book — every close since runs the corrected
+    # 600s gate and the mean stayed negative. Zero open positions. The
+    # [45,60)bps band loses its owner — DECLARED: 🪁 band-kelly's floor is
+    # 60bps, so the tiling now has a hole below it; re-opening that band is
+    # a measurement on fresh tape, never a resurrect-by-default. Idle-the-
+    # whole-process (own module + own service); ledgers kept.]
+    if os.environ.get("COOK_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("nav-cook (🧭 Captain Cook) is RETIRED (2-Sep): era n=38, mean "
+              "-0.193%/trade, upper bound -0.020% <= 0 — a measured exclusion "
+              "(I17). Idling: no venue calls, no publishes, ledgers kept. "
+              "COOK_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     ctx = venue_context(BOT)
     bot_id = ctx.bot_id
     print("[%s] 🧭 nav-cook up | band [%.0f,%.0f)bps exit %.0f hold %.0fh "

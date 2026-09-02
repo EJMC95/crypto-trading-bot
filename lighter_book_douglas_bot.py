@@ -544,6 +544,22 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
+    # [2026-09-02 RETIRED — the I17 call on the grader's own measured
+    # exclusion, Eamon's delegated docket act ("I give you permission to fix
+    # the above"). Era n=81, mean −0.725%/trade, t=−2.54, UPPER BOUND −0.357%
+    # ≤ 0 — the sample has EXCLUDED a positive mean; horizon `unreachable`.
+    # Zero open positions at retirement. Idle-the-whole-process (own module +
+    # own service, the 🌊/📊/🧙 shape — never sys.exit, which
+    # restartPolicy=always turns into a crash-loop). Ledgers kept.]
+    if os.environ.get("DOUGLAS_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("book-douglas (🧘 The Zone) is RETIRED (2-Sep): era n=81, mean "
+              "-0.725%/trade, t=-2.54, upper bound -0.357% <= 0 — a measured "
+              "exclusion (I17). Idling: no venue calls, no publishes, ledgers "
+              "kept. DOUGLAS_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if _mode != "lighter_shadow":
         raise SystemExit(

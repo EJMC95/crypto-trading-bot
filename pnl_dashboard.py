@@ -200,6 +200,21 @@ RETIRED_ROWS = {
                 # bot_pnl after every LEGACY_BOTS boot-prune and THIS set is
                 # the operative filter. Her SHADOW twin keeps trading.
                 "freqtrade-georgia-lighter",
+                # [2026-09-02 THE SEPTEMBER SLATE — five I17 calls made in one
+                # delegated operator act (Eamon: "I give you permission to fix
+                # the above"), every one on the grader's own CURRENT verdict:
+                # garrett/douglas/farmer-shadow/nav-cook `unreachable` with the
+                # upper bound at or below zero (−0.455/−0.357/−0.231/−0.020%),
+                # grimes `no_rate` (0 closes ever; gate open in 0 of 31
+                # fixed-universe retests). georgia v1 was on the slate and is
+                # DEFERRED to her own pre-registered 10-Sep read (see
+                # lighter_family_bot.RETIRED_BOOKS). Hide half; prune half in
+                # cleanup_legacy_bots; guards in each module.]
+                "band-garrett-lshadow",
+                "book-douglas-lshadow",
+                "perps-funding-lighter-lshadow",
+                "nav-cook-lshadow",
+                "book-grimes-lshadow",
                 "perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
