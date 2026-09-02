@@ -1,3 +1,100 @@
+## 2026-09-02 (wx) — THE EDGE AUDIT'S LAST FOUR ITEMS LEAVE THE PROSE: kelly's read is a docket deferral, mum's shape has a monitor, a losing streak is judged against chance, and I25 reaches the live grader's margin
+
+**Eamon, 2-Sep, asked whether every fix in `EDGE_AUDIT_2026-09-02.md` had been
+completed. The honest answer was no** — the three approved sizing advisements had
+shipped ((wu)) and one recommendation had been closed by another session ((wp)),
+but four items the report raised still lived only as sentences, and two shipped
+changes were described in the report in the shape they were PROPOSED rather than
+the shape they LANDED. **Eamon: *"Proceed on all."*** Nothing here changes what
+any bot trades; one item sizes nothing and grades a live lever more honestly,
+the rest measure and page.
+
+**1. 🪁 KELLY'S PRE-REGISTERED READ IS EXECUTABLE (§6.1).** The report committed
+to a keep-or-retire read at n≥60 fresh closes at the (vy) $80 clip — retire if
+the fresh upper bound (m+1.28·SE) ≤ 0, keep grading if the fresh mean > 0 — and
+recorded it nowhere a machine reads: the I21 shape, *"a defense that lives only
+in prose is a defense that has not been written."* It is now
+`golive_readiness.DECIDED_UNTIL["band-kelly"]` (expires **1-Oct**; the docket
+prints `decision_overdue` past it — the deferral's own it-EXPIRES property) and
+HANDOFF row `kelly-fresh-read-pre-registered` (owner OPERATOR, closes only when
+the entry is removed, i.e. when the decision is recorded). The deferral's
+selftest requires a recorded-where, so the decision is recorded in CLAUDE.md's
+kelly row too. Her all-time upper bound (+0.03% on n=383) has NOT excluded a
+positive mean; I17-as-amended forbids retiring on it today, and the read says so.
+
+**2. THE SHAPE BLOCK, PUBLISHED AND PAGED (§6.4 / §9).** The audit's point on
+👩 mum: five stops were 37% of her gross wins, avg loss $7.39 against avg win
+$3.65, PF 2.36 carried by an **83% hit rate** — so the number that says FIRST
+if she is about to lose her profit factor is her hit rate against her OWN
+break-even (1/(1+payoff) = **66.9%**), never P&L and never a bare win-rate bar
+(I15). `golive_readiness.stats()` now computes and `book_payload` publishes a
+per-book `shape` block: `hit_pct`, `hit_trailing_pct` (trailing 30), `n_trailing`,
+`avg_win_usd`, `avg_loss_usd`, `payoff`, `breakeven_hit_pct`, `hit_margin_pp`,
+`streak_now`, `streak_max`, `streak_p50_chance`, `streak_p95_chance`. REPORTED,
+never a bar — `BAR_NAMES` and `grade()` are untouched. `fleet_immune` reads it
+off the grader's payload (never re-derived) and flags a **LIVE** book (`-lighter`
+rows only — a page on every shadow streak would train Eamon to ignore the pager,
+(gl)) whose trailing hit rate sits within `IMMUNE_SHAPE_HIT_MARGIN_PP` (5pp) of
+its own break-even on ≥30 trailing closes, or whose current losing streak exceeds
+the p95 chance streak for its own hit rate. Today neither live row is near:
+mum's margin is ~16pp.
+
+**3. A STREAK IS JUDGED AGAINST CHANCE, AND THE OWNER IS THE GRADER (§9).**
+`scripts/edge_audit.py` simulated the longest losing run (2,000 draws) and does
+not ship in any image; the grader does. `golive_readiness.expected_streak`
+now computes it EXACTLY — Feller's run recurrence for P(longest run < k), the
+quantile the smallest k reaching it — so no two consumers can see two p95s for
+one book, and the audit imports it back **by identity** (a second copy of a rule
+is a second rule, (hj); pinned). Brute-force-verified against every outcome
+string for small n.
+
+**4. I25 REACHES THE ACTUATOR — `fleet_proprioception.grade_live`.** I25
+measured the defect in one number and recorded it as *latent*: a hot window is
+followed by a **−1.674pp** collapse toward the book's own mean, while the live
+lane judged a change against its PRE-WINDOW with a **0.25pp** margin and let a
+**three-trade** baseline count — so `all()` over one biased element could call a
+change `hurting` by arithmetic and revert a live lever at `get_lever`. Three
+changes, every one in the less-constriction direction (Eamon: *"our focus always
+on growth"*): the pre-window baseline carries its own margin
+`LIVE_PRE_MARGIN_PP` = **1.7pp** (the measured reversion); the shadow twin — the
+one control arm that experiences the same reversion — keeps 0.25pp and is
+**REQUIRED** for any verdict (no twin ⇒ `recorded`, reason `no-control-arm`);
+and `LIVE_BASE_MIN_N` is pinned to `fleet_allocation.MIN_N` (**10**, the
+computability floor) instead of 3. The verdict publishes its `baselines`. The
+selftest fixtures moved from 6-trade to 12-trade baselines and gained the I25
+pin: 1.3pp below the pre-window while 1.0pp below the twin now reads **flat**
+where the old margin condemned it. Real evidence still grades: 2.3pp below the
+pre-window and 1.0pp below the twin reads **bad**. No live lever is open today
+((ta) retired the Farmer's lane; the judge's lane moved to mum at (wt)), so this
+changes no verdict on the bus — it changes the next one.
+
+**5. THE REPORT, CORRECTED IN PLACE (I12).** §6.2 and §6.3 read as open
+proposals in their PROPOSED shape (`clip × max(0.25, 1 − maxDD/0.15)` through
+`apply_tuning`, publishing `extra.dd_scale`); what shipped scales only PAST the
+bar, lives in `fleet_bus.brain_clip_multi`, and records on each close's
+`brain_mult` stamp. Both now say so, §5's re-point is marked done by (wp), §8's
+clamp note says where the consequence landed, and §9's gap column carries
+CLOSED on the four rows this entry and (wu)/(wp) closed.
+
+**VERIFIED:** `tests/autonomy/test_edge_audit_followups.py` (8 pins, every
+consumer driven on the publisher's own payload) — **10 of 10 mutations red**:
+shadow books flagged too · margin comparison inverted · streak check removed ·
+pre-window margin back to 0.25 · baseline floor back to 3 · twin no longer
+required · run recurrence broken · trailing window is the whole ledger · carried
+predicate inverted · audit keeps a local copy. Module selftests green
+(`golive_readiness`, `fleet_immune`, `fleet_proprioception`, `session_state`,
+`edge_audit`); every `changelog-check.yml` guard green locally except the
+sandbox-less gitleaks. **DEPLOY: main only** — `fleet_immune`/`fleet_proprioception`/
+`golive_readiness` run in `freqtrade-bots` and ship on the auto path; no live
+row trades differently, so no live restart is dispatched.
+
+**STILL OPEN, named:** the I25 calibration is a MEASURED margin, not a
+re-measured one — the 1.674pp is (vc)'s 27-Aug number; re-run
+`scripts/study_do_our_changes_hurt_2026-08-27.py` when the ledger has another
+month and move the constant if the tide moved. The shape monitor's 5pp is a
+judgement, stated as one; a page it raises is advice to look at the twin, not a
+verdict (I25).
+
 ## 2026-09-02 (wv) — THE DASHBOARD'S GEORGIA HOLE: one attribute name killed every family publish for five days, and a stale Railway instance made the fleet look healthy the whole time
 
 **[RENUMBERED (wu) -> (wv) at push time** — PR #263's sizing-rails merge took (wu) on main while this fix was built; the pushed entry keeps the letter per the letter rule.**]**

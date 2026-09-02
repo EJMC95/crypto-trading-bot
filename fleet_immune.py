@@ -219,6 +219,15 @@ def _close_ts(row):
 #: that a REAL recurrence pages the same day. Tunable, because the right value
 #: is "comfortably longer than the claim TTL" and that TTL can move.
 DUP_WRITER_CLOSED_H = float(os.environ.get("IMMUNE_DUP_CLOSED_H", "6"))
+# [2026-09-02, edge-audit follow-up] THE SHAPE MONITOR'S BARS. A LIVE book whose
+# trailing hit rate sits within this many points of its OWN break-even hit
+# rate (1/(1+payoff), off the grader's `shape` block) is one bad week from
+# PF < 1 -- EDGE_AUDIT_2026-09-02.md section 6.4 on mum: an 83% hit rate
+# carrying a 0.49 payoff, break-even 67%. Judged against the book's own
+# payoff, never a bare win-rate bar (I15). Live rows only: a page on every
+# shadow book's streak would train Eamon to ignore the pager ((gl)).
+SHAPE_HIT_MARGIN_PP = float(os.environ.get("IMMUNE_SHAPE_HIT_MARGIN_PP", "5.0"))
+SHAPE_MIN_N = int(os.environ.get("IMMUNE_SHAPE_MIN_N", "30"))
 
 
 def _parse_iso(txt):
@@ -460,6 +469,29 @@ def organ_invariants(states, now):
                      + ". n is not one book's trades and t scales with "
                        "sqrt(n). OPERATOR: confirm `claim_writer` is arbitrating "
                        "(the loser publishes <bot>:standby, not the book's row)")
+            # [2026-09-02, edge-audit follow-up] THE SHAPE MONITOR (section 6.4 /
+            # section 9 of the edge audit): two numbers that say FIRST when a
+            # high-hit-rate live book is about to lose its profit factor, read
+            # off the grader's own `shape` block (never re-derived here).
+            _sh = _b.get("shape")
+            if isinstance(_sh, dict) and str(_bot).endswith("-lighter"):
+                _hm, _nt = _sh.get("hit_margin_pp"), _sh.get("n_trailing")
+                if (isinstance(_hm, (int, float)) and isinstance(_nt, int)
+                        and _nt >= SHAPE_MIN_N and _hm <= SHAPE_HIT_MARGIN_PP):
+                    sick("golive-readiness",
+                         f"{_bot}: trailing-{_nt} hit rate "
+                         f"{_sh.get('hit_trailing_pct')}% is within {_hm}pp of its "
+                         f"own break-even {_sh.get('breakeven_hit_pct')}% (payoff "
+                         f"{_sh.get('payoff')}, avg win ${_sh.get('avg_win_usd')} vs "
+                         f"avg loss ${_sh.get('avg_loss_usd')}) -- PF < 1 if the hit "
+                         f"rate reverts; watch the SHAPE, not the P&L")
+                _sn, _sp = _sh.get("streak_now"), _sh.get("streak_p95_chance")
+                if isinstance(_sn, int) and isinstance(_sp, int) and _sn > _sp:
+                    sick("golive-readiness",
+                         f"{_bot}: {_sn} consecutive losses exceeds the p95 chance "
+                         f"streak {_sp} for its own hit rate "
+                         f"{_sh.get('hit_pct')}% on n={_b.get('n')} -- beyond "
+                         f"variance; check the twin before calling it decay (I25)")
 
     # [2026-07-17 BORN-DARK DETECTOR] an organ silently running a DEGRADED
     # FALLBACK nobody asked for. The brain shipped its v3 engine on 16-Jul
@@ -1460,6 +1492,32 @@ def _selftest():
     assert organ_invariants({"golive-readiness": {
         "updated": "2020-01-01T00:00:00+00:00", "ttl_sec": 86400, "books": {
             "b": {"integrity": {"two_writers": True}}}}}, now) == []
+    # [2026-09-02, edge-audit follow-up] THE SHAPE MONITOR fires on a LIVE
+    # book near its own break-even or beyond its chance streak, and stays
+    # silent on a comfortable live book, on any shadow book, and on a thin
+    # trailing window -- a detector that flags everything trains the operator
+    # to ignore it.
+    _shape_ok = {"hit_pct": 83.0, "hit_trailing_pct": 80.0, "n_trailing": 30,
+                 "avg_win_usd": 3.65, "avg_loss_usd": 7.39, "payoff": 0.494,
+                 "breakeven_hit_pct": 66.9, "hit_margin_pp": 13.1,
+                 "streak_now": 1, "streak_max": 3, "streak_p50_chance": 2,
+                 "streak_p95_chance": 4}
+    _shape_near = dict(_shape_ok, hit_trailing_pct=70.0, hit_margin_pp=3.1)
+    _shape_streak = dict(_shape_ok, streak_now=5)
+    _shape_thin = dict(_shape_near, n_trailing=12)
+    _sh_inv = organ_invariants({"golive-readiness": {
+        "updated": fresh, "ttl_sec": 86400, "books": {
+            "freqtrade-mum-lighter": {"n": 52, "shape": _shape_near},
+            "freqtrade-avo-maria-lighter": {"n": 40, "shape": _shape_ok},
+            "freqtrade-mum-lshadow": {"n": 49, "shape": _shape_near},
+            "lighter-ticket-taker-lighter": {"n": 57, "shape": _shape_streak},
+            "band-kelly-lighter": {"n": 60, "shape": _shape_thin},
+            "no-shape-lighter": {"n": 12}}}}, now)
+    _sh_det = [i["detail"] for i in _sh_inv if i["organ"] == "golive-readiness"]
+    assert len(_sh_det) == 2, f"exactly the near-break-even live book and the streak book: {_sh_det}"
+    assert any(d.startswith("freqtrade-mum-lighter:") and "break-even" in d for d in _sh_det), _sh_det
+    assert any(d.startswith("lighter-ticket-taker-lighter:") and "p95 chance" in d for d in _sh_det), _sh_det
+    assert not any("lshadow" in d or "avo-maria" in d or "kelly" in d for d in _sh_det), _sh_det
     # the KEY must be fetched, or the scanner above is dead code
     _src = open(os.path.abspath(__file__)).read()
     assert '"golive-readiness")' in _src or '"golive-readiness",' in _src, \

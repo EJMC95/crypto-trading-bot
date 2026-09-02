@@ -141,8 +141,31 @@ GRADES_MIN = int(os.environ.get("PROP_GRADES_MIN", "10"))
 # live-lane grading floors (16-Jul evening, operator: "the live lane needs
 # to learn") — real money gets HIGHER evidence bars than the shadow lanes
 LIVE_EP_MIN_N = int(os.environ.get("PROP_LIVE_EP_MIN_N", "5"))
-LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", "3"))
-LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))
+# [2026-09-02, edge-audit follow-up] I25 REACHES THE ACTUATOR. This read
+# `LIVE_BASE_MIN_N = 3` and `LIVE_MARGIN_PP = 0.25` for both baselines, and I25
+# measured the pre-window baseline's problem in one number: a hot window is
+# followed by a -1.674pp collapse toward the book's own mean (3,274 closes, 21
+# books, no change made), so a 0.25pp margin against the window that MOTIVATED
+# a change condemns the change by arithmetic 6.7x too easily, and a 3-trade
+# baseline is not a baseline. Three changes, each in the LESS-constriction
+# direction (Eamon: "our focus always on growth"):
+#   * the baseline floor is the fleet's computability floor,
+#     `fleet_allocation.MIN_N` (10) -- a variance estimate from three numbers
+#     is not evidence in either direction;
+#   * the PRE-WINDOW baseline carries its own margin, the measured reversion
+#     (1.7pp), so a change is called bad against its own past only when it is
+#     worse than the tide;
+#   * the SHADOW TWIN is REQUIRED for any verdict -- it is the one baseline
+#     that experiences the same reversion, so it keeps the 0.25pp margin; with
+#     no twin the episode is `recorded` (reason `no-control-arm`), never
+#     condemned by `all()` over one biased element.
+try:
+    from fleet_allocation import MIN_N as _ALLOC_MIN_N
+except Exception:      # noqa: BLE001 -- not in every image; the value is pinned by test
+    _ALLOC_MIN_N = 10
+LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", str(_ALLOC_MIN_N)))
+LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))      # vs the twin
+LIVE_PRE_MARGIN_PP = float(os.environ.get("PROP_LIVE_PRE_MARGIN_PP", "1.7"))  # vs the pre-window, I25
 # [2026-07-17 AUDIT] Retired row REMOVED — the third copy of the same rot (see
 # evidence_board.LIVE_ROWS and fleet_respiration.LIVE_BREATHS). Tide Rider left
 # the live slot on 17-Jul and its bot_pnl row is DELETED at boot
@@ -589,18 +612,28 @@ def grade_live(ep, trades, group="live-clip"):
         return {"status": "recorded", "reason": "metric-invariant-to-lever",
                 **rec}
 
-    baselines = [m for n, m in ((n_pre, m_pre), (n_tw, m_tw))
-                 if n >= LIVE_BASE_MIN_N and m is not None]
-    if (n_in < LIVE_EP_MIN_N or m_in is None or not baselines
+    if (n_in < LIVE_EP_MIN_N or m_in is None
             or (end - start) < MIN_EP_H * 3600):
         return {"status": "recorded", **rec}
-    if all(m_in < b - LIVE_MARGIN_PP for b in baselines):
+    # [2026-09-02, edge-audit follow-up] I25: the twin is the control arm and
+    # is REQUIRED; the pre-window is a biased estimator by construction and
+    # may only corroborate, at the measured-reversion margin. See the
+    # constants' note. `baselines` is published so a verdict shows what it
+    # was judged against.
+    if n_tw < LIVE_BASE_MIN_N or m_tw is None:
+        return {"status": "recorded", "reason": "no-control-arm", **rec}
+    baselines = [("twin", m_tw, LIVE_MARGIN_PP)]
+    if n_pre >= LIVE_BASE_MIN_N and m_pre is not None:
+        baselines.append(("pre", m_pre, LIVE_PRE_MARGIN_PP))
+    if all(m_in < b - mg for _, b, mg in baselines):
         sig = "bad"
-    elif all(m_in > b + LIVE_MARGIN_PP for b in baselines):
+    elif all(m_in > b + mg for _, b, mg in baselines):
         sig = "good"
     else:
         sig = "flat"
-    return {"status": "graded", "signal": sig, **rec}
+    return {"status": "graded", "signal": sig,
+            "baselines": {k: {"mean_pct": b, "margin_pp": mg} for k, b, mg in baselines},
+            **rec}
 
 
 def grade_book(ep, trades):
@@ -1213,29 +1246,59 @@ def _selftest():
     def gl(trades):
         return grade_live(ep_lv, trades, group="live-funding")
 
-    # during: live 6 trades @ +0.2%; before: 6 @ +1.5%; twin during: 6 @ +1.2%
-    tr_bad = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
-              + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
-              + [lt(TWIN, 1 + i * 0.5, 0.012) for i in range(6)]
-              + [lt("not-live", 2, 9.9)])
+    # [2026-09-02, edge-audit follow-up] baselines are 12 trades -- above the
+    # I25 floor (LIVE_BASE_MIN_N = fleet_allocation.MIN_N = 10); a 6-trade
+    # baseline is pinned below as `recorded`.
+    def pre(pct):
+        return [lt(LIVE, -5.9 + i * 0.45, pct) for i in range(12)]
+
+    def twin(pct):
+        return [lt(TWIN, 0.25 + i * 0.45, pct) for i in range(12)]
+
+    def during(pct):
+        return [lt(LIVE, 1 + i * 0.5, pct) for i in range(6)]
+
+    # during +0.2%; pre +2.5% (worse by 2.3pp > the 1.7pp reversion margin);
+    # twin +1.2% (worse by 1.0pp > 0.25pp) -> bad
+    tr_bad = during(0.002) + pre(0.025) + twin(0.012) + [lt("not-live", 2, 9.9)]
     glb = gl(tr_bad)
     assert glb["status"] == "graded" and glb["signal"] == "bad", glb
     assert glb["n_during"] == 6 and glb["mean_pct_during"] == 0.2, glb
+    assert set(glb["baselines"]) == {"twin", "pre"}, glb
+    assert glb["baselines"]["pre"]["margin_pp"] == LIVE_PRE_MARGIN_PP > \
+        glb["baselines"]["twin"]["margin_pp"] == LIVE_MARGIN_PP, glb
+    # I25: worse than the pre-window by 1.3pp -- INSIDE the measured reversion
+    # -- while worse than the twin: flat, never bad. This is the fixture the
+    # old 0.25pp margin condemned by arithmetic.
+    tr_tide = during(0.002) + pre(0.015) + twin(0.012)
+    assert gl(tr_tide)["signal"] == "flat", gl(tr_tide)
     # worse than pre-window but BETTER than the twin -> flat (never 'bad'
     # unless worse than EVERY baseline — real money isn't blamed on noise)
-    tr_flat = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
-               + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
-               + [lt(TWIN, 1 + i * 0.5, -0.02) for i in range(6)])
+    tr_flat = during(0.002) + pre(0.025) + twin(-0.02)
     assert gl(tr_flat)["signal"] == "flat"
-    # better than both -> good
-    tr_good = ([lt(LIVE, 1 + i * 0.5, 0.02) for i in range(6)]
-               + [lt(LIVE, -6 + i * 0.5, 0.002) for i in range(6)]
-               + [lt(TWIN, 1 + i * 0.5, 0.001) for i in range(6)])
+    # better than both by their margins -> good
+    tr_good = during(0.02) + pre(0.001) + twin(0.001)
     assert gl(tr_good)["signal"] == "good"
-    # thin during-window or no usable baseline -> recorded (no signal)
+    # thin during-window -> recorded (no signal)
     assert gl(tr_bad[:3])["status"] == "recorded"
-    assert gl([lt(LIVE, 1 + i * 0.5, 0.002)
-               for i in range(6)])["status"] == "recorded"
+    # NO CONTROL ARM: the pre-window alone, however bad, records -- it is the
+    # window that motivated the change and is biased by construction (I25)
+    tr_pre_only = during(0.002) + pre(0.05)
+    assert gl(tr_pre_only) == {"status": "recorded", "reason": "no-control-arm",
+                               **{k: gl(tr_pre_only)[k] for k in
+                                  ("n_during", "mean_pct_during", "n_before",
+                                   "mean_pct_before", "n_twin", "mean_pct_twin")}}
+    assert gl(during(0.002))["status"] == "recorded"
+    # a twin baseline BELOW the floor is not a baseline
+    tr_thin_twin = during(0.002) + pre(0.025) + \
+        [lt(TWIN, 0.25 + i * 0.45, 0.012) for i in range(6)]
+    assert gl(tr_thin_twin)["status"] == "recorded", gl(tr_thin_twin)
+    # the floor IS the allocation organ's computability floor, by identity
+    try:
+        import fleet_allocation as _fa
+        assert LIVE_BASE_MIN_N == _fa.MIN_N == 10, (LIVE_BASE_MIN_N, _fa.MIN_N)
+    except ImportError:
+        pass
 
     # [2026-07-17 AUDIT] live-clip is RECORDED-ONLY, whatever the data says.
     # The metric is EXACTLY invariant to clip_scale (the lever scales pnl AND
