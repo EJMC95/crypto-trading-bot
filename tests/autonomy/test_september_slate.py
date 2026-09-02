@@ -103,6 +103,38 @@ class _Idled(Exception):
     """Raised by the trapped sleep — proof main() reached the idle loop."""
 
 
+def test_the_douglas_guard_spares_his_variant_tenant(monkeypatch):
+    """[2026-09-02, ~3h after the slate] 🚀 book-bezos runs THIS engine —
+    `core.main()` after reassigning `core.BOT` — and the guard's first,
+    process-scoped version idled him for ~3h behind a banner naming douglas,
+    which no `bezos` log filter could match. The (mr) idle-the-whole-process
+    trap, walked into by the entry citing it. The guard now keys on the
+    module-level BOT; this drives the VARIANT path and demands it get past
+    the guard (venue_context trapped = success; the idle = the regression).
+    Grep a module's importers before choosing retirement scope."""
+    import importlib
+    m = importlib.import_module("lighter_book_douglas_bot")
+    monkeypatch.delenv("DOUGLAS_RETIRED_OVERRIDE", raising=False)
+    monkeypatch.setattr(m, "BOT", "book-bezos")
+    monkeypatch.setattr(m.time, "sleep",
+                        lambda _s: (_ for _ in ()).throw(_Idled()))
+
+    class _PastTheGuard(Exception):
+        pass
+
+    monkeypatch.setattr(m, "venue_context",
+                        lambda *a, **k: (_ for _ in ()).throw(_PastTheGuard()))
+    monkeypatch.setattr(sys, "argv", ["lighter_book_bezos_bot"])
+    try:
+        m.main()
+        pytest.fail("main returned without reaching venue_context")
+    except _PastTheGuard:
+        pass
+    except _Idled:
+        pytest.fail("the douglas guard idled his VARIANT — it has gone "
+                    "process-scoped again; scope it to BOT == 'book-douglas'")
+
+
 @pytest.mark.parametrize("mod,env,marker", [
     ("lighter_book_douglas_bot", "DOUGLAS_RETIRED_OVERRIDE", "-0.357%"),
     ("lighter_book_grimes_bot", "GRIMES_RETIRED_OVERRIDE", "0 of 31"),

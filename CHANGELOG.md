@@ -1,4 +1,6 @@
-## 2026-09-02 (wx) — THE EDGE AUDIT'S LAST FOUR ITEMS LEAVE THE PROSE: kelly's read is a docket deferral, mum's shape has a monitor, a losing streak is judged against chance, and I25 reaches the live grader's margin
+## 2026-09-02 (wy) — THE EDGE AUDIT'S LAST FOUR ITEMS LEAVE THE PROSE: kelly's read is a docket deferral, mum's shape has a monitor, a losing streak is judged against chance, and I25 reaches the live grader's margin
+
+**[RENUMBERED (wx) -> (wy) at push time: another session's (wx) — the douglas guard's bezos defect — reached main first; the pushed entry keeps the letter. Commit subjects on this branch still say (wx); the CHANGELOG header is the index.]**
 
 **Eamon, 2-Sep, asked whether every fix in `EDGE_AUDIT_2026-09-02.md` had been
 completed. The honest answer was no** — the three approved sizing advisements had
@@ -137,6 +139,37 @@ the sqrt; crit a retyped 1.28; the comparison inverted; back to a 5pp points
 threshold; the bar re-derived when the payload has none; the margin edited to
 0.25 and to 5.0; the collapse measured over cold windows; DRIFT never reported;
 THIN read as INSIDE; the absent organ passing the pin).
+
+## 2026-09-02 (wx) — THE SLATE'S OWN FIRST DEFECT, FOUND BY ITS OWN PAGE: the douglas guard idled 🚀 bezos, his undeclared tenant, for ~3 hours
+
+**[RENUMBERED (ww) -> (wx) at push time** — PR #265's readback merge took (ww) on main mid-write; the pushed entry keeps the letter.**]**
+
+The (wt) douglas retirement used idle-the-whole-process on the belief the
+module was single-tenant — and 🚀 book-bezos (born 1-Sep) is a VARIANT
+WRAPPER of the douglas engine: it reassigns `core.BOT = "book-bezos"` and
+calls `core.main()`. From the 05:52 slate deploy, every bezos boot in
+`freqtrade-bots` hit the guard, printed "book-douglas (🧘 The Zone) is
+RETIRED" — a banner no `bezos` log filter could ever match — and idled.
+The watchdog's `STALE: book-bezos-lshadow` page at ~3.2h dark is what
+found it. **The (mr) idle-the-whole-process trap, walked into by the very
+entry that cited it**, because nobody grepped the module's importers
+before choosing the retirement scope.
+
+FIXED: the guard keys on the module-level `BOT` (`== "book-douglas"`),
+which a variant reassigns before calling in — so douglas' own service
+stays idled and any tenant, present or future, passes through. Driven,
+not grepped: `test_the_douglas_guard_spares_his_variant_tenant` runs
+`main()` on the variant path with the sleep trapped and demands it get
+PAST the guard; re-process-scoping the guard is mutation-verified RED.
+The other two own-module retirements were RE-CHECKED for tenants the same
+way (grimes: zero importers; nav-cook: one study reading constants) and
+the funding pair was row-scoped by resolved id from the start.
+
+THE RULE THIS ENGRAVES: **retirement scope is chosen by the module's
+IMPORTERS, not by its filename** — `grep -rln "import <module>"` is one
+command and it is the difference between retiring a book and silencing a
+tenant. bezos resumes on the freqtrade-bots redeploy this push triggers;
+verified on his row's age, not the deploy log.
 
 ## 2026-09-02 (ww) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
 
@@ -298,7 +331,13 @@ published a family row, and the zombie's rows were the only fresh ones. Two
 defects, one symptom: a stale instance that could not be seen, and a live
 instance that could not speak. (wv) fixes the publish and kills the
 instance; this entry's carried row `family-shadow-stale-writer` stays until
-the stamp is READ BACK on the feed.
+the stamp is READ BACK on the feed. **READ BACK 06:33Z, after (wv)'s
+deploy: the family rows stamp `97dbe3986551`/15, mum-lshadow publishes the
+12-position book the running container restores (the zombie held 2), and
+georgia-v3-lshadow has a row for the first time — the row is CLOSED. The
+live rows still read `88457127f621` at that moment with the (ww) marker
+deploy in flight; their readback is the next line in this file's history
+or the HANDOFF, whichever the next session reads first.**
 
 **DEPLOY for this entry.** freqtrade-bots (judge, shortfall, fleet_bus,
 fleet_tuning, incubator, tuner, dashboard lists), family-lighter-shadow

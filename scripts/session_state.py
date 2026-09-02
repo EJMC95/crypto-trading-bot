@@ -271,43 +271,15 @@ CARRIED = [
         "closes_when": lambda: _has(
             "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
     },
-    {
-        "id": "family-shadow-stale-writer",
-        "owner": "OPERATOR",
-        "what": "🩺 family-lighter-shadow's rows (👩 mum-lshadow, 🙏 avo-lshadow — "
-                "the live pair's CONTROL ARMS) publish build edc3032d1c46/15, "
-                "which the repo's own audit_code_currency resolves to commit "
-                "d2c0cb9 (28-Aug, 84 commits behind, 5 touching "
-                "lighter_family_bot.py). Measured 2-Sep: THREE OK-reported "
-                "deploys (05:12 run 660, 05:21 run 661, 05:33 dispatch 664 from "
-                "clean main) each booted a container that runs its loop, and the "
-                "(vy) restart lever (run 665) ran too — the rows kept the old "
-                "stamp through all four. A pre-28-Aug container is still the "
-                "writer: the (ml)/(vy) stuck-serving class on this service for "
-                "the SECOND time (646/647/648 before), and the family bot has no "
-                "claim_writer, so the two writers are unguarded ((hp) class). "
-                "[(wv), same day] AND the current container could not publish at "
-                "all: spend_extra raised inside the publish site's except: pass "
-                "on every loop since (vr) — fixed at (wv), which also kills the "
-                "instance; this row closes on the feed readback. "
-                "Consequence: the (wp) scan-order parity port, mum v2's post-"
-                "28-Aug fixes and the (ww) lever surface have NOT reached the "
-                "shadow twins; the judge's pair cannot open until they do.",
-        "why_open": "no lever in this repo swaps the serving container when "
-                    "Railway's activation wedges: `up` builds and the swap "
-                    "does not happen, `redeploy` re-runs the CURRENT "
-                    "deployment ((vz)). The act is Eamon's, in the Railway "
-                    "UI: find and remove the extra running instance of "
-                    "family-lighter-shadow (or `railway down` the service, "
-                    "then `railway up` from clean main), then read back "
-                    "extra.build on freqtrade-mum-lshadow — expected "
-                    "9c90be27d763/15 at 6639f1e, or the (ww) image's own id "
-                    "once merged (16 files: fleet_tuning.py joins the COPY set).",
-        "subject": ("freqtrade-mum-lshadow", "freqtrade-avo-maria-lshadow"),
-        # closes when a human has read the stamp back and recorded it — only
-        # a readback closes this; a green deploy run never did.
-        "closes_when": lambda: False,
-    },
+    # [2026-09-02, (ww) readback] `family-shadow-stale-writer` CLOSED on the feed
+    # readback, the only thing that could close it: at 06:33Z the family rows
+    # stamp 97dbe3986551/15 (the (wv) build), 👩 mum-lshadow publishes the
+    # 12-position book the running container restores (the zombie held 2),
+    # and 🔮 georgia-v3-lshadow has a row for the first time. Two defects,
+    # one symptom: a stale instance that could not be seen (this row) and a
+    # live instance that could not speak ((wv): spend_extra raising inside
+    # the publish's except: pass). The 16-file (ww) image lands on the next
+    # family deploy; the stamp is the receipt, never the deploy log.
     {
         "id": "ceiling-capital-inversion",
         "owner": "OPERATOR",
