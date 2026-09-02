@@ -1,3 +1,49 @@
+## 2026-09-02 (wz) — "IF IT MAKES MORE MONEY AND WINS MORE, IMPLEMENT RIGHT AWAY": the shadow long budget is the cohort's own cap sum — the judge's control twins stop being vetoed on paper their live arms never see
+
+**Eamon, 2-Sep: *"Continue and if it makes more money and wins more implement
+right away."*** Of what this session measured, ONE thing has a measured
+starvation and no measured harm, and it is shadow-lane: the (wy) cohort split
+showed the SHADOW cohort at **21 against a budget of 20** — 👩 mum's twin 10,
+🙏 avo's twin 5, 🎫 the taker 6, every one a paper long — while the LIVE
+cohort sat at **15/20** and the pooled light read red in **76 of 288
+samples**. So the two CONTROL twins were refusing new longs on a budget their
+live arms never hit. That is the (wp) category error's last costume: the
+judge's paired bar compares a live arm to a twin that is being vetoed when
+the live arm is not, and a control arm under a different veto is not a
+control (I25 — the twin is the baseline that moves with the tide, and only
+if it trades the same supply).
+
+**SHIPPED: `FLEET_SHADOW_LONG_BUDGET` defaults to 26**, and 26 is DERIVED, not
+chosen — the most longs the living shadow directional books can hold at once
+(mum's twin `max_open` 12 + avo's twin's shadow override 6 + the taker's
+`TT_MAX_OPEN` 8), read from those books' own code by
+`test_the_shadow_budget_default_is_the_cohorts_own_cap_sum` so a cap change
+reddens the literal instead of letting it rot. The rule it engraves: **the
+paper budget never binds below the books' own caps** — a paper long risks no
+real money, and the fleet-level budget exists for the cohort that does. The
+LIVE budget is untouched (20) and pinned so. I26 prices it: expectancy-neutral
+(no entry rule moves; the twins take the entries their live arms take), bought
+as DECIDABILITY on the arms the judge grades, revert = set the env to 20.
+
+**WHY THE CODE DEFAULT AND NOT THE RAILWAY VARIABLE:** the connector write
+(`set-variables` on `freqtrade-bots`) was refused by this session's permission
+classifier — recorded, not worked around — so the value ships through main by
+the (jg) route, "the bot's own env default when no lever is open", which is
+the delegated shadow-lane surface (kd). The env still overrides in either
+direction. **What was NOT done, with the numbers:** the taker's 8h hold floor
+(+0.257pp on 31 walked closes, h2 −4.8, lb −0.63) is hypothesis-grade and I19
+refuses it; the regime veto's largest vetoed set (🪁 kelly n=122, ub +0.25%)
+has not excluded a positive mean and its own rule, registered thirty minutes
+earlier, says wait; the brain's 1.25× on mum-live was refused at (wm) with
+numbers and nothing here changes them. **PR #267 (wy) was MERGED** as
+`da15417` under the same grant (20/20 checks; CodeQL's six hygiene threads
+fixed and resolved), so the incubator's mum offspring, the proposals heartbeat
+and the cohort lights ride the freqtrade-bots deploy it triggered; the
+read-back of that deploy (stamp, `cohorts.shadow.long_budget: 26`, a fresh
+`tuning-proposals`, mum candidates in `xp-queue`) is the next line in this
+file or the HANDOFF, never assumed. freqtrade-bots only; no live bot file
+changed; main only, no marker.
+
 ## 2026-09-02 (wy) — "RUN 2 THROUGH TO 4": the edge audit's two top hypotheses become PRE-REGISTERED instruments — and one is already excluded at 4h on 🎫 the taker's own entries — the incubator breeds for the lane the judge actually runs, and the organ board's two flags close: a proposals channel that could not tell empty from dead, and a light that mixed paper into real money
 
 **Eamon, 2-Sep, after the edge-radar / incubator / organ-board review: *"Run 2

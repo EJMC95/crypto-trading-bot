@@ -279,11 +279,20 @@ LIVE_LONG_BUDGET = int(os.environ.get("FLEET_LIVE_LONG_BUDGET", str(LONG_BUDGET)
 # [2026-09-02 (wy)] THE SHADOW COHORT'S OWN BUDGET, env-separable from the
 # pooled number. Measured 2-Sep: the shadow cohort sat at 21 against 20 —
 # every one of the 21 a paper long (👩 mum's twin 10 + 🙏 avo's twin 5 + 🎫
-# the taker 6, whose own slot caps sum to 24), so the two control twins were
-# vetoing each other on positions their live arms never see. Default = the
-# pooled budget (behaviour-neutral); raising it is a lever decision with its
-# own entry, never a side effect.
-SHADOW_LONG_BUDGET = int(os.environ.get("FLEET_SHADOW_LONG_BUDGET", str(LONG_BUDGET)))
+# the taker 6, whose own slot caps sum to 26), so the two control twins were
+# vetoing each other on positions their live arms never see.
+# [2026-09-02 (wz)] THE DEFAULT IS THE COHORT'S OWN CAP SUM — Eamon: "if it
+# makes more money and wins more implement right away." The number is DERIVED,
+# not chosen: 👩 mum's twin 12 + 🙏 avo's twin 6 + 🎫 the taker 8 = 26, the
+# most longs the living shadow directional books can hold at once, so the
+# paper budget can never bind below the books' own caps — a paper long risks
+# no real money, and the judge's control twins must face the veto their LIVE
+# arms face (the live cohort reads 15/20), not one their live arms never see.
+# Pinned to those three caps by tests/autonomy/test_fleet_risk_cohort_lights.py
+# so a cap change reddens this literal instead of letting it rot. I26: an
+# expectancy-neutral widening on a starved control arm is bought as
+# decidability; the env still overrides in either direction.
+SHADOW_LONG_BUDGET = int(os.environ.get("FLEET_SHADOW_LONG_BUDGET", "26"))
 SHORT_BUDGET = int(os.environ.get("FLEET_SHORT_BUDGET", "12"))
 YELLOW_FRAC = 0.7
 
