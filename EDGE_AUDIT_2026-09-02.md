@@ -42,8 +42,13 @@ structural pins + an offline selftest) and importable; nothing here was computed
 > **The one number that changes a decision:** 🪁 kelly has a **27.9% realised / 28.5% MTM
 > drawdown against the 15% bar, a 1.00 bootstrap probability of ruin inside 12 months as
 > recorded, and a founding claim rejected at z=3.55 on n=383.** She is not on the retirement
-> docket (`losing-underpowered` — her upper bound still admits +0.03%) and nothing in the fleet
-> reduces her $250×4 clip. That is a measured harm, which is what I26 says a cut requires.
+> docket (`losing-underpowered` — her upper bound still admits +0.03%). **[CORRECTED IN PLACE,
+> same day (I12):** this read *"nothing in the fleet reduces her $250×4 clip"* — FALSE by a
+> day. `(vy)` cut `KELLY_CLIP_USD` $250 → $80 on 1-Sep at Eamon's call, and the live row
+> publishes `caps.clip_usd: 80`. Her bootstrap re-run at $80 on her $868 book: P(ruin) **0.00
+> at 3 months, 0.27 at 6, 1.00 at 12**, median 3-month return −42%, if her −0.179%/trade mean
+> holds. **The cut bought time, not survival.** What remains is the keep-or-retire call, and
+> under I17-as-amended it needs her upper bound to reach zero — today it is +0.03%.]**
 
 ---
 
@@ -313,13 +318,15 @@ that a ceiling is computed only on a positive lower bound. **Preserving every ex
 configuration per Eamon's instruction**, these are the changes the audit's numbers support,
 as proposals for approval — none is applied here:
 
-1. **🪁 kelly's clip $250×4 → $80×4 (her pre-(qj) size), or a keep-or-retire call.** Measured
-   harm: 27.9% realised / 28.5% MTM drawdown against a 15% bar, P(ruin at 12m) = 1.00 as
-   recorded, founding claim rejected at z=3.55 on n=383, short side −$153 on n=192. She is
-   `losing-underpowered` (upper bound +0.03%) so I17's docket does not reach her — but I26's
-   bar for a restriction is a measured harm, and a 28% drawdown is one. The cut is bounded,
-   reversible (`KELLY_*` env), and buys decidability at a survivable size: at $80 her realised
-   DD would have been ~9%. **The one I would ship first if permitted.**
+1. **🪁 kelly's clip — ALREADY DONE, corrected in place (I12).** This proposed $250×4 → $80×4;
+   `(vy)` shipped exactly that on 1-Sep at Eamon's call, a day before this audit, and the live
+   row publishes `caps.clip_usd: 80`. The audit's ledger read $250 because 383 of her closes
+   were taken at the old clip. What the cut buys, re-measured at $80 on her $868 book:
+   P(ruin) 0.00 at 3 months, 0.27 at 6, 1.00 at 12; median 3-month return −42%; p95 drawdown
+   70% at 3 months — IF her −0.179%/trade mean holds. **Time, not survival.** The remaining
+   decision is keep-or-retire, and I17-as-amended requires a measured exclusion (upper bound
+   ≤ 0); hers is +0.03% on n=383. Pre-register it: read at n=60 fresh closes at the $80 clip;
+   retire if the fresh upper bound ≤ 0, keep grading if the fresh mean > 0.
 2. **Drawdown-scaled clip as a fleet rail, not a per-book env.** Kelly shows the gap: the 7d
    governor scales the fleet's *live* consumers and the go-live gate *reports* maxDD, but no
    organ reduces a shadow book's clip when its own realised drawdown crosses the bar it is
@@ -421,8 +428,8 @@ what it lacks is the margin calibration I25 names.
 
 ## 10. The pre-deploy checklist, applied to this audit's own proposals
 
-Every proposal in §6/§7 must answer the ten questions before it ships. Applied to the one the
-audit would ship first (kelly's clip cut): (1) problem — 28% DD past a 15% bar, P(ruin)=1;
+Every proposal in §6/§7 must answer the ten questions before it ships. Applied to kelly's clip
+cut (shipped by `(vy)` the day before this audit; the checklist is run on it retrospectively): (1) problem — 28% DD past a 15% bar, P(ruin)=1;
 (2) rationale — a per-trade loser at 1× gross is a slow ruin, at 0.32× gross a survivable
 sample; (3) data — her own 383-close ledger; (4) in-sample — n/a, it is a size change, per-trade
 % is clip-invariant ((hl)); (5) OOS — the same; (6) walk-forward — 5 of 12 windows positive,

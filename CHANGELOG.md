@@ -70,9 +70,13 @@ clock and counts the after-publish rows rather than failing every fast book.
   (the ghost's recorded cause of death, in the mirror), founding claim rejected
   at z=3.55. She is `losing-underpowered` (upper bound +0.03%) so I17's docket
   does not reach her, and nothing in the fleet reduces a shadow book's clip on
-  its own drawdown. **Proposed, not applied** (Eamon: *"Preserve existing bot
-  configurations and produce proposed changes separately for approval"*): clip
-  $250×4 → $80×4, bounded, reversible, a measured harm per I26.
+  its own drawdown — the rail proposed below. **The clip itself: CORRECTED IN
+  PLACE the same day (I12).** The report proposed $250×4 → $80×4 and `(vy)` had
+  already shipped exactly that on 1-Sep at Eamon's call (live row `caps.clip_usd`
+  80); the audit's ledger read $250 because 383 of her closes were taken at the
+  old clip. Re-run at $80 on her $868 book: P(ruin) 0.00 / 0.27 / 1.00 at 3 / 6 /
+  12 months if her mean holds — **the cut bought time, not survival**, and the
+  remaining call is keep-or-retire, pre-registered at n=60 fresh $80 closes.
 * **Execution is not the problem anywhere.** Live arm vs shadow twin, same
   coins, overlapping window: mum +0.027pp, georgia −0.094pp (the twin loses
   too), avo +0.517pp (n=8). `implementation_shortfall` is `stood_down` (its only
