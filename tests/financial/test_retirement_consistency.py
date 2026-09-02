@@ -91,9 +91,14 @@ def test_the_34_67_double_count_fix_is_locked():
     assert "freqtrade-georgia-lighter" in LEGACY
     assert "freqtrade-mum-lighter" not in RETIRED
     assert "freqtrade-mum-lighter" not in LEGACY
-    # the SHADOW twin keeps trading as the control arm — never filtered.
-    assert "freqtrade-georgia-lshadow" not in RETIRED
-    assert "freqtrade-georgia-lshadow" not in LEGACY
+    # [2026-09-02 (ws)] the SHADOW twin followed the same day: with no live
+    # arm to control for and t=0.62 / ~776 days to the bar it is retired on
+    # the organ-review docket — both halves, like every row retirement.
+    assert "freqtrade-georgia-lshadow" in RETIRED
+    assert "freqtrade-georgia-lshadow" in LEGACY
+    # 👩 mum's shadow is the living control arm now — never filtered.
+    assert "freqtrade-mum-lshadow" not in RETIRED
+    assert "freqtrade-mum-lshadow" not in LEGACY
 
 
 def test_is_live_bot_matches_the_live_suffix():

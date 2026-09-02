@@ -22,8 +22,11 @@ import study_ladder_exit_sweep as lad  # noqa: E402
 def test_the_shipped_rule_is_read_from_the_carrier_never_retyped():
     """A retyped constant is a constant that drifts. The ROI ladder and the
     stop cap must come from the live carrier object."""
-    import lighter_family_bot as fam
-    c = lad.carrier_for("freqtrade-georgia-lshadow")
+    # [2026-09-02 (ws)] georgia is retired on both arms: her row has no LIVE
+    # carrier (a retired replay is history, never a baseline) and the
+    # constants are still read off the class, never retyped.
+    assert lad.carrier_for("freqtrade-georgia-lshadow") is None
+    c = lad.carrier_for("freqtrade-georgia-lshadow", include_retired=True)
     assert c is not None and type(c).__name__ == "DayTraderGated"
     rule = lad.shipped_rule(c)
     assert rule["roi"] == dict(c.roi), rule["roi"]
@@ -47,7 +50,7 @@ def test_the_signal_exit_path_is_excluded_not_silently_scored():
              "t0": 0, "t1": 1, "entry": 1.0, "exit_px": 1.0,
              "side": "long", "actual_ret": 0.0}]
     scored, mix, unmodelled = lad.score(rows, {}, lad.shipped_rule(
-        lad.carrier_for("freqtrade-georgia-lshadow")))
+        lad.carrier_for("freqtrade-georgia-lshadow", include_retired=True)))
     assert unmodelled == 1 and not scored
 
 
@@ -74,7 +77,8 @@ def test_split_tag_exit_recovers_the_tag_from_the_reason():
 def test_a_walk_with_no_bars_returns_no_data_rather_than_a_number():
     """Fail-closed: an unpriceable position must not silently score as flat."""
     r = lad.walk([], {}, 0, 100.0, "long-trend-breakout",
-                 lad.shipped_rule(lad.carrier_for("freqtrade-georgia-lshadow")))
+                 lad.shipped_rule(lad.carrier_for("freqtrade-georgia-lshadow",
+                                                  include_retired=True)))
     assert r == (None, None, "no-data")
 
 

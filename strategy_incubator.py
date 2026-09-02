@@ -144,11 +144,17 @@ TAKER_GENES = {
     # [2026-07-17 BASIS FIX] grid /8 with the fleet-wide funding basis — the
     # apr these pp measure was 8x TRUE. Same alleles, true units; every one
     # must stay inside the (also /8) registry bounds 37.5-87.5.
-    "DIV_GAP_PP": ("taker.div_gap_pp", [37.5, 50.0, 62.5, 75.0, 87.5]),
-    "TAKE_PROFIT": ("taker.tp", [0.03, 0.04, 0.05, 0.06]),
+    # [2026-09-02 (ws)] 25.0 / 0.02 / 24.0 REJOIN the enactable grid with the
+    # re-decided cages (see fleet_tuning taker.max_hold_h): the only
+    # champion-grade genotype on the 2-Sep sweep (sl -0.02 / gap 25 / hold 24
+    # / tp 0.02, n=189, lcb +$3.21, both halves) was out of cage on exactly
+    # these three genes, which cage_analysis could not see because it tests
+    # one axis at a time. MAX_HOLD_H is DIVERGENCE-ONLY since the breakout
+    # clock split, so the (sk) reason for dropping 24h no longer applies.
+    "DIV_GAP_PP": ("taker.div_gap_pp", [25.0, 37.5, 50.0, 62.5, 75.0, 87.5]),
+    "TAKE_PROFIT": ("taker.tp", [0.02, 0.03, 0.04, 0.05, 0.06]),
     "STOP_LOSS": ("taker.sl", [-0.04, -0.03, -0.02]),
-    # [(sk)] the 24h allele is gone with the cage — see BRK_RANGE above.
-    "MAX_HOLD_H": ("taker.max_hold_h", [48.0, 72.0]),
+    "MAX_HOLD_H": ("taker.max_hold_h", [24.0, 48.0, 72.0]),
 }
 # The gene whose alleles the TAPE must be long enough to exercise (see
 # reachable_genes) — a hold >= the span never fires.
@@ -2148,7 +2154,8 @@ def _selftest():
     # one it was written for. 60h keeps the shape: 48 reachable, 72 not.
     g2, dropped = reachable_genes(TAKER_GENES, 60.0)
     assert dropped == [72.0], dropped
-    assert g2["MAX_HOLD_H"][1] == [48.0], g2["MAX_HOLD_H"]
+    # [(ws)] 24 rejoined the grid with the clock split: 24 and 48 reachable, 72 not
+    assert g2["MAX_HOLD_H"][1] == [24.0, 48.0], g2["MAX_HOLD_H"]
     assert g2["TAKE_PROFIT"] == TAKER_GENES["TAKE_PROFIT"], "other genes intact"
     assert reachable_genes(TAKER_GENES, 200.0)[1] == [], "all reachable -> no-op"
     assert reachable_genes(TAKER_GENES, 0.0)[1] == [], "unknown span -> no-op"

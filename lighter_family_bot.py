@@ -1112,11 +1112,17 @@ class OversoldRebound(Carrier):
     def stake_mult(self, tag, bars):
         return 1.0                      # constant clip — consistency is structural
 
-    def custom_exit(self, tag, age_min, profit):
+    def custom_exit(self, tag, age_min, profit, cap=None):
         """The carry-bounded time cap. At the measured +0.0171%/day majors
         median a 12h hold pays 0.009% of notional; v1's 29-day median hold
-        paid ~0.50% before it earned anything. That tax is refused here."""
-        if age_min >= self.MAX_HOLD_MIN:
+        paid ~0.50% before it earned anything. That tax is refused here.
+
+        [(ws)] `cap` is the position's ENTRY-STAMPED bar (the (bw) rule: bars
+        priced at entry govern the trade), so a judge lever starting or
+        fading mid-hold cannot re-time an open position. None = the class
+        value, byte-identical to before."""
+        bar = float(cap) if cap else self.MAX_HOLD_MIN
+        if age_min >= bar:
             return "max_hold"
         return None
 
@@ -1804,6 +1810,16 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
+    # [2026-09-02 (ws)] 🔮 georgia's SHADOW twin — the I17 call, made on the
+    # docket's own verdict after her LIVE arm retired at (wg): `undecidable`,
+    # n=232, mean +0.043%/trade, t=0.29, ~4,224 days to the bar at her
+    # measured rate (mean far below her own mde80). Positive but ungradeable
+    # — and with the live arm gone the twin's only remaining job, control
+    # arm for the judge, has no live arm to control for. Zero open paper
+    # positions. `freqtrade-georgia-v3` (the 28-Aug impulse-fade entry) is a
+    # SEPARATE row on its own clock and is NOT retired here. Eamon: "Proceed
+    # with everything in the organ review" (2-Sep).
+    "freqtrade-georgia":   "GEORGIA_SHADOW_RETIRED_OVERRIDE",
     # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by the operator
     # ("unretire mum and bring her back to life") and she is deliberately NOT
     # listed here. She returns as v2 — a different strategy (OversoldRebound,
@@ -1892,6 +1908,63 @@ def shadow_scan_order(coins, held, rets):
                                            rets or {})
     except Exception:  # noqa: BLE001
         return list(coins)
+
+
+#: [2026-09-02 (ws)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
+#: judge could not open a family pair because no shadow twin here could run
+#: a candidate: this file never imported fleet_tuning and stamped no `bars`
+#: receipt, so `ran_candidate` (fail-CLOSED) would exclude every close. Two
+#: knobs, one owner for the stamp both hosts write.
+MUM_LEVER_ATTRS = (("rsi_max", "RSI_MAX"), ("max_hold_min", "MAX_HOLD_MIN"))
+
+
+def mum_env_defaults(strategy):
+    """The ENV-DEFAULT values of mum's two knobs — re-read from the class's
+    own definitions so a lever expiry reverts cleanly (never from mutated
+    instance state)."""
+    cls = type(strategy)
+    return {"rsi_max": float(getattr(cls, "RSI_MAX", 36.0)),
+            "max_hold_min": float(getattr(cls, "MAX_HOLD_MIN", 1440))}
+
+
+def apply_book_levers(strategy, prefix):
+    """Overlay `<prefix>rsi_max` / `<prefix>max_hold_min` onto the strategy
+    INSTANCE (never the class) from the env defaults each call. Returns the
+    moved levers. Only 👩 mum's carrier has these knobs; every other book is a
+    no-op. Fail-OPEN: an image without fleet_tuning, or a dark rail, runs the
+    env defaults — the operator's setting, never a stale overlay."""
+    if not hasattr(strategy, "RSI_MAX") or not hasattr(strategy, "MAX_HOLD_MIN"):
+        return {}
+    base = mum_env_defaults(strategy)
+    moved = {}
+    try:
+        import fleet_tuning as _tuning
+    except Exception:  # noqa: BLE001
+        _tuning = None
+    for bar, attr in MUM_LEVER_ATTRS:
+        val = base[bar]
+        if _tuning is not None and prefix:
+            try:
+                got = _tuning.get_lever(prefix + bar, val)
+                if got is not None:
+                    val = float(got)
+            except Exception:  # noqa: BLE001
+                val = base[bar]
+        if val != base[bar]:
+            moved[prefix + bar] = val
+        setattr(strategy, attr, val if attr == "RSI_MAX" else int(val))
+    return moved
+
+
+def mum_bars(strategy):
+    """[(ws)] THE RECEIPT: the bars IN FORCE at entry, stamped into the
+    position and copied to the close row as `extra.bars` — the judge's
+    `ran_candidate` proof that this close was taken under the candidate.
+    {} for any carrier without these knobs, so the stamp is never invented."""
+    if not hasattr(strategy, "RSI_MAX") or not hasattr(strategy, "MAX_HOLD_MIN"):
+        return {}
+    return {"rsi_max": float(strategy.RSI_MAX),
+            "max_hold_min": float(strategy.MAX_HOLD_MIN)}
 
 
 def shadow_scan_order_stamp():
@@ -2416,6 +2489,11 @@ class Book:
                 # ONE constant so they cannot disagree.
                 extra={**({"entry_rank": m["entry_rank"]}
                           if m.get("entry_rank") is not None else {}),
+                       # [(ws)] the judge's receipt + the recorded RSI
+                       **({"bars": m["bars"]}
+                          if isinstance(m.get("bars"), dict) and m["bars"] else {}),
+                       **({"rsi_entry": m["rsi_entry"]}
+                          if m.get("rsi_entry") is not None else {}),
                        "policy": policy_stamp(self.s, "lighter_shadow",
                                                   shadow_scan_order_stamp(),
                                                   throttle_cap(self.s))},
@@ -2813,6 +2891,11 @@ def main():
             # so the pre-pass warms nothing new; a coin with no usable bars
             # simply sorts after the measured ones, then hits `no_bars` as
             # before.
+            # [(ws)] the judge's xp.<book>.* levers reach this twin — mum's
+            # today; a no-op for carriers without the knobs.
+            _moved = apply_book_levers(b.s, f"xp.{b.bot_id.split('-', 1)[-1]}.")
+            if _moved:
+                log.info("%s xp levers in force: %s", b.bot_id, _moved)
             _rets = {}
             for _c in set(list(b.coins) + list(b.broker.pos)):
                 try:
@@ -2936,7 +3019,12 @@ def main():
                     # is the registered-but-inert shape (I18) — a time stop
                     # that never fires is exactly how v1 held for a month.
                     if not reason and hasattr(b.s, "custom_exit"):
-                        reason = b.s.custom_exit(m.get("tag"), age_min, profit)
+                        _cap = ((m.get("bars") or {}).get("max_hold_min")
+                                if isinstance(b.s, OversoldRebound) else None)
+                        reason = (b.s.custom_exit(m.get("tag"), age_min, profit,
+                                                  cap=_cap)
+                                  if _cap else
+                                  b.s.custom_exit(m.get("tag"), age_min, profit))
                     # exit signal on a fresh candle (trend_breakout vetoes it)
                     if not reason and sig and sig.get("exit") and \
                             m.get("tag") != "trend_breakout":
@@ -3042,6 +3130,13 @@ def main():
                     stop_px = entry_px * (1 - dist)
                 _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
                          "accrued": 0.0, "stop_px": stop_px,
+                         # [(ws)] the bars in force at entry (mum's judge
+                         # receipt) + the RSI this entry was admitted at —
+                         # the quantity rsi_max cuts, recorded (I23).
+                         "bars": mum_bars(b.s),
+                         "rsi_entry": (float(sig["rsi"]) if sig and
+                                       isinstance(sig.get("rsi"), (int, float))
+                                       else None),
                          # [(sv)] which entry of its clock hour this was — the
                          # quantity `MAX_ENTRIES_PER_HOUR` cuts. None on books
                          # with no throttle.

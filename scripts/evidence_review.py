@@ -1512,7 +1512,9 @@ def selftest():
         # [2026-08-19] mum left this list when it was RETIRED (I17 no_rate).
         # The guard is unchanged and still has two living subjects — the point
         # was never mum, it is that membership stays EXACT-match.
-        for _alive in ("freqtrade-georgia-lshadow",
+        # [2026-09-02 (ws)] georgia's shadow retired too; mum v2's shadow
+        # (revived 19-Aug) takes its place as the second living subject.
+        for _alive in ("freqtrade-mum-lshadow",
                        "freqtrade-avo-maria-lshadow"):
             assert _alive not in RETIRED, (
                 f"{_alive} is a LIVING book — `LEGACY_BOTS` carries its "

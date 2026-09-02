@@ -37,10 +37,11 @@ def test_every_live_ladder_book_is_declared_unsweepable():
 
 
 def test_the_two_known_ladder_books_are_covered():
-    """georgia is the book that surfaced this; avo maria is the fleet's
-    best-evidenced book and rides the same SwingDip ladder — naming both
-    stops a future reader assuming the exclusion is georgia-specific."""
-    assert "freqtrade-georgia-lshadow" in sweep.UNSWEEPABLE_EXITS
+    """georgia was the book that surfaced this and is RETIRED on both arms
+    since (ws); 👩 mum's OversoldRebound and 🙏 avo maria's SwingDip both
+    ride an ROI ladder — naming two living books stops a future reader
+    assuming the exclusion was georgia-specific."""
+    assert "freqtrade-mum-lshadow" in sweep.UNSWEEPABLE_EXITS
     assert "freqtrade-avo-maria-lshadow" in sweep.UNSWEEPABLE_EXITS
 
 
@@ -75,10 +76,10 @@ def test_a_fixed_stop_carrier_is_NOT_excluded():
 def test_the_reason_names_the_ladder_and_the_rule_space():
     """A declaration whose reason is vague is a snooze. It must carry the
     actual rungs and say what rule space it falls outside of."""
-    why = sweep.UNSWEEPABLE_EXITS["freqtrade-georgia-lshadow"]
+    why = sweep.UNSWEEPABLE_EXITS["freqtrade-mum-lshadow"]
     assert "ladder" in why.lower()
-    assert "1.8%" in why, why          # the real first rung, not a placeholder
-    assert "720m" in why, why          # the real last rung
+    assert "0m:2%" in why, why         # the real first rung, not a placeholder
+    assert "1440m" in why, why         # the real last rung (12h carry-bounded)
     assert "ratchet" in why.lower()
 
 

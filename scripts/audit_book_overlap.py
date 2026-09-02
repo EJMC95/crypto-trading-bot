@@ -52,11 +52,14 @@ FUNDING_BOOKS = [
     # file, so leaving it would keep a dead book contending for supply it can
     # no longer take — the (gl) phantom-rival class with a corpse in it.
     "book-kiyosaki-lshadow",             # 🏦 Rich Dad
-    "band-garrett-lshadow",              # 🛢️ Garrett (thin tier — different slice)
+    # 🛢️ band-garrett-lshadow RETIRED 2-Sep (ws) — n=85, t=-2.22, upper
+    # bound -0.455% <= 0 on its own ledger. Removed here for the (pm) reason:
+    # this list drives every rivalry count, and a corpse in it keeps
+    # contending for supply it can no longer take.
     "book-hull-lshadow",                 # 🧮 Hull ([2M,10M) x [7.8%,20%) — the
                                          # tile between Garrett and the Farmer)
-    "perps-funding-lighter-lshadow",     # 💸 Farmer shadow
-    "perps-funding-lighter-lighter",     # 💸 Farmer LIVE — real money
+    # 💸 the Farmer: LIVE arm retired 22-Aug (ta), SHADOW twin retired 2-Sep
+    # (ws) — both rows leave the rivalry counts (the (pm) reason).
     "perps-funding-spread-lshadow",      # ⚖️ Counterweight
 ]
 LIVE_BOOKS = {"perps-funding-lighter-lighter"}
@@ -282,56 +285,14 @@ KNOWN_CELL_COLLISIONS = {
     # 34.9d). Its gate now overlaps 🛢️ Garrett's band on [$1M,$2M) x >=20%
     # TRUE — a POPULATED sliver (ROBO/ENA + KAITO's excursions) — so the
     # transitive component fuses all three. DELIBERATE, priced, and NOT the
-    # (pm) shape: carry/Garrett differ in BOTH apr bar (20% vs 5%) and
-    # mechanism (delta-neutral accrual harvest vs ranked directional-funding
-    # farmer); the shared sliver is a minority of each book's supply, unlike
-    # Barnes's 0-of-9 total dependence. The cost it does carry is I20's
-    # accounting one: a coin held by both counts twice in fleet_allocation's
-    # independent claims — report_now's effective-bet line is the standing
-    # correction. OWNER: OPERATOR, same ~12-Sep decision point as the pair
-    # entry above; if Rich Dad is retired there the component drops back to
-    # the carry/Garrett pair and BOTH keys below keep matching whichever
-    # grouping the live supply produces.
-    frozenset({"perps-funding-carry-lshadow", "book-kiyosaki-lshadow",
-               "band-garrett-lshadow"}):
-        "THE CARRY CELL + THE THIN-TIER SLIVER ((px) 18-Aug). 🌾 carry at "
-        ">=20%/[>=$1M]/crypto now reaches into 🛢️ Garrett's published band "
-        "[0.1M,2M) on a populated sliver, while still sharing the >=$2M cell "
-        "with 🏦 Rich Dad — one transitive component, three books, two "
-        "different declared overlaps (see the comment above this entry and "
-        "the pair entry). Owner: OPERATOR, ~12-Sep. "
-        "[2026-08-20 (sk)] THE SLIVER IS NOW THE WHOLE BAND, and this is a "
-        "material widening of the (px) overlap rather than a restatement of "
-        "it. 🌾 carry's turnover floor became a FAST PATH: below it a coin is "
-        "admitted on MEASURED depth and payback, so carry's effective reach "
-        "runs to the bottom of 🛢️ Garrett's [0.1M, 2M) band, not just its top "
-        "[1M, 2M) slice. `living_gates` reads carry's published "
-        "`depth_admit` and models the floor as UNBOUNDED BELOW so this guard "
-        "does not understate the widened book — the inverse of the (gl) "
-        "phantom-rival class, and the worse direction, because a rival that "
-        "is real and invisible starves a sibling with nothing failing. "
-        "MEASURED at the widening, 2026-08-20: at the >=20% TRUE bar the "
-        "venue offered 20 books and 16 sat under carry's old floor; the six "
-        "that are BOTH >=20% and inside Garrett's band are UNITREE ($858k), "
-        "ZRO ($543k), KAITO ($226k), ANSEM ($181k), APEX ($179k), CXMT "
-        "($137k). WHY IT IS STILL NOT THE (lv) STARVATION SHAPE, stated so "
-        "the next reader can check rather than trust: those two books are "
-        "SEPARATE PROCESSES with separate held-sets, so neither consumes the "
-        "other's supply within a loop — the Barnes trap needed one loop, one "
-        "shared held-set and a subset gate running second. What they DO share "
-        "is I20's accounting cost, unchanged and already declared above: a "
-        "coin held by both counts twice in fleet_allocation's independent "
-        "claims. AND ONE NEW ASYMMETRY WORTH THE OPERATOR'S ATTENTION: those "
-        "six coins are the TOP of Garrett's ranked book (its own (pl) "
-        "measurement found 6 of 6 top-ranked candidates are >=20%), so carry "
-        "is now a rival for exactly the supply Garrett ranks first. That is a "
-        "RANKING collision, not a gate collision, and this file's axes "
-        "(apr x vol x class) cannot express it — declared here rather than "
-        "detected. Owner: OPERATOR, same ~12-Sep decision point.",
-    frozenset({"perps-funding-carry-lshadow", "band-garrett-lshadow"}):
-        "(px) fallback key: the carry/Garrett sliver alone, for tapes where "
-        "the >=$2M Rich Dad intersection reads empty. Same declaration as "
-        "the 3-book component above.",
+    # [2026-09-02 (ws)] THE CARRY/GARRETT COMPONENT IS GONE: 🛢️ Garrett is
+    # RETIRED (n=85, t=-2.22, upper bound -0.455% <= 0 on its own ledger),
+    # so the three-book component (carry + Rich Dad + Garrett) and the
+    # carry/Garrett sliver key both drop back to the carry/Rich Dad pair
+    # declared above — exactly the fallback that entry pre-named. The
+    # ranking-collision carried row (carry-garrett-ranking-collision) closes
+    # with it. Kept as a note so the next reader of this map knows the
+    # component existed and why it no longer needs a key.
     # [2026-08-27] ⚖️ Counterweight's scout universe widened 30 -> 40, which is
     # the FIRST width that admits any scout book at all (the configured core is
     # 30 names, so every earlier value was structurally inert — the live row

@@ -92,17 +92,18 @@ def test_named_retirements_cannot_be_nominated(review, dead):
 
 
 @pytest.mark.parametrize("alive", [
-    "freqtrade-georgia-lshadow",
-    # [2026-08-19] freqtrade-mum-lshadow was here until it was RETIRED (I17
-    # no_rate: 0 in-era closes ever, ~2.4 closes/30d). Two living subjects
-    # still exercise the trap; the semantics being guarded did not move.
-    "freqtrade-avo-maria-lshadow",   # the LIVE pair's control arm
+    # [2026-08-19] freqtrade-mum-lshadow left when mum was RETIRED (I17
+    # no_rate); [2026-09-02 (ws)] it is BACK (mum v2 revived 19-Aug (ro)) and
+    # freqtrade-georgia-lshadow left — retired on both arms. Two living
+    # subjects still exercise the trap; the semantics guarded did not move.
+    "freqtrade-mum-lshadow",         # 👩 mum's control arm
+    "freqtrade-avo-maria-lshadow",   # 🙏 avo's control arm
 ])
 def test_the_bare_name_trap_does_not_retire_a_living_book(review, alive, legacy):
     """`LEGACY_BOTS` carries Kraken-era BARE names whose -lshadow twins live.
 
-    `freqtrade-georgia` was retired 14-Jul; `freqtrade-georgia-lshadow` has 118
-    closes and is trading now. Membership must stay EXACT-match — a rewrite to
+    `freqtrade-mum` was retired 14-Jul (Kraken); `freqtrade-mum-lshadow` is
+    the revived v2 book's control arm and is trading now. Membership must stay EXACT-match — a rewrite to
     substring/prefix matching would silently retire three healthy books, one of
     them the control arm of a real-money row, and the go-live scan would go
     quiet about them with no error anywhere.

@@ -110,7 +110,9 @@ TAKER_SHADOW = os.environ.get("SHORTFALL_TAKER_SHADOW", "freqtrade-avo-maria-lsh
 # unnoticed for as long as it did. Not imported from experiment_judge on
 # purpose: that would add a heavy import (and a born-dark surface) to read one
 # string.
-XPJ_SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT", "perps-funding-lighter-lshadow")
+# [(ws)] the judge derives its default from fleet_bus.living_pair_default
+# too, so with neither env set both organs name the SAME twin by construction.
+XPJ_SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT") or _DEFAULT_SHADOW
 WINDOW_DAYS = int(os.environ.get("SHORTFALL_WINDOW_DAYS", "7"))
 MIN_COINS = int(os.environ.get("SHORTFALL_MIN_COINS", "2"))
 MIN_CLOSES = int(os.environ.get("SHORTFALL_MIN_CLOSES", "4"))

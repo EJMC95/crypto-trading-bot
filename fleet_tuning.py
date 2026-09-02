@@ -127,7 +127,15 @@ _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
                        # [2026-08-25] 👩 mum's arm, registered WITH its lever
                        # in one commit — the (tb) lesson applied forward
                        # instead of re-learned.
-                       "live.mum.": "evidence-board",
+                       # [2026-09-02 (ws)] 👩 mum's arm SPLITS by name: the
+                       # clip scale stays the board's (exact key, listed
+                       # FIRST because the first prefix match wins), and
+                       # every other live.mum.* lever — the judge-promotable
+                       # rsi_max / max_hold_min twins — is the judge's, the
+                       # sole-writer property live.funding.* has carried
+                       # since 16-Jul, now on the fleet's living pair.
+                       "live.mum.clip_scale": "evidence-board",
+                       "live.mum.": "experiment-judge",
                        "live.funding.": "experiment-judge"}
 
 
@@ -222,19 +230,35 @@ LEVERS = {
     "taker.div_gap_pp": {
         # [2026-07-17] bounds /8 with the fleet-wide funding BASIS FIX: the
         # apr these pp are measured against was 8x TRUE. Same bar, true units.
-        "kind": "float", "lo": 37.5, "hi": 87.5, "lane": "lighter-taker",
+        # [2026-09-02 (ws)] `lo` 37.5 -> 25.0 — see taker.max_hold_h: the
+        # champion-grade genotype needed gap 25, and the RESEARCH grid already
+        # scored it there. Same pre-registered revert.
+        "kind": "float", "lo": 25.0, "hi": 87.5, "lane": "lighter-taker",
         "note": "divergence conviction bar (|gap| pp >=); default 62.5", "env_default": 62.5},
     "taker.tp": {
-        "kind": "float", "lo": 0.03, "hi": 0.06, "lane": "lighter-taker",
+        # [2026-09-02 (ws)] `lo` 0.03 -> 0.02 — see taker.max_hold_h. The
+        # divergence bracket's tp; the breakout arm has no tp (999). Same
+        # pre-registered revert.
+        "kind": "float", "lo": 0.02, "hi": 0.06, "lane": "lighter-taker",
         "note": "take-profit fraction; default 0.04", "env_default": 0.04},
     "taker.sl": {
         "kind": "float", "lo": -0.04, "hi": -0.02, "lane": "lighter-taker",
         "note": "stop-loss fraction; default -0.03", "env_default": -0.03},
     "taker.max_hold_h": {
         # [2026-09-02] lo 48.0 -> 24.0: same un-pin, same evidence — see
-        # taker.brk_range directly above.
+        # taker.brk_range directly above. And (wr) SPLIT THE CLOCK the same
+        # day: `bull_exit` reads its own `BRK_MAX_HOLD_H`, so this lever now
+        # times the DIVERGENCE bracket alone — the lens the tuner's replay can
+        # fill. [(ws)] The incubator's only champion-grade genotype sits at
+        # 24h (sl -0.02 / gap 25 / tp 0.02: n=189, lcb +$3.21, halves
+        # +$10.27/+$10.79) and was out of cage on this bound and two others
+        # (div_gap_pp, tp — moved with it). PRE-REGISTERED REVERT (I26): if
+        # that genotype's fresh replay lcb reads <= 0 over the 14 days after
+        # the widening, or the realised divergence record at any enacted 24h
+        # bar reads worse than at 48h on n >= 20 closes, `lo` returns to 48.
         "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
-        "note": "max hold hours; default 48", "env_default": 48.0},
+        "note": "max hold hours (DIVERGENCE bracket only since (wr)); default 48",
+        "env_default": 48.0},
     # [2026-08-20 (sk)] THE RESTRICTIVE END OF EVERY BREAKOUTUP CAGE IS NOW
     # PINNED AT THE MODULE DEFAULT, because the actuator that moves these is
     # STRUCTURALLY BLIND to the lens they govern.
@@ -409,6 +433,35 @@ LEVERS = {
         "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
         "note": "👩 mum live clip multiplier, restrict-only; 1.0 = equity/slots",
         "env_default": 1.0},
+    # [2026-09-02 (ws)] 👩 MUM'S EXPERIMENT/PROMOTION PAIR — the judge's lane
+    # moves to the fleet's living real-money pair. Eamon: "Proceed with
+    # everything in the organ review" (the review found the judge had NO
+    # pair it could open and the incubator's funding line targeting a lane
+    # retired 22-Aug). Two knobs, both MEASURED on her own ledger:
+    #   rsi_max      — the entry bar (rsi < RSI_MAX). 36 shipped; 32 is the
+    #                  measured peak by two independent studies ((tr)); the
+    #                  cage [28, 38] spans the cells STUDY_MUM_SUPPLY graded.
+    #   max_hold_min — the carry-bounded time cap. 1440 (24h) is the measured
+    #                  plateau interior; [720, 2880] is the graded band.
+    # The xp.* twin steers ONLY her SHADOW arm (zero real money); the live.*
+    # twin is written ONLY by the judge after the paired bar (>=7d, >=30
+    # shadow closes, live >=10, beats live by >=0.5pp AND both halves).
+    "xp.mum.rsi_max": {
+        "kind": "float", "lo": 28.0, "hi": 38.0, "lane": "lighter-xp",
+        "note": "👩 mum shadow twin's RSI entry bar; env default 36 (MUM_RSI_MAX)",
+        "env_default": 36.0},
+    "xp.mum.max_hold_min": {
+        "kind": "float", "lo": 720.0, "hi": 2880.0, "lane": "lighter-xp",
+        "note": "👩 mum shadow twin's max hold (minutes); env default 1440",
+        "env_default": 1440.0},
+    "live.mum.rsi_max": {
+        "kind": "float", "lo": 28.0, "hi": 38.0, "lane": "lighter-live",
+        "note": "👩 mum LIVE RSI entry bar — judge-promoted only; env default 36",
+        "env_default": 36.0},
+    "live.mum.max_hold_min": {
+        "kind": "float", "lo": 720.0, "hi": 2880.0, "lane": "lighter-live",
+        "note": "👩 mum LIVE max hold (minutes) — judge-promoted only; default 1440",
+        "env_default": 1440.0},
     # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
     # money). The experiment judge runs ONE candidate at a time here; while
     # a candidate runs, the twin is an experiment arm, not a control arm.

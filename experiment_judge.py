@@ -74,8 +74,21 @@ except Exception:  # noqa: BLE001
 KEY = "xp-judge"
 TTL_SEC = int(os.environ.get("XPJ_TTL_SEC", "10800"))
 LEVER_TTL = int(os.environ.get("XPJ_LEVER_TTL", "7800"))      # ~2h re-assert
-SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT", "perps-funding-lighter-lshadow")
-LIVE_BOT = os.environ.get("XPJ_LIVE_BOT", "perps-funding-lighter-lighter")
+# [2026-09-02 (ws)] THE SERIAL LANE FOLLOWS THE LIVING PAIR. These were
+# literals naming 💸 the Farmer's arms, retired 22-Aug — so the fleet's only
+# path from a shadow candidate to real money stood down for 11 days while
+# 👩 mum traded real money with no judge. fleet_bus.living_pair_default is the
+# ONE owner (the shortfall organ reads the same one), env still wins.
+def _default_pair():
+    try:
+        return _bus.living_pair_default()
+    except Exception:  # noqa: BLE001
+        return ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow")
+
+
+_DEF_LIVE, _DEF_SHADOW = _default_pair()
+SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT") or _DEF_SHADOW
+LIVE_BOT = os.environ.get("XPJ_LIVE_BOT") or _DEF_LIVE
 MIN_DAYS = float(os.environ.get("XPJ_MIN_DAYS", "7"))
 MAX_DAYS = float(os.environ.get("XPJ_MAX_DAYS", "14"))
 # [2026-07-17 IMB-07] the done-list AGES: a finite candidate universe (3
@@ -119,7 +132,7 @@ def half_floors(min_closes=None, live_min=None):
 
 
 # One candidate at a time, in order.
-CANDIDATES = [
+FARMER_CANDIDATES = [
     # [2026-07-21 REVIEW D2] the gate WIDENING (11-Jul "opt-in, shadow-validate",
     # re-denominated 17-Jul to enter-gate-0.0375) is DROPPED from the queue:
     # scripts/backtest_funding_lighter.py measured the 0.03-0.08 TRUE region as
@@ -399,7 +412,48 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               # [2026-08-05 (jy)] gap 1 of the (ju) QUEUE NOTE: without
               # this mapping a running min_vol spec would _needs_reset as
               # invalid state and promotion could not name its live twin
-              "xp.funding.min_vol": "live.funding.min_vol"}
+              "xp.funding.min_vol": "live.funding.min_vol",
+              # [(ws)] 👩 mum's lane — the live twins are judge-owned by
+              # fleet_tuning's prefix map; the board keeps her clip scale.
+              "xp.mum.rsi_max": "live.mum.rsi_max",
+              "xp.mum.max_hold_min": "live.mum.max_hold_min"}
+
+# [2026-09-02 (ws)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
+# order. The incubator's funding genes are the Farmer's and cannot breed
+# these (its offspring are refused by lane prefix in candidate_pool), so this
+# list is the whole queue until a family-gene incubator exists.
+#   rsi-32     — (tr): 32 is the measured peak by two independent studies
+#                (STUDY_MUM_SUPPLY: bracket +0.104%/t, t=2.38, both halves),
+#                36 shipped as "she doesn't miss anything too good".
+#   hold-720   — the plateau's tighter edge (12h): the (ro) carry-tax
+#                argument taken one step further.
+#   hold-2880  — the wider edge (48h): more of the roi ladder's tail.
+MUM_CANDIDATES = [
+    {"name": "mum-rsi-32", "levers": {"xp.mum.rsi_max": 32.0}},
+    {"name": "mum-hold-720", "levers": {"xp.mum.max_hold_min": 720.0}},
+    {"name": "mum-hold-2880", "levers": {"xp.mum.max_hold_min": 2880.0}},
+]
+LANE_CANDIDATES = {"farmer": FARMER_CANDIDATES, "mum": MUM_CANDIDATES}
+
+
+def _lane_of(live_bot):
+    """The declared pair whose live arm is `live_bot` (inline; serial_lane_id
+    below is the same lookup and is used everywhere after import)."""
+    for pid, ps in (getattr(_bus, "JUDGED_PAIRS", {}) or {}).items():
+        if isinstance(ps, dict) and ps.get("live_bot") == live_bot:
+            return pid
+    return None
+
+
+def lane_prefix(live_bot=None):
+    """The xp.* prefix of the machine's lane — candidate_pool admits queue
+    proposals ONLY under it, so a Farmer offspring cannot land on mum."""
+    ps = (getattr(_bus, "JUDGED_PAIRS", {}) or {}).get(_lane_of(live_bot or LIVE_BOT)) or {}
+    return str(ps.get("xp_prefix") or "xp.funding.")
+
+
+#: the CURRENT lane's queue (the name every existing consumer reads)
+CANDIDATES = list(LANE_CANDIDATES.get(_lane_of(LIVE_BOT), []))
 
 
 def now_ts():
@@ -865,7 +919,12 @@ LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      # construction. Selftest pins XP_TO_LIVE's live twins
                      # to THIS map — a promotable lever with no organ
                      # release path can no longer arrive silently.
-                     "live.funding.min_vol": (10000000.0, "up")}
+                     "live.funding.min_vol": (10000000.0, "up"),
+                     # [(ws)] 👩 mum's twins: a LOWER rsi bar admits fewer
+                     # entries (tighter = down); a SHORTER hold is tighter
+                     # (down). Env defaults from lighter_family_bot's class.
+                     "live.mum.rsi_max": (36.0, "down"),
+                     "live.mum.max_hold_min": (1440.0, "down")}
 
 
 def proposal_fade(proposals, live_levers, now):
@@ -1011,7 +1070,10 @@ def candidate_pool(queue, now=None):
         nm, lv = c.get("name"), c.get("levers") or {}
         if not nm or nm in seen:
             continue
-        if lv and all(k in XP_TO_LIVE for k in lv):
+        # [(ws)] and ONLY this lane's prefix — a funding offspring in the
+        # queue must not burn a serial slot on 👩 mum's lane.
+        _pfx = lane_prefix()
+        if lv and all(k in XP_TO_LIVE and str(k).startswith(_pfx) for k in lv):
             sig = _lever_sig(lv)
             if sig in sigs:
                 continue          # same experiment, different label
@@ -2912,6 +2974,29 @@ def run_once():
 # ---------------------------------------------------------------------------
 
 def _selftest():
+    """[(ws)] The body below was written when 💸 the Farmer's pair WAS the
+    machine's default lane; the default is DERIVED now (mum today). Aim the
+    machine at the Farmer for the duration so every existing assertion keeps
+    testing the property it was written for, then assert the derived lane's
+    own properties once the globals are restored."""
+    global LIVE_BOT, SHADOW_BOT, CANDIDATES
+    _save = (LIVE_BOT, SHADOW_BOT, CANDIDATES)
+    LIVE_BOT, SHADOW_BOT = "perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"
+    CANDIDATES = list(FARMER_CANDIDATES)
+    try:
+        _selftest_body()
+    finally:
+        LIVE_BOT, SHADOW_BOT, CANDIDATES = _save
+    # the derived lane: the living pair, its own candidates, its own prefix
+    _lane = serial_lane_id()
+    assert _lane == _lane_of(LIVE_BOT) and _lane in LANE_CANDIDATES, _lane
+    assert CANDIDATES == list(LANE_CANDIDATES[_lane]), _lane
+    for _c in CANDIDATES:
+        assert all(str(_k).startswith(lane_prefix()) for _k in _c["levers"]), _c
+    print(f"  derived lane {_lane}: {len(CANDIDATES)} candidates under {lane_prefix()}")
+
+
+def _selftest_body():
     def row(bot, ts, pct):
         return {"bot": bot, "profit_ratio": pct, "close_ts": iso(ts)}
 
@@ -3048,6 +3133,14 @@ def _selftest():
     assert _mm and _mm.group(1) == "on", \
         "FUNDING_SLOPE_GATE source default changed — re-derive slope_gate"
     _src_def["live.funding.slope_gate"] = 1.0
+    # [(ws)] 👩 mum's twins pin to lighter_family_bot's OWN class defaults
+    _fam_src = _pl.Path(__file__).with_name("lighter_family_bot.py").read_text()
+    _mm = _re.search(r'MUM_RSI_MAX"\s*,\s*"([0-9.]+)"', _fam_src)
+    assert _mm, "could not read MUM_RSI_MAX default from lighter_family_bot.py"
+    _src_def["live.mum.rsi_max"] = float(_mm.group(1))
+    _mm = _re.search(r'MAX_HOLD_MIN = (\d+)\s+# 24h', _fam_src)
+    assert _mm, "could not read OversoldRebound.MAX_HOLD_MIN from lighter_family_bot.py"
+    _src_def["live.mum.max_hold_min"] = float(_mm.group(1))
     for _key, (_v, _dir) in LIVE_ENV_DEFAULTS.items():
         assert _src_def[_key] == _v, (
             f"LIVE_ENV_DEFAULTS[{_key}]={_v} has DRIFTED from the funding bot's "
@@ -3075,14 +3168,37 @@ def _selftest():
     _stamp_src = _al_src[_al_src.index("_ACTIVE_BARS.update"):]
     _es_src = _fb_src.split("def entry_stamp", 1)[1].split("\ndef ", 1)[0]
     _es_bars_src = _es_src[_es_src.index('"bars": {'):]
+    # [(ws)] the receipt guard is PER LANE: funding keys against the Farmer
+    # host's two stamp sites, mum keys against lighter_family_bot.mum_bars
+    # (the ONE stamp both her hosts write) and apply_book_levers (the
+    # consumer) — a consumed-but-unreceipted lever is the zero-accrual class.
+    _mb_src = _fam_src.split("def mum_bars", 1)[1].split("\ndef ", 1)[0]
+    # the consumer reads its bars through MUM_LEVER_ATTRS, declared just
+    # above the function — the declaration + the body are the consumer
+    _ab_src = _fam_src.split("MUM_LEVER_ATTRS = ", 1)[1].split("def mum_bars", 1)[0]
     for _xk in XP_TO_LIVE:
         _bar = _xk.split(".")[-1]
+        if _xk.startswith("xp.mum."):
+            assert f'"{_bar}":' in _mb_src, (
+                f"lighter_family_bot.mum_bars stamps no {_bar} receipt — a "
+                f"{_bar} judge candidate on mum would accrue ZERO closes")
+            assert f'"{_bar}"' in _ab_src, (
+                f"apply_book_levers does not read {_bar} — registered-but-inert")
+            continue
         assert f'"{_bar}":' in _stamp_src, (
             f"apply_levers stamps no bars.{_bar} receipt — a {_bar} judge "
             f"candidate would accrue ZERO closes (ran_candidate fails closed)")
         assert f'"{_bar}":' in _es_bars_src, (
             f"entry_stamp carries no {_bar} — a mid-hold lever expiry would "
             f"rewrite the admission-time receipt (the (ed) rule)")
+    # every lane's candidates are registered, in-bounds, and map to a live twin
+    for _lane_cands in LANE_CANDIDATES.values():
+        for c in _lane_cands:
+            for k, v in c["levers"].items():
+                assert tuning.clamp(k, v) == v, (k, v)
+                assert tuning.clamp(XP_TO_LIVE[k], v) == v, (XP_TO_LIVE[k], v)
+    assert lane_prefix("freqtrade-mum-lighter") == "xp.mum."
+    assert lane_prefix("perps-funding-lighter-lighter") == "xp.funding."
 
     # every candidate's levers are registered, in-bounds, and map to a live twin
     for c in CANDIDATES:

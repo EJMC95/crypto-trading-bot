@@ -320,13 +320,15 @@ def test_fetch_rows_variant_passes_while_its_retired_base_row_stays_out(monkeypa
     # [2026-08-19] and mum is now retired too (I17 no_rate), so it moves ONE
     # MORE TIME, to georgia: the fixture must be a book whose -lshadow twin is
     # ALIVE, or it stops testing the double life it exists for.
-    assert "freqtrade-georgia" in pd.CURRENT_BOTS
-    assert "freqtrade-georgia" in pd.RETIRED_ROWS
-    db_rows = [{"bot": "freqtrade-georgia-lshadow", "equity": 1000.0},
-               {"bot": "freqtrade-georgia", "equity": 1000.0}]
+    # [2026-09-02 (ws)] and BACK to mum: georgia's shadow retired (both arms),
+    # mum v2 was revived 19-Aug (ro) so her -lshadow twin is alive again.
+    assert "freqtrade-mum" in pd.CURRENT_BOTS
+    assert "freqtrade-mum" in pd.RETIRED_ROWS
+    db_rows = [{"bot": "freqtrade-mum-lshadow", "equity": 1000.0},
+               {"bot": "freqtrade-mum", "equity": 1000.0}]
     _install_fake_psycopg2(monkeypatch, db_rows)
     out = pd.fetch_rows(hidden=set())
-    assert "freqtrade-georgia-lshadow" in out    # variant of a current base
+    assert "freqtrade-mum-lshadow" in out        # variant of a current base
     assert "crypto-intraday-15m" not in out        # retired paper row stays gone
 
 

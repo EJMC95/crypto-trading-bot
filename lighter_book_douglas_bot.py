@@ -544,6 +544,28 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
+    # ---- RETIRED 2026-09-02 (ws): the I17 keep-or-retire call, made on the
+    # decision docket's own verdict — Eamon: "Proceed with everything in the
+    # organ review" (2-Sep), on the review's recommendation. Measured on this
+    # book's OWN ledger at the grader: n=81, mean -0.725%/trade, t=-2.54,
+    # halves -14.37/-34.86, upper bound (m+1.28*SE) -0.357% <= 0 — the
+    # sample has EXCLUDED a positive mean, so more of the same closes cannot
+    # flip it (I17-as-amended's bar for retirement, not a thin sample). The
+    # founding replay read t=0.50 with h1 NEGATIVE ((nt)); the record agrees
+    # with the replay and is senior to it (I14). Zero open positions, so
+    # nothing freezes. Own module + own service, so the whole process IDLES
+    # (the 🌊/📊/🧙/🎸 shape) — never sys.exit, which restartPolicy=always
+    # turns into a crash-loop. Ledgers kept. DOUGLAS_RETIRED_OVERRIDE=run.
+    if os.environ.get("DOUGLAS_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("book-douglas (🧘 The Zone) is RETIRED (2-Sep (ws)): n=81, "
+              "-0.725%/trade, t=-2.54, upper bound -0.357% <= 0 — the sample "
+              "excluded a positive mean (I17). Idling: no venue calls, no "
+              "publishes, ledgers kept. DOUGLAS_RETIRED_OVERRIDE=run to "
+              "resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if _mode != "lighter_shadow":
         raise SystemExit(

@@ -722,6 +722,27 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
+    # ---- RETIRED 2026-09-02 (ws): the I17 keep-or-retire call on a book
+    # with ZERO closes in 19 days — Eamon: "Proceed with everything in the
+    # organ review" (2-Sep). The gate never opened on the fixed universe
+    # (last scorecard: keltner n=123 t=-0.16, failtest n=373 t=-1.43,
+    # pullback n=140 t=-0.82, all CLOSED); a gate that stays shut is a
+    # STUDY, not a book (I22), and the founding claim — none of twelve
+    # variants beat random entries — still governs. The scorecard survives
+    # as an instrument: `scripts/study_grimes_gate_2026-08-16.py` replays
+    # the same roster on demand, so the call stays falsifiable without a
+    # row, a clock or a slot of the fleet budget. Own module + own service:
+    # the process IDLES, never exits. GRIMES_RETIRED_OVERRIDE=run.
+    if os.environ.get("GRIMES_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("book-grimes (📐 The Technician) is RETIRED (2-Sep (ws)): 0 "
+              "closes in 19 days, every setup's gate closed on the fixed "
+              "universe — a study, not a book (I22). Idling: no venue calls, "
+              "no publishes, ledgers kept. GRIMES_RETIRED_OVERRIDE=run to "
+              "resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if _mode != "lighter_shadow":
         raise SystemExit(

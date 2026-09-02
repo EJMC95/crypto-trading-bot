@@ -68,7 +68,9 @@ RETIRED_LIVE_ARMS = {
         "why": "horizon `unreachable` on BOTH arms at the fleet's own grader "
                "(live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65; "
                "shadow n=161 mean -0.195% t=-0.95 halves +5.71/-18.32). "
-               "The shadow twin keeps trading as the control arm.",
+               "The shadow twin kept trading as the control arm until "
+               "2-Sep (ws), when the judge's lane moved to mum and the twin "
+               "retired on its own record (n=200, t=-2.32, ub -0.233%).",
     },
     "freqtrade-georgia-lighter": {
         "since": "2026-09-02",
@@ -83,7 +85,7 @@ RETIRED_LIVE_ARMS = {
                "t=-1.58 unreachable), so this is I17 keep-or-decide, not a "
                "tuning pass. Her ~$220 sub-account frees for mum, the fleet's "
                "only live book with a positive edge lower bound (+0.366%/trade). "
-               "The shadow twin (freqtrade-georgia-lshadow) keeps trading as "
+               "The shadow twin (freqtrade-georgia-lshadow) kept trading as "
                "the control arm. Reversible via GEORGIA_LIVE_RETIRED_OVERRIDE "
                "on BOTH the trail-blazer-live host and the judge (freqtrade-bots).",
     },
@@ -311,6 +313,12 @@ JUDGED_PAIRS = {
 }
 
 
+#: [(ws)] preference among LIVING judged pairs when the feed cannot rank
+#: them by closes: 👩 mum (n=53 live closes, the fleet's one proven edge)
+#: before 🙏 avo (n=11). A retired arm is filtered BEFORE this is consulted.
+PAIR_PRIORITY = ("mum", "avo")
+
+
 def active_price_pairs():
     """[2026-09-02 (wp)] The judged pairs whose LIVE arm is still trading —
     derived from JUDGED_PAIRS + RETIRED_LIVE_ARMS, never a typed list, so a
@@ -329,6 +337,15 @@ def active_price_pairs():
     return out
 
 
+def living_pair_default():
+    """[2026-09-02 (ws)] (live_bot, shadow_bot) — THE LIVING PAIR every organ
+    that pairs a live arm with its shadow twin defaults to: the 🧪 judge's
+    serial lane, the 📏 shortfall organ, and their collision check. One owner,
+    so the judge and the shortfall organ cannot disagree about which twin is
+    the experiment arm (the (uk) drift class). See shortfall_default_pair."""
+    return shortfall_default_pair()
+
+
 def shortfall_default_pair():
     """[(wp)] (live_bot, shadow_bot) implementation_shortfall measures when
     SHORTFALL_LIVE/SHORTFALL_SHADOW are unset. Was a literal naming 💸 the
@@ -340,13 +357,22 @@ def shortfall_default_pair():
     pairs = active_price_pairs()
     if not pairs:
         return ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow")
-    best = pairs[0]
+    # [(ws)] on a DARK feed (offline selftests, a DB blip) the choice must
+    # still be deterministic and must still be the pair with the evidence:
+    # PAIR_PRIORITY orders the LIVING pairs (a retired arm never appears —
+    # active_price_pairs filters it), so this is a preference, not a roster.
+    best = next((p for pid in PAIR_PRIORITY for p in pairs if p[0] == pid),
+                pairs[0])
     try:
         import bot_pnl_store as _store
         rows = {r.get("bot"): r for r in (_store.fetch_bot_pnl() or [])}
-        best = max(pairs, key=lambda p: int(
-            (rows.get(p[1]) or {}).get("closed_trades") or 0))
-    except Exception:  # noqa: BLE001 — a dark feed keeps registry order
+        counts = {p[0]: int((rows.get(p[1]) or {}).get("closed_trades") or 0)
+                  for p in pairs}
+        # evidence decides only when there IS evidence; an offline/empty feed
+        # (every count 0) keeps the priority pick rather than the first row
+        if max(counts.values()) > 0:
+            best = max(pairs, key=lambda p: counts[p[0]])
+    except Exception:  # noqa: BLE001 — a dark feed keeps the priority pick
         pass
     return (best[1], best[2])
 
