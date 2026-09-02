@@ -65,6 +65,9 @@ sys.path.insert(0, HERE)
 MIN_N = 40
 #: Hot-window length for the no-change control.
 K = 15
+#: [2026-09-02] a window size with fewer hot windows than this cannot grade the
+#: grader's margin -- the collapse's standard error is what the grade is made of
+MIN_WINDOWS = 20
 
 
 def _conn():
@@ -113,6 +116,130 @@ def ledger():
           f"{len(set(r[0] for r in out))} books"
           f"{f'  ({dropped} unparseable timestamps dropped)' if dropped else ''}")
     return out
+
+
+def _grader():
+    """The grader module, loaded by path (the ONE owner of `parse_stamp`)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "gl", os.path.join(HERE, "golive_readiness.py"))
+    gl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gl)
+    return gl
+
+
+def load_ledger_file(path):
+    """[(bot, closed_ts, pnl_pct)] from a `/trades.json?source=paper` dump.
+
+    [2026-09-02 -- Eamon: "Calibrate accordingly"] The sandbox that re-measures
+    this has no DATABASE_URL; the public feed carries the same rows the SQL in
+    `ledger()` reads (`bot`, `closed_at`, `pnl_pct`), parsed through the same
+    `parse_stamp`. NEITHER path applies `LEDGER_QUARANTINE` -- the study
+    measures the tide on the raw ledger, as it did on 27-Aug, and says so. A
+    `?limit=` count equal to the cap is a truncation ((qz)): read the printed
+    count before believing it.
+    """
+    import json
+    gl = _grader()
+    with open(path, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    rows = raw.get("trades") if isinstance(raw, dict) else raw
+    out, dropped = [], 0
+    for r in rows or []:
+        if not isinstance(r, dict) or r.get("pnl_pct") is None or not r.get("closed_at"):
+            continue
+        try:
+            ts = gl.parse_stamp(r["closed_at"])
+        except (ValueError, TypeError):      # a junk stamp is DROPPED and counted, never a crash
+            ts = None
+        if ts is None:
+            dropped += 1
+            continue
+        if isinstance(ts, dt.datetime):
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=dt.timezone.utc)
+            ts = ts.timestamp()
+        out.append((r["bot"], float(ts), float(r["pnl_pct"])))
+    out.sort(key=lambda r: r[1])
+    print(f"ledger file: {len(out):,} closes across "
+          f"{len(set(r[0] for r in out))} books"
+          f"{f'  ({dropped} unparseable timestamps dropped)' if dropped else ''}")
+    return out
+
+
+def hot_collapse(books, k):
+    """(mean_pp, se_pp, n_windows): window mean MINUS next-window mean over
+    every non-overlapping k-close window whose mean beats the book's own --
+    the reversion `peak_arm` prints, as ONE number with its standard error.
+    The same windows as `peak_arm`, by construction: one owner of "hot"."""
+    col = []
+    for _bot, v in books.items():
+        ys = [p for _t, p in v]
+        bm = st.mean(ys)
+        for i in range(0, len(ys) - 2 * k, k):
+            w = ys[i:i + k]
+            nxt = ys[i + k:i + 2 * k]
+            if len(nxt) < k:
+                break
+            if st.mean(w) > bm:
+                col.append((st.mean(w) - st.mean(nxt)) * 100.0)
+    if len(col) < 2:
+        return None, None, len(col)
+    return st.mean(col), st.stdev(col) / math.sqrt(len(col)), len(col)
+
+
+def margin_arm(books, margin=None, ks=None):
+    """[2026-09-02 -- Eamon: "Calibrate accordingly"] GRADE THE GRADER'S CONSTANT.
+
+    `fleet_proprioception.LIVE_PRE_MARGIN_PP` is the margin the live lane
+    applies to a change judged against its own PRE-WINDOW (I25: the window
+    that motivated a change is selected on an extreme, so the next window
+    reverts by this much with or without the change). The constant must be the
+    MEASURED reversion, so this arm measures it at the grader's own baseline
+    floor (`LIVE_BASE_MIN_N`), at this study's K, and at two wider windows,
+    and says whether the constant sits INSIDE every 95% band or has DRIFTED
+    out of one. Returns {"k": {K: {"collapse_pp", "se_pp", "n", "inside"}},
+    "margin_pp", "verdict"}; `verdict` is INSIDE, DRIFT, or THIN (no window
+    size had `MIN_WINDOWS` hot windows, so nothing was graded).
+
+    Measured 2-Sep on 3,801 closes / 26 books: K=10 +1.74 (SE 0.50), K=15
+    +1.52 (0.47), K=20 +1.60 (0.46), K=30 +1.67 (0.58) -- 1.7 inside every
+    band, so the constant stood.
+    """
+    sys.path.insert(0, os.path.dirname(HERE))
+    import fleet_proprioception as fp                 # noqa: PLC0415
+    if margin is None:
+        margin = fp.LIVE_PRE_MARGIN_PP
+    if ks is None:
+        ks = sorted({fp.LIVE_BASE_MIN_N, K, 20, 30})
+    print(f"\n=== ARM 4 — IS THE GRADER'S PRE-WINDOW MARGIN THE MEASURED "
+          f"REVERSION? ===\n  LIVE_PRE_MARGIN_PP = {margin:.2f} pp; the collapse "
+          f"is window mean minus next-window mean, hot windows only")
+    out, graded, drift = {}, 0, False
+    for k in ks:
+        m, se, n = hot_collapse(books, k)
+        if m is None or n < MIN_WINDOWS:
+            out[k] = {"collapse_pp": m, "se_pp": se, "n": n, "inside": None}
+            print(f"  K={k:>2}: {n} hot windows -- too few to grade "
+                  f"(need {MIN_WINDOWS})")
+            continue
+        lo, hi = m - 2 * se, m + 2 * se
+        inside = lo <= margin <= hi
+        graded += 1
+        drift = drift or not inside
+        out[k] = {"collapse_pp": m, "se_pp": se, "n": n, "inside": inside}
+        print(f"  K={k:>2}{' (grader floor)' if k == fp.LIVE_BASE_MIN_N else '':15s}"
+              f" collapse {m:+.3f} pp  SE {se:.3f}  n={n:>4}  "
+              f"95% band [{lo:+.2f}, {hi:+.2f}]  -> margin "
+              f"{'inside' if inside else 'DRIFT'}")
+    verdict = "DRIFT" if drift else ("INSIDE" if graded else "THIN")
+    print(f"  VERDICT: {verdict}"
+          + {"DRIFT": " -- re-derive the constant from the band above and record "
+                      "it in place (I12); never move it to a point estimate with "
+                      "a 0.5pp SE",
+             "THIN": " -- not enough hot windows to grade",
+             "INSIDE": " -- the constant is the measurement"}[verdict])
+    return {"k": out, "margin_pp": margin, "verdict": verdict}
 
 
 def by_book(rows):
@@ -258,12 +385,18 @@ def main():
     ap.add_argument("--age", action="store_true")
     ap.add_argument("--peak", action="store_true")
     ap.add_argument("--select", action="store_true")
+    ap.add_argument("--margin", action="store_true",
+                    help="grade fleet_proprioception.LIVE_PRE_MARGIN_PP against "
+                         "the measured hot-window collapse (exit 2 on DRIFT)")
+    ap.add_argument("--ledger", metavar="FILE",
+                    help="a /trades.json?source=paper dump to read instead of "
+                         "the DB (the sandbox has no DATABASE_URL)")
     ap.add_argument("-k", type=int, default=K)
     a = ap.parse_args()
-    if not (a.age or a.peak or a.select):
-        a.age = a.peak = a.select = True
+    if not (a.age or a.peak or a.select or a.margin):
+        a.age = a.peak = a.select = a.margin = True
 
-    rows = ledger()
+    rows = load_ledger_file(a.ledger) if a.ledger else ledger()
     if not rows and not a.select:
         return 1
     books = by_book(rows) if rows else {}
@@ -274,7 +407,10 @@ def main():
         peak_arm(books, a.k)
     if a.select:
         select_arm()
-    return 0
+    rc = 0
+    if a.margin and books:
+        rc = 2 if margin_arm(books)["verdict"] == "DRIFT" else 0
+    return rc
 
 
 if __name__ == "__main__":

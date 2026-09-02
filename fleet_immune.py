@@ -226,7 +226,20 @@ DUP_WRITER_CLOSED_H = float(os.environ.get("IMMUNE_DUP_CLOSED_H", "6"))
 # carrying a 0.49 payoff, break-even 67%. Judged against the book's own
 # payoff, never a bare win-rate bar (I15). Live rows only: a page on every
 # shadow book's streak would train Eamon to ignore the pager ((gl)).
-SHAPE_HIT_MARGIN_PP = float(os.environ.get("IMMUNE_SHAPE_HIT_MARGIN_PP", "5.0"))
+#: [2026-09-02, calibrated -- Eamon: "Calibrate accordingly"] the shape
+#: monitor's break-even test is in SAMPLING-NOISE units, not points: it fires
+#: when the grader's `hit_margin_z` (standard errors the trailing hit rate
+#: sits above the book's own break-even) is at or below the grader's
+#: `hit_margin_crit` -- the fleet's own claim bar for that n
+#: (`fleet_allocation.t_crit`: 1.31 at n=30, floor 1.28). It shipped hours
+#: earlier as "within 5pp", a round number that was payoff-dependent (0.58 SE
+#: at mum's payoff, 0.68 SE at avo's) and QUIET on a 30-trade window sitting
+#: 9pp above break-even -- inside noise, i.e. a window that no longer shows
+#: PF > 1. Both numbers are READ off the grader's payload, never re-derived
+#: here ((hj)); a payload without them is quiet, not a page. Cost, stated:
+#: for a book at mum's current z (+2.0) roughly one 30-trade window in four
+#: reads below the bar by chance -- a page is "look at the twin" (I25), never
+#: a verdict, and the dedup ledger pages a persisting condition once.
 SHAPE_MIN_N = int(os.environ.get("IMMUNE_SHAPE_MIN_N", "30"))
 
 
@@ -475,16 +488,20 @@ def organ_invariants(states, now):
             # off the grader's own `shape` block (never re-derived here).
             _sh = _b.get("shape")
             if isinstance(_sh, dict) and str(_bot).endswith("-lighter"):
-                _hm, _nt = _sh.get("hit_margin_pp"), _sh.get("n_trailing")
-                if (isinstance(_hm, (int, float)) and isinstance(_nt, int)
-                        and _nt >= SHAPE_MIN_N and _hm <= SHAPE_HIT_MARGIN_PP):
+                _hz, _hc = _sh.get("hit_margin_z"), _sh.get("hit_margin_crit")
+                _nt = _sh.get("n_trailing")
+                if (isinstance(_hz, (int, float)) and isinstance(_hc, (int, float))
+                        and isinstance(_nt, int) and _nt >= SHAPE_MIN_N and _hz <= _hc):
                     sick("golive-readiness",
                          f"{_bot}: trailing-{_nt} hit rate "
-                         f"{_sh.get('hit_trailing_pct')}% is within {_hm}pp of its "
-                         f"own break-even {_sh.get('breakeven_hit_pct')}% (payoff "
-                         f"{_sh.get('payoff')}, avg win ${_sh.get('avg_win_usd')} vs "
-                         f"avg loss ${_sh.get('avg_loss_usd')}) -- PF < 1 if the hit "
-                         f"rate reverts; watch the SHAPE, not the P&L")
+                         f"{_sh.get('hit_trailing_pct')}% is z={_hz:+.2f} SE from its "
+                         f"own break-even {_sh.get('breakeven_hit_pct')}% "
+                         f"({_sh.get('hit_margin_pp')}pp), below the fleet's claim "
+                         f"bar {_hc:.2f} at n={_nt} (payoff {_sh.get('payoff')}, avg "
+                         f"win ${_sh.get('avg_win_usd')} vs avg loss "
+                         f"${_sh.get('avg_loss_usd')}) -- the last {_nt} closes no "
+                         f"longer show PF > 1 beyond sampling noise; watch the "
+                         f"SHAPE, not the P&L, and check the twin (I25)")
                 _sn, _sp = _sh.get("streak_now"), _sh.get("streak_p95_chance")
                 if isinstance(_sn, int) and isinstance(_sp, int) and _sn > _sp:
                     sick("golive-readiness",
@@ -1497,27 +1514,39 @@ def _selftest():
     # silent on a comfortable live book, on any shadow book, and on a thin
     # trailing window -- a detector that flags everything trains the operator
     # to ignore it.
+    # z at be=66.9%, n=30 (SE 8.6pp): 80% -> +1.52, 70% -> +0.36, 76.7% -> +1.14
     _shape_ok = {"hit_pct": 83.0, "hit_trailing_pct": 80.0, "n_trailing": 30,
                  "avg_win_usd": 3.65, "avg_loss_usd": 7.39, "payoff": 0.494,
                  "breakeven_hit_pct": 66.9, "hit_margin_pp": 13.1,
+                 "hit_margin_z": 1.52, "hit_margin_crit": 1.311,
                  "streak_now": 1, "streak_max": 3, "streak_p50_chance": 2,
                  "streak_p95_chance": 4}
-    _shape_near = dict(_shape_ok, hit_trailing_pct=70.0, hit_margin_pp=3.1)
+    _shape_near = dict(_shape_ok, hit_trailing_pct=70.0, hit_margin_pp=3.1, hit_margin_z=0.36)
+    # [2026-09-02, calibrated] 23 of 30: 9.8pp above break-even -- a POINTS
+    # threshold of 5pp stayed quiet here; in noise units it is 1.14 SE, below
+    # the fleet's claim bar for n=30, so the window no longer shows PF > 1
+    _shape_noise = dict(_shape_ok, hit_trailing_pct=76.7, hit_margin_pp=9.8, hit_margin_z=1.14)
     _shape_streak = dict(_shape_ok, streak_now=5)
     _shape_thin = dict(_shape_near, n_trailing=12)
+    _shape_nocrit = dict(_shape_near, hit_margin_crit=None)   # fail-quiet, never re-derived
     _sh_inv = organ_invariants({"golive-readiness": {
         "updated": fresh, "ttl_sec": 86400, "books": {
             "freqtrade-mum-lighter": {"n": 52, "shape": _shape_near},
+            "fixture-noise-lighter": {"n": 45, "shape": _shape_noise},
             "freqtrade-avo-maria-lighter": {"n": 40, "shape": _shape_ok},
             "freqtrade-mum-lshadow": {"n": 49, "shape": _shape_near},
             "lighter-ticket-taker-lighter": {"n": 57, "shape": _shape_streak},
             "band-kelly-lighter": {"n": 60, "shape": _shape_thin},
+            "fixture-nocrit-lighter": {"n": 45, "shape": _shape_nocrit},
             "no-shape-lighter": {"n": 12}}}}, now)
     _sh_det = [i["detail"] for i in _sh_inv if i["organ"] == "golive-readiness"]
-    assert len(_sh_det) == 2, f"exactly the near-break-even live book and the streak book: {_sh_det}"
-    assert any(d.startswith("freqtrade-mum-lighter:") and "break-even" in d for d in _sh_det), _sh_det
+    assert len(_sh_det) == 3, f"exactly the two live books below the claim bar and the streak book: {_sh_det}"
+    assert any(d.startswith("freqtrade-mum-lighter:") and "break-even" in d and "claim bar" in d
+               for d in _sh_det), _sh_det
+    assert any(d.startswith("fixture-noise-lighter:") and "9.8pp" in d for d in _sh_det), _sh_det
     assert any(d.startswith("lighter-ticket-taker-lighter:") and "p95 chance" in d for d in _sh_det), _sh_det
-    assert not any("lshadow" in d or "avo-maria" in d or "kelly" in d for d in _sh_det), _sh_det
+    assert not any("lshadow" in d or "avo-maria" in d or "kelly" in d or "nocrit" in d
+                   for d in _sh_det), _sh_det
     # the KEY must be fetched, or the scanner above is dead code
     _src = open(os.path.abspath(__file__)).read()
     assert '"golive-readiness")' in _src or '"golive-readiness",' in _src, \

@@ -34,10 +34,27 @@ per-book `shape` block: `hit_pct`, `hit_trailing_pct` (trailing 30), `n_trailing
 never a bar — `BAR_NAMES` and `grade()` are untouched. `fleet_immune` reads it
 off the grader's payload (never re-derived) and flags a **LIVE** book (`-lighter`
 rows only — a page on every shadow streak would train Eamon to ignore the pager,
-(gl)) whose trailing hit rate sits within `IMMUNE_SHAPE_HIT_MARGIN_PP` (5pp) of
-its own break-even on ≥30 trailing closes, or whose current losing streak exceeds
-the p95 chance streak for its own hit rate. Today neither live row is near:
-mum's margin is ~16pp.
+(gl)) whose trailing hit rate no longer CLAIMS to sit above its own break-even on
+≥30 trailing closes, or whose current losing streak exceeds the p95 chance streak
+for its own hit rate. **[CALIBRATED the same day — Eamon: *"Calibrate
+accordingly"*; corrected in place per I12.]** This shipped first as *"within
+`IMMUNE_SHAPE_HIT_MARGIN_PP` (5pp) of break-even"*, and 5pp was a round number in
+the wrong units: sampling noise on a 30-trade hit rate is **±8.6pp** (one SE at
+mum's 66.9% break-even), so 5pp was 0.58 SE at her payoff and 0.68 SE at avo's,
+and a window at 23/30 — **9.8pp above break-even, 1.14 SE** — read QUIET while it
+no longer showed PF > 1. The grader now publishes `hit_margin_z` (the margin in
+standard errors, SE taken at break-even) beside `hit_margin_crit` — the fleet's
+OWN claim bar for `n_trailing` (`horizon_crit` → `fleet_allocation.t_crit`,
+**1.31 at n=30**, floor 1.28) — and the immune organ fires on `z <= crit`: *the
+last 30 closes no longer claim PF > 1*, in the same standard the allocation
+organ uses to hand out a claim (I17: one standard of evidence in both
+directions). Both are READ off the payload; either absent ⇒ quiet, never
+re-derived. **The cost is stated, not hidden:** a book at mum's current
+**z ≈ +2.0** (trailing-30 hit 83.3% vs a ~66% break-even on today's ledger)
+reads below the bar by chance in roughly one 30-trade window in four — a page
+is *look at the twin* (I25), never a verdict, and the value-normalised dedup
+ledger pages a persisting condition once. Today neither live row is near: mum
+z ≈ +2.0; avo's trailing window is 20 closes, below `SHAPE_MIN_N`.
 
 **3. A STREAK IS JUDGED AGAINST CHANCE, AND THE OWNER IS THE GRADER (§9).**
 `scripts/edge_audit.py` simulated the longest losing run (2,000 draws) and does
@@ -56,7 +73,20 @@ lane judged a change against its PRE-WINDOW with a **0.25pp** margin and let a
 change `hurting` by arithmetic and revert a live lever at `get_lever`. Three
 changes, every one in the less-constriction direction (Eamon: *"our focus always
 on growth"*): the pre-window baseline carries its own margin
-`LIVE_PRE_MARGIN_PP` = **1.7pp** (the measured reversion); the shadow twin — the
+`LIVE_PRE_MARGIN_PP` = **1.7pp** (the measured reversion — **RE-MEASURED the same
+day on today's ledger, Eamon: *"Calibrate accordingly"*:** the study's own peak
+arm over 3,801 closes / 26 books with ≥40 closes puts the hot-window collapse at
+**+1.74pp (SE 0.50, n=149 windows) at K=10**, the grader's own baseline floor,
+**+1.52 (0.47) at K=15**, +1.60 (0.46) at K=20 and +1.67 (0.58) at K=30 — (vc)'s
+27-Aug 1.674 reproduces at K=30 to 0.002pp — and **1.7 sits inside every 95%
+band, so the constant STANDS**: moving it to any one K's point estimate would be
+fitting a number with a 0.5pp standard error to two decimals. The study gained
+`--ledger FILE` (a `/trades.json?source=paper` dump, so the measurement needs no
+DATABASE_URL; neither path applies `LEDGER_QUARANTINE`, as on 27-Aug, and the
+loader says so) and a `--margin` arm that grades the constant against the
+measured bands — INSIDE / DRIFT / THIN, exit 2 on DRIFT — so the next
+re-measurement is one command, and the test pins the constant inside the 2-Sep
+bands so an edit to 0.25 or 5.0 reddens); the shadow twin — the
 one control arm that experiences the same reversion — keeps 0.25pp and is
 **REQUIRED** for any verdict (no twin ⇒ `recorded`, reason `no-control-arm`);
 and `LIVE_BASE_MIN_N` is pinned to `fleet_allocation.MIN_N` (**10**, the
@@ -88,12 +118,25 @@ sandbox-less gitleaks. **DEPLOY: main only** — `fleet_immune`/`fleet_proprioce
 `golive_readiness` run in `freqtrade-bots` and ship on the auto path; no live
 row trades differently, so no live restart is dispatched.
 
-**STILL OPEN, named:** the I25 calibration is a MEASURED margin, not a
+~~**STILL OPEN, named:** the I25 calibration is a MEASURED margin, not a
 re-measured one — the 1.674pp is (vc)'s 27-Aug number; re-run
 `scripts/study_do_our_changes_hurt_2026-08-27.py` when the ledger has another
 month and move the constant if the tide moved. The shape monitor's 5pp is a
-judgement, stated as one; a page it raises is advice to look at the twin, not a
-verdict (I25).
+judgement, stated as one.~~ **BOTH CLOSED the same day (Eamon: *"Calibrate
+accordingly"*), recorded above in place:** the margin was re-measured on today's
+ledger (1.7 inside every band; instrument `--margin`, exit 2 on DRIFT) and the
+monitor's threshold is the fleet's own claim bar in sampling-noise units, not a
+round number. What remains true: a page the monitor raises is advice to look at
+the twin, not a verdict (I25). Also fixed here, from the CodeQL review on the
+PR: `fleet_proprioception`'s selftest imported `fleet_allocation` a second way
+behind a bare `except: pass` — the identity pin now uses the module-level handle
+and FAILS if the organ is absent instead of passing vacuously (the "check that
+inspects nothing reports clean" shape). **VERIFIED: 19/19 mutations red** — the
+original ten re-run after the change, plus nine on the calibration (z without
+the sqrt; crit a retyped 1.28; the comparison inverted; back to a 5pp points
+threshold; the bar re-derived when the payload has none; the margin edited to
+0.25 and to 5.0; the collapse measured over cold windows; DRIFT never reported;
+THIN read as INSIDE; the absent organ passing the pin).
 
 ## 2026-09-02 (ww) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
 

@@ -160,11 +160,29 @@ LIVE_EP_MIN_N = int(os.environ.get("PROP_LIVE_EP_MIN_N", "5"))
 #     no twin the episode is `recorded` (reason `no-control-arm`), never
 #     condemned by `all()` over one biased element.
 try:
-    from fleet_allocation import MIN_N as _ALLOC_MIN_N
-except Exception:      # noqa: BLE001 -- not in every image; the value is pinned by test
+    import fleet_allocation as _fleet_allocation
+    _ALLOC_MIN_N = _fleet_allocation.MIN_N
+except Exception:      # noqa: BLE001 -- ships beside this file in freqtrade-bots (Dockerfile.freqtrade); the fallback is the same floor and the selftest pins the identity
+    _fleet_allocation = None
     _ALLOC_MIN_N = 10
 LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", str(_ALLOC_MIN_N)))
 LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))      # vs the twin
+#: [2026-09-02, RE-MEASURED -- Eamon: "Calibrate accordingly"] the pre-window
+#: margin is the HOT-WINDOW COLLAPSE (window mean minus next-window mean, over
+#: every non-overlapping window whose mean beats the book's own), from
+#: `scripts/study_do_our_changes_hurt_2026-08-27.py --margin`, re-run 2-Sep
+#: on 3,801 closes / 26 books with >= 40 closes:
+#:     K=10 (this grader's baseline floor)   +1.74 pp   SE 0.50   n=149 windows
+#:     K=15 (the study's own K)              +1.52 pp   SE 0.47   n= 98
+#:     K=20                                  +1.60 pp   SE 0.46   n= 77
+#:     K=30                                  +1.67 pp   SE 0.58   n= 42
+#: 1.7 sits inside every 95% band -- (vc)'s 27-Aug 1.674 reproduces at K=30 to
+#: 0.002pp -- so the constant STANDS; moving it to any one K's point estimate
+#: would be fitting a number with a 0.5pp standard error to two decimals. The
+#: instrument grades the constant against the band (INSIDE / DRIFT), so the
+#: next re-measurement is one command against a `/trades.json?source=paper`
+#: dump, not a judgement; `tests/autonomy/test_edge_audit_followups.py` pins
+#: the constant inside the 2-Sep bands so an edit to 0.25 or 5.0 reddens.
 LIVE_PRE_MARGIN_PP = float(os.environ.get("PROP_LIVE_PRE_MARGIN_PP", "1.7"))  # vs the pre-window, I25
 # [2026-07-17 AUDIT] Retired row REMOVED — the third copy of the same rot (see
 # evidence_board.LIVE_ROWS and fleet_respiration.LIVE_BREATHS). Tide Rider left
@@ -1293,12 +1311,11 @@ def _selftest():
     tr_thin_twin = during(0.002) + pre(0.025) + \
         [lt(TWIN, 0.25 + i * 0.45, 0.012) for i in range(6)]
     assert gl(tr_thin_twin)["status"] == "recorded", gl(tr_thin_twin)
-    # the floor IS the allocation organ's computability floor, by identity
-    try:
-        import fleet_allocation as _fa
-        assert LIVE_BASE_MIN_N == _fa.MIN_N == 10, (LIVE_BASE_MIN_N, _fa.MIN_N)
-    except ImportError:
-        pass
+    # the floor IS the allocation organ's computability floor, by identity --
+    # against the organ ITSELF (it ships beside this file), never a retyped 10,
+    # and never vacuously green: an absent organ FAILS here, it does not pass
+    assert _fleet_allocation is not None, "fleet_allocation must ship beside fleet_proprioception"
+    assert LIVE_BASE_MIN_N == _fleet_allocation.MIN_N == 10, (LIVE_BASE_MIN_N, _fleet_allocation.MIN_N)
 
     # [2026-07-17 AUDIT] live-clip is RECORDED-ONLY, whatever the data says.
     # The metric is EXACTLY invariant to clip_scale (the lever scales pnl AND

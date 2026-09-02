@@ -15,10 +15,19 @@ sizing advisements shipped ((wu)). These pins make each one executable:
     reversion, the twin is required, and the baseline floor is the fleet's
     computability floor.
 
+[2-Sep, later -- Eamon: "Calibrate accordingly"] the two numbers the entry
+flagged as uncalibrated are now measurements: the shape monitor tests
+`hit_margin_z` against the fleet's own claim bar (`hit_margin_crit`) instead
+of a round 5pp, and the I25 margin is re-measured by the reversion study's
+own `--margin` arm, which grades the constant against the band it measures.
+
 Consumers are driven on payloads the PUBLISHER built ((hj)), never on
 hand-written fixtures that merely look like them.
 """
+import importlib.util
 import itertools
+import json
+import math
 import os
 import sys
 import time
@@ -35,6 +44,12 @@ import fleet_proprioception as fp      # noqa: E402
 import fleet_allocation as fa          # noqa: E402
 import edge_audit as ea                # noqa: E402
 import session_state as ss             # noqa: E402
+
+_spec = importlib.util.spec_from_file_location(
+    "study_changes_hurt",
+    os.path.join(ROOT, "scripts", "study_do_our_changes_hurt_2026-08-27.py"))
+study = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(study)
 
 
 # ------------------------------------------------------------ 6.1 kelly's read
@@ -113,21 +128,41 @@ def test_shape_block_is_published_from_the_graders_own_stats():
     assert sh["avg_win_usd"] == 3.65 and sh["avg_loss_usd"] == 7.39
     assert sh["breakeven_hit_pct"] == round(100 / (1 + 3.65 / 7.39), 1)      # 66.9
     assert sh["n_trailing"] == gr.SHAPE_TRAIL_N == 30
+    # [2-Sep, calibrated] the margin in sampling-noise units -- SEs above
+    # break-even with the SE taken at break-even -- and the fleet's own claim
+    # bar for the trailing n, each from its owner, never a retyped constant
+    raw = st["shape"]
+    be = raw["breakeven_hit"]
+    z = (raw["hit_trailing"] - be) / math.sqrt(be * (1 - be) / raw["n_trailing"])
+    assert abs(raw["hit_margin_z"] - z) < 1e-9 and sh["hit_margin_z"] == round(z, 2), (raw, sh)
+    assert raw["hit_margin_crit"] == fa.t_crit(30, floor=gr.HORIZON_Z) >= 1.28, raw
+    assert sh["hit_margin_crit"] == round(raw["hit_margin_crit"], 3)
     assert "shape" not in gr.book_payload(gr.stats(_ledger(60, 0.83, 3.65, 7.39)[:1]))
 
 
-def test_immune_flags_a_live_book_near_its_own_breakeven_and_only_that():
+def test_immune_flags_a_live_book_below_the_claim_bar_and_only_that():
     near = gr.book_payload(gr.stats(_ledger(60, 0.66, 3.65, 7.39), book_usd=1000.0))
+    noise = gr.book_payload(gr.stats(_ledger(60, 0.77, 3.65, 7.39), book_usd=1000.0))
     ok = gr.book_payload(gr.stats(_ledger(60, 0.85, 3.65, 7.39), book_usd=1000.0))
-    assert near["shape"]["hit_margin_pp"] <= fi.SHAPE_HIT_MARGIN_PP < ok["shape"]["hit_margin_pp"], \
-        (near["shape"], ok["shape"])
+    # [2-Sep, calibrated] `noise` is the case a POINTS threshold got wrong: 22 of
+    # 30 sits 6.4pp above break-even -- QUIET under "within 5pp" -- and 0.74 SE,
+    # below the fleet's claim bar for n=30, so the window does not show PF > 1
+    assert noise["shape"]["hit_margin_pp"] > 5.0, noise["shape"]
+    for p in (near, noise):
+        assert p["shape"]["hit_margin_z"] <= p["shape"]["hit_margin_crit"], p["shape"]
+    assert ok["shape"]["hit_margin_z"] > ok["shape"]["hit_margin_crit"], ok["shape"]
+    nocrit = dict(near, shape=dict(near["shape"], hit_margin_crit=None))
     inv = fi.organ_invariants(_gate_payload({
         "fixture-near-lighter": {"n": 60, **near},
+        "fixture-noise-lighter": {"n": 60, **noise},
         "fixture-ok-lighter": {"n": 60, **ok},
         "fixture-near-lshadow": {"n": 60, **near},      # shadow: never paged
+        "fixture-nocrit-lighter": {"n": 60, **nocrit},  # no bar published: quiet, never re-derived
     }), time.time())
-    det = [i["detail"] for i in inv if i["organ"] == "golive-readiness"]
-    assert len(det) == 1 and det[0].startswith("fixture-near-lighter:") and "break-even" in det[0], det
+    det = sorted(i["detail"] for i in inv if i["organ"] == "golive-readiness")
+    assert len(det) == 2, det
+    assert det[0].startswith("fixture-near-lighter:") and "claim bar" in det[0], det
+    assert det[1].startswith("fixture-noise-lighter:") and "claim bar" in det[1], det
 
 
 def test_immune_flags_a_live_streak_beyond_chance_and_is_quiet_inside_it():
@@ -158,9 +193,19 @@ def _iso(ts):
     return datetime.fromtimestamp(ts, timezone.utc).isoformat()
 
 
+#: [2-Sep re-measurement, `study_do_our_changes_hurt_2026-08-27.py --margin`]
+#: hot-window collapse (pp) and its SE per window size, 3,801 closes / 26 books.
+#: RECORDED here with its date so an edit of the constant to 0.25 or 5.0
+#: reddens; the instrument, not this pin, is what re-measures it.
+MEASURED_COLLAPSE_2SEP = {10: (1.741, 0.497), 15: (1.518, 0.469),
+                          20: (1.601, 0.458), 30: (1.672, 0.579)}
+
+
 def test_i25_pre_window_margin_is_the_measured_reversion_and_twin_is_required():
     assert fp.LIVE_BASE_MIN_N == fa.MIN_N == 10
-    assert fp.LIVE_PRE_MARGIN_PP >= 1.6 and fp.LIVE_PRE_MARGIN_PP > fp.LIVE_MARGIN_PP
+    for k, (m, se) in MEASURED_COLLAPSE_2SEP.items():
+        assert abs(fp.LIVE_PRE_MARGIN_PP - m) <= 2 * se, (k, fp.LIVE_PRE_MARGIN_PP, m, se)
+    assert fp.LIVE_PRE_MARGIN_PP > fp.LIVE_MARGIN_PP
     LIVE, TWIN = "fixture-funding-lighter", "fixture-funding-lshadow"
     fp.LIVE_ROWS.add(LIVE)
     try:
@@ -190,3 +235,48 @@ def test_i25_pre_window_margin_is_the_measured_reversion_and_twin_is_required():
         assert thin["status"] == "recorded", thin
     finally:
         fp.LIVE_ROWS.discard(LIVE)
+
+
+# --------------------------------------------- I25 the instrument that re-measures
+
+def test_the_reversion_instrument_reads_a_ledger_file_and_grades_the_margin(tmp_path):
+    import random
+    rng = random.Random(7)
+    t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    trades = []
+    for bot in ("book-a-lshadow", "book-b-lshadow"):
+        for i in range(400):
+            pct = rng.gauss(0.0, 0.02)
+            trades.append({"bot": bot, "closed_at": (t0 + timedelta(hours=i)).isoformat(),
+                           "pnl_pct": pct, "pnl_abs": pct * 100})
+    trades.append({"bot": "junk", "closed_at": "not a time", "pnl_pct": 0.1})
+    trades.append({"bot": "junk", "closed_at": None, "pnl_pct": 0.1})
+    trades.append({"bot": "junk", "closed_at": t0.isoformat(), "pnl_pct": None})
+    path = tmp_path / "trades.json"
+    path.write_text(json.dumps({"trades": trades}))
+    rows = study.load_ledger_file(str(path))
+    assert len(rows) == 800 and rows == sorted(rows, key=lambda r: r[1])
+    books = study.by_book(rows)
+    assert set(books) == {"book-a-lshadow", "book-b-lshadow"}
+    # `hot_collapse` is the peak arm's own windows, as one number: brute-force it
+    k = 10
+    brute = []
+    for v in books.values():
+        ys = [p for _t, p in v]
+        bm = sum(ys) / len(ys)
+        for i in range(0, len(ys) - 2 * k, k):
+            w, nxt = ys[i:i + k], ys[i + k:i + 2 * k]
+            if len(nxt) == k and sum(w) / k > bm:
+                brute.append((sum(w) / k - sum(nxt) / k) * 100)
+    m, se, n = study.hot_collapse(books, k)
+    assert n == len(brute) >= study.MIN_WINDOWS and abs(m - sum(brute) / n) < 1e-9, (m, n)
+    assert m > 0 and se > 0, "iid noise still reverts: a window selected for being hot is followed by the mean"
+    # the grade: the measured collapse is INSIDE its own band; 10pp is DRIFT
+    assert study.margin_arm(books, margin=m, ks=[k])["verdict"] == "INSIDE"
+    drift = study.margin_arm(books, margin=10.0, ks=[k])
+    assert drift["verdict"] == "DRIFT" and drift["k"][k]["inside"] is False
+    # too few hot windows grade nothing -- THIN, never a vacuous INSIDE
+    thin = study.margin_arm({"book-a-lshadow": books["book-a-lshadow"][:60]}, margin=m, ks=[k])
+    assert thin["verdict"] == "THIN" and thin["k"][k]["inside"] is None
+    # the default window set is anchored on the grader's own baseline floor
+    assert fp.LIVE_BASE_MIN_N in study.margin_arm(books)["k"]

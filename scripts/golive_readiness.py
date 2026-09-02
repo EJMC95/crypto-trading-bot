@@ -1215,11 +1215,26 @@ def stats(rows, book_usd=None):
         _run = _run + 1 if _x <= 0 else 0
         _mx = max(_mx, _run)
     _p_loss = 1.0 - wins / n
+    # [2026-09-02, calibrated -- Eamon: "Calibrate accordingly"] the margin in
+    # SAMPLING-NOISE units: how many standard errors the trailing hit rate sits
+    # above the book's own break-even, with the SE taken AT break-even (the
+    # null): sqrt(be*(1-be)/n). Beside it the fleet's OWN critical value for a
+    # sample of `n_trailing` (`horizon_crit`, which defers to
+    # `fleet_allocation.t_crit` -- 1.31 at n=30, floor 1.28), so a monitor asks
+    # "does the trailing window still CLAIM PF > 1?" in the same standard the
+    # allocation organ uses to hand out a claim (I17: one standard of evidence
+    # in both directions). Points were payoff-dependent -- 5pp is 0.58 SE at
+    # mum's payoff and 0.68 SE at avo's; z is not. Both REPORTED, never a bar.
+    _z = None
+    if _be is not None and 0.0 < _be < 1.0 and _trail:
+        _z = (_hit_trail - _be) / math.sqrt(_be * (1.0 - _be) / len(_trail))
     out["shape"] = {
         "hit": wins / n, "hit_trailing": _hit_trail, "n_trailing": len(_trail),
         "avg_win_usd": _avg_w, "avg_loss_usd": _avg_l, "payoff": _payoff,
         "breakeven_hit": _be,
         "hit_margin": (_hit_trail - _be) if _be is not None else None,
+        "hit_margin_z": _z,
+        "hit_margin_crit": horizon_crit(len(_trail)) if _z is not None else None,
         "streak_now": _run, "streak_max": _mx,
         "streak_chance": expected_streak(n, _p_loss) if 0.0 < _p_loss < 1.0 else None,
     }
@@ -2587,8 +2602,11 @@ def book_payload(s):
     if isinstance(s.get("cluster"), dict):
         out["cluster"] = s["cluster"]
     # [2026-09-02, edge-audit follow-up] the shape block (see `stats`), in
-    # percentage points and dollars, plus the one derived field a monitor reads:
-    # `hit_margin_pp` = trailing hit rate minus the book's own break-even.
+    # percentage points and dollars, plus the derived fields a monitor reads:
+    # `hit_margin_pp` = trailing hit rate minus the book's own break-even
+    # (points, REPORTED) and, since the 2-Sep calibration, `hit_margin_z`
+    # (that margin in standard errors) against `hit_margin_crit` (the fleet's
+    # claim bar for `n_trailing`) -- the pair the immune organ actually tests.
     _sh = s.get("shape")
     if isinstance(_sh, dict):
         def _r(v, k=2):
@@ -2606,6 +2624,8 @@ def book_payload(s):
             if _sh.get("breakeven_hit") is not None else None,
             "hit_margin_pp": _r(100 * _sh["hit_margin"], 1)
             if _sh.get("hit_margin") is not None else None,
+            "hit_margin_z": _r(_sh.get("hit_margin_z")),
+            "hit_margin_crit": _r(_sh.get("hit_margin_crit"), 3),
             "streak_now": _sh.get("streak_now"), "streak_max": _sh.get("streak_max"),
             "streak_p50_chance": _sc.get("p50"), "streak_p95_chance": _sc.get("p95"),
         }
@@ -2826,7 +2846,14 @@ def _selftest_shape():
     assert abs(sh["breakeven_hit"] - 1 / (1 + 3.65 / 7.39)) < 1e-9, sh
     assert sh["streak_max"] == 1 and sh["streak_now"] == 1, sh   # last row (i=59) loses
     assert sh["streak_chance"]["p95"] >= 1, sh
+    # [2026-09-02, calibrated] z in SEs at the null (trailing 30 holds 5 losers
+    # -> 25/30), and the critical value from the ONE owner, never a retyped bar
+    _be_fx = 1 / (1 + 3.65 / 7.39)
+    _z_fx = (25 / 30 - _be_fx) / math.sqrt(_be_fx * (1 - _be_fx) / 30)
+    assert abs(sh["hit_margin_z"] - _z_fx) < 1e-9 and 1.8 < _z_fx < 2.0, (sh["hit_margin_z"], _z_fx)
+    assert sh["hit_margin_crit"] == horizon_crit(30) and sh["hit_margin_crit"] >= HORIZON_Z, sh
     bp = book_payload(st)["shape"]
+    assert bp["hit_margin_z"] == round(_z_fx, 2) and bp["hit_margin_crit"] == round(horizon_crit(30), 3), bp
     assert bp["hit_pct"] == 83.3 and bp["breakeven_hit_pct"] == round(100 / (1 + 3.65 / 7.39), 1), bp
     assert bp["hit_margin_pp"] == round(bp["hit_trailing_pct"] - bp["breakeven_hit_pct"], 1) or \
         abs(bp["hit_margin_pp"] - (bp["hit_trailing_pct"] - bp["breakeven_hit_pct"])) <= 0.11, bp
@@ -2835,6 +2862,7 @@ def _selftest_shape():
     assert "shape" not in book_payload(stats(rows[:1]))
     allwin = stats([(0.01, 1.0, t0 + _td(hours=i)) for i in range(5)])
     assert allwin["shape"]["streak_chance"] is None and allwin["shape"]["payoff"] is None
+    assert allwin["shape"]["hit_margin_z"] is None and allwin["shape"]["hit_margin_crit"] is None
 
 
 def _selftest_decided_until():
