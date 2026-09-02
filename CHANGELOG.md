@@ -1,6 +1,6 @@
-## 2026-09-02 (wm) — THE EDGE AUDIT: 18 LIVING BOOKS, ZERO SURVIVE MULTIPLICITY, AND EVERY BOOK MINTED ON A PER-TRADE REPLAY NUMBER IS REJECTING IT ON ITS OWN LEDGER — FOUR OF FOUR
+## 2026-09-02 (wn) — THE EDGE AUDIT: 18 LIVING BOOKS, ZERO SURVIVE MULTIPLICITY, AND EVERY BOOK MINTED ON A PER-TRADE REPLAY NUMBER IS REJECTING IT ON ITS OWN LEDGER — FOUR OF FOUR
 
-**[RENUMBERED (wl) → (wm) at merge:** the concurrent session's dashboard fix reached main first under (wl); the pushed entry keeps the letter, per the letters rule. The two CLAUDE.md citations moved with it; `git log` subjects keep the old letter and are not a letter index.]**
+**[RENUMBERED TWICE — (wl) → (wm) → (wn), at merge:** three sessions pushed inside twenty minutes and main took each letter first — (wl) the dashboard's capital-move-immune daily P&L, (wm) mum's I21 pre-registration on the winners' docket. The pushed entry keeps the letter, per the letters rule; the two CLAUDE.md citations moved with it each time; `git log` subjects keep the old letters and are not a letter index. Same-day instance of the race that rule was written for.]**
 
 **Eamon, 2-Sep:** *"Audit whether the bots have a real edge … Identify whether
 profits come from a repeatable signal or from a small number of lucky trades."*
