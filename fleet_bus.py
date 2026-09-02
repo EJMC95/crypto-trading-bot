@@ -69,7 +69,7 @@ RETIRED_LIVE_ARMS = {
                "(live n=91 mean -0.160%/trade t=-0.88 halves +2.51/-7.65; "
                "shadow n=161 mean -0.195% t=-0.95 halves +5.71/-18.32). "
                "The shadow twin kept trading as the control arm until "
-               "2-Sep (wt), when the judge's lane moved to mum and the twin "
+               "2-Sep (wv), when the judge's lane moved to mum and the twin "
                "retired on its own record (n=200, t=-2.32, ub -0.233%).",
     },
     "freqtrade-georgia-lighter": {
@@ -313,7 +313,7 @@ JUDGED_PAIRS = {
 }
 
 
-#: [(wt)] preference among LIVING judged pairs when the feed cannot rank
+#: [(wv)] preference among LIVING judged pairs when the feed cannot rank
 #: them by closes: 👩 mum (n=53 live closes, the fleet's one proven edge)
 #: before 🙏 avo (n=11). A retired arm is filtered BEFORE this is consulted.
 PAIR_PRIORITY = ("mum", "avo")
@@ -338,7 +338,7 @@ def active_price_pairs():
 
 
 def living_pair_default():
-    """[2026-09-02 (wt)] (live_bot, shadow_bot) — THE LIVING PAIR every organ
+    """[2026-09-02 (wv)] (live_bot, shadow_bot) — THE LIVING PAIR every organ
     that pairs a live arm with its shadow twin defaults to: the 🧪 judge's
     serial lane, the 📏 shortfall organ, and their collision check. One owner,
     so the judge and the shortfall organ cannot disagree about which twin is
@@ -357,7 +357,7 @@ def shortfall_default_pair():
     pairs = active_price_pairs()
     if not pairs:
         return ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow")
-    # [(wt)] on a DARK feed (offline selftests, a DB blip) the choice must
+    # [(wv)] on a DARK feed (offline selftests, a DB blip) the choice must
     # still be deterministic and must still be the pair with the evidence:
     # PAIR_PRIORITY orders the LIVING pairs (a retired arm never appears —
     # active_price_pairs filters it), so this is a preference, not a roster.
@@ -725,6 +725,141 @@ def brain_gross_cap(max_positions, base_clip_usd, factor=None):
     return n * c * f
 
 
+#: [2026-09-02 (wo)] THE TWO SIZING RAILS — Eamon: "Proceed with advisements."
+#: Both come out of EDGE_AUDIT_2026-09-02.md §6 and both live HERE, in the one
+#: accessor every living book already sizes through, so no bot changes a line.
+#:
+#:   * DRAWDOWN SCALE. The go-live gate REPORTS each book's max drawdown and the
+#:     7-day governor scales the fleet's live clips on FLEET drawdown — but no
+#:     organ reduced a book's own clip when its own drawdown crossed the bar it
+#:     is graded on. Measured: 🪁 kelly at 27.9% realised / 28.5% MTM against a
+#:     15% bar, bootstrap P(ruin at 12 months) 1.00, and every entry still sized
+#:     at the full clip. `dd_scale` is 1.0 all the way UP TO the gate's bar and
+#:     falls linearly to `DD_SCALE_FLOOR` at TWICE the bar. **Eamon, 2-Sep:
+#:     "make sure we don't constrict too much like we have in the past, our
+#:     focus always on growth."** The first cut began scaling at HALF the bar,
+#:     which would have cut a book in an ordinary 10% drawdown — INSIDE the
+#:     range the gate grades it on — to 0.75, and I17 says a book cannot earn
+#:     evidence with no capital. So the rail now bites only where the gate
+#:     itself already says the book has FAILED its drawdown bar: past 15% is
+#:     past the tested range, and that is a measured harm (I26), not a
+#:     precaution. The day this shipped: mum-live 3.8%, avo-live 5.6%, taker
+#:     5.1% — 1.0 and untouchable until 15%; kelly 28.5% → 0.325; georgia's
+#:     retired live row 58.3% → the floor.
+#:   * NEVER LEVER A WEAK EDGE. I16 computes a CEILING only on a positive lower
+#:     bound; nothing applied that to the brain's 6.7x MULTIPLIER, so the brain
+#:     could in principle lever a book whose own era claim is MEASURED at zero.
+#:     Now a multiplier above 1.0 is refused when `fleet_allocation` has
+#:     measured the sized book's era lower bound at or below zero on at least
+#:     `LB_CAP_MIN_N` era closes — `claim_era` 0.0 with `n_era` >= 10. That is
+#:     the same predicate `allocation_scale` uses for its own expansion ((lx)),
+#:     read the same way. Reductions pass through untouched: this rail can only
+#:     ever make a book SMALLER.
+#:
+#: BOTH RAILS FAIL OPEN, and the second one did not at first. The first cut
+#: refused expansion on a DARK allocation organ and on a THIN sample ("a dark
+#: organ earns nothing"), which is the constriction Eamon named: it would have
+#: let a second organ's outage veto the brain's own MEASURED t>=2 expansion,
+#: and it treated "no reading yet" as "no". The brain's expansion ladder is
+#: already an earned thing (n>=30 era closes, Wilson lower bound, t>=2.0/2.5,
+#: three consecutive runs), so a missing SECOND measurement must not undo the
+#: first — a restriction needs its number (I26), and a gap is not a number.
+#: The same rule as the drawdown scale: a dark or stale organ, an unknown book,
+#: a thin era or a junk value changes NOTHING; only a measured non-positive
+#: bound caps.
+#:
+#: THE RECEIPT. The `mult` `brain_clip_multi` hands back is now the EFFECTIVE
+#: stake multiplier (brain x rails), because that is the quantity that actually
+#: sized the trade and the ledger's `brain_mult` stamp must record what cut it
+#: (I23). The decomposition is kept in `last_sizing[bot]` — {brain, lb_capped,
+#: dd_pct, dd_scale} — for any publisher that wants to attach it.
+#:
+#: KILL SWITCH: `BRAIN_RAILS_MODE=advisory` on a service returns both rails to
+#: neutral at the accessor, so the switch reaches every consumer without a
+#: redeploy ([[a-kill-switch-must-reach-the-consumer]]). The brain's own clamp
+#: and the SafetyRails caps are untouched and stay senior.
+DD_SCALE_START_FRAC = 1.0      # of the gate's bar: scaling begins AT the bar
+DD_SCALE_END_FRAC = 2.0        # ... and reaches the floor at twice the bar
+DD_SCALE_FLOOR = 0.25          # the allocation organ's own probe floor (I17)
+DD_BAR_PCT_FALLBACK = 15.0     # the gate's bar, used only if the payload lacks it
+                               # — pinned equal to golive_readiness.GOLIVE_MAX_DD
+LB_CAP_MIN_N = 10              # closes before an era bound counts as MEASURED
+                               # — pinned equal to fleet_allocation.MIN_N
+last_sizing = {}
+
+
+def _rails_active():
+    return os.environ.get("BRAIN_RAILS_MODE", "act").strip().lower() == "act"
+
+
+def book_dd_pct(bot, current_time=None):
+    """(dd_pct, bar_pct) from the gate's OWN payload — its worse-of-realised/
+    MTM `max_dd_pct` for `bot` and its published `bar.max_dd` — or (None, None)
+    on any doubt. Percent, as the gate publishes it."""
+    try:
+        p = _load("golive-readiness", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None, None
+        row = (p.get("books") or {}).get(str(bot))
+        if not isinstance(row, dict):
+            return None, None
+        dd = float(row.get("max_dd_pct"))
+        if math.isnan(dd) or dd < 0:
+            return None, None
+        bar = DD_BAR_PCT_FALLBACK
+        try:
+            b = float((p.get("bar") or {}).get("max_dd"))
+            if not math.isnan(b) and b > 0:
+                bar = 100.0 * b
+        except (TypeError, ValueError):
+            pass    # no usable bar published: keep the pinned fallback
+        return dd, bar
+    except Exception:                                    # noqa: BLE001
+        return None, None
+
+
+def dd_scale(bot, current_time=None):
+    """1.0 up to the gate's bar, then down to DD_SCALE_FLOOR as the book's own
+    drawdown runs from the bar to twice the bar. Fail-OPEN: dark, stale,
+    unknown or junk -> 1.0. Inside the tested range nothing moves."""
+    if not _rails_active():
+        return 1.0
+    dd, bar = book_dd_pct(bot, current_time)
+    if dd is None or bar is None or bar <= 0:
+        return 1.0
+    start, end = bar * DD_SCALE_START_FRAC, bar * DD_SCALE_END_FRAC
+    if dd <= start:
+        return 1.0
+    if dd >= end:
+        return DD_SCALE_FLOOR
+    return 1.0 - (dd - start) / (end - start) * (1.0 - DD_SCALE_FLOOR)
+
+
+def lb_permits_expansion(bot, current_time=None):
+    """False only when `fleet_allocation` has MEASURED the book's era lower
+    bound at or below zero — `claim_era` numeric and <= 0 on `n_era` >=
+    LB_CAP_MIN_N. Everything else permits: a dark or stale organ, an unknown
+    book, a None claim (no opinion), a thin era, junk. The brain's own
+    expansion bars still govern in every one of those cases; this rail adds a
+    refusal only where a second measurement exists and says no."""
+    if not _rails_active():
+        return True
+    try:
+        p = _load("fleet-allocation", current_time)
+        if not p or not is_fresh(p, current_time):
+            return True
+        row = (p.get("books") or {}).get(str(bot))
+        if not isinstance(row, dict):
+            return True
+        n_era = int(row.get("n_era") or 0)
+        v = float(row.get("claim_era"))
+        if math.isnan(v):                                # NaN: no opinion
+            return True
+        return not (n_era >= LB_CAP_MIN_N and v <= 0)
+    except Exception:                                    # noqa: BLE001
+        return True
+
+
 def brain_clip_multi(buckets, base_usd, current_time=None,
                      deployed_usd=None, gross_cap_usd=None, slots=1):
     """`base_usd` scaled by `brain_mult_multi(buckets)` -> (scaled_usd, mult).
@@ -849,6 +984,27 @@ def brain_clip_multi(buckets, base_usd, current_time=None,
             want = max(base, min(want, room))
     except (TypeError, ValueError):
         want = base * m
+    # [(wo)] THE RAILS, on the SIZED book — the first bucket at every call site
+    # (avo's live arm passes (BOT_ROW, SHADOW_ROW); Counterweight and carry pass
+    # their own row twice). Applied AFTER the gross-cap trim, so the trim's
+    # "never below the pre-brain clip" floor keeps its meaning and the rails
+    # then act on what the brain and the budget agreed. See the block above
+    # `DD_SCALE_START_FRAC` for the measurement and the fail-safe directions.
+    try:
+        bot0 = str(buckets[0][0]) if buckets else None
+    except Exception:                                            # noqa: BLE001
+        bot0 = None
+    receipt = {"brain": m, "lb_capped": False, "dd_pct": None, "dd_scale": 1.0}
+    if bot0 is not None and base > 0:
+        if want > base and not lb_permits_expansion(bot0, current_time):
+            want = base
+            receipt["lb_capped"] = True
+        ds = dd_scale(bot0, current_time)
+        if ds < 1.0:
+            want = want * ds
+            receipt["dd_scale"] = ds
+            receipt["dd_pct"] = book_dd_pct(bot0, current_time)[0]
+        last_sizing[bot0] = receipt
     return want, (want / base if base else m)
 
 
@@ -2042,6 +2198,70 @@ if __name__ == "__main__":
     assert brain_mult_multi([(_b, "nope"), (_b, "nope2")], _now) == 1.0, \
         "nobody has an opinion -> neutral"
     assert brain_mult_multi([], _now) == 1.0, "no buckets -> neutral"
+    # [(wu)] THE RAILS. Both fail OPEN. Expansion is refused only when the
+    # allocation organ has MEASURED a non-positive era bound (claim_era 0.0 on
+    # n_era >= LB_CAP_MIN_N); a dark organ, a None claim or a thin era change
+    # nothing. The drawdown scale is 1.0 up to the bar and bites only past it.
+    _cache.pop("fleet-allocation", None)
+    _cache.pop("golive-readiness", None)
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (100.0, 1.25), \
+        "dark allocation organ -> the brain's own measured expansion stands"
+    assert last_sizing[_b]["lb_capped"] is False and last_sizing[_b]["brain"] == 1.25
+    _stamp = _now.isoformat(timespec="seconds")
+    _alloc = {"updated": _stamp, "ttl_sec": 5400, "book_usd": 1000.0,
+              "books": {_b: {"claim_era": 0.0, "n_era": 40},
+                        "c": {"claim_era": 0.001, "n_era": 40},
+                        "j": {"claim_era": 0.001, "n_era": 40}}}
+    _cache["fleet-allocation"] = {"ts": _now, "payload": _alloc}
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (80.0, 1.0), \
+        "a MEASURED zero era claim (n_era 40) refuses expansion"
+    assert last_sizing[_b]["lb_capped"] is True
+    assert brain_clip(_b, "long-deep", 80.0, _now) == (20.0, 0.25), \
+        "a REDUCTION passes the lower-bound cap untouched"
+    _alloc["books"][_b]["n_era"] = LB_CAP_MIN_N - 1
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (100.0, 1.25), \
+        "a THIN era decides nothing — the brain's own floors govern"
+    _alloc["books"][_b]["n_era"] = 40
+    _alloc["books"][_b]["claim_era"] = None
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (100.0, 1.25), \
+        "a None era claim is no opinion, not a no"
+    _alloc["books"][_b]["claim_era"] = 0.001
+    assert lb_permits_expansion(_b, _now) is True
+    assert dd_scale(_b, _now) == 1.0, "dark gate -> no drawdown scaling"
+    _gl = {"updated": _stamp, "ttl_sec": 43200, "bar": {"max_dd": 0.15},
+           "books": {_b: {"max_dd_pct": 3.8}}}
+    _cache["golive-readiness"] = {"ts": _now, "payload": _gl}
+    assert dd_scale(_b, _now) == 1.0, "3.8% on a 15% bar is an ordinary drawdown"
+    _gl["books"][_b]["max_dd_pct"] = 10.0
+    assert dd_scale(_b, _now) == 1.0, "INSIDE the bar nothing moves — growth first"
+    _gl["books"][_b]["max_dd_pct"] = 15.0
+    assert dd_scale(_b, _now) == 1.0, "AT the bar is where scaling BEGINS"
+    _gl["books"][_b]["max_dd_pct"] = 22.5
+    assert abs(dd_scale(_b, _now) - 0.625) < 1e-12, dd_scale(_b, _now)
+    _gl["books"][_b]["max_dd_pct"] = 28.5
+    assert abs(dd_scale(_b, _now) - 0.325) < 1e-12, "kelly's reading -> 0.325"
+    _gl["books"][_b]["max_dd_pct"] = 30.0
+    assert dd_scale(_b, _now) == DD_SCALE_FLOOR == 0.25, "twice the bar -> the floor"
+    _gl["books"][_b]["max_dd_pct"] = 58.3
+    assert dd_scale(_b, _now) == 0.25, "never below the probe floor"
+    _gl["books"][_b]["max_dd_pct"] = "junk"
+    assert dd_scale(_b, _now) == 1.0, "junk -> no scaling"
+    _gl["books"][_b]["max_dd_pct"] = 30.0
+    _u, _mm = brain_clip(_b, "long-swing-dip", 80.0, _now)
+    assert abs(_u - 25.0) < 1e-9 and abs(_mm - 0.3125) < 1e-9, (_u, _mm)
+    assert last_sizing[_b] == {"brain": 1.25, "lb_capped": False,
+                               "dd_pct": 30.0, "dd_scale": 0.25}, last_sizing[_b]
+    _gl["bar"] = {}                                   # no bar published -> fallback 15
+    assert dd_scale(_b, _now) == 0.25
+    _gl["bar"] = {"max_dd": 0.15}
+    _gl["books"][_b]["max_dd_pct"] = 3.8              # back to an ordinary reading
+    _alloc["books"][_b]["claim_era"] = 0.0            # measured zero, n_era 40
+    os.environ["BRAIN_RAILS_MODE"] = "advisory"
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (100.0, 1.25), \
+        "the kill switch returns both rails to neutral at the accessor"
+    os.environ.pop("BRAIN_RAILS_MODE", None)
+    assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (80.0, 1.0)
+    _alloc["books"][_b]["claim_era"] = 0.001
     assert brain_clip(_b, "long-swing-dip", 80.0, _now) == (100.0, 1.25)
     assert brain_clip(_b, "nope", 80.0, _now) == (80.0, 1.0), "silent -> base"
     assert brain_clip(_b, "long-swing-dip", None, _now) == (None, 1.0), \

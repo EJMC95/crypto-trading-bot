@@ -19,14 +19,10 @@ def _georgia():
     """The LIVE roster's Georgia — resolved through `live_strategies()` so a
     retirement makes this test disappear with the book rather than pin a
     constant on a corpse."""
-    # [2026-09-02 (wt)] her shadow is RETIRED (row-scoped, RETIRED_BOOKS), so
-    # the declaration is read rather than the living roster: the stop-tag
-    # multipliers are a property of the strategy class, which the override
-    # can resurrect at any time, and this test keeps guarding it.
-    for b in fam.STRATEGIES:
+    for b in fam.live_strategies():
         if str(getattr(b, "bot", "")).endswith("georgia"):
             return b
-    raise AssertionError("could not locate Georgia in STRATEGIES")
+    raise AssertionError("could not locate Georgia in live_strategies()")
 
 
 def _dist(strategy, tag, atr, px):

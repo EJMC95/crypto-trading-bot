@@ -1,4 +1,4 @@
-"""[2026-09-02 (wt)] THE INCUBATOR'S CHAMPION IS INSIDE THE CAGE NOW — and the
+"""[2026-09-02 (wv)] THE INCUBATOR'S CHAMPION IS INSIDE THE CAGE NOW — and the
 breakout clock takes no lever.
 
 (wr) split the breakout trend exit's clock off `taker.max_hold_h` and REFUSED

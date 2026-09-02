@@ -61,9 +61,7 @@ def test_the_row_is_neither_hidden_nor_pruned():
 
 def test_the_living_books_are_undisturbed():
     live = {s.bot for s in fam.live_strategies()}
-    # [(wt)] georgia's shadow retired on the docket's own verdict; 🙏 avo and
-    # 🔮 georgia-v3 are the living siblings mum's revival must not disturb.
-    assert {"freqtrade-avo-maria", "freqtrade-georgia-v3"} <= live
+    assert {"freqtrade-avo-maria", "freqtrade-georgia"} <= live
 
 
 # --- 2 · the clock, which is the whole diagnosis ---------------------------

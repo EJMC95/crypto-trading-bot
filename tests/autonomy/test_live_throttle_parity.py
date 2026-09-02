@@ -90,10 +90,7 @@ def test_the_stamp_reports_what_is_enforced():
 def test_both_arms_stamp_the_SAME_cap_for_georgia():
     """THE PARITY THE JUDGE ACTUALLY CHECKS, driven through the real builder
     rather than asserted about it."""
-    # [2026-09-02 (wt)] georgia is retired on both arms; the PARITY property is
-    # about the stamp BUILDER, not the roster, so drive it off the registered
-    # DayTraderGated carrier (still the one class that throttles).
-    geo = next(s for s in fam.STRATEGIES if s.bot == "freqtrade-georgia")
+    geo = next(s for s in fam.live_strategies() if s.bot == "freqtrade-georgia")
     cap = fam.throttle_cap(geo)
     # [2026-08-28 (vd)] STAYS 5. A cut to 2 was measured (permutation P=0.0244)
     # and REVERTED: one NEAR close at -19.506% on a -5% stop is 87% of the

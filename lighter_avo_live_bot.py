@@ -116,7 +116,7 @@ from lighter_family_bot import (
     # [2026-08-27] the ONE owner of a close's identity + open stamp — an
     # unknown open must never claim a colliding ':None' id ((hj)).
     close_identity,
-    # [(wt)] the judge's lever surface + the receipt stamp, from the ONE owner
+    # [(wv)] the judge's lever surface + the receipt stamp, from the ONE owner
     apply_book_levers as _fam_apply_book_levers,
     mum_bars as _fam_mum_bars,
     OversoldRebound as _FamOversoldRebound,
@@ -788,7 +788,7 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
     if not reason and roi_exit_due(age_min, profit, strategy):
         reason = "roi"
     if not reason and hasattr(strategy, "custom_exit"):
-        # [(wt)] the ENTRY-STAMPED cap governs (the (bw) rule) where the
+        # [(wv)] the ENTRY-STAMPED cap governs (the (bw) rule) where the
         # carrier prices its time cap at entry; other carriers unchanged.
         _cap = ((m.get("bars") or {}).get("max_hold_min")
                 if isinstance(strategy, _FamOversoldRebound) else None)
@@ -2288,7 +2288,7 @@ def main(_ctx=None, once=False):
                            # rank is born at the OPEN ((sv)); the pre-(th) 46
                            # georgia closes carry None and always will.
                            "entry_rank": m.get("entry_rank"),
-                           # [(wt)] the judge's receipt + the recorded RSI
+                           # [(wv)] the judge's receipt + the recorded RSI
                            **({"bars": m["bars"]}
                               if isinstance(m.get("bars"), dict) and m["bars"]
                               else {}),
@@ -2415,7 +2415,7 @@ def main(_ctx=None, once=False):
         nc_verdicts = noncrypto_regimes() if has_noncrypto else {}
         dt_h = max(0.0, (t0 - float(state.get("last_accrue") or t0)) / 3600.0)
 
-        # [(wt)] the judge's PROMOTED live.<book>.* levers reach this host —
+        # [(wv)] the judge's PROMOTED live.<book>.* levers reach this host —
         # written only by the judge after the paired bar (fleet_tuning's
         # prefix owner), read every loop, env default when none is in force.
         # A no-op for carriers without the knobs (🙏 avo today).
@@ -2921,7 +2921,7 @@ def main(_ctx=None, once=False):
                     pass
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
-                             # [(wt)] the bars in force at entry (the judge's
+                             # [(wv)] the bars in force at entry (the judge's
                              # receipt on this arm) + the admitted RSI (I23)
                              "bars": _fam_mum_bars(S),
                              "rsi_entry": (float(sig["rsi"])

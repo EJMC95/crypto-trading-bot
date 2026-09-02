@@ -1117,7 +1117,7 @@ class OversoldRebound(Carrier):
         median a 12h hold pays 0.009% of notional; v1's 29-day median hold
         paid ~0.50% before it earned anything. That tax is refused here.
 
-        [(wt)] `cap` is the position's ENTRY-STAMPED bar (the (bw) rule: bars
+        [(wv)] `cap` is the position's ENTRY-STAMPED bar (the (bw) rule: bars
         priced at entry govern the trade), so a judge lever starting or
         fading mid-hold cannot re-time an open position. None = the class
         value, byte-identical to before."""
@@ -1810,16 +1810,17 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
-    # [2026-09-02 (wt)] 🔮 georgia's SHADOW twin — the I17 call, made on the
-    # docket's own verdict after her LIVE arm retired at (wg): `undecidable`,
-    # n=232, mean +0.043%/trade, t=0.29, ~4,224 days to the bar at her
-    # measured rate (mean far below her own mde80). Positive but ungradeable
-    # — and with the live arm gone the twin's only remaining job, control
-    # arm for the judge, has no live arm to control for. Zero open paper
-    # positions. `freqtrade-georgia-v3` (the 28-Aug impulse-fade entry) is a
-    # SEPARATE row on its own clock and is NOT retired here. Eamon: "Proceed
-    # with everything in the organ review" (2-Sep).
-    "freqtrade-georgia":   "GEORGIA_SHADOW_RETIRED_OVERRIDE",
+    # [2026-09-02] 🔮 georgia v1 was ON the September slate and is DEFERRED,
+    # not retired — a refusal with evidence: her cap-5 trajectory carries a
+    # PRE-REGISTERED prediction (claims_ledger `georgia-entry-cap-5-days-to-
+    # gate`, registered 27-Aug, grade_after 10-Sep, days-to-gate ~187 at a
+    # higher mean) and the docket's ~4,233d horizon pools ~200 pre-cap closes
+    # against ~25 post-cap ones — the trajectory the prediction is ABOUT has
+    # not had time to exist (its own words). Retiring her before her read
+    # date voids a registered prediction, the I21/I25 shape. DECIDE AT THE
+    # 10-Sep GRADE: prediction fails -> retire here (the key is
+    # "freqtrade-georgia", override GEORGIA_RETIRED_OVERRIDE); holds -> she
+    # has earned the clock the prediction promised.
     # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by the operator
     # ("unretire mum and bring her back to life") and she is deliberately NOT
     # listed here. She returns as v2 — a different strategy (OversoldRebound,
@@ -1910,7 +1911,7 @@ def shadow_scan_order(coins, held, rets):
         return list(coins)
 
 
-#: [2026-09-02 (wt)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
+#: [2026-09-02 (wv)] 👩 MUM'S LEVER SURFACE — the family host's FIRST. The
 #: judge could not open a family pair because no shadow twin here could run
 #: a candidate: this file never imported fleet_tuning and stamped no `bars`
 #: receipt, so `ran_candidate` (fail-CLOSED) would exclude every close. Two
@@ -1957,7 +1958,7 @@ def apply_book_levers(strategy, prefix):
 
 
 def mum_bars(strategy):
-    """[(wt)] THE RECEIPT: the bars IN FORCE at entry, stamped into the
+    """[(wv)] THE RECEIPT: the bars IN FORCE at entry, stamped into the
     position and copied to the close row as `extra.bars` — the judge's
     `ran_candidate` proof that this close was taken under the candidate.
     {} for any carrier without these knobs, so the stamp is never invented."""
@@ -2489,7 +2490,7 @@ class Book:
                 # ONE constant so they cannot disagree.
                 extra={**({"entry_rank": m["entry_rank"]}
                           if m.get("entry_rank") is not None else {}),
-                       # [(wt)] the judge's receipt + the recorded RSI
+                       # [(wv)] the judge's receipt + the recorded RSI
                        **({"bars": m["bars"]}
                           if isinstance(m.get("bars"), dict) and m["bars"] else {}),
                        **({"rsi_entry": m["rsi_entry"]}
@@ -2891,7 +2892,7 @@ def main():
             # so the pre-pass warms nothing new; a coin with no usable bars
             # simply sorts after the measured ones, then hits `no_bars` as
             # before.
-            # [(wt)] the judge's xp.<book>.* levers reach this twin — mum's
+            # [(wv)] the judge's xp.<book>.* levers reach this twin — mum's
             # today; a no-op for carriers without the knobs.
             _moved = apply_book_levers(b.s, f"xp.{b.bot_id.split('-', 1)[-1]}.")
             if _moved:
@@ -3130,7 +3131,7 @@ def main():
                     stop_px = entry_px * (1 - dist)
                 _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
                          "accrued": 0.0, "stop_px": stop_px,
-                         # [(wt)] the bars in force at entry (mum's judge
+                         # [(wv)] the bars in force at entry (mum's judge
                          # receipt) + the RSI this entry was admitted at —
                          # the quantity rsi_max cuts, recorded (I23).
                          "bars": mum_bars(b.s),

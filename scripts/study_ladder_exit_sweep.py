@@ -162,25 +162,13 @@ def split_tag_exit(reason):
     return None, r
 
 
-def carrier_for(bot_row, include_retired=False):
+def carrier_for(bot_row):
     """The LIVE strategy object whose constants govern this row. Imported, never
-    retyped — a retyped constant is a constant that drifts.
-
-    [2026-09-02 (wt)] 🔮 georgia — the book this harness was built for — is
-    RETIRED on both arms, so by default her row has NO carrier here: a retired
-    book's replay is HISTORY and may not stand as a live baseline. Pass
-    `include_retired=True` to read the constants off the retired carrier for a
-    historical re-read; that path still reads the class, never a retyped copy.
-    """
+    retyped — a retyped constant is a constant that drifts."""
     base = bot_row.replace("-lshadow", "")
     for s in live_strategies():
         if s.bot == base:
             return s
-    if include_retired:
-        from lighter_family_bot import STRATEGIES
-        for s in STRATEGIES:
-            if s.bot == base:
-                return s
     return None
 
 

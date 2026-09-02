@@ -181,27 +181,6 @@ CARRIED = [
                     "against real closes instead of a model.",
         "closes_when": lambda: _has("brain_stats.py", "HYSTERESIS"),
     },
-    {
-        "id": "brain-mults-are-two-opinions-wide",
-        "owner": "session",
-        "what": "(so) wired every living book to the brain's stake multiplier, "
-                "including both real-money rows — and on the day it shipped the "
-                "brain had exactly TWO published opinions across twenty books "
-                "(taker short-divergence 0.75, Counterweight long 0.75). The "
-                "plumbing is done; the ORGAN is nearly silent, because a mult "
-                "needs >=30 era closes AND >=3 consecutive runs and most books "
-                "never reach the first. The open question is whether those "
-                "floors are right now that the range is 6.7x either way: a "
-                "floor calibrated for a 1.5x ceiling is not obviously the floor "
-                "for a 6.7x one.",
-        "why_open": "moving a brain floor changes what sizes EVERY book, real "
-                    "money included — it needs its own measurement (how many "
-                    "buckets would qualify at each floor, and what their "
-                    "realised expectancy was), not a judgement call.",
-        # closes when the floors stop being the shipped constants, i.e. someone
-        # has actually re-decided them rather than inherited them.
-        "closes_when": lambda: not _has("bot_learn.py", "PROMOTE_RUNS = 3"),
-    },
     # [2026-09-02] `taker-replay-blind-to-breakoutup` DELETED — BOTH halves
     # done. The blindness half was fixed 20-Aug (daily_up_resolver + the
     # relabel, forwarded by the tuner and incubator, selftest-pinned) and
@@ -218,11 +197,43 @@ CARRIED = [
     # steers only the divergence bracket, and the taker's selftest pins the
     # decoupling by AST. No widening shipped (the 48->96 evidence died to
     # leave-one-symbol-out); behaviour-neutral at ship.
-    # [2026-09-02 (wt)] `ceiling-slots-georgia` DELETED — 🔮 georgia is retired
-    # on BOTH arms now (live (wg), shadow (wt) on the organ-review docket:
-    # n=232, +0.043%/t, t=0.29, ~4,224 days to the bar), so the throttle
-    # step it waited on has no book to land on. (vj)'s rule: a carried row
-    # about a book that no longer trades is deleted, not carried.
+    {
+        "id": "ceiling-slots-georgia",
+        "owner": "session",
+        "what": "**(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE "
+                "HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 "
+                "days at full occupancy — an 11x speed-up'. Measured: her mean "
+                "hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE "
+                "slots need ~46 opens/day. Her signal supplies 40.9/day at "
+                "best. **Full occupancy is unreachable by construction, and it "
+                "was never the lever — CLOSES are.** She is flat 68.4% of the "
+                "time not because something refuses her but because she exits "
+                "in under 3 hours. (sv) took the one gate that cut closes for "
+                "no quality reason (the 2/h throttle, +0.633pp in favour of the "
+                "entry it refused, six splits) from 2 -> 3.",
+        "why_open": "the step is DELIBERATELY one notch: rank 3 has n=1 in her "
+                    "whole life because the cap was 2, so everything above it "
+                    "is extrapolation. `entry_rank` now rides every close, so "
+                    "the next step is graded from a query — re-run "
+                    "`scripts/study_georgia_entry_rank_2026-08-22.py` once "
+                    "rank-3 rows exist and take 3 -> 4 only if it holds. "
+                    "[26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, "
+                    "crash-dominated — decides NOTHING either way; 3 of the "
+                    "six (sv) controls have flipped negative, so the 3->4 "
+                    "step is REFUSED on current data and 3->2 reversion "
+                    "equally unsupported. The OTHER half is now MEASURED AND "
+                    "CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 "
+                    "paired, both intrabar conventions) put every widening "
+                    "below the harness's own +0.246pp calibration error, "
+                    "roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees "
+                    "between conventions, and the 1440m max_hold fired 0 of "
+                    "207 closes ever — exits are a dead dial on this book; "
+                    "the mean lever is ENTRY quality (rank1 +0.023% vs rank2 "
+                    "+0.656% on her own ledger).",
+        # closes when the next throttle decision has been taken on rank-3 data
+        "closes_when": lambda: _has(
+            "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
+    },
     {
         "id": "family-shadow-stale-writer",
         "owner": "OPERATOR",
@@ -239,7 +250,7 @@ CARRIED = [
                 "the SECOND time (646/647/648 before), and the family bot has no "
                 "claim_writer, so the two writers are unguarded ((hp) class). "
                 "Consequence: the (wp) scan-order parity port, mum v2's post-"
-                "28-Aug fixes and the (wt) lever surface have NOT reached the "
+                "28-Aug fixes and the (wv) lever surface have NOT reached the "
                 "shadow twins; the judge's pair cannot open until they do.",
         "why_open": "no lever in this repo swaps the serving container when "
                     "Railway's activation wedges: `up` builds and the swap "
@@ -249,7 +260,7 @@ CARRIED = [
                     "family-lighter-shadow (or `railway down` the service, "
                     "then `railway up` from clean main), then read back "
                     "extra.build on freqtrade-mum-lshadow — expected "
-                    "9c90be27d763/15 at 6639f1e, or the (wt) image's own id "
+                    "9c90be27d763/15 at 6639f1e, or the (wv) image's own id "
                     "once merged (16 files: fleet_tuning.py joins the COPY set).",
         "subject": ("freqtrade-mum-lshadow", "freqtrade-avo-maria-lshadow"),
         # closes when a human has read the stamp back and recorded it — only
@@ -306,14 +317,41 @@ CARRIED = [
     # lens the book refuses to trade is not a candidate; if the veto ever
     # lifts on fresh evidence, re-run the study THEN, on the closes that
     # lifted it.
-    # [2026-09-02 (wt)] `georgia-t-bar` DELETED — both her arms are retired
-    # (live (wg); shadow (wt): undecidable at ~4,224 days, the grader's own
-    # verdict), so the t bar is no longer a question about a trading book.
-    # [2026-09-02 (wt)] `carry-garrett-ranking-collision` DELETED — 🛢️
-    # Garrett retired (wt): unreachable, n=85, -1.090%/t, t=-2.22, upper
-    # bound -0.455%. The component is the carry/Rich Dad pair now, which
-    # audit_book_overlap.KNOWN_CELL_COLLISIONS already declares with its
-    # own ~12-Sep decision point.
+    {
+        "id": "georgia-t-bar",
+        "owner": "session",
+        "what": "🔮 georgia is 5 of 6 go-live bars, failing only t. "
+                "[MEASURED 26-Aug (tm) pass]: the weak t is ONE real 3-leg "
+                "flash-crash batch (22-Aug 05:11Z: XRP -16.4/NEAR -19.5/TRX "
+                "-3.0) = 73.5% of cluster variance — drop those 3 rows and "
+                "t_cluster reads +2.51. Tail CONTROL cannot clear the bar "
+                "honestly (at the live arm's own measured -7.17% crash fill "
+                "for a -5% stop, t_cluster caps at ~1.40), and the "
+                "stress-metric entry pause is REFUTED on the fleet's own "
+                "instrument (scout stress read 8.6bps at the 05:00:33 entry "
+                "vs the taker's 15bps bar; the 11.8 peak came 13 MINUTES "
+                "after the dump started). Exits are a dead dial (see "
+                "ceiling-slots-georgia). What remains is ENTRY QUALITY: the "
+                "crash entry rode a +7.5%-in-50-min parabolic spike, and "
+                "rank1 entries earn +0.023% vs rank2's +0.656%.",
+        "why_open": "[26-Aug (tp)]: the parabolic-extension veto was RUN and "
+                    "REFUTED-AS-OVERFIT, adversarially confirmed — the best "
+                    "cell's whole effect is the three crash rows; ex-crash it "
+                    "forgoes $+10.17 of winners and refuses 73% of "
+                    "trend_breakout's supply (I7); random-veto null P~0.10, "
+                    "forced-kept P=0.0002 / conditional P=0.37. BOTH her "
+                    "dials are now measured dead (exits at (tm), the entry "
+                    "filter at (tp)). What remains: (1) the rank1-vs-rank2 "
+                    "gap (+0.55pp, NOT explained by extension — corr −0.050) "
+                    "gets its own pre-registered study on fresh closes once "
+                    "rank-3 stamps accrue; (2) her live arm accrues under "
+                    "the (tm)-fixed policy — time, not tuning.",
+        "closes_when": lambda: False,
+    },
+    # [2026-09-02 (wv)] `carry-garrett-ranking-collision` DELETED — 🛢️ Garrett
+    # retired at (wv) (unreachable, n=85, t=-2.22, ub -0.455%); the component
+    # is the carry/Rich Dad pair, already declared in KNOWN_CELL_COLLISIONS
+    # with its own ~12-Sep decision point.
 ]
 
 

@@ -1,4 +1,4 @@
-## 2026-09-02 (wt) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": five docket retirements in one act, the breakout clock split and the incubator cage re-decided, the judge's lane moved to 👩 mum with the family host's first lever surface, and the organ board made a weekly job
+## 2026-09-02 (wv) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
 
 **Eamon, 2-Sep: *"Proceed with everything in the organ review."*** The (wp)
 review laid out seven keep-or-retire calls with a recommendation each, two
@@ -6,31 +6,33 @@ builds, and a tooling gap. This entry is all of it, shipped in the order I11
 asks — the carried work first — with PR #262 (the review's own fixes) merged
 and deployed to both live services at the top of the pass.
 
-### 1. THE DOCKET CALLS — five retirements, every one on a MEASURED exclusion
+### 1. THE DOCKET CALLS — MADE ON MAIN AS (wt) WHILE THIS PASS WAS OPEN; this entry reconciles rather than repeats
 
-I17-as-amended's bar is an upper bound of the mean at or below zero, or a
-zero rate — never a thin sample. Each row's number is the grader's own:
-
-| book | verdict | n | mean %/t | t | upper bound | mechanism |
-|---|---|---|---|---|---|---|
-| 🛢️ band-garrett | unreachable | 85 | −1.090 | −2.22 | −0.455% | VARIANT-scoped guard in the Farmer's module (`GARRETT_RETIRED_OVERRIDE`); 2 paper positions freeze |
-| 🧘 book-douglas | unreachable | 81 | −0.725 | −2.54 | −0.357% | own module idles (`DOUGLAS_RETIRED_OVERRIDE`) |
-| 📐 book-grimes | zero_ledger | 0 | — | — | 0 closes in 19d | own module idles (`GRIMES_RETIRED_OVERRIDE`); the scorecard survives as `scripts/study_grimes_gate_2026-08-16.py` |
-| 🔮 georgia shadow | undecidable | 232 | +0.043 | +0.29 | ~4,224 days | ROW-scoped in `lighter_family_bot.RETIRED_BOOKS` (`GEORGIA_SHADOW_RETIRED_OVERRIDE`); v3 NOT retired |
-| 💸 farmer shadow | unreachable | 200 | −0.525 | −2.32 | −0.233% | SHADOW-mode guard in the Farmer's module (`FARMER_SHADOW_RETIRED_OVERRIDE`); 5 paper positions freeze; retired the moment its judge lane moved (§3) |
-
-Both halves for all five (`RETIRED_ROWS` + `LEGACY_BOTS`); 🛢️ Garrett and
-both Farmer rows leave `audit_book_overlap.FUNDING_BOOKS` and the carry
-collision keys (the component drops to the carry/Rich Dad pair its own
-declaration pre-named); three carried rows about books that no longer trade
-are deleted (`carry-garrett-ranking-collision`, `georgia-t-bar`,
-`ceiling-slots-georgia` — (vj)'s rule; (wq)'s
-letter was taken on main while this pass was open, hence (wt)). Two roster pins were re-aimed per
-I26 rather than kept: `test_red_stop_slate` now proves the shared process
-with mum+avo, `test_georgia_stop_tags` reads the declaration.
-`tests/autonomy/test_docket_retirements_wt.py`. **Kept, as recommended:** 🧭
-nav-cook (upper bound −0.02%, marginal, half its sample pre-fix — fed 30
-more closes) and ⚖️ Counterweight (re-read 1-Oct).
+This pass retired 🛢️ garrett, 🧘 douglas, 📐 grimes, 💸 the Farmer's shadow
+and 🔮 georgia's shadow on the review's recommendation. Before it could land,
+the concurrent session shipped **the September slate (wt)** under the same
+grant: the same four exclusions (garrett t=−2.22 ub −0.455%; douglas t=−2.54
+ub −0.357%; farmer shadow ub −0.231%; grimes 0 closes / 0 of 31 retests) PLUS
+🧭 **nav-cook** (n=38, ub −0.020% — the review had said keep on a marginal
+exclusion; the slate re-read the grader's live payload and the exclusion
+held, so it stands) — and it **DEFERRED georgia's shadow** rather than
+retiring her, because her cap-5 trajectory carries a PRE-REGISTERED
+prediction with a 10-Sep read (`claims_ledger.georgia-entry-cap-5-days-to-
+gate`) and retiring her eight days before it voids the registration, the
+I21/I25 shape. **That refusal is right and this pass yields to it**: my
+georgia retirement is WITHDRAWN (`GEORGIA_SHADOW_RETIRED_OVERRIDE` never
+shipped), my duplicate guards on the four books are dropped in favour of
+(wt)'s (one owner — `RETIRED_SHADOW_BOOKS` for the funding arms, the idle
+guards for the own-module books), my roster re-aims that assumed georgia
+retired are reverted, and `test_september_slate.py` is the pin. What this
+entry KEEPS from the docket work, because (wt) did not carry it: 🛢️ Garrett
+and both Farmer rows leave `audit_book_overlap.FUNDING_BOOKS` and the two
+carry/Garrett collision keys (the component drops to the carry/Rich Dad
+pair its own declaration pre-named); the carried row
+`carry-garrett-ranking-collision` is deleted ((vj)'s rule); `georgia-t-bar`
+and `ceiling-slots-georgia` STAY carried, because she does; the fleet-table
+rows for the five and the RETIRED appendix are corrected in place per I12
+to what actually shipped. ⚖️ Counterweight stays KEPT (re-read 1-Oct).
 
 ### 2. THE BREAKOUT CLOCK SPLIT LANDED AS (wr) WHILE THIS PASS WAS OPEN — one owner kept, my lever withdrawn, and the cage re-decided on the incubator's evidence
 
@@ -160,6 +162,228 @@ and band-garrett-shadow (their guards), book-douglas-shadow and
 book-grimes-shadow (their guards), tide-rider-lighter-live / mum-live take the
 live host's `live.mum.*` reader and the breakout clock only from a merge
 carrying `[deploy-live]` in its subject — this PR's title does.
+
+## 2026-09-02 (wu) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
+
+**[RENUMBERED TWICE AT MERGE TIME, 2-Sep: (wp) → (wq) → (wu).** #262 — the support-system deep dive — landed on main first carrying `(wp)`, and its code cites it; while this branch re-merged, a second session landed `(wq)`, `(wr)` and `(ws)` on main and holds `(wt)` in flight — so the pushed entries keep their letters and this one moves again (letter rule 3). Every citation of THIS entry moved with it: the `fleet_bus.py` rails comment, the CLAUDE.md brain-stake-mults bullet, the PR title. The three commit subjects keep `(wp)` — git subjects are immutable, and the letter rule already says the commit log is not a letter index; grep the CHANGELOG headers.]**
+
+**Eamon, 2-Sep, on the edge audit's proposals: *"Proceed with advisements."***
+`(wo)` §6 proposed three changes for approval. The first — 🪁 kelly's clip
+$250 → $80 — was already shipped by `(vy)` a day earlier and is corrected in
+place there. These are the other two, and both live in ONE place:
+`fleet_bus.brain_clip_multi`, the accessor every living book already sizes
+through since `(so)`, so no bot changes a line and every book gets both rails
+on its next deploy.
+
+**AND THEN, BEFORE THE PUSH — Eamon: *"Let's make sure we don't constrict too
+much like we have in the past, our focus always on growth."*** He was right
+about the first cut, and it is recorded here because the shape is the general
+one (I26): both rails as first written bit on an ABSENCE. The drawdown scale
+began at HALF the bar, so a book in an ordinary 10% drawdown — INSIDE the range
+the gate grades it on — would have been cut to 0.75 while still earning the
+closes that decide it (I17: a book cannot earn evidence with no capital). And
+the lower-bound cap refused expansion on a DARK allocation organ and on a THIN
+era, so a second organ's outage could veto the brain's own MEASURED t≥2
+expansion, and "no reading yet" read as "no". Neither is a measured harm; both
+are the museum-of-avoided-losses shape. Reshaped as below — each rail now needs
+its number — with the mutations re-run.
+
+**RAIL 1 — THE DRAWDOWN SCALE.** The gate REPORTED each book's max drawdown and
+the 7-day governor scaled the fleet's live clips on FLEET drawdown, but no organ
+reduced a book's OWN clip when its own drawdown crossed the bar it is graded on.
+Measured in `(wo)`: kelly at 27.9% realised / 28.5% MTM against a 15% bar, a
+bootstrap probability of ruin inside 12 months of 1.00, and every entry still
+sized at the full clip. `dd_scale(bot)` reads the gate's own per-book
+`max_dd_pct` — the I9 worse-of-realised/MTM fold, not the realised-only number
+that read 5.3% on a book at 58% MTM — and returns **1.0 all the way to the
+published bar**, then falls linearly to **0.25** (the allocation organ's own
+probe floor, I17) at **twice** the bar. Past the bar is past the tested range:
+that is where the gate itself already says the book failed, and only there.
+**On the live payload the day it shipped:** mum-live 3.8%, avo-live 5.6%, taker
+5.1% → 1.0 and untouchable until 15% · kelly 28.5% → **0.325** · georgia's
+retired live row 58.3% → 0.25. Fail-OPEN: a dark or stale gate, an unknown book
+or a junk number scales NOTHING.
+
+**RAIL 2 — NEVER LEVER A WEAK EDGE.** I16 computes a CEILING only on a positive
+lower bound; nothing applied that to the brain's 6.7× MULTIPLIER. `lb_permits_
+expansion(bot)` now refuses a multiplier above 1.0 **only when `fleet_allocation`
+has measured the sized book's era lower bound at or below zero on at least
+`LB_CAP_MIN_N` = 10 era closes** (`claim_era` 0.0 with `n_era` ≥ 10 — the
+publisher's own era twin, the predicate `allocation_scale` has used since
+`(lx)`, and 10 is the (ua) computability floor, pinned equal to
+`fleet_allocation.MIN_N`). A dark or stale organ, an unknown book, a None or
+NaN claim, a thin era or junk all change NOTHING — the brain's own ladder
+(n≥30 era closes, Wilson lower bound, t≥2.0/2.5, three consecutive runs) is
+already an earned thing and governs alone in every one of those cases.
+Reductions pass through untouched: this rail can only ever make a book SMALLER.
+On the live payload: mum-live `claim_era` +0.003659 on n_era 52 (may expand if
+the brain ever says so), avo-live 0.0 on n_era 11 (may not — the audit's own
+LB −0.316%), kelly 0.0 on 383, taker +0.000727 on 150.
+
+**THE RECEIPT (I23).** The `mult` the accessor hands back is now the EFFECTIVE
+stake multiplier — brain × rails — because that is the quantity that actually
+sized the trade and the ledger's `brain_mult` stamp must record what cut it. The
+decomposition `{brain, lb_capped, dd_pct, dd_scale}` is kept in
+`fleet_bus.last_sizing[bot]` for any publisher that wants to attach it. The rails
+act on the FIRST bucket — the sized book at every call site (avo's live arm
+passes `(BOT_ROW, SHADOW_ROW)`) — and AFTER the `(sp)` gross-cap trim, so the
+trim's never-below-base floor keeps its meaning.
+
+**KILL SWITCH:** `BRAIN_RAILS_MODE=advisory` on a service returns both rails to
+neutral at the accessor, so the switch reaches every consumer without a redeploy
+([[a-kill-switch-must-reach-the-consumer]]). The brain's own clamp and the
+SafetyRails caps are untouched and stay senior.
+
+**MUTATIONS, 8 of 8 RED** (`tests/autonomy/test_brain_sizing_rails.py`, 27
+pins, payloads built by the publishers' own `fleet_allocation.build` /
+`set_era_twin` and `golive_readiness.book_payload`): cap reductions too · drop
+the cap · scale from half the bar · read the realised-only field · rails before
+the trim · remove the probe floor · ignore the kill switch · drop the thin-era
+guard. The rails-before-trim mutation was first written as an edit that did not
+actually reorder the code and SURVIVED — a mutation that changes nothing proves
+nothing — and was redone as a real block move before it counted. `fleet_bus
+--selftest` gained the same cases; its gross-bound and junk blocks install a
+positive era claim for their synthetic books so they keep testing the BRAIN's
+mechanics rather than tripping the cap.
+
+**CODEQL, on the PR:** five hygiene findings on the new lines — three `x != x`
+NaN idioms (now `math.isnan`), one fallback `except` without a comment, one
+unused test import — fixed before merge; a bot finding is a bug report.
+
+**DEPLOY: main only, by the (mm) rule.** `fleet_bus.py` is in `$_shared`, so
+every shadow service takes the rails on this push. Neither live row trades
+differently today — both scale 1.0, and the brain's ONE expansion opinion,
+👩 mum-live `long-oversold-rebound` at **1.25x** (published since run 808,
+t=2.06 against the 2.0 bar), passes both rails unchanged (era bound +0.366%,
+maxDD 3.8%) — so a live restart buys nothing and is not dispatched; the rails
+ride the next live deploy that does qualify. Kelly is the one book the rails
+bite today: her next entries size at 0.325 × $80 ≈ $26 until her drawdown reads
+under 15% again. **[CORRECTED IN PLACE per I12 before this merged: this
+paragraph read "the brain has no expansion opinion on either" and the next one
+read "the brain's expansion ladder has NEVER fired for either" — both false on
+the payload the day they were written; mum-live's 1.25x was seven runs old.]**
+
+**THE GROWTH HALF, MEASURED — `scripts/study_brain_floors_2026-09-02.py`,
+calibrated 3 of 3 against the live brain's own published mults before it was
+allowed to speak ((gx)).** The audit says where the evidence points — 👩 mum
+(LB +0.366%) and 🎫 the taker's `long-breakoutup` — and the carried row
+`brain-mults-are-two-opinions-wide` asked whether the brain's expansion floors,
+written for a 1.5× ceiling, are the right floors for a 6.7× one. TODAY, by the
+owner's own `qualify_v3` over the era-scoped graded ledger: mum-live clears
+1.25x and nothing else does; the taker's `long-breakoutup` (n=115, n_eff 86,
++$53.77) is held at 1.0x by the **win-rate bars** (post_wr 0.529 ≤ 0.55, w_lo
+0.487 ≤ 0.50) with `t` 1.97 a hair under 2.0 as well; 🌾 carry's `short` (n=60,
+t=2.17) is held by the win-rate bars ALONE — the I15 shape, a lose-often-win-big
+bucket that an expand ladder gated on hit rate structurally cannot back, sitting
+in the actuator that has sized real money since (so). FORWARD, the number that
+decides (I25 — judged against each bucket's OWN era mean, on the trades OPENED
+in the day after each qualification, living buckets only, 1-Jul → 2-Sep): under
+the SHIPPED bars every 1.25x/1.5x the ladder would have published on a Lighter
+book earned BELOW that bucket's own mean — the 1.25x rung −2.0pp of excess on
+15 trades, net **−$2.48** of extra P&L — while the control (positive, n≥30, NOT
+qualified: 439 trades) sat +0.05pp above its own mean: qualification selects a
+hot window, and the window reverts. The three pre-declared loosenings do not
+earn either: win-rate bars DROPPED (the I15 fix) **−$6.5** (it admits the
+taker's breakoutup on 6 days → 29 forward trades at −0.789%/trade against its
++1.182% mean, and carry's short on 17 days that produced 2 trades); every `t`
+bar −0.5, −$2.4; n floor 30 → 20, **+$6.2** on ONE bucket (mum-live admitted a
+day earlier). The one large number in the walk — +$435 across the 2.0–4.5x
+rungs — is retired HL-era `perps-donchian-breakout`, alive only in early July
+and a different venue: history, not a Lighter claim. **VERDICT: THE FLOORS ARE
+KEPT**, a refusal with evidence (I19), and the carried row is CLOSED because the
+measurement it asked for was made and decided — not because a floor moved. The
+I15 mechanism is real and costs ~$0 measured forward today; it is recorded so
+that if a lose-often-win-big bucket ever carries a positive era bound at t≥2
+(I16), the first thing re-run is this instrument, never a bar. The growth
+channel this leaves is DECIDABILITY on the positive buckets (I17/I22), not
+looser bars.
+
+## 2026-09-02 (wt) — THE SEPTEMBER SLATE: five I17 calls made under Eamon's delegated grant, one deferral the evidence forced, and the retired live service stopped
+
+**Eamon, 2-Sep: *"I give you permission to fix the above"*** — over the
+docket presented at the end of the further-improvements pass. Every call
+was re-read from the grader's OWN live payload before shipping (all six
+rows fresh, oldest age 2,068s — I1 first), not from (wp)'s snapshot, and
+the numbers held.
+
+**RETIRED, each on a measured exclusion or zero rate (I17-as-amended's own
+bar):**
+* 🛢️ **garrett** (`band-garrett-lshadow`) — `unreachable`: era n=85, mean
+  −1.090%/trade, t=−2.22, **upper bound −0.455% ≤ 0**. The thin-tier
+  founding claim (+$14.83 both halves) did not survive its own ledger.
+  2 open paper positions freeze.
+* 🧘 **douglas** (`book-douglas-lshadow`) — `unreachable`: n=81, −0.725%,
+  t=−2.54, **ub −0.357%**. Zero open positions.
+* 💸 **the Farmer's SHADOW arm** (`perps-funding-lighter-lshadow`) —
+  `unreachable`: n=200+, −0.521%, **ub −0.231%**. Its control-arm duty
+  ended at (ta) (judge lane `stood_down`); 5 paper positions freeze. The
+  LIVE arm's (ta) flatten mechanism is untouched and pinned so.
+* 🧭 **nav-cook** (`nav-cook-lshadow`) — `unreachable`: n=38, −0.193%,
+  **ub −0.020%** — the thinnest exclusion on the slate and still one, on
+  the post-(tz) power-gated verdict; every close since the (sa)
+  confirm-duration fix ran the corrected 600s gate and the mean stayed
+  negative. DECLARED: the [45,60)bps band loses its owner — 🪁 band-kelly's
+  floor is 60bps, so the dislocation tiling now has a hole below it;
+  re-opening that band is a fresh measurement, never a resurrect.
+* 📐 **grimes** (`book-grimes-lshadow`) — `no_rate`: ZERO closes ever, and
+  the (om) fixed-universe study measured the gate's own bar crossed in
+  **0 of 31 retests over 90 days** — waiting cannot decide it. The
+  founding thesis stays honest: none of twelve variants beat random, so
+  the book shipped the TEST, and the test's verdict is that nothing
+  passes. Equity exactly $1000.
+
+**DEFERRED — the refusal the evidence forced: 🔮 georgia v1 stays.** She
+was on the docket (`undecidable`, ~4,233d) and retiring her TODAY would
+void a PRE-REGISTERED prediction eight days before its own read:
+`claims_ledger.georgia-entry-cap-5-days-to-gate` (registered 27-Aug,
+grade_after **10-Sep**) predicts her cap-5 trajectory reaches days-to-gate
+~187 at a higher mean, and the docket's horizon pools ~200 pre-cap closes
+against ~25 post-cap ones — the trajectory the prediction is ABOUT "has
+not had time to exist" (the claim's own words). That is the I21/I25 shape
+(never grade a registration by cutting it off), so the call defers to her
+own read date: prediction fails → retire (the RETIRED_BOOKS key and
+override are named in place); holds → she earned the clock. Her v3
+redesign row (28-Aug, ~10 days to gate) keeps trading either way. The
+deferral is PINNED both directions in `test_september_slate.py` — she can
+be neither swept in early nor quietly kept past a failed read.
+
+**MECHANISMS, per precedent:** own-module books idle-the-whole-process
+(the 🌊/📊/🧙 shape, never sys.exit); the two funding-module arms are
+ROW-scoped by RESOLVED id (`RETIRED_SHADOW_BOOKS` — each service runs one
+bot_id, so idling is row-scoped by construction; the garrett variant and
+farmer shadow idle, an unlisted variant and the live arm do not). Both
+halves shipped for all five (RETIRED_ROWS hides, LEGACY_BOTS prunes);
+ledgers kept; per-book override envs revert. Pinned by
+`tests/autonomy/test_september_slate.py` — the guard tests are DRIVEN,
+not grepped (main() called with sleep trapped), because the first
+mutation round measured a source-level version passing a renamed
+override env; **8/8 mutations RED** across both rounds.
+
+**CLAIMS:** `georgia-golive-justification` retires with its SUBJECT (the
+live deployment it argued for is unwound; it fired correctly at (vm),
+which was its job). Her two LIVING claims stay — the exit-sweep refusal
+and the entry-cap prediction the deferral rests on. Two order/date-pinned
+claims tests re-aimed at fixtures (a test about a mechanism must not
+break when a claim retires).
+
+**ALSO: `trail-blazer-live` is STOPPED** — Eamon's grant covered the
+classifier-blocked one-liner; executed via `railway down`, read back
+`REMOVED` at 05:33:45Z on the deployment list. Tidiness, not the
+retirement: the (ta) code guard stays the durable half and idles any
+resurrected container.
+
+**WHAT THE FLEET LOOKS LIKE AFTER:** the five retired books were a
+combined **−$99.7** of paper P&L producing evidence whose sign their own
+grader had already excluded; the living roster concentrates on the books
+that can still be decided — the live pair (🙏 avo + 👩 mum), georgia's
+two clocks until 10-Sep, the family/carry/counterweight/kelly/hull/
+kiyosaki/taker/sniper shadow set, and the parliament pair. DEPLOY: every
+touched service is on the auto path (band-garrett-shadow,
+book-douglas-shadow, nav-cook-shadow, book-grimes-shadow,
+funding-farmer-shadow, freqtrade-bots, pnl-dashboard);
+`lighter_family_bot.py` is shared live surface but the change is a
+comment-only deferral note for the live image — DEFERRED, no marker, and
+said so.
 
 ## 2026-09-02 (ws) — THE SENTINEL EARNS ITS FEAR THE WAY IT EARNS ITS GREED: one graded bar for both proposal directions
 

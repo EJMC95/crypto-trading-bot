@@ -240,7 +240,7 @@ QUANTITIES = {
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "hours",
         "min_n": MIN_N_LEDGER, "precision": 0.01, "censor_at": 48.0,
         "gate": "hold hours at close; a cap of x would have cut every hold >= x"},
-    # [2026-09-02 (wt)] the breakout arm's OWN clock, split from
+    # [2026-09-02 (wv)] the breakout arm's OWN clock, split from
     # taker.max_hold_h. Scoped to the breakout lenses' closes by reason
     # substring ("long-breakoutup_hold", "long-breakout_trail", ...), which is
     # the population this bar cuts through; censored at the default because a
@@ -250,8 +250,8 @@ QUANTITIES = {
         "abs": False, "dir": "le", "to_q": 1.0, "unit": "hours",
         "min_n": MIN_N_LEDGER, "precision": 0.01,
         "gate": "hours from an _sl close to the next entry on the same symbol"},
-    # [2026-09-02 (wt)] 👩 mum's judge lane. rsi_max cuts the RSI at entry
-    # (stamped `rsi_entry` on every close since (wt)); max_hold_min is a
+    # [2026-09-02 (wv)] 👩 mum's judge lane. rsi_max cuts the RSI at entry
+    # (stamped `rsi_entry` on every close since (wv)); max_hold_min is a
     # minutes lever profiled against hold HOURS, hence to_q 1/60.
     "xp.mum.rsi_max": {
         "source": "ledger:freqtrade-mum-lshadow",
@@ -1378,7 +1378,7 @@ def _measure(dsn):                                        # pragma: no cover
             groups = 1
             rows = [r for r in ledger(q["source"].split(":", 1)[1]) if r[1]]
             if kind == "hold_h":
-                # [(wt)] optional `arg` = a substring of the exit reason that
+                # [(wv)] optional `arg` = a substring of the exit reason that
                 # scopes the sample to one lens family (e.g. "-breakoutup_"),
                 # so the breakout clock is profiled against BREAKOUT holds
                 # and never against the divergence bracket's. None = all rows,

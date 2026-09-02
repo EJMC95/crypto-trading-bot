@@ -37,6 +37,16 @@ LEGACY_BOTS = [
     # is the filter that actually hides her. The 77 real-money closes stay
     # in the ledger as always.
     "freqtrade-georgia-lighter",
+    # [2026-09-02 THE SEPTEMBER SLATE] the prune half of the five I17 calls
+    # (see pnl_dashboard.RETIRED_ROWS for the verdicts, each the grader's own
+    # current number). LEDGERS untouched — this removes only the frozen
+    # summary rows so they cannot go stale and page. georgia v1 is DEFERRED
+    # to her pre-registered 10-Sep read and stays live; her v3 row too.
+    "band-garrett-lshadow",
+    "book-douglas-lshadow",
+    "perps-funding-lighter-lshadow",
+    "nav-cook-lshadow",
+    "book-grimes-lshadow",
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
     # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the
@@ -69,15 +79,6 @@ LEGACY_BOTS = [
     # in the fleet totals. Reversible via BARNES_RETIRED_OVERRIDE=run, which
     # also stops the prune mattering (the bot re-upserts on its next publish).
     "band-barnes-lshadow",
-    # [2026-09-02 (wt)] the organ-review docket calls — prune half. Ledgers
-    # kept (garrett 85, douglas 81, georgia shadow 232 closes; grimes none);
-    # the summary rows are pruned so four frozen cards cannot sit in the
-    # fleet totals. Reversible per book (GARRETT_/DOUGLAS_/GRIMES_/
-    # GEORGIA_SHADOW_RETIRED_OVERRIDE=run) — a resurrected bot re-upserts.
-    "band-garrett-lshadow", "book-douglas-lshadow",
-    "book-grimes-lshadow", "freqtrade-georgia-lshadow",
-    # [(wt)] 💸 the Farmer's shadow twin — 239 closes KEPT in the ledger
-    "perps-funding-lighter-lshadow",
     "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
     "freqtrade-dad-lshadow",
     # [2026-08-19 (ro)] 👩 mum-lshadow is NOT pruned: the (rd) retirement was

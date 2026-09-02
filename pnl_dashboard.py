@@ -200,6 +200,21 @@ RETIRED_ROWS = {
                 # bot_pnl after every LEGACY_BOTS boot-prune and THIS set is
                 # the operative filter. Her SHADOW twin keeps trading.
                 "freqtrade-georgia-lighter",
+                # [2026-09-02 THE SEPTEMBER SLATE — five I17 calls made in one
+                # delegated operator act (Eamon: "I give you permission to fix
+                # the above"), every one on the grader's own CURRENT verdict:
+                # garrett/douglas/farmer-shadow/nav-cook `unreachable` with the
+                # upper bound at or below zero (−0.455/−0.357/−0.231/−0.020%),
+                # grimes `no_rate` (0 closes ever; gate open in 0 of 31
+                # fixed-universe retests). georgia v1 was on the slate and is
+                # DEFERRED to her own pre-registered 10-Sep read (see
+                # lighter_family_bot.RETIRED_BOOKS). Hide half; prune half in
+                # cleanup_legacy_bots; guards in each module.]
+                "band-garrett-lshadow",
+                "book-douglas-lshadow",
+                "perps-funding-lighter-lshadow",
+                "nav-cook-lshadow",
+                "book-grimes-lshadow",
                 "perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
@@ -234,18 +249,6 @@ RETIRED_ROWS = {
                 # via BARNES_RETIRED_OVERRIDE=run. Both halves shipped
                 # together; LEGACY_BOTS prunes.
                 "band-barnes-lshadow",
-                # [2026-09-02 (wt)] THE ORGAN-REVIEW DOCKET CALLS, made in one
-                # act (Eamon: "Proceed with everything in the organ review"):
-                #   band-garrett   unreachable  n=85  -1.090%/t t=-2.22 ub -0.455%
-                #   book-douglas   unreachable  n=81  -0.725%/t t=-2.54 ub -0.357%
-                #   book-grimes    zero_ledger  0 closes in 19d, gate never opened
-                #   georgia-lshadow undecidable n=232 +0.043%/t t=0.29 ~4,224d
-                # Each guarded in its own module/roster; reversible per book.
-                "band-garrett-lshadow", "book-douglas-lshadow",
-                "book-grimes-lshadow", "freqtrade-georgia-lshadow",
-                # [2026-09-02 (wt)] 💸 the Farmer's SHADOW twin — its judge
-                # lane moved to mum; own record unreachable (n=200, t=-2.32).
-                "perps-funding-lighter-lshadow",
                 "pm-gillard-lshadow", "pm-abbott-lshadow",
                 "pm-rudd-lshadow", "pm-morrison-lshadow",
                 "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",

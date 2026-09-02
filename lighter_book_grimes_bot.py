@@ -722,24 +722,22 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
-    # ---- RETIRED 2026-09-02 (wt): the I17 keep-or-retire call on a book
-    # with ZERO closes in 19 days — Eamon: "Proceed with everything in the
-    # organ review" (2-Sep). The gate never opened on the fixed universe
-    # (last scorecard: keltner n=123 t=-0.16, failtest n=373 t=-1.43,
-    # pullback n=140 t=-0.82, all CLOSED); a gate that stays shut is a
-    # STUDY, not a book (I22), and the founding claim — none of twelve
-    # variants beat random entries — still governs. The scorecard survives
-    # as an instrument: `scripts/study_grimes_gate_2026-08-16.py` replays
-    # the same roster on demand, so the call stays falsifiable without a
-    # row, a clock or a slot of the fleet budget. Own module + own service:
-    # the process IDLES, never exits. GRIMES_RETIRED_OVERRIDE=run.
+    # [2026-09-02 RETIRED — the I17 zero-rate call ((lo)'s class), Eamon's
+    # delegated docket act. ZERO closes ever in 20 days; horizon `no_rate`;
+    # and the (om) fixed-universe study measured the gate's bar crossed in
+    # 0 of 31 retests over 90 days — the book's own rule structurally never
+    # opens, so waiting does not decide it. Zero open positions, equity
+    # exactly $1000. Its founding claim is intact and honest: none of the
+    # twelve pre-declared variants beat random, which is why it shipped the
+    # TEST — and the test's verdict is that nothing passes. Idle-the-whole-
+    # process (own module + own service); ledgers kept.]
     if os.environ.get("GRIMES_RETIRED_OVERRIDE", "").strip().lower() \
             not in ("run", "1", "true") and not args.once:
-        print("book-grimes (📐 The Technician) is RETIRED (2-Sep (wt)): 0 "
-              "closes in 19 days, every setup's gate closed on the fixed "
-              "universe — a study, not a book (I22). Idling: no venue calls, "
-              "no publishes, ledgers kept. GRIMES_RETIRED_OVERRIDE=run to "
-              "resurrect.", flush=True)
+        print("book-grimes (📐 The Technician) is RETIRED (2-Sep): 0 closes "
+              "ever, horizon no_rate, gate open in 0 of 31 fixed-universe "
+              "retests over 90d (I17, the zero-rate class). Idling: no venue "
+              "calls, no publishes, ledgers kept. GRIMES_RETIRED_OVERRIDE=run "
+              "to resurrect.", flush=True)
         while True:
             time.sleep(3600)
 

@@ -78,6 +78,35 @@ from venues.safety import capital_adjusted_day_start, open_notional
 VARIANT = os.environ.get("FUNDING_VARIANT", "").strip()
 BOT = VARIANT or "perps-funding-lighter"
 
+# [2026-09-02 THE SHADOW ARMS RETIRE — the I17 calls on the grader's own
+# measured exclusions, Eamon's delegated docket act ("I give you permission
+# to fix the above"). ROW-scoped by construction: each service runs exactly
+# ONE bot_id, so idling the process whose resolved id is in this map silences
+# nothing else. The LIVE arm's (ta) retirement (fleet_bus.RETIRED_LIVE_ARMS)
+# is a different mechanism — it FLATTENS real positions — and is untouched.
+#   perps-funding-lighter-lshadow  💸 the Farmer's shadow twin: era n=200+,
+#       mean −0.521%/trade, upper bound −0.231% ≤ 0 — excluded. Its control-
+#       arm duty ended when the live arm retired ((ta): judge lane
+#       stood_down); 5 open paper positions freeze, the (mr) precedent.
+#   band-garrett-lshadow  🛢️ Garrett: era n=85, mean −1.090%/trade, t=−2.22,
+#       upper bound −0.455% ≤ 0 — excluded. The thin-tier founding claim
+#       (+$14.83 both halves) did not survive contact with its own ledger;
+#       2 open paper positions freeze.
+# Idle, never sys.exit (restartPolicy=always makes an exit a crash-loop).]
+RETIRED_SHADOW_BOOKS = {
+    "perps-funding-lighter-lshadow": "FARMER_SHADOW_RETIRED_OVERRIDE",
+    "band-garrett-lshadow": "GARRETT_RETIRED_OVERRIDE",
+}
+
+
+def shadow_book_retired(bot_id):
+    """True when this process's OWN resolved row is a retired shadow book and
+    its override env is not set. One rule, both variants; the caller idles."""
+    env = RETIRED_SHADOW_BOOKS.get(bot_id)
+    if not env:
+        return False
+    return os.environ.get(env, "").strip().lower() not in ("run", "1", "true")
+
 
 def _standby_key(bot_id):
     """[2026-08-04] The bot_state key a STOOD-DOWN container reports on —
@@ -1922,6 +1951,7 @@ def _cohort_long_state(fr, cohort):
     """[(wp)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
     the read degrades to the pooled pair — this site's prior behaviour."""
     try:
+        import fleet_bus
         return fleet_bus.cohort_long_state(fr, cohort)
     except Exception:  # noqa: BLE001
         fr = fr if isinstance(fr, dict) else {}
@@ -1964,54 +1994,22 @@ def main():
             "experiment judge's shadow arm. An inherited default must never "
             "decide that. Set VENUE=lighter_live or VENUE=lighter_shadow "
             "explicitly (or pass --once for an offline smoke).")
-    # ---- 🛢️ band-garrett RETIRED 2026-09-02 (wt): the I17 call on the
-    # thin-tier variant — Eamon: "Proceed with everything in the organ
-    # review" (2-Sep). Measured on its own ledger at the grader: n=85, mean
-    # -1.090%/trade, t=-2.22, halves -26.41/+0.92, upper bound -0.455% <= 0
-    # — the sample excluded a positive mean. The study's +$14.83 [1e5,2e6)
-    # cell did not survive contact with fills. VARIANT-scoped, because this
-    # module also runs 💸 the Farmer's shadow twin (VARIANT=""), which is a
-    # different book on a different service and must not be idled by
-    # Garrett's call — the (mr)/(ta) row-scope rule. Two open paper positions
-    # FREEZE (the (mr) precedent). The process IDLES, never exits.
-    # GARRETT_RETIRED_OVERRIDE=run resurrects.
-    if VARIANT == "band-garrett" and not args.once and \
-            os.environ.get("GARRETT_RETIRED_OVERRIDE", "").strip().lower() \
-            not in ("run", "1", "true"):
-        print("band-garrett (🛢️ Garrett) is RETIRED (2-Sep (wt)): n=85, "
-              "-1.090%/trade, t=-2.22, upper bound -0.455% <= 0 — the sample "
-              "excluded a positive mean (I17). Idling: no venue calls, no "
-              "publishes, ledgers kept. GARRETT_RETIRED_OVERRIDE=run to "
-              "resurrect.", flush=True)
-        while True:
-            time.sleep(3600)
-
-    # ---- 💸 the Farmer's SHADOW twin RETIRED 2026-09-02 (wt), the day the
-    # judge's lane moved to 👩 mum. Its only remaining job since the live arm
-    # retired at (ta) was CONTROL ARM for a judge lane that no longer exists,
-    # and its own record is the docket's: n=200, mean -0.525%/trade, t=-2.32,
-    # halves +0.09/-25.51, upper bound -0.233% <= 0 — the sample excluded a
-    # positive mean (I17). Five open paper positions FREEZE (the (mr)
-    # precedent). Scoped to the un-varianted SHADOW mode so 🛢️ Garrett's
-    # guard above and the (retired) live arm's own path are untouched. The
-    # process IDLES. FARMER_SHADOW_RETIRED_OVERRIDE=run resurrects.
-    if not VARIANT and not args.once and \
-            os.environ.get("VENUE", "").strip() == "lighter_shadow" and \
-            os.environ.get("FARMER_SHADOW_RETIRED_OVERRIDE", "").strip().lower() \
-            not in ("run", "1", "true"):
-        print("perps-funding-lighter-lshadow (💸 the Farmer's shadow twin) is "
-              "RETIRED (2-Sep (wt)): n=200, -0.525%/trade, t=-2.32, upper bound "
-              "-0.233% <= 0 (I17), and the judge's lane it was the control arm "
-              "for moved to mum. Idling: no venue calls, no publishes, ledgers "
-              "kept. FARMER_SHADOW_RETIRED_OVERRIDE=run to resurrect.",
-              flush=True)
-        while True:
-            time.sleep(3600)
-
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=("--live" in sys.argv))
     bot_id = ctx.bot_id
     _SUPERVISOR_BOT_ID = bot_id
+
+    # [2026-09-02] retired SHADOW arms idle here — see RETIRED_SHADOW_BOOKS
+    # at the top of the file for the measured exclusions. Keyed on the
+    # RESOLVED id, so the live arm's own (ta) guard is untouched and a
+    # variant that is not in the map runs exactly as before.
+    if shadow_book_retired(bot_id) and not args.once:
+        print(f"{bot_id} is RETIRED (2-Sep): the grader's era sample has "
+              "EXCLUDED a positive mean (see RETIRED_SHADOW_BOOKS — I17). "
+              "Open paper positions freeze; ledgers kept. Set "
+              f"{RETIRED_SHADOW_BOOKS[bot_id]}=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
     broker = ctx.broker
     dry_run = ctx.dry_run
     # [19-Aug (qi)] own=bool(VARIANT): a VARIANT book's clip is part of its
