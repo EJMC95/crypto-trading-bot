@@ -70,7 +70,18 @@ import os
 import re
 import sys
 import json
-import tomllib
+
+# [2026-09-02] `tomllib` is stdlib only on 3.11+. CI runs 3.11 (tests.yml), but
+# this repo's own `.venv` is 3.9.6 — so this bare import made the module
+# unimportable LOCALLY, and `tests/autonomy/test_arm_pairing_drift.py` imports
+# it at module scope. The result: `pytest tests/autonomy/` died at COLLECTION,
+# so a session running the autonomy suite locally got a stack trace and ZERO
+# tests instead of coverage, while CI stayed green and nobody saw it. `tomli`
+# is the same parser under its pre-stdlib name and is already installed.
+try:
+    import tomllib
+except ModuleNotFoundError:                # pragma: no cover — 3.11+ has it
+    import tomli as tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOW = os.path.join(ROOT, ".github", "workflows", "railway-redeploy.yml")

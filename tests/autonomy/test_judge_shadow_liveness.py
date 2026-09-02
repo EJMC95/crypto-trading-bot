@@ -34,7 +34,7 @@ LB, SB = SPEC["live_bot"], SPEC["shadow_bot"]
 
 @pytest.fixture(autouse=True)
 def _georgia_live_for_mechanics(monkeypatch):
-    """[(we)] These tests use georgia's pair as the stand-in for a LIVE pair to
+    """[(wg)] These tests use georgia's pair as the stand-in for a LIVE pair to
     exercise the judge's liveness/capacity/clock mechanics. Her live arm is now
     retired (test_georgia_live_retired.py), which correctly makes the precheck
     return `stood_down` and short-circuits the very mechanics under test — so

@@ -2462,7 +2462,7 @@ def main(_ctx=None, once=False):
                 mmf_rows = {}
         except Exception:  # noqa: BLE001
             mmf_rows = {}
-        # [2026-09-02 (we)] 🔮 georgia's LIVE ARM RETIRED — Eamon's "retire +
+        # [2026-09-02 (wg)] 🔮 georgia's LIVE ARM RETIRED — Eamon's "retire +
         # reallocate to mum" call on her measured-negative, unreachable in-era
         # record (n=30 t=-1.70, maxDD 37.6% MTM, ~-$6.4/day; v3 also negative).
         # BOOK-SCOPED BY CONSTRUCTION: `live_arm_retired(BOT_ROW)` is True only

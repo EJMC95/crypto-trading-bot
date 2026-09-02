@@ -1,4 +1,4 @@
-## 2026-09-02 (we) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
+## 2026-09-02 (wg) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
 
 Eamon, asked to choose on 🔮 georgia (measured-negative, `unreachable`, bleeding
 ~$6.4/day on ~$220): **"Retire + reallocate to mum."** This ships the CODE half —
@@ -58,7 +58,7 @@ Then Eamon moves the ~$220 georgia → mum in Lighter; mum absorbs it cleanly vi
 every loop, so a deposit is never stranded (the (sr) trap avo hit is already closed
 on mum).
 
-## 2026-09-02 (wd) — 🙏 AVO'S MAXDD RAIL WAS MEASURING 4% OF HER BOOK AND CALLING IT 20% — a frozen birth-seed denominator idled a funded real-money arm ~103h; the risk denominator now tracks the funded book
+## 2026-09-02 (wf) — 🙏 AVO'S MAXDD RAIL WAS MEASURING 4% OF HER BOOK AND CALLING IT 20% — a frozen birth-seed denominator idled a funded real-money arm ~103h; the risk denominator now tracks the funded book
 
 Eamon: *"Real money bot optimisations, edges, expansion, where can we see the
 3 live bots trade even better with what we know now"*. Measured the live trio
@@ -132,7 +132,129 @@ and diverge on the first deposit, and only one of them should stay frozen.
   1-Oct read. Recommendation deferred to Eamon per I17 / P6; no size or
   retirement change taken here.
 
+## 2026-09-02 (we) — THE ORPHAN HAD NO DETECTOR: the daily review re-derived (wb)'s split brain from the DB alone, and the class now has an executable guard — 7/7 mutations red
+
+The 2-Sep daily evidence review ran against a five-day gap (no review 29-Aug →
+1-Sep) and independently re-derived `(wb)`'s finding from the **database only**,
+with no Railway MCP and no container roster. Recording it because the two paths
+agreeing matters, and because the half `(wb)` left open is the half that stops
+this recurring: **it diagnosed the instance and prepared a support ticket; there
+was still nothing that would CATCH the next one.**
+
+**THE RE-DERIVATION, and it is a structural test rather than a hunch.** A book's
+summary row and that book's own trades are written by the same process through
+the same `_stamp_build` hook, off a per-process `_BUILD_CACHE`. So they agree
+ALWAYS — unless two processes are writing one book. Measured 2-Sep:
+
+    paper_trades.extra.build  = 4d93497e56d5   (b638893..HEAD, 18 commits)
+    bot_pnl.extra.build       = edc3032d1c46   (29135cd..d2c0cb9, pre-28-Aug)
+
+A **60-commit scan** against the image's own COPY set (`Dockerfile.familyshadow`
+omits `fleet_tuning.py`, so 15 files, not the repo tree's 16 — the `(fd)` trap)
+puts those in **DISJOINT, non-adjacent windows**: no commit produces both. Two
+code states, one `svc`. Corroborated three ways — `bot_equity_history` matches
+the live container's log **exactly** (22:07:31Z eq=1026.92 open=12 ↔ log
+`22:12:28Z mum: $1026.92 12 open`) while `bot_pnl` matches neither; the rows
+refresh on a ~9-min cadence that does not align with the container's loop; and
+👩 mum's row reports **9 closes against 56** in her ledger.
+
+**WHY NOTHING CAUGHT IT — three guards green for five days, each for its own
+structural reason, and this is the point of the entry:**
+* `audit_ledger_integrity` tests same-pair POSITION OVERLAP. Two processes whose
+  books never hold one coin at once produce zero overlaps — blind by
+  construction, and it reported `ok` on all four family books throughout.
+* `audit_code_currency` DID fire `BEHIND-OWN`. But a reader who checks it against
+  the running container's own log sees a healthy container trading all four
+  books and files it as the documented cry-wolf class. It was right and was
+  dismissed — twice, including once in this session's own first pass.
+* `evidence_review`'s build-drift arm defers with *"FILE SET, not necessarily
+  code"* whenever `build_n` differs — and for this image it **always** differs
+  (15 vs 16). That arm can never fire on these three books. A bounded check
+  reporting clean outside its bound.
+
+**SHIPPED: `scripts/audit_writer_consistency.py`** — asks the one question none
+of them asks, *does a book's own row carry the same build stamp as its own newest
+close?* Live run: **4 findings, 12 books agree** — and the 12 are the control
+group (I6) that makes the 4 mean something. It also catches the quieter half,
+**ORPHAN-BOOK**: a book whose ledger is moving while it has no summary row at all
+(🔭 georgia-v3, 46 closes, newest 0.6h ago, no row) — invisible to every organ
+that enumerates books from `bot_pnl`. Two regimes: with `DATABASE_URL` it audits
+the fleet, without one it SKIPs clean rather than reddening CI for want of a
+database. Pinned by `tests/autonomy/test_writer_consistency.py`, **7/7 mutations
+red** — including one the first round left ALIVE: the orphan branch lived inside
+the DB walk where no test could reach it, so `classify_orphan` was extracted, and
+it gained the retirement control it always needed (a retired book keeps its
+ledger forever, so the CLOCK is what separates an orphan from a retirement — 🧲
+Snap Back at 670.9h must never be a finding).
+
+**AND THE LOCAL TEST SUITE HAD BEEN RUNNING ZERO TESTS.**
+`scripts/audit_deploy_coverage.py` imports `tomllib` bare — stdlib only on 3.11+.
+CI runs 3.11 so CI stayed green; this repo's `.venv` is **3.9.6**, and
+`tests/autonomy/test_arm_pairing_drift.py` imports that module at scope, so
+**`pytest tests/autonomy/` died at COLLECTION** and a session running the suite
+locally got a stack trace instead of coverage. Measured: before, **0 tests ran**;
+after the shim, **2,977 pass / 3 skip**. `tomli` is the same parser under its
+pre-stdlib name and was already installed; added to `requirements-test.txt`
+behind a `python_version < "3.11"` marker so CI installs nothing new. This is the
+*"a check that inspects nothing reports clean"* class one level up — the guard
+that guards the guards was itself unrunnable, locally, for anyone.
+
+**CARRIED, not closed:** the orphan is still alive ((wc): it survived a region
+migration), so the four family books' ledgers stay two-writer mixtures since
+~28-Aug and every family era decision waits on Railway support. `(wb)`'s
+hardening candidate — requiring a same-`svc` claim takeover to carry a build at
+least as new as the holder's — remains the right durable fix and is still
+unshipped; this guard does not replace it, it makes its absence visible.
+
+**Also verified this run, so it is not re-litigated:** 🎫 the taker's `exit:hold`
+pre-registration is **CONFIRMED on its fresh sample alone** (n=21, t=3.10,
++3.230%/trade, +$49.40, p=0.0028, 9 close-days) while its sibling 🙏 avo is
+NOT_CONFIRMED (fresh n=10, t=0.49) — I21's follow-through working in both
+directions. 🪁 kelly's `(vy)` clip cut is live at `clip_usd 80.0` and 93% of his
+burn predates it (30-Aug −$83.28, 31-Aug −$36.23, 1-Sep **+$9.78**).
+
+## 2026-09-01 (wd) — EAMON MAKES THE REPO PUBLIC: the security sweeps come back clean, the CodeQL path reopens, and branch protection becomes more urgent, not less
+
+**Eamon, ~23:27Z: the repo's visibility flipped to PUBLIC** ("Check GitHub it
+should be public now") — his deliberate call, made minutes after (wc) recorded
+the private-plan block, and it reverses that entry's premise: (wc)'s *"making
+a real-money trading fleet's repo public to buy a linter is refused"* was
+Lucy's frame, and the owner overrode it with the repository he owns. What a
+public flip demands is not relitigation but a MEASURED sweep of what just
+became world-readable, run immediately:
+
+* **Working tree: CLEAN.** Every literal `postgres://` match is a docstring
+  example, prose, a test fake, or the secret-leak guard's own annotated
+  fixture. No phone numbers or emails in tracked files. No hardcoded API-key
+  shapes. **No `pull_request_target` workflow** — fork PRs (now possible from
+  anyone) get read-only tokens and cannot reach `RAILWAY_TOKEN` or any other
+  secret, per GitHub's default.
+* **Full git history: CLEAN.** Two `git log -G` sweeps over ALL commits —
+  password-embedded DB URLs, and key shapes (AKIA/ghp_/sk_live/xoxb/private
+  key blocks) — matched exactly ONE commit: `9ef3517`, which is the
+  `.gitleaks.toml` DETECTION RULES being added; the matches are the patterns,
+  not credentials. The one real historical leak the fleet knows of lived in
+  `.claude/settings.local.json` (never committed) and the pre-July DB
+  credential is rotated-dead per (kb).
+* **What public turns ON for free:** GitHub's server-side secret scanning +
+  push protection (alerts land in the repo's Security tab — worth one glance),
+  and **code scanning — so the (wc) CodeQL withdrawal reverses**: setting repo
+  variable `ENABLE_CODEQL=1` is back on the board and now SAFE (the gated job
+  un-skips and its upload will succeed). One click, then a dispatched run
+  proves the chain green.
+* **What public makes MORE urgent: branch protection**, still verified NOT in
+  effect (`main` `protected: false` at 23:35Z). A public repo can receive
+  pull requests from any account; the require-PR + required-checks rule is
+  the gate that keeps the next changelog-wipe-class merge out. Still the same
+  one page: `settings/branch_protection_rules/new`, pattern `main`, require
+  PR + checks **Tests** and **Changelog check**.
+* Stated once, eyes open, and not relitigated: the fleet's strategies,
+  doctrine, P&L history, and this changelog are now world-readable — the
+  owner's deliberate trade, made on the record. `/pnl.json` was already
+  unauthenticated by design; nothing new leaks that was not already chosen.
+
 ## 2026-09-01 (wc) — THE ORPHAN SURVIVES A REGION MIGRATION, AND HALF OF DECISION 1 IS WITHDRAWN: code scanning is plan-blocked on a private personal repo, so ENABLE_CODEQL must stay unset
+**[(wd), an hour later: the premise reversed — Eamon made the repo PUBLIC, so the plan-block is void, `ENABLE_CODEQL=1` is safe and back on the board, and the security sweeps that a public flip demands came back clean. The "refused" sentence below stands as the honest record of what was said before the owner decided otherwise.]**
 
 Eamon: *"Can you assume controls and do for me"* — the last stretch, executed
 to the hard boundary of every tool held, with two findings that change the

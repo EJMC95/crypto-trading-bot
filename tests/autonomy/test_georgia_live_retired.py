@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[2026-09-02 (we)] 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire +
+"""[2026-09-02 (wg)] 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire +
 reallocate to mum" call, on the fleet's OWN grader.
 
 Her clean in-era sample (post the 26-Aug exit-parity fix) reads n=30, mean

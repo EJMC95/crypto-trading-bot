@@ -72,7 +72,7 @@ RETIRED_LIVE_ARMS = {
     },
     "freqtrade-georgia-lighter": {
         "since": "2026-09-02",
-        "entry": "(we)",
+        "entry": "(wg)",
         "override": "GEORGIA_LIVE_RETIRED_OVERRIDE",
         "successor": "freqtrade-mum-lighter",
         "why": "Eamon's 'retire + reallocate to mum' call on her own grader's "

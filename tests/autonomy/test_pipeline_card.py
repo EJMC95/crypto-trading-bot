@@ -60,7 +60,7 @@ import strategy_incubator as si         # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _georgia_live_for_mechanics(monkeypatch):
-    """[(we)] These card tests use 🔮 georgia as the `policy_mismatch` (WIRE)
+    """[(wg)] These card tests use 🔮 georgia as the `policy_mismatch` (WIRE)
     example and 💸 the farmer as the `stood_down` example, to check the pipeline
     card sorts blockers by who can clear them. georgia's live arm is now retired
     (fleet_bus.RETIRED_LIVE_ARMS), which would short-circuit her to `stood_down`

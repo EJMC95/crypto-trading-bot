@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 09:26 Sydney (23:26Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 09:35 Sydney (23:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,8 +69,9 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (1 commit(s), entries (wb))
+## Shipped today (2 commit(s), entries (wb), (wc))
 
+- `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
 
 ## How this file stays honest

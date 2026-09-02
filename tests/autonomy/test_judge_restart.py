@@ -47,7 +47,7 @@ import fleet_tuning                    # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _georgia_live_for_mechanics(monkeypatch):
-    """[(we)] This file demonstrates the parking mechanism with 💸 the FARMER as
+    """[(wg)] This file demonstrates the parking mechanism with 💸 the FARMER as
     the retired lane and the OTHER pairs as live controls. 🔮 georgia's live arm
     is now retired too (fleet_bus.RETIRED_LIVE_ARMS), which would make her a
     SECOND parked lane and move the sets these tests assert. Force her live so
