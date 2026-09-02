@@ -225,13 +225,18 @@ def test_the_phantom_import_resolves_in_a_clean_interpreter():
     ledger containing three phantom rows and asserts they do not reach the
     claim — the production path, end to end.
     """
+    # [2026-09-02 (wl)] vehicle swapped 🔮 georgia-live -> 👩 mum-live: georgia's
+    # live arm joined LEGACY_BOTS at her (wg) retirement, so `_living` now
+    # correctly drops her rows BEFORE the phantom screen — this test is about
+    # the phantom mechanism, which needs a LIVING carrier (the (wg) rule:
+    # mechanics tests name why their vehicle changed).
     r = _clean_run(
         "import fleet_allocation as fa\n"
-        "REAL = {'bot': 'freqtrade-georgia-lighter', 'profit_ratio': -0.004,\n"
+        "REAL = {'bot': 'freqtrade-mum-lighter', 'profit_ratio': -0.004,\n"
         "        'profit_abs': -1.2, 'open_rate': 0.31, 'close_rate': 0.30,\n"
         "        'closed_at': '2026-08-27T10:00:00Z',\n"
         "        'opened_at': '2026-08-27T09:00:00Z'}\n"
-        "PH = {'bot': 'freqtrade-georgia-lighter', 'profit_ratio': 0.0,\n"
+        "PH = {'bot': 'freqtrade-mum-lighter', 'profit_ratio': 0.0,\n"
         "      'profit_abs': 0.0, 'open_rate': None, 'close_rate': None,\n"
         "      'closed_at': '2026-08-27T11:00:00Z',\n"
         "      'opened_at': '2026-08-27T11:00:00Z'}\n"
@@ -241,7 +246,7 @@ def test_the_phantom_import_resolves_in_a_clean_interpreter():
         "    def fetch_bot_pnl(self, *a, **k): return []\n"
         "fa.store = S()\n"
         "p = fa.run_once(publish=False)\n"
-        "rec = (p.get('books') or {}).get('freqtrade-georgia-lighter') or {}\n"
+        "rec = (p.get('books') or {}).get('freqtrade-mum-lighter') or {}\n"
         "print('RESULT', p.get('n_phantom'), rec.get('n'))\n")
     assert "RESULT 3 12" in r.stdout, (
         "run_once did not exclude the 3 phantom rows from a clean "

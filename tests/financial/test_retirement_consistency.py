@@ -81,8 +81,19 @@ def test_the_34_67_double_count_fix_is_locked():
     # slot's current occupant and must not be filtered.
     assert "perps-funding-lighter-lighter" in RETIRED
     assert "perps-funding-lighter-lighter" in LEGACY
-    assert "freqtrade-georgia-lighter" not in RETIRED
-    assert "freqtrade-georgia-lighter" not in LEGACY
+    # [2026-09-02 (wl)] fourth generation: 🔮 georgia's live arm retired at
+    # (wg), receipt read (open 0, equity $0.01, funds verified on mum's row),
+    # then hidden + pruned. Her slot has NO successor occupant — the host
+    # keeps heart-beating the row with entries registry-gated, so the prune
+    # is undone each publish and RETIRED_ROWS is the operative filter. 👩 mum
+    # (a FRESH sub-account, not this slot) must not be filtered.
+    assert "freqtrade-georgia-lighter" in RETIRED
+    assert "freqtrade-georgia-lighter" in LEGACY
+    assert "freqtrade-mum-lighter" not in RETIRED
+    assert "freqtrade-mum-lighter" not in LEGACY
+    # the SHADOW twin keeps trading as the control arm — never filtered.
+    assert "freqtrade-georgia-lshadow" not in RETIRED
+    assert "freqtrade-georgia-lshadow" not in LEGACY
 
 
 def test_is_live_bot_matches_the_live_suffix():

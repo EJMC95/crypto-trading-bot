@@ -1,3 +1,83 @@
+## 2026-09-02 (wl) — THE DASHBOARD READ THE (wg) REALLOCATION AS A −$220 TRADING DAY: today's P&L is now capital-move-immune, and georgia's drained live row is hidden with the (ta) receipt stamped at its source
+
+**[Renumbered (wj) → (wl) at push:** the concurrent sessions' taker-successor
+runbook reached main first under (wj) and the night record under (wk); the
+pushed entries keep their letters, per the letters rule. Every citation in
+this pass's own files moved with it — verified by grepping the diff to zero
+`(wj)` additions, uncapped per (qz).]**
+
+Eamon: *"pnl dashboard fix."* The morning after (wg) retired 🔮 georgia's live
+arm and he moved her ~$220 to 👩 mum, the dashboard told three lies about one
+fund move, and the watchdog paged two of them:
+
+* **`enrich.today_pnl` is a raw equity delta since UTC midnight**
+  (`bot_equity_history` endpoints), so a withdrawal reads as a loss and a
+  deposit as a gain. Measured on the live table: georgia **−220.42** — the
+  watchdog warned *"daily P&L below −100.0"* on a book that traded NOTHING
+  today — and mum **+203.59**, a phantom daily GAIN on the card of the book
+  that merely received the same dollars. Their honest days: **0.00** and
+  **−16.83**. FIXED at the query: the day delta now prefers the **`pnl_abs`
+  endpoints** (newest/oldest non-NULL, `FILTER` so one NULL sample cannot
+  re-open the hole), equity delta only as the fallback — `pnl_abs` is
+  invariant to a fund move because the publishers book deposits/withdrawals
+  as `capital_adjust` (the (sr) equity-guard path; georgia's pnl_abs sat at
+  −66.6 through the whole $220 move). Stated cost (I19): a book whose
+  pnl_abs is realised-only loses intraday unrealised wiggle — measured
+  **$0.11** on 🌾 carry, the one such book, the day this shipped — against
+  capital-move phantoms of $220/$204 the same day. Verified by running the
+  NEW query read-only against the production table before shipping: every
+  no-capital-move book byte-matches its old figure, `market-context`
+  (all-NULL pnl) degrades to None exactly as before. This closes the CLASS:
+  the next deposit on any live book stops printing as a windfall.
+* **She was still one of THREE "live bots"** — `live_fleet` carried her
+  $0.01 equity and her −66.6 in `live_pnl` (reading −31.06 when the real
+  live fleet is +35.5 across two books). The (ta) deferral rule is
+  discharged — the receipt is read on the row (open_trades 0, `held` {},
+  `flatten_incomplete` false, equity $0.01) and the ~$220 verifiably
+  arrived on mum's row (equity ~$565 = (wh)'s "funded to $570") — so both
+  halves ship: `RETIRED_ROWS` hides, `LEGACY_BOTS` prunes. One honest
+  difference from the Farmer precedent, recorded in both comments: her host
+  was NOT converted in place — it keeps heart-beating the row with entries
+  registry-gated, so the boot-prune is undone by the next publish and
+  RETIRED_ROWS is the operative filter. `fleet_books.DECLARED_LIVE` drops
+  her (the pair is 🙏 avo + 👩 mum), `audit_live_roster.FORMERLY_LIVE`
+  gains her, and CLAUDE.md's live-scope rule is corrected in place per I12
+  — its FOURTH slot-swap correction, exactly the rot its own text predicts.
+* **The watchdog warned "halted (daily-loss rule)" at a retirement** —
+  because its retired-note path keys on `extra.retired`, which only 💸 the
+  Farmer's (ta) retirement ever stamped; the (wg) registry mechanism
+  skipped it, so `halted` was byte-identical between *lost 5% today* and
+  *retired yesterday* (I1/I18) on the very row the pattern was invented
+  for. FIXED at the source so the NEXT bus-retired arm cannot repeat it:
+  `_publish_row` now stamps `extra.retired.{since,entry,why,open,override,
+  successor}` from the ONE declaration (`fleet_bus.RETIRED_LIVE_ARMS` — a
+  second copy of the why is a second rule) and forces `status="halted"`
+  beside it, whenever `live_arm_retired(BOT_ROW)`. Fail direction matches
+  the entry gate: a bus error stamps NOTHING — a live row must never
+  mislabel itself retired. Book-scoped by the registry, so mum and avo
+  publish byte-identically (pinned).
+
+PINNED: `test_georgia_live_retired.py` +3 AST tests (receipt shape ·
+registry-derived gate that forces halted · fail-toward-not-stamping), 5/5
+host mutations RED including `if _rspec:`→`if True:` and a guessing except;
+`test_dashboard_money.py` pins the SQL basis (COALESCE order, both FILTERs,
+newest-minus-oldest endpoints), 4/4 semantic mutations RED after two rounds
+each killed a survivor by strengthening the pin (one filter dropped ·
+both-endpoints-DESC = a delta of 0 forever); `test_retirement_consistency.py`
+gains the fourth generation (georgia hidden+pruned, mum and the shadow twin
+never). `audit_live_roster` green on the new declaration.
+
+DEPLOY: pnl-dashboard + freqtrade-bots ride the auto path on this push
+(the dashboard serves the fixed feed; the watchdog reads it post-filter, so
+both georgia warnings clear). The host receipt reaches trail-blazer-live on
+the `[deploy-live-georgia]` subject marker — georgia's service only; mum-live
+and tide-rider-lighter-live see no restart (their behaviour is
+byte-identical: `live_arm_retired` is False for them). The halt check is
+satisfied the only way it can be here: georgia IS halted, flat at $0.01, and
+her memory halt is superseded by the durable registry gate a restart cannot
+wipe; the other two live rows read `online`. Verify by `extra.build`/`build_n`
+readback + the receipt appearing on her row, never a green run.
+
 ## 2026-09-02 (wk) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
 **[RENUMBERED TWICE — (wi) → (wj) → (wk): three sessions worked this hour and main took each letter first ((wi) the clear-guard release, (wj) the taker-successor runbook). Two of this session's cargoes were OVERTAKEN and withdrawn, recorded here per I12: the parallel latched-lock release valve (8 tests, 2 mutations red) — main's (wi) FAMILY_CLEAR_GUARD shipped and deployed first, a second valve for one latch is a second copy of a rule ((hj)); and the safety-rails test re-pin — this session updated test_confirm_true_via_absolute_rail_even_if_pct_ok to the (wh) floor contract to heal main's red, and the fleet then ruled the OTHER way: the failing test was a DELIBERATE pin, (wh) was refuted and reverted, mum's $57 arrived as Eamon's env VALUE with published derivation. The re-pin is dropped and main's original test stands. Two independent sessions converging on the same wrong read of that test, and a third catching both, is the review system working.]**
 

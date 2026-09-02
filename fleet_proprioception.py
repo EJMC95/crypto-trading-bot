@@ -166,7 +166,9 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
     # organs are pinned to agree by test_live_clip_arms, so this default and
     # evidence_board's are one decision recorded twice on purpose.
     # [2026-08-25 (te)] 👩 mum joins with the board's cohort, same decision.
-    "freqtrade-avo-maria-lighter,freqtrade-georgia-lighter,"
+    # [2026-09-02 (wl)] 🔮 georgia leaves with the board's cohort — her live
+    # arm retired at (wg), sub-account drained to mum; same decision.
+    "freqtrade-avo-maria-lighter,"
     "freqtrade-mum-lighter").split(",")
     if s.strip()}
 

@@ -181,11 +181,18 @@ def test_the_ratchet_may_only_shrink():
 def test_a_new_live_book_with_no_justification_fails_the_push_that_adds_it():
     """The ratchet's forward half: today's backlog is tolerated, a NEW one is
     not — which is what stops the pile growing while it drains."""
+    # [2026-09-02 (wl)] georgia's live arm retired at (wg) and left the
+    # declared roster — taking the fleet's ONLY justified live row with her,
+    # so the measured backlog is still 2 (avo, mum) and the ratchet cannot
+    # tighten. The fixture now mirrors that exact production state: a claim
+    # covering the OFF-roster georgia, both living rows unjustified, baseline
+    # sitting AT the ratchet — which is precisely when the forward half must
+    # still catch one more.
     ok = dict(cl._fixture()[0], covers=("freqtrade-georgia-lighter",),
               kind="doctrine")
     st = {"k": {"books": {"b": {"t": 2.0}}}}
     roster = acf.live_rows()
-    assert roster and "freqtrade-georgia-lighter" in roster, roster
+    assert roster and "freqtrade-georgia-lighter" not in roster, roster
     base = dict(today=dt.date(2026, 8, 27), sh_text="", docker_text="",
                 states=st, claims=[ok], ratchet=dict(acf.RATCHET))
     assert acf.audit(rows=roster, **base)[0] == 0

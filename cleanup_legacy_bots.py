@@ -28,6 +28,15 @@ LEGACY_BOTS = [
     # in paper_trades); this only removes the frozen summary row so it
     # cannot go stale and page after georgia took the service.
     "perps-funding-lighter-lighter",
+    # [2026-09-02 (wl)] 🔮 georgia's LIVE arm — the prune half of the (wg)
+    # retirement, kept for the RETIRED_ROWS ⊆ LEGACY_BOTS parity invariant
+    # (test_retirement_consistency). One honest difference from the Farmer's
+    # line above: her host was NOT converted in place — it keeps
+    # heart-beating the row (entries gated by fleet_bus.RETIRED_LIVE_ARMS),
+    # so this delete is undone by the host's next publish and RETIRED_ROWS
+    # is the filter that actually hides her. The 77 real-money closes stay
+    # in the ledger as always.
+    "freqtrade-georgia-lighter",
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
     # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the

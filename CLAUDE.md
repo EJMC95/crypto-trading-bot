@@ -2837,6 +2837,18 @@ All new bots:
   ([deploy-live-taker] / [deploy-live-georgia] / [deploy-live-mum], and
   [deploy-live] for all three) is now the only thing keeping a fix to one book
   from restarting the other two.]**
+  **[2-Sep (wl): A FOURTH TIME — 🔮 georgia's live arm RETIRED at (wg) (Eamon:
+  "retire + reallocate to mum"), sub-account drained to mum. THE LIVE PAIR IS
+  NOW 🙏 Avo Maria + 👩 mum**, both on the same variant host, so the
+  real-money surface is unchanged in shape: `lighter_avo_live_bot.py` ·
+  `lighter_family_bot.py` · `venues/` · the `live.*` lever consumers. The
+  mechanism this rule keeps demonstrating — a list-keyed scope rule rots on
+  every slot swap — now has its executable half: `audit_live_roster.py`
+  compares `fleet_books.DECLARED_LIVE` against the feed weekly and its prose
+  arm greps this very anchor, and georgia joined `FORMERLY_LIVE` the same
+  commit that removed her from the declaration. Her retired host keeps
+  heart-beating the hidden row; her SHADOW twin stays in ordinary shadow
+  scope.]**
 
 
 ## Doctrine: Claude is the judgment layer, never the polling layer (added 28-Jul-2026)

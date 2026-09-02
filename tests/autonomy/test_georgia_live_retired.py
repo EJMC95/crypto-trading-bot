@@ -122,5 +122,90 @@ def test_the_host_never_sys_exits_on_retirement():
         "the retirement path must not exit the process"
 
 
+# ---- the (wl) receipt: a bus-retired arm stamps extra.retired --------------
+# The (ta) Farmer published `extra.retired.{since,why,open,override}` beside
+# status=halted because `halted` is byte-identical between "lost 5% today" and
+# "retired" (I1/I18); the (wg) registry mechanism skipped that stamp and the
+# watchdog warned "halted (daily-loss rule)" at a retirement the next day.
+# AST-pinned (a substring test is not a wiring test).
+
+def _receipt_assign(tree):
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Subscript)
+                and isinstance(node.targets[0].value, ast.Name)
+                and node.targets[0].value.id == "payload"
+                and isinstance(node.targets[0].slice, ast.Constant)
+                and node.targets[0].slice.value == "retired"):
+            return node
+    return None
+
+
+def test_a_bus_retired_arm_stamps_the_farmer_receipt_shape():
+    node = _receipt_assign(_host_tree())
+    assert node is not None, \
+        "the host must stamp payload['retired'] for a bus-retired row"
+    assert isinstance(node.value, ast.Dict), "the receipt is a dict literal"
+    keys = {k.value for k in node.value.keys if isinstance(k, ast.Constant)}
+    assert {"since", "why", "open", "override"} <= keys, \
+        f"the (ta) receipt shape is since/why/open/override — got {sorted(keys)}"
+
+
+def test_the_receipt_is_gated_on_the_one_registry_and_forces_halted():
+    tree = _host_tree()
+    receipt = _receipt_assign(tree)
+    gate = next((n for n in ast.walk(tree)
+                 if isinstance(n, ast.If)
+                 and receipt in list(ast.walk(n))), None)
+    assert gate is not None, "the receipt must sit inside an if, never stamp unconditionally"
+    assert any(isinstance(n, ast.Name) and n.id == "_rspec"
+               for n in ast.walk(gate.test)), \
+        "the if must test _rspec itself — an always-true gate stamps every row"
+    # inside the same branch, status is forced to the Farmer's published value
+    assert any(isinstance(n, ast.Assign)
+               and any(isinstance(t, ast.Name) and t.id == "status"
+                       for t in n.targets)
+               and isinstance(n.value, ast.Constant)
+               and n.value.value == "halted"
+               for n in ast.walk(gate)), \
+        "a retired arm must publish status='halted' beside the receipt"
+    # and the condition rides _rspec, which is derived from the ONE
+    # declaration: RETIRED_LIVE_ARMS.get(BOT_ROW) gated on live_arm_retired
+    src = HOST.read_text()
+    i = src.index("_rspec = ")
+    window = src[i:i + 400]
+    assert "RETIRED_LIVE_ARMS.get(BOT_ROW)" in window, \
+        "the receipt spec must come from fleet_bus.RETIRED_LIVE_ARMS (one declaration)"
+    assert "live_arm_retired(BOT_ROW)" in window, \
+        "the receipt must be gated on the same accessor as the entry gate"
+
+
+def test_the_receipt_fails_toward_not_stamping():
+    """A bus error must not mislabel a LIVE row as retired — the handler
+    degrades _rspec to None, mirroring the entry gate's keep-trading default."""
+    tree = _host_tree()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            assigns = [n for n in ast.walk(node)
+                       if isinstance(n, ast.Assign)
+                       and any(isinstance(t, ast.Name) and t.id == "_rspec"
+                               for t in n.targets)]
+            if not assigns:
+                continue
+            handler_assigns = [n for h in node.handlers
+                               for n in ast.walk(h)
+                               if isinstance(n, ast.Assign)
+                               and any(isinstance(t, ast.Name)
+                                       and t.id == "_rspec"
+                                       for t in n.targets)]
+            if handler_assigns:
+                assert all(isinstance(n.value, ast.Constant)
+                           and n.value.value is None
+                           for n in handler_assigns), \
+                    "the except path must set _rspec = None, never a guess"
+                return
+    raise AssertionError("no try/except computing _rspec found in the host")
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
