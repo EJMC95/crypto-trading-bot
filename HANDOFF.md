@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 16:36 Sydney (06:36Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 19:26 Sydney (09:26Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -59,8 +59,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (86 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx))
+## Shipped today (88 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx))
 
+- `fb25313` Calibrate the two numbers (wx) left as judgements: the I25 margin is re-measured and stands, the shape monitor fires in sampling-noise units against the fleet's own claim bar
+- `1e726a3` HANDOFF regenerated after merging main (wx)
 - `42d438c` Merge origin/main: #264 (ww) landed under the follow-up branch; the entry keeps (wx)
 - `fdb7182` The edge audit's last four items leave the prose: kelly's read is a docket deferral, mum's shape has a monitor, streaks are judged against chance, I25 reaches the live grader's margin (wx)
 - `bd524a5` [deploy-live] Merge PR #264: (ww) proceed with everything in the organ review — docket calls reconciled with the (wt) slate, cage re-decided, mum judge lane, weekly organ board
