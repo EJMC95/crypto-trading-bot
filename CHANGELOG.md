@@ -175,6 +175,31 @@ more than the change did, and the two worst were mine:
   here, because a measured benefit with an invented mechanism is how a rail
   gets kept for the wrong reason and tuned in the wrong direction.
 
+### AND THE SHARED-WORKTREE CLASS HAS A NEW ACTOR: MY OWN REVIEW SUBAGENTS
+
+`(lz)`/`(nx)`/`(oe)` document the shared-worktree hazard for concurrent
+SESSIONS. Today it arrived from a direction none of those entries name: the
+adversarial reviewers were given the live working tree to reproduce findings
+in, and one of them **edited `lighter_avo_live_bot.py` while `session_commit`
+was snapshotting it** — a verifier testing whether a guard mattered by
+removing it. The commit that landed therefore held a WEAKENED safety guard
+(`not (ds > 0)` deleted from the day-start check) that the working tree did
+not, on a real-money entry path.
+
+**Nothing reached money, and the reason is the receipt.** `session_commit`'s
+read-back compares the commit object against the snapshot it took and
+REFUSED (exit 3, "commit made but read-back MISMATCHED"). Without it the
+weakened guard would have gone to a PR looking exactly like the reviewed
+code. `(po)`'s lesson — *"a receipt for fidelity is not a receipt for
+correctness"* — cuts the other way here: fidelity was the whole question, and
+the fidelity receipt is what caught it.
+
+**THE RULE: a subagent that may RUN code against the repo gets an isolated
+worktree** (`isolation: 'worktree'` on the agent call), not the tree the
+session is committing from. A reviewer with write access to the artefact under
+review can invalidate both the review and the commit, and neither failure is
+loud on its own.
+
 **DECLARED LIMITS:** the study replays the PCT leash only, while production
 takes the tighter of the leash and the absolute cap — on mum today they
 coincide (~$57 on a $570 book), which is why the numbers stand and would not
