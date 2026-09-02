@@ -377,3 +377,49 @@ jobs:
           echo "Bot-affecting files without a changelog entry:"; echo "$bot_touched"
           echo "Add a dated one-line entry to CHANGELOG.md in this commit (see CLAUDE.md)."
           exit 1
+
+      - name: Actions-liveness heartbeat (piggyback beat on push CI)
+        # [2026-09-02] The dead-man's switch's SECOND writer. GitHub starves
+        # free-tier `schedule` delivery (measured 18-Aug -> 2-Sep: p95 5.77h,
+        # max 21.52h between hourly-cron runs), so the cron-only beat paged
+        # "CI AND deploys dead" on 10.1% of ordinary intervals while push CI
+        # ran fine straight through. This step beats the same key from every
+        # push run — merged-stream control: max gap 8.39h, 0 of 999 over the
+        # 12h page bar — so the beat's age measures "any Actions delivery",
+        # the quantity the page's diagnosis actually claims. Same upsert,
+        # same secret pattern, src-stamped; ttl_sec must match
+        # fleet-watchdog.yml's (pinned by test_actions_heartbeat). `always()`
+        # is load-bearing: a RED changelog gate is still a LIVE Actions
+        # delivery, which is exactly what the switch measures. Push-only —
+        # PR contexts add nothing the push beat doesn't. continue-on-error
+        # for the same reason as the cron writer: enforcement is the beat
+        # going stale, never this step's color.
+        if: ${{ always() && github.event_name == 'push' }}
+        continue-on-error: true
+        env:
+          RAILWAY_PROJECT_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_ACCOUNT_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          curl -fsSL https://railway.app/install.sh | sh >/dev/null 2>&1 || true
+          command -v railway >/dev/null 2>&1 || npm install -g @railway/cli >/dev/null 2>&1
+          command -v railway >/dev/null 2>&1 || { echo "railway CLI unavailable — piggyback beat skipped (the hourly cron still writes)"; exit 0; }
+          if [ -n "${RAILWAY_PROJECT_TOKEN:-}" ]; then
+            export RAILWAY_TOKEN="$RAILWAY_PROJECT_TOKEN"; unset RAILWAY_API_TOKEN || true
+          fi
+          URL=""
+          for svc in Postgres postgres PostgreSQL; do
+            URL=$(railway variables --service "$svc" --json 2>/dev/null \
+                  | jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_PUBLIC_URL") | .value] | first // empty') && [ -n "$URL" ] && break
+          done
+          [ -n "$URL" ] || { echo "no DATABASE_PUBLIC_URL resolved — piggyback beat skipped (the hourly cron still writes)"; exit 0; }
+          echo "::add-mask::$URL"
+          UPDATED=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+          psql "$URL" -v ON_ERROR_STOP=1 -q -c "
+            INSERT INTO bot_state (bot, updated_at, state) VALUES ('actions-heartbeat', now(),
+              jsonb_build_object('updated', '${UPDATED}', 'ttl_sec', 14400,
+                                 'run_id', '${RUN_ID}', 'src', 'changelog-check.yml'))
+            ON CONFLICT (bot) DO UPDATE SET updated_at = now(), state = EXCLUDED.state;"
+          echo "actions-heartbeat written (piggyback, run ${RUN_ID}, ${UPDATED})"

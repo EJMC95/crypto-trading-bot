@@ -1,3 +1,70 @@
+## 2026-09-02 (wn) — THE CI-LIVENESS PAGER CRIED WOLF ON ONE ORDINARY INTERVAL IN TEN: the beat now rides push CI too, and the page bar is measured — LATE warns at 4h, DARK pages at 12h
+
+Eamon: *"Continue fixing."* The morning's watchdog page — *"GITHUB ACTIONS
+DARK: hourly heartbeat 4.9h old ... a billing lockout kills CI AND deploys
+silently"* — was FALSE in its diagnosis: CI was demonstrably alive (this
+session's own pushes ran to green through it). The (28-Jul-scar) dead-man's
+switch assumed GitHub delivers `schedule` events roughly hourly, and it does
+not.
+
+**MEASURED, twice over** (an earlier session had measured this on 25-28 Aug
+and its fix + entry — self-cited as "(vp)" — died uncommitted in the main
+worktree; the claim was RE-MEASURED here per verify-inherited-claims rather
+than trusted, on a 5x window):
+* **Schedule-only** (198 consecutive hourly-cron deliveries, 18-Aug → 2-Sep):
+  median 0.99h · p90 3.33h · p95 5.77h · **max 21.52h** — five 7-21.5h gaps
+  in ONE week, and **10.1% of ordinary intervals exceeded the old 3.25h page
+  bar.** A pager firing twice a week on healthy state is the (gl) failure:
+  the operator learns to ignore the ONE detector for a class that is
+  permanent and otherwise invisible.
+* **Merged stream** (those crons ∪ every push-CI run, 999 gaps, 26-Aug →
+  2-Sep): **max 8.39h, 0 over 12h** — through the same week the schedule
+  queue starved. Push delivery is fine; only the `schedule` queue is
+  deprioritised on the free tier. So the old page's text ("CI AND deploys
+  dead") was false whenever it fired on starvation.
+
+**SHIPPED, closing the class rather than widening one bar:**
+* **A second writer.** `changelog-check.yml` gains a lean final step
+  (`always() && push`, continue-on-error, src-stamped
+  `'changelog-check.yml'`) writing the same `actions-heartbeat` upsert — so
+  the beat's age measures "any Actions delivery", the quantity the page
+  actually claims dead. Cost: ~15-20s appended to an already-running job per
+  push. A RED gate still beats (that IS a live delivery — `always()` is
+  load-bearing).
+* **Two rungs, one story across both pager paths.**
+  `ACTIONS_HB_LATE_S=14400` (4h): a WARNING on /watchdog.json + the vitals
+  card turning LATE — visible, never paged. `ACTIONS_HB_MAX_S=43200` (12h)
+  pages, and `ORGAN_SPECS` ttl moves 3900 → 14400 so the generic
+  critical-organ DARK fires at the same instant (3× ttl) as the direct
+  diagnosis — the min(payload, spec) rule meant BOTH the spec and both
+  workflows' `ttl_sec` had to move together, and the three-bars test now
+  `findall`s every write site instead of trusting the first match.
+* **The trade, stated:** a real lockout/outage pages in up to 12h instead of
+  3.25h — on a bar that fired 0 times in 999 measured ordinary gaps instead
+  of 20 in 198, which is what makes the page mean something. The 4h warning
+  keeps the early signal without spending the pager on it.
+
+PINNED: `test_actions_heartbeat.py` grows to 15 tests — the LATE band warns
+and never pages, dark is not double-reported, fail-directions inherited (a
+junk stamp stays a PAGE, never a warning), the late rung wired into
+`warnings` by AST, the piggyback upsert anchored in its SQL with its own src
+stamp and push gate, and the old "DARK within 4h" pin RE-AIMED with the
+measurement per I26 (a pin is not a reason): the bar must now clear the
+measured 8.39h merged max AND stay inside half a day. Mutations: 5/5 svc
+(both bars, the band's upper bound, the wiring, the junk-stamp direction) ·
+2/2 ORGAN_SPECS (ttl drift, criticality demotion) · 4/4 workflows by hand
+(mutate.py cannot run YAML): cron ttl drift, piggyback ttl drift, upsert key
+rename, push-gate removal — all RED.
+
+DEPLOY: pnl-dashboard rides the auto path (fleet_watchdog_svc.py +
+pnl_dashboard.py are on its list); the two workflow changes are Actions-side
+and active on merge — THIS push's own changelog-check run is the piggyback's
+first live beat, verified by the run log + the row's `src` flipping. No
+real-money service is touched. The main worktree still holds the dead
+session's uncommitted draft of this fix on `fleet_watchdog_svc.py` — it is
+superseded by this entry and safe to discard; telling, not touching, per the
+shared-tree rule.
+
 ## 2026-09-02 (wm) — 👩 MUM IS PRE-REGISTERED (I21): both docket buckets held "only by the multiplicity referee" now have the instrument that decides them — on fresh closes alone
 
 **Eamon, 2-Sep: *"now check mum is winning too."*** The check ran as a
