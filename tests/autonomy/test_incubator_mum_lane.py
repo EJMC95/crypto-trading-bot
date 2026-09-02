@@ -82,10 +82,26 @@ def test_the_judge_admits_mum_offspring_and_refuses_farmer_offspring_on_her_lane
     assert not any(c["name"].startswith("xp-enter_apr") or c["name"].startswith("xp-take_profit")
                    for c in pool), "a Farmer offspring burned a slot on mum's lane"
     # the NOVEL alleles are the ones the statics do not test (signature dedup
-    # drops the copies of rsi-32 / hold-720 / hold-2880 — that is the point)
+    # drops the copies of rsi-32 / hold-720 / hold-2880 — that is the point).
+    #
+    # [(xl)] ASSERTED AS THE PROPERTY, NOT A NAME LIST. This pinned four exact
+    # names, which encoded the emitter's ORDERING as well as its content — so
+    # adding a gene to her pool failed it even though the behaviour improved.
+    # Worse, a name list cannot express the thing that actually matters and
+    # that (xl) had to fix: the emitter enumerated gene-by-gene under a cap,
+    # so genes declared later were minted ZERO times ((lv) inside the
+    # incubator). What must hold is that EVERY gene reaches the judge and no
+    # admitted offspring duplicates a static.
     names = {c["name"] for c in admitted}
-    assert {"xp-mum-rsi_max-30", "xp-mum-rsi_max-34",
-            "xp-mum-max_hold_min-1080", "xp-mum-max_hold_min-2160"} <= names, names
+    levers_seen = {list(c["levers"])[0] for c in admitted}
+    assert levers_seen == {l for l, _ in inc.MUM_GENES.values()}, (
+        "a declared gene never reached the judge's pool — position in "
+        f"MUM_GENES is deciding reachability again: {sorted(levers_seen)}")
+    static_sigs = {tuple(sorted(c["levers"].items())) for c in ej.CANDIDATES}
+    for c in admitted:
+        assert tuple(sorted(c["levers"].items())) not in static_sigs, (
+            f"{c['name']} duplicates a hand-declared static — the dedup that "
+            "keeps an offspring from burning a slot on a known cell is gone")
     assert not any(n in names for n in ("xp-mum-rsi_max-32", "xp-mum-max_hold_min-720",
                                         "xp-mum-max_hold_min-2880")), names
 

@@ -200,3 +200,69 @@ def test_the_horizon_fails_toward_keeping_a_book_when_the_owner_is_missing():
             "retirement docket — that is absence of evidence acting as proof")
     finally:
         builtins.__import__ = real
+
+
+# ------------------------------------------------------------------ (xm)
+# THE VERDICT MAY NOT ASSERT AN EXCLUSION THE SAMPLE NEVER MADE.
+# The `underpowered` branch is gated on `bars["maxdd"]`, so a book failing the
+# mean bar AND the drawdown bar falls straight through to `unreachable` — and
+# that block used to print "the sample has EXCLUDED a positive mean" beside
+# the very number refuting it. Measured in the live payload the day this was
+# written: 🪁 band-kelly-lshadow published "upper bound +0.027% <= 0 — the
+# sample has EXCLUDED a positive mean". That sentence is the I17 precondition
+# a RETIREMENT is written on.
+
+def _blown_dd_open_mean():
+    """A book with a blown drawdown whose mean is negative but NOT excluded.
+
+    DETERMINISTIC on purpose. A seeded random fixture reproduced this state on
+    9 of 14 seeds and a POSITIVE mean on the rest, so the first draft `skip`ped
+    — and a skipped test reads exactly like a passing one in the summary line,
+    which is the repo's own "a check that inspects nothing reports clean" trap.
+    One 60% loss blows the drawdown bar permanently; a symmetric +-8% ladder
+    around it supplies dispersion, so the mean is dragged below zero while the
+    upper bound stays clearly ABOVE it. Every precondition below is ASSERTED,
+    never skipped: if this stops reproducing the state, the test must go red,
+    because it is then no longer testing what it claims.
+    """
+    pcts = [-0.60] + [0.08, -0.08] * 60
+    rows = _rows(pcts, usd=1000.0)
+    st = g.stats(rows, book_usd=1000.0)
+    bars = g.bar_map(st)
+    assert bars["mean"] is False, ("fixture no longer fails the mean bar", st["mean_pct"])
+    assert bars["maxdd"] is False, ("fixture no longer blows the drawdown bar",
+                                    st.get("max_dd_frac"))
+    upper = st["mean_pct"] + g.horizon_crit(st["n"]) * st["se_pct"]
+    assert upper > 0, ("fixture's upper bound is genuinely excluded — it can no "
+                       "longer stand in for the un-excluded case", upper)
+    return st, rows
+
+
+def test_a_blown_drawdown_never_manufactures_an_exclusion_of_the_mean():
+    st, rows = _blown_dd_open_mean()
+    hz = g.gate_horizon(st, first_close=rows[0][2], now=NOW)
+    assert hz["verdict"] == "unreachable", hz          # the drawdown is permanent
+    assert hz.get("mean_excluded") is False, hz        # ...but the mean is NOT
+    assert "has NOT excluded a positive mean" in hz["why"], hz["why"]
+    assert "has EXCLUDED a positive mean" not in hz["why"], (
+        "the verdict claims an exclusion its own upper bound refutes — this is "
+        "the sentence an I17 retirement is written on")
+    assert "un-blow" in hz["why"], "the real binding cause must still be named"
+
+
+def test_a_genuine_exclusion_still_says_so_and_publishes_the_flag():
+    """The fix must DISCRIMINATE, or it is a blanket softening (I3)."""
+    pcts = [-0.02] * 40 + [-0.018] * 40
+    hz, st = _horizon(pcts)
+    assert hz["verdict"] == "unreachable", hz
+    assert hz.get("mean_excluded") is True, hz
+    assert "has EXCLUDED a positive mean" in hz["why"], hz["why"]
+
+
+def test_the_exclusion_flag_is_published_not_left_to_prose():
+    """A docket that string-matches the reason is a second copy of the rule."""
+    st, rows = _blown_dd_open_mean()
+    hz = g.gate_horizon(st, first_close=rows[0][2], now=NOW)
+    assert "mean_excluded" in hz, (
+        "an `unreachable` verdict must publish whether the MEAN was excluded — "
+        "otherwise the only way to know is to parse the sentence")

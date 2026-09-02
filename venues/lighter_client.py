@@ -1272,8 +1272,41 @@ class LighterClient(VenueClient):
         return self.last_fill_detail(coin, is_ask, since_ts, lookback,
                                     client_id)[0]
 
+    def position_of(self, coin):
+        """This account's position in `coin`, under EITHER spelling.
+
+        [2026-09-02 (xo)] `positions()` is keyed by the FLEET symbol
+        (`out[fleet] = rec`, via `from_lighter`), so `1000PEPE` lives under
+        `kPEPE`. A caller holding the VENUE spelling looked up a key that is
+        never there and got None — and None is the "no position" answer, which
+        is how a live book with $440 on the venue read as flat.
+
+        MEASURED ON REAL MONEY, 2-Sep: 👩 mum hit her daily-loss halt at
+        17:19Z, `_flatten_all` iterated her position map — which `(xa)`
+        normalises to the VENUE spelling to fix a DIFFERENT arm of this same
+        confusion — and called `market_close("1000PEPE")`. This lookup missed,
+        returned None, and the caller logged its safe-looking
+        "venue reports NO position — leaving meta; retry next cycle (not
+        booking a phantom close)" and did it again 90 seconds later, forever.
+        Her row published `flatten_incomplete: true` with `kPEPE` worth
+        $440.02 against $521.77 of equity — 84% of a real-money book that the
+        halt could not flatten and the halted loop does not manage (it
+        `continue`s past the trading pass, so no roi, no stop, no max_hold).
+
+        Fixed HERE rather than at the call site because this class already
+        arrived twice ((xa) the bracket, (xe) the mark) and patching a third
+        instance leaves the fourth. `positions()` is the one owner of the map;
+        it now answers to the name its own callers hold.
+        """
+        p = self.positions() or {}
+        got = p.get(coin)
+        if got is None:
+            from .symbol_map import from_lighter
+            got = p.get(from_lighter(coin)[0])
+        return got
+
     def market_close(self, coin):
-        pos = self.positions().get(coin)
+        pos = self.position_of(coin)
         if not pos or not pos["size"]:
             return None
         sym, mult, m = self._resolve(coin)

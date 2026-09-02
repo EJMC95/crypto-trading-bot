@@ -117,6 +117,107 @@ def noncrypto_extra(bot, raw=None):
         if name.strip() == bot:
             return [c.strip() for c in syms.split(",") if c.strip()]
     return []
+
+
+#: [2026-09-02 (xk)] PER-CARRIER non-crypto EXCLUSION — the mirror of the
+#: extension above, same `"bot:SYM,SYM;bot:SYM"` shape, same per-carrier
+#: scoping and for the same reason: a cut measured on ONE book must not re-aim
+#: two others. Eamon: "if it makes any bot make more money then implement."
+#:
+#: **STILL INERT, AND THE MECHANISM THAT MOTIVATED IT IS REFUTED — corrected
+#: in place the same day per I12, because a doctrine note that no longer
+#: describes the system is a defect, not history.** The first version of this
+#: note said 👩 mum's non-crypto sleeve loses because "a non-crypto book prints
+#: through its underlying's CLOSED hours, so a 1h oversold read there is a flat
+#: tape and the 24h cap closes it at a loss". That claim dies on its own
+#: discriminator: of the 10 `max_hold` losses across both arms, ZERO expired
+#: before the underlying reopened (each carried 27%-96% of its hold inside the
+#: open session), the ONE trade with no open minutes at all exited `roi` at
+#: **+0.070%**, and entry-while-OPEN measures WORSE (−0.521%/trade) than
+#: entry-while-CLOSED (−0.383%). XAU/XCU trade ~23h and carry the two largest
+#: live losses.
+#:
+#: WHAT THE SAMPLE ACTUALLY SAYS, re-measured through the fleet's own owners:
+#: the seven closes are **4 entry days** (three share one `opened_at`), and the
+#: upper bound is ≤ 0 only on the iid read — every day-clustered one is
+#: POSITIVE (+0.170% live), so **there is no measured exclusion** and I17-as-
+#: amended forbids the cut. The raw class gap of −0.98pp **flips sign to
+#: +0.18pp** under a close-day fixed effect: on the day carrying most of the
+#: sleeve, CRYPTO lost more than twice as much per trade (I25 — judging a
+#: sleeve on the window that motivated looking at it). And most of the rest is
+#: selection by exit: `max_hold` is negative BY CONSTRUCTION (the roi ladder's
+#: terminal rung is `1440: 0.0`) and measured 0-positive/18-negative across
+#: 114 era closes, while the sleeve is 71% `max_hold` against crypto's ~8%.
+#: Conditional on reaching the cap, non-crypto does no worse.
+#:
+#: THE MECHANISM THAT IS SUPPORTED points the other way: these names are
+#: LOW-VOLATILITY against a bracket calibrated on crypto — realised |return|
+#: 0.623% vs 1.746% (2.8x) against a first roi rung needing +2.0% in 4h, so 5
+#: of 7 run the full cap against 4 of 52 crypto (binomial P=5.0e-05). The
+#: remedy that follows is a CLASS-AWARE LADDER OR HOLD (the I26 feed-it
+#: direction), owed its own measurement — not a cut.
+#:
+#: **[(xn)] THAT MEASUREMENT WAS RUN, AND BOTH HALVES OF THE PARAGRAPH ABOVE
+#: ARE CORRECTED IN PLACE per I12.** (1) The 2.8x is a SEVEN-CLOSE artifact.
+#: On 10,020 non-crypto and 12,418 crypto episodes of her own mechanical entry
+#: over the venue's full 1h tape, median favourable excursion is 1.203% vs
+#: 1.554% — **1.29x, not 2.80x** — and at the p90 the non-crypto names move
+#: MORE (2.903% vs 2.744%). **66.0% of them still reach a rung** against
+#: crypto's 74.5%. The ladder is somewhat harder to reach off-class; it is not
+#: "largely unreachable", and that is a far smaller claim than the one this
+#: note recorded. (2) The remedy is REFUSED. Halving the ladder is the best
+#: cell at +0.0325%/bar-day, but shuffling the class labels and re-running the
+#: whole best-of-N selection gives a MEDIAN advantage of +0.0363% against the
+#: real half's +0.0304% (**p=0.5885**) — a randomly-labelled half does better,
+#: so the gain is the selection, not the class. And the CRYPTO control moves
+#: the opposite way, monotone in the dose (-0.022 / -0.080 / -0.176 %/bar-day
+#: at k=0.5/0.35/0.25) on the half that actually earns (+0.0953%/bar-day), so
+#: a WHOLE-BOOK lowering is refuted rather than merely untested. Shortening the
+#: hold is negative everywhere — it converts `roi` exits into `max_hold` ones,
+#: which are negative by construction. Full working:
+#: `STUDY_MUM_CLASS_LADDER_2026-09-02.md`.
+#:
+#: So this stays PRE-REGISTERED and inert (default "" — no book trades
+#: differently today). `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` holds
+#: the corrected rule: G>=10 distinct ENTRY DAYS, a DAY-CLUSTERED upper bound
+#: at or below zero, AND worse than crypto on matched close-days. The act is
+#: one env (`freqtrade-mum:*`, the whole class, so it matches the graded
+#: population) — an EXCLUSION list, never an edit of the shared
+#: NONCRYPTO_UNIVERSE (the (vd) lesson, in the other direction). Applies to
+#: BOTH hosts through `carrier_universe`, so the live arm and its control twin
+#: see the same universe, and it is ENTRY-ONLY: a HELD name keeps its place
+#: until its own bracket closes it.
+FAMILY_NONCRYPTO_EXCLUDE = os.environ.get("FAMILY_NONCRYPTO_EXCLUDE", "")
+
+
+#: [(xk)] The wildcard: `"freqtrade-mum:*"` excludes the carrier's WHOLE
+#: non-crypto half. It exists so an act can MATCH ITS OWN POPULATION. The
+#: registered claim is about a CLASS — the venue's whole non-crypto half — not
+#: about four tickers, and the sample is every non-crypto close. A symbol list would have been graded on one population and
+#: applied to another, and would drift the moment a (vd) extension name crossed
+#: the oracle's 203-bar floor and started trading. `*` cannot drift.
+NONCRYPTO_EXCLUDE_ALL = "*"
+
+
+def noncrypto_exclude(bot, raw=None, universe=None):
+    """Non-crypto symbols carrier `bot` must NOT scan, or [] when unset.
+
+    `"<bot>:*"` means the whole non-crypto half: with `universe` given it
+    resolves to those names, and without it returns `["*"]` so a caller that
+    only asks "is anything excluded?" still sees a truthy answer.
+    """
+    raw = FAMILY_NONCRYPTO_EXCLUDE if raw is None else raw
+    for group in str(raw or "").split(";"):
+        name, _, syms = group.partition(":")
+        if name.strip() == bot:
+            out = [c.strip().upper() for c in syms.split(",") if c.strip()]
+            if NONCRYPTO_EXCLUDE_ALL in out:
+                return ([c.upper() for c in universe] if universe is not None
+                        else [NONCRYPTO_EXCLUDE_ALL])
+            return out
+    return []
+
+
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 
 #: [2026-08-28 (vd)] PER-CARRIER CRYPTO WIDTH. `"bot:N,bot:N"`; absent = the
@@ -241,7 +342,7 @@ def crypto_width(bot, raw=None):
     return 0
 
 
-def carrier_universe(s, raw=None):
+def carrier_universe(s, raw=None, held=None):
     """The symbols carrier `s` scans. **ONE OWNER, BOTH HOSTS.**
 
     The shadow runner and the live variant host each built
@@ -272,6 +373,23 @@ def carrier_universe(s, raw=None):
         if len(wide) >= len(COINS):
             crypto = list(dict.fromkeys(crypto + wide))
     nc = list(NONCRYPTO_UNIVERSE) + noncrypto_extra(s.bot)
+    # [(xk)] the per-carrier exclusion subtracts from the NON-CRYPTO half only
+    # — it can never touch a crypto name, and an unset env subtracts nothing.
+    #
+    # ENTRY-ONLY, AND THE HELD UNION IS WHAT MAKES IT SO ((hk), and the (ly)
+    # sleeve-retirement convention: "a restored position still exits
+    # normally"). A held coin dropped from `b.coins` gets no mark, no accrual
+    # and no stop, and the shadow host's ZOMBIE GUARD then force-closes it as
+    # `delisted` — while the live host, which has no sweeper, holds the same
+    # leg to its bracket. That is the control arm and the real-money arm
+    # diverging AT THE MOMENT OF THE ACT, on the one change meant to be
+    # identical across both. So a name under exclusion that is CURRENTLY HELD
+    # stays in the universe until it closes on its own terms; one position per
+    # coin means keeping it can never re-open an entry.
+    drop = {c.upper() for c in noncrypto_exclude(s.bot, raw, universe=nc)}
+    if drop:
+        keep = {str(c).split("/")[0].upper() for c in (held or ())}
+        nc = [c for c in nc if c.upper() not in drop or c.upper() in keep]
     return crypto + list(dict.fromkeys(nc))
 
 
@@ -378,6 +496,15 @@ def census_no_entry_why(strategy, sig):
             and isinstance(sig.get("rsi"), (int, float))
             and sig["rsi"] < strategy.RSI_MAX and sig.get("uptrend")):
         return "uptrend_blocked"
+    # [(xl)] the VELOCITY band gets its own verdict for the same reason the
+    # uptrend half did: pooled into `no_signal`, an armed band is invisible,
+    # and `opened: 0` reads identically whether the tape was quiet or the
+    # band refused everything (I18). Only reachable when a lever has armed it
+    # — `vel_ok` is True on every bar while the defaults are +-999.
+    if (sig and sig.get("vel_ok") is False
+            and isinstance(sig.get("rsi"), (int, float))
+            and sig["rsi"] < strategy.RSI_MAX and not sig.get("uptrend")):
+        return "vel_blocked"
     return "no_signal" if sig else "no_read"
 
 
@@ -1084,6 +1211,39 @@ class OversoldRebound(Carrier):
     #: inherits mum's semantics by shape alone.
     UPTREND_BLOCKS = True
     MAX_HOLD_MIN = 1440                 # 24h — the MEASURED plateau interior
+    #: [2026-09-02 (xl)] THE DIP'S VELOCITY — the shape of the fall, not its
+    #: depth. `rsi<36` says price is low; it says nothing about HOW it got
+    #: there, and that turns out to be where her information is.
+    #:
+    #: MEASURED on 460d of her own 1h tape, exit-free excess over each coin's
+    #: own drift ((hm)), cluster-robust, trailing 180d:
+    #:     slow   <5 pts / 4h   -0.076%  t -1.00   (a drift, not a dip)
+    #:     5-12 pts            -0.027%  t -0.39
+    #:     12-20 pts           +0.309%  t +2.82   <- the band
+    #:     violent 20+ pts     -0.091%  t -0.66   (a repricing, keeps going)
+    #: It survives every test that killed the session's other candidates:
+    #: month-clustering (+1.63), NON-OVERLAPPING windows (+3.19), both halves,
+    #: and a permutation that re-runs the whole best-of-N selection
+    #: (**p=0.0033**). The plateau is broad — [8,16) through [10,24) all
+    #: positive at t 1.90-3.20 — so the band is an interior, not a grid edge.
+    #: CORROBORATED ON HER OWN LEDGER, which outranks any replay (I14), on
+    #: BOTH arms independently: in-band live n=12 **+1.039%/trade t=+3.68**
+    #: and twin n=13 +1.131% t=+3.82, against +0.223% / +0.137% outside it.
+    #: 12 of her 58 live closes carried $32.86 of her $49.12.
+    #:
+    #: DECLARED LIMITS, because this is not proven: n=12/13 is thin, the two
+    #: arms share coin-days so that is ~13 independent observations not 25,
+    #: the split is POST-HOC, it sits inside the hot window (xf) identified,
+    #: and the replay through her bracket books +0.02%/trade where the ledger
+    #: says +1.04% — a 50x gap that is NOT reconciled.
+    #:
+    #: SHIPPED INERT. The defaults below are +-infinity, so `enter` is
+    #: byte-identical to the pre-(xl) rule until a lever moves. The band is
+    #: reached ONLY through `xp.mum.vel_*` on the SHADOW twin; the live arm
+    #: keeps the shipped entry and is the control the judge grades against.
+    VEL_LO = -999.0                     # inert: no floor on the fall
+    VEL_HI = 999.0                      # inert: no ceiling on it
+    VEL_LOOKBACK = 4                    # bars — the window the band was measured on
     control_arm = True                  # publishes its own random-entry null
     census = True                       # publishes why nothing opened (I18)
     #: v1 positions (opened 2026-07-12) are flattened on the first v2 loop —
@@ -1109,12 +1269,33 @@ class OversoldRebound(Carrier):
         # NOT an uptrend: the cell 🙏 avo structurally cannot take (I20), and
         # the half (qu) measured the trend filter was destroying.
         outside_uptrend = not (e50[i] > e200[i])
-        enter = (rsi[i] < self.RSI_MAX and outside_uptrend and v[i] > 0)
+        # [(xl)] THE VELOCITY BAND. Inert unless a lever moves it (both
+        # defaults are +-999), and then FAIL-CLOSED: a bar too early in the
+        # series to measure the fall does not enter. Restrict-direction by
+        # construction — this conjunct can only ever remove entries.
+        vel = None
+        vel_ok = True
+        if self.VEL_LO > -900.0 or self.VEL_HI < 900.0:
+            j = i - int(self.VEL_LOOKBACK)
+            if j >= 0 and rsi[j] is not None:
+                vel = rsi[j] - rsi[i]
+                vel_ok = self.VEL_LO <= vel < self.VEL_HI
+            else:
+                vel_ok = False
+        enter = (rsi[i] < self.RSI_MAX and outside_uptrend and v[i] > 0
+                 and vel_ok)
         # No exit SIGNAL by design — the bracket predefined at entry is the
         # whole exit rule (stop / roi ladder / max hold). Douglas's discipline.
+        # `vel` is published whether or not the band is armed, so the census
+        # can show the distribution she is drawing from and `opened: 0` is
+        # never byte-identical between "quiet" and "the band refused it" (I18).
         return {"enter": "oversold-rebound" if enter else None,
                 "exit": False, "exit_reason": "bracket",
-                "rsi": rsi[i], "uptrend": not outside_uptrend}
+                "rsi": rsi[i], "uptrend": not outside_uptrend,
+                "vel": (rsi[i - int(self.VEL_LOOKBACK)] - rsi[i])
+                       if i >= int(self.VEL_LOOKBACK)
+                       and rsi[i - int(self.VEL_LOOKBACK)] is not None else None,
+                "vel_ok": vel_ok}
 
     def stake_mult(self, tag, bars):
         return 1.0                      # constant clip — consistency is structural
@@ -1923,7 +2104,13 @@ def shadow_scan_order(coins, held, rets):
 #: a candidate: this file never imported fleet_tuning and stamped no `bars`
 #: receipt, so `ran_candidate` (fail-CLOSED) would exclude every close. Two
 #: knobs, one owner for the stamp both hosts write.
-MUM_LEVER_ATTRS = (("rsi_max", "RSI_MAX"), ("max_hold_min", "MAX_HOLD_MIN"))
+#: (lever suffix, class attr, cast). [(xl)] added the velocity band; the cast
+#: is carried HERE rather than branched on the attr name at the setattr, which
+#: silently made every future non-RSI lever an int.
+MUM_LEVER_ATTRS = (("rsi_max", "RSI_MAX", float),
+                   ("max_hold_min", "MAX_HOLD_MIN", int),
+                   ("vel_lo", "VEL_LO", float),
+                   ("vel_hi", "VEL_HI", float))
 
 
 def mum_env_defaults(strategy):
@@ -1932,7 +2119,9 @@ def mum_env_defaults(strategy):
     instance state)."""
     cls = type(strategy)
     return {"rsi_max": float(getattr(cls, "RSI_MAX", 36.0)),
-            "max_hold_min": float(getattr(cls, "MAX_HOLD_MIN", 1440))}
+            "max_hold_min": float(getattr(cls, "MAX_HOLD_MIN", 1440)),
+            "vel_lo": float(getattr(cls, "VEL_LO", -999.0)),
+            "vel_hi": float(getattr(cls, "VEL_HI", 999.0))}
 
 
 def apply_book_levers(strategy, prefix):
@@ -1949,7 +2138,7 @@ def apply_book_levers(strategy, prefix):
         import fleet_tuning as _tuning
     except Exception:  # noqa: BLE001
         _tuning = None
-    for bar, attr in MUM_LEVER_ATTRS:
+    for bar, attr, cast in MUM_LEVER_ATTRS:
         val = base[bar]
         if _tuning is not None and prefix:
             try:
@@ -1960,7 +2149,7 @@ def apply_book_levers(strategy, prefix):
                 val = base[bar]
         if val != base[bar]:
             moved[prefix + bar] = val
-        setattr(strategy, attr, val if attr == "RSI_MAX" else int(val))
+        setattr(strategy, attr, cast(val))
     return moved
 
 
@@ -1971,8 +2160,13 @@ def mum_bars(strategy):
     {} for any carrier without these knobs, so the stamp is never invented."""
     if not hasattr(strategy, "RSI_MAX") or not hasattr(strategy, "MAX_HOLD_MIN"):
         return {}
-    return {"rsi_max": float(strategy.RSI_MAX),
-            "max_hold_min": float(strategy.MAX_HOLD_MIN)}
+    # [(xl)] DERIVED FROM `MUM_LEVER_ATTRS`, not retyped. The judge's own
+    # selftest refuses a promotable lever whose bar this does not stamp
+    # ("a vel_lo judge candidate on mum would accrue ZERO closes"), and a
+    # hand-written dict is how the next lever arrives half-wired.
+    return {bar: float(getattr(strategy, attr))
+            for bar, attr, _cast in MUM_LEVER_ATTRS
+            if hasattr(strategy, attr)}
 
 
 def shadow_scan_order_stamp():
@@ -2129,6 +2323,18 @@ def _census_extra(b):
             # how many sit within 8 points of the bar — the leading indicator
             # of supply, visible hours before an entry rather than days after
             out["near_bar"] = sum(1 for v in vals if v < bar + 8)
+        # [(xl)] THE QUANTITY THE VELOCITY BAND CUTS (I23), published whether
+        # or not the band is armed — so the distribution she draws from is
+        # visible BEFORE anyone arms it, and `vel_blocked` can be read against
+        # the supply that produced it rather than against nothing.
+        if getattr(b, "last_vel", None):
+            vv = sorted(b.last_vel.values())
+            lo, hi = getattr(b.s, "VEL_LO", -999.0), getattr(b.s, "VEL_HI", 999.0)
+            out["vel_med"] = round(vv[len(vv) // 2], 1)
+            out["vel_p90"] = round(vv[int(0.9 * (len(vv) - 1))], 1)
+            out["vel_read"] = len(vv)
+            out["vel_band"] = [lo, hi]
+            out["vel_in_band"] = sum(1 for v in vv if lo <= v < hi)
     except Exception:  # noqa: BLE001
         pass
     # [2026-08-27 (vm)] THE TERM NOBODY COULD SEE, and it is why 👩 mum's
@@ -2248,6 +2454,10 @@ class Book:
         # `control_arm` / `census`, so no other book's payload shape moves.
         self.last_mark = {}      # coin -> most recent mark seen this cycle
         self.last_rsi = {}       # coin -> last computed RSI (gate reachability)
+        #: [(xl)] coin -> last computed RSI VELOCITY (points dropped over
+        #: VEL_LOOKBACK bars). I23: a knob must record the quantity it cuts,
+        #: and this is the one `xp.mum.vel_*` gates on.
+        self.last_vel = {}
         # [2026-08-27 (vm)] THE OTHER CONJUNCT. 👩 mum's rule is `rsi <
         # RSI_MAX and NOT uptrend and v > 0`; (rr) gauged the RSI half and
         # the trend half had no gauge at all, so a bar that is MET while
@@ -2741,6 +2951,22 @@ def main():
         books.append(Book(s, venue, listed))
     for b in books:
         b.restore()
+        # [(xk)] RE-RESOLVE AFTER RESTORE, so a per-carrier exclusion is
+        # ENTRY-ONLY. The universe is built at boot, before any position is
+        # known, so a held name under exclusion would leave `b.coins` — and
+        # the ZOMBIE GUARD below would then close it `delisted` while the
+        # LIVE arm, which has no sweeper, held the same leg to its bracket.
+        # Re-resolving with the restored book in hand keeps the two arms
+        # identical through the act; `carrier_universe` stays the one owner.
+        try:
+            _src = carrier_universe(b.s, held=list(b.broker.pos))
+            _listed = [c for c in _src if venue.supports(c)]
+            if set(_listed) != set(b.coins):
+                b.s.skipped = [c for c in _src if c not in _listed]
+                b.coins = _listed
+        except Exception as _ue:                            # noqa: BLE001
+            log.warning("%s universe re-resolve after restore failed: %s",
+                        b.bot_id, _ue)
 
     log.info("=" * 64)
     log.info("FAMILY + SPOT bots on LIGHTER (shadow) | %d books", len(books))
@@ -2917,6 +3143,7 @@ def main():
             # INSIDE the instrument built to close it.
             b.scan = {"scanned": 0, "held": 0, "no_bars": 0, "no_px": 0,
                       "no_signal": 0, "uptrend_blocked": 0, "no_read": 0,
+                      "vel_blocked": 0,
                       "stale_candle": 0, "locked": 0,
                       "capped": 0, "cooldown": 0, "vetoed": 0,
                       "noncrypto_ungated": 0, "budget_headroom": 0,
@@ -2968,6 +3195,8 @@ def main():
                 # the row can say how far the market is from the entry bar.
                 if sig and isinstance(sig.get("rsi"), (int, float)):
                     b.last_rsi[coin] = float(sig["rsi"])
+                    if isinstance(sig.get("vel"), (int, float)):
+                        b.last_vel[coin] = float(sig["vel"])
                 # [(vm)] the trend conjunct and the FULL condition, off the
                 # same sig, in the same pass — no second walk of the universe.
                 # A non-bool `uptrend` is ABSENT rather than False: False

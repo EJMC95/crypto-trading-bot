@@ -893,6 +893,51 @@ def drop_retired_sleeves(rows, retired, tag_of=None):
     return kept, dropped
 
 
+#: [(xq)] The tag `(xa)` stamps on a position the book found at the venue and
+#: did not open. Exactly `<side>-adopted`, so a strategy whose own name ends in
+#: "adopted" cannot collide with it.
+ADOPTED_TAG = "adopted"
+
+
+def is_adopted_close(r):
+    """[(xq)] True for a close of an ADOPTED position — a leg the book found on
+    the venue with no bracket of its own and took over mid-life.
+
+    IT IS NOT THAT BOOK'S EVIDENCE, BY CONSTRUCTION. `(xa)` starts the clock at
+    adoption because the true open is unknown to the record, so the row's entry
+    basis and holding period are both fictions of the takeover instant — the
+    P&L it books is whatever happened to the position before this book ever saw
+    it. `(xa)` already keeps it out of the BRAIN's per-tag bucket; nothing kept
+    it out of the book-level mean, t, halves or drawdown, which is the sample
+    the go-live gate reads. A finding no gate consumes is a note.
+
+    Eamon, 2-Sep: *"It was a manual trade please disregard it ... drop it from
+    her trades"* — 👩 mum adopted a 1000PEPE leg he opened by hand. That is the
+    clearest instance and not the only one: a container that loses its meta
+    re-adopts its own position on the next boot, and that row is equally
+    unmeasurable for the same reason.
+
+    SPEAKS BOTH LEDGER SHAPES ((vd), whose lesson was that a single-shape
+    predicate silently classifies every row of the other shape): `enter_tag` on
+    a `fetch_paper_trades` row, `tag`/`reason` on a raw `/trades.json` one.
+
+    Fail-CLOSED IN THE KEEPING DIRECTION: anything unparseable is NOT adopted
+    and stays in the sample — `is_phantom_close`'s contract verbatim, and for
+    the same reason. A filter over a graded sample must never be able to shrink
+    it beyond its exact signature.
+    """
+    try:
+        from bot_pnl_store import split_reason   # noqa: PLC0415 — one owner
+        raw = r.get("enter_tag") or r.get("tag") or r.get("reason") or ""
+        if not isinstance(raw, str) or not raw:
+            return False
+        direction, _exit = split_reason(raw)
+        parts = str(direction or "").split("-")
+        return len(parts) == 2 and parts[1].lower() == ADOPTED_TAG
+    except Exception:  # noqa: BLE001 — a filter never breaks a grade
+        return False
+
+
 def is_phantom_close(r):
     """[2026-08-25 (th)] True for a ledger row that is a halt/flatten EVENT
     wearing a close's shape: exactly $0.00 P&L with NO entry price. The
@@ -2149,22 +2194,48 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
 
     # Genuinely unreachable: the sample has EXCLUDED a positive mean, or the
     # in-era drawdown is blown (which cannot un-blow at any n).
+    #
+    # [2026-09-02 (xm)] THE MEAN CLAUSE BRANCHES ON `mean_excluded`, NOT ON
+    # "an upper bound could be computed". The `underpowered` branch above is
+    # gated on `bars["maxdd"]`, so a book that fails the mean bar AND the
+    # drawdown bar falls through to here even when its upper bound is POSITIVE
+    # — and this clause then asserted "the sample has EXCLUDED a positive
+    # mean" while printing the very number that refutes it. Measured in the
+    # live payload the day this was fixed: 🪁 band-kelly-lshadow published
+    # "upper bound **+0.027% <= 0** — the sample has EXCLUDED a positive
+    # mean", which is self-contradictory on its face. That sentence is the
+    # I17 precondition a RETIREMENT is written on, and five books were retired
+    # on this verdict a few hours earlier ((wt)), so a false one is not a
+    # cosmetic defect. The VERDICT stays `unreachable` — a blown drawdown
+    # genuinely cannot un-blow — but the reason now names the drawdown as the
+    # binding cause instead of claiming an exclusion the sample never made.
     if not bars["mean"] or not bars["maxdd"]:
         parts = []
         if not bars["mean"]:
-            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
-                         f"{100 * upper:+.3f}% <= 0 — the sample has EXCLUDED "
-                         "a positive mean, so more of the same closes cannot "
-                         "flip mean/t/halves"
-                         if upper is not None else
-                         f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
-                         "same closes cannot flip mean/t/halves")
+            if mean_excluded:
+                parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
+                             f"{100 * upper:+.3f}% <= 0 — the sample has EXCLUDED "
+                             "a positive mean, so more of the same closes cannot "
+                             "flip mean/t/halves")
+            elif upper is not None:
+                parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0 but its upper "
+                             f"bound {100 * upper:+.3f}% is still ABOVE zero — "
+                             "the sample has NOT excluded a positive mean, so "
+                             "this verdict rests on the drawdown alone and is "
+                             "NOT an I17 exclusion of the mean")
+            else:
+                parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0, upper bound "
+                             "un-computable — no exclusion has been measured; "
+                             "this verdict rests on the drawdown alone")
         if not bars["maxdd"]:
             dd = s.get("max_dd_frac")
             parts.append((f"maxDD {100 * dd:.1f}%" if dd is not None
                           else "maxDD unmeasurable")
                          + " >= bar — a blown in-era drawdown cannot un-blow")
-        out.update(verdict="unreachable",
+        # [(xm)] PUBLISHED, so no consumer has to read the sentence to learn
+        # whether the mean was actually excluded. A retirement docket that
+        # string-matches prose is the second copy of a rule.
+        out.update(verdict="unreachable", mean_excluded=bool(mean_excluded),
                    why="at current trajectory: " + "; ".join(parts))
         return out
 
@@ -3621,6 +3692,13 @@ def main():
         rows = [r for r in rows if not is_phantom_close(r)]
         print(f"(phantom closes excluded by signature: {_phantoms} — "
               f"$0.00 with no entry price)")
+    # [(xq)] and the ADOPTED legs — a position the book took over mid-life,
+    # whose entry basis and hold are fictions of the takeover instant.
+    _adopted = sum(1 for r in rows if is_adopted_close(r))
+    if _adopted:
+        rows = [r for r in rows if not is_adopted_close(r)]
+        print(f"(adopted closes excluded by tag: {_adopted} — a leg this "
+              f"book found on the venue, not one it opened)")
     books = {}
     for r in rows:
         bot = str(r.get("bot"))

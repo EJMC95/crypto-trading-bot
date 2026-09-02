@@ -1004,16 +1004,33 @@ def run_once(publish=False):
     # clean subprocess — the AST test that shipped beside the defect asserted
     # the import STRING was present and called, which a broken import satisfies
     # perfectly ([[a-substring-test-is-not-a-wiring-test]]).
+    #
+    # [(xq)] The mutual import with `golive_readiness` (which reaches back for
+    # `t_crit`, I17's one-owner rule) is a real cycle and BOTH SIDES resolve it
+    # the same deliberate way: function-local imports, never module-level.
+    # CodeQL re-flags this line whenever it changes; the cycle is inherent to
+    # two modules that must share owners, and the local import is the fix, not
+    # the symptom.
     n_phantom = 0
+    n_adopted = 0
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(
             os.path.abspath(__file__)), "scripts"))
-        from golive_readiness import is_phantom_close
-        _keep = [t for t in trades if not is_phantom_close(t)]
-        n_phantom = len(trades) - len(_keep)
+        from golive_readiness import is_phantom_close, is_adopted_close
+        # [(xq)] COUNTED SEPARATELY, published separately. They are different
+        # exclusions with different reasons — a halt event wearing a close's
+        # shape, versus a leg this book never opened — and folding both into
+        # `n_phantom` would make the published number mean two things at once,
+        # which is how a reader stops being able to act on it (I8/I18).
+        _keep = [t for t in trades
+                 if not is_phantom_close(t) and not is_adopted_close(t)]
+        n_phantom = sum(1 for t in trades if is_phantom_close(t))
+        n_adopted = sum(1 for t in trades
+                        if is_adopted_close(t) and not is_phantom_close(t))
         trades = _keep
     except Exception:                                    # noqa: BLE001
         n_phantom = None
+        n_adopted = None
     rows_by_bot = {}
     for t in trades:
         bot = t.get("bot")
@@ -1043,6 +1060,7 @@ def run_once(publish=False):
     # [[guards-blind-to-their-own-refusals]] lesson — measured there as 0 of 20
     # rows accumulating a census).
     payload["n_phantom"] = n_phantom
+    payload["n_adopted"] = n_adopted        # [(xq)]
     # [(kc)] Say WHICH sample the ranked claim is computed on. Three organs
     # grade this fleet on three different samples — allocation pools all-time,
     # golive_readiness scopes to the policy era, the brain decays at a 14d

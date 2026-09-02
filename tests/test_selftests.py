@@ -43,7 +43,7 @@ SELFTEST_MODULES = [
     # fleet-weekly-assessment.yml beside audit_code_currency, which is where
     # "which commit is running, and was it graded" is the actual subject.
     "scripts.audit_ci_coverage", "scripts.edge_aware_safety",
-    # [2026-09-02 (xh)] the squash-marker guard. SELFTEST_MODULES and NOT the
+    # [2026-09-02 (xk)] the squash-marker guard. SELFTEST_MODULES and NOT the
     # scan group below, for the same reason as audit_ci_coverage directly
     # above: its verdict needs a PULL REQUEST TITLE, which is not in the repo,
     # so there is no standalone scan to run — pointing it at a checkout would
@@ -146,6 +146,18 @@ SELFTEST_MODULES = [
     # the public feeds and refuse on a dark one.
     "scripts.study_regime_short_veto_2026-09-02",
     "scripts.study_taker_hold_floor_2026-09-02",
+    # [2026-09-02 (xk)] 👩 mum's non-crypto sleeve read, pre-registered; the
+    # selftest is offline (planted control CUT, placebo KEPT, thin sample
+    # not decidable, the twin-agreement arm).
+    "scripts.study_mum_noncrypto_sleeve_2026-09-02",
+    # [2026-09-02 (xn)] 👩 mum's class-aware ladder replay. --selftest is
+    # OFFLINE and is the reuse pin: the generalised bracket walk must reduce
+    # byte-identically to `study_mum_supply.bracket_walk`, and the vectorised
+    # entry predicate is DRIVEN against the carrier's own `signals()` rather
+    # than asserted to match it. Also pins that the verdict metric is the
+    # AGGREGATE return per bar-day and not the mean of per-episode ratios —
+    # that distinction shipped wrong once and inflated a headline ~40x.
+    "scripts.study_mum_class_ladder_2026-09-02",
     # [2026-08-20 (ru)] the docket class-split evidence. --selftest is offline
     # and pure (the split, the sleeve-tag round-trip, and the calibration gate's
     # fail-closed arms); the SCAN needs the public feeds, so only the fixture

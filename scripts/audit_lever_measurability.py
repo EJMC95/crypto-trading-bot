@@ -92,6 +92,23 @@ LEVER_BOOK = {
 #: Levers with no path to measurement, DECLARED. An entry is a decision with a
 #: reason — never a snooze — and the list may only shrink (see RATCHET below).
 UNMEASURABLE_OK = {
+    # [2026-09-02 (xl)] 👩 mum's DIP-VELOCITY band, all four twins. DECLARED
+    # rather than backlogged, per I23's own rule that a NEW lever is measurable
+    # or declared THE SAME DAY — and the declaration is narrow, because the
+    # quantity is NOT unrecorded. It is published on her row every loop
+    # (`scan.vel_med` / `vel_p90` / `vel_read` / `vel_band` / `vel_in_band`,
+    # armed or not) and stamped on every close through `mum_bars`. What it
+    # lacks is a source THIS PROFILER can read: every `QUANTITIES` spec pulls
+    # from a scout-tape state key (`state:lighter-market`), and her RSI
+    # velocity is a 1h per-carrier statistic that never enters the scout tape.
+    # Closing it properly means teaching the profiler a per-book census
+    # source, which is a change to the guard, not to the book.
+    # OWNER: this repo. Revisit when a second carrier-statistic lever lands —
+    # one is a declaration, two is a missing source type.
+    "xp.mum.vel_lo": "recorded on the row (scan.vel_*) + mum_bars; no scout-tape source",
+    "xp.mum.vel_hi": "recorded on the row (scan.vel_*) + mum_bars; no scout-tape source",
+    "live.mum.vel_lo": "as xp.mum.vel_lo — judge-promoted twin",
+    "live.mum.vel_hi": "as xp.mum.vel_hi — judge-promoted twin",
     # [2026-08-22 (sx)] 🔮 georgia's live clip arm, registered ahead of her
     # funding. Declared rather than counted against the ratchet, because a
     # NEW lever must be measurable or declared THE SAME DAY (I23) — and the
