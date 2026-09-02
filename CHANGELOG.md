@@ -1,3 +1,96 @@
+## 2026-09-02 (xp) — THE STOP OVERSHOOT IS NOT SLIPPAGE AND NOT LATENCY: a resting venue-side stop is REFUSED with the number, and the ceiling that assumed fire-at-level is now measured
+
+**Eamon: *"Implement fix."*** The fix that shipped is the arithmetic. The
+execution change is REFUSED, with a measured harm rather than an absent
+benefit (I26 runs in both directions).
+
+**WHAT THE OVERSHOOT IS NOT.** 👩 mum's six live stop fills landed 12.2 /
+12.2 / 12.6 / 40.8 / 51.7 / 62.4 bps PAST their level, so a 4.0% stop cost
+up to 4.62%. The obvious reading is book walk at her clip. **It is not**, and
+her own SHADOW twin proves it: the paper broker fills at MARK — it has no
+book to walk — and it overshoots MORE.
+
+| arm | fills | mean overshoot | worst |
+|---|---|---|---|
+| LIVE (real fills) | 6 | 32.1 bps | 62.4 |
+| SHADOW (mark fills) | 6 | **36.8 bps** | 87.0 |
+
+Two paired instants say it directly: on JTO the live arm filled **0.43714**
+73 seconds AFTER the shadow's mark of **0.43697** — the real fill was
+*better* than the mark.
+
+**AND IT IS NOT POLL LATENCY EITHER.** The first look said it was: on the 1m
+tape the stop level traded 130.7 min before the FIL exit, 24.7 before APT,
+23.9 before FARTCOIN — hours, not the 90s loop. That reading was wrong, and
+the way it was wrong is the transferable part: **the bot reads `fresh_mid`,
+and I was comparing it against the candle LOW — a trade print the mid may
+never reach.** Comparing an actuator to a series it cannot act on
+manufactures a lag.
+
+**THE REFUTATION TEST, and it is one-sided.** Across all 69 of her live
+closes, exactly ONE non-stop position ever had a 1m low touch its stop level
+(TRUMP, closed `daily_loss` at −3.598%) — so when the level genuinely trades
+she stops, 68 of 69 times. A resting stop buys at most the 32bps × 6 = 1.93%
+of clip of overshoot and pays −0.72% on TRUMP: a prize of ~1.2% of clip ≈
+**$0.35 on her book over 8 days**, at n=6, on an order path this fleet has
+never run live.
+
+**THEN THE HARM, and it lands on exactly the trades that motivated the
+change.** Minute-by-minute after each stop's first cross:
+
+| pair | overshoot | minutes after 1st cross | closed back ABOVE the stop |
+|---|---|---|---|
+| POL | 12.2 | 2 | 0 (0%) |
+| POL | 13.0 | 3 | 1 (33%) |
+| FARTCOIN | 12.6 | 25 | 2 (8%) |
+| JTO | 62.4 | 6 | 1 (17%) |
+| **APT** | **51.7** | 26 | **21 (81%)** |
+| **FIL** | **40.8** | 132 | **123 (93%)** |
+
+**The two largest overshoots are the two cases where the first cross was a
+WICK that recovered.** FIL traded through its level and then closed back
+above it for 123 of the next 132 minutes before finally breaking down. A
+resting venue-side stop fires on that wick — 130 minutes early, on a position
+that had not yet lost. So the apparent prize is concentrated precisely where
+the trigger is wrong, and the "lag" it was supposed to cure is the mid
+correctly declining to chase a print. Add the orphan-order hazard on a real
+money account (a resting stop that survives a restart the bot's memory does
+not — [[lighter-flatten-silent-halt-redeploy-incident]] one costume worse,
+because this one can OPEN a position) and the change is refused.
+
+**WHAT DID SHIP — the ceiling (th) specified in prose and never built.**
+*"G_max assumes the stop fires AT its level; the honest ceiling divides by
+(|stop|+overshoot+mmf)"* has sat in the comment beside the measurement since
+(th). `leverage.all_slots_stop_pct` still prices an all-slots stop at
+`gross_x × |stoploss|` — the assumption the six fills refute. New beside it:
+`all_slots_stop_pct_measured` = `gross_x × (|stoploss| + p90 overshoot)`,
+plus `overshoot_p90_bps` and `overshoot_n` inline.
+
+* **REPORTED, never a clamp.** `GROSS_X_MAX` is an operator env by (sr)'s
+  explicit rule — *"risk appetite belongs to the person whose money it is;
+  the code's job is the arithmetic, published."* This publishes the
+  arithmetic. It moves no lever, no clip, no trade.
+* **Degrades to None, never to the assumption.** Below the n floor the honest
+  answer is "not measured"; publishing the fire-at-level number under a name
+  that promises measurement is the flattering direction, the byte-identical
+  trap I18 exists to close. Mum's real n is **6**, so the field reads None
+  today and says so — the number arrives when the sample does.
+* **The floor is the fleet's own** — `fleet_allocation.MIN_N` imported by
+  identity, not retyped (hj); a local literal is a declared fallback for an
+  image without the organ.
+* **A fill BETTER than the level does not earn leverage**: a negative
+  overshoot floors at zero, so the measured cost can never read below the
+  assumption it corrects.
+
+Pinned by `tests/autonomy/test_honest_stop_cost.py` (13 tests, **7/7
+mutations red** — including two that first failed to APPLY and whose green
+was my harness's, not the guard's: a 31-occurrence `return None` and a floor
+mutated in the dead `except` branch. A mutation that does not land is not a
+surviving mutant, and reading it as one is I3 in reverse).
+
+Real-money surface, and it changes no trade — so main only, per (mm). It
+rides the next deploy that qualifies.
+
 ## 2026-09-02 (xo) — 👩 MUM'S DAILY HALT COULD NOT FLATTEN A 1000-MARKET, AND THE FAILURE PRINTED AS SAFETY: 84% of a real-money book left unmanaged behind a retry that could never succeed
 
 **Eamon, 2-Sep: *"Mum isn't appearing to be trading? If so can we look for a

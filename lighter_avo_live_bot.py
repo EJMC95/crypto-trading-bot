@@ -695,6 +695,51 @@ def halt_room(equity, day_start_equity, rails):
     return eq - level
 
 
+#: [(xp)] The n floor under which a measured stop cost is not published.
+#: Pinned to the fleet's own computability floor rather than invented here —
+#: `fleet_allocation.MIN_N` is the one owner of "how many samples before a
+#: number may be spoken" (I16 as amended), and a second copy of that constant
+#: is a second rule (hj).
+#:
+#: REACHED VIA `fleet_bus`, NOT `fleet_allocation`, and the difference is the
+#: whole point: this image does NOT carry the allocation organ, so importing
+#: it here would take the fallback SILENTLY in production while every test
+#: passed in the repo — the 17-Jul brain_stats class, caught by
+#: `audit_image_imports` on the run that introduced it. `fleet_bus` IS in the
+#: image, and `LB_CAP_MIN_N` is already pinned to `fleet_allocation.MIN_N` by
+#: identity in `test_brain_sizing_rails`, so the chain to the one owner holds
+#: without dragging an organ into the real-money import graph (or moving
+#: `build_n`, the (fd) stamp trap).
+OVERSHOOT_MIN_N = _bus.LB_CAP_MIN_N
+
+
+def _honest_stop_cost(ov, gx=None, stop=None):
+    """What an all-slots stop ACTUALLY costs, as a fraction of equity.
+
+    `gross_x * (|stoploss| + measured overshoot)`. The published
+    `all_slots_stop_pct` beside it prices the same event at `|stoploss|`
+    alone, which assumes every stop fires at its level; measured on 👩 mum's
+    own live fills it does not (12.2..62.4 bps past, n=6).
+
+    Returns None below `OVERSHOOT_MIN_N` — the honest reading of a thin
+    sample, and never the fire-at-level number wearing this name.
+    """
+    try:
+        vals = list((ov or {}).get("vals") or [])
+        if int((ov or {}).get("n") or 0) < OVERSHOOT_MIN_N or not vals:
+            return None
+        p90 = sorted(vals)[max(0, int(round(0.9 * len(vals))) - 1)]
+        # a NEGATIVE overshoot is a fill BETTER than the level; it does not
+        # earn leverage, so the cost floors at the fire-at-level assumption.
+        over = max(0.0, float(p90)) / 1e4
+        g = gross_x() if gx is None else float(gx)
+        sl = abs(float(S.stoploss)) if stop is None else abs(float(stop))
+        out = g * (sl + over)
+        return round(out, 4) if out == out and abs(out) != float("inf") else None
+    except Exception:  # noqa: BLE001 - a telemetry field never breaks the loop
+        return None
+
+
 def gross_x():
     """The effective gross multiplier. Floors at 1.0 — this lever exists to
     deploy balance, and SHRINKING the clip is the live clip scale's job
@@ -1919,6 +1964,27 @@ def main(_ctx=None, once=False):
                     "deployed_at_full": (round(_eff_clip * S.max_open, 2)
                                          if _eff_clip else None),
                     "all_slots_stop_pct": round(gross_x() * abs(float(S.stoploss)), 4),
+                    # [(xp)] THE SAME NUMBER, MEASURED. The line above prices
+                    # an all-slots stop at |stoploss| — i.e. it assumes every
+                    # stop fires AT its level. Mum's own live fills say it does
+                    # not: n=6 measured 12.2..62.4bps PAST the level, so a 4.0%
+                    # stop has cost 4.0%..4.62%. This is the ceiling the (th)
+                    # comment already specified — `|stop| + overshoot` — and it
+                    # is REPORTED, never a clamp: `GROSS_X_MAX` is an operator
+                    # env by (sr)'s explicit rule ("risk appetite belongs to the
+                    # person whose money it is; the code's job is the
+                    # arithmetic, published").
+                    #
+                    # DEGRADES TO None, NEVER TO THE ASSUMPTION. Below the n
+                    # floor the honest answer is "not measured", and publishing
+                    # the fire-at-level number under a name that promises
+                    # measurement is the flattering direction — the exact
+                    # byte-identical trap (lv)/I18 exists to close.
+                    "all_slots_stop_pct_measured": _honest_stop_cost(ov),
+                    "overshoot_p90_bps": (sorted(ov["vals"])[
+                        max(0, int(round(0.9 * len(ov["vals"]))) - 1)]
+                        if ov.get("vals") else None),
+                    "overshoot_n": int(ov.get("n") or 0),
                     # [(sr)] THE HELD BASKET'S MEASURED INDEPENDENCE. n_eff ~1
                     # means the slots are one bet wearing five names and the
                     # leverage above is riding a single position; n_eff near the
