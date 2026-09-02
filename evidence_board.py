@@ -677,6 +677,23 @@ def live_clip_grade(prop_state, bot=None):
         return None
 
 
+def _live_light(fr):
+    """[2026-09-02 (wy)] The LIVE cohort's own light, for a gate on REAL
+    money. The pooled `light` went red on 2-Sep with the live cohort at 15/20
+    — six of the 21 pooled longs were paper — and this ladder's UP step read
+    it as "fleet at budget". (wp) split the veto consumers by cohort and left
+    the light pooled; a real-money up-scale must read the cohort real money
+    sits in. Falls back to the pooled light on a pre-(wy) payload, so a
+    stale fleet-risk container gates exactly as before (never opens on a
+    missing field)."""
+    co = (fr or {}).get("cohorts")
+    if isinstance(co, dict) and isinstance(co.get("live"), dict):
+        lt = co["live"].get("light")
+        if lt in ("green", "yellow", "red"):
+            return lt
+    return (fr or {}).get("light")
+
+
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
                     prior_scale, now_ts, clip_grade=None, window=None,
                     released_ts=0.0, scope=None):
@@ -862,7 +879,7 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
 
     # UP must be earned on every gate at once.
     fr_ok = (_fresh(fleet_risk or {})
-             and str(fleet_risk.get("light")) == "green"
+             and str(_live_light(fleet_risk)) == "green"
              # [2026-07-15 AUDIT FIX] fail CLOSED for a real-money UP-scale: a
              # MISSING drawdown field must NOT bypass the shallow-DD guard
              # (was `is None or > MIN`, which up-scaled on absent dd).

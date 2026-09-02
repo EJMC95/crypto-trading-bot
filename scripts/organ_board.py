@@ -92,10 +92,20 @@ def c_fleet_risk(p, ctx):
     lp, lb = need(p, "long_positions"), need(p, "long_budget")
     why, co = f"light {p.get('light')} · pooled long {lp}/{lb}", p.get("cohorts")
     if isinstance(co, dict):   # [(wp)] the live/shadow split
-        why += " · " + " ".join(f"{k} {v.get('long_positions')}/{v.get('long_budget')}"
-                                for k, v in co.items() if isinstance(v, dict))
-    else:
-        why += " · cohorts absent (pre-(wp) payload)"
+        # [(wy)] graded PER COHORT: the pooled count mixes paper into real
+        # money and back, so "at budget" is asked of each population against
+        # its own budget, and the row names WHICH one binds.
+        at = []
+        for k, v in co.items():
+            if not isinstance(v, dict):
+                continue
+            n, b = v.get("long_positions"), v.get("long_budget")
+            lt = v.get("light")
+            why += f" · {k} {n}/{b}" + (f" {lt}" if lt else "")
+            if isinstance(n, NUM) and isinstance(b, NUM) and n >= b:
+                at.append(k)
+        return ("watch" if at else "ok"), why + (f" · AT BUDGET: {','.join(at)}" if at else "")
+    why += " · cohorts absent (pre-(wp) payload)"
     return ("watch" if lp >= lb else "ok"), why
 
 
