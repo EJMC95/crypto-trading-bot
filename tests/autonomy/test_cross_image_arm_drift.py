@@ -30,7 +30,6 @@ DECLARED BLIND SPOT (asserted below so it cannot be forgotten): drift confined
 to a live-only entry module is invisible to the shared stamp. `build`/`build_n`
 stay published and `audit_code_currency` resolves per row.
 """
-import os
 import re
 import sys
 from pathlib import Path
