@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 11:54 Sydney (01:54Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 14:04 Sydney (04:04Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,14 +69,27 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (20 commit(s), entries (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj))
+## Shipped today (33 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl))
 
+- `acc656a` The edge audit: 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wl)
+- `3e15884` Merge PR #258: the (wk) record — the night's cross-session convergences, receipts and withdrawals
+- `0030ce1` Merge remote-tracking branch 'origin/main' into claude/fleet-audit-review-wjz9zy
+- `6887a8e` [deploy-live-mum] Merge PR #259: the (wh) daily-loss floor reverted — the pinned rail restored, mum's staged $57 cap activates (wj)
 - `0173257` Merge remote-tracking branch 'origin/main' into claude/fleet-audit-review-wjz9zy
+- `fa87526` (we) corrected in place: the guard learns direction after crying wolf on a deploy wave
+- `7d6fdef` wiring test rejects a constant: kwarg-present/value-None survived the round
+- `48642fe` SPLIT-BRAIN guard: direction is load-bearing — the second live run cried wolf on a deploy wave
+- `0cb659e` Merge origin/main: the peer's (wi) latch-release landed first — the runbook entry renumbers to (wj); the avo host now carries both the clear-guard and the restored daily-loss rail
 - `9515786` The latched-lock release valve: a lock stamped by a defective rail no longer outlives its own fix — avo's 04:02:46Z phantom is its first release (wj)
 - `85c9f8e` [deploy-live-taker] avo: FAMILY_CLEAR_GUARD release lever for the (vn) latch — armed-by-fixed-defect lock gets a designed exit
 - `6626f39` (wi) — the latch outlived its bug: the (vg) unlock ported to the live arm
 - `1e01a45` FAMILY_CLEAR_GUARD reaches the live arm — once per process, and the sentinel is the point
+- `e733653` Eamon takes the lever: LIGHTER_MAX_DAILY_LOSS=57 set on mum-live (skipDeploys, rides the marker deploy) — derivation published per (tg)
+- `d5741ec` the (wh) title keeps its main stem + CORRECTED IN PLACE declared — the cross-branch letter arm now reads it as the same entry corrected (retitle, not a deletion; session_commit's deletion guard cannot tell those apart, its own message routes retitles here)
+- `1d959e9` the (wh) entry records the shipped window: the refuted floor rode Eamon's merge to all three live services for ~2h, telemetry disagreeing with the actuator
 - `dd5bb32` Drive #258 to green: the (wh) daily-loss floor left one real-money test pinning the superseded pilot-cap contract — main red on its own direct push
+- `9e22cbd` Revert the (wh) daily-loss floor — a pinned safety test showed the abs cap is a deliberate tighter fleet rail
+- `0b97876` the taker is georgia's successor — staged go-live runbook + carry named the regime hedge (wi)
 - `2b6e101` The (wi) record: #257 taken over and deployed to all three live services in one act; avo's unlock stamped 04:02:46Z; binding-label nit recorded (wi)
 - `9b41ab5` [deploy-live] Merge PR #257: avo's maxdd rail reads the funded book + georgia's live arm retired, reallocated to mum (wf)(wg)
 - `ea2d96f` mum's daily-loss pilot cap floors under the pct leash — funded to $570 she halted at 5.26% not 10% (wh)
