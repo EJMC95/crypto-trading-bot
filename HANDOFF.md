@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 20:35 Sydney (10:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 21:10 Sydney (11:10Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -28,11 +28,6 @@ _Still open because:_ the fresh sample has not accrued. At registration the inst
 The edge audit's hypothesis #2 is a PRE-REGISTERED instrument now (I21): `scripts/study_taker_hold_floor_2026-09-02.py` walks 🎫 the taker's OWN entries through `exit_reason` with a hold floor (no tp/sl/trail before F h) against the shipped rule, paired, calibrated against the realised closes, on the scout tape. Registered 2-Sep 09:30Z. READ: run it with `--fresh` at n>=30 fresh walked closes (~4.7 closes/day -> ~10 days) or on 16-Sep, whichever first. CONFIRMED -> register `TT_MIN_HOLD_H` as a caged shadow-lane lever at the confirmed floor, its own entry, era untouched (an exit bar is not in the (jf) signature); REFUTED -> record it; else record and re-arm once.
 
 _Still open because:_ the fresh sample has not accrued; the read at registration is in the (wy) changelog entry. Declared limit: the replay form of this test (a floor's effect on the ENTRIES it blocks by holding a slot) needs the up-resolver, which this environment's egress refuses — run that half in the container when the walk confirms.
-
-### `mum-noncrypto-sleeve-preregistered-read`  ·  owner: **session**
-👩 mum's graded NON-CRYPTO sleeve (XAU/QQQ/SPY/XCU) is her one measured weak spot: 7 closes at −0.383%/trade on the live arm (−0.54% on the twin), 5 of 7 `max_hold` losers on both arms, upper bound at zero — below the fleet's own 10-close floor. PRE-REGISTERED (I21): run `scripts/study_mum_noncrypto_sleeve_2026-09-02.py` at n>=10 non-crypto closes on the live arm or on 6-Sep, whichever first. CUT (set FAMILY_NONCRYPTO_EXCLUDE='freqtrade-mum:<the graded names>' on mum-live AND family-lighter-shadow so the control twin moves with her) if the live upper bound (m + t_crit*SE) <= 0 AND the twin's mean < 0; KEEP if the live mean > 0; anything else re-arm once.
-
-_Still open because:_ the sample is 7; the floor is 10. The mechanism (`noncrypto_exclude`, per carrier, inert at '') shipped with the registration so the cut is one env, not a build, when the read passes.
 
 ### `allocation-clamp-is-a-per-position-bound-doing-per-book-duty`  ·  owner: **OPERATOR**
 💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vj)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
@@ -69,10 +64,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (115 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx), (wy), (xc))
+## Shipped today (114 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx), (wy), (xc), (xe))
 
-- `843eabf` Merge remote-tracking branch 'origin/main' into claude/edge-radar-incubator-review-wjioye
-- `19f046a` The mechanism for mum's non-crypto sleeve: a per-carrier exclusion, shipped inert, with the pre-registered read that decides it
+- `9691937` [deploy-live] one position, two spellings: a 1000-market's mark arrived venue-spelled and the margin block asked fleet-spelled, so a priced real-money leg published as unmeasurable (xe)
 - `4d1de6b` Merge PR #266: (xb)/(xc) the edge audit's last items, then both judgement numbers calibrated optimally
 - `b2b7d8e` HANDOFF regenerated after merging main (xc)
 - `cbf6f43` Merge origin/main into the calibration branch: #270's (wz) readback

@@ -1,4 +1,4 @@
-## 2026-09-02 (xd) — 👩 MUM'S ONE MEASURED WEAK SPOT IS HER NON-CRYPTO SLEEVE — registered, not cut, with the one-env mechanism that acts on it; and 🙏 avo is refused a hand-placed trade by the venue's own floors
+## 2026-09-02 (xf) — 👩 MUM'S ONE MEASURED WEAK SPOT IS HER NON-CRYPTO SLEEVE — registered, not cut, with the one-env mechanism that acts on it; and 🙏 avo is refused a hand-placed trade by the venue's own floors
 
 **Eamon, 2-Sep: *"How do we fix mum"*, then *"Tell avo to take a long position
 on united stables"*, then *"Continue with all the above — if it makes any bot
@@ -122,6 +122,223 @@ the auto path; **the mechanism is inert, so no book trades differently today**;
 the study is a `scripts/` instrument registered in `SELFTEST_MODULES` and ships
 in no image. No live bot file changed → main only, no marker, per (mm). Carried
 as `mum-noncrypto-sleeve-preregistered-read`, 6-Sep backstop.
+
+## 2026-09-02 (xe) — THE SEAM (xa) CLOSED ON ONE SIDE WAS OPEN ON THE OTHER: A 1000-MARKET'S MARK ARRIVED UNDER THE VENUE'S SPELLING AND THE MARGIN BLOCK ASKED FOR THE FLEET'S, SO A PRICED, READABLE REAL-MONEY LEG PUBLISHED AS UNMEASURABLE AND PAGED EVERY LOOP
+
+**Found by the organ board's own follow-up read, not by a failing test** — 👩 mum
+is REAL MONEY and her row had been refusing `headroom` on `mark_blind` since
+`(xa)` deployed this morning.
+
+**THE MECHANISM, and it is `(xa)`'s mirror image rather than its regression.**
+`(xa)` fixed a real defect: the host's universe, `meta` and `held` map carry the
+VENUE's spelling (the scout's `vols` keys: `1000PEPE`) while `venue.positions()`
+returns FLEET symbols (`from_lighter`: `kPEPE`), so a 1000-market was two names
+in one loop and the reconciler dropped its bracket. It normalised the position
+map to the venue spelling — correctly. But `_margin_block` then hands that same
+map to `marks.stop_marks`, which keys its output by **whatever spelling its
+caller gave it**, while `LighterClient._positions_from` keys the margin block by
+the **fleet** symbol. The two met at one expression:
+
+```python
+liq, mark = rec.get("liq"), (marks or {}).get(coin)   # coin is kPEPE
+                                                      # marks holds 1000PEPE
+```
+
+Before `(xa)` both sides were fleet-spelled and it worked by coincidence.
+
+**MEASURED ON THE LIVE ROW, 2-Sep, every field agreeing:**
+
+| field | value | spelling |
+|---|---|---|
+| `held` | `{..., "1000PEPE": "adopted"}` | venue |
+| `margin.positions` | `[..., "kPEPE"]` | fleet |
+| `liq_mark_blind` | `["kPEPE"]` | the one 1000-market of ten legs |
+| `mark_blind` (the caller's own) | **ABSENT** | the order book read FINE |
+| `headroom` | `{"ok": false, "reason": "mark_blind", "gap_stop_widths": 18.66}` | |
+
+`mark_blind` absent beside `liq_mark_blind` populated is the whole diagnosis in
+two keys: the price existed, under the other name.
+
+**TWO COSTS, BOTH REAL, NEITHER A LOSS — and the distinction is the point.**
+1. **The published risk number was computed over a subset.** `nearest_liq` is
+   built from positions that have BOTH a venue liq price and a readable mark, so
+   the blind leg dropped out and the row published the *comfortable* leg's
+   distance (XRP, 0.746 of mark) as the account's nearest. A 1000-market can
+   therefore never BE `nearest_liq`, which makes `too_close` — the one refusal in
+   `headroom_check` that means the money is actually in danger — **structurally
+   unreachable** for such a leg.
+2. **A spelling paged the operator every loop.** `mark_blind` is not in this
+   book's `fleet_immune.HEADROOM_OK` allowlist (mum's declared-structural set is
+   `{too_close, liq_unpriced}`), so `headroom_sickness` fired continuously — the
+   `(gl)` failure the allowlist's own comment names, a detector whose output one
+   learns to ignore.
+
+**WHAT WAS NEVER WRONG, stated so the severity is not overstated:** the VERDICT.
+`mark_blind` is itself a refusal, so the ruin gate declined in the safe direction
+throughout; nothing unsafe was admitted, and on this host the gate is
+publish-only in any case. The number and the reason were wrong; the rail was not.
+
+**FIXED AT THE OWNER, NOT THE CALL SITE.** `venues.lighter_client._mark_for`
+looks the mark up under the fleet spelling FIRST and falls back to
+`symbol_map.to_lighter(coin)` — the ONE owner of the alias rule ((hj)) — so an
+unknown coin maps to itself and this is a byte-for-byte no-op on every market
+that is not a 1000-market. The call-site fix was rejected: `lighter_avo_live_bot`
+and `lighter_funding_bot` carry **byte-identical** `_margin_block` helpers, so
+patching mum's host alone leaves the trap standing for the sibling and for the
+next caller — fixing the instance guarantees the return visit (FORWARD MOTION,
+rule 2). `to_lighter` is definitional, so the fallback can never resolve to a
+DIFFERENT market's price; that is pinned, because this is a real-money price.
+
+**AFTER THE FIX**: `liq_mark_blind` empties, the 1000-market joins the priced
+set, and `headroom` falls through to `liq_unpriced`, which mum's allowlist
+declares as structural on a cross-margin book. The page stops because the
+condition stops, not because a reason was allowlisted.
+
+**AND THE ONE NUMBER THAT COULD HAVE BEEN OVERSTATED IS CORRECTED IN PLACE
+BEFORE IT SHIPPED (I12), because I wrote it from my own FIXTURE and called it
+the live geometry.** The draft of this entry said the blind leg *is* today's
+nearest at "0.10 of mark against XRP's 0.746, a number 7x more comfortable
+than the position it could not see". That is my test's constructed geometry,
+not mum's. Measured on the live row (build `08147b6bc9fb`): kPEPE liq
+`0.00061214` against an entry of `0.00344`, so at a mark near entry it sits
+**~0.82 of mark from liquidation** — SECOND-nearest, ~2.6pp behind XRP's
+measured `0.79664`. **So today's published `gap_stop_widths` (19.9 = 0.79664
+/ 0.04) is materially correct, and the blind leg was never hiding a closer
+one.** The defect is therefore STRUCTURAL rather than currently mis-stating:
+a 1000-market can never BE `nearest_liq`, so on the day it *is* the closest
+the row would publish a comfortable number instead and `too_close` could not
+fire — a near miss, and the page is the part that was costing something every
+loop. Five of mum's ten legs carry no venue liq price at all (cross-margin,
+structural, allowlisted), so the priced set the blind leg was dropped from is
+five, not ten.
+
+**PINNED** by `tests/autonomy/test_margin_mark_spelling.py` — 10 tests driving
+the whole seam in the host's own order (`stop_marks` -> `margin_state_from` ->
+`headroom_check`) against a venue that quotes books under the venue's spelling,
+which is what the real client does. The three incident tests were confirmed RED
+against the pre-fix expression and GREEN after; the no-regression and
+teeth-kept tests pass in both. **8 mutations, 7 killed**; the survivor
+(`if not marks:` -> `if marks is None:`) is SEMANTICALLY EQUIVALENT — the two
+differ only on `{}`, where both return None — and the None-safety half of that
+guard is separately killed by `if not marks:` -> `if False:`. `HEADROOM_OK` is
+READ in the test, never retyped, so allowlisting `mark_blind` later would fail
+the test that cites the page as this fix's justification.
+
+**DEPLOYED BOTH WAYS** under `(pz)`: `venues/` is in `_BUILD_SHARED`, so every
+image's stamp moves; the live pair (🙏 avo + 👩 mum, one variant host) takes it
+under the marker with a halt check first and a stamp readback after.
+
+## 2026-09-02 (xd) — THE JUDGE'S SERIAL LANE COULD NOT PROMOTE, BY CONSTRUCTION: a drift guard that was sound for one entry file in two services became a permanent block the day the lane moved to two images
+
+**Found by the organ board's first real run** (`scripts/organ_board.py`, shipped
+(ww)) — which is the point of it: it grades an organ's OUTPUT, not its
+timestamp, and the judge's output said the same thing every cycle.
+
+**THE SYMPTOM.** 🧪 the judge is RUNNING mum's first candidate (`mum-rsi-32`,
+lever `xp.mum.rsi_max=32.0` open on the bus, reach check green: mum's shadow
+closes **4.14/day → ~29 in a 7d window** against a 15-close floor). Every
+evaluation returned:
+
+> ARMS ON DIFFERENT CODE: live=733ee8665875 shadow=f009aec2315f — this window
+> measures a code delta, not edge; no promotion can rest on it
+
+**THE MECHANISM, and it is structural rather than a bad window.**
+`implementation_shortfall.arm_drift` claims drift when the two arms' `extra.build`
+differ, and `experiment_judge.paired_eval` returns on that claim BEFORE any floor
+or gap logic — a drift claim is a HARD BLOCK on promotion. `build` is a sha256
+over name+bytes of the entry module PLUS the `_BUILD_SHARED` names **that exist in
+that image**. Measured from the two Dockerfiles and reproduced by driving the real
+hasher over both image shapes:
+
+| arm | image | entry | files | `build` |
+|---|---|---|---|---|
+| 👩 mum LIVE | `Dockerfile.avolive` | `lighter_avo_live_bot.py` | **17** | `02ef7b39f9ac` |
+| 👩 mum SHADOW | `Dockerfile.familyshadow` | `lighter_family_bot.py` | **16** | `aa629492ce4e` |
+
+**The shadow's set is a strict SUBSET of the live's — the sole difference is the
+live entry module.** A hash over one extra file can never equal a hash over the
+rest, at any commit, forever. So the guard fired on every sample and the lane
+could never promote. It was SOUND on the lane it was built for: 💸 the Farmer's
+two arms both ran `lighter_funding_bot.py`, one entry file in two services, so
+converged arms stamped identically and a difference really did mean one arm was
+behind. (ww) moved the lane to a CROSS-IMAGE pair and the premise silently died
+with it — the (fd) trap in a new costume, *"a different COUNT means a different
+FILE SET, not drifted code"*, this time inside the authority that promotes to
+real money.
+
+**AND THE PATH THAT ACTUALLY HELD HER WAS THE OTHER ONE — found by running the
+suite, not by reading.** The judge has TWO drift paths and the live payload
+named which fired: `last_eval.arm_drift.source == "rows-disjoint"`, i.e.
+`experiment_judge._row_drift`, not the container half. `_row_drift` is (lf)'s
+rule and it is a BETTER rule — it asks whether the arms' in-window build SETS
+intersect, so a rolling deploy reads as timing rather than drift. But its
+premise is *"intersecting sets mean the arms tracked the same deploy
+sequence"*, and that holds only while both arms draw ids from ONE id space. A
+cross-image pair draws from TWO: mum's live closes can only ever carry a
+17-file id and her shadow's only ever a 16-file one, so the sets are disjoint
+**by construction, at every commit** — the same defect as the container half,
+one level up, in the rule that replaced it. Fixing only `arm_drift` would have
+left the block exactly where it was, and the suite is what said so: main's own
+`test_judge_arm_drift_wiring.py` (from (lf)) went red on the additive `basis`
+key and sent me to read the path I had not read.
+
+**SHIPPED, the class not the instance — both paths.**
+* **`bot_pnl_store.build_shared_compute`** — a second id over `_BUILD_SHARED`
+  **alone**, entry excluded. That tuple is one fleet-wide constant, so the id is
+  comparable ACROSS images by construction: two arms carrying the same shared
+  files at the same commit agree, an arm behind on any of them differs. Published
+  as `extra.build_shared` / `build_shared_n` from the central `_stamp_build`
+  hook, so all 28 images get it without a per-bot edit. Verified on both image
+  shapes: `build` differs (`02ef…` vs `aa62…`) and `build_shared` **agrees**
+  (`aa629492ce4e` both) — the whole fix in one asymmetry.
+* **BOTH sensors prefer `build_shared`**: `implementation_shortfall.arm_drift`
+  (the container half) and `experiment_judge._row_drift` (the row half, the one
+  that held mum). The row half compares SHARED-id sets and falls back to
+  `build` sets only when the arms' `build_n` sets INTERSECT; `arm_drift` falls
+  back to `build` ONLY when `build_n` MATCHES — two ids hashed over different sets are not comparable, so
+  a difference between them is not positive evidence of anything. That is the
+  same fail-safe direction the sensor already took on an unstamped arm, and its
+  own stated contract (*"we only ever claim drift on POSITIVE evidence"*).
+* **The claim now names its basis** (`basis: shared|build`) — "shared" and
+  "build" mean different things to whoever reads the hold (I8). The three
+  existing equality pins were extended rather than loosened.
+* **One hashing owner**: `_digest` extracted so `build_compute` and
+  `build_shared_compute` cannot drift apart — they are compared against each
+  other, and a second copy of a rule is a second rule ((hj)). Pinned.
+
+**DECLARED BLIND SPOT, not hidden.** Drift confined to a LIVE-ONLY entry module
+(one outside `_BUILD_SHARED` — `lighter_avo_live_bot.py` is the case) is
+invisible to the shared stamp. `build`/`build_n` stay published and
+`audit_code_currency` still resolves per row. Asserted by a test so the limit
+cannot quietly lapse.
+
+**THE ROLLOUT WINDOW IS BOUNDED BY THE PROMOTION FLOORS THEMSELVES.** Until both
+arms publish `build_shared`, the fallback compares nothing on a cross-image pair
+— blind rather than wrong. That window cannot reach a promotion: the paired bar
+needs ≥7 days AND ≥30 shadow closes, and at mum's measured 4.14/day that is
+~7.2 days, by which time both arms have redeployed through ordinary traffic. The
+sensor's blindness is strictly shorter than the earliest promotion it could
+affect.
+
+**NO REAL-MONEY RESTART IS REQUIRED TO UNBLOCK.** `implementation_shortfall.py`
+is on the auto path, so the sensor lands on `freqtrade-bots` — where the judge
+runs — on merge. The live books pick up the new stamp on whatever deploy they
+next earn for another reason ((mm)). Nothing in this change alters a gate, a
+bar, a cage or a clip: the paired bar, fade-watch, the cages and SafetyRails are
+untouched, and the judge remains the sole writer of `live.*`.
+
+**(lf)'s two cases are preserved and pinned** — disjoint sets in ONE image are
+still drift; a rolling deploy in one image is still not. The rule it shipped was
+right for the pair it was shipped on; only its id space changed underneath it.
+
+**Verification.** `tests/autonomy/test_cross_image_arm_drift.py` (15 tests,
+including the premise read from the Dockerfiles rather than retyped, and the
+no-regression case that a genuinely-drifted SAME-image pair still claims);
+**8/8 mutations RED** through `scripts/mutate.py` — both sensors ignoring the
+shared stamp, both dropping their count guard, the shared stamp including the
+entry, the stamp not published, the live entry added to `_BUILD_SHARED`, the
+blind-spot declaration deleted. A seventh was malformed and the harness correctly refused
+to score it as a pass ((qg) working). Three module selftests green.
 
 ## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
 
