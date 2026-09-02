@@ -1,3 +1,241 @@
+## 2026-09-02 (xg) — 👩 MUM'S HALT-AWARE ENTRY GATE: a leg whose own stop would flatten the whole book is refused, measured neutral in the regime she trades and worth 6pp in the one that halts her
+
+**[RENUMBERED (xe) -> (xg) at push time** — main took (xd) and (xe) while this
+branch was open; the cited entries keep their letters. The gross entry below moved
+(xd) -> (xf) with it.**]**
+
+**[AND A THIRD ENTRY FROM THIS BRANCH IS WITHDRAWN, which is the more useful
+half of the note.** This session independently found that 🧪 the judge could not
+promote on 👩 mum's lane — every evaluation returning "ARMS ON DIFFERENT CODE"
+because her arms run from two images whose content digests are computed over
+different file sets and can never be equal — and built a fix for it: defer to
+SILENCE when the stamps are not comparable, and publish the resulting blind spot
+so it is never mistaken for agreement.
+
+A concurrent session shipped `(xd)` on main for the SAME defect, hours earlier,
+with a BETTER mechanism: `bot_pnl_store.build_shared_compute`, an id over the
+`_BUILD_SHARED` tuple ALONE with the entry module excluded — which IS comparable
+across images, because that tuple is one fleet-wide constant. **Theirs restores
+the signal where mine only stopped the false alarm**, so it closes the blind spot
+mine had to declare.
+
+My change was therefore DROPPED rather than merged, and the tests with it. Two
+fixes for one rule is precisely what `(hj)` forbids, and the question is never
+which session got there first — it is which mechanism should own the rule. Two
+independent sessions converging on the same jammed lane within the hour is worth
+recording on its own: the defect was real enough to be found twice.**]**
+
+
+**Eamon, 2-Sep:** *"Let it run, but optimise and enhance as best as possible."*
+So: no bar moved, no window re-fitted (I25 — and the one dial that measured
+better belongs to the judge, see `(xf)`). What shipped is a rail the book did
+not have.
+
+**THE HAZARD, from `(xa)`'s own reading.** mum's daily-loss halt does not close
+a position — it **FLATTENS every leg** at whatever the mark is and shuts entries
+until the UTC roll. So an entry taken while the book's room to that level is
+smaller than that entry's OWN stop carries the entire book's downside: one −4%
+on the new leg ends the day for all twelve and sells every held dip at the low,
+which is the one loss a buy-oversold-and-wait-24h thesis cannot absorb.
+Measured on her live row at 19:40 Sydney: **$14 above the halt — a 0.42% basket
+move — with 10 legs open, and a fresh entry still admissible.**
+
+**MEASURED BEFORE IT SHIPPED** (`scripts/study_mum_gross_halt_2026-09-02.py
+--sweep`, her own cell replayed as a 12-slot book on the live 64-coin universe,
+calibrated against her shadow twin's ledger). Rule pre-declared in the study:
+ship only if the gate never lowers 30d total AND lowers halts or drawdown
+somewhere.
+
+| window @3.75× | total% | maxDD% | halts | entries gated |
+|---|---|---|---|---|
+| trailing 30d, gate off | +28.78 | 13.17 | 0 | — |
+| trailing 30d, gate ON | **+28.78** | **13.17** | 0 | **0** |
+| trailing 120d, gate off | −56.48 | 70.0 | 18 | — |
+| trailing 120d, gate ON | **−50.20** | **65.7** | 18 | 27 |
+
+**Inert in the regime she trades, +6.28pp of total return and −4.3pp of
+drawdown in the other.** RESTRICT-ONLY and FAIL-OPEN: `halt_room` returns None
+on any unreadable input and the gate then does nothing; it can only refuse an
+entry, never size one up, never suppress the halt.
+
+### THREE CORRECTIONS FROM AN ADVERSARIAL REVIEW, AND TWO WERE REAL MONEY
+
+Six independent lenses were run over this diff before it shipped. They found
+more than the change did, and the two worst were mine:
+
+* **THE RAIL WOULD HAVE SHUT DOWN 🙏 AVO.** This module is the VARIANT HOST for
+  both live books, and I sized the gate on 👩 mum's geometry alone. Measured at
+  production settings: one slot-stop is **12.5%** of mum's daily allowance at
+  3.75× and **100%** of avo's at her 5× (clip = equity × 5 / 5 slots, −10%
+  stop, 10% leash). Unscoped, the gate would have refused **every avo entry on
+  any day she was fractionally down** — silently stopping the fleet's other
+  real-money book. The (te)/(vh) class exactly: verify a mechanism in one file,
+  ship without asking which arm executes it. FIXED by arming on the book's own
+  geometry (`halt_gate_share`, one stop as a fraction of the whole allowance,
+  armed at ≤50%) — **derived, never a book list**, because a roster rots on the
+  next slot swap and this repo has four entries about that. The row publishes
+  `halt_gate.{armed, stop_share, max_share}` so a disarmed book says so.
+* **THE ROOM WAS SPENT TWICE IN ONE CYCLE.** `equity` is read once per loop, so
+  every candidate in a pass saw the same room: with $2.00 of room and a $1.33
+  stop per leg, TWO legs each passed and jointly breached it. Raised
+  independently by three lenses. FIXED with a within-cycle stop budget.
+* **AND THE ATTRIBUTION I PUBLISHED WAS WRONG.** I wrote that the gain comes
+  from avoiding flattens. **Over the 120d window halts are 18 with the gate and
+  18 without — it prevented ZERO flattens.** The gain is that the 27 refused
+  entries were themselves net losers: the rail declines to open into a day
+  already deep in drawdown, and those are bad entries. Flatten-avoidance is the
+  DESIGN rationale and remains untested. Corrected in the code, the tests and
+  here, because a measured benefit with an invented mechanism is how a rail
+  gets kept for the wrong reason and tuned in the wrong direction.
+
+### AND THE SHARED-WORKTREE CLASS HAS A NEW ACTOR: MY OWN REVIEW SUBAGENTS
+
+`(lz)`/`(nx)`/`(oe)` document the shared-worktree hazard for concurrent
+SESSIONS. Today it arrived from a direction none of those entries name: the
+adversarial reviewers were given the live working tree to reproduce findings
+in, and one of them **edited `lighter_avo_live_bot.py` while `session_commit`
+was snapshotting it** — a verifier testing whether a guard mattered by
+removing it. The commit that landed therefore held a WEAKENED safety guard
+(`not (ds > 0)` deleted from the day-start check) that the working tree did
+not, on a real-money entry path.
+
+**Nothing reached money, and the reason is the receipt.** `session_commit`'s
+read-back compares the commit object against the snapshot it took and
+REFUSED (exit 3, "commit made but read-back MISMATCHED"). Without it the
+weakened guard would have gone to a PR looking exactly like the reviewed
+code. `(po)`'s lesson — *"a receipt for fidelity is not a receipt for
+correctness"* — cuts the other way here: fidelity was the whole question, and
+the fidelity receipt is what caught it.
+
+**THE RULE: a subagent that may RUN code against the repo gets an isolated
+worktree** (`isolation: 'worktree'` on the agent call), not the tree the
+session is committing from. A reviewer with write access to the artefact under
+review can invalidate both the review and the commit, and neither failure is
+loud on its own.
+
+**DECLARED LIMITS:** the study replays the PCT leash only, while production
+takes the tighter of the leash and the absolute cap — on mum today they
+coincide (~$57 on a $570 book), which is why the numbers stand and would not
+on a book where the cap binds. And 3.75× is not a "validated operating point":
+the study's own decision rule returns NO gross on the 120d window, because the
+cell loses there. See `(xd)`.
+
+**AND IT DROVE OUT A DEFECT IN THE ROW.** The gate needs the halt LEVEL, which
+is the tighter of two rails (the pct leash, the absolute cap). The row's
+`halt.binding` field re-derived that same comparison inline — `(hj)`'s second
+copy of a rule, on a real-money row — and **it could RAISE**: a `max_daily_loss`
+that is not a number made `cap < frac * day_start` throw a TypeError *inside the
+publish path*, i.e. a telemetry field able to take down the loop that publishes
+it. Both now read one owner, `halt_level`, and a **90-cell parity grid** against
+the expression it replaces is identical on every defined input.
+
+**THE PARITY GRID ALSO CAUGHT MY OWN ERROR, which is why it exists.** My first
+draft required `cap > 0` to treat the absolute rail as real. But
+`SafetyRails.daily_loss_hit` trips at `loss >= cap`, so **a cap of $0 halts on
+the first cent and IS the binding rail** — the guard would have handed the gate
+room against a level the actuator had already passed. Reading the code had said
+the guard was harmless; the grid said otherwise.
+
+Published on the row as `entry_vetoes.halt_room_skips` (I18 — `opened: 0` must
+never be byte-identical between "quiet" and "a rail refused everything").
+Pinned by `tests/autonomy/test_halt_room_gate.py` — 13 tests driving the real
+`main()` one cycle against a stub venue, **6/6 mutations red**, each caught by
+the test aimed at it.
+
+## 2026-09-02 (xf) — "PROCEED WITH OPTIMAL METRICS AND PARAMETERS": 👩 mum's gross 9.5× → 3.75×, on her own cell replayed as a book — and the same replay says yesterday's success was a 30-day hot window on a cell that LOSES over 120 days
+
+**[RENUMBERED (xb) -> (xd) at push time** — main took (xb) AND (xc) for the
+edge audit's last items and the live lane's margins while this branch was open;
+the cited entries keep their letters, this one moves.**]**
+
+**Eamon, 2-Sep 20:15 Sydney:** *"Proceed with optimal metrics and parameters"*,
+then 20:40: *"Mum's gone from success yesterday to bleeding today."* The (xa)
+deep dive left two parameters with him — the gross and the daily-loss cap —
+and this is the measurement that decides them, plus the finding it turned up
+on the way.
+
+### 1. THE INSTRUMENT — `scripts/study_mum_gross_halt_2026-09-02.py`
+
+Her SHIPPED cell (`rsi < 36 AND NOT e50>e200 AND v>0`, read off the strategy
+object), LAG-1 entries, one position per coin, 12 slots, the real roi ladder /
+−4% stop / 24h cap (owners imported from `study_mum_supply`), replayed as a
+BOOK with `clip = gross × equity / 12` on the live arm's own 64-coin crypto
+universe (the scout's $0.1M floor, from the bus snapshot; a second run on the
+configured 43 agrees on every verdict). The daily halt is simulated as the
+host runs it: 10% of day-start equity ⇒ flatten every leg at that bar's close,
+entries shut to the UTC roll; equity marked at bar CLOSE (decision) and at
+bar LOW (an upper bound on halts). Grid: gross 1→10 × halt frac 0.10/0.15;
+windows trailing 120d (decision) and 30d (her live regime). **Calibration
+(gx):** at 1× over the shadow twin's window the replay reads **+0.344%/trade
+at 9.3 closes/day** against the twin's ledger +0.494% / 6.0 — inside the
+pre-declared ±0.30pp / ×1.6 gate. Decision rule fixed before the run: the
+largest gross with close-marked maxDD ≤ 15% (the gate's bar) AND ≤ 1 halt per
+30d on the 120d window; the halt frac stays 0.10 unless 0.15 halves halts
+inside the bar.
+
+### 2. WHAT IT MEASURED
+
+**On the 30d window (the regime she went live into):**
+
+| gross | closes/day | mean%/trade | total% | maxDD% | halts/30d (close · low) | halt cost% |
+|---|---|---|---|---|---|---|
+| 1 | 11.1 | +0.253 | +7.2 | 3.6 | 0 · 0 | 0 |
+| **3.75** | 11.1 | +0.253 | **+28.8** | **13.2** | **0 · 0** | 0 |
+| 5 | 11.1 | +0.223 | +33.5 | 20.9 | 1 · 3 | +5.0 |
+| 6 | 11.0 | +0.172 | +27.7 | 24.9 | 3 · 5 | +11.7 |
+| **9.5 (set)** | 10.5 | +0.136 | **+27.7** | **29.3** | **6 · 10** | +14.3 |
+| 10 | 10.4 | +0.139 | +29.5 | 30.6 | 6 · 10 | +13.4 |
+
+At her setting the daily halt fires **six times a month** on close marks (ten
+on lows), the book spends 8% of its hours locked out, and the gross buys
+NOTHING: total return at 9.5× (+27.7%) is BELOW 3.75× (+28.8%) with more than
+twice the drawdown, because every halt realises the dip her thesis is holding
+for. 3.75× is the largest gross inside the 15% bar with zero halts — and it is
+not a new number: it is `0.15 / |stop|`, the all-slots-stop bound
+`fleet_allocation` already publishes as `dd_bound.max_scale`, and the (sr)
+`GROSS_X_MAX` derivation on avo. The halt frac stays 0.10 (at 3.75× both
+fracs read identically).
+
+**On the 120d window the pre-declared rule returns NO gross, and the reason
+is the finding of the day:** at **1×** the cell reads **−0.180%/trade,
+−23.6% total, maxDD 33%** (n=1,673). Nothing passes because the CELL loses
+over that window; no gross fixes a negative cell, it only scales it (9.5× →
+−88.6%, 40 halts). **The last 30 days are a hot window on a cell that is
+negative over four months** — which is exactly what `(vd)` measured on 28-Aug
+(bar 36: +0.026%/trade, t=0.47, versus 32's +0.202) before Eamon set 36 on the
+record, and it is I25 at book scale: yesterday's +$40 days were the window,
+today is the mean. Her live ledger (n=59, +0.53%/trade) is the record (I14),
+it is 8 days old, and the `(wm)` pre-registration grades it on FRESH closes
+only — this entry moves no bar, and says the bar's owner is that read.
+
+### 3. WHAT MOVED, AND WHAT DID NOT
+
+* **`MUM_GROSS_X` 9.5 → 3.75** on `mum-live`, set under Eamon's delegation
+  ((tg): a cap value carries its derivation — above). New entries size at
+  `equity × 3.75 / 12` (~$168 at $537 vs ~$425); the ten open legs are
+  untouched and roll off through their own brackets within 24h, so the cut
+  bites over a day, not at once. Reversible by the same env.
+* **`LIGHTER_MAX_DAILY_LOSS` stays $57** (= 10% of the $570 funded book;
+  the pct rail binds first below $570 anyway).
+* **Strategy bars untouched** (rsi 36, roi ladder, 24h cap, −4% stop): I25
+  forbids retuning a book on the window that motivated it, in either
+  direction, and the judge's `xp.mum.*` lane and the `(wm)` registration own
+  them.
+* **Today, stated plainly for Eamon:** at 20:40 Sydney she is −$42.81 on the
+  day (−7.4%): −$24.50 realised (five 24h timers, one −4% stop on FARTCOIN,
+  one roi) and ≈−$18 marked on ten open longs into BTC 76.5k (−2.6% over the
+  holds). The $57 halt sits **$14 (a 0.42% basket move) away**; if it fires
+  the host flattens all ten at the low. The shadow twin, same cell at 1×,
+  is **+$5.48** on the day — different coins in the diversified order, no
+  leverage. Nothing here is a defect; it is the gross meeting the tape.
+
+DECLARED LIMITS of the replay: slots filled deepest-RSI-first (the live host
+orders by basket correlation — its baskets are less correlated than the
+replay's, so replay halts are an upper bound on that axis); no brain gate,
+no coin veto, no fleet long budget; fills at the bar open/close with no
+slippage (her measured exit gap is −0.8bps, (ro)). The 120d cell result is a
+REPLAY over 1h bars, not her ledger — it agrees with `(vd)`'s independent
+measurement, and it is the reason the `(wm)` fresh-close read matters.
 ## 2026-09-02 (xe) — THE SEAM (xa) CLOSED ON ONE SIDE WAS OPEN ON THE OTHER: A 1000-MARKET'S MARK ARRIVED UNDER THE VENUE'S SPELLING AND THE MARGIN BLOCK ASKED FOR THE FLEET'S, SO A PRICED, READABLE REAL-MONEY LEG PUBLISHED AS UNMEASURABLE AND PAGED EVERY LOOP
 
 **Found by the organ board's own follow-up read, not by a failing test** — 👩 mum

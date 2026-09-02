@@ -82,6 +82,7 @@ live-entry hygiene the Farmer and the Taker run.
 """
 
 import argparse
+import math
 import os
 import sys
 import time
@@ -580,6 +581,118 @@ def vol_target_gross_x(n_eff=1.0):
     except (TypeError, ValueError):
         ne = 1.0
     return round(0.15 / (abs(float(S.stoploss)) / (ne ** 0.5)), 4)
+
+
+def halt_level(day_start_equity, rails):
+    """`(level_usd, "abs"|"pct")` — the equity at which the day ends, and which
+    rail sets it. `(None, None)` when the day-start is unreadable.
+
+    [2026-09-02 (xg)] THE ONE OWNER of "which daily-loss rail binds". Two rails
+    can end the day and the breach check consults BOTH: the pct leash
+    (`DAILY_LOSS_LIMIT` of day-start) and the absolute cap
+    (`rails.max_daily_loss`). The TIGHTER — the higher level — is the one that
+    actually fires, so it is the only one worth guarding against.
+
+    It exists because the row's `halt.binding` field re-derived that same
+    comparison inline, which is (hj)'s "a second copy of a rule is a second
+    rule" on a real-money row — and the copy could RAISE: a `max_daily_loss`
+    that is not a number made `cap < frac * day_start` throw a TypeError
+    inside the publish path, i.e. a telemetry field able to take down the
+    loop that publishes it. Found by driving the gate's own tests. Behaviour
+    on every valid input is byte-identical to the expression it replaces
+    (abs binds iff `cap < DAILY_LOSS_LIMIT * day_start`).
+
+    Every read is guarded and every failure degrades to the PCT leash, never
+    to "no rail": an unreadable cap must not be able to widen the level.
+    """
+    try:
+        ds = float(day_start_equity)
+    except (TypeError, ValueError):
+        return None, None
+    # `math.isfinite` rather than the `x != x` idiom: CodeQL reads a
+    # self-comparison as a defect, and this also rejects an INFINITE day-start,
+    # which the idiom let through.
+    if not math.isfinite(ds) or not (ds > 0):
+        return None, None
+    level, binding = ds * (1.0 - DAILY_LOSS_LIMIT), "pct"
+    cap = getattr(rails, "max_daily_loss", None)
+    try:
+        c = None if cap is None else float(cap)
+    except (TypeError, ValueError):
+        c = None
+    # NB: any FINITE cap counts, including 0 or negative — `SafetyRails.
+    # daily_loss_hit` trips at `loss >= cap`, so a cap of 0 halts on the first
+    # cent and IS the binding rail. A `c > 0` guard here read that as "pct"
+    # and would have let the gate measure room against a level the actuator
+    # had already passed; caught by the parity grid against the expression
+    # this replaces, not by reading the code.
+    if c is not None and math.isfinite(c) and (ds - c) > level:
+        level, binding = ds - c, "abs"              # tighter rail wins
+    return level, binding
+
+
+#: [(xg), corrected after adversarial review] THE GATE ONLY ARMS ON A BOOK
+#: WHOSE GEOMETRY LEAVES IT ROOM TO MEAN ANYTHING. Measured at production
+#: settings: one slot-stop is **12.5%** of 👩 mum's whole daily allowance at
+#: 3.75x, and **100%** of 🙏 avo's at her 5x (clip = equity x 5 / 5 slots, stop
+#: -10%, leash 10%). This module is the VARIANT HOST for both, so a rail sized
+#: on mum's geometry and shipped unscoped would have refused EVERY avo entry on
+#: any day she was even fractionally down — silently stopping the fleet's other
+#: real-money book. That is the (te)/(vh) class exactly: verify the mechanism in
+#: one file, ship without asking which arm executes it.
+#:
+#: DERIVED, NOT A BOOK LIST: a hardcoded roster rots on the next slot swap (this
+#: repo has four entries about that). The share is computed from the book's own
+#: clip, stop and leash every loop, so it self-corrects if Eamon moves a gross.
+HALT_GATE_MAX_STOP_SHARE = float(_env("HALT_GATE_MAX_STOP_SHARE", "0.5"))
+
+
+def halt_gate_share(clip, stop_frac, day_start_equity, rails):
+    """`(share, armed)` — one slot-stop as a fraction of the book's whole daily
+    allowance, and whether the halt-room gate is meaningful at that geometry.
+
+    `(None, False)` when it cannot be computed: the gate then does NOTHING,
+    which is the same fail-open direction as `halt_room` itself. A book whose
+    single stop consumes more than `HALT_GATE_MAX_STOP_SHARE` of its allowance
+    has no room for the rail — for it the gate would not be a tail guard, it
+    would be "stop trading whenever down", which is a different decision and
+    is Eamon's, not a rail's.
+    """
+    try:
+        ds = float(day_start_equity)
+        stake, stop = float(clip), abs(float(stop_frac))
+    except (TypeError, ValueError):
+        return None, False
+    if not (ds > 0) or not (stake > 0) or not (stop > 0):
+        return None, False
+    level, _ = halt_level(ds, rails)
+    if level is None:
+        return None, False
+    allowance = ds - level                     # the whole day's room, flat book
+    if not (allowance > 0):
+        return None, False
+    share = (stake * stop) / allowance
+    return share, share <= HALT_GATE_MAX_STOP_SHARE
+
+
+def halt_room(equity, day_start_equity, rails):
+    """Dollars of equity above the daily-halt level, or None when unmeasurable.
+
+    [2026-09-02 (xg)] The entry gate's reading of `halt_level`. FAIL-OPEN by
+    construction: a dark equity or day-start returns None and the caller gates
+    NOTHING. It can only ever refuse a new entry — it never permits one, never
+    sizes one up, and never suppresses the halt itself.
+    """
+    level, _ = halt_level(day_start_equity, rails)
+    if level is None:
+        return None
+    try:
+        eq = float(equity)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(eq):                       # NaN or infinity
+        return None
+    return eq - level
 
 
 def gross_x():
@@ -1595,6 +1708,8 @@ def main(_ctx=None, once=False):
         brain_gated_tags = []
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
+        halt_room_skips = 0
+        halt_gate_stat = None
         mmf_clip_scaled = 0
         coin_vetoed = {}
         live_scale = 1.0
@@ -1886,13 +2001,12 @@ def main(_ctx=None, once=False):
                         # three real-money rows until this field existed.
                         "basket_move_now_state": basket_move_state(
                             eq, _open_ntl),
-                        "binding": ("abs" if (
-                            day_start_equity
-                            and getattr(rails, "max_daily_loss", None)
-                            is not None
-                            and rails.max_daily_loss
-                            < DAILY_LOSS_LIMIT * day_start_equity)
-                            else "pct"),
+                        # [(xg)] derived from `halt_level`, the ONE owner the
+                        # entry gate also reads — this was a second inline copy
+                        # of the same comparison, and it could raise on a
+                        # non-numeric cap inside the publish path.
+                        "binding": halt_level(day_start_equity, rails)[1]
+                        or "pct",
                     },
                 },
                 "held": {c: (meta.get(c) or {}).get("tag")
@@ -1921,6 +2035,18 @@ def main(_ctx=None, once=False):
                     # loop. Zero on a book whose cap has room, so non-zero
                     # always means the cap turned a signal away.
                     "notional_cap_skips": notional_cap_skips,
+                    # [(xg)] entries refused because ONE stop on the new leg
+                    # would have breached the daily halt for the WHOLE book.
+                    # Non-zero means the halt rail turned a signal away before
+                    # it could become the trade that ended the day.
+                    "halt_room_skips": halt_room_skips,
+                    # [(xg)] WHETHER THE GATE IS ARMED ON THIS BOOK AT ALL, and
+                    # the geometry that decided it. `armed: false` with a
+                    # stop_share near 1.0 means one slot-stop is this book's
+                    # whole daily allowance — the rail would be "stop trading
+                    # whenever down", which is a decision, not a rail. None
+                    # until the first entry candidate of a cycle prices it.
+                    "halt_gate": halt_gate_stat,
                     # [(vy)] entries this pass whose clip the per-coin
                     # mmf factor shrank — see mmf_clip_factor.
                     "mmf_clip_scaled": mmf_clip_scaled,
@@ -2518,6 +2644,13 @@ def main(_ctx=None, once=False):
         # (so) was written to close.
         brain_expand_refused = brain_floored = 0
         notional_cap_skips = 0
+        halt_room_skips = 0
+        halt_gate_stat = None
+        # [(xg)] stop-dollars this cycle has already COMMITTED. `equity` is read
+        # once per loop, so without this every candidate saw the same room and
+        # k legs each individually "safe" could jointly breach it — raised
+        # independently by three review lenses and confirmed against the loop.
+        cycle_stop_committed = 0.0
         mmf_clip_scaled = 0
         cycle_admitted = 0
 
@@ -2909,6 +3042,55 @@ def main(_ctx=None, once=False):
                     if int(state.get("rank_n") or 0) >= _cap:
                         _verdict(sym, "throttled")
                         continue
+                # [2026-09-02 (xg)] THE HALT-AWARE ENTRY GATE. The daily halt
+                # does not close ONE leg, it FLATTENS THE BOOK at whatever the
+                # mark is — so a leg opened while the room to that level is
+                # smaller than this leg's OWN stop carries the whole book's
+                # downside: a single -4% on it ends the day for all twelve and
+                # sells every held dip at the low. That is the one loss this
+                # book's thesis (buy oversold, wait 24h) cannot absorb.
+                #
+                # MEASURED on 👩 mum's own cell replayed as a 12-slot book
+                # (`scripts/study_mum_gross_halt_2026-09-02.py --sweep`,
+                # calibrated against her shadow twin's ledger): at the 3.75x
+                # she runs today it is NEUTRAL on the trailing 30d (0 entries
+                # gated, total +28.78% unchanged) and worth +6.28pp of total
+                # return and -4.3pp of max drawdown over the trailing 120d
+                # (27 entries gated).
+                #
+                # AND THE ATTRIBUTION IS NOT WHAT THE RATIONALE ABOVE ASSUMES —
+                # corrected after an adversarial review caught it. Over that
+                # 120d window HALTS ARE UNCHANGED, 18 with the gate and 18
+                # without: the rail prevented ZERO flattens. The gain is that
+                # the 27 entries it refused were themselves net losers — it
+                # declines to open into a day already deep enough in drawdown
+                # that one stop would end it, and empirically those are bad
+                # entries. The flatten-avoidance story is the DESIGN rationale
+                # and remains untested; the measured effect is entry quality
+                # in a drawdown. Both are stated because only one is measured.
+                #
+                # RESTRICT-ONLY and FAIL-OPEN: `halt_room` returns None on any
+                # unreadable input and the gate then does nothing. It can only
+                # refuse an entry — never size one up, never suppress a halt.
+                _one_stop = stake * abs(float(S.stoploss))
+                _share, _armed = halt_gate_share(stake, S.stoploss,
+                                                 day_start_equity, rails)
+                halt_gate_stat = {"armed": bool(_armed),
+                                  "stop_share": (round(_share, 4)
+                                                 if _share is not None else None),
+                                  "max_share": HALT_GATE_MAX_STOP_SHARE}
+                _room = halt_room(equity, day_start_equity, rails)
+                if _armed and _room is not None and \
+                        (_room - cycle_stop_committed) < _one_stop:
+                    _verdict(sym, "halt_room")
+                    # I18: `{opened: 0}` must never be byte-identical between
+                    # "no signal" and "a rail refused every one of them".
+                    halt_room_skips += 1
+                    _PRINT(f"[avo-live] {iso(t_now)} {sym} HALT_ROOM_SKIP "
+                           f"(room ${_room:.2f} less ${cycle_stop_committed:.2f} "
+                           f"already committed this cycle < one stop "
+                           f"${_one_stop:.2f} on a ${stake:.2f} clip)")
+                    continue
                 open_ntl = open_notional(pos, meta, len(pos), stake)
                 if not rails.notional_ok(open_ntl, stake):
                     _verdict(sym, "notional_cap")
@@ -2962,6 +3144,9 @@ def main(_ctx=None, once=False):
                              "measured": meas, "fill_src": src})
                 except Exception:  # noqa: BLE001
                     pass
+                # [(xg)] this leg's stop is now part of the day's exposure —
+                # the next candidate in THIS cycle must see it.
+                cycle_stop_committed += _one_stop
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
                              # [(wv)] the bars in force at entry (the judge's
