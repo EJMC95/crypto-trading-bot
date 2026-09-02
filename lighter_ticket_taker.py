@@ -2835,6 +2835,24 @@ def main(_ctx=None):
     # justified, and it is REPORTED, never a gate — it changes no entry.
     slot_census = {"offered": 0, "slots_full": 0, "lens_once": 0,
                    "held_sym": 0, "opened": 0}
+    # [2026-09-03 (xr)] THE GATE CENSUS — the half (uo) could not see.
+    # `slot_census` counts the three SLOT throttles, and every one of them is
+    # counted AFTER seven upstream gates have already `continue`d silently.
+    # Measured on the live payload the day this shipped: the scout offered
+    # **24** tickets (dip 4 / breakout 12 / momentum 3 / divergence 5) and
+    # exactly **1** reached `offered`, so the row published
+    # `{offered: 1, slots_full: 0}` — "slots are not binding", which was true
+    # and useless, because 23 tickets died before the counter and NOTHING said
+    # which gate took them. That is (uo)'s own byte-identical argument moved
+    # one loop upstream, and it is the (lv)/(tx)/(om) shape: an arm that opens
+    # nothing must publish its OWN census at its OWN bar (I18).
+    # Each counter is incremented AT its gate's own `continue`, so it cannot
+    # drift from the gate it describes ((hj) — the sniper's rule). REPORTED,
+    # never a gate: this changes no entry, and `gate_census` is publish-only.
+    gate_census = {"tickets_in": 0, "lens_not_allowed": 0, "side_not_allowed": 0,
+                   "lens_vetoed": 0, "bull_blocked": 0, "quality_blocked": 0,
+                   "coin_vetoed": 0, "no_mark": 0, "spread_blocked": 0,
+                   "long_budget": 0, "notional_cap": 0, "fill_missing": 0}
     # [2026-07-17] Hard mode allow-list, evaluated ONCE and independently of any
     # bus payload. Live = divergence only; shadow keeps filling all four so the
     # control arm still grades them. See allowed_lenses().
@@ -2848,7 +2866,9 @@ def main(_ctx=None):
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
             sym = t.get("sym")
+            gate_census["tickets_in"] += 1
             if lens not in _allowed:
+                gate_census["lens_not_allowed"] += 1
                 continue          # mode allow-list — FAIL-CLOSED, reads no bus
             # [(hj)] SIDE allow-list, the twin of the line above and evaluated
             # in the same place for the same reason: independent of BULL_MODE,
@@ -2857,6 +2877,7 @@ def main(_ctx=None):
             # and the measured-losing side of the lens — off real money when
             # TT_BULL_MODE is not set. No-op on shadow (both sides allowed).
             if side_of(t) not in allowed_sides(TT_VENUE, lens):
+                gate_census["side_not_allowed"] += 1
                 continue
             # [2026-07-24 (dk) breakout_up RELABEL — BEFORE the veto] An UP-REGIME
             # crypto breakout becomes its own lens 'breakoutup' HERE, ahead of the
@@ -2879,6 +2900,7 @@ def main(_ctx=None):
                 if _bull_up is True and _is_crypto(sym):
                     lens = "breakoutup"
             if lens in lens_vetoed:
+                gate_census["lens_vetoed"] += 1
                 continue          # brain veto stays SENIOR (restrict-only)
             # [2026-07-24] BULL DUAL-MODE gate — no-op unless TT_BULL_MODE.
             # Restrict-only: admits ONLY long-breakout(up-regime) + short-
@@ -2891,6 +2913,7 @@ def main(_ctx=None):
                 # breakout lens -> divergence's funding-screen fallback).
                 _up = True if lens == "breakoutup" else _bull_up
                 if not bull_entry_ok(lens, _bside, t, up=_up):
+                    gate_census["bull_blocked"] += 1
                     continue
                 # [2026-07-24 (di) SCANNER SIDEKICK] breakout QUALITY score — for
                 # a plain 'breakout' AND the relabelled 'breakoutup'. Reuses
@@ -2904,6 +2927,7 @@ def main(_ctx=None):
                     _q = breakout_quality(_ustr, t.get("range_pos"),
                                           t.get("vol_m"))
                     if _q < BRK_QUALITY_MIN:
+                        gate_census["quality_blocked"] += 1
                         continue          # default 0.0 -> never blocks
                     t = {**t, "_brk_quality": _q, "_up_strength": _ustr}
             # [2026-07-22] coin-quality veto. Symbol form is normalised because
@@ -2925,6 +2949,7 @@ def main(_ctx=None):
             _vbase = str(sym or "").split("/")[0]
             if coin_vetoed and (_fleet(_vbase) in coin_vetoed
                                 or _vbase in coin_vetoed):
+                gate_census["coin_vetoed"] += 1
                 continue          # measured slippage over the bar (fail-open)
             # one NEW position per lens per cycle; never add to a held symbol
             # [(uo)] counted BEFORE the `continue`/`break` so the census sees
@@ -2945,6 +2970,7 @@ def main(_ctx=None):
                 continue
             mark = marks.get(sym)
             if not mark:
+                gate_census["no_mark"] += 1
                 continue
             # [2026-07-23] SPREAD GATE — proactive execution-cost veto, default
             # OFF. The book is fetched ONLY when the gate is enabled and ONLY for
@@ -2960,11 +2986,13 @@ def main(_ctx=None):
                 except Exception:  # noqa: BLE001 — read blip is not a stop
                     spread_bps = None
                 if spread_gate_blocks(spread_bps, SPREAD_GATE_BPS):
+                    gate_census["spread_blocked"] += 1
                     print(f"[ticket-taker] {iso(t_now)} {sym} SPREAD_GATE_SKIP "
                           f"(quoted {spread_bps:.1f}bps > {SPREAD_GATE_BPS:.0f})")
                     continue
             is_long = t.get("side", "long") != "short"
             if is_long and long_budget_full:
+                gate_census["long_budget"] += 1
                 continue          # L2 veto: fleet long budget is full
             # [2026-08-20 (so)] THE BRAIN SIZES THIS ENTRY, per (side, lens).
             # This book is the reason the wiring exists: on the morning it
@@ -3034,6 +3062,7 @@ def main(_ctx=None):
                 # claiming one in `pos` would strand a phantom in the cap
                 # count and the slot budget.
                 if sym not in broker.pos:
+                    gate_census["fill_missing"] += 1
                     print(f"[ticket-taker] {iso(t_now)} open {sym} rejected by "
                           f"broker (size {size} @ {mark})")
                     continue
@@ -3047,6 +3076,7 @@ def main(_ctx=None):
                 # rail made the clip variable. venues.safety owns this rule.
                 open_ntl = open_notional(pos, meta, len(pos), clip)
                 if not rails.notional_ok(open_ntl, clip):
+                    gate_census["notional_cap"] += 1
                     print(f"[ticket-taker] {iso(t_now)} {sym} NOTIONAL_CAP_SKIP "
                           f"(deployed ${open_ntl:.2f} + ${clip:.2f} > cap "
                           f"${rails.max_notional})")
@@ -3239,6 +3269,16 @@ def main(_ctx=None):
                # rather than the previous cycle's, so quiet is never mistaken
                # for full.
                "slot_census": slot_census,
+               # [(xr)] WHICH GATE TOOK THE SUPPLY, upstream of the slots.
+               # `slot_census` answers "did the cap turn away earned trades?";
+               # this answers the question that has to be settled FIRST — how
+               # much supply ever reached the cap. Read them together and in
+               # gate order: `tickets_in` is what the scout offered, each
+               # counter is what one gate refused, and `offered` is what
+               # survived to the slot throttles. The first large counter names
+               # the binding gate. Zeroed per cycle exactly like slot_census,
+               # so a quiet cycle is never mistaken for a wide-open one.
+               "gate_census": gate_census,
                "cap_usd": (rails.max_notional if rails is not None else None),
                # D1: total capital excluded from pnl_abs — self-describing
                **({"capital_adjust": round(capital_adjust["total"]
