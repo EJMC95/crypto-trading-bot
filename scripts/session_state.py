@@ -253,7 +253,7 @@ CARRIED = [
         "closes_when": lambda: _has(
             "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
     },
-    # [2026-09-02 (wx)] `family-shadow-stale-writer` CLOSED on the feed
+    # [2026-09-02, (ww) readback] `family-shadow-stale-writer` CLOSED on the feed
     # readback, the only thing that could close it: at 06:33Z the family rows
     # stamp 97dbe3986551/15 (the (wv) build), 👩 mum-lshadow publishes the
     # 12-position book the running container restores (the zombie held 2),
