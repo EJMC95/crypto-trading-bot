@@ -127,6 +127,22 @@ from venues.safety import (
 from venues.fills import read_fill, measured_from_reason
 from venues.symbol_map import to_lighter, from_lighter
 
+
+def _fleet(sym):
+    """The FLEET spelling of `sym` — the ONE form every venue lookup keyed by
+    a position map takes.
+
+    [2026-09-02] This host keys its live position map by the VENUE spelling
+    since (xa), so the exit reconciler and the host's own meta agree on one
+    name. That is right for meta, and WRONG for any venue call that finds its
+    subject by looking in `venue.positions()`, which is fleet-keyed:
+    `market_close` did exactly that and returned None — no order, no raise —
+    for every 1000-market. The 🎫 taker learned this on 17-Jul and answered it
+    with one helper used at every venue call site; this host had the same map
+    and no helper. One owner (`venues.symbol_map`), no second copy of the rule.
+    """
+    return from_lighter(str(sym))[0]
+
 # ---------------------------------------------------------------------------
 # [2026-08-22 (sx)] THIS MODULE IS NOW A VARIANT HOST, and 🔮 georgia is the
 # second instance. **Eamon, 22-Aug: "get georgia ready to go live on a new sub
@@ -2371,7 +2387,7 @@ def main(_ctx=None, once=False):
                 mark_px = marks.fresh_mid(venue, sym) or \
                     float((meta.get(sym) or {}).get("last_px") or 0.0)
                 try:
-                    res = venue.market_close(sym)
+                    res = venue.market_close(_fleet(sym))
                 except Exception as e:  # noqa: BLE001
                     _PRINT(f"[avo-live] {iso(t_now)} flatten {sym}: {e!r}")
                     continue
@@ -2610,7 +2626,7 @@ def main(_ctx=None, once=False):
                     meta[sym] = m
                 elif (t0 - first) / 3600.0 >= DELIST_GIVEUP_H:
                     try:
-                        res = venue.market_close(sym)
+                        res = venue.market_close(_fleet(sym))
                     except Exception as e:  # noqa: BLE001
                         _PRINT(f"[avo-live] {iso(t_now)} delist close {sym}: "
                                f"{e!r}")
@@ -2636,7 +2652,7 @@ def main(_ctx=None, once=False):
             reason = manage_exit_reason(S, m, px, profit, age_min, sig, bars)
             if reason:
                 try:
-                    res = venue.market_close(sym)
+                    res = venue.market_close(_fleet(sym))
                 except Exception as e:  # noqa: BLE001
                     _PRINT(f"[avo-live] {iso(t_now)} close {sym} failed: "
                            f"{e!r} — position keeps its manager")

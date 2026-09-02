@@ -83,6 +83,71 @@ because the mutation found it. Consumers are driven on the payload
 call-site pin is AST-shaped and FOLLOWS the variable binding, because a substring
 grep passes on the comment describing the fix ((hp)).
 
+### THE SAME SEAM, ONE LAYER DEEPER — AND THIS ONE COULD NOT CLOSE A POSITION
+
+Hunting the rest of the class with a fan-out audit of the live path turned up
+the one that matters, and it is the same two spellings meeting at a third
+owner. **`LighterClient.market_close` is the ONLY method on that client that
+finds its subject by a DICT LOOKUP instead of through `_resolve`:**
+
+```python
+def market_close(self, coin):
+    pos = self.positions().get(coin)      # positions() is FLEET-keyed
+    if not pos or not pos["size"]:
+        return None                       # <- no order, no book read, NO RAISE
+```
+
+`positions()` runs `_positions_from` → `from_lighter`, so it is keyed `kPEPE`.
+Since (xa) the live host holds its position map in the **venue** spelling. So
+`market_close("1000PEPE")` **returned None having placed no order, read no
+book and raised nothing** — while `market_open`, which resolves first, worked
+with either spelling. Open succeeded; close silently no-opped. That is exactly
+the asymmetry `lighter_ticket_taker._fleet`'s docstring recorded on 17-Jul, on
+a host that never got the helper.
+
+**MEASURED against the client's own position parser** (`scratchpad` probe, and
+now a test): `market_close('1000PEPE')` → `None` with an **empty collaborator
+list** — no `_resolve`, no `orderbook` — while `'kPEPE'` reached the order path.
+
+**WHAT SAT UNDER IT.** Every exit on a real-money book calls `market_close` and
+reads `None` as *"there is no such position"*: the −4% stop, the ROI ladder,
+the 24h `max_hold`, the delist give-up, the daily-loss flatten and **the KILL
+SWITCH**. 👩 mum is holding that leg now — 1000PEPE, ~$441 of a $3,379 gross
+book on $541 equity at 6.2×. **Not fired yet** (the leg sat inside its bracket),
+and it did not need to fire to be a defect: the exits were unable to act on it.
+
+**FIXED AT BOTH ENDS, again, because one end is a fix and two are a class:**
+* **braces, at the owner** — `market_close` looks the position up under the
+  caller's spelling and then, only if that misses, under `from_lighter`'s. An
+  unknown or flat coin still returns `None` **before** `_resolve`, so nothing
+  starts raising that did not raise before; the alias rewrites at a 1.0 size
+  multiplier, so no size or price is rescaled.
+* **belt, at the host** — a single `_fleet()` helper (the taker's shape,
+  deferring to `venues.symbol_map`) on **all three** `market_close` sites: the
+  manage/exit path, the delist give-up and `_flatten_all`.
+
+**AND THE TEST THAT SHOULD HAVE CAUGHT IT WAS PINNING THE DEFECT.** (xa)'s
+`test_an_adopted_leg_closes_on_the_time_cap_through_the_venue` asserted
+`closes == ["1000BONK"]` — the venue spelling, i.e. **the exact call that
+no-ops in production** — because the shared `_Venue` stub accepted any spelling
+and popped by whatever key it was handed. A consumer tested against a fixture
+its publisher would never produce ((hj)). The stub now models the real client:
+`positions()` returns fleet keys, and `market_close` returns `None` on a
+lookup miss. The (xa) assertion is re-aimed at `kBONK`, the spelling that
+actually closes.
+
+**VERIFIED: 10/10 mutations red** — the client back on the single fleet-keyed
+lookup (the shipped defect) · the alias owner replaced by a hand-rolled strip ·
+a flat coin made to raise · a zero-size position closed anyway · each of the
+three host sites back on the raw venue symbol (the kill switch, the exit stack
+and the delist path, separately) · `_fleet` re-implementing the rule · plus the
+margin-read pair re-run. **Two SURVIVED the first round and both were my own
+guards** — the hand-rolled strip agrees with the owner on every symbol the
+venue lists, and the size guard is unreachable through a parser that already
+drops flat legs — so each got the test that makes it load-bearing: an AST pin
+that the lookup CALLS the owner, and a probe whose `positions()` reports a flat
+leg rather than dropping it. That is I3 twice in one pass.
+
 ### AND THE CURRENCY AUDIT WAS BLOCKED, SO NOBODY COULD SEE ANY OF IT
 
 Reaching for `scripts/audit_code_currency.py` to answer *"is my fix actually
@@ -117,6 +182,14 @@ on any 1000-market she takes. **This entry's own two markers bring her forward.*
 Noted, not changed: run against a feature branch the audit measures containers
 against LOCAL HEAD, so an unmerged marked commit reads as a gap; the CI job runs
 on main, where that cannot happen.
+
+**AND MAPPING HER TRIPPED THE NEXT GUARD, correctly:** with the row visible,
+`test_every_registered_book_is_visible_to_agronomy` demanded a `BookSpec` or a
+declared exemption. 🔭 georgia v3 is a living book with 48 closes, so she gets a
+real spec, **read from her carrier rather than guessed** —
+`ImpulseFade.protections = {"cooldown_candles": 1}` at `tf="15m"` = **0.25h** —
+because the constant three lines above it in that table records a spec that
+described a book's previous self and misprofiled it by 12× ((sl)/I23).
 
 **DEPLOY: BOTH WAYS** ((mm)/(pz) — a real-money correctness fix). Markers
 `[deploy-live-taker]` (🙏 avo, `tide-rider-lighter-live`) and `[deploy-live-mum]`

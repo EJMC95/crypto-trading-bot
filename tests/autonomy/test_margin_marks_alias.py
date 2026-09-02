@@ -30,6 +30,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from venues.lighter_client import margin_state_from      # noqa: E402
+from venues import symbol_map                            # noqa: E402
 from venues.symbol_map import from_lighter, to_lighter   # noqa: E402
 
 
@@ -89,15 +90,14 @@ def test_the_price_scale_guard_is_load_bearing(monkeypatch):
     raw-unit market were ever mapped that way, and the realignment must REFUSE
     rather than move a price by 1000x onto a liquidation comparison. A refusal
     leaves the leg blind, which is the honest, fail-closed answer."""
-    import venues.symbol_map as sm
+    real = symbol_map.from_lighter
 
     def scaled(symbol):
         if symbol == "1000PEPE":
             return "kPEPE", 0.001          # a price-scaling alias
-        return sm_from_lighter_real(symbol)
+        return real(symbol)
 
-    sm_from_lighter_real = sm.from_lighter
-    monkeypatch.setattr(sm, "from_lighter", scaled)
+    monkeypatch.setattr(symbol_map, "from_lighter", scaled)
     st = margin_state_from(_acct(), marks={"1000PEPE": 0.00069, "XRP": 1.3216615})
     assert st["liq_mark_blind"] == ["kPEPE"], \
         "a scaled alias must NOT be realigned onto a liquidation read"
@@ -128,8 +128,8 @@ def test_the_live_host_asks_for_marks_in_the_fleet_spelling():
     position dict through `from_lighter` before calling `stop_marks`. A grep
     would pass on the comment that describes the fix ((hp): a page-wide
     substring scan is not a structural claim), so this reads the call."""
-    src = open(os.path.join(ROOT, "lighter_avo_live_bot.py"), encoding="utf-8").read()
-    tree = ast.parse(src)
+    with open(os.path.join(ROOT, "lighter_avo_live_bot.py"), encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
              and n.func.attr == "stop_marks"]

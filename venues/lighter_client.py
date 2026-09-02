@@ -1268,7 +1268,37 @@ class LighterClient(VenueClient):
                                     client_id)[0]
 
     def market_close(self, coin):
-        pos = self.positions().get(coin)
+        # [2026-09-02] LOOK THE POSITION UP UNDER BOTH SPELLINGS. This is the
+        # ONE method on this client that finds its subject by a DICT LOOKUP
+        # instead of through `_resolve`, and the map it looks in
+        # (`positions()` -> `_positions_from` -> from_lighter) is keyed by the
+        # FLEET symbol. So a caller holding the VENUE spelling — which the
+        # live family host has held since (xa) re-keyed its position map so
+        # the exit reconciler and its meta agree on one name — missed the
+        # lookup and got `None` back HAVING PLACED NO ORDER, READ NO BOOK AND
+        # RAISED NOTHING. `market_open` resolves first and works with either
+        # spelling, so open succeeded and close silently no-opped: exactly the
+        # asymmetry `lighter_ticket_taker._fleet`'s docstring warned about on
+        # 17-Jul, on a different host.
+        #
+        # MEASURED against this class's own position parser: `market_close`
+        # driven with '1000PEPE' returned None with an EMPTY collaborator list
+        # (no `_resolve`, no `orderbook`), while 'kPEPE' reached the order
+        # path. On 👩 mum's real-money book that is a $441 leg of a $3,379
+        # gross book that the stop, the ROI ladder, `max_hold`, the daily-loss
+        # flatten and the KILL SWITCH could all fail to close, each reading
+        # the None as "there is no such position".
+        #
+        # Fixed HERE as well as at the caller because this is the owner: the
+        # lookup is widened, nothing else moves. An unknown coin still returns
+        # None before `_resolve` (so an unlisted symbol keeps its old contract
+        # and cannot start raising), and `from_lighter` rewrites only
+        # 1000X -> kX at a 1.0 size multiplier, so no size or price is rescaled.
+        _p = self.positions()
+        pos = _p.get(coin)
+        if pos is None:
+            from .symbol_map import from_lighter        # the ONE alias owner
+            pos = _p.get(from_lighter(str(coin))[0])
         if not pos or not pos["size"]:
             return None
         sym, mult, m = self._resolve(coin)

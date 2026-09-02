@@ -128,7 +128,11 @@ def test_an_adopted_leg_closes_on_the_time_cap_through_the_venue():
         meta={"1000BONK": {"entry": px * 1.005,        # -0.5%: no roi, no stop
                            "opened_ts": time.time() - 25 * 3600,
                            "tag": "adopted", "size": 100.0, "accrued": 0.0}})
-    assert out["venue"].closes == ["1000BONK"], out["venue"].closes
+    # [2026-09-02] the FLEET spelling is what actually closes a position: the
+    # real `market_close` looks the leg up in the fleet-keyed `positions()` map,
+    # so this assertion used to pin the call that SILENTLY NO-OPS in production
+    # (None, no order, no raise) — the stub accepted either spelling and hid it.
+    assert out["venue"].closes == ["kBONK"], out["venue"].closes
     rows = [kw for b, kw in out["paper"] if b == ROW]
     assert rows and rows[-1]["reason"] == "long-adopted_max_hold", \
         [r.get("reason") for r in rows]

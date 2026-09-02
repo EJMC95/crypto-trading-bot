@@ -404,7 +404,13 @@ def _driven(m, tape="breakout"):
             return []
 
         def positions(self):
-            return dict(self.pos)
+            # [2026-09-02] FLEET-KEYED, like the real client. `LighterClient
+            # .positions()` runs `_positions_from` -> `from_lighter`, so a
+            # 1000-market comes back as `kPEPE` however it was opened. This
+            # stub returned whatever key a test seeded, which made it blind to
+            # the exact spelling seam it exists to exercise — see market_close.
+            from venues.symbol_map import from_lighter
+            return {from_lighter(str(c))[0]: v for c, v in self.pos.items()}
 
         def funding_map(self):
             return {}
@@ -418,8 +424,28 @@ def _driven(m, tape="breakout"):
             return {"client_order_index": 1}
 
         def market_close(self, coin):
+            # [2026-09-02] MODELS THE REAL LOOKUP, and this is the whole point.
+            # `LighterClient.market_close` finds its position by a DICT LOOKUP
+            # in the FLEET-keyed `positions()` map — the one method that does
+            # not go through `_resolve` — so a VENUE-spelled caller got `None`
+            # back having placed no order and raised nothing, and every exit on
+            # a real-money book (stop, roi, max_hold, the daily-loss flatten and
+            # the KILL SWITCH) read that None as "no such position".
+            #
+            # This stub used to accept any spelling and pop by that key, so it
+            # returned a successful close for exactly the call that silently
+            # no-ops in production — a consumer tested against a fixture its
+            # publisher would never have produced ((hj)). Now a venue-spelled
+            # close returns None here too, so the seam cannot be masked again.
+            from venues.symbol_map import from_lighter
+            key = next((c for c in self.pos if c == coin), None)
+            if key is None:
+                key = next((c for c in self.pos
+                            if from_lighter(str(c))[0] == str(coin)), None)
+            if key is None:
+                return None                     # the real method's silent None
             self.closes.append(coin)
-            self.pos.pop(coin, None)
+            self.pos.pop(key, None)
             return {"client_order_index": 2}
 
     class _Rails:

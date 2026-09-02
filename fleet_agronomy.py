@@ -290,6 +290,12 @@ _FAMILY_COOLDOWN_H = {
     "freqtrade-dad-lshadow": 4.0,            # MomoBreakout 4h x1
     "freqtrade-avo-maria-lshadow": 4.0,      # SwingDip    4h  x1
     "freqtrade-georgia-lshadow": 1.0,        # DayTrader  15m  x4
+    # [2026-09-02 (xe)] 🔭 georgia v3 — READ from the carrier, never guessed:
+    # `ImpulseFade.protections = {"cooldown_candles": 1}` (lighter_family_bot
+    # :1216) at `tf="15m"` (:1752) = 0.25h. She was invisible to this organ
+    # until her row was mapped in fleet_books, and the coverage guard demanded
+    # a spec the moment it could see her — which is the guard working.
+    "freqtrade-georgia-v3-lshadow": 0.25,    # ImpulseFade 15m x1
     "crypto-intraday-15m-lshadow": 4.0,      # DayTrader   1h  x4
     "crypto-swing-daily-lshadow": 24.0,      # SwingDip    1d  x1
     "crypto-breakout-4h-lshadow": 4.0,       # MomoBreakout 4h x1
@@ -496,6 +502,7 @@ BOOKS = {b.row: b for b in [
     _family("freqtrade-dad-lshadow"),
     _family("freqtrade-avo-maria-lshadow"),
     _family("freqtrade-georgia-lshadow"),
+    _family("freqtrade-georgia-v3-lshadow"),
     _family("crypto-intraday-15m-lshadow"),
     _family("crypto-swing-daily-lshadow"),
     _family("crypto-breakout-4h-lshadow"),
