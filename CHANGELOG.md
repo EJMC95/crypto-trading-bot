@@ -135,6 +135,24 @@ were vetoing real money no longer do; the immune page on a basket nobody
 held has its measurement. (mum's row took ~25 min to flip — the (ml)
 stale-serving window, read back rather than assumed.)
 
+**AND THE SAME READBACK FOUND THE FAMILY SHADOW HOST STUCK ON 28-AUG CODE.**
+`freqtrade-mum-lshadow` / `freqtrade-avo-maria-lshadow` — the live pair's
+CONTROL ARMS — publish `edc3032d1c46`/15, which `audit_code_currency` (run
+from a clean main tree, the image's own 15-file COPY set) resolves to
+**d2c0cb9, 28-Aug, 84 commits behind, 5 of them changing
+`lighter_family_bot.py`**. Three OK-reported deploys today (runs 660, 661, and
+a clean-main dispatch, 664) each booted a container that runs its loop, and
+the (vy) restart lever (665) ran too; the rows kept the old stamp through all
+four. A pre-28-Aug container is still the writer — the (ml)/(vy)
+stuck-serving class on this service for the SECOND time — and the family bot
+has no `claim_writer`, so the two writers are unguarded. **Consequence,
+stated plainly: the (wp) scan-order parity port never reached the shadow
+twins, so the judge's pair is still unjudgeable, and the mum lever surface in
+this entry will not run there either until the zombie is removed.** No lever
+in this repo swaps a wedged container ((vz): `redeploy` re-runs the CURRENT
+deployment); it is an OPERATOR act in the Railway UI, carried as
+`family-shadow-stale-writer` with the expected stamp to read back.
+
 **DEPLOY for this entry.** freqtrade-bots (judge, shortfall, fleet_bus,
 fleet_tuning, incubator, tuner, dashboard lists), family-lighter-shadow
 (mum's lever surface + georgia's shadow retirement), funding-farmer-shadow

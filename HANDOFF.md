@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 15:39 Sydney (05:39Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 15:45 Sydney (05:45Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -24,6 +24,11 @@ _Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is st
 
 _Still open because:_ moving a brain floor changes what sizes EVERY book, real money included — it needs its own measurement (how many buckets would qualify at each floor, and what their realised expectancy was), not a judgement call.
 
+### `family-shadow-stale-writer`  ·  owner: **OPERATOR**
+🩺 family-lighter-shadow's rows (👩 mum-lshadow, 🙏 avo-lshadow — the live pair's CONTROL ARMS) publish build edc3032d1c46/15, which the repo's own audit_code_currency resolves to commit d2c0cb9 (28-Aug, 84 commits behind, 5 touching lighter_family_bot.py). Measured 2-Sep: THREE OK-reported deploys (05:12 run 660, 05:21 run 661, 05:33 dispatch 664 from clean main) each booted a container that runs its loop, and the (vy) restart lever (run 665) ran too — the rows kept the old stamp through all four. A pre-28-Aug container is still the writer: the (ml)/(vy) stuck-serving class on this service for the SECOND time (646/647/648 before), and the family bot has no claim_writer, so the two writers are unguarded ((hp) class). Consequence: the (wp) scan-order parity port, mum v2's post-28-Aug fixes and the (wt) lever surface have NOT reached the shadow twins; the judge's pair cannot open until they do.
+
+_Still open because:_ no lever in this repo swaps the serving container when Railway's activation wedges: `up` builds and the swap does not happen, `redeploy` re-runs the CURRENT deployment ((vz)). The act is Eamon's, in the Railway UI: find and remove the extra running instance of family-lighter-shadow (or `railway down` the service, then `railway up` from clean main), then read back extra.build on freqtrade-mum-lshadow — expected 9c90be27d763/15 at 6639f1e, or the (wt) image's own id once merged (16 files: fleet_tuning.py joins the COPY set).
+
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
 
@@ -39,10 +44,12 @@ _Still open because:_ 18 bot edits and 18 deploys; do it a book at a time on the
 
 _Still open because:_ each one needs the bot to stamp its own governing quantity first (the (sk) give_back/mae_ret pattern).
 
-## Shipped today (60 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp))
+## Shipped today (62 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp))
 
+- `bd1ad2a` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
 - `b7599d4` Renumber (ws) -> (wt): main took (ws) for the sentinel's graded bar while this pass was open
 - `21283ad` (ws) Proceed with everything in the organ review: five docket retirements, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to mum, and a weekly organ board
+- `6639f1e` The sentinel earns its fear (ws): one graded bar (n>=10, hit>=0.55) for BOTH proposal directions — a below-coin-flip playbook can no longer propose the crouch
 - `7ab31ed` The clock split (wr): the breakout trend exit gets its own BRK_MAX_HOLD_H — taker.max_hold_h steers only the divergence bracket, AST-pinned, behaviour-neutral at ship
 - `7cb0c7d` The backlog drained (wq): both live books claim-justified (ratchet 2->0), Counterweight fresh-read tripwire, minvol wired into the tp study, the (sk) breakoutup pins re-decided on a sighted gate, divergence stop priced (a refusal)
 - `faf9bc8` [deploy-live] Merge PR #262: (wp) support-system deep dive — cohort long budget, held-basket margin, shadow scan-order parity, living shortfall pair
