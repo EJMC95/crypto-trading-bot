@@ -1,6 +1,6 @@
 # 🎫 Ticket Taker — go-live runbook (georgia's successor)
 
-_Prepared 2026-09-02 (wi) after Eamon retired 🔮 georgia and asked to "prepare
+_Prepared 2026-09-02 (wj) after Eamon retired 🔮 georgia and asked to "prepare
 the best candidate to take Georgia's place." This is a STAGED runbook: the taker
 is not gate-ready yet (ETA ~3-Oct). Nothing here goes live until it passes the
 gate AND Eamon funds it AND Eamon gives the explicit go-live word — the
