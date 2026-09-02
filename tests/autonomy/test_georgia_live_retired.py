@@ -25,7 +25,6 @@ break:
    way, so the arm resurrects on BOTH services or neither.
 """
 import ast
-import os
 import sys
 from pathlib import Path
 
