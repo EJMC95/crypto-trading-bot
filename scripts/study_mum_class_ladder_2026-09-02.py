@@ -279,21 +279,44 @@ def score(eps, ladder, stop, max_hold):
         ret, reason, held = r
         rows.append({"sym": e["sym"], "cls": e["cls"], "ts": e["bars"][e["i"]][0],
                      "ret": ret, "reason": reason, "held": held,
+                     # REPORTED, never the verdict metric (see `agg`)
                      "per_day": ret / (held / 24.0)})
     return rows
 
 
 # -------------------------------------------------------------- aggregation
 
-def agg(rows, key="per_day"):
+def agg(rows, key="ret"):
+    """Aggregate stats. `mean` is the AGGREGATE return per bar-day.
+
+    **CORRECTED IN PLACE, and the first version of this file shipped the
+    defect C4 exists to prevent.** `mean` was the MEAN OF PER-EPISODE RATIOS
+    `ret / (held/24)`. That is not return per bar-day: a short winner gets 24x
+    the weight of a long loser purely from its denominator, so the statistic
+    is maximised by exiting winners fast and losers slow — denominator
+    shrinkage, reproduced inside the guard built to catch it. Measured on the
+    live run: it read **+1.7173%/bar-day on a sleeve whose mean trade was
+    -0.1333%**, which is impossible for any honest exposure metric and is what
+    exposed it. The aggregate `sum(ret) / sum(bar-days)` is the number (hl)
+    actually used ("per bar-day held only 1.04x"), and it cannot be gamed by
+    reweighting: total profit over total exposure.
+
+    `mean_ratio` is kept and REPORTED so the artifact stays visible rather
+    than being quietly deleted.
+    """
     if not rows:
         return {"n": 0}
+    n = len(rows)
+    tot_ret = sum(r["ret"] for r in rows)
+    tot_days = sum(r["held"] for r in rows) / 24.0
     xs = [r[key] for r in rows]
-    n = len(xs)
-    m = sum(xs) / n
     t_cl, G = S.cluster_t(xs, [r["sym"] for r in rows])
-    return {"n": n, "mean": m, "t_iid": S.iid_t(xs), "t_cl": t_cl, "G": G,
-            "mean_pct": sum(r["ret"] for r in rows) / n,
+    return {"n": n,
+            "mean": (tot_ret / tot_days) if tot_days else None,   # AGGREGATE
+            "mean_ratio": sum(r["ret"] / (r["held"] / 24.0) for r in rows) / n,
+            "t_iid": S.iid_t(xs), "t_cl": t_cl, "G": G,
+            "mean_pct": tot_ret / n,
+            "total_ret": tot_ret, "bar_days": tot_days,
             "held_h": sum(r["held"] for r in rows) / n,
             "exits": dict(Counter(r["reason"] for r in rows))}
 
@@ -305,23 +328,32 @@ def halves(rows, key="per_day"):
 
 
 def paired_delta(base, cand):
-    """Per-episode (cand - base) on the SAME entries, keyed by (sym, ts)."""
+    """Per-episode (cand - base) RETURN on the SAME entries, keyed by (sym,ts).
+
+    The delta is in RETURN, not in per-bar-day: a paired test needs a
+    per-episode quantity, and the exposure change is reported separately as
+    `bar_days` rather than folded into the same number.
+    """
     b = {(r["sym"], r["ts"]): r for r in base}
     out = []
     for r in cand:
         k = (r["sym"], r["ts"])
         if k in b:
             out.append({"sym": r["sym"], "ts": r["ts"],
-                        "ret": r["per_day"] - b[k]["per_day"],
-                        "reason": r["reason"], "held": r["held"],
-                        "per_day": r["per_day"] - b[k]["per_day"]})
+                        "ret": r["ret"] - b[k]["ret"],
+                        "reason": r["reason"], "held": r["held"]})
     return out
 
 
 # ------------------------------------------------------------- calibration
 
 def ledger_episodes(ledger=None):
-    """mum's REAL era closes, as (sym, opened_ts, actual_reason), both arms."""
+    """mum's REAL era closes, as (sym, opened_ts, actual_reason), both arms.
+
+    `--ledger` takes a local dump: the public feed is a 2.4MB response that has
+    truncated mid-transfer on this network, and a calibration target that
+    sometimes arrives short is worse than one explicitly pinned.
+    """
     import edge_audit as ea
     trades = ea.load_trades(ledger, 6000)
     shaped = ea.shape(trades)
@@ -431,72 +463,105 @@ def reachability(eps, ladder, stop, hold):
 # ---------------------------------------------------------------- the sweep
 
 def sweep(eps, ladder, stop, hold, cls="noncrypto"):
-    """C3 grid over ladder scale k, then over max_hold, on one class."""
+    """C3 grid over ladder scale k, then over max_hold, on one class.
+
+    Reports THREE things per cell, deliberately not one: the candidate's
+    AGGREGATE return per bar-day (the C4 verdict metric), its delta over
+    shipped, and the PAIRED per-episode return delta with a cluster-t and
+    chronological halves. Exposure (`bar_days`) is printed beside them so a
+    cell that "wins" purely by holding less is visible as such.
+    """
     sub = [e for e in eps if e["cls"] == cls]
     base = score(sub, ladder, stop, hold)
-    out = {"class": cls, "base": agg(base), "k": [], "hold": []}
+    b = agg(base)
+    out = {"class": cls, "base": b, "k": [], "hold": []}
+
+    def cell(rows, **tag):
+        a = agg(rows)
+        d = paired_delta(base, rows)
+        da = agg(d) if d else {}
+        h1, h2 = halves(d) if d else ({}, {})
+        a.update(tag, paired=len(d),
+                 d_pbd=(a["mean"] - b["mean"]) if (a.get("mean") is not None
+                                                   and b.get("mean") is not None) else None,
+                 d_ret=da.get("mean_pct"), d_t_cl=da.get("t_cl"),
+                 d_h1=h1.get("mean_pct"), d_h2=h2.get("mean_pct"),
+                 exposure_ratio=(a["bar_days"] / b["bar_days"])
+                 if b.get("bar_days") else None)
+        return a
+
     for k in K_GRID:
-        rows = score(sub, scale_ladder(ladder, k), stop, hold)
-        d = paired_delta(base, rows)
-        h1, h2 = halves(d)
-        a = agg(rows)
-        a.update(k=k, delta_per_day=agg(d)["mean"] if d else None,
-                 delta_t_cl=agg(d)["t_cl"] if d else None,
-                 delta_h1=h1.get("mean"), delta_h2=h2.get("mean"), paired=len(d))
-        out["k"].append(a)
+        out["k"].append(cell(score(sub, scale_ladder(ladder, k), stop, hold), k=k))
     for hh in HOLD_GRID:
-        rows = score(sub, ladder, stop, hh)
-        d = paired_delta(base, rows)
-        h1, h2 = halves(d)
-        a = agg(rows)
-        a.update(hold=hh, delta_per_day=agg(d)["mean"] if d else None,
-                 delta_t_cl=agg(d)["t_cl"] if d else None,
-                 delta_h1=h1.get("mean"), delta_h2=h2.get("mean"), paired=len(d))
-        out["hold"].append(a)
+        out["hold"].append(cell(score(sub, ladder, stop, hh), hold=hh))
     return out
 
 
-def best_advantage(eps, ladder, stop, hold, cls_of):
-    """The whole selection procedure, as ONE number: the best per-bar-day
-    advantage over shipped across every cell, on the labelled subset."""
-    sub = [e for e in eps if cls_of(e) == "noncrypto"]
-    if len(sub) < 2:
-        return None
-    base = score(sub, ladder, stop, hold)
-    if not base:
-        return None
-    b0 = agg(base)["mean"]
-    best = None
+def cell_scores(eps, ladder, stop, hold):
+    """{cell: {episode_key: per_day}} — every cell walked ONCE.
+
+    The walks do not depend on the class label, so C6 below is a
+    re-AGGREGATION of these numbers rather than a re-walk. The first draft
+    re-ran the whole sweep per draw: 400 draws x 10 cells x 22k episodes x 24
+    bars is ~1e9 iterations and it did not finish. Caching is not an
+    optimisation here, it is what makes the pre-registered C6 runnable at all.
+    """
+    cells = {"base": (ladder, hold)}
     for k in K_GRID:
-        if k == 1.0:
-            continue
-        rows = score(sub, scale_ladder(ladder, k), stop, hold)
-        if rows:
-            best = max(best, agg(rows)["mean"] - b0) if best is not None                 else agg(rows)["mean"] - b0
+        if k != 1.00:
+            cells[f"k={k}"] = (scale_ladder(ladder, k), hold)
     for hh in HOLD_GRID:
-        if hh == hold:
+        if hh != hold:
+            cells[f"hold={hh}"] = (ladder, hh)
+    return {name: {(r["sym"], r["ts"]): (r["ret"], r["held"])
+                   for r in score(eps, lad, stop, hh)}
+            for name, (lad, hh) in cells.items()}
+
+
+def best_advantage_cached(cache, keys):
+    """Best per-bar-day advantage over `base` across every cell, on `keys`."""
+    base = cache["base"]
+    def _agg(m, kk):
+        rr = [m[k] for k in kk if k in m]
+        if len(rr) < 2:
+            return None
+        d = sum(h for _, h in rr) / 24.0
+        return (sum(r for r, _ in rr) / d) if d else None
+    ks = [k for k in keys if k in base]
+    b0 = _agg(base, ks)
+    if b0 is None:
+        return None
+    best = None
+    for name, m in cache.items():
+        if name == "base":
             continue
-        rows = score(sub, ladder, stop, hh)
-        if rows:
-            v = agg(rows)["mean"] - b0
-            best = v if best is None else max(best, v)
+        v = _agg(m, ks)
+        if v is None:
+            continue
+        best = (v - b0) if best is None else max(best, v - b0)
     return best
 
 
-def permutation(eps, ladder, stop, hold, draws, seed=SEED):
-    """C6 — re-run the SELECTION on shuffled class labels, sizes held."""
-    real = best_advantage(eps, ladder, stop, hold, lambda e: e["cls"])
+def permutation(eps, cache, draws, seed=SEED):
+    """C6 — re-run the SELECTION on shuffled class labels, sizes held.
+
+    Prices cell selection AND the class label in ONE number: if best-of-N on a
+    randomly-labelled half matches the real half's advantage, the advantage is
+    the selection procedure, not the class.
+    """
+    keys_all = [(e["sym"], e["bars"][e["i"]][0]) for e in eps]
+    labels = [e["cls"] for e in eps]
+    real = best_advantage_cached(
+        cache, [k for k, c in zip(keys_all, labels) if c == "noncrypto"])
     if real is None:
         return {"ok": False, "why": "no non-crypto episodes"}
-    labels = [e["cls"] for e in eps]
     rnd = random.Random(seed)
-    ge = 0
-    vals = []
+    vals, ge = [], 0
     for _ in range(draws):
         sh = labels[:]
         rnd.shuffle(sh)
-        m = {id(e): sh[j] for j, e in enumerate(eps)}
-        v = best_advantage(eps, ladder, stop, hold, lambda e: m[id(e)])
+        v = best_advantage_cached(
+            cache, [k for k, c in zip(keys_all, sh) if c == "noncrypto"])
         if v is None:
             continue
         vals.append(v)
@@ -504,7 +569,7 @@ def permutation(eps, ladder, stop, hold, draws, seed=SEED):
             ge += 1
     n = len(vals) or 1
     vals.sort()
-    return {"ok": True, "real": real, "draws": len(vals),
+    return {"ok": True, "real": round(real, 4), "draws": len(vals),
             "p": round((ge + 1) / (n + 1), 4),
             "shuffled_median": round(vals[len(vals) // 2], 4) if vals else None,
             "shuffled_p95": round(vals[int(0.95 * len(vals))], 4) if vals else None}
@@ -522,7 +587,7 @@ def run(a):
     nc = sum(1 for e in eps if e["cls"] == "noncrypto")
     print(f"episodes: {len(eps)} total | noncrypto {nc} | crypto {len(eps)-nc}\n")
 
-    led = ledger_episodes()
+    led = ledger_episodes(a.ledger)
     cal = calibrate(led, mids, ladder, stop, hold)
     print("## C1 CALIBRATION (fail-closed, exit-mix)")
     for r in cal.get("mix", []):
@@ -549,25 +614,24 @@ def run(a):
         return 0
 
     sw = sweep(eps, ladder, stop, hold)
-    print("## C3/C4 SWEEP — non-crypto, entries CONSTANT, verdict metric is "
-          "return per BAR-DAY")
+    print("## C3/C4 SWEEP — non-crypto, entries CONSTANT. Verdict metric is the")
+    print("##   AGGREGATE return per bar-day = total return / total bar-days.")
     b = sw["base"]
-    print(f"   SHIPPED  n={b['n']} per-bar-day {b['mean']:+.4f}%  "
-          f"%/trade {b['mean_pct']:+.4f}%  held {b['held_h']:.1f}h  {b['exits']}")
-    print("   -- ladder scale k (stop and hold held) --")
-    for r in sw["k"]:
-        print(f"   k={r['k']:<5} per-bar-day {r['mean']:+.4f}%  "
-              f"d {r['delta_per_day']:+.4f}%  t_cl {r['delta_t_cl']:+.2f}  "
-              f"halves {r['delta_h1']:+.4f}/{r['delta_h2']:+.4f}  "
-              f"%/trade {r['mean_pct']:+.3f}%  held {r['held_h']:.1f}h  {r['exits']}")
-    print("   -- max_hold bars (ladder held at shipped) --")
-    for r in sw["hold"]:
-        print(f"   h={r['hold']:<5} per-bar-day {r['mean']:+.4f}%  "
-              f"d {r['delta_per_day']:+.4f}%  t_cl {r['delta_t_cl']:+.2f}  "
-              f"halves {r['delta_h1']:+.4f}/{r['delta_h2']:+.4f}  "
-              f"%/trade {r['mean_pct']:+.3f}%  held {r['held_h']:.1f}h  {r['exits']}")
+    print(f"   SHIPPED  n={b['n']}  per-bar-day {b['mean']:+.4f}%  "
+          f"%/trade {b['mean_pct']:+.4f}%  total {b['total_ret']:+.1f}%  "
+          f"exposure {b['bar_days']:.0f} bar-days  held {b['held_h']:.1f}h  {b['exits']}")
+    hdr = ("   {:<9} pbd {:>9}  d_pbd {:>9}  d_ret {:>8}  t_cl {:>7}  "
+           "halves {:>8}/{:>8}  expo {:>5}  {}")
+    print(hdr.format("cell", "%/bar-day", "vs ship", "%/trade", "", "h1", "h2", "x", "exits"))
+    for label, rows, key in (("k", sw["k"], "k"), ("hold", sw["hold"], "hold")):
+        print(f"   -- {'ladder scale k (stop and hold held)' if label=='k' else 'max_hold bars (ladder held at shipped)'} --")
+        for r in rows:
+            print(f"   {label}={r[key]:<7} {r['mean']:+9.4f}  {r['d_pbd']:+9.4f}  "
+                  f"{r['d_ret']:+8.4f}  {r['d_t_cl']:+7.2f}  "
+                  f"{(r['d_h1'] or 0):+8.4f}/{(r['d_h2'] or 0):+8.4f}  "
+                  f"{r['exposure_ratio']:.2f}  {r['exits']}")
 
-    perm = permutation(eps, ladder, stop, hold, a.perm_draws)
+    perm = permutation(eps, cache, a.perm_draws)
     print(f"\n## C6 SELECTION PREMIUM (class labels shuffled, {perm.get('draws')} draws)")
     print(f"   best real advantage {perm.get('real'):+.4f}%/bar-day | "
           f"shuffled median {perm.get('shuffled_median')} p95 {perm.get('shuffled_p95')} "
@@ -587,43 +651,56 @@ def run(a):
 
 
 def verdict(sw, perm):
-    """C7, applied mechanically to the pre-declared bars."""
+    """C7, applied mechanically to the pre-declared bars.
+
+    The verdict metric is the AGGREGATE per-bar-day (`d_pbd`); the paired
+    return delta and its cluster-t are the significance test. A cell must win
+    on BOTH — a cell that raises per-bar-day only by cutting exposure has not
+    made money, it has held less.
+    """
     print("\n## C7 VERDICT")
     cells = [(f"k={r['k']}", r) for r in sw["k"] if r["k"] != 1.00] + \
             [(f"hold={r['hold']}", r) for r in sw["hold"] if r["hold"] != 24]
     good = [(n, r) for n, r in cells
-            if (r["delta_per_day"] or 0) > 0 and (r["delta_h1"] or 0) > 0
-            and (r["delta_h2"] or 0) > 0]
+            if (r["d_pbd"] or 0) > 0 and (r["d_ret"] or 0) > 0
+            and (r["d_h1"] or 0) > 0 and (r["d_h2"] or 0) > 0]
     if not good:
-        best = max(cells, key=lambda x: x[1]["delta_per_day"] or -9e9)
-        print(f"   REFUSE — no cell beats shipped on per-bar-day in BOTH halves. "
-              f"Best is {best[0]} at {best[1]['delta_per_day']:+.4f}%/bar-day "
-              f"(halves {best[1]['delta_h1']:+.4f}/{best[1]['delta_h2']:+.4f}).")
+        best = max(cells, key=lambda x: x[1]["d_pbd"] or -9e9)
+        n, r = best
+        print(f"   REFUSE — no cell beats shipped on BOTH the aggregate "
+              f"per-bar-day and the paired return, in both halves.")
+        print(f"   Best on per-bar-day is {n}: {r['d_pbd']:+.4f}%/bar-day, but "
+              f"its paired return delta is {(r['d_ret'] or 0):+.4f}%/trade at "
+              f"exposure {r['exposure_ratio']:.2f}x — "
+              + ("it holds less, it does not earn more."
+                 if (r['d_ret'] or 0) <= 0 else "halves disagree."))
         print("   A refusal with a number satisfies the growth rule (I19).")
         return
-    name, r = max(good, key=lambda x: x[1]["delta_per_day"])
-    ks = [c["k"] for c in sw["k"]]
+    name, r = max(good, key=lambda x: x[1]["d_pbd"])
     plateau = None
     if name.startswith("k="):
-        k = r["k"]
-        j = ks.index(k)
-        nb = [sw["k"][i] for i in (j - 1, j + 1) if 0 <= i < len(sw["k"])]
-        plateau = all((x["delta_per_day"] or 0) > 0 for x in nb if x["k"] != 1.00)
+        ks = [c["k"] for c in sw["k"]]
+        j = ks.index(r["k"])
+        nb = [sw["k"][i] for i in (j - 1, j + 1)
+              if 0 <= i < len(sw["k"]) and sw["k"][i]["k"] != 1.00]
+        plateau = all((x["d_pbd"] or 0) > 0 for x in nb) if nb else None
     miss = []
-    if (r["delta_t_cl"] or 0) < T_BAR:
-        miss.append(f"cluster-t {r['delta_t_cl']:+.2f} < {T_BAR}")
+    if (r["d_t_cl"] or 0) < T_BAR:
+        miss.append(f"cluster-t {r['d_t_cl']:+.2f} < {T_BAR}")
     if plateau is False:
         miss.append("C5 plateau: a neighbour does not also beat shipped")
     if (perm.get("p") or 1.0) > 0.05:
-        miss.append(f"C6 selection p={perm.get('p')} > 0.05")
+        miss.append(f"C6 selection p={perm.get('p')} > 0.05 — the advantage is "
+                    "not distinguishable from best-of-N on a random label")
     if miss:
-        print(f"   HYPOTHESIS — {name} leads at {r['delta_per_day']:+.4f}%/bar-day "
-              f"in both halves, but misses: " + "; ".join(miss) + ".")
+        print(f"   HYPOTHESIS — {name} leads at {r['d_pbd']:+.4f}%/bar-day and "
+              f"{r['d_ret']:+.4f}%/trade in both halves, but misses: "
+              + "; ".join(miss) + ".")
         print("   NOT shipped. Named exactly so a later pass cannot read it as proven.")
     else:
-        print(f"   SHIP — {name}: {r['delta_per_day']:+.4f}%/bar-day over shipped, "
-              f"both halves, t_cl {r['delta_t_cl']:+.2f}, plateau holds, "
-              f"selection p={perm.get('p')}.")
+        print(f"   SHIP — {name}: {r['d_pbd']:+.4f}%/bar-day and "
+              f"{r['d_ret']:+.4f}%/trade over shipped, both halves, "
+              f"t_cl {r['d_t_cl']:+.2f}, plateau holds, selection p={perm.get('p')}.")
         print("   INHERITS the declared limit: slot contention is not simulated "
               "and that term flatters this cell.")
 
@@ -694,6 +771,41 @@ def _selftest():
         "the ladder no longer starts at age 0, so `roi_thr`'s initialiser is "
         "live and is a GUESSED floor below the first rung — give it an explicit "
         "below-first-rung behaviour before trusting any number from this file")
+    # THE ARM THAT WOULD HAVE CAUGHT THE C4 DEFECT, added after it shipped.
+    # `mean` must be the AGGREGATE sum(ret)/sum(bar-days), not the mean of
+    # per-episode ratios. On a fast winner + slow loser the two DISAGREE IN
+    # SIGN, and the mean-of-ratios says a losing book earns +23%/day. The live
+    # run printed +1.7173%/bar-day beside a mean trade of -0.1333%, which is
+    # what exposed it; nothing in the first selftest could.
+    fx = [{"sym": "A", "cls": "noncrypto", "ts": 1, "ret": +2.0, "reason": "roi",
+           "held": 1, "per_day": 48.0},
+          {"sym": "B", "cls": "noncrypto", "ts": 2, "ret": -2.0, "reason": "stop",
+           "held": 24, "per_day": -2.0}]
+    g = agg(fx)
+    assert abs(g["mean"] - 0.0) < 1e-9, (
+        "`mean` is not the aggregate return per bar-day — a book that broke "
+        f"even reads {g['mean']}")
+    assert g["mean_ratio"] > 20, "the artifact must stay REPORTED, not deleted"
+    assert abs(g["mean"] - g["mean_ratio"]) > 20, (
+        "the fixture no longer separates the two metrics — it cannot "
+        "discriminate and this arm is decorative")
+    assert abs(g["bar_days"] - 25 / 24.0) < 1e-9 and g["total_ret"] == 0.0
+    # ...and a SECOND fixture where all THREE candidate metrics differ, because
+    # the break-even one above cannot tell the aggregate from %/trade (they are
+    # both 0 there) — a mutation swapping them survived until this was added.
+    fy = [dict(fx[0], ret=+2.0, held=1), dict(fx[1], ret=-1.0, held=24)]
+    gy = agg(fy)
+    assert abs(gy["mean"] - 1.0 / (25 / 24.0)) < 1e-9, (
+        f"`mean` is not total return / total bar-days: {gy['mean']}")
+    assert abs(gy["mean_pct"] - 0.5) < 1e-9
+    assert abs(gy["mean"] - gy["mean_pct"]) > 0.4, (
+        "aggregate per-bar-day and %/trade coincide on this fixture — it "
+        "cannot discriminate them and the arm is decorative")
+    assert gy["mean_ratio"] > 20
+    # a PAIRED delta is in RETURN, so it must not carry a per_day field that a
+    # later reader could mistake for the verdict metric
+    pd_ = paired_delta([dict(fx[0], ret=1.0)], [dict(fx[0], ret=3.0)])
+    assert pd_ and abs(pd_[0]["ret"] - 2.0) < 1e-9 and "per_day" not in pd_[0]
     # the class axis never guesses
     assert fbus.is_crypto("NOTACOIN") in (None, False, True)
     # THE ENTRY PREDICATE IS THE CARRIER'S OWN, DRIVEN — not asserted.
@@ -729,6 +841,7 @@ def _selftest():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--ledger", help="local /trades.json?source=paper dump")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--json")
     ap.add_argument("--perm-draws", type=int, default=PERM_DRAWS)
@@ -736,7 +849,6 @@ def main(argv=None):
     if a.selftest:
         _selftest()
         return 0
-    print(__doc__.split("===")[0].strip()[:0] or "", end="")
     return run(a)
 
 
