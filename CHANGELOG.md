@@ -1,3 +1,83 @@
+## 2026-09-02 (xj) — A CARRIED ROW SENT ME TO BUILD SOMETHING THAT HAD SHIPPED FIVE DAYS EARLIER, AND THE THING IT ACTUALLY POINTED AT WAS A GUARD THE CODE PROMISED IN WRITING AND NEVER GOT
+
+**Eamon, 2-Sep:** *"Full permission for you to push forward"*. Per I11 that
+means starting from the carried list, not from whatever is interesting — and
+the carried list is what went wrong.
+
+**MOST OF THE LIST IS CORRECTLY BLOCKED, which is worth stating rather than
+treating as nothing to do.** Of 13 rows: **five are date-gated pre-registered
+reads** (🪁 kelly 1-Oct, 🔮 georgia 10-Sep, ⚖️ Counterweight 1-Oct, two
+instruments 16-Sep) where reading early **voids the registration** (I21/I25);
+two are operator capital calls (I16); four say in their own text that what
+remains is fresh closes, not tuning. Refusing to touch those is the invariant
+working, not idleness.
+
+**THE ROW THAT LOOKED ACTIONABLE WAS STALE.**
+`allocation-clamp-is-a-per-position-bound-doing-per-book-duty` said: *"What a
+session CAN do first is derive the per-book bound the drawdown bar implies (the
+`GROSS_X_MAX = 0.15/|stop|` shape (sr) used on avo) and publish it beside the
+claim."* **That shipped at `(vd)` on 28-Aug** as `fleet_allocation.dd_bound` —
+imported bar, per-book stop, `None` on unknown, a declared
+`NO_STOP_BY_DESIGN` set, its own test file, and **live on all 16 books**
+(🪁 kelly `{bar: 0.15, stop: 0.05, max_scale: 3.0}`). I read the row, went to
+build it, and found it finished. **A stale carried row is not neutral — it is a
+pointer at work already done, and the cost it nearly extracted was a rebuild.**
+Corrected in place per I12.
+
+**WHAT THE PAYLOAD ACTUALLY SAYS, measured 2-Sep:** 6 books bounded — including
+all three live arms (👩 mum **3.75x**, which is exactly the `MUM_GROSS_X` `(xf)`
+shipped hours earlier, arrived at independently) — **1** declared
+`NO_STOP_BY_DESIGN` (⚖️ Counterweight), and **9 living books with no bound at
+all**, so the shared `[0.25, 4.0]` clamp governs them blind. Not urgent (fleet
+max scale ~1.59), and the row never mentioned the gap.
+
+**THE REAL FINDING IS ONE LEVEL DOWN.** `_STOP_BRIDGE` retypes ten stops, and
+the module argues at length that retyping is RIGHT there — importing each book
+would be born-dark, because `fleet_allocation` runs in an image that does not
+COPY `lighter_family_bot`, so the lookup would fail inside its own `try/except`
+and every family book would silently lose its bound. Its closing sentence is a
+promise:
+
+> *"A retyped constant that a guard CAN check beats an import that it cannot."*
+
+**The guard was never written.** Ten hand-typed values feeding a real-money
+capital bound, and nothing compared one of them to the book it claims to
+describe — the repo's most-repeated shape (`(iz)`: I9's enforcement existed and
+was inert; this file's own preamble: a green run proves an enforcement EXISTS,
+not that it is CORRECT).
+
+**SHIPPED: `tests/autonomy/test_stop_bridge_drift.py`.** Each bridge value is
+read from its book's own source every run — env-backed constants through
+`audit_lever_bounds._literal_env_default` (the parser this repo already proved,
+never a second copy, `(hj)`), family rows by **AST** over the `Carrier(...)`
+declarations (not a regex: a `stoploss=-0.04` in a comment or a selftest
+fixture must not be mistaken for a shipped row). Both readers carry a **positive
+control** — the family reader must find a book the bridge does NOT carry
+(georgia-v3 at 0.015) or it is only ever confirming what it was told.
+
+**MEASURED, and the honest headline is that nothing has drifted yet: all ten
+values are CORRECT** (FUNDING 0.10, KELLY 0.05, COOK 0.05, mum 0.04, avo 0.10,
+georgia 0.05), so the guard is green on its first run. It is a ratchet against
+tomorrow, not a repair of today. **What IS already wrong is membership**: the
+bridge names three RETIRED books while nine living ones are missing.
+
+**6 OF 6 MUTATIONS RED, BOTH DIRECTIONS** — the bridge drifting from source
+(3 values, incl. a 0.0501-vs-0.05 tolerance probe) AND source drifting from the
+bridge (mum's `stoploss=-0.04 -> -0.05` in the family host, `KELLY_HARD_STOP
+"0.05" -> "0.07"` in its module). The second direction is the one that matters:
+a session edits a book's stop and forgets the bridge.
+
+**THE 9 UNBOUNDED BOOKS ARE DECLARED AS A SHRINK-ONLY RATCHET, NOT FIXED.**
+A guard that reddens on a pre-existing backlog is exempted within a day and then
+guards nothing (`(mz)`), so `UNBOUNDED_BACKLOG` may only shrink and a NEW
+unbounded book fails immediately. **Refusing to drain it today is the honest
+call, not laziness:** three are delta-neutral funding books whose 2% bleed stop
+IS a real per-position loss bound — but whether a bleed stop is the right input
+to `0.15/|stop|` is a claim about books nobody has studied for this purpose, and
+asserting **7.5x** for three books off a grep is precisely the
+confident-wrong-number this feature exists to prevent (I8). Named, with the
+reason, per book.
+
 ## 2026-09-02 (xi) — "FULL PERMISSION TO FIX RAILWAY": THE DELETE IS A PLATFORM LIMIT, NOT A PERMISSION ONE — SO THE HARM WAS NEUTRALISED INSTEAD, AND THE REASON IS NOW MEASURED RATHER THAN ASSUMED
 
 **Eamon, 2-Sep:** *"Approve and full permission for you to fix railway"*, on the

@@ -233,11 +233,25 @@ CARRIED = [
         "why_open": "the clamp is a capital-allocation policy and moving it "
                     "moves money between books — an operator call (I16), not a "
                     "session one. It is NOT urgent: nothing is near the "
-                    "ceiling today. What a session CAN do first is derive the "
-                    "per-book bound the drawdown bar implies (the "
-                    "`GROSS_X_MAX = 0.15/|stop|` shape (sr) used on avo) and "
-                    "publish it beside the claim, so the ceiling stops being a "
-                    "single number shared by books with different stops.",
+                    "ceiling today. **[(xj)] THE SESSION-DOABLE HALF THIS ROW "
+                    "NAMED IS DONE, AND THE ROW WAS FIVE DAYS STALE — it read "
+                    "\'what a session CAN do first is derive the per-book "
+                    "bound the drawdown bar implies and publish it beside the "
+                    "claim\', which shipped at (vd) on 28-Aug as "
+                    "`fleet_allocation.dd_bound` and is LIVE on all 16 books. "
+                    "The stale row nearly caused it to be rebuilt.** What is "
+                    "actually left, measured on the live payload 2-Sep: 6 books "
+                    "bounded (incl. all three live arms — mum 3.75x, avo 1.5x), "
+                    "1 declared NO_STOP_BY_DESIGN, and **9 living books with no "
+                    "bound at all**, so the shared ceiling governs them blind. "
+                    "(xj) built the drift guard `_STOP_BRIDGE` promised and "
+                    "never got (all 10 retyped stops verified correct, 6/6 "
+                    "mutations red both directions) and DECLARED the 9 as a "
+                    "shrink-only ratchet. Draining that backlog needs a per-book "
+                    "reading — a bleed stop is a genuine loss bound but whether "
+                    "it is the right input to 0.15/|stop| is a claim nobody has "
+                    "studied. The OPERATOR half is untouched: moving the clamp "
+                    "moves money between books (I16).",
         # closes when the clamp is re-decided (either bound moves) or carry's
         # slot count and clip stop multiplying out past its own equity.
         "closes_when": lambda: not _has("fleet_bus.py",

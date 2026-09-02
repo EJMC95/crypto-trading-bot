@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 02:53 Sydney (16:53Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-03 03:12 Sydney (17:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -32,7 +32,7 @@ _Still open because:_ the fresh sample has not accrued; the read at registration
 ### `allocation-clamp-is-a-per-position-bound-doing-per-book-duty`  ·  owner: **OPERATOR**
 💰 fleet_allocation's [0.25, 4.0] clamp is a per-POSITION slippage bound being asked to do a per-BOOK job. **[(vj)] THE 4.0 ALARM THIS ROW USED TO CARRY IS WITHDRAWN — it was measured stale.** It read '💰 sits AT its 4.0 ceiling on 🌾 carry right now, delta_usd +13,500, $14,400 of gross on a $1,000 book'. Measured on the live payload 27-Aug: the MAXIMUM scale anywhere in the fleet is **1.594** (🙏 avo shadow) and carry sits at **1.272** ($1,271.75 target on a $1,000 book). (tz) replaced the winner-take-all split with a tilted flat prior, which made 4.0 structurally unreachable — so the row described the organ as it behaved BEFORE the fix that had already shipped. What survives is LATENT, not live: the ceiling still PERMITS a scale that breaches the 15% go-live drawdown bar, because maxDD is the one bar that is NOT clip-invariant ((hl) measured per-trade % invariance for the other five) — ⚖️ Counterweight breaches at 3.06x, inside the 4.0 ceiling.
 
-_Still open because:_ the clamp is a capital-allocation policy and moving it moves money between books — an operator call (I16), not a session one. It is NOT urgent: nothing is near the ceiling today. What a session CAN do first is derive the per-book bound the drawdown bar implies (the `GROSS_X_MAX = 0.15/|stop|` shape (sr) used on avo) and publish it beside the claim, so the ceiling stops being a single number shared by books with different stops.
+_Still open because:_ the clamp is a capital-allocation policy and moving it moves money between books — an operator call (I16), not a session one. It is NOT urgent: nothing is near the ceiling today. **[(xj)] THE SESSION-DOABLE HALF THIS ROW NAMED IS DONE, AND THE ROW WAS FIVE DAYS STALE — it read 'what a session CAN do first is derive the per-book bound the drawdown bar implies and publish it beside the claim', which shipped at (vd) on 28-Aug as `fleet_allocation.dd_bound` and is LIVE on all 16 books. The stale row nearly caused it to be rebuilt.** What is actually left, measured on the live payload 2-Sep: 6 books bounded (incl. all three live arms — mum 3.75x, avo 1.5x), 1 declared NO_STOP_BY_DESIGN, and **9 living books with no bound at all**, so the shared ceiling governs them blind. (xj) built the drift guard `_STOP_BRIDGE` promised and never got (all 10 retyped stops verified correct, 6/6 mutations red both directions) and DECLARED the 9 as a shrink-only ratchet. Draining that backlog needs a per-book reading — a bleed stop is a genuine loss bound but whether it is the right input to 0.15/|stop| is a claim nobody has studied. The OPERATOR half is untouched: moving the clamp moves money between books (I16).
 
 ### `brain-mult-transition-oscillation`  ·  owner: **session**
 The brain's `t` is computed on DOLLARS (`brain_stats.weighted_bucket` reads `profit_abs`), so a bucket MID-TRANSITION is a mixture of two clip scales: sd inflates against mean and `t` falls on a book whose edge has not moved. Predicted shape: a bucket that clears a rung steps back down a rung within ~10 closes, then climbs again. A uniform scale is invariant, so there is no runaway — this is a transient limit cycle, damped by the 14d decay and the 3-run streak gate.
@@ -64,8 +64,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (4 commit(s))
+## Shipped today (7 commit(s))
 
+- `7a9e9c8` wip
+- `d6626e9` Merge PR #278: (xi) the Railway delete is a platform limit, not a permission one — harm neutralised, reason measured
+- `a0361e5` (xi) the Railway delete is a platform limit, not a permission one — harm neutralised, reason measured
 - `26feade` Merge PR #276: (xh) the suite's 8-red floor was the container, and finding that surfaced a live-deploy marker lost to a squash merge on a real-money book
 - `cbfcdb6` (xh) a live-deploy marker does not survive a squash merge — measured on a real-money book, closed executably
 - `8b174ba` (xh) the local suite had a standing floor of 8 reds that were not the tree's — a SessionStart hook installs the repo's own declared deps
