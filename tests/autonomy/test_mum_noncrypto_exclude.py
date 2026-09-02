@@ -163,7 +163,8 @@ def test_the_live_host_reads_the_same_universe_owner():
     """👩 mum's LIVE arm and her SHADOW twin must see one universe rule. The
     live variant host must IMPORT carrier_universe, never rebuild it inline —
     a divergence here silently breaks the judge's control arm."""
-    src = open(os.path.join(ROOT, "lighter_avo_live_bot.py")).read()
+    with open(os.path.join(ROOT, "lighter_avo_live_bot.py")) as fh:
+        src = fh.read()
     tree = ast.parse(src)
     imported = set()
     for node in ast.walk(tree):
@@ -191,7 +192,8 @@ def test_the_live_host_reads_the_same_universe_owner():
 
 def test_the_subtraction_lives_in_the_one_owner():
     """The cut must be inside `carrier_universe`, so every host inherits it."""
-    src = open(os.path.join(ROOT, "lighter_family_bot.py")).read()
+    with open(os.path.join(ROOT, "lighter_family_bot.py")) as fh:
+        src = fh.read()
     body = src.split("def carrier_universe(", 1)[1].split("\ndef ", 1)[0]
     assert "noncrypto_exclude(" in body, \
         "the exclusion is not applied in carrier_universe — a host could miss it"

@@ -105,6 +105,18 @@ is a universe widening *through her own rule*; it was not taken because two of
 the three fail a measured slippage floor and the third is refused by a regime
 gate that exists to stop exactly this.
 
+**CI, recorded because a red check is never silent:** the I22 spend audit failed
+once at 10:37Z on `feed unusable (read timed out) — FAIL-CLOSED`, which is that
+guard working, not this diff. Diagnosed rather than assumed: `/pnl.json` timed
+out 3× at 60s with zero bytes while the SAME host served `/watchdog.json` in
+0.52s and `/bus.json` in 3.0s and both GitHub and the venue answered in ~0.4s —
+one route hanging during the `freqtrade-bots` restart from the (xb)/(xc) deploy
+(the watchdog logged `STALE:` on the four rows that container publishes, all
+43-48s fresh again by 10:44Z). Recovered to 200-in-3.78s; the one permitted
+re-run passed; no code change. CodeQL then flagged two bare `open()` reads in
+the new test file — a bot finding is a bug report, so both went through
+context managers in the same PR.
+
 **DEPLOY.** `freqtrade-bots` + `family-lighter-shadow` take the family module on
 the auto path; **the mechanism is inert, so no book trades differently today**;
 the study is a `scripts/` instrument registered in `SELFTEST_MODULES` and ships
