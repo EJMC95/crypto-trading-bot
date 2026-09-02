@@ -437,34 +437,6 @@ def send_push(title, body):
         return False
 
 
-def stamps_comparable(n_live, n_shadow):
-    """Can two `extra.build` digests be compared at all?
-
-    [2026-09-02 (xf)] THE ONE OWNER of the `(fd)` question, so the fleet stops
-    answering it three different ways. `build_compute` hashes only the
-    `_BUILD_SHARED` names that EXIST in the image, so **the same source tree
-    stamps different ids in two images carrying different COPY sets** — and
-    `extra.build_n` is that count. Two stamps are comparable only when the
-    counts match; otherwise the digests answer "different FILE SET", which
-    says nothing about whether the CODE differs.
-
-    `scripts/evidence_review.arm_drift_line` has applied this rule since
-    2026-08-01 ("arms differ on FILE SET, not necessarily code"). The judge's
-    drift sensors did not, and the asymmetry cost the fleet its only live
-    promotion lane — see `arm_drift` below.
-
-    UNKNOWN COUNTS ARE COMPARABLE, deliberately: a missing `build_n` is the
-    pre-(fd) shape, and refusing to compare there would silently disarm the
-    sensor on every legacy row. Only a KNOWN mismatch defers.
-    """
-    if n_live is None or n_shadow is None:
-        return True                       # unknown count: compare as before
-    try:
-        return int(n_live) == int(n_shadow)
-    except (TypeError, ValueError):
-        return True                       # unparseable: do not disarm on junk
-
-
 def arm_drift(rows, live=None, shadow=None):
     """(None | {'live','shadow'}) — are the two arms running DIFFERENT CODE?
 
@@ -500,33 +472,36 @@ def arm_drift(rows, live=None, shadow=None):
     a, b = by.get(live), by.get(shadow)
     if not a or not b:
         return None
-    ba = ((a.get("extra") or {}) or {}).get("build")
-    bb = ((b.get("extra") or {}) or {}).get("build")
+    xa = (a.get("extra") or {}) or {}
+    xb = (b.get("extra") or {}) or {}
+    # [2026-09-02] PREFER THE CROSS-IMAGE-COMPARABLE STAMP. `build` hashes the
+    # entry module plus the shared names PRESENT IN THAT IMAGE, so two arms of
+    # one book running DIFFERENT ENTRY FILES can never match — measured on 👩
+    # mum's pair: the shadow's 16 files are a strict SUBSET of the live host's
+    # 17 (the live entry `lighter_avo_live_bot.py` is the only difference), so
+    # this sensor claimed drift on EVERY sample and `paired_eval` hard-blocked
+    # every promotion. The judge's serial lane could not promote, by
+    # construction, forever. `build_shared` hashes `_BUILD_SHARED` alone — one
+    # tuple fleet-wide — so it is equal across images at the same commit and
+    # differs when an arm is genuinely behind on shared code.
+    sa, sb = xa.get("build_shared"), xb.get("build_shared")
+    if sa and sb:
+        return None if sa == sb else {"live": sa, "shadow": sb, "basis": "shared"}
+    ba = xa.get("build")
+    bb = xb.get("build")
     if not ba or not bb:
         return None          # not yet stamped — no claim
+    # [(fd)] A DIFFERENT COUNT IS A DIFFERENT FILE SET, NOT DRIFTED CODE. Two
+    # ids hashed over different sets are not comparable, so a difference
+    # between them is not positive evidence of anything. Same fail-safe
+    # direction as the unstamped case above, and the same reason: claiming
+    # drift we cannot establish freezes the queue on healthy arms.
+    na, nb = xa.get("build_n"), xb.get("build_n")
+    if na and nb and na != nb:
+        return None
     if ba == bb:
         return None
-    # [2026-09-02 (xf)] DIFFERENT FILE SET IS NOT DRIFT — and claiming it as
-    # drift jammed the fleet's only promotion lane. 👩 mum's pair spans TWO
-    # IMAGES: her live arm runs `Dockerfile.avolive` (build_n 17) and her
-    # shadow twin runs the freqtrade image (build_n 14-16), so their digests
-    # are computed over DIFFERENT FILE SETS and can never be equal. Measured
-    # 2-Sep over her whole ledger: live {4 ids, all n=17} vs shadow {9 ids,
-    # n in 14,15,16} — intersection EMPTY, by construction and forever. The
-    # judge held EVERY evaluation with "ARMS ON DIFFERENT CODE: no promotion
-    # can rest on it", i.e. a structurally-stuck sensor closing the only
-    # designed path from shadow evidence to real money, hours after the lane
-    # moved to mum at (ww).
-    #
-    # This function's own contract is "we only ever claim drift on POSITIVE
-    # evidence"; a digest pair that cannot answer the question is not
-    # positive evidence. It degrades to SILENCE, exactly as an unstamped arm
-    # does — and the judge publishes the BASIS beside the verdict so that
-    # silence is never read as "the arms agree" (I18).
-    if not stamps_comparable(((a.get("extra") or {}) or {}).get("build_n"),
-                             ((b.get("extra") or {}) or {}).get("build_n")):
-        return None
-    return {"live": ba, "shadow": bb}
+    return {"live": ba, "shadow": bb, "basis": "build"}
 
 
 def _xp_running(now):
@@ -808,9 +783,28 @@ def _selftest():
     def _row(bot, build=None):
         return {"bot": bot, "extra": ({"build": build} if build else {})}
 
-    # POSITIVE: two stamps, different -> drift, and it NAMES both builds
+    # POSITIVE: two stamps, different -> drift, and it NAMES both builds.
+    # [2026-09-02] `basis` rides along so the claim says WHICH stamp it rests
+    # on — "shared" and "build" mean different things to an operator (I8).
     d = arm_drift([_row(LIVE, "aaaaaaaaaaaa"), _row(SHADOW, "bbbbbbbbbbbb")])
-    assert d == {"live": "aaaaaaaaaaaa", "shadow": "bbbbbbbbbbbb"}, d
+    assert d == {"live": "aaaaaaaaaaaa", "shadow": "bbbbbbbbbbbb",
+                 "basis": "build"}, d
+    # ...and a pair whose ids are hashed over DIFFERENT FILE SETS is not
+    # comparable, so it is not a claim ((fd)). This is 👩 mum's live pair: two
+    # images, 17 files vs 16, identical commit. Before this the judge held
+    # every mum evaluation on a drift that could never clear.
+    def _row_n(bot, build, n):
+        return {"bot": bot, "extra": {"build": build, "build_n": n}}
+    assert arm_drift([_row_n(LIVE, "aaaaaaaaaaaa", 17),
+                      _row_n(SHADOW, "bbbbbbbbbbbb", 16)]) is None
+    # ...while the cross-image-comparable stamp still speaks when it differs
+    _sh = [{"bot": LIVE, "extra": {"build": "a", "build_n": 17,
+                                   "build_shared": "s1"}},
+           {"bot": SHADOW, "extra": {"build": "b", "build_n": 16,
+                                     "build_shared": "s2"}}]
+    assert arm_drift(_sh) == {"live": "s1", "shadow": "s2", "basis": "shared"}
+    _sh[1]["extra"]["build_shared"] = "s1"
+    assert arm_drift(_sh) is None, "same shared stamp -> converged, no claim"
     # NEGATIVE 1: same build -> silent. The healthy state must never fire.
     assert arm_drift([_row(LIVE, "aaaaaaaaaaaa"), _row(SHADOW, "aaaaaaaaaaaa")]) is None
     # NEGATIVE 2: unstamped arms -> NO CLAIM. This is the rollout state — the
@@ -831,7 +825,8 @@ def _selftest():
         is None, "converged NOW must be silent, whatever old rows say"
     assert arm_drift([_row(LIVE, "nnnnnnnnnnnn"), _row(SHADOW, "mmmmmmmmmmmm"),
                       _row(LIVE, "oooooooooooo"), _row(SHADOW, "oooooooooooo")]) \
-        == {"live": "nnnnnnnnnnnn", "shadow": "mmmmmmmmmmmm"}, \
+        == {"live": "nnnnnnnnnnnn", "shadow": "mmmmmmmmmmmm",
+            "basis": "build"}, \
         "drift NOW must fire, however aligned the arms once were"
 
     # the VERDICT wiring: drift outranks xp-contamination and refuses the number

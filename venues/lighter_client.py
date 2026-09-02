@@ -198,6 +198,54 @@ def _bounded_longs(recs, collateral):
     return longs
 
 
+def _mark_for(marks, coin):
+    """The live mark for a FLEET-spelled `coin`, under EITHER spelling, or None.
+
+    [2026-09-02] ONE POSITION, TWO SPELLINGS — ON THE OTHER SIDE OF THE SEAM
+    `(xa)` CLOSED. `_positions_from` keys this block by the FLEET symbol
+    (`from_lighter`: 1000PEPE -> kPEPE), while `marks.stop_marks` keys its
+    output by whatever spelling its CALLER handed it — and since (xa) the
+    variant host hands it the VENUE's own spelling, because that is what its
+    universe, `meta` and `held` map carry. So a bare `marks.get(coin)` asked
+    for `kPEPE`, a mark filed under `1000PEPE` did not answer, and a position
+    the venue HAD priced and whose order book read fine was filed as
+    unmeasurable.
+
+    MEASURED on 👩 mum's real-money row, 2-Sep 11:0xZ, and every field agrees:
+      held        {..., "1000PEPE": "adopted"}       <- venue spelling
+      positions   [..., "kPEPE"]                     <- fleet spelling
+      liq_mark_blind  ["kPEPE"]                      <- the one 1000-market
+      mark_blind      ABSENT                         <- the book read FINE
+      headroom    {"ok": false, "reason": "mark_blind", "gap_stop_widths": 18.66}
+    Two costs, both real and neither a loss: `nearest_liq` was computed over
+    9 of 10 real-money legs, so the published liquidation distance excluded a
+    position it could not see; and `mark_blind` is not in this book's
+    `fleet_immune.HEADROOM_OK` allowlist, so a spelling paged the operator
+    every loop — the (gl) failure, a detector whose output one learns to
+    ignore. `too_close`, the one refusal that means the money is in danger,
+    is also unreachable for a 1000-market leg, because such a leg can never
+    BE `nearest_liq`. The rail still refused (`mark_blind` is itself a
+    refusal), so nothing unsafe was ever admitted — the number was wrong, not
+    the verdict.
+
+    FIXED HERE, NOT AT THE CALL SITE, because `lighter_avo_live_bot` and
+    `lighter_funding_bot` carry byte-identical `_margin_block` helpers and a
+    third caller would inherit the same trap — an instance fix guarantees a
+    return visit. `venues.symbol_map` stays the ONE owner of the alias rule
+    ((hj)): `to_lighter` is the definitional map, an unknown coin maps to
+    itself, so this is a no-op for every market that is not a 1000-market and
+    can never resolve to a DIFFERENT market's price.
+    """
+    if not marks:
+        return None
+    m = marks.get(coin)
+    if m is None:
+        alt = to_lighter(coin)[0]
+        if alt != coin:
+            m = marks.get(alt)
+    return m
+
+
 def margin_state_from(acct, marks=None):
     """The account's margining view, derived from ONE venue account payload.
 
@@ -295,7 +343,7 @@ def margin_state_from(acct, marks=None):
         #     so consumers take abs() for notional and the sign for direction.
         row = {k: rec[k] for k in ("size", "value", "liq", "entry", "imf_pct",
                                    "max_lev", "margin", "mode") if k in rec}
-        liq, mark = rec.get("liq"), (marks or {}).get(coin)
+        liq, mark = rec.get("liq"), _mark_for(marks, coin)
         if liq is None:
             unknown.append(coin)
             # [2026-08-19 (rb)] WHY the venue published nothing, when the block

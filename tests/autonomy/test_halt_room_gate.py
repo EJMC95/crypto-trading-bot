@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[2026-09-02 (xe)] THE HALT-AWARE ENTRY GATE: a leg whose own stop would end
+"""[2026-09-02 (xg)] THE HALT-AWARE ENTRY GATE: a leg whose own stop would end
 the day for the WHOLE book is refused.
 
 Eamon, 2-Sep: *"Let it run, but optimise and enhance as best as possible."*

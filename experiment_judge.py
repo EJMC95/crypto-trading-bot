@@ -681,8 +681,7 @@ def _mean_pct(trades):
 
 def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
                 min_closes=None, live_min=None, margin_pp=None,
-                cand_levers=None, drift=None, both_halves=True,
-                drift_basis_=None):
+                cand_levers=None, drift=None, both_halves=True):
     """The promotion bar. Returns a verdict dict; verdict['promote'] is True
     only when the shadow arm is positive AND beats the live arm per-trade by
     margin_pp on the FULL window AND on BOTH halves (the doctrine's
@@ -739,22 +738,6 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     # Fail-safe toward SILENCE, matching the sensor: `drift` is only ever set on
     # positive evidence (two stamps, both present, both different). Unknown is
     # not drift, or this gate would freeze the queue through every rollout.
-    # [(xf)] the BASIS, published on every verdict — "file-set" is a blind
-    # spot, not a clean bill of health, and it is the permanent answer on a
-    # pair whose arms run from different images.
-    #
-    # TAKEN FROM THE CALLER, which is the only thing that knows how `drift`
-    # was scoped: `_arm_drift_snapshot` windows the row half by `since_ts`,
-    # and computing the receipt here off the UNSCOPED ledger would let it
-    # describe a different sample than the verdict it explains — a receipt
-    # that contradicts its own hold. The whole-ledger fallback is kept ONLY
-    # for callers that pass no drift at all (the selftests and the census),
-    # where there is no scoped sample to disagree with.
-    try:
-        v["arm_drift_basis"] = (drift_basis_ if drift_basis_ is not None
-                                else drift_basis(rows, live_bot, shadow_bot))
-    except Exception:      # noqa: BLE001 — a receipt never breaks a verdict
-        v["arm_drift_basis"] = None
     if drift:
         v["arm_drift"] = drift
         v["why"] = (f"ARMS ON DIFFERENT CODE: live={drift.get('live')} "
@@ -1286,12 +1269,7 @@ def growth_promoter(rows, gstate, now, drift=None):
                                   "why": f"release cooldown until "
                                          f"{iso(_num(gstate['cooldown_until']))}"}))
     start = growth_window_start(now)
-    # [(xf)] the receipt is computed on THIS window, the one the verdict below
-    # is computed on — a basis read off the whole ledger could contradict the
-    # hold it claims to explain.
     v = paired_eval(rows, start, now, shadow_bot=SHADOW_BOT, live_bot=LIVE_BOT,
-                    drift_basis_=drift_basis(_rows_since(rows, start),
-                                             LIVE_BOT, SHADOW_BOT),
                     min_closes=GROWTH_MIN_CLOSES, live_min=GROWTH_LIVE_MIN,
                     cand_levers=GROWTH_CAND, drift=drift, both_halves=False)
     v["candidate"] = "growth-levers"
@@ -1335,30 +1313,33 @@ def _rows_since(rows, since_ts):
     return out
 
 
-def _row_build_sets(rows, live=None, shadow=None):
-    """{bot: set((build_n, build))} over the rows given, ignoring unstamped rows.
+def _row_build_sets(rows, live=None, shadow=None, key="build"):
+    """{bot: set(ids)} over the rows given, ignoring unstamped rows.
 
-    [2026-09-02 (xf)] KEYED BY `build_n` AS WELL AS THE DIGEST. A digest is a
-    hash over the `_BUILD_SHARED` files that EXIST in the image ((fd)), so two
-    arms running from different images stamp different ids for the same source
-    — and comparing the digests alone answers "different FILE SET", not
-    "different code". Carrying the count in the key lets `_row_drift` restrict
-    the comparison to the counts the two arms actually share.
+    [2026-09-02] `key` selects WHICH stamp — `build` (per-image) or
+    `build_shared` (cross-image comparable). See `_row_drift`.
     """
     live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
     out = {live: set(), shadow: set()}
     for r in rows or []:
         b = str(r.get("bot"))
         if b in out:
-            ex = (r.get("extra") or {}) or {}
-            bid = ex.get("build")
+            bid = ((r.get("extra") or {}) or {}).get(key)
             if bid:
-                n = ex.get("build_n")
-                try:
-                    n = int(n) if n is not None else None
-                except (TypeError, ValueError):
-                    n = None
-                out[b].add((n, str(bid)))
+                out[b].add(str(bid))
+    return out
+
+
+def _row_build_counts(rows, live=None, shadow=None):
+    """{bot: set(build_n)} — the FILE COUNT each arm's rows were hashed over."""
+    live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
+    out = {live: set(), shadow: set()}
+    for r in rows or []:
+        b = str(r.get("bot"))
+        if b in out:
+            n = ((r.get("extra") or {}) or {}).get("build_n")
+            if n:
+                out[b].add(int(n))
     return out
 
 
@@ -1393,70 +1374,41 @@ def _row_drift(rows, live=None, shadow=None):
     arms to have stamped rows in the window (an empty set on either side is
     "unknown", never drift), so a rollout cannot make this fire.
     """
-    return _row_drift_verdict(rows, live, shadow)[0]
-
-
-def _row_drift_verdict(rows, live=None, shadow=None):
-    """`(claim | None, basis)` from ONE pass — the claim and the receipt can
-    never describe different samples because they are the same read.
-
-    [2026-09-02 (xf), corrected after adversarial review] Three things this
-    gets right that the first cut did not:
-
-    * **AGREEMENT IS TESTED ON THE DIGEST, never on the (count, digest) pair.**
-      Keying the sets by count and then intersecting the pairs meant two arms
-      publishing the SAME digest under different counts no longer read as one
-      deploy line — re-creating the very false hold this change exists to
-      remove. A shared digest is a shared deploy line, full stop.
-    * **COMPARABILITY GOES THROUGH THE ONE OWNER**,
-      `implementation_shortfall.stamps_comparable`. The first cut open-coded
-      `shared_n` here, which is a second copy of the rule that could drift from
-      the declared owner ((hj)) — and it disarmed itself on unknown counts,
-      the exact behaviour the owner declares must NOT happen.
-    * **IDS ARE SORTED, never the pairs.** An arm mid-rollout carries some rows
-      stamped with `build_n` and some without, so sorting the pairs compares
-      None with an int and raises TypeError inside the judge's own evaluation.
-    """
-    try:
-        from implementation_shortfall import stamps_comparable
-    except Exception:      # noqa: BLE001 — no owner, no claim
-        return None, "unstamped"
-    sets = _row_build_sets(rows, live, shadow)
-    a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
+    lb, sb = live or LIVE_BOT, shadow or SHADOW_BOT
+    # [2026-09-02] PREFER THE CROSS-IMAGE-COMPARABLE STAMP, for the reason the
+    # set rule itself gives: intersecting sets mean "the arms tracked the same
+    # deploy sequence". That premise holds only while both arms draw ids from
+    # ONE id space. A CROSS-IMAGE pair does not: 👩 mum's live arm is
+    # `lighter_avo_live_bot.py` (17 files) and her shadow is
+    # `lighter_family_bot.py` (16, a strict SUBSET), so their `build` sets are
+    # disjoint BY CONSTRUCTION at every commit and this rule read "different
+    # code" forever — hard-blocking every promotion on the fleet's only
+    # shadow->live path. `build_shared` hashes `_BUILD_SHARED` alone, one tuple
+    # fleet-wide, so both arms draw from the SAME space again and the set rule
+    # means what it says.
+    shared = _row_build_sets(rows, lb, sb, key="build_shared")
+    sa, ss = shared[lb], shared[sb]
+    if sa and ss:
+        if sa & ss:
+            return None                  # same shared code => not drift
+        return {"live": sorted(sa)[-1], "shadow": sorted(ss)[-1],
+                "source": "rows-disjoint", "basis": "shared"}
+    sets = _row_build_sets(rows, lb, sb)
+    a, b = sets[lb], sets[sb]
     if not a or not b:
-        return None, "unstamped"         # unknown is not drift
-    ids_a, ids_b = {i for _, i in a}, {i for _, i in b}
-    if ids_a & ids_b:
-        return None, "agree"             # shared digest => same deploy line
-    # A DIFFERENT FILE SET IS NOT DRIFT. On a pair whose arms run from
-    # different images no two counts are comparable, the digests answer
-    # "different COPY set" rather than "different code", and claiming drift
-    # there held every evaluation on 👩 mum's lane — the fleet's only live
-    # promotion path — with "no promotion can rest on it".
-    if not any(stamps_comparable(x, y)
-               for x in {n for n, _ in a} for y in {n for n, _ in b}):
-        return None, "file-set"
-    return ({"live": sorted(ids_a)[-1], "shadow": sorted(ids_b)[-1],
-             "source": "rows-disjoint"}, "drift")
-
-
-def drift_basis(rows, live=None, shadow=None):
-    """Why the drift verdict is what it is: "agree" | "drift" | "file-set" |
-    "unstamped".
-
-    [2026-09-02 (xf)] I18 — a gate that STOPPED gating and a gate with nothing
-    to report must never publish the same byte-string. `_row_drift` degrades to
-    None on three different questions ("the arms match", "one arm is
-    unstamped", "the two images carry different FILE SETS so the digests are
-    not comparable"), and the third is a genuine BLIND SPOT that a reader must
-    be able to see. On 👩 mum's cross-image pair it is the permanent answer, so
-    the row says so instead of publishing the silence that "agree" also
-    produces.
-
-    REPORTED, NEVER A GATE: nothing branches on this string — it is the
-    receipt for a verdict reached elsewhere.
-    """
-    return _row_drift_verdict(rows, live, shadow)[1]
+        return None                      # unknown is not drift
+    if a & b:
+        return None                      # shared build => same deploy line
+    # [(fd)] Ids hashed over DIFFERENT FILE SETS are not comparable, so their
+    # disjointness is not evidence of anything. Same fail-safe direction as the
+    # unstamped case above: claiming drift we cannot establish freezes the
+    # queue on healthy arms, which is exactly what it did.
+    counts = _row_build_counts(rows, lb, sb)
+    ca, cb = counts[lb], counts[sb]
+    if ca and cb and not (ca & cb):
+        return None
+    return {"live": sorted(a)[-1], "shadow": sorted(b)[-1],
+            "source": "rows-disjoint", "basis": "build"}
 
 
 def _current_drift(fetch=None):
@@ -2858,12 +2810,9 @@ def run_once():
         # the ROW half is re-scoped to THIS candidate's window, because the
         # growth pair's trailing 2.5d and a candidate's `started` are
         # different samples and a hold must be about the rows this bar uses.
-        _drift_basis = drift_basis(_rows_since(rows, started),
-                                   LIVE_BOT, SHADOW_BOT)
         _drift = _arm_drift_snapshot(rows, since_ts=started,
                                      current=_cur_drift)
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
-                          drift_basis_=_drift_basis,
                           drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
         # ARM DRIFT -> HOLD, exactly as ARM SKEW below and for the same reason:
@@ -3456,7 +3405,8 @@ def _selftest_body():
     if _isf_ok:
         # fallback fires: unstamped rows + drifted current builds -> HOLD
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # fallback stays quiet when current builds match (no false hold)
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_same) is None
         # THE 29-Jul REVERSAL, asserted: rows agree on a build, but the arms
@@ -3466,7 +3416,8 @@ def _selftest_body():
         _r_same = [{"bot": LIVE_BOT, "extra": {"build": "x"}},
                    {"bot": SHADOW_BOT, "extra": {"build": "x"}}]
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # ...and converged rows + converged current builds still clear
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_same) is None
         # row-based POSITIVE drift: DISJOINT build sets, the only shape that
@@ -3474,7 +3425,8 @@ def _selftest_body():
         _r_drift = [{"bot": LIVE_BOT, "extra": {"build": "p"}},
                     {"bot": SHADOW_BOT, "extra": {"build": "q"}}]
         assert _arm_drift_snapshot(_r_drift, fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint",
+             "basis": "build"}
         # a dead fetch costs nothing, claims nothing
         def _boom():
             raise RuntimeError("db down")
@@ -3505,13 +3457,15 @@ def _selftest_body():
         #     {new}), so a claim here is correct even without a window. This
         #     was the (la) shape; (lf) keeps it true for the right reason.
         assert _arm_drift_snapshot(_r_prewindow, fetch=lambda: _pnl_same) == \
-            {"live": "old", "shadow": "new", "source": "rows-disjoint"}
+            {"live": "old", "shadow": "new", "source": "rows-disjoint",
+             "basis": "build"}
         # C — scoping never blinds the CONTAINER half: rows clean in-window,
         #     containers on two builds -> hold. This is what makes dropping
         #     the pre-window rows safe.
         assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
                                    fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # D — real drift INSIDE the window is still caught
         _r_inwindow = [
             {"bot": LIVE_BOT, "close_ts": iso(_w0 + 30), "extra": {"build": "p"}},
@@ -3519,7 +3473,8 @@ def _selftest_body():
         ]
         assert _arm_drift_snapshot(_r_inwindow, since_ts=_w0,
                                    fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint",
+             "basis": "build"}
         # D2 [(lf)] — THE DEFECT (la) LEFT BEHIND, and the reason this rule
         #     changed. A ROLLING DEPLOY inside a wide window: both arms close
         #     under the old build AND the new one, but the slower arm's newest

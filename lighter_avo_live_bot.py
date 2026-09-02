@@ -587,7 +587,7 @@ def halt_level(day_start_equity, rails):
     """`(level_usd, "abs"|"pct")` — the equity at which the day ends, and which
     rail sets it. `(None, None)` when the day-start is unreadable.
 
-    [2026-09-02 (xe)] THE ONE OWNER of "which daily-loss rail binds". Two rails
+    [2026-09-02 (xg)] THE ONE OWNER of "which daily-loss rail binds". Two rails
     can end the day and the breach check consults BOTH: the pct leash
     (`DAILY_LOSS_LIMIT` of day-start) and the absolute cap
     (`rails.max_daily_loss`). The TIGHTER — the higher level — is the one that
@@ -631,7 +631,7 @@ def halt_level(day_start_equity, rails):
     return level, binding
 
 
-#: [(xe), corrected after adversarial review] THE GATE ONLY ARMS ON A BOOK
+#: [(xg), corrected after adversarial review] THE GATE ONLY ARMS ON A BOOK
 #: WHOSE GEOMETRY LEAVES IT ROOM TO MEAN ANYTHING. Measured at production
 #: settings: one slot-stop is **12.5%** of 👩 mum's whole daily allowance at
 #: 3.75x, and **100%** of 🙏 avo's at her 5x (clip = equity x 5 / 5 slots, stop
@@ -678,7 +678,7 @@ def halt_gate_share(clip, stop_frac, day_start_equity, rails):
 def halt_room(equity, day_start_equity, rails):
     """Dollars of equity above the daily-halt level, or None when unmeasurable.
 
-    [2026-09-02 (xe)] The entry gate's reading of `halt_level`. FAIL-OPEN by
+    [2026-09-02 (xg)] The entry gate's reading of `halt_level`. FAIL-OPEN by
     construction: a dark equity or day-start returns None and the caller gates
     NOTHING. It can only ever refuse a new entry — it never permits one, never
     sizes one up, and never suppresses the halt itself.
@@ -2001,7 +2001,7 @@ def main(_ctx=None, once=False):
                         # three real-money rows until this field existed.
                         "basket_move_now_state": basket_move_state(
                             eq, _open_ntl),
-                        # [(xe)] derived from `halt_level`, the ONE owner the
+                        # [(xg)] derived from `halt_level`, the ONE owner the
                         # entry gate also reads — this was a second inline copy
                         # of the same comparison, and it could raise on a
                         # non-numeric cap inside the publish path.
@@ -2035,12 +2035,12 @@ def main(_ctx=None, once=False):
                     # loop. Zero on a book whose cap has room, so non-zero
                     # always means the cap turned a signal away.
                     "notional_cap_skips": notional_cap_skips,
-                    # [(xe)] entries refused because ONE stop on the new leg
+                    # [(xg)] entries refused because ONE stop on the new leg
                     # would have breached the daily halt for the WHOLE book.
                     # Non-zero means the halt rail turned a signal away before
                     # it could become the trade that ended the day.
                     "halt_room_skips": halt_room_skips,
-                    # [(xe)] WHETHER THE GATE IS ARMED ON THIS BOOK AT ALL, and
+                    # [(xg)] WHETHER THE GATE IS ARMED ON THIS BOOK AT ALL, and
                     # the geometry that decided it. `armed: false` with a
                     # stop_share near 1.0 means one slot-stop is this book's
                     # whole daily allowance — the rail would be "stop trading
@@ -2646,7 +2646,7 @@ def main(_ctx=None, once=False):
         notional_cap_skips = 0
         halt_room_skips = 0
         halt_gate_stat = None
-        # [(xe)] stop-dollars this cycle has already COMMITTED. `equity` is read
+        # [(xg)] stop-dollars this cycle has already COMMITTED. `equity` is read
         # once per loop, so without this every candidate saw the same room and
         # k legs each individually "safe" could jointly breach it — raised
         # independently by three review lenses and confirmed against the loop.
@@ -3042,7 +3042,7 @@ def main(_ctx=None, once=False):
                     if int(state.get("rank_n") or 0) >= _cap:
                         _verdict(sym, "throttled")
                         continue
-                # [2026-09-02 (xe)] THE HALT-AWARE ENTRY GATE. The daily halt
+                # [2026-09-02 (xg)] THE HALT-AWARE ENTRY GATE. The daily halt
                 # does not close ONE leg, it FLATTENS THE BOOK at whatever the
                 # mark is — so a leg opened while the room to that level is
                 # smaller than this leg's OWN stop carries the whole book's
@@ -3144,7 +3144,7 @@ def main(_ctx=None, once=False):
                              "measured": meas, "fill_src": src})
                 except Exception:  # noqa: BLE001
                     pass
-                # [(xe)] this leg's stop is now part of the day's exposure —
+                # [(xg)] this leg's stop is now part of the day's exposure —
                 # the next candidate in THIS cycle must see it.
                 cycle_stop_committed += _one_stop
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,

@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 20:18 Sydney (10:18Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 21:10 Sydney (11:10Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -64,8 +64,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (111 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx), (wy), (xc))
+## Shipped today (114 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx), (wy), (xc), (xe))
 
+- `9691937` [deploy-live] one position, two spellings: a 1000-market's mark arrived venue-spelled and the margin block asked fleet-spelled, so a priced real-money leg published as unmeasurable (xe)
+- `4d1de6b` Merge PR #266: (xb)/(xc) the edge audit's last items, then both judgement numbers calibrated optimally
+- `b2b7d8e` HANDOFF regenerated after merging main (xc)
 - `cbf6f43` Merge origin/main into the calibration branch: #270's (wz) readback
 - `93a77d1` HANDOFF regenerated after merging main (xc)
 - `c1f3cc6` Merge origin/main into the calibration branch: (wz), (xa) and a second (wy) landed first; this branch's entries are (xb) and (xc)
