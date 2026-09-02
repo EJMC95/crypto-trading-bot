@@ -663,6 +663,14 @@ def halt_gate_share(clip, stop_frac, day_start_equity, rails):
         stake, stop = float(clip), abs(float(stop_frac))
     except (TypeError, ValueError):
         return None, False
+    # [(xh), I5] `math.isfinite`, not `> 0`: `inf > 0` is True, so an infinite
+    # clip passed this guard and put a bare `Infinity` on the row. That is not
+    # merely an ugly number — `json.dumps` emits it unquoted, Postgres `jsonb`
+    # REFUSES the whole write, and this book's entire row would stop publishing.
+    # A non-finite input is unreadable, and unreadable means the gate does
+    # nothing (fail-open), exactly as a dark read does.
+    if not all(math.isfinite(v) for v in (ds, stake, stop)):
+        return None, False
     if not (ds > 0) or not (stake > 0) or not (stop > 0):
         return None, False
     level, _ = halt_level(ds, rails)
@@ -673,6 +681,29 @@ def halt_gate_share(clip, stop_frac, day_start_equity, rails):
         return None, False
     share = (stake * stop) / allowance
     return share, share <= HALT_GATE_MAX_STOP_SHARE
+
+
+def halt_gate_stat_for(clip, stop_frac, day_start_equity, rails, basis):
+    """The PUBLISHED arming telemetry for the halt-room gate — ONE owner, so
+    the entry site and the publish site can never disagree about whether this
+    book is armed ((hj): a second copy of a rule is a second rule).
+
+    [(xh), I18] `basis` names WHICH clip priced it: "candidate" when a real
+    entry candidate reached sizing this cycle, "book_clip" when the row is
+    reporting the book's own geometry because no candidate did. (xg) published
+    `null` in the second case, which is byte-identical to "the gate never ran"
+    — the ambiguity I18 exists to forbid, sitting on a real-money rail. The
+    arming never needed a candidate: it is a property of the book's clip, its
+    stop and its daily allowance, all of which the publish path already holds.
+
+    `stop_share: null` with `armed: false` is the honest unreadable case and is
+    NOT the same as absence — it says the gate priced itself and could not.
+    """
+    share, armed = halt_gate_share(clip, stop_frac, day_start_equity, rails)
+    return {"armed": bool(armed),
+            "stop_share": (round(share, 4) if share is not None else None),
+            "max_share": HALT_GATE_MAX_STOP_SHARE,
+            "basis": basis}
 
 
 def halt_room(equity, day_start_equity, rails):
@@ -2044,9 +2075,18 @@ def main(_ctx=None, once=False):
                     # the geometry that decided it. `armed: false` with a
                     # stop_share near 1.0 means one slot-stop is this book's
                     # whole daily allowance — the rail would be "stop trading
-                    # whenever down", which is a decision, not a rail. None
-                    # until the first entry candidate of a cycle prices it.
-                    "halt_gate": halt_gate_stat,
+                    # whenever down", which is a decision, not a rail.
+                    # [(xh)] NEVER null on a live row. (xg) left this None
+                    # whenever no entry candidate reached sizing, so a quiet
+                    # cycle and a gate that never ran published the same bytes
+                    # (I18). The arming does not need a candidate — it is the
+                    # book's own clip, stop and allowance — so the row falls
+                    # back to `basis: "book_clip"`, and `basis: "candidate"`
+                    # means a real entry priced it this cycle.
+                    "halt_gate": (halt_gate_stat if halt_gate_stat is not None
+                                  else halt_gate_stat_for(
+                                      _eff_clip, S.stoploss,
+                                      day_start_equity, rails, "book_clip")),
                     # [(vy)] entries this pass whose clip the per-coin
                     # mmf factor shrank — see mmf_clip_factor.
                     "mmf_clip_scaled": mmf_clip_scaled,
@@ -3073,12 +3113,9 @@ def main(_ctx=None, once=False):
                 # unreadable input and the gate then does nothing. It can only
                 # refuse an entry — never size one up, never suppress a halt.
                 _one_stop = stake * abs(float(S.stoploss))
-                _share, _armed = halt_gate_share(stake, S.stoploss,
-                                                 day_start_equity, rails)
-                halt_gate_stat = {"armed": bool(_armed),
-                                  "stop_share": (round(_share, 4)
-                                                 if _share is not None else None),
-                                  "max_share": HALT_GATE_MAX_STOP_SHARE}
+                halt_gate_stat = halt_gate_stat_for(
+                    stake, S.stoploss, day_start_equity, rails, "candidate")
+                _armed = halt_gate_stat["armed"]
                 _room = halt_room(equity, day_start_equity, rails)
                 if _armed and _room is not None and \
                         (_room - cycle_stop_committed) < _one_stop:
