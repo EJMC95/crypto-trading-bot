@@ -70,6 +70,23 @@ RETIRED_LIVE_ARMS = {
                "shadow n=161 mean -0.195% t=-0.95 halves +5.71/-18.32). "
                "The shadow twin keeps trading as the control arm.",
     },
+    "freqtrade-georgia-lighter": {
+        "since": "2026-09-02",
+        "entry": "(wg)",
+        "override": "GEORGIA_LIVE_RETIRED_OVERRIDE",
+        "successor": "freqtrade-mum-lighter",
+        "why": "Eamon's 'retire + reallocate to mum' call on her own grader's "
+               "in-era verdict: n=30 mean -0.354%/trade t=-1.70, maxDD 37.6% "
+               "MTM, horizon `unreachable` (in-era upper bound -0.081% <= 0, so "
+               "more of the same closes cannot flip the sign), ~-$6.4/day. The "
+               "standing v3 replacement grades negative too (shadow n=41 "
+               "t=-1.58 unreachable), so this is I17 keep-or-decide, not a "
+               "tuning pass. Her ~$220 sub-account frees for mum, the fleet's "
+               "only live book with a positive edge lower bound (+0.366%/trade). "
+               "The shadow twin (freqtrade-georgia-lshadow) keeps trading as "
+               "the control arm. Reversible via GEORGIA_LIVE_RETIRED_OVERRIDE "
+               "on BOTH the trail-blazer-live host and the judge (freqtrade-bots).",
+    },
 }
 
 

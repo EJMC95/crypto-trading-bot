@@ -60,8 +60,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
+import pytest  # noqa: E402
 import fleet_bus  # noqa: E402
 import experiment_judge as ej  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _georgia_live_for_mechanics(monkeypatch):
+    """[(wg)] This file tests the judge's policy-WAIVER machinery, which only 🔮
+    georgia's pair exercises (she carries the `policy_waived` throttle field; no
+    other live pair does). Her live arm is now retired
+    (fleet_bus.RETIRED_LIVE_ARMS), which makes `_pair_precheck` return
+    `stood_down` and short-circuits the waiver rungs under test — so force the
+    override to keep the vehicle live. The retirement itself is owned by
+    test_georgia_live_retired.py."""
+    monkeypatch.setenv("GEORGIA_LIVE_RETIRED_OVERRIDE", "run")
+
 
 #: More than `_latest_policy_stamp`'s `look` window, so the slice is exercised.
 LOOK = 30

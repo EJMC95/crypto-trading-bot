@@ -24,11 +24,23 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import pytest                        # noqa: E402
 import experiment_judge as J        # noqa: E402
 import fleet_bus as fb              # noqa: E402
 
 SPEC = dict(fb.JUDGED_PAIRS["georgia"])
 LB, SB = SPEC["live_bot"], SPEC["shadow_bot"]
+
+
+@pytest.fixture(autouse=True)
+def _georgia_live_for_mechanics(monkeypatch):
+    """[(wg)] These tests use georgia's pair as the stand-in for a LIVE pair to
+    exercise the judge's liveness/capacity/clock mechanics. Her live arm is now
+    retired (test_georgia_live_retired.py), which correctly makes the precheck
+    return `stood_down` and short-circuits the very mechanics under test — so
+    force the override to keep the vehicle live. The stand-down-on-retirement
+    behaviour is a separate concern, owned by the retirement test."""
+    monkeypatch.setenv("GEORGIA_LIVE_RETIRED_OVERRIDE", "run")
 
 _LIVE_POL = {"strategy": "daytrader-15m", "venue": "lighter_live",
              "stoploss": -0.05, "roi": {"0": 0.02}, "sides": ["long"],

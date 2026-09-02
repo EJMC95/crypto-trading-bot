@@ -917,10 +917,45 @@ def universe_expand_candidates(bot, current_universe, limit=10):
     return out
 
 
+def maxdd_ref(day_start_equity, equity, baseline):
+    """The denominator for the book-level MaxDrawdown protection: the book's
+    FUNDED equity, not its frozen birth seed.
+
+    [2026-09-02] `entries_lock` measures a drawdown in dollars and divides it
+    by this to get a fraction to compare against `maxdd.dd` (0.20 for 🙏 avo).
+    (vm) reused `state.initial_equity` for it — correct when avo WAS a $63 book,
+    and the reason the docstring below says "the LIVE baseline instead of the
+    shadow's $1,000". But `initial_equity` is her BIRTH seed and never tracks
+    deposits: Eamon funded her $62.93 -> $305, so 20% of the frozen $62.80 is
+    **$12.56**, LESS than one -4% stop on her leveraged $323 clip. The
+    protection was measuring 4% of her real book and calling it 20%, so maxdd
+    fired on 4 of her last 5 days and idled the live arm ~103h while her shadow
+    twin (same strategy, $1,000 denominator that simply never binds) traded
+    on_track. The P&L anchor stays `initial_equity` (return-from-birth is
+    measured from the seed, correctly); only the RISK denominator moves to the
+    funded book.
+
+    Prefer day-start equity — it is capital-adjusted (the (mi) daily-loss
+    anchor, so the two book-level rails now share one denominator) and
+    self-updating — then the live equity read, then the birth baseline as a
+    last resort. Returns None only when all three are dark, and `entries_lock`
+    then fails OPEN to $1,000 (a looser protection on dark data is the safe
+    direction, and matches its existing `else 1000.0`)."""
+    for v in (day_start_equity, equity, baseline):
+        try:
+            if v is not None and float(v) > 0:
+                return float(v)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def entries_lock(closed, t_now, baseline, latch=None):
     """The family Book's protections (slguard + maxdd) on THIS arm's own
-    closes, with the drawdown denominator the LIVE baseline instead of the
-    shadow's $1,000 — 20% of a paper grand would never bind on a $63 book.
+    closes, with the drawdown denominator the FUNDED book equity (via
+    `maxdd_ref` at the call site) instead of the shadow's $1,000 — 20% of a
+    paper grand would never bind, and 20% of a frozen $63 birth seed binds on
+    noise once the book is funded (see `maxdd_ref`).
     Returns (lock-release ts, cause) — 0.0 = unlocked — so the row can PUBLISH
     both.
 
@@ -2193,8 +2228,14 @@ def main(_ctx=None, once=False):
         # ---- daily-loss rails (pct + absolute, confirm-debounced) ----------
         breach = False
         if equity is not None and day_start_equity:
+            # [2026-09-02] pass the pct leash so the abs PILOT cap floors under
+            # it instead of undercutting it — 👩 mum funded to $570 was halting
+            # at the $30 cap (5.26%) instead of her intended 10% (see
+            # SafetyRails.daily_loss_hit). The pct term below is unchanged; the
+            # abs term now reads max($30, 10%*day_start).
             breach = (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)
-                      or rails.daily_loss_hit(day_start_equity, equity))
+                      or rails.daily_loss_hit(day_start_equity, equity,
+                                              DAILY_LOSS_LIMIT))
         if breach and not halted_today:
             confirmed, equity = rails.confirm_daily_loss(
                 day_start_equity, equity, DAILY_LOSS_LIMIT,
@@ -2280,8 +2321,14 @@ def main(_ctx=None, once=False):
         except Exception:  # noqa: BLE001
             pass
 
+        # [2026-09-02] the maxdd DENOMINATOR is the FUNDED book, not the frozen
+        # birth seed — `baseline` (state.initial_equity) stays the P&L anchor,
+        # `maxdd_ref` picks the funded/day-start equity for the risk fraction.
+        # Without this, 🙏 avo's post-funding 20% bar was $12.56 (< one stop)
+        # and idled her live arm ~103h; see maxdd_ref for the arithmetic.
         locked_until, lock_cause = entries_lock(
-            closed_win, t0, baseline, latch=(guard_latch[0], guard_latch[1]))
+            closed_win, t0, maxdd_ref(day_start_equity, equity, baseline),
+            latch=(guard_latch[0], guard_latch[1]))
         # the latch the NEXT loop honours — persisted, like the family's
         # `guard_until`, so a redeploy cannot silently reset a running lockout
         # (nor extend one: a lockout already expired stays expired).
@@ -2421,12 +2468,30 @@ def main(_ctx=None, once=False):
                 mmf_rows = {}
         except Exception:  # noqa: BLE001
             mmf_rows = {}
+        # [2026-09-02 (wg)] 🔮 georgia's LIVE ARM RETIRED — Eamon's "retire +
+        # reallocate to mum" call on her measured-negative, unreachable in-era
+        # record (n=30 t=-1.70, maxDD 37.6% MTM, ~-$6.4/day; v3 also negative).
+        # BOOK-SCOPED BY CONSTRUCTION: `live_arm_retired(BOT_ROW)` is True only
+        # for a row named in `fleet_bus.RETIRED_LIVE_ARMS`, so 👩 mum and 🙏 avo
+        # (not in the table) read False and are untouched — the registry scopes
+        # it, not a per-book branch here, and a typo can only fail toward
+        # KEEP-TRADING (an unknown row is not retired; a bus error defaults the
+        # same way). Entries ONLY: the exit/flatten paths above always run
+        # (a book must always CLOSE), so any open position winds down on her
+        # own stops/roi — she is flat at retirement. No sys.exit
+        # (restartPolicy=always would crash-loop); she keeps heart-beating and
+        # publishes `entries_shut: live_retired`. Reversible via
+        # GEORGIA_LIVE_RETIRED_OVERRIDE=run on BOTH this host and the judge.
+        try:
+            _retired = bool(_bus.live_arm_retired(BOT_ROW))
+        except Exception:  # noqa: BLE001 — a bus error must not retire a book
+            _retired = False
         # [2026-08-18 (pq)] `not halt_blind` — when the daily-halt read failed
         # we do not know whether this book is halted, and "unknown" must not
         # buy. Entries only; the exit/flatten paths above already ran, because
         # a book must always be able to CLOSE (the Farmer's :2688 rule).
         entries_ok = (pos_readable and equity is not None
-                      and not halt_blind
+                      and not halt_blind and not _retired
                       and clip is not None and clip >= MIN_CLIP_USD
                       and t0 >= locked_until)
         # [(st)] WHEN THE WHOLE SCAN IS SHUT, say which precondition shut it.
@@ -2434,6 +2499,7 @@ def main(_ctx=None, once=False):
         # indistinguishable from a universe with no signal — the same
         # ambiguity one level up from the per-coin census below.
         entries_shut = None if entries_ok else (
+            "live_retired" if _retired else
             "positions_unreadable" if not pos_readable else
             "equity_unreadable" if equity is None else
             "halt_unreadable" if halt_blind else
@@ -2941,7 +3007,7 @@ def _selftest():
         def equity_scale(self, equity, gross):
             return self.max_notional        # interface parity; stub never scales
 
-        def daily_loss_hit(self, ds, eq):
+        def daily_loss_hit(self, ds, eq, pct_limit=0.0):
             return False
 
         def confirm_daily_loss(self, ds, eq, lim, rd, delay_s=0):

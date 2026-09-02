@@ -1,3 +1,175 @@
+## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
+
+Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:
+the deposit folded into `capital_adjust`, not P&L, and her clip auto-scaled
+**$288 → $452**, +57% size on the same proven edge — the transfer IS the
+optimisation). This entry is the one rail that did NOT scale with her.
+
+**THE FINDING, the (wf) avo pattern at a second rail.** `SafetyRails.max_daily_loss`
+(`LIGHTER_MAX_DAILY_LOSS`, $30) is a PILOT cap from when the live books were
+seed-sized: $30 == 10% of a $300 book, so it COINCIDED with the strategy's own
+`DAILY_LOSS_LIMIT` (10%). The book halts for the day on the TIGHTER of the two —
+and once mum was funded the fixed $30 binds at **5.26%** while her 10% leash
+intends **$57**, so a normal drawdown day would halt her early and forfeit the
+recovery. Same fixed-dollar-vs-funded-equity class as avo's maxdd denominator,
+one rail over; measured, not hypothetical (`halt.abs_usd 30`, `binding: abs` on
+her live row at $570).
+
+**THE FIX — the pilot cap FLOORS under the pct leash, never a ceiling.**
+`daily_loss_hit(day_start, equity, pct_limit=0.0)` now trips at
+`max(self.max_daily_loss, pct_limit * day_start_equity)`: the cap still protects
+a tiny book (10% of $50 = $5 < the $30 floor) and the pct leash governs a funded
+one (10% of $570 = $57 > $30). Measured after: mum trades through a 7% day and
+still halts at 10%; a genuine 10% day still halts her — the protection is
+RESTORED to her funded scale, not removed. **`pct_limit=0.0` — every caller that
+does not opt in (the funding bot, the taker, the hyperliquid bots) — is
+byte-identical to the old absolute cap**, so the blast radius is exactly the
+family live host, which passes `DAILY_LOSS_LIMIT`. Pinned by
+`tests/autonomy/test_daily_loss_pilot_floor.py` (mutation red: reverting the
+floor to the bare cap reddens the funded-book test). Reaches mum on the same
+`[deploy-live]` dispatch as (wf)/(wg).
+
+DECLARED, not changed: mum's EDGE is untouched — I25 forbids retuning a winner
+on the hot window that flatters it, and her entry/exit were measured at birth.
+Her leverage (9.5×, Eamon's stop-death edge) and the brain's refused 1.25×
+expand are risk-appetite calls, not code fixes: the brain wants to pay her more
+and there is no room under her stop-alive ceiling, which is why CAPITAL, not
+leverage, was the lever — and it is now deployed.
+
+## 2026-09-02 (wg) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
+
+Eamon, asked to choose on 🔮 georgia (measured-negative, `unreachable`, bleeding
+~$6.4/day on ~$220): **"Retire + reallocate to mum."** This ships the CODE half —
+her live arm stands down so the sub-account frees; the fund transfer itself is
+Eamon's act in Lighter (I16 / the un-amendable core: fund movement is always his).
+
+**THE EVIDENCE, her own grader's:** in-era (post the 26-Aug exit-parity fix — her
+clean current policy) n=30, mean −0.354%/trade, t=−1.70, maxDD 37.6% MTM, horizon
+`unreachable` (the in-era upper bound −0.081% has already EXCLUDED a positive
+mean, so more of the same closes cannot flip the sign). 67% of the in-era loss is
+one lens (`range-on`, 24 closes, −$26.66, via trailing-stop + daily-loss — while
+its range_top EXIT is itself positive at +$28.13/t=2.61, so it is entry quality,
+not an exit knob). The standing v3 replacement grades negative too (shadow n=41,
+t=−1.58, `unreachable`). Her exits and entry filters were BOTH already measured
+dead ((tm)/(tp)) — which is exactly why this is I17 keep-or-decide, not a tuning
+pass. Meanwhile 👩 mum is the fleet's ONLY live book with a positive edge lower
+bound (+0.366%/trade), capital-capped at ~$363 and maxed on leverage — so moving
+georgia's $220 to mum is capital following measured edge (I16), the honest answer
+to "why isn't the fleet making more".
+
+**THE MECHANISM — the (ta) Farmer precedent, ROW-SCOPED on a SHARED HOST.** She
+shares the variant host with mum and avo, so a stand-down MUST be book-scoped or
+it halts a winner. It is book-scoped BY CONSTRUCTION rather than by a per-book
+branch: `fleet_bus.RETIRED_LIVE_ARMS` gains `freqtrade-georgia-lighter`
+(override `GEORGIA_LIVE_RETIRED_OVERRIDE`, successor `freqtrade-mum-lighter`),
+and the host reads `_bus.live_arm_retired(BOT_ROW)` — True only for a row named
+in that table, so mum and avo read False and trade untouched, and a typo can only
+fail toward KEEP-TRADING (an unknown row is not retired; a bus error defaults the
+same way). It is ENTRIES-ONLY and GRACEFUL: `_retired` is ANDed into the master
+`entries_ok` gate and named first in the `entries_shut` cascade (`live_retired`),
+while the exit/flatten paths above always run — so any open position winds down on
+her own stops/roi (she is FLAT at retirement, so it is a clean immediate stop) and
+the process keeps heart-beating (NO sys.exit — restartPolicy=always would
+crash-loop; the kill switch was rejected for exactly that reason, it boot-refuses
+with SystemExit). The judge and impl-shortfall read the same registry, so
+georgia's pair is `stood_down` BY CONSTRUCTION and her SHADOW twin
+(`freqtrade-georgia-lshadow`) keeps trading as the control arm. Reversible via
+`GEORGIA_LIVE_RETIRED_OVERRIDE=run` on BOTH the trail-blazer-live host AND the
+judge (freqtrade-bots) — a half-set override is a book trading with no judge.
+
+**PINNED** by `tests/autonomy/test_georgia_live_retired.py` (13 tests: the
+registry fact, book-scoping — mum/avo read live, the AST wiring of the gate and
+the `entries_shut` reason, no-sys.exit; call-site and registry mutations both
+verified RED). Six suites that used georgia as a LIVE example were updated the
+honest way — each names why: the mechanics files force her live via the override
+(`test_variant_host`, `test_judge_shadow_liveness`, `test_judge_restart`,
+`test_judge_policy_waiver`, `test_pipeline_card` — she is the vehicle for sizing /
+liveness / waiver / card-sorting machinery, not the subject), and
+`test_farmer_live_retired` swaps her for 👩 mum as its not-retired example.
+
+**DEPLOY:** reaches real money on a `[deploy-live]` dispatch to `trail-blazer-live`
+(georgia's host) + `freqtrade-bots` (the judge); mum-live and tide-rider-live need
+no restart (their behaviour is byte-identical — `live_arm_retired` is False for
+them). Verified by the `extra.build` + `build_n` stamp readback, never a green run.
+Then Eamon moves the ~$220 georgia → mum in Lighter; mum absorbs it cleanly via
+`EQUITY_SCALED_CAP` ((to)), which re-derives her notional cap from live equity
+every loop, so a deposit is never stranded (the (sr) trap avo hit is already closed
+on mum).
+
+## 2026-09-02 (wf) — 🙏 AVO'S MAXDD RAIL WAS MEASURING 4% OF HER BOOK AND CALLING IT 20% — a frozen birth-seed denominator idled a funded real-money arm ~103h; the risk denominator now tracks the funded book
+
+Eamon: *"Real money bot optimisations, edges, expansion, where can we see the
+3 live bots trade even better with what we know now"*. Measured the live trio
+end-to-end from their own payloads and ledgers; ONE shippable real-money
+correctness fix, and two decisions that are Eamon's (framed with numbers, not
+taken).
+
+**THE FIX — 🙏 avo's book-level MaxDrawdown protection had a stale denominator,
+and it was strangling the live arm.** `entries_lock`'s maxdd measures a
+peak-to-trough drawdown of recent closes in dollars and divides by a
+denominator to compare against `maxdd.dd` (0.20). (vm) set that denominator to
+`state.initial_equity` — correct when 🙏 avo WAS a $63 book, which is why the
+docstring reads "the LIVE baseline instead of the shadow's $1,000". But
+`initial_equity` is her BIRTH seed and never tracked deposits: Eamon funded her
+**$62.93 → $305**, so 20% of the frozen **$62.80** is **$12.56** — LESS than a
+single −4% stop on her leveraged $323 clip. Measured on her own live ledger her
+worst peak-to-trough drawdown was **$22.12 (7% of her real equity)** — under the
+intended 20% bar, over the accidental one — so maxdd fired on **4 of her last 5
+days** and idled the live arm **~103h** (`idle_open_h 103.21`, `shut_now maxdd`)
+while her SHADOW twin (same strategy, a $1,000 denominator that simply never
+binds) traded **on_track** (n=25, t=2.28, both halves positive, ETA ~18-Sep).
+The lockouts do not just halve her close rate (0.23/d live vs 0.47/d shadow —
+the difference between gradeable in ~6 weeks and "623 days"); they BIAS which
+trades her live arm can take, because she can only enter after a lockout
+expires. `maxdd_ref(day_start_equity, equity, baseline)` moves the RISK
+denominator to the funded book (day-start equity — the capital-adjusted (mi)
+daily-loss anchor, so the two book-level rails finally share one denominator)
+while the P&L anchor stays the seed (return-from-birth is measured from the
+seed, correctly). Simulated on her real ledger: her $22.12 drawdown trips maxdd
+at $62.80 ($12.56 bar) and does NOT at $230–$305 ($46–$61 bar) — **the fix
+RESTORES the intended 20%-of-equity protection, it does not remove it** (a
+genuine 25% drawdown still locks the funded book, pinned by a test). Scoped to
+the live host; the shadow's $1,000 denominator is untouched. Pinned by
+`tests/autonomy/test_avo_maxdd_denominator.py` (7 tests; both mutations —
+call-site revert to `baseline`, helper preferring the seed — verified RED).
+Consistent-and-harmless for the other two live books (mum seed $300 vs $355
+equity; georgia $186 vs $220; neither currently trips maxdd — `halt_days.maxdd
+0`), so their maxdd bar now tracks funded equity too with no behaviour change
+today.
+
+THE GENERAL CLASS (noted, not yet an invariant — it generalises through the fix
+itself, which uses funded equity for all three arms): **a frozen birth-seed
+reused as a risk-fraction DENOMINATOR goes stale the instant the book is
+funded** — the P&L anchor and the risk denominator are the same number at birth
+and diverge on the first deposit, and only one of them should stay frozen.
+
+**THE TWO DECISIONS (Eamon's — numbers, not actions taken):**
+* **👩 mum is the model book — leave her.** n=52, t=2.73 (cluster 2.64), win
+  82.7%, +$90.47 realised, maxDD 3.7% MTM, **5 of 6 go-live bars**, failing only
+  the 30-day window (time), on_track **~27-Sep**; the fleet's highest era claim
+  (+0.366%/trade lower bound) and the brain is already paying her **1.25× expand**
+  (streak 5). She is fully deployed (12/12 slots, 9.5× ≈ 9.84× actual). I25 is
+  explicit that a winning book on a hot run is exactly what you must NOT tune on
+  the window that flatters it, and her only missing bar is the calendar. The one
+  lever that could add dollars is gross 9.5→10× — but 9.5 is Eamon's own
+  stop-death-edge setting (10.0 = the −4% stop dies), a +5.3% notional / risk
+  call that is his, published (`all_slots_stop 0.38→0.40`).
+* **🔮 georgia is a genuine I17 keep-or-decide, and it is Eamon's.** Her in-era
+  sample (post the 26-Aug exit-parity fix — her clean current policy) is
+  n=30, **t=−1.70, mean −0.354%, maxDD 37.6% MTM, `unreachable`** (in-era upper
+  bound −0.081% ≤ 0 — the sample has EXCLUDED a positive mean), burning
+  **~−$6.4/day**; **67% of the in-era loss is the range-on lens** (24 closes,
+  −$26.66, via trailing_stop + daily_loss — while its range_top EXIT is itself
+  positive at +$28.13/t=2.61, so it is entry quality, not an exit knob). The
+  standing plan (v3 ImpulseFade) is **also negative** (shadow n=41, t=−1.58,
+  unreachable). Her exits and entry filters are both already MEASURED dead
+  ((tm)/(tp)), which is precisely why this is a decision and not a tuning pass.
+  Options, costed: (a) **retire the live arm** — she meets the I17 measured-
+  exclusion bar, ~$220 on the ex-Farmer sub-account; (b) **cut size** to slow
+  the burn while a next candidate is developed (reversible); (c) **hold** to a
+  1-Oct read. Recommendation deferred to Eamon per I17 / P6; no size or
+  retirement change taken here.
+
 ## 2026-09-02 (we) — THE ORPHAN HAD NO DETECTOR: the daily review re-derived (wb)'s split brain from the DB alone, and the class now has an executable guard — 7/7 mutations red
 
 The 2-Sep daily evidence review ran against a five-day gap (no review 29-Aug →

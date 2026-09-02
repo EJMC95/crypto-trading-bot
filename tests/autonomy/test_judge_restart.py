@@ -44,6 +44,19 @@ import experiment_judge as ej          # noqa: E402
 import fleet_bus as fb                 # noqa: E402
 import fleet_tuning                    # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _georgia_live_for_mechanics(monkeypatch):
+    """[(wg)] This file demonstrates the parking mechanism with 💸 the FARMER as
+    the retired lane and the OTHER pairs as live controls. 🔮 georgia's live arm
+    is now retired too (fleet_bus.RETIRED_LIVE_ARMS), which would make her a
+    SECOND parked lane and move the sets these tests assert. Force her live so
+    the farmer stays the single retired example under test; that georgia parks
+    when retired is the same per-pair mechanism, owned by
+    test_georgia_live_retired.py and the bus=None scoping tests below."""
+    monkeypatch.setenv("GEORGIA_LIVE_RETIRED_OVERRIDE", "run")
+
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 T0 = 1_800_000_000.0                   # the judge's own selftest clock
 
