@@ -219,6 +219,30 @@ def _close_ts(row):
 #: that a REAL recurrence pages the same day. Tunable, because the right value
 #: is "comfortably longer than the claim TTL" and that TTL can move.
 DUP_WRITER_CLOSED_H = float(os.environ.get("IMMUNE_DUP_CLOSED_H", "6"))
+# [2026-09-02, edge-audit follow-up] THE SHAPE MONITOR'S BARS. A LIVE book whose
+# trailing hit rate sits within this many points of its OWN break-even hit
+# rate (1/(1+payoff), off the grader's `shape` block) is one bad week from
+# PF < 1 -- EDGE_AUDIT_2026-09-02.md section 6.4 on mum: an 83% hit rate
+# carrying a 0.49 payoff, break-even 67%. Judged against the book's own
+# payoff, never a bare win-rate bar (I15). Live rows only: a page on every
+# shadow book's streak would train Eamon to ignore the pager ((gl)).
+#: [2026-09-02, CALIBRATED OPTIMALLY -- Eamon: "Calibrate optimally with
+#: findings"] the shape monitor pages when a LIVE book's trailing window has
+#: `wins_trailing` at or below the grader's `page_wins_max` -- the exact
+#: minimum-total-error boundary between "still the book's own era hit rate"
+#: and "fallen to its break-even" (`golive_readiness.page_boundary`, the
+#: equal-prior likelihood-ratio boundary, pinned by brute force). Both are
+#: INTEGERS read off the grader's payload, never re-derived here ((hj)); a
+#: payload without them is quiet, not a page. The two earlier rules, measured
+#: on mum's live shape (era 83.0%, break-even 66.1%, n=30): "within 5pp"
+#: paged 5.6% of healthy windows and MISSED 26.4% of break-even ones (total
+#: 32.1%); "z <= the claim bar" paged 23.9% and missed 7.4% (31.3%); the
+#: boundary pages 12.4% and misses 15.1% (27.5%) -- the minimum this window
+#: length allows. Both rates ride the payload (`page_false_rate_pct`,
+#: `page_miss_rate_pct`) and the page text, so what a page costs is a number
+#: on the row. A page is "look at the twin" (I25), never a verdict; the dedup
+#: ledger pages a persisting condition once.
+SHAPE_MIN_N = int(os.environ.get("IMMUNE_SHAPE_MIN_N", "30"))
 
 
 def _parse_iso(txt):
@@ -460,6 +484,35 @@ def organ_invariants(states, now):
                      + ". n is not one book's trades and t scales with "
                        "sqrt(n). OPERATOR: confirm `claim_writer` is arbitrating "
                        "(the loser publishes <bot>:standby, not the book's row)")
+            # [2026-09-02, edge-audit follow-up] THE SHAPE MONITOR (section 6.4 /
+            # section 9 of the edge audit): two numbers that say FIRST when a
+            # high-hit-rate live book is about to lose its profit factor, read
+            # off the grader's own `shape` block (never re-derived here).
+            _sh = _b.get("shape")
+            if isinstance(_sh, dict) and str(_bot).endswith("-lighter"):
+                _wt, _pk = _sh.get("wins_trailing"), _sh.get("page_wins_max")
+                _nt = _sh.get("n_trailing")
+                if (isinstance(_wt, int) and isinstance(_pk, int) and isinstance(_nt, int)
+                        and _nt >= SHAPE_MIN_N and _wt <= _pk):
+                    sick("golive-readiness",
+                         f"{_bot}: {_wt} of the last {_nt} closes won "
+                         f"({_sh.get('hit_trailing_pct')}%), at or below the page "
+                         f"boundary {_pk}/{_nt} -- the window is likelier under a hit "
+                         f"rate at the book's own break-even "
+                         f"{_sh.get('breakeven_hit_pct')}% than at its era rate "
+                         f"{_sh.get('hit_pct')}% (payoff {_sh.get('payoff')}, avg win "
+                         f"${_sh.get('avg_win_usd')} vs avg loss ${_sh.get('avg_loss_usd')}; "
+                         f"this page fires by chance on {_sh.get('page_false_rate_pct')}% "
+                         f"of healthy windows and misses {_sh.get('page_miss_rate_pct')}% "
+                         f"of break-even ones) -- watch the SHAPE, not the P&L, and "
+                         f"check the twin (I25)")
+                _sn, _sp = _sh.get("streak_now"), _sh.get("streak_p95_chance")
+                if isinstance(_sn, int) and isinstance(_sp, int) and _sn > _sp:
+                    sick("golive-readiness",
+                         f"{_bot}: {_sn} consecutive losses exceeds the p95 chance "
+                         f"streak {_sp} for its own hit rate "
+                         f"{_sh.get('hit_pct')}% on n={_b.get('n')} -- beyond "
+                         f"variance; check the twin before calling it decay (I25)")
 
     # [2026-07-17 BORN-DARK DETECTOR] an organ silently running a DEGRADED
     # FALLBACK nobody asked for. The brain shipped its v3 engine on 16-Jul
@@ -1460,6 +1513,49 @@ def _selftest():
     assert organ_invariants({"golive-readiness": {
         "updated": "2020-01-01T00:00:00+00:00", "ttl_sec": 86400, "books": {
             "b": {"integrity": {"two_writers": True}}}}}, now) == []
+    # [2026-09-02, edge-audit follow-up] THE SHAPE MONITOR fires on a LIVE
+    # book near its own break-even or beyond its chance streak, and stays
+    # silent on a comfortable live book, on any shadow book, and on a thin
+    # trailing window -- a detector that flags everything trains the operator
+    # to ignore it.
+    # mum-shaped: era 83%, break-even 66.9%, n=30 -> the grader's boundary is
+    # 22 wins (page at <= 22; false 11.4% / miss 17.4%)
+    _shape_ok = {"hit_pct": 83.0, "hit_trailing_pct": 80.0, "n_trailing": 30,
+                 "wins_trailing": 24, "page_wins_max": 22,
+                 "page_false_rate_pct": 11.4, "page_miss_rate_pct": 17.4,
+                 "avg_win_usd": 3.65, "avg_loss_usd": 7.39, "payoff": 0.494,
+                 "breakeven_hit_pct": 66.9, "hit_margin_pp": 13.1, "hit_margin_z": 1.52,
+                 "streak_now": 1, "streak_max": 3, "streak_p50_chance": 2,
+                 "streak_p95_chance": 4}
+    _shape_near = dict(_shape_ok, hit_trailing_pct=70.0, wins_trailing=21, hit_margin_pp=3.1,
+                       hit_margin_z=0.36)
+    # [2026-09-02, CALIBRATED OPTIMALLY] 22 of 30 is ON the boundary: 6.4pp above
+    # break-even -- a 5pp points rule stayed quiet -- yet the window is already
+    # likelier under a break-even hit rate than under the book's own
+    _shape_edge = dict(_shape_ok, hit_trailing_pct=73.3, wins_trailing=22, hit_margin_pp=6.4,
+                       hit_margin_z=0.74)
+    _shape_streak = dict(_shape_ok, streak_now=5)
+    _shape_thin = dict(_shape_near, n_trailing=12)
+    _shape_nobound = dict(_shape_near, page_wins_max=None)   # fail-quiet, never re-derived
+    _sh_inv = organ_invariants({"golive-readiness": {
+        "updated": fresh, "ttl_sec": 86400, "books": {
+            "freqtrade-mum-lighter": {"n": 52, "shape": _shape_near},
+            "fixture-edge-lighter": {"n": 45, "shape": _shape_edge},
+            "freqtrade-avo-maria-lighter": {"n": 40, "shape": _shape_ok},
+            "freqtrade-mum-lshadow": {"n": 49, "shape": _shape_near},
+            "lighter-ticket-taker-lighter": {"n": 57, "shape": _shape_streak},
+            "band-kelly-lighter": {"n": 60, "shape": _shape_thin},
+            "fixture-nobound-lighter": {"n": 45, "shape": _shape_nobound},
+            "no-shape-lighter": {"n": 12}}}}, now)
+    _sh_det = [i["detail"] for i in _sh_inv if i["organ"] == "golive-readiness"]
+    assert len(_sh_det) == 3, f"exactly the two live books at/below the boundary and the streak book: {_sh_det}"
+    assert any(d.startswith("freqtrade-mum-lighter:") and "21 of the last 30" in d
+               and "page boundary 22/30" in d and "break-even" in d for d in _sh_det), _sh_det
+    assert any(d.startswith("fixture-edge-lighter:") and "22 of the last 30" in d
+               and "11.4% of healthy windows" in d for d in _sh_det), _sh_det
+    assert any(d.startswith("lighter-ticket-taker-lighter:") and "p95 chance" in d for d in _sh_det), _sh_det
+    assert not any("lshadow" in d or "avo-maria" in d or "kelly" in d or "nobound" in d
+                   for d in _sh_det), _sh_det
     # the KEY must be fetched, or the scanner above is dead code
     _src = open(os.path.abspath(__file__)).read()
     assert '"golive-readiness")' in _src or '"golive-readiness",' in _src, \

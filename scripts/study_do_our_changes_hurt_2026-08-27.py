@@ -65,6 +65,9 @@ sys.path.insert(0, HERE)
 MIN_N = 40
 #: Hot-window length for the no-change control.
 K = 15
+#: [2026-09-02] a window size with fewer hot windows than this cannot grade the
+#: grader's margin -- the collapse's standard error is what the grade is made of
+MIN_WINDOWS = 20
 
 
 def _conn():
@@ -113,6 +116,180 @@ def ledger():
           f"{len(set(r[0] for r in out))} books"
           f"{f'  ({dropped} unparseable timestamps dropped)' if dropped else ''}")
     return out
+
+
+def _grader():
+    """The grader module, loaded by path (the ONE owner of `parse_stamp`)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "gl", os.path.join(HERE, "golive_readiness.py"))
+    gl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gl)
+    return gl
+
+
+def load_ledger_file(path):
+    """[(bot, closed_ts, pnl_pct)] from a `/trades.json?source=paper` dump.
+
+    [2026-09-02 -- Eamon: "Calibrate accordingly"] The sandbox that re-measures
+    this has no DATABASE_URL; the public feed carries the same rows the SQL in
+    `ledger()` reads (`bot`, `closed_at`, `pnl_pct`), parsed through the same
+    `parse_stamp`. NEITHER path applies `LEDGER_QUARANTINE` -- the study
+    measures the tide on the raw ledger, as it did on 27-Aug, and says so. A
+    `?limit=` count equal to the cap is a truncation ((qz)): read the printed
+    count before believing it.
+    """
+    import json
+    gl = _grader()
+    with open(path, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    rows = raw.get("trades") if isinstance(raw, dict) else raw
+    out, dropped = [], 0
+    for r in rows or []:
+        if not isinstance(r, dict) or r.get("pnl_pct") is None or not r.get("closed_at"):
+            continue
+        try:
+            ts = gl.parse_stamp(r["closed_at"])
+        except (ValueError, TypeError):      # a junk stamp is DROPPED and counted, never a crash
+            ts = None
+        if ts is None:
+            dropped += 1
+            continue
+        if isinstance(ts, dt.datetime):
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=dt.timezone.utc)
+            ts = ts.timestamp()
+        out.append((r["bot"], float(ts), float(r["pnl_pct"])))
+    out.sort(key=lambda r: r[1])
+    print(f"ledger file: {len(out):,} closes across "
+          f"{len(set(r[0] for r in out))} books"
+          f"{f'  ({dropped} unparseable timestamps dropped)' if dropped else ''}")
+    return out
+
+
+def hot_collapse(books, k):
+    """(mean_pp, se_pp, n_windows): window mean MINUS next-window mean over
+    every non-overlapping k-close window whose mean beats the book's own --
+    the reversion `peak_arm` prints, as ONE number with its standard error.
+    The same windows as `peak_arm`, by construction: one owner of "hot"."""
+    col = []
+    for _bot, v in books.items():
+        ys = [p for _t, p in v]
+        bm = st.mean(ys)
+        for i in range(0, len(ys) - 2 * k, k):
+            w = ys[i:i + k]
+            nxt = ys[i + k:i + 2 * k]
+            if len(nxt) < k:
+                break
+            if st.mean(w) > bm:
+                col.append((st.mean(w) - st.mean(nxt)) * 100.0)
+    if len(col) < 2:
+        return None, None, len(col)
+    return st.mean(col), st.stdev(col) / math.sqrt(len(col)), len(col)
+
+
+#: how far above the nominal one-sided rate the no-change control may read
+#: before the grader's margin is called DRIFTED: the fleet's books DRIFT (their
+#: means decay), so a book-mean baseline over-calls `bad` a little by
+#: construction; twice nominal is the cry-wolf bound, not a target
+TOL_X = 2.0
+
+
+def margin_arm(books, ks=None, nominal=None, crit=None, shifts=(-2.0, -4.0, 2.0)):
+    """[2026-09-02 -- Eamon: "Calibrate accordingly", then "Calibrate optimally
+    with findings"] GRADE THE GRADER'S RULE ON THE NO-CHANGE CONTROL.
+
+    The live lane (`fleet_proprioception.judge_windows`) calls a change `bad`
+    when the episode's mean sits below EVERY baseline by that baseline's own
+    DERIVED margin -- the comparison's standard error at the fleet's critical
+    value. Only the BOOK gate can be run on the ledger (no book but the live
+    pairs has a twin), so this arm runs `fleet_proprioception.book_gate` -- the
+    shipped code, never a copy ((hj)) -- over every non-overlapping (motivating
+    window, next window) pair of every book with NO change made between them,
+    and reports the false-`bad` / false-`good` rate, overall and after a HOT /
+    COLD motivating window, beside the power on a planted shift.
+
+    Verdict INSIDE while every graded window size keeps both false rates within
+    `TOL_X` times the nominal one-sided rate (1 - fleet_allocation.CONF); DRIFT
+    beyond it; THIN when no window size has `MIN_WINDOWS` pairs. `crit`
+    overrides the critical value -- crit=0 is the positive control and must
+    read DRIFT. Returns {"k": {K: {...}}, "nominal", "verdict"}.
+
+    Why the book gate is graded and not trusted alone: on 2-Sep it read false
+    bad ~16% / good ~10% at K=10 against a 10% nominal -- above nominal in the
+    `bad` direction because the books drift -- which is why the twin, the only
+    baseline that moves with the tide, is the gate that decides (I25).
+    """
+    sys.path.insert(0, os.path.dirname(HERE))
+    import fleet_proprioception as fp                 # noqa: PLC0415
+    import fleet_allocation as fa                     # noqa: PLC0415
+    nominal = (1.0 - fa.CONF) if nominal is None else float(nominal)
+    if ks is None:
+        ks = sorted({fp.LIVE_BASE_MIN_N, K})
+    print(f"\n=== ARM 4 — THE LIVE LANE'S BOOK GATE ON THE NO-CHANGE CONTROL ===\n"
+          f"  `bad` = next-window mean below the book's mean (EXCLUDING the motivating "
+          f"window) by its own\n  derived margin = crit x SE (floor {fp.LIVE_MARGIN_PP}pp); "
+          f"nominal one-sided rate {nominal:.0%}, cry-wolf bound {TOL_X:g}x")
+    out, graded, drift = {}, 0, False
+    for k in ks:
+        n = bad = good = hot_n = hot_bad = cold_n = cold_good = 0
+        power = {sh: [0, 0] for sh in shifts}
+        for _bot, v in books.items():
+            ys = [p * 100.0 for _t, p in v]
+            bm = st.mean(ys)
+            i = k
+            while i + k <= len(ys):
+                pre, dur = ys[i - k:i], ys[i:i + k]
+                gate = fp.book_gate(dur, ys[:i - k], ys[:i], crit=crit)
+                if gate is None:
+                    i += k
+                    continue
+                b, mg = gate["mean_pct"], gate["margin_pp"]
+                m_in = st.mean(dur)
+                n += 1
+                ib, ig = m_in < b - mg, m_in > b + mg
+                bad += ib
+                good += ig
+                if st.mean(pre) > bm:
+                    hot_n += 1
+                    hot_bad += ib
+                else:
+                    cold_n += 1
+                    cold_good += ig
+                for sh in shifts:
+                    ms = m_in + sh
+                    power[sh][0] += ms < b - mg
+                    power[sh][1] += ms > b + mg
+                i += k
+        if n < MIN_WINDOWS:
+            out[k] = {"n": n, "inside": None}
+            print(f"  K={k:>2}: {n} pairs -- too few to grade (need {MIN_WINDOWS})")
+            continue
+        fb, fg = bad / n, good / n
+        inside = fb <= TOL_X * nominal and fg <= TOL_X * nominal
+        graded += 1
+        drift = drift or not inside
+        out[k] = {"n": n, "false_bad": fb, "false_good": fg,
+                  "hot_bad": hot_bad / hot_n if hot_n else None, "hot_n": hot_n,
+                  "cold_good": cold_good / cold_n if cold_n else None, "cold_n": cold_n,
+                  "power": {sh: {"bad": pb / n, "good": pg / n} for sh, (pb, pg) in power.items()},
+                  "inside": inside}
+        print(f"  K={k:>2}{' (grader floor)' if k == fp.LIVE_BASE_MIN_N else '':15s} n={n:>4}"
+              f"  false bad {fb:5.1%}  false good {fg:5.1%}"
+              f"  | after HOT: bad {out[k]['hot_bad'] if out[k]['hot_bad'] is not None else float('nan'):5.1%}"
+              f" (n={hot_n})  after COLD: good "
+              f"{out[k]['cold_good'] if out[k]['cold_good'] is not None else float('nan'):5.1%} (n={cold_n})"
+              f"  -> {'inside' if inside else 'DRIFT'}")
+        for sh in shifts:
+            pw = out[k]["power"][sh]
+            print(f"{'':>26} planted {sh:+.0f}pp: bad {pw['bad']:5.1%}  good {pw['good']:5.1%}")
+    verdict = "DRIFT" if drift else ("INSIDE" if graded else "THIN")
+    print(f"  VERDICT: {verdict}"
+          + {"DRIFT": " -- the margin no longer holds the false rate under the bound; "
+                      "re-derive the noise model before trusting a verdict (I12)",
+             "THIN": " -- not enough pairs to grade",
+             "INSIDE": " -- the derived margin holds the false rate inside the bound"}[verdict])
+    return {"k": out, "nominal": nominal, "verdict": verdict}
 
 
 def by_book(rows):
@@ -258,12 +435,18 @@ def main():
     ap.add_argument("--age", action="store_true")
     ap.add_argument("--peak", action="store_true")
     ap.add_argument("--select", action="store_true")
+    ap.add_argument("--margin", action="store_true",
+                    help="run fleet_proprioception.book_gate on the no-change "
+                         "control and grade its false-verdict rates (exit 2 on DRIFT)")
+    ap.add_argument("--ledger", metavar="FILE",
+                    help="a /trades.json?source=paper dump to read instead of "
+                         "the DB (the sandbox has no DATABASE_URL)")
     ap.add_argument("-k", type=int, default=K)
     a = ap.parse_args()
-    if not (a.age or a.peak or a.select):
-        a.age = a.peak = a.select = True
+    if not (a.age or a.peak or a.select or a.margin):
+        a.age = a.peak = a.select = a.margin = True
 
-    rows = ledger()
+    rows = load_ledger_file(a.ledger) if a.ledger else ledger()
     if not rows and not a.select:
         return 1
     books = by_book(rows) if rows else {}
@@ -274,7 +457,10 @@ def main():
         peak_arm(books, a.k)
     if a.select:
         select_arm()
-    return 0
+    rc = 0
+    if a.margin and books:
+        rc = 2 if margin_arm(books)["verdict"] == "DRIFT" else 0
+    return rc
 
 
 if __name__ == "__main__":

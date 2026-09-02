@@ -94,6 +94,7 @@ Publishes bot_state 'fleet-proprioception' (+ lean history):
 Consumers: lighter_scout_tuner (hurting-skip), evidence_board, dashboard,
 the 21-Jul review. --selftest is offline.
 """
+import math
 import os
 import sys
 import time
@@ -141,7 +142,51 @@ GRADES_MIN = int(os.environ.get("PROP_GRADES_MIN", "10"))
 # live-lane grading floors (16-Jul evening, operator: "the live lane needs
 # to learn") — real money gets HIGHER evidence bars than the shadow lanes
 LIVE_EP_MIN_N = int(os.environ.get("PROP_LIVE_EP_MIN_N", "5"))
-LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", "3"))
+# [2026-09-02, edge-audit follow-up] I25 REACHES THE ACTUATOR -- and the same
+# day its margins were CALIBRATED OPTIMALLY (Eamon: "Calibrate accordingly",
+# then "Calibrate optimally with findings"). Three steps, kept because each
+# corrected the one before:
+#   * this read `LIVE_BASE_MIN_N = 3` and `LIVE_MARGIN_PP = 0.25` for both
+#     baselines while I25 had measured a -1.674pp collapse after a hot window
+#     (3,274 closes, no change made): a 0.25pp margin against the window that
+#     MOTIVATED a change condemned it by arithmetic, and a 3-trade baseline is
+#     not a baseline;
+#   * the first fix gave the pre-window its own FIXED margin, the mean reversion
+#     (1.7pp), required the twin, and pinned the floor to `fleet_allocation.MIN_N`.
+#     Re-measured on 3,801 closes / 26 books the mean collapse held (1.52-1.74pp
+#     across K=10..30, SE ~0.5) -- but a margin AT the mean is the wrong object:
+#     on the no-change control it still called a neutral change `bad` 21.3% of
+#     the time after a HOT pre-window and `good` 19.2% after a COLD one, and
+#     1.7pp was 2.9 SE on mum's live book (sd 1.86pp at n=10) while 0.7 SE on a
+#     book with sd 8pp -- one constant, a different false rate on every book;
+#   * NOW the margins are DERIVED (`judge_windows`): each baseline's margin is
+#     the comparison's own standard error at the fleet's critical value
+#     (`fleet_allocation.t_crit`, the one owner -- I17: one standard of evidence
+#     in both directions), from the arm's OWN pre-episode history. The book
+#     baseline is the book's era mean EXCLUDING the motivating window (I25 THE
+#     RULE: the counterfactual is the book's MEAN, never the window that
+#     motivated the change); the twin -- the only baseline that moves with the
+#     tide -- is REQUIRED and carries the same derived margin (its fixed 0.25pp
+#     was ~0.15 SE of a 10-vs-10 comparison on mum's pair: a coin flip dressed
+#     as a control). Measured on the same control, during=10: false bad 15.6% /
+#     good 9.8% unconditional, 17.0% after HOT (was 21.3%), 5.8% after COLD
+#     (was 19.2%); power on a planted -2pp 68% (was 66%), on +2pp 57% (was 64%).
+#     The book gate's false-bad stays above the 10% nominal because the books
+#     DRIFT (their means decay), which is exactly why the twin decides and the
+#     book corroborates. Real live/shadow pairs are too thin to validate the
+#     twin's noise model yet (mum: 3 paired 48h windows, |z| never above the
+#     bar; avo: none), so the iid standard error is the declared model.
+#   The instrument is `scripts/study_do_our_changes_hurt_2026-08-27.py --margin`,
+#   which runs THIS module's `book_gate` on the no-change control.
+try:
+    import fleet_allocation as _fleet_allocation
+    _ALLOC_MIN_N = _fleet_allocation.MIN_N
+except Exception:      # noqa: BLE001 -- ships beside this file in freqtrade-bots (Dockerfile.freqtrade); the fallback is the same floor and the selftest pins the identity
+    _fleet_allocation = None
+    _ALLOC_MIN_N = 10
+LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", str(_ALLOC_MIN_N)))
+#: the FLOOR under every derived margin -- a zero-variance history must not make
+#: a verdict free. It is no longer a margin in its own right (see `judge_windows`).
 LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))
 # [2026-07-17 AUDIT] Retired row REMOVED — the third copy of the same rot (see
 # evidence_board.LIVE_ROWS and fleet_respiration.LIVE_BREATHS). Tide Rider left
@@ -523,6 +568,115 @@ def _twin(bot):
     return bot[:-len("-lighter")] + "-lshadow" if bot.endswith("-lighter") else None
 
 
+def _sd(xs):
+    """sample standard deviation, None without two values"""
+    if len(xs) < 2:
+        return None
+    m = sum(xs) / len(xs)
+    return math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1))
+
+
+def crit_for(n):
+    """The fleet's one-sided critical value for a mean of `n` closes, from the
+    ONE owner (`fleet_allocation.t_crit`: Student-t at n-1 df, floored at
+    Z_LOWER). With the owner absent -- impossible in the shipped image, the
+    selftest asserts it -- this degrades to the large-sample floor, and says
+    so here rather than growing a second copy of the t rule ((hj))."""
+    try:
+        return float(_fleet_allocation.t_crit(n))
+    except Exception:                                   # noqa: BLE001
+        return 1.28
+
+
+def book_baseline(before_pre, before_start, min_n=None):
+    """(rows, excludes_motivating_window) -- the book's own history that stands
+    in for the counterfactual (I25): everything before the MOTIVATING window
+    when that is at least `min_n` closes; else everything before the episode
+    when that is; else (None, None) -- the twin then decides alone."""
+    min_n = LIVE_BASE_MIN_N if min_n is None else min_n
+    if len(before_pre) >= min_n:
+        return before_pre, True
+    if len(before_start) >= min_n:
+        return before_start, False
+    return None, None
+
+
+def book_gate(during, before_pre, before_start, floor=None, min_n=None, crit=None):
+    """The BOOK baseline for one episode (pct points in, pct points out):
+    {mean_pct, margin_pp, se_pp, crit, n, excludes_motivating_window} or None.
+    margin = max(floor, crit(n_during) * sqrt(SE(during mean)^2 + SE(baseline
+    mean)^2)), both SEs from the book's own pre-episode dispersion. `crit`
+    overrides the critical value (the instrument's positive control)."""
+    base, excl = book_baseline(before_pre, before_start, min_n)
+    if base is None or not during:
+        return None
+    floor = LIVE_MARGIN_PP if floor is None else floor
+    c = crit_for(len(during)) if crit is None else float(crit)
+    sd = _sd(before_start) if len(before_start) >= 2 else _sd(base)
+    se = None
+    if sd is not None:
+        se = math.sqrt(sd ** 2 / len(during) + sd ** 2 / len(base))
+    margin = max(floor, c * se) if se is not None else floor
+    return {"mean_pct": round(sum(base) / len(base), 3), "margin_pp": round(margin, 3),
+            "se_pp": round(se, 3) if se is not None else None, "crit": round(c, 3),
+            "n": len(base), "excludes_motivating_window": excl}
+
+
+def twin_gate(during, live_hist, twin_during, twin_hist, floor=None, min_n=None, crit=None):
+    """The TWIN baseline for one episode: {mean_pct, margin_pp, se_pp, crit, n}
+    or None when the twin's window is below the floor (no control arm).
+    margin = max(floor, crit(min(n_during, n_twin)) * sqrt(SE_live^2 +
+    SE_twin^2)), each arm's SE from its OWN pre-episode dispersion, falling
+    back to the window's own dispersion when the history cannot give one."""
+    min_n = LIVE_BASE_MIN_N if min_n is None else min_n
+    if len(twin_during) < min_n or not during:
+        return None
+    floor = LIVE_MARGIN_PP if floor is None else floor
+    c = crit_for(min(len(during), len(twin_during))) if crit is None else float(crit)
+    sd_l = _sd(live_hist) if len(live_hist) >= 2 else _sd(during)
+    sd_t = _sd(twin_hist) if len(twin_hist) >= 2 else _sd(twin_during)
+    se = None
+    if sd_l is not None and sd_t is not None:
+        se = math.sqrt(sd_l ** 2 / len(during) + sd_t ** 2 / len(twin_during))
+    margin = max(floor, c * se) if se is not None else floor
+    return {"mean_pct": round(sum(twin_during) / len(twin_during), 3),
+            "margin_pp": round(margin, 3), "se_pp": round(se, 3) if se is not None else None,
+            "crit": round(c, 3), "n": len(twin_during)}
+
+
+def judge_windows(during, live_hist, before_pre, twin_during, twin_hist,
+                  floor=None, min_n=None):
+    """[2026-09-02, CALIBRATED OPTIMALLY] the live lane's verdict on ONE
+    episode, pure -- fixtures and the instrument drive THIS; `grade_live`
+    wraps it with the ledger reads. All inputs are per-trade returns in pct
+    points: the episode's `during` closes, the live arm's `live_hist` (every
+    close before the episode), `before_pre` (every close before the MOTIVATING
+    window, i.e. before start minus the episode's own duration), the twin's
+    `twin_during` and `twin_hist`.
+
+    The twin is REQUIRED (no control arm -> `recorded`); the book baseline
+    joins when its history clears the floor. `bad` = below EVERY baseline by
+    that baseline's own derived margin; `good` is symmetric; else `flat`.
+    Each baseline is published with its mean, margin, SE and critical value,
+    so a verdict shows exactly what it was judged against and how wide the
+    noise was."""
+    tw = twin_gate(during, live_hist, twin_during, twin_hist, floor, min_n)
+    if tw is None:
+        return {"status": "recorded", "reason": "no-control-arm"}
+    baselines = {"twin": tw}
+    bk = book_gate(during, before_pre, live_hist, floor, min_n)
+    if bk is not None:
+        baselines["book"] = bk
+    m_in = sum(during) / len(during)
+    if all(m_in < b["mean_pct"] - b["margin_pp"] for b in baselines.values()):
+        sig = "bad"
+    elif all(m_in > b["mean_pct"] + b["margin_pp"] for b in baselines.values()):
+        sig = "good"
+    else:
+        sig = "flat"
+    return {"status": "graded", "signal": sig, "baselines": baselines}
+
+
 def grade_live(ep, trades, group="live-clip"):
     """The live lane LEARNS (16-Jul evening, operator mandate): an episode
     under live levers is graded per-trade against TWO baselines — the same
@@ -542,20 +696,31 @@ def grade_live(ep, trades, group="live-clip"):
             else set(LIVE_ROWS))
     twins = {t for t in (_twin(b) for b in bots) if t}
 
-    def stats(names, a, b):
-        pcts = [float(r["profit_ratio"]) for r in trades or []
-                if str(r.get("bot")) in names
-                and r.get("profit_ratio") is not None
-                and a <= (_parse_ts(r.get("close_ts")) or -1) < b]
-        return (len(pcts),
-                round(100.0 * sum(pcts) / len(pcts), 3) if pcts else None)
+    def rows(names, a, b):
+        out = []
+        for r in trades or []:
+            if str(r.get("bot")) not in names or r.get("profit_ratio") is None:
+                continue
+            ts = _parse_ts(r.get("close_ts"))
+            if ts is None or not (a <= ts < b):
+                continue
+            out.append(100.0 * float(r["profit_ratio"]))     # pct points
+        return out
 
-    n_in, m_in = stats(bots, start, end)
-    n_pre, m_pre = stats(bots, start - (end - start), start)
-    n_tw, m_tw = stats(twins, start, end)
-    rec = {"n_during": n_in, "mean_pct_during": m_in,
-           "n_before": n_pre, "mean_pct_before": m_pre,
-           "n_twin": n_tw, "mean_pct_twin": m_tw}
+    def _m(xs):
+        return round(sum(xs) / len(xs), 3) if xs else None
+
+    dur = rows(bots, start, end)
+    pre = rows(bots, start - (end - start), start)          # the MOTIVATING window: recorded, never a baseline
+    hist = rows(bots, float("-inf"), start)
+    before_pre = rows(bots, float("-inf"), start - (end - start))
+    tw_dur = rows(twins, start, end)
+    tw_hist = rows(twins, float("-inf"), start)
+    n_in = len(dur)
+    rec = {"n_during": n_in, "mean_pct_during": _m(dur),
+           "n_before": len(pre), "mean_pct_before": _m(pre),
+           "n_twin": len(tw_dur), "mean_pct_twin": _m(tw_dur),
+           "n_book": len(hist), "mean_pct_book": _m(hist)}
 
     # [2026-07-17 AUDIT] live.clip_scale is RECORDED, never GRADED — the metric
     # above is EXACTLY invariant to it, so any verdict is other-causes + noise.
@@ -589,18 +754,14 @@ def grade_live(ep, trades, group="live-clip"):
         return {"status": "recorded", "reason": "metric-invariant-to-lever",
                 **rec}
 
-    baselines = [m for n, m in ((n_pre, m_pre), (n_tw, m_tw))
-                 if n >= LIVE_BASE_MIN_N and m is not None]
-    if (n_in < LIVE_EP_MIN_N or m_in is None or not baselines
-            or (end - start) < MIN_EP_H * 3600):
+    if n_in < LIVE_EP_MIN_N or (end - start) < MIN_EP_H * 3600:
         return {"status": "recorded", **rec}
-    if all(m_in < b - LIVE_MARGIN_PP for b in baselines):
-        sig = "bad"
-    elif all(m_in > b + LIVE_MARGIN_PP for b in baselines):
-        sig = "good"
-    else:
-        sig = "flat"
-    return {"status": "graded", "signal": sig, **rec}
+    # [2026-09-02, CALIBRATED OPTIMALLY] I25: the twin is the control arm and is
+    # REQUIRED; the book's own mean EXCLUDING the motivating window corroborates;
+    # every margin is the comparison's own noise at the fleet's critical value.
+    # See the constants' note and `judge_windows`. `baselines` is published so
+    # a verdict shows what it was judged against and how wide the noise was.
+    return {**judge_windows(dur, hist, before_pre, tw_dur, tw_hist), **rec}
 
 
 def grade_book(ep, trades):
@@ -1213,29 +1374,108 @@ def _selftest():
     def gl(trades):
         return grade_live(ep_lv, trades, group="live-funding")
 
-    # during: live 6 trades @ +0.2%; before: 6 @ +1.5%; twin during: 6 @ +1.2%
-    tr_bad = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
-              + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
-              + [lt(TWIN, 1 + i * 0.5, 0.012) for i in range(6)]
-              + [lt("not-live", 2, 9.9)])
+    # [2026-09-02, CALIBRATED OPTIMALLY] every fixture carries NOISE -- values
+    # alternate +-0.4pp around their mean -- because the margins are derived
+    # from the arm's own dispersion; a zero-variance fixture would only ever
+    # exercise the floor. 12 closes per window clears the I25 floor
+    # (LIVE_BASE_MIN_N = fleet_allocation.MIN_N = 10); 6 pins `recorded`.
+    AMP = 0.004
+
+    def alt(mean, i):
+        return mean + (AMP if i % 2 == 0 else -AMP)
+
+    def older(pct):                 # the book BEFORE the motivating window
+        return [lt(LIVE, -20 + i * 0.5, alt(pct, i)) for i in range(12)]
+
+    def pre(pct):                   # the MOTIVATING window (same duration as the episode)
+        return [lt(LIVE, -5.9 + i * 0.45, alt(pct, i)) for i in range(12)]
+
+    def twin(pct, n=12):            # the control arm over the episode
+        return [lt(TWIN, 0.25 + i * 0.45, alt(pct, i)) for i in range(n)]
+
+    def twin_hist(pct):             # the control arm's own history
+        return [lt(TWIN, -20 + i * 0.5, alt(pct, i)) for i in range(12)]
+
+    def during(pct):
+        return [lt(LIVE, 1 + i * 0.5, alt(pct, i)) for i in range(6)]
+
+    book = older(0.015) + pre(0.015)          # a steady +1.5% book
+    # during +0.2 vs book +1.5 and twin +1.2: both gaps far beyond ~0.3pp of noise -> bad
+    tr_bad = during(0.002) + book + twin(0.012) + twin_hist(0.012) + [lt("not-live", 2, 9.9)]
     glb = gl(tr_bad)
     assert glb["status"] == "graded" and glb["signal"] == "bad", glb
     assert glb["n_during"] == 6 and glb["mean_pct_during"] == 0.2, glb
-    # worse than pre-window but BETTER than the twin -> flat (never 'bad'
-    # unless worse than EVERY baseline — real money isn't blamed on noise)
-    tr_flat = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
-               + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
-               + [lt(TWIN, 1 + i * 0.5, -0.02) for i in range(6)])
+    assert set(glb["baselines"]) == {"twin", "book"}, glb
+    # the book baseline EXCLUDES the motivating window (12 older closes, not 24)
+    assert glb["baselines"]["book"]["n"] == 12 and glb["baselines"]["book"]["excludes_motivating_window"], glb
+    assert glb["baselines"]["book"]["mean_pct"] == 1.5 and glb["baselines"]["twin"]["mean_pct"] == 1.2, glb
+    # THE MARGINS ARE THE NOISE AT THE FLEET'S CRITICAL VALUE, by identity with
+    # the one owner -- recomputed here from the fixture's own dispersion
+    _live_pp = [100 * alt(0.015, i) for i in range(24)]
+    _sd_live = _sd(_live_pp)
+    _se_book = math.sqrt(_sd_live ** 2 / 6 + _sd_live ** 2 / 12)
+    _crit6 = _fleet_allocation.t_crit(6)
+    assert glb["baselines"]["book"]["crit"] == round(_crit6, 3) and 1.4 < _crit6 < 1.6, glb
+    assert abs(glb["baselines"]["book"]["margin_pp"] - max(LIVE_MARGIN_PP, _crit6 * _se_book)) < 2e-3, glb
+    _sd_twin = _sd([100 * alt(0.012, i) for i in range(12)])
+    _se_twin = math.sqrt(_sd_live ** 2 / 6 + _sd_twin ** 2 / 12)
+    assert abs(glb["baselines"]["twin"]["margin_pp"] - max(LIVE_MARGIN_PP, _crit6 * _se_twin)) < 2e-3, glb
+    assert glb["baselines"]["twin"]["margin_pp"] > LIVE_MARGIN_PP, "the derived margin, not the floor, is binding here"
+    # I25, THE FIXTURE THAT MATTERS: the pre-window was HOT (+2.5) and the
+    # episode simply returned to the book's own mean (+1.5) alongside a twin at
+    # +1.5. Against the motivating window this is "1.0pp worse" and the old
+    # rule called it bad; against the book's mean and the twin it is nothing.
+    tr_tide = during(0.015) + older(0.015) + pre(0.025) + twin(0.015) + twin_hist(0.015)
+    _tide = gl(tr_tide)
+    assert _tide["signal"] == "flat", _tide
+    assert _tide["mean_pct_before"] == 2.5 and _tide["baselines"]["book"]["mean_pct"] == 1.5, _tide
+    # worse than the book but BETTER than the twin -> flat (never 'bad' unless
+    # worse than EVERY baseline -- real money is not blamed on one comparison)
+    tr_flat = during(0.002) + book + twin(-0.02) + twin_hist(-0.02)
     assert gl(tr_flat)["signal"] == "flat"
-    # better than both -> good
-    tr_good = ([lt(LIVE, 1 + i * 0.5, 0.02) for i in range(6)]
-               + [lt(LIVE, -6 + i * 0.5, 0.002) for i in range(6)]
-               + [lt(TWIN, 1 + i * 0.5, 0.001) for i in range(6)])
+    # ...and the mirror: worse than the twin beyond its margin but AT the book's
+    # own mean -> flat, never bad on the twin alone
+    tr_flat2 = during(0.015) + book + twin(0.025) + twin_hist(0.025)
+    assert gl(tr_flat2)["signal"] == "flat", gl(tr_flat2)
+    # better than both beyond their margins -> good
+    tr_good = during(0.03) + book + twin(0.012) + twin_hist(0.012)
     assert gl(tr_good)["signal"] == "good"
-    # thin during-window or no usable baseline -> recorded (no signal)
+    # INSIDE THE NOISE: 0.28pp below both baselines clears a 0.25pp FLOOR but
+    # not the derived ~0.3pp margin -> flat. A floor-only rule reads bad here.
+    tr_noise = during(0.0122) + book + twin(0.015) + twin_hist(0.015)
+    _nz = gl(tr_noise)
+    assert _nz["signal"] == "flat", _nz
+    assert all(b["margin_pp"] > LIVE_MARGIN_PP >= 0.25 for b in _nz["baselines"].values()), _nz
+    # a ZERO-VARIANCE history gives no noise estimate beyond the floor: the
+    # floor is what stops a verdict being free (0.3pp gaps, constant values)
+    tr_flat_hist = [lt(LIVE, 1 + i * 0.5, 0.012) for i in range(6)] + \
+        [lt(LIVE, -20 + i * 0.5, 0.015) for i in range(24)] + \
+        [lt(TWIN, 0.25 + i * 0.45, 0.015) for i in range(12)]
+    _zv = gl(tr_flat_hist)
+    assert _zv["signal"] == "bad" and all(b["margin_pp"] == LIVE_MARGIN_PP and b["se_pp"] == 0.0
+                                          for b in _zv["baselines"].values()), _zv
+    # thin during-window -> recorded (no signal)
     assert gl(tr_bad[:3])["status"] == "recorded"
-    assert gl([lt(LIVE, 1 + i * 0.5, 0.002)
-               for i in range(6)])["status"] == "recorded"
+    # NO CONTROL ARM: the book alone, however bad the episode looks against it,
+    # records -- the twin is the only baseline that moves with the tide (I25)
+    tr_book_only = during(0.002) + book
+    _bo = gl(tr_book_only)
+    assert _bo["status"] == "recorded" and _bo["reason"] == "no-control-arm" and "signal" not in _bo, _bo
+    assert _bo["n_book"] == 24 and _bo["mean_pct_book"] == 1.5, _bo
+    assert gl(during(0.002))["status"] == "recorded"
+    # a twin window BELOW the floor is not a control arm
+    tr_thin_twin = during(0.002) + book + twin(0.012, n=6) + twin_hist(0.012)
+    assert gl(tr_thin_twin)["status"] == "recorded", gl(tr_thin_twin)
+    # a book history below the floor drops the book baseline; the twin decides alone
+    tr_young = during(0.002) + pre(0.015)[:6] + twin(0.012) + twin_hist(0.012)
+    _yg = gl(tr_young)
+    assert _yg["status"] == "graded" and set(_yg["baselines"]) == {"twin"}, _yg
+    # the floor IS the allocation organ's computability floor, by identity --
+    # against the organ ITSELF (it ships beside this file), never a retyped 10,
+    # and never vacuously green: an absent organ FAILS here, it does not pass
+    assert _fleet_allocation is not None, "fleet_allocation must ship beside fleet_proprioception"
+    assert LIVE_BASE_MIN_N == _fleet_allocation.MIN_N == 10, (LIVE_BASE_MIN_N, _fleet_allocation.MIN_N)
+    assert crit_for(10) == _fleet_allocation.t_crit(10), "crit_for must be the owner's value, never a copy"
 
     # [2026-07-17 AUDIT] live-clip is RECORDED-ONLY, whatever the data says.
     # The metric is EXACTLY invariant to clip_scale (the lever scales pnl AND
@@ -1488,7 +1728,7 @@ def _selftest():
           "incl. backdated release + daily slice, replay counterfactual "
           "win/lose/too-short/too-few-trades (marked), scout throughput, "
           "gapscout activity, live "
-          "paired-learning (bad/flat/good vs pre-window+twin, funding split), "
+          "paired-learning (bad/flat/good vs book-mean+twin at derived margins, funding split), "
           "verdict floors + joint blame, fail-safe hurting+helping hooks, "
           "BOOK selection-vs-capacity grading + feed gate)")
 
