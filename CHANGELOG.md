@@ -85,6 +85,19 @@ her own strategy rail) if you want her to trade through bigger dollar down-days.
 That LOOSENS a safety cap, so it is a risk-appetite decision, presented not taken
 — per (tg) I may set cap values with a derivation, but loosening a live
 real-money loss cap is yours to say.
+**[TAKEN, same session — Eamon: "Approved, continue" / "Full permission for you
+to change the variables."** `LIGHTER_MAX_DAILY_LOSS=57` is SET on mum-live
+(mum had NO per-service value — she rode the $30 code default; avo carries 32,
+georgia 27). Set with skipDeploys: the running (wh) container already halts at
+~$56.70, so the value rides the revert's own `[deploy-live-mum]` deploy and mum
+restarts ONCE — end state under restored semantics: effective halt
+min($57 abs, $56.70 pct) = $56.70 ≈ her intended 10%, with the tighter-first
+rail semantics intact. Derivation published per (tg): 57 = 0.10 × $570 funded
+equity, aligning the fleet dollar rail with her own `DAILY_LOSS_LIMIT` leash so
+the abs cap stops binding first at 5.26%. Re-derive on the next material
+capital change — a fixed dollar cap on a funded book goes stale exactly the
+way (wf)'s denominator did, and the VALUE, not the semantics, is where that is
+absorbed.]
 
 DECLARED, unchanged: mum's EDGE is untouched (I25 — no retuning a winner on a hot
 window); her leverage (9.5×, your stop-death edge) and the brain's refused 1.25×
