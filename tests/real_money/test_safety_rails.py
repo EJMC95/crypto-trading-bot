@@ -155,10 +155,24 @@ def test_confirm_true_when_second_read_still_breaching_pct(monkeypatch):
     assert eq == 940.0  # caller adopts the fresher read
 
 
-def test_confirm_true_via_absolute_rail_even_if_pct_ok(monkeypatch):
-    # pct rail would NOT trip (990 > 950) but the absolute -$30 rail does.
+def test_confirm_absolute_rail_floors_under_pct_but_governs_the_opt_out(monkeypatch):
+    # [(wh)/(wi)] This pinned the SUPERSEDED contract: a $31 second-read loss
+    # on a $1,000 day-start confirmed via the $30 pilot cap even though the 5%
+    # leash reads $50 — the exact fixed-dollar-undercuts-the-funded-book class
+    # (wh) removed (`daily_loss_hit` is now max(abs, pct*ds), "the LOOSER of
+    # the pilot cap and the leash"). (wh) updated its own two test files and
+    # missed this one, so main went red on its direct-to-main push and the
+    # failure surfaced on the next PR. Both directions of the NEW contract:
     r = _rails(monkeypatch, daily_loss="30")
+    # 1. pct passed: the pilot cap FLOORS under the $50 leash — $31 is not a
+    #    breach any more, the transient path runs and adopts the fresh read.
     confirmed, eq = r.confirm_daily_loss(1000.0, 930.0, 0.05, lambda: 969.0, delay_s=0)
+    assert confirmed is False
+    assert eq == 969.0
+    # 2. pct_limit=0.0 (every caller that does not opt in): byte-identical to
+    #    the old absolute cap — the $30 rail still confirms alone, so the
+    #    backstop the old test guarded survives on the path that carries it.
+    confirmed, eq = r.confirm_daily_loss(1000.0, 930.0, 0.0, lambda: 969.0, delay_s=0)
     assert confirmed is True
     assert eq == 969.0
 
