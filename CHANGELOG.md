@@ -1,3 +1,63 @@
+## 2026-09-02 (xh) — THE LOCAL SUITE HAD A STANDING FLOOR OF EIGHT REDS THAT WERE NOT THE TREE'S, SO IT COULD NOT BE USED AS A PRE-PUSH CHECK — AND A BASELINE OF EXPECTED FAILURES IS EXACTLY WHERE THE NINTH HIDES
+
+**Eamon, 2-Sep:** *"Fix the psycopg2 and lighter sdk issue too"*. He is right,
+and the diagnosis is that **nothing in the repo was wrong**: `requirements-test.txt`
+has carried `psycopg2-binary>=2.9` since it was written, `requirements.txt` pins
+`lighter-sdk==1.1.2` (the pin `audit_sdk_pin` enforces and the real-money signer
+binaries ride), and `.github/workflows/tests.yml` installs both — with an
+explicit guard whose own step name is *"The SDK must import — a silent skip is
+the rot this job exists to prevent"*. **The remote SESSION container never ran
+any of it.**
+
+**MEASURED, and the shape is the point.** `python3 -m pytest tests/` in a fresh
+web session reported **8 failures**: seven `ModuleNotFoundError: No module named
+'psycopg2'` in `test_card_record_excludes_events.py`, one
+`VenueError: lighter-sdk missing` in `test_funding_variant.py`. Identical on
+pristine `main` at `4d1de6b` with an empty tree — so every one was the
+environment. After installing the repo's own declared deps: **the entire suite
+is green, zero failures.**
+
+**WHY A KNOWN-RED FLOOR IS A DEFECT AND NOT A NUISANCE.** A suite with eight
+standing reds cannot answer "did my change break anything?" without a human
+re-deciding, every run, which reds are furniture. That judgement had to be made
+**three separate times in one session, the last of them before a REAL-MONEY
+push** — and each time the honest check was to re-run the same eight on
+pristine main and compare. **A red you have learned to ignore is a detector you
+have switched off** — the same class this file already names twice: `(gl)`'s
+warning nobody has to act on, and `(po)`'s check that inspects nothing and
+reports clean.
+
+**SHIPPED: `.claude/hooks/session-start.sh`**, registered as a `SessionStart`
+hook, remote-sessions-only (a local machine has its own venv and a hook that
+installs into it uninvited is a worse bug than the one this closes). It mirrors
+the CI job rather than paraphrasing it, and **the SDK version is never typed
+here** — it is grepped out of `requirements.txt`, because that file is the
+single source of truth `audit_sdk_pin` enforces and a second copy of a version
+that signs real orders is a second rule ((hj)).
+
+**IT ASSERTS BOTH IMPORTS BEFORE EXITING 0**, mirroring CI's own guard: a hook
+that installs nothing and exits 0 is byte-identical to one that worked.
+
+**VALIDATED BY BREAKING WHAT IT REPAIRS (I3), NOT BY READING IT** — and that is
+how the hook's own bug was found. The first draft opened with
+`pip install --upgrade pip`, copied from the CI job. This image's pip is
+**Debian-managed**, so it dies with *"Cannot uninstall pip 24.0, RECORD file not
+found"*, and under `set -euo pipefail` it took the whole hook down — **a session
+would have started with NO deps because of a line that installs none of them.**
+Deleted, with the reason recorded at the line. Then, from a deliberately broken
+environment (both packages uninstalled, the failure reproduced): the hook
+repairs it, prints `psycopg2 2.9.12 · lighter-sdk 1.1.2`, is idempotent on a
+second run, and is a silent exit-0 no-op with `CLAUDE_CODE_REMOTE` unset —
+verified by confirming the deps were STILL absent after the local run, rather
+than by trusting the branch.
+
+**ALSO IN THIS PASS: the two CodeQL findings `(xe)` landed with.** `File is
+opened but is not closed` at two `open(...).read()` sites in
+`tests/autonomy/test_margin_mark_spelling.py` — real, and mine; both now
+`pathlib.Path(...).read_text()`, which is what the sibling test file already
+used. Main-only, no live deploy: neither change alters a trade any book would
+take, so under `(mm)` it rides the next deploy that does.
+
 ## 2026-09-02 (xg) — 👩 MUM'S HALT-AWARE ENTRY GATE: a leg whose own stop would flatten the whole book is refused, measured neutral in the regime she trades and worth 6pp in the one that halts her
 
 **[RENUMBERED (xe) -> (xg) at push time** — main took (xd) and (xe) while this
