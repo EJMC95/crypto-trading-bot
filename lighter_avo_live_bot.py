@@ -2829,10 +2829,26 @@ def main(_ctx=None, once=False):
                 if symcap_blocked(fleet_symcap, sym, cycle_sym):
                     _verdict(sym, "symcap")
                     continue
-                if sym.split("/")[0] in coin_vetoed or sym in coin_vetoed:
+                # [2026-09-02 (xe)] NORMALISED, the third instance of the same
+                # alias seam. `market_context._fold_coin_quality` canonicalises
+                # BOTH evidence arms onto the FLEET spelling (`from_lighter`,
+                # deliberately: the taker writes '1000BONK' and the funding
+                # books write 'kBONK', so an un-normalised GROUP BY split one
+                # coin's evidence), so `coin-vetoes` is keyed kPEPE/kBONK —
+                # while `sym` here comes from the VENUE-spelled universe. For
+                # every 1000-market the lookup missed by construction, so the
+                # fleet's ONLY automated per-coin refusal on the real-money
+                # entry path could not refuse them. The 🎫 taker normalised
+                # this on 22-Jul (`_fleet(_vbase) in coin_vetoed or ...`); this
+                # host had the same map and never got that half — one rule with
+                # two copies that disagreed. Restrict-only, so matching either
+                # form can only ever SKIP an entry, never force one.
+                _vbase = str(sym or "").split("/")[0]
+                if coin_vetoed and (_fleet(_vbase) in coin_vetoed
+                                    or _vbase in coin_vetoed):
                     _verdict(sym, "coin_veto")
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} entry SKIPPED — "
-                           f"coin veto: {coin_vetoed.get(sym) or coin_vetoed.get(sym.split('/')[0])}")
+                           f"coin veto: {coin_vetoed.get(_fleet(_vbase)) or coin_vetoed.get(_vbase)}")
                     continue
                 tag = sig["enter"]
                 gated = False

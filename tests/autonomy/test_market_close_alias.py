@@ -1,4 +1,7 @@
-"""[2026-09-02] A 1000-MARKET MUST BE CLOSEABLE ON A REAL-MONEY BOOK.
+"""[2026-09-02] THE LIVE HOST'S VENUE-SPELLED MAP MEETING A FLEET-KEYED OWNER.
+
+Two pins, one seam: a 1000-market must be CLOSEABLE, and it must be able to
+receive its own coin veto.
 
 `LighterClient.market_close` is the ONE method on that client which finds its
 subject by a DICT LOOKUP (`self.positions().get(coin)`) instead of through
@@ -174,3 +177,37 @@ def test_the_hosts_helper_is_the_owner_not_a_second_copy():
               if isinstance(n, ast.FunctionDef) and n.name == "_fleet")
     names = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)}
     assert "from_lighter" in names, "_fleet must defer to venues.symbol_map, not re-implement it"
+
+
+# ------------------------------------------- the same seam at the coin veto
+
+def test_the_coin_quality_veto_is_looked_up_in_the_spelling_its_publisher_uses():
+    """`market_context._fold_coin_quality` canonicalises BOTH evidence arms onto
+    the FLEET spelling — its own comment says why (the taker writes '1000BONK',
+    the funding books write 'kBONK', and an un-normalised GROUP BY split one
+    coin's evidence) — so `coin-vetoes` is keyed kPEPE/kBONK. The live host's
+    universe is VENUE-spelled, so an un-normalised lookup misses for every
+    1000-market and the fleet's only automated per-coin refusal on the
+    real-money entry path cannot refuse them. Driven on the payload the real
+    publisher builds, not a hand-written veto map."""
+    from market_context import _fold_coin_quality
+    q = _fold_coin_quality(
+        venue_rows=[("1000PEPE", 9, 180.0, 9, 0.0, 0)],
+        paper_rows=[("1000PEPE", 9, 4, 5)])
+    assert "kPEPE" in q and "1000PEPE" not in q, (
+        f"the publisher keys the fleet spelling: {sorted(q)}")
+
+    with open(os.path.join(ROOT, "lighter_avo_live_bot.py"), encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    # find the `in coin_vetoed` test and require the alias owner in it
+    tests = [n for n in ast.walk(tree)
+             if isinstance(n, ast.Compare)
+             and any(isinstance(c, ast.Name) and c.id == "coin_vetoed"
+                     for c in n.comparators)]
+    assert tests, "the live host must still consult the coin veto"
+    names = set()
+    for n in tests:
+        names |= {x.id for x in ast.walk(n) if isinstance(x, ast.Name)}
+    assert "_fleet" in names, (
+        "the coin-veto lookup must normalise through the alias owner — "
+        "coin-vetoes is fleet-keyed and this host's universe is venue-spelled")

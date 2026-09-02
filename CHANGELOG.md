@@ -148,6 +148,25 @@ drops flat legs — so each got the test that makes it load-bearing: an AST pin
 that the lookup CALLS the owner, and a probe whose `positions()` reports a flat
 leg rather than dropping it. That is I3 twice in one pass.
 
+### AND A THIRD INSTANCE, ON THE SAME AXIS: THE COIN VETO COULD NOT REFUSE THEM
+
+The same audit flagged it and the same check confirms it.
+`market_context._fold_coin_quality` canonicalises BOTH evidence arms onto the
+FLEET spelling, and its own comment says why — the taker writes `1000BONK`, the
+funding books write `kBONK`, and an un-normalised `GROUP BY` split one coin's
+evidence (measured 7 vs 12 for BONK). So `coin-vetoes` is keyed `kPEPE`/`kBONK`,
+while the live host's universe is VENUE-spelled and its lookup read
+`sym.split("/")[0] in coin_vetoed or sym in coin_vetoed`. **For every
+1000-market the fleet's ONLY automated per-coin refusal on the real-money entry
+path missed by construction.** The 🎫 taker normalised exactly this on 22-Jul;
+this host had the same map and never got that half — one rule, two copies,
+disagreeing. Now `_fleet(_vbase) in coin_vetoed or _vbase in coin_vetoed`, the
+taker's own form, restrict-only so matching either spelling can only ever SKIP
+an entry. **LATENT today** (no 1000-market is vetoed right now), and it is the
+gate that would have refused one. Pinned on the payload the real publisher
+builds; 2/2 mutations red (the lookup back to the raw symbol; the publisher's
+canonicalisation removed).
+
 ### AND THE CURRENCY AUDIT WAS BLOCKED, SO NOBODY COULD SEE ANY OF IT
 
 Reaching for `scripts/audit_code_currency.py` to answer *"is my fix actually
