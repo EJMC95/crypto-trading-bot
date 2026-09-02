@@ -299,12 +299,34 @@ FALLBACK = {
 }
 
 
+def graded_sample(rows, bot):
+    """The rows the fleet's GRADER would count for `bot` — and only those.
+
+    [2026-09-02] THE PUBLIC FEED IS NOT THE GRADER'S SAMPLE. This organ reads
+    `/trades.json?source=paper`, which serves every stored row; the grader's
+    read (`bot_pnl_store.fetch_paper_trades`) withholds `LEDGER_QUARANTINE`
+    rows and `golive_readiness` drops phantom halt/flatten events. Measured by
+    `scripts/edge_audit.py`'s calibration gate on its first run: 🧘 douglas
+    n=83 on this feed against n=81 published — the two (pv) frozen-mark ROBO
+    rows the quarantine exists to withhold — so this organ was pricing a
+    ceiling on trades the fleet's own grader refuses. Both filters are the
+    owners' (identity import, no second copy); (vd) explains why the phantom
+    one was NOT added here earlier — the predicate spoke only the DB shape
+    and would have blanked every feed row — and why it is safe now.
+    """
+    import golive_readiness as gr          # noqa: PLC0415 — scripts/ sibling
+    import bot_pnl_store as store          # noqa: PLC0415 — is_quarantined only
+    return [r for r in rows if r.get("bot") == bot
+            and _ts(r.get("closed_at")) and _ts(r.get("opened_at"))
+            and not gr.is_phantom_close(r)
+            and not store.is_quarantined(bot, r.get("pair"), r.get("closed_at"))]
+
+
 def survey(rows, books):
     out = {}
     for b in books:
         bot = b.get("bot")
-        tr = [r for r in rows if r.get("bot") == bot
-              and _ts(r.get("closed_at")) and _ts(r.get("opened_at"))]
+        tr = graded_sample(rows, bot)
         if not tr:
             continue
         span = (max(_ts(r["closed_at"]) for r in tr)

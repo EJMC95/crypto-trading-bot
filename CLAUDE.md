@@ -1323,7 +1323,14 @@ equivalent is: gate ENTRIES only, publish `retired: true`, keep the census
 alive so the call can be reversed on evidence, and pin it with a test.
 
 ### Read-only endpoints (no auth)
-`/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
+`/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger —
+**[2-Sep (wo)] this public feed does NOT apply `LEDGER_QUARANTINE`**; the
+grader's read, `bot_pnl_store.fetch_paper_trades`, does. An outside consumer
+grading from it must apply `bot_pnl_store.is_quarantined` + `golive_readiness.
+is_phantom_close` itself or it grades a sample the gate refuses — measured:
+🧘 douglas n=83 raw vs n=81 graded. `scripts/edge_audit.py` and `scripts/
+ceiling.py` do; `?limit=` caps at 5000 and a count equal to the cap is a
+truncation ((qz)))
 `/bus.json` (risk light + signal bus + brain keys + lighter-market +
 fleet-proprioception + **golive-readiness** (30-Jul (gk) — the go-live bars
 per book, live AND `?hours=` history, so a review seat with no Railway login
@@ -1351,6 +1358,14 @@ its row is dashboard-retired regardless; stop the process when found.
 - `lighter_market_scout.py` / `lighter_ticket_taker.py` — scout + its trader
 - `bot_learn.py` + `fleet_bus.py` — brain and the strategies' read client
 - `fleet_risk.py` / `regime_oracle.py` / `market_pulse.py` — shared organs
+- `scripts/edge_audit.py` — **[2-Sep (wo)] the fleet-wide EDGE AUDIT**: per-book
+  profit factor / Sharpe / Sortino / recovery / streak-vs-chance / concentration
+  / break-even cost / long-vs-short / hold-band splits, founding-claim OOS test,
+  block-bootstrap P(loss)+P(ruin) at 3/6/12m, correlation-aware portfolio
+  N_eff and drawdown overlap. Imports every owner (era, phantom, quarantine,
+  stats, t_crit, BH) and REFUSES unless its sample reproduces the live
+  `golive-readiness` grade exactly. Moves nothing. Report:
+  `EDGE_AUDIT_2026-09-02.md`
 - `lighter_ticket_replay.py` — replay the recorded scout tape through the
   taker's real code (rule changes judged in seconds, not shadow-days)
 - `parliament_main.py` + `parliament/` — 🏛️ the six-layer PM shadow fleet
