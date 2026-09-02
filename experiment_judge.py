@@ -3425,7 +3425,8 @@ def _selftest_body():
         _r_drift = [{"bot": LIVE_BOT, "extra": {"build": "p"}},
                     {"bot": SHADOW_BOT, "extra": {"build": "q"}}]
         assert _arm_drift_snapshot(_r_drift, fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint",
+             "basis": "build"}
         # a dead fetch costs nothing, claims nothing
         def _boom():
             raise RuntimeError("db down")
@@ -3456,7 +3457,8 @@ def _selftest_body():
         #     {new}), so a claim here is correct even without a window. This
         #     was the (la) shape; (lf) keeps it true for the right reason.
         assert _arm_drift_snapshot(_r_prewindow, fetch=lambda: _pnl_same) == \
-            {"live": "old", "shadow": "new", "source": "rows-disjoint"}
+            {"live": "old", "shadow": "new", "source": "rows-disjoint",
+             "basis": "build"}
         # C — scoping never blinds the CONTAINER half: rows clean in-window,
         #     containers on two builds -> hold. This is what makes dropping
         #     the pre-window rows safe.
@@ -3471,7 +3473,8 @@ def _selftest_body():
         ]
         assert _arm_drift_snapshot(_r_inwindow, since_ts=_w0,
                                    fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint",
+             "basis": "build"}
         # D2 [(lf)] — THE DEFECT (la) LEFT BEHIND, and the reason this rule
         #     changed. A ROLLING DEPLOY inside a wide window: both arms close
         #     under the old build AND the new one, but the slower arm's newest
