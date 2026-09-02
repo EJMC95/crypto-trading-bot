@@ -321,7 +321,10 @@ def agg(rows, key="ret"):
             "exits": dict(Counter(r["reason"] for r in rows))}
 
 
-def halves(rows, key="per_day"):
+def halves(rows, key="ret"):
+    """Chronological halves. `key` defaults to `ret` because a PAIRED row is a
+    return delta and carries no `per_day` — the selftest pins that absence, and
+    this default is what made the pin bite in the caller instead of here."""
     r = sorted(rows, key=lambda x: x["ts"])
     h = len(r) // 2
     return agg(r[:h], key), agg(r[h:], key)
@@ -631,6 +634,25 @@ def run(a):
                   f"{(r['d_h1'] or 0):+8.4f}/{(r['d_h2'] or 0):+8.4f}  "
                   f"{r['exposure_ratio']:.2f}  {r['exits']}")
 
+    # every cell walked ONCE; C6 below re-aggregates, never re-walks
+    cache = cell_scores(eps, ladder, stop, hold)
+    # THE CONTROL, and it is the control for the hypothesis actually tested,
+    # not a new one: the SAME pre-declared cells on the CRYPTO half. C6 prices
+    # the class label statistically; this makes the answer legible. If the
+    # crypto half responds to the ladder the same way, the finding is a
+    # WHOLE-BOOK ladder question and not a class one — a larger and separately
+    # registrable claim, never something to ship off this file's selection.
+    swc = sweep(eps, ladder, stop, hold, cls="crypto")
+    bc = swc["base"]
+    print(f"\n## CONTROL — the same cells on the CRYPTO half")
+    print(f"   SHIPPED  n={bc['n']}  per-bar-day {bc['mean']:+.4f}%  "
+          f"%/trade {bc['mean_pct']:+.4f}%  exposure {bc['bar_days']:.0f} bar-days")
+    for r in swc["k"]:
+        if r["k"] == 1.00:
+            continue
+        print(f"   k={r['k']:<7} {r['mean']:+9.4f}  {r['d_pbd']:+9.4f}  "
+              f"{r['d_ret']:+8.4f}  t_cl {r['d_t_cl']:+7.2f}  expo {r['exposure_ratio']:.2f}")
+
     perm = permutation(eps, cache, a.perm_draws)
     print(f"\n## C6 SELECTION PREMIUM (class labels shuffled, {perm.get('draws')} draws)")
     print(f"   best real advantage {perm.get('real'):+.4f}%/bar-day | "
@@ -640,7 +662,7 @@ def run(a):
     res = {"rule": {"roi": dict(ladder), "stop": stop, "hold": hold,
                     "rsi_max": rsi_max},
            "episodes": {"total": len(eps), "noncrypto": nc},
-           "calibration": cal, "reachability": rch, "sweep": sw,
+           "calibration": cal, "reachability": rch, "sweep": sw, "control_crypto": swc,
            "permutation": perm}
     verdict(sw, perm)
     if a.json:
