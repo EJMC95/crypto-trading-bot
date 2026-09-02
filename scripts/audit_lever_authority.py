@@ -240,11 +240,41 @@ QUANTITIES = {
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "hours",
         "min_n": MIN_N_LEDGER, "precision": 0.01, "censor_at": 48.0,
         "gate": "hold hours at close; a cap of x would have cut every hold >= x"},
+    # [2026-09-02 (ww)] the breakout arm's OWN clock, split from
+    # taker.max_hold_h. Scoped to the breakout lenses' closes by reason
+    # substring ("long-breakoutup_hold", "long-breakout_trail", ...), which is
+    # the population this bar cuts through; censored at the default because a
+    # cap of 48 cuts every hold >= 48.
     "taker.sl_cooldown_h": {
         "source": "ledger:lighter-ticket-taker-lshadow", "extract": ("gap_after", "_sl"),
         "abs": False, "dir": "le", "to_q": 1.0, "unit": "hours",
         "min_n": MIN_N_LEDGER, "precision": 0.01,
         "gate": "hours from an _sl close to the next entry on the same symbol"},
+    # [2026-09-02 (ww)] 👩 mum's judge lane. rsi_max cuts the RSI at entry
+    # (stamped `rsi_entry` on every close since (ww)); max_hold_min is a
+    # minutes lever profiled against hold HOURS, hence to_q 1/60.
+    "xp.mum.rsi_max": {
+        "source": "ledger:freqtrade-mum-lshadow",
+        "extract": ("xfield", ("rsi_entry", None)),
+        "abs": False, "dir": "le", "to_q": 1.0, "unit": "rsi",
+        "min_n": MIN_N_LEDGER, "precision": 0.1,
+        "gate": "lighter_family_bot.OversoldRebound.signals — enter iff rsi < RSI_MAX"},
+    "live.mum.rsi_max": {
+        "source": "ledger:freqtrade-mum-lighter",
+        "extract": ("xfield", ("rsi_entry", None)),
+        "abs": False, "dir": "le", "to_q": 1.0, "unit": "rsi",
+        "min_n": MIN_N_LEDGER, "precision": 0.1,
+        "gate": "lighter_family_bot.OversoldRebound.signals — enter iff rsi < RSI_MAX (LIVE)"},
+    "xp.mum.max_hold_min": {
+        "source": "ledger:freqtrade-mum-lshadow", "extract": ("hold_h", None),
+        "abs": False, "dir": "ge", "to_q": 1.0 / 60.0, "unit": "hours",
+        "min_n": MIN_N_LEDGER, "precision": 0.01, "censor_at": 24.0,
+        "gate": "OversoldRebound.custom_exit — max_hold iff age >= cap (shadow twin)"},
+    "live.mum.max_hold_min": {
+        "source": "ledger:freqtrade-mum-lighter", "extract": ("hold_h", None),
+        "abs": False, "dir": "ge", "to_q": 1.0 / 60.0, "unit": "hours",
+        "min_n": MIN_N_LEDGER, "precision": 0.01, "censor_at": 24.0,
+        "gate": "OversoldRebound.custom_exit — max_hold iff age >= cap (LIVE)"},
     "live.funding.max_hold_h": {
         "source": "ledger:perps-funding-lighter-lighter", "extract": ("hold_h", None),
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "hours",
@@ -1348,7 +1378,13 @@ def _measure(dsn):                                        # pragma: no cover
             groups = 1
             rows = [r for r in ledger(q["source"].split(":", 1)[1]) if r[1]]
             if kind == "hold_h":
-                vals = [(ts(c) - ts(o)) / 3600.0 for _p, o, c, _r, _x in rows]
+                # [(wv)] optional `arg` = a substring of the exit reason that
+                # scopes the sample to one lens family (e.g. "-breakoutup_"),
+                # so the breakout clock is profiled against BREAKOUT holds
+                # and never against the divergence bracket's. None = all rows,
+                # byte-identical to before.
+                vals = [(ts(c) - ts(o)) / 3600.0 for _p, o, c, r, _x in rows
+                        if not arg or str(arg) in str(r or "")]
             elif kind == "xfield":
                 # [2026-08-20 (sk)] A FIELD STAMPED ON THE CLOSE ROW'S `extra`.
                 # The two ledger kinds above derive their quantity from the

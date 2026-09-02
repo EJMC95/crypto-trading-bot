@@ -17,8 +17,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # fleet_bus.py: the brain's stake-multiplier consumer contract (15-Jul wiring)
 # funding_basis.py: REQUIRED by the 17-Jul accrual fix — a bare import, so a
 # missing COPY here is a boot crash-loop, not a silent degrade.
+# fleet_tuning.py [(wv)]: 👩 mum's shadow twin is the 🧪 judge's experiment
+# arm now (xp.mum.* levers) — the first family book with a lever surface.
 COPY lighter_family_bot.py bot_pnl_store.py paper_broker.py fleet_bus.py \
-     funding_basis.py ./
+     funding_basis.py fleet_tuning.py ./
 COPY venues/ ./venues/
 
 ENV PYTHONUNBUFFERED=1

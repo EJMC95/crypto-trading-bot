@@ -287,9 +287,19 @@ def test_the_publish_path_wires_the_series():
     assert any(isinstance(c.func, ast.Attribute)
                and c.func.attr == "snapshot_census" for c in calls), \
         "the loop never snapshots the census — nothing accumulates"
-    assert any(isinstance(c.func, ast.Name)
-               and c.func.id == "_census_series_extra" for c in calls), \
-        "the row never publishes census_24h"
+    # [2026-09-02 (wv)] the publish's extra is built by ONE builder now
+    # (`family_publish_extra`, extracted so a test can drive it for every
+    # book); the row publishes the rollup when the loop calls that builder
+    # AND the builder calls the series. Either link missing is the same
+    # inert-series failure this test exists to catch.
+    def _calls(fn):
+        return [c for c in ast.walk(fn) if isinstance(c, ast.Call)]
+    def _names(fn):
+        return {c.func.id for c in _calls(fn) if isinstance(c.func, ast.Name)}
+    reached = "_census_series_extra" in _names(loop)
+    if not reached and "family_publish_extra" in _names(loop):
+        reached = "_census_series_extra" in _names(fns["family_publish_extra"])
+    assert reached, "the row never publishes census_24h"
     # and the snapshot is fed by the ONE owner, not a second census
     snap = [c for c in calls if isinstance(c.func, ast.Attribute)
             and c.func.attr == "snapshot_census"]

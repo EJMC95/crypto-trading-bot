@@ -1,3 +1,173 @@
+## 2026-09-02 (ww) — "PROCEED WITH EVERYTHING IN THE ORGAN REVIEW": the docket calls reconciled with the concurrent (wt) slate, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to 👩 mum with the family host's first lever surface, the organ board made a weekly job — and the family shadow host found stuck on 28-Aug code
+
+**Eamon, 2-Sep: *"Proceed with everything in the organ review."*** The (wp)
+review laid out seven keep-or-retire calls with a recommendation each, two
+builds, and a tooling gap. This entry is all of it, shipped in the order I11
+asks — the carried work first — with PR #262 (the review's own fixes) merged
+and deployed to both live services at the top of the pass.
+
+### 1. THE DOCKET CALLS — MADE ON MAIN AS (wt) WHILE THIS PASS WAS OPEN; this entry reconciles rather than repeats
+
+This pass retired 🛢️ garrett, 🧘 douglas, 📐 grimes, 💸 the Farmer's shadow
+and 🔮 georgia's shadow on the review's recommendation. Before it could land,
+the concurrent session shipped **the September slate (wt)** under the same
+grant: the same four exclusions (garrett t=−2.22 ub −0.455%; douglas t=−2.54
+ub −0.357%; farmer shadow ub −0.231%; grimes 0 closes / 0 of 31 retests) PLUS
+🧭 **nav-cook** (n=38, ub −0.020% — the review had said keep on a marginal
+exclusion; the slate re-read the grader's live payload and the exclusion
+held, so it stands) — and it **DEFERRED georgia's shadow** rather than
+retiring her, because her cap-5 trajectory carries a PRE-REGISTERED
+prediction with a 10-Sep read (`claims_ledger.georgia-entry-cap-5-days-to-
+gate`) and retiring her eight days before it voids the registration, the
+I21/I25 shape. **That refusal is right and this pass yields to it**: my
+georgia retirement is WITHDRAWN (`GEORGIA_SHADOW_RETIRED_OVERRIDE` never
+shipped), my duplicate guards on the four books are dropped in favour of
+(wt)'s (one owner — `RETIRED_SHADOW_BOOKS` for the funding arms, the idle
+guards for the own-module books), my roster re-aims that assumed georgia
+retired are reverted, and `test_september_slate.py` is the pin. What this
+entry KEEPS from the docket work, because (wt) did not carry it: 🛢️ Garrett
+and both Farmer rows leave `audit_book_overlap.FUNDING_BOOKS` and the two
+carry/Garrett collision keys (the component drops to the carry/Rich Dad
+pair its own declaration pre-named); the carried row
+`carry-garrett-ranking-collision` is deleted ((vj)'s rule); `georgia-t-bar`
+and `ceiling-slots-georgia` STAY carried, because she does; the fleet-table
+rows for the five and the RETIRED appendix are corrected in place per I12
+to what actually shipped. ⚖️ Counterweight stays KEPT (re-read 1-Oct).
+
+### 2. THE BREAKOUT CLOCK SPLIT LANDED AS (wr) WHILE THIS PASS WAS OPEN — one owner kept, my lever withdrawn, and the cage re-decided on the incubator's evidence
+
+Carried item `breakout-arm-inherits-reversion-clock` was closed on main by
+the concurrent session's (wr) in the exact shape this pass had built:
+`BRK_MAX_HOLD_H` (env `TT_BRK_MAX_HOLD_H`, inheriting `TT_MAX_HOLD_H` then
+48) times the trend exit, `taker.max_hold_h` steers only the divergence
+bracket, and the decoupling is AST-pinned in the taker's selftest. This pass
+had ALSO registered a `taker.brk_max_hold_h` lever [48, 96] with an entry
+stamp, a grandfathering read on open positions and a QUANTITIES spec; **all
+of it is WITHDRAWN in favour of (wr)'s refusal** — the only 48→96 evidence
+died to leave-one-symbol-out (+0.78pp → +0.07pp ex-HYPE), so a cage that
+reaches 96 is reach toward a measured artifact, I18's own refutation at
+(tx). A second copy of the split is a second rule ((hj)); the taker on main
+is the one owner and this entry adds nothing to it. **What this pass keeps
+is the cage.** (wq) re-opened `taker.max_hold_h` to `lo` 24 on the sighted
+gate; the incubator's only champion-grade genotype — sl −0.02 / gap 25 /
+hold 24 / tp 0.02, **n=189, lcb +$3.21, halves +$10.27/+$10.79, +$46.75
+over default** — was still out of cage on the two bounds (wr) left for
+their own measurement: `taker.div_gap_pp` 37.5→**25** and `taker.tp`
+0.03→**0.02** move now, the alleles rejoin `TAKER_GENES`, and the tuner's
+`SWEEP_HOLD` gains 24. The number is the genotype's own out-of-sample
+replay claim; I26: reversible, bounded, shadow lane, expectancy-neutral (no
+default moves) — with a **PRE-REGISTERED REVERT**: if that genotype's fresh
+replay lcb reads ≤ 0 over the 14 days after the widening, or the realised
+divergence record at any enacted 24h bar reads worse than at 48h on n≥20
+closes, `lo` returns to 48/37.5/0.03. The gate is untouched: a walk still
+has to clear the tuner's replay gate to enact. Carried item
+`taker-replay-blind-to-breakoutup` was closed by (wq).
+`tests/autonomy/test_breakout_cage_redecision.py` pins the three cages, the
+grids, the sweep, the champion-inside-every-cage property, and that NO
+registered lever reaches `BRK_MAX_HOLD_H`.
+
+### 3. THE JUDGE'S LANE MOVES TO 👩 MUM — the family host's first lever surface
+
+The review found the shadow→live pipeline had **no pair it could open** and
+the family shadow host **could not have run a candidate anyway**: no
+`fleet_tuning`, no `bars` receipt, so `ran_candidate` (fail-CLOSED) would
+exclude every close. Built:
+* **Levers.** `xp.mum.rsi_max` [28,38] and `xp.mum.max_hold_min` [720,2880]
+  steer ONLY her shadow twin; `live.mum.rsi_max` / `live.mum.max_hold_min`
+  are written ONLY by the judge after the paired bar — `_LIVE_PREFIX_OWNERS`
+  splits her arm by name: `live.mum.clip_scale` stays the board's (exact key,
+  listed first), every other `live.mum.*` is the judge's, the sole-writer
+  property `live.funding.*` has carried since 16-Jul. Both measurable on her
+  own ledger (QUANTITIES: `rsi_entry`, now stamped on every close; hold hours
+  with `to_q` 1/60 — `audit_lever_authority` reads all four UNMEASURED until
+  the first stamped closes land, which is the honest state of a lever whose
+  quantity starts recording on this deploy; the measurability ratchet is
+  unchanged). The family image ships `fleet_tuning.py`; the
+  born-dark declaration for it is withdrawn.
+* **Both hosts.** `lighter_family_bot.apply_book_levers` overlays the INSTANCE
+  (never the class) from env defaults each loop; `mum_bars` is the ONE
+  receipt stamp both hosts write at entry and copy to the close row;
+  `OversoldRebound.custom_exit(cap=)` honours the entry-stamped cap (the (bw)
+  rule) so a lever starting or fading mid-hold re-times no open trade. The
+  live host reads `live.mum.*` the same way; 🙏 avo's carrier has no such
+  knobs and is a no-op by construction.
+* **The judge.** `LIVE_BOT`/`SHADOW_BOT` DERIVE from
+  `fleet_bus.living_pair_default` (the shortfall organ reads the same owner,
+  so both name the same twin by construction; `PAIR_PRIORITY` = mum before
+  avo when the feed cannot rank by closes) — no more Farmer literal, the
+  fourth list-keyed rot on a slot swap. Candidates are per lane
+  (`LANE_CANDIDATES`); mum's three are hand-declared and MEASURED: `mum-rsi-32`
+  ((tr)'s measured peak), `mum-hold-720`, `mum-hold-2880`. `candidate_pool`
+  admits a queue proposal only under the lane's prefix, so the incubator's
+  Farmer offspring cannot burn a mum slot. `XP_TO_LIVE`/`LIVE_ENV_DEFAULTS`
+  carry the twins; the selftest's receipt guard is per lane and its env-drift
+  pin reads mum's class defaults from the family source. Judge ETA for the
+  pair to OPEN: ~8.6 days (the shadow-closes floor) after the (wp) parity port
+  deploys. **What is unchanged, stated plainly**: the paired bar (≥7d, ≥30
+  shadow closes, live ≥10, beats live by ≥0.5pp AND both halves), fade-watch,
+  the cages, SafetyRails. A promotion moves a bar on real money only after
+  that evidence, exactly as it did on the Farmer.
+`tests/autonomy/test_mum_judge_lane.py` (11 tests); `test_judge_restart`
+re-aimed from the Farmer default to the derived lane.
+
+### 4. THE ORGAN BOARD IS A WEEKLY JOB
+
+`scripts/organ_board.py` reads the public bus and pnl feeds and grades each
+organ's OUTPUT, not its timestamp — the 20 checks the review ran by hand
+(liveness first per I1, then: the pooled long count at budget, the brain's
+opinion count, the incubator's champion, the judge's `judging: 0 of N`, the
+immune sick list, the shortfall verdict, the sentinel's sources and playbook
+grade, the parliament's out-of-sample accuracy, the docket…). A missing field
+degrades to `watch: absent`, never a silent ok; a dark FEED exits 2. Its
+`REVIEW_2SEP` baseline pins today's by-hand reading so a later run reports
+`fixed?` rather than promoting a change to `ok` on its own. Job `organ-board`
+in `fleet-weekly-assessment.yml`, table to the run summary.
+`tests/autonomy/test_organ_board.py`.
+
+### 5. PR #262 MERGED AND DEPLOYED
+
+The (wp) fixes went to main under `[deploy-live]` at 05:07Z with both live
+rows online and unlocked (mum `fa4c0b99acb8`, avo `0af4038a63ba`, both
+`fleet_long_veto: true`). **VERIFIED by stamp readback after run 660**, not
+by the green run: both `freqtrade-avo-maria-lighter` and
+`freqtrade-mum-lighter` publish `88457127f621`/17 — byte-equal to
+`build_compute` at faf9bc8 — and both now read `leverage.stop_reachable_held:
+true` and `entry_vetoes.fleet_long_veto: false`. The paper positions that
+were vetoing real money no longer do; the immune page on a basket nobody
+held has its measurement. (mum's row took ~25 min to flip — the (ml)
+stale-serving window, read back rather than assumed.)
+
+**AND THE SAME READBACK FOUND THE FAMILY SHADOW HOST STUCK ON 28-AUG CODE.**
+`freqtrade-mum-lshadow` / `freqtrade-avo-maria-lshadow` — the live pair's
+CONTROL ARMS — publish `edc3032d1c46`/15, which `audit_code_currency` (run
+from a clean main tree, the image's own 15-file COPY set) resolves to
+**d2c0cb9, 28-Aug, 84 commits behind, 5 of them changing
+`lighter_family_bot.py`**. Three OK-reported deploys today (runs 660, 661, and
+a clean-main dispatch, 664) each booted a container that runs its loop, and
+the (vy) restart lever (665) ran too; the rows kept the old stamp through all
+four. A pre-28-Aug container is still the writer — the (ml)/(vy)
+stuck-serving class on this service for the SECOND time — and the family bot
+has no `claim_writer`, so the two writers are unguarded. **Consequence,
+stated plainly: the (wp) scan-order parity port never reached the shadow
+twins, so the judge's pair is still unjudgeable, and the mum lever surface in
+this entry will not run there either until the zombie is removed.** **AND THE CONCURRENT SESSION FOUND THE OTHER HALF, (wv), while this entry
+was being written:** the CURRENT container's publish was raising every loop
+(`spend_extra` read `b.bot` on a Book whose attribute is `bot_id`, inside
+the publish site's `except: pass`) — so no post-(vr) container ever
+published a family row, and the zombie's rows were the only fresh ones. Two
+defects, one symptom: a stale instance that could not be seen, and a live
+instance that could not speak. (wv) fixes the publish and kills the
+instance; this entry's carried row `family-shadow-stale-writer` stays until
+the stamp is READ BACK on the feed.
+
+**DEPLOY for this entry.** freqtrade-bots (judge, shortfall, fleet_bus,
+fleet_tuning, incubator, tuner, dashboard lists), family-lighter-shadow
+(mum's lever surface + georgia's shadow retirement), funding-farmer-shadow
+and band-garrett-shadow (their guards), book-douglas-shadow and
+book-grimes-shadow (their guards), tide-rider-lighter-live / mum-live take the
+live host's `live.mum.*` reader and the breakout clock only from a merge
+carrying `[deploy-live]` in its subject — this PR's title does.
+
 ## 2026-09-02 (wv) — THE DASHBOARD'S GEORGIA HOLE: one attribute name killed every family publish for five days, and a stale Railway instance made the fleet look healthy the whole time
 
 **[RENUMBERED (wu) -> (wv) at push time** — PR #263's sizing-rails merge took (wu) on main while this fix was built; the pushed entry keeps the letter per the letter rule.**]**
@@ -440,8 +610,6 @@ DEPLOY: freqtrade-bots rides the auto path (fleet_tuning's un-pinned cages
 reach the tuner; `clamp` runs at read so no lever write is needed). No
 real-money service is touched — the taker's `apply_tuning` returns empty on
 the live arm, twice-guarded.
-
-
 
 ## 2026-09-02 (wp) — THE SUPPORT SYSTEM DEEP DIVE: every organ is alive, the candidate line is structurally empty by design, and four of the fleet's own instruments were pointed at the wrong thing — paper positions vetoing real money, a stop-dead page on a basket nobody held, a judge with no pair it could open, an execution organ measuring a retired book
 

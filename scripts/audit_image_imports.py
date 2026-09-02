@@ -76,7 +76,10 @@ BORN_DARK_OK = {
     **{(df, "fleet_tuning"): "shadow book outside the board's LIVE_ROWS — the "
                              "growth-rail clip lever must not size it; "
                              "venues/__init__ falls back to env sizing"
-       for df in ("Dockerfile.dislocation", "Dockerfile.familyshadow",
+       # [(wv)] Dockerfile.familyshadow LEFT this list: the family image
+       # copies fleet_tuning now — 👩 mum's shadow twin reads xp.mum.* as the
+       # judge's experiment arm (venues/__init__ still clamps clip levers).
+       for df in ("Dockerfile.dislocation",
                   "Dockerfile.funding", "Dockerfile.fundspread",
                   "Dockerfile.indexshadow", "Dockerfile.momolive",
                   "Dockerfile.momoshadow", "Dockerfile.perpslive",

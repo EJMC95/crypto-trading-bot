@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 16:12 Sydney (06:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 16:14 Sydney (06:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -29,6 +29,11 @@ _Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is st
 
 _Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. [26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, crash-dominated — decides NOTHING either way; 3 of the six (sv) controls have flipped negative, so the 3->4 step is REFUSED on current data and 3->2 reversion equally unsupported. The OTHER half is now MEASURED AND CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 paired, both intrabar conventions) put every widening below the harness's own +0.246pp calibration error, roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees between conventions, and the 1440m max_hold fired 0 of 207 closes ever — exits are a dead dial on this book; the mean lever is ENTRY quality (rank1 +0.023% vs rank2 +0.656% on her own ledger).
 
+### `family-shadow-stale-writer`  ·  owner: **OPERATOR**
+🩺 family-lighter-shadow's rows (👩 mum-lshadow, 🙏 avo-lshadow — the live pair's CONTROL ARMS) publish build edc3032d1c46/15, which the repo's own audit_code_currency resolves to commit d2c0cb9 (28-Aug, 84 commits behind, 5 touching lighter_family_bot.py). Measured 2-Sep: THREE OK-reported deploys (05:12 run 660, 05:21 run 661, 05:33 dispatch 664 from clean main) each booted a container that runs its loop, and the (vy) restart lever (run 665) ran too — the rows kept the old stamp through all four. A pre-28-Aug container is still the writer: the (ml)/(vy) stuck-serving class on this service for the SECOND time (646/647/648 before), and the family bot has no claim_writer, so the two writers are unguarded ((hp) class). [(wv), same day] AND the current container could not publish at all: spend_extra raised inside the publish site's except: pass on every loop since (vr) — fixed at (wv), which also kills the instance; this row closes on the feed readback. Consequence: the (wp) scan-order parity port, mum v2's post-28-Aug fixes and the (ww) lever surface have NOT reached the shadow twins; the judge's pair cannot open until they do.
+
+_Still open because:_ no lever in this repo swaps the serving container when Railway's activation wedges: `up` builds and the swap does not happen, `redeploy` re-runs the CURRENT deployment ((vz)). The act is Eamon's, in the Railway UI: find and remove the extra running instance of family-lighter-shadow (or `railway down` the service, then `railway up` from clean main), then read back extra.build on freqtrade-mum-lshadow — expected 9c90be27d763/15 at 6639f1e, or the (ww) image's own id once merged (16 files: fleet_tuning.py joins the COPY set).
+
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
 
@@ -49,24 +54,24 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-### `carry-garrett-ranking-collision`  ·  owner: **OPERATOR**
-🌾 carry's measured-depth gate now reaches the whole of 🛢️ Garrett's [0.1M, 2M) band, and Garrett's own (pl) measurement found 6 of 6 of its top-ranked candidates are >=20% APR — so carry is a rival for exactly the supply Garrett ranks first. A RANKING collision; audit_book_overlap's axes (apr x vol x class) cannot express it.
+## Shipped today (80 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
 
-_Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
-
-## Shipped today (91 commit(s), entries (tg), (vt), (vw), (vx), (vy), (vz), (wa), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu))
-
-- `21f2cd3` The dashboard's georgia hole (wv): spend_extra's b.bot killed every family publish for five days behind a stale Railway writer — one builder, driven for every book, publish failures now log
+- `085a748` Merge origin/main: reconcile with the (wt) September slate and the (wu) rails — georgia's shadow retirement withdrawn (deferred to her 10-Sep read), duplicate guards dropped for the slate's, roster re-aims reverted, letter (ws)->(wv)
 - `9c3b2cb` Merge PR #263: the two sizing rails from the edge audit, reshaped to bite only on measured harm; the brain's expansion floors measured and kept (wu)
 - `ab465ba` HANDOFF regenerated after the third re-merge (wu)
 - `07adc37` Merge origin/main a third time: the (wt) September slate landed; the rails entry keeps (wu)
 - `922016c` The September slate (wt): five I17 retirements on the grader's own verdicts (garrett, douglas, farmer-shadow, nav-cook, grimes), georgia v1 deferred to her pre-registered 10-Sep read, trail-blazer-live stopped — Eamon's delegated docket act
+- `643bc6e` CodeQL hygiene on (wt) and the merged (wp): one import style for the family module, no dead binding, file reads through pathlib, explanatory comments in the two empty excepts, redundant inner imports dropped
 - `83bcbfd` CodeQL hygiene on the floors study: the --out write goes through a with-block (wu)
 - `cd8410c` Port the selftest registration for scripts/study_taker_divergence_stop_2026-09-02 (wu)
+- `7544d84` (wt) the family shadow host is stuck on 28-Aug code: carried as an operator act with the stamp to read back
 - `b0b2340` HANDOFF regenerated after the second re-merge (wu)
 - `5724989` Merge origin/main again: main took (wq)-(ws) and holds (wt) in flight, so the rails entry moves to (wu); the carried list is main's minus the closed floors row
+- `bd1ad2a` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
+- `b7599d4` Renumber (ws) -> (wt): main took (ws) for the sentinel's graded bar while this pass was open
 - `1b12ace` HANDOFF regenerated after closing the floors row (wq)
 - `7dd38b4` The brain's expansion floors, measured before the rails merge: floors KEPT with evidence, the entry's two false sentences corrected in place, the carried row closed (wq)
+- `21283ad` (ws) Proceed with everything in the organ review: five docket retirements, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to mum, and a weekly organ board
 - `6639f1e` The sentinel earns its fear (ws): one graded bar (n>=10, hit>=0.55) for BOTH proposal directions — a below-coin-flip playbook can no longer propose the crouch
 - `7ab31ed` The clock split (wr): the breakout trend exit gets its own BRK_MAX_HOLD_H — taker.max_hold_h steers only the divergence bracket, AST-pinned, behaviour-neutral at ship
 - `694f7c6` HANDOFF regenerated after merging main into the rails branch (wq)
@@ -131,22 +136,6 @@ _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~1
 - `03ed81c` Merge PR #256: repo public - sweeps clean, CodeQL path reopens, branch protection now more urgent (wd)
 - `d69ed1a` Merge PR #255: the orphan survives a region migration; CodeQL enable withdrawn - code scanning is plan-blocked on a private personal repo (wc)
 - `879ba9b` Merge PR #253: GROSS_X live on all three books via the Railway connector; the family wedge is an orphaned container and (id)'s assumption is measured false (wb)
-- `bdfc437` Merge PR #252: the address-all-of-the-above records - sentinel proven live, ⚖️ kept on a fresh criterion, GROSS_X handed over, family pinned Railway-side (wa)
-- `2e18902` Merge PR #251: the restart lever's sentinel was dead on arrival - run 650 measured it, one line fixes it, a guard pins it (vz)
-- `39ba58a` [deploy-live] Merge PR #250: kelly clips 250->80, the mmf-aware clip on all three live books, and the stuck-server restart lever (vy)
-- `8c6644e` Re-aim the (qj) risk-up pin to the 1-Sep recorded shape - I26: a pin is not a reason (vy)
-- `11cef14` Record (vy): the proceed-with-all execution, and HANDOFF regenerated
-- `65c84fd` A restart lever for the (ml) stuck-server class: railway redeploy via dispatch, no upload, no UI (vy)
-- `fa8821e` Kelly snap clips revert 250 -> 80 on the grader's own verdict - Eamon's call, era untouched (vy)
-- `f3b337a` The mmf-aware clip: 10x becomes compatible with living stops, per coin and restrict-only — 5/5 mutations red (vy)
-- `bbb9b8e` Merge PR #249: the 1-Sep fleet audit — changelog restored + guarded, bezos un-crashed, CI green (vw)-(vx)
-- `8a9ec15` The edge, explored: half of mum's mean is tape and half is her, the brain is warming toward paying her for it, and the margin tier completes the 10x decision (vx)
-- `00336d8` The always-red check: #238's CodeQL had failed 10 of 10 runs ever, on main included — rebuilt working and gated on the setting it requires (vw)
-- `893ce7e` Corrected in place: the dashboard flipped and the family service is the one stuck server — deploys that report OK while the old container serves (vw)
-- `a1c010a` The lost-entries arm was vacuous on the real file and a mutation caught it: the renumber excuse becomes two-signal (vw)
-- `e5b7527` Fleet audit 1-Sep: the report, and HANDOFF regenerated (vw)
-- `1a6ec31` book-bezos was born dead three ways: the engine ships, the accidental 5x is gone, and the book joins every registry its birth skipped (vt)
-- `56eb4e7` The changelog was wiped on main and no guard could say so: 655 entries restored, and the class gets its lost-entries arm (vw)
 
 ## How this file stays honest
 

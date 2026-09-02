@@ -93,6 +93,37 @@ jobs:
       - name: Entry/exit/stop/loss lens selftest
         run: python3 scripts/study_entry_exit_stoploss_fleet.py --selftest
 
+  # [2026-09-02] ORGAN BOARD — the (wp) organ review read every organ on the
+  # bus BY HAND and judged its OUTPUT against what the organ promises (a judge
+  # at "0 of 4" lanes, an incubator whose champion is never real, a parliament
+  # ensemble at coin-flip accuracy). Nothing scheduled asked that question:
+  # the watchdog pages on DEATH, the immune organ on invariant violations,
+  # the scoreboard reads P&L. This job asks it weekly from the two PUBLIC
+  # feeds — liveness FIRST (I1: a frozen payload is byte-identical to a
+  # healthy one), then semantics — with the 2-Sep by-hand reading pinned as
+  # the baseline, so the next review is a DIFF. Mirrors `code-currency`'s
+  # shape: a separate job, the script's fail-closed feed contract (exit 2 on
+  # a dark/unparseable feed, never a vacuous green), selftest FIRST so a
+  # board that cannot see never grades. INFORMATIONAL BY DESIGN otherwise:
+  # `watch` is a reading, not a red — the step summary is the deliverable.
+  # Guarded by tests/autonomy/test_organ_board.py.
+  organ-board:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The board must still be able to see (fixture + 4 mutations)
+        run: python3 scripts/organ_board.py --selftest
+      - name: Fetch the public feeds
+        run: |
+          set -euo pipefail
+          curl -sS --retry 3 --retry-delay 5 "$BUS" -o bus.json
+          curl -sS --retry 3 --retry-delay 5 "$FEED" -o pnl.json
+          test -s bus.json && test -s pnl.json
+      - name: What does each organ SAY, not just is it alive?
+        # exit 2 = a FEED is dark/unparseable (fail-closed); exit 0 otherwise —
+        # the table lands in $GITHUB_STEP_SUMMARY via the script itself.
+        run: python3 scripts/organ_board.py --bus-json bus.json --pnl-json pnl.json
+
   code-currency:
     runs-on: ubuntu-latest
     steps:

@@ -116,6 +116,10 @@ from lighter_family_bot import (
     # [2026-08-27] the ONE owner of a close's identity + open stamp — an
     # unknown open must never claim a colliding ':None' id ((hj)).
     close_identity,
+    # [(wv)] the judge's lever surface + the receipt stamp, from the ONE owner
+    apply_book_levers as _fam_apply_book_levers,
+    mum_bars as _fam_mum_bars,
+    OversoldRebound as _FamOversoldRebound,
 )
 from venues import marks
 from venues.safety import (
@@ -784,7 +788,12 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
     if not reason and roi_exit_due(age_min, profit, strategy):
         reason = "roi"
     if not reason and hasattr(strategy, "custom_exit"):
-        reason = strategy.custom_exit(m.get("tag"), age_min, profit)
+        # [(wv)] the ENTRY-STAMPED cap governs (the (bw) rule) where the
+        # carrier prices its time cap at entry; other carriers unchanged.
+        _cap = ((m.get("bars") or {}).get("max_hold_min")
+                if isinstance(strategy, _FamOversoldRebound) else None)
+        reason = (strategy.custom_exit(m.get("tag"), age_min, profit, cap=_cap)
+                  if _cap else strategy.custom_exit(m.get("tag"), age_min, profit))
     if not reason and sig and sig.get("exit") \
             and m.get("tag") != "trend_breakout":
         reason = sig.get("exit_reason", "exit_signal")
@@ -2279,6 +2288,12 @@ def main(_ctx=None, once=False):
                            # rank is born at the OPEN ((sv)); the pre-(th) 46
                            # georgia closes carry None and always will.
                            "entry_rank": m.get("entry_rank"),
+                           # [(wv)] the judge's receipt + the recorded RSI
+                           **({"bars": m["bars"]}
+                              if isinstance(m.get("bars"), dict) and m["bars"]
+                              else {}),
+                           **({"rsi_entry": m["rsi_entry"]}
+                              if m.get("rsi_entry") is not None else {}),
                            "mmf_factor": m.get("mmf_factor"),
                            **({"non_economic": True} if _phantom else {}),
                            **({"stop_overshoot_bps": _ob}
@@ -2400,6 +2415,16 @@ def main(_ctx=None, once=False):
         nc_verdicts = noncrypto_regimes() if has_noncrypto else {}
         dt_h = max(0.0, (t0 - float(state.get("last_accrue") or t0)) / 3600.0)
 
+        # [(wv)] the judge's PROMOTED live.<book>.* levers reach this host —
+        # written only by the judge after the paired bar (fleet_tuning's
+        # prefix owner), read every loop, env default when none is in force.
+        # A no-op for carriers without the knobs (🙏 avo today).
+        try:
+            _fam_apply_book_levers(S, f"live.{_PFX.lower()}.")
+        except Exception:  # noqa: BLE001
+            # a dark rail runs the env default; the overlay is re-derived
+            # from the class defaults every loop, so nothing is left stale
+            pass
         # L2 fleet reads (restrict-only, fail-open) — this is a directional
         # LONG book, so the fleet long budget + symbol cap bind it like every
         # other long book. The SHADOW drawdown governor is deliberately NOT
@@ -2896,6 +2921,13 @@ def main(_ctx=None, once=False):
                     pass
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
+                             # [(wv)] the bars in force at entry (the judge's
+                             # receipt on this arm) + the admitted RSI (I23)
+                             "bars": _fam_mum_bars(S),
+                             "rsi_entry": (float(sig["rsi"])
+                                           if isinstance(sig, dict) and
+                                           isinstance(sig.get("rsi"), (int, float))
+                                           else None),
                              # [(so)] I22 receipt, carried on the durable
                              # position record so it survives a restart and
                              # reaches the close row.
