@@ -215,15 +215,15 @@ def test_the_gate_refuses_to_arm_on_a_book_whose_one_stop_is_its_whole_leash():
     unscoped would have refused EVERY avo entry on any day she was fractionally
     down — silently stopping the fleet's other real-money book. Derived from
     the book's own geometry, never a hardcoded roster."""
-    import importlib
     import os
+
     class _R:
         max_daily_loss = None
+
     for book, var, gx, want_armed in (
             ("freqtrade-avo-maria", "AVO_GROSS_X", "5.0", False),
             ("freqtrade-mum", "MUM_GROSS_X", "3.75", True)):
         with loaded(book, **{var: gx}) as m:
-            importlib.reload(m) if False else None
             eq = 1000.0
             share, armed = m.halt_gate_share(m.clip_usd(eq), m.S.stoploss, eq, _R())
             assert armed is want_armed, (book, share, armed)
