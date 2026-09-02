@@ -1,4 +1,6 @@
-## 2026-09-02 (wp) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
+## 2026-09-02 (wq) — THE TWO SIZING RAILS FROM THE EDGE AUDIT SHIP — RESHAPED BEFORE THEY LANDED SO EACH BITES ONLY ON A MEASURED HARM: A BOOK PAST ITS DRAWDOWN BAR IS SCALED, AND A BOOK WHOSE ERA BOUND IS MEASURED AT ZERO IS NOT LEVERED
+
+**[RENUMBERED (wp) → (wq) AT MERGE TIME, 2-Sep.** #262 — the support-system deep dive — landed on main first carrying `(wp)`, and its code cites it, so the pushed entry keeps the letter and this one moves (letter rule 3). Every citation of THIS entry moved with it: the `fleet_bus.py` rails comment, the CLAUDE.md brain-stake-mults bullet, the PR title. The three commit subjects keep `(wp)` — git subjects are immutable, and the letter rule already says the commit log is not a letter index; grep the CHANGELOG headers.]**
 
 **Eamon, 2-Sep, on the edge audit's proposals: *"Proceed with advisements."***
 `(wo)` §6 proposed three changes for approval. The first — 🪁 kelly's clip
@@ -98,6 +100,179 @@ fired for either, because its floors were calibrated for a 1.5× ceiling
 win-more direction, and it is a measurement first: how many buckets qualify at
 each floor, and what they earned.
 
+## 2026-09-02 (wp) — THE SUPPORT SYSTEM DEEP DIVE: every organ is alive, the candidate line is structurally empty by design, and four of the fleet's own instruments were pointed at the wrong thing — paper positions vetoing real money, a stop-dead page on a basket nobody held, a judge with no pair it could open, an execution organ measuring a retired book
+
+**Eamon, 2-Sep: *"Deep dive into how every organ, scanner, incubator, is
+working please? I haven't seen any additional bots from the candidate line even
+though several have showed promise."*** This entry is that pass, measured on
+the live bus at 04:19Z (Sydney 14:19) and then shipped. The short answer to the
+candidate-line question is in §2 and it is a design fact, not a defect: **no
+organ in this fleet can mint a book**, by doctrine
+([[incubator-cannot-mint-books]], I20, I22) — the incubator breeds PARAMETER
+SETS for one shadow book and proposes them to a replay gate; the judge promotes
+LEVER VALUES from a shadow twin to its live arm. "Promise" in a candidate is a
+lever proposal that survived a gate, and §2 measures why zero have.
+
+### 1. LIVENESS — every organ inside its TTL, nothing to fix
+
+All 28 bus keys fresh (oldest `golive-readiness` 2.2h against a 12h TTL; the
+rest under 11 min); watchdog `problems: []`, `bots=20 open_positions=79
+freshest=3s`; respiration SpO2 **1.0** on all six feeds; regen `repaired: []`;
+allocation `n_unpriced 0`. The one liveness scare was the 🏛️ Parliament's
+`restarts: 75` beside `scanners.bench` all `runs: 0` — read against the
+container logs, those are DEPLOYS (5 resets in 19h = the night's five
+`freqtrade-bots` redeploys, build stamp moving `dd0fa6fdfe1c → e11b44f6d0fd`),
+and the bench reads zero because the snapshot was 68 seconds after a boot. Not
+a fault. What IS a finding there: Keating's 5-model ML ensemble reads
+`oos_acc 0.488–0.501` on n=81 — a coin flip, reported never a bar (I15) — and
+its websocket is CDN-blocked (known; REST carries on). Event sentinel's GDELT
+source is down (`gdelt: false`, RSS up) and its playbook self-grades at
+**hit 0.33 over n=833**, below a coin flip, while it keeps proposing the
+risk-off crouch (`taker.momo_chg 6.0` / `brk_range 0.95` / `max_hold 48`)
+every cycle — proprioception grades those `neutral` (Σ+$1.89 over 5 episodes)
+because the momentum lens is brain-vetoed anyway. Noise, declared, not fixed
+here: the risk-ON branch already requires a graded ≥0.55 playbook and the
+risk-OFF branch requires nothing, and that asymmetry is the next thing to
+measure on the sentinel.
+
+### 2. THE CANDIDATE LINE — three gates, each measured, and where it dies
+
+* **🧬 the incubator (taker line).** 1,050 genotypes scored this cycle, **5
+  both-halves-positive, 0 enactable both-halves, champion streak 0/3**,
+  `champion_why: weak half $-7.60 < $3.5`. The fittest ENACTABLE genotype
+  (sl −0.02 / div_gap 37.5 / hold 48 / tp 0.03) has lcb **−8.88**; the
+  fittest of ALL (sl −0.06 / div 25 / hold 24 / tp 0.04) has lcb **+10.40**
+  but h2 −$3.02; and the ONE genotype that would pass every champion bar —
+  sl −0.02 / div 25 / hold 24 / tp 0.02, **n=189, lcb +3.21, halves
+  +10.27/+10.79, +$46.75 over default** — is OUT OF CAGE on three genes at
+  once (div_gap 25 < lo 37.5, hold 24 < lo 48, tp 0.02 < lo 0.03).
+  `cage_analysis` reports `cage_may_bind: false` on every gene because it
+  tests one axis at a time and the winner is joint. **So the answer to "why
+  no champion" is the cage, and the cage is pinned for a reason that is now
+  half-spent**: (sk) pinned `taker.max_hold_h` lo=48 because the tuner's
+  replay was blind to `breakoutup`; the tuner now reads `up_resolver: true`
+  and replays 26 breakoutup takes — but the SAME `MAX_HOLD_H` clocks the
+  breakout arm (carried item `breakout-arm-inherits-reversion-clock`), and
+  (sk) measured a 24h hold as +0.22..0.57pp WORSE on that arm. Widening the
+  cage lo to feed the divergence genotype would cut breakoutup's hold in the
+  same move. **The unblocking work is the carried clock split, not a cage
+  edit** — recorded so the next session starts there (I11).
+* **🧬 → 🧪 (funding line).** The incubator's 8 proposed funding candidates
+  target `xp.funding.*` on 💸 the Farmer's shadow, whose live arm retired at
+  (ta); `xp-queue` publishes `candidates: []` and the judge's serial lane is
+  `farmer: stood_down`. **That line is structurally dead** and has been since
+  22-Aug. Retargeting it needs an `xp.mum.*` / `xp.avo.*` lever family with
+  a consumer in the shadow host — a build, sized and declined here.
+* **🧪 the judge (family pairs).** `judging: 0 of 4` — farmer and georgia
+  `stood_down` (correct), **avo and mum `unjudgeable: policy_mismatch` on
+  `scan_order`** (live=diversified, shadow=list). This is the ONLY path from a
+  shadow candidate to real money and it had no pair it could open. Measured
+  on 👩 mum's two ledgers since 25-Aug: 36 of 53 live entries matched a shadow
+  entry on the same coin within 2h; **7 coins live-only, 4 shadow-only** —
+  material, so the georgia-style waiver is the wrong tool. **SHIPPED: the
+  port** (§4c). Judge ETA for mum after the port: ~8.6d (shadow closes bound).
+
+### 3. THE REAL-MONEY FINDINGS — two instruments pointed at the wrong object
+
+* **a. PAPER WAS VETOING REAL MONEY.** `fleet-risk` published
+  `long_positions 20 / long_budget 20` = 👩 mum 11 (real) + 🙏 avo 3 (real) +
+  🎫 the shadow taker **6 (PAPER)**, and BOTH live rows published
+  `fleet_long_veto: true` with slots free (mum 11 of 12, avo 3 of 5). Over
+  the trailing 24h the pooled count sat AT the budget in **17 of 285 samples
+  (6.0%), every one since 02:02Z** — i.e. since georgia's $220 moved to mum
+  and her clip grew. The 20-long budget was written for an all-paper fleet.
+  A paper position carries no risk to a real book and a real one none to a
+  paper book, so one count is a category error in BOTH directions — and the
+  shadow twin of a live base was counted NOWHERE (`authoritative_row` picks
+  the live row) while it vetoed itself on the live count.
+* **b. THE STOP-DEAD PAGE WAS ON A BASKET NOBODY HELD.** `fleet-immune`
+  listed both live books sick every loop: *"protective stop is DEAD at gross
+  9.5 (ceiling 4.17)"* / *"5.3 (ceiling 3.33)"*. The publisher computes it
+  from `worst_mmf(universe)` — the worst maintenance margin across the ~93
+  books the row COULD hold, **0.20** — at FULL-slot gross. Read off the
+  venue's own margin block, mum's HELD basket was TAO 12% · PENGU 7.5% · four
+  6% majors · XCU/GRAM 3% · XAU 2.4% · QQQ 2% · SPY 1.2% (notional-weighted
+  ~5–6%) at the venue's own **5.63x**, so ~12% to liquidation against a −4%
+  stop: reachable. The `liq_unpriced` page beside it is structural on a
+  cross-margin book (the venue prices liquidation per ACCOUNT; 1 of 11 legs
+  carried a per-position liq). A trigger a book satisfies structurally is not
+  a measurement (I7), and a detector that pages every loop trains the reader
+  to ignore it ((gl)) — on the real-money surface.
+
+### 4. SHIPPED (all pinned; new suites 28 tests, existing suites green)
+
+* **a. The long budget splits into cohorts.** `fleet_risk` publishes
+  `cohorts.{live,shadow}.{long_positions,long_budget}` beside the unchanged
+  pooled pair (`row_longs` / `cohort_longs` extracted so the two counts share
+  one rule; the live base's `-lshadow` twin now counts in `shadow`).
+  `fleet_bus.cohort_long_state` is the ONE reader and degrades to the pooled
+  pair on an old-shape payload — a fleet-risk container still publishing the
+  old shape vetoes exactly as before. Consumers: live host → `live`; family
+  shadow, taker (by `TT_VENUE`), funding (by `shadow_tag`), trend → their
+  own. `FLEET_LIVE_LONG_BUDGET` defaults to the same 20 — a separate COUNT,
+  not a wider budget. Expectancy-neutral (no entry rule moves); it removes a
+  starvation, and I26 puts the burden on the refusal.
+  `tests/autonomy/test_fleet_risk_cohorts.py`.
+* **b. The held-basket margin is measured and paged on.** The live host
+  publishes `leverage.{mmf_held, mmf_held_weights, leverage_now,
+  liq_gap_held_pct, stop_reachable_held, stop_dead_above_held}` — the
+  notional-weighted margin of the positions actually held, at the venue's
+  own gross/equity — beside the universe bound, which stays. Fail-CLOSED: one
+  unreadable leg makes the basket None (an average that drops the riskiest
+  leg is the one number never to guess). `fleet_immune` pages on the held
+  reading when present, the bound when absent (deploy latency never goes
+  quiet), and `liq_unpriced` is DECLARED structural for both cross-margin
+  rows in `HEADROOM_OK` with the measurement.
+  `tests/autonomy/test_held_basket_mmf.py`; immune selftest extended.
+* **c. The shadow twins scan in the live host's order.** `diversified_order`
+  moves to `fleet_bus` (one owner; the live host aliases it — the (sr) tests
+  bind the name and stay green). `lighter_family_bot` builds returns off the
+  bars its cache already holds and offers candidates via
+  `shadow_scan_order`; the policy stamp and the loop read ONE constant
+  (`FAMILY_SHADOW_SCAN_ORDER`, `list` reverts and stamps `list`). Byte-
+  identical for any single candidate; only the offer ORDER moves, and only
+  when a cycle has more signals than free slots. Georgia's declared waiver is
+  untouched and becomes moot once both arms stamp `diversified`.
+  `tests/autonomy/test_family_shadow_scan_order.py`.
+* **d. The execution-quality organ measures a living pair.**
+  `implementation_shortfall` defaulted `SHORTFALL_LIVE` to a LITERAL naming
+  the Farmer's retired arm, so it published `stood_down` for 11 days while
+  two real-money books traded unmeasured — the fourth list-keyed rot on a
+  slot swap. `fleet_bus.active_price_pairs()` derives the living pairs from
+  `JUDGED_PAIRS` + `RETIRED_LIVE_ARMS`; `shortfall_default_pair()` picks the
+  one with the most live closes (mum), env still wins.
+  `tests/autonomy/test_shortfall_default_pair.py`.
+* **e. Counterweight's decision date.** `DECIDED_UNTIL` still said 28-Aug, so
+  the docket printed `decision_overdue` for four days after Eamon's 1-Sep
+  KEPT call ((wa)) — the deferral's own "it EXPIRES" property, on a decision
+  nobody had recorded there. Corrected in place per I12 to the pre-registered
+  re-read (n≥60 fresh on-class closes or 1-Oct).
+
+### 5. DECLARED, NOT CHANGED — Eamon's calls, laid out with the numbers
+
+The decision docket holds **seven** keep-or-retire calls, every one with a
+measured exclusion or a zero rate (I17-as-amended's bar): 🛢️ garrett
+(n=85, −1.09%/trade, t=−2.22, upper bound −0.46%), 🧘 douglas (n=81,
+−0.73%, t=−2.54, ub −0.36%), 💸 farmer shadow (n=200, −0.53%, t=−2.32, ub
+−0.23%), 🧭 nav-cook (n=38, −0.19%, t=−1.45, ub −0.02%), 📐 grimes (0 closes
+in 19d — the gate has never opened on the fixed universe), 🔮 georgia shadow
+(t=0.29, ~4,224 days to the bar), ⚖️ counterweight (kept, re-read 1-Oct).
+None is touched here; each is an operator act, and each is presented in the
+session report with its options. Also declared: 💰 the allocation organ's
+`n_with_era_claim` is 0 on funding and 5 on directional (the claim table is
+honest and thin); 🧠 the brain publishes 3 opinions across 20 books (mum
+expand 1.25 — which her restrict-only host correctly refuses; douglas and
+the taker's short-divergence reduce 0.75); the evidence board holds a stale
+`live.georgia.clip_scale 0.75` lever on a retired row (expires on its own).
+
+**DEPLOY.** freqtrade-bots (fleet_risk, fleet_immune, shortfall, docket) and
+family-lighter-shadow auto-deploy on merge; the two live services take (a)
+and (b) on the merge commit carrying `[deploy-live]` in its SUBJECT — both
+rows read `online`, not halted, at ship (a restart wipes memory-only halts).
+Verify by `extra.build`+`build_n` on `freqtrade-mum-lighter` and
+`freqtrade-avo-maria-lighter`, then read `leverage.stop_reachable_held` and
+`entry_vetoes.fleet_long_veto` on both — the two numbers this entry exists
+to change.
 ## 2026-09-02 (wo) — THE EDGE AUDIT: 18 LIVING BOOKS, ZERO SURVIVE MULTIPLICITY, AND EVERY BOOK MINTED ON A PER-TRADE REPLAY NUMBER IS REJECTING IT ON ITS OWN LEDGER — FOUR OF FOUR
 
 **[RENUMBERED THREE TIMES — (wl) → (wm) → (wn) → (wo), at merge:** three sessions pushed inside half an hour and main took each letter first — (wl) the dashboard's capital-move-immune daily P&L, (wm) mum's I21 pre-registration on the winners' docket, (wn) the CI-liveness pager's heartbeat. The pushed entry keeps the letter, per the letters rule; the two CLAUDE.md citations moved with it each time; `git log` subjects keep the old letters and are not a letter index. Same-day instance of the race that rule was written for.]**

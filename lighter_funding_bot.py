@@ -1918,6 +1918,19 @@ def read_quarantine(load_checked, key, tries=3, backoff=2.0, sleep=None):
     return False, {}, {}
 
 
+def _cohort_long_state(fr, cohort):
+    """[(wp)] fleet_bus.cohort_long_state, image-guarded: without fleet_bus
+    the read degrades to the pooled pair — this site's prior behaviour."""
+    try:
+        import fleet_bus
+        return fleet_bus.cohort_long_state(fr, cohort)
+    except Exception:  # noqa: BLE001
+        fr = fr if isinstance(fr, dict) else {}
+        _lb = fr.get("long_budget")
+        return (int(fr.get("long_positions") or 0),
+                10**9 if _lb is None else int(_lb))
+
+
 def main():
     p = argparse.ArgumentParser(description="Yield Harvester — Lighter directional funding")
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
@@ -2720,20 +2733,19 @@ def main():
             _fr = store.load_state("fleet-risk") or {}
             _fage = (now - datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
-            _lb = _fr.get("long_budget")
-            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
+            # [(wp)] this arm's OWN cohort (shadow twin -> paper count, a
+            # live arm -> real-money count); fleet_bus owns the fallback.
+            _lp, _lb = _cohort_long_state(
+                _fr, "shadow" if shadow_tag else "live")
             if (_fage <= float(_fr.get("ttl_sec") or 900)
                     and _fr.get("mode") == "enforce"):
-                fleet_long_headroom = max(
-                    0, _lb - int(_fr.get("long_positions") or 0))
+                fleet_long_headroom = max(0, _lb - _lp)
             if (_fage <= float(_fr.get("ttl_sec") or 900)
-                    and _fr.get("mode") == "enforce"
-                    and (_fr.get("long_positions") or 0) >= _lb):
+                    and _fr.get("mode") == "enforce" and _lp >= _lb):
                 fleet_long_veto = True
-                log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                log.info("FLEET LONG-BUDGET VETO — %s/%s cohort longs; "
                          "no new LONG entries this cycle (shorts/exits "
-                         "unaffected)", _fr.get("long_positions"),
-                         _fr.get("long_budget"))
+                         "unaffected)", _lp, _lb)
         except Exception:  # noqa: BLE001 — fail-safe open
             fleet_long_veto = False
             fleet_long_headroom = None

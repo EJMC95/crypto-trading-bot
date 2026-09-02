@@ -399,6 +399,50 @@ def worst_mmf(universe):
     return max(seen) if seen else None
 
 
+def held_mmf(positions, rows):
+    """[2026-09-02 (wp)] THE HELD BASKET'S maintenance-margin fraction,
+    notional-weighted, or None — the quantity cross-margin liquidation is
+    actually computed on. `positions` is the venue margin block's
+    `{sym: {"value": notional_usd, ...}}`; `rows` the scout's margin surface.
+
+    WHY A SECOND NUMBER. `worst_mmf(universe)` is the worst margin across the
+    93 books this row COULD hold, applied at FULL-slot gross — a bound, and
+    on 2-Sep it read 0.20 (a 20%-mmf book mum did not hold) against her
+    real basket (TAO 12%, PENGU 7.5%, four 6% majors, XCU/GRAM 3%, XAU/QQQ/
+    SPY 1.2-2.4%) at the venue's own 5.6x. So the immune organ paged "stop
+    DEAD, ceiling 4.17x" every loop on both live books, on a condition their
+    holdings did not satisfy (I7: a trigger a book meets structurally is not
+    a measurement). The bound stays published; THIS is what gets paged on.
+
+    Fail-CLOSED like worst_mmf: a position whose margin is unreadable makes
+    the whole basket unreadable (None) — an average that silently dropped the
+    riskiest leg would be the one number this row must never guess. Weights
+    are |value|; a basket with no readable notional weights equally, declared
+    via the second return."""
+    if not isinstance(positions, dict) or not positions:
+        return None, None
+    if not isinstance(rows, dict):
+        return None, None
+    num = den = 0.0
+    weighted = True
+    for sym, p in positions.items():
+        m = coin_mmf(sym, rows)
+        if m is None:
+            return None, None
+        try:
+            w = abs(float((p or {}).get("value")))
+        except (TypeError, ValueError):
+            w = None
+        if not w or w <= 0:
+            weighted = False
+            w = 1.0
+        num += m * w
+        den += w
+    if den <= 0:
+        return None, None
+    return num / den, ("notional" if weighted else "equal")
+
+
 #: [2026-09-01 (vy)] MMF-AWARE CLIP — option D of the (vx) sizing card,
 #: executed on Eamon's "proceed with all of it". The (vx) measurement: 63% of
 #: 👩 mum's week-1 P&L sits in ≤6%-mmf coins, the 12% tier is net NEGATIVE,
@@ -634,31 +678,10 @@ _pair_corr = _bus.pair_corr
 basket_n_eff = _bus.basket_n_eff
 
 
-def diversified_order(universe, held, rets):
-    """`universe` reordered so the candidate that most REDUCES the held
-    basket's correlation is offered first.
-
-    FAIL-SAFE IS THE WHOLE CONTRACT: anything unmeasurable keeps its original
-    relative position and sorts AFTER the measured ones, and an empty/held-less
-    /dark read returns the list unchanged — i.e. exactly today's behaviour. A
-    correlation we could not measure must never jump a name up the queue.
-    """
-    try:
-        held = [h for h in (held or []) if rets.get(h)]
-        if not held or not universe:
-            return list(universe)
-        scored = []
-        for i, sym in enumerate(universe):
-            r = rets.get(sym)
-            cs = [c for h in held
-                  if (c := _pair_corr(r, rets[h])) is not None] if r else []
-            # unmeasured -> (1, original index): after every measured name,
-            # original order preserved among themselves.
-            scored.append(((0, sum(cs) / len(cs), i) if cs else (1, 0.0, i), sym))
-        scored.sort(key=lambda kv: kv[0])
-        return [s for _, s in scored]
-    except Exception:  # noqa: BLE001 — ordering is an enhancement, never a dependency
-        return list(universe)
+# [2026-09-02 (wp)] ONE owner: fleet_bus.diversified_order — the family
+# shadow host now runs the same rule, so the judge's parity rung can open.
+# Kept as a module name because the (sr) tests and the entry loop bind it.
+diversified_order = _bus.diversified_order
 
 
 def _clip_scale_now():
@@ -1690,6 +1713,24 @@ def main(_ctx=None, once=False):
             # read once per publish and shared by the three fields below.
             _mmf = worst_mmf(universe)
             _stop_ok, _stop_ceiling = stop_reachable(_mmf)
+            # [(wp)] and the MEASURED one: the held basket at the venue's
+            # own leverage (gross/equity off the margin read), never the
+            # full-slot bound. None when any leg's margin is unreadable.
+            _held_mmf, _held_w = (None, None)
+            _lev_now = None
+            try:
+                _mrows = _bus.market_margins() or {}
+                _mpos = (_mstate or {}).get("positions") \
+                    if isinstance(_mstate, dict) else None
+                _held_mmf, _held_w = held_mmf(_mpos, _mrows)
+                _ln = (_mstate or {}).get("leverage") \
+                    if isinstance(_mstate, dict) else None
+                _lev_now = float(_ln) if _ln is not None else None
+            except Exception:  # noqa: BLE001 — telemetry never breaks the loop
+                _held_mmf, _held_w, _lev_now = None, None, None
+            _stop_ok_held, _stop_ceiling_held = (
+                stop_reachable(_held_mmf, _lev_now)
+                if (_held_mmf is not None and _lev_now) else (None, None))
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
                 # [2026-08-25] derived from the variant — this was a hardcoded
@@ -1764,6 +1805,25 @@ def main(_ctx=None, once=False):
                     # protective stop is dead code. Reported, never a gate.
                     "stop_reachable": _stop_ok,
                     "stop_dead_above": _stop_ceiling,
+                    # [(wp)] THE HELD-BASKET MEASUREMENT beside the bound.
+                    # `mmf`/`liq_gap_pct`/`stop_reachable` above are the
+                    # universe-worst margin at FULL-slot gross — a ceiling
+                    # on what this row could ever do. These are what it IS
+                    # doing: the notional-weighted margin of the positions
+                    # actually held, at the venue's own leverage read, and
+                    # whether the stop fires first THERE. fleet_immune pages
+                    # on `stop_reachable_held` when present. None means a
+                    # leg's margin was unreadable — reported, never guessed.
+                    "mmf_held": (round(_held_mmf, 4)
+                                 if _held_mmf is not None else None),
+                    "mmf_held_weights": _held_w,
+                    "leverage_now": (round(_lev_now, 4)
+                                     if _lev_now is not None else None),
+                    "liq_gap_held_pct": (
+                        liq_gap_pct(_held_mmf, _lev_now)
+                        if (_held_mmf is not None and _lev_now) else None),
+                    "stop_reachable_held": _stop_ok_held,
+                    "stop_dead_above_held": _stop_ceiling_held,
                     # [(th)] THE RUIN GATE'S VERDICT, published — the fleet's
                     # only liquidation-aware gate guarded zero live dollars
                     # after the (ta) retirement of its sole caller, while the
@@ -2352,10 +2412,14 @@ def main(_ctx=None, once=False):
             fr = store.load_state("fleet-risk") or {}
             age = (t_now - parse_ts(fr.get("updated"))).total_seconds()
             if 0 <= age <= float(fr.get("ttl_sec") or 900):
-                lb = fr.get("long_budget")
-                lb = 10 ** 9 if lb is None else int(lb)
+                # [(wp)] THE LIVE COHORT'S OWN COUNT. This read `long_positions`,
+                # the POOLED number, so on 2-Sep both real-money books were
+                # vetoed with slots free by a budget 6/20 of which was 🎫 the
+                # shadow taker's PAPER longs. fleet_bus.cohort_long_state is
+                # the one reader; an old-shape payload degrades to the pooled
+                # pair, i.e. exactly this site's prior behaviour.
+                held_longs, lb = _bus.cohort_long_state(fr, "live")
                 if fr.get("mode") == "enforce":
-                    held_longs = int(fr.get("long_positions") or 0)
                     fleet_headroom = max(0, lb - held_longs)
                     fleet_long_veto = held_longs >= lb
                 fleet_symcap = symcap_state(fr)
