@@ -246,7 +246,8 @@ def main(argv=None):
           f"max_hold_bars={S.MAX_HOLD_BARS} roi={S.ROI}")
     universe = list(fb.carrier_universe(strat))
     if a.universe_file:
-        universe = list(json.load(open(a.universe_file)))
+        with open(a.universe_file) as fh:
+            universe = list(json.load(fh))
         print(f"universe OVERRIDDEN from {a.universe_file}: {len(universe)} symbols")
     mids = S.market_ids()
     syms = [s for s in universe if s in mids]
@@ -313,8 +314,9 @@ def main(argv=None):
         print(f"  gross* = {g_star} ; halt frac* = {frac_star} "
               f"(0.10: {r10['halts_per_30d']:.2f} halts/30d maxDD {r10['maxdd_pct']:.1f}% ; "
               f"0.15: {r15['halts_per_30d']:.2f}/30d maxDD {r15['maxdd_pct']:.1f}%)")
-    json.dump({f"{w}|{g}|{f}": {"close": r, "low": rl} for (w, g, f), (r, rl) in results.items()},
-              open(os.path.join(S.CACHE, "gross_halt_results.json"), "w"), indent=1)
+    with open(os.path.join(S.CACHE, "gross_halt_results.json"), "w") as fh:
+        json.dump({f"{w}|{g}|{f}": {"close": r, "low": rl}
+                   for (w, g, f), (r, rl) in results.items()}, fh, indent=1)
     return 0
 
 
