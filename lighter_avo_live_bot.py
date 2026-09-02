@@ -125,6 +125,7 @@ from venues import marks
 from venues.safety import (
     SafetyRails, open_notional, capital_adjusted_day_start, env_prefix)
 from venues.fills import read_fill, measured_from_reason
+from venues.symbol_map import to_lighter, from_lighter
 
 # ---------------------------------------------------------------------------
 # [2026-08-22 (sx)] THIS MODULE IS NOW A VARIANT HOST, and 🔮 georgia is the
@@ -1530,7 +1531,24 @@ def main(_ctx=None, once=False):
 
         # ---- venue truth: the positions the exits must manage --------------
         try:
-            pos = dict(venue.positions() or {})
+            # [2026-09-02 (wz)] ONE SPELLING FOR ONE POSITION. `venue.positions()`
+            # returns FLEET symbols (`from_lighter`: 1000PEPE -> kPEPE) while
+            # this host's universe, entries and meta carry the venue's own
+            # spelling (the scout's `vols` keys: 1000PEPE). So a 1000-market
+            # was TWO names in one loop: `meta["1000PEPE"]` (tag, opened_ts,
+            # bars) and `pos["kPEPE"]` (the real money). The reconciler then
+            # read "1000PEPE in meta but NOT on the venue" and DROPPED the
+            # bracket, and managed kPEPE from an empty meta — age pinned at
+            # zero, so the 24h max_hold could never fire, roi frozen at its
+            # first rung, the close row untagged with a zero hold. Measured
+            # on 👩 mum's real-money row: kPEPE + kBONK closed 31-Aug as
+            # `long_roi` with opened_at == closed_at, and 1000PEPE opened
+            # 2-Sep 09:06:52Z was orphaned five minutes later ($442 of a
+            # $3.3k book). The 🎫 taker closed this class on 17-Jul with the
+            # same map (`_live_pos`, lighter_ticket_taker.py) — one owner,
+            # `venues.symbol_map`, no second copy of the alias rule.
+            pos = {to_lighter(c)[0]: v
+                   for c, v in (venue.positions() or {}).items()}
             pos_readable = True
         except Exception as e:  # noqa: BLE001
             _PRINT(f"[avo-live] {iso(t_now)} positions unreadable ({e!r}) — "
@@ -2519,6 +2537,31 @@ def main(_ctx=None, once=False):
                            f"the venue — dropping meta (venue is the record)")
                     meta.pop(sym, None)
                 continue
+            if not m.get("opened_ts"):
+                # [2026-09-02 (wz)] AN UNTRACKED LEG IS ADOPTED INTO THE
+                # BRACKET, NEVER MANAGED FROM AN EMPTY META. Without an
+                # `opened_ts` the age below reads ZERO every loop, so the
+                # time cap is dead code and the roi ladder never decays — a
+                # real-money position with no exit but the stop. First the
+                # rescue: a pre-(wz) container left meta under the ALIAS
+                # spelling (kPEPE beside pos 1000PEPE); merge it so the
+                # entry/size/accrued it carried are not lost. Then adopt:
+                # the clock starts NOW (honest — the true open is unknown to
+                # this record) under its own tag, so the close row reads
+                # `long-adopted_<exit>` and the brain never grades it in
+                # the strategy's bucket (I23: the record names what sized
+                # and what governed).
+                _alt = from_lighter(sym)[0]
+                if _alt != sym and meta.get(_alt):
+                    m = {**meta.pop(_alt), **m}
+                if not m.get("opened_ts"):
+                    m["opened_ts"] = t0
+                    m["tag"] = m.get("tag") or "adopted"
+                    m.setdefault("accrued", 0.0)
+                    _PRINT(f"[avo-live] {iso(t_now)} {sym} on the venue with "
+                           f"no bracket — ADOPTED (tag={m['tag']}, clock "
+                           f"starts now; stop/roi/max_hold govern from here)")
+                meta[sym] = m
             entry = float(m.get("entry")
                           or (pos.get(sym) or {}).get("entry") or 0.0)
             px = marks.fresh_mid(venue, sym)
