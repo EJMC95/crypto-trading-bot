@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 14:53 Sydney (04:53Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 15:00 Sydney (05:00Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -71,7 +71,7 @@ _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~1
 
 ## Shipped today (53 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp))
 
-- `d1cfd8d` The two sizing rails from the edge audit: a book's own drawdown scales its clip, and the brain may not lever a book whose lower bound is not positive (wp)
+- `3aff7bc` The two sizing rails from the edge audit, reshaped to bite only on measured harm: a book past its drawdown bar is scaled, a book whose era bound is measured at zero is not levered (wp)
 - `cf11c48` Merge PR #260: the edge audit — 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wo)
 - `713c0c0` Kelly's clip was already cut to $80 on 1-Sep (vy): the audit's 'nothing reduces her clip' corrected in place, and her Monte Carlo re-run at the live clip (wo)
 - `aa93e7d` Regenerate HANDOFF after the third main merge (wo)
