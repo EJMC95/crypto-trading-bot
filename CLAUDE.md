@@ -1316,7 +1316,7 @@ alive so the call can be reversed on evidence, and pin it with a test.
 
 ### Read-only endpoints (no auth)
 `/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger —
-**[2-Sep (wl)] this public feed does NOT apply `LEDGER_QUARANTINE`**; the
+**[2-Sep (wm)] this public feed does NOT apply `LEDGER_QUARANTINE`**; the
 grader's read, `bot_pnl_store.fetch_paper_trades`, does. An outside consumer
 grading from it must apply `bot_pnl_store.is_quarantined` + `golive_readiness.
 is_phantom_close` itself or it grades a sample the gate refuses — measured:
@@ -1350,7 +1350,7 @@ its row is dashboard-retired regardless; stop the process when found.
 - `lighter_market_scout.py` / `lighter_ticket_taker.py` — scout + its trader
 - `bot_learn.py` + `fleet_bus.py` — brain and the strategies' read client
 - `fleet_risk.py` / `regime_oracle.py` / `market_pulse.py` — shared organs
-- `scripts/edge_audit.py` — **[2-Sep (wl)] the fleet-wide EDGE AUDIT**: per-book
+- `scripts/edge_audit.py` — **[2-Sep (wm)] the fleet-wide EDGE AUDIT**: per-book
   profit factor / Sharpe / Sortino / recovery / streak-vs-chance / concentration
   / break-even cost / long-vs-short / hold-band splits, founding-claim OOS test,
   block-bootstrap P(loss)+P(ruin) at 3/6/12m, correlation-aware portfolio
