@@ -88,6 +88,118 @@ the test that cites the page as this fix's justification.
 image's stamp moves; the live pair (🙏 avo + 👩 mum, one variant host) takes it
 under the marker with a halt check first and a stamp readback after.
 
+## 2026-09-02 (xd) — THE JUDGE'S SERIAL LANE COULD NOT PROMOTE, BY CONSTRUCTION: a drift guard that was sound for one entry file in two services became a permanent block the day the lane moved to two images
+
+**Found by the organ board's first real run** (`scripts/organ_board.py`, shipped
+(ww)) — which is the point of it: it grades an organ's OUTPUT, not its
+timestamp, and the judge's output said the same thing every cycle.
+
+**THE SYMPTOM.** 🧪 the judge is RUNNING mum's first candidate (`mum-rsi-32`,
+lever `xp.mum.rsi_max=32.0` open on the bus, reach check green: mum's shadow
+closes **4.14/day → ~29 in a 7d window** against a 15-close floor). Every
+evaluation returned:
+
+> ARMS ON DIFFERENT CODE: live=733ee8665875 shadow=f009aec2315f — this window
+> measures a code delta, not edge; no promotion can rest on it
+
+**THE MECHANISM, and it is structural rather than a bad window.**
+`implementation_shortfall.arm_drift` claims drift when the two arms' `extra.build`
+differ, and `experiment_judge.paired_eval` returns on that claim BEFORE any floor
+or gap logic — a drift claim is a HARD BLOCK on promotion. `build` is a sha256
+over name+bytes of the entry module PLUS the `_BUILD_SHARED` names **that exist in
+that image**. Measured from the two Dockerfiles and reproduced by driving the real
+hasher over both image shapes:
+
+| arm | image | entry | files | `build` |
+|---|---|---|---|---|
+| 👩 mum LIVE | `Dockerfile.avolive` | `lighter_avo_live_bot.py` | **17** | `02ef7b39f9ac` |
+| 👩 mum SHADOW | `Dockerfile.familyshadow` | `lighter_family_bot.py` | **16** | `aa629492ce4e` |
+
+**The shadow's set is a strict SUBSET of the live's — the sole difference is the
+live entry module.** A hash over one extra file can never equal a hash over the
+rest, at any commit, forever. So the guard fired on every sample and the lane
+could never promote. It was SOUND on the lane it was built for: 💸 the Farmer's
+two arms both ran `lighter_funding_bot.py`, one entry file in two services, so
+converged arms stamped identically and a difference really did mean one arm was
+behind. (ww) moved the lane to a CROSS-IMAGE pair and the premise silently died
+with it — the (fd) trap in a new costume, *"a different COUNT means a different
+FILE SET, not drifted code"*, this time inside the authority that promotes to
+real money.
+
+**AND THE PATH THAT ACTUALLY HELD HER WAS THE OTHER ONE — found by running the
+suite, not by reading.** The judge has TWO drift paths and the live payload
+named which fired: `last_eval.arm_drift.source == "rows-disjoint"`, i.e.
+`experiment_judge._row_drift`, not the container half. `_row_drift` is (lf)'s
+rule and it is a BETTER rule — it asks whether the arms' in-window build SETS
+intersect, so a rolling deploy reads as timing rather than drift. But its
+premise is *"intersecting sets mean the arms tracked the same deploy
+sequence"*, and that holds only while both arms draw ids from ONE id space. A
+cross-image pair draws from TWO: mum's live closes can only ever carry a
+17-file id and her shadow's only ever a 16-file one, so the sets are disjoint
+**by construction, at every commit** — the same defect as the container half,
+one level up, in the rule that replaced it. Fixing only `arm_drift` would have
+left the block exactly where it was, and the suite is what said so: main's own
+`test_judge_arm_drift_wiring.py` (from (lf)) went red on the additive `basis`
+key and sent me to read the path I had not read.
+
+**SHIPPED, the class not the instance — both paths.**
+* **`bot_pnl_store.build_shared_compute`** — a second id over `_BUILD_SHARED`
+  **alone**, entry excluded. That tuple is one fleet-wide constant, so the id is
+  comparable ACROSS images by construction: two arms carrying the same shared
+  files at the same commit agree, an arm behind on any of them differs. Published
+  as `extra.build_shared` / `build_shared_n` from the central `_stamp_build`
+  hook, so all 28 images get it without a per-bot edit. Verified on both image
+  shapes: `build` differs (`02ef…` vs `aa62…`) and `build_shared` **agrees**
+  (`aa629492ce4e` both) — the whole fix in one asymmetry.
+* **BOTH sensors prefer `build_shared`**: `implementation_shortfall.arm_drift`
+  (the container half) and `experiment_judge._row_drift` (the row half, the one
+  that held mum). The row half compares SHARED-id sets and falls back to
+  `build` sets only when the arms' `build_n` sets INTERSECT; `arm_drift` falls
+  back to `build` ONLY when `build_n` MATCHES — two ids hashed over different sets are not comparable, so
+  a difference between them is not positive evidence of anything. That is the
+  same fail-safe direction the sensor already took on an unstamped arm, and its
+  own stated contract (*"we only ever claim drift on POSITIVE evidence"*).
+* **The claim now names its basis** (`basis: shared|build`) — "shared" and
+  "build" mean different things to whoever reads the hold (I8). The three
+  existing equality pins were extended rather than loosened.
+* **One hashing owner**: `_digest` extracted so `build_compute` and
+  `build_shared_compute` cannot drift apart — they are compared against each
+  other, and a second copy of a rule is a second rule ((hj)). Pinned.
+
+**DECLARED BLIND SPOT, not hidden.** Drift confined to a LIVE-ONLY entry module
+(one outside `_BUILD_SHARED` — `lighter_avo_live_bot.py` is the case) is
+invisible to the shared stamp. `build`/`build_n` stay published and
+`audit_code_currency` still resolves per row. Asserted by a test so the limit
+cannot quietly lapse.
+
+**THE ROLLOUT WINDOW IS BOUNDED BY THE PROMOTION FLOORS THEMSELVES.** Until both
+arms publish `build_shared`, the fallback compares nothing on a cross-image pair
+— blind rather than wrong. That window cannot reach a promotion: the paired bar
+needs ≥7 days AND ≥30 shadow closes, and at mum's measured 4.14/day that is
+~7.2 days, by which time both arms have redeployed through ordinary traffic. The
+sensor's blindness is strictly shorter than the earliest promotion it could
+affect.
+
+**NO REAL-MONEY RESTART IS REQUIRED TO UNBLOCK.** `implementation_shortfall.py`
+is on the auto path, so the sensor lands on `freqtrade-bots` — where the judge
+runs — on merge. The live books pick up the new stamp on whatever deploy they
+next earn for another reason ((mm)). Nothing in this change alters a gate, a
+bar, a cage or a clip: the paired bar, fade-watch, the cages and SafetyRails are
+untouched, and the judge remains the sole writer of `live.*`.
+
+**(lf)'s two cases are preserved and pinned** — disjoint sets in ONE image are
+still drift; a rolling deploy in one image is still not. The rule it shipped was
+right for the pair it was shipped on; only its id space changed underneath it.
+
+**Verification.** `tests/autonomy/test_cross_image_arm_drift.py` (15 tests,
+including the premise read from the Dockerfiles rather than retyped, and the
+no-regression case that a genuinely-drifted SAME-image pair still claims);
+**8/8 mutations RED** through `scripts/mutate.py` — both sensors ignoring the
+shared stamp, both dropping their count guard, the shared stamp including the
+entry, the stamp not published, the live entry added to `_BUILD_SHARED`, the
+blind-spot declaration deleted. A seventh was malformed and the harness correctly refused
+to score it as a pass ((qg) working). Three module selftests green.
+
 ## 2026-09-02 (xc) — "CALIBRATE OPTIMALLY WITH FINDINGS": THE LIVE LANE'S MARGINS ARE DERIVED FROM EACH COMPARISON'S OWN NOISE AT THE FLEET'S CRITICAL VALUE, THE BOOK BASELINE EXCLUDES THE WINDOW THAT MOTIVATED THE CHANGE, AND THE SHAPE MONITOR PAGES AT THE EXACT MINIMUM-TOTAL-ERROR BOUNDARY
 
 **[LETTERED (xc) at push time: written as (wz), then (xb); (wz), (xa) AND a second (wy) reached main first — PR #269's cohort long budget, PR #268's mum position aliasing, and another session's (wy) — so this session's two entries take (xb) and (xc) in the order they were written; the pushed entries keep their letters.]**

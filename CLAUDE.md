@@ -1561,7 +1561,16 @@ its row is dashboard-retired regardless; stop the process when found.
   real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
   `live.funding.*` — see growth rail + experiment judge above)
   + **lighter-books (2026-07-30)**.
-  **[2-Sep (ww)] THE JUDGE'S LANE IS 👩 MUM'S** — `xp.mum.rsi_max` /
+  **[2-Sep (ww)] THE JUDGE'S LANE IS 👩 MUM'S**
+  **[2-Sep (xd)] AND THE PAIR IS CROSS-IMAGE, WHICH BROKE THE DRIFT GUARD.**
+  Her arms run DIFFERENT ENTRY FILES in different images (`lighter_avo_live_bot.py`
+  17 files vs `lighter_family_bot.py` 16, the shadow's set a strict SUBSET), so
+  `extra.build` can never match and `arm_drift` hard-blocked EVERY promotion —
+  a guard that was sound for the Farmer's one-entry-file pair. `build_shared`
+  (hash over `_BUILD_SHARED` alone, entry excluded) is the cross-image-comparable
+  id; `arm_drift` prefers it and refuses to compare `build` across differing
+  `build_n` ((fd)). Declared blind spot: drift confined to a live-only entry
+  module is invisible to the shared stamp. — `xp.mum.rsi_max` /
   `xp.mum.max_hold_min` steer her SHADOW twin (the family host's first lever
   surface: `lighter_family_bot.apply_book_levers` + the `mum_bars` receipt
   both hosts stamp); `live.mum.rsi_max` / `live.mum.max_hold_min` are written

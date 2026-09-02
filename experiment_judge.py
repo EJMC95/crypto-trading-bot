@@ -1313,16 +1313,33 @@ def _rows_since(rows, since_ts):
     return out
 
 
-def _row_build_sets(rows, live=None, shadow=None):
-    """{bot: set(build ids)} over the rows given, ignoring unstamped rows."""
+def _row_build_sets(rows, live=None, shadow=None, key="build"):
+    """{bot: set(ids)} over the rows given, ignoring unstamped rows.
+
+    [2026-09-02] `key` selects WHICH stamp — `build` (per-image) or
+    `build_shared` (cross-image comparable). See `_row_drift`.
+    """
     live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
     out = {live: set(), shadow: set()}
     for r in rows or []:
         b = str(r.get("bot"))
         if b in out:
-            bid = ((r.get("extra") or {}) or {}).get("build")
+            bid = ((r.get("extra") or {}) or {}).get(key)
             if bid:
                 out[b].add(str(bid))
+    return out
+
+
+def _row_build_counts(rows, live=None, shadow=None):
+    """{bot: set(build_n)} — the FILE COUNT each arm's rows were hashed over."""
+    live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
+    out = {live: set(), shadow: set()}
+    for r in rows or []:
+        b = str(r.get("bot"))
+        if b in out:
+            n = ((r.get("extra") or {}) or {}).get("build_n")
+            if n:
+                out[b].add(int(n))
     return out
 
 
@@ -1357,14 +1374,41 @@ def _row_drift(rows, live=None, shadow=None):
     arms to have stamped rows in the window (an empty set on either side is
     "unknown", never drift), so a rollout cannot make this fire.
     """
-    sets = _row_build_sets(rows, live, shadow)
-    a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
+    lb, sb = live or LIVE_BOT, shadow or SHADOW_BOT
+    # [2026-09-02] PREFER THE CROSS-IMAGE-COMPARABLE STAMP, for the reason the
+    # set rule itself gives: intersecting sets mean "the arms tracked the same
+    # deploy sequence". That premise holds only while both arms draw ids from
+    # ONE id space. A CROSS-IMAGE pair does not: 👩 mum's live arm is
+    # `lighter_avo_live_bot.py` (17 files) and her shadow is
+    # `lighter_family_bot.py` (16, a strict SUBSET), so their `build` sets are
+    # disjoint BY CONSTRUCTION at every commit and this rule read "different
+    # code" forever — hard-blocking every promotion on the fleet's only
+    # shadow->live path. `build_shared` hashes `_BUILD_SHARED` alone, one tuple
+    # fleet-wide, so both arms draw from the SAME space again and the set rule
+    # means what it says.
+    shared = _row_build_sets(rows, lb, sb, key="build_shared")
+    sa, ss = shared[lb], shared[sb]
+    if sa and ss:
+        if sa & ss:
+            return None                  # same shared code => not drift
+        return {"live": sorted(sa)[-1], "shadow": sorted(ss)[-1],
+                "source": "rows-disjoint", "basis": "shared"}
+    sets = _row_build_sets(rows, lb, sb)
+    a, b = sets[lb], sets[sb]
     if not a or not b:
         return None                      # unknown is not drift
     if a & b:
         return None                      # shared build => same deploy line
+    # [(fd)] Ids hashed over DIFFERENT FILE SETS are not comparable, so their
+    # disjointness is not evidence of anything. Same fail-safe direction as the
+    # unstamped case above: claiming drift we cannot establish freezes the
+    # queue on healthy arms, which is exactly what it did.
+    counts = _row_build_counts(rows, lb, sb)
+    ca, cb = counts[lb], counts[sb]
+    if ca and cb and not (ca & cb):
+        return None
     return {"live": sorted(a)[-1], "shadow": sorted(b)[-1],
-            "source": "rows-disjoint"}
+            "source": "rows-disjoint", "basis": "build"}
 
 
 def _current_drift(fetch=None):
@@ -3361,7 +3405,8 @@ def _selftest_body():
     if _isf_ok:
         # fallback fires: unstamped rows + drifted current builds -> HOLD
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # fallback stays quiet when current builds match (no false hold)
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_same) is None
         # THE 29-Jul REVERSAL, asserted: rows agree on a build, but the arms
@@ -3371,7 +3416,8 @@ def _selftest_body():
         _r_same = [{"bot": LIVE_BOT, "extra": {"build": "x"}},
                    {"bot": SHADOW_BOT, "extra": {"build": "x"}}]
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # ...and converged rows + converged current builds still clear
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_same) is None
         # row-based POSITIVE drift: DISJOINT build sets, the only shape that
@@ -3379,7 +3425,8 @@ def _selftest_body():
         _r_drift = [{"bot": LIVE_BOT, "extra": {"build": "p"}},
                     {"bot": SHADOW_BOT, "extra": {"build": "q"}}]
         assert _arm_drift_snapshot(_r_drift, fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint",
+             "basis": "build"}
         # a dead fetch costs nothing, claims nothing
         def _boom():
             raise RuntimeError("db down")
@@ -3410,13 +3457,15 @@ def _selftest_body():
         #     {new}), so a claim here is correct even without a window. This
         #     was the (la) shape; (lf) keeps it true for the right reason.
         assert _arm_drift_snapshot(_r_prewindow, fetch=lambda: _pnl_same) == \
-            {"live": "old", "shadow": "new", "source": "rows-disjoint"}
+            {"live": "old", "shadow": "new", "source": "rows-disjoint",
+             "basis": "build"}
         # C — scoping never blinds the CONTAINER half: rows clean in-window,
         #     containers on two builds -> hold. This is what makes dropping
         #     the pre-window rows safe.
         assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
                                    fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+            {"live": "aaa", "shadow": "bbb", "basis": "build",
+             "source": "bot_pnl-current"}
         # D — real drift INSIDE the window is still caught
         _r_inwindow = [
             {"bot": LIVE_BOT, "close_ts": iso(_w0 + 30), "extra": {"build": "p"}},
@@ -3424,7 +3473,8 @@ def _selftest_body():
         ]
         assert _arm_drift_snapshot(_r_inwindow, since_ts=_w0,
                                    fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint",
+             "basis": "build"}
         # D2 [(lf)] — THE DEFECT (la) LEFT BEHIND, and the reason this rule
         #     changed. A ROLLING DEPLOY inside a wide window: both arms close
         #     under the old build AND the new one, but the slower arm's newest
