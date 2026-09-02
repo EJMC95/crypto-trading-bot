@@ -79,6 +79,10 @@ nothing — and was redone as a real block move before it counted. `fleet_bus
 positive era claim for their synthetic books so they keep testing the BRAIN's
 mechanics rather than tripping the cap.
 
+**CODEQL, on the PR:** five hygiene findings on the new lines — three `x != x`
+NaN idioms (now `math.isnan`), one fallback `except` without a comment, one
+unused test import — fixed before merge; a bot finding is a bug report.
+
 **DEPLOY: main only, by the (mm) rule.** `fleet_bus.py` is in `$_shared`, so
 every shadow service takes the rails on this push. Neither live row would trade
 differently today (both scale 1.0; the brain has no expansion opinion on

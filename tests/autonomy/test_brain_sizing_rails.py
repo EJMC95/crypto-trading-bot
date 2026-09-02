@@ -30,7 +30,6 @@ the probe floor, (7) ignore the kill switch, (8) drop the thin-era guard.
 """
 import datetime as dt
 import importlib
-import os
 import sys
 from pathlib import Path
 

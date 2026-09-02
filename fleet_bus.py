@@ -737,15 +737,15 @@ def book_dd_pct(bot, current_time=None):
         if not isinstance(row, dict):
             return None, None
         dd = float(row.get("max_dd_pct"))
-        if dd != dd or dd < 0:
+        if math.isnan(dd) or dd < 0:
             return None, None
         bar = DD_BAR_PCT_FALLBACK
         try:
             b = float((p.get("bar") or {}).get("max_dd"))
-            if b == b and b > 0:
+            if not math.isnan(b) and b > 0:
                 bar = 100.0 * b
         except (TypeError, ValueError):
-            pass
+            pass    # no usable bar published: keep the pinned fallback
         return dd, bar
     except Exception:                                    # noqa: BLE001
         return None, None
@@ -786,7 +786,7 @@ def lb_permits_expansion(bot, current_time=None):
             return True
         n_era = int(row.get("n_era") or 0)
         v = float(row.get("claim_era"))
-        if v != v:                                       # NaN: no opinion
+        if math.isnan(v):                                # NaN: no opinion
             return True
         return not (n_era >= LB_CAP_MIN_N and v <= 0)
     except Exception:                                    # noqa: BLE001
