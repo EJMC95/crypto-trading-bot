@@ -79,6 +79,13 @@ RECENT_TRADES = int(os.environ.get("WRITER_CONSISTENCY_RECENT_N", "5"))
 #: is ORPHANED — trading into a row nothing publishes.
 ORPHAN_H = float(os.environ.get("WRITER_CONSISTENCY_ORPHAN_H", "12"))
 
+#: How far back to look when establishing which build was FIRST SEEN trading a
+#: service — the ordering that separates a split brain (row build older) from
+#: post-deploy lag (row build newer). Wide on purpose: the real orphan's build
+#: was 5 days old when caught, and a too-narrow window degrades the verdict to
+#: AMBIGUOUS (reported, not a finding), the fail-quiet direction.
+FIRST_SEEN_H = float(os.environ.get("WRITER_CONSISTENCY_FIRST_SEEN_H", "336"))
+
 
 def _extra(raw):
     """bot_pnl.extra / paper_trades.extra as a dict, whatever the driver gives."""
@@ -93,15 +100,34 @@ def _extra(raw):
         return {}
 
 
-def classify(row_build, row_n, trade_build, trade_n, ledger_n, row_closes):
+def classify(row_build, row_n, trade_build, trade_n, ledger_n, row_closes,
+             row_build_first_seen=None, trade_build_first_seen=None):
     """(verdict, detail) for ONE book. Pure — this is what the selftest drives.
 
-    Verdicts:
-      SPLIT-BRAIN  the row and the book's own newest trade carry DIFFERENT
-                   build stamps. Two code states wrote one book.
-      QUIET        no trades in the window; nothing to compare.
-      UNSTAMPED    one side carries no stamp; reported, never a finding.
-      OK           both stamps present and equal.
+    [2026-09-02, SECOND LIVE RUN] DIRECTION IS LOAD-BEARING, and the first
+    version of this function did not have it. It called ANY stamp difference
+    SPLIT-BRAIN — and its second live run landed an hour after a fleet-wide
+    deploy wave and printed **15 findings**, 11 of them books whose row carried
+    the NEW build while their newest close still carried the OLD one: ordinary
+    post-deploy lag that persists until the book's next close, which for a slow
+    book is days. A guard that reddens on every deploy wave is the (gl)
+    cry-wolf defect in the very tool built to end one.
+
+    Hashes are not orderable, so ordering comes from OBSERVATION: when each
+    build was FIRST SEEN writing this service's own trades (the caller derives
+    it from the append-only ledger).
+
+      row's build seen EARLIER than trade's  -> the summary writer is
+          superseded code still alive        -> SPLIT-BRAIN (the orphan shape)
+      row's build seen LATER, or never seen
+          trading yet                        -> a fresh deploy whose first
+          close hasn't landed                -> REDEPLOY-LAG, reported only
+      no first-seen data at all              -> AMBIGUOUS, reported only —
+          an unordered difference is a lead, not a finding (I6: an absence
+          is evidence only against a control group)
+
+    Verdicts: SPLIT-BRAIN (finding) · REDEPLOY-LAG · AMBIGUOUS · QUIET ·
+    UNSTAMPED · OK (all reported-only except the first).
     """
     if trade_build is None:
         return "QUIET", "no closes in the window — nothing to compare"
@@ -117,11 +143,29 @@ def classify(row_build, row_n, trade_build, trade_n, ledger_n, row_closes):
             d += (f" (note: row reports {row_closes} closes vs {ledger_n} in the"
                   " ledger — large gap, check the publish cadence)")
         return "OK", d
-    return "SPLIT-BRAIN", (
-        f"summary row was written by {row_build}/{row_n} while this book's own "
-        f"newest close was written by {trade_build}/{trade_n} — two code states "
-        f"are writing one book (row reports {row_closes} closes, ledger has "
-        f"{ledger_n})")
+    if row_build_first_seen is None:
+        if trade_build_first_seen is None:
+            return "AMBIGUOUS", (
+                f"row={row_build}/{row_n} vs newest close={trade_build}/"
+                f"{trade_n}, and neither build has a first-seen time — "
+                "cannot order them; a lead, not a finding")
+        return "REDEPLOY-LAG", (
+            f"row carries {row_build}/{row_n}, never yet seen trading — a "
+            f"fresh deploy whose first close hasn't landed (newest close is "
+            f"{trade_build}); re-check after the book's next close")
+    if trade_build_first_seen is not None and \
+            row_build_first_seen < trade_build_first_seen:
+        return "SPLIT-BRAIN", (
+            f"summary row was written by {row_build}/{row_n} (first seen "
+            f"trading {row_build_first_seen}) while this book's own newest "
+            f"close was written by {trade_build}/{trade_n} (first seen "
+            f"{trade_build_first_seen}) — SUPERSEDED code is still writing "
+            f"this book's row (row reports {row_closes} closes, ledger has "
+            f"{ledger_n})")
+    return "REDEPLOY-LAG", (
+        f"row carries {row_build}/{row_n}, seen trading no earlier than the "
+        f"newest close's {trade_build}/{trade_n} — a redeploy the ledger "
+        "hasn't caught up with; re-check after the book's next close")
 
 
 def classify_orphan(last_h, ledger_n):
@@ -161,6 +205,23 @@ def audit(conn):
            group by 1""" % int(LOOKBACK_H))
     active = dict(cur.fetchall())
 
+    # [2026-09-02, second live run] FIRST-SEEN per (svc, build) — the ordering
+    # `classify` needs, derived from the append-only ledger over a window wide
+    # enough to hold both sides of a split (the real orphan's build was 5 days
+    # old when caught). Keyed by SVC because that is the process boundary: a
+    # service's books share one container, so one deploy moves them together.
+    first_seen = {}
+    cur.execute(
+        """select extra->>'svc', extra->>'build',
+                  min(closed_at::timestamptz)
+             from paper_trades
+            where closed_at::timestamptz > now() - interval '%s hours'
+              and extra->>'build' is not null
+            group by 1, 2""" % int(FIRST_SEEN_H))
+    for svc, bld, ts in cur.fetchall():
+        if svc and bld:
+            first_seen[(svc, bld)] = ts
+
     for bot in sorted(set(rows) | set(active)):
         try:
             cur.execute(
@@ -186,11 +247,14 @@ def audit(conn):
                 continue
 
             row_closes, extra = rows[bot]
-            verdict, detail = classify(extra.get("build"), extra.get("build_n"),
-                                       trade_build, trade_n, ledger_n, row_closes)
-            svc = extra.get("svc") or "?"
+            svc = extra.get("svc")
+            verdict, detail = classify(
+                extra.get("build"), extra.get("build_n"),
+                trade_build, trade_n, ledger_n, row_closes,
+                row_build_first_seen=first_seen.get((svc, extra.get("build"))),
+                trade_build_first_seen=first_seen.get((svc, trade_build)))
             if verdict == "SPLIT-BRAIN":
-                findings.append((bot, verdict, f"svc={svc}: {detail}"))
+                findings.append((bot, verdict, f"svc={svc or '?'}: {detail}"))
             elif verdict == "OK":
                 clean.append((bot, detail))
             else:
@@ -207,10 +271,22 @@ def audit(conn):
 def _selftest():
     """Drive `classify` over the shapes that matter. I3: each assertion is a
     mutation someone could make to this file and would have to redden."""
-    # the real 2026-09-02 incident
-    v, d = classify("edc3032d1c46", 15, "4d93497e56d5", 15, 56, 9)
+    # the real 2026-09-02 incident — orphan build first seen 28-Aug, HEAD
+    # build first seen 30-Aug: ordered, so it is a FINDING
+    v, d = classify("edc3032d1c46", 15, "4d93497e56d5", 15, 56, 9,
+                    row_build_first_seen="2026-08-28", trade_build_first_seen="2026-08-30")
     assert v == "SPLIT-BRAIN", v
-    assert "two code states" in d
+    assert "SUPERSEDED" in d
+    # [second live run] the deploy-wave shape that produced 11 false findings:
+    # the row's build is NEWER (or not yet seen trading) — never a finding
+    assert classify("newbuild12345", 17, "oldbuild12345", 17, 56, 55,
+                    row_build_first_seen=None,
+                    trade_build_first_seen="2026-08-30")[0] == "REDEPLOY-LAG"
+    assert classify("newbuild12345", 17, "oldbuild12345", 17, 56, 55,
+                    row_build_first_seen="2026-09-02",
+                    trade_build_first_seen="2026-08-30")[0] == "REDEPLOY-LAG"
+    # unordered difference: a lead, not a finding (I6)
+    assert classify("aaa", 15, "bbb", 15, 10, 10)[0] == "AMBIGUOUS"
     # the agreeing case must NOT fire, including across a legitimate redeploy
     assert classify("abc", 15, "abc", 15, 56, 55)[0] == "OK"
     # a differing build_n with the SAME id is still one process (the (fd) trap

@@ -436,7 +436,7 @@ def _driven(m, tape="breakout"):
         def headroom_check(self, margin_state, stop_frac):
             return True, "flat"
 
-        def daily_loss_hit(self, ds, eq, pct_limit=0.0):
+        def daily_loss_hit(self, ds, eq):
             return False
 
         def confirm_daily_loss(self, ds, eq, lim, rd, delay_s=0):

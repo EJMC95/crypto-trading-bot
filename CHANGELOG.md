@@ -1,5 +1,5 @@
-## 2026-09-02 (wj) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
-**[RENUMBERED (wi) → (wj) at the #258 merge — the sibling session's FAMILY_CLEAR_GUARD entry took (wi) on main first. The latched-lock release valve this session built in parallel (its own (wj), 8 tests, 2 mutations red) is WITHDRAWN unmerged: main's (wi) mechanism shipped and deployed first, and a second release valve for one latch is a second copy of a rule ((hj)). Its staged env was blanked; the convergence itself — two sessions independently deriving the same tool within the hour — is the record worth keeping.]**
+## 2026-09-02 (wk) — "OPTIMISE MUM AND AVO": #257 taken over cross-session, driven to green, and deployed to ALL THREE live services in one act — both deposit-fallout rail fixes are live, and avo's unlock is stamped 04:02:46Z
+**[RENUMBERED TWICE — (wi) → (wj) → (wk): three sessions worked this hour and main took each letter first ((wi) the clear-guard release, (wj) the taker-successor runbook). Two of this session's cargoes were OVERTAKEN and withdrawn, recorded here per I12: the parallel latched-lock release valve (8 tests, 2 mutations red) — main's (wi) FAMILY_CLEAR_GUARD shipped and deployed first, a second valve for one latch is a second copy of a rule ((hj)); and the safety-rails test re-pin — this session updated test_confirm_true_via_absolute_rail_even_if_pct_ok to the (wh) floor contract to heal main's red, and the fleet then ruled the OTHER way: the failing test was a DELIBERATE pin, (wh) was refuted and reverted, mum's $57 arrived as Eamon's env VALUE with published derivation. The re-pin is dropped and main's original test stands. Two independent sessions converging on the same wrong read of that test, and a third catching both, is the review system working.]**
 
 **Eamon, ~01:00Z: "Optimise mum and avo and make sure both are optimal and
 running smoothly"** — with the material fact that he had executed the
@@ -60,6 +60,45 @@ declined tonight — 9.5 was DERIVED to sit strictly inside her stop-death bar
 ((gv): inside, never at), 10.0 IS the declared ceiling, and the step buys +5%
 deployed capital for pure proximity to liquidation with no expectancy term.
 The arithmetic is his whenever he wants the last half-turn.
+## 2026-09-02 (wj) — 🎫 THE TICKET TAKER IS GEORGIA'S SUCCESSOR — the best-tracked shadow book, on a clean gate path ~3-Oct, staged in a go-live runbook; 🌾 carry is named the parallel regime hedge
+
+Eamon, after the georgia retirement: *"prepare the best candidate to take
+Georgia's place."* Ranked every non-live shadow book on the live payload; the
+answer is **🎫 the Ticket Taker**, and the deliverable is `TAKER_GOLIVE_RUNBOOK.md`
+— STAGED, not executed (it is not gate-ready; go-live stays Eamon's explicit act
+past the gate, the un-amendable core).
+
+**WHY THE TAKER.** It wins the combination a real-money slot needs: the longest
+clean track record in the shadow fleet (n=246, stable single-policy era since
+30-Jul, +$85 realised, on-class edge **+0.691%/trade** t=1.46), and — unlike
+another long-only book — it **diversifies mum instead of doubling her**: mum is
+long-only oversold beta, the taker trades BOTH sides across 5 lenses, so it is
+far less regime-correlated. It is also proven live infrastructure (it held the
+slot before avo took it 13-Aug). Its only blockers are TIME — `t` 1.46 → 2.0
+(~3-Oct at 4.48 closes/day) and its early-era negative half rolling off — not a
+design flaw. Runners-up: pm-turnbull passes one more bar but is economically
+thin (+$3.5 over 35 closes); 🌾 carry has the best edge quality but its clean
+on-screen era is n=7 and flat.
+
+**THE CLOCK IS SAFE, NO FREEZE NEEDED.** The era signature is
+`venue/bull/lenses/sides` only ((jf)); the scout tuner moves the taker's BRACKET
+levers (`momo_chg`, `max_hold_h`) but those are not in the signature, so ordinary
+tuning does not reset its 30-day clock. It accumulates cleanly to the gate. The
+one standing caution, in the runbook: do NOT change its lenses/sides/venue before
+go-live (that WOULD reset it).
+
+**THE STRATEGIC NOTE Eamon should have, on the record:** after mum + avo + taker
+the live fleet is ALL DIRECTIONAL (item-18: Lighter's tape is one falling-BTC
+regime). The taker's long/short breadth softens this; the true regime hedge is a
+FUNDING book, and **🌾 carry is that book** — regime-agnostic, best edge quality —
+but its clean era is n=7 and ~months from decidable. It is named as the NEXT slot
+after the taker, developed in parallel: its path is supply + time, not a rebuild.
+No book is minted here (I20/I22 unchanged) — this is a promotion recommendation
+for an existing shadow book, staged for the gate.
+
+**[Renumbered (wi) → (wj) at merge:** the concurrent session's latch-release
+entry reached main first under (wi); the pushed entry keeps the letter, per
+the letters rule. The citation in TAKER_GOLIVE_RUNBOOK.md moved with it.]
 
 ## 2026-09-02 (wi) — THE LATCH OUTLIVED ITS BUG: (vn)'s durable lock had no designed release, so avo served a 20-hour sentence for a defect (wf) had already fixed — the (vg) unlock ported to the live arm, 5/5 mutations red
 
@@ -116,43 +155,77 @@ to $447, `cap_usd` equity-scaled to $5,636, unlocked, trading. Her binding
 constraint is signal supply, measured at its optimum in `(uz)`/`(tr)` — the
 honest optimisation for mum today is "nothing further; the rails now match
 her funded size."
-## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
 
-Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:
-the deposit folded into `capital_adjust`, not P&L, and her clip auto-scaled
-**$288 → $452**, +57% size on the same proven edge — the transfer IS the
-optimisation). This entry is the one rail that did NOT scale with her.
+## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; REFUTED AND REVERTED: the abs cap is a DELIBERATE tighter fleet rail, and raising its VALUE is Eamon's risk call
 
-**THE FINDING, the (wf) avo pattern at a second rail.** `SafetyRails.max_daily_loss`
-(`LIGHTER_MAX_DAILY_LOSS`, $30) is a PILOT cap from when the live books were
-seed-sized: $30 == 10% of a $300 book, so it COINCIDED with the strategy's own
-`DAILY_LOSS_LIMIT` (10%). The book halts for the day on the TIGHTER of the two —
-and once mum was funded the fixed $30 binds at **5.26%** while her 10% leash
-intends **$57**, so a normal drawdown day would halt her early and forfeit the
-recovery. Same fixed-dollar-vs-funded-equity class as avo's maxdd denominator,
-one rail over; measured, not hypothetical (`halt.abs_usd 30`, `binding: abs` on
-her live row at $570).
+Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**), and the
+verification is the headline: the deposit folded into `capital_adjust`, not P&L,
+and her clip auto-scaled **$288 → $452**, +57% size per trade on the same proven
+edge. **The transfer IS the optimisation** — mum now earns ~57% more dollars
+automatically, no code required.
 
-**THE FIX — the pilot cap FLOORS under the pct leash, never a ceiling.**
-`daily_loss_hit(day_start, equity, pct_limit=0.0)` now trips at
-`max(self.max_daily_loss, pct_limit * day_start_equity)`: the cap still protects
-a tiny book (10% of $50 = $5 < the $30 floor) and the pct leash governs a funded
-one (10% of $570 = $57 > $30). Measured after: mum trades through a 7% day and
-still halts at 10%; a genuine 10% day still halts her — the protection is
-RESTORED to her funded scale, not removed. **`pct_limit=0.0` — every caller that
-does not opt in (the funding bot, the taker, the hyperliquid bots) — is
-byte-identical to the old absolute cap**, so the blast radius is exactly the
-family live host, which passes `DAILY_LOSS_LIMIT`. Pinned by
-`tests/autonomy/test_daily_loss_pilot_floor.py` (mutation red: reverting the
-floor to the bare cap reddens the funded-book test). Reaches mum on the same
-`[deploy-live]` dispatch as (wf)/(wg).
+**WHAT I GOT WRONG, recorded because a refuted fix is reported as refuted.** I
+read her daily-loss halt binding at **5.26%** ($30 abs cap on a $570 book) as the
+(wf) fixed-dollar-vs-funded-equity class and shipped a "floor" — `daily_loss_hit`
+tripping at `max(cap, pct×equity)` so the pct leash would govern a funded book.
+**CI caught it**: `tests/real_money/test_safety_rails.py::test_confirm_true_via_
+absolute_rail_even_if_pct_ok` pins that the abs cap is a DELIBERATE *tighter*
+fleet rail — a hard dollar limit that must catch a $31 loss on a $1,000 book even
+though the 5% strategy rail ($50) has not tripped. My floor inverted that and let
+a $31 loss pass. So the 5.26% halt is **not a stale artifact — it is the fleet's
+absolute-dollar cap working as designed**, and the (wf) analogy was wrong (avo's
+maxdd denominator genuinely tracked funded equity; this rail is meant to be
+fixed). Reverted in full (`daily_loss_hit` signature, the host breach call, the
+test). The pinned test did exactly its job — I3, from the outside.
 
-DECLARED, not changed: mum's EDGE is untouched — I25 forbids retuning a winner
-on the hot window that flatters it, and her entry/exit were measured at birth.
-Her leverage (9.5×, Eamon's stop-death edge) and the brain's refused 1.25×
-expand are risk-appetite calls, not code fixes: the brain wants to pay her more
-and there is no room under her stop-alive ceiling, which is why CAPITAL, not
-leverage, was the lever — and it is now deployed.
+**[CORRECTED IN PLACE same day, post-merge (this entry originally SHIPPED the
+floor; it now records its refutation) — THE REFUTED FIX SHIPPED ANYWAY, for a
+~2h window, and the record must say so.** Eamon merged PR #257 at `ea2d96f` (00:56Z)
+— the branch tip BEFORE this revert had been pushed — and the merge commit
+(authored by the peer session, which resolved the cross-session conflict and
+never mentions (wh)) carried `[deploy-live]`, so run 654 put the (wh) code on
+ALL THREE live services (readback: every live row on build `4690a497e564`).
+Measured while it was live: main's Tests run went RED on exactly the pinned rail
+test, and 👩 mum's own row published `leverage.halt = {abs_usd: 30, binding:
+"abs"}` while the deployed actuator would confirm a halt only at $56.70 — the
+halt telemetry and the halt actuator disagreeing about the rail that governs
+real money (the I23 shape: the (wh) commit changed the actuator and never the
+publisher). No halt latched inside the window (mum's row reads unhalted, entries
+open). This revert lands POST-merge, rebased onto main, and deploys with
+`[deploy-live-mum]` — mum is the only book whose behavior (wh) changed
+($56.70 → $30 effective; avo's binding rail moved $30.50 → $32 under it, $1.50
+of slack, and she re-tightens for free on her next qualifying deploy per (mm);
+georgia is retired + drained). The transferable lesson beside the refutation:
+**a merge is a deploy decision here — the marker rides the merge subject — so a
+branch whose tip is known-red must say so IN THE PR THREAD before anyone can
+merge it**, because the merge button does not read the branch's later commits.]
+
+**THE REAL LEVER, and it is Eamon's.** Whether mum halts at 5.26% or a looser
+level is not a bug to fix, it is a cap VALUE to choose: raise her
+`LIGHTER_MAX_DAILY_LOSS` (currently $30) toward, say, $57 (= 10% of $570, matching
+her own strategy rail) if you want her to trade through bigger dollar down-days.
+That LOOSENS a safety cap, so it is a risk-appetite decision, presented not taken
+— per (tg) I may set cap values with a derivation, but loosening a live
+real-money loss cap is yours to say.
+**[TAKEN, same session — Eamon: "Approved, continue" / "Full permission for you
+to change the variables."** `LIGHTER_MAX_DAILY_LOSS=57` is SET on mum-live
+(mum had NO per-service value — she rode the $30 code default; avo carries 32,
+georgia 27). Set with skipDeploys: the running (wh) container already halts at
+~$56.70, so the value rides the revert's own `[deploy-live-mum]` deploy and mum
+restarts ONCE — end state under restored semantics: effective halt
+min($57 abs, $56.70 pct) = $56.70 ≈ her intended 10%, with the tighter-first
+rail semantics intact. Derivation published per (tg): 57 = 0.10 × $570 funded
+equity, aligning the fleet dollar rail with her own `DAILY_LOSS_LIMIT` leash so
+the abs cap stops binding first at 5.26%. Re-derive on the next material
+capital change — a fixed dollar cap on a funded book goes stale exactly the
+way (wf)'s denominator did, and the VALUE, not the semantics, is where that is
+absorbed.]
+
+DECLARED, unchanged: mum's EDGE is untouched (I25 — no retuning a winner on a hot
+window); her leverage (9.5×, your stop-death edge) and the brain's refused 1.25×
+expand are risk-appetite calls, not code fixes — the brain wants to pay her more
+and there is no room under her stop-alive ceiling, which is why CAPITAL was the
+lever, and it is now deployed.
 
 ## 2026-09-02 (wg) — 🔮 GEORGIA'S LIVE ARM IS RETIRED — Eamon's "retire + reallocate to mum" call, so the fleet stops funding its one measured loser and can concentrate capital on its one proven live edge
 
@@ -354,6 +427,23 @@ pre-stdlib name and was already installed; added to `requirements-test.txt`
 behind a `python_version < "3.11"` marker so CI installs nothing new. This is the
 *"a check that inspects nothing reports clean"* class one level up — the guard
 that guards the guards was itself unrunnable, locally, for anyone.
+
+**[2026-09-02 later, CORRECTED IN PLACE per I12 — DIRECTION IS LOAD-BEARING
+AND THE FIRST VERSION DID NOT HAVE IT.]** The guard's second live run landed an
+hour after the (wf)/(wh) deploy wave and printed **15 findings, 11 false** —
+every freshly-deployed book's row carried the NEW build over trades still
+stamped with the OLD one, ordinary lag until the book's next close. A bare
+stamp difference is not a split brain; WHICH SIDE IS OLDER is. Hashes are not
+orderable, so ordering now comes from observation — when each build was FIRST
+SEEN trading that service, off the append-only ledger: row-build older ⇒
+SPLIT-BRAIN; row-build newer or unseen ⇒ `REDEPLOY-LAG`, reported only;
+unordered ⇒ `AMBIGUOUS`, a lead not a finding (I6). Live after the fix: the 11
+downgrade, the 3 family SPLIT-BRAINs and the ORPHAN survive — now printing the
+28-Aug-vs-30-Aug first-seen that orders them — and the orphan is confirmed
+STILL ALIVE through the deploy wave. Two more mutation rounds: the inverted
+comparison and the None-branch cry-wolf both redden, and the wiring test had to
+learn to reject a PRESENT kwarg with a CONSTANT value — kwarg-present/value-None
+survived the first round, the vacuous-guard shape one level down.
 
 **CARRIED, not closed:** the orphan is still alive ((wc): it survived a region
 migration), so the four family books' ledgers stay two-writer mixtures since

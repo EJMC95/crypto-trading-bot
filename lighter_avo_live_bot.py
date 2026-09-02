@@ -2263,14 +2263,8 @@ def main(_ctx=None, once=False):
         # ---- daily-loss rails (pct + absolute, confirm-debounced) ----------
         breach = False
         if equity is not None and day_start_equity:
-            # [2026-09-02] pass the pct leash so the abs PILOT cap floors under
-            # it instead of undercutting it — 👩 mum funded to $570 was halting
-            # at the $30 cap (5.26%) instead of her intended 10% (see
-            # SafetyRails.daily_loss_hit). The pct term below is unchanged; the
-            # abs term now reads max($30, 10%*day_start).
             breach = (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)
-                      or rails.daily_loss_hit(day_start_equity, equity,
-                                              DAILY_LOSS_LIMIT))
+                      or rails.daily_loss_hit(day_start_equity, equity))
         if breach and not halted_today:
             confirmed, equity = rails.confirm_daily_loss(
                 day_start_equity, equity, DAILY_LOSS_LIMIT,
@@ -3042,7 +3036,7 @@ def _selftest():
         def equity_scale(self, equity, gross):
             return self.max_notional        # interface parity; stub never scales
 
-        def daily_loss_hit(self, ds, eq, pct_limit=0.0):
+        def daily_loss_hit(self, ds, eq):
             return False
 
         def confirm_daily_loss(self, ds, eq, lim, rd, delay_s=0):

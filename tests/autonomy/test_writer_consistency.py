@@ -24,10 +24,38 @@ from scripts.audit_writer_consistency import (  # noqa: E402
 
 
 def test_the_2026_09_02_incident_is_a_finding():
-    """The real numbers. If this ever stops firing, the guard is decorative."""
-    verdict, detail = classify("edc3032d1c46", 15, "4d93497e56d5", 15, 56, 9)
+    """The real numbers, WITH the ordering that makes them a finding: the
+    orphan's build first traded 28-Aug, HEAD's 30-Aug. If this ever stops
+    firing, the guard is decorative."""
+    verdict, detail = classify("edc3032d1c46", 15, "4d93497e56d5", 15, 56, 9,
+                               row_build_first_seen="2026-08-28",
+                               trade_build_first_seen="2026-08-30")
     assert verdict == "SPLIT-BRAIN"
-    assert "two code states" in detail
+    assert "SUPERSEDED" in detail
+
+
+def test_a_deploy_wave_is_not_a_split_brain():
+    """[second live run] An hour after a fleet-wide deploy the first version
+    printed 15 findings, 11 of them rows carrying the NEW build over trades
+    still stamped with the OLD one. Direction is the whole test: a row whose
+    build is newer than — or not yet seen among — the book's trades is
+    REDEPLOY-LAG, reported only, never a finding."""
+    # new build not yet seen trading (the first minutes after a deploy)
+    v, d = classify("0af4038a63ba", 17, "4690a497e564", 17, 20, 20,
+                    row_build_first_seen=None,
+                    trade_build_first_seen="2026-08-30")
+    assert v == "REDEPLOY-LAG", (v, d)
+    # new build already trading, row simply predates the book's next close
+    v, _ = classify("0af4038a63ba", 17, "4690a497e564", 17, 20, 20,
+                    row_build_first_seen="2026-09-02",
+                    trade_build_first_seen="2026-08-30")
+    assert v == "REDEPLOY-LAG", v
+
+
+def test_an_unorderable_difference_is_a_lead_not_a_finding():
+    """I6: with no first-seen data on either side the difference cannot be
+    ordered, and an absence is evidence only against a control group."""
+    assert classify("aaa", 15, "bbb", 15, 10, 10)[0] == "AMBIGUOUS"
 
 
 def test_agreeing_stamps_are_never_a_finding():
@@ -72,9 +100,11 @@ def test_the_closes_gap_is_corroboration_and_can_never_create_a_finding():
 
 
 def test_the_detector_has_a_control_group():
-    """I6: the same call that flags a split brain must return OK for a healthy
-    book, or 'everything is flagged' and the finding means nothing."""
-    assert classify("aaa", 15, "bbb", 15, 10, 10)[0] == "SPLIT-BRAIN"
+    """I6: the same inputs that flag a split brain must return OK when the
+    stamps agree, or 'everything is flagged' and the finding means nothing."""
+    assert classify("aaa", 15, "bbb", 15, 10, 10,
+                    row_build_first_seen="2026-08-01",
+                    trade_build_first_seen="2026-08-15")[0] == "SPLIT-BRAIN"
     assert classify("aaa", 15, "aaa", 15, 10, 10)[0] == "OK"
 
 
@@ -107,3 +137,30 @@ def test_the_orphan_clock_is_the_discriminator():
     the clock is doing the work and not the close count."""
     assert classify_orphan(ORPHAN_H - 0.1, 41)[0] == "ORPHAN-BOOK"
     assert classify_orphan(ORPHAN_H + 0.1, 41)[0] is None
+
+
+def test_the_audit_call_site_passes_the_first_seen_ordering():
+    """Wiring, by AST — the (wi)-session lesson repeated: classify's direction
+    logic is only as real as the call site that feeds it. Strip the first_seen
+    kwargs and every difference degrades to AMBIGUOUS: no finding can ever
+    fire and the guard is vacuous while every test above stays green."""
+    import ast
+    src = open(os.path.join(os.path.dirname(__file__), "..", "..",
+                            "scripts", "audit_writer_consistency.py")).read()
+    calls = [n for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Name) and n.func.id == "classify"]
+    def _live_value(call, name):
+        for k in call.keywords:
+            if k.arg == name:
+                # a Constant (None included) is the mutation that survived the
+                # first round: kwarg present, ordering dead. The value must be
+                # a lookup into the first_seen map, not a literal.
+                return (not isinstance(k.value, ast.Constant)
+                        and "first_seen" in ast.unparse(k.value))
+        return False
+    wired = [c for c in calls
+             if _live_value(c, "row_build_first_seen")
+             and _live_value(c, "trade_build_first_seen")]
+    assert wired, "no classify() call passes a LIVE first-seen ordering — " \
+                  "every verdict degrades to AMBIGUOUS and nothing can fire"
