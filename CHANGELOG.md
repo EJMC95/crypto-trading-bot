@@ -1,3 +1,39 @@
+## 2026-09-02 (wi) — 🎫 THE TICKET TAKER IS GEORGIA'S SUCCESSOR — the best-tracked shadow book, on a clean gate path ~3-Oct, staged in a go-live runbook; 🌾 carry is named the parallel regime hedge
+
+Eamon, after the georgia retirement: *"prepare the best candidate to take
+Georgia's place."* Ranked every non-live shadow book on the live payload; the
+answer is **🎫 the Ticket Taker**, and the deliverable is `TAKER_GOLIVE_RUNBOOK.md`
+— STAGED, not executed (it is not gate-ready; go-live stays Eamon's explicit act
+past the gate, the un-amendable core).
+
+**WHY THE TAKER.** It wins the combination a real-money slot needs: the longest
+clean track record in the shadow fleet (n=246, stable single-policy era since
+30-Jul, +$85 realised, on-class edge **+0.691%/trade** t=1.46), and — unlike
+another long-only book — it **diversifies mum instead of doubling her**: mum is
+long-only oversold beta, the taker trades BOTH sides across 5 lenses, so it is
+far less regime-correlated. It is also proven live infrastructure (it held the
+slot before avo took it 13-Aug). Its only blockers are TIME — `t` 1.46 → 2.0
+(~3-Oct at 4.48 closes/day) and its early-era negative half rolling off — not a
+design flaw. Runners-up: pm-turnbull passes one more bar but is economically
+thin (+$3.5 over 35 closes); 🌾 carry has the best edge quality but its clean
+on-screen era is n=7 and flat.
+
+**THE CLOCK IS SAFE, NO FREEZE NEEDED.** The era signature is
+`venue/bull/lenses/sides` only ((jf)); the scout tuner moves the taker's BRACKET
+levers (`momo_chg`, `max_hold_h`) but those are not in the signature, so ordinary
+tuning does not reset its 30-day clock. It accumulates cleanly to the gate. The
+one standing caution, in the runbook: do NOT change its lenses/sides/venue before
+go-live (that WOULD reset it).
+
+**THE STRATEGIC NOTE Eamon should have, on the record:** after mum + avo + taker
+the live fleet is ALL DIRECTIONAL (item-18: Lighter's tape is one falling-BTC
+regime). The taker's long/short breadth softens this; the true regime hedge is a
+FUNDING book, and **🌾 carry is that book** — regime-agnostic, best edge quality —
+but its clean era is n=7 and ~months from decidable. It is named as the NEXT slot
+after the taker, developed in parallel: its path is supply + time, not a rebuild.
+No book is minted here (I20/I22 unchanged) — this is a promotion recommendation
+for an existing shadow book, staged for the gate.
+
 ## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; the abs cap now floors under the pct leash
 
 Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**, verified:
