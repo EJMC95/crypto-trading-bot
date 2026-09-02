@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 16:14 Sydney (06:14Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 16:36 Sydney (06:36Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `kelly-fresh-read-pre-registered`  ·  owner: **OPERATOR**
+EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh mean > 0, anything else returns to Eamon. Her all-time upper bound (+0.03% on n=383) has not excluded a positive mean, so I17-as-amended forbids retiring on it today.
+
+_Still open because:_ the read lived only in the report's prose (the I21 shape); it is now the `band-kelly` entry in golive_readiness.DECIDED_UNTIL, so the docket asks on the date. Closes when the decision is recorded and the entry removed.
 
 ### `georgia-v1-preregistered-read-10sep`  ·  owner: **session**
 🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
@@ -54,8 +59,14 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (80 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv))
+## Shipped today (86 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx))
 
+- `42d438c` Merge origin/main: #264 (ww) landed under the follow-up branch; the entry keeps (wx)
+- `fdb7182` The edge audit's last four items leave the prose: kelly's read is a docket deferral, mum's shape has a monitor, streaks are judged against chance, I25 reaches the live grader's margin (wx)
+- `bd524a5` [deploy-live] Merge PR #264: (ww) proceed with everything in the organ review — docket calls reconciled with the (wt) slate, cage re-decided, mum judge lane, weekly organ board
+- `6b24cc1` test_mum_census_both_terms follows the census series through (wv)'s one builder — red on main since the extraction, healed here
+- `8bb645f` Merge origin/main: (wv) landed the family publish fix — my entry moves to (ww) and its stale-writer paragraph cites the root cause
+- `3992544` The dashboard's georgia hole (wv): spend_extra's b.bot killed every family publish for five days behind a stale Railway writer — one builder, driven for every book, publish failures now log
 - `085a748` Merge origin/main: reconcile with the (wt) September slate and the (wu) rails — georgia's shadow retirement withdrawn (deferred to her 10-Sep read), duplicate guards dropped for the slate's, roster re-aims reverted, letter (ws)->(wv)
 - `9c3b2cb` Merge PR #263: the two sizing rails from the edge audit, reshaped to bite only on measured harm; the brain's expansion floors measured and kept (wu)
 - `ab465ba` HANDOFF regenerated after the third re-merge (wu)
