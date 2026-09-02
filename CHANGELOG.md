@@ -34,7 +34,7 @@ after the taker, developed in parallel: its path is supply + time, not a rebuild
 No book is minted here (I20/I22 unchanged) — this is a promotion recommendation
 for an existing shadow book, staged for the gate.
 
-## 2026-09-02 (wh) — 👩 THE TRANSFER OPTIMISED MUM (+57% clip); the daily-loss "floor fix" was REFUTED by a pinned safety test and reverted — her $30 cap is a DELIBERATE fleet dollar rail, and raising it is Eamon's risk call
+## 2026-09-02 (wh) — 👩 MUM'S DAILY-LOSS PILOT CAP WAS A CEILING, NOT A FLOOR — funded to $570 she was halting at 5.26%, not her intended 10%; REFUTED AND REVERTED: the abs cap is a DELIBERATE tighter fleet rail, and raising its VALUE is Eamon's risk call
 
 Eamon moved 🔮 georgia's freed ~$220 into 👩 mum (equity $300 → **$570**), and the
 verification is the headline: the deposit folded into `capital_adjust`, not P&L,
@@ -56,8 +56,9 @@ maxdd denominator genuinely tracked funded equity; this rail is meant to be
 fixed). Reverted in full (`daily_loss_hit` signature, the host breach call, the
 test). The pinned test did exactly its job — I3, from the outside.
 
-**[AMENDED same day, POST-MERGE — THE REFUTED FIX SHIPPED ANYWAY, for a ~2h
-window, and the record must say so.** Eamon merged PR #257 at `ea2d96f` (00:56Z)
+**[CORRECTED IN PLACE same day, post-merge (this entry originally SHIPPED the
+floor; it now records its refutation) — THE REFUTED FIX SHIPPED ANYWAY, for a
+~2h window, and the record must say so.** Eamon merged PR #257 at `ea2d96f` (00:56Z)
 — the branch tip BEFORE this revert had been pushed — and the merge commit
 (authored by the peer session, which resolved the cross-session conflict and
 never mentions (wh)) carried `[deploy-live]`, so run 654 put the (wh) code on
