@@ -51,6 +51,59 @@ second run, and is a silent exit-0 no-op with `CLAUDE_CODE_REMOTE` unset —
 verified by confirming the deps were STILL absent after the local run, rather
 than by trusting the branch.
 
+**AND THE PASS TURNED UP A LOST REAL-MONEY DEPLOY, which is the more expensive
+half.** With the suite honest, `scripts/audit_code_currency.py` was run against
+the live feed — and refused to report at all, because 🔮 georgia's new
+`freqtrade-georgia-v3-lshadow` row was UNMAPPED in `ROW_ENTRY`. That is the
+`(jb)` gate working as designed (it declines to audit the fleet minus one row),
+and the cost is worth recording: while it refused, nothing could answer *"is
+🙏 avo running the `(xe)` fix?"* on a real-money book. Row mapped; the audit then
+said it plainly — **`freqtrade-avo-maria-lighter` DEFERRED, 14 commits behind,
+"none marked for this marker-gated service"**.
+
+**THE CAUSE: A LIVE-DEPLOY MARKER DOES NOT SURVIVE A SQUASH MERGE.** `(xe)`'s
+commit subject opened with `[deploy-live]`. It merged as #275 **squashed**, and
+a squash subject is generated from the **PULL REQUEST TITLE**, not from the
+branch — so main took `9a667f7 (xe) One position, two spellings: ... (#275)`
+with no marker, and the deploy gate, reading main correctly, shipped nothing.
+👩 mum got the fix only because an unrelated PR an hour later carried
+`[deploy-live-mum]` in its TITLE. **The whole difference between a fixed
+real-money book and an unfixed one was which field the marker was typed into.**
+`(hj)` settled which FIELD the gate reads and pinned it; it could not know which
+subject survives the merge. Corrected in place in CLAUDE.md per I12.
+
+**RECOVERED, not left for the next push:** the documented no-marker route — an
+explicit `workflow_dispatch` of `railway-redeploy.yml` for
+`tide-rider-lighter-live` (avo's live service), after checking the row `online`
+and unhalted. Never an empty commit to kick the gate. **VERIFIED BY STAMP
+READBACK, not by the green run** (run 678, success): avo's row moved to
+`078f894f89d1`/17 — **byte-identical to 👩 mum's**, so both real-money books
+now run the same image carrying `(xe)`, and `liq_mark_blind` is empty on both.
+
+**AND TWO OF THE REPO'S OWN GUARDS CAUGHT THIS PASS'S MISTAKES BEFORE IT
+PUSHED,** which is worth recording because both were mine: mapping
+georgia-v3 in `ROW_ENTRY` immediately reddened
+`test_every_registered_book_is_visible_to_agronomy` — a registered book with
+no `fleet_agronomy` spec — and the new guard's own `--selftest` reddened
+`test_no_unregistered_selftest`. 🔮 georgia v3 is a **living** book
+(ImpulseFade 15m, born `(vr)` 28-Aug), so it gets a real spec rather than an
+exemption, and its cooldown is READ from the carrier (`cooldown_candles 1` on
+15m = **0.25h**) rather than inherited from v1's 1.0h — copying the sibling
+would have misprofiled it by 4x in the organ that asks whether it has room to
+grow, which is the `(sl)`/I23 class that map's own mum entry already records.
+
+**CLOSED EXECUTABLY, because fixing the instance guarantees the return visit:**
+`scripts/audit_live_marker_survives_squash.py`, wired as a PR-only CI job. It is
+**deliberately the weak form** — it never REQUIRES a marker (most changes are
+correctly main-only under `(mm)`) and never guesses the merge method; it fails
+only when a marker present on the branch is absent from the title, which is
+always fixable by editing the title and costs nothing to satisfy. Its `MARKERS`
+list is checked against the literals `railway-redeploy.yml` actually greps for,
+so a new live service cannot be added there and silently escape it. **Driven
+against the real #275 title and its real commit subjects, it reports the drop
+and exits 1** — a guard reproduced on the incident that motivated it, not on a
+fixture of its own invention.
+
 **ALSO IN THIS PASS: the two CodeQL findings `(xe)` landed with.** `File is
 opened but is not closed` at two `open(...).read()` sites in
 `tests/autonomy/test_margin_mark_spelling.py` — real, and mine; both now

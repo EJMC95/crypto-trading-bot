@@ -81,6 +81,13 @@ ROW_ENTRY = {
     "freqtrade-avo-maria-lshadow": "lighter_family_bot.py",
     "freqtrade-dad-lshadow": "lighter_family_bot.py",
     "freqtrade-georgia-lshadow": "lighter_family_bot.py",
+    # [2026-09-02 (xh)] 🔮 georgia's v3 variant row, mapped the day it first
+    # published. It was born UNMAPPED, and the (jb) gate did exactly what it
+    # was built to do — it refused to report at all rather than audit the
+    # fleet minus one row. The cost is worth recording: while it refused,
+    # `audit_code_currency` could not answer "is 🙏 avo running the (xe) fix?"
+    # on a REAL-MONEY book, which is the question that surfaced this.
+    "freqtrade-georgia-v3-lshadow": "lighter_family_bot.py",
     "freqtrade-mum-lshadow": "lighter_family_bot.py",
     "equities-regime-lshadow": "lighter_index_bot.py",
     "lighter-dislocation-lshadow": "lighter_dislocation_bot.py",

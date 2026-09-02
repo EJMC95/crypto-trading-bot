@@ -2331,6 +2331,29 @@ All new bots:
   a subject mention still fires, by design (a subject is a deliberate
   statement, not prose). Verify a live deploy by the `extra.build` +
   `extra.build_n` stamp, never by the green run.
+  **[2-Sep (xh)] AND THE SUBJECT THAT COUNTS IS THE ONE THAT LANDS ON MAIN —
+  UNDER A SQUASH MERGE THAT IS THE PULL REQUEST TITLE, NOT YOUR COMMIT.**
+  `(hj)` settled which FIELD the gate reads and pinned it; it could not know
+  which subject survives the merge. Under a merge commit every branch subject
+  does. Under a SQUASH the branch subjects are folded into the body and the
+  squash subject is generated from the PR title — so a marker typed into a
+  commit subject is dropped, main carries none, and the gate correctly ships
+  nothing. **Measured on real money the day this was written:** `(xe)` fixed a
+  margin mis-read on both live rows behind a `[deploy-live]` commit subject and
+  merged squashed as `9a667f7 (xe) One position, two spellings: ... (#275)`.
+  🙏 avo's live arm never took it — `audit_code_currency` read *"DEFERRED, 14
+  commits behind, none marked for this marker-gated service"*, which is that
+  guard being exactly right about a deploy that was supposed to have happened —
+  and 👩 mum got the fix only because an unrelated PR an hour later carried
+  `[deploy-live-mum]` in its TITLE. The whole difference between a fixed
+  real-money book and an unfixed one was which field the marker was typed into.
+  **So put the marker in BOTH the PR title and the commit subject.** Both is
+  correct and costs nothing, and it makes the deploy independent of which merge
+  button is pressed. The recovery when it is already merged is the documented
+  no-marker route — dispatch the workflow for that service explicitly — never a
+  new empty commit.
+  ENFORCED BY: `scripts/audit_live_marker_survives_squash.py::check`,
+  `scripts/audit_live_marker_survives_squash.py::MARKERS`
 - **GRADE A DIRECTIONAL BOOK AGAINST A RANDOM-ENTRY BENCHMARK, NEVER AGAINST
   ZERO (30-Jul (hm)).** On this venue a random short earns +0.2% to +1.1%/trade
   for free. Measured on the Ticket Taker: random entries on the LENS'S OWN
