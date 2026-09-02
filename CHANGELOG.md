@@ -64,13 +64,28 @@ next caller — fixing the instance guarantees the return visit (FORWARD MOTION,
 rule 2). `to_lighter` is definitional, so the fallback can never resolve to a
 DIFFERENT market's price; that is pinned, because this is a real-money price.
 
-**AFTER THE FIX**, on the reproduced live payload: `liq_mark_blind` empties, the
-1000-market enters `nearest_liq` (and on the live geometry it IS the nearest —
-0.10 of mark against XRP's 0.746, i.e. the row had been publishing a number 7x
-more comfortable than the position it could not see), and `headroom` falls
-through to `liq_unpriced`, which mum's allowlist declares as structural on a
-cross-margin book. The page stops because the condition stops, not because a
-reason was allowlisted.
+**AFTER THE FIX**: `liq_mark_blind` empties, the 1000-market joins the priced
+set, and `headroom` falls through to `liq_unpriced`, which mum's allowlist
+declares as structural on a cross-margin book. The page stops because the
+condition stops, not because a reason was allowlisted.
+
+**AND THE ONE NUMBER THAT COULD HAVE BEEN OVERSTATED IS CORRECTED IN PLACE
+BEFORE IT SHIPPED (I12), because I wrote it from my own FIXTURE and called it
+the live geometry.** The draft of this entry said the blind leg *is* today's
+nearest at "0.10 of mark against XRP's 0.746, a number 7x more comfortable
+than the position it could not see". That is my test's constructed geometry,
+not mum's. Measured on the live row (build `08147b6bc9fb`): kPEPE liq
+`0.00061214` against an entry of `0.00344`, so at a mark near entry it sits
+**~0.82 of mark from liquidation** — SECOND-nearest, ~2.6pp behind XRP's
+measured `0.79664`. **So today's published `gap_stop_widths` (19.9 = 0.79664
+/ 0.04) is materially correct, and the blind leg was never hiding a closer
+one.** The defect is therefore STRUCTURAL rather than currently mis-stating:
+a 1000-market can never BE `nearest_liq`, so on the day it *is* the closest
+the row would publish a comfortable number instead and `too_close` could not
+fire — a near miss, and the page is the part that was costing something every
+loop. Five of mum's ten legs carry no venue liq price at all (cross-margin,
+structural, allowlisted), so the priced set the blind leg was dropped from is
+five, not ten.
 
 **PINNED** by `tests/autonomy/test_margin_mark_spelling.py` — 10 tests driving
 the whole seam in the host's own order (`stop_marks` -> `margin_state_from` ->

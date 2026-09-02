@@ -106,11 +106,18 @@ def _book(px):
     return {"bids": [(px * 0.999, 10.0)], "asks": [(px * 1.001, 10.0)]}
 
 
-# 👩 mum's real-money holding on the day, reduced to the two legs that matter:
-# the 1000-market (two spellings) and a plain one (one spelling). XRP sits at
-# 0.746 of its mark from liquidation; 1000PEPE at 0.10 — so if the fix works,
-# the 1000-market becomes `nearest_liq`, and if it does not, the row keeps
-# publishing XRP's comfortable number while the real nearest is invisible.
+# 👩 mum's real-money holding, reduced to the two legs that matter: the
+# 1000-market (two spellings) and a plain one (one spelling).
+#
+# THE GEOMETRY HERE IS CONSTRUCTED, NOT TODAY'S — and saying so is the point.
+# On the live row the blind leg is the SECOND-nearest (kPEPE liq 0.00061214
+# against an entry of 0.00344, so ~0.82 of mark, behind XRP's measured
+# 0.79664), which is why the published `gap_stop_widths` happened to be
+# correct while the leg was invisible. This fixture puts the 1000-market
+# NEAREST on purpose, because that is the day the defect stops being a near
+# miss: the row would publish the comfortable leg's distance and `too_close`
+# could not fire on the dangerous one. A test that only reproduced today's
+# safe geometry would pass on the pre-fix code.
 LIVE_ACCT = _acct([_pos("1000PEPE", liq="0.0090"),
                    _pos("XRP", liq="0.3335")])
 LIVE_BOOKS = {"1000PEPE": _book(0.0100), "XRP": _book(1.3154)}
@@ -170,10 +177,11 @@ def test_a_venue_spelled_mark_prices_the_position_it_names():
     assert "dist_frac" in st["positions"]["kPEPE"]
 
 
-def test_the_nearest_liquidation_is_the_one_the_row_could_not_see():
-    """The consequential half: the published risk number was computed over a
-    SUBSET. With the 1000-market priced, it is the nearest — so the row had
-    been publishing the comfortable leg's distance."""
+def test_the_nearest_liquidation_can_be_the_leg_the_row_could_not_see():
+    """The consequential half: the published risk number is computed over a
+    SUBSET, so on the day the 1000-market IS the closest, the row publishes
+    the comfortable leg's distance instead and `too_close` cannot fire on the
+    dangerous one. Constructed geometry — see the fixture note above."""
     st, _, _ = _drive(["1000PEPE", "XRP"])
     assert st["nearest_liq"]["coin"] == "kPEPE"
     assert st["nearest_liq"]["dist_frac"] < 0.2
