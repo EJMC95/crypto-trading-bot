@@ -89,6 +89,21 @@ PRE_REGISTERED = {
     ("freqtrade-avo-maria-lshadow", "book", "*"): dict(
         since="2026-08-18T11:29:15+00:00", n=12, t=2.31, mean_pct=1.313,
         source="(qd)/I21 — the winners' docket's own first live run"),
+    # [2026-09-02 (wm)] 👩 mum LIVE — both buckets sat "held only by the
+    # multiplicity referee" on the 2-Sep docket; this registration is the
+    # instrument that decides them on FRESH closes alone. Two caveats carried
+    # on purpose: (I25) it follows two hot days (+$40.55, +$39.40), so the
+    # fresh window is expected near her MEAN (+0.70%), and a not_confirmed
+    # first read is the arithmetic, not a failure; (hm) her own published
+    # control puts the edge over matched-random at +0.187%/trade — a
+    # confirmed follow-through still owes the random-entry null before
+    # anything ACTS on it, per I21's own text.
+    ("freqtrade-mum-lighter", "book", "*"): dict(
+        since="2026-09-02T04:05:59+00:00", n=52, t=2.71, mean_pct=0.703,
+        source="(wm)/I21 — 2-Sep docket: t-bar met, held by the referee"),
+    ("freqtrade-mum-lighter", "tag", "long-oversold-rebound"): dict(
+        since="2026-09-02T04:05:59+00:00", n=50, t=2.40, mean_pct=0.640,
+        source="(wm)/I21 — 2-Sep docket: t-bar met, held by the referee"),
 }
 
 

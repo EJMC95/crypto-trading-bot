@@ -231,8 +231,16 @@ def test_the_two_live_registrations_are_declared_with_their_record():
     assert taker["n"] == 53 and taker["t"] == 2.65, taker
     avo = wd.PRE_REGISTERED[("freqtrade-avo-maria-lshadow", "book", "*")]
     assert avo["n"] == 12 and avo["t"] == 2.31, avo
+    # [2026-09-02 (wm)] Re-aimed per I26: this asserted every `since` began
+    # "2026-08-18" — a snapshot of the table's first two rows that reddened the
+    # first NEW registration (👩 mum), i.e. it pinned the table's narrowness,
+    # not the commitment property. The property: every row carries a parseable
+    # UTC `since` and its at-registration record, and the founding rows above
+    # stay byte-stable (asserted explicitly there).
     for r in wd.PRE_REGISTERED.values():
-        assert r["since"].startswith("2026-08-18"), r
+        assert r["since"][:4].isdigit() and "T" in r["since"], r
+        assert r["n"] >= wd.MIN_N and r["t"] > 0 and r["mean_pct"] > 0, r
+        assert r["source"], r
 
 
 def test_a_pre_registered_bucket_is_not_double_reported_as_on_its_way():
