@@ -1,3 +1,47 @@
+## 2026-09-02 (wm) — 👩 MUM IS PRE-REGISTERED (I21): both docket buckets held "only by the multiplicity referee" now have the instrument that decides them — on fresh closes alone
+
+**Eamon, 2-Sep: *"now check mum is winning too."*** The check ran as a
+four-package measure + adversarial pass (the verify half completed by the main
+session after the subagent quota reset). The verdict is YES on every axis the
+gate grades — **n=52, +$90.47, +0.703%/trade, t=2.71 (cluster 2.73, n_eff
+48.6), 82.7% win, both halves positive** — and none of the usual artifacts:
+last-15 window +0.673% ≈ her own mean (I25 clean), top-3 concentration 24.9%
+with **ex-top-3 t=2.19** (the anti-(po) shape), zero halt-family closes in the
+sample, and her shadow twin's LEDGER (never its orphan-corrupted row) agrees to
+**−0.001pp/trade over 34 paired same-coin entries, 33/34 sign agreement** — the
+edge is not an execution artifact. The overnight scare answered itself while
+being measured: a −$66 open excursion (~1.9% basket move on an n_eff-2.4
+all-long book, her deepest in dollars, comparable in equity terms to 28-Aug's)
+recovered to −$10 on the day by 04:05Z, exactly the I25 no-change expectation.
+
+**SHIPPED: the two `PRE_REGISTERED` rows** — book (n=52, t=2.71, +0.703%) and
+`long-oversold-rebound` (n=50, t=2.40, +0.640%), since 2026-09-02T04:05:59Z.
+Registration is the (tt) contract: decided on closes strictly after `since`,
+fresh n≥10, t≥2.0 on the fresh sample alone; the caveats ride in the table —
+(I25) it follows two hot days so a `not_confirmed` first read is arithmetic,
+not failure; (hm) her published control puts the edge over matched-random at
++0.187%/trade, so even a CONFIRMED follow-through owes the random-entry null
+before anything ACTS. **A snapshot pin was re-aimed per I26's own text**: the
+docket test asserted every registration's `since` began "2026-08-18" — the
+table's narrowness, not the commitment property — and reddened on the first
+new registration ever made; it now asserts each row carries a parseable
+`since` + its at-registration record, with the founding rows still pinned
+byte-stable explicitly.
+
+**Rails verdict carried from the same pass, verified against the RUNNING build
+(`fa4c0b99acb8` = origin tip):** the (wh) max()-floor was REVERTED by (wj) in
+favour of tighter-first semantics + the staged `LIGHTER_MAX_DAILY_LOSS=57` env
+(verified on mum-live) — halt at $57/day against day_start $580.50; maxdd now
+day-start-denominated ($87.08 trip vs $45 pre-fix, realised worst in window
+$23.99); clip arithmetic exact ($432.30 published = equity×9.5/12); liq gap
+~9.5% ≈ 14× the halt distance, so the halt is the working rail by design.
+**Refused with numbers:** more slots (adds no dollars at fixed gross, (sr));
+the brain's published 1.25× expand (host restrict-only per (sp), and 1.25×
+would be 11.9× equity past every cap); the 203-bar non-crypto oracle floor
+(WTI graduates ~7d, IWM ~20d, on the oracle's own clock); her coin vetoes
+(her own ledger at ≥50% stop rate). Her ~$2k of still-idle deposit redeploys
+itself as the roi ladder recycles the book (~24h) — watch, don't touch.
+
 ## 2026-09-02 (wl) — THE DASHBOARD READ THE (wg) REALLOCATION AS A −$220 TRADING DAY: today's P&L is now capital-move-immune, and georgia's drained live row is hidden with the (ta) receipt stamped at its source
 
 **[Renumbered (wj) → (wl) at push:** the concurrent sessions' taker-successor
