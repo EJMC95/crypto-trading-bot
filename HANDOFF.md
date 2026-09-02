@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-02 14:04 Sydney (04:04Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-02 14:09 Sydney (04:09Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -69,9 +69,13 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 _Still open because:_ declared in KNOWN_CELL_COLLISIONS; the call is the same ~12-Sep decision point as the rest of that component.
 
-## Shipped today (33 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl))
+## Shipped today (37 commit(s), entries (tg), (wb), (wc), (wd), (we), (wg), (wh), (wi), (wj), (wl), (wm))
 
+- `af7700b` Merge origin/main: main's (wl) dashboard fix landed first; the edge audit keeps (wm) above it
+- `712c3df` Renumber (wl) -> (wm): main took (wl) for the dashboard fix first; citations moved with it (wm)
+- `c974f7d` Regenerate HANDOFF — I11's regenerate-last half (wl)
 - `acc656a` The edge audit: 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wl)
+- `05985d6` [deploy-live-georgia] (wl) pnl dashboard fix: capital-move-immune daily P&L + georgia's drained live row hidden with the (ta) receipt
 - `3e15884` Merge PR #258: the (wk) record — the night's cross-session convergences, receipts and withdrawals
 - `0030ce1` Merge remote-tracking branch 'origin/main' into claude/fleet-audit-review-wjz9zy
 - `6887a8e` [deploy-live-mum] Merge PR #259: the (wh) daily-loss floor reverted — the pinned rail restored, mum's staged $57 cap activates (wj)
