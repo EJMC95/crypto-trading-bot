@@ -67,6 +67,23 @@ that they should go, and the reason is stronger than the evidence one.
 path drops meta without booking a phantom close, exactly as written). 🙏 avo:
 **TAO $235 + TRX $327 = $562 on a $319-equity book**, in 2 of her 5 slots.
 
+**[CORRECTED IN PLACE 3-Sep (xw) per I12 — THE PARAGRAPH BELOW OVERSTATES, AND
+THE ERROR IS MINE.** It says her *"only exits are a −10% stop and an ROI
+ladder"*. **False.** `SwingDip.signals` returns
+`exit_ = ((rsi[i] > 65 or c[i] >= sell_zone) and v[i] > 0)` — a mean-reversion
+exit tagged `sell_into_strength` — and THAT is her workhorse: **25 of 26
+shadow closes and 6 of 20 live**. I read the registry (`roi`, `stoploss`, no
+`custom_exit`) and missed the signal exit entirely, which is the (po) lesson
+about a check that inspects the wrong thing. Measured on her own ledger:
+median hold **1.11d live / 4.84d shadow**, max **4.33d / 11.01d**, and
+**ZERO closes have ever reached 14 days** — the ROI backstop is untested, not
+absent. **What survives:** an adopted leg exits only if ITS coin mean-reverts
+up, so a quiet or falling coin leaves it sitting until −10% or 14 days, with no
+entry logic having chosen it. That still justifies the purge — an adopted leg
+is not this book's trade and should not hold a slot at all — but the URGENCY
+below was inflated by my misreading, and the honest cost is "until the coin
+signals", not "a guaranteed fortnight".]**
+
 **WHY A SLOT IS THE REAL COST, not the P&L.** `SwingDip` has **no time stop**.
 Its exits are a −10% stop and `roi = {0: 0.20, 5760: 0.12, 11520: 0.06,
 20160: 0.0}` — the ladder reaches breakeven at **20,160 minutes = 14 days**. A
