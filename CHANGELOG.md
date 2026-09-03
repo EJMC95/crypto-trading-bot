@@ -1,3 +1,58 @@
+## 2026-09-03 (xu) — `_run` LEAKED EVERY COROUTINE IT REFUSED, AND THE FIRST TEST I WROTE FOR IT WAS VACUOUS — found in 👩 mum's own logs on the first entry after her halt cleared
+
+**Eamon: *"fix the above"***, on a defect his live book printed at 00:07Z, four
+minutes after coming back:
+
+```
+lighter_client.py:1237: RuntimeWarning: coroutine 'OrderApi.trades' was never awaited
+WLFI entry fill UNMEASURED — skipped:budget(0.9 tok, reserve 6.0)
+  after api-error:trades:VenueError:lighter tx budget exhausted
+```
+
+**THE MECHANISM, and it is a CLASS not an instance.** Every caller builds its
+coroutine as an ARGUMENT — `_run(self._order_api.trades(...))` — so the object
+exists before `_run` is entered. `_run` then asks the governor for a token and,
+on refusal, **raised before `asyncio.run_coroutine_threadsafe` ever saw it**:
+
+```python
+if not self.gov.acquire(weight=weight, **_kw):
+    raise VenueError("lighter tx budget exhausted; skipping")   # coro never awaited
+fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+```
+
+So the coroutine was never awaited and never closed. **All 9 call sites share
+the shape**, and the fix is in the ONE owner of "refuse to run a coroutine"
+rather than at the single site that happened to surface it.
+
+**NOT A MONEY BUG, and saying so precisely matters.** The caller's `except`
+records `api-error:trades:...`, no order is affected, no position mis-sized. It
+is a **MEASUREMENT** bug: the fill books `slippage NULL`, and measurement is the
+thing this fleet's whole discipline rests on. It also feeds `(xp)`'s
+`unmeasured_n` bucket, which is the number a future gross notch must price.
+
+**Covered BOTH refusal paths** — the governor saying no, and the governor
+itself raising. Cleanup never masks the caller's error (a `close()` that throws
+is swallowed; the governor's exception is the one the caller needs).
+
+**AND THE FIRST TEST I WROTE FOR THIS WAS VACUOUS — recorded because that is
+the more useful half of the entry (I3).** It captured
+`RuntimeWarning: ... never awaited` and asserted none escaped. It passed. Then
+the mutation round found that **removing the close on the acquire-raises path
+SURVIVED it**: the exception's traceback keeps `_run`'s frame alive, and
+therefore `coro`, so nothing is collected inside the capture block and no
+warning is ever emitted. A test built on *when the garbage collector happens to
+run* is a test that reports clean by accident.
+
+Replaced with `inspect.getcoroutinestate(coro) == CORO_CLOSED`, which asks the
+object directly and cannot be fooled by collection timing. The warning-based
+assertion survives as CORROBORATION on the path where it does bite — because it
+is the exact symptom Eamon saw — never as the proof.
+
+6 tests, **4/4 mutations red** (no close on refusal · no close when acquire
+raises · cleanup masking the governor's error · the governor never consulted).
+The happy path is pinned separately: a refusal fix must not touch the path that
+actually runs.
+
 ## 2026-09-02 (xt) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
 
 **[RENUMBERED (xr) -> (xt), 3-Sep.** Another session landed a different `(xr)` on main first — the stuck-flatten page — and it is already cited by its own code and tests, so per the letter rule the CITED entry keeps the letter and this one moves. Recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**
