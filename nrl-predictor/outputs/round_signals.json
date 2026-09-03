@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 27,
- "scanned_at": "2026-09-01T12:45:07+00:00",
+ "scanned_at": "2026-09-03T01:46:07+00:00",
  "games": [
   {
    "home": "Canterbury-Bankstown Bulldogs",
@@ -323,12 +323,22 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 13.8,
-    "temp_c": 19.7,
+    "wind_kmh": 13.9,
+    "temp_c": 20.1,
     "forecast_hour": "2026-09-03T19:00"
    },
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - Nine.com.au",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
+     "published": "Tue, 04 Aug 2026 07:00:00 GMT"
+    }
+   ],
    "news_away": []
   },
   {
@@ -651,8 +661,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 7.6,
-    "temp_c": 19.8,
+    "wind_kmh": 2.7,
+    "temp_c": 19.4,
     "forecast_hour": "2026-09-04T18:00"
    },
    "news": [],
@@ -986,13 +996,7 @@
      "status": null
     }
    ],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 13.0,
-    "temp_c": 16.8,
-    "forecast_hour": "2026-09-04T20:00"
-   },
+   "weather": null,
    "news": [],
    "news_home": [],
    "news_away": []
@@ -1318,31 +1322,13 @@
    "news": [],
    "news_home": [
     {
-     "headline": "Jett's 'mad' debut powers Wahs to top from Ivan and Nate's Panthers - NRL.com",
+     "headline": "Bulldogs v Warriors: Crichton returns; Webster sticks solid - NRL.com",
      "flags": [
-      "debut"
+      "return"
      ],
      "players": [],
-     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxOT0Q0RXlocnVhUFNkdWVwc0FDaFJ5SFVuYjZRajdWdFZQMWxyMlVuOGRBMlFTUXlEaDhTbS1YNlo1aXlQcDF0TnpDNnp3LU9KbU11R2xpTEswUVBqMkhYd0N6NzVVbV9OcGZGZG5sYjN6WTFpMlpXVWNoa1c3RWZjdDdJY0h3T3NLWmNwSURqSEVzblU0bFA4?oc=5",
-     "published": "Mon, 31 Aug 2026 02:18:41 GMT"
-    },
-    {
-     "headline": "Mixed feelings for Clearys after Jett\u2019s debut helps Warriors leap-frog Panthers - nine.com.au",
-     "flags": [
-      "debut"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMixgFBVV95cUxNNFpwd002RjB5ZjVGWjhhYXRwLUZwX3ZHd1MxaGYyU0I2WVZnNmRHLWdIOVBOcWlqeUttbnliSy1Sc2xINkVVYjk2cTM5ZjhlbUIxVUNTV29HZkYzclBzek91VHM4TFMwQzZwNThBdV9SYVJYTjZXMXY5UGlSZXJoWTg0dzNYSmtFVHZIR05zVDJvaGtseGlsLVB1OUpVOXRQUjJXMExPWGxLSmVTdDZUcW1EeTg0Ul9rb1VDbFlsWG8xX1V3YXc?oc=5",
-     "published": "Sun, 30 Aug 2026 09:47:16 GMT"
-    },
-    {
-     "headline": "Warriors v Knights: Jett Cleary to debut, when they play, kick-off time, team list, injuries, NRL ladder - what to know - RNZ",
-     "flags": [
-      "debut"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxOcVdiWWl0dmMtSG5MYjQ4SkhZQ3pUbVRPa1BzZWNNdEpubGc4X1dWZk5fdldUVXc1czZ1a0lLc1d5MjdWNzVrNVYzNHNvaE5Vc0lHbG1CaDZYTVRjSjRTNzhfM0tMb0RZUjRyQkxVMXZjUzRNT0Z5UDB4WXVuS0V0ajJOcGVUbTlJOXk4Yl9rZjFsU1dBUmY1cngtMDNYTlBGZl9peXpPd0dHMnNOR0xXaXlvUUM4TTRNRFZuY1Yyc1JMZVM0UDEtcmk0S3c3aHY0RWVJbi1Ec01WbmE5MG4tSnVqQlJrSWM?oc=5",
-     "published": "Sat, 29 Aug 2026 06:58:31 GMT"
+     "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxPRUFxMENPQ3NaOGpBc0g1aTIyV2RmejlIaTQwQnh1ajV5VnQ5UmxkcnlWdE0xZGJQYVBhX2ZJZ25sVGZjeVVBLW9yZWRJTGRLcWZSdzBURkNzM2Uxa2l4WEo3eEI1ZGt3blh5ZjV1aUZ4b3RtZUE0OW9mVEZHOG00TmhCR3hLLU5nYzFaeFRkMEE3dFhVdG5kUTV3?oc=5",
+     "published": "Sat, 25 Jul 2026 07:00:00 GMT"
     }
    ],
    "news_away": []
@@ -2320,9 +2306,9 @@
    ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 5,
-    "wind_kmh": 13.1,
-    "temp_c": 19.5,
+    "precip_prob": 0,
+    "wind_kmh": 18.3,
+    "temp_c": 20.3,
     "forecast_hour": "2026-09-06T14:00"
    },
    "news": [],
@@ -2648,13 +2634,23 @@
    ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 4,
-    "wind_kmh": 12.1,
-    "temp_c": 18.5,
+    "precip_prob": 0,
+    "wind_kmh": 17.6,
+    "temp_c": 18.7,
     "forecast_hour": "2026-09-06T16:00"
    },
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Eels v Panthers: Moses, Penisini return; Edwards sidelined - NRL.com",
+     "flags": [
+      "out"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxPQWVuUkNMb0ZXYXUybFBOVG5VTEZGc1ZhaW9ySW9Ldjc5dkw3ZnoyNmNkOTdXWVVPTWMwWXhPeUxXOVRSNUxnVTJacHF5ZHRlaU1MbktqVDd1MEQ4RmVZSEUxVkdqSzJzaEVxcEdiV1RUZXF1VlNnVXp2akdqWVU0emt5cXFvY3o4TkFLNE5MeUI1VmtQeFdB?oc=5",
+     "published": "Thu, 23 Jul 2026 07:00:00 GMT"
+    }
+   ],
    "news_away": []
   }
  ]

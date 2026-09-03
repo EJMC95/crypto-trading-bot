@@ -1,9 +1,9 @@
 round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,disp_home,disp_away,value_side,value_ev_pct
-Round 27,2026-09-03 19:50:00,Canterbury-Bankstown Bulldogs,Brisbane Broncos,0.6428,0.715,-0.0722,4,1.35,3.35,0.015,0.0075,Brisbane Broncos,19.662
-Round 27,2026-09-04 18:00:00,Gold Coast Titans,Dolphins,0.2275,0.2381,-0.0106,4,4.1,1.25,0.025,0.0,Dolphins,-3.4375
-Round 27,2026-09-04 20:00:00,South Sydney Rabbitohs,Sydney Roosters,0.4495,0.8683,-0.4188,4,1.1,7.5,0.0,0.0345,Sydney Roosters,312.875
-Round 27,2026-09-05 15:00:00,New Zealand Warriors,Manly-Warringah Sea Eagles,0.6595,0.7263,-0.0668,4,1.34,3.5,0.0308,0.0145,Manly-Warringah Sea Eagles,19.175
-Round 27,2026-09-05 17:30:00,North Queensland Cowboys,Canberra Raiders,0.6032,0.6125,-0.0093,4,1.57,2.5,0.0129,0.0204,Canberra Raiders,-0.8
-Round 27,2026-09-05 19:35:00,Cronulla-Sutherland Sharks,Melbourne Storm,0.6225,0.3049,0.3176,4,3.15,1.37,0.0161,0.0074,Cronulla-Sutherland Sharks,96.0875
-Round 27,2026-09-06 14:00:00,St George Illawarra Dragons,Parramatta Eels,0.4419,0.4327,0.0092,4,2.3,1.7,0.0502,0.018,St George Illawarra Dragons,1.637
-Round 27,2026-09-06 16:05:00,Penrith Panthers,Wests Tigers,0.8765,0.8715,0.005,4,1.11,7.75,0.023,0.0508,Penrith Panthers,-2.7085
+Round 27,2026-09-03 19:50:00,Canterbury-Bankstown Bulldogs,Brisbane Broncos,0.6425,0.715,-0.0725,4,1.35,3.35,0.015,0.0075,Brisbane Broncos,19.7625
+Round 27,2026-09-04 18:00:00,Gold Coast Titans,Dolphins,0.2221,0.2381,-0.016,4,4.0,1.25,0.0,0.004,Dolphins,-2.7625
+Round 27,2026-09-04 20:00:00,South Sydney Rabbitohs,Sydney Roosters,0.4707,0.8683,-0.3976,4,1.1,7.5,0.0046,0.0345,Sydney Roosters,296.975
+Round 27,2026-09-05 15:00:00,New Zealand Warriors,Manly-Warringah Sea Eagles,0.6643,0.7217,-0.0574,4,1.33,3.5,0.0153,0.0294,Manly-Warringah Sea Eagles,17.495
+Round 27,2026-09-05 17:30:00,North Queensland Cowboys,Canberra Raiders,0.5871,0.6172,-0.0301,4,1.55,2.6,0.0098,0.0505,Canberra Raiders,7.354
+Round 27,2026-09-05 19:35:00,Cronulla-Sutherland Sharks,Melbourne Storm,0.5996,0.31,0.2896,4,3.1,1.38,0.0164,0.0073,Cronulla-Sutherland Sharks,85.876
+Round 27,2026-09-06 14:00:00,St George Illawarra Dragons,Parramatta Eels,0.4169,0.4158,0.0011,4,2.3,1.64,0.0,0.0061,St George Illawarra Dragons,-4.113
+Round 27,2026-09-06 16:05:00,Penrith Panthers,Wests Tigers,0.8707,0.8715,-0.0008,4,1.11,7.75,0.023,0.0508,Wests Tigers,0.2075
