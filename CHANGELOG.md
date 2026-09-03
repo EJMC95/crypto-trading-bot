@@ -1,4 +1,7 @@
-## 2026-09-02 (xr) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
+## 2026-09-02 (xt) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
+
+**[RENUMBERED (xr) -> (xt), 3-Sep.** Another session landed a different `(xr)` on main first — the stuck-flatten page — and it is already cited by its own code and tests, so per the letter rule the CITED entry keeps the letter and this one moves. Recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**
+
 
 **Eamon, 2-Sep: *"get rid of anything adopted from mum or avo"*** — after
 `(xq)` established that an adopted leg is not the book's evidence. He is right
@@ -53,6 +56,161 @@ binding constraint (I17/I22).
 
 16 tests, **6/6 mutations red**, including the two that matter: defaulting the
 switch ON, and letting the purge pre-empt a genuine stop.
+## 2026-09-02 (xs) — 🎫 THE TAKER'S GATE CENSUS: `(uo)` COUNTED THE SLOTS AND 23 OF 24 TICKETS DIED BEFORE THE COUNTER
+
+**Found by the daily review, on the book holding the fleet's only CONFIRMED
+pre-registered winner.** `(uo)` built `slot_census` on exactly the right
+argument — *"`open 6/6` is BYTE-IDENTICAL between 'six tickets existed' and
+'twenty existed and fourteen were refused for want of a slot'"* — and then
+counted the three SLOT throttles, every one of which is reached only after a
+run of upstream gates that `continue` silently.
+
+**MEASURED on the live payload, 2-Sep 23:4xZ:**
+
+| | |
+|---|---|
+| scout `tickets` | dip 4 · **breakout 12** · momentum 3 · divergence 5 = **24** |
+| taker `slot_census` | `{offered: 1, slots_full: 0, held_sym: 1, opened: 0}` |
+| open / cap | **4 of 8** |
+
+So the row published *"slots are not binding"* — **true, and useless**. 23 of
+24 tickets died before the counter and nothing said which gate took them.
+That is `(uo)`'s own byte-identical argument moved one loop upstream, and it is
+the `(lv)`/`(tx)`/`(om)` shape: **an arm that opens nothing must publish its
+OWN census at its OWN bar** (I18).
+
+It matters on this book specifically. `breakout` returns **exactly 12 =
+`TICKET_TOP_N`** — the cap-binding signature `(hd)` shipped the 6→12 widening
+on — and `breakoutup` is the taker's ONLY unvetoed lens with evidence (n=113,
+t=1.99, +1.137%/trade; the winners' docket has it at n_req~166, ~15d out).
+All four open positions are `long-breakoutup`. Meanwhile `dip`, `divergence`
+and `momentum` are all brain-vetoed, which is 12 of the 24 tickets — and
+nothing published that either.
+
+### WHAT SHIPPED — publish-only, changes no entry
+
+`extra.gate_census`, one counter per gate, incremented **at its own gate's
+`continue`** so it cannot drift from the rule it describes ((hj)):
+`tickets_in` · `lens_not_allowed` · `side_not_allowed` · `lens_vetoed` ·
+`bull_blocked` · `quality_blocked` · `coin_vetoed` · `no_mark` ·
+`spread_blocked` · `long_budget` · `notional_cap` · `fill_missing`.
+Read with `slot_census` in gate order: `tickets_in` is the denominator, each
+counter is one gate's refusal, `offered` is what survived to the slot
+throttles, and the first large counter names the binding gate.
+
+**WRITING THE AST TEST IS WHAT FOUND THREE OF THE TWELVE.** Reading the code I
+had seven gates; walking the loop's `continue`-guards mechanically returned
+**13**, and the three I had missed are not minor — the **spread gate**, the
+**fleet long-budget veto** (the one ceiling no per-bot lever can lift) and the
+**notional cap**. A hand-enumerated gate list is exactly the truncated-search
+failure `(qz)` names; the machine enumeration is the fix.
+
+### THE GUARD IS THE CLASS, NOT THE TWELVE COUNTERS
+
+`tests/autonomy/test_taker_gate_census.py` walks the real entry loop by its own
+iterator and **requires every `continue`-guard to increment a census key inside
+its own block** — so gate fourteen cannot arrive uncounted. It carries a
+POSITIVE CONTROL (I3 applied to the detector: a synthetic uncounted guard must
+redden it, because an empty result is not a negative result), a
+publish-only arm (no entry condition may READ the census), and a
+reaches-the-payload arm (the `(iz)` shape — a declared enforcement that exists
+and is inert).
+
+**11 of 11 mutations killed across three rounds — and round 2 found a defect in
+MY OWN TEST.** Deleting `"tickets_in": 0` from the initialiser stayed GREEN:
+the declared-key check scanned only counters inside continue-guards, and
+`tickets_in` is incremented at the top of the loop body, outside any guard —
+while the parametrised key check passed on the WRITE site's substring, the
+exact *"a substring test is NOT a wiring test"* trap in the file written to
+avoid it. The scan is now whole-loop and the mutation is red.
+
+**Expectancy price: none.** No entry decision reads the census; admission is
+byte-identical with and without it. What it buys is the measurement that has to
+exist BEFORE anyone argues about this book's supply — and `(uo)`'s own rule
+applies to its successor: it is REPORTED, never a gate.
+## 2026-09-02 (xr) — THE STUCK-FLATTEN PAGE: `flatten_incomplete` was published by both real-money hosts and consumed by NOTHING, which is why (xo) ran 6.9 hours before a human reading a P&L brief found it
+
+**Found while writing the daily brief, on Eamon's *"implement fixes and
+improvements as they come"*.** `(xo)` had already fixed the instance hours
+earlier — a 1000-market that `market_close` could not look up, so 👩 mum's
+daily-loss halt retried against $442 of a $524 real-money book and never
+closed it. This entry is not that fix and does not duplicate it. It closes
+**the class `(xo)` left open**, and the measurement that says the class IS
+open is one grep:
+
+    $ git grep -n flatten_incomplete origin/main -- '*.py'
+    lighter_avo_live_bot.py:2614      "flatten_incomplete": bool(pos)     <- publisher
+    lighter_ticket_taker.py:2382      "flatten_incomplete": bool(_still)  <- publisher
+    lighter_ticket_taker.py:4629      assert ... is True                  <- its own selftest
+    pnl_dashboard.py:190              # ...a comment
+    venues/lighter_client.py:1291     # ...a docstring
+
+**Two real-money-capable hosts publish the condition and nothing reads it.**
+No detector, no page, no dashboard chip. The field has existed since the
+daily-halt path was written; on 2-Sep it was `true` for **6.9 hours** on a
+live book beside `open_trades: 1` and `held: {"1000PEPE": "adopted"}`, and the
+thing that eventually noticed was a person reading the morning P&L email.
+
+**WHY IT WAS INVISIBLE, and why the check has to be out-of-process (I13).**
+Every signal available in-process was behaving exactly as designed:
+* the flatten is an *idempotent retry* — retrying is the correct behaviour;
+* its log line reads like safety — *"venue reports NO position — leaving meta;
+  retry next cycle (not booking a phantom close)"* is CORRECT, and it is the
+  sentence that made 6.9 hours look fine;
+* `status` is `halted`, which is byte-identical between *flattened and resting*
+  and *cannot close 84% of the book* — I1/I18's shape, the same one `(ta)`
+  wrote `extra.retired` for.
+
+And `(xo)`'s fix does not cover the next one: a flatten can fail on a venue
+error, an empty book, a rejected reduce-only, or a spelling nobody has met
+yet. From outside, all of them look identical — a quiet halted row, still
+holding.
+
+**SHIPPED: `fleet_immune.flatten_stuck_sickness`.** A halted book publishing
+`flatten_incomplete: true` for longer than `FLATTEN_STUCK_S` (30 min) pages,
+naming the **service** and the **coins** (I8 — the operator's action is on a
+named Railway service holding named positions, never an opaque row id).
+
+**The design decisions, each one a rule this fleet already paid for:**
+* **PERSISTENCE, not a sighting.** The row carries no "incomplete since", so
+  the organ's own first-seen map IS the sensor — the `app_seen` / `churn_seen`
+  pattern, persisted as `flatten_seen`. Without it every cycle is a first
+  sighting and the detector can never fire (the defect those two carry notes
+  about). A book that CLEARS is forgotten, so the next episode gets a fresh
+  clock rather than paging on sight.
+* **The bar is derived from both ends.** The retry runs every loop (90s–5min),
+  so a healthy flatten clears in a cycle or two; the measured incident ran
+  24,840s. 30 min is far outside normal and far inside the damage — pinned by
+  a test asserting it sits in that gap.
+* **Fail-safe in three directions**: a STALE row is skipped (I1 — a corpse's
+  last word is not a live verdict, and death is the watchdog's job); a row not
+  publishing the key is silent (deploy latency is not sickness — the
+  `headroom_sickness` rule); and **only the literal `True` fires**, so
+  None/absent/`0`/`""`/junk can never manufacture a page on a real-money book.
+* **`FLATTEN_STUCK_OK` is EMPTY and that is the point** — the `BORN_DARK_OK` /
+  `STALE_WRITER_OK` idiom. An entry here would excuse a book from the detector
+  built for it (the `DRIFT_OK` shape, where the carve-out lands on exactly the
+  row most worth watching). The mechanism is proven by `ok=` injection instead.
+
+**VERIFIED, not asserted (I3): 8 of 8 mutations RED** via `scripts/mutate.py`,
+and the two that matter most are the ones that make an enforcement INERT
+rather than wrong — deleting the call from `run_once`, and dropping
+`flatten_seen` from the payload. Both reddened. That is the `(iz)` class the
+top of CLAUDE.md warns about: a declared enforcement that EXISTS and never
+runs (the `(ia)` maxDD bar shipped inert for days behind a bare `except`), so
+the wiring is asserted by AST — a mention in a docstring is not a wiring.
+The consumer key is pinned against **both publishers' ASTs**, so a rename on
+either host reddens the push instead of blinding the detector on the one book
+it was built for. Suite: **3327 passed, 3 skipped**.
+
+**DEPLOY: main only, and stated per (mm).** `fleet_immune.py` is an organ in
+`freqtrade-bots` (auto-deploy `paths:`) and is NOT in `_BUILD_SHARED`, so this
+changes no trade either live book takes and does not disturb their stamps or
+restart their containers. It rides the ordinary organ deploy.
+
+**WHAT THIS DOES NOT CLAIM.** It does not make a flatten succeed — it makes a
+failing one *loud*, in under 30 minutes instead of never. The flatten's own
+correctness is `(xo)`'s fix and the venue's answer.
 
 ## 2026-09-02 (xq) — AN ADOPTED LEG IS NOT THE BOOK'S EVIDENCE: a manual trade Eamon placed by hand was on its way into a real-money book's go-live sample, and (xa)'s tag reached the brain but no grader
 

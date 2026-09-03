@@ -327,14 +327,14 @@ except (TypeError, ValueError):
 #: about it.
 GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
-#: [(xr)] THE ADOPTION TAG, owned HERE because this is where it is stamped.
+#: [(xt)] THE ADOPTION TAG, owned HERE because this is where it is stamped.
 #: `golive_readiness.ADOPTED_TAG` carries a second copy on purpose — that
 #: module is graded in the freqtrade image, which does not COPY this one, so an
 #: import is impossible in either direction. A second copy of a rule is a second
 #: rule ((hj)), so the two are pinned EQUAL by test rather than left to drift.
 ADOPTED_TAG = "adopted"
 
-#: [(xr)] PURGE ADOPTED LEGS. Eamon, 2-Sep: *"get rid of anything adopted from
+#: [(xt)] PURGE ADOPTED LEGS. Eamon, 2-Sep: *"get rid of anything adopted from
 #: mum or avo"*. An adopted position (`(xa)`) is one the book found on the
 #: venue with no bracket of its own — a hand-placed trade, or its own leg after
 #: a meta loss. It is NOT the book's evidence ((xq) keeps it out of every
@@ -976,7 +976,7 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
             reason = "trailing_stop_loss"
     elif profit <= strategy.stoploss:
         reason = "stop_loss"
-    # [(xr)] the adopted purge. AFTER the stop deliberately: a leg that is
+    # [(xt)] the adopted purge. AFTER the stop deliberately: a leg that is
     # genuinely through its stop books as `stop_loss`, because the risk record
     # is what a stop is for and a purge must not paper over one. Before roi,
     # so an adopted leg does not wait out a 14-day ladder in a slot.

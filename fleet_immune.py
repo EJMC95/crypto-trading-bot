@@ -671,6 +671,101 @@ def bot_row_sickness(bot_rows):
     return out
 
 
+#: How long a halted book may publish `flatten_incomplete: true` before it is
+#: a STUCK flatten rather than a slow one. The flatten is an idempotent retry
+#: on every loop (90s-5min), so a healthy one clears in a cycle or two; the
+#: (xo) incident ran 6.9h. 30 min is far outside normal and far inside the
+#: damage, and it is the ONE number this detector's sensitivity rests on.
+FLATTEN_STUCK_S = float(os.environ.get("IMMUNE_FLATTEN_STUCK_S", "1800"))
+
+# [2026-09-03 (xr)] Books whose `flatten_incomplete` is LEGITIMATELY sticky.
+# The BORN_DARK_OK / STALE_WRITER_OK idiom: a deliberate exemption is DECLARED
+# with a reason, never defaulted into. EMPTY today and that is the point — a
+# stuck flatten on a real-money book is exactly the condition this exists to
+# page on, so an entry here must justify why THAT book may hold an unclosable
+# position through its own halt. The MECHANISM is tested via the `ok=`
+# injection, so a future exemption is one entry away without this dict having
+# to be non-empty.
+FLATTEN_STUCK_OK = {}
+
+
+def flatten_stuck_sickness(bot_rows, seen, now=None, ok=None):
+    """A halted book whose emergency flatten is NOT completing — the purest
+    'the safety rail fired and did nothing' shape there is.
+
+    [2026-09-03 (xr)] WHY THIS EXISTS. `extra.flatten_incomplete` has been
+    published by both real-money-capable hosts since the daily-halt path was
+    written (`lighter_avo_live_bot`, `lighter_ticket_taker`) and was consumed
+    by NOTHING — no page, no detector, no card. Measured on 👩 mum, 2-Sep: her
+    daily-loss halt fired at ~02:19 AEST and `_flatten_all` retried every loop
+    for **6.9 hours** against a $442 leg — 84% of a $524 real-money book —
+    logging "venue reports NO position" each time, while the row published
+    `flatten_incomplete: true` and `open_trades: 1` to a feed nobody was
+    watching for it. `(xo)` fixed that instance (a 1000-market resolving under
+    two spellings, closed by `LighterClient.position_of`); this closes the
+    CLASS, because a flatten can also fail on a venue error, an empty book, a
+    rejected reduce-only, or the next spelling nobody has met yet — and every
+    one of those looks identical from outside: a halted row, quietly holding.
+
+    THE FAILURE IS SILENT BY CONSTRUCTION, which is the argument for an
+    out-of-process check (I13): the retry is working as designed, the log line
+    reads like safety ("not booking a phantom close" — correct, and it was the
+    sentence that made 6.9h look fine), and `status` is `halted`, which is
+    byte-identical between *flattened and resting* and *cannot close 84% of the
+    book* (I1/I18).
+
+    PERSISTENCE, not a single sighting: `seen` is this organ's own first-seen
+    map {bot: ts}, mutated in place and persisted by the caller — exactly the
+    `app_seen`/`churn_seen` pattern, and for the same reason (the row carries
+    no "stuck since", and a flatten legitimately spans a cycle or two). A book
+    that clears the condition is FORGOTTEN, so a later episode starts a fresh
+    clock rather than inheriting an old one.
+
+    Fail-safe throughout: a STALE row is skipped (I1 — a corpse's last word is
+    not a live verdict, and the watchdog owns death); a row that does not
+    publish the key at all is silent (deploy latency is not sickness, the
+    `headroom_sickness` rule); only the literal `True` fires, so None/absent/
+    junk can never manufacture a page. Names the SERVICE and the coins (I8) —
+    the operator's action is on a named Railway service holding named
+    positions, never an opaque row id."""
+    allow = FLATTEN_STUCK_OK if ok is None else ok
+    t_now = float(now if now is not None else now_ts())
+    out, live = [], set()
+    for r in bot_rows or []:
+        if _row_stale(r, t_now):
+            continue
+        extra = r.get("extra") or {}
+        # Only the literal True — a missing key is a host that does not
+        # publish it, and None/0/"" must never read as "stuck".
+        if extra.get("flatten_incomplete") is not True:
+            continue
+        bot = str(r.get("bot") or "")
+        live.add(bot)
+        since = seen.get(bot)
+        if not isinstance(since, (int, float)):
+            seen[bot] = t_now          # first sighting — start the clock
+            continue
+        held_for = t_now - float(since)
+        if held_for < FLATTEN_STUCK_S or bot in allow:
+            continue
+        held = extra.get("held")
+        coins = ",".join(sorted(held)) if isinstance(held, dict) and held \
+            else "unnamed"
+        out.append({
+            "organ": bot,
+            "detail": (f"HALTED and the flatten is NOT completing after "
+                       f"{held_for / 3600.0:.1f}h — {r.get('open_trades')} "
+                       f"position(s) still open ({coins}) on service "
+                       f"{extra.get('svc') or 'unknown'}; the daily-loss rail "
+                       f"fired and the book is still exposed"),
+        })
+    # forget books that are no longer incomplete, so the next episode's clock
+    # starts at its own beginning rather than inheriting a spent one
+    for gone in set(seen) - live:
+        seen.pop(gone, None)
+    return out
+
+
 # [2026-07-31 (hu)] Rows whose publisher LEGITIMATELY carries no `extra.svc`.
 # The BORN_DARK_OK idiom: a deliberate omission is DECLARED with a reason, so
 # silence is never an option. These three run on services in the LIVE-MARKER
@@ -1304,8 +1399,14 @@ def run_once():
     # counter, carried cycle to cycle exactly like app_seen above (a reset is
     # only observable BETWEEN cycles, so the memory IS the sensor).
     churn_seen = dict(prior.get("churn_seen") or {})
+    # [2026-09-03 (xr)] the stuck-flatten memory. Same shape and same reason as
+    # app_seen/churn_seen above: the row carries no "incomplete since", so this
+    # organ's own first-seen map IS the sensor — without persisting it every
+    # cycle is a first sighting and the detector can never fire.
+    flatten_seen = dict(prior.get("flatten_seen") or {})
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
             + headroom_sickness(bot_rows)
+            + flatten_stuck_sickness(bot_rows, flatten_seen, now)
             + stale_writer_sickness(bot_rows)
             + restart_churn(states, churn_seen, now)
             + brain_amnesia(states.get("learning-brain"),
@@ -1339,6 +1440,10 @@ def run_once():
         # for the same reason app_seen is: without it every cycle is a first
         # sighting and the sensor can never fire.
         "churn_seen": churn_seen,
+        # [2026-09-03 (xr)] {bot: first-seen ts} for the stuck-flatten sensor.
+        # Persisted for the same reason as the two maps around it; a book that
+        # clears the condition is dropped by the detector itself.
+        "flatten_seen": flatten_seen,
         # ...and WHICH counters are watched, so an organ that is NOT watched
         # is visible here rather than silently unmonitored.
         "churn_watched": sorted(RESTART_COUNTERS),

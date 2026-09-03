@@ -1,4 +1,4 @@
-"""[(xr)] The adopted purge — Eamon, 2-Sep: *"get rid of anything adopted from
+"""[(xt)] The adopted purge — Eamon, 2-Sep: *"get rid of anything adopted from
 mum or avo"*.
 
 An adopted leg (`(xa)`) is one the book found on the venue with no bracket of

@@ -79,7 +79,7 @@ def test_the_tag_matches_what_the_bot_actually_stamps():
 
 
 def test_the_live_host_still_stamps_the_tag_this_filter_keys_on():
-    """A drift pin, by IDENTITY rather than by grep ((xr)).
+    """A drift pin, by IDENTITY rather than by grep ((xt)).
 
     The two constants are a deliberate second copy: `golive_readiness` is
     graded inside the freqtrade image, which does not COPY the live host, so
