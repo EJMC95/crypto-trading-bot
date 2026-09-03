@@ -2762,3 +2762,79 @@ def publish_venue_order(bot, venue, shadow, coin, side, size,
             pass
         _conn = None
         return False
+
+
+def resolve_venue_order_fill(bot, order_key, px_fill, fill_src):
+    """[2026-09-03 (xt)] Attach a LATE-RESOLVED real fill to an order already
+    written. Returns True when exactly one row was updated, else False.
+
+    WHY A SECOND WRITE EXISTS AT ALL. The fill lookup runs immediately after
+    submission, when the venue governor's bucket is at its emptiest (an order
+    costs WEIGHT_ORDER_TX=6 of ~21), so `last_fill_detail` declines BOTH tapes
+    on spare budget and the order is recorded honestly as UNMEASURED with
+    `px_fill = px_decision`. Measured on the live feed 2-Sep: **63 of 151 live
+    orders carried a measured fill and 88 echoed the decision price**, so live
+    execution quality was an average over a NON-RANDOM 42% — and the missing
+    58% are the busiest moments, which is exactly where slippage lives. The
+    shadow twin measured 134 of 134, so the two arms' execution numbers were
+    never comparable.
+
+    THE ORDER PATH IS UNTOUCHED, and that is the point. `venues/fills.py`
+    already rules that an IMMEDIATE retry on `skipped:budget` is wrong — it
+    "spends the governor's telemetry reserve to fail identically" — and that
+    reasoning is exactly right for the same loop. It does not describe a retry
+    a few minutes later against a REFILLED bucket, which is what resolves here.
+
+    SCOPE, deliberately narrow: this corrects the EXECUTION LEDGER only. It
+    never touches the position's entry price, the book's P&L, or any close row
+    — a fill learned after the fact must not retroactively restate a book that
+    has already been graded on it. Telemetry improves; the record does not move.
+
+    SLIPPAGE IS COMPUTED IN SQL from the row's OWN `px_decision`, not passed
+    in. Both live legs already reduce to the same expression — open is
+    `(fill-dec)/dec*1e4` and close is `(dec-fill)/dec*-1e4`, which is the same
+    number — so a caller-supplied value would be a second copy of one formula
+    with two chances to get the sign wrong on real money. The row knows its own
+    decision price; let it do the arithmetic.
+
+    IDEMPOTENT by the `fill_resolved IS NULL` clause: a repeated drain can
+    never overwrite a resolution or double-apply one, so the caller may retry
+    freely without bookkeeping.
+
+    Guarded like every publisher in this module: never raises into a loop."""
+    if not bot or not order_key:
+        return False
+    conn = _get_conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_venue_orders_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE venue_orders
+                   SET px_fill = %s,
+                       slippage_bps = CASE
+                           WHEN px_decision IS NULL OR px_decision = 0
+                           THEN NULL
+                           ELSE (%s - px_decision) / px_decision * 1e4 END,
+                       raw = COALESCE(raw, '{}'::jsonb) || %s::jsonb
+                 WHERE bot = %s
+                   AND raw::jsonb->>'order_key' = %s
+                   AND (raw::jsonb->>'fill_resolved') IS NULL
+                """,
+                (px_fill, px_fill,
+                 json.dumps({"fill_src": fill_src, "measured": True,
+                             "fill_resolved": "deferred"}),
+                 bot, str(order_key)),
+            )
+            return cur.rowcount == 1
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"venue-order fill resolve failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False
