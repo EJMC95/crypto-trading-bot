@@ -85,6 +85,29 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "mum-halt-cost-preregistered-read",
+        "owner": "session",
+        "what": "(xu) pre-registered whether 👩 mum's daily-loss halt costs or "
+                "saves her, paired same-coin against her never-halting shadow "
+                "twin. At registration her ledger holds exactly ONE daily-loss "
+                "halt (2-Sep 17:19:45Z, 8 legs, +1.76pp/leg cost against the "
+                "twin) -- one flatten instant is ONE observation, not eight, "
+                "so it decides nothing. READ at n>=5 halt EVENTS occurring "
+                "AFTER 2026-09-03: LOOSEN only if mean paired cost > 1.0pp/leg "
+                "AND the sign is consistent across events; otherwise KEEP. "
+                "Instrument: scripts/study_mum_halt_cost_2026-09-03.py (its "
+                "calibration gate REFUSES unless it reproduces both the "
+                "registered event and the registered baseline).",
+        "why_open": "the rail is HELD until the criterion is met -- a cost-only "
+                    "study of a daily-loss halt reads 'loosen' on every "
+                    "ordinary halt day right up until the day it saves the "
+                    "book, so the burden sits on loosening. Closes when the "
+                    "read is taken and recorded (the PRE_REGISTERED block "
+                    "removed from the study).",
+        "closes_when": lambda: not _has(
+            "scripts/study_mum_halt_cost_2026-09-03.py", "PRE_REGISTERED = {"),
+    },
+    {
         "id": "kelly-fresh-read-pre-registered",
         "owner": "OPERATOR",
         "what": "EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-"
