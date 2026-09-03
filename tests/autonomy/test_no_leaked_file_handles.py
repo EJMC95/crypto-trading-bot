@@ -1,4 +1,4 @@
-"""[(xt)] A RATCHET on leaked file handles in the autonomy tests.
+"""[(xx)] A RATCHET on leaked file handles in the autonomy tests.
 
 CodeQL flagged `open(...).read()` without a context manager three times in one
 evening, across three different files I had just written. Fixing each instance

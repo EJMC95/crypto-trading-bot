@@ -126,6 +126,7 @@ from venues import marks
 from venues.safety import (
     SafetyRails, open_notional, capital_adjusted_day_start, env_prefix)
 from venues.fills import read_fill, measured_from_reason
+from venues.order_keys import fill_key
 from venues.symbol_map import to_lighter, from_lighter
 
 # ---------------------------------------------------------------------------
@@ -327,14 +328,14 @@ except (TypeError, ValueError):
 #: about it.
 GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
-#: [(xt)] THE ADOPTION TAG, owned HERE because this is where it is stamped.
+#: [(xx)] THE ADOPTION TAG, owned HERE because this is where it is stamped.
 #: `golive_readiness.ADOPTED_TAG` carries a second copy on purpose — that
 #: module is graded in the freqtrade image, which does not COPY this one, so an
 #: import is impossible in either direction. A second copy of a rule is a second
 #: rule ((hj)), so the two are pinned EQUAL by test rather than left to drift.
 ADOPTED_TAG = "adopted"
 
-#: [(xt)] PURGE ADOPTED LEGS. Eamon, 2-Sep: *"get rid of anything adopted from
+#: [(xx)] PURGE ADOPTED LEGS. Eamon, 2-Sep: *"get rid of anything adopted from
 #: mum or avo"*. An adopted position (`(xa)`) is one the book found on the
 #: venue with no bracket of its own — a hand-placed trade, or its own leg after
 #: a meta loss. It is NOT the book's evidence ((xq) keeps it out of every
@@ -976,7 +977,7 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
             reason = "trailing_stop_loss"
     elif profit <= strategy.stoploss:
         reason = "stop_loss"
-    # [(xt)] the adopted purge. AFTER the stop deliberately: a leg that is
+    # [(xx)] the adopted purge. AFTER the stop deliberately: a leg that is
     # genuinely through its stop books as `stop_loss`, because the risk record
     # is what a stop is for and a purge must not paper over one. Before roi,
     # so an adopted leg does not wait out a 14-day ladder in a slot.
@@ -1750,6 +1751,30 @@ def main(_ctx=None, once=False):
             _PRINT(f"[avo-live] {iso(t_now)} positions unreadable ({e!r}) — "
                    f"skipping cycle; never trade blind")
             pos, pos_readable = {}, False
+
+        # [2026-09-03 (xx)] RESOLVE FILLS THE GOVERNOR DECLINED EARLIER.
+        # Measured 2-Sep: 63 of 151 live orders carried a measured fill and 88
+        # echoed the decision price, because the fill read fires when the token
+        # bucket is at its emptiest (an order costs 6 of ~21) — so live
+        # execution quality was an average over a NON-RANDOM 42%, and the
+        # missing 58% are the busiest moments, where slippage actually lives.
+        # Spare budget ONLY and bounded, so the invariant that caused the skip
+        # ("telemetry must never starve an order") is preserved exactly; the
+        # only thing that changes is WHEN the read is attempted. Corrects the
+        # execution ledger alone — never a position entry or a booked P&L.
+        try:
+            for _fx in (getattr(venue, "drain_pending_fills", None)
+                        and venue.drain_pending_fills(limit=3) or []):
+                if store.resolve_venue_order_fill(
+                        BOT_ROW, _fx["key"], _fx["px"], _fx["reason"]):
+                    _PRINT(f"[avo-live] {iso(t_now)} fill resolved late: "
+                           f"{_fx['coin']} @ {_fx['px']:.6g} ({_fx['reason']})")
+            _derr = getattr(venue, "_drain_last_error", None)
+            if _derr:
+                _PRINT(f"[avo-live] {iso(t_now)} deferred-fill drain "
+                       f"SWALLOWED: {_derr} — fills stay unmeasured")
+        except Exception as e:  # noqa: BLE001
+            _PRINT(f"[avo-live] {iso(t_now)} deferred-fill drain: {e!r}")
 
         # [2026-08-18 (pq)] THE HALT IS LATCHED, AND A FAILED READ DOES NOT
         # CLEAR IT. This was `halted_today = bool(store.load_daily_halt(...))`
@@ -2877,7 +2902,10 @@ def main(_ctx=None, once=False):
                         slippage_bps=((px - fpx) / px * -1e4
                                       if meas and px else None),
                         raw={"leg": "close", "reason": reason,
-                             "measured": meas, "fill_src": src})
+                             "measured": meas, "fill_src": src,
+                             "order_key": fill_key(
+                                 (res or {}).get("client_order_index"),
+                                 (res or {}).get("tx_hash"))})
                 except Exception:  # noqa: BLE001
                     pass
                 _book_close(sym, fpx, meas, src, reason)
@@ -3245,7 +3273,14 @@ def main(_ctx=None, once=False):
                         slippage_bps=((fpx - px) / px * 1e4
                                       if meas and px else None),
                         raw={"leg": "open", "tag": tag, "clip": stake,
-                             "measured": meas, "fill_src": src})
+                             "measured": meas, "fill_src": src,
+                             # [(xx)] the handle a DEFERRED fill resolution
+                             # finds this row by; None when the venue echoed
+                             # no identifier, which is honest — an order that
+                             # cannot be named cannot be resolved later.
+                             "order_key": fill_key(
+                                 (res or {}).get("client_order_index"),
+                                 (res or {}).get("tx_hash"))})
                 except Exception:  # noqa: BLE001
                     pass
                 # [(xg)] this leg's stop is now part of the day's exposure —

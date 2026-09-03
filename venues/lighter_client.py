@@ -26,6 +26,7 @@ Design constraints it encodes (all empirically verified 2026-07-09):
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 import json
 import logging
 import os
@@ -33,6 +34,7 @@ import threading
 import time
 
 from .base import VenueClient, VenueError
+from .order_keys import fill_key
 from .equity_guard import EquityGuard, EquityRejected, vet_account_read
 from .governor import TxBudgetGovernor, WEIGHT_INFO, WEIGHT_ORDER_TX
 
@@ -45,6 +47,18 @@ from .governor import TxBudgetGovernor, WEIGHT_INFO, WEIGHT_ORDER_TX
 # suppressed the very fill this fix exists to record.
 _TELEMETRY_RESERVE = float(os.environ.get("LIGHTER_TELEMETRY_RESERVE",
                                           WEIGHT_ORDER_TX))
+
+#: [(xt)] How long a declined fill stays worth re-reading. The account-filtered
+#: tape is ordered by timestamp and paged to 100, so a fill only scrolls out
+#: once ~100 further account trades land; 30 min is far inside that for every
+#: book in this fleet (the fastest closes ~10/day) and far outside one loop.
+_PENDING_FILL_TTL_S = float(os.environ.get("LIGHTER_PENDING_FILL_TTL_S", "1800"))
+#: Bound on the queue itself — a venue outage must never grow it without limit.
+_PENDING_FILL_MAX = int(os.environ.get("LIGHTER_PENDING_FILL_MAX", "64"))
+#: Tries per entry before it is given up as unresolvable and dropped.
+_PENDING_FILL_TRIES = int(os.environ.get("LIGHTER_PENDING_FILL_TRIES", "4"))
+
+
 from .symbol_map import to_lighter
 
 log = logging.getLogger("venues.lighter")
@@ -650,6 +664,10 @@ class LighterClient(VenueClient):
         self._books = _BookCache(self.host)
         self._books.start()
         self._rest_books: dict[int, tuple[float, dict]] = {}   # market_id -> (ts, book)
+        # [(xt)] fills the governor declined, kept for a LATER read against a
+        # refilled bucket. Bounded and self-expiring — see drain_pending_fills.
+        self._pending_fills: "OrderedDict[str, dict]" = OrderedDict()
+        self._drain_last_error = None
 
         self.signer = None
         self.account_index = None
@@ -1282,8 +1300,11 @@ class LighterClient(VenueClient):
             self.gov._refill()                     # noqa: SLF001
             spare = self.gov.tokens - _TELEMETRY_RESERVE
         if spare < WEIGHT_INFO:
-            return None, (f"skipped:budget({self.gov.tokens:.1f} tok, reserve "
-                          f"{_TELEMETRY_RESERVE}) after {reason or 'trades-empty'}")
+            _why = (f"skipped:budget({self.gov.tokens:.1f} tok, reserve "
+                    f"{_TELEMETRY_RESERVE}) after {reason or 'trades-empty'}")
+            # [(xt)] the tape was NEVER READ — queue it for a refilled bucket
+            self._defer_fill(_why, coin, is_ask, since_ts, client_id, tx_hash)
+            return None, _why
         try:
             r = self._run(self._order_api.recent_trades(
                 market_id=m["id"], limit=100), gov_timeout=0)
@@ -1297,8 +1318,113 @@ class LighterClient(VenueClient):
             return None, (f"no-match:both({reason or 'trades-empty'})"
                           if trades else f"empty:both({reason or 'trades-empty'})")
         except Exception as e:  # noqa: BLE001
-            return None, (f"api-error:recentTrades:{type(e).__name__}"
-                          f":{str(e)[:50]} (after {reason or 'trades-empty'})")
+            _why = (f"api-error:recentTrades:{type(e).__name__}"
+                    f":{str(e)[:50]} (after {reason or 'trades-empty'})")
+            self._defer_fill(_why, coin, is_ask, since_ts, client_id, tx_hash)
+            return None, _why
+
+    def _defer_fill(self, reason, coin, is_ask, since_ts, client_id, tx_hash):
+        """Queue a fill the governor DECLINED to read, for a later pass.
+
+        Only for reasons that mean THE TAPE WAS NEVER READ — `skipped:budget`
+        and `api-error`. `venues/fills.py` is explicit that retrying those in
+        the SAME breath "spends the governor's telemetry reserve to fail
+        identically", and it is right; this is the other case, minutes later
+        against a refilled bucket. A `no-match` is NOT queued: that tape was
+        read and our fill was not on it, which a re-read does not change.
+
+        Never raises — a telemetry bookkeeping error must not reach an order."""
+        try:
+            if not reason or not (str(reason).startswith("skipped:budget")
+                                  or str(reason).startswith("api-error")):
+                return
+            key = fill_key(client_id, tx_hash)
+            if key is None or key in self._pending_fills:
+                return
+            while len(self._pending_fills) >= _PENDING_FILL_MAX:
+                self._pending_fills.popitem(last=False)   # oldest goes first
+            self._pending_fills[key] = {
+                "coin": coin, "is_ask": bool(is_ask),
+                "since_ts": float(since_ts), "client_id": client_id,
+                "tx_hash": tx_hash, "queued_at": time.time(), "tries": 0,
+                "first_reason": str(reason)[:120]}
+        except Exception:  # noqa: BLE001
+            pass
+
+    def drain_pending_fills(self, limit=3):
+        """Re-read fills the governor declined earlier. Returns a list of
+        {key, px, reason, coin, is_ask} for the ones that RESOLVED.
+
+        Spends SPARE BUDGET ONLY, exactly like the tape-2 peek it mirrors, and
+        stops at the first cycle where there is none — so this can never make
+        the next `market_open` queue behind a measurement. That invariant is
+        the reason the fill was skipped in the first place and it is not being
+        traded away here; what changes is only WHEN the read is attempted.
+
+        Reads the AUTHORITATIVE account-filtered tape only, at full lookback.
+        The public tape is a market-wide 100-row window that a busy book pushes
+        our fill out of within minutes, so it is sound live and worthless late
+        — using it here would manufacture `no-match` and burn the entry's
+        tries. Entries expire by TTL and by try count; nothing accumulates.
+
+        Never raises."""
+        out = []
+        try:
+            self._drain_last_error = None
+            if not self._pending_fills or self.signer is None \
+                    or self.account_index is None:
+                return out
+            now = time.time()
+            for key in list(self._pending_fills)[:max(0, int(limit))]:
+                ent = self._pending_fills.get(key)
+                if ent is None:
+                    continue
+                if now - float(ent["queued_at"]) > _PENDING_FILL_TTL_S:
+                    self._pending_fills.pop(key, None)
+                    continue
+                with self.gov._lock:                   # noqa: SLF001
+                    self.gov._refill()                 # noqa: SLF001
+                    spare = self.gov.tokens - _TELEMETRY_RESERVE
+                if spare < WEIGHT_INFO:
+                    break          # still no room — try again next cycle
+                px, reason = None, "drain-failed"
+                try:
+                    _sym, _mult, m = self._resolve(ent["coin"])
+                    auth = self.signer.create_auth_token_with_expiry(
+                        api_key_index=self.api_key_index)
+                    if isinstance(auth, tuple):
+                        auth, _err = auth
+                    if auth:
+                        r = self._run(self._order_api.trades(
+                            sort_by="timestamp", sort_dir="desc", limit=100,
+                            authorization=auth, market_id=m["id"],
+                            account_index=self.account_index), gov_timeout=0)
+                        trades = getattr(r, "trades", None) or []
+                        px = self._our_fills(trades, ent["is_ask"],
+                                             ent["since_ts"], ent["client_id"],
+                                             tx_hash=ent["tx_hash"])
+                        reason = ("trades(tx,deferred)" if ent["tx_hash"]
+                                  else "trades(deferred)")
+                    else:
+                        reason = "auth-failed:deferred"
+                except Exception as e:  # noqa: BLE001
+                    reason = f"api-error:deferred:{type(e).__name__}"
+                if px:
+                    self._pending_fills.pop(key, None)
+                    out.append({"key": key, "px": px, "reason": reason,
+                                "coin": ent["coin"], "is_ask": ent["is_ask"]})
+                    continue
+                ent["tries"] = int(ent.get("tries") or 0) + 1
+                if ent["tries"] >= _PENDING_FILL_TRIES:
+                    self._pending_fills.pop(key, None)
+        except Exception as e:  # noqa: BLE001
+            # [(xt)] A FAIL-OPEN EXCEPT IS A SILENT KILL SWITCH. Telemetry must
+            # never raise into a trading loop, so this swallows — but a
+            # swallowed programming error here would leave the drain returning
+            # `[]` forever, byte-identical to "nothing was pending". Record it
+            # so the silence is READABLE; the caller surfaces it.
+            self._drain_last_error = f"{type(e).__name__}: {str(e)[:120]}"
+        return out
 
     def last_fill(self, coin, is_ask, since_ts, lookback=10, client_id=None):
         """[2026-07-16 FILL RECON] REAL average fill price, or None. Thin

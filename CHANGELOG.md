@@ -53,9 +53,9 @@ raises · cleanup masking the governor's error · the governor never consulted).
 The happy path is pinned separately: a refusal fix must not touch the path that
 actually runs.
 
-## 2026-09-02 (xt) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
+## 2026-09-02 (xx) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
 
-**[RENUMBERED (xr) -> (xt), 3-Sep.** Another session landed a different `(xr)` on main first — the stuck-flatten page — and it is already cited by its own code and tests, so per the letter rule the CITED entry keeps the letter and this one moves. Recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**
+**[RENUMBERED TWICE — (xr) -> (xt) -> (xx), 3-Sep, and the second one landed within the hour.** A session put a different `(xr)` on main first (the stuck-flatten page); this entry moved to `(xt)`. A THIRD session then landed `(xt)` (the deferred-fill resolution), already cited by `lighter_client.py`, `order_keys.py`, `bot_pnl_store.py` and its own test, so it moved again to `(xx)`. Per the letter rule the CITED entry keeps the letter each time. **Three sessions picked "the next free letter" from three stale snapshots inside one hour** — which is precisely why the rule is pick-at-PUSH-time and not pick-at-write-time. Recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**
 
 
 **Eamon, 2-Sep: *"get rid of anything adopted from mum or avo"*** — after
@@ -128,6 +128,120 @@ binding constraint (I17/I22).
 
 16 tests, **6/6 mutations red**, including the two that matter: defaulting the
 switch ON, and letting the purge pre-empt a genuine stop.
+## 2026-09-02 (xt) — LIVE EXECUTION WAS MEASURED ON A NON-RANDOM 42% OF ORDERS, BECAUSE THE FILL READ FIRES WHEN THE TOKEN BUCKET IS EMPTIEST — the declined reads are now resolved against a REFILLED bucket, order priority untouched
+
+**Eamon, 3-Sep: *"implement any optomisations on mum we can"* → *"go ahead"*.**
+The optimisation is not her entry cell. It is that **we cannot see her
+execution**, and the blindness is not random.
+
+**THE MEASUREMENT** (`impl-shortfall.order_slip`, live feed 2-Sep):
+
+| arm | orders | with a measured fill | echoed the decision price |
+|---|---|---|---|
+| **live** | 151 | **63 (42%)** | **88** |
+| shadow | 134 | **134 (100%)** | 0 |
+
+and the skip reason on 82 of them, verbatim:
+`skipped:budget(0.9 tok, reserve 6.0) after api-error:trades:VenueError:lighter tx budget exhausted; skipping`.
+
+**THE MECHANISM, and every part of it is behaving as designed.** `read_fill`
+runs immediately after submission — the moment the governor's bucket is at its
+emptiest, because an order costs `WEIGHT_ORDER_TX` 6 of a ~21 capacity. Tape 1
+(auth'd, account-filtered) raises on the empty bucket; tape 2 (public) peeks at
+`tokens - _TELEMETRY_RESERVE`, finds nothing spare, and declines by name. The
+order is then recorded HONESTLY: `px_fill = px_decision`, `measured: false`,
+`slippage_bps` NULL, the reason string preserved. **Nothing lies and nothing is
+hidden** — `with_slip`, `echoed_decision` and `fill_src` are all published.
+
+**WHY IT STILL MATTERS: the 58% is not a random 58%.** A skip happens exactly
+when the venue is busy, which is exactly where slippage lives. So live
+execution quality (−3.24bps) is an average over the calm 42%, the shadow twin
+measures 100%, and **the two arms' execution numbers were never comparable** —
+while 👩 mum's live arm trails her own twin by **0.358 pp/trade** and her
+grader reads `~176d, beyond the 90d horizon` against the twin's `on_track,
+ETA 24-Sep`.
+
+**THE FIX IS *WHEN*, NOT *WHETHER*.** `venues/fills.py` already rules that an
+IMMEDIATE retry on `skipped:budget` is wrong — it *"spends the governor's
+telemetry reserve to fail identically"* — and that is exactly right **for the
+same breath**. It does not describe a read minutes later against a REFILLED
+bucket, where the premise "to fail identically" is simply false. So:
+* `_defer_fill` queues ONLY the reasons that mean **the tape was never read**
+  (`skipped:budget`, `api-error`). A `no-match` is never queued — that tape WAS
+  read and our fill was not on it, which re-reading does not change.
+* `drain_pending_fills` re-reads on later cycles from **spare budget only**,
+  the same peek that declined it, and **stops at the first cycle with none**.
+  The invariant that caused the skip is preserved exactly; only the timing moves.
+* **Authoritative tape only.** The public tape is a market-wide 100-row window
+  a busy book pushes our fill out of within minutes — sound live, worthless
+  late. Using it here would manufacture `no-match` and burn the entry's tries.
+* Bounded three ways so nothing accumulates: `_PENDING_FILL_MAX` 64 (oldest
+  evicted), `_PENDING_FILL_TTL_S` 30 min, `_PENDING_FILL_TRIES` 4.
+
+**SCOPE, deliberately narrow: the EXECUTION LEDGER ONLY.** A fill learned after
+the fact never touches the position's entry, the book's P&L, or a close row —
+the book was already graded on those, and a late correction that restated them
+would be a grader reading a sample that changed underneath it. Telemetry
+improves; the record does not move. Pinned by a test that fails if the function
+so much as mentions `paper_trades`, `bot_pnl` or `INSERT`.
+
+**Two details that are decisions, not defaults:**
+* **`fill_key` has ONE owner** — `venues/order_keys.py`, a dependency-free leaf.
+  The client keys its queue with it and the host stamps `raw.order_key` with it.
+  A second copy would key the queue one way and the ledger another, and every
+  resolution would miss its row **silently** while both sides looked correct
+  ((hj)). It is a leaf module because the host must not drag the Lighter SDK
+  into its import graph at load time — it imports `LighterClient` lazily on
+  purpose. Verified by object identity across all three modules.
+* **Slippage is computed IN SQL** from the row's own `px_decision`. Both legs
+  already reduce to `(fill−dec)/dec·1e4` (the close writes it as
+  `(dec−fill)/dec·−1e4`, the same number), so a caller-passed value would be a
+  second copy of one formula with two chances to invert a sign on real money.
+  The UPDATE is idempotent (`fill_resolved IS NULL`), so a repeated drain can
+  never double-apply.
+
+**VERIFIED — 10 of 10 mutations RED, and the harness earned its keep twice.**
+Two survivors on the first pass, both the same trap and both on the properties
+that matter most:
+1. **Deleting the spare-budget guard from the drain left the suite GREEN.** The
+   test used `pytest.fail` inside a stub — and the code under test *swallows
+   exceptions by design*, so the failure was swallowed and the assertion passed
+   vacuously. It now COUNTS venue calls and asserts zero. That is the whole
+   safety of this change, and it was untested until a mutation said so (I3).
+2. **Neutering the drain call, and deleting the idempotency clause, both left
+   substring tests green** — `drain_pending_fills` still appeared inside the
+   `getattr` guard beside the dead call, and `IS NULL` still matched the
+   unrelated `px_decision` check. Both are now asserted on the AST / on the
+   exact clause ([[a-substring-test-is-not-a-wiring-test]]).
+
+**And the fail-open except was made READABLE.** The drain's outer `except` must
+swallow — telemetry may never raise into a trading loop — but a swallowed bug
+there returns `[]` forever, byte-identical to "nothing was pending". It now
+records `_drain_last_error` and the host prints it. Found while debugging this
+change's own incomplete stub, which raised into that swallow and read exactly
+like a code defect.
+
+**RENUMBERED (xs) → (xt)**: a concurrent session landed `(xs)` (the taker gate
+census) on main while this was being built. Recorded inline per the letter rule
+— the cited entry keeps the letter, and 10 citation sites moved with it.
+
+**AND THIS ENTRY NEARLY COST THE CHANGELOG, which is worth recording because
+`(vw)` already paid for it once** (655 entries → 2 lines). Prepending with
+`open(f,"w").write(entry + open(f).read())` TRUNCATES on the write handle
+before the read runs, so the file became my 102 lines and nothing else. Caught
+by reading back the headers — the restore was `git checkout origin/main -- `
+and nothing reached main. **Prepend by concatenation** (`cat new old > tmp &&
+mv`), never by a read nested inside a truncating open.
+
+**DEPLOY: main only, per (mm).** This changes **no trade any book takes** — it
+changes when a measurement is attempted. It reaches the shadow services on the
+ordinary `venues/**` auto-path and rides the next deliberate live deploy; 👩 mum
+is trading right now and a restart to ship telemetry buys nothing and costs a
+real-money container cycle. **The coverage claim is a PREDICTION, not a result:
+`with_slip` should climb from 63/151 toward the shadow's 100%. Read it on
+`impl-shortfall.order_slip` after the next live deploy — if it does not move,
+this entry is wrong and the queue is not draining.**
+
 ## 2026-09-02 (xs) — 🎫 THE TAKER'S GATE CENSUS: `(uo)` COUNTED THE SLOTS AND 23 OF 24 TICKETS DIED BEFORE THE COUNTER
 
 **Found by the daily review, on the book holding the fleet's only CONFIRMED
