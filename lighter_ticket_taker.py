@@ -2835,7 +2835,7 @@ def main(_ctx=None):
     # justified, and it is REPORTED, never a gate — it changes no entry.
     slot_census = {"offered": 0, "slots_full": 0, "lens_once": 0,
                    "held_sym": 0, "opened": 0}
-    # [2026-09-03 (xr)] THE GATE CENSUS — the half (uo) could not see.
+    # [2026-09-03 (xs)] THE GATE CENSUS — the half (uo) could not see.
     # `slot_census` counts the three SLOT throttles, and every one of them is
     # counted AFTER seven upstream gates have already `continue`d silently.
     # Measured on the live payload the day this shipped: the scout offered
@@ -3269,7 +3269,7 @@ def main(_ctx=None):
                # rather than the previous cycle's, so quiet is never mistaken
                # for full.
                "slot_census": slot_census,
-               # [(xr)] WHICH GATE TOOK THE SUPPLY, upstream of the slots.
+               # [(xs)] WHICH GATE TOOK THE SUPPLY, upstream of the slots.
                # `slot_census` answers "did the cap turn away earned trades?";
                # this answers the question that has to be settled FIRST — how
                # much supply ever reached the cap. Read them together and in

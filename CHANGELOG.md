@@ -1,3 +1,75 @@
+## 2026-09-02 (xs) — 🎫 THE TAKER'S GATE CENSUS: `(uo)` COUNTED THE SLOTS AND 23 OF 24 TICKETS DIED BEFORE THE COUNTER
+
+**Found by the daily review, on the book holding the fleet's only CONFIRMED
+pre-registered winner.** `(uo)` built `slot_census` on exactly the right
+argument — *"`open 6/6` is BYTE-IDENTICAL between 'six tickets existed' and
+'twenty existed and fourteen were refused for want of a slot'"* — and then
+counted the three SLOT throttles, every one of which is reached only after a
+run of upstream gates that `continue` silently.
+
+**MEASURED on the live payload, 2-Sep 23:4xZ:**
+
+| | |
+|---|---|
+| scout `tickets` | dip 4 · **breakout 12** · momentum 3 · divergence 5 = **24** |
+| taker `slot_census` | `{offered: 1, slots_full: 0, held_sym: 1, opened: 0}` |
+| open / cap | **4 of 8** |
+
+So the row published *"slots are not binding"* — **true, and useless**. 23 of
+24 tickets died before the counter and nothing said which gate took them.
+That is `(uo)`'s own byte-identical argument moved one loop upstream, and it is
+the `(lv)`/`(tx)`/`(om)` shape: **an arm that opens nothing must publish its
+OWN census at its OWN bar** (I18).
+
+It matters on this book specifically. `breakout` returns **exactly 12 =
+`TICKET_TOP_N`** — the cap-binding signature `(hd)` shipped the 6→12 widening
+on — and `breakoutup` is the taker's ONLY unvetoed lens with evidence (n=113,
+t=1.99, +1.137%/trade; the winners' docket has it at n_req~166, ~15d out).
+All four open positions are `long-breakoutup`. Meanwhile `dip`, `divergence`
+and `momentum` are all brain-vetoed, which is 12 of the 24 tickets — and
+nothing published that either.
+
+### WHAT SHIPPED — publish-only, changes no entry
+
+`extra.gate_census`, one counter per gate, incremented **at its own gate's
+`continue`** so it cannot drift from the rule it describes ((hj)):
+`tickets_in` · `lens_not_allowed` · `side_not_allowed` · `lens_vetoed` ·
+`bull_blocked` · `quality_blocked` · `coin_vetoed` · `no_mark` ·
+`spread_blocked` · `long_budget` · `notional_cap` · `fill_missing`.
+Read with `slot_census` in gate order: `tickets_in` is the denominator, each
+counter is one gate's refusal, `offered` is what survived to the slot
+throttles, and the first large counter names the binding gate.
+
+**WRITING THE AST TEST IS WHAT FOUND THREE OF THE TWELVE.** Reading the code I
+had seven gates; walking the loop's `continue`-guards mechanically returned
+**13**, and the three I had missed are not minor — the **spread gate**, the
+**fleet long-budget veto** (the one ceiling no per-bot lever can lift) and the
+**notional cap**. A hand-enumerated gate list is exactly the truncated-search
+failure `(qz)` names; the machine enumeration is the fix.
+
+### THE GUARD IS THE CLASS, NOT THE TWELVE COUNTERS
+
+`tests/autonomy/test_taker_gate_census.py` walks the real entry loop by its own
+iterator and **requires every `continue`-guard to increment a census key inside
+its own block** — so gate fourteen cannot arrive uncounted. It carries a
+POSITIVE CONTROL (I3 applied to the detector: a synthetic uncounted guard must
+redden it, because an empty result is not a negative result), a
+publish-only arm (no entry condition may READ the census), and a
+reaches-the-payload arm (the `(iz)` shape — a declared enforcement that exists
+and is inert).
+
+**11 of 11 mutations killed across three rounds — and round 2 found a defect in
+MY OWN TEST.** Deleting `"tickets_in": 0` from the initialiser stayed GREEN:
+the declared-key check scanned only counters inside continue-guards, and
+`tickets_in` is incremented at the top of the loop body, outside any guard —
+while the parametrised key check passed on the WRITE site's substring, the
+exact *"a substring test is NOT a wiring test"* trap in the file written to
+avoid it. The scan is now whole-loop and the mutation is red.
+
+**Expectancy price: none.** No entry decision reads the census; admission is
+byte-identical with and without it. What it buys is the measurement that has to
+exist BEFORE anyone argues about this book's supply — and `(uo)`'s own rule
+applies to its successor: it is REPORTED, never a gate.
 ## 2026-09-02 (xr) — THE STUCK-FLATTEN PAGE: `flatten_incomplete` was published by both real-money hosts and consumed by NOTHING, which is why (xo) ran 6.9 hours before a human reading a P&L brief found it
 
 **Found while writing the daily brief, on Eamon's *"implement fixes and

@@ -1,4 +1,4 @@
-"""[2026-09-03 (xr)] 🎫 THE TAKER'S GATE CENSUS — the half `(uo)` could not see.
+"""[2026-09-03 (xs)] 🎫 THE TAKER'S GATE CENSUS — the half `(uo)` could not see.
 
 `(uo)` built `slot_census` on exactly the right argument: `open 6/6` is
 BYTE-IDENTICAL between "six tickets existed" and "twenty existed and fourteen
