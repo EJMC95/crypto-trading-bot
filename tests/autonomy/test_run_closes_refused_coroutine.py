@@ -76,8 +76,13 @@ def _refuse(gov):
     raised = None
     try:
         LighterClient._run(_Stub(gov), coro, gov_timeout=0)
-    except BaseException as e:  # noqa: BLE001
-        raised = e
+    except Exception as e:  # noqa: BLE001 - the helper must catch whatever
+        raised = e          # _run raises: VenueError on refusal, or whatever
+                            # the governor itself threw. Deliberately NOT
+                            # BaseException here: the two paths under test both
+                            # raise ordinary Exceptions, and a test that also
+                            # swallowed KeyboardInterrupt would be harder to
+                            # interrupt than it is useful.
     state = inspect.getcoroutinestate(coro)
     if state != inspect.CORO_CLOSED:
         coro.close()            # do not leak out of the test either
@@ -107,10 +112,8 @@ def test_no_never_awaited_warning_escapes_a_refusal():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         coro = _never_awaited()
-        try:
+        with pytest.raises(VenueError, match="budget exhausted"):
             LighterClient._run(_Stub(gov), coro, gov_timeout=0)
-        except VenueError:
-            pass
         del coro
         gc.collect()
     leaks = [w for w in caught if issubclass(w.category, RuntimeWarning)
