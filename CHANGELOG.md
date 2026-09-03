@@ -1,3 +1,133 @@
+## 2026-09-03 (xu) — `_run` LEAKED EVERY COROUTINE IT REFUSED, AND THE FIRST TEST I WROTE FOR IT WAS VACUOUS — found in 👩 mum's own logs on the first entry after her halt cleared
+
+**Eamon: *"fix the above"***, on a defect his live book printed at 00:07Z, four
+minutes after coming back:
+
+```
+lighter_client.py:1237: RuntimeWarning: coroutine 'OrderApi.trades' was never awaited
+WLFI entry fill UNMEASURED — skipped:budget(0.9 tok, reserve 6.0)
+  after api-error:trades:VenueError:lighter tx budget exhausted
+```
+
+**THE MECHANISM, and it is a CLASS not an instance.** Every caller builds its
+coroutine as an ARGUMENT — `_run(self._order_api.trades(...))` — so the object
+exists before `_run` is entered. `_run` then asks the governor for a token and,
+on refusal, **raised before `asyncio.run_coroutine_threadsafe` ever saw it**:
+
+```python
+if not self.gov.acquire(weight=weight, **_kw):
+    raise VenueError("lighter tx budget exhausted; skipping")   # coro never awaited
+fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+```
+
+So the coroutine was never awaited and never closed. **All 9 call sites share
+the shape**, and the fix is in the ONE owner of "refuse to run a coroutine"
+rather than at the single site that happened to surface it.
+
+**NOT A MONEY BUG, and saying so precisely matters.** The caller's `except`
+records `api-error:trades:...`, no order is affected, no position mis-sized. It
+is a **MEASUREMENT** bug: the fill books `slippage NULL`, and measurement is the
+thing this fleet's whole discipline rests on. It also feeds `(xp)`'s
+`unmeasured_n` bucket, which is the number a future gross notch must price.
+
+**Covered BOTH refusal paths** — the governor saying no, and the governor
+itself raising. Cleanup never masks the caller's error (a `close()` that throws
+is swallowed; the governor's exception is the one the caller needs).
+
+**AND THE FIRST TEST I WROTE FOR THIS WAS VACUOUS — recorded because that is
+the more useful half of the entry (I3).** It captured
+`RuntimeWarning: ... never awaited` and asserted none escaped. It passed. Then
+the mutation round found that **removing the close on the acquire-raises path
+SURVIVED it**: the exception's traceback keeps `_run`'s frame alive, and
+therefore `coro`, so nothing is collected inside the capture block and no
+warning is ever emitted. A test built on *when the garbage collector happens to
+run* is a test that reports clean by accident.
+
+Replaced with `inspect.getcoroutinestate(coro) == CORO_CLOSED`, which asks the
+object directly and cannot be fooled by collection timing. The warning-based
+assertion survives as CORROBORATION on the path where it does bite — because it
+is the exact symptom Eamon saw — never as the proof.
+
+6 tests, **4/4 mutations red** (no close on refusal · no close when acquire
+raises · cleanup masking the governor's error · the governor never consulted).
+The happy path is pinned separately: a refusal fix must not touch the path that
+actually runs.
+
+## 2026-09-02 (xx) — THE ADOPTED PURGE: a leg the book never opened was holding 2 of 🙏 avo's 5 slots, and her only exits are a −10% stop and an ROI ladder that reaches zero at FOURTEEN DAYS
+
+**[RENUMBERED TWICE — (xr) -> (xt) -> (xx), 3-Sep, and the second one landed within the hour.** A session put a different `(xr)` on main first (the stuck-flatten page); this entry moved to `(xt)`. A THIRD session then landed `(xt)` (the deferred-fill resolution), already cited by `lighter_client.py`, `order_keys.py`, `bot_pnl_store.py` and its own test, so it moved again to `(xx)`. Per the letter rule the CITED entry keeps the letter each time. **Three sessions picked "the next free letter" from three stale snapshots inside one hour** — which is precisely why the rule is pick-at-PUSH-time and not pick-at-write-time. Recorded inline because `git log` subjects keep the OLD letter, so the commit log is not a reliable letter index.**
+
+
+**Eamon, 2-Sep: *"get rid of anything adopted from mum or avo"*** — after
+`(xq)` established that an adopted leg is not the book's evidence. He is right
+that they should go, and the reason is stronger than the evidence one.
+
+**MEASURED FIRST, and mum needed nothing.** 👩 mum: **zero** adopted legs
+(her stuck 1000PEPE cleared when Eamon closed it at the venue; her reconcile
+path drops meta without booking a phantom close, exactly as written). 🙏 avo:
+**TAO $235 + TRX $327 = $562 on a $319-equity book**, in 2 of her 5 slots.
+
+**[CORRECTED IN PLACE 3-Sep (xw) per I12 — THE PARAGRAPH BELOW OVERSTATES, AND
+THE ERROR IS MINE.** It says her *"only exits are a −10% stop and an ROI
+ladder"*. **False.** `SwingDip.signals` returns
+`exit_ = ((rsi[i] > 65 or c[i] >= sell_zone) and v[i] > 0)` — a mean-reversion
+exit tagged `sell_into_strength` — and THAT is her workhorse: **25 of 26
+shadow closes and 6 of 20 live**. I read the registry (`roi`, `stoploss`, no
+`custom_exit`) and missed the signal exit entirely, which is the (po) lesson
+about a check that inspects the wrong thing. Measured on her own ledger:
+median hold **1.11d live / 4.84d shadow**, max **4.33d / 11.01d**, and
+**ZERO closes have ever reached 14 days** — the ROI backstop is untested, not
+absent. **What survives:** an adopted leg exits only if ITS coin mean-reverts
+up, so a quiet or falling coin leaves it sitting until −10% or 14 days, with no
+entry logic having chosen it. That still justifies the purge — an adopted leg
+is not this book's trade and should not hold a slot at all — but the URGENCY
+below was inflated by my misreading, and the honest cost is "until the coin
+signals", not "a guaranteed fortnight".]**
+
+**WHY A SLOT IS THE REAL COST, not the P&L.** `SwingDip` has **no time stop**.
+Its exits are a −10% stop and `roi = {0: 0.20, 5760: 0.12, 11520: 0.06,
+20160: 0.0}` — the ladder reaches breakeven at **20,160 minutes = 14 days**. A
+leg sitting between −10% and breakeven therefore occupies a slot for up to a
+fortnight, and an adopted leg's clock starts at ADOPTION, so a container that
+loses meta again restarts it: **an adopted leg whose meta keeps being lost is
+effectively immortal.** Measured on the live row: her last close was **28-Aug,
+five days earlier, with all 5 of 5 slots full.** She was not declining to
+trade — she could not.
+
+**SHIPPED: `<PFX>_FLATTEN_ADOPTED`, and every property of it is a refusal of
+some way this could go wrong.**
+* **DEFAULT OFF, and that is the load-bearing one.** A container that loses
+  its meta re-adopts its OWN positions — the exact case `(xa)` was written for
+  — so a default-on purge liquidates a live book at market during a state
+  incident. This is an OPERATOR assertion ("these are not mine"), never a
+  default.
+* **ENV ONLY.** No lever, no bus, no brain, no organ may set it (AST-pinned).
+  The blast radius is a real-money book at market; that is not a knob the
+  growth rail gets.
+* **JUNK READS OFF** — `1/true/yes/on` and nothing else. A misspelled switch
+  must never flatten a book.
+* **AFTER THE STOP, BEFORE THE ROI LADDER.** A leg genuinely through its stop
+  still books `stop_loss`, because the risk record is what a stop is FOR and a
+  purge must not paper over one. Before roi so it does not wait out 14 days.
+* **EXITS ONLY** — it cannot gate, size or admit an entry (AST-pinned over
+  `clip_usd` / `gross_x` / `cap_slots` / `vol_target_gross_x`).
+
+**AND THE TAG GOT AN OWNER.** `ADOPTED_TAG` now lives in the live host, where
+the tag is actually stamped, and the adoption site reads it. `golive_readiness`
+keeps a second copy **on purpose** — it is graded inside the freqtrade image,
+which does not COPY the live host, so an import is impossible in either
+direction. A second copy of a rule is a second rule ((hj)), so `(xq)`'s
+grep-based drift pin is replaced by an **identity pin**: the two constants must
+be equal, and the host must still stamp from its own.
+
+**Expectancy price (I19):** the two legs are ~flat (+$3.4 combined at the marks
+that motivated this), so the purge costs approximately nothing and returns 2 of
+5 slots to entries her strategy actually chose. It buys DECIDABILITY, not edge
+— and on a book that has closed nothing in five days, decidability is the
+binding constraint (I17/I22).
+
+16 tests, **6/6 mutations red**, including the two that matter: defaulting the
+switch ON, and letting the purge pre-empt a genuine stop.
 ## 2026-09-02 (xt) — LIVE EXECUTION WAS MEASURED ON A NON-RANDOM 42% OF ORDERS, BECAUSE THE FILL READ FIRES WHEN THE TOKEN BUCKET IS EMPTIEST — the declined reads are now resolved against a REFILLED bucket, order priority untouched
 
 **Eamon, 3-Sep: *"implement any optomisations on mum we can"* → *"go ahead"*.**
@@ -1402,7 +1532,33 @@ bar LOW (an upper bound on halts). Grid: gross 1→10 × halt frac 0.10/0.15;
 windows trailing 120d (decision) and 30d (her live regime). **Calibration
 (gx):** at 1× over the shadow twin's window the replay reads **+0.344%/trade
 at 9.3 closes/day** against the twin's ledger +0.494% / 6.0 — inside the
-pre-declared ±0.30pp / ×1.6 gate. Decision rule fixed before the run: the
+pre-declared ±0.30pp / ×1.6 gate.
+**[CORRECTED IN PLACE 3-Sep (xv) per I12 — THAT PASS WAS MARGINAL BY 0.05 AND
+THE GATE NOW REFUSES.** 9.3/6.0 is a ratio of **1.55** against a **1.6** bar:
+this instrument cleared its own calibration by five hundredths and then set a
+REAL-MONEY gross. Re-run 3-Sep 00:20Z on the extended tape it reads **10.11
+closes/day vs the ledger's 6.02 = 1.68**, and prints
+*"REFUSED: the harness does not reproduce the twin's record; nothing
+forward-looking is printed (gx)"* — the gate working exactly as designed, one
+day late to be useful. The MEAN reproduces fine in both runs (+0.466% vs
++0.494%); what misses is the RATE, and it has always missed in the same
+direction: **the replay trades ~1.6x more often than the book it models.**
+**WHY THAT DIRECTION UNDER-COUNTS HALTS, and it is the mechanism behind this
+entry's own headline claim of `0 · 0` halts at 3.75x:** higher turnover at a
+fixed slot count means shorter holds, so lower AVERAGE CONCURRENT OCCUPANCY —
+and the daily halt fires on a basket move against SIMULTANEOUSLY held legs.
+Measured live on 👩 mum: occupancy averages **6.23 of 12** with **>=9 slots
+32.4%** of the time, and her 2-Sep halt came at 9 slots on a 4.0% basket move.
+A replay whose book empties faster rarely stacks 9-12 correlated legs, so it
+rarely produces that shape. STATED AS A HYPOTHESIS: occupancy INSIDE the
+replay has not been instrumented, and that is the confirming measurement.
+**WHAT DOES NOT DEPEND ON THIS INSTRUMENT:** the 3-Sep cut to **2.5x** rests on
+arithmetic, not on this replay — `daily_loss_frac / |stoploss|` = 0.10/0.04 =
+2.50 is the gross above which the daily cap binds before the stops do — and is
+corroborated by the book's OWN published field going
+`basket_move_at_full_gross_pct` **0.0267 -> 0.0400** across the change. Reality
+had already settled the question the replay got wrong: **one halt within days
+of `(xf)` shipping 3.75x.**]** Decision rule fixed before the run: the
 largest gross with close-marked maxDD ≤ 15% (the gate's bar) AND ≤ 1 halt per
 30d on the 120d window; the halt frac stays 0.10 unless 0.15 halves halts
 inside the bar.

@@ -328,6 +328,34 @@ except (TypeError, ValueError):
 #: about it.
 GROSS_X_MAX = float(_env("GROSS_X_MAX", "10.0"))
 
+#: [(xx)] THE ADOPTION TAG, owned HERE because this is where it is stamped.
+#: `golive_readiness.ADOPTED_TAG` carries a second copy on purpose — that
+#: module is graded in the freqtrade image, which does not COPY this one, so an
+#: import is impossible in either direction. A second copy of a rule is a second
+#: rule ((hj)), so the two are pinned EQUAL by test rather than left to drift.
+ADOPTED_TAG = "adopted"
+
+#: [(xx)] PURGE ADOPTED LEGS. Eamon, 2-Sep: *"get rid of anything adopted from
+#: mum or avo"*. An adopted position (`(xa)`) is one the book found on the
+#: venue with no bracket of its own — a hand-placed trade, or its own leg after
+#: a meta loss. It is NOT the book's evidence ((xq) keeps it out of every
+#: grader), and on 🙏 avo it was worse than noise: TAO and TRX held **2 of her
+#: 5 slots** while her ONLY exits are a -10% stop and an ROI ladder that
+#: reaches 0% at **14 days** — no time stop — so a leg sitting between those
+#: two bounds occupies a slot indefinitely. Measured 2-Sep: her last close was
+#: 28-Aug, five days earlier, with all 5 slots full.
+#:
+#: **DEFAULT OFF, AND THE REASON IS A REAL FOOTGUN.** A container that loses
+#: its meta re-adopts its OWN positions — that is the case `(xa)` was written
+#: for — so switching this on during a state incident liquidates a live book
+#: at market. It is an operator assertion ("these are not mine"), never a
+#: default, and never something an organ may set: it reads the env only.
+#:
+#: Exits ONLY. It cannot block an entry, cannot widen a stop, and closes
+#: through the same path every other exit uses.
+FLATTEN_ADOPTED = str(_env("FLATTEN_ADOPTED", "0")).strip().lower() \
+    in ("1", "true", "yes", "on")
+
 #: [2026-08-25 (td)] OPERATOR-ATTESTED MANUAL-TRADE P&L. **Eamon, 25-Aug: "the
 #: losses come from manual trades I made (have learned my lesson and will let
 #: the bots do their thing lol)".** His manual fills on 🙏 Avo's sub-account
@@ -949,6 +977,12 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
             reason = "trailing_stop_loss"
     elif profit <= strategy.stoploss:
         reason = "stop_loss"
+    # [(xx)] the adopted purge. AFTER the stop deliberately: a leg that is
+    # genuinely through its stop books as `stop_loss`, because the risk record
+    # is what a stop is for and a purge must not paper over one. Before roi,
+    # so an adopted leg does not wait out a 14-day ladder in a slot.
+    if not reason and FLATTEN_ADOPTED and m.get("tag") == ADOPTED_TAG:
+        reason = "adopted_purge"
     if not reason and roi_exit_due(age_min, profit, strategy):
         reason = "roi"
     if not reason and hasattr(strategy, "custom_exit"):
@@ -1718,7 +1752,7 @@ def main(_ctx=None, once=False):
                    f"skipping cycle; never trade blind")
             pos, pos_readable = {}, False
 
-        # [2026-09-03 (xt)] RESOLVE FILLS THE GOVERNOR DECLINED EARLIER.
+        # [2026-09-03 (xx)] RESOLVE FILLS THE GOVERNOR DECLINED EARLIER.
         # Measured 2-Sep: 63 of 151 live orders carried a measured fill and 88
         # echoed the decision price, because the fill read fires when the token
         # bucket is at its emptiest (an order costs 6 of ~21) — so live
@@ -2784,7 +2818,7 @@ def main(_ctx=None, once=False):
                     m = {**meta.pop(_alt), **m}
                 if not m.get("opened_ts"):
                     m["opened_ts"] = t0
-                    m["tag"] = m.get("tag") or "adopted"
+                    m["tag"] = m.get("tag") or ADOPTED_TAG
                     m.setdefault("accrued", 0.0)
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} on the venue with "
                            f"no bracket — ADOPTED (tag={m['tag']}, clock "
@@ -3240,7 +3274,7 @@ def main(_ctx=None, once=False):
                                       if meas and px else None),
                         raw={"leg": "open", "tag": tag, "clip": stake,
                              "measured": meas, "fill_src": src,
-                             # [(xt)] the handle a DEFERRED fill resolution
+                             # [(xx)] the handle a DEFERRED fill resolution
                              # finds this row by; None when the venue echoed
                              # no identifier, which is honest — an order that
                              # cannot be named cannot be resolved later.

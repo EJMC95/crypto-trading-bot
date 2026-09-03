@@ -699,7 +699,43 @@ class LighterClient(VenueClient):
         # instantly. Telemetry passes 0 so a measurement can never queue ahead
         # of (and delay) a real order. Default None keeps acquire's own 120s.
         _kw = {} if gov_timeout is None else {"timeout": gov_timeout}
-        if not self.gov.acquire(weight=weight, **_kw):
+        # [(xu)] CLOSE A COROUTINE WE ARE NOT GOING TO AWAIT.
+        #
+        # Every caller builds its coroutine as an ARGUMENT — `_run(api.foo(...))`
+        # — so it exists before this method is entered. The governor check below
+        # can refuse, and until now it raised with the coroutine never awaited
+        # and never closed: Python then emits `RuntimeWarning: coroutine
+        # 'OrderApi.trades' was never awaited` and the frame lives until GC.
+        #
+        # Observed on 👩 mum's REAL-MONEY row, 3-Sep 00:07Z, on the first entry
+        # after her halt cleared:
+        #     RuntimeWarning: coroutine 'OrderApi.trades' was never awaited
+        #     WLFI entry fill UNMEASURED — skipped:budget(0.9 tok, reserve 6.0)
+        #
+        # It is not a money bug — the caller's `except` records
+        # `api-error:trades:...` and no order is affected — but it is a
+        # MEASUREMENT bug, and this fleet's whole discipline rests on
+        # measurement. The fill records `slippage NULL`.
+        #
+        # Fixed HERE rather than at the 1 call site that happened to show it:
+        # this method is the single owner of "refuse to run a coroutine", and
+        # every one of its callers has the same shape (a fix that closes a
+        # class, not an instance).
+        def _discard(c):
+            """Never raise from cleanup — a failed close must not mask the
+            governor's own error, which is the one the caller needs."""
+            try:
+                c.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+        try:
+            _ok = self.gov.acquire(weight=weight, **_kw)
+        except BaseException:      # acquire itself blew up — same leak
+            _discard(coro)
+            raise
+        if not _ok:
+            _discard(coro)
             raise VenueError("lighter tx budget exhausted; skipping")
         fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
         try:
