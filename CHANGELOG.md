@@ -1,3 +1,99 @@
+## 2026-09-03 (xv) — "DOES THE HALT COST OR SAVE HER?" IS PRE-REGISTERED, NOT ANSWERED: one flatten instant is ONE observation, and her ledger holds exactly one
+
+**Eamon, 3-Sep: *"Mum doesn't appear to be trading properly"*** → *"Yes I like
+this idea."* Two findings, and the first one is a correction of my own reading.
+
+**THE THROUGHPUT WORRY WAS WRONG, AND THE ERROR IS INSTRUCTIVE.** I first
+compared CLOSES — live 1 vs twin 12 over 12h — and called it a 12× gap. Closes
+measure inventory being DRAINED, not activity. On OPENS:
+
+| | since halt cleared (6.9h) | 24h | 48h |
+|---|---|---|---|
+| live | **1** | 6 | 20 |
+| twin | **0** | 8 | 23 |
+
+She is trading, and since the halt cleared she is AHEAD of her twin. She looked
+idle because the halt flattened 8 legs at 17:19Z, leaving her nothing to close
+while the twin still had a book running — and `rsi_med 55.9` against her `36`
+bar means the tape genuinely is not oversold (`no_signal 92` of 94 is real).
+**A rate comparison must use the leg that opens, not the leg that closes.**
+
+Also chased and REFUTED as a lead: `both_terms_n: 3` beside `no_signal: 92`
+looked like a contradiction. It is not — that gauge is PERSISTED and written
+~once an hour on her 1h book (`last_sig_ts` short-circuits `S.signals()`
+between candles), exactly as `(vm)` designed it. Checking the accessor before
+reporting a bug is the rule, and it held here.
+
+**THE REAL DIFFERENCE IS THE HALT, AND IT IS NOT DECIDABLE YET.**
+
+| 24h | live | twin |
+|---|---|---|
+| n | 17 | 20 |
+| P&L | **−$67.37** | **−$1.69** |
+| stop/halt losses | 9 closes, −$55.55 | 1 close, −$2.33 |
+| roi wins | 2 | **9** |
+
+Paired same-coin against the twin, the 8 halt-closed legs realised
+**−1.70%/leg** where the twin's same coins exited at **+0.05%/leg** — a cost of
+**+1.76pp/leg**, four of seven recovering into `roi` exits she no longer owned.
+
+**AND IT DECIDES NOTHING, because all eight legs closed in the same second.**
+One flatten, one falling minute, one correlated crypto basket — **one
+observation, not eight.** The 7-of-7 sign test across those legs reads p≈0.008
+and is an artifact of treating one market moment as seven independent draws:
+the (kw)/(ky) cluster lesson in its most tempting costume, because the legs
+genuinely are separate ledger rows. Her ledger holds **exactly one** daily-loss
+halt; the other three "shut" days in `halt_days_30d` were stop-guard and
+cooldown LOCKOUTS, which block entries without force-closing anything and carry
+no forced-exit counterfactual at all.
+
+**THE I25 CONTROL, and it is the reassuring half:** on the 53 closes across
+days she did NOT halt, live reads **+0.720%/trade** against the twin's
+**+0.625%** — she BEATS her control arm off halt days. So the coin vetoes,
+cooldowns, live-only gates and execution are costing her nothing measurable,
+and the halt is the only measured difference between the arms.
+
+**SO IT IS REGISTERED, NOT DECIDED (I21).**
+`scripts/study_mum_halt_cost_2026-09-03.py` fixes the criterion NOW, before the
+data arrives: **read at n≥5 halt EVENTS occurring AFTER 2026-09-03; LOOSEN only
+if mean paired cost > 1.0pp/leg AND the sign is consistent across events;
+otherwise KEEP.** The registered event is never re-mined into that count.
+
+**WHY THE DEFAULT IS KEEP, and this is the load-bearing argument:** a rail's
+COST is visible every single time it fires; its BENEFIT appears only on the day
+it prevents a ruinous loss, which by construction has not happened yet. **A
+cost-only study of a daily-loss halt will read "loosen" on every ordinary halt
+day right up until the day it doesn't.** The burden therefore sits on
+loosening, never on holding — which is why the bar is a mean across EVENTS with
+a consistency requirement rather than a single expensive afternoon.
+
+**TWO DEFECTS THE CALIBRATION GATE CAUGHT IN MY OWN INSTRUMENT**, both in the
+direction that would have manufactured a decision:
+1. **Events were keyed on the exact timestamp.** The registered event's 8 legs
+   happen to share a microsecond so it "worked" — and a flatten spanning two
+   seconds would have split silently into two events, inflating the count
+   toward the n≥5 bar. Now grouped by UTC DAY, which is exactly right because
+   `halted_today` LATCHES once per day, so at most one halt can occur per day
+   by construction.
+2. **The baseline compared the twin over its FULL history** (from 7-Aug)
+   against live's six days — and it FLIPPED the verdict, printing "live trails
+   the twin" (+0.720 vs +1.105) where the paired window reads the opposite
+   (+0.720 vs +0.625). A control arm on a different window is not a control.
+   Both the event AND the baseline are now inside the calibration gate, which
+   REFUSES (exit 2) rather than reporting when either fails to reproduce.
+
+Carried as `mum-halt-cost-preregistered-read` so it cannot be forgotten; the
+row closes only when the read is taken and the registration removed. Pinned by
+`tests/autonomy/test_mum_halt_cost_registration.py` — **5/5 mutations red**,
+including both bars: lowering `MIN_EVENTS` 5→1 or `LOOSEN_COST_PP` 1.0→0.1
+reddens, so the criterion cannot be quietly moved once a bad week makes
+loosening attractive.
+
+**RENUMBERED (xu) → (xv)**: a concurrent session landed `(xu)` while this was
+being built — the second letter race today.
+
+**No lever moved. No trade changed.** Read-only instrument plus a registration.
+
 ## 2026-09-03 (xu) — `_run` LEAKED EVERY COROUTINE IT REFUSED, AND THE FIRST TEST I WROTE FOR IT WAS VACUOUS — found in 👩 mum's own logs on the first entry after her halt cleared
 
 **Eamon: *"fix the above"***, on a defect his live book printed at 00:07Z, four

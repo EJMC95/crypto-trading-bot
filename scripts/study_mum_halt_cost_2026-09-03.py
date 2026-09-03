@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[2026-09-03 (xu)] DOES 👩 MUM'S DAILY-LOSS HALT COST OR SAVE HER? — the
+"""[2026-09-03 (xv)] DOES 👩 MUM'S DAILY-LOSS HALT COST OR SAVE HER? — the
 instrument, plus the PRE-REGISTERED criterion that decides it on FRESH events.
 
 **Eamon, 3-Sep: *"Mum doesn't appear to be trading properly"*** → the throughput

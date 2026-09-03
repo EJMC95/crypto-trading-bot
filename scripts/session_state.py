@@ -87,7 +87,7 @@ CARRIED = [
     {
         "id": "mum-halt-cost-preregistered-read",
         "owner": "session",
-        "what": "(xu) pre-registered whether 👩 mum's daily-loss halt costs or "
+        "what": "(xv) pre-registered whether 👩 mum's daily-loss halt costs or "
                 "saves her, paired same-coin against her never-halting shadow "
                 "twin. At registration her ledger holds exactly ONE daily-loss "
                 "halt (2-Sep 17:19:45Z, 8 legs, +1.76pp/leg cost against the "

@@ -1,4 +1,4 @@
-"""[2026-09-03 (xu)] THE HALT-COST REGISTRATION, PINNED.
+"""[2026-09-03 (xv)] THE HALT-COST REGISTRATION, PINNED.
 
 Eamon asked whether 👩 mum's daily-loss halt costs or saves her. It cannot be
 answered today and the reason is the point: her ledger holds **one** daily-loss
