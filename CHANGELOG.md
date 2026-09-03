@@ -1401,7 +1401,33 @@ bar LOW (an upper bound on halts). Grid: gross 1→10 × halt frac 0.10/0.15;
 windows trailing 120d (decision) and 30d (her live regime). **Calibration
 (gx):** at 1× over the shadow twin's window the replay reads **+0.344%/trade
 at 9.3 closes/day** against the twin's ledger +0.494% / 6.0 — inside the
-pre-declared ±0.30pp / ×1.6 gate. Decision rule fixed before the run: the
+pre-declared ±0.30pp / ×1.6 gate.
+**[CORRECTED IN PLACE 3-Sep (xv) per I12 — THAT PASS WAS MARGINAL BY 0.05 AND
+THE GATE NOW REFUSES.** 9.3/6.0 is a ratio of **1.55** against a **1.6** bar:
+this instrument cleared its own calibration by five hundredths and then set a
+REAL-MONEY gross. Re-run 3-Sep 00:20Z on the extended tape it reads **10.11
+closes/day vs the ledger's 6.02 = 1.68**, and prints
+*"REFUSED: the harness does not reproduce the twin's record; nothing
+forward-looking is printed (gx)"* — the gate working exactly as designed, one
+day late to be useful. The MEAN reproduces fine in both runs (+0.466% vs
++0.494%); what misses is the RATE, and it has always missed in the same
+direction: **the replay trades ~1.6x more often than the book it models.**
+**WHY THAT DIRECTION UNDER-COUNTS HALTS, and it is the mechanism behind this
+entry's own headline claim of `0 · 0` halts at 3.75x:** higher turnover at a
+fixed slot count means shorter holds, so lower AVERAGE CONCURRENT OCCUPANCY —
+and the daily halt fires on a basket move against SIMULTANEOUSLY held legs.
+Measured live on 👩 mum: occupancy averages **6.23 of 12** with **>=9 slots
+32.4%** of the time, and her 2-Sep halt came at 9 slots on a 4.0% basket move.
+A replay whose book empties faster rarely stacks 9-12 correlated legs, so it
+rarely produces that shape. STATED AS A HYPOTHESIS: occupancy INSIDE the
+replay has not been instrumented, and that is the confirming measurement.
+**WHAT DOES NOT DEPEND ON THIS INSTRUMENT:** the 3-Sep cut to **2.5x** rests on
+arithmetic, not on this replay — `daily_loss_frac / |stoploss|` = 0.10/0.04 =
+2.50 is the gross above which the daily cap binds before the stops do — and is
+corroborated by the book's OWN published field going
+`basket_move_at_full_gross_pct` **0.0267 -> 0.0400** across the change. Reality
+had already settled the question the replay got wrong: **one halt within days
+of `(xf)` shipping 3.75x.**]** Decision rule fixed before the run: the
 largest gross with close-marked maxDD ≤ 15% (the gate's bar) AND ≤ 1 halt per
 30d on the 120d window; the halt frac stays 0.10 unless 0.15 halves halts
 inside the bar.
