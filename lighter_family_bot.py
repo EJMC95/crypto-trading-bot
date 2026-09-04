@@ -1203,7 +1203,43 @@ class OversoldRebound(Carrier):
     #: policies and must not be pooled into one grade ((hc)'s era discipline).
     #: 32 remains the measured peak by two independent studies and is one env
     #: away — `MUM_RSI_MAX=32` — whenever he wants it.
-    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "36.0"))
+    #:
+    #: [2026-09-04 (ya)] 36 -> 38, Eamon: *"widen slightly"*, on the day the
+    #: REGIME FLIPPED — `regime_oracle` reads `risk-on uptrend, n_long 9,
+    #: n_short 0`, BTC +12.6% over its ema200, and her RSI floor across 94
+    #: coins sat at **37.1 against a bar of 36.0**: she could not buy anything,
+    #: anywhere, because a counter-trend dip buyer has no dips in a rally.
+    #:
+    #: PRICED FIRST (`study_mum_reachability`, 60d, her real 23-coin universe,
+    #: episodes not bars, through her REAL bracket, vs a random-entry null):
+    #:     bar 32: 4.67 eps/d · +0.495%/trade vs null · t=5.42 · 2.31 %-u/day
+    #:     bar 36: 7.30 eps/d · +0.242%/trade (interp.)  · 1.77 %-u/day
+    #:     bar 38: 8.70 eps/d · +0.319%/trade vs null · t=4.48 · 2.78 %-u/day
+    #: Every bar 28-42 beats the null at t >= 3.9, so widening does not destroy
+    #: the edge; and the sweep's own binding-term check says the RSI term is
+    #: implicated in 95% of blocked bars against 5.0% for the trend term, so
+    #: this is the RIGHT knob (had that gone the other way the whole sweep
+    #: would have been measuring the wrong one).
+    #:
+    #: SAID PLAINLY, BECAUSE THE LINE ABOVE STILL STANDS: **32 is still the
+    #: per-TRADE peak, now by three studies.** 38 wins only on the per-DAY
+    #: decomposition (I24's `$/day = rate x clip x mean_pct`), which is the
+    #: right objective ONLY because this book is nowhere near slot-bound —
+    #: 0 of 12 held when this shipped. And the 35-vs-38 ordering is inside the
+    #: null's noise; what is robust is that the whole band clears it. So this
+    #: is bought as DECIDABILITY ((ty)'s framing, I26) — her gate verdict is
+    #: `undecidable, ~133d at the measured rate` — with expectancy measured not
+    #: to deteriorate, NOT as a claim that 38 earns more per trade.
+    #:
+    #: REVERT: `MUM_RSI_MAX=36` restores this exactly; `=32` takes the
+    #: per-trade peak. PRE-REGISTERED (I21/I25 — graded on FRESH closes only,
+    #: never the window that motivated this): read at n>=30 closes stamped
+    #: `bars.rsi_max=38` or on 2026-10-04, whichever first; REVERT to 36 if the
+    #: fresh mean is below the same window's random-entry null; keep if above.
+    #: Her closes carry `extra.bars` ((wv)), so the two bars must be graded
+    #: SEPARATELY and never pooled — (hc)'s era discipline, which the standing
+    #: note above already invokes for the 36/32 split.
+    RSI_MAX = float(os.environ.get("MUM_RSI_MAX", "38.0"))
     #: [2026-08-26] the census may name the NOT-uptrend half of the entry cell
     #: when it is the blocking term (`census_no_entry_why`). Class-scoped so a
     #: carrier whose signals dict happens to carry rsi/uptrend for OTHER
@@ -2361,8 +2397,38 @@ def _census_extra(b):
                 out["outside_uptrend_n"] = sum(
                     1 for u in b.last_uptrend.values() if not u)
             if b.last_enter:
-                out["both_terms_n"] = sum(
-                    1 for e in b.last_enter.values() if e)
+                # [(ya)] counted at the PUBLISHED bar only — see the live
+                # arm's `scan_census`. Verdicts stamped under a different (or
+                # no) bar are surfaced as `both_terms_stale_n`, never folded
+                # into either answer: this number is what a widening is priced
+                # from, so an unvouchable count must be visible.
+                _bar = out.get("rsi_bar")
+                fresh = stale = 0
+                for _c, _e in b.last_enter.items():
+                    if not _e:
+                        continue
+                    _b = b.last_enter_bar.get(_c)
+                    if (_bar is not None and isinstance(_b, (int, float))
+                            and float(_b) == float(_bar)):
+                        fresh += 1
+                    else:
+                        stale += 1
+                out["both_terms_n"] = fresh
+                if stale:
+                    out["both_terms_stale_n"] = stale
+    except Exception:  # noqa: BLE001
+        pass
+    # [(ya)] 🙏 avo's BB dip gauge — the conjunct that binds her in a rally.
+    # `bb_dist_pct` passes below 0, so `bb_min` is the closest coin to entry.
+    # ABSENT never zero on no readings (I8). REPORTED: no gate reads it.
+    try:
+        bvals = sorted(v for v in b.last_bb.values()
+                       if isinstance(v, (int, float)))
+        if bvals:
+            out["bb_min"] = round(bvals[0], 2)
+            out["bb_med"] = round(bvals[len(bvals) // 2], 2)
+            out["bb_read"] = len(bvals)
+            out["bb_below_n"] = sum(1 for v in bvals if v < 0.0)
     except Exception:  # noqa: BLE001
         pass
     return {"scan": out}
@@ -2468,6 +2534,19 @@ class Book:
         # moment the entry cell moves.
         self.last_uptrend = {}   # coin -> last uptrend verdict (bool ONLY)
         self.last_enter = {}     # coin -> did the SHIPPED rule say enter
+        # [(ya)] coin -> the RSI_MAX that `last_enter` was computed under.
+        # The verdict is CACHED (the loop skips `signals()` on a candle it has
+        # already acted on) while `rsi_bar` is read FRESH at census time after
+        # `apply_book_levers`, so a lever that opens, moves or expires between
+        # candle passes leaves the two at different bars. Ported from the LIVE
+        # arm in the same commit: the (vh) lesson is that two arms
+        # re-expressing one tool must not diverge, and (vm) itself reached the
+        # $1,000 shadow before the $300 of real money.
+        self.last_enter_bar = {}
+        # [(ya)] coin -> 🙏 avo's BB distance, 100*(c/bb_lo-1). Her binding
+        # conjunct in a rally, computed by `signals()` since (st) and thrown
+        # away on both arms until now.
+        self.last_bb = {}
         # [(vm)] the 24h census rollup + when it was computed. Cached rather
         # than recomputed every 90s loop: the snapshot is one small insert,
         # the rollup is a ~2,880-row read whose sums move by one loop.
@@ -3207,6 +3286,18 @@ def main():
                     b.last_uptrend[coin] = sig["uptrend"]
                 if sig:
                     b.last_enter[coin] = bool(sig.get("enter"))
+                    # [(ya)] the bar this verdict ran under, same pass, same
+                    # strategy object. Unstamped (non-numeric bar) reads as
+                    # stale at the census, never as current.
+                    _bar_now = getattr(b.s, "RSI_MAX", None)
+                    if isinstance(_bar_now, (int, float)):
+                        b.last_enter_bar[coin] = float(_bar_now)
+                    else:
+                        b.last_enter_bar.pop(coin, None)
+                # [(ya)] 🙏 avo's BB dip term; only SwingDip returns it, so
+                # this scopes itself to her carrier without a new flag.
+                if sig and isinstance(sig.get("bb_dist_pct"), (int, float)):
+                    b.last_bb[coin] = float(sig["bb_dist_pct"])
 
                 held = coin in b.broker.pos
                 px = marks.fresh_mid(venue, coin)
