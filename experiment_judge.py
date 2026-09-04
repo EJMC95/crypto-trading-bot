@@ -532,7 +532,7 @@ def ran_candidate(row, levers):
 
 
 def arm_trades(rows, bot, start_ts, end_ts=None, levers=None,
-               keep_srcs=None):
+               keep_srcs=None, opened_after=None):
     """[(close_ts, pnl_pct)] for one arm inside the window, oldest first.
 
     levers=None keeps the historical behaviour (time-window attribution only) —
@@ -600,6 +600,18 @@ def arm_trades(rows, bot, start_ts, end_ts=None, levers=None,
         # returned (ts, pct) pairs cannot, because close_ts is not unique.
         if keep_srcs is not None and _src_of(r) not in keep_srcs:
             continue
+        # [(ye)] OPENED-AFTER. The receipt (`extra.bars`) is stamped at
+        # ENTRY, so a position opened BEFORE a lever was applied can never
+        # carry it no matter how the arm behaves. Callers asking "did the arm
+        # apply the candidate?" must count only closes that COULD have proved
+        # it. Default None = unchanged for every existing caller.
+        if opened_after is not None:
+            try:
+                _o = parse_ts(r.get("open_ts"))
+            except Exception:                                    # noqa: BLE001
+                continue                  # unreadable open -> cannot vouch
+            if _o is None or _o < opened_after:
+                continue
         try:
             ts = parse_ts(r.get("close_ts"))
         except Exception:
@@ -776,12 +788,41 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
         # must NOT age this toward ABANDONED (that would retire a possibly-good
         # candidate on a verdict about an experiment that never happened).
         n_all = len(arm_trades(rows, shadow_bot, start_ts, end_ts))
+        # [(ye)] THE DENOMINATOR THAT CAN ACTUALLY VOUCH. `extra.bars` is
+        # stamped at ENTRY, so a position OPENED before the lever was applied
+        # and closed inside the window cannot carry the receipt however
+        # faithfully the arm is running. Counting it made `0/N` byte-identical
+        # between "the lever is not reaching the arm" (a real defect, and the
+        # only thing this gate should hold the queue for) and "the arm has not
+        # OPENED anything since the lever was set" (a drought, which no code
+        # change fixes and which must not freeze the promotion lane).
+        #
+        # MEASURED, 4-Sep: the judge held candidate `mum-rsi-32` on
+        # "ARM NOT APPLYING: 0/3 shadow closes carry a receipt" while 👩 mum's
+        # shadow had last OPENED a position ~26h earlier — before the
+        # experiment began at 03-Sep 02:52Z. All three closes were of
+        # pre-experiment positions. The arm was applying the lever perfectly
+        # and had simply had nothing to buy: the regime drought of (ya)/(yb),
+        # reported as broken plumbing on the fleet's ONLY path from shadow
+        # evidence to real money — the lane (xd) unjammed six days earlier.
+        n_open = len(arm_trades(rows, shadow_bot, start_ts, end_ts,
+                                opened_after=start_ts))
         v["n_shadow_closes"] = n_all
-        if n_all and not sh:
+        v["n_shadow_opened_in_window"] = n_open
+        if n_open and not sh:
             v["arm_skew"] = True
-            v["why"] = (f"ARM NOT APPLYING: 0/{n_all} shadow closes carry a "
-                        f"receipt for {json.dumps(cand_levers)} — the arm is "
-                        f"not running this experiment")
+            v["why"] = (f"ARM NOT APPLYING: 0/{n_open} shadow closes that were "
+                        f"OPENED after the lever was set carry a receipt for "
+                        f"{json.dumps(cand_levers)} — the arm is not running "
+                        f"this experiment")
+            return v
+        if n_all and not sh:
+            # Closes exist but NONE were opened under the lever: no evidence
+            # either way. Say so plainly rather than accusing the arm — this
+            # is the ordinary floors path, and the candidate ages normally.
+            v["why"] = (f"no receipted closes yet: {n_all} close(s) in window, "
+                        f"{n_open} opened since the lever was set — the arm has "
+                        f"not yet OPENED under this candidate")
             return v
     if len(sh) < min_closes or len(lv) < live_min:
         v["why"] = f"floors: shadow {len(sh)}/{min_closes}, live {len(lv)}/{live_min}"
@@ -3660,8 +3701,14 @@ def _selftest_body():
     # scored version skew and would have promoted an untested value to REAL
     # MONEY. A receipt is stamped only inside the arm's apply_levers(), so a
     # missing one is disproof. This gate must stay fail-CLOSED.
-    def rowb(bot, ts, pct, bars=None):
-        r = {"bot": bot, "profit_ratio": pct, "close_ts": iso(ts), "extra": {}}
+    def rowb(bot, ts, pct, bars=None, open_ts=None):
+        # [(ye)] `open_ts` defaults to the close instant, i.e. a position the
+        # arm OPENED inside the window. That is what this fixture has always
+        # MEANT — "a frozen arm closing trades and stamping no receipt" — and
+        # it had to become explicit once arm-skew started asking whether the
+        # arm ever opened UNDER the lever at all.
+        r = {"bot": bot, "profit_ratio": pct, "close_ts": iso(ts),
+             "open_ts": iso(open_ts if open_ts is not None else ts), "extra": {}}
         if bars is not None:
             r["extra"] = {"bars": bars}
         return r
@@ -3682,6 +3729,41 @@ def _selftest_body():
     _skv = paired_eval(_sk, t0, end, cand_levers=_cand)          # gated: blocked
     assert _skv["promote"] is False and _skv["arm_skew"] is True, _skv
     assert _skv["n_shadow_closes"] == 32, _skv
+    assert _skv["n_shadow_opened_in_window"] == 32, _skv
+
+    # [(ye)] ...AND THE MIRROR: closes of positions OPENED BEFORE the lever was
+    # set are NOT disproof, because `extra.bars` is stamped at ENTRY and such a
+    # close could never carry it however faithfully the arm runs. Measured
+    # 4-Sep: the judge held `mum-rsi-32` on "0/3 shadow closes carry a receipt"
+    # while mum's shadow had last OPENED ~26h before the experiment began — the
+    # regime drought of (ya)/(yb) reported as broken plumbing, on the fleet's
+    # only path from shadow evidence to real money.
+    _pre = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.05, open_ts=t0 - day)
+             for i in range(32)]
+            + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    _pv = paired_eval(_pre, t0, end, cand_levers=_cand)
+    assert not _pv.get("arm_skew"), (
+        "a close of a PRE-LEVER position is not proof the arm is deaf", _pv)
+    assert _pv["promote"] is False, "still no receipted evidence -> no promotion"
+    assert _pv["n_shadow_opened_in_window"] == 0, _pv
+    assert "not yet OPENED" in _pv["why"], _pv["why"]
+
+    # [(ye)] ...and an UNREADABLE open stamp cannot vouch either. `parse_ts`
+    # raises on None/''/junk alike, so the filter must DROP such a row, never
+    # admit it at the boundary: a row that cannot prove it opened under the
+    # lever must not be used to accuse the arm of ignoring it (I8 — unknown
+    # degrades to the honest absence, and here the absence is "no evidence",
+    # not "the arm is deaf"). A mutation admitting these survived the first
+    # round, because every other fixture row carries a valid stamp.
+    _bad = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.05) for i in range(32)]
+            + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    for _r in _bad:
+        if _r["bot"] == SHADOW_BOT:
+            _r["open_ts"] = "not-a-timestamp"
+    _bv = paired_eval(_bad, t0, end, cand_levers=_cand)
+    assert not _bv.get("arm_skew"), (
+        "an unreadable open stamp is not proof the arm is deaf", _bv)
+    assert _bv["n_shadow_opened_in_window"] == 0, _bv
 
     # ---- [2026-07-17] ARM-DRIFT gate: same arms, or no verdict -------------
     # The arms live in different Railway services on separate deploy clocks —

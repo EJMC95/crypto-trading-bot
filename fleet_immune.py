@@ -41,6 +41,7 @@ Consumers: fleet_tuning.get_lever (quarantine), dashboard, the operator's
 phone. Run-once; run_all.sh loops it. --selftest is offline.
 """
 import json
+import math
 import os
 import re
 import sys
@@ -799,6 +800,130 @@ STALE_WRITER_OK = {}
 STALE_ROW_S = float(os.environ.get("IMMUNE_STALE_ROW_S", "7800"))
 
 
+#: [2026-09-04 (yd)] THE PROBABILITY THAT BUYS THE ALARM. A book's silence is
+#: only surprising against its OWN measured rate, so this detector types NO
+#: hour count: it types the P-VALUE of the silence and DERIVES the hours per
+#: book. Treating entries as ~Poisson at the book's demonstrated rate r/day,
+#: P(no entry in T days) = exp(-r*T), so the alarm sits at
+#: T = -ln(P)/r days. At P=0.01 that is 4.6/r days — 👩 mum at ~10.1 closes/day
+#: alarms at ~11h, 🙏 avo at ~1.35/day alarms at ~82h. ONE constant, correctly
+#: scaled for a fast book and a slow one, instead of an hour count that would
+#: cry wolf on the slow book or sleep through the fast one (the (gl) shape,
+#: aimed at the operator's phone).
+DROUGHT_P = float(os.environ.get("IMMUNE_DROUGHT_P", "0.01"))
+
+# [2026-09-04 (yd)] LIVE books whose entry drought is LEGITIMATE. The
+# BORN_DARK_OK / FLATTEN_STUCK_OK idiom: a deliberate exemption is DECLARED
+# with a reason, never defaulted into. EMPTY today and that is the point — a
+# real-money book that has stopped entering is exactly what this exists to
+# page on. The MECHANISM is tested via the `ok=` injection, so an exemption is
+# one entry away without this dict having to be non-empty.
+DROUGHT_OK = {}
+
+
+def entry_drought_sickness(bot_rows, now=None, ok=None):
+    """A LIVE book that is FRESH, UNHALTED, BELOW ITS CAP — and has taken no
+    entry for far longer than its own measured rate explains.
+
+    [2026-09-04 (yd)] WHY THIS EXISTS, and it is the plainest observability
+    hole this fleet has had. Eamon asked "bots aren't trading" THREE TIMES on
+    4-Sep. Both real-money books had been idle 28h and 41h; every organ read
+    healthy, `n_stale: 0`, the watchdog `problems: []`, and NOTHING surfaced
+    it. I1 gives the fleet a hard page on a dead WRITER — but a book whose
+    writer is perfectly alive while the BOOK has stopped trading publishes
+    `open: 0` forever and looks identical to a book that is merely quiet.
+    Liveness of the publisher was covered; liveness of the BOOK was not.
+
+    THE FOUR EXCLUSIONS ARE THE WHOLE DESIGN — each is a condition that looks
+    like a drought and is not, and each is already someone else's class:
+      * STALE row  -> the watchdog's / `_row_stale`'s class (I1: establish that
+        something still writes the row before interpreting what it says);
+      * HALTED     -> the halt is the reason, and `flatten_stuck_sickness`
+        already owns the halt that will not clear;
+      * AT CAP     -> a book holding every slot is FULL, not starved. 🧮 hull
+        sat 10/10 with no entry for 19 days and was working correctly; firing
+        there is the I7 error of a trigger a book satisfies STRUCTURALLY;
+      * NO MEASURED RATE -> a book with no demonstrated cadence has no
+        expectation to violate (I8: unknown degrades to silence, never to an
+        alarm on the operator's phone).
+
+    SCOPE is the row's OWN `extra.venue == "lighter_live"`, not a list of book
+    ids. A list-keyed roster rots on every slot swap — this file's own history
+    records that happening FOUR times — and `fleet_books` lives under
+    `scripts/`, which does not ship in an image (the born-dark rule), so a
+    copy here would be a second roster free to drift. A row that does not
+    declare itself live is simply not checked: fail-safe by construction.
+
+    Returns [{organ, detail}].
+    """
+    okmap = DROUGHT_OK if ok is None else ok
+    out = []
+    for r in bot_rows or []:
+        if not isinstance(r, dict):
+            continue                      # a junk row must never break the loop
+        bot = str(r.get("bot") or "")
+        if bot in (okmap or {}):
+            continue
+        extra = r.get("extra")
+        if not isinstance(extra, dict):
+            continue
+        if str(extra.get("venue") or "") != "lighter_live":
+            continue                      # scope: real money declares itself
+        if _row_stale(r, now):
+            continue                      # I1 — a dead writer is not a drought
+        status = str(r.get("status") or "")
+        vetoes = extra.get("entry_vetoes")
+        shut = (vetoes or {}).get("shut_now") if isinstance(vetoes, dict) else None
+        if status == "halted" or shut:
+            continue                      # the halt IS the reason
+        try:
+            open_n = int(r.get("open_trades") or 0)
+            cap = int(extra.get("max_open") or 0)
+        except (TypeError, ValueError):
+            open_n, cap = 0, 0
+        if cap and open_n >= cap:
+            continue                      # full, not starved (I7)
+        prog = extra.get("progression")
+        if not isinstance(prog, dict):
+            continue
+        rates = []
+        for key in ("close_rate_day_7d", "close_rate_day_life"):
+            try:
+                v = float(prog.get(key))
+            except (TypeError, ValueError):
+                continue
+            # `math.isfinite` not `v == v`: the identity trick tests only NaN
+            # and lets INF through, which would drive the derived bar to ZERO
+            # and page on any idle time at all. (CodeQL flagged the idiom; the
+            # inf hole was the real defect behind it.)
+            if math.isfinite(v) and v > 0:
+                rates.append(v)
+        if not rates:
+            continue                      # no measured cadence -> no claim
+        # the book's DEMONSTRATED rate. max(), not the trailing one alone: a
+        # drought drags `close_rate_day_7d` down as it lengthens, which would
+        # raise the threshold and make a deepening silence HARDER to page —
+        # the alarm would fade out exactly as the problem got worse.
+        rate = max(rates)
+        scan = extra.get("scan")
+        idle_h = (scan or {}).get("idle_open_h") if isinstance(scan, dict) else None
+        try:
+            idle_h = float(idle_h)
+        except (TypeError, ValueError):
+            continue
+        bar_h = -math.log(max(DROUGHT_P, 1e-9)) / rate * 24.0
+        if idle_h > bar_h:
+            out.append({
+                "organ": bot,
+                "detail": (f"LIVE book has not opened in {idle_h:.1f}h — its own "
+                           f"rate is {rate:.2f} closes/day, so P(silence this "
+                           f"long) < {DROUGHT_P:g} (bar {bar_h:.1f}h). "
+                           f"Row fresh, NOT halted, {open_n}/{cap} slots used: "
+                           f"the book is scanning and refusing, not stopped."),
+            })
+    return out
+
+
 def _row_stale(row, now=None):
     """True when a bot_pnl row has stopped being written. Unknown age reads as
     NOT stale: this only ever SUPPRESSES a finding, so an unreadable stamp
@@ -1407,6 +1532,7 @@ def run_once():
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
             + headroom_sickness(bot_rows)
             + flatten_stuck_sickness(bot_rows, flatten_seen, now)
+            + entry_drought_sickness(bot_rows, now)
             + stale_writer_sickness(bot_rows)
             + restart_churn(states, churn_seen, now)
             + brain_amnesia(states.get("learning-brain"),

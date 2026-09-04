@@ -1,3 +1,297 @@
+## 2026-09-04 (ye) — THE JUDGE ACCUSED AN ARM THAT WAS BEHAVING PERFECTLY: a receipt stamped at ENTRY cannot be carried by a position opened before the lever
+
+**Found while answering Eamon's *"bots are still not trading"*, and it had
+frozen the fleet's ONLY path from shadow evidence to real money.**
+
+`xp-judge` read `phase: running`, candidate **`mum-rsi-32`**, and its own last
+eval said:
+
+> `ARM NOT APPLYING: 0/3 shadow closes carry a receipt for {"xp.mum.rsi_max":
+> 32.0} — the arm is not running this experiment`, `arm_skew: true`
+
+That is an accusation of BROKEN PLUMBING, and it holds the queue: `arm_skew`
+deliberately does not age a candidate toward ABANDONED, because "the experiment
+never happened" is not the candidate's fault. **It never happened for the
+opposite reason.**
+
+**THE MECHANISM.** `extra.bars` — the proof-of-application receipt — is stamped
+at **ENTRY** (`mum_bars`, copied to the close row). `arm_trades` filters on
+**`close_ts`**. So a position OPENED before the lever was applied and CLOSED
+inside the window is counted in the denominator **and can never carry the
+receipt, however faithfully the arm is running.** Measured 4-Sep: 👩 mum's
+shadow last OPENED a position ~26h before the read — i.e. before the experiment
+began at 03-Sep 02:52Z. All three closes were of pre-experiment positions. The
+arm was applying `rsi_max=32` perfectly and had simply had nothing to buy: the
+regime drought of `(ya)`/`(yb)`, reported as a broken arm.
+
+**`0/N` was byte-identical between "the lever is not reaching the arm" (a real
+defect, and the only thing this gate should ever hold the queue for) and "the
+arm has not OPENED anything since the lever was set" (a drought, which no code
+change fixes).** The I1/I18 ambiguity, sitting on the promotion lane.
+
+**FIXED** by giving the denominator the only closes that COULD vouch:
+`arm_trades` gains an additive `opened_after=` (default None — every existing
+caller unchanged, which matters because the LIVE control arm's rows predate the
+receipt entirely), and `arm_skew` now counts closes **opened after the lever
+was set**. When closes exist but none were opened under the lever, the verdict
+says so plainly — `"no receipted closes yet: 3 close(s) in window, 0 opened
+since the lever was set"` — and the candidate ages normally instead of being
+accused. An UNREADABLE open stamp is DROPPED, never admitted at the boundary
+(I8: unknown is "no evidence", not "the arm is deaf").
+
+Pinned in the judge's own selftest AND
+`tests/autonomy/test_judge_receipt_and_live_census.py`; **8 mutations verified
+red**, including the positive control (an arm that DID open and still stamped
+nothing is still caught — a gate that cannot fire is worthless) and one that
+survived the first round: flipping `opened_after`'s default from `None` to
+`0.0` leaves the filter permanently on, which silently drops every
+unreadable-stamp row from EVERY bar in the promotion path. Now pinned.
+
+## 2026-09-04 (yf) — THE 24h DENOMINATOR EXISTED ONLY ON THE PAPER BOOKS
+
+`(vm)` built `census_24h` — the scan census summed over a day, so a refusal
+finally has a denominator — and shipped it into `lighter_family_bot`. **The
+live arms run `lighter_avo_live_bot`.** So the instrument reached every $1,000
+shadow and not one row holding real money: the `(vh)` class again, and `(vm)`'s
+own entry had already been bitten by it once.
+
+**Measured 4-Sep, diagnosing why both live books had stopped:** 👩 mum's SHADOW
+published the entire answer — `both_terms_n: 36`, `stale_candle: 11594`,
+`no_signal: 2313`, every refusal bucket summed over 149 loops with `loops` and
+`hours` beside them — and **her LIVE row published nothing at all.** The
+question had to be answered on the paper twin and inferred across to the real
+money, which is exactly backwards.
+
+`no_signal: 94` on ONE loop and on 300 of them are the same integer and
+opposite facts; without the series a live row can only ever publish the first.
+**SHIPPED:** the live host now snapshots its scan census every loop and
+publishes the rollup, read back from `payload["scan"]` so the series and the
+published field are the same census by construction ((hj)). Keyed on the BARE
+row id — the rails census lives under `<row>:rails`, and pooling the two would
+make both meaningless. Dark history OMITS the key rather than publishing zeros
+(a zero-filled census reads as "300 loops, nothing refused", the loudest
+possible claim from no data); the rollup carries its own `age_s`, because a
+cache that quietly froze would be I1 living inside the instrument built to
+answer I18; and it can never raise into a live trading loop.
+
+Both are PUBLISH-ONLY: no gate reads either, and no trade changes.
+
+## 2026-09-04 (yd) — A LIVE BOOK CAN STOP TRADING AND NOTHING PAGES: publisher liveness was covered, BOOK liveness was not
+
+**Eamon asked *"bots aren't trading"* THREE TIMES on 4-Sep**, and the reason he
+had to is the finding. Both real-money books had been idle **28h** and **41h**.
+Every organ read healthy: `n_stale: 0`, watchdog `problems: []`, neither row
+halted, both fresh to the second. **Nothing surfaced it, and nothing could.**
+
+**THE HOLE, stated exactly:** I1 gives this fleet a hard page on a dead
+WRITER — `_row_stale`, `STALE_ROW_S`, the watchdog, `stale_writer_sickness`.
+But a book whose writer is perfectly alive while the BOOK has stopped trading
+publishes `open: 0`, `status: online`, `age 30s` forever, and is
+**byte-identical to a book that is merely quiet**. That is the `(lv)`
+`{open: 0}` ambiguity at the level of the whole book, on the two rows holding
+real money, and it is the same shape as I13's *"a dead loop runs no handler"* —
+self-report covers the process that FAULTS, never the one that simply stops
+doing its job.
+
+**`fleet_immune.entry_drought_sickness`** closes it. Its domain is exactly this
+organ's stated one: *ALIVE BUT SICK — fresh, in-TTL, trusted, and WRONG.*
+
+**THE BAR IS DERIVED PER BOOK, AND THAT IS THE WHOLE DESIGN.** This detector
+types NO hour count. It types a **P-VALUE** and derives the hours: entries
+treated as ~Poisson at the book's demonstrated rate `r`/day, `P(no entry in T)
+= exp(-r·T)`, alarm at `T = -ln(P)/r`. At **`DROUGHT_P = 0.01`** that is
+`4.6/r` days. Measured on the live payload the hour this shipped:
+
+| book | idle | own rate | derived bar | verdict |
+|---|---|---|---|---|
+| 👩 mum | **28.1h** | 10.14/day | **10.9h** | **PAGES** |
+| 🙏 avo | 41.2h | 1.35/day | 82h | correctly SILENT |
+
+**One constant, two right answers.** No typed hour count can do that: anything
+catching mum at 28h cries wolf on avo, and anything sparing avo at 41h sleeps
+through mum — the `(gl)` cry-wolf shape aimed at the operator's phone.
+
+**THE FOUR EXCLUSIONS ARE THE REST OF THE DESIGN.** Each looks like a drought,
+each is already someone else's class, and each is pinned:
+* **stale row** → I1, the watchdog's; a dead writer is not a drought;
+* **halted** → the halt IS the reason, and `flatten_stuck_sickness` owns the
+  halt that will not clear;
+* **at cap** → a book holding every slot is FULL. 🧮 hull sat **10/10 with no
+  entry for 19 days** and was working correctly; firing there is I7's
+  trigger-a-book-satisfies-STRUCTURALLY error;
+* **no measured rate** → I8: a book with no demonstrated cadence has no
+  expectation to violate, and a fabricated one lands on a phone.
+
+**SCOPE IS SELF-DECLARED** — the row's own `extra.venue == "lighter_live"`,
+never a list of ids. This file's own audit-scope rule has named a RETIRED bot
+**four times** because it was list-keyed; and `fleet_books` lives under
+`scripts/`, which does not ship in an image (the born-dark rule), so a copy
+here would be a second roster free to drift. A row that does not declare itself
+live is simply not checked.
+
+**THE TRAILING-RATE TRAP, caught in design and pinned:** `close_rate_day_7d`
+FALLS as a drought lengthens. Built from the trailing rate alone, the bar would
+RISE as the silence deepened and **the alarm would fade out exactly as the
+problem got worse.** The bar uses the book's DEMONSTRATED rate — `max(7d,
+life)` — so a longer silence is always easier to page, never harder.
+
+Pinned by `tests/autonomy/test_entry_drought.py`, **9 mutations verified red**.
+Two defects were found by that round rather than by re-reading: a junk row
+(`None`) would have **raised into the organ loop**, and my own I8 test used a
+28h fixture where a fabricated rate of 1.0 puts the bar at 110h — so it passed
+for the WRONG REASON and a fabricate-the-rate mutation SURVIVED it. The fixture
+is now 500h, far past any plausible fabricated bar. *An unexercised boundary is
+the second one this session; it is what mutation testing is for.*
+
+**Publish-only: it pages and changes no trade.** 👩 mum is firing it today, and
+correctly — she is scanning 95 coins and refusing all of them, which `(ya)`,
+`(yb)` and `(yc)` establish is her cell being right about a regime, not broken.
+The alarm's job is that Eamon learns this from his phone rather than by asking
+three times.
+
+## 2026-09-04 (yc) — 🙏 AVO IS TWO CLOSES FROM THE GATE, AND EVERY WAY OF MANUFACTURING THEM DESTROYS THE EDGE THE GATE WOULD CERTIFY
+
+**Eamon, 4-Sep: *"let's run with what works."*** This entry is what happened
+when that instruction was taken literally and the fleet was asked, with
+numbers, *which books actually work*.
+
+**THE ANSWER INVERTS THE QUESTION THAT PROMPTED IT.** "Bots aren't trading"
+points at the idle books; the ledger points the other way:
+
+| book | clock | opens 24h | n | mean %/trade | t | total $ |
+|---|---|---|---|---|---|---|
+| 🪁 band-kelly | — | **17** | 423 | −0.186 | −1.23 | **−$131.46** |
+| 🔮 georgia-v3 | 15m | **7** | 62 | −0.097 | −0.71 | −$3.16 |
+| 🔮 georgia | 15m | **7** | 253 | +0.032 | 0.24 | +$7.56 |
+| 👩 mum LIVE | 1h | **0** | 71 | +0.213 | 0.90 | **+$25.72** |
+| 👩 mum shadow | 1h | **0** | 79 | **+0.743** | **2.01** | +$29.35 |
+| 🙏 avo LIVE | 4h | **0** | 22 | **+1.385** | 1.49 | **+$77.43** |
+
+**THE BUSY BOOKS ARE THE LOSERS AND THE IDLE BOOKS ARE THE EARNERS.** The
+15-minute cells `(yb)` named as "the only thing trading in this tape" trade at
+**+0.032%** and **−0.097%** per trade — activity, not edge. Moving 👩 mum from a
+cell earning +0.743%/trade at t=2.01 onto one of those would have been the
+worst trade in this fleet's history, and `(yb)` proposed exactly that as the
+supported path. **Corrected here: it is not supported. Activity was never the
+metric** — the forward metric has always been *books that can be GRADED, then
+go live*.
+
+**🌾 CARRY WAS ALSO CHECKED AND ALSO REFUSED.** Its all-time ledger is the
+fleet's best (n=109, +0.248%/trade, t=3.22, +$70.45, 13 positions open right
+now) and it is delta-neutral, so it is regime-INDEPENDENT — the obvious
+candidate. **Era-scoped it reads 2/6 bars, n=18, mean −0.010%, t=−0.10.** The
+strong number is pre-era. Recommending it off the all-time column would have
+been `(hc)`'s pooling error on the fleet's most tempting book.
+
+**WHAT IS ACTUALLY ONE MOVE FROM REAL MONEY:** 🙏 avo's shadow passes **5 of 6**
+go-live bars era-scoped — mean **+1.802%/trade**, **t=2.39**, both halves,
+drawdown, window — failing only `closes` at **n=28 against 30**. TWO closes.
+And she cannot get them: her binding conjunct is the BB dip, and `(ya)`'s new
+gauge shows why — **`bb_min 1.39 · bb_below 0`**, her closest coin 1.39% ABOVE
+the lower band and none of 43 below it, while the RSI half is met.
+
+**SO THE BAND WAS PRICED** (`scripts/study_avo_bb_band_2026-09-04.py`, 180d of
+her own 4h tape, her REAL bracket, LAG-1, vs a matched random-entry null;
+k relaxes `c < bb_lo` to `c < bb_lo·(1+k)`):
+
+| k | eps/30d | mean %/trade | t | edge vs null |
+|---|---|---|---|---|
+| **0.000 SHIPPED** | 42.3 | +0.910 | 2.20 | **+0.302** |
+| 0.005 | 55.7 | +0.911 | 2.50 | −0.212 |
+| 0.010 | 58.0 | +0.585 | 1.63 | −0.196 |
+| 0.015 | 60.3 | +0.709 | 2.05 | −0.040 |
+| 0.020 | 60.0 | +0.595 | 1.71 | +0.082 |
+| 0.030 | 59.2 | +0.690 | 1.94 | −0.027 |
+
+**The shipped rule is the best cell on the board**; every relaxation trades edge
+for volume and most go NEGATIVE against the null. And it buys nothing anyway —
+over 14 days the shipped band fired **11** and k=0.010 fired **12**, *one extra
+trade in a fortnight*, with **all** variants at ZERO across the last five days.
+Concentration is bad too (best coin 41–44% of total).
+
+**THE GENERAL RULE THIS ENTRY EXISTS FOR, and it is the sharp end of I26:**
+*a book that is N closes from its gate must not be widened to reach it.* The
+number that makes 🙏 avo worth promoting is produced BY the strictness that makes
+her idle; relax the cell to manufacture the closes and the gate certifies a
+DIFFERENT, WORSE book — while reading exactly as green. I26 rightly puts the
+burden of proof on a refusal, and it is discharged here by measurement in both
+directions, on two books and eleven cells: 👩 mum (bars 32/35/38/42 × trend
+on/off, `(ya)`/`(yb)`) and 🙏 avo (six bands). **Every single one is worse than
+what is already shipped.** The books are right; the market is not offering their
+cell. Waiting is the correct action, and it is an ACTION — not a failure to act.
+
+**NOT CHANGED:** any live book. **SHIPPED:** the instrument, so the next session
+that wants to widen a starved book toward its own gate meets these numbers
+first.
+
+## 2026-09-04 (yb) — THE TREND SLEEVE IS REFUTED, AND IT WOULD NOT HAVE HELPED EITHER: both halves of 👩 mum's cell went to zero on the same two days
+
+**Eamon, 4-Sep, twice: *"Bots are still not trading."*** He was right both
+times, and the second time the answer was not the one `(ya)` gave.
+
+**WHAT `(ya)` ESTABLISHED AND WHAT IT MISSED.** It measured her config as the
+optimum of everything reachable (bar 38 = 2.78 %-units/day vs 2.31 at 32, 1.19
+at 42, 1.43 with the trend term dropped) and concluded "the market has no
+dips". True, and insufficient: it quoted a 14d/30d average of ~5.5 entries/day
+while the live book sat 28h idle, and **did not reconcile the two**. A daily
+bucket does:
+
+| 08-31 | 09-01 | 09-02 | 09-03 | 09-04 |
+|---|---|---|---|---|
+| 14 | 13 | **19** | **0** | **0** |
+
+**Her cell fired 19 times on 2-Sep and exactly zero since — a CLIFF, not a dry
+spell**, matching her idle to the hour. An average over 60 days cannot see a
+two-day cliff, and quoting one as reassurance is how a stalled book gets left
+alone. *(My own first cut of that bucket used a `Counter`, which has no key for
+a zero day, so `sorted()` silently skipped 09-03 and 09-04 and the tail read
+"accelerating, 13.2/day". The zero days were the entire finding.)*
+
+**THE PROPOSED FIX, AND ITS REFUTATION.** Her rule refuses the one thing the
+tape offers — a coin oversold INSIDE an uptrend (live census: `uptrend_blocked:
+1` against `rsi_min 36.5 < bar 38.0`). Eamon chose to build that counterpart as
+a second sleeve. Measured first (`scripts/study_mum_trend_sleeve_2026-09-04.py`,
+60d, her own 1h tape, her REAL bracket via the reachability study's own `walk`
+so no second copy of the exit rule, vs a matched random-entry null):
+
+| cell @ bar | mean %/trade | t | edge vs null |
+|---|---|---|---|
+| SHIPPED not-uptrend @38 | +0.268 | +4.52 | **+0.172** |
+| proposed uptrend @32 | +0.009 | 0.09 | **−0.072** |
+| proposed uptrend @35 | −0.090 | −0.97 | **−0.142** |
+| proposed uptrend @38 | −0.082 | −1.06 | **−0.135** |
+| proposed uptrend @42 | −0.204 | −2.80 | **−0.160** |
+
+**NEGATIVE AGAINST THE NULL AT EVERY BAR**, significantly so at 42; 10 of 23
+coins positive; ex-best-coin −0.140%. This is `(qu)`'s finding reproduced on a
+second book — the `e50>e200` direction was measured ACTIVELY DESTRUCTIVE on
+🙏 avo, and it was carried here as a WARNING rather than a verdict (applying one
+book's evidence to another's cell is the `(lk)` error). The warning was right.
+
+**AND THE SECOND HALF IS THE ONE THAT SETTLES IT: the proposed cell fired ZERO
+on 09-03 and 09-04 TOO.** Both halves of the conjunction went dark together, so
+the drought is not a mis-pointed trend term — **nothing in her universe has been
+oversold in either trend state** (`rsi_med` 59 across the venue). The sleeve
+would have added a money-losing cell that is idle exactly when she is idle:
+the worst of both, and invisible without the daily bucket.
+
+**REFUSED, and the refusal is the deliverable** — this is the permanent
+doctrine's "a refusal with evidence outranks enthusiasm, Eamon's and Lucy's
+alike". Nothing was shipped to a book; the instrument is, so the next session
+that has this idea meets the number instead of the idea.
+
+**WHAT THE EVIDENCE DOES SUPPORT, stated but NOT taken** (a policy change on a
+real-money book is Eamon's call, and it resets her 30-day era): the only cells
+demonstrably trading in this tape are on a **15-minute** clock — 🔮 georgia
+`daytrader-15m` and `impulse-fade-15m` each opened **7 in the last 24h**, same
+host, same image, same venue, same hour, while mum (1h) and 🙏 avo (4h) opened
+**0**. On 1h/4h a strong trend smooths the dips away; on 15m they survive.
+
+**ALSO FOUND, not fixed:** mum's LIVE row publishes **no `census_24h`** while her
+$1,000 shadow does — the 24h denominator exists on the paper book and not on the
+row holding real money, which is `(st)`'s own complaint recurring. It is what
+made this diagnosis possible on the shadow and impossible on the live arm.
+
 ## 2026-09-04 (ya) — "BOTS AREN'T TRADING": NOTHING WAS BROKEN, THE REGIME FLIPPED — and both gauges built to say so were themselves defective
 
 **Eamon, 4-Sep: *"Bots aren't trading."*** They were. 11 of 16 books were

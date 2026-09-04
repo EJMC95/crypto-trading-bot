@@ -1330,6 +1330,51 @@ SHUT_UNATTRIBUTED = "unattributed"
 #: at counter scale.
 RAILS_CENSUS_BOT = BOT_ROW + ":rails"
 
+#: [(yf)] how often `census_24h` is recomputed, and the cache behind it. Same
+#: contract as `lighter_family_bot.CENSUS_ROLLUP_S`: the scan census is
+#: SNAPSHOT every loop (one small insert) while the ROLLUP reads a day of
+#: history, and recomputing that per loop buys sums that moved by one loop.
+CENSUS_ROLLUP_S = float(os.environ.get("LIVE_CENSUS_ROLLUP_S", "1800"))
+_CENSUS_ROLLUP = [None, 0.0]                     # [payload, computed_at]
+
+
+def census_series_extra(bot, t_now):
+    """[(yf)] `census_24h` — this book's scan census SUMMED over the trailing
+    day, ON THE ROW THAT HOLDS REAL MONEY.
+
+    WHY THIS EXISTS. `(vm)` built this series and shipped it into
+    `lighter_family_bot`, so it reached every $1,000 PAPER book and NOT the
+    live arms — which run THIS file. That is the `(vh)` class exactly: verify a
+    mechanism in one file, ship without asking which arm executes it. Measured
+    4-Sep, diagnosing why both real-money books had stopped trading: 👩 mum's
+    SHADOW published `census_24h` with the whole answer (`both_terms_n`,
+    `stale_candle`, every refusal bucket summed over 149 loops) and **her LIVE
+    row published nothing at all**, so the question had to be answered on the
+    paper twin and inferred across.
+
+    `no_signal: 94` on ONE loop and on 300 of them are the same integer and
+    opposite facts; without the series a live row can only ever publish the
+    first. The cached rollup carries its own `age_s`, because a cache that
+    quietly froze would be I1 living inside the instrument built to answer
+    I18; `census_window` returns {} on dark/empty history — never a zero-filled
+    dict — and the key is then OMITTED rather than published empty, so a stale
+    rollup degrades to the PREVIOUS honest value with a visibly growing age,
+    never to a guess.
+    """
+    try:
+        if (_CENSUS_ROLLUP[0] is None
+                or (t_now - _CENSUS_ROLLUP[1]) >= CENSUS_ROLLUP_S):
+            roll = store.census_window(bot)
+            if roll:
+                _CENSUS_ROLLUP[0], _CENSUS_ROLLUP[1] = roll, t_now
+        if not _CENSUS_ROLLUP[0]:
+            return {}
+        return {"census_24h": dict(
+            _CENSUS_ROLLUP[0],
+            age_s=round(max(0.0, t_now - _CENSUS_ROLLUP[1])))}
+    except Exception:                                        # noqa: BLE001
+        return {}
+
 
 def shut_cause(kill_armed, halted, t_now, locked_until, lock_cause,
                entries_shut, verdicts):
@@ -2406,6 +2451,20 @@ def main(_ctx=None, once=False):
                 },
             }
             payload.update(extra_extra or {})
+            # [(yf)] SNAPSHOT the scan census and publish its 24h ROLLUP — the
+            # denominator a refusal needs, on the real-money row. Read back
+            # from `payload` so the series and the published field are the same
+            # census by construction ((hj): a second copy of a rule is a second
+            # rule). Keyed on the BARE row id; the rails census lives under
+            # `<row>:rails`, so the two cannot collide. Best-effort: a census
+            # write must never break a live trading loop.
+            try:
+                _scan_now = payload.get("scan")
+                if _scan_now:
+                    store.snapshot_census(BOT_ROW, _scan_now)
+                payload.update(census_series_extra(BOT_ROW, t0))
+            except Exception:                                # noqa: BLE001
+                pass
             # [2026-09-02 (wl)] A BUS-RETIRED LIVE ARM PUBLISHES ITS RECEIPT —
             # the (ta) Farmer parity the (wg) registry mechanism skipped.
             # Without it `halted` is byte-identical between "lost 5% today"
