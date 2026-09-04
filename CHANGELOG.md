@@ -1,3 +1,76 @@
+## 2026-09-04 (xy) — THE PRE-REGISTERED READ ON A REAL-MONEY BOOK COUNTED ONE HALT AS EIGHT INDEPENDENT DRAWS: `(xv)`'s own rule, one day old, and the docket that decides could not consume it
+
+**Found by the daily review, in the instrument's own output.** 👩 mum's LIVE
+row — real money — carries a follow-through pre-registered 2026-09-02. The
+winners' docket read her fresh sample as **n=18, t=-3.05, -$66.46** and printed
+**NOT_CONFIRMED**. Read alone, that is a sentence: a live book whose registered
+hypothesis came back significantly negative.
+
+**IT IS ONE HALT.** Eight of those eighteen closes share a single timestamp —
+`2026-09-02T17:19:45`, all `exit_reason=daily_loss`, **-$43.13 = 67% of the
+entire loss**. That is the `(xo)` flatten, and a flatten writes n rows at one
+instant: they share that instant's move and are **ONE observation, not eight**.
+The remaining 11 closes read **t=-1.19**. Through the gate's own cluster
+estimator the fresh sample is **t=-2.72 over 8 close-batches** — and 8 batches
+is *below the I16 floor* once the floor counts observations instead of rows, so
+the honest verdict is **UNDECIDED**, not a condemnation.
+
+**`(xv)` ENGRAVED THIS EXACT SENTENCE THE DAY BEFORE** — *"one flatten instant
+is ONE observation"* — and the docket had no way to hear it. Its only
+independence caveat counted distinct UTC **dates** and duly reported "2
+close-day(s)": true, and the wrong granularity for the question. **A finding no
+gate consumes is a note** ((gn)'s rule, and this is its fifth costume).
+
+**AND THE OWNER ALREADY EXISTED.** `golive_readiness.cluster_stats` /
+`cluster_se` have keyed on batched closes since they measured ⚖️ Counterweight
+at t_iid **-2.00** / cluster-robust **-1.32**, complete with a fail-closed
+contract and the `(kg)` degeneracy guard. The docket **imports
+`golive_readiness` already** — for the era boundary — and simply never asked it
+this question. So this is not the `(hj)` second-copy failure; it is the one
+before it: a consumer that never reached the owner at all.
+
+**SHIPPED.** `winners_docket.cluster_view` shapes rows and *nothing else* —
+the arithmetic AND the cluster definition stay `golive_readiness`'s, pinned by
+a test that reads the function body and fails if the sandwich meat reappears
+locally. Then:
+* **the follow-through VERDICT is the cluster-robust `t`**, not the iid one;
+* **the I16 floor counts BATCHES, not rows** — n rows at one instant cannot buy
+  a floor with draws that do not exist;
+* **FAIL-CLOSED, and the closed direction is "never crown"** — a shape the
+  estimator cannot judge (G<2, or cancelling batches) is `undecided`, never
+  `confirmed` on the iid `t`.
+
+**SYMMETRIC BY CONSTRUCTION, AND THE POSITIVE CONTROL IS THE POINT.** A guard
+that only ever refuses is trivially safe and useless — I3 applied to a gate. So
+the same commit is tested to refuse a false CROWN on an inflated winning batch,
+and **🎫 the taker's `exit:hold` follow-through survives untouched**: 24 closes
+over **23** batches, cluster-robust **t=+2.67**, still **CONFIRMED**. The fix
+removes a false condemnation on real money and leaves the fleet's one live
+confirmation standing. 🙏 avo's shadow moves +1.68 → **+1.49** over 12 batches,
+same verdict.
+
+**REPORTED, NOT YET A BAR, ON THE REFEREE — with the measurement that says why.**
+Every graded bucket now publishes its cluster read. The BH referee still runs on
+the iid `p`, because changing *that* re-verdicts 42 buckets and owes its own
+evidence pass. Measured today so the next pass starts from a number rather than
+a hunch: **no bucket crosses |t|=2 upward when clustered**, so no PROVEN verdict
+moves and the referee is minting no false winner; the inflation is concentrated
+exactly where the design predicts — ⚖️ Counterweight, the one living book that
+closes ten legs in one instant — `side:short` **-2.77 → -1.57** (the one
+|t|=2 crossing in the fleet, and it is a *retirement-direction* number),
+`book:*` **-1.84 → -0.83**, `side:long` **+0.99 → +0.35**. That book's own
+retirement read is pre-registered for 1-Oct and is graded by
+`golive_readiness`, which has reported the clustered number all along — so the
+gap this entry closes was never in front of ⚖️; it was in front of mum.
+
+**Expectancy price (I19): none.** The docket is read-only — it moves no
+capital, writes no lever and promotes nothing. What changes is which number a
+human acts on.
+
+14 tests, **6/6 mutations red** (verdict reads the iid `t` · floor counts rows ·
+fail-open when the cluster read is absent · `cluster_view` stops sorting ·
+report drops the clustered line · the referee stops publishing it).
+
 ## 2026-09-03 (xv) — "DOES THE HALT COST OR SAVE HER?" IS PRE-REGISTERED, NOT ANSWERED: one flatten instant is ONE observation, and her ledger holds exactly one
 
 **Eamon, 3-Sep: *"Mum doesn't appear to be trading properly"*** → *"Yes I like
