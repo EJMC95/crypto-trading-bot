@@ -153,6 +153,23 @@ jobs:
       - name: Does the declared live roster still match the live feed?
         run: python3 scripts/audit_live_roster.py --pnl-json pnl.json
 
+      # [(xz)] THE LEVERAGE BAND'S LIVE ARM, and it is the only arm that can
+      # see anything. A book's gross is a Railway SERVICE ENV; the repo cannot
+      # read it, so the source arm scores code defaults (gross 1.0) and would
+      # have passed every day 🙏 avo ran 5.3x against a -10% stop while 64% of
+      # her closes were daily-loss flattens. Placed here for the same reason as
+      # the roster arm directly above: this job already fetches the feed and
+      # already fails on a dark one.
+      #
+      # THIS STEP EXISTS BECAUSE ITS ABSENCE SHIPPED. `(xz)` asserted, in the
+      # script's own docstring AND its changelog entry, that the live arm
+      # "rides the weekly assessment like audit_code_currency does" — and it
+      # was wired nowhere. Eamon asked "if it was correct will it still be?",
+      # which is how it was found. A defense that lives only in prose is a
+      # defense that has not been written ((tt)/I21).
+      - name: Is any live book outside its leverage band?
+        run: python3 scripts/audit_leverage_band.py --pnl-json pnl.json
+
       # [2026-08-16 (pb)] CI COVERAGE — the two workflows disagree about a
       # burst of pushes and the disagreement is silent: Tests cancels
       # in-progress runs, Railway Redeploy does not. Measured 16-Aug over 4

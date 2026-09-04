@@ -65,7 +65,32 @@ from the payload.
 require the guard to flag it. A guard that cannot see the incident it was built
 for is decoration.
 
-16 tests, **7/7 mutations red** — and one of them nearly escaped for a reason
+**[EXTENDED 3-Sep — Eamon: *"If it was correct will it still be?"*, which is
+the right question and found a real gap in the hour-old guard.]** The honest
+answer is that correctness DECAYS, and this fleet has the receipt: `(sr)`'s
+ceiling was correct, was made an env, and nothing replaced it as a report. So
+the question is not *is it correct* but *what would have to happen for it to
+stop, and does anything notice*. Three vectors, now pinned:
+1. **The live arm ran nowhere.** This entry and the script's own docstring both
+   asserted it *"rides the weekly assessment like `audit_code_currency` does"*
+   — **and it was wired into no workflow at all.** The source arm scores code
+   defaults (gross 1.0) and would have passed every day 🙏 avo ran 5.3x. Now
+   actually a step in `fleet-weekly-assessment.yml`, pinned by a test.
+2. **`DECLARED` could grow silently.** A guard whose exemption list expands on
+   demand reports OK forever — ratcheted at 2, so a third is a deliberate act.
+3. **A green SOURCE arm reads as a verdict on the live books.** It is not, and
+   the script must say so where a reader hits it.
+
+**AND THE PINNING TESTS THEMSELVES FAILED TWICE, both times passing for the
+WRONG REASON** — recorded because it is the same lesson one level up:
+`"test -s pnl.json" in wf` was satisfied by an occurrence **inside a comment**
+(the string appears 4x, in 3 jobs and one comment), and
+`any("--pnl-json pnl.json" in r for r in runs)` was satisfied by
+`audit_code_currency`'s step in the SAME job while the band's own step pointed
+at `/nope.json`. Both now read the workflow STRUCTURALLY through YAML and
+assert against the band's own line. Neither would have been found by re-reading.
+
+20 tests, **11/11 mutations red** — and one of them nearly escaped for a reason
 worth recording: the ceiling mutation `D/s -> D*s` is **SIZE-PRESERVING**, so
 Python served a stale `__pycache__` and the test passed against bytecode the
 source no longer contained. **A mutation harness that does not clear the
