@@ -446,10 +446,18 @@ LEVERS = {
     # The xp.* twin steers ONLY her SHADOW arm (zero real money); the live.*
     # twin is written ONLY by the judge after the paired bar (>=7d, >=30
     # shadow closes, live >=10, beats live by >=0.5pp AND both halves).
+    #: [(ya)] env default 36 -> 38 with the carrier's own code default, so the
+    #: registry keeps describing what the consumer RUNS. `audit_lever_bounds`
+    #: checks exactly that, and a registry that misdescribes the running value
+    #: is worse than none — every organ reasoning about headroom would reason
+    #: from the wrong number. The default now sits AT `hi`, so the rail may
+    #: only TIGHTEN from here; that is deliberate and measured (42 reads
+    #: +0.104%/trade against 38's +0.319, so there is nothing above 38 worth
+    #: reaching for) rather than an accident of the cage.
     "xp.mum.rsi_max": {
         "kind": "float", "lo": 28.0, "hi": 38.0, "lane": "lighter-xp",
-        "note": "👩 mum shadow twin's RSI entry bar; env default 36 (MUM_RSI_MAX)",
-        "env_default": 36.0},
+        "note": "👩 mum shadow twin's RSI entry bar; env default 38 (MUM_RSI_MAX)",
+        "env_default": 38.0},
     "xp.mum.max_hold_min": {
         "kind": "float", "lo": 720.0, "hi": 2880.0, "lane": "lighter-xp",
         "note": "👩 mum shadow twin's max hold (minutes); env default 1440",
@@ -479,10 +487,11 @@ LEVERS = {
         "note": "👩 mum LIVE dip-velocity ceiling — judge-promoted only; "
                 "env default 999 (inert)",
         "env_default": 999.0},
+    #: [(ya)] 36 -> 38, tracking the carrier — see the xp twin above.
     "live.mum.rsi_max": {
         "kind": "float", "lo": 28.0, "hi": 38.0, "lane": "lighter-live",
-        "note": "👩 mum LIVE RSI entry bar — judge-promoted only; env default 36",
-        "env_default": 36.0},
+        "note": "👩 mum LIVE RSI entry bar — judge-promoted only; env default 38",
+        "env_default": 38.0},
     "live.mum.max_hold_min": {
         "kind": "float", "lo": 720.0, "hi": 2880.0, "lane": "lighter-live",
         "note": "👩 mum LIVE max hold (minutes) — judge-promoted only; default 1440",

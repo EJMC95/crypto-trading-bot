@@ -948,7 +948,12 @@ LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      # [(wv)] 👩 mum's twins: a LOWER rsi bar admits fewer
                      # entries (tighter = down); a SHORTER hold is tighter
                      # (down). Env defaults from lighter_family_bot's class.
-                     "live.mum.rsi_max": (36.0, "down"),
+                     # [(ya)] 36.0 -> 38.0, tracking the carrier's own class
+                     # default (see lighter_family_bot.OversoldRebound). The
+                     # selftest below DERIVES this from that source, so the
+                     # two cannot drift; the direction ("down" = tighter) is
+                     # unchanged and is what the release paths consume.
+                     "live.mum.rsi_max": (38.0, "down"),
                      "live.mum.max_hold_min": (1440.0, "down"),
                      # [(xl)] the dip-velocity band. A HIGHER floor demands a
                      # faster fall and a LOWER ceiling rejects more violent

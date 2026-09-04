@@ -257,7 +257,11 @@ def main():
         for k in tot:
             tot[k] += b[k]
     n = sum(tot.values()) or 1
-    for k, lbl in (("rsi", "RSI >= 32 only"),
+    # [(ya)] DERIVED, not retyped. This label read "RSI >= 32" while the row
+    # beside it was computed at `live_bar()` — 36 since (ve) — under a header
+    # that says "read from the carrier, not retyped". A stale label on a
+    # correct number is how the wrong knob gets moved.
+    for k, lbl in (("rsi", f"RSI >= {live_bar():g} only"),
                    ("trend", "in an UPTREND only (e50>e200)"),
                    ("both", "both terms fail")):
         print(f"  {lbl:<34}{tot[k]:>9,} bars {100.0*tot[k]/n:>6.1f}%")

@@ -1031,7 +1031,8 @@ _LAST_REJECT = {}
 
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
-                strategy=None, uptrend=None, enter=None, last_reject=None):
+                strategy=None, uptrend=None, enter=None, last_reject=None,
+                enter_bar=None, bb=None):
     """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
     directional row.
 
@@ -1093,7 +1094,47 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 out["outside_uptrend_n"] = sum(
                     1 for u in uptrend.values() if not u)
             if enter:
-                out["both_terms_n"] = sum(1 for e in enter.values() if e)
+                # [(ya)] COUNTED AT THE PUBLISHED BAR, never across bars. Each
+                # `enter` is stamped with the RSI_MAX it was computed under;
+                # only stamps equal to the `rsi_bar` printed beside it are
+                # counted, so `both_terms_n` and `rsi_bar` can no longer
+                # disagree. The rest are surfaced as `both_terms_stale_n`
+                # rather than dropped — a widening is priced off this number,
+                # so "I cannot vouch for 1 of these" must be visible, not
+                # silently rounded to either answer. An unstamped verdict
+                # (pre-upgrade state, or a non-numeric bar) is STALE by
+                # construction. No gate reads any of it.
+                fresh = stale = 0
+                for _sym, _e in enter.items():
+                    if not _e:
+                        continue
+                    _b = enter_bar.get(_sym) if enter_bar else None
+                    if (rsi_bar is not None and isinstance(_b, (int, float))
+                            and float(_b) == float(rsi_bar)):
+                        fresh += 1
+                    else:
+                        stale += 1
+                out["both_terms_n"] = fresh
+                if stale:
+                    out["both_terms_stale_n"] = stale
+    except Exception:  # noqa: BLE001 — a gauge must never break a live loop
+        pass
+    # [(ya)] 🙏 avo's BB DIP TERM — the conjunct that actually binds her in a
+    # rally, and the reason her row could say `no_signal: 39` with the RSI half
+    # visibly MET and explain nothing. `bb_dist_pct` is 100*(c/bb_lo-1): the
+    # term PASSES below 0, so `bb_min` is the closest coin to entry (mirroring
+    # `rsi_min`) and `bb_below_n` is how many satisfy it outright. ABSENT, never
+    # zero, on no readings — a fabricated `bb_min: 0.0` reads as a coin sitting
+    # exactly ON the band, the loudest possible signal from no data (the (st)
+    # `rsi_min: 0.0` trap, I8). REPORTED: no gate reads it.
+    try:
+        bvals = sorted(v for v in (bb or {}).values()
+                       if isinstance(v, (int, float)))
+        if bvals:
+            out["bb_min"] = round(bvals[0], 2)
+            out["bb_med"] = round(bvals[len(bvals) // 2], 2)
+            out["bb_read"] = len(bvals)
+            out["bb_below_n"] = sum(1 for v in bvals if v < 0.0)
     except Exception:  # noqa: BLE001 — a gauge must never break a live loop
         pass
     for key, ts in (("idle_open_h", last_open_ts),
@@ -1633,6 +1674,34 @@ def main(_ctx=None, once=False):
         last_enter = {str(k): bool(v)
                       for k, v in (state.get("last_enter") or {}).items()
                       if isinstance(v, bool)}
+        # [(ya)] THE BAR EACH `enter` WAS COMPUTED UNDER. `last_enter` is a
+        # CACHED verdict — the entry loop skips `S.signals()` on a candle it
+        # has already acted on — while `rsi_bar` is read FRESH from
+        # `S.RSI_MAX` at census time, AFTER `apply_book_levers` has run. So a
+        # `live.mum.rsi_max` lever that opens, moves or EXPIRES between candle
+        # passes leaves the two sampled at different bars, and the row
+        # contradicts itself. Measured on 👩 mum's REAL-MONEY row 4-Sep:
+        # `rsi_bar 36.0 · rsi_min 37.1 · both_terms_n 1` — no coin can pass a
+        # bar of 36 when the closest is 37.1, and one was counted as passing
+        # because its cached verdict was computed under a bar >= 37.2 that has
+        # since come down. Exactly the disagreement (vm) built `both_terms_n`
+        # to make impossible ("the census and the gate can never disagree
+        # about the cell") — prose could not enforce it because the two halves
+        # are sampled at different TIMES, which is (tt)'s lesson again.
+        last_enter_bar = {str(k): float(v)
+                          for k, v in (state.get("last_enter_bar") or {}).items()
+                          if isinstance(v, (int, float))}
+        # [(ya)] 🙏 avo's BINDING term, which had no gauge at all. Her rule is
+        # `e50>e200 AND rsi<42 AND close<lower-Bollinger AND v>0`; (st)/(vm)
+        # gauged RSI and the trend half, and the BB dip — the one that
+        # actually binds in a rally — was computed by `signals()` and thrown
+        # away. Measured 4-Sep: `rsi_min 34.4` against `rsi_bar 42.0` (the RSI
+        # half MET) beside `verdicts {no_signal: 39}`, with nothing on the row
+        # able to say why. Same class as (vm) at the sibling book: gauge one
+        # conjunct while a different one binds and no widening can be priced.
+        last_bb = {str(k): float(v)
+                   for k, v in (state.get("last_bb") or {}).items()
+                   if isinstance(v, (int, float))}
         last_open_ts = [float(state.get("last_open_ts") or 0.0)]
         # [(vn)] the StoplossGuard/MaxDrawdown LATCH, restored like the family
         # Book's `guard_until`. A list so the publish helper's closure sees the
@@ -1866,6 +1935,12 @@ def main(_ctx=None, once=False):
                 # and is persisted precisely so the row can answer BETWEEN
                 # candles. Blank-most-of-the-time is the worse failure.
                 "last_uptrend": last_uptrend, "last_enter": last_enter,
+                # [(ya)] the bar each cached `enter` was computed under, and
+                # 🙏 avo's BB gauge — persisted for the SAME reason as the two
+                # above: written only on a new candle, so an unrestored map
+                # blanks the row between candles. An absent stamp reads as
+                # stale, so a restart degrades to "unknown", never to a pass.
+                "last_enter_bar": last_enter_bar, "last_bb": last_bb,
                 "last_open_ts": last_open_ts[0],
                 "guard_until": guard_latch[0], "guard_cause": guard_latch[1],
                 "capital_adjust": {"total": round(capital_adjust, 2)}})
@@ -2322,7 +2397,8 @@ def main(_ctx=None, once=False):
                     entries_shut, last_open_ts[0],
                     (closed_win[-1].get("ts") if closed_win else None), t0,
                     strategy=S, uptrend=last_uptrend, enter=last_enter,
-                    last_reject=(_LAST_REJECT or None)),
+                    last_reject=(_LAST_REJECT or None),
+                    enter_bar=last_enter_bar, bb=last_bb),
                 # Advisory only: top liquid Lighter markets this arm is not
                 # currently scanning (for measured universe-evolution reviews).
                 "evolve": {
@@ -3031,6 +3107,25 @@ def main(_ctx=None, once=False):
                     last_uptrend[sym] = sig["uptrend"]
                 if sig is not None:
                     last_enter[sym] = bool(sig.get("enter"))
+                    # [(ya)] stamp the bar this verdict was computed under, in
+                    # the SAME pass off the SAME strategy object the rule just
+                    # ran on. The census counts only verdicts stamped at the
+                    # bar it publishes, so a lever move can no longer make the
+                    # row disagree with itself. A bar that is not a number is
+                    # left UNSTAMPED and the census reads that as stale — never
+                    # as current (I8: no fabricated pass on the term a widening
+                    # is argued from).
+                    _bar_now = getattr(S, "RSI_MAX", None)
+                    if isinstance(_bar_now, (int, float)):
+                        last_enter_bar[sym] = float(_bar_now)
+                    else:
+                        last_enter_bar.pop(sym, None)
+                # [(ya)] 🙏 avo's BB dip term. `bb_dist_pct` is 100*(c/bb_lo-1),
+                # so the conjunct is MET at < 0 (close below the lower band).
+                # Only SwingDip returns it, so this scopes itself to her
+                # without a new carrier flag.
+                if sig and isinstance(sig.get("bb_dist_pct"), (int, float)):
+                    last_bb[sym] = float(sig["bb_dist_pct"])
                 if not sig or not sig.get("enter"):
                     # [2026-08-26] the ONE census owner: 👩 mum's sub-bar RSI
                     # refused by the NOT-uptrend half now reads

@@ -20,6 +20,7 @@ identity forms, and pin the (vh) rule that the two arms share one env var.
 """
 import ast
 import os
+import pathlib as _p
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -40,16 +41,18 @@ def _clear_block(src):
 def test_the_live_arm_reads_the_same_env_var_as_the_family():
     """(vh): one tool, one name. A second env var for the same concept is a
     second rule, free to drift."""
-    live = open(LIVE).read()
+    # [(ya)] read via pathlib — a bare `open().read()` leaks the handle and
+    # the repo's own ratchet counts it (test_no_leaked_file_handles).
+    live = _p.Path(LIVE).read_text()
     assert 'os.environ.get("FAMILY_CLEAR_GUARD"' in live
-    assert 'FAMILY_CLEAR_GUARD' in open(FAMILY).read()
+    assert 'FAMILY_CLEAR_GUARD' in _p.Path(FAMILY).read_text()
 
 
 def test_the_clear_is_guarded_by_a_once_per_process_sentinel():
     """The load-bearing line. Without `not _GUARD_CLEAR_DONE` in the SAME test
     as the env check, a set env var re-clears every loop and the rails are off.
     Asserted on the AST so a refactor cannot satisfy it with a comment."""
-    node = _clear_block(open(LIVE).read())
+    node = _clear_block(_p.Path(LIVE).read_text())
     assert node is not None, "the clear site is gone from the live arm"
     cond = ast.unparse(node.test)
     assert "_GUARD_CLEAR_DONE" in cond and "not " in cond, cond
@@ -81,7 +84,7 @@ def test_both_identity_forms_are_accepted_and_the_match_is_exact():
 def test_the_clear_logs_what_it_cleared():
     """(vg): an unlock nobody can see is how a protection goes missing
     quietly. The log must carry the cause and the deadline it dropped."""
-    node = _clear_block(open(LIVE).read())
+    node = _clear_block(_p.Path(LIVE).read_text())
     body = "\n".join(ast.unparse(s) for s in node.body)
     assert "FAMILY_CLEAR_GUARD" in body
     assert "guard_latch[1]" in body and "guard_latch[0]" in body
@@ -91,7 +94,7 @@ def test_the_env_default_is_off():
     """Unset env ⇒ empty set ⇒ no bot matches ⇒ the latch stands. The tool is
     opt-in per (vg); a default that cleared anything would be a standing
     bypass of a live protection."""
-    node = _clear_block(open(LIVE).read())
+    node = _clear_block(_p.Path(LIVE).read_text())
     # find the _clear assignment just above: it must default to ""
     src = open(LIVE).read()
     assert 'os.environ.get("FAMILY_CLEAR_GUARD", "")' in src

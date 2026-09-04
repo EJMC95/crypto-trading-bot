@@ -172,7 +172,26 @@ def test_the_oversold_threshold_is_genuinely_DEEP():
     # below must still be REFUSED, so "widen to 95" fails here exactly as
     # before. What moved is the number he chose; what did not move is that the
     # bar cannot quietly become "buy anything falling".
-    assert s.RSI_MAX <= 36, "an entry bar above 36 is no longer 'oversold'"
+    # [2026-09-04 (ya)] CEILING RAISED 36 -> 38 on Eamon's "widen slightly",
+    # the day the regime flipped (`regime_oracle`: risk-on uptrend, n_long 9 /
+    # n_short 0) and her RSI floor across 94 coins sat at 37.1 against a bar of
+    # 36 — she could not buy anything, anywhere. Priced first over 60d of her
+    # real universe through her real bracket: bar 38 reads +0.319%/trade over a
+    # random-entry null at t=4.48, and every bar 28-42 clears that null, so the
+    # widening does not destroy the edge. THE GUARD'S PURPOSE IS UNCHANGED AND
+    # STILL BITES: the fixture above is a MILD rsi 40-65 reading and is still
+    # refused at 38, so "widen to 95" — buy anything falling — fails here
+    # exactly as it did at 30, 32 and 36.
+    #
+    # AND THE HEADROOM IS NOW ALMOST GONE, which is worth saying out loud
+    # rather than discovering at the next bump: this fixture's floor is rsi 40,
+    # so **38 is very nearly the highest bar at which this guard can bite at
+    # all** — at 40 it would pass vacuously while asserting nothing. The cage
+    # `hi` is also 38. A future session that wants a wider bar must move the
+    # FIXTURE (and justify a genuinely milder cell) rather than only this
+    # number, or the guard becomes decoration. The measurement agrees there is
+    # nothing up there: 42 reads +0.104%/trade against 38's +0.319.
+    assert s.RSI_MAX <= 38, "an entry bar above 38 is no longer 'oversold'"
 
 
 def test_the_widened_band_actually_admits_its_cell():

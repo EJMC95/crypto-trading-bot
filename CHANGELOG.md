@@ -1,3 +1,156 @@
+## 2026-09-04 (ya) — "BOTS AREN'T TRADING": NOTHING WAS BROKEN, THE REGIME FLIPPED — and both gauges built to say so were themselves defective
+
+**Eamon, 4-Sep: *"Bots aren't trading."*** They were. 11 of 16 books were
+holding positions, 14 of 16 had closed a trade inside 24h, and the real money
+read **+$93.82**. What was true is that both LIVE books were empty-ish and
+neither row could say WHY — which is the I18 failure, not a trading failure.
+
+**THE ANSWER IS THE REGIME, AND IT RETIRES A CAVEAT THIS FILE HAS CARRIED SINCE
+JULY.** Item 18 says *"Lighter's tape is ONE falling-BTC regime (BTC −32.9%)"*
+and that the only on-venue source of anything else is the non-crypto books.
+Measured 4-Sep from `regime_oracle`, an organ independent of the books' own
+census: **`fleet: "risk-on uptrend", n_long 9, n_short 0`**, BTC **$81,217
+against an ema200 of $72,138 (+12.6%)**, ADX 44–51 on BTC/ETH/SOL/BNB. Both
+live books are LONG-ONLY DIP BUYERS, starved through different conjuncts:
+👩 mum needs `RSI<36 AND **NOT** uptrend` (RSI floor across her 94 coins:
+**37.1** — nothing oversold); 🙏 avo needs `uptrend AND rsi<42 AND
+close<lower-Bollinger` (RSI met at 34.4, the **BB dip** is what refuses).
+`audit_stuck_vs_slow --samples 3` returns **REFUSING — "its gate is working,
+not broken"** for both. No fix is owed to a book that is correctly declining to
+buy a market with no dips in it.
+
+**A NEAR-MISS WORTH RECORDING: mum's row looked FROZEN** — `updated_at` static
+for 4+ minutes while avo republished every 60s — and that reads exactly like a
+dead real-money writer. It is `LOOP_SECONDS = 300`. She ticked on schedule. The
+check that settles it is the code, not another sample; a false "your live book
+is dead" is the cry-wolf this file already pays for elsewhere.
+
+### THE TWO GAUGES THAT COULD NOT ANSWER THE QUESTION THEY EXIST FOR
+
+**1 · `both_terms_n` DISAGREED WITH THE BAR PRINTED BESIDE IT — on the
+real-money row.** 👩 mum published `rsi_bar 36.0 · rsi_min 37.1 ·
+both_terms_n 1`. **No coin can pass a bar of 36 when the closest is 37.1**, yet
+one was counted as passing. Root cause, from the code and not from a guess:
+`last_enter` is a **CACHED** verdict — the scan loop `continue`s before
+`signals()` on a candle it has already acted on — while `rsi_bar` is read
+**FRESH** off `S.RSI_MAX` at census time, **after `apply_book_levers` has run
+every loop** (`lighter_avo_live_bot.py:2696`). A `live.mum.rsi_max` lever that
+opens, moves or **EXPIRES** between candle passes leaves the two sampled at
+different bars. `(vm)` built this field so *"the census and the gate can never
+disagree about the cell"* — **prose could not enforce it, because the two
+halves are sampled at different TIMES.** `(tt)`'s lesson exactly: a defense
+that lives only in prose has not been written.
+It costs **no trades** (the real gate recomputes fresh each candle) — it
+corrupts *the number a widening is priced from*, which is what `(vm)` built it
+for, and a widening was being priced off it the same hour.
+FIXED: each `enter` is stamped with the `RSI_MAX` it ran under, in the same
+pass off the same strategy object; the census counts **only** stamps equal to
+the bar it publishes and surfaces the rest as **`both_terms_stale_n`** rather
+than folding them into either answer. Unstamped (restored pre-upgrade state, or
+a non-numeric bar) reads STALE, never a pass — I8, on the exact term a widening
+is argued from. The shipped rule stays the only source of the verdict, so this
+adds no second copy of the rule ((hj)).
+
+**2 · 🙏 avo's BINDING TERM HAD NO GAUGE AT ALL.** Her rule carries four
+conjuncts; `(st)`/`(vm)` gauged RSI and the trend half, and the **BB dip** —
+the one that actually binds in a rally — was computed by `signals()` and thrown
+away on both arms. So her row could print `no_signal: 39` with the RSI half
+visibly MET and explain nothing. SHIPPED: `bb_min` / `bb_med` / `bb_read` /
+`bb_below_n` off the rule's own `bb_dist_pct` (passes below 0; the comparison
+is STRICT, so a close sitting exactly ON the band does not enter). ABSENT never
+zero on no readings — a fabricated `bb_min: 0.0` reads as a coin sitting on the
+band, the loudest possible signal from no data (the `(st)` `rsi_min: 0.0`
+trap). Both gauges are **REPORTED**: no gate reads either.
+
+**BOTH ARMS, ONE COMMIT.** `(vh)` is the standing lesson that a fix verified in
+one file and shipped without asking which arm executes it reaches the $1,000
+shadow and not the real money — which is what happened to `(vm)` itself. Pinned
+by `tests/autonomy/test_census_bar_and_bb.py`, **9 mutations verified red**.
+**Two of those mutations survived the first round and both were my own test's
+fault, in the two shapes this file already names:** a `bb_below_n` boundary
+never exercised (no coin sat exactly ON the band), and — worse — a
+**page-wide substring scan** for `last_enter_bar` that a mutation DELETING the
+write survived, because the name still appears in the init, the persist dict
+and the census call. That is this file's own rule ("a page-wide substring scan
+is not a structural claim") reproduced inside the guard written to enforce it.
+Now on the AST: a write is a Subscript in Store context, nothing else counts.
+
+### AND THE INSTRUMENT THAT PRICES THE WIDENING HAD A RETYPED CONSTANT
+`study_mum_reachability`'s blocking-term table printed **"RSI >= 32 only"**
+under a header that says *"read from the carrier, not retyped"*, while the
+number beside it was computed at `live_bar()` — **36** since `(ve)`. The
+numbers were right and the label was two years of drift away from them. Derived
+now. A stale label on a correct number is how the wrong knob gets moved.
+
+### THE WIDENING, PRICED
+Eamon: *"widen slightly."* Measured over **60d of her real 23-coin universe**
+through her REAL bracket, episodes not bars, against a random-entry null
+((hm)):
+
+| bar | eps/day | edge %/trade vs null | t | **edge %-units/DAY** |
+|---|---|---|---|---|
+| 32 | 4.67 | +0.495 | 5.42 | 2.312 |
+| 35 | 6.60 | +0.204 | 4.14 | 1.346 |
+| **36 (shipped, interp.)** | 7.30 | +0.242 | — | **1.769** |
+| **38 (cage ceiling)** | **8.70** | **+0.319** | **4.48** | **2.775** |
+| 42 | 11.40 | +0.104 | 4.19 | 1.186 |
+
+**Every bar from 28 to 42 beats the null at t ≥ 3.9**, so widening does not
+destroy the edge. **Per-trade edge is the wrong statistic for a supply
+change**: 36 → 38 is **1.19× the supply at 1.57× the total daily edge**. And
+the sweep's own binding-term check answers the question it exists to ask —
+at the shipped bar the RSI term is implicated in **95%** of blocked bars
+(43.7% RSI-only + 51.3% both) against **5.0%** for the trend term alone — so
+**the RSI bar is the right knob**, which is the one thing that would have made
+this whole sweep meaningless if it had gone the other way.
+**STATED HONESTLY: the 35-vs-38 ordering is inside the noise of the null**; what
+is robust is that the whole band clears it. This is bought as **DECIDABILITY**
+first ((ty)'s framing, I26) — her gate verdict is `undecidable · ~133d at the
+measured rate` — with expectancy measured not to deteriorate.
+
+### CARRIED, NOT ACTED ON — THE JUDGE'S EXPERIMENT IS STALLED, AND SO IS ITS DIAGNOSIS
+`xp-judge` reads `phase: running`, candidate **`mum-rsi-32`**, and its own last
+eval says **`"ARM NOT APPLYING: 0/3 shadow closes carry a receipt for
+{xp.mum.rsi_max: 32.0}"`, `arm_skew: true`.** That reads as broken plumbing and
+is very likely the drought: mum's shadow twin **last opened 26h ago**, before
+the experiment started (03-Sep 02:52Z), so no close CAN carry the receipt yet.
+**`0/N carry a receipt` is byte-identical between "the lever is not reaching the
+arm" and "the arm has not opened a position since the lever was set"** — the
+I1/I18 ambiguity, sitting on the fleet's only path from shadow evidence to real
+money, the lane `(xd)` unjammed six days ago. NOT fixed here (it is the judge's
+own lane and deserves its own measurement); recorded so it is not re-found.
+Note the shape: **the judge's candidate is TIGHTER (32) than the bar being
+widened**, and on this tape 32 is the best per-trade cell while 38 is the best
+per-DAY cell. Those are not in conflict, and a reader should not resolve them
+by moving a bar.
+
+### SHIPPED
+* `MUM_RSI_MAX` code default **36 → 38** + the matching `env_default` on BOTH
+  `xp.mum.rsi_max` and `live.mum.rsi_max`. The registry moves WITH the carrier
+  because `audit_lever_bounds` checks exactly that, and *"a registry that
+  misdescribes the running value is worse than none"*. Verified first that
+  `MUM_RSI_MAX` is **not set** on the `mum-live` service — had it been, the
+  code default would have moved nothing, silently. NOT done as a Railway env
+  var for the same reason: the guard cannot see Railway, so it would have
+  stayed green while the registry lied. The default now sits AT the cage `hi`,
+  so the rail may only TIGHTEN from here — deliberate, because 42 measures
+  +0.104%/trade against 38's +0.319 and there is nothing above 38 worth
+  reaching for.
+* `both_terms_n` counted at the published bar + `both_terms_stale_n`; 🙏 avo's
+  `bb_*` gauge — both arms, `tests/autonomy/test_census_bar_and_bb.py`,
+  9 mutations red.
+* `study_mum_reachability`'s blocking-term label derived from `live_bar()`.
+* One pre-existing bare `open()` retired from `test_live_clear_guard.py`: the
+  leaked-handle ratchet was **already red on clean HEAD at 51/50** before this
+  branch (verified by stashing). Not mine, cheap to shrink, and the ratchet's
+  own rule is that the backlog may only shrink — so it goes to 50 rather than
+  riding along as someone else's red.
+
+**WHAT DID NOT MOVE, and why:** 🙏 avo's cell. Her binding term is the BB dip
+and it has **no lever, no cage and no measurement** — the gauge shipped here is
+the prerequisite for pricing one, not a licence to move it. I19: a widening
+with no number is not covered by any grant.
+
 ## 2026-09-04 (xy) — THE PRE-REGISTERED READ ON A REAL-MONEY BOOK COUNTED ONE HALT AS EIGHT INDEPENDENT DRAWS: `(xv)`'s own rule, one day old, and the docket that decides could not consume it
 
 **Found by the daily review, in the instrument's own output.** 👩 mum's LIVE
