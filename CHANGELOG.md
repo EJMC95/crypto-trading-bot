@@ -1,3 +1,81 @@
+## 2026-09-04 (ye) — THE JUDGE ACCUSED AN ARM THAT WAS BEHAVING PERFECTLY: a receipt stamped at ENTRY cannot be carried by a position opened before the lever
+
+**Found while answering Eamon's *"bots are still not trading"*, and it had
+frozen the fleet's ONLY path from shadow evidence to real money.**
+
+`xp-judge` read `phase: running`, candidate **`mum-rsi-32`**, and its own last
+eval said:
+
+> `ARM NOT APPLYING: 0/3 shadow closes carry a receipt for {"xp.mum.rsi_max":
+> 32.0} — the arm is not running this experiment`, `arm_skew: true`
+
+That is an accusation of BROKEN PLUMBING, and it holds the queue: `arm_skew`
+deliberately does not age a candidate toward ABANDONED, because "the experiment
+never happened" is not the candidate's fault. **It never happened for the
+opposite reason.**
+
+**THE MECHANISM.** `extra.bars` — the proof-of-application receipt — is stamped
+at **ENTRY** (`mum_bars`, copied to the close row). `arm_trades` filters on
+**`close_ts`**. So a position OPENED before the lever was applied and CLOSED
+inside the window is counted in the denominator **and can never carry the
+receipt, however faithfully the arm is running.** Measured 4-Sep: 👩 mum's
+shadow last OPENED a position ~26h before the read — i.e. before the experiment
+began at 03-Sep 02:52Z. All three closes were of pre-experiment positions. The
+arm was applying `rsi_max=32` perfectly and had simply had nothing to buy: the
+regime drought of `(ya)`/`(yb)`, reported as a broken arm.
+
+**`0/N` was byte-identical between "the lever is not reaching the arm" (a real
+defect, and the only thing this gate should ever hold the queue for) and "the
+arm has not OPENED anything since the lever was set" (a drought, which no code
+change fixes).** The I1/I18 ambiguity, sitting on the promotion lane.
+
+**FIXED** by giving the denominator the only closes that COULD vouch:
+`arm_trades` gains an additive `opened_after=` (default None — every existing
+caller unchanged, which matters because the LIVE control arm's rows predate the
+receipt entirely), and `arm_skew` now counts closes **opened after the lever
+was set**. When closes exist but none were opened under the lever, the verdict
+says so plainly — `"no receipted closes yet: 3 close(s) in window, 0 opened
+since the lever was set"` — and the candidate ages normally instead of being
+accused. An UNREADABLE open stamp is DROPPED, never admitted at the boundary
+(I8: unknown is "no evidence", not "the arm is deaf").
+
+Pinned in the judge's own selftest AND
+`tests/autonomy/test_judge_receipt_and_live_census.py`; **8 mutations verified
+red**, including the positive control (an arm that DID open and still stamped
+nothing is still caught — a gate that cannot fire is worthless) and one that
+survived the first round: flipping `opened_after`'s default from `None` to
+`0.0` leaves the filter permanently on, which silently drops every
+unreadable-stamp row from EVERY bar in the promotion path. Now pinned.
+
+## 2026-09-04 (yf) — THE 24h DENOMINATOR EXISTED ONLY ON THE PAPER BOOKS
+
+`(vm)` built `census_24h` — the scan census summed over a day, so a refusal
+finally has a denominator — and shipped it into `lighter_family_bot`. **The
+live arms run `lighter_avo_live_bot`.** So the instrument reached every $1,000
+shadow and not one row holding real money: the `(vh)` class again, and `(vm)`'s
+own entry had already been bitten by it once.
+
+**Measured 4-Sep, diagnosing why both live books had stopped:** 👩 mum's SHADOW
+published the entire answer — `both_terms_n: 36`, `stale_candle: 11594`,
+`no_signal: 2313`, every refusal bucket summed over 149 loops with `loops` and
+`hours` beside them — and **her LIVE row published nothing at all.** The
+question had to be answered on the paper twin and inferred across to the real
+money, which is exactly backwards.
+
+`no_signal: 94` on ONE loop and on 300 of them are the same integer and
+opposite facts; without the series a live row can only ever publish the first.
+**SHIPPED:** the live host now snapshots its scan census every loop and
+publishes the rollup, read back from `payload["scan"]` so the series and the
+published field are the same census by construction ((hj)). Keyed on the BARE
+row id — the rails census lives under `<row>:rails`, and pooling the two would
+make both meaningless. Dark history OMITS the key rather than publishing zeros
+(a zero-filled census reads as "300 loops, nothing refused", the loudest
+possible claim from no data); the rollup carries its own `age_s`, because a
+cache that quietly froze would be I1 living inside the instrument built to
+answer I18; and it can never raise into a live trading loop.
+
+Both are PUBLISH-ONLY: no gate reads either, and no trade changes.
+
 ## 2026-09-04 (yd) — A LIVE BOOK CAN STOP TRADING AND NOTHING PAGES: publisher liveness was covered, BOOK liveness was not
 
 **Eamon asked *"bots aren't trading"* THREE TIMES on 4-Sep**, and the reason he
