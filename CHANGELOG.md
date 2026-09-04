@@ -1,3 +1,71 @@
+## 2026-09-04 (yb) — THE TREND SLEEVE IS REFUTED, AND IT WOULD NOT HAVE HELPED EITHER: both halves of 👩 mum's cell went to zero on the same two days
+
+**Eamon, 4-Sep, twice: *"Bots are still not trading."*** He was right both
+times, and the second time the answer was not the one `(ya)` gave.
+
+**WHAT `(ya)` ESTABLISHED AND WHAT IT MISSED.** It measured her config as the
+optimum of everything reachable (bar 38 = 2.78 %-units/day vs 2.31 at 32, 1.19
+at 42, 1.43 with the trend term dropped) and concluded "the market has no
+dips". True, and insufficient: it quoted a 14d/30d average of ~5.5 entries/day
+while the live book sat 28h idle, and **did not reconcile the two**. A daily
+bucket does:
+
+| 08-31 | 09-01 | 09-02 | 09-03 | 09-04 |
+|---|---|---|---|---|
+| 14 | 13 | **19** | **0** | **0** |
+
+**Her cell fired 19 times on 2-Sep and exactly zero since — a CLIFF, not a dry
+spell**, matching her idle to the hour. An average over 60 days cannot see a
+two-day cliff, and quoting one as reassurance is how a stalled book gets left
+alone. *(My own first cut of that bucket used a `Counter`, which has no key for
+a zero day, so `sorted()` silently skipped 09-03 and 09-04 and the tail read
+"accelerating, 13.2/day". The zero days were the entire finding.)*
+
+**THE PROPOSED FIX, AND ITS REFUTATION.** Her rule refuses the one thing the
+tape offers — a coin oversold INSIDE an uptrend (live census: `uptrend_blocked:
+1` against `rsi_min 36.5 < bar 38.0`). Eamon chose to build that counterpart as
+a second sleeve. Measured first (`scripts/study_mum_trend_sleeve_2026-09-04.py`,
+60d, her own 1h tape, her REAL bracket via the reachability study's own `walk`
+so no second copy of the exit rule, vs a matched random-entry null):
+
+| cell @ bar | mean %/trade | t | edge vs null |
+|---|---|---|---|
+| SHIPPED not-uptrend @38 | +0.268 | +4.52 | **+0.172** |
+| proposed uptrend @32 | +0.009 | 0.09 | **−0.072** |
+| proposed uptrend @35 | −0.090 | −0.97 | **−0.142** |
+| proposed uptrend @38 | −0.082 | −1.06 | **−0.135** |
+| proposed uptrend @42 | −0.204 | −2.80 | **−0.160** |
+
+**NEGATIVE AGAINST THE NULL AT EVERY BAR**, significantly so at 42; 10 of 23
+coins positive; ex-best-coin −0.140%. This is `(qu)`'s finding reproduced on a
+second book — the `e50>e200` direction was measured ACTIVELY DESTRUCTIVE on
+🙏 avo, and it was carried here as a WARNING rather than a verdict (applying one
+book's evidence to another's cell is the `(lk)` error). The warning was right.
+
+**AND THE SECOND HALF IS THE ONE THAT SETTLES IT: the proposed cell fired ZERO
+on 09-03 and 09-04 TOO.** Both halves of the conjunction went dark together, so
+the drought is not a mis-pointed trend term — **nothing in her universe has been
+oversold in either trend state** (`rsi_med` 59 across the venue). The sleeve
+would have added a money-losing cell that is idle exactly when she is idle:
+the worst of both, and invisible without the daily bucket.
+
+**REFUSED, and the refusal is the deliverable** — this is the permanent
+doctrine's "a refusal with evidence outranks enthusiasm, Eamon's and Lucy's
+alike". Nothing was shipped to a book; the instrument is, so the next session
+that has this idea meets the number instead of the idea.
+
+**WHAT THE EVIDENCE DOES SUPPORT, stated but NOT taken** (a policy change on a
+real-money book is Eamon's call, and it resets her 30-day era): the only cells
+demonstrably trading in this tape are on a **15-minute** clock — 🔮 georgia
+`daytrader-15m` and `impulse-fade-15m` each opened **7 in the last 24h**, same
+host, same image, same venue, same hour, while mum (1h) and 🙏 avo (4h) opened
+**0**. On 1h/4h a strong trend smooths the dips away; on 15m they survive.
+
+**ALSO FOUND, not fixed:** mum's LIVE row publishes **no `census_24h`** while her
+$1,000 shadow does — the 24h denominator exists on the paper book and not on the
+row holding real money, which is `(st)`'s own complaint recurring. It is what
+made this diagnosis possible on the shadow and impossible on the live arm.
+
 ## 2026-09-04 (ya) — "BOTS AREN'T TRADING": NOTHING WAS BROKEN, THE REGIME FLIPPED — and both gauges built to say so were themselves defective
 
 **Eamon, 4-Sep: *"Bots aren't trading."*** They were. 11 of 16 books were
