@@ -58,7 +58,6 @@ sys.path.insert(0, HERE)
 
 import tape_cache                                            # noqa: E402
 import lighter_family_bot as fam                             # noqa: E402
-from lighter_family_bot import ema_series, rsi_series        # noqa: E402
 # the venue-details loader, borrowed the way the reachability study borrows it
 # (one owner for order_book_details; no second copy of the fetch)
 import importlib.util                                        # noqa: E402
@@ -177,8 +176,8 @@ def episodes(bars, k):
     """Her SHIPPED cell with the BB line moved to `bb_lo * (1 + k)`.
     k=0 is the shipped rule byte-for-byte."""
     ts, c, h, lo, v = series(bars)
-    rsi = rsi_series(c, 14)
-    e50, e200 = ema_series(c, 50), ema_series(c, 200)
+    rsi = fam.rsi_series(c, 14)
+    e50, e200 = fam.ema_series(c, 50), fam.ema_series(c, 200)
     tp = [(h[j] + lo[j] + c[j]) / 3.0 for j in range(len(c))]
     out, armed = [], True
     for i in range(len(c)):
