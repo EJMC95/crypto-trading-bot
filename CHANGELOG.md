@@ -1,3 +1,218 @@
+## 2026-09-04 (yb) — "FLIP HER 'VIRTUAL' TRADE": THE NAIVE FLIP LOSES ON HER OWN RECORD, AND CHASING THE QUESTION FOUND THE JUDGE'S MUM LANE HAD NEVER APPLIED AN EXPERIMENT
+
+**Eamon, 4-Sep:** *"Mum should seize the opportunity to flip her 'virtual' -
+trade. Thoughts on her evolving to be able to change a long to a short if the
+percentage. And record why at this time, it did not go long while the others
+did, I see there is an opportunity for both safety and opportunity to combine
+here."*
+
+**'virtual' is a COIN.** 👩 mum was holding JTO, XAU, TRUMP and **VIRTUAL**,
+and VIRTUAL was her only red position — `-2.08%` against a `-4%` stop while the
+other three sat `+0.33 / +1.09 / +0.88%`. He spotted it by eye on the live row.
+
+### 1 · WHY VIRTUAL AND NOT THE OTHER THREE — AND HE FOUND (xl)'s EFFECT BY EYE
+
+All four are DOWN on the day; she is a dip buyer and she bought four dips. The
+difference is not WHICH dip, it is WHERE IN THE FALL she bought:
+
+| coin | day % | 24h vol | **entry @ % of day's range** | now @ range |
+|---|---|---|---|---|
+| XAU | −1.28 | $39.4M | **11.1%** | 47.1% |
+| TRUMP | −5.90 | $2.6M | **16.7%** | 22.9% |
+| JTO | −6.91 | $0.48M | **22.8%** | 24.1% |
+| **VIRTUAL** | **−7.10** | **$0.41M** | **38.9%** | **16.6%** |
+
+She caught the other three near the bottom of the day's range (11–23%) and
+bought VIRTUAL at **38.9% — more than twice as far up the fall**, on the
+thinnest book of the four, and it then made new lows. Her rule is
+`RSI(14,1h) < 38 AND NOT (e50>e200)`, and **RSI is a DEPTH measure: it says
+price is low and nothing about how it got there.**
+
+That is `(xl)`'s dip-velocity finding, measured two days earlier on 460d of her
+own tape — slow drift −0.076% (t −1.00) · 5-12 pts −0.027% · **12-20 pts
++0.309% (t +2.82)** · **violent 20+ pts −0.091% (t −0.66), "a repricing, keeps
+going"**. VIRTUAL is the violent corner. Eamon read one live position and
+landed on the effect the fleet had just measured on 460 days of tape.
+
+### 2 · AND THE REAL-MONEY ARM COULD NOT SAY SO, BECAUSE IT NEVER KEPT THE NUMBER
+
+`signals()` returns `vel` on EVERY scan whether or not the band is armed —
+`(xl)` was explicit about that. The **$1,000 shadow** published it
+(`vel_med 11.8 · vel_p90 22.5 · vel_read 95`). The row holding **real money**
+had **no `vel` field at all**: `lighter_avo_live_bot.scan_census` is a separate
+implementation and never captured it. So the quantity `(xl)` measured as
+carrying her information was computed every loop against real money and thrown
+away — **I23 at the arm that steers**, and the same shape `(ya)` had found in
+🙏 avo's BB term one wave earlier: gauge one arm, ship, and the other is blind.
+
+FIXED: `vel_census` is now ONE owner in `lighter_family_bot`, called by both
+hosts by IDENTITY ((hj)), and every entry on BOTH arms stamps `vel_entry` so
+the band can be graded from the **LEDGER** (I14) rather than only by a replay
+whose own author declared a **50x** gap to it.
+
+### 3 · THE FLIP ITSELF, MEASURED ON HER OWN RECORD — AND IT LOSES
+
+Exit attribution, live arm (n=72 over 10.2d):
+
+| exit | n | total | mean % | med hold |
+|---|---|---|---|---|
+| roi | 46 | **+$159.07** | +1.380 | 8.8h |
+| max_hold | 10 | −$26.36 | −0.877 | 24.0h |
+| daily_loss | 8 | −$43.13 | −1.920 | 8.3h |
+| **stop_loss** | **6** | **−$70.27** | **−4.301** | 5.9h |
+
+So the stop family is her largest dollar loss and the obvious flip trigger.
+**What happens AFTER it fires** (both arms, 12 stop events, paired to the
+fleet's next priced observation of the same coin, median lag **2.32h**):
+
+* **the coin goes UP +0.881% (n=10, t=+3.26)** — a flip-to-short at the stop
+  **loses ~0.9%/trade**. The stop fires at maximum oversold, which is the
+  bottom; flipping there sells it. That is her own thesis pointed at herself.
+* the `daily_loss` flatten is worse: **+0.956% at ~4.3h (n=5), +2.807% at 24h
+  (n=8)** — the forced flatten exits at the worst instant, corroborating the
+  `(xv)`/`(xy)` pre-registered halt-cost read from an independent direction.
+* the control: after her `roi` exits the coin drifts **−0.27% / −0.43%** — she
+  exits winners near local tops. Her exits are well-placed in BOTH directions.
+
+**DECLARED LIMITS, because they are the reason this shipped as an instrument
+and not as a trade:** n is 10–12 events; the "after" price is whenever any book
+next traded that coin, a SELECTED instant rather than a random one (the fleet's
+dominant shape is dip-BUYING, which biases the estimate DOWN and therefore
+makes the refutation conservative); and **the matched-window random-coin null
+was WITHDRAWN** — a random (coin, time) pair sits a median **29.4h** from its
+nearest prior price, so it priced a 29h return against a 6h signal. Quoting it
+would have been a fabricated excess. The definitive replay needs 1h candles and
+`/api/v1/candlesticks` answers **403** to every egress outside the container
+(already recorded in `study_mum_autopsy_2026-08-19.py`).
+
+### 4 · SO THE FLEET MEASURES IT FORWARD, AT ZERO COST — THE VIRTUAL FLIP LEDGER
+
+At every **loss-class** exit the book now records the SHORT it did not take,
+opened at its own exit price, and marks it at **6h and 24h** against a
+matched-window random-coin short — `(hm)` in mirror form, and mum's own control
+arm's exact machinery (`control_draw` is shared, not copied). Published every
+loop as `extra.flip`, including at n=0 (I18).
+
+**WHY THIS SHAPE AND NOT A REAL SHORT SIDE, stated because it is the whole
+argument:** `golive_readiness.POLICY_SIG_FIELDS` is `("venue","bull","lenses",
+"sides")`. Her live stamp reads `sides: ["long"]`, so **adding a short side
+RESETS her policy era and her 72 closes stop counting** — on the book whose own
+row reads `days_to_gate_obs 19.8`, i.e. the closest thing this fleet has to a
+gradeable real-money book. The ledger trades nothing, so `sides` never moves.
+At her ~10 closes/day it decides the question in weeks, on her own record
+(I14), instead of costing the clock to ask it.
+
+Both horizons are ALWAYS published so a horizon-dependent sign is visible
+rather than choosable (the `(oe)` artifact shape); the realised
+`settled_at_h` is published beside the nominal one (I1: the age is the fact);
+a dark mark books NOTHING rather than an exactly-flat 0.0% (the `(st)`
+`rsi_min: 0.0` trap); the pair settles atomically ((rp)); the per-loop settle
+count is capped because each priced record costs up to two orderbook reads on
+the live host and its fill reads already contend for a token bucket ((xt)), and
+deferrals are COUNTED, never silently dropped.
+
+### 5 · CHASING IT FOUND THE REAL DEFECT: THE JUDGE'S MUM LANE HAD NEVER APPLIED
+
+Eamon asked for `mum-vel-12-20` to be armed. It is declared **FIRST IN THE
+QUEUE** and the judge was running `mum-rsi-32` with `done: []`. Checking why
+turned up this, on the live bus:
+
+* `fleet_tuning` held **`xp.mum.rsi_max = 32.0`**, set by the judge, open 36h.
+* every shadow close stamped **`bars.rsi_max = 38.0`**.
+* the judge published **`ARM NOT APPLYING: 0/4 shadow closes carry a receipt`,
+  `arm_skew: true`**.
+
+**The arm was asking for `xp.mum-lshadow.rsi_max`.** `lighter_family_bot` built
+its prefix as `f"xp.{bot_id.split('-', 1)[-1]}."` — it strips the FIRST id
+segment and keeps the venue SUFFIX — while `fleet_bus.JUDGED_PAIRS["mum"]
+["xp_prefix"]` has declared `"xp.mum."` all along. `fleet_tuning.get_lever`
+returns the CALLER'S DEFAULT for an unregistered name. **So the fleet's ONLY
+path from shadow evidence to real money had never applied a single experiment
+on this lane, and every reading looked exactly like a quiet judge.** Reproduced
+before it was believed: `xp.mum-lshadow.{rsi_max,max_hold_min,vel_lo,vel_hi}`
+are `registered=False`, all four.
+
+Same family as the `era_epoch_for` double-`rsplit` ((hd)/(hg)/(hh)): **an id is
+not a namespace.** And it was invisible because **two CORRECT fail-opens
+composed**: `apply_book_levers` degrades to the env default on a dark rail
+(right), `get_lever` returns the default for an unregistered name (right).
+Neither is wrong; together they are unobservable — the `(lv)`/I18 shape.
+`(ya)` saw the symptom one day earlier and read it as the benign case ("the arm
+has not opened a position since the lever was set"), which was true that hour
+and is exactly the ambiguity that entry itself named.
+
+**WHAT SAVED IT FROM BEING WORSE:** the LIVE host's prefix is correct
+(`live.mum.`), so a promotion would have reached real money — and the judge's
+own **fail-closed `ran_candidate` receipt rule** is what refused to promote on
+a comparison with zero receipts. The guard worked; the arm didn't.
+
+FIXED in three parts, because the instance alone would recur:
+1. **`fleet_bus.xp_prefix_for(bot_id)`** — the ONE owner, matching either arm,
+   `None` for a book no declared pair claims (I8: unknown degrades to an
+   honest absence, never a plausible name).
+2. **`lever_surface()` on the census** — the row now says which namespace it
+   resolved and whether those names EXIST. `unregistered` is absent when clean
+   (a key whose only possible value is a defect must not also have a benign
+   value people learn to skim past). A dark registry publishes
+   `registry: false`, never a fabricated clean bill.
+3. **`VOID_SKEW_H` in the judge** — the ARM-SKEW hold was deliberately
+   permanent ("stay running and stay LOUD until the arm is fixed"), which was
+   right for a FIXABLE arm and became a permanent stall on a STRUCTURAL one,
+   announced by exactly one push because `skew_notified` latches (I4's "never
+   report a persistent condition with a one-shot warning"). A candidate with
+   **zero receipts across its whole elapsed window is a NON-RUN**: after 24h it
+   is VOIDED — levers stop being asserted and TTL out, the clock resets, and
+   the candidate returns to the **UNTRIED** queue, never to `done`, because a
+   skew verdict is about the plumbing and says nothing whatever about the idea.
+   `pick_candidate` then takes the next untried candidate, so no
+   structurally-blocked candidate can monopolise the lane again.
+
+**THAT IS ALSO HOW `mum-vel-12-20` GETS ARMED** — by the queue's own declared
+priority rather than by hand-editing live judge state: on the first cycle after
+this deploys, `mum-rsi-32` is 36h+ with 0 receipts, so it is voided and
+requeued, and `next_candidate` returns `mum-vel-12-20` (index 0, `done: []`).
+
+### REFUSED, WITH THE NUMBERS
+* **The real stop-and-reverse.** −0.881%/trade at the trigger on her own
+  record, plus an era reset that discards 72 closes ~20 days from the gate. A
+  refusal with evidence is a valid output; this is one.
+* **Hand-closing the live VIRTUAL position.** Discretionary intervention in a
+  live book is the un-amendable core, and `(xq)` is the standing measurement:
+  a manual leg was already caught on its way into a real-money go-live sample.
+* **Quoting the matched-window null on the post-stop read** — withdrawn on its
+  own calibration (29.4h vs 6h), per the harness rule that an instrument which
+  cannot reproduce what DID happen may not say what WOULD have.
+
+### SHIPPED
+* `fleet_bus.xp_prefix_for` + the family host reading it; `lever_surface` on
+  the census; **`vel_census` as one owner on both arms**; `vel_entry` stamped
+  on every entry and carried to every close row, both arms.
+* `flip_open` / `flip_settle` / `flip_block` + `extra.flip`, both arms, mum
+  the only declaring carrier; `control_draw` gains a `flag` argument so the
+  placebo rule is SHARED rather than copied.
+* `experiment_judge.VOID_SKEW_H` (env `XPJ_VOID_SKEW_H`, 24h) +
+  `VOIDED-NEVER-APPLIED`.
+* `tests/autonomy/test_mum_virtual_flip.py` — **29 tests, 14/14 mutations
+  verified red.** THREE of those mutations survived the first round and all
+  three were my own tests being weak in shapes this file already names: an AST
+  check that inspected the call ARGUMENT while the mutation moved the f-string
+  one line up into the assignment (the guard written to catch the class,
+  walking into it); an identity assertion that a re-implementation passed
+  because importing an owner is not calling it; and a dark-mark test that
+  passed for an unrelated reason because BOTH legs were dark, so the atomic
+  pair rule blocked the write and the rule under test never ran. All three are
+  recorded in the tests themselves.
+* A regression caught by the existing suite and fixed as the class, not the
+  instance: the close-path call read `self.flips` straight off the Book and a
+  stub Book raised inside a REAL-MONEY close — the `(vr)` shape that killed
+  four books' publishes for five days. The containers are TOLERATED now, never
+  assumed, and that is pinned.
+
+**WHAT DID NOT MOVE, and why:** no entry rule, no exit rule, no bar, no cage,
+no clip, no side. Every number above is REPORTED; nothing here gates a trade.
+The velocity band stays INERT on the live arm — `(xl)` made that arm the
+judge's control on purpose, and the judge's own paired bar is the criterion.
+
 ## 2026-09-04 (ya) — "BOTS AREN'T TRADING": NOTHING WAS BROKEN, THE REGIME FLIPPED — and both gauges built to say so were themselves defective
 
 **Eamon, 4-Sep: *"Bots aren't trading."*** They were. 11 of 16 books were
