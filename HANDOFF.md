@@ -1,13 +1,8 @@
 # HANDOFF — start here
 
-_Generated 2026-09-05 02:23 Sydney (16:23Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-05 02:45 Sydney (16:45Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
-
-### `mum-virtual-flip-preregistered-read`  ·  owner: **session**
-(yb) 👩 mum publishes a VIRTUAL FLIP LEDGER: at every loss-class exit she records the SHORT she did not take and marks it at 6h and 24h against a matched-window random-coin short. It exists because the NAIVE flip is measured NEGATIVE on her own record -- across 12 stop-outs the coin is +0.881% higher a median 2.32h later (t=+3.26 AGAINST the short), the stop firing at maximum oversold, which is the bottom. READ `extra.flip` on freqtrade-mum-lighter at n>=30 settled 6h observations, or on 2026-10-04, whichever first, and read BOTH horizons -- a sign that appears at one and not the other is the (oe) artifact, not a finding. REFUTED (edge_pct <= 0, or positive below t_crit(n) via fleet_allocation) -> record it and RETIRE the instrument, because a telemetry arm nobody can act on is the museum the OFFENSE tier warns about. CONFIRMED (edge_pct > 0 at t_crit(n) on BOTH horizons) -> it goes to Eamon WITH the era price, never straight to a build: POLICY_SIG_FIELDS carries `sides`, so a real short side resets her go-live clock. Anything else, re-arm ONCE (P3).
-
-_Still open because:_ the sample has not accrued: at registration the ledger is empty and her live arm books ~2.4 loss-class exits/day, so n>=30 lands ~mid-Sep. The date is the backstop, not the trigger. Closes when the read is taken and recorded in the CHANGELOG -- and note the honest asymmetry: this instrument was built to price a REFUSAL, so a refutation is a completed read, not a failure.
 
 ### `mum-halt-cost-preregistered-read`  ·  owner: **session**
 (xv) pre-registered whether 👩 mum's daily-loss halt costs or saves her, paired same-coin against her never-halting shadow twin. At registration her ledger holds exactly ONE daily-loss halt (2-Sep 17:19:45Z, 8 legs, +1.76pp/leg cost against the twin) -- one flatten instant is ONE observation, not eight, so it decides nothing. READ at n>=5 halt EVENTS occurring AFTER 2026-09-03: LOOSEN only if mean paired cost > 1.0pp/leg AND the sign is consistent across events; otherwise KEEP. Instrument: scripts/study_mum_halt_cost_2026-09-03.py (its calibration gate REFUSES unless it reproduces both the registered event and the registered baseline).
@@ -81,7 +76,7 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 ## Shipped today (1 commit(s))
 
-- `b940c45` [deploy-live-mum] (yb) the flip that loses, and the judge lane that never ran
+- `e1e1b79` [deploy-live-mum] (yb) the flip that loses, and the judge lane that never ran (#284)
 
 ## How this file stays honest
 

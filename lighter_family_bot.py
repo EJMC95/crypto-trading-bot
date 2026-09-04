@@ -1281,12 +1281,6 @@ class OversoldRebound(Carrier):
     VEL_HI = 999.0                      # inert: no ceiling on it
     VEL_LOOKBACK = 4                    # bars — the window the band was measured on
     control_arm = True                  # publishes its own random-entry null
-    #: [(yb)] the VIRTUAL FLIP LEDGER — at every loss-class exit she records
-    #: the SHORT she did not take and marks it forward. Zero capital, no
-    #: order, no side: `sides` stays ["long"] so her go-live era is untouched.
-    #: This is the ONLY carrier that declares it; the naive stop-flip it
-    #: exists to price is measured at -0.881%/trade on her own record.
-    flip_ledger = True
     census = True                       # publishes why nothing opened (I18)
     #: v1 positions (opened 2026-07-12) are flattened on the first v2 loop —
     #: they are v1-policy artifacts holding all four slots, and a book that
@@ -2166,87 +2160,6 @@ def mum_env_defaults(strategy):
             "vel_hi": float(getattr(cls, "VEL_HI", 999.0))}
 
 
-def xp_prefix_for(bot_id):
-    """[(yb)] `fleet_bus.xp_prefix_for` with this file's standard image-safety
-    guard (the `_cohort_long_state` pattern). An image built without
-    fleet_bus.py resolves NO prefix and the book runs its env defaults —
-    which is the same fail-open `apply_book_levers` always had, except that
-    it is now PUBLISHED rather than inferred."""
-    try:
-        import fleet_bus
-        return fleet_bus.xp_prefix_for(bot_id)
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def vel_census(vel_readings, strategy):
-    """[(xl)/(yb)] THE DIP-VELOCITY GAUGE — one owner, both arms.
-
-    `signals()` returns `vel` (RSI points dropped over VEL_LOOKBACK bars) on
-    EVERY scan whether or not the band is armed, and until (yb) only the
-    $1,000 shadow published it: 👩 mum's REAL-MONEY row had no `vel` field at
-    all, so the quantity `(xl)` measured as carrying her information was
-    computed every loop against real money and thrown away. That is I23 at
-    the arm that holds the money, and it is the same shape `(ya)` had just
-    found in 🙏 avo's BB term — gauge one arm, ship, and the other is blind.
-
-    Absent readings are ABSENT, never zero: a fabricated `vel_med: 0.0` reads
-    as "every dip is a flat drift", which is a claim, not a silence (the
-    `(st)` `rsi_min: 0.0` trap). REPORTED — no gate reads any of it.
-    """
-    out = {}
-    try:
-        vv = sorted(v for v in (vel_readings or {}).values()
-                    if isinstance(v, (int, float)))
-        if not vv:
-            return out
-        lo = float(getattr(strategy, "VEL_LO", -999.0))
-        hi = float(getattr(strategy, "VEL_HI", 999.0))
-        out["vel_med"] = round(vv[len(vv) // 2], 1)
-        out["vel_p90"] = round(vv[int(0.9 * (len(vv) - 1))], 1)
-        out["vel_read"] = len(vv)
-        out["vel_band"] = [lo, hi]
-        out["vel_in_band"] = sum(1 for v in vv if lo <= v < hi)
-    except Exception:  # noqa: BLE001 — a gauge never breaks a trading loop
-        return {}
-    return out
-
-
-def lever_surface(prefix):
-    """[(yb)] WHAT THIS ARM'S LEVER SURFACE ACTUALLY IS — the half of the fix
-    that stops the defect recurring silently.
-
-    `apply_book_levers` is fail-OPEN and `fleet_tuning.get_lever` returns the
-    caller's default for an UNREGISTERED name. Both are right on their own,
-    and together they made a 36h experiment stall unobservable: the arm asked
-    for `xp.mum-lshadow.rsi_max`, no registry has ever held that name, and
-    every reading on the row looked exactly like "the judge set nothing".
-
-    So the row now says which prefix it resolved and whether that prefix's
-    lever names EXIST. `{"prefix": None}` (a book outside the judge, or an
-    image without fleet_bus) is a first-class answer and is distinct from
-    `unregistered: [...]`, which can only mean a bug. REPORTED — nothing
-    gates on it, and a dark registry publishes `registry: false` rather than
-    a fabricated clean bill (I8)."""
-    out = {"prefix": prefix}
-    if not prefix:
-        return out
-    try:
-        import fleet_tuning as _tuning
-    except Exception:  # noqa: BLE001
-        out["registry"] = False
-        return out
-    names = [prefix + bar for bar, _attr, _cast in MUM_LEVER_ATTRS]
-    missing = [n for n in names if n not in getattr(_tuning, "LEVERS", {})]
-    out["registry"] = True
-    out["registered_n"] = len(names) - len(missing)
-    if missing:
-        # the only value this key can ever hold is a defect, so it is absent
-        # when clean rather than an empty list somebody learns to skim past
-        out["unregistered"] = missing
-    return out
-
-
 def apply_book_levers(strategy, prefix):
     """Overlay `<prefix>rsi_max` / `<prefix>max_hold_min` onto the strategy
     INSTANCE (never the class) from the env defaults each call. Returns the
@@ -2347,7 +2260,7 @@ def policy_stamp(strategy, venue, scan_order, max_entries_per_hour):
     }
 
 
-def control_draw(strategy, pool_coins, coin, mark_of, flag="control_arm"):
+def control_draw(strategy, pool_coins, coin, mark_of):
     """[(th)] The (ro) placebo DRAW, factored to ONE owner for both arms.
 
     The live variant host reuses this by IDENTITY — (hj): a second copy of a
@@ -2360,13 +2273,7 @@ def control_draw(strategy, pool_coins, coin, mark_of, flag="control_arm"):
     draw / any error). Never raises: a control arm that can break a trading
     loop is worse than no control arm."""
     try:
-        # [(yb)] `flag` names the carrier attribute that switches this draw
-        # ON. It exists so the VIRTUAL FLIP LEDGER can use the same placebo
-        # rule as the control arm without a second copy of it ((hj)) and
-        # without inheriting the control arm's own on/off switch — the two
-        # instruments answer different questions and must be separately
-        # retirable.
-        if not getattr(strategy, flag, False):
+        if not getattr(strategy, "control_arm", False):
             return {}
         pool = [c for c in pool_coins if c != coin]
         if not pool:
@@ -2378,224 +2285,6 @@ def control_draw(strategy, pool_coins, coin, mark_of, flag="control_arm"):
         return {"null_pair": nc, "null_entry": float(px)}
     except Exception:  # noqa: BLE001
         return {}
-
-
-#: [2026-09-04 (yb)] THE VIRTUAL FLIP LEDGER — Eamon, 4-Sep: *"Mum should
-#: seize the opportunity to flip her 'virtual' trade... her evolving to be
-#: able to change a long to a short if the percentage"*, on the day she sat
-#: long VIRTUAL at -2.08% while JTO/XAU/TRUMP were green.
-#:
-#: THE NAIVE VERSION IS MEASURED AND IT LOSES, which is why this instrument
-#: exists instead of the trade. On her own 152 closes across both arms, the
-#: 12 stop-outs are followed by the coin going UP +0.881% within a median
-#: 2.32h (t=+3.26 against the short) — the stop fires at maximum oversold,
-#: which is the bottom, and a flip there sells it. The daily-loss flatten is
-#: worse: +0.956% at ~4.3h (n=5), +2.807% at 24h (n=8). Her ROI exits are
-#: followed by -0.27%/-0.43% drift, so her winners already exit near local
-#: tops. DECLARED LIMITS of that read, because it is what this replaces: n is
-#: 10-12 events, the "after" price is whenever any book next traded the coin
-#: (a selected instant, not a random one), and the matched-window null was
-#: WITHDRAWN — a random (coin, time) pair sits a median 29.4h from its
-#: nearest prior price, so it priced a 29h return against a 6h signal. The
-#: definitive replay needs 1h candles and `/api/v1/candlesticks` answers 403
-#: to every egress outside the container.
-#:
-#: SO THE FLEET MEASURES IT FORWARD, WHICH IS BETTER EVIDENCE ANYWAY (I14),
-#: AT ZERO COST: at every loss-class exit the book records the SHORT it did
-#: not take, marks it at fixed horizons against a matched-window random-coin
-#: short ((hm) in mirror form), and publishes the answer every loop. No
-#: capital, no order, no side — so `POLICY_SIG_FIELDS` ("venue","bull",
-#: "lenses","sides") is untouched and her go-live era does NOT reset. That
-#: last point is the whole reason this shape was chosen: she is 72 closes in
-#: with `days_to_gate_obs 19.8`, and adding a real short side would restart
-#: that clock at zero.
-FLIP_REASONS = ("stop_loss", "max_hold", "daily_loss")
-#: TWO horizons on purpose, and BOTH published. Picking one and reporting it
-#: is how an (oe)-style artifact ships; a pair makes a sign that depends on
-#: the horizon VISIBLE rather than choosable. 6h is where the ledger read
-#: found the bounce; 24h is her own max_hold.
-FLIP_HORIZONS_H = (6.0, 24.0)
-#: pending records are persisted state, so they are bounded. Oldest-first
-#: eviction: an unsettled record is worth less than a settled one.
-FLIP_MAX_PENDING = 400
-
-
-def flip_key(h):
-    """The published/accumulator key for a horizon. One owner, so the writer
-    and the reader cannot disagree about `6h` vs `6.0h`."""
-    return f"{float(h):g}h"
-
-
-def flip_family(reason):
-    """Which FLIP_REASONS family a close belongs to, or None.
-
-    Substring, because the ledger reason is `<side>-<tag>_<exit>` and the
-    exit vocabulary is the carrier's. Order matters only if a reason could
-    match two families; none does, and the selftest pins that."""
-    r = str(reason or "")
-    for fam in FLIP_REASONS:
-        if fam in r:
-            return fam
-    return None
-
-
-def flip_open(strategy, flips, coin, exit_px, reason, t, pool_coins, mark_of):
-    """Record the SHORT this book did not take, at the loss-class exit it did.
-
-    Returns True when a record was opened. Never raises: a telemetry arm that
-    can break a trading loop is worse than no telemetry arm — the control
-    arm's own rule, and this runs in a real-money close path.
-
-    The placebo leg is drawn HERE, at the flip's own instant, through
-    `control_draw` by identity — so the null is matched in window and
-    unmatched in signal, exactly as the control arm's is."""
-    try:
-        if not getattr(strategy, "flip_ledger", False):
-            return False
-        if not isinstance(flips, list):
-            # [(vr)] the container is TOLERATED, never assumed. A stub or a
-            # partially-restored Book must not be able to raise inside a
-            # close path — that class already killed four books' publishes
-            # for five days, and this one sits in a real-money close.
-            return False
-        fam = flip_family(reason)
-        if fam is None or not exit_px or float(exit_px) <= 0:
-            return False
-        rec = {"coin": str(coin), "px": float(exit_px), "why": fam,
-               "ts": float(t), "done": []}
-        rec.update(control_draw(strategy, pool_coins, coin, mark_of,
-                                flag="flip_ledger"))
-        flips.append(rec)
-        # oldest-first: a record that has never settled is the one to drop
-        while len(flips) > FLIP_MAX_PENDING:
-            flips.pop(0)
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
-#: [(yb)] the most records `flip_settle` will price in ONE loop. Each priced
-#: record costs up to two venue reads on the LIVE host (`marks.fresh_mid` is
-#: an orderbook call), and this runs inside a real-money loop whose fill reads
-#: already contend for a token bucket ((xt)). At mum's ~1-2 loss-class exits a
-#: day the cap can never bind; it exists so a restored backlog cannot burst.
-#: Deferred records are COUNTED and published — never silently dropped.
-FLIP_MAX_SETTLE_PER_LOOP = 20
-
-
-def flip_settle(strategy, flips, fl, t, mark_of,
-                max_settle=FLIP_MAX_SETTLE_PER_LOOP):
-    """Mark every pending virtual short that has reached a horizon.
-
-    A SHORT's return is `(entry - mark) / entry`, so a coin that keeps
-    falling pays and a coin that bounces costs. Both legs settle or NEITHER
-    ((rp)'s atomic rule): an unpaired observation cannot be differenced
-    against anything, so dropping it is the honest statistic. Mutates `fl`
-    and `flips` in place. Never raises."""
-    try:
-        if not getattr(strategy, "flip_ledger", False):
-            return
-        if not isinstance(flips, list) or not isinstance(fl, dict):
-            return                       # (vr): tolerate, never assume
-        alive = []
-        priced = 0
-        for rec in flips:
-            try:
-                age_h = (float(t) - float(rec.get("ts") or 0.0)) / 3600.0
-                done = list(rec.get("done") or [])
-                for h in FLIP_HORIZONS_H:
-                    k = flip_key(h)
-                    if k in done or age_h < h:
-                        continue
-                    if priced >= max_settle:
-                        # the cap deferred a due record — counted, so a
-                        # settle lag can never be inferred from silence
-                        fl["deferred"] = int(fl.get("deferred") or 0) + 1
-                        continue
-                    priced += 1
-                    px = float(rec.get("px") or 0.0)
-                    mk = mark_of(rec.get("coin"))
-                    npair, npx = rec.get("null_pair"), rec.get("null_entry")
-                    nmk = mark_of(npair) if npair else None
-                    if not (px > 0 and mk and float(mk) > 0
-                            and npair and npx and float(npx) > 0
-                            and nmk and float(nmk) > 0):
-                        # not settleable at this horizon yet; a dark mark must
-                        # never book a 0% return, which would read as "the
-                        # flip was exactly flat" — the loudest possible claim
-                        # from no data (I8/(st)'s rsi_min trap)
-                        continue
-                    b = fl.setdefault(k, {"n": 0, "sum": 0.0, "null_n": 0,
-                                          "null_sum": 0.0, "by": {}})
-                    b["n"] += 1
-                    b["sum"] += (px - float(mk)) / px
-                    # the age this record was ACTUALLY priced at. A horizon is
-                    # what we asked for; this is what we got, and the two
-                    # differ by the loop period plus any deferral. Published,
-                    # because a silently late mark is a different measurement.
-                    b["age_sum"] = float(b.get("age_sum") or 0.0) + age_h
-                    b["null_n"] += 1
-                    b["null_sum"] += (float(npx) - float(nmk)) / float(npx)
-                    w = b["by"].setdefault(str(rec.get("why")),
-                                           {"n": 0, "sum": 0.0})
-                    w["n"] += 1
-                    w["sum"] += (px - float(mk)) / px
-                    done.append(k)
-                rec["done"] = done
-                if len(done) < len(FLIP_HORIZONS_H):
-                    # keep until every horizon is answered, but never forever:
-                    # twice the longest horizon is the giving-up point, and it
-                    # is recorded as `dropped` rather than silently forgotten
-                    if age_h <= 2.0 * max(FLIP_HORIZONS_H):
-                        alive.append(rec)
-                    else:
-                        fl["dropped"] = int(fl.get("dropped") or 0) + 1
-            except Exception:  # noqa: BLE001
-                continue
-        flips[:] = alive
-    except Exception:  # noqa: BLE001
-        return
-
-
-def flip_block(strategy, fl, flips):
-    """The published `flip` payload — ALWAYS present for a flip-ledger book,
-    including at n=0 ((lv)/I18: an omitted key is byte-identical between "no
-    loss-class exit yet" and "the instrument is not running"). {} for every
-    other book, so no other payload shape moves."""
-    if not getattr(strategy, "flip_ledger", False):
-        return {}
-    out = {"pending": len(flips or []),
-           "reasons": list(FLIP_REASONS),
-           "dropped": int((fl or {}).get("dropped") or 0),
-           "deferred": int((fl or {}).get("deferred") or 0),
-           "basis": "the SHORT this book did not take, opened at its own "
-                    "loss-class exit price and marked at fixed horizons "
-                    "against a matched-window random-coin short ((hm) in "
-                    "mirror form). ZERO capital, no order, no side — "
-                    "POLICY_SIG_FIELDS is untouched and the go-live era does "
-                    "not reset. REPORTED: nothing gates on it."}
-    for h in FLIP_HORIZONS_H:
-        k = flip_key(h)
-        b = (fl or {}).get(k) or {}
-        n, nn = int(b.get("n") or 0), int(b.get("null_n") or 0)
-        mean = (b.get("sum", 0.0) / n * 100.0) if n else None
-        null = (b.get("null_sum", 0.0) / nn * 100.0) if nn else None
-        out[k] = {
-            "n": n,
-            # what the horizon actually resolved at (I1: the age is the fact,
-            # the nominal horizon is the intent)
-            "settled_at_h": (round(b["age_sum"] / n, 2)
-                             if n and b.get("age_sum") is not None else None),
-            "mean_pct": round(mean, 4) if mean is not None else None,
-            "null_pct": round(null, 4) if null is not None else None,
-            "edge_pct": (round(mean - null, 4)
-                         if (mean is not None and null is not None) else None),
-            "by_reason": {r: {"n": int(v.get("n") or 0),
-                              "mean_pct": (round(v["sum"] / v["n"] * 100.0, 4)
-                                           if v.get("n") else None)}
-                          for r, v in sorted((b.get("by") or {}).items())},
-        }
-    return out
 
 
 def control_settle(strategy, ctrl, m, total, notional, null_px):
@@ -2659,16 +2348,6 @@ def _census_extra(b):
     # never fire", and 👩 mum v1 died of the second while every reading on her
     # row looked like the first. `no_signal: 23` alone cannot tell them apart.
     # Reported, never a gate: nothing here decides a trade.
-    # [(yb)] WHICH LEVER NAMESPACE THIS ARM IS ACTUALLY ASKING FOR. Absent
-    # for a book outside the judge; an `unregistered` list here can only mean
-    # the arm is asking for names no registry holds, which is what made a 36h
-    # experiment stall read exactly like a quiet judge.
-    try:
-        _ls = lever_surface(getattr(b, "lever_prefix", None))
-        if _ls.get("prefix"):
-            out["levers"] = _ls
-    except Exception:  # noqa: BLE001
-        pass
     try:
         bar = getattr(b.s, "RSI_MAX", None)
         if bar is not None and b.last_rsi:
@@ -2684,10 +2363,14 @@ def _census_extra(b):
         # or not the band is armed — so the distribution she draws from is
         # visible BEFORE anyone arms it, and `vel_blocked` can be read against
         # the supply that produced it rather than against nothing.
-        # [(yb)] factored to `vel_census`, shared with the LIVE host by
-        # IDENTITY — (hj): a second copy of a rule is a second rule, and this
-        # one is read to price a real-money entry cell.
-        out.update(vel_census(getattr(b, "last_vel", None), b.s))
+        if getattr(b, "last_vel", None):
+            vv = sorted(b.last_vel.values())
+            lo, hi = getattr(b.s, "VEL_LO", -999.0), getattr(b.s, "VEL_HI", 999.0)
+            out["vel_med"] = round(vv[len(vv) // 2], 1)
+            out["vel_p90"] = round(vv[int(0.9 * (len(vv) - 1))], 1)
+            out["vel_read"] = len(vv)
+            out["vel_band"] = [lo, hi]
+            out["vel_in_band"] = sum(1 for v in vv if lo <= v < hi)
     except Exception:  # noqa: BLE001
         pass
     # [2026-08-27 (vm)] THE TERM NOBODY COULD SEE, and it is why 👩 mum's
@@ -2783,12 +2466,6 @@ def family_publish_extra(b, mode, regime, t0):
             # the exact class this function exists to close
             "skipped_unlisted": getattr(b.s, "skipped", []),
             **_control_extra(b), **_census_extra(b),
-            # [(yb)] the virtual flip ledger — ALWAYS present for a
-            # flip-ledger book, including at n=0, so "no loss-class exit yet"
-            # and "the instrument is not running" are never one byte-string
-            # (I18/(lv)). {} for every other carrier.
-            **flip_block(b.s, getattr(b, "flip", None),
-                         getattr(b, "flips", None)),
             **spend_extra(b, t0),
             **_census_series_extra(b, t0)}
 
@@ -2847,10 +2524,6 @@ class Book:
         #: VEL_LOOKBACK bars). I23: a knob must record the quantity it cuts,
         #: and this is the one `xp.mum.vel_*` gates on.
         self.last_vel = {}
-        #: [(yb)] the xp.* prefix this book's levers actually live under,
-        #: resolved from the pair registry each loop. None = no declared pair
-        #: claims this book (correct for every carrier outside the judge).
-        self.lever_prefix = None
         # [2026-08-27 (vm)] THE OTHER CONJUNCT. 👩 mum's rule is `rsi <
         # RSI_MAX and NOT uptrend and v > 0`; (rr) gauged the RSI half and
         # the trend half had no gauge at all, so a bar that is MET while
@@ -2880,10 +2553,6 @@ class Book:
         self._rollup = None
         self._rollup_at = 0.0
         self.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
-        #: [(yb)] the virtual flip ledger: pending unsettled virtual shorts,
-        #: and the settled per-horizon accumulators.
-        self.flips = []
-        self.flip = {}
         self.scan = {}           # per-cycle census counters
         self.halted_today = False
         self.day_start_equity = None
@@ -2967,20 +2636,6 @@ class Book:
                         self.ctrl.setdefault(k, d)
             except Exception:  # noqa: BLE001
                 self.ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
-            # [(yb)] the flip ledger persists for the SAME reason the control
-            # arm does (I4): its longest horizon is 24h and this container
-            # redeploys whenever any shared organ changes, so an in-memory
-            # ledger would lose every pending record on every deploy and
-            # could never reach a sample. Shape-checked; a malformed blob
-            # degrades to a fresh instrument rather than raising in boot.
-            try:
-                _f = saved.get("flips")
-                self.flips = [r for r in _f if isinstance(r, dict)] \
-                    if isinstance(_f, list) else []
-                _fa = saved.get("flip")
-                self.flip = dict(_fa) if isinstance(_fa, dict) else {}
-            except Exception:  # noqa: BLE001
-                self.flips, self.flip = [], {}
             log.info("%s restored: $%.2f, %d open", self.bot_id,
                      self.broker.equity(), self.broker.open_count())
         if store.load_daily_halt(self.bot_id,
@@ -3008,10 +2663,7 @@ class Book:
                 # evidence is worse than none (I4: never discard a persistence
                 # result, and never let a long-run measurement depend on
                 # uptime).
-                "ctrl": self.ctrl,
-                # [(yb)] the virtual flip ledger — pending records and the
-                # settled accumulators. Bounded by FLIP_MAX_PENDING.
-                "flips": self.flips[-FLIP_MAX_PENDING:], "flip": self.flip})
+                "ctrl": self.ctrl})
         except Exception:  # noqa: BLE001
             pass
 
@@ -3102,14 +2754,6 @@ class Book:
         _np = m.get("null_pair")
         control_settle(self.s, self.ctrl, m, total, notional,
                        self.last_mark.get(_np) if _np else None)
-        # [(yb)] THE FLIP SHE DID NOT TAKE. Opened at THIS close's own exit
-        # price, on the loss-class exits only — the mirror of a winning exit
-        # is not the question anyone asked, and her ROI exits already measure
-        # -0.27%/-0.43% of subsequent drift (i.e. she exits winners near
-        # local tops). Records nothing on any other carrier.
-        flip_open(self.s, getattr(self, "flips", None), coin, px, reason,
-                  time.time(), list(self.last_mark.keys()),
-                  self.last_mark.get)
         pct = total / notional if notional else total / STAKE_USD
         self.n_closed += 1
         self.n_wins += 1 if total > 0 else 0
@@ -3176,8 +2820,6 @@ class Book:
                           if isinstance(m.get("bars"), dict) and m["bars"] else {}),
                        **({"rsi_entry": m["rsi_entry"]}
                           if m.get("rsi_entry") is not None else {}),
-                       **({"vel_entry": m["vel_entry"]}
-                          if m.get("vel_entry") is not None else {}),
                        "policy": policy_stamp(self.s, "lighter_shadow",
                                                   shadow_scan_order_stamp(),
                                                   throttle_cap(self.s))},
@@ -3594,23 +3236,7 @@ def main():
             # before.
             # [(wv)] the judge's xp.<book>.* levers reach this twin — mum's
             # today; a no-op for carriers without the knobs.
-            # [(yb)] THE PREFIX COMES FROM THE PAIR REGISTRY, NOT FROM THE
-            # BOT ID. `f"xp.{bot_id.split('-', 1)[-1]}."` yields
-            # `xp.mum-lshadow.` — strips the FIRST segment and keeps the venue
-            # SUFFIX — which is not a registered lever name, so every judge
-            # experiment on this lane silently ran the env default for 36h.
-            # Same family as the `era_epoch_for` double-rsplit ((hd)/(hg)):
-            # an id is not a lever namespace, and the mapping between them is
-            # DECLARED in `fleet_bus.JUDGED_PAIRS[...]["xp_prefix"]`.
-            # [(yb)] settle any virtual short that has reached a horizon,
-            # off the SAME `last_mark` map the control arm settles on — one
-            # price source, so the flip and its own null cannot be read at
-            # different instants. Runs before the scan so a coin that leaves
-            # the universe still settles from the last mark seen.
-            flip_settle(b.s, getattr(b, "flips", None),
-                        getattr(b, "flip", None), time.time(), b.last_mark.get)
-            b.lever_prefix = xp_prefix_for(b.bot_id)
-            _moved = apply_book_levers(b.s, b.lever_prefix)
+            _moved = apply_book_levers(b.s, f"xp.{b.bot_id.split('-', 1)[-1]}.")
             if _moved:
                 log.info("%s xp levers in force: %s", b.bot_id, _moved)
             _rets = {}
@@ -3867,13 +3493,6 @@ def main():
                          "bars": mum_bars(b.s),
                          "rsi_entry": (float(sig["rsi"]) if sig and
                                        isinstance(sig.get("rsi"), (int, float))
-                                       else None),
-                         # [(yb)] I23 parity with the live arm: the velocity
-                         # this trade was entered at, recorded ON THE TRADE.
-                         # Both arms or neither — a band graded on one arm's
-                         # ledger and the other's replay is not a comparison.
-                         "vel_entry": (float(sig["vel"]) if sig and
-                                       isinstance(sig.get("vel"), (int, float))
                                        else None),
                          # [(sv)] which entry of its clock hour this was — the
                          # quantity `MAX_ENTRIES_PER_HOUR` cuts. None on books

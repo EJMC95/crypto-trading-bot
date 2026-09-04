@@ -1,3 +1,51 @@
+## 2026-09-04 (yc) — (yb) IS REVERTED OUT OF THE CODE AT EAMON'S INSTRUCTION, AND THE RECORD IS KEPT ON PURPOSE
+
+**Eamon, 4-Sep: *"Fall back / Go back to how things were."*** Done, in two
+parts, and the split is deliberate.
+
+**REVERTED (the code):** every file (yb) touched — `fleet_bus.xp_prefix_for`,
+`lever_surface`, `vel_census` on both arms, `vel_entry`, the virtual flip
+ledger, `experiment_judge.VOID_SKEW_H`, the tests and the CLAUDE.md rule. The
+CLAUDE.md rule had to go with the code: `audit_doctrine_enforcement` fails the
+build on an enforcement reference that no longer resolves, and a doctrine line
+pointing at a deleted test is precisely the rot I12 exists to stop.
+
+**ALSO REVERTED (the trading change that was actually live):**
+`MUM_RSI_MAX` **38 → 36** as a Railway env on **BOTH** `mum-live` and
+`family-lighter-shadow` — both arms, because a twin running a different bar is
+not a control ((pt)'s pair clock). This is `(ya)`'s own pre-registered revert
+path, used verbatim. NOTE the code default in `lighter_family_bot` is still
+38, so the running value now comes from the env; the registry and the code
+still agree with each other, and the row publishes `rsi_bar` so the effective
+bar stays readable.
+
+**KEPT (this entry, and the one above it):** the measurements do not become
+untrue because the code was pulled, and two of them are expensive to
+rediscover:
+* **the judge's mum lane is dead again, and it was dead before (yb).** Her
+  shadow arm asks `fleet_tuning` for `xp.mum-lshadow.rsi_max`; the registry
+  declares `xp.mum.`; `get_lever` returns the caller's default for an
+  unregistered name. Measured on the live bus 4-Sep: the lever sat open **36h**
+  while every close stamped the env default, judge holding on `arm_skew`. **No
+  experiment has ever applied on that lane.** That is still true this minute.
+* **the naive stop-flip is measured NEGATIVE** on her own ledger: across 12
+  stop-outs the coin is **+0.881% higher a median 2.32h later (t=+3.26 against
+  the short)**. Anyone proposing it again should read (yb) first.
+
+**AND THE FACT THAT MOTIVATED THE REVERT DID NOT HOLD, recorded because a
+future session will otherwise infer that (yb) broke something.** (yb) was
+merged at 16:31Z and **never reached a container**: at 16:41Z both live rows
+still published `build cdefd4383ee1/18` — the pre-merge stamp — with no `flip`
+key and no `vel_med`, and the Railway run was still mid-flight. Over the same
+window 👩 mum went **$534.20 → $537.18 equity (pnl_abs +13.78 → +16.76) with
+zero new closes** and 🙏 avo sat at **+$85.73**. So no measurement here
+attributes anything to (yb), and none of it argues against Eamon's call: he
+asked for the fleet in its earlier state and that is a decision about his own
+money, not a claim about causation. The revert is recorded as what it is.
+
+**RE-LANDING IT** is `git revert` of this commit, or PR #284's branch
+`claude/virtual-trade-flip-sna7nz`, which is untouched.
+
 ## 2026-09-04 (yb) — "FLIP HER 'VIRTUAL' TRADE": THE NAIVE FLIP LOSES ON HER OWN RECORD, AND CHASING THE QUESTION FOUND THE JUDGE'S MUM LANE HAD NEVER APPLIED AN EXPERIMENT
 
 **Eamon, 4-Sep:** *"Mum should seize the opportunity to flip her 'virtual' -
