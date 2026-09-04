@@ -97,6 +97,11 @@ class _B:
         self.last_rsi = {}
         self.last_uptrend = {}
         self.last_enter = {}
+        # [(ya)] the bar each `enter` ran under, and avo's BB gauge — mirrored
+        # here because the fixture's whole premise is that it captures exactly
+        # what the scan loop captures.
+        self.last_enter_bar = {}
+        self.last_bb = {}
         self._rollup = None
         self._rollup_at = 0.0
 
@@ -116,6 +121,13 @@ def _drive(kinds, strat=None):
             b.last_uptrend[coin] = sig["uptrend"]
         if sig:
             b.last_enter[coin] = bool(sig.get("enter"))
+            # [(ya)] the shipped loop stamps the bar in the same pass; so does
+            # the fixture, or it would stop mirroring the publisher.
+            _bar = getattr(b.s, "RSI_MAX", None)
+            if isinstance(_bar, (int, float)):
+                b.last_enter_bar[coin] = float(_bar)
+        if sig and isinstance(sig.get("bb_dist_pct"), (int, float)):
+            b.last_bb[coin] = float(sig["bb_dist_pct"])
     return b
 
 

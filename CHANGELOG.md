@@ -71,6 +71,327 @@ Python served a stale `__pycache__` and the test passed against bytecode the
 source no longer contained. **A mutation harness that does not clear the
 bytecode cache can report a kill it did not make.** Every mutation here is now
 re-run with `__pycache__` removed.
+## 2026-09-04 (ya) — "BOTS AREN'T TRADING": NOTHING WAS BROKEN, THE REGIME FLIPPED — and both gauges built to say so were themselves defective
+
+**Eamon, 4-Sep: *"Bots aren't trading."*** They were. 11 of 16 books were
+holding positions, 14 of 16 had closed a trade inside 24h, and the real money
+read **+$93.82**. What was true is that both LIVE books were empty-ish and
+neither row could say WHY — which is the I18 failure, not a trading failure.
+
+**THE ANSWER IS THE REGIME, AND IT RETIRES A CAVEAT THIS FILE HAS CARRIED SINCE
+JULY.** Item 18 says *"Lighter's tape is ONE falling-BTC regime (BTC −32.9%)"*
+and that the only on-venue source of anything else is the non-crypto books.
+Measured 4-Sep from `regime_oracle`, an organ independent of the books' own
+census: **`fleet: "risk-on uptrend", n_long 9, n_short 0`**, BTC **$81,217
+against an ema200 of $72,138 (+12.6%)**, ADX 44–51 on BTC/ETH/SOL/BNB. Both
+live books are LONG-ONLY DIP BUYERS, starved through different conjuncts:
+👩 mum needs `RSI<36 AND **NOT** uptrend` (RSI floor across her 94 coins:
+**37.1** — nothing oversold); 🙏 avo needs `uptrend AND rsi<42 AND
+close<lower-Bollinger` (RSI met at 34.4, the **BB dip** is what refuses).
+`audit_stuck_vs_slow --samples 3` returns **REFUSING — "its gate is working,
+not broken"** for both. No fix is owed to a book that is correctly declining to
+buy a market with no dips in it.
+
+**A NEAR-MISS WORTH RECORDING: mum's row looked FROZEN** — `updated_at` static
+for 4+ minutes while avo republished every 60s — and that reads exactly like a
+dead real-money writer. It is `LOOP_SECONDS = 300`. She ticked on schedule. The
+check that settles it is the code, not another sample; a false "your live book
+is dead" is the cry-wolf this file already pays for elsewhere.
+
+### THE TWO GAUGES THAT COULD NOT ANSWER THE QUESTION THEY EXIST FOR
+
+**1 · `both_terms_n` DISAGREED WITH THE BAR PRINTED BESIDE IT — on the
+real-money row.** 👩 mum published `rsi_bar 36.0 · rsi_min 37.1 ·
+both_terms_n 1`. **No coin can pass a bar of 36 when the closest is 37.1**, yet
+one was counted as passing. Root cause, from the code and not from a guess:
+`last_enter` is a **CACHED** verdict — the scan loop `continue`s before
+`signals()` on a candle it has already acted on — while `rsi_bar` is read
+**FRESH** off `S.RSI_MAX` at census time, **after `apply_book_levers` has run
+every loop** (`lighter_avo_live_bot.py:2696`). A `live.mum.rsi_max` lever that
+opens, moves or **EXPIRES** between candle passes leaves the two sampled at
+different bars. `(vm)` built this field so *"the census and the gate can never
+disagree about the cell"* — **prose could not enforce it, because the two
+halves are sampled at different TIMES.** `(tt)`'s lesson exactly: a defense
+that lives only in prose has not been written.
+It costs **no trades** (the real gate recomputes fresh each candle) — it
+corrupts *the number a widening is priced from*, which is what `(vm)` built it
+for, and a widening was being priced off it the same hour.
+FIXED: each `enter` is stamped with the `RSI_MAX` it ran under, in the same
+pass off the same strategy object; the census counts **only** stamps equal to
+the bar it publishes and surfaces the rest as **`both_terms_stale_n`** rather
+than folding them into either answer. Unstamped (restored pre-upgrade state, or
+a non-numeric bar) reads STALE, never a pass — I8, on the exact term a widening
+is argued from. The shipped rule stays the only source of the verdict, so this
+adds no second copy of the rule ((hj)).
+
+**2 · 🙏 avo's BINDING TERM HAD NO GAUGE AT ALL.** Her rule carries four
+conjuncts; `(st)`/`(vm)` gauged RSI and the trend half, and the **BB dip** —
+the one that actually binds in a rally — was computed by `signals()` and thrown
+away on both arms. So her row could print `no_signal: 39` with the RSI half
+visibly MET and explain nothing. SHIPPED: `bb_min` / `bb_med` / `bb_read` /
+`bb_below_n` off the rule's own `bb_dist_pct` (passes below 0; the comparison
+is STRICT, so a close sitting exactly ON the band does not enter). ABSENT never
+zero on no readings — a fabricated `bb_min: 0.0` reads as a coin sitting on the
+band, the loudest possible signal from no data (the `(st)` `rsi_min: 0.0`
+trap). Both gauges are **REPORTED**: no gate reads either.
+
+**BOTH ARMS, ONE COMMIT.** `(vh)` is the standing lesson that a fix verified in
+one file and shipped without asking which arm executes it reaches the $1,000
+shadow and not the real money — which is what happened to `(vm)` itself. Pinned
+by `tests/autonomy/test_census_bar_and_bb.py`, **9 mutations verified red**.
+**Two of those mutations survived the first round and both were my own test's
+fault, in the two shapes this file already names:** a `bb_below_n` boundary
+never exercised (no coin sat exactly ON the band), and — worse — a
+**page-wide substring scan** for `last_enter_bar` that a mutation DELETING the
+write survived, because the name still appears in the init, the persist dict
+and the census call. That is this file's own rule ("a page-wide substring scan
+is not a structural claim") reproduced inside the guard written to enforce it.
+Now on the AST: a write is a Subscript in Store context, nothing else counts.
+
+### AND THE INSTRUMENT THAT PRICES THE WIDENING HAD A RETYPED CONSTANT
+`study_mum_reachability`'s blocking-term table printed **"RSI >= 32 only"**
+under a header that says *"read from the carrier, not retyped"*, while the
+number beside it was computed at `live_bar()` — **36** since `(ve)`. The
+numbers were right and the label was two years of drift away from them. Derived
+now. A stale label on a correct number is how the wrong knob gets moved.
+
+### THE WIDENING, PRICED
+Eamon: *"widen slightly."* Measured over **60d of her real 23-coin universe**
+through her REAL bracket, episodes not bars, against a random-entry null
+((hm)):
+
+| bar | eps/day | edge %/trade vs null | t | **edge %-units/DAY** |
+|---|---|---|---|---|
+| 32 | 4.67 | +0.495 | 5.42 | 2.312 |
+| 35 | 6.60 | +0.204 | 4.14 | 1.346 |
+| **36 (shipped, interp.)** | 7.30 | +0.242 | — | **1.769** |
+| **38 (cage ceiling)** | **8.70** | **+0.319** | **4.48** | **2.775** |
+| 42 | 11.40 | +0.104 | 4.19 | 1.186 |
+
+**Every bar from 28 to 42 beats the null at t ≥ 3.9**, so widening does not
+destroy the edge. **Per-trade edge is the wrong statistic for a supply
+change**: 36 → 38 is **1.19× the supply at 1.57× the total daily edge**. And
+the sweep's own binding-term check answers the question it exists to ask —
+at the shipped bar the RSI term is implicated in **95%** of blocked bars
+(43.7% RSI-only + 51.3% both) against **5.0%** for the trend term alone — so
+**the RSI bar is the right knob**, which is the one thing that would have made
+this whole sweep meaningless if it had gone the other way.
+**STATED HONESTLY: the 35-vs-38 ordering is inside the noise of the null**; what
+is robust is that the whole band clears it. This is bought as **DECIDABILITY**
+first ((ty)'s framing, I26) — her gate verdict is `undecidable · ~133d at the
+measured rate` — with expectancy measured not to deteriorate.
+
+### CARRIED, NOT ACTED ON — THE JUDGE'S EXPERIMENT IS STALLED, AND SO IS ITS DIAGNOSIS
+`xp-judge` reads `phase: running`, candidate **`mum-rsi-32`**, and its own last
+eval says **`"ARM NOT APPLYING: 0/3 shadow closes carry a receipt for
+{xp.mum.rsi_max: 32.0}"`, `arm_skew: true`.** That reads as broken plumbing and
+is very likely the drought: mum's shadow twin **last opened 26h ago**, before
+the experiment started (03-Sep 02:52Z), so no close CAN carry the receipt yet.
+**`0/N carry a receipt` is byte-identical between "the lever is not reaching the
+arm" and "the arm has not opened a position since the lever was set"** — the
+I1/I18 ambiguity, sitting on the fleet's only path from shadow evidence to real
+money, the lane `(xd)` unjammed six days ago. NOT fixed here (it is the judge's
+own lane and deserves its own measurement); recorded so it is not re-found.
+Note the shape: **the judge's candidate is TIGHTER (32) than the bar being
+widened**, and on this tape 32 is the best per-trade cell while 38 is the best
+per-DAY cell. Those are not in conflict, and a reader should not resolve them
+by moving a bar.
+
+### SHIPPED
+* `MUM_RSI_MAX` code default **36 → 38** + the matching `env_default` on BOTH
+  `xp.mum.rsi_max` and `live.mum.rsi_max`. The registry moves WITH the carrier
+  because `audit_lever_bounds` checks exactly that, and *"a registry that
+  misdescribes the running value is worse than none"*. Verified first that
+  `MUM_RSI_MAX` is **not set** on the `mum-live` service — had it been, the
+  code default would have moved nothing, silently. NOT done as a Railway env
+  var for the same reason: the guard cannot see Railway, so it would have
+  stayed green while the registry lied. The default now sits AT the cage `hi`,
+  so the rail may only TIGHTEN from here — deliberate, because 42 measures
+  +0.104%/trade against 38's +0.319 and there is nothing above 38 worth
+  reaching for.
+* `both_terms_n` counted at the published bar + `both_terms_stale_n`; 🙏 avo's
+  `bb_*` gauge — both arms, `tests/autonomy/test_census_bar_and_bb.py`,
+  9 mutations red.
+* `study_mum_reachability`'s blocking-term label derived from `live_bar()`.
+* One pre-existing bare `open()` retired from `test_live_clear_guard.py`: the
+  leaked-handle ratchet was **already red on clean HEAD at 51/50** before this
+  branch (verified by stashing). Not mine, cheap to shrink, and the ratchet's
+  own rule is that the backlog may only shrink — so it goes to 50 rather than
+  riding along as someone else's red.
+
+**WHAT DID NOT MOVE, and why:** 🙏 avo's cell. Her binding term is the BB dip
+and it has **no lever, no cage and no measurement** — the gauge shipped here is
+the prerequisite for pricing one, not a licence to move it. I19: a widening
+with no number is not covered by any grant.
+
+## 2026-09-04 (xy) — THE PRE-REGISTERED READ ON A REAL-MONEY BOOK COUNTED ONE HALT AS EIGHT INDEPENDENT DRAWS: `(xv)`'s own rule, one day old, and the docket that decides could not consume it
+
+**Found by the daily review, in the instrument's own output.** 👩 mum's LIVE
+row — real money — carries a follow-through pre-registered 2026-09-02. The
+winners' docket read her fresh sample as **n=18, t=-3.05, -$66.46** and printed
+**NOT_CONFIRMED**. Read alone, that is a sentence: a live book whose registered
+hypothesis came back significantly negative.
+
+**IT IS ONE HALT.** Eight of those eighteen closes share a single timestamp —
+`2026-09-02T17:19:45`, all `exit_reason=daily_loss`, **-$43.13 = 67% of the
+entire loss**. That is the `(xo)` flatten, and a flatten writes n rows at one
+instant: they share that instant's move and are **ONE observation, not eight**.
+The remaining 11 closes read **t=-1.19**. Through the gate's own cluster
+estimator the fresh sample is **t=-2.72 over 8 close-batches** — and 8 batches
+is *below the I16 floor* once the floor counts observations instead of rows, so
+the honest verdict is **UNDECIDED**, not a condemnation.
+
+**`(xv)` ENGRAVED THIS EXACT SENTENCE THE DAY BEFORE** — *"one flatten instant
+is ONE observation"* — and the docket had no way to hear it. Its only
+independence caveat counted distinct UTC **dates** and duly reported "2
+close-day(s)": true, and the wrong granularity for the question. **A finding no
+gate consumes is a note** ((gn)'s rule, and this is its fifth costume).
+
+**AND THE OWNER ALREADY EXISTED.** `golive_readiness.cluster_stats` /
+`cluster_se` have keyed on batched closes since they measured ⚖️ Counterweight
+at t_iid **-2.00** / cluster-robust **-1.32**, complete with a fail-closed
+contract and the `(kg)` degeneracy guard. The docket **imports
+`golive_readiness` already** — for the era boundary — and simply never asked it
+this question. So this is not the `(hj)` second-copy failure; it is the one
+before it: a consumer that never reached the owner at all.
+
+**SHIPPED.** `winners_docket.cluster_view` shapes rows and *nothing else* —
+the arithmetic AND the cluster definition stay `golive_readiness`'s, pinned by
+a test that reads the function body and fails if the sandwich meat reappears
+locally. Then:
+* **the follow-through VERDICT is the cluster-robust `t`**, not the iid one;
+* **the I16 floor counts BATCHES, not rows** — n rows at one instant cannot buy
+  a floor with draws that do not exist;
+* **FAIL-CLOSED, and the closed direction is "never crown"** — a shape the
+  estimator cannot judge (G<2, or cancelling batches) is `undecided`, never
+  `confirmed` on the iid `t`.
+
+**SYMMETRIC BY CONSTRUCTION, AND THE POSITIVE CONTROL IS THE POINT.** A guard
+that only ever refuses is trivially safe and useless — I3 applied to a gate. So
+the same commit is tested to refuse a false CROWN on an inflated winning batch,
+and **🎫 the taker's `exit:hold` follow-through survives untouched**: 24 closes
+over **23** batches, cluster-robust **t=+2.67**, still **CONFIRMED**. The fix
+removes a false condemnation on real money and leaves the fleet's one live
+confirmation standing. 🙏 avo's shadow moves +1.68 → **+1.49** over 12 batches,
+same verdict.
+
+**REPORTED, NOT YET A BAR, ON THE REFEREE — with the measurement that says why.**
+Every graded bucket now publishes its cluster read. The BH referee still runs on
+the iid `p`, because changing *that* re-verdicts 42 buckets and owes its own
+evidence pass. Measured today so the next pass starts from a number rather than
+a hunch: **no bucket crosses |t|=2 upward when clustered**, so no PROVEN verdict
+moves and the referee is minting no false winner; the inflation is concentrated
+exactly where the design predicts — ⚖️ Counterweight, the one living book that
+closes ten legs in one instant — `side:short` **-2.77 → -1.57** (the one
+|t|=2 crossing in the fleet, and it is a *retirement-direction* number),
+`book:*` **-1.84 → -0.83**, `side:long` **+0.99 → +0.35**. That book's own
+retirement read is pre-registered for 1-Oct and is graded by
+`golive_readiness`, which has reported the clustered number all along — so the
+gap this entry closes was never in front of ⚖️; it was in front of mum.
+
+**Expectancy price (I19): none.** The docket is read-only — it moves no
+capital, writes no lever and promotes nothing. What changes is which number a
+human acts on.
+
+14 tests, **6/6 mutations red** (verdict reads the iid `t` · floor counts rows ·
+fail-open when the cluster read is absent · `cluster_view` stops sorting ·
+report drops the clustered line · the referee stops publishing it).
+
+## 2026-09-03 (xv) — "DOES THE HALT COST OR SAVE HER?" IS PRE-REGISTERED, NOT ANSWERED: one flatten instant is ONE observation, and her ledger holds exactly one
+
+**Eamon, 3-Sep: *"Mum doesn't appear to be trading properly"*** → *"Yes I like
+this idea."* Two findings, and the first one is a correction of my own reading.
+
+**THE THROUGHPUT WORRY WAS WRONG, AND THE ERROR IS INSTRUCTIVE.** I first
+compared CLOSES — live 1 vs twin 12 over 12h — and called it a 12× gap. Closes
+measure inventory being DRAINED, not activity. On OPENS:
+
+| | since halt cleared (6.9h) | 24h | 48h |
+|---|---|---|---|
+| live | **1** | 6 | 20 |
+| twin | **0** | 8 | 23 |
+
+She is trading, and since the halt cleared she is AHEAD of her twin. She looked
+idle because the halt flattened 8 legs at 17:19Z, leaving her nothing to close
+while the twin still had a book running — and `rsi_med 55.9` against her `36`
+bar means the tape genuinely is not oversold (`no_signal 92` of 94 is real).
+**A rate comparison must use the leg that opens, not the leg that closes.**
+
+Also chased and REFUTED as a lead: `both_terms_n: 3` beside `no_signal: 92`
+looked like a contradiction. It is not — that gauge is PERSISTED and written
+~once an hour on her 1h book (`last_sig_ts` short-circuits `S.signals()`
+between candles), exactly as `(vm)` designed it. Checking the accessor before
+reporting a bug is the rule, and it held here.
+
+**THE REAL DIFFERENCE IS THE HALT, AND IT IS NOT DECIDABLE YET.**
+
+| 24h | live | twin |
+|---|---|---|
+| n | 17 | 20 |
+| P&L | **−$67.37** | **−$1.69** |
+| stop/halt losses | 9 closes, −$55.55 | 1 close, −$2.33 |
+| roi wins | 2 | **9** |
+
+Paired same-coin against the twin, the 8 halt-closed legs realised
+**−1.70%/leg** where the twin's same coins exited at **+0.05%/leg** — a cost of
+**+1.76pp/leg**, four of seven recovering into `roi` exits she no longer owned.
+
+**AND IT DECIDES NOTHING, because all eight legs closed in the same second.**
+One flatten, one falling minute, one correlated crypto basket — **one
+observation, not eight.** The 7-of-7 sign test across those legs reads p≈0.008
+and is an artifact of treating one market moment as seven independent draws:
+the (kw)/(ky) cluster lesson in its most tempting costume, because the legs
+genuinely are separate ledger rows. Her ledger holds **exactly one** daily-loss
+halt; the other three "shut" days in `halt_days_30d` were stop-guard and
+cooldown LOCKOUTS, which block entries without force-closing anything and carry
+no forced-exit counterfactual at all.
+
+**THE I25 CONTROL, and it is the reassuring half:** on the 53 closes across
+days she did NOT halt, live reads **+0.720%/trade** against the twin's
+**+0.625%** — she BEATS her control arm off halt days. So the coin vetoes,
+cooldowns, live-only gates and execution are costing her nothing measurable,
+and the halt is the only measured difference between the arms.
+
+**SO IT IS REGISTERED, NOT DECIDED (I21).**
+`scripts/study_mum_halt_cost_2026-09-03.py` fixes the criterion NOW, before the
+data arrives: **read at n≥5 halt EVENTS occurring AFTER 2026-09-03; LOOSEN only
+if mean paired cost > 1.0pp/leg AND the sign is consistent across events;
+otherwise KEEP.** The registered event is never re-mined into that count.
+
+**WHY THE DEFAULT IS KEEP, and this is the load-bearing argument:** a rail's
+COST is visible every single time it fires; its BENEFIT appears only on the day
+it prevents a ruinous loss, which by construction has not happened yet. **A
+cost-only study of a daily-loss halt will read "loosen" on every ordinary halt
+day right up until the day it doesn't.** The burden therefore sits on
+loosening, never on holding — which is why the bar is a mean across EVENTS with
+a consistency requirement rather than a single expensive afternoon.
+
+**TWO DEFECTS THE CALIBRATION GATE CAUGHT IN MY OWN INSTRUMENT**, both in the
+direction that would have manufactured a decision:
+1. **Events were keyed on the exact timestamp.** The registered event's 8 legs
+   happen to share a microsecond so it "worked" — and a flatten spanning two
+   seconds would have split silently into two events, inflating the count
+   toward the n≥5 bar. Now grouped by UTC DAY, which is exactly right because
+   `halted_today` LATCHES once per day, so at most one halt can occur per day
+   by construction.
+2. **The baseline compared the twin over its FULL history** (from 7-Aug)
+   against live's six days — and it FLIPPED the verdict, printing "live trails
+   the twin" (+0.720 vs +1.105) where the paired window reads the opposite
+   (+0.720 vs +0.625). A control arm on a different window is not a control.
+   Both the event AND the baseline are now inside the calibration gate, which
+   REFUSES (exit 2) rather than reporting when either fails to reproduce.
+
+Carried as `mum-halt-cost-preregistered-read` so it cannot be forgotten; the
+row closes only when the read is taken and the registration removed. Pinned by
+`tests/autonomy/test_mum_halt_cost_registration.py` — **5/5 mutations red**,
+including both bars: lowering `MIN_EVENTS` 5→1 or `LOOSEN_COST_PP` 1.0→0.1
+reddens, so the criterion cannot be quietly moved once a bad week makes
+loosening attractive.
+
+**RENUMBERED (xu) → (xv)**: a concurrent session landed `(xu)` while this was
+being built — the second letter race today.
+
+**No lever moved. No trade changed.** Read-only instrument plus a registration.
 
 ## 2026-09-03 (xu) — `_run` LEAKED EVERY COROUTINE IT REFUSED, AND THE FIRST TEST I WROTE FOR IT WAS VACUOUS — found in 👩 mum's own logs on the first entry after her halt cleared
 
@@ -1607,7 +1928,7 @@ windows trailing 120d (decision) and 30d (her live regime). **Calibration
 (gx):** at 1× over the shadow twin's window the replay reads **+0.344%/trade
 at 9.3 closes/day** against the twin's ledger +0.494% / 6.0 — inside the
 pre-declared ±0.30pp / ×1.6 gate.
-**[CORRECTED IN PLACE 3-Sep (xv) per I12 — THAT PASS WAS MARGINAL BY 0.05 AND
+**[CORRECTED IN PLACE 3-Sep (yb) per I12 [renumbered from (xv): a concurrent session landed a different (xv) cited from five places in tracked code, so per the letter rule the CITED entry keeps it; note the commit for this correction still says (xv) in its subject, which is why git log is not a letter index] — THAT PASS WAS MARGINAL BY 0.05 AND
 THE GATE NOW REFUSES.** 9.3/6.0 is a ratio of **1.55** against a **1.6** bar:
 this instrument cleared its own calibration by five hundredths and then set a
 REAL-MONEY gross. Re-run 3-Sep 00:20Z on the extended tape it reads **10.11

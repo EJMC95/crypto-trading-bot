@@ -294,6 +294,41 @@ def buckets_of(by_bot):
     return {k: out[k] for k in best.values()}
 
 
+def cluster_view(rows):
+    """Cluster-robust view of a docket bucket, keyed on BATCHED CLOSES.
+
+    [2026-09-04 (xy)] THE ARITHMETIC AND THE CLUSTER DEFINITION ARE BOTH
+    `golive_readiness`'s — this function shapes rows and nothing else, so a fix
+    there is a fix here ((hj): a second copy of a rule is a second rule). The
+    gate has owned `cluster_stats` since it measured ⚖️ Counterweight at
+    t_iid -2.00 / cluster-robust -1.32; the docket, which decides a
+    PRE-REGISTERED real-money follow-through, never asked it.
+
+    WHY IT MATTERS HERE. `t = mean / (sd/sqrt(n))` assumes n INDEPENDENT
+    observations, and a book that flattens closes its whole book in ONE
+    instant — those rows share that instant's move and are one observation,
+    not n. Measured the day this shipped, on 👩 mum's LIVE row: her fresh
+    pre-registered sample read **n=18, t=-3.05**, and **8 of those closes are
+    a single `daily_loss` halt at 2026-09-02T17:19:45 carrying 67% of the
+    loss**. Clustered she reads **t=-1.00 over 9 batches**. The docket's
+    existing `days` caveat counts distinct UTC DATES and reported "2
+    close-day(s)" — true, and the wrong granularity for the question.
+
+    Returns `gr.cluster_stats`'s dict, or None on a shape the estimator cannot
+    judge (G < 2, or between-batch deviations that cancel — the (kg)
+    degeneracy). Absent means "not computable", never "fine".
+    """
+    rr = sorted(rows, key=lambda r: r["closed"])
+    pct = [r["pct"] * 100 for r in rr]
+    n = len(pct)
+    if n < 2:
+        return None
+    mean = sum(pct) / n
+    sd = math.sqrt(sum((x - mean) ** 2 for x in pct) / n) or 1e-12
+    return gr.cluster_stats([(r["pct"] * 100, r["abs"], r["closed"]) for r in rr],
+                            mean, sd, n)
+
+
 def followthrough(key, rows):
     """[I21] The pre-registered test: the FRESH closes alone, never the pooled.
 
@@ -321,18 +356,39 @@ def followthrough(key, rows):
     tags = defaultdict(int)
     for r in fresh:
         tags[r["tag"] or "-"] += 1
+    clus = cluster_view(fresh)
     out.update(t=round(t, 2), mean_pct=round(sum(pcts) / len(pcts), 3),
                total=round(sum(r["abs"] for r in fresh), 2),
                p=t_sf(t, len(pcts) - 1),
                tag_share=round(max(tags.values()) / len(fresh), 2),
-               days=len({r["closed"].date() for r in fresh}))
-    if len(fresh) < MIN_N:
+               days=len({r["closed"].date() for r in fresh}),
+               clus=clus)
+    # [2026-09-04 (xy)] THE VERDICT IS THE CLUSTER-ROBUST READ, and the FLOOR
+    # counts BATCHES, not rows. A book that flattens writes n rows at one
+    # instant; those are ONE observation, so admitting them as n both inflates
+    # |t| by ~sqrt(batch) and buys the I16 floor with draws that do not exist.
+    # FAIL-CLOSED, and the closed direction is "never crown": a shape this
+    # estimator cannot judge is `undecided`, never `confirmed` on the iid t.
+    # SYMMETRIC by construction — it refuses a false CONFIRM on an inflated
+    # winning batch exactly as it refuses a false condemnation on a halt.
+    g = (clus or {}).get("n_clusters")
+    t_cr = (clus or {}).get("t_cluster")
+    if clus is None or g is None or t_cr is None:
         out.update(verdict="undecided",
-                   why=f"fresh n={len(fresh)} < MIN_N {MIN_N} (I16 floor)")
-    elif t >= 2.0:
-        out.update(verdict="confirmed", why="t >= 2.0 on the fresh sample alone")
+                   why=f"cluster-robust t not computable on n={len(fresh)} "
+                       "(G<2 or cancelling batches) — never crowned on the iid t")
+    elif g < MIN_N:
+        out.update(verdict="undecided",
+                   why=f"fresh n={len(fresh)} is {g} independent close-batch(es) "
+                       f"< MIN_N {MIN_N} (I16 floor, counted on batches)")
+    elif t_cr >= 2.0:
+        out.update(verdict="confirmed",
+                   why=f"cluster-robust t {t_cr:+.2f} >= 2.0 on the fresh "
+                       f"sample alone ({g} batches)")
     else:
-        out.update(verdict="not_confirmed", why="t < 2.0 on the fresh sample alone")
+        out.update(verdict="not_confirmed",
+                   why=f"cluster-robust t {t_cr:+.2f} < 2.0 on the fresh "
+                       f"sample alone ({g} batches)")
     return out
 
 
@@ -353,6 +409,15 @@ def grade_buckets(bk):
             drift=(key[2].startswith("short") or key[2] == "short")
             and not any(f in key[0] for f in FUNDING_BOOKS),
             prereg=followthrough(key, rows),
+            # [(xy)] REPORTED on every bucket, never a bar here: the BH referee
+            # still runs on the iid p, and changing THAT re-verdicts 42 buckets
+            # and needs its own evidence pass. Measured the day this shipped, no
+            # bucket crosses |t|=2 upward when clustered (so no PROVEN verdict
+            # moves today) and the inflation is concentrated exactly where the
+            # design predicts — ⚖️ Counterweight, the one book that closes ten
+            # legs in one instant: side:short t -2.77 -> -1.57, book:* -1.84 ->
+            # -0.83. Publishing it is what lets the next pass grade the referee.
+            clus=cluster_view(rows),
         )
     return graded
 
@@ -403,6 +468,14 @@ def report(graded, fdr=FDR):
                              f"mean={ft['mean_pct']:+.3f}% ${ft['total']:+.2f} "
                              f"p={ft['p']:.4f} · {ft['days']} close-day(s), "
                              f"dominant tag {ft['tag_share']:.0%}")
+                fc = ft.get("clus")
+                lines.append("      CLUSTERED (the test, (xy)): "
+                             + (f"t={fc['t_cluster']:+.2f} over "
+                                f"{fc['n_clusters']} close-batch(es), "
+                                f"largest {fc['max_batch']}, n_eff={fc['n_eff']}"
+                                if fc else
+                                "not computable — a shape this estimator "
+                                "cannot judge (never crowned on the iid t)"))
             lines.append(f"      => {ft['verdict'].upper()} — {ft['why']}")
     near = [(k, g) for k, g in graded.items()
             if k not in winners and k not in PRE_REGISTERED
