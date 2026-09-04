@@ -1,3 +1,77 @@
+## 2026-09-03 (xz) — THREE CONSTANTS IN THREE FILES DECIDE ONE BOOK'S BEHAVIOUR, AND NOTHING READ THEM TOGETHER: the leverage band, and 🙏 avo was losing 64% of her trades to it
+
+**[RENUMBERED (xy) -> (xz) at push time.** A concurrent session landed a different `(xy)` on main first and it is already cited, so per the letter rule the CITED entry keeps it. **Third collision in one night** — (xr)->(xt)->(xx) moved twice, and this one once; four sessions have picked "the next free letter" from four stale snapshots since midnight.**
+
+**Eamon, 3-Sep: *"Check on all 'relationships' in the fleet, we could be onto
+something."*** He was, and this is the general form.
+
+**THE RELATIONSHIP.** A book's gross `g` is a Railway service env. Its stop `s`
+is a registry entry. Its daily-loss fraction `f` is a constant in whichever host
+runs it. Each is defensible alone; only the RATIO decides whether the book's own
+strategy or the daily rail gets to end its trades — and no guard read the three
+together.
+
+| | |
+|---|---|
+| **R1** the halt must not pre-empt the stops | `f / g >= s`, i.e. `f >= g*s` |
+| **R2** an all-slots stop stays inside the gate's drawdown bar | `g * s < D` (D = 0.15) |
+| **⇒ the derived ceiling on leverage** | **`g < D / s`** |
+
+**IT HAD ALREADY BEEN PAID FOR THREE TIMES, and patched locally each time.**
+* `(hl)` 🌊 Tide Rider — *"at >=10 the -10% daily-loss halt becomes reachable
+  before the -35% stop"*. Fixed by capping that ONE book's `max_open`.
+* 👩 mum — 3.75x / 4% / 0.10 = **0.71 stop-widths**. She halted on a 4.0% basket
+  move at 9 of 12 slots and lost a trading day; the halt then could not flatten
+  a 1000-market ((xo)), so 84% of her book sat unmanaged behind it.
+* 🙏 avo — 5.3x / 10% / 0.10 = **0.19 stop-widths**, a fifth of one stop. And it
+  was not theoretical: **14 of her 22 live closes (64%) were `daily_loss`
+  flattens.** Her strategy exited 8. She was not a book with a risk rail; she
+  was a book being liquidated by one, two-thirds of the time.
+
+**AND `(sr)` HAD ALREADY DERIVED THE CEILING.** `GROSS_X_MAX = 0.15/|stoploss|`
+IS `D/s`, and mum's 3.75x was precisely that number. It was later made an
+operator env — correctly, *"risk appetite belongs to the person whose money it
+is"* — and **nothing replaced it as a REPORT.** A bound removed on purpose left
+no instrument behind, so the next book to take leverage did so blind. That is
+the whole mechanism, and it is why this reports rather than clamps.
+
+**WHY IT KEEPS BEING MISSED: the relationship is DORMANT AT 1x.** A book at
+gross 1.0 caps its own day at `s` whatever `f` says. The trap opens the moment
+leverage arrives — and leverage arrives on a service env, in a different system
+from either other constant. Measured this session: of 16 living books, only the
+two live ones publish `gross_x` at all; for the other 14 the ratio is invisible
+from the payload.
+
+**SHIPPED: `scripts/audit_leverage_band.py`.**
+* **Reports, never clamps** — the gross is Eamon's ((sr)).
+* **Two arms.** The SOURCE arm reads the owners (`lighter_family_bot.STRATEGIES`
+  for stops, `RETIRED_BOOKS` for who is living, each host's own
+  `DAILY_LOSS_LIMIT`) and is registered in `ENFORCED_AUDITS`, so a NEW book born
+  outside the band reddens the push. The LIVE arm (`--pnl-json`) is the only
+  place the real gross is visible and **fails CLOSED** — a dark feed exits 2,
+  never a vacuous green.
+* **The gate bar is IMPORTED** from `golive_readiness`, not retyped (hj), and a
+  test fails if it ever falls back to a literal.
+* **A RATCHET, not a bar.** Both live books deliberately sit outside R2 today
+  (`g*s = 0.20` vs `D = 0.15`) on Eamon's explicit call, scored from an option
+  set. A guard that reddens on a DECIDED state gets exempted within a day and
+  then guards nothing ((mz), cited by I23) — so those are `DECLARED` with the
+  decider named and the value decided at, and only an UNDECLARED violation
+  fails.
+* **"No daily halt" reads `None`, never True.** Six living books have a stop and
+  no halt; *not applicable* and *checked and fine* are different answers (I18).
+
+**THE HEADLINE TEST IS RETROSPECTIVE:** plant avo's real pre-fix config and
+require the guard to flag it. A guard that cannot see the incident it was built
+for is decoration.
+
+16 tests, **7/7 mutations red** — and one of them nearly escaped for a reason
+worth recording: the ceiling mutation `D/s -> D*s` is **SIZE-PRESERVING**, so
+Python served a stale `__pycache__` and the test passed against bytecode the
+source no longer contained. **A mutation harness that does not clear the
+bytecode cache can report a kill it did not make.** Every mutation here is now
+re-run with `__pycache__` removed.
+
 ## 2026-09-03 (xu) — `_run` LEAKED EVERY COROUTINE IT REFUSED, AND THE FIRST TEST I WROTE FOR IT WAS VACUOUS — found in 👩 mum's own logs on the first entry after her halt cleared
 
 **Eamon: *"fix the above"***, on a defect his live book printed at 00:07Z, four

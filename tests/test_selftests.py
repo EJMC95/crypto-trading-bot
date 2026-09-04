@@ -450,6 +450,16 @@ LIVE_SELFTESTS = [
 # `audit_changelog_letters` is the deliberate exception, and it earns it: at
 # push time your own letter IS part of the change under test.
 ENFORCED_AUDITS = [
+    # [(xz)] THE LEVERAGE BAND. Three constants in three files — gross on a
+    # Railway service env, the stop in a registry, the daily-loss fraction in
+    # whichever host runs the book — jointly decide whether a book's own
+    # strategy or the daily rail gets to end its trades. Each is defensible
+    # alone; only the RATIO is wrong, and nothing read the three together.
+    # Registered as ENFORCED rather than guard-only because the scan is the
+    # point: it exits 0 today and reddens on a NEW book born outside the band.
+    # The scan sees code defaults (gross 1.0); the LIVE gross is a service env
+    # this repo cannot see, so the --pnl-json arm rides the weekly assessment.
+    "scripts/audit_leverage_band.py",
     # [2026-08-16] boot-stagger reachability. A push is a deploy and a deploy
     # restarts every organ's boot timer, so an organ whose time-to-first-run
     # exceeds the deploy cadence never starts — and NOTHING else reports that,
