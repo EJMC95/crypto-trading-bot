@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-03 18:01 Sydney (08:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-05 02:23 Sydney (16:23Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `mum-virtual-flip-preregistered-read`  ·  owner: **session**
+(yb) 👩 mum publishes a VIRTUAL FLIP LEDGER: at every loss-class exit she records the SHORT she did not take and marks it at 6h and 24h against a matched-window random-coin short. It exists because the NAIVE flip is measured NEGATIVE on her own record -- across 12 stop-outs the coin is +0.881% higher a median 2.32h later (t=+3.26 AGAINST the short), the stop firing at maximum oversold, which is the bottom. READ `extra.flip` on freqtrade-mum-lighter at n>=30 settled 6h observations, or on 2026-10-04, whichever first, and read BOTH horizons -- a sign that appears at one and not the other is the (oe) artifact, not a finding. REFUTED (edge_pct <= 0, or positive below t_crit(n) via fleet_allocation) -> record it and RETIRE the instrument, because a telemetry arm nobody can act on is the museum the OFFENSE tier warns about. CONFIRMED (edge_pct > 0 at t_crit(n) on BOTH horizons) -> it goes to Eamon WITH the era price, never straight to a build: POLICY_SIG_FIELDS carries `sides`, so a real short side resets her go-live clock. Anything else, re-arm ONCE (P3).
+
+_Still open because:_ the sample has not accrued: at registration the ledger is empty and her live arm books ~2.4 loss-class exits/day, so n>=30 lands ~mid-Sep. The date is the backstop, not the trigger. Closes when the read is taken and recorded in the CHANGELOG -- and note the honest asymmetry: this instrument was built to price a REFUSAL, so a refutation is a completed read, not a failure.
 
 ### `mum-halt-cost-preregistered-read`  ·  owner: **session**
 (xv) pre-registered whether 👩 mum's daily-loss halt costs or saves her, paired same-coin against her never-halting shadow twin. At registration her ledger holds exactly ONE daily-loss halt (2-Sep 17:19:45Z, 8 legs, +1.76pp/leg cost against the twin) -- one flatten instant is ONE observation, not eight, so it decides nothing. READ at n>=5 halt EVENTS occurring AFTER 2026-09-03: LOOSEN only if mean paired cost > 1.0pp/leg AND the sign is consistent across events; otherwise KEEP. Instrument: scripts/study_mum_halt_cost_2026-09-03.py (its calibration gate REFUSES unless it reproduces both the registered event and the registered baseline).
@@ -74,113 +79,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (105 commit(s), entries (wg), (wl), (wm), (wn), (wo), (wp), (wq), (wu), (wv), (wx), (wy), (xc), (xd))
+## Shipped today (1 commit(s))
 
-- `b7ab9b9` (xu) pre-mutation
-- `3a60488` [deploy-live] (xu) _run leaked every coroutine it refused — a prerequisite for main's own deferred-fill retry; plus (xx) the adopted purge, (xv)/(xw) two corrections in place (#281)
-- `18ee037` (xt) resolve the fills the governor declined: live execution was measured on a non-random 42%
-- `06d546d` (xs) the taker's gate census: 23 of 24 tickets died before (uo)'s counter
-- `069d0eb` (xr) the declared-key check scans the whole loop — mutation round 2 found it blind to tickets_in
-- `a741244` (xr) the taker's gate census: 23 of 24 tickets died before (uo)'s counter
-- `0dc874b` (xr) the stuck-flatten page: a halted book that cannot close is loud in 30 min instead of never
-- `dd57efb` [deploy-live] (xo) mum's halt could not flatten a 1000-market — 84% of a live book left unmanaged; plus (xp) the measured stop ceiling, (xq) adopted legs are not evidence, (xl) her dip-velocity band (#272)
-- `decd8ee` Merge PR #280: (xj) the drift guard _STOP_BRIDGE promised in writing and never got — plus a carried row that was five days stale
-- `9f0f186` Merge origin/main (xi) into the (xj) branch
-- `cb4cc5d` (xj) the drift guard _STOP_BRIDGE promised in writing and never got — plus a carried row that was five days stale
-- `988e40c` Merge PR #279: (xi) the check ran and came back positive — and my own predicate for it was wrong
-- `578fa14` (xi) the check ran and came back positive — and my own predicate for it was wrong
-- `d6626e9` Merge PR #278: (xi) the Railway delete is a platform limit, not a permission one — harm neutralised, reason measured
-- `a0361e5` (xi) the Railway delete is a platform limit, not a permission one — harm neutralised, reason measured
-- `26feade` Merge PR #276: (xh) the suite's 8-red floor was the container, and finding that surfaced a live-deploy marker lost to a squash merge on a real-money book
-- `cbfcdb6` (xh) a live-deploy marker does not survive a squash merge — measured on a real-money book, closed executably
-- `8b174ba` (xh) the local suite had a standing floor of 8 reds that were not the tree's — a SessionStart hook installs the repo's own declared deps
-- `98f0a3d` [deploy-live-mum] (xf)(xg) mum's gross 3.75x and her halt-aware entry gate (#271)
-- `9a667f7` (xe) One position, two spellings: a 1000-market's mark arrived venue-spelled and the margin block asked fleet-spelled (#275)
-- `72cc51a` Merge PR #274: the judge's serial lane could not promote, by construction — a drift guard sound for one entry file in two services became a permanent block when the lane moved to two images (xd)
-- `790ec1f` (xd) drop an unused import from the cross-image drift test
-- `c8684ad` (xd) The judge's serial lane could not promote, by construction: a drift guard sound for one entry file in two services became a permanent block the day the lane moved to two images
-- `f529d02` wip3
-- `a992b9c` wip2
-- `6b60e4d` wip: cross-image arm drift (pre-mutation)
-- `4d1de6b` Merge PR #266: (xb)/(xc) the edge audit's last items, then both judgement numbers calibrated optimally
-- `b2b7d8e` HANDOFF regenerated after merging main (xc)
-- `cbf6f43` Merge origin/main into the calibration branch: #270's (wz) readback
-- `93a77d1` HANDOFF regenerated after merging main (xc)
-- `c1f3cc6` Merge origin/main into the calibration branch: (wz), (xa) and a second (wy) landed first; this branch's entries are (xb) and (xc)
-- `1af3ebc` Merge PR #270: (wz) readback — shadow budget 26 published, the proposals heartbeat's first beat, six mum offspring queued
-- `79d2f1d` Calibrate optimally with findings (xb): the live lane's margins are derived from each comparison's own noise at the fleet's critical value, the book baseline excludes the motivating window, the shape monitor pages at the exact minimum-total-error boundary
-- `106259f` (wz) read back on the live bus: shadow budget 26 published, the proposals heartbeat's first beat, six mum offspring queued
-- `80ef8b0` [deploy-live-mum] Merge PR #268: (xa) mum's 1000-market legs keep their bracket — positions read in one spelling, untracked legs adopted into stop/roi/max_hold
-- `9115dac` Merge remote-tracking branch 'origin/main' into claude/real-money-performance-5irang
-- `1c37d6c` Merge PR #269: (wz) the shadow long budget is the cohort's own cap sum (26) — the judge's control twins stop being vetoed on paper their live arms never see
-- `476a4e9` Merge remote-tracking branch 'origin/main' into claude/real-money-performance-5irang
-- `5175109` (wz) The shadow long budget is the cohort's own cap sum (26 = mum's twin 12 + avo's twin 6 + taker 8), pinned to the books' caps — the judge's control twins stop being vetoed on paper their live arms never see
-- `b7cd24b` Mum's real-money 1000-market legs lose their bracket (wz): positions read in one spelling, untracked legs adopted into stop/roi/max_hold — driven tests, 3/3 mutations red
-- `da15417` Merge PR #267: (wy) run 2 through 4 — two pre-registered studies, the incubator on the judge's lane, the organ board's two flags closed
-- `34e33ad` CodeQL hygiene on (wy): four file reads through with-blocks, one constant comparison dropped from a test assertion
-- `1b0a4e1` (wy) Run 2 through 4: two pre-registered studies from the edge audit (the taker's 4h hold floor already excluded on its own entries), the incubator breeds for the judge's lane, and the organ board's two flags close
-- `5cc2a88` HANDOFF regenerated after merging main (wy)
-- `31011bc` Merge origin/main into the calibration branch: main's (wx) landed first, this entry moves to (wy)
-- `4a7e809` HANDOFF regenerated after the (wx) calibration
-- `fb25313` Calibrate the two numbers (wx) left as judgements: the I25 margin is re-measured and stands, the shape monitor fires in sampling-noise units against the fleet's own claim bar
-- `8f90426` HANDOFF regenerated at session end (save)
-- `39311fc` The douglas guard spares his tenant (wx): scope by BOT — bezos is a variant of the retired engine and was idled ~3h; retirement scope is chosen by a module's importers
-- `2860c20` Merge PR #265: (ww) readback — family-shadow-stale-writer closed on the feed
-- `1e726a3` HANDOFF regenerated after merging main (wx)
-- `42d438c` Merge origin/main: #264 (ww) landed under the follow-up branch; the entry keeps (wx)
-- `fdb7182` The edge audit's last four items leave the prose: kelly's read is a docket deferral, mum's shape has a monitor, streaks are judged against chance, I25 reaches the live grader's margin (wx)
-- `39a45ea` The closing note cites (ww), the entry it belongs to — no phantom letter
-- `bf47978` Close family-shadow-stale-writer on the feed readback: family rows on 97dbe3986551/15, mum's 12-position book publishing, georgia-v3's first row
-- `bd524a5` [deploy-live] Merge PR #264: (ww) proceed with everything in the organ review — docket calls reconciled with the (wt) slate, cage re-decided, mum judge lane, weekly organ board
-- `6b24cc1` test_mum_census_both_terms follows the census series through (wv)'s one builder — red on main since the extraction, healed here
-- `8bb645f` Merge origin/main: (wv) landed the family publish fix — my entry moves to (ww) and its stale-writer paragraph cites the root cause
-- `3992544` The dashboard's georgia hole (wv): spend_extra's b.bot killed every family publish for five days behind a stale Railway writer — one builder, driven for every book, publish failures now log
-- `085a748` Merge origin/main: reconcile with the (wt) September slate and the (wu) rails — georgia's shadow retirement withdrawn (deferred to her 10-Sep read), duplicate guards dropped for the slate's, roster re-aims reverted, letter (ws)->(wv)
-- `9c3b2cb` Merge PR #263: the two sizing rails from the edge audit, reshaped to bite only on measured harm; the brain's expansion floors measured and kept (wu)
-- `ab465ba` HANDOFF regenerated after the third re-merge (wu)
-- `07adc37` Merge origin/main a third time: the (wt) September slate landed; the rails entry keeps (wu)
-- `922016c` The September slate (wt): five I17 retirements on the grader's own verdicts (garrett, douglas, farmer-shadow, nav-cook, grimes), georgia v1 deferred to her pre-registered 10-Sep read, trail-blazer-live stopped — Eamon's delegated docket act
-- `643bc6e` CodeQL hygiene on (wt) and the merged (wp): one import style for the family module, no dead binding, file reads through pathlib, explanatory comments in the two empty excepts, redundant inner imports dropped
-- `83bcbfd` CodeQL hygiene on the floors study: the --out write goes through a with-block (wu)
-- `cd8410c` Port the selftest registration for scripts/study_taker_divergence_stop_2026-09-02 (wu)
-- `7544d84` (wt) the family shadow host is stuck on 28-Aug code: carried as an operator act with the stamp to read back
-- `b0b2340` HANDOFF regenerated after the second re-merge (wu)
-- `5724989` Merge origin/main again: main took (wq)-(ws) and holds (wt) in flight, so the rails entry moves to (wu); the carried list is main's minus the closed floors row
-- `bd1ad2a` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
-- `b7599d4` Renumber (ws) -> (wt): main took (ws) for the sentinel's graded bar while this pass was open
-- `1b12ace` HANDOFF regenerated after closing the floors row (wq)
-- `7dd38b4` The brain's expansion floors, measured before the rails merge: floors KEPT with evidence, the entry's two false sentences corrected in place, the carried row closed (wq)
-- `21283ad` (ws) Proceed with everything in the organ review: five docket retirements, the incubator cage re-decided beside (wr)'s clock split, the judge's lane moved to mum, and a weekly organ board
-- `6639f1e` The sentinel earns its fear (ws): one graded bar (n>=10, hit>=0.55) for BOTH proposal directions — a below-coin-flip playbook can no longer propose the crouch
-- `7ab31ed` The clock split (wr): the breakout trend exit gets its own BRK_MAX_HOLD_H — taker.max_hold_h steers only the divergence bracket, AST-pinned, behaviour-neutral at ship
-- `694f7c6` HANDOFF regenerated after merging main into the rails branch (wq)
-- `27a3d7b` Merge origin/main into the rails branch: #262 took (wp), so the rails entry moves to (wq) and every citation moves with it
-- `7cb0c7d` The backlog drained (wq): both live books claim-justified (ratchet 2->0), Counterweight fresh-read tripwire, minvol wired into the tp study, the (sk) breakoutup pins re-decided on a sighted gate, divergence stop priced (a refusal)
-- `faf9bc8` [deploy-live] Merge PR #262: (wp) support-system deep dive — cohort long budget, held-basket margin, shadow scan-order parity, living shortfall pair
-- `2165a41` CodeQL hygiene on the rails: three NaN checks through math.isnan, a commented fallback except, an unused test import (wp)
-- `f58ba46` Merge remote-tracking branch 'origin/main' into claude/bot-system-health-check-q0hko4
-- `7227ca0` Renumber (wo) -> (wp): main took (wo) for the edge audit while this PR waited on CI; citations moved with it (wp)
-- `a0f3426` Regenerate HANDOFF — I11's regenerate-last half (wp)
-- `3aff7bc` The two sizing rails from the edge audit, reshaped to bite only on measured harm: a book past its drawdown bar is scaled, a book whose era bound is measured at zero is not levered (wp)
-- `cf11c48` Merge PR #260: the edge audit — 18 living books, zero survive multiplicity, four of four founding claims rejected on their own ledgers (wo)
-- `dec9ad4` (wo) the support-system deep dive: cohort long budget, held-basket margin, shadow scan-order parity, a living shortfall pair, Counterweight's date
-- `713c0c0` Kelly's clip was already cut to $80 on 1-Sep (vy): the audit's 'nothing reduces her clip' corrected in place, and her Monte Carlo re-run at the live clip (wo)
-- `aa93e7d` Regenerate HANDOFF after the third main merge (wo)
-- `a46640b` Merge origin/main: (wn) the CI-liveness pager landed first; the edge audit keeps (wo) above it
-- `bdf6689` Renumber (wn) -> (wo): main took (wn) for the CI-liveness pager; citations moved with it (wo)
-- `09e5fc4` (wn) the CI-liveness pager cried wolf 1-in-10: heartbeat rides push CI, LATE warns at 4h, DARK pages at the measured 12h
-- `bd9b07a` CodeQL hygiene on the edge audit: nine findings — eight bare open() calls now use context managers, one unused local removed (wn)
-- `4e65d49` Merge PR #261: CodeQL hygiene on the #257 suites, with its dated (wg) note
-- `8516ff6` Regenerate HANDOFF after the second main merge — I11's regenerate-last half (wn)
-- `b874c82` Merge origin/main: mum's (wm) pre-registration landed first; the edge audit keeps (wn) above it
-- `07b609e` Renumber (wm) -> (wn): main took (wm) for mum's I21 pre-registration first; citations moved with it (wn)
-- `6dfbc16` Regenerate HANDOFF after the main merge — I11's regenerate-last half (wm)
-- `af7700b` Merge origin/main: main's (wl) dashboard fix landed first; the edge audit keeps (wm) above it
-- `65d67c5` the changelog gate counts tests/ as bot-affecting — the CodeQL hygiene pass gets its dated note in (wg)
-- `712c3df` Renumber (wl) -> (wm): main took (wl) for the dashboard fix first; citations moved with it (wm)
-- `9f091f0` (wm) — mum pre-registered on the winners' docket (I21); the snapshot pin re-aimed per I26
-- `c90e359` CodeQL hygiene on the #257 suites: an unused os import and an unclosed file handle
-- `c974f7d` Regenerate HANDOFF — I11's regenerate-last half (wl)
+- `b940c45` [deploy-live-mum] (yb) the flip that loses, and the judge lane that never ran
 
 ## How this file stays honest
 
