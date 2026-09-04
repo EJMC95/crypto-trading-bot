@@ -1,3 +1,76 @@
+## 2026-09-04 (yd) — A LIVE BOOK CAN STOP TRADING AND NOTHING PAGES: publisher liveness was covered, BOOK liveness was not
+
+**Eamon asked *"bots aren't trading"* THREE TIMES on 4-Sep**, and the reason he
+had to is the finding. Both real-money books had been idle **28h** and **41h**.
+Every organ read healthy: `n_stale: 0`, watchdog `problems: []`, neither row
+halted, both fresh to the second. **Nothing surfaced it, and nothing could.**
+
+**THE HOLE, stated exactly:** I1 gives this fleet a hard page on a dead
+WRITER — `_row_stale`, `STALE_ROW_S`, the watchdog, `stale_writer_sickness`.
+But a book whose writer is perfectly alive while the BOOK has stopped trading
+publishes `open: 0`, `status: online`, `age 30s` forever, and is
+**byte-identical to a book that is merely quiet**. That is the `(lv)`
+`{open: 0}` ambiguity at the level of the whole book, on the two rows holding
+real money, and it is the same shape as I13's *"a dead loop runs no handler"* —
+self-report covers the process that FAULTS, never the one that simply stops
+doing its job.
+
+**`fleet_immune.entry_drought_sickness`** closes it. Its domain is exactly this
+organ's stated one: *ALIVE BUT SICK — fresh, in-TTL, trusted, and WRONG.*
+
+**THE BAR IS DERIVED PER BOOK, AND THAT IS THE WHOLE DESIGN.** This detector
+types NO hour count. It types a **P-VALUE** and derives the hours: entries
+treated as ~Poisson at the book's demonstrated rate `r`/day, `P(no entry in T)
+= exp(-r·T)`, alarm at `T = -ln(P)/r`. At **`DROUGHT_P = 0.01`** that is
+`4.6/r` days. Measured on the live payload the hour this shipped:
+
+| book | idle | own rate | derived bar | verdict |
+|---|---|---|---|---|
+| 👩 mum | **28.1h** | 10.14/day | **10.9h** | **PAGES** |
+| 🙏 avo | 41.2h | 1.35/day | 82h | correctly SILENT |
+
+**One constant, two right answers.** No typed hour count can do that: anything
+catching mum at 28h cries wolf on avo, and anything sparing avo at 41h sleeps
+through mum — the `(gl)` cry-wolf shape aimed at the operator's phone.
+
+**THE FOUR EXCLUSIONS ARE THE REST OF THE DESIGN.** Each looks like a drought,
+each is already someone else's class, and each is pinned:
+* **stale row** → I1, the watchdog's; a dead writer is not a drought;
+* **halted** → the halt IS the reason, and `flatten_stuck_sickness` owns the
+  halt that will not clear;
+* **at cap** → a book holding every slot is FULL. 🧮 hull sat **10/10 with no
+  entry for 19 days** and was working correctly; firing there is I7's
+  trigger-a-book-satisfies-STRUCTURALLY error;
+* **no measured rate** → I8: a book with no demonstrated cadence has no
+  expectation to violate, and a fabricated one lands on a phone.
+
+**SCOPE IS SELF-DECLARED** — the row's own `extra.venue == "lighter_live"`,
+never a list of ids. This file's own audit-scope rule has named a RETIRED bot
+**four times** because it was list-keyed; and `fleet_books` lives under
+`scripts/`, which does not ship in an image (the born-dark rule), so a copy
+here would be a second roster free to drift. A row that does not declare itself
+live is simply not checked.
+
+**THE TRAILING-RATE TRAP, caught in design and pinned:** `close_rate_day_7d`
+FALLS as a drought lengthens. Built from the trailing rate alone, the bar would
+RISE as the silence deepened and **the alarm would fade out exactly as the
+problem got worse.** The bar uses the book's DEMONSTRATED rate — `max(7d,
+life)` — so a longer silence is always easier to page, never harder.
+
+Pinned by `tests/autonomy/test_entry_drought.py`, **9 mutations verified red**.
+Two defects were found by that round rather than by re-reading: a junk row
+(`None`) would have **raised into the organ loop**, and my own I8 test used a
+28h fixture where a fabricated rate of 1.0 puts the bar at 110h — so it passed
+for the WRONG REASON and a fabricate-the-rate mutation SURVIVED it. The fixture
+is now 500h, far past any plausible fabricated bar. *An unexercised boundary is
+the second one this session; it is what mutation testing is for.*
+
+**Publish-only: it pages and changes no trade.** 👩 mum is firing it today, and
+correctly — she is scanning 95 coins and refusing all of them, which `(ya)`,
+`(yb)` and `(yc)` establish is her cell being right about a regime, not broken.
+The alarm's job is that Eamon learns this from his phone rather than by asking
+three times.
+
 ## 2026-09-04 (yc) — 🙏 AVO IS TWO CLOSES FROM THE GATE, AND EVERY WAY OF MANUFACTURING THEM DESTROYS THE EDGE THE GATE WOULD CERTIFY
 
 **Eamon, 4-Sep: *"let's run with what works."*** This entry is what happened
