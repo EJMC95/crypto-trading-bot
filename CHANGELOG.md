@@ -1,3 +1,78 @@
+## 2026-09-04 (yc) — 🙏 AVO IS TWO CLOSES FROM THE GATE, AND EVERY WAY OF MANUFACTURING THEM DESTROYS THE EDGE THE GATE WOULD CERTIFY
+
+**Eamon, 4-Sep: *"let's run with what works."*** This entry is what happened
+when that instruction was taken literally and the fleet was asked, with
+numbers, *which books actually work*.
+
+**THE ANSWER INVERTS THE QUESTION THAT PROMPTED IT.** "Bots aren't trading"
+points at the idle books; the ledger points the other way:
+
+| book | clock | opens 24h | n | mean %/trade | t | total $ |
+|---|---|---|---|---|---|---|
+| 🪁 band-kelly | — | **17** | 423 | −0.186 | −1.23 | **−$131.46** |
+| 🔮 georgia-v3 | 15m | **7** | 62 | −0.097 | −0.71 | −$3.16 |
+| 🔮 georgia | 15m | **7** | 253 | +0.032 | 0.24 | +$7.56 |
+| 👩 mum LIVE | 1h | **0** | 71 | +0.213 | 0.90 | **+$25.72** |
+| 👩 mum shadow | 1h | **0** | 79 | **+0.743** | **2.01** | +$29.35 |
+| 🙏 avo LIVE | 4h | **0** | 22 | **+1.385** | 1.49 | **+$77.43** |
+
+**THE BUSY BOOKS ARE THE LOSERS AND THE IDLE BOOKS ARE THE EARNERS.** The
+15-minute cells `(yb)` named as "the only thing trading in this tape" trade at
+**+0.032%** and **−0.097%** per trade — activity, not edge. Moving 👩 mum from a
+cell earning +0.743%/trade at t=2.01 onto one of those would have been the
+worst trade in this fleet's history, and `(yb)` proposed exactly that as the
+supported path. **Corrected here: it is not supported. Activity was never the
+metric** — the forward metric has always been *books that can be GRADED, then
+go live*.
+
+**🌾 CARRY WAS ALSO CHECKED AND ALSO REFUSED.** Its all-time ledger is the
+fleet's best (n=109, +0.248%/trade, t=3.22, +$70.45, 13 positions open right
+now) and it is delta-neutral, so it is regime-INDEPENDENT — the obvious
+candidate. **Era-scoped it reads 2/6 bars, n=18, mean −0.010%, t=−0.10.** The
+strong number is pre-era. Recommending it off the all-time column would have
+been `(hc)`'s pooling error on the fleet's most tempting book.
+
+**WHAT IS ACTUALLY ONE MOVE FROM REAL MONEY:** 🙏 avo's shadow passes **5 of 6**
+go-live bars era-scoped — mean **+1.802%/trade**, **t=2.39**, both halves,
+drawdown, window — failing only `closes` at **n=28 against 30**. TWO closes.
+And she cannot get them: her binding conjunct is the BB dip, and `(ya)`'s new
+gauge shows why — **`bb_min 1.39 · bb_below 0`**, her closest coin 1.39% ABOVE
+the lower band and none of 43 below it, while the RSI half is met.
+
+**SO THE BAND WAS PRICED** (`scripts/study_avo_bb_band_2026-09-04.py`, 180d of
+her own 4h tape, her REAL bracket, LAG-1, vs a matched random-entry null;
+k relaxes `c < bb_lo` to `c < bb_lo·(1+k)`):
+
+| k | eps/30d | mean %/trade | t | edge vs null |
+|---|---|---|---|---|
+| **0.000 SHIPPED** | 42.3 | +0.910 | 2.20 | **+0.302** |
+| 0.005 | 55.7 | +0.911 | 2.50 | −0.212 |
+| 0.010 | 58.0 | +0.585 | 1.63 | −0.196 |
+| 0.015 | 60.3 | +0.709 | 2.05 | −0.040 |
+| 0.020 | 60.0 | +0.595 | 1.71 | +0.082 |
+| 0.030 | 59.2 | +0.690 | 1.94 | −0.027 |
+
+**The shipped rule is the best cell on the board**; every relaxation trades edge
+for volume and most go NEGATIVE against the null. And it buys nothing anyway —
+over 14 days the shipped band fired **11** and k=0.010 fired **12**, *one extra
+trade in a fortnight*, with **all** variants at ZERO across the last five days.
+Concentration is bad too (best coin 41–44% of total).
+
+**THE GENERAL RULE THIS ENTRY EXISTS FOR, and it is the sharp end of I26:**
+*a book that is N closes from its gate must not be widened to reach it.* The
+number that makes 🙏 avo worth promoting is produced BY the strictness that makes
+her idle; relax the cell to manufacture the closes and the gate certifies a
+DIFFERENT, WORSE book — while reading exactly as green. I26 rightly puts the
+burden of proof on a refusal, and it is discharged here by measurement in both
+directions, on two books and eleven cells: 👩 mum (bars 32/35/38/42 × trend
+on/off, `(ya)`/`(yb)`) and 🙏 avo (six bands). **Every single one is worse than
+what is already shipped.** The books are right; the market is not offering their
+cell. Waiting is the correct action, and it is an ACTION — not a failure to act.
+
+**NOT CHANGED:** any live book. **SHIPPED:** the instrument, so the next session
+that wants to widen a starved book toward its own gate meets these numbers
+first.
+
 ## 2026-09-04 (yb) — THE TREND SLEEVE IS REFUTED, AND IT WOULD NOT HAVE HELPED EITHER: both halves of 👩 mum's cell went to zero on the same two days
 
 **Eamon, 4-Sep, twice: *"Bots are still not trading."*** He was right both
