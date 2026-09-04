@@ -104,6 +104,15 @@ from lighter_family_bot import (
     # carrier class the entry_rank stamp keys on — imported, never re-typed:
     # these are the numbers a go-live verdict is judged on.
     DayTraderGated, control_draw, control_settle, control_block,
+    # [(yb)] the DIP-VELOCITY gauge, by IDENTITY. (xl) measured that mum's
+    # information is in the SHAPE of the fall, `signals()` returns `vel` on
+    # every scan, and this host — the one holding real money — threw it away
+    # while the $1,000 shadow published it. I23 at the arm that steers.
+    vel_census,
+    # [(yb)] the VIRTUAL FLIP LEDGER's owners, by IDENTITY with the shadow
+    # arm. This host must run the same instrument or the two arms measure
+    # different questions and the comparison is void ((vh)/(pt)).
+    flip_open, flip_settle, flip_block, FLIP_MAX_PENDING,
     # [(ti)] the ONE policy-stamp builder, shared with the shadow host so
     # judge v2's parity precheck compares like with like.
     policy_stamp,
@@ -1032,7 +1041,7 @@ _LAST_REJECT = {}
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
                 strategy=None, uptrend=None, enter=None, last_reject=None,
-                enter_bar=None, bb=None):
+                enter_bar=None, bb=None, vel=None):
     """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
     directional row.
 
@@ -1070,6 +1079,10 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
     # "refused, reason unknown" (I8: unknown degrades to the honest absence).
     if last_reject:
         out["venue_reject_why"] = dict(last_reject)
+    # [(yb)] the dip-velocity gauge, by IDENTITY with the shadow arm's
+    # (lighter_family_bot.vel_census) — one owner, so the two arms cannot
+    # publish different readings of the same rule ((hj)/(vh)).
+    out.update(vel_census(vel, strategy))
     vals = sorted(v for v in rsi_readings.values()
                   if isinstance(v, (int, float)))
     if vals and rsi_bar:
@@ -1668,6 +1681,13 @@ def main(_ctx=None, once=False):
         # leave the row blank in between. Only real bools survive the restore —
         # a `None` read as False publishes a fabricated PASS on the binding
         # term.
+        # [(yb)] the velocity gauge, restored exactly as `last_rsi` is and for
+        # the same reason: the entry loop skips `S.signals()` on a candle it
+        # has already acted on, so on a 1h book this is written ~once an hour
+        # and an unrestored map leaves the row blank in between.
+        last_vel = {str(k): float(v)
+                    for k, v in (state.get("last_vel") or {}).items()
+                    if isinstance(v, (int, float))}
         last_uptrend = {str(k): bool(v)
                         for k, v in (state.get("last_uptrend") or {}).items()
                         if isinstance(v, bool)}
@@ -1909,6 +1929,17 @@ def main(_ctx=None, once=False):
         # — 4.1x mum's entire 53bps liquidation headroom).
         ctrl = state.setdefault(
             "ctrl", {"n": 0, "sum": 0.0, "null_n": 0, "null_sum": 0.0})
+        # [(yb)] the virtual flip ledger lives IN the state dict for the same
+        # reason `ctrl` does: its longest horizon is 24h and a redeploy must
+        # not blank a pending record. `setdefault` means a book that has
+        # never run one starts empty rather than absent.
+        flips = state.setdefault("flips", [])
+        flip_acc = state.setdefault("flip", {})
+        if not isinstance(flips, list):
+            flips = state["flips"] = []
+        if not isinstance(flip_acc, dict):
+            flip_acc = state["flip"] = {}
+        del flips[:-FLIP_MAX_PENDING]
         ov = state.setdefault(
             "overshoot", {"n": 0, "unmeasured_n": 0, "vals": []})
 
@@ -1935,6 +1966,10 @@ def main(_ctx=None, once=False):
                 # and is persisted precisely so the row can answer BETWEEN
                 # candles. Blank-most-of-the-time is the worse failure.
                 "last_uptrend": last_uptrend, "last_enter": last_enter,
+                # [(yb)] the velocity gauge persists for the SAME reason as
+                # `last_rsi`: written only on a new candle, so an unrestored
+                # map blanks the row between candles.
+                "last_vel": last_vel,
                 # [(ya)] the bar each cached `enter` was computed under, and
                 # 🙏 avo's BB gauge — persisted for the SAME reason as the two
                 # above: written only on a new candle, so an unrestored map
@@ -2367,6 +2402,11 @@ def main(_ctx=None, once=False):
                 # pre-registered leverage notch read THIS, from her own
                 # real-money ledger, instead of a differently-supplied twin.
                 **control_block(S, ctrl),
+                # [(yb)] the VIRTUAL FLIP LEDGER — the answer to "should she
+                # flip a losing long to a short", measured FORWARD on her own
+                # book at zero capital. ALWAYS present for a flip-ledger book
+                # incl. n=0; {} for avo/georgia so their payloads do not move.
+                **flip_block(S, flip_acc, flips),
                 # [(th)] stop overshoot — LIVE measured fills only, per-book,
                 # published always so quiet (n=0) and dark are never the same
                 # byte-string. p90 enters any future gross ceiling only
@@ -2398,7 +2438,7 @@ def main(_ctx=None, once=False):
                     (closed_win[-1].get("ts") if closed_win else None), t0,
                     strategy=S, uptrend=last_uptrend, enter=last_enter,
                     last_reject=(_LAST_REJECT or None),
-                    enter_bar=last_enter_bar, bb=last_bb),
+                    enter_bar=last_enter_bar, bb=last_bb, vel=last_vel),
                 # Advisory only: top liquid Lighter markets this arm is not
                 # currently scanning (for measured universe-evolution reviews).
                 "evolve": {
@@ -2565,6 +2605,12 @@ def main(_ctx=None, once=False):
             _np = m.get("null_pair")
             control_settle(S, ctrl, m, total, notional or 0.0,
                            marks.fresh_mid(venue, _np) if _np else None)
+            # [(yb)] THE FLIP SHE DID NOT TAKE, on the arm that holds the
+            # money. Loss-class exits only; zero capital, no order, no side.
+            # `universe` is the draw pool — the same pool the control arm's
+            # placebo is drawn from, so the two nulls are comparable.
+            flip_open(S, flips, sym, exit_px, reason, time.time(),
+                      list(universe), lambda c: marks.fresh_mid(venue, c))
             # [(th)] STOP OVERSHOOT — the quantity every future gross notch
             # must price. G_max = 1/(|stop|+mmf) assumes the stop fires AT its
             # level; the honest ceiling divides by (|stop|+overshoot+mmf), and
@@ -2643,6 +2689,12 @@ def main(_ctx=None, once=False):
                               else {}),
                            **({"rsi_entry": m["rsi_entry"]}
                               if m.get("rsi_entry") is not None else {}),
+                           # [(yb)] I23: the velocity this trade was ENTERED
+                           # at, on the close row, so the band can be graded
+                           # from the LEDGER (I14) and not only by a replay
+                           # whose own author declared a 50x gap to it.
+                           **({"vel_entry": m["vel_entry"]}
+                              if m.get("vel_entry") is not None else {}),
                            "mmf_factor": m.get("mmf_factor"),
                            **({"non_economic": True} if _phantom else {}),
                            **({"stop_overshoot_bps": _ob}
@@ -2774,6 +2826,12 @@ def main(_ctx=None, once=False):
             # a dark rail runs the env default; the overlay is re-derived
             # from the class defaults every loop, so nothing is left stale
             pass
+        # [(yb)] price any virtual short that has reached a horizon. Bounded
+        # per loop (FLIP_MAX_SETTLE_PER_LOOP) because each priced record costs
+        # up to two orderbook reads and this loop's fill reads already contend
+        # for a token bucket ((xt)); deferred records are counted, not lost.
+        flip_settle(S, flips, flip_acc, time.time(),
+                    lambda c: marks.fresh_mid(venue, c))
         # L2 fleet reads (restrict-only, fail-open) — this is a directional
         # LONG book, so the fleet long budget + symbol cap bind it like every
         # other long book. The SHADOW drawdown governor is deliberately NOT
@@ -3093,6 +3151,21 @@ def main(_ctx=None, once=False):
                 # that it did not clear it ((rr)'s reading, at this book).
                 if sig and isinstance(sig.get("rsi"), (int, float)):
                     last_rsi[sym] = float(sig["rsi"])
+                # [(yb)] THE DIP'S VELOCITY, on the arm that holds real money.
+                # Captured from the SAME `sig` in the SAME pass as the RSI
+                # above — never a second walk, which would sample a different
+                # candle and make the two halves disagree ((ya)'s lesson at
+                # `both_terms_n`). 4-Sep, the entry that forced this: 👩 mum
+                # was long VIRTUAL at -2.08% while JTO/XAU/TRUMP were green,
+                # and the row could not say that VIRTUAL was bought at 38.9%
+                # of its daily range against 11-23% for the other three —
+                # i.e. mid-fall, the "violent repricing" corner (xl) measured
+                # at -0.091%/trade (t -0.66) against +0.309% (t +2.82) for
+                # the 12-20 band. The number existed every loop; nothing kept
+                # it. REPORTED, never a gate: the live arm keeps the shipped
+                # entry and is the judge's control (xl).
+                if sig and isinstance(sig.get("vel"), (int, float)):
+                    last_vel[sym] = float(sig["vel"])
                 # [(vm)] THE TREND TERM, on the arm that holds real money.
                 # (vm) shipped this gauge into `lighter_family_bot` and 👩 mum's
                 # LIVE row runs THIS file, so it reached her $1,000 shadow and
@@ -3389,6 +3462,17 @@ def main(_ctx=None, once=False):
                              "rsi_entry": (float(sig["rsi"])
                                            if isinstance(sig, dict) and
                                            isinstance(sig.get("rsi"), (int, float))
+                                           else None),
+                             # [(yb)] I23: the quantity `xp.mum.vel_*` cuts,
+                             # recorded ON THE TRADE. Without it the band can
+                             # only ever be graded by replay, and (xl)'s own
+                             # declared limit is that its replay books
+                             # +0.02%/trade where the ledger says +1.04% — a
+                             # 50x gap that is NOT reconciled, so the LEDGER
+                             # has to be able to answer (I14).
+                             "vel_entry": (float(sig["vel"])
+                                           if isinstance(sig, dict) and
+                                           isinstance(sig.get("vel"), (int, float))
                                            else None),
                              # [(so)] I22 receipt, carried on the durable
                              # position record so it survives a restart and

@@ -377,6 +377,50 @@ def shortfall_default_pair():
         pass
     return (best[1], best[2])
 
+def xp_prefix_for(bot_id):
+    """[2026-09-04 (yb)] THE ONE OWNER of a book's experiment-lever prefix.
+
+    `JUDGED_PAIRS[<pair>]["xp_prefix"]` has declared this since the pair
+    registry existed, and 👩 mum's shadow twin never asked it. The family
+    host built its own by stripping the FIRST id segment —
+    `freqtrade-mum-lshadow` -> `xp.mum-lshadow.` — which is not a registered
+    lever name, so `fleet_tuning.get_lever` returned the CALLER'S DEFAULT.
+    Correctly, and silently, and forever.
+
+    MEASURED 4-Sep on the live bus, which is the only reason this was found:
+    the 🧪 judge held `xp.mum.rsi_max = 32.0` open for 36h while every one of
+    the arm's closes stamped `bars.rsi_max = 38.0`, and the judge published
+    `ARM NOT APPLYING: 0/4 shadow closes carry a receipt`, `arm_skew: true`.
+    **The fleet's ONLY path from shadow evidence to real money had never
+    applied a single experiment on this lane.** `(ya)` saw the symptom one
+    day earlier and read it as the benign case ("the arm has not opened a
+    position since the lever was set") — which was true THAT hour and is the
+    I1/I18 ambiguity it named: `0/N carry a receipt` is byte-identical
+    between a quiet arm and an arm asking for a name no registry holds.
+
+    Two correct fail-OPENs composed into a surface that cannot move:
+    `apply_book_levers` degrades to the env default on a dark rail (right),
+    and `get_lever` returns the default for an unregistered name (right).
+    Neither is wrong; together they are unobservable. Hence the second half
+    of this fix, which is `lever_surface()` publishing the resolution.
+
+    Matches on EITHER arm — one book identity resolves both twins — and
+    returns None for a book no declared pair claims, so a carrier outside
+    the judge is untouched rather than handed a guessed prefix (I8: unknown
+    degrades to the honest absence, never to a plausible name).
+    """
+    try:
+        for spec in (JUDGED_PAIRS or {}).values():
+            if not isinstance(spec, dict):
+                continue
+            if bot_id in (spec.get("live_bot"), spec.get("shadow_bot")):
+                pref = spec.get("xp_prefix")
+                return str(pref) if pref else None
+    except Exception:  # noqa: BLE001 — a registry read must never break a loop
+        pass
+    return None
+
+
 #: Live-capable books DELIBERATELY outside the judge, each with a reason —
 #: the BORN_DARK_OK idiom. The roster test additionally injects a synthetic
 #: entry so the mechanism is under test whatever this dict holds.
