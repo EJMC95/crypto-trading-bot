@@ -102,28 +102,6 @@ LIVE_MIN_CLOSES = int(os.environ.get("XPJ_LIVE_MIN_CLOSES", "10"))
 MARGIN_PP = float(os.environ.get("XPJ_MARGIN_PP", "0.5"))     # per-trade pp
 FADE_N = int(os.environ.get("XPJ_FADE_N", "15"))
 COOLDOWN_H = float(os.environ.get("XPJ_COOLDOWN_H", "48"))
-#: [2026-09-04 (yb)] HOW LONG A NEVER-APPLIED EXPERIMENT MAY HOLD THE LANE.
-#: The ARM-SKEW hold below is deliberately permanent ("stay running and stay
-#: LOUD until the arm is fixed") and that was right for a fixable arm. It is
-#: wrong for a STRUCTURAL one, and this fleet just ran the structural case:
-#: 👩 mum's shadow arm asked `fleet_tuning` for `xp.mum-lshadow.rsi_max` — a
-#: name no registry has ever held, because the family host built its prefix
-#: by stripping the FIRST id segment instead of reading
-#: `JUDGED_PAIRS[...]["xp_prefix"]`. So `get_lever` returned the caller's
-#: default, correctly and silently, and `mum-rsi-32` held the fleet's ONLY
-#: shadow->real-money lane for 36h having never once applied. One urgent push
-#: fired, ONCE (`skew_notified` latches — I4's "never report a persistent
-#: condition with a one-shot warning"), and nothing moved after it.
-#: A candidate that has proved ZERO receipts across its WHOLE elapsed window
-#: is not a failed experiment, it is a NON-RUN: it is VOIDED — levers stop
-#: being asserted (they TTL out), the clock resets, and the candidate goes
-#: BACK to the untried queue rather than into `done`, because a skew verdict
-#: says nothing whatever about the candidate. `pick_candidate` then takes the
-#: next untried one, so a structurally-blocked candidate can no longer
-#: monopolise the lane. NOT a retirement and NOT an abandonment — both of
-#: those record a verdict on the idea, and there is no evidence here to
-#: record one from.
-VOID_SKEW_H = float(os.environ.get("XPJ_VOID_SKEW_H", "24"))
 # [2026-07-16 AUDIT] promoted-phase ledger blackout tolerance: keep re-asserting
 # live levers through a SHORT ledger outage (a DB blip shouldn't release a
 # 7d-earned promotion), but past this many consecutive blind cycles stop
@@ -2913,39 +2891,13 @@ def run_once():
         # Stay running and stay LOUD until the arm is fixed — fail-closed:
         # a stuck, noisy queue beats a phantom promotion.
         if ev.get("arm_skew"):
-            # [(yb)] A NEVER-APPLIED EXPERIMENT IS A NON-RUN, AND AFTER
-            # VOID_SKEW_H IT STOPS HOLDING THE LANE. See VOID_SKEW_H: the
-            # permanent hold was correct for an arm somebody could fix and
-            # became a permanent stall when the cause was structural. The
-            # candidate returns to the UNTRIED queue (never `done`): a skew
-            # verdict is about the plumbing, not the idea, so retiring the
-            # candidate on it would be exactly the false negative the hold
-            # was written to prevent.
-            _skew_h = (now - _num(st.get("started_ts"), now)) / 3600.0
-            if _skew_h >= VOID_SKEW_H:
-                verdicts.append({"name": cand["name"],
-                                 "verdict": "VOIDED-NEVER-APPLIED",
-                                 "ts": iso(now), "hours": round(_skew_h, 1),
-                                 "eval": ev})
-                send_push(f"experiment VOIDED (never applied): {cand['name']}",
-                          f"{_skew_h:.1f}h with 0 receipts — the arm never ran "
-                          f"this candidate. Returned to the queue UNTRIED; the "
-                          f"lane moves to the next candidate.",
-                          priority="urgent")
-                return save(phase="idle", current=None, spec={},
-                            started_ts=None, skew_notified=False,
-                            last_eval=ev,
-                            note=f"VOIDED-NEVER-APPLIED {cand['name']}: "
-                                 f"{_skew_h:.1f}h, 0 receipts — requeued "
-                                 f"untried")
             if not st.get("skew_notified"):
                 send_push(f"experiment ARM NOT APPLYING: {cand['name']}",
                           f"{ev['why']}\nthe judge is holding — no promotion "
                           f"can clear until the arm runs the candidate's bars",
                           priority="urgent")
             return save(last_eval=ev, skew_notified=True,
-                        note=f"ARM SKEW {cand['name']}: {ev['why']} "
-                             f"({_skew_h:.1f}h/{VOID_SKEW_H:g}h to void)")
+                        note=f"ARM SKEW {cand['name']}: {ev['why']}")
         if st.get("skew_notified"):
             # Arm recovered. Restart the clock: `days` accrued while the arm
             # was NOT applying, so without this the first good cycle could land
