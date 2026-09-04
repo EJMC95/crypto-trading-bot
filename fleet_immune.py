@@ -892,7 +892,11 @@ def entry_drought_sickness(bot_rows, now=None, ok=None):
                 v = float(prog.get(key))
             except (TypeError, ValueError):
                 continue
-            if v == v and v > 0:
+            # `math.isfinite` not `v == v`: the identity trick tests only NaN
+            # and lets INF through, which would drive the derived bar to ZERO
+            # and page on any idle time at all. (CodeQL flagged the idiom; the
+            # inf hole was the real defect behind it.)
+            if math.isfinite(v) and v > 0:
                 rates.append(v)
         if not rates:
             continue                      # no measured cadence -> no claim

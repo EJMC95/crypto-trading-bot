@@ -20,8 +20,6 @@ WHAT IS PINNED, in the order it matters:
      page as it lengthens;
   5. it fires on the REAL payload shape, driven through the shipped function.
 """
-import copy
-
 import fleet_immune as fi
 
 
@@ -102,7 +100,8 @@ def test_no_measured_rate_degrades_to_silence_never_to_an_alarm():
     fixture's 28h idle a fabricated rate puts the bar at ~110h and the row
     stayed silent for the WRONG REASON. The fixture must be far enough past
     any plausible fabricated bar that only the real skip can keep it quiet."""
-    for r7, rl in ((None, None), (0.0, 0.0), ("junk", None), (float("nan"), None)):
+    for r7, rl in ((None, None), (0.0, 0.0), ("junk", None), (float("nan"), None),
+                   (float("inf"), None), (float("-inf"), None)):
         r = _live(idle_h=500.0, rate7=r7, rate_life=rl)
         assert _hits([r]) == set(), (r7, rl)
 
