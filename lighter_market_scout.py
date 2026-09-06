@@ -481,6 +481,25 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # incubator accept on. (~215 vs ~130 symbols; a few KB per snapshot.)
         "marks": {s: float(f'{v["last"]:.6g}')
                   for s, v in stats.items() if v.get("last")},
+        # [2026-09-06 (ye)] THE FULL PER-MARKET RESIDUAL — the third instance of
+        # the class the two comments around it already name, and the last one
+        # still open. `prem_outliers` is a VIEW of this data: top-8, RANKED BY
+        # ABSOLUTE bps, liquid-only. Persisting only that view makes one whole
+        # question permanently unanswerable, because the truncation is adverse
+        # to it: a market whose OWN residual sigma is 4bps having a 5-sigma
+        # event at 20bps never enters a top-8-by-absolute list, so no amount of
+        # tape can ever measure a sigma-normalised band. Measured on the 8.3d
+        # of tape retention this shipped against: the smallest |prem_bps| the
+        # history contains is 9.5 while the venue-wide MEDIAN residual is
+        # 3.5bps (`stress.med`) — the record began near the venue's own p90.
+        # Storing the vector instead of the view costs ~2.5KB on a 37.8KB
+        # payload (`margins` alone is 13.8KB) and makes per-market sigma
+        # computable from ~14 days of history. ALL ACTIVE books, not liquid
+        # only, for the `marks` reason directly above: a book that drops below
+        # the volume floor mid-episode must not vanish from its own tape.
+        # ADDITIVE — no gate reads it, no book's behaviour changes.
+        "resid": {s: v["prem_bps"] for s, v in stats.items()
+                  if isinstance(v.get("prem_bps"), (int, float))},
         # [2026-07-17 CARRY CROSS-SECTION] the FULL per-symbol funding APR over
         # every ACTIVE book, historized alongside `marks` and for the same
         # reason: only a stored cross-section can be joined to a decision after
@@ -731,6 +750,36 @@ def selftest():
     # must be joinable to `marks` (same key space) — that join IS the use case
     assert set(snap["funding"]) <= set(stats), "funding/marks key spaces diverged"
     assert set(snap["marks"]) <= set(stats)
+    # [(ye)] the RESIDUAL VECTOR must be the DATA, never the top-8 VIEW: it
+    # carries every active book that has a premium, not the ones that happened
+    # to rank. A `resid` that merely mirrored `prem_outliers` would leave the
+    # sigma question exactly as unanswerable as it was.
+    assert set(snap["resid"]) <= set(stats), "resid/marks key spaces diverged"
+    _po = {o["sym"] for o in snap["prem_outliers"]}
+    assert _po <= set(snap["resid"]), "the view must be a subset of the data"
+    assert snap["resid"]["BTC"] == stats["BTC"]["prem_bps"], snap["resid"]
+    assert "HALT" not in snap["resid"], "inactive book carries no residual"
+    assert "resid" in historized(snap), "residual must survive into history"
+    # DEAD is ACTIVE but ILLIQUID and carries a +1000bps premium. It is the
+    # whole point: `prem_outliers` and `stress` are liquid-only VIEWS, so a
+    # residual vector that inherited that filter would still be a view.
+    assert "DEAD" not in _po, "fixture: DEAD must be outside the liquid view"
+    assert "DEAD" in snap["resid"], "resid must carry ACTIVE-but-illiquid books"
+    assert snap["resid"]["DEAD"] == stats["DEAD"]["prem_bps"]
+    # ...and the TRUNCATION itself needs a fixture that can exercise it: the
+    # books above are 3, so a cap of TOP_N=8 can never bind and a `resid` that
+    # merely copied `prem_outliers` would pass every assertion written against
+    # them. This one has more liquid books than the cap. (The (po) rule: empty
+    # output is not a negative result until the check has produced a positive.)
+    _many = [{"symbol": f"S{i}", "status": "active", "mark_price": 100.0 + i,
+              "index_price": 100.0, "daily_quote_token_volume": 1e7,
+              "open_interest": 10.0} for i in range(TOP_N + 4)]
+    _ms = book_stats(_many, 1e5)
+    _msnap = build_snapshot(_ms, {}, {}, {})
+    assert len(_msnap["prem_outliers"]) == TOP_N, _msnap["prem_outliers"]
+    assert len(_msnap["resid"]) == TOP_N + 4, len(_msnap["resid"])
+    assert len(_msnap["resid"]) > len(_msnap["prem_outliers"]), \
+        "resid must be the DATA, never the top-N view"
     # the BASIS STAMP must ride with the data — an 8x-wrong APR that travels
     # WITHOUT its divisor is exactly how a tape becomes 60 days of false fact
     # post-fix the tape is TRUE (divisor 1.0); the key must SURVIVE anyway —
