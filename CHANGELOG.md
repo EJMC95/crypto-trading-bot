@@ -1,4 +1,4 @@
-## 2026-09-06 (yg) — THE FLEET'S ONLY SHADOW→REAL-MONEY PATH HAD NEVER APPLIED AN EXPERIMENT ON THE BOOK THAT HOLDS THE MONEY: found on 4-Sep, fixed, reverted by accident the same day, re-landed alone
+## 2026-09-06 (yg) — THE FLEET'S ONLY SHADOW→REAL-MONEY PATH HAD NEVER APPLIED AN EXPERIMENT ON THE BOOK THAT HOLDS THE MONEY: found on 4-Sep, fixed, reverted by accident the same day — and fixed AGAIN by two sessions within the hour; (ye) owns the fix, this ships the lever surface and the marker
 
 **Eamon, 6-Sep:** *"find a way to build a profit machine for the bots."* The
 route to this entry is the answer, so it is recorded in order.
@@ -64,35 +64,57 @@ ever applied on that lane. That is still true this minute."* Two correct
 fail-OPENs — `apply_book_levers` on a dark rail, `get_lever` on an unregistered
 name — composed into a surface that cannot move and cannot be seen not moving.
 
-**RE-LANDED, ALONE.** `fleet_bus.xp_prefix_for(bot_id)` — THE owner, reading
-`JUDGED_PAIRS[<pair>]["xp_prefix"]`, matching either arm, **None** for a book no
-pair claims (I8: never a plausible guess). In the family host: the
-image-safety wrapper, `Book.lever_prefix` seeded None, the call site
-`b.lever_prefix = xp_prefix_for(b.bot_id)` → `apply_book_levers(b.s,
-b.lever_prefix)`, and **`lever_surface`** published on the row as
-`extra.levers` — `{prefix, registry, registered_n, unregistered:[...]}` — the
-half that makes the NEXT unregistered name a row-visible defect instead of
-38 hours of a judge that "set nothing". None of (yb)'s trading content
-returns: no flip, no `vel_census`, no RSI move. **This changes no trade any
-book takes today** — the velocity levers' env defaults are ±999 (inert) and
-the fix only lets the judge's SHADOW candidate actually run; real money moves
-only through the judge's own paired bar, as designed.
+**CORRECTED IN PLACE per I12.** This entry was written and pushed at 12:17Z
+as "re-landed alone" — its own prefix fix, wrapper, `Book.lever_prefix`, 11
+pins. At the 12:26Z rebase it was no longer true: (ye) had landed the same
+fix on main at `24cfb90` and this branch's copy was dropped in favour of it.
+A doctrine entry that describes a fix the tree does not carry is the rot I12
+names, so the title and the shipped-half paragraph are corrected here rather
+than left standing; the route and the measurements above are unchanged.
 
-`tests/autonomy/test_xp_lever_prefix.py`: 11 pins, **6 of 6 mutations red** —
-the exact bug at the call site, the (yb)-survivor (f-string moved one line up
-into the assignment — pinned on the AST, `lever_prefix` may be produced only
-by a call to `xp_prefix_for`), the owner guessing a prefix for an unclaimed
-book, the owner deriving from the id instead of the registry, the surface
-dropped from the row, the surface hiding `unregistered`. The class-closer:
-**every declared pair's prefix must resolve to registered levers**, so a new
-book cannot ship with a namespace nothing holds.
+**A CONCURRENT SESSION LANDED THE SAME FIX ON MAIN WHILE THIS BRANCH WAS IN
+CI — (ye), `24cfb90`: `fleet_bus.xp_prefix_for(shadow_bot)` reading
+`JUDGED_PAIRS`, the host's `xp_prefix_for_arm` wrapper returning `""` for a
+row that is nobody's shadow arm, the call site
+`apply_book_levers(b.s, xp_prefix_for_arm(b.bot_id))`, and
+`tests/autonomy/test_judge_lever_prefix_reaches_the_arm.py` pinning the string
+on the AST plus two class-closers (every registered `xp.*` knob is asked for
+by its own arm; every registered lever is reachable by some arm). That is the
+one fix, per (hj): this branch's own `xp_prefix_for` / wrapper / `lever_prefix`
+/ call-site change were DROPPED at the rebase, and a duplicate `def
+xp_prefix_for` that git had auto-merged into `fleet_bus.py` without a conflict
+marker — the later definition silently shadowing the earlier — was found by
+counting defs and removed. Same finding, same day, twice; the record keeps
+both because the second diagnosis is independent evidence for the first.
+
+**WHAT THIS ENTRY SHIPS, on top of (ye):**
+* **`lighter_family_bot.lever_surface(prefix)`**, published on every family
+  row as **`extra.levers`** — `{prefix, registry, registered_n,
+  unregistered:[...]}`. (ye) fixes the NAME; this makes the next wrong name
+  VISIBLE. Two correct fail-OPENs (`apply_book_levers` on a dark rail,
+  `get_lever` on an unregistered name) compose into an arm that cannot move
+  and cannot be seen not moving — the row read exactly like "the judge set
+  nothing" for 36h on 4-Sep and 38h on 6-Sep. Now `unregistered` is PRESENT
+  only when it is a defect (never an empty list a reader learns to skim), `""`
+  — `xp_prefix_for_arm`'s own no-op value — is a first-class answer, and a
+  dark registry publishes `registry: false` rather than a clean bill (I8).
+  Fed by **their** owner, `xp_prefix_for_arm(b.bot_id)`, never a second
+  resolution of the same string. `tests/autonomy/test_lever_surface.py`,
+  6 pins, **3 of 3 mutations red** (dropped from the row, `unregistered`
+  hidden, fed a rebuilt string instead of the owner).
 
 **DEPLOY — BOTH ARMS, `[deploy-live-mum]` in the commit subject AND the PR
 title ((xh)).** `lighter_family_bot.py` is in `_BUILD_SHARED`, so a shadow-only
 deploy would split the pair's `build_shared` stamp and trip the judge's own
 `arm_drift` guard ((xd)) on the lane this exists to unblock. The live arm's
-prefix path is `_PFX`-based and untouched (`git diff` names no `_PFX`, no
-`live.{`, no `lighter_avo_live_bot`), so it rides free. mum-live checked at
+prefix path is `_PFX`-based and untouched, so it rides free. **AND THIS IS NOW
+THE LOAD-BEARING HALF: (ye) shipped the fix to main with `[deploy-live-taker]`
+(avo's cap), which moves `family-lighter-shadow` (auto) and avo-live (marker)
+and NOT mum-live — so on the shadow's next boot mum's pair reads two
+`build_shared` stamps and the judge's `arm_drift` guard blocks the very lane
+both sessions just fixed. Measured at 12:29Z: all four rows still on
+`f766cb58282c/17`, main predicting `900cfaa8598e/17` for the family image;
+nothing had landed yet. This PR's marker is what carries mum-live across.** mum-live checked at
 push: `online`, 0 open, no halt. DECLARED: 🙏 avo-live is NOT redeployed (the
 marker is mum's), so her `build_shared` will read one commit behind her twin's
 — her lane is already `unjudgeable` on capacity for 28 days, so this costs
