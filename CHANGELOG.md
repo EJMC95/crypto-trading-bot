@@ -1,3 +1,385 @@
+## 2026-09-06 (yg) — THE FLEET'S ONLY SHADOW→REAL-MONEY PATH HAD NEVER APPLIED AN EXPERIMENT ON THE BOOK THAT HOLDS THE MONEY: found on 4-Sep, fixed, reverted by accident the same day — and fixed AGAIN by two sessions within the hour; (ye) owns the fix, this ships the lever surface and the marker
+
+**Eamon, 6-Sep:** *"find a way to build a profit machine for the bots."* The
+route to this entry is the answer, so it is recorded in order.
+
+**1 · THE VENUE'S STRUCTURAL PAYMENT IS THIN — measured, not assumed.** Full
+216-market cross-section off the scout's own `funding`/`vols`/`classes`:
+median TRUE apr **+10.5%** (the venue's resting `base_interest_rate`, paid on
+202 of 206 signed markets, ~400× smaller than the price move at any tradeable
+hold); at the **20% gate and $1M floor, SIX markets** (USELESS +254%, XMR
++160%, NEAR +76%, PUMP +39%, PONS +56%, CASHCAT +47%), and the three carry
+books already hold them — 🌾 carry reads `eligible: 0`. Persistence over the
+8.3-day tape: **8 symbols** hold |apr| ≥ 20% for half the time, **2** for 80%
+(XMR +54% median, 100% sign-stable; RIVER +60%). A funding machine at scale
+does not exist on this venue today; the supply is captured.
+
+**2 · SO THE MACHINE IS THE ONE BOOK WITH REAL MONEY AND REAL EVIDENCE — and
+its improvement loop.** 🙏 avo live is the fleet's best P&L (**+$100.16,
++26.3%, 9W/5L**) at **0.27 closes/day**, 3 of 5 slots empty, gate 99 days out
+on rate. 👩 mum live is **+$48.76, 89 closes at 5/day**, beats her own
+random-entry null by **+0.22pp**, 0 of 12 slots filled in a rally. Both are
+long-only dip-buyers starved by entry conjuncts in a regime where the pooled
+fleet's longs make +0.39%/trade ((yf)). The fleet's DESIGNED machine for
+exactly this — measure a widening on the shadow twin, promote it to real money
+on the paired bar — is the 🧪 judge, and its serial lane is on mum with
+`mum-vel-12-20` in the queue: (xl)'s dip-velocity band, measured on **her own
+live ledger** at **+1.039%/trade in-band (n=12, t=+3.68) vs +0.223% outside**,
+12 of her 58 closes carrying $32.86 of her $49.12. avo's lane reads
+`unjudgeable: capacity_mismatch` — live `max_open` 5 vs shadow 6, the
+`FAMILY_SHADOW_MAX_OPEN_OVERRIDES` code default `freqtrade-avo-maria:6` — but
+even matched, her paired bar cannot OPEN before 4-Oct (28-day floor on shadow
+closes) and needs a 4.6pp effect at her sd. Not a useful-horizon machine.
+
+**3 · AND THE MUM LANE WAS INERT.** Judge payload at 11:54Z: `phase: running`,
+`candidate: mum-vel-12-20`, lever `xp.mum.vel_lo=12.0 / vel_hi=20.0` on the
+bus since **05T03:06Z**, and `last_eval.why`: *"ARM NOT APPLYING: 0/8 shadow
+closes carry a receipt … the arm is not running this experiment"*. Every
+default-returning branch of `get_lever` was then ruled out one at a time,
+because a guess here costs a day: lever alive (expires 06T14:04Z) · lane
+`lighter-xp` in the code-default `ENACT_LANES` and **`FLEET_TUNING_ENACT_LANES`
+not set on the service** (variable names read; values never) · cages clamp
+12→12 and 20→20 so `_skewed` cannot fire · immune quarantine `{}` · payload
+fresh (ttl 7552s) · `Dockerfile.familyshadow` **does** COPY `fleet_tuning.py`
+(my first read of `audit_image_imports.image_contents` said otherwise — the
+(iw) 4-tuple trap, caught by reading the Dockerfile) · shadow container on
+build `f766cb58282c/17` = repo HEAD. **The receipts decided it:** positions
+opened **05T16:05** and **06T02:08** — 13 and 23 hours after the candidate
+started — stamp `vel_lo -999 / vel_hi 999`, the env defaults, while one
+opened 04T16:44 stamps `12/20`. The deployment that booted **04T21:29** has
+never once printed `xp levers in force` in 38 hours of log, with zero
+warnings.
+
+**THE DEFECT, which (yc) had already written down:** `Book.bot_id` is
+`strat.bot + "-lshadow"`; the call site built its prefix as
+`f"xp.{b.bot_id.split('-', 1)[-1]}."` — `freqtrade-mum-lshadow` →
+**`xp.mum-lshadow.`** — a namespace no registry holds, so `get_lever` returns
+the caller's default. Correctly, silently, forever. (yb) found this on 4-Sep
+(*"the judge's mum lane had never applied an experiment"*) and fixed it with
+`fleet_bus.xp_prefix_for`; (yc) reverted (yb) wholesale at Eamon's *"go back
+to how things were"* — an instruction about the **trading** change (the flip,
+the RSI bar) — and this plumbing went with it. (yc) says so itself: *"the
+judge's mum lane is dead again, and it was dead before (yb) … No experiment has
+ever applied on that lane. That is still true this minute."* Two correct
+fail-OPENs — `apply_book_levers` on a dark rail, `get_lever` on an unregistered
+name — composed into a surface that cannot move and cannot be seen not moving.
+
+**CORRECTED IN PLACE per I12.** This entry was written and pushed at 12:17Z
+as "re-landed alone" — its own prefix fix, wrapper, `Book.lever_prefix`, 11
+pins. At the 12:26Z rebase it was no longer true: (ye) had landed the same
+fix on main at `24cfb90` and this branch's copy was dropped in favour of it.
+A doctrine entry that describes a fix the tree does not carry is the rot I12
+names, so the title and the shipped-half paragraph are corrected here rather
+than left standing; the route and the measurements above are unchanged.
+
+**A CONCURRENT SESSION LANDED THE SAME FIX ON MAIN WHILE THIS BRANCH WAS IN
+CI — (ye), `24cfb90`: `fleet_bus.xp_prefix_for(shadow_bot)` reading
+`JUDGED_PAIRS`, the host's `xp_prefix_for_arm` wrapper returning `""` for a
+row that is nobody's shadow arm, the call site
+`apply_book_levers(b.s, xp_prefix_for_arm(b.bot_id))`, and
+`tests/autonomy/test_judge_lever_prefix_reaches_the_arm.py` pinning the string
+on the AST plus two class-closers (every registered `xp.*` knob is asked for
+by its own arm; every registered lever is reachable by some arm). That is the
+one fix, per (hj): this branch's own `xp_prefix_for` / wrapper / `lever_prefix`
+/ call-site change were DROPPED at the rebase, and a duplicate `def
+xp_prefix_for` that git had auto-merged into `fleet_bus.py` without a conflict
+marker — the later definition silently shadowing the earlier — was found by
+counting defs and removed. Same finding, same day, twice; the record keeps
+both because the second diagnosis is independent evidence for the first.
+
+**WHAT THIS ENTRY SHIPS, on top of (ye):**
+* **`lighter_family_bot.lever_surface(prefix)`**, published on every family
+  row as **`extra.levers`** — `{prefix, registry, registered_n,
+  unregistered:[...]}`. (ye) fixes the NAME; this makes the next wrong name
+  VISIBLE. Two correct fail-OPENs (`apply_book_levers` on a dark rail,
+  `get_lever` on an unregistered name) compose into an arm that cannot move
+  and cannot be seen not moving — the row read exactly like "the judge set
+  nothing" for 36h on 4-Sep and 38h on 6-Sep. Now `unregistered` is PRESENT
+  only when it is a defect (never an empty list a reader learns to skim), `""`
+  — `xp_prefix_for_arm`'s own no-op value — is a first-class answer, and a
+  dark registry publishes `registry: false` rather than a clean bill (I8).
+  Fed by **their** owner, `xp_prefix_for_arm(b.bot_id)`, never a second
+  resolution of the same string. `tests/autonomy/test_lever_surface.py`,
+  6 pins, **3 of 3 mutations red** (dropped from the row, `unregistered`
+  hidden, fed a rebuilt string instead of the owner).
+
+**DEPLOY — BOTH ARMS, `[deploy-live-mum]` in the commit subject AND the PR
+title ((xh)).** `lighter_family_bot.py` is in `_BUILD_SHARED`, so a shadow-only
+deploy would split the pair's `build_shared` stamp and trip the judge's own
+`arm_drift` guard ((xd)) on the lane this exists to unblock. The live arm's
+prefix path is `_PFX`-based and untouched, so it rides free. **AND THIS IS NOW
+THE LOAD-BEARING HALF: (ye) shipped the fix to main with `[deploy-live-taker]`
+(avo's cap), which moves `family-lighter-shadow` (auto) and avo-live (marker)
+and NOT mum-live — so on the shadow's next boot mum's pair reads two
+`build_shared` stamps and the judge's `arm_drift` guard blocks the very lane
+both sessions just fixed. Measured at 12:29Z: all four rows still on
+`f766cb58282c/17`, main predicting `900cfaa8598e/17` for the family image;
+nothing had landed yet. This PR's marker is what carries mum-live across.** mum-live checked at
+push: `online`, 0 open, no halt. DECLARED: 🙏 avo-live is NOT redeployed (the
+marker is mum's), so her `build_shared` will read one commit behind her twin's
+— her lane is already `unjudgeable` on capacity for 28 days, so this costs
+nothing today and aligns on her next marker deploy.
+
+**VERIFIED BY, after the merge lands:** the shadow container's log printing
+`freqtrade-mum-lshadow xp levers in force: {'xp.mum.vel_lo': 12.0,
+'xp.mum.vel_hi': 20.0}` (fires every loop `_moved` is non-empty, independent of
+positions — the receipt that needs no trade), `extra.levers.registered_n == 4`
+on her row, and the next opened position stamping `vel_lo 12 / vel_hi 20`.
+The judge's `arm_skew` then clears on its own cycle. The lever expires
+**06T14:04Z**; the judge re-issues it.
+
+**WHAT THIS IS, plainly.** Not a new book — the fleet is four-for-four on
+books minted from replay numbers failing on their own ledgers ((wo)), and
+today's own instruments refused one more ((ye)). It is the machine the fleet
+already built to turn a measured improvement on its best real-money book into
+real money, found dead for the second time in three days, with the
+best-evidenced candidate in the fleet sitting in its queue. The first thing a
+profit machine needs is a path from evidence to capital that actually
+conducts.
+
+## 2026-09-06 (yf) — EVERY GRADER IN THIS FLEET IS PER-BOOK, SO A DEFECT THAT IS SMALL IN EVERY BOOK AND LARGE IN THE FLEET IS INVISIBLE TO ALL OF THEM AT ONCE — the pooled grader, and the four artefacts it killed in its own first output
+
+> **[RENUMBERED (yd) -> (yf) at push.]** A concurrent session pushed its own (yd) to main while this branch was in CI; that entry is on main and keeps the letter, per the letters rule. This one had ZERO code citations (counted, not sampled), so the move is free. `git log` subjects keep the old letter and are not a letter index.
+
+**Eamon's standing mandate:** *"we should be running this mandate and doctrine on
+building bots that can utlize every aspect of the ecosystem we are currently
+working on."* This is that mandate pointed at the fleet's own MEASUREMENT
+surface, which turned out to be the place it bit hardest.
+
+**THE GAP, measured by grepping the tree before a line was written.**
+`golive_readiness` grades a book. `winners_docket` buckets
+`for bot, rows in by_bot.items()`. `fleet_allocation` ranks books. `edge_audit`
+has a `side_split` and computes it INSIDE `audit_book`. **Not one instrument in
+this fleet pools a structural feature ACROSS books** — so a defect that is
+underpowered in every book individually and decisive in aggregate is invisible
+to every instrument simultaneously, because none of them is allowed to take the
+sum. That is I22's own arithmetic (*one construct is one term in the sum*)
+pointed at measurement rather than at trading.
+
+`scripts/fleet_pooled_grader.py` takes the sum: every (feature, value) cell —
+`side`, `side x regime`, `hold band`, `side x hold`, `exit` — pooled over every
+living book that has it.
+
+**IT RE-IMPLEMENTS NOTHING, and that is load-bearing rather than tidy.** The
+sample is `edge_audit.shape` (itself `golive_readiness.era_rows` +
+`is_phantom_close` + `is_adopted_close` + `store.is_quarantined` +
+`drop_retired_sleeves`); the clustered SE is `golive_readiness.cluster_se`; the
+strategy identity is `golive_readiness.era_base`; the reason split is
+`bot_pnl_store.split_reason`; the I7 exit screen is
+`winners_docket.OUTCOME_EXITS`; the multiplicity rule is
+`winners_docket.bh_survivors`; the critical value is `fleet_allocation.t_crit`.
+All identity imports, AST-pinned, per (hj) — and three of the four defects below
+were caused by owning something locally that already had an owner.
+
+**THE BINDING STATISTIC IS THE WORSE OF `t_book` AND `t_day`.** A pooled cell
+has exactly two ways to be a fake — one prolific book carries it (the
+concentration failure (wo) found four times), or one day does (the (vr)
+day-concentration class, where 17 simultaneous exits across 7 correlated majors
+were 77% of a book's P&L). Clustering by book alone is blind to the second, by
+day alone to the first; only the weaker of the two refuses both. BH at FDR 0.05
+then runs across every cell tested.
+
+### THE HEADLINE IS A REFUSAL, AND IT IS MY OWN CLAIM BEING REFUSED
+
+The candidate this was built to test is the fleet's SHORT side. **On the graded
+sample it does not clear the bar, and the first three readings I took of it were
+each wrong in the same direction — too strong.**
+
+| reading | n | mean | binding t | BH |
+|---|---:|---:|---:|:--:|
+| raw public feed, raw bot ids | 420 | −0.946% | −3.52 (day) | — |
+| graded sample, raw bot ids, all books | 1441 | −0.618% | **−2.61** (book) | no |
+| **graded sample, arms collapsed, living books** | **526** | **−1.032%** | **−1.74** (book) | **no** |
+
+**NO CELL SURVIVES BH. Nothing here is a fleet-wide claim** — including the one
+I went looking for. What the short side *is*, stated at its real strength: 10
+living strategies, 526 closes, 51 days, negative in both regimes, binding
+t=−1.74. That is a WATCH item, not an action, and the honest sentence is "the
+fleet's strongest candidate for a systematic drag does not clear the fleet's own
+multiplicity bar".
+
+**THE REGIME STORY IS DEAD, and it was the (wo) audit's own top-ranked §7
+hypothesis** (*"the highest-prior one is a regime VETO on existing books'
+shorts, not a new book"*). Reconstructing the regime at every trade's open from
+Lighter's OWN BTC dailies vs an EMA200, LAG-1 — a genuine two-regime split, BTC
+below its ema200 for 50 days to ~17-Aug and above it for the 18 since — shorts
+lose in **both**: risk-OFF −2.087%, risk-ON −0.507%. If this were beta, shorts
+would have paid when BTC was falling. They did not. A regime veto would buy
+nothing, and it is refused here with the number rather than left as a plausible
+proposal (I19).
+
+### FOUR DEFECTS, ALL IN MY OWN CODE, ALL FOUND BY DISTRUSTING ITS OUTPUT
+
+The first live run printed **eight BH survivors**. Every one was an artefact.
+
+1. **FIVE OF THE EIGHT WERE TAUTOLOGIES.** `exit=tp` +2.700% (t=+3.69) and
+   `exit=sl` −2.225% (t=−5.74): an exit family CONDITIONED ON THE PRICE OUTCOME
+   is a winner or a loser BY CONSTRUCTION. `winners_docket` had closed exactly
+   this class at I21 (*"outcome-conditioned exit families never reach the
+   referee"*) and I reproduced it one directory away. That is (hj) and I15
+   (*"when a bad idea is removed from a report, grep for it in the things that
+   ACT"*) in a single function. FIXED by importing `OUTCOME_EXITS`.
+2. **THE REASON PARSER WAS HAND-ROLLED AND WRONG ON REAL STRINGS.**
+   `rsplit("_", 1)[-1]` turns `long_exit_long` into **"long"** — which then
+   reached the survivor list as a `+4.803%/trade` *finding* — and
+   `long-trend-breakout_trailing_stop_loss` into "loss", hiding that it is a
+   stop. `bot_pnl_store.split_reason` is *"the ONE parser those composers
+   round-trip against"* and was sitting there the whole time.
+3. **THREE ARMS OF ONE STRATEGY COUNTED AS THREE BOOKS.** After the first two
+   fixes the sole remaining survivor was `exit_long` +6.387%/trade at
+   t_book=+31.89 *"across 3 books"*. The three were
+   `perps-donchian-breakout`, `-lighter` and `-lshadow` — **one strategy on
+   three arms, 95 of 99 rows on one of them.** Clustering on the raw row id
+   inflates the cluster count and understates the SE of every cell the arms
+   appear in. FIXED by clustering on `golive_readiness.era_base` — the same
+   suffix hazard that function exists for, reached from the clustering side
+   rather than the era side.
+4. **THE dof BELONGED TO THE WRONG CLUSTERING.** `dof = min(g_book, g_day) − 1`
+   priced a t computed from 13 day-clusters against **2** degrees of freedom,
+   roughly doubling its p. Over-conservative is still wrong: it *hides*
+   findings, which is the failure this instrument exists to end. The dof now
+   belongs to whichever clustering binds.
+
+Plus the scope call: **living books only by default** (`--all-books` reverts).
+`edge_audit.shape` grades all 41 books the ledger has ever held, which is right
+for an audit and wrong for a claim about how the fleet trades NOW —
+`study_exit_attribution` already set this precedent in the fleet's own words,
+*"RETIRED rows are excluded by default: the ledger is history"*. Defect 3's
+survivor was a retired Kraken-era book.
+
+**ADVISORY, asserted rather than promised**: no lever write, no capital move, no
+`market_open` — checked against this module's own AST, the `fleet_allocation`
+pattern. And a pooled cell is evidence about a CLASS, never an instruction about
+a book: pooling mixes books with different signals, so acting on one is a
+separate, per-book, measured decision.
+
+**TESTS:** `tests/autonomy/test_fleet_pooled_grader.py`, 33 pins, **10 of 10
+mutations verified RED** — the I7 screen removed, the binding statistic flipped
+to the *stronger* clustering, the dof reverted, arms un-collapsed, both floors
+dropped, living scope ignored, unknown regime folded into risk-OFF, the naive
+rsplit restored, and the regime map failing OPEN. The tenth (the n floor)
+**SURVIVED the first round** and the reason is this file's own recurring shape:
+every "underpowered" fixture in the suite happened to fail the BOOK floor first,
+so the TRADE floor was never exercised. It has its own case now, with a
+positive control one trade above the bar. A positive control also guards the
+grader itself (I3 applied to a grader): a real effect spread across 8 books
+must still be FOUND, because an instrument that never finds anything is
+trivially safe and useless.
+
+Registered in `SELFTEST_MODULES`, deliberately not `ENFORCED_AUDITS` — the
+`edge_audit` reason exactly: its live arm reads the public ledger and
+`/pnl.json`, both of which move with every publish and no code change.
+
+## 2026-09-06 (yh) — ⚓ nav-flinders IS REFUSED BY ITS OWN PRE-REGISTERED SCORECARD: 5 of 6 bars pass, the binding one fails, and the parent claim it was projected from is measured dead
+
+> **[RENUMBERED (ye) -> (yh) at rebase.]** A concurrent session took (ye) on main (its own (yd)->(ye) renumber) while this branch was in CI; that entry keeps the letter per the letters rule. This one's only code citations were its own study docstring and the scout's residual comment, both re-pointed in the same rebase. `git log` subjects keep the old letter and are not a letter index.
+
+**The design** (`(vu)`: *"NOT CONSUMED BY ANY BOOK. This is the instrument;
+⚓ nav-flinders is the first caller and comes next"*) declared a STEP 0
+measurement and the rule that **the book is not built unless it clears**.
+`scripts/study_flinders_zband_2026-09-06.py` is that measurement. It refuses.
+A refusal was named a valid, publishable output before the run, and this is it.
+
+**THE PRE-REGISTERED SCORECARD**, evaluated mechanically rather than eyeballed
+over a grid of cells (the (oe) hazard), on the band `z ∈ [3.0, 8.0)` at 4h, net
+of the tier's own measured slippage:
+
+| bar | required | measured | |
+|---|---|---|:--:|
+| supply | ≥ 6.0/day | **98.7/day** | PASS |
+| edge | mean > 0 | **+0.281%** | PASS |
+| **edge** | **t ≥ +2.0** | **t_day = +0.59** | **FAIL** |
+| shape | ≥4 of 5 horizons positive | **5 of 5** | PASS |
+| control | ghost direction negative | −0.511% (t=−1.86) | PASS |
+| class | positive in ≥2 classes | **4 classes** | PASS |
+
+`t_day` is the binding statistic and not `t_iid` (+1.02): episodes overlap
+heavily — same coin, adjacent 5-minute snapshots — over a 9-day tape. At the
+measured `S_d ≈ 0.197` the implied **days-to-gate is ~103**, and I22's own guard
+(`audit_book_spend.MAX_DAYS_TO_GATE = 60`) says a design past 60 **is a STUDY,
+not a book: it may run as an instrument but it does not get a row, a clock,
+capital or a slot of the fleet budget.** The refusal is the doctrine working, on
+its author, on the first design to reach it.
+
+**THE SECOND, INDEPENDENT GROUND — and it is the stronger one.** The design's
+whole `S_d = 0.293 ⇒ 47 days` projection was reconstructed from 🧭 nav-cook's
+founding `t = +2.74`. Four days before this ran, (wo) measured that claim OUT OF
+SAMPLE: **founding +0.367%/trade → live −0.193% (n=38, z=+4.22)**, one of four
+of four books minted on a per-trade replay number now rejecting it on their own
+ledger. So the projection was built on a number the fleet has since refuted, and
+this study's own fresh-tape replay reproduces the live sign independently: the
+mirror direction reads −0.113% to −0.265%/trade at every horizon. Two blind
+lines onto the same conclusion.
+
+**WHAT THE STUDY DID FIND, and it is worth keeping.** The σ-normalisation
+premise has DIRECTIONAL support that absolute bps does not: sorted by
+`z = |prem|/σ` the edge is monotone (z<2 −0.21%, z∈[5,8) **+1.89%**, z∈[8,15)
++1.24% at 4h) where sorting by absolute bps produces no clean order at all. It
+is not significant — the winning cell's `t_day` is +0.38 against an iid +3.04 —
+and the design's own band mixes that cell with a negative one, which is the
+fitted-cell hazard the spec itself warned about. Directional support, recorded
+as such.
+
+**THREE MEASUREMENT WALLS, PROBED RATHER THAN ASSUMED** ((sc)'s rule: *a
+constraint I have not tested is not a constraint, it is an assumption*):
+* **The scout tape is TOP-8-BY-ABSOLUTE-BPS** (`TOP_N = 8`), and the truncation
+  is adverse to the exact hypothesis: a small-σ market having a large SIGMA
+  event at a small ABSOLUTE premium is precisely what a top-8-by-absolute list
+  excludes. Measured: the smallest observed |prem| is **9.5bps** against a
+  venue-wide median residual of **3.5bps**, so the observable sample begins near
+  the venue's own p90 and the targeted population is structurally ABSENT. A null
+  here therefore refutes only *"normalisation helps among already-large
+  dislocations"* — the scope is printed in the report so no reader can drop it.
+* **The venue exposes no historical index series.** `/api/v1/candles` ignores
+  `candlestick_type` / `price_type` / `source` / `kind` — byte-identical
+  responses for every value **including bogus ones**, which is what proves it is
+  an absent endpoint rather than a parameter name I was missing. Substituting
+  another venue's spot as the index is banned outright (BACKTEST ON LIGHTER
+  ONLY), so the residual cannot be reconstructed historically.
+* **`sigma_price` is REFUTED as the scale proxy**, by its own test rather than by
+  assumption: Pearson +0.401 but **Spearman +0.070** against each market's
+  observable residual scale — the rank correlation is ~zero, and the Pearson is
+  carried by a few extremes. Price volatility is not residual volatility; at
+  5-minute scale the venue's median σ_price (59.6bps) is larger than the median
+  premium (36.9bps), which is why the design's `z ∈ [3,8)` band sits above the
+  p90 of z (2.22) and is nearly empty even in the truncated sample.
+
+**THE ONE THING THAT CHANGES THE ANSWER IS SHIPPED IN THIS PASS, because it is
+one comprehension and the fleet's own rule is that a growth finding is
+implemented rather than filed.** The scout already computes a residual for every
+active market on every loop and stores **8** of them: `book_stats` produces
+`prem_bps` for all ~123 liquid (and ~212 active) books, and `build_snapshot`
+sorts by `abs(prem_bps)` and truncates to `TOP_N`. `lighter-market.resid` now
+carries the FULL per-market vector — ~2.5KB against a 37.8KB payload (`margins`
+alone is 13.8KB), so the REAL per-market σ becomes computable from ~14 days of
+history and this question answers itself instead of being permanently
+unanswerable.
+
+**It is the THIRD instance of a class this file already names twice, which is
+why it needed no argument.** `funding` was added because *"the ONLY funding this
+organ persisted was the top-8 |extremes| — which is a VIEW, not the data"*;
+`xvenue_funding` because it *"carries the FULL cross-section, not
+`funding_divergence`'s top-5 truncation"*. `prem_outliers` was the last view
+still standing in for its own data. ALL ACTIVE books, not liquid-only, for the
+reason the `marks` comment three lines above gives: a book that drops below the
+volume floor mid-episode must not vanish from its own tape.
+
+**ADDITIVE — no gate reads it, no book's behaviour changes**, so it carries no
+expectancy price to state (I19). **4 mutations verified red, and TWO OF THEM
+SURVIVED THE FIRST ROUND** in the shape this file keeps paying for: the
+selftest's fixture has 3 active books, so a cap of **8** can never bind in it
+and a `resid` that merely copied `prem_outliers` passed every assertion written
+against that fixture. The two survivors were the two that matter — *resid
+becomes the top-8 view* and *resid restricted to liquid books* — i.e. the guard
+was green against precisely the defect it exists to prevent. Fixed with a
+second fixture carrying `TOP_N + 4` books so the truncation is actually
+exercised, plus an assertion that the fixture's ACTIVE-but-ILLIQUID book
+(+1000bps, outside every liquid view) is present in the vector.
+
+Harness registered in `SELFTEST_MODULES` so a refusal is re-runnable — (sa)'s
+rule applied to a negative result: a founding claim nobody can re-run is a
+rumour with a number attached, and so is a refusal.
+
 ## 2026-09-06 (ye) — "PROCEED WITH ALL OF THE ABOVE": the judge's mum lane was inert by ONE STRING, avo's live cap follows her twin's best trades, a READY book keeps its bracket, and the allocation organ reaches the books that hold the claims — with two of the seven refused on measurement
 
 **Eamon, 6-Sep, on the evening brief's improvement list:** *"proceed with all of

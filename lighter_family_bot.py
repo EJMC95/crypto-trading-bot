@@ -2210,6 +2210,45 @@ def xp_prefix_for_arm(bot_id):
         return ""
 
 
+def lever_surface(prefix):
+    """[(yb), re-landed (yg)] WHAT THIS ARM'S LEVER SURFACE ACTUALLY IS — the
+    half of the fix that stops the defect recurring SILENTLY.
+
+    `apply_book_levers` is fail-OPEN and `fleet_tuning.get_lever` returns the
+    caller's default for an UNREGISTERED name. Both are right on their own,
+    and together they made a 36h experiment stall unobservable — twice: the
+    arm asked for `xp.mum-lshadow.rsi_max`, no registry has ever held that
+    name, and every reading on the row looked exactly like "the judge set
+    nothing" (I1/I18: `0/N carry a receipt` is byte-identical between a quiet
+    arm and an arm asking for a name nothing holds). (ye) fixed the name;
+    this publishes the resolution so the NEXT unregistered name is a
+    row-visible defect instead of 38 hours of a judge that "set nothing".
+
+    So the row says which prefix it resolved and whether that prefix's lever
+    names EXIST. `{"prefix": ""}` (a book outside the judge, or an image
+    without fleet_bus — `xp_prefix_for_arm`'s own no-op value) is a
+    first-class answer, distinct from `unregistered: [...]`, which can only
+    mean a bug. REPORTED — nothing gates on it; a dark registry publishes
+    `registry: false` rather than a fabricated clean bill (I8)."""
+    out = {"prefix": prefix}
+    if not prefix:
+        return out
+    try:
+        import fleet_tuning as _tuning
+    except Exception:  # noqa: BLE001
+        out["registry"] = False
+        return out
+    names = [prefix + bar for bar, _attr, _cast in MUM_LEVER_ATTRS]
+    missing = [n for n in names if n not in getattr(_tuning, "LEVERS", {})]
+    out["registry"] = True
+    out["registered_n"] = len(names) - len(missing)
+    if missing:
+        # the only value this key can hold is a defect, so it is ABSENT when
+        # clean rather than an empty list somebody learns to skim past
+        out["unregistered"] = missing
+    return out
+
+
 def apply_book_levers(strategy, prefix):
     """Overlay `<prefix>rsi_max` / `<prefix>max_hold_min` onto the strategy
     INSTANCE (never the class) from the env defaults each call. Returns the
@@ -2515,6 +2554,12 @@ def family_publish_extra(b, mode, regime, t0):
             # universe resolution — a builder that raises on a fresh Book is
             # the exact class this function exists to close
             "skipped_unlisted": getattr(b.s, "skipped", []),
+            # [(yg)] which xp.* namespace this arm reads, and whether the
+            # registry holds it — so an unregistered prefix is a row-visible
+            # defect instead of 38h of a judge lane that "set nothing".
+            # Read through THEIR owner ((ye) `xp_prefix_for_arm`), never a
+            # second resolution of the same string.
+            "levers": lever_surface(xp_prefix_for_arm(b.bot_id)),
             **_control_extra(b), **_census_extra(b),
             **spend_extra(b, t0),
             **_census_series_extra(b, t0)}

@@ -132,6 +132,23 @@ SELFTEST_MODULES = [
     # synthetic rows, and the "moves nothing" source scan. The structural
     # pins live in tests/autonomy/test_edge_audit.py.
     "scripts.edge_audit",
+    # [2026-09-06] the FLEET POOLED GRADER — does a structural feature pay,
+    # pooled across every book that has it? SELFTEST_MODULES and deliberately
+    # NOT ENFORCED_AUDITS, the edge_audit reason exactly: its live arm reads
+    # the public ledger AND /pnl.json (for the living-book scope), both of
+    # which move with every publish and no code change. The --selftest is
+    # offline and pure: the advisory source scan, the identity imports, the
+    # I7 outcome-exit screen, the binding-cluster choice and its dof, the two
+    # floors, the arm-collapse, and the fail-closed regime map. The
+    # mutation-verified structural pins (10 of 10 killed) live in
+    # tests/autonomy/test_fleet_pooled_grader.py.
+    "scripts.fleet_pooled_grader",
+    # [2026-09-06] STEP 0 of the nav-flinders design — the sigma-normalised
+    # dislocation replay whose pre-registered scorecard REFUSED the build.
+    # Registered so the harness behind a refusal is re-runnable, which is the
+    # (sa) rule applied to a negative result: a founding claim nobody can
+    # re-run is a rumour with a number attached, and so is a refusal.
+    "scripts.study_flinders_zband_2026-09-06",
     # [2026-09-02 (wu)] PORTED from the in-flight health-check branch, the CI-red
     # rule: (wr) landed this study on main with a --selftest and no registration,
     # so test_no_unregistered_selftest is red on main itself. Its selftest is

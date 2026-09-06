@@ -313,9 +313,6 @@ JUDGED_PAIRS = {
 }
 
 
-#: [(wv)] preference among LIVING judged pairs when the feed cannot rank
-#: them by closes: 👩 mum (n=53 live closes, the fleet's one proven edge)
-#: before 🙏 avo (n=11). A retired arm is filtered BEFORE this is consulted.
 PAIR_PRIORITY = ("mum", "avo")
 
 
