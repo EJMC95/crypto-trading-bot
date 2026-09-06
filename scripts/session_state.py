@@ -85,6 +85,43 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "avo-judge-lane-declared-but-not-lever-capable",
+        "owner": "session",
+        "what": "(yg)'s lever surface, on its FIRST loop after the 6-Sep deploy, "
+                "published on freqtrade-avo-maria-lshadow: {prefix: 'xp.avo.', "
+                "registry: true, registered_n: 0, unregistered: [xp.avo.rsi_max, "
+                "xp.avo.max_hold_min, xp.avo.vel_lo, xp.avo.vel_hi]}. Sized: "
+                "fleet_bus.JUDGED_PAIRS['avo'] DECLARES xp_prefix 'xp.avo.'; "
+                "fleet_tuning.LEVERS registers ZERO xp.avo.* levers; and her "
+                "carrier SwingDip defines RSI_MAX but not MAX_HOLD_MIN, so "
+                "lighter_family_bot.apply_book_levers returns at its own guard "
+                "before asking get_lever for anything. The judge's avo lane -- "
+                "judgeable since (ye) matched the caps at 6/6 -- is therefore "
+                "structurally INERT: the (ye) class-closers pin that every "
+                "REGISTERED xp.* lever is reachable and cannot see a declared "
+                "prefix with nothing under it. Same class as (yb)/(ye), one "
+                "namespace over; found by the instrument built to find it.",
+        "why_open": "the fix is a DECISION with a measurement, not a one-liner: "
+                    "(a) give SwingDip a hold bound so the guard passes and "
+                    "register xp.avo.rsi_max + max_hold_min with cages (a "
+                    "behaviour change on a real-money carrier -> (qu)'s "
+                    "measurement first), or (b) narrow apply_book_levers to "
+                    "per-attribute and register only xp.avo.rsi_max (cage TBD "
+                    "against her rsi<42 cell), or (c) withdraw xp_prefix from "
+                    "JUDGED_PAIRS['avo'] so the judge stops reporting a lane "
+                    "that cannot apply. Whichever ships, the surface's own "
+                    "over-report (it derives names from MUM_LEVER_ATTRS, not "
+                    "from the carrier's consumable set) is fixed in the SAME "
+                    "push -- and that push touches lighter_family_bot.py, so "
+                    "it MUST carry [deploy-live] (both markers): a shadow-only "
+                    "redeploy re-splits both live pairs (measured 6-Sep 15:31Z, "
+                    "the judge read ARMS ON DIFFERENT CODE). Deferred rather "
+                    "than restarting two real-money books for a report-shape "
+                    "fix at the tail of the deploy that found it.",
+        "closes_when": lambda: _has("fleet_tuning.py", '"xp.avo.')
+                       or not _has("fleet_bus.py", "xp.avo."),
+    },
+    {
         "id": "mum-halt-cost-preregistered-read",
         "owner": "session",
         "what": "(xv) pre-registered whether 👩 mum's daily-loss halt costs or "

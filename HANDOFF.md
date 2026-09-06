@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-06 22:17 Sydney (12:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 01:51 Sydney (15:51Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `avo-judge-lane-declared-but-not-lever-capable`  ·  owner: **session**
+(yg)'s lever surface, on its FIRST loop after the 6-Sep deploy, published on freqtrade-avo-maria-lshadow: {prefix: 'xp.avo.', registry: true, registered_n: 0, unregistered: [xp.avo.rsi_max, xp.avo.max_hold_min, xp.avo.vel_lo, xp.avo.vel_hi]}. Sized: fleet_bus.JUDGED_PAIRS['avo'] DECLARES xp_prefix 'xp.avo.'; fleet_tuning.LEVERS registers ZERO xp.avo.* levers; and her carrier SwingDip defines RSI_MAX but not MAX_HOLD_MIN, so lighter_family_bot.apply_book_levers returns at its own guard before asking get_lever for anything. The judge's avo lane -- judgeable since (ye) matched the caps at 6/6 -- is therefore structurally INERT: the (ye) class-closers pin that every REGISTERED xp.* lever is reachable and cannot see a declared prefix with nothing under it. Same class as (yb)/(ye), one namespace over; found by the instrument built to find it.
+
+_Still open because:_ the fix is a DECISION with a measurement, not a one-liner: (a) give SwingDip a hold bound so the guard passes and register xp.avo.rsi_max + max_hold_min with cages (a behaviour change on a real-money carrier -> (qu)'s measurement first), or (b) narrow apply_book_levers to per-attribute and register only xp.avo.rsi_max (cage TBD against her rsi<42 cell), or (c) withdraw xp_prefix from JUDGED_PAIRS['avo'] so the judge stops reporting a lane that cannot apply. Whichever ships, the surface's own over-report (it derives names from MUM_LEVER_ATTRS, not from the carrier's consumable set) is fixed in the SAME push -- and that push touches lighter_family_bot.py, so it MUST carry [deploy-live] (both markers): a shadow-only redeploy re-splits both live pairs (measured 6-Sep 15:31Z, the judge read ARMS ON DIFFERENT CODE). Deferred rather than restarting two real-money books for a report-shape fix at the tail of the deploy that found it.
 
 ### `mum-halt-cost-preregistered-read`  ·  owner: **session**
 (xv) pre-registered whether 👩 mum's daily-loss halt costs or saves her, paired same-coin against her never-halting shadow twin. At registration her ledger holds exactly ONE daily-loss halt (2-Sep 17:19:45Z, 8 legs, +1.76pp/leg cost against the twin) -- one flatten instant is ONE observation, not eight, so it decides nothing. READ at n>=5 halt EVENTS occurring AFTER 2026-09-03: LOOSEN only if mean paired cost > 1.0pp/leg AND the sign is consistent across events; otherwise KEEP. Instrument: scripts/study_mum_halt_cost_2026-09-03.py (its calibration gate REFUSES unless it reproduces both the registered event and the registered baseline).
@@ -79,14 +84,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (6 commit(s))
+## Shipped today (2 commit(s))
 
-- `ba437e6` (ye) the record: changelog entry, three doctrine amendments in place, and RENUMBERED (yd) -> (ye) after another session took (yd) on main
-- `4c4f3ef` (yd) the freeze pin asserts the result REBINDS levers (a discarded call froze nothing; M1)
-- `2acd138` (yd) a READY book keeps the bracket it passed on (tuner freeze), and the allocation organ reaches the family shadows + the taker
-- `91390a3` [deploy-live-taker] (yd) avo LIVE 5 -> 6 slots: the twin's 6th slot took its best trades, and the arms' caps now match so the judge's avo pair is judgeable
-- `24cfb90` (yd) the judge's mum lane was inert by one string: the shadow arm rebuilt the lever prefix from a suffixed row id
-- `f9546fc` (yd) the winners' docket graded the taker on a superseded policy: era_rows was pinned by identity and fed the wrong shape
+- `4bf21e8` (yg) VERIFIED: both arms on 5e30671ecf64, judge un-drifted at its next cycle, resid live — and the lever surface found avo's undeclared namespace on its first loop
+- `b775b06` [deploy-live-mum] The judge's mum lane: (ye) owns the fix, this ships the lever surface and the marker that keeps mum's pair aligned; plus the pooled grader and the flinders refusal (yg)(yf)(yh) (#287)
 
 ## How this file stays honest
 
