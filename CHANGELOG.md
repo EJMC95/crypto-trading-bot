@@ -1,3 +1,120 @@
+## 2026-09-06 (yg) — THE FLEET'S ONLY SHADOW→REAL-MONEY PATH HAD NEVER APPLIED AN EXPERIMENT ON THE BOOK THAT HOLDS THE MONEY: found on 4-Sep, fixed, reverted by accident the same day, re-landed alone
+
+**Eamon, 6-Sep:** *"find a way to build a profit machine for the bots."* The
+route to this entry is the answer, so it is recorded in order.
+
+**1 · THE VENUE'S STRUCTURAL PAYMENT IS THIN — measured, not assumed.** Full
+216-market cross-section off the scout's own `funding`/`vols`/`classes`:
+median TRUE apr **+10.5%** (the venue's resting `base_interest_rate`, paid on
+202 of 206 signed markets, ~400× smaller than the price move at any tradeable
+hold); at the **20% gate and $1M floor, SIX markets** (USELESS +254%, XMR
++160%, NEAR +76%, PUMP +39%, PONS +56%, CASHCAT +47%), and the three carry
+books already hold them — 🌾 carry reads `eligible: 0`. Persistence over the
+8.3-day tape: **8 symbols** hold |apr| ≥ 20% for half the time, **2** for 80%
+(XMR +54% median, 100% sign-stable; RIVER +60%). A funding machine at scale
+does not exist on this venue today; the supply is captured.
+
+**2 · SO THE MACHINE IS THE ONE BOOK WITH REAL MONEY AND REAL EVIDENCE — and
+its improvement loop.** 🙏 avo live is the fleet's best P&L (**+$100.16,
++26.3%, 9W/5L**) at **0.27 closes/day**, 3 of 5 slots empty, gate 99 days out
+on rate. 👩 mum live is **+$48.76, 89 closes at 5/day**, beats her own
+random-entry null by **+0.22pp**, 0 of 12 slots filled in a rally. Both are
+long-only dip-buyers starved by entry conjuncts in a regime where the pooled
+fleet's longs make +0.39%/trade ((yf)). The fleet's DESIGNED machine for
+exactly this — measure a widening on the shadow twin, promote it to real money
+on the paired bar — is the 🧪 judge, and its serial lane is on mum with
+`mum-vel-12-20` in the queue: (xl)'s dip-velocity band, measured on **her own
+live ledger** at **+1.039%/trade in-band (n=12, t=+3.68) vs +0.223% outside**,
+12 of her 58 closes carrying $32.86 of her $49.12. avo's lane reads
+`unjudgeable: capacity_mismatch` — live `max_open` 5 vs shadow 6, the
+`FAMILY_SHADOW_MAX_OPEN_OVERRIDES` code default `freqtrade-avo-maria:6` — but
+even matched, her paired bar cannot OPEN before 4-Oct (28-day floor on shadow
+closes) and needs a 4.6pp effect at her sd. Not a useful-horizon machine.
+
+**3 · AND THE MUM LANE WAS INERT.** Judge payload at 11:54Z: `phase: running`,
+`candidate: mum-vel-12-20`, lever `xp.mum.vel_lo=12.0 / vel_hi=20.0` on the
+bus since **05T03:06Z**, and `last_eval.why`: *"ARM NOT APPLYING: 0/8 shadow
+closes carry a receipt … the arm is not running this experiment"*. Every
+default-returning branch of `get_lever` was then ruled out one at a time,
+because a guess here costs a day: lever alive (expires 06T14:04Z) · lane
+`lighter-xp` in the code-default `ENACT_LANES` and **`FLEET_TUNING_ENACT_LANES`
+not set on the service** (variable names read; values never) · cages clamp
+12→12 and 20→20 so `_skewed` cannot fire · immune quarantine `{}` · payload
+fresh (ttl 7552s) · `Dockerfile.familyshadow` **does** COPY `fleet_tuning.py`
+(my first read of `audit_image_imports.image_contents` said otherwise — the
+(iw) 4-tuple trap, caught by reading the Dockerfile) · shadow container on
+build `f766cb58282c/17` = repo HEAD. **The receipts decided it:** positions
+opened **05T16:05** and **06T02:08** — 13 and 23 hours after the candidate
+started — stamp `vel_lo -999 / vel_hi 999`, the env defaults, while one
+opened 04T16:44 stamps `12/20`. The deployment that booted **04T21:29** has
+never once printed `xp levers in force` in 38 hours of log, with zero
+warnings.
+
+**THE DEFECT, which (yc) had already written down:** `Book.bot_id` is
+`strat.bot + "-lshadow"`; the call site built its prefix as
+`f"xp.{b.bot_id.split('-', 1)[-1]}."` — `freqtrade-mum-lshadow` →
+**`xp.mum-lshadow.`** — a namespace no registry holds, so `get_lever` returns
+the caller's default. Correctly, silently, forever. (yb) found this on 4-Sep
+(*"the judge's mum lane had never applied an experiment"*) and fixed it with
+`fleet_bus.xp_prefix_for`; (yc) reverted (yb) wholesale at Eamon's *"go back
+to how things were"* — an instruction about the **trading** change (the flip,
+the RSI bar) — and this plumbing went with it. (yc) says so itself: *"the
+judge's mum lane is dead again, and it was dead before (yb) … No experiment has
+ever applied on that lane. That is still true this minute."* Two correct
+fail-OPENs — `apply_book_levers` on a dark rail, `get_lever` on an unregistered
+name — composed into a surface that cannot move and cannot be seen not moving.
+
+**RE-LANDED, ALONE.** `fleet_bus.xp_prefix_for(bot_id)` — THE owner, reading
+`JUDGED_PAIRS[<pair>]["xp_prefix"]`, matching either arm, **None** for a book no
+pair claims (I8: never a plausible guess). In the family host: the
+image-safety wrapper, `Book.lever_prefix` seeded None, the call site
+`b.lever_prefix = xp_prefix_for(b.bot_id)` → `apply_book_levers(b.s,
+b.lever_prefix)`, and **`lever_surface`** published on the row as
+`extra.levers` — `{prefix, registry, registered_n, unregistered:[...]}` — the
+half that makes the NEXT unregistered name a row-visible defect instead of
+38 hours of a judge that "set nothing". None of (yb)'s trading content
+returns: no flip, no `vel_census`, no RSI move. **This changes no trade any
+book takes today** — the velocity levers' env defaults are ±999 (inert) and
+the fix only lets the judge's SHADOW candidate actually run; real money moves
+only through the judge's own paired bar, as designed.
+
+`tests/autonomy/test_xp_lever_prefix.py`: 11 pins, **6 of 6 mutations red** —
+the exact bug at the call site, the (yb)-survivor (f-string moved one line up
+into the assignment — pinned on the AST, `lever_prefix` may be produced only
+by a call to `xp_prefix_for`), the owner guessing a prefix for an unclaimed
+book, the owner deriving from the id instead of the registry, the surface
+dropped from the row, the surface hiding `unregistered`. The class-closer:
+**every declared pair's prefix must resolve to registered levers**, so a new
+book cannot ship with a namespace nothing holds.
+
+**DEPLOY — BOTH ARMS, `[deploy-live-mum]` in the commit subject AND the PR
+title ((xh)).** `lighter_family_bot.py` is in `_BUILD_SHARED`, so a shadow-only
+deploy would split the pair's `build_shared` stamp and trip the judge's own
+`arm_drift` guard ((xd)) on the lane this exists to unblock. The live arm's
+prefix path is `_PFX`-based and untouched (`git diff` names no `_PFX`, no
+`live.{`, no `lighter_avo_live_bot`), so it rides free. mum-live checked at
+push: `online`, 0 open, no halt. DECLARED: 🙏 avo-live is NOT redeployed (the
+marker is mum's), so her `build_shared` will read one commit behind her twin's
+— her lane is already `unjudgeable` on capacity for 28 days, so this costs
+nothing today and aligns on her next marker deploy.
+
+**VERIFIED BY, after the merge lands:** the shadow container's log printing
+`freqtrade-mum-lshadow xp levers in force: {'xp.mum.vel_lo': 12.0,
+'xp.mum.vel_hi': 20.0}` (fires every loop `_moved` is non-empty, independent of
+positions — the receipt that needs no trade), `extra.levers.registered_n == 4`
+on her row, and the next opened position stamping `vel_lo 12 / vel_hi 20`.
+The judge's `arm_skew` then clears on its own cycle. The lever expires
+**06T14:04Z**; the judge re-issues it.
+
+**WHAT THIS IS, plainly.** Not a new book — the fleet is four-for-four on
+books minted from replay numbers failing on their own ledgers ((wo)), and
+today's own instruments refused one more ((ye)). It is the machine the fleet
+already built to turn a measured improvement on its best real-money book into
+real money, found dead for the second time in three days, with the
+best-evidenced candidate in the fleet sitting in its queue. The first thing a
+profit machine needs is a path from evidence to capital that actually
+conducts.
+
 ## 2026-09-06 (yf) — EVERY GRADER IN THIS FLEET IS PER-BOOK, SO A DEFECT THAT IS SMALL IN EVERY BOOK AND LARGE IN THE FLEET IS INVISIBLE TO ALL OF THEM AT ONCE — the pooled grader, and the four artefacts it killed in its own first output
 
 > **[RENUMBERED (yd) -> (yf) at push.]** A concurrent session pushed its own (yd) to main while this branch was in CI; that entry is on main and keeps the letter, per the letters rule. This one had ZERO code citations (counted, not sampled), so the move is free. `git log` subjects keep the old letter and are not a letter index.
