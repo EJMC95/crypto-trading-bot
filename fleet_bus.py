@@ -313,55 +313,6 @@ JUDGED_PAIRS = {
 }
 
 
-def xp_prefix_for(bot_id):
-    """[2026-09-04 (yb), RE-LANDED 2026-09-06 (yg)] THE ONE OWNER of a book's
-    experiment-lever prefix.
-
-    `JUDGED_PAIRS[<pair>]["xp_prefix"]` has declared this since the pair
-    registry existed, and 👩 mum's shadow twin never asked it. The family
-    host built its own by stripping the FIRST id segment —
-    `freqtrade-mum-lshadow` -> `xp.mum-lshadow.` — which is not a registered
-    lever name, so `fleet_tuning.get_lever` returned the CALLER'S DEFAULT.
-    Correctly, and silently, and forever.
-
-    MEASURED 4-Sep on the live bus: the 🧪 judge held `xp.mum.rsi_max = 32.0`
-    open for 36h while every close stamped `bars.rsi_max = 38.0`, judge
-    publishing `ARM NOT APPLYING`, `arm_skew: true`. (yb) fixed it; (yc)
-    reverted (yb) wholesale at Eamon's "go back to how things were" — an
-    instruction about the TRADING change — and this plumbing went out with
-    it. Measured AGAIN 6-Sep: `mum-vel-12-20` open since 05T03:06Z, the
-    shadow container's 38h log never once printing `xp levers in force`,
-    positions opened 13h and 23h after the candidate started stamping
-    `vel_lo -999 / vel_hi 999`. **The fleet's ONLY path from shadow evidence
-    to real money had never applied a single experiment on this lane.**
-
-    Two correct fail-OPENs composed into a surface that cannot move:
-    `apply_book_levers` degrades to the env default on a dark rail (right),
-    and `get_lever` returns the default for an unregistered name (right).
-    Neither is wrong; together they are unobservable. Hence the second half
-    of this fix, `lighter_family_bot.lever_surface`, which PUBLISHES the
-    resolution so the next unregistered name reads as a defect on the row.
-
-    Matches on EITHER arm — one book identity resolves both twins — and
-    returns None for a book no declared pair claims, so a carrier outside
-    the judge is untouched rather than handed a guessed prefix (I8: unknown
-    degrades to the honest absence, never to a plausible name).
-    """
-    try:
-        for spec in (JUDGED_PAIRS or {}).values():
-            if not isinstance(spec, dict):
-                continue
-            if bot_id in (spec.get("live_bot"), spec.get("shadow_bot")):
-                pref = spec.get("xp_prefix")
-                return str(pref) if pref else None
-    except Exception:  # noqa: BLE001 — a registry read must never break a loop
-        pass
-    return None
-
-
-#: [(wv)] preference among LIVING judged pairs when the feed cannot rank
-#: them by closes: 👩 mum (n=53 live closes, the fleet's one proven edge)
-#: before 🙏 avo (n=11). A retired arm is filtered BEFORE this is consulted.
 PAIR_PRIORITY = ("mum", "avo")
 
 
