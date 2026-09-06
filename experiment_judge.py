@@ -1228,6 +1228,23 @@ def _respec_clamped(cand, clamp=None):
 # ledger reverts to env within LEVER_TTL. The tight fade-revert backstops the
 # weaker bar. The judge stays the SOLE writer of live.funding.*.
 GROWTH_CAND = {"xp.funding.explore_k": 2, "xp.funding.conviction_hi": 2.2}
+
+
+def growth_cand_for(prefix=None):
+    """[(yi)] The growth-lever pair IF it belongs to the lane this module runs.
+
+    `GROWTH_CAND` is a Farmer-only literal (`xp.funding.*`), written when the
+    serial machine's lane WAS the Farmer's. `(ww)` moved the lane to 👩 mum, and
+    the promoter kept asking mum's shadow for receipts proving it ran the
+    Farmer's levers — a bar no lane but the Farmer's can ever meet. It failed
+    CLOSED, which is why it cost nothing but noise; what it published was a
+    growth pair permanently "floors: shadow 0/15" and an hourly UNREACHABLE
+    warning about a book that does not have the levers. Empty dict = this lane
+    owns no growth pair, and the caller publishes `skipped` rather than a
+    verdict about a comparison it never made."""
+    pre = prefix or lane_prefix()
+    return dict(GROWTH_CAND) if all(
+        str(k).startswith(str(pre)) for k in GROWTH_CAND) else {}
 GROWTH_LIVE = {"live.funding.explore_k": 2, "live.funding.conviction_hi": 2.2}
 GROWTH_WINDOW_D = float(os.environ.get("XPJ_GROWTH_DAYS", "2.5"))
 GROWTH_MIN_CLOSES = int(os.environ.get("XPJ_GROWTH_MIN_CLOSES", "15"))
@@ -2462,10 +2479,16 @@ def lane_census(pairs, live_bot=None):
     return out
 
 
-def _farmer_pair_entry(payload):
-    """Mirror the serial machine's top-level state into pairs['farmer'] —
+def _serial_pair_entry(payload):
+    """Mirror the serial machine's top-level state into ITS OWN lane's entry —
     one machine, two views, no second copy of the rule: everything here is
-    DERIVED from the payload the machine just built."""
+    DERIVED from the payload the machine just built.
+
+    [(yi)] Named for the ROLE, not for one book. It was `_farmer_pair_entry`
+    and its call site wrote `pairs["farmer"]`, so when `(ww)` moved the serial
+    lane to 👩 mum the machine's just-built state landed on a RETIRED pair
+    while `pairs["mum"]` — the lane it actually runs — kept the census's stale
+    precheck view. The lane comes from `serial_lane_id()`, the one owner."""
     hold = None
     if payload.get("phase") == "running":
         le = payload.get("last_eval") or {}
@@ -2658,7 +2681,12 @@ def run_once():
         # v2.1 rollup flip will promote, WITH its consumers.
         try:
             _pairs = dict(_census)
-            _pairs["farmer"] = _farmer_pair_entry(payload)
+            # [(yi)] the machine's own lane is DERIVED (serial_lane_id reads
+            # LIVE_BOT against the declared pairs), never the literal that
+            # went stale under (ww)'s lane move. `or "farmer"` keeps the
+            # pre-(ww) key for an unpaired machine rather than dropping the
+            # entry — the census view degrades, it never disappears.
+            _pairs[serial_lane_id() or "farmer"] = _serial_pair_entry(payload)
             payload["pairs"] = _pairs
             # [(vm)] the roll-up of that map: which lanes are live, which are
             # parked, and which one the serial machine below actually runs.
@@ -2742,17 +2770,32 @@ def run_once():
     # see growth_step/growth_promoter. [2026-07-29 AUDIT F1] serial_phase
     # passes the queue's state so the promote WRITE holds while a serial
     # candidate contaminates the shadow window; evaluation never stops.
-    _g2, _glast = growth_step(st.get("growth"), rows, have_ledger, now,
-                              drift=_drift_snap, serial_phase=phase)
-    st["growth"], st["last_growth"] = _g2, _glast
-    if _glast.get("kind") not in (None, "eval"):
-        print(f"[xp-judge] growth-levers: {_glast}", flush=True)
-    # [2026-07-29] Is the growth floor even REACHABLE at the arm's own close
-    # rate? Report-only (see growth_reachable) — "floors: shadow N/15" for
-    # weeks must be distinguishable from a bar that cannot be met.
-    _reach, _reach_d = growth_reachable(rows, now)
-    st["growth_reach"] = dict(_reach_d, reachable=_reach)
-    if _reach is False and not _g2.get("promoted"):
+    # [(yi)] ...and it runs only where the pair EXISTS. `growth_cand_for`
+    # returns {} on a lane whose prefix the literal does not match, and the
+    # block then publishes why it is parked instead of a verdict about a
+    # receipt gate no book on this lane can ever satisfy.
+    _gc = growth_cand_for()
+    if not _gc:
+        _why = (f"growth-lever pair is {sorted(GROWTH_CAND)} — not this "
+                f"lane's ({lane_prefix()}); no pair to promote")
+        _g2 = dict(st.get("growth") or {}, skipped=True, why=_why)
+        _glast = {"kind": "skipped", "why": _why}
+        _reach, _reach_d = None, {"why": _why, "skipped": True}
+        st["growth"], st["last_growth"] = _g2, _glast
+        st["growth_reach"] = dict(_reach_d, reachable=_reach)
+    else:
+        _g2, _glast = growth_step(st.get("growth"), rows, have_ledger, now,
+                                  drift=_drift_snap, serial_phase=phase)
+        st["growth"], st["last_growth"] = _g2, _glast
+        if _glast.get("kind") not in (None, "eval"):
+            print(f"[xp-judge] growth-levers: {_glast}", flush=True)
+        # [2026-07-29] Is the growth floor even REACHABLE at the arm's own
+        # close rate? Report-only (see growth_reachable) — "floors: shadow
+        # N/15" for weeks must be distinguishable from a bar that cannot be
+        # met.
+        _reach, _reach_d = growth_reachable(rows, now)
+        st["growth_reach"] = dict(_reach_d, reachable=_reach)
+    if _gc and _reach is False and not _g2.get("promoted"):
         print(f"[xp-judge] ⚠️  growth floor UNREACHABLE at the current rate: "
               f"{_reach_d['why']} — the pair cannot promote until the arm "
               f"closes faster or the operator re-specs the window "
@@ -4039,21 +4082,39 @@ def _selftest_body():
     _pl = _saved.get(KEY) or {}
     assert set(_pl.get("pairs") or {}) == set(_bus.JUDGED_PAIRS), \
         sorted(_pl.get("pairs") or {})
-    assert _pl["pairs"]["farmer"]["phase"] == _pl["phase"], _pl["pairs"]
-    # ...and the farmer entry is the MACHINE'S state, not the census's
-    # precheck view — the two agree while stood_down, so provenance is what
-    # makes the overwrite testable (mutation: drop the overwrite => red)
-    assert _pl["pairs"]["farmer"].get("src") == "machine", _pl["pairs"]
+    # [(yi)] the mirror lands on the lane the machine RUNS, derived the same
+    # way the machine derives it — never a literal. Mutation: restore
+    # `_pairs["farmer"] = ...` and this reddens while the serial lane is mum's.
+    _lane_id = serial_lane_id() or "farmer"
+    assert _pl["pairs"][_lane_id]["phase"] == _pl["phase"], _pl["pairs"]
+    # ...and that entry is the MACHINE'S state, not the census's precheck
+    # view — the two agree while stood_down, so provenance is what makes the
+    # overwrite testable (mutation: drop the overwrite => red)
+    assert _pl["pairs"][_lane_id].get("src") == "machine", _pl["pairs"]
+    # ...and NO OTHER lane carries the machine's provenance: the pre-(yi) bug
+    # was not a missing entry, it was the state written onto the WRONG pair.
+    assert [p for p, e in _pl["pairs"].items()
+            if (e or {}).get("src") == "machine"] == [_lane_id], _pl["pairs"]
     for _pid, _pe in _pl["pairs"].items():
         assert _pe.get("phase") in _VOC, (_pid, _pe)
 
-    # the farmer mirror derives holds from the machine's own payload
-    _fe = _farmer_pair_entry({"phase": "running", "candidate": "x",
+    # the lane mirror derives holds from the machine's own payload
+    _fe = _serial_pair_entry({"phase": "running", "candidate": "x",
                               "last_eval": {"arm_skew": True}})
     assert _fe["hold"] == "arm_skew", _fe
-    _fe = _farmer_pair_entry({"phase": "running", "candidate": "x",
+    _fe = _serial_pair_entry({"phase": "running", "candidate": "x",
                               "last_eval": {"why": "floors: shadow 3/30"}})
     assert _fe["hold"] == "floors", _fe
+
+    # [(yi)] the growth pair is the FARMER's literal, so it may only run on
+    # the Farmer's lane. Mutation: drop the `if not _gc` gate in run_once, or
+    # make growth_cand_for return GROWTH_CAND unconditionally => red.
+    assert growth_cand_for("xp.funding.") == GROWTH_CAND, growth_cand_for("xp.funding.")
+    assert growth_cand_for("xp.mum.") == {}, growth_cand_for("xp.mum.")
+    _gr = (_pl.get("growth_reach") or {})
+    if lane_prefix() != "xp.funding.":
+        assert (_pl.get("last_growth") or {}).get("kind") == "skipped", _pl.get("last_growth")
+        assert _gr.get("skipped") is True and _gr.get("reachable") is None, _gr
 
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, proprioception early-fade, registry mapping, "

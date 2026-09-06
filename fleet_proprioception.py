@@ -677,6 +677,61 @@ def judge_windows(during, live_hist, before_pre, twin_during, twin_hist,
     return {"status": "graded", "signal": sig, "baselines": baselines}
 
 
+def live_books_for(ep, group, rows=None, pairs=None):
+    """[(yi)] WHICH live rows an episode's baselines are computed over.
+
+    `live-funding` is the Farmer's lane by name and keeps its own filter.
+    Every other live group pooled EVERY row in `LIVE_ROWS` — correct while the
+    live lane held exactly one book, and the (oc) defect the moment the judge
+    started writing PER-BOOK levers. `(ww)` moved the judge's serial lane to
+    👩 mum, so `live.mum.rsi_max` is graded here — over 🙏 avo's trades as well
+    as mum's, because both rows are in `LIVE_ROWS`. The generic `live` group
+    CAN return `hurting`, and `fleet_tuning.get_lever` reverts a hurting
+    live-lane lever at the consumer, every loop: avo's record could release
+    mum's promoted lever. That is exactly the sentence `group_of` already
+    carries about clip levers — "one book's lever judged on another book's
+    record" — reaching a second family of levers.
+
+    A per-book lever names its book in its own prefix, and
+    `fleet_bus.JUDGED_PAIRS` is the ONE map from that prefix to the live row
+    (`xp.<book>.` <-> `live.<book>.`). Every lever in the stance is resolved
+    and the books are UNIONED, so a joint stance is judged over exactly the
+    books it steers — the module's standing rule that joint stances share
+    blame, not that one book absorbs another's.
+
+    Fail-OPEN to the whole cohort: an unattributable lever is graded
+    conservatively (the pre-(yi) population), never dropped."""
+    if group == "live-funding":
+        return {b for b in (rows if rows is not None else LIVE_ROWS)
+                if "funding" in b}
+    cohort = set(rows if rows is not None else LIVE_ROWS)
+    if pairs is None:
+        try:
+            import fleet_bus as _fb
+            pairs = getattr(_fb, "JUDGED_PAIRS", {}) or {}
+        except Exception:  # noqa: BLE001
+            pairs = {}
+    #: live-prefix -> the live row it steers, from the ONE declaration
+    owners = {}
+    for ps in (pairs or {}).values():
+        if not isinstance(ps, dict):
+            continue
+        xp, lb = str(ps.get("xp_prefix") or ""), ps.get("live_bot")
+        if xp.startswith("xp.") and lb:
+            owners["live." + xp[len("xp."):]] = str(lb)
+    named, unattributed = set(), False
+    for lev in ((ep or {}).get("stance") or {}):
+        hit = next((b for pre, b in owners.items() if str(lev).startswith(pre)),
+                   None)
+        if hit:
+            named.add(hit)
+        else:
+            unattributed = True
+    if named and not unattributed:
+        return named
+    return cohort
+
+
 def grade_live(ep, trades, group="live-clip"):
     """The live lane LEARNS (16-Jul evening, operator mandate): an episode
     under live levers is graded per-trade against TWO baselines — the same
@@ -692,8 +747,7 @@ def grade_live(ep, trades, group="live-clip"):
     judge fades a promotion early; HELPING earns exactly one thing — the
     clip ladder's TOP step, fail-closed."""
     start, end = ep["start"], ep["end"]
-    bots = ({b for b in LIVE_ROWS if "funding" in b} if group == "live-funding"
-            else set(LIVE_ROWS))
+    bots = live_books_for(ep, group)
     twins = {t for t in (_twin(b) for b in bots) if t}
 
     def rows(names, a, b):

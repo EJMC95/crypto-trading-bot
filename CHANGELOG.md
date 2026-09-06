@@ -1,3 +1,97 @@
+## 2026-09-06 (yi) — THE JUDGE'S LANE MOVED TO MUM AND THREE ORGANS KEPT WATCHING THE FARMER: a receipt detector structurally blind to the living lane, a census entry written onto a retired pair, a growth promoter asking for a receipt no book on this lane can produce, and one live book's lever graded on another live book's trades
+
+`(ww)` moved the judge's serial lane from 💸 the Farmer to 👩 mum. `(ye)` then
+found the lever PREFIX was being rebuilt from a suffixed row id and closed that
+class by AST — a real fix, and it closed the class **at the bot**. Every
+Farmer literal in the ORGANS that watch the lane survived it, because each was
+written when the Farmer's lane was the only one there was and none of them
+names a book in a way a prefix test can see.
+
+**FOUR of them, found by an adversarial sweep and each verified by execution
+before it was believed.** They share one shape and it is `(hj)`'s: **a second
+copy of a rule is a second rule** — here, four private answers to "which lane
+does this machine run?" beside the one declaration (`fleet_bus.JUDGED_PAIRS`)
+that already knows.
+
+**1 · THE ENACTED-IS-NOT-APPLIED DETECTOR WAS WATCHING A RETIRED PAIR.**
+`fleet_immune.APP_RECEIPT_BOTS` was two literals — `xp.funding.` and
+`live.funding.` — so the organ whose whole job is *"a lever was enacted and the
+consumer never applied it"* could only ever ask that question of 💸 the Farmer's
+arms, one of which is retired and the other of which the judge no longer runs.
+**It was blind to exactly the defect `(ye)` had just found**, on exactly the
+lane where it happened: `mum-rsi-32` VOIDED-NEVER-APPLIED at 37.7h and
+`mum-vel-12-20` ran 34h with the arm publishing `vel_band [-999, 999]`, and
+this detector could not have said so at any point. Now DERIVED from
+`JUDGED_PAIRS` — both sides of every declared pair, **2 entries → 8** — so a
+lane the fleet declares is a lane this organ watches, and the next slot swap
+carries it for free. **And a dark declaration is now a SICKNESS of the
+detector, not a clean bill** (I1/I4): an unreadable `JUDGED_PAIRS` publishes
+`app-receipt-map: DARK` instead of an empty, healthy-looking result.
+
+**2 · THE MACHINE WROTE ITS OWN STATE ONTO SOMEONE ELSE'S PAIR.**
+`experiment_judge` builds a per-pair census and then overwrites its own lane's
+entry with the state it just built (the machine is senior for the lane it
+runs). The call site was `_pairs["farmer"] = _farmer_pair_entry(payload)`. So
+since `(ww)`: **`pairs["mum"]` — the lane the machine actually runs — carried
+the census's stale precheck view, while `pairs["farmer"]`, a pair whose live
+arm has been retired since 22-Aug, claimed a running machine.** Both halves
+wrong, and `lane_census` rolls that map up into the `lanes` field the pipeline
+card reads. The lane is now `serial_lane_id()` — the one owner, which derives
+it from `LIVE_BOT` against the declared pairs — and the function is
+`_serial_pair_entry`, named for the ROLE. `or "farmer"` keeps the pre-`(ww)`
+key for an unpaired machine: the view degrades, it never disappears.
+
+**3 · THE GROWTH PROMOTER WAS ASKING MUM FOR A FARMER RECEIPT.**
+`GROWTH_CAND` is `{xp.funding.explore_k, xp.funding.conviction_hi}` — the
+Farmer's two levers, promoted as a pair on the faster bar. The block runs
+EVERY cycle by design, so after `(ww)` it ran on mum's lane: `paired_eval`
+receipt-gated mum's shadow on `extra.bars` proving it had run the FARMER's
+levers. **It failed CLOSED, which is why this cost nothing but noise** — and
+the noise was a published growth pair permanently short of its floor plus an
+hourly `⚠️ growth floor UNREACHABLE` warning about a book that does not have
+the levers. `growth_cand_for()` returns `{}` when the pair's prefix is not this
+lane's, and the block then publishes `skipped` with the reason in
+`growth`/`last_growth`/`growth_reach` — **the (lv) rule that `{open: 0}` must
+not be byte-identical between "quiet" and "structurally impossible"**, at the
+judge. `growth_promoter` keeps reading `GROWTH_CAND` directly and stays
+fail-closed if ever called off-lane; the gate is at the one call site.
+
+**4 · ONE LIVE BOOK'S LEVER WAS GRADED ON ANOTHER LIVE BOOK'S TRADES — and
+this one has an actuator.** `fleet_proprioception.grade_live` computed its
+baselines over `set(LIVE_ROWS)`, i.e. **every** live row. That was right while
+the live lane held one book. The judge now writes per-book levers
+(`live.mum.rsi_max`, `live.mum.max_hold_min` — `_LIVE_PREFIX_OWNERS`), which
+`group_of` routes to the generic `live` group, **and that group CAN return
+`hurting`** — which `fleet_tuning.get_lever` reverts at the consumer, every
+loop. So 🙏 avo's record could release 👩 mum's promoted lever, and mum's
+avo's. This is verbatim the defect `(oc)` fixed for clip levers — its comment
+in this very file reads *"one book's lever judged on another book's record"* —
+reaching a second family of levers eight days later. `live_books_for` resolves
+every lever in the stance through `JUDGED_PAIRS` (`live.<book>.` ↔ the live
+row) and unions the books, so a joint stance is judged over exactly the books
+it steers and a single-book stance over one. **Fail-OPEN**: an unattributable
+lever grades over the whole cohort — the pre-`(yi)` population — never over
+nothing. `LIVE_ROWS` is now unreachable from inside `grade_live`, AST-pinned,
+so the population cannot regrow a second owner.
+
+**WHAT THIS COSTS AND WHAT IT BUYS (I19).** No trade changes: three of the four
+were fail-closed or publish-only, and the fourth removes a revert that should
+never have been reachable. What it buys is that the fleet's only shadow→real-
+money path is now WATCHED on the lane it runs — the receipt detector, the
+census entry, the promoter's own account of itself, and the grader's
+population all read one declaration. **The measured claim is narrow and stated
+as such: this makes the next lane move free, and it makes the `(ye)` class of
+defect visible while it is happening rather than four days later.**
+
+Pinned by `tests/autonomy/test_lane_owner_reaches_every_organ.py` (13 tests),
+**7 of 7 mutations verified RED** — each mutation restores the exact literal
+this entry removes: the two-entry receipt map, the dropped dark guard, the
+`_pairs["farmer"]` write, an unconditional `growth_cand_for`, the ungated
+growth block, the inline `set(LIVE_ROWS)`, and a `live_books_for` that always
+returns the cohort. Selftests green in all three organs. **Main only** — none
+of the three files is in `_BUILD_SHARED`, so no live pair drifts and no marker
+is owed; they ride `freqtrade-bots`, which auto-deploys all three.
+
 ## 2026-09-06 (yg) — THE FLEET'S ONLY SHADOW→REAL-MONEY PATH HAD NEVER APPLIED AN EXPERIMENT ON THE BOOK THAT HOLDS THE MONEY: found on 4-Sep, fixed, reverted by accident the same day — and fixed AGAIN by two sessions within the hour; (ye) owns the fix, this ships the lever surface and the marker
 
 **Eamon, 6-Sep:** *"find a way to build a profit machine for the bots."* The

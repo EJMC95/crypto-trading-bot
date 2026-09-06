@@ -188,12 +188,45 @@ def lever_sickness(levers, now):
 # loop on a healthy arm (quarantine -> consumer runs defaults -> receipts stop
 # matching -> sickness persists forever). Sick-list + phone only; the judge's
 # own ARM-SKEW hold is the measurement guard.
-APP_RECEIPT_BOTS = {
-    "xp.funding.": os.environ.get("XPJ_SHADOW_BOT",
-                                  "perps-funding-lighter-lshadow"),
-    "live.funding.": os.environ.get("XPJ_LIVE_BOT",
-                                    "perps-funding-lighter-lighter"),
-}
+def _receipt_bots():
+    """[(yi)] lever-prefix -> the ROW whose close rows carry that lane's
+    receipt (`extra.bars`), DERIVED from `fleet_bus.JUDGED_PAIRS` — the one
+    declaration of which book a judge prefix steers.
+
+    This was two literals naming the retired Farmer pair (`xp.funding.` ->
+    perps-funding-lighter-lshadow, `live.funding.` -> ...-lighter). The judge's
+    serial lane moved to 👩 mum at (ww) and this map never followed, so for
+    every `xp.mum.*` / `live.mum.*` name the lookup below fell to `None` and
+    `continue`d — no sick entry, no page, no clock. The organ whose remit is
+    "enacted but not applied" could not fire on the exact condition (yg)
+    measured: `mum-rsi-32` asserted 37.7h with 0/4 receipts, `mum-vel-12-20`
+    34h at env defaults, and the (yg) entry recorded `immune quarantine {}`
+    as a clean reading. Found by the (yi) sweep, verified 3/3 lenses.
+
+    The live prefix is the judge's own `XP_TO_LIVE` rule (`xp.<book>.` ->
+    `live.<book>.`), not a second table. Fail-CLOSED for the detector's
+    purpose: a dark declaration returns {} and `application_sickness`
+    publishes THAT as a sickness rather than a clean bill (I1/I13)."""
+    out = {}
+    try:
+        import fleet_bus as _fb_
+        pairs = getattr(_fb_, "JUDGED_PAIRS", {}) or {}
+    except Exception:  # noqa: BLE001
+        return out
+    for _pid, ps in pairs.items():
+        if not isinstance(ps, dict):
+            continue
+        xp = ps.get("xp_prefix")
+        if not (isinstance(xp, str) and xp.startswith("xp.")):
+            continue
+        if ps.get("shadow_bot"):
+            out[xp] = str(ps["shadow_bot"])
+        if ps.get("live_bot"):
+            out["live." + xp[len("xp."):]] = str(ps["live_bot"])
+    return out
+
+
+APP_RECEIPT_BOTS = _receipt_bots()
 APP_SICK_MIN_CLOSES = int(os.environ.get("IMMUNE_APP_MIN_CLOSES", "2"))
 APP_GRACE_S = float(os.environ.get("IMMUNE_APP_GRACE_S", "900"))  # arm loop lag
 
@@ -277,6 +310,12 @@ def application_sickness(levers, paper_rows, now, seen):
     if tuning is None:
         return out
     live_names = set()
+    if not APP_RECEIPT_BOTS:
+        # [(yi)] a dark declaration is a SICKNESS of this detector, not a
+        # clean bill — the map read {} for 4 days once and nothing said so
+        out["app-receipt-map"] = ("DARK: fleet_bus.JUDGED_PAIRS unreadable — "
+                                  "enacted-but-not-applied cannot be detected")
+        return out
     for name, entry in (levers or {}).items():
         bot = next((b for p, b in APP_RECEIPT_BOTS.items()
                     if name.startswith(p)), None)
