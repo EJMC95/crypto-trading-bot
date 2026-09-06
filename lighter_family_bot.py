@@ -581,7 +581,7 @@ def brain_stake_mult(bot_id, tag):
 
 
 def shadow_allocation_scale(bot_id):
-    """[(yd)] 💰 `fleet_bus.allocation_scale(bot_id)` for a SHADOW row, or 1.0
+    """[(ye)] 💰 `fleet_bus.allocation_scale(bot_id)` for a SHADOW row, or 1.0
     on any doubt — dark organ, stale payload, unknown book, an image without
     fleet_bus, or `FLEET_ALLOCATION_MODE=advisory` (the accessor's own kill
     switch, which reaches this consumer without a redeploy). Called ONLY from
@@ -1967,7 +1967,7 @@ STRATEGIES = [
     # **6 never, in 17 episodes**. So the 5th slot is reachable supply and the
     # 6th is a permanently empty divisor that would cost ~28% of deployed
     # capital ($181 -> $130 expected). 5 captures the reachable slot and stops.
-    # [6-Sep (yd)] 5 -> 6, and the (sr) premise above is CORRECTED IN PLACE
+    # [6-Sep (ye)] 5 -> 6, and the (sr) premise above is CORRECTED IN PLACE
     # per I12: "6 never" was true on 21-Aug and is FALSE on the twin's own
     # record today. Measured on 🙏 avo's shadow ledger (32 closes, 53.7d):
     # time-weighted occupancy at 6 slots = 8.3% (peak 7), and the FOUR trades
@@ -2196,7 +2196,7 @@ def mum_env_defaults(strategy):
 
 
 def xp_prefix_for_arm(bot_id):
-    """[(yd)] This shadow arm's judge-lever prefix, from `fleet_bus`'s ONE
+    """[(ye)] This shadow arm's judge-lever prefix, from `fleet_bus`'s ONE
     declaration. "" (a no-op for `apply_book_levers`) when the row is not a
     judged shadow arm, or when fleet_bus is absent from this image — so the
     carrier runs its ENV DEFAULTS rather than a name that resolves to
@@ -3015,7 +3015,7 @@ def shadow_max_open_overrides(raw=None):
     to [1, 12]; junk tokens are dropped, never guessed. The default used to
     carry the measured avo step ("freqtrade-avo-maria:6" — X3, adversarially
     confirmed: cap-4 binding 39% of its era, cap 6 ≈ +25% close rate, no era
-    reset per (hc)). [(yd)] That step moved INTO the literal (both arms read
+    reset per (hc)). [(ye)] That step moved INTO the literal (both arms read
     6 now, so the judge's capacity-parity rung passes), and the default is
     EMPTY: a shadow-only override that silently re-opened a cap delta between
     the arms is the exact thing that made the pair unjudgeable for a fortnight.
@@ -3291,7 +3291,7 @@ def main():
             # before.
             # [(wv)] the judge's xp.<book>.* levers reach this twin — mum's
             # today; a no-op for carriers without the knobs.
-            # [(yd)] THE PREFIX IS DECLARED, NEVER RECONSTRUCTED. This read
+            # [(ye)] THE PREFIX IS DECLARED, NEVER RECONSTRUCTED. This read
             # `f"xp.{b.bot_id.split('-', 1)[-1]}."`, which is `xp.mum-lshadow.`
             # for 👩 mum and `xp.avo-maria-lshadow.` for 🙏 avo — unregistered
             # names, so `get_lever` returned the default at its unregistered
@@ -3536,7 +3536,7 @@ def main():
                 if bm != 1.0:
                     log.info("%s %s brain stake-mult x%.2f (%s)",
                              b.bot_id, coin, bm, ledger_tag(tag))
-                # [2026-09-06 (yd)] 💰 the allocation organ's evidence-weighted
+                # [2026-09-06 (ye)] 💰 the allocation organ's evidence-weighted
                 # scale, composed with the brain's exactly as 🌾 carry does
                 # ((jr)/(so): two different questions — "how much of the
                 # fleet's capital does this book's EVIDENCE earn" times "how

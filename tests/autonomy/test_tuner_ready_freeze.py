@@ -1,4 +1,4 @@
-"""[2026-09-06 (yd)] A READY BOOK KEEPS THE BRACKET IT PASSED ON.
+"""[2026-09-06 (ye)] A READY BOOK KEEPS THE BRACKET IT PASSED ON.
 
 (hm) wrote "if a book needs grading, FREEZE ITS BARS FIRST" after 137 shadow
 closes produced zero gradeable ones because the scout tuner moved the taker's

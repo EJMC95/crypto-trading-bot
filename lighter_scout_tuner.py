@@ -718,7 +718,7 @@ def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh,
     return ({k: v for k, v in bars.items() if v != DEFAULTS[k]}, prov, log)
 
 
-#: [2026-09-06 (yd)] THE READY FREEZE — BRACKET levers, i.e. what a trade
+#: [2026-09-06 (ye)] THE READY FREEZE — BRACKET levers, i.e. what a trade
 #: CLOSES on. The moment the book this tuner steers reads READY on the go-live
 #: gate, these stop moving. (hm)'s own lesson — "if a book needs grading,
 #: FREEZE ITS BARS FIRST"; 137 closes were lost to a bracket the tuner moved
@@ -774,7 +774,7 @@ def apply_ready_freeze(levers, gate, now_ts=None, book=None):
         else:
             kept[k] = v
     log = [f"ready-freeze: {book} reads READY on the gate — bracket lever "
-           f"{k} NOT enacted (frozen; (yd))" for k in out["dropped"]]
+           f"{k} NOT enacted (frozen; (ye))" for k in out["dropped"]]
     return kept, log, out
 
 
@@ -929,7 +929,7 @@ def run_once():
     # reality is not re-asserted this cycle (restrict-only; fail-safe none)
     levers, log4 = apply_proprioception(levers, prop_state, prop_now)
 
-    # [(yd)] the READY freeze: a book that has passed the gate keeps the
+    # [(ye)] the READY freeze: a book that has passed the gate keeps the
     # bracket it passed on. Read from the gate's OWN payload, fresh (I1);
     # fail-open on darkness. Runs LAST so nothing downstream can re-add one.
     levers, log6, ready_freeze = apply_ready_freeze(
@@ -963,7 +963,7 @@ def run_once():
         "baseline_lenses": {l: {k: s.get(k) for k in ("seen", "taken", "closed", "net")}
                             for l, s in (baseline.get("lenses") or {}).items()},
         "enacted": now_set, "log": (log4 + log5 + log1 + log2 + log3)[:20],
-        # [(yd)] the freeze's receipt — {book, ready, fresh, dropped}. A
+        # [(ye)] the freeze's receipt — {book, ready, fresh, dropped}. A
         # bracket lever the sweep wanted and this refused is visible here.
         "ready_freeze": ready_freeze,
     }

@@ -1,4 +1,4 @@
-"""[2026-09-06 (yd)] A LEVER NAME THE CONSUMER BUILDS ITSELF IS A LEVER THAT
+"""[2026-09-06 (ye)] A LEVER NAME THE CONSUMER BUILDS ITSELF IS A LEVER THAT
 CAN BE UNREACHABLE, SILENTLY — and this closes the CLASS, not the instance.
 
 THE DEFECT. `lighter_family_bot` reconstructed the judge's lever prefix from

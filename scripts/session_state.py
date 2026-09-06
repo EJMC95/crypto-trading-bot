@@ -147,7 +147,7 @@ CARRIED = [
     {
         "id": "avo-live-slot-6-preregistered-read",
         "owner": "session",
-        "what": "🙏 avo's LIVE cap went 5 -> 6 at (yd) (6-Sep) on the twin's "
+        "what": "🙏 avo's LIVE cap went 5 -> 6 at (ye) (6-Sep) on the twin's "
                 "own record: the 4 shadow trades opened with >=5 already held "
                 "earned +6.877%/trade (+$13.76, 53% of its +$25.80) vs +1.027% "
                 "for the other 28, and the (sr) premise '6 never' had become "

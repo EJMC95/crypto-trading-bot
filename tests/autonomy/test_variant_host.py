@@ -107,7 +107,7 @@ def test_the_default_is_avo_unchanged():
         assert m.STATE_KEY == "freqtrade-avo-maria-lighter:live"
         assert m._PFX == "AVO"
         assert m.LIVE_CLIP_LEVER == "live.avo.clip_scale"
-        assert m.S.bot == "freqtrade-avo-maria" and m.S.max_open == 6  # (yd)
+        assert m.S.bot == "freqtrade-avo-maria" and m.S.max_open == 6  # (ye)
         assert abs(float(m.S.stoploss) + 0.10) < 1e-9
 
 

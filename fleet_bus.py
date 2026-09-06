@@ -338,7 +338,7 @@ def active_price_pairs():
 
 
 def xp_prefix_for(shadow_bot):
-    """[2026-09-06 (yd)] The judge's `xp.<book>.*` lever prefix for a SHADOW
+    """[2026-09-06 (ye)] The judge's `xp.<book>.*` lever prefix for a SHADOW
     arm, read from the ONE declaration (`JUDGED_PAIRS[*]["xp_prefix"]`).
 
     THE ONLY SUPPORTED WAY for a shadow host to name the judge's levers.

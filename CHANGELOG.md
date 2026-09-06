@@ -1,3 +1,155 @@
+## 2026-09-06 (ye) — "PROCEED WITH ALL OF THE ABOVE": the judge's mum lane was inert by ONE STRING, avo's live cap follows her twin's best trades, a READY book keeps its bracket, and the allocation organ reaches the books that hold the claims — with two of the seven refused on measurement
+
+**Eamon, 6-Sep, on the evening brief's improvement list:** *"proceed with all of
+the above."* Seven items; five shipped, two closed by measurement with no
+change. Every number below is from tonight's own pull (`/pnl.json` 21:12 AEST,
+the ledgers via `/trades.json`), and every guard was mutation-verified before
+it was called a guard (13 of 13 red). **Letter note:** this session's work was
+written as (yd) and another session landed a different (yd) on main first
+(`f9546fc`, the winners' docket era fix); per the letter rule the cited entry
+keeps it and this one moved: **RENUMBERED (yd) -> (ye)** — 20 citations in 10
+files renamed before rebase, counted not `head`-ed ((qz)).
+
+### 1 · THE JUDGE'S MUM LANE COULD NOT HEAR ITS OWN LEVERS — `xp.mum-lshadow.` (correctness, shipped)
+
+`lighter_family_bot.py:3239` built the lever prefix from the suffixed row id:
+`f"xp.{b.bot_id.split('-', 1)[-1]}."`. `bot_id` is `strat.bot + "-lshadow"`
+and the strategy is `OversoldRebound("freqtrade-mum", …)`, so the arm asked
+for **`xp.mum-lshadow.vel_lo`** while the judge wrote `xp.mum.vel_lo`.
+`fleet_tuning.LEVERS` has no such name and `get_lever` returns the caller's
+default at its unregistered rung (`fleet_tuning.py:1152`) — silently, every
+loop. For 🙏 avo the same arithmetic yields `xp.avo-maria-lshadow.` (her
+book's name contains a hyphen), so BOTH live books' lanes were inert.
+
+Measured on the bus: `mum-rsi-32` → **VOIDED-NEVER-APPLIED** after 37.7h
+(*"0/4 shadow closes carry a receipt"*); `mum-vel-12-20` ran **34h** with
+`xp.mum.vel_lo=12 / vel_hi=20` open and the arm publishing **`vel_band
+[-999.0, 999.0]`, `vel_in_band 105`, `vel_blocked 0`** — the env default,
+untouched. `audit_code_currency`: every container CURRENT at HEAD, so this was
+never staleness. ~72h of the fleet's only shadow→real-money promotion path
+spent producing nothing.
+
+**Why the existing test stayed green — the transferable half:**
+`test_mum_judge_lane.py:99` calls `apply_book_levers(s, "xp.mum.")` with the
+correct prefix HARD-CODED. It exercises the function, never the call site.
+
+**Shipped:** the prefix is DECLARED and never rebuilt — `fleet_bus.xp_prefix_for(shadow_bot)`
+reads `JUDGED_PAIRS[*]["xp_prefix"]` (the one owner, which already held the
+right string for all four pairs), and `lighter_family_bot.xp_prefix_for_arm`
+consumes it, fail-safe `""` (env defaults) on junk/dark. **The CLASS is
+closed** by `tests/autonomy/test_judge_lever_prefix_reaches_the_arm.py`: the
+call site's second argument must be the accessor by AST (an f-string or
+concat there reddens); the accessor must read `xp_prefix` and contain no
+`.split`/f-string (docstring stripped first — the docstring QUOTES the broken
+code and a naive dump scan failed on the explanation, found on the test's own
+first run); every REGISTERED `xp.<token>.<bar>` must be a name its own arm
+ASKS for (the assertion that would have failed on the shipped code); every
+registered `xp.*` token must be one some judged arm derives; and the live
+host's `_BOOKS` token must equal the pair's. **6/6 mutations red**, including
+restoring the exact original f-string and inventing a prefix for an unknown
+arm.
+
+### 2 · 🙏 AVO'S LIVE CAP 5 → 6 — THE TWIN'S 6th SLOT TOOK ITS BEST TRADES (real money, `[deploy-live-taker]`)
+
+The judge's avo pair read `unjudgeable: capacity_mismatch` — live `max_open 5`
+vs shadow 6 — so the fleet's second real-money book had no promotion path. The
+brief proposed aligning the caps; the direction was decided by measurement.
+(sr) refused 6 on 21-Aug because the shadow had reached 6 **"never, in 17
+episodes"**. On her ledger tonight (32 closes, 53.7d): time-weighted occupancy
+at 6 = **8.3%**, peak **7**, and the **four trades opened with ≥5 already
+held — exactly the ones a cap of 5 refuses — earned +6.877%/trade (+$13.76,
+53% of the book's +$25.80)** against +1.027% for the other 28 (AVAX +5.50,
+TRX +1.56, VVV +1.76, ZEC +18.69). So cutting the shadow to 5 was REFUSED
+(measured harm: her best trades), and the live arm went UP to 6 under I26
+(bounded, reversible, on an arm that cannot currently be graded — horizon 99d).
+
+Priced (I19): at the twin's occupancy distribution the clip shrinks 5/6 and
+deployed capital falls **~14%** on the ordinary trades (28 × 1.03 × 0.143 =
+4.1 clip-%) against **27.5 clip-%** on the marginal ones — positive under every
+reading, break-even even if the marginal trades merely match the book's mean;
+ex-ZEC the other three still average +2.94%. Per-trade % is invariant to clip
+so the gate's `t` does not move; all-slots-stop is `gross_x × |stop|` and
+independent of slot count; `cap_slots` at 6 = min(6, $1700/$137.77) = 6, the
+notional cap does not bind. Ordinary tuning, no era reset (hc).
+**PRE-REGISTERED REVERT** (`session_state` row `avo-live-slot-6-preregistered-read`,
+tripwire 6-Oct): at ≥10 LIVE closes opened with ≥5 held, revert to 5 if their
+mean ≤ the live book's other closes over the same window. Shipped as the
+literal (`lighter_family_bot.STRATEGIES`), the live geometry pin
+(`_EXPECT`), and the shadow override default emptied — both arms read 6, so
+the judge's capacity rung passes. Deployed with `[deploy-live-taker]` in the
+commit subject on a DIRECT push (the (xh) squash trap avoided by not
+squashing); halt check passed pre-dispatch (`online`, 2 open, no halt, no
+`flatten_incomplete`).
+
+### 3 · A READY BOOK KEEPS THE BRACKET IT PASSED ON (doctrine amendment + actuator, shipped)
+
+The fleet's first-ever READY verdict — 🎫 the taker, 6/6, t=2.60, cluster
+t=2.66 — was computed over a sample spanning `taker.tp` 0.03/0.04 and
+`taker.max_hold_h` 24/48, because (jf)'s era signature deliberately excludes
+bracket levers and nothing else stopped the tuner. (hm)'s *"freeze its bars
+first"* was prose. Now `lighter_scout_tuner.apply_ready_freeze` runs LAST at
+the write site: while the tuned book reads `ready: true` on a FRESH
+`golive-readiness` payload, `FROZEN_WHEN_READY` (tp/sl/max_hold_h/
+sl_cooldown_h/brk_trail/brk_sl) is dropped from the enactment and published
+under `ready_freeze.dropped`. Entry levers keep moving. Fail-OPEN on a dark
+gate. Forward-only — the era is not re-cut (that would void the verdict).
+Recorded in CLAUDE.md's (hm) block with ENFORCED BY. **4/4 mutations red**,
+including the one my first AST pin would have missed: a call whose result is
+discarded (the pin now asserts the result REBINDS `levers`).
+
+### 4 · THE ALLOCATION ORGAN REACHES THE FAMILY SHADOWS AND THE TAKER (I16 consumer, shipped)
+
+`fleet_allocation` was ADVISORY with `n_adopted: 0`, read by three funding
+books while every measured claim sat on directional ones (avo shadow 0.0082,
+taker 0.0064, mum shadow 0.0026). `shadow_allocation_scale` composes the scale
+into the family SHADOW loop's stake (×1.52 avo, ×1.18 mum, ×0.885 georgia)
+and into the taker's RISK budget beside the brain's (×1.23), gated on the
+`-lshadow` row. Real money never reads it: the live host has NO call (AST),
+the family call sits only inside the shadow accessor called from `main()`,
+the taker's is a `BOT_ROW.endswith("-lshadow")` conditional. Kill switch
+`FLEET_ALLOCATION_MODE=advisory` reaches both. Per-trade % is invariant to
+clip, so no grade and no paired bar moves — paper $ follows evidence. **3/3
+mutations red** (scale ignored; live row reads it; live host grows a call).
+Declared NOT wired, with reasons: 🪁 kelly / 🏦 kiyosaki / 🧮 hull are
+env-only by birth declaration ((nb): env-only config means env-only size);
+🎯 sniper sits at the probe floor; 🏛️ parliament sizes itself.
+
+### 5 · 👩 MUM'S PAYOFF SHAPE — REFUSED, the gap is one halt (measured, no change)
+
+Live payoff 0.578 vs shadow 0.900 read like an exit-shape problem. By exit
+reason on both ledgers: `roi` **+1.404% vs +1.410%**, `stop_loss` **−4.285% vs
+−4.338%**, `max_hold` −0.877% vs −1.194% — byte-close. The entire gap is
+**`daily_loss` n=8, −1.920%/trade, −$15.36 — absent on the shadow**: the ONE
+2-Sep halt event flattened as eight legs, which (xv)/(xy) already
+pre-registered as one observation. Ex-halt the live arm reads +0.631%/trade
+against the shadow's +0.518%. Her exit machinery is identical between arms;
+there is nothing to tune, and the judge's own refusal to strip forced-flatten
+losses from a promotion sample stands.
+
+### 6 · REAL-MONEY FILL MEASUREMENT AT 57% — REFUSED, (xt) is working forward (measured, no change)
+
+`impl-shortfall` reads 77 of 135 live orders measurable with 53
+`skipped:budget … lighter tx budget exhausted`. On mum's own close rows by
+day: the 9 `skipped:budget` stamps are **all 2 Sep**; every close since 3 Sep
+— **20 of 20** — reads `trades(tx)`. The organ's aggregate is its cumulative
+window; the defect it describes is closed. Declared, not built: a
+since-(xt) split on the organ's payload would stop the next reader taking the
+cumulative number as an open defect.
+
+### 7 · WHAT WAS CHECKED AND NOT CHANGED
+
+* `stale_candle: 105` on mum's shadow scan — NOT a fault: `lighter_family_bot.py:3402`
+  books it when `not new_candle` mid-bar ("rule not evaluated this loop").
+* The taker's era signature — left alone; the freeze is forward-only.
+* The mum stop-dead immune page — she is flat; the read is the universe-worst
+  tier with `mmf_clip` on; `stop_reachable_held` answers it on her next fill.
+
+**Forward metric:** 🎫 the taker stays READY and its bracket is now frozen
+under that verdict; 🙏 avo's shadow is one close from the gate (n=29) and her
+pair is judgeable for the first time; 👩 mum's judge lane can run a candidate
+for the first time since (ww) — the next `xp.mum.*` write is its proof
+(`vel_band` on the shadow row reads the candidate, not `[-999, 999]`).
+
 ## 2026-09-06 (yd) — THE WINNERS' DOCKET GRADED 🎫 THE TAKER ON A SUPERSEDED POLICY: `era_rows` WAS PINNED BY IDENTITY AND FED THE WRONG SHAPE
 
 **Found by the 6-Sep daily review, verified twice, shipped from an isolated
@@ -54,6 +206,7 @@ now agree about the same ledger, which is the docket header's own claim.
 **NOT DEPLOYED** — `scripts/` does not ship in any image; this lands on the
 next merge to main and reaches the daily review and the weekly assessment from
 there.
+
 
 ## 2026-09-04 (yc) — (yb) IS REVERTED OUT OF THE CODE AT EAMON'S INSTRUCTION, AND THE RECORD IS KEPT ON PURPOSE
 

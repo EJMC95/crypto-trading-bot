@@ -330,7 +330,7 @@ def test_counterweight_reads_allocation_only_when_not_live():
 
 
 def _enclosing_functions(path, func="allocation_scale"):
-    """[(yd)] {call_lineno: [enclosing FunctionDef names, innermost first]} and
+    """[(ye)] {call_lineno: [enclosing FunctionDef names, innermost first]} and
     the set of IfExp/If test-Name ids on the path — for consumers whose guard
     is a conditional EXPRESSION rather than an `if` statement."""
     tree = ast.parse((ROOT / path).read_text())
@@ -356,7 +356,7 @@ def _enclosing_functions(path, func="allocation_scale"):
 
 
 def test_the_family_shadow_loop_consumes_and_the_live_host_never_does():
-    """[(yd)] I16 with a consumer on the books that hold the claims. The
+    """[(ye)] I16 with a consumer on the books that hold the claims. The
     family host's ONLY call sits inside `shadow_allocation_scale`, which is
     called from main()'s shadow trading loop; the LIVE host (which imports
     the family module) contains NO call at all — real money never reads it."""
@@ -382,7 +382,7 @@ def test_the_family_shadow_loop_consumes_and_the_live_host_never_does():
 
 
 def test_the_takers_consumer_is_gated_to_its_shadow_row():
-    """[(yd)] the taker's call is a conditional expression on BOT_ROW ending
+    """[(ye)] the taker's call is a conditional expression on BOT_ROW ending
     `-lshadow`; the retired live arm reads only live.* and takes no scale."""
     calls = _enclosing_functions("lighter_ticket_taker.py")
     assert calls, "the taker lost its allocation consumer"

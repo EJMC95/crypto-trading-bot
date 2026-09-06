@@ -3015,7 +3015,7 @@ def main(_ctx=None):
             # $3,216 of gross on a $1,000 shadow row.
             _bm = fleet_bus.brain_mult_multi(
                 [(BOT_ROW, f"{'long' if is_long else 'short'}-{lens}")])
-            # [2026-09-06 (yd)] 💰 the allocation organ's scale enters as RISK
+            # [2026-09-06 (ye)] 💰 the allocation organ's scale enters as RISK
             # too, composed with the brain's — the (sp) rule that conviction
             # is a risk budget, never a post-hoc clip multiplier, applied to
             # a second organ. SHADOW ARM ONLY (`-lshadow` row; the live arm is
