@@ -68,7 +68,12 @@ def test_the_shadow_budget_default_is_the_cohorts_own_cap_sum():
     import lighter_family_bot as fam
     import lighter_ticket_taker as tt
     mum = next(b for b in fam.STRATEGIES if b.bot == "freqtrade-mum")
-    avo_shadow = fam.shadow_max_open_overrides()["freqtrade-avo-maria"]
+    avo = next(b for b in fam.STRATEGIES if b.bot == "freqtrade-avo-maria")
+    # [(ye)] the shadow cap is the override if one is set, else the literal —
+    # exactly main()'s rule; the override default is empty now that the 6 is
+    # the literal on both arms.
+    avo_shadow = fam.shadow_max_open_overrides().get("freqtrade-avo-maria",
+                                                     avo.max_open)
     assert fr.SHADOW_LONG_BUDGET == mum.max_open + avo_shadow + tt.MAX_OPEN == 26
     assert fr.SHADOW_LONG_BUDGET >= fr.LONG_BUDGET, "the paper budget never sits below the pooled one"
     # the live cohort's budget is untouched by this

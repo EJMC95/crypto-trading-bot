@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-05 02:45 Sydney (16:45Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-06 22:17 Sydney (12:17Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -18,6 +18,11 @@ _Still open because:_ the read lived only in the report's prose (the I21 shape);
 🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
 
 _Still open because:_ retiring her before the registration's own read voids it (I21/I25); the docket's ~4,233d pools ~200 pre-cap closes against ~25 post-cap ones.
+
+### `avo-live-slot-6-preregistered-read`  ·  owner: **session**
+🙏 avo's LIVE cap went 5 -> 6 at (ye) (6-Sep) on the twin's own record: the 4 shadow trades opened with >=5 already held earned +6.877%/trade (+$13.76, 53% of its +$25.80) vs +1.027% for the other 28, and the (sr) premise '6 never' had become false (6 held 8.3% of the time, peak 7). PRE-REGISTERED READ (I21/I26 — graded on FRESH live closes only, never the window that motivated it): at >=10 LIVE closes opened with >=5 held, or on 6-Oct, whichever first — REVERT the literal to 5 (lighter_family_bot.STRATEGIES, [deploy-live-taker]) if their mean <= the live book's other closes' mean over the same window; KEEP if greater; record either verdict as 'avo-live-slot-6 READ:' in the CHANGELOG and remove this row.
+
+_Still open because:_ the read date has not arrived and the live arm has no post-change closes yet; this row is the tripwire the registration would otherwise lack (the I21 prose shape).
 
 ### `counterweight-preregistered-fresh-read`  ·  owner: **session**
 ⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 1-Oct, whichever first. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
@@ -74,9 +79,14 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (1 commit(s))
+## Shipped today (6 commit(s))
 
-- `e1e1b79` [deploy-live-mum] (yb) the flip that loses, and the judge lane that never ran (#284)
+- `ba437e6` (ye) the record: changelog entry, three doctrine amendments in place, and RENUMBERED (yd) -> (ye) after another session took (yd) on main
+- `4c4f3ef` (yd) the freeze pin asserts the result REBINDS levers (a discarded call froze nothing; M1)
+- `2acd138` (yd) a READY book keeps the bracket it passed on (tuner freeze), and the allocation organ reaches the family shadows + the taker
+- `91390a3` [deploy-live-taker] (yd) avo LIVE 5 -> 6 slots: the twin's 6th slot took its best trades, and the arms' caps now match so the judge's avo pair is judgeable
+- `24cfb90` (yd) the judge's mum lane was inert by one string: the shadow arm rebuilt the lever prefix from a suffixed row id
+- `f9546fc` (yd) the winners' docket graded the taker on a superseded policy: era_rows was pinned by identity and fed the wrong shape
 
 ## How this file stays honest
 
