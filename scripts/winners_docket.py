@@ -237,8 +237,20 @@ def era_scoped_rows(trades):
     out = {}
     for bot, rows in by_bot.items():
         rows.sort(key=lambda r: _parse_ts(r.get("close_ts")))
+        # [2026-09-06 daily review] `extra` rides at [4]. `stamped_policy_boundary`
+        # reads the policy stamp THERE and derives nothing from a 4-tuple, so the
+        # docket silently fell back to the declared POLICY_ERA for every book
+        # while its selftest pinned `era_rows` by IDENTITY and never saw the
+        # input shape. Measured: 🎫 the taker graded on 258 closes from
+        # 2026-07-17 against the gate's 181 from 2026-07-30T11:09:46 — 77 closes
+        # under a superseded policy, and `tag:long-breakoutup` surviving as a
+        # bucket the correct sample dedups into `side:long`, so the same closes
+        # entered the BH referee twice. Pinned by
+        # tests/autonomy/test_winners_docket.py::
+        # test_the_era_rows_are_fed_the_full_shape_so_the_stamp_boundary_lands.
         shaped = [(float(r["profit_ratio"]), float(r.get("profit_abs") or 0.0),
-                   _parse_ts(r["close_ts"]), r.get("open_ts")) for r in rows]
+                   _parse_ts(r["close_ts"]), r.get("open_ts"), r.get("extra"))
+                  for r in rows]
         scoped, _all, _iso = gr.era_rows(bot, shaped)
         scoped_keys = {(round(row[0], 9), row[2]) for row in scoped}
         out[bot] = [dict(pct=float(r["profit_ratio"]),

@@ -140,6 +140,54 @@ def test_phantom_closes_never_reach_the_referee():
                    enter_tag="long")
     assert len(wd.era_scoped_rows([scratch])["bk2"]) == 1, \
         "a real scratch close was dropped — the filter exceeded its signature"
+def test_the_era_rows_are_fed_the_full_shape_so_the_stamp_boundary_lands():
+    """[2026-09-06 daily review] IDENTITY WAS PINNED; THE INPUT SHAPE WAS NOT.
+
+    `test_the_era_rule_is_the_gates_own_by_identity` proves the docket calls
+    the gate's `era_rows`. It could not see that the docket fed it 4-tuples
+    while `stamped_policy_boundary` reads the policy stamp at [4] — so the
+    stamp-derived boundary was never computed and the docket fell back to the
+    declared `POLICY_ERA` for every book. Measured 6-Sep: exactly one book
+    differed — 🎫 the taker graded on 258 closes from 2026-07-17 against the
+    gate's 181 from 2026-07-30T11:09:46 — and the 77 stale closes kept
+    `tag:long-breakoutup` alive as a separate bucket that the correct sample
+    dedups into `side:long`, so the same closes entered the BH referee twice.
+
+    The fixture varies nothing but the policy stamp: 12 closes under lens A,
+    then 10 under lens B. The docket must grade the same rows the gate does
+    when the gate is handed the stamp — and that count must be strictly below
+    the total, or the fixture never exercised the stamp path (the 6-Sep
+    harness trap: floats at [2] disable BOTH arms and they agree spuriously).
+    """
+    import golive_readiness as gr
+
+    def stamp(lens):
+        return {"policy": {"venue": "lighter_shadow", "bull": True,
+                           "lenses": [lens], "sides": {lens: ["long"]},
+                           "max_open": 8, "ticket_top_n": 12}}
+
+    rows = []
+    for i in range(22):
+        lens = "dip" if i < 12 else "breakoutup"
+        rows.append(dict(bot="bk", profit_ratio=0.01, profit_abs=1.0,
+                         open_rate=100.0,
+                         close_ts=(T0 + timedelta(hours=2 * i + 1)).isoformat(),
+                         open_ts=(T0 + timedelta(hours=2 * i)).isoformat(),
+                         exit_reason="long_hold", enter_tag=f"long-{lens}",
+                         extra=stamp(lens)))
+
+    # the gate's own reading, handed the full shape — the standard
+    quint = [(r["profit_ratio"], r["profit_abs"], wd._parse_ts(r["close_ts"]),
+              r["open_ts"], r["extra"]) for r in rows]
+    gate_n = len(gr.era_rows("bk", quint)[0])
+    assert 0 < gate_n < len(rows), \
+        f"fixture did not exercise the stamp path (gate kept {gate_n} of {len(rows)})"
+
+    docket_n = len(wd.era_scoped_rows(rows)["bk"])
+    assert docket_n == gate_n, \
+        (f"the docket grades {docket_n} closes where the gate grades {gate_n} — "
+         f"era_rows was fed a row shape that hides the policy stamp")
+
 # --------------------------------------------------------------- [I21] (tt)
 # THE PRE-REGISTERED FOLLOW-THROUGH. I21 says a bucket held only by the
 # multiplicity referee is "graded on closes AFTER registration, t>=2 on the

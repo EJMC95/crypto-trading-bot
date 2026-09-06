@@ -1,3 +1,60 @@
+## 2026-09-06 (yd) — THE WINNERS' DOCKET GRADED 🎫 THE TAKER ON A SUPERSEDED POLICY: `era_rows` WAS PINNED BY IDENTITY AND FED THE WRONG SHAPE
+
+**Found by the 6-Sep daily review, verified twice, shipped from an isolated
+worktree by the duplicate firing of the same job** (the second run landed
+three minutes after the first published, and the fix the first one left as
+"owner: Lucy, next interactive pass" was the highest-value thing on the desk —
+(vd): a found improvement ships in the session that finds it).
+
+**THE DEFECT.** `winners_docket.era_scoped_rows` built 4-tuples
+`(pct, abs, closed, opened)` and handed them to the gate's own `era_rows`.
+`stamped_policy_boundary` reads the policy stamp at **index [4]** and, per its
+own docstring, *"rows without one … derive nothing"* — so the stamp-derived
+boundary was never computed and the docket silently fell back to the declared
+`POLICY_ERA` for every book. `test_the_era_rule_is_the_gates_own_by_identity`
+was green throughout: it proves the docket calls the gate's function and says
+nothing about what it feeds it. **Identity was pinned; the input SHAPE was
+not** — the (hj) second-copy rule closed, one layer down.
+
+**MEASURED, with a harness that varied nothing but the tuple length** (same
+rows, same order, real `datetime`s at [2] — the review's first harness passed
+floats there, which makes `_era_parse` treat every close as unreadable and
+disables the stamp path in BOTH arms, so they agreed spuriously; a check that
+agrees with you is not a check until it can also disagree):
+
+| | as shipped (4-tuple) | with the stamp (5-tuple) |
+|---|---|---|
+| `lighter-ticket-taker-lshadow` | **258** closes from **2026-07-17** | **181** closes from **2026-07-30T11:09:46** |
+| every other book (15 of 16) | identical | identical |
+
+Exactly one book is affected today — the only book whose stamped boundary is
+later than its declared era — and it is the book carrying the fleet's headline
+winning evidence. **77 closes taken under a superseded policy sat inside every
+docket verdict for it.** The book reads BETTER on the correct era (`book:*`
++0.846% t=2.46 → **+1.227% t=2.68**), so no verdict flips; the real damage was
+structural: on the correct era `long-breakoutup` IS the long side, so the
+docket's dedup folds it into `side:long` — on the defective era it survived as
+a separate bucket and **the same closes entered the BH referee twice under two
+names**, inflating `m` and diluting every other bucket in the fleet. That is
+precisely the failure the dedup block was written to prevent.
+
+**THE FIX** is one element — `r.get("extra")` at [4], mirroring
+`golive_readiness`'s own row shaping at its `quads.append` — pinned by
+`tests/autonomy/test_winners_docket.py::test_the_era_rows_are_fed_the_full_shape_so_the_stamp_boundary_lands`:
+a fixture of 12 closes under lens A then 10 under lens B; the docket must grade
+the same count the gate grades when handed the stamp, AND that count must be
+strictly below the total or the fixture never exercised the stamp path.
+**Mutation verified**: reverting the one element reddens it with the exact
+live diagnostic (`the docket grades 22 closes where the gate grades 9`).
+
+**Expectancy price: none** — the docket is read-only, moves no capital and
+writes no lever. What it buys is that the winners' referee and the go-live gate
+now agree about the same ledger, which is the docket header's own claim.
+
+**NOT DEPLOYED** — `scripts/` does not ship in any image; this lands on the
+next merge to main and reaches the daily review and the weekly assessment from
+there.
+
 ## 2026-09-04 (yc) — (yb) IS REVERTED OUT OF THE CODE AT EAMON'S INSTRUCTION, AND THE RECORD IS KEPT ON PURPOSE
 
 **Eamon, 4-Sep: *"Fall back / Go back to how things were."*** Done, in two
