@@ -1952,7 +1952,27 @@ STRATEGIES = [
     # **6 never, in 17 episodes**. So the 5th slot is reachable supply and the
     # 6th is a permanently empty divisor that would cost ~28% of deployed
     # capital ($181 -> $130 expected). 5 captures the reachable slot and stops.
-    SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=5,
+    # [6-Sep (yd)] 5 -> 6, and the (sr) premise above is CORRECTED IN PLACE
+    # per I12: "6 never" was true on 21-Aug and is FALSE on the twin's own
+    # record today. Measured on 🙏 avo's shadow ledger (32 closes, 53.7d):
+    # time-weighted occupancy at 6 slots = 8.3% (peak 7), and the FOUR trades
+    # opened with >=5 already held — exactly the ones a cap of 5 refuses —
+    # earned +6.877%/trade (+$13.76, 53% of the book's +$25.80) against
+    # +1.027% for the other 28. So the 6th slot is not an empty divisor; it is
+    # where the broadest dips land. Priced (I19): at the twin's occupancy the
+    # clip shrinks 5/6 and deployed capital falls ~14% on the 28 ordinary
+    # trades (28 x 1.03 x 0.143 = 4.1 clip-%) against 4 x 6.88 = 27.5 clip-%
+    # on the marginal ones — positive under every reading, break-even even if
+    # the marginal trades only match the book's mean. What it also buys: the
+    # arms' caps now MATCH, so the 🧪 judge's avo pair leaves
+    # `capacity_mismatch` and becomes judgeable. Per-trade % is invariant to
+    # clip, so the gate's `t` does not move; all-slots-stop is gross_x x |stop|
+    # and independent of slot count. Ordinary tuning, no era reset (hc).
+    # PRE-REGISTERED REVERT (session_state row `avo-live-slot-6-preregistered-
+    # read`): at >=10 LIVE closes opened with >=5 held, or on 6-Oct, whichever
+    # first — revert to 5 if their mean <= the live book's other closes' mean.
+    # Revert is this literal back to 5 behind a [deploy-live-taker] marker.
+    SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=6,
              style="swing-dip-4h"),
     DayTraderGated("freqtrade-georgia", tf="15m", stoploss=-0.05, max_open=5,
                    style="daytrader-15m"),
@@ -2977,12 +2997,17 @@ def shadow_max_open_overrides(raw=None):
     Called from main() ONLY, never at import: the live Avo bot binds the same
     STRATEGIES instance by identity and sizes its real-money clip as
     equity/max_open, so the declared literals are live surface. Values clamp
-    to [1, 12]; junk tokens are dropped, never guessed. Default carries the
-    measured avo step (X3, adversarially confirmed: cap-4 binding 39% of its
-    era, cap 6 ≈ +25% close rate, no era reset per (hc)); "" reverts."""
+    to [1, 12]; junk tokens are dropped, never guessed. The default used to
+    carry the measured avo step ("freqtrade-avo-maria:6" — X3, adversarially
+    confirmed: cap-4 binding 39% of its era, cap 6 ≈ +25% close rate, no era
+    reset per (hc)). [(yd)] That step moved INTO the literal (both arms read
+    6 now, so the judge's capacity-parity rung passes), and the default is
+    EMPTY: a shadow-only override that silently re-opened a cap delta between
+    the arms is the exact thing that made the pair unjudgeable for a fortnight.
+    The mechanism stays for a deliberate, declared experiment; "" is the
+    resting state."""
     if raw is None:
-        raw = os.environ.get("FAMILY_SHADOW_MAX_OPEN_OVERRIDES",
-                             "freqtrade-avo-maria:6")
+        raw = os.environ.get("FAMILY_SHADOW_MAX_OPEN_OVERRIDES", "")
     out = {}
     for tok in str(raw).split(","):
         tok = tok.strip()

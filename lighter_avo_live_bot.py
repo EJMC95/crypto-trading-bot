@@ -3522,7 +3522,9 @@ def _selftest():
     # table rather than `whatever S says`, which would be vacuous: each book is
     # pinned to its OWN known geometry, and a book added to `_BOOKS` without an
     # entry here fails rather than running unpinned.
-    _EXPECT = {"freqtrade-avo-maria": (5, -0.10),
+    # [(yd)] avo 5 -> 6: the twin's 6th slot took its best trades (measured;
+    # see the literal's own comment in lighter_family_bot.STRATEGIES).
+    _EXPECT = {"freqtrade-avo-maria": (6, -0.10),
                "freqtrade-georgia": (5, -0.05)}
     assert BOT in _EXPECT, f"{BOT} is live-capable but has no geometry pin"
     _slots, _stop = _EXPECT[BOT]

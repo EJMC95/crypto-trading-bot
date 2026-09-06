@@ -145,6 +145,26 @@ CARRIED = [
         "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 10),
     },
     {
+        "id": "avo-live-slot-6-preregistered-read",
+        "owner": "session",
+        "what": "🙏 avo's LIVE cap went 5 -> 6 at (yd) (6-Sep) on the twin's "
+                "own record: the 4 shadow trades opened with >=5 already held "
+                "earned +6.877%/trade (+$13.76, 53% of its +$25.80) vs +1.027% "
+                "for the other 28, and the (sr) premise '6 never' had become "
+                "false (6 held 8.3% of the time, peak 7). PRE-REGISTERED "
+                "READ (I21/I26 — graded on FRESH live closes only, never the "
+                "window that motivated it): at >=10 LIVE closes opened with "
+                ">=5 held, or on 6-Oct, whichever first — REVERT the literal "
+                "to 5 (lighter_family_bot.STRATEGIES, [deploy-live-taker]) if "
+                "their mean <= the live book's other closes' mean over the "
+                "same window; KEEP if greater; record either verdict as "
+                "'avo-live-slot-6 READ:' in the CHANGELOG and remove this row.",
+        "why_open": "the read date has not arrived and the live arm has no "
+                    "post-change closes yet; this row is the tripwire the "
+                    "registration would otherwise lack (the I21 prose shape).",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 6),
+    },
+    {
         "id": "counterweight-preregistered-fresh-read",
         "owner": "session",
         "what": "⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a "
