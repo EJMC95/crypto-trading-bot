@@ -412,8 +412,8 @@ def main():
 # ---------------------------------------------------------------------------
 def _selftest():
     import ast
-    src = open(os.path.abspath(__file__)).read()
-    tree = ast.parse(src)
+    with open(os.path.abspath(__file__)) as fh:
+        tree = ast.parse(fh.read())
 
     # ADVISORY, asserted on the source (the fleet_allocation pattern): this
     # module may not write a lever, move capital, or open a market.

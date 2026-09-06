@@ -198,7 +198,7 @@ def tstat(xs):
     if n < 3:
         return (n, float("nan"), float("nan"))
     m = st.mean(xs)
-    sd = st.pstdev(xs) * math.sqrt(n / (n - 1.0)) if n > 1 else 0.0
+    sd = st.pstdev(xs) * math.sqrt(n / (n - 1.0))   # n >= 3 here
     if sd <= 0:
         return (n, m, float("nan"))
     return (n, m, m / (sd / math.sqrt(n)))

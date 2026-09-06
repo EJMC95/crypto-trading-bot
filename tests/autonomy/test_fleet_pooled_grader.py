@@ -7,9 +7,7 @@ three arms of one strategy wearing three names. Each of those four produced a
 wrong headline on a real run before it was pinned.
 """
 import ast
-import math
 import os
-import statistics as st
 import sys
 
 import pytest
@@ -45,7 +43,8 @@ def test_selftest_passes():
 # IDENTITY IMPORTS — (hj): a second copy of a rule is a second rule
 # ---------------------------------------------------------------------------
 def test_rules_are_imported_not_reimplemented():
-    tree = ast.parse(open(SRC).read())
+    with open(SRC) as fh:
+        tree = ast.parse(fh.read())
     local = {n.name for n in ast.walk(tree)
              if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
     for owned in ("cluster_se", "bh_survivors", "t_crit", "era_rows",
@@ -68,7 +67,8 @@ def test_module_is_advisory_on_its_own_source():
     """It may not write a lever, move capital or open a market — the
     fleet_allocation pattern, asserted against the source rather than promised
     in the docstring."""
-    tree = ast.parse(open(SRC).read())
+    with open(SRC) as fh:
+        tree = ast.parse(fh.read())
     banned = {"write_levers", "get_lever", "market_open", "publish",
               "apply_tuning", "set_allocation", "claim_writer"}
     for node in ast.walk(tree):
