@@ -107,17 +107,30 @@ def test_the_freeze_runs_at_the_write_site_after_every_other_filter():
     src = (ROOT / "lighter_scout_tuner.py").read_text()
     mod = ast.parse(src)
     freeze_line = write_line = None
+    rebinds_levers = False
     for n in ast.walk(mod):
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call) \
+                and isinstance(n.value.func, ast.Name) \
+                and n.value.func.id == "apply_ready_freeze":
+            freeze_line = n.lineno
+            tgt = n.targets[0]
+            elts = tgt.elts if isinstance(tgt, ast.Tuple) else [tgt]
+            rebinds_levers = bool(elts) and isinstance(elts[0], ast.Name) \
+                and elts[0].id == "levers"
         if isinstance(n, ast.Call):
             f = n.func
-            if isinstance(f, ast.Name) and f.id == "apply_ready_freeze":
-                freeze_line = n.lineno
             if (isinstance(f, ast.Attribute) and f.attr == "write_levers"
                     and isinstance(f.value, ast.Name) and f.value.id == "tuning"):
                 write_line = n.lineno
+                assert n.args and isinstance(n.args[0], ast.Name) \
+                    and n.args[0].id == "levers", \
+                    "write_levers must receive the (filtered) `levers` name"
     assert freeze_line and write_line, "call sites not found — guard is vacuous"
     assert freeze_line < write_line, \
         "apply_ready_freeze must run BEFORE write_levers"
+    assert rebinds_levers, \
+        "the freeze's result must REBIND `levers` — a call whose result is " \
+        "discarded freezes nothing"
     assert '"ready_freeze": ready_freeze' in src, \
         "the freeze's receipt must be PUBLISHED on the tuner payload (I18)"
 
