@@ -29,7 +29,7 @@ THE DATA WALL, MEASURED AND DECLARED FIRST (this governs how the answer reads)
       design targets is not in the sample. It refutes only "normalisation helps
       among already-large absolute dislocations".
   Neither reading is available until the scout publishes its FULL per-market
-  residual vector instead of the top 8 — see the (ye) entry, which measures what
+  residual vector instead of the top 8 — see the (yh) entry, which measures what
   that would cost (~2.5KB on a 37.8KB payload) and why it is the named next step
   rather than something this pass widened on the way past. Until then this
   script's verdict is reported with the truncation scope attached, never without.

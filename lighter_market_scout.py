@@ -481,7 +481,7 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # incubator accept on. (~215 vs ~130 symbols; a few KB per snapshot.)
         "marks": {s: float(f'{v["last"]:.6g}')
                   for s, v in stats.items() if v.get("last")},
-        # [2026-09-06 (ye)] THE FULL PER-MARKET RESIDUAL — the third instance of
+        # [2026-09-06 (yh)] THE FULL PER-MARKET RESIDUAL — the third instance of
         # the class the two comments around it already name, and the last one
         # still open. `prem_outliers` is a VIEW of this data: top-8, RANKED BY
         # ABSOLUTE bps, liquid-only. Persisting only that view makes one whole
@@ -750,7 +750,7 @@ def selftest():
     # must be joinable to `marks` (same key space) — that join IS the use case
     assert set(snap["funding"]) <= set(stats), "funding/marks key spaces diverged"
     assert set(snap["marks"]) <= set(stats)
-    # [(ye)] the RESIDUAL VECTOR must be the DATA, never the top-8 VIEW: it
+    # [(yh)] the RESIDUAL VECTOR must be the DATA, never the top-8 VIEW: it
     # carries every active book that has a premium, not the ones that happened
     # to rank. A `resid` that merely mirrored `prem_outliers` would leave the
     # sigma question exactly as unanswerable as it was.
