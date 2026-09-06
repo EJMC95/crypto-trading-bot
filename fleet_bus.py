@@ -337,6 +337,35 @@ def active_price_pairs():
     return out
 
 
+def xp_prefix_for(shadow_bot):
+    """[2026-09-06 (yd)] The judge's `xp.<book>.*` lever prefix for a SHADOW
+    arm, read from the ONE declaration (`JUDGED_PAIRS[*]["xp_prefix"]`).
+
+    THE ONLY SUPPORTED WAY for a shadow host to name the judge's levers.
+    `lighter_family_bot` used to RECONSTRUCT it from the suffixed row id —
+    `f"xp.{bot_id.split('-', 1)[-1]}."` — which yields `xp.mum-lshadow.` for
+    👩 mum and `xp.avo-maria-lshadow.` for 🙏 avo. Neither is a registered
+    lever, so `fleet_tuning.get_lever` returned the caller's default at its
+    unregistered-name rung and EVERY candidate the judge wrote was silently
+    unreachable by the arm meant to run it. Measured on the live bus: two
+    consecutive candidates voided — `mum-rsi-32` VOIDED-NEVER-APPLIED after
+    37.7h ("0/4 shadow closes carry a receipt"), then `mum-vel-12-20` ran
+    34h with the arm publishing `vel_band [-999, 999]` and `vel_blocked 0`
+    of 105 reads, i.e. the env default, untouched.
+
+    Fail-safe: an unknown row, junk, or a row that is nobody's shadow arm
+    returns None, and the caller runs its ENV DEFAULTS — the operator's
+    setting. A darkness here must never invent a prefix, because a prefix
+    that resolves to nothing is exactly the defect this closes."""
+    if not isinstance(shadow_bot, str) or not shadow_bot:
+        return None
+    for spec in JUDGED_PAIRS.values():
+        if spec.get("shadow_bot") == shadow_bot:
+            pfx = spec.get("xp_prefix")
+            return pfx if isinstance(pfx, str) and pfx else None
+    return None
+
+
 def living_pair_default():
     """[2026-09-02 (ww)] (live_bot, shadow_bot) — THE LIVING PAIR every organ
     that pairs a live arm with its shadow twin defaults to: the 🧪 judge's

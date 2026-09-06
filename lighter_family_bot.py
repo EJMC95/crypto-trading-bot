@@ -2160,6 +2160,21 @@ def mum_env_defaults(strategy):
             "vel_hi": float(getattr(cls, "VEL_HI", 999.0))}
 
 
+def xp_prefix_for_arm(bot_id):
+    """[(yd)] This shadow arm's judge-lever prefix, from `fleet_bus`'s ONE
+    declaration. "" (a no-op for `apply_book_levers`) when the row is not a
+    judged shadow arm, or when fleet_bus is absent from this image — so the
+    carrier runs its ENV DEFAULTS rather than a name that resolves to
+    nothing. NEVER rebuild this string from the row id: `bot_id` carries the
+    `-lshadow` suffix and the book's own name may itself contain a hyphen
+    (`freqtrade-avo-maria`), which is how both live books' lanes were inert."""
+    try:
+        import fleet_bus as _fb
+        return _fb.xp_prefix_for(bot_id) or ""
+    except Exception:  # noqa: BLE001 — a dark bus runs the operator's defaults
+        return ""
+
+
 def apply_book_levers(strategy, prefix):
     """Overlay `<prefix>rsi_max` / `<prefix>max_hold_min` onto the strategy
     INSTANCE (never the class) from the env defaults each call. Returns the
@@ -3236,7 +3251,12 @@ def main():
             # before.
             # [(wv)] the judge's xp.<book>.* levers reach this twin — mum's
             # today; a no-op for carriers without the knobs.
-            _moved = apply_book_levers(b.s, f"xp.{b.bot_id.split('-', 1)[-1]}.")
+            # [(yd)] THE PREFIX IS DECLARED, NEVER RECONSTRUCTED. This read
+            # `f"xp.{b.bot_id.split('-', 1)[-1]}."`, which is `xp.mum-lshadow.`
+            # for 👩 mum and `xp.avo-maria-lshadow.` for 🙏 avo — unregistered
+            # names, so `get_lever` returned the default at its unregistered
+            # rung and the judge's candidates could never reach the arm.
+            _moved = apply_book_levers(b.s, xp_prefix_for_arm(b.bot_id))
             if _moved:
                 log.info("%s xp levers in force: %s", b.bot_id, _moved)
             _rets = {}
