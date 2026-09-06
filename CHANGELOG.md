@@ -90,9 +90,14 @@ bracket levers and nothing else stopped the tuner. (hm)'s *"freeze its bars
 first"* was prose. Now `lighter_scout_tuner.apply_ready_freeze` runs LAST at
 the write site: while the tuned book reads `ready: true` on a FRESH
 `golive-readiness` payload, `FROZEN_WHEN_READY` (tp/sl/max_hold_h/
-sl_cooldown_h/brk_trail/brk_sl) is dropped from the enactment and published
-under `ready_freeze.dropped`. Entry levers keep moving. Fail-OPEN on a dark
-gate. Forward-only — the era is not re-cut (that would void the verdict).
+sl_cooldown_h — the bracket levers this tuner can WRITE) is dropped from the
+enactment and published under `ready_freeze.dropped`. `brk_trail`/`brk_sl`
+are deliberately NOT in the set: they are structurally off every tuner
+ladder ((sk) ratchet), so a freeze on them is a no-op — and the ratchet's own
+guard scans every uppercase collection in the tuner for those names and read
+the first draft's freeze list as a ladder. Entry levers keep moving.
+Fail-OPEN on a dark gate. Forward-only — the era is not re-cut (that would
+void the verdict).
 Recorded in CLAUDE.md's (hm) block with ENFORCED BY. **4/4 mutations red**,
 including the one my first AST pin would have missed: a call whose result is
 discarded (the pin now asserts the result REBINDS `levers`).

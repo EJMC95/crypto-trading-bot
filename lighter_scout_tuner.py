@@ -728,9 +728,14 @@ def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh,
 #: `taker.tp` 0.03/0.04 and `taker.max_hold_h` 24/48. Entry/supply levers
 #: (dip_range, brk_range, momo_chg, div_gap_pp) are (hc) ordinary tuning and
 #: keep moving — they change WHICH tickets are taken, not what a taken one is
-#: graded on. Forward-only by design: it never re-cuts the era.
+#: graded on. Forward-only by design: it never re-cuts the era. The set is
+#: exactly the bracket levers THIS tuner can write; `taker.brk_trail` /
+#: `taker.brk_sl` are deliberately absent because they are structurally off
+#: every ladder/proposal surface here ((sk) ratchet, pinned by
+#: test_breakoutup_ratchet) — a freeze on a lever nobody can write is a no-op
+#: that the ratchet's own guard reads as a ladder.
 FROZEN_WHEN_READY = ("taker.tp", "taker.sl", "taker.max_hold_h",
-                     "taker.sl_cooldown_h", "taker.brk_trail", "taker.brk_sl")
+                     "taker.sl_cooldown_h")
 #: the ONE row this tuner's levers steer (the shadow taker; its live arm is
 #: retired and reads only `live.*`).
 TUNED_BOOK = tt.BOT + "-lshadow"

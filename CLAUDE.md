@@ -2416,8 +2416,10 @@ All new bots:
   The fix is FORWARD-ONLY and lives at the tuner's write site, not in the era
   (a retroactive re-cut would void the verdict — a step back): while the tuned
   book reads `ready: true` on a FRESH `golive-readiness` payload, every
-  `FROZEN_WHEN_READY` lever (tp/sl/max_hold_h/sl_cooldown_h/brk_trail/brk_sl)
-  is dropped from the enactment and published under `ready_freeze.dropped`.
+  `FROZEN_WHEN_READY` lever (tp/sl/max_hold_h/sl_cooldown_h — the bracket
+  levers this tuner can WRITE; brk_trail/brk_sl are structurally off its
+  ladders per the (sk) ratchet and need no freeze) is dropped from the
+  enactment and published under `ready_freeze.dropped`.
   Entry/supply levers keep moving — (hc) tuning changes WHICH tickets are
   taken, not what a taken one is graded on. Fail-OPEN on a dark gate (the
   shadow-lane contract: a dark organ restricts nothing).
