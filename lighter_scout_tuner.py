@@ -718,6 +718,66 @@ def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh,
     return ({k: v for k, v in bars.items() if v != DEFAULTS[k]}, prov, log)
 
 
+#: [2026-09-06 (yd)] THE READY FREEZE — BRACKET levers, i.e. what a trade
+#: CLOSES on. The moment the book this tuner steers reads READY on the go-live
+#: gate, these stop moving. (hm)'s own lesson — "if a book needs grading,
+#: FREEZE ITS BARS FIRST"; 137 closes were lost to a bracket the tuner moved
+#: ~20 times — was doctrine with no actuator: the era signature deliberately
+#: excludes bracket levers ((jf): venue/bull/lenses/sides only), so a READY
+#: verdict could be, and on 6-Sep WAS, computed over a sample spanning
+#: `taker.tp` 0.03/0.04 and `taker.max_hold_h` 24/48. Entry/supply levers
+#: (dip_range, brk_range, momo_chg, div_gap_pp) are (hc) ordinary tuning and
+#: keep moving — they change WHICH tickets are taken, not what a taken one is
+#: graded on. Forward-only by design: it never re-cuts the era.
+FROZEN_WHEN_READY = ("taker.tp", "taker.sl", "taker.max_hold_h",
+                     "taker.sl_cooldown_h", "taker.brk_trail", "taker.brk_sl")
+#: the ONE row this tuner's levers steer (the shadow taker; its live arm is
+#: retired and reads only `live.*`).
+TUNED_BOOK = tt.BOT + "-lshadow"
+
+
+def _gate_fresh(gate, now_ts=None):
+    """True when a golive-readiness payload is inside its own TTL (I1)."""
+    try:
+        upd = datetime.fromisoformat(str(gate.get("updated")).replace("Z", "+00:00"))
+        ttl = float(gate.get("ttl_sec") or 0)
+        now = now_ts if now_ts is not None else datetime.now(timezone.utc).timestamp()
+        return ttl > 0 and (now - upd.timestamp()) <= ttl
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def apply_ready_freeze(levers, gate, now_ts=None, book=None):
+    """Drop every FROZEN_WHEN_READY lever while `book` reads READY on a FRESH
+    go-live payload. -> (levers, log_lines, frozen_dict).
+
+    Fail-OPEN on a dark, stale, unreadable or non-READY gate: the tuner
+    behaves exactly as before — a dark organ restricts nothing (the shadow-lane
+    contract), and the freeze is protective of EVIDENCE, not of money. What it
+    publishes (`ready_freeze`) is the receipt: a lever the sweep wanted and the
+    freeze refused is visible, never silently absent."""
+    book = book or TUNED_BOOK
+    out = {"book": book, "ready": None, "fresh": False, "dropped": []}
+    if not isinstance(gate, dict) or not gate:
+        return levers, [], out
+    out["fresh"] = _gate_fresh(gate, now_ts)
+    if not out["fresh"]:
+        return levers, [], out
+    row = (gate.get("books") or {}).get(book) or {}
+    out["ready"] = True if row.get("ready") is True else False
+    if not out["ready"]:
+        return levers, [], out
+    kept = {}
+    for k, v in (levers or {}).items():
+        if k in FROZEN_WHEN_READY:
+            out["dropped"].append(k)
+        else:
+            kept[k] = v
+    log = [f"ready-freeze: {book} reads READY on the gate — bracket lever "
+           f"{k} NOT enacted (frozen; (yd))" for k in out["dropped"]]
+    return kept, log, out
+
+
 def apply_proprioception(levers, prop_state, now_ts):
     """[2026-07-16 PROPRIOCEPTION] Drop any would-be enactment whose lever
     carries a fresh HURTING verdict from fleet_proprioception — the lever's
@@ -869,6 +929,13 @@ def run_once():
     # reality is not re-asserted this cycle (restrict-only; fail-safe none)
     levers, log4 = apply_proprioception(levers, prop_state, prop_now)
 
+    # [(yd)] the READY freeze: a book that has passed the gate keeps the
+    # bracket it passed on. Read from the gate's OWN payload, fresh (I1);
+    # fail-open on darkness. Runs LAST so nothing downstream can re-add one.
+    levers, log6, ready_freeze = apply_ready_freeze(
+        levers, store.load_state("golive-readiness") or {})
+    log4 = log4 + log6
+
     enacted = tuning.write_levers(levers, set_by="scout-tuner",
                                   ttl_sec=LEVER_TTL) if levers else None
 
@@ -896,6 +963,9 @@ def run_once():
         "baseline_lenses": {l: {k: s.get(k) for k in ("seen", "taken", "closed", "net")}
                             for l, s in (baseline.get("lenses") or {}).items()},
         "enacted": now_set, "log": (log4 + log5 + log1 + log2 + log3)[:20],
+        # [(yd)] the freeze's receipt — {book, ready, fresh, dropped}. A
+        # bracket lever the sweep wanted and this refused is visible here.
+        "ready_freeze": ready_freeze,
     }
     if _ok_prev:
         store.save_state(KEY, payload)

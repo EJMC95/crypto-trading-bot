@@ -329,6 +329,82 @@ def test_counterweight_reads_allocation_only_when_not_live():
             "`not _is_live` branch — the live arm's clip is PINNED ((ia))")
 
 
+def _enclosing_functions(path, func="allocation_scale"):
+    """[(yd)] {call_lineno: [enclosing FunctionDef names, innermost first]} and
+    the set of IfExp/If test-Name ids on the path — for consumers whose guard
+    is a conditional EXPRESSION rather than an `if` statement."""
+    tree = ast.parse((ROOT / path).read_text())
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            child._parent = parent
+    out = {}
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == func):
+            fns, guards = [], set()
+            p = node
+            while hasattr(p, "_parent"):
+                p = p._parent
+                if isinstance(p, ast.FunctionDef):
+                    fns.append(p.name)
+                if isinstance(p, (ast.If, ast.IfExp)):
+                    guards |= {n.id for n in ast.walk(p.test)
+                               if isinstance(n, ast.Name)}
+            out[node.lineno] = (fns, guards)
+    return out
+
+
+def test_the_family_shadow_loop_consumes_and_the_live_host_never_does():
+    """[(yd)] I16 with a consumer on the books that hold the claims. The
+    family host's ONLY call sits inside `shadow_allocation_scale`, which is
+    called from main()'s shadow trading loop; the LIVE host (which imports
+    the family module) contains NO call at all — real money never reads it."""
+    fam = _enclosing_functions("lighter_family_bot.py")
+    assert fam, "the family shadow host lost its allocation consumer"
+    for line, (fns, _g) in fam.items():
+        assert fns and fns[0] == "shadow_allocation_scale", (
+            f"lighter_family_bot.py:{line}: allocation_scale called outside "
+            f"the shadow accessor (in {fns}) — the live host imports this "
+            "module and must never inherit a capital scale")
+    # the accessor is consumed from main()'s loop, by name, exactly once
+    src = (ROOT / "lighter_family_bot.py").read_text()
+    calls = [n for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+             and n.func.id == "shadow_allocation_scale"]
+    assert len(calls) == 1, "shadow_allocation_scale must have ONE consumer"
+    live = _enclosing_functions("lighter_avo_live_bot.py")
+    assert not live, (
+        f"the LIVE host calls allocation_scale at {sorted(live)} — "
+        "real money must never size off the allocation organ (S1)")
+    # and the sizing line actually multiplies by it (not a dead read)
+    assert "* _alloc" in src.split("shadow_allocation_scale(b.bot_id)")[1][:200]
+
+
+def test_the_takers_consumer_is_gated_to_its_shadow_row():
+    """[(yd)] the taker's call is a conditional expression on BOT_ROW ending
+    `-lshadow`; the retired live arm reads only live.* and takes no scale."""
+    calls = _enclosing_functions("lighter_ticket_taker.py")
+    assert calls, "the taker lost its allocation consumer"
+    for line, (_fns, guards) in calls.items():
+        assert "BOT_ROW" in guards, (
+            f"lighter_ticket_taker.py:{line}: allocation_scale is not guarded "
+            "on BOT_ROW — a live taker arm would size off paper evidence")
+    src = (ROOT / "lighter_ticket_taker.py").read_text()
+    assert 'BOT_ROW.endswith("-lshadow")' in src
+    assert "risk_usd=RISK_USD * _bm * _alloc" in src, \
+        "the scale must enter as RISK, composed with the brain ((sp))"
+
+
+def test_the_images_that_run_the_new_consumers_carry_fleet_bus():
+    """Born-dark pin for the two new consumers: a guarded import with no COPY
+    is a silent 1.0 forever."""
+    for df in ("Dockerfile.familyshadow", "Dockerfile.freqtrade",
+               "Dockerfile.tickettaker"):
+        text = (ROOT / df).read_text()
+        assert "fleet_bus.py" in text, f"{df} does not COPY fleet_bus.py"
+
+
 def test_carry_consumes_and_both_funding_images_carry_fleet_bus():
     assert _guarded_calls("funding_carry_bot.py"), \
         "carry lost its allocation consumer"

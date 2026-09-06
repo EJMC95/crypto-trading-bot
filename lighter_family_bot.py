@@ -580,6 +580,21 @@ def brain_stake_mult(bot_id, tag):
         return 1.0
 
 
+def shadow_allocation_scale(bot_id):
+    """[(yd)] 💰 `fleet_bus.allocation_scale(bot_id)` for a SHADOW row, or 1.0
+    on any doubt — dark organ, stale payload, unknown book, an image without
+    fleet_bus, or `FLEET_ALLOCATION_MODE=advisory` (the accessor's own kill
+    switch, which reaches this consumer without a redeploy). Called ONLY from
+    the shadow trading loop in main(); a live row must never size off it, and
+    the accessor itself returns None for a row the organ does not rank."""
+    try:
+        import fleet_bus
+        s = fleet_bus.allocation_scale(bot_id)
+        return float(s) if s and s > 0 else 1.0
+    except Exception:  # noqa: BLE001
+        return 1.0
+
+
 def brain_clip_for(rows, tag, base_usd):
     """`base_usd` scaled by the brain across SEVERAL rows -> (usd, mult).
 
@@ -3521,7 +3536,21 @@ def main():
                 if bm != 1.0:
                     log.info("%s %s brain stake-mult x%.2f (%s)",
                              b.bot_id, coin, bm, ledger_tag(tag))
-                stake = STAKE_USD * b.s.stake_mult(tag, bars) * bm * fleet_gov
+                # [2026-09-06 (yd)] 💰 the allocation organ's evidence-weighted
+                # scale, composed with the brain's exactly as 🌾 carry does
+                # ((jr)/(so): two different questions — "how much of the
+                # fleet's capital does this book's EVIDENCE earn" times "how
+                # convinced is the brain of this TAG"). Measured the day it
+                # shipped: 🙏 avo's twin 1.52x, 👩 mum's 1.18x, 🔮 georgia's
+                # 0.885x — I16 with a consumer on the books that hold the
+                # claims, instead of on three funding books only. Per-trade %
+                # is invariant to clip ((hl)), so no grade and no paired bar
+                # moves; only paper $ follows evidence. SHADOW LOOP ONLY — the
+                # live host never runs this loop (test_allocation_consumer
+                # pins the live source clean by AST).
+                _alloc = shadow_allocation_scale(b.bot_id)
+                stake = (STAKE_USD * b.s.stake_mult(tag, bars) * bm * fleet_gov
+                         * _alloc)
                 size = stake / px
                 b.broker.open(coin, True, size, px)
                 ent = b.broker.pos.get(coin)
