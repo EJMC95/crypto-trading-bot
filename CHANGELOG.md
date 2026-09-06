@@ -137,6 +137,47 @@ best-evidenced candidate in the fleet sitting in its queue. The first thing a
 profit machine needs is a path from evidence to capital that actually
 conducts.
 
+**VERIFIED 15:47Z — both arms deployed, read on the rows, never the run log.**
+#287 merged as `b775b068` at 15:21Z (squash subject carrying `[deploy-live-mum]`).
+Run 690 (push) `Deployed: … family-lighter-shadow … mum-live …` plus every
+image carrying `fleet_bus.py` — the duplicate-def removal touched a shared
+module, so the born-dark rule fanned it out (19 services; the retired ones idle
+behind their guards). Run 691 (`workflow_dispatch`, `services=tide-rider-lighter-
+live`) `Deployed: tide-rider-lighter-live` at 15:33Z — queued by hand behind
+690 because the family shadow container hosts EVERY family twin and the
+workflow no longer pairs a shadow deploy with its live arm (its own line 282:
+"the auto-pair is GONE"), so 690 alone would have aligned mum's pair and split
+avo's, whose lane had just become judgeable at 6/6. The drift was not
+hypothetical: the judge's 15:31Z cycle read **`ARMS ON DIFFERENT CODE:
+live=f766cb58282c shadow=900cfaa8598e — this window measures a code delta, not
+edge; no promotion can rest on it`**.
+
+Rows at 15:47Z against the stamps predicted by `build_compute` at `b775b068`
+(family `5e30671ecf64/17`, avolive `6e419cf7b70a/18`):
+`freqtrade-mum-lshadow` **5e30671ecf64/17** · `freqtrade-mum-lighter`
+**6e419cf7b70a/18 shared 5e30671ecf64** · `freqtrade-avo-maria-lshadow`
+**5e30671ecf64/17** · `freqtrade-avo-maria-lighter` **6e419cf7b70a/18 shared
+5e30671ecf64**. Both pairs share one stamp; the judge's `arm_drift` clears on
+its next hourly cycle (~16:31Z), and `n_shadow` rises only as fresh shadow
+closes carry the `vel_lo 12 / vel_hi 20` receipt. `lighter-market.resid` is on
+the bus (216 markets) — the (yh) recorder, live.
+
+**AND THE SURFACE FOUND ITS FIRST INSTANCE ON ITS FIRST LOOP.** mum's row
+publishes `extra.levers = {prefix: "xp.mum.", registry: true, registered_n: 4}`
+— clean. 🙏 avo's shadow publishes **`{prefix: "xp.avo.", registry: true,
+registered_n: 0, unregistered: [xp.avo.rsi_max, xp.avo.max_hold_min,
+xp.avo.vel_lo, xp.avo.vel_hi]}`**: her pair DECLARES a judge prefix that no
+registered lever exists under — the (ye) defect one namespace over. Inert
+today (no candidate is queued on her lane), and both halves would fail silently
+if one were: `get_lever` defaults on the unregistered name and `write_levers`
+drops it. The (ye) class-closers pin that every REGISTERED `xp.*` lever is
+reachable; they cannot see a DECLARED prefix with no levers under it, which is
+exactly the gap this surface exists to expose. Carried, not fixed here: the fix
+is a measurement first (which of those four attributes avo's SwingDip carrier
+actually consumes — registering levers for attributes a strategy does not read
+is the I18 registered-but-inert failure) and then either registered cages or a
+narrowed declaration.
+
 ## 2026-09-06 (yf) — EVERY GRADER IN THIS FLEET IS PER-BOOK, SO A DEFECT THAT IS SMALL IN EVERY BOOK AND LARGE IN THE FLEET IS INVISIBLE TO ALL OF THEM AT ONCE — the pooled grader, and the four artefacts it killed in its own first output
 
 > **[RENUMBERED (yd) -> (yf) at push.]** A concurrent session pushed its own (yd) to main while this branch was in CI; that entry is on main and keeps the letter, per the letters rule. This one had ZERO code citations (counted, not sampled), so the move is free. `git log` subjects keep the old letter and are not a letter index.
