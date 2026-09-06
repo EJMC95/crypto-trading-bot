@@ -1695,6 +1695,106 @@ def is_quarantined(bot, pair, closed_at):
     return False
 
 
+def normalize_paper_row(bot, pair, pnl_abs, pnl_pct, opened_at, closed_at,
+                        reason, extra=None, venue=None, entry_price=None,
+                        exit_price=None, tag=None):
+    """THE ONE OWNER of the paper_trades -> brain-shaped normalisation.
+
+    TWO consumers read the same ledger over DIFFERENT transports and must
+    agree about what a trade is: `fetch_paper_trades` below (the production
+    brain's only paper ingest, straight off Postgres) and
+    `brain_replay.load_trades` (the harness that VALIDATES that brain, off
+    the dashboard's public /trades.json). Until [2026-09-07 (yi)] the
+    harness carried a PARTIAL hand-written copy of this body whose own
+    docstring claimed it normalised "exactly like" this one, and the two
+    disagreed on both halves of the sample:
+
+      * it derived the bucket key from the reason prefix alone, ignoring the
+        stored `tag` column the rule below prefers — so 366 of 4,288 live
+        rows bucketed differently and BOTH Funding Farmer arms partitioned
+        at a granularity production never uses ({short 188, long 17} in the
+        harness vs {short-funding 162, long-funding 16, short 26, long 1}
+        in production, shadow arm, era-filtered);
+      * it never applied `is_quarantined`, so 47 rows the production brain
+        withholds reached the harness that grades it.
+
+    A second copy of a rule is a second rule ((hj)), and this one graded the
+    brain's engines on a universe the brain does not have.
+
+    Returns the normalised row, or **None when the row is a real trade but
+    NOT admissible evidence** (`is_quarantined`) — None has exactly ONE
+    meaning so a caller can count withheld rows honestly. The side='skip'
+    gate-log filter deliberately stays at each transport (a SQL clause here,
+    a dict check in the harness): it is a query predicate, not row
+    normalisation, and cannot be shared across the two.
+
+    DECLARED DIVERGENCE, measured inert: the public feed's SELECT carries no
+    `venue` column (pnl_dashboard.fetch_paper_rows), so the harness passes
+    venue=None and its rows read venue-less where production's carry the
+    real venue. Driven end-to-end, it changes nothing the harness computes —
+    its only reachable path (compute_stake_mults -> brain_stats) reads
+    profit_abs, profit_ratio and _close_epoch — so the fix is to DECLARE it,
+    not to widen a real-money-adjacent SELECT for a measured-zero gain.
+    """
+    from datetime import datetime
+    # [(hr)] real trades, not evidence — see LEDGER_QUARANTINE. This is
+    # the ONLY thing a None return means, so a caller may count withheld
+    # rows without mislabelling anything else as a quarantine.
+    if is_quarantined(bot, pair, closed_at):
+        return None
+    direction, exit_reason = split_reason(reason)
+    # a stored tag is richer than the reason prefix ('long-funding'
+    # beats 'long'); split_reason strips any '_exit' suffix a
+    # publisher folded in (the Parliament stamps tag=full_tag), so
+    # the bucket key is always entry-side only. Reason-derived
+    # direction stays the fallback for pre-stamp rows.
+    if tag:
+        _tdir, _ = split_reason(tag)
+        direction = _tdir or direction
+    # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
+    # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
+    # rejects, so its 337 rows carried duration_min=None forever.
+    def _pts(s):
+        s = str(s).strip().replace("Z", "+00:00")
+        if s.endswith(" UTC"):
+            s = s[:-4] + "+00:00"
+        return datetime.fromisoformat(s)
+    dur = None
+    try:
+        if opened_at and closed_at:
+            dur = max(0.0, (_pts(closed_at) - _pts(opened_at))
+                      .total_seconds() / 60.0)
+    except Exception:
+        dur = None
+    def _rate(x):
+        # None stays None: a missing fill price must read as ABSENT
+        # evidence, never as 0.0 (which would look like a real price).
+        try:
+            return float(x) if x is not None else None
+        except (TypeError, ValueError):
+            return None
+    return {
+        "bot": bot, "pair": pair,
+        "profit_abs": float(pnl_abs) if pnl_abs is not None else 0.0,
+        "profit_ratio": pnl_pct,
+        "enter_tag": direction or None,   # None -> brain's "(untagged)"
+        "exit_reason": exit_reason or "trade",
+        "duration_min": dur,
+        "open_ts": opened_at, "close_ts": closed_at,
+        "is_open": False,
+        # [2026-07-17] the venue this trade actually executed on
+        # ('lighter' | None for the CEX sniper / HL-data carry book).
+        "venue": venue,
+        # freqtrade's names, so a paper row and a bot_trades row carry
+        # rates under the SAME keys (bot_learn reads open_rate /
+        # close_rate for both).
+        "open_rate": _rate(entry_price),
+        "close_rate": _rate(exit_price),
+        # dict or {} — never None, so consumers can .get() safely
+        "extra": extra if isinstance(extra, dict) else {},
+    }
+
+
 def fetch_paper_trades(limit=2000):
     """Per-trade rows from the durable paper_trades ledger (perps + sniper),
     normalized to the SAME shape bot_learn expects from the freqtrade /trades.json
@@ -1743,66 +1843,17 @@ def fetch_paper_trades(limit=2000):
                 (int(limit),),
             )
             rows = cur.fetchall()
-        from datetime import datetime
         out = []
         _quarantined = 0
         for (bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason,
              extra, venue, entry_price, exit_price, tag) in rows:
-            # [(hr)] real trades, not evidence — see LEDGER_QUARANTINE.
-            if is_quarantined(bot, pair, closed_at):
+            row = normalize_paper_row(bot, pair, pnl_abs, pnl_pct,
+                                      opened_at, closed_at, reason, extra,
+                                      venue, entry_price, exit_price, tag)
+            if row is None:
                 _quarantined += 1
                 continue
-            direction, exit_reason = split_reason(reason)
-            # a stored tag is richer than the reason prefix ('long-funding'
-            # beats 'long'); split_reason strips any '_exit' suffix a
-            # publisher folded in (the Parliament stamps tag=full_tag), so
-            # the bucket key is always entry-side only. Reason-derived
-            # direction stays the fallback for pre-stamp rows.
-            if tag:
-                _tdir, _ = split_reason(tag)
-                direction = _tdir or direction
-            # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
-            # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
-            # rejects, so its 337 rows carried duration_min=None forever.
-            def _pts(s):
-                s = str(s).strip().replace("Z", "+00:00")
-                if s.endswith(" UTC"):
-                    s = s[:-4] + "+00:00"
-                return datetime.fromisoformat(s)
-            dur = None
-            try:
-                if opened_at and closed_at:
-                    dur = max(0.0, (_pts(closed_at) - _pts(opened_at))
-                              .total_seconds() / 60.0)
-            except Exception:
-                dur = None
-            def _rate(x):
-                # None stays None: a missing fill price must read as ABSENT
-                # evidence, never as 0.0 (which would look like a real price).
-                try:
-                    return float(x) if x is not None else None
-                except (TypeError, ValueError):
-                    return None
-            out.append({
-                "bot": bot, "pair": pair,
-                "profit_abs": float(pnl_abs) if pnl_abs is not None else 0.0,
-                "profit_ratio": pnl_pct,
-                "enter_tag": direction or None,   # None -> brain's "(untagged)"
-                "exit_reason": exit_reason or "trade",
-                "duration_min": dur,
-                "open_ts": opened_at, "close_ts": closed_at,
-                "is_open": False,
-                # [2026-07-17] the venue this trade actually executed on
-                # ('lighter' | None for the CEX sniper / HL-data carry book).
-                "venue": venue,
-                # freqtrade's names, so a paper row and a bot_trades row carry
-                # rates under the SAME keys (bot_learn reads open_rate /
-                # close_rate for both).
-                "open_rate": _rate(entry_price),
-                "close_rate": _rate(exit_price),
-                # dict or {} — never None, so consumers can .get() safely
-                "extra": extra if isinstance(extra, dict) else {},
-            })
+            out.append(row)
         if _quarantined:
             print(f"[bot_pnl_store] ledger quarantine: {_quarantined} row(s) "
                   f"withheld from grading (see LEDGER_QUARANTINE) — real trades, "

@@ -107,24 +107,44 @@ def fetch(url):
 
 def load_trades():
     """bot_trades rows come freqtrade-shaped; the HTTP paper feed is RAW
-    paper_trades schema, so normalize it exactly like
-    bot_pnl_store.fetch_paper_trades does for the production brain
-    (skip-row filter, pnl_abs->profit_abs, split_reason -> enter_tag)."""
-    from bot_pnl_store import split_reason
+    paper_trades schema, so it is normalised by the SINGLE OWNER the
+    production brain itself uses — `bot_pnl_store.normalize_paper_row` —
+    and never by a copy of it.
+
+    [2026-09-07 (yi)] It WAS a copy, and a partial one whose own docstring
+    claimed it normalised "exactly like" production: it derived the bucket
+    key from the reason prefix alone (ignoring the stored `tag` column
+    production prefers) and never applied the ledger quarantine. So the
+    harness that VALIDATES the brain graded its engines on a universe the
+    brain does not have — 366 of 4,288 live rows bucketed differently, 47
+    quarantined rows reached it, and both Funding Farmer arms partitioned
+    at a granularity production never uses. Measured on the live feed the
+    day this was fixed, the harness's headline verdict moves on every
+    metric it prints (v3 half-1 −0.815 -> +0.068, a sign change in one of
+    the two halves the go-live bar reads). See `normalize_paper_row` for
+    the full measurement and for the ONE declared divergence that remains:
+    the public feed's SELECT carries no `venue` column, which is measured
+    inert on this harness's only reachable path.
+    """
+    from bot_pnl_store import normalize_paper_row
     trades = fetch(BASE + "/trades.json?limit=2000")
     for p in fetch(BASE + "/trades.json?limit=5000&source=paper"):
+        # side='skip' rows are the sniper's gate log, not trades. The feed
+        # already drops them server-side; this is the TRANSPORT's own
+        # filter, which the shared owner deliberately does not carry (a
+        # query predicate is not row normalisation — see its docstring).
         if not isinstance(p, dict) or p.get("side") == "skip":
             continue
-        direction, exit_reason = split_reason(p.get("reason"))
-        trades.append({
-            "bot": p.get("bot"), "pair": p.get("pair"),
-            "profit_abs": float(p["pnl_abs"]) if p.get("pnl_abs") is not None else 0.0,
-            "profit_ratio": p.get("pnl_pct"),
-            "enter_tag": direction or None,
-            "exit_reason": exit_reason or "trade",
-            "open_ts": p.get("opened_at"), "close_ts": p.get("closed_at"),
-            "is_open": False,
-        })
+        row = normalize_paper_row(
+            p.get("bot"), p.get("pair"), p.get("pnl_abs"), p.get("pnl_pct"),
+            p.get("opened_at"), p.get("closed_at"), p.get("reason"),
+            extra=p.get("extra"), venue=None,
+            entry_price=p.get("entry_price"), exit_price=p.get("exit_price"),
+            tag=p.get("tag"),
+        )
+        # None means exactly one thing: withheld by the ledger quarantine.
+        if row is not None:
+            trades.append(row)
     out = []
     for t in trades:
         if not isinstance(t, dict) or t.get("is_open"):

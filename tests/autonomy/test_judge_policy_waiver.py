@@ -265,22 +265,40 @@ def test_the_sort_key_reads_the_key_the_publisher_actually_emits():
     assert ej._close_rank({"bot": "x", "extra": {}}) == (False, 0.0)
 
 
+# The publisher function that OWNS the ledger row's key set. [2026-09-07 (yi)]
+# It used to be `fetch_paper_trades`, which built the literal inline; the
+# normalisation is now shared with `brain_replay` (which carried a partial
+# copy of it), so the literal lives in the extracted owner. The name is a
+# constant here because this extractor going EMPTY is the failure mode the
+# positive control below exists to catch — and it did catch exactly this move.
+_PUBLISHER_FN = "normalize_paper_row"
+
+
 def _publisher_row_keys():
-    """The key set `bot_pnl_store.fetch_paper_trades` really constructs, read
-    off its own `out.append({...})` literal. Derived from the publisher rather
-    than restated here, because a retyped key set is a second copy of the
-    contract and drifts exactly like the one that caused (uy)."""
+    """The key set `bot_pnl_store` really constructs for a ledger row, read off
+    the owner's own dict literal. Derived from the publisher rather than
+    restated here, because a retyped key set is a second copy of the contract
+    and drifts exactly like the one that caused (uy).
+
+    Reads BOTH literal shapes — a `return {...}` (the owner) and an
+    `out.append({...})` (the old inline form) — so re-inlining the body cannot
+    silently empty this set either."""
     import bot_pnl_store
     tree = ast.parse(open(bot_pnl_store.__file__).read())
     fn = next(n for n in ast.walk(tree)
               if isinstance(n, ast.FunctionDef)
-              and n.name == "fetch_paper_trades")
+              and n.name == _PUBLISHER_FN)
     keys = set()
     for n in ast.walk(fn):
+        lit = None
         if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
                 and n.func.attr == "append" and n.args
                 and isinstance(n.args[0], ast.Dict)):
-            keys |= {k.value for k in n.args[0].keys
+            lit = n.args[0]
+        elif isinstance(n, ast.Return) and isinstance(n.value, ast.Dict):
+            lit = n.value
+        if lit is not None:
+            keys |= {k.value for k in lit.keys
                      if isinstance(k, ast.Constant) and isinstance(k.value, str)}
     return keys
 
@@ -370,7 +388,7 @@ def test_every_ledger_key_the_census_reads_is_one_the_publisher_emits():
     # an empty `emitted` would make every subset check below vacuously true
     assert {"bot", "close_ts", "extra"} <= emitted, sorted(emitted)
     assert "closed_at" not in emitted, (
-        "fetch_paper_trades now emits closed_at — the (uy) premise changed, "
+        f"{_PUBLISHER_FN} now emits closed_at — the (uy) premise changed, "
         "re-read _close_rank before relaxing this")
 
     for fn_name, rowvar in LEDGER_ROW_READERS:

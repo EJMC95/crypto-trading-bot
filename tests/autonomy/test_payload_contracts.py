@@ -879,11 +879,20 @@ class TestLedgerQuarantine:
             assert len(why) > 30, f"{pair}: a quarantine needs a real reason"
 
     def test_the_reader_actually_applies_it(self):
+        """[2026-09-07 (yi)] Re-aimed, not relaxed. The quarantine used to be
+        applied inline in `fetch_paper_trades`; it now lives in
+        `normalize_paper_row`, the ONE owner that function and
+        `brain_replay.load_trades` both call — which is the whole point of
+        extracting it, since the harness's own copy had never applied it at
+        all. Both halves are still asserted, each where it now lives: the
+        FILTER in the owner, and the COUNT in the fetch that reports it."""
         import pathlib as _p
         src = (_p.Path(__file__).resolve().parents[2] / "bot_pnl_store.py").read_text()
-        body = src[src.index("def fetch_paper_trades"):]
-        assert "is_quarantined(" in body, "declared but never applied"
-        assert "_quarantined" in body, "a silent filter hides its own effect"
+        owner = src[src.index("def normalize_paper_row"):
+                    src.index("def fetch_paper_trades")]
+        assert "is_quarantined(" in owner, "declared but never applied"
+        fetch = src[src.index("def fetch_paper_trades"):]
+        assert "_quarantined" in fetch, "a silent filter hides its own effect"
 
     def test_no_caller_passes_bot_and_pair_in_the_wrong_order(self):
         """[(vj)] APPLIED IS NOT ENOUGH — IT MUST BE APPLIED THE RIGHT WAY ROUND.
