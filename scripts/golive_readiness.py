@@ -738,6 +738,114 @@ def published_class_screen(extra):
         return None
 
 
+def published_lens_veto(extra):
+    """A book's OWN currently-vetoed lens set — a tuple, or None.
+
+    [(yn)] THE ONE OWNER of "which of this book's lenses is switched off right
+    now". 🎫 the taker publishes `extra.lens_veto` every loop (its realised
+    veto, I14/I15); this reads that declaration rather than re-deriving it,
+    the same direction `published_class_screen` established — the publisher's
+    verdict is the fact, and a second copy of the veto rule here would be a
+    second rule.
+
+    THREE-VALUED for the same reason: `None` means the book publishes no veto
+    set and must not be read as "nothing is vetoed" (I6). A non-list value, or
+    a list carrying non-strings, is `None` — never a partial guess.
+    """
+    try:
+        e = extra if isinstance(extra, dict) else {}
+        caps = e.get("caps") if isinstance(e.get("caps"), dict) else {}
+        lv = e.get("lens_veto", caps.get("lens_veto"))
+        if not isinstance(lv, (list, tuple)):
+            return None
+        if any(not isinstance(x, str) or not x for x in lv):
+            return None
+        return tuple(sorted(set(lv)))
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def veto_split(rows, vetoed, tag_of=None):
+    """The graded sample split by whether its rows came from a lens the book
+    has since VETOED — REPORTED, never a bar. `class_split`'s sibling.
+
+    [(yn)] WHY THIS EXISTS, and it was found on the fleet's FIRST-EVER `ready`
+    verdict. 🎫 the taker passed all six bars on 6-Sep (n=183, +1.195%/trade,
+    t=2.63). Split by lens, that sample is:
+
+        long-breakoutup   n=138   +1.866%/trade   t=+3.35
+        short-divergence  n= 46   -0.788%/trade   t=-1.31
+
+    and `divergence` is **already vetoed** by the book's own realised-lens rule
+    — it publishes `lens_veto: ["dip", "divergence"]`. So a QUARTER of the
+    graded sample comes from a lens the book will not trade again, and the
+    pooled +1.195% is a mixture of a live component and a dead one. Here that
+    UNDERSTATES the forward book, which is the point: the split is not a
+    warning, it is the number the decision actually needs.
+
+    This is `class_split`'s argument on a different screen — *a number a
+    decision depends on must be READABLE, not recomputable* — and it carries
+    the same three refusals: **it moves no sample, no era and no bar.**
+    `BAR_NAMES` is untouched and `grade()` never sees it. A veto is not a
+    retirement (`drop_retired_sleeves` DROPS; this only reports) precisely
+    because a veto can lift on the lens's own next evidence.
+
+    `tag_of` extracts the entry tag, defaulting to `r[5]` — the grader's row
+    shape, the same element `drop_retired_sleeves` reads. The lens is the part
+    after the side prefix (`long-breakoutup` -> `breakoutup`), parsed the way
+    `bot_pnl_store.split_reason` composes it.
+    """
+    if not vetoed or not rows:
+        return None
+    get = tag_of if tag_of is not None else (
+        lambda r: r[5] if len(r) > 5 else None)
+    vset = {str(v) for v in vetoed}
+
+    def _lens(r):
+        t = get(r)
+        if not isinstance(t, str) or "-" not in t:
+            return None
+        return t.split("-", 1)[1]
+
+    live, dead = [], []
+    try:
+        for r in rows:
+            L = _lens(r)
+            if L is None:
+                return None          # an unreadable tag is not a guess (I6)
+            (dead if L in vset else live).append(r)
+    except Exception:      # noqa: BLE001
+        return None
+
+    def _side(rs):
+        if not rs:
+            return {"n": 0, "net_usd": 0.0}
+        st = stats([(r[0], r[1], r[2]) for r in rs])
+        if st.get("n", 0) < 2:
+            return {"n": st.get("n", 0),
+                    "net_usd": round(sum((r[1] or 0) for r in rs), 2)}
+        return {"n": st["n"], "net_usd": round(st["realised_usd"], 2),
+                "mean_pct": round(100 * st["mean_pct"], 3),
+                "t": round(st["t"], 2)}
+
+    out = {"vetoed": sorted(vset),
+           "still_tradeable": _side(live), "now_vetoed": _side(dead)}
+    if out["now_vetoed"]["n"]:
+        nv, sv = out["now_vetoed"], out["still_tradeable"]
+        out["why"] = (
+            f"{nv['n']} of {len(rows)} graded closes come from "
+            f"{'a lens' if len(vset) == 1 else 'lenses'} this book has since "
+            f"VETOED ({', '.join(sorted(vset))}): {nv['net_usd']:+.2f} of "
+            f"{nv['net_usd'] + sv['net_usd']:+.2f}. On what it can still "
+            f"trade: n={sv['n']}, {sv['net_usd']:+.2f}"
+            + (f", {sv['mean_pct']:+.3f}%/trade, t={sv['t']:+.2f}"
+               if sv.get("mean_pct") is not None else "")
+            + ". The era is deliberately NOT re-cut — a veto is evidence-"
+              "reversible, not a retirement — so this is reported beside the "
+              "pooled grade, never subtracted from it.")
+    return out
+
+
 def class_split(rows, screen, is_crypto=None, pair_of=None):
     """The graded sample split by instrument class — REPORTED, never a bar.
 
@@ -2588,9 +2696,15 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "class_split": ((c.get("class_split") or {})
                             if (c.get("class_split") or {}).get("why")
                             else None),
+            # [(yn)] and the lens-veto split, for the identical reason: this
+            # is the surface an operator acts on.
+            "veto_split": ((c.get("veto_split") or {})
+                           if (c.get("veto_split") or {}).get("why")
+                           else None),
             "why": " · ".join(
                 x for x in (hz.get("why") or "",
-                            (c.get("class_split") or {}).get("why") or "")
+                            (c.get("class_split") or {}).get("why") or "",
+                            (c.get("veto_split") or {}).get("why") or "")
                 if x),
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
@@ -2775,6 +2889,9 @@ def book_payload(s):
     # never a bar, and it moves no sample.
     if isinstance(s.get("class_split"), dict):
         out["class_split"] = s["class_split"]
+    # [(yn)] the LENS veto split, on the same footing and for the same reason.
+    if isinstance(s.get("veto_split"), dict):
+        out["veto_split"] = s["veto_split"]
     return out
 
 
@@ -3749,13 +3866,17 @@ def main():
     # map is deliberately three-valued (see `published_class_screen`), so a
     # book absent from `bot_pnl` reads None and its split is descriptive only,
     # never a finding.
-    _class_screen = {}
+    _class_screen, _lens_veto = {}, {}
     try:
         for _r in (store.fetch_bot_pnl() or []):
             _rs = retired_sleeves(_r.get("extra"))
             if _rs:
                 _sleeve_retired[str(_r.get("bot"))] = _rs
             _class_screen[str(_r.get("bot"))] = published_class_screen(
+                _r.get("extra"))
+            # [(yn)] the book's own live veto set, read from its publish and
+            # never re-derived — see `published_lens_veto`.
+            _lens_veto[str(_r.get("bot"))] = published_lens_veto(
                 _r.get("extra"))
     except Exception as e:      # noqa: BLE001 — a lost filter, never a lost grade
         _sleeve_err = f"{type(e).__name__}: {e}"
@@ -3835,6 +3956,12 @@ def main():
         s["class_split"] = class_split(
             ed.get("scoped_rows") or [], _class_screen.get(bot),
             is_crypto=_is_crypto)
+        # [(yn)] the same footing, the same refusals: reported beside, moves
+        # no sample and no bar. Attached to the ERA-SCOPED rows only, for the
+        # reason the class split is — the all-time sample's whole point is the
+        # pooled reading the era replaced.
+        s["veto_split"] = veto_split(
+            ed.get("scoped_rows") or [], _lens_veto.get(bot))
         if s_all.get("n", 0) < a.min_closes:
             # [2026-08-06 (kv)] BELOW THE FLOOR IS NOT INVISIBLE ANY MORE.
             # `continue` used to be the whole story, and it hid exactly the

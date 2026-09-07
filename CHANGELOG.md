@@ -1,3 +1,99 @@
+## 2026-09-06 (yn) — THE FLEET PASSED THE GO-LIVE GATE FOR THE FIRST TIME, AND A QUARTER OF THE SAMPLE THAT PASSED IT COMES FROM A LENS THE BOOK HAS ALREADY VETOED
+
+**🎫 the Ticket Taker returned `ready: True` — 6 of 6 bars, the first in this
+fleet's history.** In-era n=183, **+1.195%/trade, t=2.63, maxDD 5.4%**, window
+37.1d, era boundary 30-Jul on its own policy stamp. **Go-live is Eamon's
+explicit act and nothing here takes it.** What this entry does is answer the
+question doctrine puts in front of that act, and publish the number the answer
+turns on.
+
+**THE INSTRUMENT REFUSED THREE TIMES BEFORE IT SPOKE, and each refusal was a
+real defect in it.** `scripts/study_taker_ready_2026-09-06.py` reproduces the
+live grade from the public ledger through the grader's OWN owners
+(`era_rows`, `stats`, `is_phantom_close`, `is_quarantined`) and exits 2 unless
+n, mean and t match — the `(gx)` rule that a harness which cannot reproduce
+what DID happen may not say what WOULD have. Run 1: **n=261 from a 17-Jul era**
+because the rows were 4-tuples and `stamped_policy_boundary` reads the row's
+`extra` at **[4]** — a missing tuple element silently widening a book's graded
+sample by 78 closes. Run 2: **mean 0.00833 vs 1.195** — `stats` returns a
+FRACTION and the payload publishes `round(100 * mean, 3)`, a 100× unit error of
+exactly the shape this fleet has paid for once. Run 3: **n=184 vs 183**,
+because `golive-readiness` publishes 6-hourly and the ledger had moved on;
+calibration is now taken as-of the payload's own `updated` stamp. Then: **n=183,
+mean 1.195, t 2.629 against a published 2.63.** Exact.
+
+**1 · THE EDGE IS ONE-SIDED, WHICH IS THE ALTERNATIVE `(hm)` NAMES.**
+
+| | n | mean/trade | t |
+|---|---|---|---|
+| **long** | 138 | **+1.866%** | **+3.35** |
+| **short** | 46 | **−0.788%** | −1.31 |
+
+`(hm)`, 30-Jul: *grade a directional book against a random-entry benchmark,
+never against zero* — on this venue a random short earned +0.2% to +1.1%/trade
+for free. When `(hm)` last ran that null ON THIS BOOK, six runs put P(coin flip
+≥ taker) at **0.55–0.84** — random beat it. That reading is PRE-era and thin,
+so it does not settle today; the side split says the alternative is live rather
+than hypothetical.
+
+**2 · AND THE SIDE SPLIT IS THE LENS SPLIT — the book is not five books, it is
+two.** `breakoutup` is all 138 longs; `divergence` is all 46 shorts.
+**`breakout`, `dip` and `momentum` produced ZERO closes in 38 days** while the
+era's policy stamp declares all five. And **`divergence` is ALREADY VETOED** —
+the row publishes `lens_veto: ["dip", "divergence"]` every loop, its own
+realised-lens rule (I14/I15) working exactly as designed at t=−1.31 against a
+−1.0 bar. **So a quarter of the sample that passed the gate comes from a lens
+the book will not trade again.**
+
+**HERE THAT UNDERSTATES THE BOOK, which is why this is a report and not an
+alarm.** Split on the live ledger: still-tradeable **n=138, +$176.06,
++1.866%/trade, t=+3.35**; now-vetoed **n=46, −$17.35, −0.788%, t=−1.31**.
+
+**3 · WHAT DOES *NOT* OVERTURN THE VERDICT, stated because it looked like it
+might.** Clustering by UTC day gives an equal-weight-per-day t of **+1.31** —
+below the bar — and that estimator is the wrong one here: it discards how many
+closes each day carried. The principled route is the dependence itself, so it
+was measured rather than asserted: **intraclass correlation of same-day closes
+= +0.060**, design effect 1.22, **n_eff ≈ 151 of 184 ⇒ corrected t ≈ 2.41.**
+**Still clears 2.0.** The grader's own cluster read groups closes within 60s —
+built for a basket book closing ten legs at once — and correctly finds no
+batches in a book that holds for hours. Concentration is clean too: top-3 =
+36.2% of realised, and **ex-top-3 still reads +0.863%/trade, t=+2.12** — not
+the `(po)` fat-tail shape.
+
+**SHIPPED: `veto_split`, `class_split`'s sibling — REPORTED, NEVER A BAR.**
+`class_split` ruled that *a number a decision depends on must be READABLE, not
+recomputable*, after two consecutive reviews re-derived the same split by hand.
+This is that rule on the veto screen. `published_lens_veto` reads the book's
+OWN `extra.lens_veto` (three-valued: an unpublished set is `None` and may
+neither manufacture a finding nor erase one, I6); `veto_split` splits the
+era-scoped rows and rides on the book payload AND the docket item, because
+those are read by different people at different times. **The three refusals are
+the safety and each is asserted: it moves no sample, no era and no bar.**
+Unlike `drop_retired_sleeves`, which DROPS, this only reports — a veto lifts on
+the lens's own next evidence, so subtracting here would make the 30-day bar
+depend on a reversible switch.
+
+**WHAT IS NOT ANSWERED, and it is the one that matters.** The `(hm)`
+random-entry null over the full era is **NOT RUN and NOT CLAIMED.** The venue's
+`/api/v1/candlesticks` is **403 from every egress outside the production
+containers** (measured 19-Aug, re-confirmed today) and substituting another
+venue's tape is refused by the venue-purity rule; the fleet's own recorded
+scout tape on `/bus.json` reaches **8.3 of the era's 38 days**. Running it needs
+`DATABASE_URL` (`bot_pnl_store.fetch_state_history`) or a production container.
+**That is the test standing between a book passing six bars and a directional
+edge being established, and this session could not run it — said plainly rather
+than worked around.**
+
+Pinned by `tests/autonomy/test_veto_split.py` (18 tests), **7 of 7 mutations
+verified RED**. One of those mutations killed a test of MINE: the first
+payload assertion grepped `book_payload`'s SOURCE for the string, and wrapping
+the publish in `if False:` sailed straight through it — the `(po)` shape, in a
+test written the same hour as the entry warning about it. It is driven now.
+Main only; the grader is publish-only and in no live image.
+
+**[RENUMBERED (yl) -> (yn) at push.** Another session landed a different (yl) on main while this was being written — the brain-replay harness entry — and a third took (ym). The rule is that the CITED entry keeps the letter and the other moves; theirs was on main and this one was not yet anywhere, so this moves. Recorded inline because `git log` keeps the OLD letter in the commit subject, which is exactly why the changelog headers are the index and the commit log is not. The in-code citations moved with it.**
+
 ## 2026-09-07 (ym) — THE JUDGE'S MUM LANE IS ALIVE — and the serial machine was overwriting the census's own measurements on the one lane it runs
 
 **[RENUMBERED (yk) -> (yl) -> (ym)** — two concurrent sessions took (yk) then (yl) on main while this pass's suite ran. Per the letter rule the CITED entry keeps the letter: the other (yl) (the brain-replay normalisation entry) is cited in `bot_pnl_store.py`, `brain_replay.py` and three tests; this one is cited nowhere, so this one moved.**]**
