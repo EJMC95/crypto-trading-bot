@@ -285,13 +285,19 @@ mutations reddened the guards** across four rounds, including one that INSERTS a
 
 Full working: `STUDY_POSITION_SIZING_2026-09-07.md`.
 
-## 2026-09-07 (yq) — TWO MEASURING INSTRUMENTS WERE WRONG IN THE REASSURING DIRECTION: an asset key that made the fleet look diversified, and a drawdown denominator that made real money look safe
+## 2026-09-07 (yr) — TWO MEASURING INSTRUMENTS WERE WRONG IN THE REASSURING DIRECTION: an asset key that made the fleet look diversified, and a drawdown denominator that made real money look safe
 
-> **[RENUMBERED (yp) -> (yq) at push.]** A concurrent session landed its own
-> (yp) — the position-sizing ladder — on main while this branch was in its
-> mutation rounds. Neither entry is cited from tracked code, so the tie broke on
-> which reached main first; this one moves. The cross-branch arm of
-> `audit_changelog_letters` caught it before the push, which is the arm working.
+> **[RENUMBERED (yp) -> (yq) -> (yr).]** Three concurrent sessions landed
+> entries while this branch was in its mutation rounds: (yp) the position-sizing
+> ladder, then (yq) the shadow fill model. No collision involved an entry cited
+> from tracked code, so each tie broke on which reached main first and this one
+> moved twice. The cross-branch guard caught both — and then a THIRD slipped
+> past it: the final rebase auto-merged cleanly (the two entries sit 287 lines
+> apart, so git saw no conflict), the guard had already passed, and main briefly
+> carried two (yq) headers with this commit's subject reading (yr). Corrected in
+> the next push. **The lesson is the guard's blind spot, recorded rather than
+> patched around: a letter collision is a CONTENT collision, and a clean
+> three-way merge is not evidence of one being absent.**
 
 Eamon: *"Analyse the attached trading results"* → *"Tidy up save and implement
 advancements"*. Nothing was attached, so the analysis ran on the fleet's own
