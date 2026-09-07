@@ -176,6 +176,48 @@ def _ts(s):
         return None
 
 
+def base_symbol(pair):
+    """'ADA/USDC:USDC' -> 'ADA'. The ONE owner of "which asset is this".
+
+    [2026-09-07] THE DEFECT THIS CLOSES, measured on the live ledger. This
+    module keyed every asset on the RAW `pair` string, and this venue's books
+    spell one market three ways — `ADA`, `ADA/USD`, `ADA/USDC`. Across the 14
+    living books that is **194 raw keys for 131 real assets, with 51 assets
+    wearing more than one spelling**.
+
+    Inside ONE book it is harmless: a book uses a single convention, so its own
+    concentration table is byte-identical either way (verified on the taker,
+    ⚖️ Counterweight and 🪁 kelly — 48/53/35 assets unchanged). The damage is
+    entirely CROSS-BOOK, and it runs in the reassuring direction:
+    `coholding()` intersects these strings between books, so a book holding
+    `ADA` and a book holding `ADA/USDC` at the same instant **do not
+    intersect** and the pair reports co-holding of exactly 0.000.
+
+    Measured before this fix: **24 of 88 book pairs read a perfect 0.000**
+    while the truth is up to 0.276, and fleet-wide same-coin book-pair hours
+    read 1,875 against a true 2,526 — a **34.7% understatement** of how much
+    of this fleet is the same bet held twice. A perfect zero on a pair that
+    overlaps a quarter of the time is the string-mismatch signature, not a
+    diversified fleet.
+
+    That matters because I20 and I22 both turn on this number, and an
+    instrument built to detect "one bet held three times" was structurally
+    unable to see it whenever the two books spelled the coin differently.
+
+    `fleet_risk` — the LIVE organ — was already correct: it takes
+    `str(pair).split("/")[0]` at every harvest site, so no actuator ever acted
+    on the understated number. This was an audit-instrument defect only, which
+    is why it is fixed here and nothing downstream of a veto changes.
+
+    Degrades to the input, never to a guess (I8): an unsplittable or empty
+    string returns itself, so an unknown key stays its own bucket rather than
+    silently merging with another asset.
+    """
+    s = str(pair or "").split(":")[0]
+    head = s.split("/")[0]
+    return head or s
+
+
 def side_of(r):
     """'long' | 'short' | None — from the side COLUMN, else the reason prefix.
 
@@ -469,8 +511,8 @@ def concentration(rows):
     by_coin, by_month = defaultdict(float), defaultdict(float)
     n_coin, n_month = defaultdict(int), defaultdict(int)
     for q in rows:
-        by_coin[str(q[6])] += q[1]
-        n_coin[str(q[6])] += 1
+        by_coin[base_symbol(q[6])] += q[1]
+        n_coin[base_symbol(q[6])] += 1
         m = q[2].strftime("%Y-%m")
         by_month[m] += q[1]
         n_month[m] += 1
@@ -657,7 +699,10 @@ def coholding(shaped, bots, step_s=3600):
             o = _ts(q[3])
             if o is None:
                 continue
-            iv.append((o, q[2], str(q[6]), side_of(q[7])))
+            # base_symbol, NOT the raw pair: this set is INTERSECTED across
+            # books below, and two books spelling one coin differently never
+            # intersect. That was 24 of 88 pairs reading a false 0.000.
+            iv.append((o, q[2], base_symbol(q[6]), side_of(q[7])))
             lo = o if lo is None or o < lo else lo
             hi = q[2] if hi is None or q[2] > hi else hi
         holds[b] = iv
@@ -1004,7 +1049,7 @@ def breakdowns(rows, stress_series=None, stress_hi_bps=15.0):
         by["side"][side_of(r) or "?"].append(q)
         by["setup"][setup_of(r) or "(none)"].append(q)
         by["exit"][exit_of(r)].append(q)
-        by["coin"][str(q[6])].append(q)
+        by["coin"][base_symbol(q[6])].append(q)
         if o is not None:
             by["weekday"][o.strftime("%a")].append(q)
             hb = f"{(o.hour // 6) * 6:02d}-{(o.hour // 6) * 6 + 6:02d}Z"

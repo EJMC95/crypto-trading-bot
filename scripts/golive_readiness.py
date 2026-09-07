@@ -1688,11 +1688,38 @@ def mtm_drawdown(samples, book_usd=None):
         peak = max(peak, eq)
         dd = min(dd, eq - peak)
     days = (pts[-1][0] - pts[0][0]).total_seconds() / 86400.0
+    peak_eq = max(e for _, e in pts)
     return {"n": len(pts), "days": days,
             "max_dd_usd": dd,
             "max_dd_frac": abs(dd) / book_usd if book_usd else None,
+            # [2026-09-07] THE PEAK-RELATIVE FRACTION — the textbook drawdown,
+            # and on a LIVE book the only honest one. REPORTED, NEVER A BAR:
+            # `grade()` is byte-unchanged and `max_dd_frac` above still decides,
+            # exactly as (kw) added `cluster` beside `t` without moving it.
+            # Making it blocking is a gate re-spec and therefore an operator act.
+            #
+            # WHY IT IS NEEDED. `book_usd` is BOOK_USD ($1,000) for every row,
+            # which is right for a $1,000 paper book and wrong for a live one
+            # holding real money BELOW that. Measured on the live payload the
+            # day this shipped, published vs peak-relative:
+            #   🙏 avo LIVE   peak $416.79   5.57% -> 13.36%  (2.40x)
+            #   👩 mum LIVE   peak $581.96   6.43% -> 11.05%  (1.72x)
+            # Both real-money books were reported at less than half their true
+            # peak-to-trough hole, against a 15% bar. The 12 shadow books move
+            # by 0.85-1.01x, i.e. not at all.
+            #
+            # NOT UNIFORMLY STRICTER, stated rather than buried: a book whose
+            # equity peaked ABOVE $1,000 reads LOWER here — 🪁 kelly 28.51% ->
+            # 26.02% — because the denominator grew. It is a different, better
+            # question, not a tightening.
+            #
+            # Self-derived: needs no feed, no starting-equity lookup and no
+            # second copy of "what is this book's capital" — the series it was
+            # handed already contains its own peak. None when that peak is
+            # non-positive, never 0.0 (I8: unknown degrades to unknown).
+            "max_dd_frac_peak": (abs(dd) / peak_eq) if peak_eq > 0 else None,
             "first_equity": pts[0][1], "last_equity": pts[-1][1],
-            "peak_equity": max(e for _, e in pts)}
+            "peak_equity": peak_eq}
 
 
 def equity_series(bot, store=None, limit=20000):
@@ -2804,6 +2831,10 @@ def book_payload(s):
                                        if _m.get("days") is not None else None),
             "max_dd_pct": (round(100 * _m["max_dd_frac"], 2)
                            if _m.get("max_dd_frac") is not None else None),
+            # Beside it, never instead of it — see `mtm_drawdown`.
+            "max_dd_pct_peak": (round(100 * _m["max_dd_frac_peak"], 2)
+                                if _m.get("max_dd_frac_peak") is not None
+                                else None),
             "last_equity": _m.get("last_equity"),
             "peak_equity": _m.get("peak_equity")}
     if s.get("max_dd_frac_realised") is not None:

@@ -285,6 +285,82 @@ mutations reddened the guards** across four rounds, including one that INSERTS a
 
 Full working: `STUDY_POSITION_SIZING_2026-09-07.md`.
 
+## 2026-09-07 (yq) — TWO MEASURING INSTRUMENTS WERE WRONG IN THE REASSURING DIRECTION: an asset key that made the fleet look diversified, and a drawdown denominator that made real money look safe
+
+> **[RENUMBERED (yp) -> (yq) at push.]** A concurrent session landed its own
+> (yp) — the position-sizing ladder — on main while this branch was in its
+> mutation rounds. Neither entry is cited from tracked code, so the tie broke on
+> which reached main first; this one moves. The cross-branch arm of
+> `audit_changelog_letters` caught it before the push, which is the arm working.
+
+Eamon: *"Analyse the attached trading results"* → *"Tidy up save and implement
+advancements"*. Nothing was attached, so the analysis ran on the fleet's own
+live record (published as the artifact **Three Trades Wide**). A multi-agent
+verification pass over that analysis found defects in MY report — and two of
+them turned out to live in the fleet's own shipped instruments, not in the
+report. Both err toward reassurance, which is why they are worth a commit.
+
+**1. `edge_audit` KEYED EVERY ASSET ON THE RAW `pair` STRING.** This venue
+spells one market three ways — `ADA`, `ADA/USD`, `ADA/USDC`. Measured across
+the 14 living books: **194 raw keys for 131 real assets, 51 assets wearing more
+than one spelling.**
+
+Inside ONE book that is harmless — a book uses a single convention, so its own
+concentration table is byte-identical either way (verified unchanged on the
+taker, ⚖️ Counterweight and 🪁 kelly: 48/53/35 assets). **The damage is entirely
+CROSS-BOOK, and it is exactly the measurement I20 and I22 turn on.**
+`coholding()` INTERSECTS those strings between books, so a book holding `ADA`
+and a book holding `ADA/USDC` at the same instant do not intersect at all:
+
+* **24 of 88 book pairs reported a perfect `0.000`** while the truth runs to
+  **0.276** — the taker/Counterweight pair read "never the same coin" against a
+  real 27.6% of shared hours;
+* fleet-wide same-coin book-pair hours **1,875 → 2,526, a 34.7% understatement**;
+* the "only one book in the market" hour bucket **537 → 412**.
+
+A perfect zero on a pair that overlaps a quarter of the time is a string
+mismatch, not a diversified fleet. `base_symbol()` is now the one owner
+(concentration · coholding · the breakdown coin slice); unknown degrades to the
+input, never to a guess (I8). **`fleet_risk` — the LIVE organ — was already
+correct** (`str(pair).split("/")[0]` at every harvest site), so no veto ever
+acted on the understated number and nothing downstream of an actuator changes.
+This was an audit-instrument defect only, and saying so is the point: the
+detector built to find "one bet held three times" was structurally unable to
+see it whenever two books spelled the coin differently.
+
+**2. THE 15% DRAWDOWN BAR DIVIDES EVERY BOOK BY $1,000, INCLUDING LIVE BOOKS
+HOLDING LESS THAN THAT.** `mtm_drawdown` and `stats` both default to
+`BOOK_USD`. Right for a $1,000 paper book; wrong for real money below it.
+Measured on the live payload, published vs peak-relative:
+
+| book | peak equity | published | peak-relative | ratio |
+|---|---:|---:|---:|---:|
+| 🙏 avo LIVE | $416.79 | 5.57% | **13.36%** | 2.40× |
+| 👩 mum LIVE | $581.96 | 6.43% | **11.05%** | 1.72× |
+| 12 shadow books | ~$1,000 | — | — | 0.85–1.01× |
+
+Both real-money books were reported at **less than half** their true
+peak-to-trough hole, against a 15% bar. `max_dd_frac_peak` is now computed and
+published beside `max_dd_pct` — **self-derived**, because the series
+`mtm_drawdown` is already handed contains its own peak, so it needs no feed, no
+starting-equity lookup and no second copy of "what is this book's capital".
+
+**REPORTED, NEVER A BAR.** `grade()` is byte-unchanged and `apply_mtm` still
+decides on `max_dd_frac`; both are pinned by tests that redden if a future edit
+makes the peak fraction blocking. That is this file's own `cluster`-beside-`t`
+precedent — **making it blocking is a gate re-spec, and that is Eamon's call,
+not a session's.** The numbers above are what he would be deciding on.
+
+**AND IT IS NOT UNIFORMLY STRICTER, stated rather than buried:** 🪁 kelly's
+equity peaked ABOVE $1,000, so she reads **28.51% → 26.02%** — lower. It is a
+different and better question, not a tightening.
+
+**Pinned by `tests/autonomy/test_asset_key_and_peak_drawdown.py`** (23 tests).
+**10 mutations, 10 killed** — including one round that found a real hole: the
+`:` split in `base_symbol` survived its first mutation because every test case
+had a `/` before the colon, so the branch was never exercised. A case was added
+rather than the branch removed.
+
 ## 2026-09-07 (yo) — SIX PRE-REGISTERED READS SAY "THE DATE IS THE BACKSTOP, NOT THE TRIGGER" AND NOTHING WAS MEASURING THE TRIGGER: 🪁 kelly's had been due for three and a half weeks, and its verdict is the branch that returns to Eamon
 
 > **[RENUMBERED (ym) -> (yn) -> (yo) at push.]** Two concurrent sessions took (ym)
