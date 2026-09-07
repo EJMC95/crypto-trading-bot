@@ -1,3 +1,400 @@
+## 2026-09-07 (zd) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
+
+**[RENUMBERED (yw) -> (zd) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
+
+**Eamon: *"Yes, if it's a step closer to making more profit"*.** The condition
+is the entry. The per-close REGIME stamp `(za)` ranked second does **NOT** clear
+it, and this does — the reasoning is recorded here rather than the work being
+done on momentum.
+
+**WHY THE REGIME STAMP WAS REFUSED (a refusal with evidence, `(vc)`'s
+first-class output):** it is telemetry, so it moves no trade and earns nothing
+directly. Its only route to profit is a regime GATE — and (a) the fleet already
+has a PRE-REGISTERED instrument for exactly that
+(`study_regime_short_veto_2026-09-02.py`, registered 2-Sep, read due 16-Sep),
+whose binding constraint is fresh SAMPLE and not stamping; and (b) `(za)`'s own
+measurement is evidence AGAINST a detectable effect at reachable n — 👩 mum's
+LIVE and SHADOW arms, running the SAME POLICY, **disagree on the SIGN** of the
+regime split over ~60 closes each (live +0.842% BTC-up vs +0.105% BTC-down;
+shadow +0.336% vs +0.616%). Stamping would make a 16-Sep read marginally
+richer. It would not make a dollar, and it is not the next best use of a pass.
+
+**WHAT DOES CLEAR THE BAR: THE SIZING TABLE `(za)` PUBLISHED IS WRONG IN THE
+DIRECTION THAT LOSES MONEY**, and it sits directly in front of the only
+real-money sizing decision the fleet has open. Sizing is the most direct profit
+lever there is; a sizing model that flatters is worse than none.
+
+**MEASURED, from the ledger's own open/close stamps (`concurrency`):**
+
+| book | mean open | p90 | peak | cap | legs opened while others held |
+|---|---|---|---|---|---|
+| 🎫 taker | **4.92** | 7 | 8 | 8 | **97%** |
+| 👩 mum LIVE | **6.92** | 11 | 13 | 12 | **91%** |
+| ⚖️ Counterweight | **13.43** | 21 | 27 | 10 | **99%** |
+| 🪁 kelly | 2.32 | 3 | 8 | 4 | 77% |
+| 🔮 georgia | 2.21 | 4 | 5 | 5 | 62% |
+
+`(za)`'s table compounded legs SEQUENTIALLY and declared that a lower bound.
+It is not a small correction: these books essentially **never hold one position
+alone**, so the sequential model priced a book that does not exist.
+
+**THE NUMBER THAT MATTERS IS GROSS, AND IT IS NOW ON THE TABLE.** At the
+SHIPPED clip: 🎫 taker `f=5.2% x 5 = **26%** of equity`; ⚖️ Counterweight
+`1.8% x 13 = **24%**`; and **👩 mum's LIVE arm `25.3% x 7 = 177%`**. That last
+one is a real-money book running ~1.8x its equity on average, and it
+corroborates the carried `mum-live-rho-read-preregistered` row from a
+completely independent direction — that row reaches the same place via
+`all_slots_stop_pct` 0.20 against a 0.15 bar. Two instruments, one conclusion,
+neither acted on: the read is pre-registered and its date has not come (I25).
+
+**THREE DEFECTS IN MY OWN MODEL, FOUND IN SEQUENCE, EACH BY CHECKING THE LAST
+FIX** — recorded because the pattern is the point:
+1. **Legs applied sequentially.** Fixed with `k_joint`: draw the measured
+   concurrency and apply the SUMMED return as ONE equity step.
+2. **Applied jointly, still drawn INDEPENDENTLY.** Concurrent legs here share a
+   lens, a side and a market move; independent draws cancel and the joint tail
+   comes out far too thin. Fixed with `block=`: a CONTIGUOUS slice of the
+   book's own open-ordered timeline, so the legs carry the co-movement they
+   actually had.
+3. **A UNIT MIX-UP IN THE DENOMINATOR.** `steps = n_draw // kj` counted
+   close-BATCHES while the block draw counted LEGS, so ⚖️ Counterweight ran
+   **3 rounds instead of 12** and the "corrected" model reported LESS ruin than
+   the sequential one it was correcting (P(-50%) 2.6% vs 49.5% at f=25%). Now
+   `len(blk) // kj`, and the two models agree at 47.1% vs 49.5% — which is the
+   sanity check that says the correction is a correction and not a new error.
+
+**WHAT THE FIXED TABLE ACTUALLY SAYS ABOUT 🎫 THE TAKER, stated plainly because
+it is the tempting reading:** its E[log] still rises to f=40% / **200% gross**
+with P(-50%) = 0.0%, i.e. the model still says *size up*. That is what the model
+says; it is not a recommendation. The sample is 37.6 days in ONE regime, its
+own random-entry null is NOT cleared (P=0.145), and its test slice is 4x its
+train slice. A sizing model cannot see any of those, which is precisely why
+`(za)`'s conclusion — no parameter change — is unchanged by this entry.
+
+**MOVES NOTHING.** An instrument-only change: no lever, no bot, no gate, no
+publish. `--selftest` green (the moves-nothing AST proof included),
+`tests/test_selftests.py` green.
+
+## 2026-09-07 (zc) — THE FLEET'S ONLY ANSWER TO ITS OWN NULL WAS INSTALLED ON ONE BOOK OF FOURTEEN: the control arm is per-BOOK now, and two more books have one
+
+**[RENUMBERED (yv) -> (zc) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
+
+**Eamon: *"Where can we improve on from here"* -> *"Yes"*.** The second half of
+`(zb)`, and the improvement `(za)` ranked first.
+
+**THE GAP.** `(za)` measured that **NOT ONE of fourteen books clears a
+random-entry null** (best P=0.072; 🎫 the READY taker P=0.145) — and the
+fleet's own proper instrument for that question, a PAIRED matched-window
+placebo, was installed on **exactly one book**. `(hm)` has required this since
+30-Jul (*"grade a directional book against a random-entry benchmark, never
+against zero"*) and `(ro)` built the machinery; it was never generalised, so
+the audit had to substitute a null built from a sparse price tape that could
+only randomise the COIN and not the TIMING.
+
+**WHY IT COULD NOT SIMPLY BE SWITCHED ON, and this is the whole change.**
+`control_arm` was a CLASS attribute on `OversoldRebound`, and **the carriers
+are SHARED**: `DayTraderGated` carries 🔮 georgia AND retired
+`crypto-intraday-15m`; `SwingDip` carries 🙏 avo — **which has a LIVE
+real-money arm** — AND retired `crypto-swing-daily`; `MomoBreakout` carries
+retired dad AND retired breakout-4h. Setting the class flag would have swept
+in three retired rows and one real-money book. `STRATEGIES` holds one INSTANCE
+per book, so the honest granularity is an instance attribute: the class default
+is now `False` on `Carrier`, the constructor takes `control_arm=None`
+(inherit) and mum's class attribute is **untouched** — she is the one book with
+a proven arm and this pass must not perturb her.
+
+**TURNED ON: 🔮 georgia and 🔮 georgia-v3. BOTH SHADOW-ONLY.**
+* **georgia** is the largest sample in the fleet (**n=268**) and the grader
+  calls her `undecidable` at **mean +0.068%/trade, t=0.52** — precisely the
+  reading a null can settle: is that ~zero DIFFERENT from drawing a coin at
+  random?
+* **georgia-v3** is the newest book (era 28-Aug), so her null covers nearly her
+  whole record rather than being bolted onto a ledger it cannot reach.
+
+**THE WIRING ALREADY EXISTED** — `control_draw` and `control_settle` are called
+UNCONDITIONALLY at both hosts' open/close sites and return `{}` for a book that
+does not declare the arm, so this pass adds no call, no branch and no code path.
+Only the flag moved.
+
+**TWO HAZARDS CHECKED RATHER THAN ASSUMED, because this touches carriers that
+also run real money:**
+1. **THE RNG STREAM.** `control_draw` calls `random.choice`, so if any trade
+   decision shared the module RNG, enabling the arm would shift the stream and
+   CHANGE TRADES. Measured: that call is the **only** `random.` use in
+   `lighter_family_bot`, and there is **none at all** in
+   `lighter_avo_live_bot`. No trade can move.
+2. **THE MARK READ.** The SHADOW host prices the placebo from
+   `b.last_mark.get` — marks already fetched this cycle, **zero extra venue
+   calls**. The LIVE host uses `marks.fresh_mid`, **one venue read per open**.
+   Both books turned on here are shadow-only (`fleet_books.DECLARED_LIVE` is
+   avo + mum, verified not assumed), so this pass costs nothing. **DECLARED
+   because it is latent rather than absent:** if georgia is ever re-activated
+   live, the flag stops being free and that cost must be priced first.
+
+**🙏 AVO IS DEFERRED, DELIBERATELY.** She is the book this would most inform —
+n=29 at +1.793%/trade, t=2.46, `on_track`, heading for the gate — and she is
+the one whose carrier is shared with a live arm and whose host pays the venue
+read. That is a different risk class from the two shadow books here, so it gets
+its own pass after these are verified in the live payload (rule 1: ship narrow,
+verify, then widen). Pinned by a test that a future pass has to come and edit.
+
+**THE ERA DOES NOT MOVE.** `stamp_state` keys on `extra["policy"]` alone, so
+adding `control_leg` to a close's extra cannot shift a policy boundary —
+verified in the owner, not inferred. No book's graded sample changes.
+
+**A PIN WAS RE-AIMED AND SAID SO** (`(vd)`): `test_other_family_books_do_not_
+grow_a_control_block` asserted *only mum* has an arm. That was correct when
+written and became the thing holding a measurement down — a snapshot, not a
+property. It is now `test_only_declared_books_grow_a_control_block` against a
+declared roster, joined by two tests that pin the PROPERTIES the old one only
+implied: a shared carrier cannot sweep its siblings in, and no live arm gains
+an arm silently. A second pin in `test_variant_host` used georgia as its
+example of a book WITHOUT an arm; re-aimed to avo, who still satisfies its
+premise and is the better example anyway (she is the live book on the shared
+carrier).
+
+**FOUR MUTATIONS VERIFIED RED:** the flag at class level on `DayTraderGated`
+(sweeps in retired intraday-15m); at class level on `Carrier` (sweeps in
+**avo's live arm**); a constructor that silently ignores the per-book kwarg;
+and mum losing her arm.
+
+**TELEMETRY ONLY — no trade, gate, entry, exit or size moves** (hazard 1 above
+is the proof, not the claim), so **main only** per `(mm)`. Forward-only: closes
+already in the ledger have no control leg and never will. Full suite green;
+`audit_image_imports`, `audit_undefined_names`, `audit_venue_purity`,
+`audit_doctrine_enforcement`, `audit_live_roster` all pass.
+
+## 2026-09-07 (zb) — THE CONTROL ARM COMPUTED ITS ANSWER AND THREW IT AWAY: the placebo pair settled 21 lines before the publish and never reached a single close
+
+**[RENUMBERED (yu) -> (zb) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
+
+**Follow-up to `(za)`'s audit, and the first of the two improvements it
+ranked.** Eamon: *"List improvements"* -> *"Please proceed"*.
+
+**THE DEFECT, AND IT IS THE `(gr)` SHAPE ONE INSTRUMENT OVER.** 👩 mum v2 is the
+only book in the fleet carrying its own random-entry control arm — `(ro)` built
+it precisely so `(hm)`'s *"grade a directional book against a random null, never
+against zero"* could be answered **from her own payload rather than in a study
+nobody runs**. `control_settle` computes, per trade, the real leg's return AND
+the matched placebo's return, folds both into running sums, and **returns
+nothing**. The publish site is **21 lines below it in the same function**. So
+the pair existed for one loop iteration and was discarded.
+
+**MEASURED across all 4,311 ledger rows on 7-Sep: ZERO closes carry a control
+observation.** The summary row carries only a lifetime aggregate.
+
+**WHAT THE AGGREGATE CANNOT DO**, which is the whole cost:
+* **a PAIRED statistic** — the difference of two running sums has no standard
+  error, so the published `edge_pct` is a number that can be QUOTED and never
+  TESTED. It is the headline on the fleet's only control arm.
+* **ERA SCOPING** — the sum pools across every policy change, exactly what
+  `POLICY_ERA` exists to prevent. `control_settle`'s own `(rp)` docstring
+  already worries about this contamination ("the exact contamination
+  POLICY_ERA exists to prevent, one instrument over") and then accumulates
+  across it anyway.
+* any split by tag, side, exit reason or regime; any cluster-robust treatment
+  of legs that close together.
+
+The `(za)` audit had to build a whole separate null from a sparse price tape
+**because the book's own better answer was not on the row** — and that
+substitute could only randomise the COIN, not the TIMING, which is the exact
+limitation `(za)` had to declare on 🎫 the taker.
+
+**THE FIX IS THAT `control_settle` NOW RETURNS WHAT IT ALREADY COMPUTED**, and
+`control_leg` formats it onto the close. Both hosts stamp it, sharing the
+formatter **by identity** with `control_draw`/`control_settle`/`control_block`
+— the `(th)` rule, so the two arms cannot format the judged statistic
+differently. **The accumulation is byte-unchanged**, so the published `control`
+block and every existing caller behave exactly as before.
+
+**THE REAL LEG IS DELIBERATELY NOT REPEATED ON THE ROW.** When the pair
+settles, the close's own `pnl_pct` IS `total / notional` — the identical
+expression the accumulator uses — so the row already carries it and a second
+copy could only ever drift. Pinned.
+
+**AN ABSENCE STAYS AN ABSENCE** (`(rp)`/`(yq)`): an unpriceable placebo
+publishes NOTHING, never a `null_ret` of 0.0. A zero is a MEASUREMENT ("the
+placebo went nowhere") and an unpriceable draw is an ABSENCE, and collapsing
+them would feed fabricated observations into the very null that decides whether
+this book has an edge. A genuine zero IS published.
+
+**SIX MUTATIONS VERIFIED RED:** the settle discarding the observation again
+(the original defect); an unpriceable placebo becoming a fabricated zero; a
+non-finite `null_ret` reaching the row (I5); the accumulator drifting; a book
+with no control arm growing the leg; and the live host formatting its own leg
+instead of importing the owner.
+
+**TELEMETRY ONLY — NO TRADE, GATE, ENTRY, EXIT OR SIZE MOVES**, so under the
+`(mm)` rule this goes to **main only** and rides the next deploy that earns
+one. Forward-only: the existing closes have no control leg and never will.
+Blast radius is one field on one book's closes (only a carrier that DECLARES
+`control_arm` settles a pair), pinned by the same test that pins the summary
+block's scope.
+
+**WHAT IS NOT IN THIS ENTRY, AND WHY.** `(za)` ranked a second improvement
+beside this one: per-close REGIME stamps (`extra.btc_regime_up` rides the
+SUMMARY row and never the trade, coverage **0%** across all 14 books, so regime
+attribution is impossible from the ledger). It is the same shape — grading
+context computed and not stamped — but the regime lives in the LOOP while the
+close lives in a method, so it needs an entry-site stamp threaded through `m`
+like `rsi_entry`, at two sites per host. That is a second change with its own
+surface on a real-money carrier, and this file's own rule 1 — **ship narrow,
+verify in the live payload, then widen** — cost six follow-up entries the last
+time it was ignored. It is the next pass, not this one.
+
+## 2026-09-07 (za) — THE GATE GRADES ONE PATH, AND TWO OF ITS NUMBERS WERE DECIDED BY ROW ORDER: a Monte Carlo risk audit, a benchmark shootout, and the two smallest fixes it justifies
+
+**[RENUMBERED (yt) -> (za) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
+
+**Eamon: *"Run Monte Carlo simulations using the bot's historical trade
+outcomes... Explain whether the bot adds genuine value."*** Sibling of `(ys)`
+/ PR #290 the same day — that pass built the BASELINE, this one resamples it.
+
+**THE INSTRUMENT REFUSES BEFORE IT SPEAKS.** `scripts/study_montecarlo_risk_2026-09-07.py`
+recomputes every book's grade from the raw ledger and compares it to the LIVE
+`golive-readiness` payload field by field; beyond tolerance it exits 2 and
+prints nothing — `(gx)`'s rule applied to itself. It PASSED 14 of 14 books,
+with two declared exemptions (below). It moves nothing, asserted by an AST
+walk of its own call sites rather than a substring scan ((po): a page-wide
+substring scan is not a structural claim).
+
+**IT FOUND TWO DEFECTS IN ITSELF FIRST, AND THAT IS THE ARGUMENT FOR THE GATE.**
+(1) It passed `era_rows` 4-TUPLES, so every close's `extra.policy` stamp — which
+rides at index [4] — was invisible, every book fell back to its DECLARED era,
+and 🎫 the taker graded **262 closes against the live 184**: a 42% wider sample,
+in the flattering direction, on the one book the fleet has ever called READY.
+(2) Its ruin curve scaled by `f / clip_frac`, which at the shipped size
+collapses to 1.0 and compounds RAW per-trade returns as if every trade risked
+the whole account — a median **6.51x** on a book whose record is **+15.9%**, and
+**P(-50%) = 96.4%** on ⚖️ Counterweight, which is down 3.5%. Neither was caught
+by the grade-reproduction gate, because that gate reads the LEDGER and not the
+SIMULATOR; `calibrate_ruin` is the second gate that does, and it is why the
+sizing numbers below can be trusted. Both pinned by mutation.
+
+**RESAMPLE DECISIONS, NOT LEGS.** This fleet closes baskets in one instant, so
+drawing legs i.i.d. treats one decision as ten and shrinks every tail. The
+batching rule is `CLUSTER_WINDOW_S`, imported rather than re-chosen. Measured,
+p95 drawdown decision-wise vs leg-wise: 👩 mum LIVE **10.79% vs 6.79% (1.59x)**,
+🙏 avo LIVE 4.44% vs 2.95% (1.51x), ⚖️ Counterweight 9.45% vs 7.15% (1.32x),
+🪁 kelly 46.00% vs 40.14% (1.15x), 🎫 taker 3.06% vs 3.04% (1.01x). The
+correction is largest on the two REAL-MONEY arms and the basket book, and
+vanishes on the one that closes its legs singly.
+
+**THE RISK FINDINGS.** The realised path flatters: 👩 mum's LIVE arm reads
+**7.08%** maxDD against the 15% bar and her resampled **p99 is 14.39%**;
+🪁 kelly's **P(maxDD > bar) is 81.9%**. Losing streaks run LONGER than chance on
+four books (mum live 7 observed vs a p95 of 5; 🌾 carry 7 vs 6) — losses cluster,
+which is the honest argument for a reserve above the observed drawdown.
+🌾 carry's edge sits INSIDE the execution-cost band: P(ending below start) goes
+**13.7% -> 52.9%** at the measured p90 slippage, corroborating `(ys)`'s finding
+that the fleet's own 17.49bps flips it negative.
+
+**DOES THE BOT ADD GENUINE VALUE? PARTLY, AND LESS THAN THE GRADE SUGGESTS.**
+Over the only window with regular bars for every arm (8.3d, 196 coins, the same
+measured 10.2bps round trip charged to the books as to the benchmarks):
+🎫 taker **+11.54%** · **buy & hold +7.82%** · 👩 mum LIVE +5.46% ·
+**volatility-only +3.08%** · 🌾 carry +2.79% · **cash 0.00%** ·
+**SMA 12/48 -4.39%** (60 flips of churn) · 🪁 kelly -11.14%. **Exactly ONE book
+beat passive holding, and it is the READY one.** But against a random-entry null
+— hold a random OTHER coin over the same windows, same side, same cost —
+**NOT ONE of the fourteen books clears p <= 0.05**: best is 🏛️ turnbull at
+**P=0.072**, then 🎫 the taker at **P=0.145**. DECLARED LIMIT, because it changes
+what the number means: that null randomises the COIN and not the TIMING, so it
+cannot refute an edge that lives in when the book is in the market — which is
+precisely the taker's thesis. Closing it needs bar data this egress cannot reach
+(`/api/v1/candlesticks` is 403 outside the container); recommended as a
+pre-registered follow-up, not asserted.
+
+**TWO CHANGES, BOTH MOVING ZERO VERDICTS** (measured: 0 of 14 books change any
+of the six bars; the READY set is identical):
+
+1. **A DETERMINISTIC TOTAL ORDER OVER ONE BOOK'S CLOSES.** `sorted(key=_key)` is
+   STABLE, so legs sharing a close stamp kept whatever order Postgres returned —
+   and `halves` splits at `mid = n // 2`. **Re-running the grader over an
+   UNCHANGED ledger could publish a different h1/h2**, which is not a property a
+   bar governing real money may have. 🙏 avo's LIVE arm sits on such a tie (five
+   legs closing on one daily-loss flatten instant, 2026-08-28T16:22:46.174888);
+   permuting only that batch moves h1 across **[+$7.27, +$17.36]** — the live
+   payload reads $17.36 and an independent recomputation from the same rows read
+   $9.67. Every ordering leaves both halves positive, so **no verdict moves**.
+   What makes it worth fixing is the neighbour: **👩 mum's LIVE arm passes this
+   same bar on h2 = -$0.02.** `stats` now also publishes `shape.halves_tie` so a
+   reader knows when the bar sat on an ordering rather than on the book.
+2. **`resampled_dd` — THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.** The
+   gate grades a 15% bar over the ONE ordering a book happened to walk and cannot
+   tell a safe book from a benign sequence. REPORTED, NEVER A BAR: `BAR_NAMES`
+   and `grade()` are byte-unchanged and a selftest asserts `dd_resampled` is not
+   in `bar_map`. Deterministic (fixed seed — a diagnostic that shimmers is one an
+   operator learns to ignore, (gl)), fail-SILENT (absent, never zero-filled: a
+   missing risk number that reads as a low one is worse than none).
+
+**EIGHT MUTATIONS VERIFIED RED** (I3), and the eighth is the point: the first
+round pinned seven and left the DENOMINATOR unpinned, so `worst / max(peak,
+book_usd)` — the `(yr)` "drawdown denominator that halved real money's hole"
+defect, in the new code — survived. It is now pinned by PROPORTIONALITY (same
+seed, same units, so the reported fraction must scale exactly with 1/book_usd).
+The others: drawdown-from-zero instead of from-peak (which ALSO survived its
+first two tests, because on an all-losing path the peak IS zero); leg-wise
+batching; a non-deterministic seed; zero-fill instead of fail-silent;
+`halves_tie` always-on; `halves_tie` on the wrong boundary; `dd_resampled`
+promoted into the bars.
+
+**REFUSALS WITH REASONS, ON THE RECORD — no parameter change is proposed.**
+👩 mum's live arm runs **5x the clip of its own control twin** ($253 vs $50
+median), so the twin cannot corroborate her DRAWDOWN, only her mean — left to
+the `mum-live-rho-read-preregistered` row, because cutting a real-money clip on
+the window that motivated it is exactly what I25 forbids; this is independent
+corroboration from her own ledger, to be read at the registered date. 🎫 the
+taker's median capture ratio is **0.275** and 34% of its trades that peaked above
++0.5% closed at a LOSS (n=92) — left alone, because `(ye)`'s `FROZEN_WHEN_READY`
+drops exactly those bracket levers while a book reads ready, and changing the
+bracket a book passed on is what that rule exists to prevent. 🪁 kelly is already
+Eamon's call under its own pre-registered read.
+
+**ALSO MEASURED, REPORTED, NOT ACTED ON:** mean pairwise correlation **+0.066**
+and **N_eff 7.55 of 14** — genuine diversification; the worst fleet days are
+SINGLE-BOOK events, not correlated drawdowns. 🎫 the taker's OOS test slice
+(+2.775%) is 4x its train slice (+0.686%), which is either a genuinely improving
+book or the I25 hot-window shape and the sample cannot yet tell them apart — its
+READY verdict rests on the era's second half. **Per-close regime attribution is
+IMPOSSIBLE from the ledger**: `extra.btc_regime_up` rides the SUMMARY row and
+never the trade, coverage **0%** across all 14 books; the split published here is
+derived from the scout's own BTC marks and covers only the 8.3-day tape.
+
+**AND THE WORST DEFECT IN THIS WORK WAS MINE, FOUND BY CI ON THE SECOND PUSH.**
+`resampled_dd` was called UNCONDITIONALLY inside `stats()` — a HOT function that
+eight scripts call, several inside sweep loops. Measured, 20 calls on a
+120-close book: **2.656s before, 0.0055s after — a 660x slowdown**, and it broke
+a study with nothing to do with drawdown (`study_mum_noncrypto_sleeve_2026-09-02`'s
+selftest blew CI's 120s timeout; reproduced locally at 33s-vs-2s on a machine
+faster than the runner, then shown passing). The bootstrap is now **OPT-IN**
+(`stats(rows, dd_resample=True)`) and the publish path is its only caller, on
+the ERA-SCOPED sample alone — the all-time reading exists to be the pooled
+figure the era replaced, and a risk distribution on it invites the two to be
+read together. **The class is closed, not the instance:** the selftest asserts
+both that the field is ABSENT by default AND that 20 default calls cost less
+than ONE opt-in call, so a future "small" default (200 draws, say) that
+reintroduces the regression by degrees also reddens. Both mutations verified
+RED, taking this entry's total to **10**. The honest lesson: an expensive
+computation went inside a shared pure function without asking who else calls
+it, and the local suite passed three times because it was SLOWER, not broken —
+a timeout is what turned a latent 660x regression into a visible failure.
+
+**CI AND HOUSEKEEPING.** `tests/test_selftests.py` registers this study AND
+`scripts/study_taker_ready_2026-09-06.py`, which was **already unregistered at
+HEAD** — verified by stashing this work — so `test_no_unregistered_selftest` had
+been red on main since 6-Sep. Recorded rather than folded in silently. Two CodeQL
+findings on the first push were both real and both fixed: an unclosed file in the
+selftest, and an unused `max_open` that was a FUNCTIONAL defect — the
+concurrency caveat printed "up to ? concurrent positions" on every book because
+the value was read from the golive payload, which does not carry it, instead of
+from the books' own rows (🎫 taker 8, 👩 mum 12, 🙏 avo 6).
+
+**Report:** `MONTECARLO_RISK_AUDIT_2026-09-07.md`. **Reproduce:**
+`python3 scripts/study_montecarlo_risk_2026-09-07.py --all --draws 20000`.
+Baseline P&L recorded before testing and re-verified after: no book lost rows,
+no book with an unchanged close count changed its P&L.
+
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 
 **[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position
