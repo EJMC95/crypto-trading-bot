@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 17:25 Sydney (07:25Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 20:18 Sydney (10:18Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -23,6 +23,11 @@ _Still open because:_ the blocker is EXPOSING `oi_ntl` history (a publish-site c
 (yu) only 4 of 14 living books record the venue's quoted spread on their own fills (kelly, douglas, bezos, Hull). Every other book's execution cost has to be INFERRED from the venue rather than read from its record -- the inversion of I14, where a record exists. The four that do record are what made `scripts/cost_model.py`'s calibration gate possible at all (deltas 0.06-3.73bps against an 8.0 tolerance).
 
 _Still open because:_ it is one publish-site edit per book plus the deploy each one earns for another reason -- cheap individually, ten times over collectively, and none of them urgent. Closes when a majority of living books stamp a per-fill spread.
+
+### `trail-blazer-live-routing-is-stale`  ·  owner: **OPERATOR**
+(yw) FOUR SOURCES DISAGREE about what the real-money service `trail-blazer-live` runs. railway-redeploy.yml:544 echoes "REAL MONEY, runs georgia"; deploy_live_verify.py:74 maps it to freqtrade-georgia-lighter; fleet_books.DECLARED_LIVE says georgia is NOT live (avo + mum only, since her (wg) retirement); and the container's own log reads `[avo-live] equity 0.01 open 0/5 closed 77 clip=$0.01` -- a SECOND instance of a live book, on a drained sub-account. Measured 7-Sep: deployed 03:05:26Z SUCCESS (so it takes every marked live push), 0.006802 avg vCPU over 7d (2nd highest in the project, 22-1700x the retired shadows), and NO row in /pnl.json -- invisible to the dashboard, the watchdog and the pager. Harmless today only because equity $0.01 derives a $0.01 clip; the two things standing between this and a live duplicate of avo are an empty account (a deposit reverses it) and claim_writer, which is FAIL-OPEN by design.
+
+_Still open because:_ whether it still holds live API keys is readable only from Railway variables, which this audit deliberately does not fetch (the CLI prints RESOLVED values and the (ml) wrap defeats line-based redaction). OPERATOR call: read FAMILY_LIVE_BOOK/VENUE, decide keys-or-no-keys, then correct the routing. audit_live_roster is green and correctly so -- it checks BOOKS against the feed; nothing checks SERVICE->BOOK routing, which is where all three stale references sit. Closes when deploy_live_verify no longer points this service at a retired book.
 
 ### `mum-live-rho-read-preregistered`  ·  owner: **session**
 (yp) put every book's sizing on ONE axis for the first time -- risk at the stop per position as a fraction of equity, rho = clip_fraction x stop -- and the fleet spans 83x on it (avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull 0.04%). The one real-money reading: 👩 mum's LIVE arm runs rho 1.67% (clip $240 on $576 equity = 41.7% of the account behind a 4% stop) against a proposed 0.25% and an admissible 0.5% -- 6.7x the proposal. Corroborated from three independent directions by her OWN published row: all_slots_stop_pct 0.20 against the gate's 0.15 bar, vol_target_at_neff1 3.75x against a configured 5.0x, and stop_reachable FALSE (stop_dead_above 4.17x) on the worst-margin book in her universe. NOT acted on: the study's reading rests on 10 trading days at its own 10x extrapolation cap, and her measured n_eff 1.824 puts her vol_target_here at 5.06x, i.e. exactly at her own framework's target. So it is REGISTERED, not executed.
@@ -109,8 +114,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (34 commit(s), entries (yo), (yp))
+## Shipped today (36 commit(s), entries (yo), (yp))
 
+- `0891337` (yv) CodeQL failed and was right: the BH call was wrong three ways, and no test drove it
+- `227b8e2` (yv) The candle field called `i` is not open interest, and 1/HHI over symbols overstates independence by 4.2x
 - `c9a623b` (yu) CodeQL: hoist the refusal message out of the list literal
 - `d27553b` (yu) regenerate HANDOFF.md
 - `295b54b` (yu) Per-book execution cost: the fleet average was wrong in both directions, and the stress that used it was a double charge

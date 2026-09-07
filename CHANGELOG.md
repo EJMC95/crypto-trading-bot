@@ -1,3 +1,98 @@
+## 2026-09-07 (yw)
+### Four sources disagree about which book the real-money service `trail-blazer-live` runs — and 10 of 27 containers publish nothing
+
+Eamon: *"Continue and suggest ways for railway and Postgres's to be used to
+their fullest extent and improve notion if possible."* Read-only infra pass to
+close the audit: **no Railway mutation, no variable read, no deploy, no Notion
+write.** Report: `INFRA_AUDIT_2026-09-07.md`.
+
+**THE FINDING IS NOT THE WASTE, IT IS THE ROUTING.** `trail-blazer-live` has
+changed hands twice (💸 Farmer → 🔮 georgia at `(ta)`/`(tb)`) and georgia's live
+arm retired at `(wg)`. Four sources now say four different things:
+`railway-redeploy.yml:544` echoes *"REAL MONEY, runs georgia"*;
+`deploy_live_verify.py:74` maps it to `freqtrade-georgia-lighter`;
+`fleet_books.DECLARED_LIVE` says georgia is **not live at all**
+(`avo-maria-lighter`, `mum-lighter`); and the container's own log reads
+**`[avo-live] equity 0.01 open 0/5 closed 77 clip=$0.01`** — a SECOND instance
+of a live book, on a drained sub-account.
+
+Measured: deployed **2026-09-07T03:05:26Z SUCCESS** (so it takes every marked
+live push), **0.006802 avg vCPU over 7d** — second highest in the project after
+`freqtrade-bots`, 22–1,700× the retired shadows — and **no row in `/pnl.json`**,
+so it is invisible to the dashboard, `fleet-watchdog.yml` and the pager. It is
+the composite of three shapes already paid for: `(hp)` one-book-one-writer,
+`(I13)` inverted (a *live* loop nothing observes from outside), and the
+list-keyed-scope rot `CLAUDE.md` names — *"a stale one sends every future audit
+to the wrong file"*, now on its fourth slot swap.
+
+**Harmless today, and by accident rather than by guard.** Equity $0.01 derives
+a $0.01 clip through `clip = equity × gross_x / max_open`, so any order is
+dust-rejected. The two things between this and a live duplicate of 🙏 avo are
+an empty account (a deposit reverses it) and `claim_writer`, which is
+**fail-OPEN by design** — a dark DB never idles a book, so the single event
+most likely to break the fleet is also the one that un-silences the duplicate.
+
+**WHAT CAUGHT IT AND WHAT DID NOT.** `audit_live_roster` is green and correctly
+so — it checks BOOKS against the feed, and the books are declared right.
+**Nothing checks SERVICE → BOOK routing**, which is where all three stale
+references sit. Carried as `trail-blazer-live-routing-is-stale`, **owner
+OPERATOR** because whether it still holds live keys is readable only from
+Railway variables, which this audit deliberately does not fetch (`(ml)`: the
+CLI prints RESOLVED values and a wrap defeats line-based redaction; Eamon's own
+constraint bans exposing credentials). Predicate mutation-verified: correcting
+`deploy_live_verify.py`'s mapping turns the row CLOSE THIS and reddens
+`--check`.
+
+**THE CENSUS, since the `svc` stamp makes it measurable.** 27 services; **10
+publish all 16 books**; 3 are infrastructure; 4 are correctly stopped at 0/0;
+**10 run and publish nothing** — ~482 MB resident continuously. Two tiers, and
+the difference is real: the 13/17-Aug retirements idle at **15–18 MB** (the
+guard bites before the heavy imports — the retirement doctrine working), the
+September slate loops at **34–79 MB**. Both correct by doctrine; nine are
+tidy-only, and the code guard stays regardless because a push resurrects a
+stopped service. `funding-carry` has now been the known dead duplicate for
+**38 days** `(hu)` — optional tidiness in August, worth re-reading now that the
+only thing silencing it is a fail-open claim on 🌾 carry, the fleet's
+best-evidenced book.
+
+**POSTGRES, measured not assumed.** Disk **660.4 → 768.5 MB in 7 days
+(15.4 MB/day)** — expected and about to stop: `bot_state_history` began 16-Jul,
+its retention DELETE raised on every call until the 2-Aug fix, and the prune
+drops rows older than 60 days, so **the first real deletions land ~14-Sep** and
+it plateaus near **876 MB**. Two schema gaps: `paper_trades` has **no index on
+`closed_at`** though every grading path in the fleet filters and sorts on it
+(`CREATE INDEX CONCURRENTLY`, no write lock); and the PK `(bot, trade_id)`
+gives **false integrity assurance** — `(hf)` measured that two writers never
+collide on `trade_id` because it is `{coin}:{opened_ts}`. A `btree_gist`
+EXCLUDE on overlapping `(bot, pair, [opened_at, closed_at))` would make the
+two-writer class **structurally impossible to insert** rather than detectable
+after the damage, which is the one place it can be closed globally — proposed
+with its three caveats (historical overlaps must pass, the TEXT→timestamptz
+cast needs a generated column, and it permanently forbids two positions in one
+pair), not shipped. **Backups are healthy** — `db-backup.yml`, 58 runs, last 8
+all `success` — and **the restore has never been tested**, which is this repo's
+own *"a check that inspects nothing reports clean"* pointed at itself.
+
+**NOTION: the shared brain is too big to load.** Hub = **87,670 chars, of which
+"🧵 Recent thread" is 85,901 = 98%**, holding **34 entries against the ~8 the
+loading contract specifies**; the fetch **exceeded the tool's token limit twice
+this session**, so the read-on-start contract is not degrading, it is failing,
+on every surface. Nothing durable is at stake: the Session Log database
+independently holds **40 rows back to 2026-06-30**. Recommended fix is
+structural, not a trim — Recent thread becomes a **linked view of Session Log
+filtered to 8**, so appending a log row *is* updating the thread and the block
+cannot grow again. **Not executed**: it is a live shared artefact across three
+surfaces and the audit's own constraint is *do not overwrite live files*.
+
+**Also named:** the highest-value unused capability is a **nightly Railway log
+sweep** — the `bot_state_history` retention bug *"said so in the logs every boot
+while nobody read them"* and `(ml)`'s stale reader were both found by a human
+reading logs by hand; and `fleet-watchdog.yml` probes `/pnl.json`, i.e. payload
+liveness, so all ten idle containers are **invisible to it by construction**.
+`freqtrade-bots` averages 263 MB against a **1,354 MB peak** (5.1×) with nothing
+alerting on it. Protected surface re-verified: **5/5 symbols unchanged, 42/42
+ledgers unrewritten.**
+
 ## 2026-09-07 (yv) — THE CANDLE FIELD CALLED `i` IS NOT OPEN INTEREST, AND `1/HHI` OVER SYMBOLS OVERSTATES INDEPENDENCE BY 4.2x: the fleet's market exposure, measured across books for the first time
 
 **Eamon: *"Continue with all improvements"*** — the ranked list from the audit,

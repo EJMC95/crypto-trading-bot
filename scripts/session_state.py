@@ -172,6 +172,40 @@ CARRIED = [
     },
 
     {
+        "id": "trail-blazer-live-routing-is-stale",
+        "owner": "OPERATOR",
+        "what": "(yw) FOUR SOURCES DISAGREE about what the real-money service "
+                "`trail-blazer-live` runs. railway-redeploy.yml:544 echoes "
+                "\"REAL MONEY, runs georgia\"; deploy_live_verify.py:74 maps it "
+                "to freqtrade-georgia-lighter; fleet_books.DECLARED_LIVE says "
+                "georgia is NOT live (avo + mum only, since her (wg) "
+                "retirement); and the container's own log reads "
+                "`[avo-live] equity 0.01 open 0/5 closed 77 clip=$0.01` -- a "
+                "SECOND instance of a live book, on a drained sub-account. "
+                "Measured 7-Sep: deployed 03:05:26Z SUCCESS (so it takes every "
+                "marked live push), 0.006802 avg vCPU over 7d (2nd highest in "
+                "the project, 22-1700x the retired shadows), and NO row in "
+                "/pnl.json -- invisible to the dashboard, the watchdog and the "
+                "pager. Harmless today only because equity $0.01 derives a "
+                "$0.01 clip; the two things standing between this and a live "
+                "duplicate of avo are an empty account (a deposit reverses it) "
+                "and claim_writer, which is FAIL-OPEN by design.",
+        "why_open": "whether it still holds live API keys is readable only from "
+                    "Railway variables, which this audit deliberately does not "
+                    "fetch (the CLI prints RESOLVED values and the (ml) wrap "
+                    "defeats line-based redaction). OPERATOR call: read "
+                    "FAMILY_LIVE_BOOK/VENUE, decide keys-or-no-keys, then "
+                    "correct the routing. audit_live_roster is green and "
+                    "correctly so -- it checks BOOKS against the feed; nothing "
+                    "checks SERVICE->BOOK routing, which is where all three "
+                    "stale references sit. Closes when deploy_live_verify no "
+                    "longer points this service at a retired book.",
+        "closes_when": lambda: not _has(
+            "scripts/deploy_live_verify.py",
+            '"trail-blazer-live": ("freqtrade-georgia-lighter"'),
+    },
+
+    {
         "id": "mum-live-rho-read-preregistered",
         "owner": "session",
         "what": "(yp) put every book's sizing on ONE axis for the first time -- "
