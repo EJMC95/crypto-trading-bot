@@ -504,6 +504,190 @@ def weighted_bucket_episodes(trades, now_ts, half_life=HALF_LIFE_DAYS,
 
 
 # ---------------------------------------------------------------------------
+# [2026-09-07 (ze)] SELF-GRADE — the brain's own multiplier, graded
+# ---------------------------------------------------------------------------
+#
+# THE GAP THIS CLOSES, measured the day it shipped. `fleet_proprioception`
+# grades every growth-rail LEVER out-of-sample and publishes helping/hurting/
+# neutral. The brain's stake multiplier is the fleet's MOST-WIRED actuator —
+# `fleet_bus.brain_clip` reaches every living book since (so)/(sp), real money
+# included — and it was the ONE actuator with no retrospective grade at all.
+# Measured on the live ledger: 891 living closes carry `extra.brain_mult`, and
+# the string `extra` appears NOWHERE in bot_learn.py or brain_stats.py. The
+# evidence was delivered to the brain's door and never opened.
+#
+# THE BASIS IS PER-TRADE %, NEVER DOLLARS, AND THAT IS THE WHOLE DESIGN.
+# A 2.0x multiplier doubles `profit_abs` BY CONSTRUCTION. Grading a
+# position-size actuator in dollars is I7 in its purest form — the metric is
+# a mechanical consequence of the knob, so every multiplier "works" and the
+# grade is a tautology. `profit_ratio` is invariant to clip ((hl), measured),
+# so it asks the only honest question: did the trades the brain sized UP earn
+# more PER UNIT than the ones it left alone?
+#
+# THE BASELINE IS A WITHIN-BUCKET CONTROL ARM (I25). A sized trade is compared
+# to the SAME (bot, tag) bucket's closes that ran at 1.0x — not to the bucket's
+# pre-multiplier window, which is selected on an extreme and is a biased
+# estimator by construction. The bucket's own all-regime mean rides along as a
+# REPORTED corroborator, never as the comparison.
+#
+# FORWARD BY CONSTRUCTION, so there is no look-ahead to guard against: a
+# trade's `brain_mult` was computed from closes that had already happened when
+# it opened, so that trade's own return is out-of-sample for the multiplier
+# that sized it.
+#
+# CLUSTER-ROBUST ON DISTINCT UTC OPEN-DAYS ((uf)/(ye)): a pooled t over trades
+# a book opens in one burst measures sampling density, not edge.
+#
+# REPORTED ONLY. This returns a dict. It writes no lever, moves no clip and
+# promotes nothing — pinned by an AST walk of call sites in
+# tests/autonomy/test_brain_selfgrade.py, not a substring scan ((po)/(yk)).
+SG_MIN_N = 10          # closes per arm — fleet_allocation.MIN_N, the fleet's
+                       # own computability floor, restated rather than imported
+                       # (this module is stdlib-only by contract)
+SG_MIN_DAYS = 5        # distinct UTC open-days per arm: the cluster count IS
+                       # the sample size once the t is cluster-robust, so a
+                       # 40-trade burst over 2 days must not read as evidence
+SG_T = 2.0             # the fleet's standard evidence bar (go-live, winners'
+                       # docket, the expand ladder's own softest rung)
+
+
+def _sg_day(t):
+    ts = str(t.get("open_ts") or "")
+    return ts[:10] if len(ts) >= 10 else None
+
+
+def _sg_regime(m):
+    """A multiplier's DIRECTION, not its value: the arms must be big enough to
+    grade, and the ladder's rungs are far too thinly populated to grade one by
+    one (measured: 1.25x on 21 closes, 1.5x on 1, everything above on 0)."""
+    if m is None:
+        return None
+    if m > 1.001:
+        return "up"
+    if m < 0.999:
+        return "down"
+    return "flat"
+
+
+def _sg_cluster_means(trades):
+    """Mean per-trade % within each distinct UTC open-day."""
+    by_day = {}
+    for t in trades:
+        d = _sg_day(t)
+        r = t.get("profit_ratio")
+        if d is None or r is None:
+            continue
+        by_day.setdefault(d, []).append(float(r) * 100.0)
+    return [sum(v) / len(v) for v in by_day.values()]
+
+
+def _sg_welch(a, b):
+    """(t, delta) of mean(a) - mean(b) on cluster means, or None."""
+    if len(a) < 2 or len(b) < 2:
+        return None
+    ma, mb = sum(a) / len(a), sum(b) / len(b)
+    va = sum((x - ma) ** 2 for x in a) / (len(a) - 1)
+    vb = sum((x - mb) ** 2 for x in b) / (len(b) - 1)
+    se = math.sqrt(va / len(a) + vb / len(b))
+    if se <= 1e-12:
+        return None
+    return (ma - mb) / se, ma - mb
+
+
+def selfgrade_mult(era_trades, min_n=SG_MIN_N, min_days=SG_MIN_DAYS, t_bar=SG_T):
+    """Grade the brain's own published multiplier on the closes it sized.
+
+    `era_trades` is {bot: [normalised close, ...]} exactly as
+    `compute_stake_mults` receives it; each close may carry `extra.brain_mult`
+    (the EFFECTIVE multiplier that sized it — brain x rails, per (wu)).
+
+    Returns {"buckets": [...], "pooled": {...}, "coverage": {...}} where every
+    bucket verdict is one of:
+        helping     sized arm beat the 1.0x arm by >= t_bar, cluster-robust
+        hurting     sized arm lost to the 1.0x arm by >= t_bar
+        neutral     both arms graded, |t| < t_bar
+        undecidable a floor was not met — NEVER a verdict by default
+
+    Fail-safe in the only direction that matters: a bucket with no stamped
+    multiplier, one regime only, or too few open-days is `undecidable`, never
+    `helping`. A dark or partial stamp therefore asserts nothing.
+    """
+    buckets, cov = [], {"bots": 0, "closes": 0, "stamped": 0, "buckets": 0}
+    for bot, trades in sorted((era_trades or {}).items()):
+        cov["bots"] += 1
+        by_tag = {}
+        for t in trades or []:
+            cov["closes"] += 1
+            tag = str(t.get("enter_tag") or "(untagged)")
+            if tag == "(untagged)":
+                continue
+            m = (t.get("extra") or {}).get("brain_mult")
+            if not isinstance(m, (int, float)) or isinstance(m, bool):
+                continue
+            if t.get("profit_ratio") is None or _sg_day(t) is None:
+                continue
+            cov["stamped"] += 1
+            by_tag.setdefault(tag, []).append((float(m), t))
+        for tag, rows in sorted(by_tag.items()):
+            cov["buckets"] += 1
+            arms = {}
+            for m, t in rows:
+                arms.setdefault(_sg_regime(m), []).append(t)
+            flat = arms.get("flat") or []
+            own = [float(t["profit_ratio"]) * 100.0 for _m, t in rows]
+            own_mean = sum(own) / len(own) if own else None
+            for direction in ("up", "down"):
+                sized = arms.get(direction) or []
+                if not sized:
+                    continue
+                rec = {"bot": bot, "tag": tag, "dirn": direction,
+                       "n_sized": len(sized), "n_flat": len(flat),
+                       "days_sized": len({_sg_day(t) for t in sized}),
+                       "days_flat": len({_sg_day(t) for t in flat}),
+                       "mults": sorted({round(float(m), 3) for m, t in rows
+                                        if _sg_regime(m) == direction}),
+                       "own_mean_pct": (round(own_mean, 4)
+                                        if own_mean is not None else None),
+                       "verdict": "undecidable", "why": None,
+                       "t": None, "delta_pp": None}
+                if len(sized) < min_n or len(flat) < min_n:
+                    rec["why"] = "n<%d in an arm" % min_n
+                elif rec["days_sized"] < min_days or rec["days_flat"] < min_days:
+                    rec["why"] = "open-days<%d in an arm" % min_days
+                else:
+                    got = _sg_welch(_sg_cluster_means(sized),
+                                    _sg_cluster_means(flat))
+                    if got is None:
+                        rec["why"] = "no usable cluster variance"
+                    else:
+                        tt, delta = got
+                        rec["t"], rec["delta_pp"] = round(tt, 2), round(delta, 4)
+                        # An UP multiplier helps by earning MORE per unit; a
+                        # DOWN multiplier helps by cutting size on trades that
+                        # earn LESS. The sign of "good" flips with direction —
+                        # reading it one way would grade every throttle as a
+                        # failure for doing its job.
+                        good = delta if direction == "up" else -delta
+                        if abs(tt) < t_bar:
+                            rec["verdict"] = "neutral"
+                        elif good > 0:
+                            rec["verdict"] = "helping"
+                        else:
+                            rec["verdict"] = "hurting"
+                buckets.append(rec)
+    graded = [b for b in buckets if b["verdict"] != "undecidable"]
+    pooled = {"graded": len(graded), "undecidable": len(buckets) - len(graded),
+              "helping": sum(1 for b in graded if b["verdict"] == "helping"),
+              "hurting": sum(1 for b in graded if b["verdict"] == "hurting"),
+              "neutral": sum(1 for b in graded if b["verdict"] == "neutral")}
+    deltas = [b["delta_pp"] if b["dirn"] == "up" else -b["delta_pp"]
+              for b in graded if b["delta_pp"] is not None]
+    pooled["mean_gain_pp"] = (round(sum(deltas) / len(deltas), 4)
+                              if deltas else None)
+    return {"buckets": buckets, "pooled": pooled, "coverage": cov}
+
+
+# ---------------------------------------------------------------------------
 # selftest
 # ---------------------------------------------------------------------------
 
@@ -691,6 +875,125 @@ def _selftest():
     assert qualify_v3(weighted_bucket_episodes(win_burst, now),
                       eb_prior([], [], []), expand=True)[0] is None, \
         "one lucky market event bought a 1.5x raise"
+
+    # --- [2026-09-07 (ze)] SELF-GRADE ------------------------------------
+    # read the SHIPPED bars, never a retyped copy ((gn): a retyped constant
+    # is a constant that drifts)
+    t_bar_probe, min_n_probe, min_days_probe = SG_T, SG_MIN_N, SG_MIN_DAYS
+
+    def sgt(mult, ratio_pct, day, tag="long-x", bot="b"):
+        return {"enter_tag": tag, "profit_ratio": ratio_pct / 100.0,
+                # profit_abs is deliberately CONSISTENT with a real ledger
+                # (dollars scale with the multiplier) so the dollars-basis
+                # mutation below is a genuine trap, not a strawman.
+                "profit_abs": ratio_pct * mult,
+                "open_ts": "2026-09-%02dT04:00:00+00:00" % day,
+                "extra": {"brain_mult": mult}}
+
+    # THE LOAD-BEARING PIN: identical PER-UNIT returns, 3x the dollars.
+    # A dollars-basis grade calls this 'helping'; the shipped %-basis must
+    # call it 'neutral'. This is the mutation that guards the whole design.
+    # (the per-unit returns must VARY and MATCH across arms: a zero-variance
+    # fixture returns 'no usable cluster variance' and never reaches the
+    # basis at all — the first cut of this very test was vacuous that way)
+    # the two arms must carry the SAME per-unit sequence (index by position,
+    # not by calendar day — an off-by-phase cycle silently unmatches them)
+    _cyc = [0.8, 1.0, 1.2, 1.0]
+    same = ([sgt(3.0, _cyc[i % 4], 1 + i) for i in range(14)] +
+            [sgt(1.0, _cyc[i % 4], 15 + i) for i in range(14)])
+    out = selfgrade_mult({"b": same})
+    up = [b for b in out["buckets"] if b["dirn"] == "up"]
+    assert len(up) == 1 and up[0]["verdict"] == "neutral", up
+    _up_d = sum(t["profit_abs"] for t in same if t["extra"]["brain_mult"] > 1)
+    _fl_d = sum(t["profit_abs"] for t in same if t["extra"]["brain_mult"] == 1)
+    assert abs(_up_d - 3 * _fl_d) < 1e-9 and _fl_d > 0, \
+        "the fixture must actually carry the 3x dollar skew it is trapping"
+    assert up[0]["t"] is not None, "the trap must REACH the statistic"
+    # ...and the trap must have POWER: on the DOLLAR basis these same arms
+    # differ by 3x and clear the bar easily, so a basis mutation flips the
+    # verdict. Without this the 'neutral' above is true for the wrong reason.
+    _dt = _sg_welch([sum(t["profit_abs"] for t in same
+                         if _sg_day(t) == "2026-09-%02d" % d) for d in range(1, 15)],
+                    [sum(t["profit_abs"] for t in same
+                         if _sg_day(t) == "2026-09-%02d" % d) for d in range(15, 29)])
+    assert _dt and abs(_dt[0]) >= t_bar_probe, \
+        "the dollars basis must actually FIRE here, or the trap is toothless"
+
+    # An UP multiplier that really did size the better trades reads helping.
+    better = ([sgt(1.5, 3.0 + 0.1 * d, d) for d in range(1, 13)] +
+              [sgt(1.0, 0.1 * d, d) for d in range(13, 25)])
+    up = [b for b in selfgrade_mult({"b": better})["buckets"]
+          if b["dirn"] == "up"][0]
+    assert up["verdict"] == "helping" and up["delta_pp"] > 0, up
+    # delta is reported in PERCENTAGE POINTS, not fractions. Pinned against
+    # the fixture's OWN arithmetic rather than a hand-typed range, so a units
+    # slip (the missing x100) is caught and the bound cannot drift.
+    _ms = sum(t["profit_ratio"] for t in better
+              if t["extra"]["brain_mult"] > 1) / 12.0 * 100.0
+    _mf = sum(t["profit_ratio"] for t in better
+              if t["extra"]["brain_mult"] == 1) / 12.0 * 100.0
+    assert abs(up["delta_pp"] - (_ms - _mf)) < 1e-6, (up["delta_pp"], _ms - _mf)
+    assert _ms - _mf > 1.0, "the fixture must carry a visible per-unit gap"
+
+    # ...and the SIGN FLIPS for a throttle: a DOWN multiplier on trades that
+    # earn LESS is the knob working, not failing.
+    cut = ([sgt(0.5, -3.0 - 0.1 * d, d) for d in range(1, 13)] +
+           [sgt(1.0, 0.1 * d, d) for d in range(13, 25)])
+    dn = [b for b in selfgrade_mult({"b": cut})["buckets"]
+          if b["dirn"] == "down"][0]
+    assert dn["verdict"] == "helping" and dn["delta_pp"] < 0, dn
+
+    # THE CLUSTER PIN ((uf)): five identical copies of one day's trade carry
+    # ONE day's information, but a pooled t reads them as five observations
+    # and inflates by ~sqrt(5). Same arms, same means; only the unit differs.
+    _sd = [2.0, 1.0, 3.0, 0.0, 2.5, 1.5]      # sized arm's daily values
+    _fd = [1.0, 0.0, 2.0, -0.5, 1.5, 0.5]     # flat arm's daily values
+    dup = ([sgt(1.5, v, 1 + i) for i, v in enumerate(_sd) for _ in range(5)] +
+           [sgt(1.0, v, 10 + i) for i, v in enumerate(_fd) for _ in range(5)])
+    _up = [b for b in selfgrade_mult({"b": dup})["buckets"]
+           if b["dirn"] == "up"][0]
+    assert _up["n_sized"] == 30 and _up["days_sized"] == 6, _up
+    assert _up["verdict"] == "neutral" and abs(_up["t"]) < t_bar_probe, _up
+    # ...and the trap has teeth: pooled over TRADES the very same arms clear
+    # the bar, so dropping the day-clustering flips this verdict.
+    _pooled = _sg_welch([v for v in _sd for _ in range(5)],
+                        [v for v in _fd for _ in range(5)])
+    assert _pooled and abs(_pooled[0]) >= t_bar_probe, \
+        "the cluster pin is toothless unless the pooled read would fire"
+
+    # Floors fail to UNDECIDABLE, never to a verdict: a 40-trade burst over
+    # two open-days is sampling density, not evidence ((uf)).
+    burst = ([sgt(1.5, 9.0, 1) for _ in range(20)] +
+             [sgt(1.5, 9.0, 2) for _ in range(20)] +
+             [sgt(1.0, 0.0, d) for d in range(3, 25)])
+    up = [b for b in selfgrade_mult({"b": burst})["buckets"]
+          if b["dirn"] == "up"][0]
+    assert up["verdict"] == "undecidable" and "open-days" in up["why"], up
+
+    # A thin arm is undecidable, and a bucket with NO flat control arm never
+    # grades at all — there is nothing to compare against.
+    thin = [sgt(1.5, 5.0 + 0.1 * d, d) for d in range(1, 9)] + \
+           [sgt(1.0, 0.1 * d, d) for d in range(9, 25)]
+    _t = [b for b in selfgrade_mult({"b": thin})["buckets"]
+          if b["dirn"] == "up"][0]
+    # isolates the n floor from the day floor: 8 closes over 8 distinct days
+    # clears days>=5 and fails n>=10, so dropping either floor is visible.
+    assert _t["days_sized"] >= min_days_probe and _t["n_sized"] < min_n_probe
+    assert _t["verdict"] == "undecidable" and _t["why"].startswith("n<"), _t
+    nocontrol = [sgt(1.5, 5.0, d) for d in range(1, 20)]
+    assert all(b["verdict"] == "undecidable"
+               for b in selfgrade_mult({"b": nocontrol})["buckets"])
+
+    # An unstamped ledger asserts NOTHING (the pre-(ze) fleet, and any book
+    # whose publisher does not stamp the multiplier).
+    bare = [{"enter_tag": "long-x", "profit_ratio": 0.05, "profit_abs": 5.0,
+             "open_ts": "2026-09-0%dT04:00:00+00:00" % d} for d in range(1, 9)]
+    out = selfgrade_mult({"b": bare})
+    assert out["buckets"] == [] and out["coverage"]["stamped"] == 0, out
+    # ...and an untagged close is never bucketed (a mult there is noise —
+    # compute_stake_mults' own rule).
+    assert selfgrade_mult({"b": [sgt(1.5, 1.0, 1, tag="(untagged)")]}
+                          )["coverage"]["stamped"] == 0
 
     print("brain_stats selftest OK (incl. close-burst episode basis: "
           "identity, gap-0 kill, raw-floor preservation, recorded "

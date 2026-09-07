@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 22:45 Sydney (12:45Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 23:19 Sydney (13:19Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -62,7 +62,7 @@ _Still open because:_ the clamp is a capital-allocation policy and moving it mov
 ### `brain-mult-transition-oscillation`  ·  owner: **session**
 The brain's `t` is computed on DOLLARS (`brain_stats.weighted_bucket` reads `profit_abs`), so a bucket MID-TRANSITION is a mixture of two clip scales: sd inflates against mean and `t` falls on a book whose edge has not moved. Predicted shape: a bucket that clears a rung steps back down a rung within ~10 closes, then climbs again. A uniform scale is invariant, so there is no runaway — this is a transient limit cycle, damped by the 14d decay and the 3-run streak gate.
 
-_Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is stateless; the held rung lives in bot_learn's `mult_streaks`), and rewriting the brain's ladder on the same day 13 consumers were wired to it is the untested-rewrite-of-an-authority the doctrine forbids. It is now MEASURABLE for the first time — every close carries its `brain_mult` — so the next pass tests the prediction against real closes instead of a model.
+_Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is stateless; the held rung lives in bot_learn's `mult_streaks`), and rewriting the brain's ladder on the same day 13 consumers were wired to it is the untested-rewrite-of-an-authority the doctrine forbids. [7-Sep (ze)] THE INSTRUMENT THIS ROW ASKED FOR NOW EXISTS and the row's own premise is CORRECTED IN PLACE per I12: it read 'now MEASURABLE — every close carries its brain_mult', and that was true of the LEDGER and false of the BRAIN, which read no `extra` at all (AST-verified: the string appears nowhere in bot_learn.py or brain_stats.py). `brain_stats.selfgrade_mult` opens the envelope and publishes on `brain-vitals.selfgrade`. What still blocks the TEST is sample, not access: of 15 stamped buckets only 4 are gradeable (both arms >= 10 closes over >= 5 open-days) and NONE has yet crossed a rung mid-sample, which is precisely the transition the prediction is about. Re-read when a graded bucket steps a rung; the self-grade's own `mults` list per bucket is the tripwire.
 
 ### `ceiling-slots-georgia`  ·  owner: **session**
 **(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 days at full occupancy — an 11x speed-up'. Measured: her mean hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE slots need ~46 opens/day. Her signal supplies 40.9/day at best. **Full occupancy is unreachable by construction, and it was never the lever — CLOSES are.** She is flat 68.4% of the time not because something refuses her but because she exits in under 3 hours. (sv) took the one gate that cut closes for no quality reason (the 2/h throttle, +0.633pp in favour of the entry it refused, six splits) from 2 -> 3.
@@ -89,14 +89,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (32 commit(s), entries (yo), (yp))
+## Shipped today (27 commit(s), entries (yo), (yp))
 
-- `36b3a6f` (yw) the sizing table priced a book that holds one position at a time, and these books hold five to thirteen
-- `aeaca16` (yv) the fleet's only answer to its own null was on one book of fourteen: the control arm is per-book now
-- `9579a55` (yu) the control arm computed its answer and threw it away: the placebo pair settled 21 lines before the publish
-- `bec6716` (yt) the bootstrap is OPT-IN: it was inside a hot pure function and made stats() 660x slower
-- `49f1641` (yt) the changelog entry CI correctly demanded, and two CodeQL findings that were both real
-- `b5432a3` Monte Carlo risk audit: the gate grades one path, and two of its numbers were decided by row order
+- `cf56b26` [deploy-live] Monte Carlo risk audit, the control arm that threw its answer away, and the sizing table that priced one position at a time (#291)
 - `69ed911` (yr) renumber the changelog header to match its commit subject — main briefly carried two (yq) entries because the final rebase auto-merged clean
 - `7f9462e` (yr) two instruments wrong in the reassuring direction: the asset key that hid co-holding, and the drawdown denominator that halved real money's hole
 - `3e205d9` (yq) an unfillable shadow order is NOT a zero-cost fill: NULL slippage, a named reason, and the coin-quality veto stops eating fabricated evidence

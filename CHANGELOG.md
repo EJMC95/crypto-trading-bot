@@ -1,3 +1,132 @@
+## 2026-09-07 (ze) — THE BRAIN'S STATISTICS ARE FINE AND IT IS STARVING: the funnel, the null that beats its own pair rule, and the actuator that could not see its own output
+
+**Eamon: *"The brain needs to be smarter, can you do a deep dive on how we can
+learn and grow more efficiently. I want our intelligence to be elite."*** The
+deep dive came back with the opposite of the expected answer, so it is worth
+stating plainly first: **the brain's statistics are sound, its bars survived
+being challenged, and the binding constraint on its decision rate is CLOSES PER
+BUCKET.** What was actually broken is that the fleet's most-wired actuator had
+no feedback loop at all. Full working: `STUDY_BRAIN_LEARNING_EFFICIENCY_2026-09-07.md`;
+instrument `scripts/study_brain_learning_efficiency_2026-09-07.py` (four arms,
+calibration gate 5/5 against the live brain, REFUSES on a feed it cannot
+reproduce).
+
+**1. THE FUNNEL — I18 applied to the brain itself, which nobody had done.**
+37 era buckets on 16 living books; 23 positive; **12 of those 23 blocked by the
+raw `n>=30` floor before any bar is consulted**, 6 by `t<2.0` (the bar working),
+**1 by WIN RATE alone**. `n_eff` never binds independently on any current
+bucket — the decayed-evidence floor is currently decorative, recorded rather
+than removed. Realised range: the ladder reaches **6.7x either way** and of 891
+stamped closes **624 (70%) ran at exactly 1.0x**; the whole EXPAND side — the
+half built on *"the brain needs to be able to widen too"* — **has fired on 22 of
+891 closes and has never exceeded 1.5x.**
+
+**1a. THE I15 TRIGGER FIRED AND THE ANSWER IS KEEP — the registration is
+honoured, with the number.** ⚖️ Counterweight's `long` reads **n=74, t=2.13,
++1.348%/trade** and is held at 1.0x because it wins 51.3% against a 55% bar —
+I15 (*win rate is not expectancy*) inside an actuator, on the fleet that removed
+win rate from the go-live gate because 🌾 carry wins 38.8%. `(wu)` pre-registered
+this exact condition and its response: ***"re-run the instrument, never a bar."***
+Re-run (`study_brain_floors_2026-09-02.py`, calibration 5/5): **V1 expectancy-only
+reads fwd +1.992%/trade against its own mean +2.105% = −0.113pp, while the
+CONTROL — the buckets V1 would ADD, currently refused — reads +0.320 against
++0.230 = +0.090pp.** Dropping the win-rate bars does not earn forward. **BARS
+KEEP; Counterweight stays at 1.0x.** Second time this bar has been challenged
+and held.
+
+**2. THE BRAIN'S LARGEST CONDITIONAL RULE IS BEATEN BY A COIN FLIP.** `analyse_bot`'s
+pair/session rules run against a PERMUTATION NULL (pair and open-hour labels
+shuffled WITHIN each book, so n per cell, the book's win rate and its P&L are
+all preserved and only cell<->outcome is destroyed; 200 draws, living books):
+**`pair_earner` REAL 11 vs null MEAN 14.1, P(null>=real)=0.935** — chance
+produces MORE "consistent earners" than the tape does. `pair_bleeder` P=0.675;
+both session rules fire zero. `pair_earner` is the largest category in the live
+hypothesis ledger (36 of 134 entries, 9 of the 20 ACTIONABLE) and carries no
+information. **And the tier is inert regardless: 0 of the 134 live hypotheses
+can reach any actuator** — `derive_actions` consumes only `diag_regime_timing`,
+`derive_proposals` only `diag_entry_quality` on the taker, and between them
+those kinds hold 6 hypotheses, all retired.
+
+**3. A PROPER REFEREE FINDS NOTHING EITHER, AND THAT IS THE FINDING.** The
+obvious fix — give the conditional tier the machinery Tier A already has — was
+built and run: judged against the book's OWN mean (I25), cluster-robust on
+distinct UTC open-days ((uf)), BH-FDR 0.05 across every test. **Categorical
+entry-known axes (pair/hour6/side): 0 of 82 survive** against a null of mean
+0.30. **Continuous covariates the brain has never read: 0 of 27**, strongest
+anywhere `brk_quality` on the taker at **t=−1.06**. So the conditional tier is
+NOT fixable by better statistics — there is no conditional structure to find on
+these axes at this sample, and building a smarter learner today would be
+building a machine to find nothing.
+
+**3a. THE INSTRUMENT WAS WRONG TWICE, BOTH TIMES IN THE REASSURING DIRECTION,
+BOTH TIMES I7.** First cut graded `exit_reason` and hold-duration and found 68
+"effects"; **35 were take-profit buckets, which win BY CONSTRUCTION** — a rule
+`winners_docket.OUTCOME_EXITS` already owns and this referee rediscovered the
+hard way. Second cut deny-listed four outcome names and still admitted
+`price_pnl` (a COMPONENT of the P&L), `peak_ret`, `mae_ret` and `accrued`, all
+at rho>0.84. **A deny-list cannot do this job — it must anticipate every field a
+new book invents.** The shipped instrument uses an ALLOW-LIST (`ENTRY_KNOWN`:
+admissible iff DETERMINED AT THE OPEN) and COUNTS its refusals (22 admitted, 17
+refused) so the refusal is visible rather than silent.
+
+**4. THE SHIP — `brain_stats.selfgrade_mult`: THE BRAIN GRADES ITS OWN
+ACTUATOR.** `fleet_proprioception` has graded every growth-rail LEVER since
+16-Jul; the stake multiplier reaches EVERY living book through
+`fleet_bus.brain_clip`, real money included, and was **the one actuator with no
+retrospective grade**. Cause is structural and AST-verified: **the string
+`extra` appears NOWHERE in `bot_learn.py` or `brain_stats.py`** — the books
+stamp **54 numeric covariates** onto their closes, `brain_mult` itself on **916
+living rows**, and the brain has never opened the envelope. It sized 916 trades
+and could not read what size it chose. First live reading, published on
+`brain-vitals.selfgrade` every run: **891 stamped closes, 15 buckets, 4 graded,
+ALL NEUTRAL, 0 helping / 0 hurting, mean gain +0.636pp** — undecided, leaning
+right, and a number nobody had.
+
+**THE BASIS IS PER-TRADE %, NEVER DOLLARS, AND THAT IS THE WHOLE DESIGN.** A
+2.0x multiplier doubles `profit_abs` BY CONSTRUCTION, so grading a position-size
+actuator in dollars is I7 in its purest form — the metric is a mechanical
+consequence of the knob, every multiplier "works", and the grade is a tautology.
+`profit_ratio` is clip-invariant ((hl), measured), so it asks the only honest
+question: did the trades the brain sized UP earn more PER UNIT? The selftest's
+load-bearing pin is that trap — two arms with **identical per-unit returns and a
+3x dollar skew must read `neutral`** — and **9 of 9 mutations verified RED**,
+including one that survived the first round because my own fixture had zero
+variance and never reached the statistic, and one that survived because every
+fixture had one trade per day so the cluster collapse was a no-op. Baseline is a
+WITHIN-BUCKET control arm (the same bucket's 1.0x closes), never the
+pre-multiplier window, which is selected on an extreme (I25); no control arm =>
+never graded. Forward by construction (the mult was set on closes that had
+already happened). The sign of "good" FLIPS with direction — a down multiplier
+helps by cutting size on trades that earn less, and reading it one way grades
+every throttle as a failure for doing its job. Fails to `undecidable`, never to
+a verdict. **REPORTED ONLY**, pinned by an AST walk of call sites rather than a
+substring scan ((po)/(yk)), and `compute_stake_mults` is pinned NOT to read it:
+a grader that feeds back into the thing it grades stops being a control.
+
+**5. THE ADVICE NOW CARRIES ITS OWN NULL.** `pair_earner` read *"protect it in
+any universe change"* — the one act a starved book least needs (I26) — on a rule
+measuring worse than chance. It still fires (a labelling fix, not a cut) and now
+says so in the sentence a human actually reads, with the P-value and the
+reproduction command. `pair_bleeder`'s *"consider dropping"* likewise now states
+that a drop needs a MEASURED HARM.
+
+**REFUSED, WITH REASONS, so no future session re-proposes them blind:**
+(a) **pooling expectancy across books** the way win rate is pooled — `eb_prior`
+shrinks the win rate but `t`, the bar that actually blocks, has no prior at all;
+refused on the EXPAND side because the `(bh)` asymmetry deliberately forbids
+praise inheritance, and shrinking `t` toward a pool sizes a thin book up on its
+siblings' record. Legitimate on the reduce side or as a REPORTED number — a
+measured build, not this one. (b) **pooling the live/shadow twin arms**, which
+the funnel makes look free (`freqtrade-mum-lshadow|long-oversold-rebound` n=92
+t=2.69 at 1.5x beside `freqtrade-mum-lighter|long-oversold-rebound` n=91 t=1.13
+at nothing — same strategy, same tag, learned as two strangers; 🙏 avo the same,
+and her n=15 arm is REAL MONEY) — refused because the shadow twin is a CONTROL
+ARM: `(xd)` measured the arms run different entry files, `(ye)` that their caps
+differed, and pooling destroys the only baseline I25 calls immune to reversion.
+
+**MOVES NO MONEY, WRITES NO LEVER, CHANGES NO BAR.** Two bars were challenged by
+measurement and HELD. Suite green.
+
 ## 2026-09-07 (zd) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
 
 **[RENUMBERED (yw) -> (zd) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**

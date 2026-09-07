@@ -678,11 +678,28 @@ def analyse_bot(bot, trades, pulse_hist=None):
         if b["n"] >= MIN_N_FLAG and b["w"] / b["n"] < 0.20 and b["pnl"] < 0:
             hyp(f"pair:{pair}:bleeder", "pair_bleeder",
                 f"{pair}: {b['n']} trades, {b['w']/b['n']*100:.0f}% win, ${b['pnl']:+.2f}",
-                f"consider dropping {pair} from {bot}'s whitelist")
+                f"consider LOOKING at {pair} on {bot} — unrefereed raw "
+                f"counts (null P=0.675, (ze)); a drop needs a measured harm, "
+                f"not a low win rate (I26)")
         if b["n"] >= MIN_N_FLAG and b["w"] / b["n"] >= 0.55 and b["pnl"] > 0:
+            # [2026-09-07 (ze)] THE ADVICE CARRIES ITS OWN MEASURED NULL.
+            # This rule was run against a permutation null that shuffles the
+            # pair labels WITHIN each book — n per pair, the book's win rate
+            # and its P&L all preserved, only pair<->outcome destroyed. On the
+            # living fleet it fired 11 times against a null MEAN of 14.1:
+            # P(null >= real) = 0.935. Chance produces MORE "consistent
+            # earners" than the tape does. It reaches no actuator (derive_
+            # actions and derive_proposals both exclude the kind), so the only
+            # way it can cost anything is a human believing the sentence — and
+            # it used to read "protect it in any universe change", which is
+            # exactly the act a starved book LEAST needs (I26). Reproduce with
+            # scripts/study_brain_learning_efficiency_2026-09-07.py --naive-null
             hyp(f"pair:{pair}:earner", "pair_earner",
                 f"{pair}: {b['n']} trades, {b['w']/b['n']*100:.0f}% win, ${b['pnl']:+.2f}",
-                f"{pair} is a consistent earner for {bot} — protect it in any universe change")
+                f"{pair} is {bot}'s best-looking pair on RAW COUNTS — NOT a "
+                f"finding: this rule reads P(null>=real)=0.935 against its own "
+                f"permutation null ((ze)), so treat it as a place to LOOK, "
+                f"never as a reason to protect a pair or narrow a universe")
     # [2026-07-14b] Entry-mode expectancy moved to the DIAGNOSIS layer in
     # main(): the old blanket "tighten the '{tag}' entry gates" prose fired on
     # any negative bucket regardless of whether the loss lived in the entry,
@@ -2089,6 +2106,14 @@ def main():
                    "mults_published": sum(len(t) for t in published_mults.values()),
                    "watchlist": len(mult_vitals.get("watchlist") or []),
                    "diagnoses": len(diagnoses)},
+        # [2026-09-07 (ze)] THE BRAIN GRADES ITS OWN ACTUATOR. Every growth-rail
+        # lever has had a retrospective grade since (16-Jul) proprioception; the
+        # stake multiplier — the most-wired actuator in the fleet, reaching every
+        # living book through `fleet_bus.brain_clip`, real money included — had
+        # none, because nothing here ever opened `extra`. REPORTED ONLY: it
+        # writes no lever and sizes nothing; see brain_stats.selfgrade_mult for
+        # why the basis is per-trade % and never dollars.
+        "selfgrade": (bstats.selfgrade_mult(alive_trades) if bstats else None),
     }
     try:
         import bot_pnl_store as store
