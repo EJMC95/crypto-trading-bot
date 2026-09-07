@@ -1402,6 +1402,26 @@ def resampled_dd(rows, book_usd=None, draws=None, seed=None):
                 "p95_pct": round(100 * _q(0.95), 2),
                 "p99_pct": round(100 * _q(0.99), 2),
                 "p_over_bar": round(over, 4),
+                # [2026-09-07] THE DENOMINATOR IS PUBLISHED, NOT ASSUMED — and
+                # a concurrent session is why. An open PR (#292, unmerged at
+                # the time of writing, so its letter is deliberately NOT cited
+                # here — it would resolve to nothing in this tree) moves the
+                # drawdown BAR off `BOOK_USD` and onto the book's own peak
+                # equity, on Eamon's instruction, and it is right: $1,000 is a
+                # fiction for a live book at $421, where a dollar hole divided
+                # by $1,000 reads 15% against a real **35.6%**.
+                #
+                # These percentages are computed against `book_usd` because
+                # that is what `stats.max_dd_frac` uses AT THIS POINT in the
+                # pipeline (the rebase happens later, in `apply_mtm`). Once
+                # that lands, a reader comparing this number to the published
+                # `max_dd_pct` would be comparing two denominators — which is
+                # precisely the "meant a different thing on every row" defect
+                # that PR exists to end, reproduced one field over. So the
+                # denominator travels WITH the number, and `denom_usd` is what
+                # a consumer rebases by. Whoever merges second reconciles.
+                "denom_usd": round(float(book_usd), 2),
+                "maxdd_denom": "book_usd",
                 "basis": "decision-resampled realised closes; REPORTED, not a bar"}
     except Exception:      # noqa: BLE001 -- a lost diagnostic, never a lost grade
         return None
@@ -3298,6 +3318,13 @@ def _selftest_dd_resampled():
     d_small = resampled_dd(updown, 100.0, draws=800)
     assert d_small and abs(d_small["p95_pct"] - 10.0 * d["p95_pct"]) < 0.11, \
         (d_small["p95_pct"], d["p95_pct"])
+
+    # ...and the denominator TRAVELS WITH THE NUMBER, so the percentages can
+    # never be read against a different one. PR #292 is moving the BAR
+    # onto peak equity; until the two are reconciled, a consumer needs
+    # `denom_usd` to rebase. A mutation dropping it reddens here.
+    assert d["denom_usd"] == 1000.0 and d_small["denom_usd"] == 100.0
+    assert d["maxdd_denom"] == "book_usd"
 
     # IT MUST RESAMPLE DECISIONS, NOT LEGS. Ten legs closing in one instant is
     # ONE decision: drawn together they can produce a 10x deeper hole than
