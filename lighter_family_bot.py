@@ -927,8 +927,22 @@ WIDE_COINS = ("BTC,ETH,SOL,XRP,ADA,DOGE,AVAX,LINK,DOT,LTC,BCH,ATOM,XLM,TRX,"
 
 class Carrier:
     coins = None                        # None -> the family COINS list
+    #: [2026-09-07] The random-entry control arm, PER BOOK. `(ro)` put this on
+    #: `OversoldRebound` as a CLASS attribute, which was right when 👩 mum was
+    #: the only book that had one — but the carriers are SHARED (`SwingDip`
+    #: carries 🙏 avo AND retired swing-daily; `DayTraderGated` carries
+    #: 🔮 georgia AND retired intraday-15m), so a class attribute cannot turn
+    #: the arm on for one book without turning it on for its siblings, retired
+    #: rows and live arms included.
+    #:
+    #: `STRATEGIES` holds one INSTANCE per book, so an instance attribute is
+    #: the honest granularity. The class default stays False and mum's class
+    #: attribute is untouched — she is the one book with a proven arm and this
+    #: change must not perturb her.
+    control_arm = False
 
-    def __init__(self, bot, tf, stoploss, max_open, style, coins=None):
+    def __init__(self, bot, tf, stoploss, max_open, style, coins=None,
+                 control_arm=None):
         self.bot = bot
         self.tf = tf
         self.stoploss = stoploss
@@ -936,6 +950,10 @@ class Carrier:
         self.style = style
         if coins is not None:
             self.coins = coins
+        # None => inherit the class default (mum's True, everyone else's
+        # False). An explicit value opts this ONE book in or out.
+        if control_arm is not None:
+            self.control_arm = bool(control_arm)
 
 
 class TrendMomo(Carrier):
@@ -1989,8 +2007,26 @@ STRATEGIES = [
     # Revert is this literal back to 5 behind a [deploy-live-taker] marker.
     SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=6,
              style="swing-dip-4h"),
+    # [2026-09-07] CONTROL ARM ON. The `(yt)` audit's central finding is that
+    # NOT ONE of fourteen books clears a random-entry null — and the fleet's
+    # own proper instrument for that question (a paired, matched-window
+    # placebo) was installed on exactly ONE book. 🔮 georgia is the largest
+    # sample in the fleet (n=268) and the grader calls her `undecidable` at
+    # mean +0.068%/trade, t=0.52, which is precisely the reading a null can
+    # settle: is that ~zero DIFFERENT from drawing a coin at random?
+    # SHADOW-ONLY BY CHOICE — her live arm retired at `(wg)` and
+    # `fleet_books.DECLARED_LIVE` is avo + mum only (verified, not assumed), so
+    # this book costs no venue call (the shadow host draws from marks already
+    # fetched this cycle) and touches no real money. Per-INSTANCE, so the
+    # retired `crypto-intraday-15m` on the same carrier is untouched.
+    # DECLARED CONSEQUENCE, because it is latent rather than absent: the LIVE
+    # variant host prices the placebo with `marks.fresh_mid` — one venue read
+    # per open — so if georgia is ever re-activated live, this flag stops being
+    # free and that cost must be priced before she runs. Pinned by
+    # `test_no_live_arm_silently_gained_a_control_arm_in_this_pass`, which is
+    # where a future pass has to come and say so.
     DayTraderGated("freqtrade-georgia", tf="15m", stoploss=-0.05, max_open=5,
-                   style="daytrader-15m"),
+                   style="daytrader-15m", control_arm=True),
     # [2026-08-28 (vr)] 🔮 georgia v3 — the IMPULSE FADE book. A NEW ENTRY on
     # her timeframe, not a rearrangement of v1: every axis on v1 is measured
     # closed (see ImpulseFade's docstring for the five, including the sleeve
@@ -2001,8 +2037,13 @@ STRATEGIES = [
     # convenience. v1 keeps trading UNTOUCHED as the control arm: the whole
     # point is "see if it's better", which needs both books running.
     # stoploss -1.5% and max_open 5 are the shipped bracket's own terms.
+    # [2026-09-07] CONTROL ARM ON, same reason as v1 above. She is the fleet's
+    # newest book (era 2026-08-28), so her null accrues from near the start of
+    # her record rather than being bolted onto a long ledger it cannot cover —
+    # the cleanest case in the fleet for the arm to be worth having. Her
+    # carrier `ImpulseFade` is hers alone, and she has no live arm.
     ImpulseFade("freqtrade-georgia-v3", tf="15m", stoploss=-0.015, max_open=5,
-                style="impulse-fade-15m", coins=COINS),
+                style="impulse-fade-15m", coins=COINS, control_arm=True),
     DayTraderGated("crypto-intraday-15m", tf="1h", stoploss=-0.12, max_open=5,
                    style="daytrader-1h", coins=WIDE_COINS),
     SwingDip("crypto-swing-daily", tf="1d", stoploss=-0.10, max_open=8,

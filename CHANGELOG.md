@@ -1,3 +1,90 @@
+## 2026-09-07 (yv) — THE FLEET'S ONLY ANSWER TO ITS OWN NULL WAS INSTALLED ON ONE BOOK OF FOURTEEN: the control arm is per-BOOK now, and two more books have one
+
+**Eamon: *"Where can we improve on from here"* -> *"Yes"*.** The second half of
+`(yu)`, and the improvement `(yt)` ranked first.
+
+**THE GAP.** `(yt)` measured that **NOT ONE of fourteen books clears a
+random-entry null** (best P=0.072; 🎫 the READY taker P=0.145) — and the
+fleet's own proper instrument for that question, a PAIRED matched-window
+placebo, was installed on **exactly one book**. `(hm)` has required this since
+30-Jul (*"grade a directional book against a random-entry benchmark, never
+against zero"*) and `(ro)` built the machinery; it was never generalised, so
+the audit had to substitute a null built from a sparse price tape that could
+only randomise the COIN and not the TIMING.
+
+**WHY IT COULD NOT SIMPLY BE SWITCHED ON, and this is the whole change.**
+`control_arm` was a CLASS attribute on `OversoldRebound`, and **the carriers
+are SHARED**: `DayTraderGated` carries 🔮 georgia AND retired
+`crypto-intraday-15m`; `SwingDip` carries 🙏 avo — **which has a LIVE
+real-money arm** — AND retired `crypto-swing-daily`; `MomoBreakout` carries
+retired dad AND retired breakout-4h. Setting the class flag would have swept
+in three retired rows and one real-money book. `STRATEGIES` holds one INSTANCE
+per book, so the honest granularity is an instance attribute: the class default
+is now `False` on `Carrier`, the constructor takes `control_arm=None`
+(inherit) and mum's class attribute is **untouched** — she is the one book with
+a proven arm and this pass must not perturb her.
+
+**TURNED ON: 🔮 georgia and 🔮 georgia-v3. BOTH SHADOW-ONLY.**
+* **georgia** is the largest sample in the fleet (**n=268**) and the grader
+  calls her `undecidable` at **mean +0.068%/trade, t=0.52** — precisely the
+  reading a null can settle: is that ~zero DIFFERENT from drawing a coin at
+  random?
+* **georgia-v3** is the newest book (era 28-Aug), so her null covers nearly her
+  whole record rather than being bolted onto a ledger it cannot reach.
+
+**THE WIRING ALREADY EXISTED** — `control_draw` and `control_settle` are called
+UNCONDITIONALLY at both hosts' open/close sites and return `{}` for a book that
+does not declare the arm, so this pass adds no call, no branch and no code path.
+Only the flag moved.
+
+**TWO HAZARDS CHECKED RATHER THAN ASSUMED, because this touches carriers that
+also run real money:**
+1. **THE RNG STREAM.** `control_draw` calls `random.choice`, so if any trade
+   decision shared the module RNG, enabling the arm would shift the stream and
+   CHANGE TRADES. Measured: that call is the **only** `random.` use in
+   `lighter_family_bot`, and there is **none at all** in
+   `lighter_avo_live_bot`. No trade can move.
+2. **THE MARK READ.** The SHADOW host prices the placebo from
+   `b.last_mark.get` — marks already fetched this cycle, **zero extra venue
+   calls**. The LIVE host uses `marks.fresh_mid`, **one venue read per open**.
+   Both books turned on here are shadow-only (`fleet_books.DECLARED_LIVE` is
+   avo + mum, verified not assumed), so this pass costs nothing. **DECLARED
+   because it is latent rather than absent:** if georgia is ever re-activated
+   live, the flag stops being free and that cost must be priced first.
+
+**🙏 AVO IS DEFERRED, DELIBERATELY.** She is the book this would most inform —
+n=29 at +1.793%/trade, t=2.46, `on_track`, heading for the gate — and she is
+the one whose carrier is shared with a live arm and whose host pays the venue
+read. That is a different risk class from the two shadow books here, so it gets
+its own pass after these are verified in the live payload (rule 1: ship narrow,
+verify, then widen). Pinned by a test that a future pass has to come and edit.
+
+**THE ERA DOES NOT MOVE.** `stamp_state` keys on `extra["policy"]` alone, so
+adding `control_leg` to a close's extra cannot shift a policy boundary —
+verified in the owner, not inferred. No book's graded sample changes.
+
+**A PIN WAS RE-AIMED AND SAID SO** (`(vd)`): `test_other_family_books_do_not_
+grow_a_control_block` asserted *only mum* has an arm. That was correct when
+written and became the thing holding a measurement down — a snapshot, not a
+property. It is now `test_only_declared_books_grow_a_control_block` against a
+declared roster, joined by two tests that pin the PROPERTIES the old one only
+implied: a shared carrier cannot sweep its siblings in, and no live arm gains
+an arm silently. A second pin in `test_variant_host` used georgia as its
+example of a book WITHOUT an arm; re-aimed to avo, who still satisfies its
+premise and is the better example anyway (she is the live book on the shared
+carrier).
+
+**FOUR MUTATIONS VERIFIED RED:** the flag at class level on `DayTraderGated`
+(sweeps in retired intraday-15m); at class level on `Carrier` (sweeps in
+**avo's live arm**); a constructor that silently ignores the per-book kwarg;
+and mum losing her arm.
+
+**TELEMETRY ONLY — no trade, gate, entry, exit or size moves** (hazard 1 above
+is the proof, not the claim), so **main only** per `(mm)`. Forward-only: closes
+already in the ledger have no control leg and never will. Full suite green;
+`audit_image_imports`, `audit_undefined_names`, `audit_venue_purity`,
+`audit_doctrine_enforcement`, `audit_live_roster` all pass.
+
 ## 2026-09-07 (yu) — THE CONTROL ARM COMPUTED ITS ANSWER AND THREW IT AWAY: the placebo pair settled 21 lines before the publish and never reached a single close
 
 **Follow-up to `(yt)`'s audit, and the first of the two improvements it

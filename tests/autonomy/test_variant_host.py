@@ -866,15 +866,23 @@ def test_mum_control_pair_settles_through_the_one_owner():
 
 
 def test_a_non_control_book_payload_does_not_move():
-    """{} for avo/georgia — the control block must not appear on books that
-    run no control arm, or every grader learns a phantom key."""
-    # [(vd)] SLEEVES_OFF="" — these drive her BREAKOUT sleeve to exercise
-    # sizing/rank/stop geometry, which is a different question from which
-    # sleeves may trade. Opting out explicitly beats re-writing the fixture
-    # around `range_on`, and it keeps the geometry assertions honest if the
-    # sleeve policy changes again.
-    with loaded("freqtrade-georgia", GEORGIA_GROSS_X="5",
-                GEORGIA_SLEEVES_OFF="") as m:
+    """The control block must not appear on a book that runs no control arm,
+    or every grader learns a phantom key.
+
+    [2026-09-07] RE-AIMED FROM 🔮 georgia TO 🙏 avo, because georgia now HAS an
+    arm. `(yt)` measured that not one of fourteen books clears a random-entry
+    null while the fleet's own instrument for that question sat on one book;
+    georgia is the largest sample in the fleet and shadow-only, so she was
+    turned on. This test's PREMISE — a book with no arm publishes no block —
+    is unchanged and avo satisfies it, so the property is still pinned; only
+    the example moved. (The `(vd)` sleeve/gross env that used to be needed
+    here was georgia-specific and goes with her.)
+
+    avo is the right replacement for a second reason: she is the LIVE book
+    whose carrier is shared with a control-arm sibling, so if a future pass
+    ever turns `SwingDip` on at CLASS level this reddens.
+    """
+    with loaded() as m:                      # no book => avo, the default
         with _driven(m) as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
