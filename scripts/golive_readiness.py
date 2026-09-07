@@ -65,6 +65,7 @@ import argparse
 import json
 import math
 import os
+import random
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1315,8 +1316,129 @@ def cluster_stats(rows, mean, sd, n):
         return None
 
 
-def stats(rows, book_usd=None):
+#: Resampling budget for `resampled_dd`. Small on purpose: this runs inside
+#: the 6-hourly publish loop for every book, and the quantiles it reports are
+#: stable to well under a tenth of a point at this many draws.
+DD_DRAWS = int(os.environ.get("GOLIVE_DD_DRAWS", "4000"))
+DD_SEED = int(os.environ.get("GOLIVE_DD_SEED", "20260907"))
+
+
+def resampled_dd(rows, book_usd=None, draws=None, seed=None):
+    """The drawdown DISTRIBUTION behind the single realised path.
+
+    Resamples the book's own closes with replacement and reports the max
+    drawdown quantiles plus P(exceeding the gate's own bar). Returns None on
+    anything it cannot judge -- fail-SILENT, because this is a reported
+    diagnostic and an absent one must never look like a low number.
+
+    IT RESAMPLES **DECISIONS, NOT LEGS**, and that is the whole care here.
+    This fleet's books close baskets in one instant -- ⚖️ Counterweight's ten
+    legs, 👩 mum's daily-loss flatten -- so drawing legs independently would
+    treat one decision as ten, shrink the tail by roughly sqrt(batch) and
+    report a reassuring number about a risk that is real. The batching rule is
+    `CLUSTER_WINDOW_S`, imported from the cluster estimator rather than
+    re-chosen, so "what counts as one decision" has ONE definition in this
+    file (`(hj)`: a second copy of a rule is a second rule). MEASURED 7-Sep,
+    p95 decision-wise against p95 leg-wise on the same ledgers:
+
+        ⚖️ Counterweight   155 legs ->  47 decisions   9.45% vs 7.15%  (1.32x)
+        👩 mum LIVE         91 legs ->  77 decisions  10.79% vs 6.79%  (1.59x)
+        🙏 avo LIVE         14 legs ->   8 decisions   4.44% vs 2.95%  (1.51x)
+        🪁 kelly           589 legs -> 569 decisions  46.00% vs 40.14% (1.15x)
+        🎫 taker           184 legs -> 178 decisions   3.06% vs 3.04%  (1.01x)
+
+    So the correction is largest on exactly the books that batch -- the two
+    REAL-MONEY arms and the basket book -- and vanishes on the one that closes
+    its legs singly. Leg-wise resampling would have understated the number an
+    operator acts on by up to 1.6x, on real money.
+
+    DETERMINISTIC BY CONSTRUCTION: a fixed seed, so the published payload does
+    not shimmer between two runs over an unchanged ledger. A diagnostic that
+    moves on its own is one an operator learns to ignore ((gl)).
+
+    The denominator is `book_usd`, matching `stats`'s own `max_dd_frac`, so
+    the two numbers are comparable and both are comparable to the 15% bar.
+    """
+    book_usd = BOOK_USD if book_usd is None else book_usd
+    try:
+        if not rows or len(rows) < 4 or not book_usd or book_usd <= 0:
+            return None
+        # Group legs into decisions by close proximity -- CLUSTER_WINDOW_S is
+        # the fleet's own definition, and `cluster_stats` scans timestamps the
+        # same way.
+        units, cur, anchor = [], [], None
+        for r in rows:
+            ts = r[2]
+            if anchor is not None and (ts - anchor).total_seconds() > CLUSTER_WINDOW_S:
+                units.append(cur)
+                cur, anchor = [], None
+            if anchor is None:
+                anchor = ts
+            cur.append(float(r[1] or 0.0))
+        if cur:
+            units.append(cur)
+        if len(units) < 4:
+            return None
+        rnd = random.Random(DD_SEED if seed is None else seed)
+        k, n_draw = len(units), len(units)
+        dds = []
+        for _ in range(DD_DRAWS if draws is None else draws):
+            eq = peak = 0.0
+            worst = 0.0
+            for _ in range(n_draw):
+                for x in units[rnd.randrange(k)]:
+                    eq += x
+                    peak = max(peak, eq)
+                    worst = max(worst, peak - eq)
+            dds.append(worst / book_usd)
+        dds.sort()
+
+        def _q(q):
+            return dds[min(len(dds) - 1, max(0, int(round(q * (len(dds) - 1)))))]
+
+        over = sum(1 for d in dds if d > GOLIVE_MAX_DD) / len(dds)
+        return {"draws": len(dds), "decisions": k,
+                "p50_pct": round(100 * _q(0.50), 2),
+                "p95_pct": round(100 * _q(0.95), 2),
+                "p99_pct": round(100 * _q(0.99), 2),
+                "p_over_bar": round(over, 4),
+                # [2026-09-07] THE DENOMINATOR IS PUBLISHED, NOT ASSUMED — and
+                # a concurrent session is why. An open PR (#292, unmerged at
+                # the time of writing, so its letter is deliberately NOT cited
+                # here — it would resolve to nothing in this tree) moves the
+                # drawdown BAR off `BOOK_USD` and onto the book's own peak
+                # equity, on Eamon's instruction, and it is right: $1,000 is a
+                # fiction for a live book at $421, where a dollar hole divided
+                # by $1,000 reads 15% against a real **35.6%**.
+                #
+                # These percentages are computed against `book_usd` because
+                # that is what `stats.max_dd_frac` uses AT THIS POINT in the
+                # pipeline (the rebase happens later, in `apply_mtm`). Once
+                # that lands, a reader comparing this number to the published
+                # `max_dd_pct` would be comparing two denominators — which is
+                # precisely the "meant a different thing on every row" defect
+                # that PR exists to end, reproduced one field over. So the
+                # denominator travels WITH the number, and `denom_usd` is what
+                # a consumer rebases by. Whoever merges second reconciles.
+                "denom_usd": round(float(book_usd), 2),
+                "maxdd_denom": "book_usd",
+                "basis": "decision-resampled realised closes; REPORTED, not a bar"}
+    except Exception:      # noqa: BLE001 -- a lost diagnostic, never a lost grade
+        return None
+
+
+def stats(rows, book_usd=None, dd_resample=False):
     """Grade one book from its closed-trade rows.
+
+    `dd_resample=True` additionally computes `dd_resampled` (see that
+    function). **It is OPT-IN, and that is not a style choice — it is a
+    measured one.** This function is hot: eight scripts call it, several
+    inside sweep loops, and the bootstrap costs ~133ms against `stats`' own
+    ~0.2ms. Computing it unconditionally made `stats` **660x slower** and blew
+    `study_mum_noncrypto_sleeve_2026-09-02`'s selftest past its 120s CI
+    timeout — a study that has nothing to do with drawdown. The PUBLISH path
+    asks for it once per book per six hours; a study sweeping cells must not
+    pay for a diagnostic it never reads.
 
     rows: [(pnl_pct, pnl_abs, closed_at_datetime)] oldest first. Pure — the DB
     read is the caller's job so this is selftestable offline.
@@ -1368,6 +1490,24 @@ def stats(rows, book_usd=None):
         _run = _run + 1 if _x <= 0 else 0
         _mx = max(_mx, _run)
     _p_loss = 1.0 - wins / n
+    # [2026-09-07] IS THE `halves` BAR SITTING ON A TIE? `mid` splits rows
+    # sorted by close stamp; when rows[mid-1] and rows[mid] share that stamp to
+    # the microsecond, which legs land in which half is decided by the SORT's
+    # stability -- i.e. by the order the database returned -- and not by
+    # anything about the book. `main()` now imposes a deterministic total order
+    # so the same ledger always grades the same way, but the bar is still
+    # FRAGILE there and a reader is entitled to know.
+    #
+    # Measured 7-Sep, 14 graded books: exactly one sits on a tie (🙏 avo's LIVE
+    # arm, whose median boundary lands inside a five-leg daily-loss flatten at
+    # 2026-08-28T16:22:46.174888). Permuting only that batch moves h1 across
+    # **[+$7.27, +$17.36]** -- every ordering still positive, so no verdict
+    # moves today. What makes it worth publishing rather than shrugging at is
+    # the neighbouring row: 👩 mum's LIVE arm passes this same bar on
+    # **h2 = -$0.02**, so the fleet already grades real money on a halves
+    # figure two cents from failing. REPORTED, NEVER A BAR -- `BAR_NAMES` and
+    # `grade()` are byte-unchanged.
+    _halves_tie = bool(n >= 4 and rows[mid - 1][2] == rows[mid][2])
     # [2026-09-02, calibrated -- Eamon: "Calibrate accordingly"] the margin in
     # SAMPLING-NOISE units: how many standard errors the trailing hit rate sits
     # above the book's own break-even, with the SE taken AT break-even (the
@@ -1399,7 +1539,28 @@ def stats(rows, book_usd=None):
         "page_miss_rate": _pb["miss_rate"] if _pb else None,
         "streak_now": _run, "streak_max": _mx,
         "streak_chance": expected_streak(n, _p_loss) if 0.0 < _p_loss < 1.0 else None,
+        "halves_tie": _halves_tie,
     }
+    # [2026-09-07] THE DRAWDOWN DISTRIBUTION, beside the one path that was
+    # walked. `max_dd_frac` above is a single draw: the book's trades in the
+    # order they happened. The 15% bar is then graded on that one ordering,
+    # and the gate cannot tell a book that is SAFE from a book that got a
+    # benign sequence. Measured 7-Sep by resampling each book's own decisions:
+    #
+    #   🪁 kelly       observed 27.9%   p95 45.4%   P(>15% bar) = 82%
+    #   👩 mum LIVE    observed  7.1%   p95 10.8%   p99 14.4%  (bar 15%)
+    #   🎫 taker       observed  2.3%   p95  3.1%   P(>15% bar) =  0%
+    #
+    # so on the fleet's two riskiest books the realised path understates the
+    # p95 by 1.5-1.6x, and mum's real-money arm sits inside one percentage
+    # point of the bar at p99 while reading half of it on the path it walked.
+    # REPORTED, NEVER A BAR, exactly as `cluster`, `mde80_pct` and
+    # `class_split` are: `BAR_NAMES` is the published contract and `grade()`
+    # is untouched. Making it blocking is a gate re-spec and an operator act.
+    # OPT-IN — see the note in this function's docstring for the measurement
+    # that made it so.
+    if dd_resample:
+        out["dd_resampled"] = resampled_dd(rows, book_usd)
     # [2026-08-20 (tz)] `se_pct` — computed one line above inside `t` and then
     # thrown away, which is why the horizon could only ask "is the mean
     # negative?" and never "is it negative BEYOND NOISE?". Published so a
@@ -1853,6 +2014,41 @@ def apply_mtm(s, mtm, min_samples=None, min_days=None):
     out["max_dd_frac"] = worse
     out["maxdd_denom"] = denom
     out["maxdd_basis"] = "mtm" if worse == m_bar else "realised"
+    # [(yz)] RECONCILE `dd_resampled` ONTO THE SAME DENOMINATOR — the handoff
+    # the concurrent session left in `resampled_dd`: *"the denominator travels
+    # WITH the number ... Whoever merges second reconciles."* That is this
+    # merge. They computed against `book_usd` because that is what
+    # `stats.max_dd_frac` used AT THAT POINT in the pipeline, and named the
+    # hazard exactly: once the rebase lands, a reader comparing `dd_resampled`
+    # to the published `max_dd_pct` compares two denominators — "the defect
+    # that PR exists to end, reproduced one field over".
+    #
+    # `apply_mtm` is the one place that holds BOTH, so it is where they are
+    # reconciled. The quantiles are a pure scale and rebase EXACTLY.
+    # `p_over_bar` does not: it is a COUNT over a threshold, recoverable only
+    # from the draws themselves, and on a live book whose peak is BELOW
+    # `denom_usd` it **understates** — the alarming direction, which is the
+    # same failure this change exists to end. So it is nulled with its reason
+    # and kept under a self-describing name rather than silently rescaled or
+    # silently dropped (I8).
+    _ddr = out.get("dd_resampled")
+    if (denom == "peak_equity" and isinstance(_ddr, dict)
+            and isinstance(_ddr.get("denom_usd"), (int, float))
+            and _ddr["denom_usd"] > 0):
+        _k = float(_ddr["denom_usd"]) / peak_eq
+        _reb = dict(_ddr)
+        for _q in ("p50_pct", "p95_pct", "p99_pct"):
+            if isinstance(_reb.get(_q), (int, float)):
+                _reb[_q] = round(_reb[_q] * _k, 2)
+        _reb["p_over_bar_at_book_denom"] = _reb.get("p_over_bar")
+        _reb["p_over_bar"] = None
+        _reb["p_over_bar_why"] = (
+            "counted against the bar on denom_usd; a count over a threshold "
+            "cannot be rescaled from quantiles, and where peak < denom_usd it "
+            "UNDERSTATES")
+        _reb["denom_usd"] = round(float(peak_eq), 2)
+        _reb["maxdd_denom"] = "peak_equity"
+        out["dd_resampled"] = _reb
     return out
 
 
@@ -2984,7 +3180,17 @@ def book_payload(s):
             if _sh.get("page_miss_rate") is not None else None,
             "streak_now": _sh.get("streak_now"), "streak_max": _sh.get("streak_max"),
             "streak_p50_chance": _sc.get("p50"), "streak_p95_chance": _sc.get("p95"),
+            # [2026-09-07] TRUE when the `halves` bar's split boundary falls
+            # inside a tied close batch — see `stats`. A reader comparing h1/h2
+            # across runs, or deciding on a near-zero half, needs to know the
+            # figure sat on an ordering rather than on the book.
+            "halves_tie": _sh.get("halves_tie"),
         }
+    # [2026-09-07] The drawdown DISTRIBUTION beside the single realised path —
+    # see `resampled_dd`. Absent when it cannot be computed; never zero-filled,
+    # because a missing risk number that reads as a low one is worse than none.
+    if isinstance(s.get("dd_resampled"), dict):
+        out["dd_resampled"] = s["dd_resampled"]
     # [2026-08-17] The instrument-class split, on the same footing and for the
     # same reason as `cluster` above: a number the keep-or-retire decision
     # depends on, which two consecutive reviews had to re-derive from the raw
@@ -3171,6 +3377,138 @@ def _selftest_class_split():
     assert book_payload(s)["class_split"] is cs, "published on the payload"
 
 
+def _selftest_dd_resampled():
+    """[2026-09-07] the drawdown distribution and the halves-tie flag.
+
+    Mutation-verified (I3) — each assertion below was confirmed to REDDEN
+    against the specific defect it names, because a guard nobody has broken is
+    a guard nobody has tested.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+    t0 = _dt(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc)
+
+    # ---- resampled_dd -----------------------------------------------------
+    # A book that only ever wins can never draw down; one that only loses is
+    # in drawdown the whole way. Mutation: dropping the `peak - eq` max and
+    # reporting the FINAL loss instead passes the second and fails the first.
+    winners = [(0.01, 10.0, t0 + _td(hours=i)) for i in range(20)]
+    d = resampled_dd(winners, 1000.0, draws=300)
+    assert d and d["p99_pct"] == 0.0, d
+    losers = [(-0.01, -10.0, t0 + _td(hours=i)) for i in range(20)]
+    d = resampled_dd(losers, 1000.0, draws=300)
+    assert d and d["p50_pct"] >= 19.0, d
+    assert d["p_over_bar"] == 1.0, d
+
+    # DRAWDOWN IS MEASURED FROM THE RUNNING PEAK, NOT FROM ZERO. Both cases
+    # above are blind to that: on an all-losing path the peak IS zero, and on
+    # an all-winning path a loss-from-zero reads zero too, so `peak - eq` and
+    # `-eq` agree on each. This book ENDS far up (+$400 over 20 draws) while
+    # taking real holes on the way, so a from-zero definition reports ~0 and a
+    # from-peak one cannot. Mutation `worst = max(worst, -eq)` reddens ONLY
+    # here — it survived the two tests above, which is why this one exists.
+    updown = ([(0.03, 30.0, t0 + _td(hours=i)) for i in range(15)] +
+              [(-0.01, -10.0, t0 + _td(hours=15 + i)) for i in range(5)])
+    d = resampled_dd(updown, 1000.0, draws=800)
+    assert d and d["p95_pct"] >= 1.5, d      # real holes below a rising peak
+    assert d["p50_pct"] > 0.0, d
+
+    # THE DENOMINATOR IS `book_usd`, NOT THE RUNNING PEAK — the same choice
+    # `stats.max_dd_frac` makes, so the two numbers and the 15% bar are all on
+    # one scale. Dividing by the peak would report a SMALLER hole on a book
+    # that has grown, which is the (yr) "drawdown denominator that halved real
+    # money's hole" defect; adopting it here would import that defect into the
+    # risk estimate. Pinned by PROPORTIONALITY: same seed, same units, so the
+    # dollar holes are identical and the reported fraction must scale exactly
+    # with 1/book_usd. Under a `max(peak, book_usd)` denominator the peak
+    # (~$450) exceeds the $100 book and the ratio collapses. Mutation
+    # `worst / max(peak, book_usd)` survived every other assertion here.
+    d_small = resampled_dd(updown, 100.0, draws=800)
+    assert d_small and abs(d_small["p95_pct"] - 10.0 * d["p95_pct"]) < 0.11, \
+        (d_small["p95_pct"], d["p95_pct"])
+
+    # ...and the denominator TRAVELS WITH THE NUMBER, so the percentages can
+    # never be read against a different one. PR #292 is moving the BAR
+    # onto peak equity; until the two are reconciled, a consumer needs
+    # `denom_usd` to rebase. A mutation dropping it reddens here.
+    assert d["denom_usd"] == 1000.0 and d_small["denom_usd"] == 100.0
+    assert d["maxdd_denom"] == "book_usd"
+
+    # IT MUST RESAMPLE DECISIONS, NOT LEGS. Ten legs closing in one instant is
+    # ONE decision: drawn together they can produce a 10x deeper hole than
+    # drawn independently. Mutation: batching by row index (one leg per unit)
+    # collapses this gap and reddens here.
+    inst = t0
+    basket, solo = [], []
+    for i in range(40):
+        # 4 legs on one instant, alternating +/- baskets
+        sign = 1.0 if (i % 2 == 0) else -1.0
+        for j in range(4):
+            basket.append((sign * 0.01, sign * 25.0, inst))
+            solo.append((sign * 0.01, sign * 25.0, inst + _td(hours=j + 1)))
+        inst += _td(days=1)
+    db = resampled_dd(basket, 1000.0, draws=800)
+    ds = resampled_dd(solo, 1000.0, draws=800)
+    assert db and ds and db["decisions"] < ds["decisions"], (db, ds)
+    assert db["p95_pct"] > ds["p95_pct"], (db["p95_pct"], ds["p95_pct"])
+
+    # DETERMINISTIC: an unchanged ledger must not publish a shimmering number.
+    assert resampled_dd(basket, 1000.0, draws=300) == \
+        resampled_dd(basket, 1000.0, draws=300)
+
+    # FAIL-SILENT, never zero-filled: an absent risk number that reads as a
+    # low one is worse than none. Mutation: returning {} or zeros reddens.
+    assert resampled_dd([], 1000.0) is None
+    assert resampled_dd(winners[:3], 1000.0) is None
+    assert resampled_dd(winners, 0.0) is None
+
+    # ---- the bootstrap is OPT-IN, and stays that way ----------------------
+    # `stats` is hot: eight scripts call it, several inside sweep loops.
+    # Computing the bootstrap unconditionally cost ~133ms against `stats`' own
+    # ~0.2ms and blew an UNRELATED study's selftest past CI's 120s timeout.
+    # Two arms, because a comment is not a control:
+    #   (a) the field is ABSENT unless asked for -- a mutation restoring the
+    #       unconditional call reddens here;
+    #   (b) the default path stays CHEAP, measured against the opt-in path on
+    #       the same rows, so a future "small" default (say 200 draws) that
+    #       reintroduces the regression by degrees also reddens.
+    many = [(0.01 if i % 2 else -0.01, 10.0 if i % 2 else -10.0,
+             t0 + _td(hours=i)) for i in range(120)]
+    assert "dd_resampled" not in stats(many)
+    assert isinstance(stats(many, dd_resample=True).get("dd_resampled"), dict)
+    import time as _time
+    _a = _time.perf_counter()
+    for _ in range(20):
+        stats(many)
+    _cheap = _time.perf_counter() - _a
+    _b = _time.perf_counter()
+    stats(many, dd_resample=True)
+    _one_boot = _time.perf_counter() - _b
+    assert _cheap < _one_boot, (
+        f"20 default stats() calls ({_cheap:.3f}s) must cost less than ONE "
+        f"opt-in call ({_one_boot:.3f}s) — the bootstrap has leaked into the "
+        f"default path")
+
+    # ---- the halves-tie flag ---------------------------------------------
+    # It must fire ONLY when the split boundary is genuinely inside a tie.
+    # Mutation: `n >= 4 and True` (always-on) reddens on the clear case;
+    # comparing rows[mid] to rows[mid+1] reddens on the tied one.
+    tied = [(0.0, 1.0, t0), (0.0, 1.0, t0 + _td(hours=1)),
+            (0.0, 1.0, t0 + _td(hours=1)), (0.0, 1.0, t0 + _td(hours=2))]
+    clear = [(0.0, 1.0, t0), (0.0, 1.0, t0 + _td(hours=1)),
+             (0.0, 1.0, t0 + _td(hours=2)), (0.0, 1.0, t0 + _td(hours=3))]
+    assert stats(tied)["shape"]["halves_tie"] is True
+    assert stats(clear)["shape"]["halves_tie"] is False
+
+    # BOTH ARE REPORTED, NEVER BARS. The published contract and the verdict
+    # must be byte-unchanged by everything above — this is the assertion that
+    # keeps a diagnostic from quietly becoming a gate.
+    assert BAR_NAMES == ("window", "closes", "mean", "t", "halves", "maxdd")
+    s_clear, s_tied = stats(clear, dd_resample=True), stats(tied, dd_resample=True)
+    assert grade(s_clear) == grade(s_tied), (grade(s_clear), grade(s_tied))
+    assert "dd_resampled" not in bar_map(s_clear)
+    assert "halves_tie" not in bar_map(s_clear)
+
+
 def _selftest_shape():
     """[2026-09-02, edge-audit follow-up] the shape block and the exact streak."""
     from datetime import datetime as _dt, timedelta as _td
@@ -3309,6 +3647,7 @@ def _selftest():
     _selftest_class_split()
     _selftest_decided_until()
     _selftest_shape()
+    _selftest_dd_resampled()
     from datetime import datetime, timedelta, timezone
     t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
@@ -3984,6 +4323,34 @@ def main():
     def _key(r):
         return r.get("close_ts") or r.get("closed_at") or ""
 
+    def _sort_key(r):
+        """A DETERMINISTIC TOTAL ORDER over one book's closes.
+
+        [2026-09-07] `sorted(..., key=_key)` is stable, so legs sharing a close
+        stamp kept whatever order the database returned — and the `halves` bar
+        splits on `mid = n // 2`, so when that boundary lands inside a tied
+        batch the bar was decided by row order. Re-running the grader over an
+        UNCHANGED ledger could publish a different h1/h2, which is not a
+        property a bar governing real money may have.
+
+        Measured 7-Sep before this shipped: one of 14 graded books sits on such
+        a tie (🙏 avo's LIVE arm — five legs closing on one daily-loss flatten
+        instant), and permuting only that batch moves h1 across
+        [+$7.27, +$17.36]. **No verdict moves today** — every ordering leaves
+        both halves positive, and the same 14 books grade identically before
+        and after — so this buys reproducibility, not a different answer. The
+        book that makes it matter is the neighbour: 👩 mum's LIVE arm passes
+        `halves` on h2 = -$0.02.
+
+        The secondary keys are the OPEN stamp then the pair: among legs closed
+        in the same instant, the one opened first is the older trade, and the
+        pair breaks the remainder. Both are properties of the trade rather than
+        of the query, which is the whole point.
+        """
+        return (_key(r),
+                str(r.get("open_ts") or r.get("opened_at") or ""),
+                str(r.get("pair") or ""))
+
     print(f"GO-LIVE READINESS — bar: >={GOLIVE_MIN_DAYS:g}d, >={GOLIVE_MIN_CLOSES} "
           f"closes, mean>0, t>={GOLIVE_MIN_T:g}, both halves +, maxDD<"
           f"{100*GOLIVE_MAX_DD:.0f}%")
@@ -4056,7 +4423,7 @@ def main():
         print("class split unavailable (no fleet_bus.is_crypto) — grades "
               "unchanged, splits omitted", file=sys.stderr)
     for bot in sorted(books):
-        rs = sorted(books[bot], key=_key)
+        rs = sorted(books[bot], key=_sort_key)
         quads, integ_eps = [], []
         for r in rs:
             # [(hf)] intervals for the integrity check, over the WHOLE ledger:
@@ -4104,7 +4471,15 @@ def main():
         # count on purpose: a book whose era has too few closes must still
         # appear, showing its era bars dark, or narrowing the window would
         # silently REMOVE the frontrunner from the report instead of demoting it.
-        s, s_all = stats(parsed), stats(parsed_all)
+        # [2026-09-07] `dd_resample=True` on the ERA-SCOPED sample only — the
+        # authoritative one, and the one the 15% bar is graded on. The
+        # all-time reading is deliberately left without it: its whole purpose
+        # is the pooled figure the era replaced, and putting a risk
+        # distribution on it invites the two to be read together, which is the
+        # confusion the era split exists to end. This is also the ONLY call
+        # site that asks for the bootstrap (see `stats`' docstring: it is
+        # opt-in because it is ~660x the cost of the rest of the function).
+        s, s_all = stats(parsed, dd_resample=True), stats(parsed_all)
         # [2026-08-17] Attached to the ERA-SCOPED sample only, and rides on `s`
         # exactly as `cluster`/`mtm` do so `book_payload` stays the one place
         # that decides what is published. The all-time sample deliberately gets

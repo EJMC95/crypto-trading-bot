@@ -248,3 +248,60 @@ def test_the_peak_denominator_is_not_uniformly_stricter():
     assert got["max_dd_frac"] == pytest.approx(0.0458)
     assert got["max_dd_frac"] < got["max_dd_frac_book"]
     assert gr.bar_map(got)["maxdd"] is True
+
+
+def test_dd_resampled_is_reconciled_onto_the_same_denominator():
+    """The concurrent-merge handoff: *"Whoever merges second reconciles."*
+
+    PR #291's `resampled_dd` computes against `book_usd` because that is what
+    `stats.max_dd_frac` used at that point in the pipeline, and its author
+    named the hazard the (yz) rebase would create — a reader comparing
+    `dd_resampled` to the published `max_dd_pct` compares two denominators,
+    "the defect that PR exists to end, reproduced one field over".
+
+    `apply_mtm` is the one place holding both, so it reconciles them.
+    """
+    s_in = {"n": 40, "days": 40.0, "mean_pct": 0.5, "t": 3.0, "h1": 1.0,
+            "h2": 1.0, "max_dd_frac": 0.0708, "max_dd_usd": -70.80,
+            "dd_resampled": {"draws": 400, "decisions": 30,
+                             "p50_pct": 5.0, "p95_pct": 10.0, "p99_pct": 12.0,
+                             "p_over_bar": 0.02, "denom_usd": 1000.0,
+                             "maxdd_denom": "book_usd"}}
+    mtm = {"n": 3761, "days": 13.0, "max_dd_frac": 0.0643,
+           "max_dd_frac_peak": 0.1104, "peak_equity": 500.0}
+
+    got = gr.apply_mtm(s_in, mtm)["dd_resampled"]
+
+    # $1,000 -> $500 peak doubles every quantile. An EXACT scale, not a model.
+    assert got["p50_pct"] == pytest.approx(10.0)
+    assert got["p95_pct"] == pytest.approx(20.0)
+    assert got["p99_pct"] == pytest.approx(24.0)
+    assert got["denom_usd"] == pytest.approx(500.0)
+    assert got["maxdd_denom"] == "peak_equity"
+
+    # A COUNT over a threshold cannot be rescaled from quantiles, and where
+    # peak < denom_usd it UNDERSTATES — the alarming direction. Nulled with a
+    # reason, and KEPT under a name that states its basis: neither fabricated
+    # nor lost.
+    assert got["p_over_bar"] is None
+    assert got["p_over_bar_at_book_denom"] == pytest.approx(0.02)
+    assert "UNDERSTATES" in got["p_over_bar_why"]
+
+    # The caller's dict is never mutated (apply_mtm's standing contract).
+    assert s_in["dd_resampled"]["p50_pct"] == 5.0
+    assert s_in["dd_resampled"]["maxdd_denom"] == "book_usd"
+
+
+def test_dd_resampled_is_left_alone_when_the_bar_did_not_rebase():
+    """No rebase, no reconciliation — the two are already on one denominator,
+    and touching it would invent a mismatch rather than close one."""
+    s_in = {"n": 40, "days": 40.0, "mean_pct": 0.5, "t": 3.0, "h1": 1.0,
+            "h2": 1.0, "max_dd_frac": 0.40,          # no max_dd_usd
+            "dd_resampled": {"p50_pct": 5.0, "p_over_bar": 0.02,
+                             "denom_usd": 1000.0, "maxdd_denom": "book_usd"}}
+    got = gr.apply_mtm(s_in, {"n": 3000, "days": 30.0, "max_dd_frac": 0.01,
+                              "max_dd_frac_peak": 0.005, "peak_equity": 2000.0})
+    assert got["maxdd_denom"] == "book_usd"
+    assert got["dd_resampled"]["p50_pct"] == 5.0
+    assert got["dd_resampled"]["p_over_bar"] == 0.02
+    assert "p_over_bar_at_book_denom" not in got["dd_resampled"]

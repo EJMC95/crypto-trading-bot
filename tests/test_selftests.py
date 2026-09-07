@@ -205,6 +205,31 @@ SELFTEST_MODULES = [
     # verdict branches — including RETIRE and KEEP GRADING, which the live
     # data does not currently exercise, so the untaken branches cannot rot.
     "scripts.study_kelly_fresh_read_2026-09-07",
+    # [2026-09-07] the MONTE CARLO RISK AUDIT + benchmark shootout. The gate
+    # grades a 15% drawdown bar over the ONE path a book happened to walk;
+    # this resamples the book's own decisions and reports the distribution
+    # behind it, then prices the books against buy-and-hold / SMA / random
+    # entry / volatility-only / cash on one window and one cost model.
+    # SELFTEST_MODULES and deliberately NOT ENFORCED_AUDITS, the edge_audit
+    # reason exactly: its live arms read the public ledger and /bus.json, both
+    # of which move with every publish and no code change. The --selftest is
+    # OFFLINE and pure, and pins what the live run cannot: that the file moves
+    # nothing (an AST walk of its own call sites, not a substring scan), that
+    # batching groups a basket close into ONE decision, that the drawdown
+    # denominator agrees with `golive_readiness.stats`' own routine, that the
+    # varied-edge arm moves the MEAN and not the spread, that the position
+    # fraction is the whole sizing scale (the defect that read 6.5x on a book
+    # that made 16%), that a 10x sizing disagreement is REFUSED, that
+    # `price_at` refuses beyond its gap rather than extrapolating, that N_eff
+    # collapses nine perfectly correlated arms to one, and that the critical
+    # value and computability floor are the fleet's own owners BY IDENTITY.
+    "scripts.study_montecarlo_risk_2026-09-07",
+    # [2026-09-06] 🎫 the taker's READY read. Registered 7-Sep: it shipped
+    # with a `--selftest` and no registry entry, so `test_no_unregistered_
+    # selftest` has been RED on main since — found by the next study to add
+    # one. Pre-existing and unrelated to that study; recorded here rather than
+    # folded in silently.
+    "scripts.study_taker_ready_2026-09-06",
     # [2026-09-02 (xn)] 👩 mum's class-aware ladder replay. --selftest is
     # OFFLINE and is the reuse pin: the generalised bracket walk must reduce
     # byte-identically to `study_mum_supply.bracket_walk`, and the vectorised

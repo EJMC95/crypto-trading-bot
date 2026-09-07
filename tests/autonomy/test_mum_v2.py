@@ -267,17 +267,160 @@ def test_she_declares_a_control_arm_and_publishes_it_even_at_zero():
     assert out["edge_pct"] == pytest.approx(1.5), "edge is mean MINUS the null"
 
 
-def test_other_family_books_do_not_grow_a_control_block():
-    """Blast-radius discipline: only a carrier that DECLARES the arm gets it."""
+def _mum_ctl():
+    """A control-arm strategy stub, and a settled meta."""
+    class _S:
+        control_arm = True
+    return _S(), {"null_pair": "SOL", "null_entry": 100.0}
+
+
+def test_the_settled_control_pair_reaches_the_close_not_just_the_running_sum():
+    """[2026-09-07] The (gr) shape one instrument over.
+
+    `control_settle` computed the per-trade placebo return, folded it into a
+    lifetime running sum, and dropped it 21 lines before `publish_paper_trade`
+    — so the pair lived for one loop iteration and NEVER reached the ledger.
+    Measured across all 4,311 rows on 7-Sep: **zero closes carry a control
+    observation.** Without the per-trade pairs the published `edge_pct` has no
+    standard error, cannot be era-scoped, and cannot be split or clustered —
+    it is a number that can be quoted and not tested.
+
+    Mutation-verified: reverting `control_settle` to `return None` reddens
+    here, and only here.
+    """
+    S, m = _mum_ctl()
+    ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    obs = fam.control_settle(S, ctrl, m, total=5.0, notional=100.0,
+                             null_px=110.0)
+    # the accumulation is UNCHANGED — the whole point is that this is additive
+    assert ctrl == {"n": 1, "sum": pytest.approx(0.05),
+                    "null_n": 1, "null_sum": pytest.approx(0.10)}
+    # ...and the observation now survives the call
+    assert obs["null_pair"] == "SOL"
+    assert obs["null_ret"] == pytest.approx(0.10)
+    leg = fam.control_leg(obs)
+    assert leg["control_leg"] == {"null_pair": "SOL", "null_ret": 0.1}
+
+    # THE REAL LEG IS NOT REPEATED. When the pair settles, the close's own
+    # pnl_pct IS total/notional — the identical expression the accumulator
+    # uses — so a second copy on the row could only ever drift.
+    assert "ret" not in leg["control_leg"] and "pnl_pct" not in leg["control_leg"]
+    assert ctrl["sum"] == pytest.approx(5.0 / 100.0)
+
+
+def test_an_unsettled_control_pair_publishes_nothing_rather_than_a_zero():
+    """(rp)/(yq): both legs or neither, and an absence must not become a 0.0.
+
+    A zero `null_ret` is a MEASUREMENT ("the placebo went nowhere"); an
+    unpriceable placebo is an ABSENCE. Collapsing them would feed fabricated
+    observations into the very null that decides whether this book has an edge.
+    """
+    S, m = _mum_ctl()
+    ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    # unpriceable placebo -> nothing settles, nothing accumulates, nothing published
+    assert fam.control_settle(S, ctrl, m, 5.0, 100.0, None) == {}
+    assert ctrl == {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    assert fam.control_leg({}) == {} and fam.control_leg(None) == {}
+    # no draw at all (the common case: no pool) -> same
+    assert fam.control_settle(S, ctrl, {}, 5.0, 100.0, 110.0) == {}
+    # a non-finite return is refused rather than published (I5)
+    assert fam.control_leg({"null_pair": "X", "null_ret": float("inf")}) == {}
+    assert fam.control_leg({"null_pair": "X", "null_ret": None}) == {}
+    # a genuine zero IS published — it is evidence, not an absence
+    assert fam.control_leg({"null_pair": "X", "null_ret": 0.0}) == {
+        "control_leg": {"null_pair": "X", "null_ret": 0.0}}
+
+
+def test_a_book_without_a_control_arm_publishes_no_leg():
+    """Blast-radius discipline, mirroring the summary-block test below: only a
+    carrier that DECLARES the arm gets the per-close field."""
+    class _S:
+        control_arm = False
+    ctrl = {"n": 0, "sum": 0.0, "null_sum": 0.0, "null_n": 0}
+    assert fam.control_settle(_S(), ctrl, {"null_pair": "SOL",
+                                           "null_entry": 100.0},
+                              5.0, 100.0, 110.0) == {}
+    assert ctrl["n"] == 0
+
+
+#: [2026-09-07] The books that carry a random-entry control arm. RE-AIMED from
+#: "only mum", which was correct when written and became the thing holding a
+#: measurement down — the `(vd)` rule: a test asserting a book's CURRENT
+#: narrowness is a SNAPSHOT, not a property, and when it blocks a widening the
+#: question is whether the widening is right, never whether the pin exists.
+#:
+#: The widening is right: `(za)` measured that NOT ONE of fourteen books clears
+#: a random-entry null, and the fleet's own instrument for that question was on
+#: one book. 🔮 georgia (n=268, the largest sample in the fleet, `undecidable`
+#: at t=0.52) and georgia-v3 (newest era, so the null covers almost her whole
+#: record) are the two cleanest cases, and both are SHADOW-ONLY.
+CONTROL_ARM_BOOKS = {"freqtrade-mum", "freqtrade-georgia", "freqtrade-georgia-v3"}
+
+#: Books whose carrier is SHARED with one of the above. These are the reason
+#: the flag is per-INSTANCE: a class attribute would have swept them in.
+CARRIER_SIBLINGS = {"crypto-intraday-15m",    # DayTraderGated, with georgia
+                    "crypto-swing-daily",     # SwingDip, with avo
+                    "crypto-breakout-4h"}     # MomoBreakout, with dad
+
+
+def test_only_declared_books_grow_a_control_block():
+    """Blast-radius discipline: exactly the DECLARED set, and nothing else."""
     class _B:
         pass
+    seen = set()
     for s in fam.STRATEGIES:
-        if s.bot == "freqtrade-mum":
-            continue
         b = _B()
         b.s = s
         b.ctrl = {"n": 1, "sum": 0.0, "null_sum": 0.0, "null_n": 1}
-        assert fam._control_extra(b) == {}
+        if fam._control_extra(b):
+            seen.add(s.bot)
+    assert seen == CONTROL_ARM_BOOKS, (
+        f"the control-arm roster drifted: {seen ^ CONTROL_ARM_BOOKS}")
+
+
+def test_a_shared_carrier_cannot_sweep_its_siblings_into_the_arm():
+    """[2026-09-07] THE REASON THE FLAG IS PER-INSTANCE.
+
+    `(ro)` set `control_arm = True` as a CLASS attribute, which was right when
+    mum was the only book that had one. But the carriers are SHARED —
+    `DayTraderGated` carries 🔮 georgia AND retired `crypto-intraday-15m`,
+    `SwingDip` carries 🙏 avo AND retired `crypto-swing-daily` — so turning the
+    arm on at class level would have swept in retired rows and, through
+    `SwingDip`, a book with a LIVE REAL-MONEY ARM.
+
+    Mutation-verified: moving `control_arm = True` onto `DayTraderGated` or
+    `SwingDip` reddens here.
+    """
+    by_bot = {s.bot: s for s in fam.STRATEGIES}
+    for sib in CARRIER_SIBLINGS:
+        s = by_bot.get(sib)
+        if s is None:                     # a retirement removed the row
+            continue
+        assert not getattr(s, "control_arm", False), (
+            f"{sib} grew a control arm from a shared carrier "
+            f"({type(s).__name__}) — the flag must be per-instance")
+
+
+def test_no_live_arm_silently_gained_a_control_arm_in_this_pass():
+    """[2026-09-07] 🙏 avo is DEFERRED, deliberately, and this pins it.
+
+    Her carrier `SwingDip` is the one shared with a live real-money arm, and
+    unlike the shadow books her host prices the placebo with a VENUE READ
+    (`marks.fresh_mid`) — one extra call per open on a real-money path. That
+    is a different risk class from the two shadow books this pass turns on,
+    so it waits for its own pass after these are verified in the live payload
+    (rule 1: ship narrow, verify, then widen).
+
+    👩 mum is the declared exception: her arm predates this work and is the
+    proven one. This test pins WHICH live arms carry one, so a future pass
+    turning avo on has to come here and say so.
+    """
+    by_bot = {s.bot: s for s in fam.STRATEGIES}
+    assert by_bot["freqtrade-avo-maria"].control_arm is False, (
+        "avo's live arm gained a control arm without the venue-read cost "
+        "being priced — see this test's docstring")
+    assert by_bot["freqtrade-mum"].control_arm is True, (
+        "mum's arm is the proven one and must not be disturbed by this pass")
 
 
 def test_the_census_can_name_the_binding_constraint():
