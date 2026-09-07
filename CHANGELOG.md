@@ -95,6 +95,8 @@ BH-FDR.** At alpha 0.05 across 88 tests, ~4.4 false positives are expected by
 chance alone. The register is a real build; the number is what makes the case
 for it.
 
+**[SAME DAY, CORRECTED IN PLACE per I12 — CodeQL failed this commit and was RIGHT, on a defect three layers deep.]** It flagged `bh_survivors(cand, alpha=0.05)` as an unsupported keyword. The keyword was the visible third of it: the real signature is `bh_survivors(pvals, fdr=FDR)` taking a list of **(key, p) TUPLES** and returning a **SET**, and I passed a list of DICTS with a downstream comprehension compensating for a return shape I had guessed. Three errors in one line. **It was latent because the study REFUSES on this venue's data before the branch ever runs** — dead in practice, green in CI, and it would have raised `TypeError` the day the OI history was exposed and the test finally reached it. The fix is not the keyword: the selftest now **EXERCISES the BH path** on a planted signal that is actually PICKED on train, and both original errors (the keyword and the argument shape) are individually verified to redden it. Also removed an unused `clip` local in `fleet_beta` (CodeQL note). **The lesson is the one this fleet keeps paying for: a branch no test drives is not covered by the module's own green selftest**, and a study that correctly refuses on its data will never exercise what comes after the refusal.
+
 **FILES:** `scripts/fleet_beta.py` (**6/6 mutations RED** — an unmeasurable
 correlation reading as 0, the MIN_N floor, the coverage gate, the withheld
 ratio, N_eff not collapsing on correlated names, and a short overlap inventing

@@ -217,19 +217,23 @@ def run(hist, looks=(4, 24), horizons=(4, 12, 24)):
     # BH across the TEST results of the picked cells only
     surv = []
     if picked:
+        # `bh_survivors(pvals, fdr=FDR)` takes a list of (key, p) TUPLES and
+        # returns a SET of surviving keys. The first cut of this call passed a
+        # list of DICTS with `alpha=` — three errors in one line, and latent,
+        # because the study refuses on this venue's data before the branch ever
+        # runs. CodeQL caught the keyword; the shape errors were sitting behind
+        # it. The selftest below now EXERCISES this path, so the branch is
+        # covered rather than merely correct today.
         cand = []
         for k in picked:
             m_te, t_te, n_te = test.get(k, (None, None, 0))
             if t_te is None or n_te < MIN_COINS:
                 continue
-            p = _p_from_t(t_te, n_te - 1)
-            cand.append({"key": "%dh/%dh/%s" % k, "p": p})
+            cand.append(("%dh/%dh/%s" % k, _p_from_t(t_te, n_te - 1)))
         if cand:
-            surv = bh_survivors(cand, alpha=0.05) or []
+            surv = sorted(bh_survivors(cand, fdr=0.05))
     return {"rows": rows, "n_cells": len(train), "n_picked": len(picked),
-            "survivors": [s if isinstance(s, str) else s.get("key")
-                          for s in surv],
-            "train_frac": TRAIN_FRAC}
+            "survivors": list(surv), "train_frac": TRAIN_FRAC}
 
 
 def _p_from_t(t, dof):
@@ -321,6 +325,30 @@ def _selftest():
     assert "up_oiup" in got and len(got["up_oiup"]) >= 10, got.keys()
     m, t, n = by_coin_t(got["up_oiup"])
     assert m is not None and m > 0, (m, t, n)      # the plant is recovered
+    # EXERCISE THE BH BRANCH. Without this the survivor path is never run by
+    # any test — which is exactly how a call with the wrong keyword AND the
+    # wrong argument shape shipped: the study refuses on real data, so the
+    # branch is dead in practice and green in CI. Drive it directly.
+    surv = bh_survivors([("a", 0.001), ("b", 0.9)], fdr=0.05)
+    assert isinstance(surv, set) and "a" in surv and "b" not in surv, surv
+    planted = {}
+    for c in range(14):
+        bars, px, oi = {}, 100.0, 1000.0
+        for h in range(600):
+            d = 0.0
+            if h > 4 and bars.get(h - 1) and bars.get(h - 5):
+                if (bars[h - 1]["c"] > bars[h - 5]["c"]
+                        and bars[h - 1]["oi"] > bars[h - 5]["oi"]):
+                    d = 0.006
+            px *= (1.0 + d + rnd.gauss(0, 0.001))
+            oi *= (1.0 + rnd.gauss(0, 0.01))
+            bars[h] = {"c": px, "oi": oi}
+        planted["P%d" % c] = {1000 + h * 3600: bars[h] for h in range(600)}
+    r = run(planted, looks=(4,), horizons=(4,))
+    assert r["n_picked"] >= 1, r          # the plant must be PICKED on train
+    assert isinstance(r["survivors"], list), r
+    assert all(isinstance(x, str) for x in r["survivors"]), r
+
     # and the renderer says REFUSED when nothing survives
     md = render({"rows": [], "n_cells": 3, "n_picked": 0, "survivors": [],
                  "train_frac": 0.6})

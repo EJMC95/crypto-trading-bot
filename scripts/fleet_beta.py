@@ -418,7 +418,6 @@ def main(argv=None):
         aud = res["books"][bot]
         rows = (shaped.get(bot) or {}).get("rows") or []
         beta, t, n, cov = book_beta(rows, regimes)
-        clip = _bl._notional and None
         tm = _bl.trade_metrics(rows, aud.get("book_usd") or 1000.0)
         expo = (tm.get("avg_exposure_frac") or 0.0) * (aud.get("book_usd") or 1000.0)
         live = ((feed.get(bot) or {}).get("extra") or {}).get("venue") == "lighter_live"

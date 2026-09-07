@@ -1,4 +1,4 @@
-# FLEET MARKET EXPOSURE — 2026-09-07 07:19
+# FLEET MARKET EXPOSURE — 2026-09-07 07:33
 
 _Advisory. Moves no lever, no capital, no promotion. Beta is each book's per-trade return regressed on an equal-weight BTC/ETH/SOL index over **that trade's own holding window**._
 
