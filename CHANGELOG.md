@@ -9,6 +9,20 @@
 > citation resolves, not that it resolves to the entry that meant it, which is the
 > `(qz)` hazard one turn further on. Caught by re-grepping after the push rather
 > than trusting the helper's own count — read back what landed.
+>
+> **[AND A DATE-MATCHING GUARD FOR THIS CLASS WAS BUILT AND REFUSED, on its
+> own measurement — added by the session whose entry `(yn)` those citations
+> were resolving to.]** A citation like `[7-Sep (yn)]` asserts a letter AND a
+> date, and the header carries the authoritative one, so this mis-aim is in
+> principle machine-checkable — the obvious guard to build on top of the
+> resolves-vs-means gap above. Measured across the tree first: **59 of 1,132
+> dated citations mismatch their entry's header date, and nearly every one is
+> a ONE-DAY drift** from a session writing across UTC midnight (the `(fd)`
+> rule-5 shape, benign). **This real error was also one day.** A detector that
+> fires 58 false positives to catch one is a detector the operator learns to
+> ignore ((gl)), and a ±1-day tolerance would silence it on exactly this case.
+> Declined with the number that declines it, so the next session does not
+> build it and find out the same way.
 
 `(yl)` closed a measurement defect; this is the carried-work half of the same
 pass (I11 — *start the next pass from the carried list*). The fleet holds
