@@ -85,6 +85,127 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "survivorship-measured-but-not-consumed",
+        "owner": "session",
+        "what": "(yt) measured the largest distortion in the fleet's own "
+                "reporting: every grading instrument scores the LIVING set, so "
+                "a loser leaves the sample the day it is retired. On the "
+                "Lighter era -- living 16 books +$296.09, retired 18 books "
+                "-$260.47, TRUE FLEET TOTAL +$35.63. The living-book figure "
+                "overstates the realised result by 8.3x. Each retirement was "
+                "individually correct (I17 measured exclusions); the aggregate "
+                "had simply never been computed. `baseline_snapshot."
+                "survivorship()` now recomputes it every run.",
+        "why_open": "the number EXISTS and nothing CONSUMES it -- the same "
+                    "shape as (yo), where the fleet kept building the "
+                    "measurement and not the tripwire that reads it. No "
+                    "dashboard card, no organ, no guard reads it, so a reader "
+                    "of /pnl.json still sees only the survivors' sum. Closes "
+                    "when some published surface carries the true-total figure "
+                    "beside the living one.",
+        "closes_when": lambda: (_has("pnl_dashboard.py", "survivorship")
+                                or _has("fleet_radar.py", "survivorship")
+                                or _has("scripts/organ_board.py", "survivorship")),
+    },
+    {
+        "id": "fleet-risk-effective-n-overstates-independence",
+        "owner": "OPERATOR",
+        "what": "(yv) measured, like-for-like on the SAME held set: "
+                "`fleet_risk.long_effective_n` (1/HHI over DISTINCT SYMBOLS, "
+                "fleet_risk.py:366) reads 11.8 while a correlation-aware N_eff "
+                "on the same 29 held names reads 2.8 -- the incumbent "
+                "overstates independence by 4.2x. The organ's own docstring "
+                "already warns that '23 open longs that are all crypto beta is "
+                "~one trade, and nothing said so'; the warning is right and the "
+                "formula cannot express it. `scripts/fleet_beta.py` publishes "
+                "the alternative BESIDE the incumbent and modifies nothing.",
+        "why_open": "changing `long_effective_n` changes a field live consumers "
+                    "read, which is a risk-policy decision rather than a "
+                    "session one -- and the audit's own safety constraints "
+                    "forbid touching filters that affect existing bots. Closes "
+                    "when the operator decides either to move the formula or to "
+                    "record why it stays.",
+        "closes_when": lambda: _has("fleet_risk.py", "corr_effective_n"),
+    },
+    {
+        "id": "oi-history-is-not-reachable",
+        "owner": "session",
+        "what": "(yv) THE CANDLE FIELD `i` IS NOT OPEN INTEREST. Measured on 44 "
+                "coins x 1,500 bars: it rose or held in 65,956 of 65,956 "
+                "bar-to-bar steps and never fell, at magnitudes (~2.4e10 on "
+                "AAVE) far above any plausible level -- a cumulative counter. "
+                "The real point-in-time OI is `orderBookDetails.open_interest` "
+                "(BTC 2031 base ~ $162M) and its HISTORY lives only in "
+                "`market_context`'s own `oi_ntl` state, which is DB-side and "
+                "absent from /bus.json. So the price/OI hypothesis cannot be "
+                "tested from outside the containers. "
+                "`scripts/study_open_interest_2026-09-07.py` exists, carries a "
+                "planted-signal positive control that passes, and REFUSES on "
+                "the data rather than reporting a vacuous no-signal.",
+        "why_open": "the blocker is EXPOSING `oi_ntl` history (a publish-site "
+                    "change in market_context, or a /bus.json key), not writing "
+                    "the study. Closes when that history is reachable and the "
+                    "study runs to a real verdict.",
+        # The predicate must test EXPOSURE, not the existence of an internal
+        # variable. The first cut read `_has("market_context.py", '"oi_hist"')`
+        # and fired immediately, because `oi_hist` is a local in that module's
+        # own loop — the guard caught it on the first --check, which is the
+        # guard working. /bus.json's key block in pnl_dashboard is where a
+        # reachable series would have to appear.
+        "closes_when": lambda: _has("pnl_dashboard.py", 'live.get("market-context")'),
+    },
+    {
+        "id": "books-do-not-record-their-own-fill-cost",
+        "owner": "session",
+        "what": "(yu) only 4 of 14 living books record the venue's quoted "
+                "spread on their own fills (kelly, douglas, bezos, Hull). Every "
+                "other book's execution cost has to be INFERRED from the venue "
+                "rather than read from its record -- the inversion of I14, "
+                "where a record exists. The four that do record are what made "
+                "`scripts/cost_model.py`'s calibration gate possible at all "
+                "(deltas 0.06-3.73bps against an 8.0 tolerance).",
+        "why_open": "it is one publish-site edit per book plus the deploy each "
+                    "one earns for another reason -- cheap individually, ten "
+                    "times over collectively, and none of them urgent. Closes "
+                    "when a majority of living books stamp a per-fill spread.",
+        "closes_when": lambda: _has("lighter_family_bot.py", "spread_bps_entry"),
+    },
+
+    {
+        "id": "trail-blazer-live-routing-is-stale",
+        "owner": "OPERATOR",
+        "what": "(yw) FOUR SOURCES DISAGREE about what the real-money service "
+                "`trail-blazer-live` runs. railway-redeploy.yml:544 echoes "
+                "\"REAL MONEY, runs georgia\"; deploy_live_verify.py:74 maps it "
+                "to freqtrade-georgia-lighter; fleet_books.DECLARED_LIVE says "
+                "georgia is NOT live (avo + mum only, since her (wg) "
+                "retirement); and the container's own log reads "
+                "`[avo-live] equity 0.01 open 0/5 closed 77 clip=$0.01` -- a "
+                "SECOND instance of a live book, on a drained sub-account. "
+                "Measured 7-Sep: deployed 03:05:26Z SUCCESS (so it takes every "
+                "marked live push), 0.006802 avg vCPU over 7d (2nd highest in "
+                "the project, 22-1700x the retired shadows), and NO row in "
+                "/pnl.json -- invisible to the dashboard, the watchdog and the "
+                "pager. Harmless today only because equity $0.01 derives a "
+                "$0.01 clip; the two things standing between this and a live "
+                "duplicate of avo are an empty account (a deposit reverses it) "
+                "and claim_writer, which is FAIL-OPEN by design.",
+        "why_open": "whether it still holds live API keys is readable only from "
+                    "Railway variables, which this audit deliberately does not "
+                    "fetch (the CLI prints RESOLVED values and the (ml) wrap "
+                    "defeats line-based redaction). OPERATOR call: read "
+                    "FAMILY_LIVE_BOOK/VENUE, decide keys-or-no-keys, then "
+                    "correct the routing. audit_live_roster is green and "
+                    "correctly so -- it checks BOOKS against the feed; nothing "
+                    "checks SERVICE->BOOK routing, which is where all three "
+                    "stale references sit. Closes when deploy_live_verify no "
+                    "longer points this service at a retired book.",
+        "closes_when": lambda: not _has(
+            "scripts/deploy_live_verify.py",
+            '"trail-blazer-live": ("freqtrade-georgia-lighter"'),
+    },
+
+    {
         "id": "mum-live-rho-read-preregistered",
         "owner": "session",
         "what": "(yp) put every book's sizing on ONE axis for the first time -- "

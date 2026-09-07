@@ -1,8 +1,33 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 13:30 Sydney (03:30Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 20:18 Sydney (10:18Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `survivorship-measured-but-not-consumed`  ·  owner: **session**
+(yt) measured the largest distortion in the fleet's own reporting: every grading instrument scores the LIVING set, so a loser leaves the sample the day it is retired. On the Lighter era -- living 16 books +$296.09, retired 18 books -$260.47, TRUE FLEET TOTAL +$35.63. The living-book figure overstates the realised result by 8.3x. Each retirement was individually correct (I17 measured exclusions); the aggregate had simply never been computed. `baseline_snapshot.survivorship()` now recomputes it every run.
+
+_Still open because:_ the number EXISTS and nothing CONSUMES it -- the same shape as (yo), where the fleet kept building the measurement and not the tripwire that reads it. No dashboard card, no organ, no guard reads it, so a reader of /pnl.json still sees only the survivors' sum. Closes when some published surface carries the true-total figure beside the living one.
+
+### `fleet-risk-effective-n-overstates-independence`  ·  owner: **OPERATOR**
+(yv) measured, like-for-like on the SAME held set: `fleet_risk.long_effective_n` (1/HHI over DISTINCT SYMBOLS, fleet_risk.py:366) reads 11.8 while a correlation-aware N_eff on the same 29 held names reads 2.8 -- the incumbent overstates independence by 4.2x. The organ's own docstring already warns that '23 open longs that are all crypto beta is ~one trade, and nothing said so'; the warning is right and the formula cannot express it. `scripts/fleet_beta.py` publishes the alternative BESIDE the incumbent and modifies nothing.
+
+_Still open because:_ changing `long_effective_n` changes a field live consumers read, which is a risk-policy decision rather than a session one -- and the audit's own safety constraints forbid touching filters that affect existing bots. Closes when the operator decides either to move the formula or to record why it stays.
+
+### `oi-history-is-not-reachable`  ·  owner: **session**
+(yv) THE CANDLE FIELD `i` IS NOT OPEN INTEREST. Measured on 44 coins x 1,500 bars: it rose or held in 65,956 of 65,956 bar-to-bar steps and never fell, at magnitudes (~2.4e10 on AAVE) far above any plausible level -- a cumulative counter. The real point-in-time OI is `orderBookDetails.open_interest` (BTC 2031 base ~ $162M) and its HISTORY lives only in `market_context`'s own `oi_ntl` state, which is DB-side and absent from /bus.json. So the price/OI hypothesis cannot be tested from outside the containers. `scripts/study_open_interest_2026-09-07.py` exists, carries a planted-signal positive control that passes, and REFUSES on the data rather than reporting a vacuous no-signal.
+
+_Still open because:_ the blocker is EXPOSING `oi_ntl` history (a publish-site change in market_context, or a /bus.json key), not writing the study. Closes when that history is reachable and the study runs to a real verdict.
+
+### `books-do-not-record-their-own-fill-cost`  ·  owner: **session**
+(yu) only 4 of 14 living books record the venue's quoted spread on their own fills (kelly, douglas, bezos, Hull). Every other book's execution cost has to be INFERRED from the venue rather than read from its record -- the inversion of I14, where a record exists. The four that do record are what made `scripts/cost_model.py`'s calibration gate possible at all (deltas 0.06-3.73bps against an 8.0 tolerance).
+
+_Still open because:_ it is one publish-site edit per book plus the deploy each one earns for another reason -- cheap individually, ten times over collectively, and none of them urgent. Closes when a majority of living books stamp a per-fill spread.
+
+### `trail-blazer-live-routing-is-stale`  ·  owner: **OPERATOR**
+(yw) FOUR SOURCES DISAGREE about what the real-money service `trail-blazer-live` runs. railway-redeploy.yml:544 echoes "REAL MONEY, runs georgia"; deploy_live_verify.py:74 maps it to freqtrade-georgia-lighter; fleet_books.DECLARED_LIVE says georgia is NOT live (avo + mum only, since her (wg) retirement); and the container's own log reads `[avo-live] equity 0.01 open 0/5 closed 77 clip=$0.01` -- a SECOND instance of a live book, on a drained sub-account. Measured 7-Sep: deployed 03:05:26Z SUCCESS (so it takes every marked live push), 0.006802 avg vCPU over 7d (2nd highest in the project, 22-1700x the retired shadows), and NO row in /pnl.json -- invisible to the dashboard, the watchdog and the pager. Harmless today only because equity $0.01 derives a $0.01 clip; the two things standing between this and a live duplicate of avo are an empty account (a deposit reverses it) and claim_writer, which is FAIL-OPEN by design.
+
+_Still open because:_ whether it still holds live API keys is readable only from Railway variables, which this audit deliberately does not fetch (the CLI prints RESOLVED values and the (ml) wrap defeats line-based redaction). OPERATOR call: read FAMILY_LIVE_BOOK/VENUE, decide keys-or-no-keys, then correct the routing. audit_live_roster is green and correctly so -- it checks BOOKS against the feed; nothing checks SERVICE->BOOK routing, which is where all three stale references sit. Closes when deploy_live_verify no longer points this service at a retired book.
 
 ### `mum-live-rho-read-preregistered`  ·  owner: **session**
 (yp) put every book's sizing on ONE axis for the first time -- risk at the stop per position as a fraction of equity, rho = clip_fraction x stop -- and the fleet spans 83x on it (avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull 0.04%). The one real-money reading: 👩 mum's LIVE arm runs rho 1.67% (clip $240 on $576 equity = 41.7% of the account behind a 4% stop) against a proposed 0.25% and an admissible 0.5% -- 6.7x the proposal. Corroborated from three independent directions by her OWN published row: all_slots_stop_pct 0.20 against the gate's 0.15 bar, vol_target_at_neff1 3.75x against a configured 5.0x, and stop_reachable FALSE (stop_dead_above 4.17x) on the worst-margin book in her universe. NOT acted on: the study's reading rests on 10 trading days at its own 10x extrapolation cap, and her measured n_eff 1.824 puts her vol_target_here at 5.06x, i.e. exactly at her own framework's target. So it is REGISTERED, not executed.
@@ -89,8 +114,23 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (29 commit(s), entries (yo))
+## Shipped today (36 commit(s), entries (yo), (yp))
 
+- `0891337` (yv) CodeQL failed and was right: the BH call was wrong three ways, and no test drove it
+- `227b8e2` (yv) The candle field called `i` is not open interest, and 1/HHI over symbols overstates independence by 4.2x
+- `c9a623b` (yu) CodeQL: hoist the refusal message out of the list literal
+- `d27553b` (yu) regenerate HANDOFF.md
+- `295b54b` (yu) Per-book execution cost: the fleet average was wrong in both directions, and the stress that used it was a double charge
+- `030433f` (yt) CodeQL: close the four file handles in audit_fingerprint
+- `065004f` (yt) regenerate HANDOFF.md
+- `e440208` (yt) Audit phases 3-5: survivorship is 8.3x, the fleet's first regime split, and the exposure denominator nobody had printed
+- `98d35c0` (ys) regenerate HANDOFF.md
+- `2554083` (ys) Phase 1 inventory + the first dated, reproducible, cost-stressed BASELINE
+- `69ed911` (yr) renumber the changelog header to match its commit subject — main briefly carried two (yq) entries because the final rebase auto-merged clean
+- `7f9462e` (yr) two instruments wrong in the reassuring direction: the asset key that hid co-holding, and the drawdown denominator that halved real money's hole
+- `3e205d9` (yq) an unfillable shadow order is NOT a zero-cost fill: NULL slippage, a named reason, and the coin-quality veto stops eating fabricated evidence
+- `cab0cd5` (yp) acknowledge golive-readiness recurrence: six mechanisms, one grading authority, and RENUMBERED (yn) -> (yp)
+- `4ffe5e7` (yn) the study report, changelog entry and carried row (renumbered yk -> yn)
 - `c0262bb` (yk) adversarial review: the taker's breakout stop was read from a key its publisher never emits, and fixed_dollar's gross was priced at t=0
 - `80065a2` (yk) the moves-nothing check is an AST walk of call sites, not a substring scan ((po): a page-wide substring scan is not a structural claim)
 - `23ac9ee` (yk) the mum-live rho finding is PRE-REGISTERED, not acted on: 10 trading days is not a mandate to cut a real-money clip 6.7x
@@ -112,14 +152,6 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `fa26156` carry: avo's judge lane is declared but her carrier is not lever-capable — the (yg) surface's first finding, deferred with its own closes_when
 - `4bf21e8` (yg) VERIFIED: both arms on 5e30671ecf64, judge un-drifted at its next cycle, resid live — and the lever surface found avo's undeclared namespace on its first loop
 - `b775b06` [deploy-live-mum] The judge's mum lane: (ye) owns the fix, this ships the lever surface and the marker that keeps mum's pair aligned; plus the pooled grader and the flinders refusal (yg)(yf)(yh) (#287)
-- `0119b9b` (ye) FROZEN_WHEN_READY is the bracket levers this tuner can WRITE — brk_trail/brk_sl are off its ladders by the (sk) ratchet and need no freeze
-- `189a9f5` (ye) re-aim the avo slot pins 5 -> 6 with the measurement (the guard did its job), and regenerate HANDOFF.md
-- `ba437e6` (ye) the record: changelog entry, three doctrine amendments in place, and RENUMBERED (yd) -> (ye) after another session took (yd) on main
-- `4c4f3ef` (yd) the freeze pin asserts the result REBINDS levers (a discarded call froze nothing; M1)
-- `2acd138` (yd) a READY book keeps the bracket it passed on (tuner freeze), and the allocation organ reaches the family shadows + the taker
-- `91390a3` [deploy-live-taker] (yd) avo LIVE 5 -> 6 slots: the twin's 6th slot took its best trades, and the arms' caps now match so the judge's avo pair is judgeable
-- `24cfb90` (yd) the judge's mum lane was inert by one string: the shadow arm rebuilt the lever prefix from a suffixed row id
-- `f9546fc` (yd) the winners' docket graded the taker on a superseded policy: era_rows was pinned by identity and fed the wrong shape
 
 ## How this file stays honest
 

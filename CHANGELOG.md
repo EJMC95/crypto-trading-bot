@@ -1,3 +1,587 @@
+## 2026-09-07 (yw)
+### Four sources disagree about which book the real-money service `trail-blazer-live` runs — and 10 of 27 containers publish nothing
+
+Eamon: *"Continue and suggest ways for railway and Postgres's to be used to
+their fullest extent and improve notion if possible."* Read-only infra pass to
+close the audit: **no Railway mutation, no variable read, no deploy, no Notion
+write.** Report: `INFRA_AUDIT_2026-09-07.md`.
+
+**THE FINDING IS NOT THE WASTE, IT IS THE ROUTING.** `trail-blazer-live` has
+changed hands twice (💸 Farmer → 🔮 georgia at `(ta)`/`(tb)`) and georgia's live
+arm retired at `(wg)`. Four sources now say four different things:
+`railway-redeploy.yml:544` echoes *"REAL MONEY, runs georgia"*;
+`deploy_live_verify.py:74` maps it to `freqtrade-georgia-lighter`;
+`fleet_books.DECLARED_LIVE` says georgia is **not live at all**
+(`avo-maria-lighter`, `mum-lighter`); and the container's own log reads
+**`[avo-live] equity 0.01 open 0/5 closed 77 clip=$0.01`** — a SECOND instance
+of a live book, on a drained sub-account.
+
+Measured: deployed **2026-09-07T03:05:26Z SUCCESS** (so it takes every marked
+live push), **0.006802 avg vCPU over 7d** — second highest in the project after
+`freqtrade-bots`, 22–1,700× the retired shadows — and **no row in `/pnl.json`**,
+so it is invisible to the dashboard, `fleet-watchdog.yml` and the pager. It is
+the composite of three shapes already paid for: `(hp)` one-book-one-writer,
+`(I13)` inverted (a *live* loop nothing observes from outside), and the
+list-keyed-scope rot `CLAUDE.md` names — *"a stale one sends every future audit
+to the wrong file"*, now on its fourth slot swap.
+
+**Harmless today, and by accident rather than by guard.** Equity $0.01 derives
+a $0.01 clip through `clip = equity × gross_x / max_open`, so any order is
+dust-rejected. The two things between this and a live duplicate of 🙏 avo are
+an empty account (a deposit reverses it) and `claim_writer`, which is
+**fail-OPEN by design** — a dark DB never idles a book, so the single event
+most likely to break the fleet is also the one that un-silences the duplicate.
+
+**WHAT CAUGHT IT AND WHAT DID NOT.** `audit_live_roster` is green and correctly
+so — it checks BOOKS against the feed, and the books are declared right.
+**Nothing checks SERVICE → BOOK routing**, which is where all three stale
+references sit. Carried as `trail-blazer-live-routing-is-stale`, **owner
+OPERATOR** because whether it still holds live keys is readable only from
+Railway variables, which this audit deliberately does not fetch (`(ml)`: the
+CLI prints RESOLVED values and a wrap defeats line-based redaction; Eamon's own
+constraint bans exposing credentials). Predicate mutation-verified: correcting
+`deploy_live_verify.py`'s mapping turns the row CLOSE THIS and reddens
+`--check`.
+
+**THE CENSUS, since the `svc` stamp makes it measurable.** 27 services; **10
+publish all 16 books**; 3 are infrastructure; 4 are correctly stopped at 0/0;
+**10 run and publish nothing** — ~482 MB resident continuously. Two tiers, and
+the difference is real: the 13/17-Aug retirements idle at **15–18 MB** (the
+guard bites before the heavy imports — the retirement doctrine working), the
+September slate loops at **34–79 MB**. Both correct by doctrine; nine are
+tidy-only, and the code guard stays regardless because a push resurrects a
+stopped service. `funding-carry` has now been the known dead duplicate for
+**38 days** `(hu)` — optional tidiness in August, worth re-reading now that the
+only thing silencing it is a fail-open claim on 🌾 carry, the fleet's
+best-evidenced book.
+
+**POSTGRES, measured not assumed.** Disk **660.4 → 768.5 MB in 7 days
+(15.4 MB/day)** — expected and about to stop: `bot_state_history` began 16-Jul,
+its retention DELETE raised on every call until the 2-Aug fix, and the prune
+drops rows older than 60 days, so **the first real deletions land ~14-Sep** and
+it plateaus near **876 MB**. Two schema gaps: `paper_trades` has **no index on
+`closed_at`** though every grading path in the fleet filters and sorts on it
+(`CREATE INDEX CONCURRENTLY`, no write lock); and the PK `(bot, trade_id)`
+gives **false integrity assurance** — `(hf)` measured that two writers never
+collide on `trade_id` because it is `{coin}:{opened_ts}`. A `btree_gist`
+EXCLUDE on overlapping `(bot, pair, [opened_at, closed_at))` would make the
+two-writer class **structurally impossible to insert** rather than detectable
+after the damage, which is the one place it can be closed globally — proposed
+with its three caveats (historical overlaps must pass, the TEXT→timestamptz
+cast needs a generated column, and it permanently forbids two positions in one
+pair), not shipped. **Backups are healthy** — `db-backup.yml`, 58 runs, last 8
+all `success` — and **the restore has never been tested**, which is this repo's
+own *"a check that inspects nothing reports clean"* pointed at itself.
+
+**NOTION: the shared brain is too big to load.** Hub = **87,670 chars, of which
+"🧵 Recent thread" is 85,901 = 98%**, holding **34 entries against the ~8 the
+loading contract specifies**; the fetch **exceeded the tool's token limit twice
+this session**, so the read-on-start contract is not degrading, it is failing,
+on every surface. Nothing durable is at stake: the Session Log database
+independently holds **40 rows back to 2026-06-30**. Recommended fix is
+structural, not a trim — Recent thread becomes a **linked view of Session Log
+filtered to 8**, so appending a log row *is* updating the thread and the block
+cannot grow again. **Not executed**: it is a live shared artefact across three
+surfaces and the audit's own constraint is *do not overwrite live files*.
+
+**[CORRECTED IN PLACE, same session, per I12 — Eamon: *"I only use lighter
+exchange."*]** The first cut of the report suggested **FMP** as an off-venue
+regime feed and called the IBKR stocks side *"the largest un-audited surface
+you have"*. Both are **WITHDRAWN**: the Lighter-only rule has stood since
+17-Jul and I should not have proposed around it, and item 18's own answer is
+already on-venue (the venue's ~41 non-crypto books). Re-measured across **all
+9 Railway projects** rather than just `Trading Bots`, the framing was wrong in
+the consequential direction — there is nothing to audit off-venue because
+**nothing is trading there**, and what is actually true is more actionable.
+
+**OUTSIDE THE LIGHTER FLEET, EXACTLY TWO SERVICES RUN, AND ONE IS THE BIGGEST
+CONSUMER IN THE ACCOUNT.** `ikbr-stock-bot/ibgateway` averages **640.6 MB**
+(peak 793.9, CPU peak 0.305) — **larger than all ten idle Lighter containers
+combined (482 MB) and 2.4× `freqtrade-bots` (263 MB)**, the container running
+four books, every organ, the brain, the scout, the judge and the Parliament.
+Its own logs show IBC auto-logging in daily: `DUQ875469 Trader Workstation
+Configuration (Simulated Trading)` — a **PAPER** account, so no real money —
+and `Read-Only API checkbox is already set to: false`, i.e. configured to
+accept orders. **The service that would drive it (`bot`) is stopped, 0/0, for
+the whole 7-day window.** So it is a broker session re-established daily for no
+consumer. `trading-bot/trading-bot` (43.8 MB) is the Alpaca cron `CLAUDE.md`
+records as *"torn down"* 15-Jul — stopped, but still resident and restarting.
+Everything else across the 9 projects is 0/0 or an empty project
+(`feisty-delight`, `nurturing-appreciation`).
+
+**This also closes the 14-Jul open item, precisely rather than loosely.**
+`CLAUDE.md`: *"equities-regime-ibkr's publisher runs on an UNIDENTIFIED host …
+stop the process when found."* The project is `ikbr-stock-bot`; the plausible
+publisher is `bot`, which is **already stopped**, so the row stopped on its
+own. What was never found, and is still up, is the **gateway beside it**. Both
+are outside this repo, so `railway down` needs no code guard — nothing pushes
+to them and nothing will resurrect them.
+
+**Also named:** the highest-value unused capability is a **nightly Railway log
+sweep** — the `bot_state_history` retention bug *"said so in the logs every boot
+while nobody read them"* and `(ml)`'s stale reader were both found by a human
+reading logs by hand; and `fleet-watchdog.yml` probes `/pnl.json`, i.e. payload
+liveness, so all ten idle containers are **invisible to it by construction**.
+`freqtrade-bots` averages 263 MB against a **1,354 MB peak** (5.1×) with nothing
+alerting on it. Protected surface re-verified: **5/5 symbols unchanged, 42/42
+ledgers unrewritten.**
+
+## 2026-09-07 (yv) — THE CANDLE FIELD CALLED `i` IS NOT OPEN INTEREST, AND `1/HHI` OVER SYMBOLS OVERSTATES INDEPENDENCE BY 4.2x: the fleet's market exposure, measured across books for the first time
+
+**Eamon: *"Continue with all improvements"*** — the ranked list from the audit,
+worked through. **Nothing deployed:** his brief says do not deploy
+automatically and get approval before live deployment, and that stands over
+this repo's own grants. `audit_fingerprint --check` reads **5/5 protected
+symbols unchanged, 42/42 ledgers unrewritten**.
+
+**#3 PORTFOLIO BETA — the largest finding, and the weighting IS the finding.**
+`scripts/fleet_beta.py` (advisory; moves no lever, no capital, no promotion):
+
+| weighting | fleet beta | what it asks |
+|---|---|---|
+| trade-weighted | **+0.043** | what does the average TRADE look like |
+| **exposure-weighted** | **+0.324** | **what is the MONEY doing** |
+| live cohort | **+0.658** | what is the REAL money doing |
+
+The gap is an averaging artifact with a name: 🪁 kelly is **590 of 1,730**
+labelled trades at beta **−0.76** on an $83 average exposure, so it dominates
+the COUNT and almost none of the RISK. Composition is the real statement —
+**profitable books mean beta +0.40 (+$317.59), loss-making books −0.12
+(−$201.60)**: *a fleet that nets to zero beta by holding winners long and
+losers short is not hedged, it is paying for its neutrality, and the bill is
+the losers' P&L.*
+
+**AND `1/HHI` OVER DISTINCT SYMBOLS CANNOT SEE IT — measured like-for-like.**
+`fleet_risk.long_effective_n` (fleet_risk.py:366) reads **11.8** on the 29
+currently-held names; a correlation-aware `N_eff` on the **same 29 names, all
+29 priced**, reads **2.8**. The incumbent overstates independence **4.2x**.
+The organ's own docstring already warns that *"23 open longs that are all
+crypto beta is ~one trade, and nothing said so"* — the warning is right and
+the formula cannot express it. **NOTHING WAS MODIFIED**: the alternative is
+published BESIDE the incumbent, because that field feeds live consumers and
+the brief forbids touching filters that affect existing bots.
+**THE FIRST CUT OF THIS CLAIM WAS 10.1x AND WRONG** — it compared `hhi_n` on
+the held set against `corr_n` on the majors basket, an apples-to-oranges ratio.
+Corrected before shipping, and the module now WITHHOLDS the ratio whenever the
+two measures do not cover the same population (mutation-pinned).
+
+**#6 OPEN INTEREST — AND THIS IS THE FINDING OF THE PASS, because it corrects
+this audit's own claim.** `(yt)` asserted *"candles also carry per-bar OI (`i`),
+so 1,500h of history is available immediately per market"*. **That is FALSE.**
+Measured on 44 coins x 1,500 bars: the field rose or held in **65,956 of 65,956**
+bar-to-bar steps and **never once fell**, at magnitudes (~2.4e10 on AAVE) far
+above any plausible OI level. It is a **cumulative counter**. Real
+point-in-time OI is `orderBookDetails.open_interest` (BTC **2031 base ~ $162M**,
+plausible), and its HISTORY exists only inside `market_context`'s own `oi_ntl`
+state — DB-side, absent from `/bus.json`. **So the price/OI hypothesis cannot
+be tested from outside the containers**, and the blocker is EXPOSING that
+history, not writing a study.
+
+**I nearly shipped a vacuous refusal.** The study ran, produced 12 cells, 0
+picked on train, 0 surviving BH — a clean-looking REFUSED verdict computed
+entirely on a monotone counter. What caught it was the shape of the output:
+**12 cells where 24 were expected**, because every `OI down` quadrant was
+structurally empty. `oi_is_a_level()` now REFUSES on that signature rather than
+reporting a verdict, and the selftest carries a **planted-signal positive
+control** so a future "no signal" can be attributed to the data rather than the
+method ((po): empty output is not a negative result until the check has been
+seen to produce a positive one).
+
+**#1 mum's STOP — the risk is LATENT, not live, and my own list overstated it.**
+Her row reads `stop_reachable: false` / `stop_dead_above 4.17x` — but that is
+the worst-margin book in her 104-market UNIVERSE. On what she is **actually
+holding**: `stop_reachable_held: **true**`, `stop_dead_above_held **12.17x**`,
+`headroom.ok true (unliquidatable)`, and `leverage_now **0.83x**` against a
+configured 5.0. The honest statement is that her configured CEILING permits a
+state in which the stop is unreachable; she is not in that state and is nowhere
+near it. Recorded, not acted on.
+
+**#2 ARM-DRIFT — diagnosed, and my recommendation was wrong.** I called it "the
+cheapest fix, do it first". Measured: **my own audit commits touched NONE of the
+`_BUILD_SHARED` files.** The drift comes from three other sessions' commits —
+`(yi)`/`(yj)` on `bot_pnl_store.py` and `(yq)` on `venues/shadow.py` — which
+the shadow twins took and the marker-gated live arms correctly did not. The
+judge IS held (`hold: arm_drift`, *"ARMS ON DIFFERENT CODE ... no promotion can
+rest on it"*) on candidate `mum-vel-12-20`. **But `n_live=3` against a paired
+bar of 10, so the SAMPLE is the binding constraint, not the drift** —
+unblocking it today would promote nothing. Note also that `venues/shadow.py`
+governs SHADOW fills only, so the functional delta for a live arm taking real
+exchange fills is near nil: the guard is stamp-based and cannot tell a
+shadow-only change from one that alters live behaviour. That is a judge design
+question, not a deploy chore.
+
+**#5 SURVIVORSHIP + #8 MULTIPLICITY.** The 8.3x number recomputes every run and
+**nothing consumes it** — so it is now a `session_state` CARRIED row with a
+predicate CI evaluates, alongside three others (the `1/HHI` decision, the OI
+history exposure, and the 10 of 14 books that do not record their own fill
+cost). That is this repo's own mechanism for "cannot be silently dropped", and
+one of my four predicates fired immediately on its first `--check` because it
+matched an internal variable name rather than the exposure — the guard doing
+its job on my work. **#8 is MEASURED rather than built: 110 study/backtest
+scripts, 88 of them against essentially one Lighter tape, and 4 applying
+BH-FDR.** At alpha 0.05 across 88 tests, ~4.4 false positives are expected by
+chance alone. The register is a real build; the number is what makes the case
+for it.
+
+**[SAME DAY, CORRECTED IN PLACE per I12 — CodeQL failed this commit and was RIGHT, on a defect three layers deep.]** It flagged `bh_survivors(cand, alpha=0.05)` as an unsupported keyword. The keyword was the visible third of it: the real signature is `bh_survivors(pvals, fdr=FDR)` taking a list of **(key, p) TUPLES** and returning a **SET**, and I passed a list of DICTS with a downstream comprehension compensating for a return shape I had guessed. Three errors in one line. **It was latent because the study REFUSES on this venue's data before the branch ever runs** — dead in practice, green in CI, and it would have raised `TypeError` the day the OI history was exposed and the test finally reached it. The fix is not the keyword: the selftest now **EXERCISES the BH path** on a planted signal that is actually PICKED on train, and both original errors (the keyword and the argument shape) are individually verified to redden it. Also removed an unused `clip` local in `fleet_beta` (CodeQL note). **The lesson is the one this fleet keeps paying for: a branch no test drives is not covered by the module's own green selftest**, and a study that correctly refuses on its data will never exercise what comes after the refusal.
+
+**FILES:** `scripts/fleet_beta.py` (**6/6 mutations RED** — an unmeasurable
+correlation reading as 0, the MIN_N floor, the coverage gate, the withheld
+ratio, N_eff not collapsing on correlated names, and a short overlap inventing
+a rho; that last one SURVIVED the first round because the test used a 1-point
+overlap that returns None through the zero-variance branch anyway — a test
+passing for the wrong reason, strengthened and re-killed),
+`scripts/study_open_interest_2026-09-07.py`, `FLEET_BETA_2026-09-07.md`,
+`STUDY_OPEN_INTEREST_2026-09-07.md`, `scripts/session_state.py` (+4 carried
+rows), `AUDIT_PHASE3_4_2026-09-07.md` corrected in place per I12.
+
+## 2026-09-07 (yu) — THE FLEET-AVERAGE COST WAS WRONG IN BOTH DIRECTIONS AND THE STRESS THAT USED IT WAS A DOUBLE CHARGE: per-book execution cost, measured on each book's own basket at its own deployed clip
+
+**Eamon: *"do the per-book cost modelling"*** — the brief's own first
+recommended improvement, and the one this audit's Phase-2 output had got wrong.
+
+**WHAT THE BASELINE SAID, AND WHY IT DOES NOT SURVIVE.** `(ys)` charged every
+book the fleet-wide `MEASURED_RT_BPS` of 17.49 and reported that it *"flips two
+profitable books negative"* — 🌾 carry +$12.92 → −$2.82, 🔮 georgia v1 +$12.85 →
+−$10.59. Two things are wrong with reading that as a cost verdict, and neither
+is arithmetic:
+
+1. **17.49 IS A MEAN OVER A RIGHT-SKEWED DISTRIBUTION.** Measured here on **711
+   recorded spreads across 40 coins** from the fleet's own fills: the median
+   full quoted spread runs **17.1bps in the thinnest volume band down to 2.5bps
+   in the thickest** — a **6.8×** span, monotone across six bands, fitting
+   `spread ~ vol^−0.485`. That exponent is the square-root liquidity law, not a
+   curve fit. **One mean charged to every book overcharges the liquid ones and
+   UNDERCHARGES the thin ones**, which is the dangerous direction.
+2. **THE BOOKS ALREADY PAY.** Every living book's realised P&L is already net
+   of execution. 🌾 carry is the clearest case and it is not subtle: its P&L is
+   literally `accrued - fees` (`funding_carry_bot` lines 1291/1379). **The
+   stress deducted a round trip the book had already deducted.** Charging it
+   again is a double count, not a sensitivity — and it is what produced the
+   "flips negative" headline.
+
+**SO THE QUESTION IS HEADROOM, NOT COST**, and `edge_audit` already owned half
+of it (`breakeven_cost_bps`). `scripts/cost_model.py` supplies the other half —
+what each book pays *now*, on its own basket, at its own **deployed** clip
+(never its published `caps.clip_usd`, which the sizing stack multiplies
+afterwards: carry declares $80 and deploys $300).
+
+**MEASURED, and the answer is reassuring in a way the fleet mean hid:**
+
+| book | fill basis | clip | cost now | break-even | headroom |
+|---|---|---|---|---|---|
+| 🙏 avo shadow | book_walked | $50 | 3.79bps | 179.34 | **47.3×** |
+| 🙏 avo LIVE | real_fills | $236 | 5.06bps | 235.98 | **46.6×** |
+| 🎫 taker | book_walked | $52 | 6.85bps | 118.67 | **17.3×** |
+| 👩 mum shadow | book_walked | $50 | 6.71bps | 53.74 | **8.0×** |
+| 🌾 carry | book_walked | $300 | 4.17bps | 30.35 | **7.3×** |
+| 👩 mum LIVE | real_fills | $253 | 7.26bps | 43.36 | **6.0×** |
+| 🔮 georgia v1 | book_walked | $50 | 5.03bps | 6.79 | **1.35× — thin** |
+
+**Every living book pays between 1.2 and 7.8bps round trip — not 17.49.** The
+fleet mean overstated real execution by **2–7×** on every book measured.
+**Nothing fails to survive its own execution.** 🌾 carry's true headroom is
+**7.3×**, so the "carry is unprofitable after costs" reading is withdrawn
+outright. The one book that is genuinely close is **🔮 georgia v1 at 1.35×** —
+her edge is real and it is roughly the size of her execution, which is a
+materially different and more useful statement than the fleet mean produced.
+
+**THE FILL BASIS IS DERIVED, NOT TYPED**, because a hand-kept table of it rots
+on the next broker change (the (mn) lesson, and this repo's audit-scope rule has
+rotted on a slot swap four times). Read by AST from each book's own entry file
+via `fleet_books.ROW_ENTRY` — **10 book_walked** (ShadowBroker, directly or
+through `venue_context`, so the crossed spread is inside the fill price),
+**2 real_fills** (the live rows — classified from the PAYLOAD's `extra.venue`,
+never the file, per `fleet_books`' own rule that which rows are live must not be
+written down), **2 unknown** (both Parliament, in-process bus — DECLARED, never
+guessed). The first cut of the detector reported **8 of 14 unknown** because it
+matched only the `ShadowBroker` class name and missed `venue_context`; that is
+`(po)`'s "a check that inspects the wrong thing reports clean" landing inside
+this very module, and it was found by reading the output rather than trusting
+it.
+
+**IT RE-IMPLEMENTS NOTHING.** The round trip is
+`funding_carry_bot.rt_cost_bps` — the fleet's **declared one owner** of
+*"measured adverse cost of getting `notional` IN and OUT, in bps of mid"*,
+which `study_depth_vs_volume` already imports rather than copying. The walk
+underneath is `venues.shadow.fill_from_book`, i.e. **the same code that fills
+the shadow books**, so the cost model and the fills cannot disagree. Sample from
+`edge_audit.shape`, symbols from `edge_audit.base_symbol`.
+
+**THE CALIBRATION GATE, and it passed tightly.** Four books record the venue's
+quoted spread on their own fills. The module fetches live books for the coins
+they traded and REFUSES unless it reproduces those recorded medians: 🚀 bezos
+**Δ0.06bps**, 🪁 kelly Δ1.31, 🧮 Hull Δ2.15, 🧘 douglas Δ3.73 — against a tolerance
+of 8.0. Distributional, not per-trade, and stated as such: the records are
+historical and the fetch is now, so claiming an exact match would be the
+fiction. **Fail-CLOSED in three directions** — no recorder, too few overlapping
+coins, or a mismatch all refuse, because "nothing to disagree with" must never
+read as "no disagreement".
+
+**AND THE GAP BEHIND ALL OF IT: only 4 of 14 living books record what their own
+fills cost.** Every other book's cost has to be inferred from the venue rather
+than read from its record — the exact inversion of I14, where a record exists.
+That is the cheap, obvious follow-up and it is a publish-site edit per book.
+
+**THE BASELINE IS CORRECTED, NOT PATCHED.** `baseline_snapshot` takes
+`--costs` and, without it, **WITHHOLDS the section entirely** rather than
+falling back to the fleet mean — pinned by a selftest, because a silent
+fallback to the wrong number is the defect this pass exists to remove.
+
+**FILES:** `scripts/cost_model.py` (**7/7 mutations RED** — fail-open
+calibration, unfillable clips averaged away, coverage forced to 100%, a live
+row classified from the file, `venue_context` dropped, a crossed book priced,
+and `rt_cost_bps` replaced by a local copy), `COST_MODEL_2026-09-07.md`,
+`BASELINE_2026-09-07.md` regenerated, `scripts/baseline_snapshot.py`
+(**+2 mutations RED** on the withhold). **MOVES NOTHING** — no lever, capital,
+env or position; `audit_fingerprint --check` reads 5/5 symbols unchanged, 42/42
+ledgers unrewritten. Deployment still withheld per Eamon's brief.
+
+## 2026-09-07 (yt) — THE SURVIVORS' SUM IS NOT THE FLEET'S RESULT: 8.3x, measured — plus the fleet's first regime split, the exposure denominator nobody had printed, and an OI signal published every 30 minutes that nothing trades
+
+**Eamon's audit brief, Phases 3-5.** Phase 1 and the first cut of Phase 2 shipped
+at `(ys)`; this adds the thirteen metrics that pass did not carry, then the
+research-quality audit and the module evaluation. **Nothing moved** — no lever,
+no capital, no env, no position — and for the first time in this repo that is
+*verified rather than asserted*: `scripts/audit_fingerprint.py` AST-hashes the
+five protected symbols and every bot's ledger prefix, and reads **5/5 unchanged,
+42/42 unrewritten** after the whole pass. Both arms mutation-verified (a
+one-digit `STALE_SECONDS` edit and a single rewritten historical `pnl_abs` are
+each caught).
+
+**THE FINDING, and it is the largest number in this audit.** Every grading
+instrument here scores the LIVING set — `golive_readiness.roster` admits
+publishers, `fleet_allocation` ranks living rows, `edge_audit` audits the
+published grade, and `(ys)`'s own cohort totals did the same. Retirement is
+decided per book on a measured exclusion (I17) and that is correct. **The
+aggregate consequence had never been computed.** On the Lighter-only era:
+
+| population (since the 17-Jul cut) | books | closes | net |
+|---|---|---|---|
+| still publishing | 16 | 1,984 | **+$296.09** |
+| retired since the cut | 18 | 1,549 | **-$260.47** |
+| **TRUE FLEET TOTAL** | 34 | 3,533 | **+$35.63** |
+
+**The living-book figure overstates the fleet's realised result by 8.3x.** This
+reopens no retirement — it says the number that SURVIVES is not the number that
+was EARNED, and both belong in the record. `baseline_snapshot.survivorship()`
+computes it every run, scoped to the Lighter era on purpose (three pre-cut
+legacy books, +$547 on other venues, would bias it the other way). 3/3 mutations
+red, including the one that lets a retired loser be counted as living.
+
+**AND THE INSTRUMENT THAT SKIPS THE REGIME SPLIT DOES SO ON A STALE PREMISE.**
+`edge_audit.breakdowns` publishes `regime_limit: "candles endpoint refused by
+egress policy"`. **Measured this session: `/api/v1/candles` returns HTTP 200
+from this exact environment** — only `/candlesticks` is 403, and the two are
+different endpoints. The second half of that note is still true and load-bearing
+(the fleet's own oracle read ONE regime in 413/413 snapshots), so the conclusion
+held for the right reason and the stated cause was wrong. With 1,500h of majors
+history fetched, the fleet has its first regime split:
+
+* **trend** (index EMA50/200, the fleet's own convention) — **84% bull**, which
+  is item-18's regime caveat MEASURED rather than asserted; a per-book `bear`
+  cell of a dozen trades decides nothing and the doc says so before the table.
+* **market direction over each trade's own holding window** — 699 up / 1,041
+  down, near balanced, and therefore the usable one.
+
+**THE RISK FINDING, and the obvious read of it is wrong.** Fleet beta to the
+majors index: **trade-weighted +0.04** (looks neutral) but **exposure-weighted
++0.324**, and **the LIVE cohort alone is +0.658**. Trade-weighting is an
+artifact — 🪁 kelly contributes 590 of 1,740 labelled trades at tiny clips with
+beta -0.76, so it dominates the COUNT and almost none of the RISK. Composition
+matters more than the level: **profitable books mean beta +0.40** (georgia
++0.99, taker +0.80, georgia-v3 +0.75, mum live +0.66) against **loss-making
+books -0.12** (kelly -0.76, sniper -0.58, Counterweight -0.25). **The fleet
+earns from long beta and pays for its hedge** — its market-neutrality is
+supplied by books that lose money, kelly alone at -$132.53. No per-book
+instrument can see that; it is a portfolio-construction property.
+Corroborating: 🌾 carry carries **significant long beta (+0.12, t=3.26)** on a
+book whose P&L is defined as `accrued - fees` with no price term. A
+delta-neutral book should not have a beta.
+
+**THE DENOMINATOR NOBODY HAD PRINTED.** `avg_exposure_frac` — time-weighted
+deployed capital — is what makes two equal returns comparable, and no
+instrument here computed it. Deriving it surfaced a second thing: **a book's
+published `caps.clip_usd` is not what it deploys.** 🌾 carry declares $80 and
+puts a median **$300** at risk (3.75x); 🪁 kelly declares $80 and deploys $250.
+Nothing is broken — `brain_clip` x drawdown-scale x `allocation_scale` all
+multiply after the cap is published — but reading the cap as the exposure
+understates both books by the whole sizing stack, and `deployed clip $` now
+prints beside it. Notional is derived as `|pnl_abs/pnl_pct|` because `size` is
+present on **878 of 4,311 rows (20%)** and reading it would have computed
+turnover on a fifth of the fleet while calling it the fleet.
+
+**PHASE 4, and the rule applied throughout is DO NOT REBUILD WHAT EXISTS** —
+eight of the twelve modules are already present. **C (funding/basis) is the
+best-developed module in the repo** and needs nothing; **L (safety)** and **I
+(sentiment, which grades its own anticipations against a coin flip)** already
+exceed the brief; **F (cross-exchange) is deliberately retired** and reviving it
+would breach the venue doctrine; **H (on-chain) is correctly absent**. The one
+clean opportunity is **D**, and the first draft of this entry got it wrong in
+the flattering direction: "zero consumers anywhere in the tree" was FALSE and is
+corrected here before it shipped. `market_context` already computes `oi_ntl`
+(base x mark, verified against live rows), keeps an hourly history and publishes
+**`oi_chg_1h`/`oi_chg_24h`** every 30 minutes; the scout publishes `oi` per book.
+What is true — and stronger — is that **0 of 19 book files reference `oi` or
+`open_interest` at all.** The signal is computed, published, and read by nothing
+that trades. That moves D from "medium, needs collection" to "low, needs only a
+test".
+
+**RANKED, by measured gap rather than novelty:** (1) portfolio beta control —
+the largest measured risk, invisible to every existing instrument, and
+`fleet_risk.exposure` still reports `1/HHI` over DISTINCT SYMBOLS (verified in
+code at `fleet_risk.py:366`, not taken from doctrine), overstating independence;
+(2) per-book cost — the fleet-average 17.49bps stress flips 🌾 carry and 🔮
+georgia negative while carry's own row reads median half-spread **1.46bps**, so
+the average is the wrong number for both and it changes two verdicts; (3) open
+interest; (4) regime filtering, with the warning that a filter fitted on an 84%
+bull sample is fitted to one regime; (5) vol-adjusted stops, where 👩 mum's live
+`stop_reachable: false` is the worked example.
+
+**NO MODULE WAS IMPLEMENTED.** Phase 5's table is recorded EMPTY with its
+pass/fail criteria agreed in advance — OOS Sharpe with cluster-robust t>=2,
+maxDD not worse on the gate's MTM definition, survives the book's own measured
+cost +50%, neighbouring grid cells agree in sign, refuses no profitable existing
+trade without evidence, and a pre-registered revert date (I21/I26) — so the bar
+cannot move to fit a result. A full rollback procedure is in the report.
+
+**FILES:** `AUDIT_PHASE3_4_2026-09-07.md` (Phases 3-5),
+`scripts/audit_fingerprint.py` (the protected-surface guard),
+`BASELINE_2026-09-07.md` regenerated with survivorship, risk-adjusted metrics,
+regime, month and asset splits; `scripts/baseline_snapshot.py` extended
+(**12/12 mutations verified RED** across both passes). **Deployment is
+explicitly withheld** — Eamon's brief says do not deploy automatically, and that
+instruction is senior to this repo's standing deploy grants.
+
+## 2026-09-07 (ys) — THE FLEET COULD SAY WHETHER A BOOK PASSES AND NEVER WHAT IT RETURNED: a Phase-1 inventory and the first dated, reproducible, cost-stressed BASELINE
+
+**Eamon asked for a senior-quant audit in two phases — document the system, then
+save a baseline before anything changes.** Phase 1 changed no code, no lever, no
+env and no position; Phase 2 added one read-only instrument and two artefacts.
+
+**THE GAP, measured by grepping the tree rather than assumed.** This fleet owns
+more grading machinery than most desks: six pass/fail bars (`golive_readiness`),
+a lower-bound capital ranking (`fleet_allocation`), a BH-refereed winners docket,
+a ceiling organ, and since (wo) a full edge audit with profit factor, Sharpe,
+Sortino, concentration and P(ruin). **Not one of them writes down what a book
+RETURNED.** There was no artefact anywhere in the repo holding total return,
+annualised return, net after fees, win rate, avg win and avg loss, per book,
+dated. So "did that change help?" had no starting line to be measured from —
+which is the same shape as (yo)'s finding a week earlier: the fleet keeps
+building the measurement and not the tripwire that reads it.
+
+**`scripts/baseline_snapshot.py` RE-IMPLEMENTS NOTHING.** Every statistic is
+derived from `edge_audit.run()`, which imports `golive_readiness` for the era,
+the phantom filter, the retired-sleeve drop, `stats` and `cluster_se`, and
+`fleet_allocation.t_crit` for the critical value. **The calibration gate is
+inherited, not rebuilt** — `edge_audit` REFUSES when its sample cannot reproduce
+the live `golive-readiness` grade, and this refuses with it. Verified
+fail-CLOSED against a dark bus: exit 2, no baseline written, and the refusal
+NAMES what disagreed (I8) rather than printing the bare bool `edge_audit` hands
+back. The only arithmetic this module owns is the four ratios nobody had named,
+and each is a division of two numbers that already existed.
+
+**THREE WAYS A BASELINE LIES, each closed in the instrument rather than in
+prose:**
+* **ANNUALISATION IS FLAGGED, NEVER SILENT.** Half this fleet has a span under
+  the 30-day window bar, and annualising them is an extrapolation, not a
+  measurement — 👩 mum LIVE spans **9.4 days**, so her "587%/yr" is a 39x
+  extrapolation of ten days and 🙏 avo LIVE's is 20x. Every row carries
+  `span_days` and `extrapolation_x`, and short ones are marked ⚠.
+* **SIMPLE AND COMPOUNDED ARE BOTH SHOWN.** These books trade a FIXED clip, not
+  a fraction of equity, so compounding realised P&L models a book none of them
+  runs — and it reads absurdly high (mum LIVE: 587% simple vs **23,515%**
+  compounded). Simple is the headline; compounded sits beside it so no future
+  session re-derives the bigger number and believes it found something.
+* **LIVE AND PAPER ARE NEVER POOLED**, at any aggregate ((wp)).
+
+**THE BASELINE, 2026-09-07** — 14 books calibrated to the grade published
+04:02:43Z, 4,311 ledger closes (truncation checked per (qz): 4,311 against a
+5,000 cap, so not cut):
+
+| cohort | books | capital | net after fees | total return | closes | win rate | avg win | avg loss | PF |
+|---|---|---|---|---|---|---|---|---|---|
+| **live** | 2 | $835 | **+$164.75** | **+19.74%** | 105 | 73.3% | $4.39 | −$6.18 | 1.95 |
+| **shadow** | 12 | $12,000 | **+$34.93** | **+0.29%** | 1,637 | 47.9% | $1.79 | −$1.60 | 1.03 |
+
+**AND THE ONE NUMBER THE FLEET HAD NEVER PUT SIDE BY SIDE: real money is
+carrying the whole result.** $835 of live capital earned +$164.75 while $12,000
+of paper earned +$34.93 — and **$158.28 of that paper figure is one book**
+(🎫 the taker). Strip it and the other eleven shadow books are **−$123.35
+combined**. That is not an argument for more real money; it is the statement of
+what the baseline actually is, so a later "the fleet is up" cannot be read off a
+number two books produced.
+
+**THE COST STRESS IS WHERE IT BITES, and it found two books nobody had flagged.**
+Venue fee is zero (measured), so `realised_usd` is already net of the only real
+cost — the crossed spread, inside the shadow broker's book-walked fill. Charging
+each book the fleet's OWN measured round trip on top (`n x 17.49bps x clip`,
+(qq)) **flips two profitable books negative**: 🌾 carry **+$12.92 → −$2.82** and
+🔮 georgia v1 **+$12.85 → −$10.59**. Both are high-`n` books earning a thin mean,
+which is exactly the shape a cost term kills — and 🌾 carry is a book with an
+`established` verdict and t=2.59. Its edge is real and it is **smaller than the
+fleet's own execution noise**, which is a materially different statement from
+"it passes five of six bars". Recorded, not acted on: the stress charges a
+directional round trip to a delta-neutral funding book, which overstates its
+case, and the honest next step is carry's own measured `cost_bps` (median half
+1.46bps on its row today) rather than the fleet average. Named so the next pass
+starts from it.
+
+**PHASE 1 FOUND ONE LIVE DIVERGENCE WORTH THE WRITE-UP AND IT IS NOT A DEFECT:**
+`OversoldRebound.RSI_MAX` defaults to **38.0** in the file while both mum rows
+publish **36.0** — Eamon's own 4-Sep revert of (ya), set as an env on BOTH arms
+so the twin stays a control. Correct, deliberate, and invisible to anyone
+reading only the code. The inventory records it because a constant in a file is
+a claim about a container, not a measurement of one.
+
+**OPEN RISK FLAGS carried out of Phase 1, none acted on in this pass:** the
+live/shadow pair reads `impl_shortfall: arm-drift`, which weakens every paired
+comparison until resolved; 👩 mum LIVE publishes `stop_reachable: false`
+(`stop_dead_above 4.17x`) with `headroom.reason: liq_unpriced`, i.e. her −4% stop
+is not reachable on the worst-margin book in her 104-market universe; and
+🪁 kelly sits at **28.5% MTM drawdown** against a 15% bar with a pre-registered
+read already returned to Eamon.
+
+**THE FOURTH WAY A BASELINE LIES WAS FOUND IN THIS ONE'S OWN OUTPUT AND FIXED
+BEFORE IT SHIPPED: it does not equal the dashboard.** The baseline is
+**era-scoped** (`POLICY_ERA` — the sample that describes the book as it runs
+today) and **realised** (closed trades; open positions are marks, not evidence).
+The dashboard row's `pnl_abs` is lifetime and includes open MTM. On 🌾 carry
+those are **n=30 / +$12.92** against **n=121 / +$94.59** — a 7x gap on the same
+book, both correct, and an artefact that showed only one of them would have been
+compared to the dashboard once and distrusted forever. Every row now carries
+`n_all` and the lifetime figure beside the era one, and the doc opens with a
+four-point BASIS section (era, realised, quarantine+phantom filtered, book unit)
+that the selftest pins. **The public `/trades.json?source=paper` feed does not
+apply `LEDGER_QUARANTINE`** — `edge_audit` does, so grading straight off the feed
+uses a sample the gate refuses.
+
+**FILES:** `SYSTEM_INVENTORY_2026-09-07.md` (Phase 1, read-only),
+`BASELINE_2026-09-07.md` (generated — regenerate, do not hand-edit),
+`scripts/baseline_snapshot.py` (selftest + **9/9 mutations verified RED**:
+the extrapolation flag, the 365 in the simple annualisation, the cost drag, an
+unknown degrading to 0.0 instead of None, the refusal propagation, a compounded
+rate on a wiped-out book, the basis note, the lifetime reconciliation, and the
+cohort derived from a hardcoded name instead of the payload's own venue). The
+selftest earned its keep before it was committed: it caught a real defect in
+this session's own patch — `_feed_index` never stored `pnl_abs`, so the
+reconciliation column added to fix the gap above would have shipped rendering
+em-dashes.
+
+**A REGISTRATION GUARD WENT RED ON SOMEONE ELSE'S PUSH AND IS RECORDED, NOT
+ABSORBED.** `tests/test_selftests.py::test_no_unregistered_selftest` was already
+failing on main before this pass: `scripts/study_taker_ready_2026-09-06.py`
+merged at `950b578` (yl) without a registration. Registered here with the
+edge_audit reason verbatim, and said out loud in the test file itself, because a
+red shared build blocks every session and silently fixing another session's work
+is how authorship gets lost. Its author owns its structural pins.
+
+**MOVES NOTHING** — no lever, no capital, no promotion, no env, no position; it
+reads three public feeds and writes two files. Full suite green (exit 0).
+`audit_secret_leak` and `audit_ci_coverage` fail in this environment for
+environmental reasons only (gitleaks not installed; CI run history unreadable) —
+both fail-closed by design and neither touches these files.
+
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 
 **[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position
