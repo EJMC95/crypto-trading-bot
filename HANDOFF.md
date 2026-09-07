@@ -86,7 +86,7 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 ## Shipped today (19 commit(s))
 
-- `4e4e422` The judge's mum lane (yl): the serial machine overwrote the census's own measurements on the lane it runs — pnl_form stale as the Farmer's 'funding', the (vm) power report dropped
+- `28a335e` The judge's mum lane (yl): the serial machine overwrote the census's own measurements on the lane it runs — pnl_form stale as the Farmer's 'funding', the (vm) power report dropped
 - `8122704` (yj) regenerate HANDOFF.md
 - `af7ad34` (yj) the record: the changelog entry, and RENUMBERED (yf) -> (yi) -> (yj) after two sessions took those letters on main
 - `4d8eefa` (yi) the harness that validates the brain normalised the ledger with a partial copy of the brain's own rule

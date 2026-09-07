@@ -1,6 +1,6 @@
-## 2026-09-07 (yl) — THE JUDGE'S MUM LANE IS ALIVE — and the serial machine was overwriting the census's own measurements on the one lane it runs
+## 2026-09-07 (ym) — THE JUDGE'S MUM LANE IS ALIVE — and the serial machine was overwriting the census's own measurements on the one lane it runs
 
-**[RENUMBERED (yk) -> (yl) at push time** — a concurrent session's spelling/roster entry took (yk) on main while this pass's suite ran; the pushed entry keeps the letter per the letter rule.**]**
+**[RENUMBERED (yk) -> (yl) -> (ym)** — two concurrent sessions took (yk) then (yl) on main while this pass's suite ran. Per the letter rule the CITED entry keeps the letter: the other (yl) (the brain-replay normalisation entry) is cited in `bot_pnl_store.py`, `brain_replay.py` and three tests; this one is cited nowhere, so this one moved.**]**
 
 **Eamon: *"Judges mum lane."*** The hub's open thread carried it as the
 standing found-but-unfixed item — *"her arm asks `fleet_tuning` for
