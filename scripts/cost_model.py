@@ -346,8 +346,13 @@ def calibrate(rec, books_by_coin, tol=CALIB_TOL_BPS):
     findings = []
     ok = True
     if not rec:
-        return False, [["(no recorder)", "no book records spread_bps_entry — "
-                                         "nothing to calibrate against"]]
+        # Hoisted to a name rather than split inside the list literal: an
+        # implicit concatenation between two elements of a collection is the
+        # classic missing-comma bug, and CodeQL rightly cannot tell this one
+        # from that one. Cheaper to remove the ambiguity than to argue it.
+        why = ("no book records spread_bps_entry — nothing to calibrate "
+               "against")
+        return False, [["(no recorder)", why]]
     for bot, coins in sorted(rec.items()):
         mine, theirs = [], []
         for c, v in coins.items():
