@@ -1018,12 +1018,35 @@ def _selftest():
     assert set(PRE_REGISTERED[_reg_bot]["at_registration"]) >= {
         "rho_now", "rho_adm", "rho_star", "n_days", "edge_lb_pct"}
 
-    # -- the study moves nothing
+    # -- THE STUDY MOVES NOTHING, asserted on the AST rather than on a
+    #    substring scan. This repo's own (po) rule is that "a page-wide
+    #    substring scan is not a structural claim" — three tests in one session
+    #    once passed or failed on the PROSE that promised the property they
+    #    checked. So walk the call sites: any Call whose callee name (bare or
+    #    attribute) is a mutator is a defect, and the docstrings are invisible
+    #    to it by construction.
+    import ast as _ast
     with open(os.path.abspath(__file__), encoding="utf-8") as fh:
         src = fh.read()
-    src = src[:src.index("def _selftest")]
-    for bad in ("write_levers", "market_open(", "publish(", "set_status(", "get_lever("):
-        assert bad not in src, f"study must not call {bad}"
+    tree = _ast.parse(src)
+    # the selftest itself is excluded — it may name these to assert their
+    # absence, which is exactly what the substring version could not express.
+    body = [n for n in tree.body
+            if not (isinstance(n, _ast.FunctionDef) and n.name == "_selftest")]
+    MUTATORS = {"write_levers", "market_open", "set_status", "publish",
+                "get_lever", "snapshot_equity", "claim_writer", "set_lever"}
+    called = set()
+    for node in body:
+        for sub in _ast.walk(node):
+            if isinstance(sub, _ast.Call):
+                fn = sub.func
+                nm = (fn.attr if isinstance(fn, _ast.Attribute)
+                      else fn.id if isinstance(fn, _ast.Name) else None)
+                if nm:
+                    called.add(nm)
+    assert not (called & MUTATORS), f"study calls a mutator: {called & MUTATORS}"
+    # ... and the check is not vacuous: it must SEE the calls this file does make.
+    assert {"run_paths", "propose", "daily_units"} <= called, sorted(called)[:20]
 
     # -- end to end: a planted winner gets a rung, a planted loser gets none,
     #    and the horizon never exceeds the quotability cap.

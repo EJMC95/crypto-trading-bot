@@ -265,6 +265,24 @@ to a rung the sample cannot support.
 
 ---
 
+## 8a. Sensitivity — the proposal does not move with the projection window
+
+Re-run at 3, 6 and 12 months (300 draws each), every proposal is **identical**:
+
+| book | h=3m | h=6m | h=12m |
+|---|---|---|---|
+| 🙏 avo shadow | 1.00% | 1.00% | 1.00% |
+| 👩 mum live | 0.25% | 0.25% | 0.25% |
+| 👩 mum shadow | 0.25% | 0.25% | 0.25% |
+
+`rho_adm` does drift down at longer horizons on some REFUSED books (⚖️
+Counterweight 0.5% → 0.25% → none; 🏛️ albanese the same), which is the right
+direction — a longer path gives more chances to draw down. But no book that
+gets a proposal changes it, so the recommendation is a property of the ledger
+rather than of the window chosen to project it.
+
+---
+
 ## 9. What this does NOT establish
 
 * **Every forward number is conditional on the sample repeating in
