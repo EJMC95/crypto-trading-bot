@@ -87,7 +87,7 @@ CARRIED = [
     {
         "id": "mum-live-rho-read-preregistered",
         "owner": "session",
-        "what": "(yk) put every book's sizing on ONE axis for the first time -- "
+        "what": "(yp) put every book's sizing on ONE axis for the first time -- "
                 "risk at the stop per position as a fraction of equity, "
                 "rho = clip_fraction x stop -- and the fleet spans 83x on it "
                 "(avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull "

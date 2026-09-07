@@ -1,3 +1,185 @@
+## 2026-09-07 (yp) — THE FLEET SPANS 83x ON RISK PER POSITION AND NO ORGAN HAD EVER PRINTED THE NUMBER: five sizing rules on one ladder, and the rule matters far less than the rung
+
+**Eamon:** *"Review the position-sizing logic. Compare fixed dollar / fixed
+percentage / volatility-adjusted / risk-per-trade / fractional Kelly. Cap the
+proposed risk conservatively. Show the impact on return, drawdown, volatility
+and risk of ruin. Do not optimise sizing solely for maximum historical
+profit."*
+
+**Letter note: RENUMBERED (yf) -> (yk) -> (yn) -> (yp).** Concurrent sessions
+landed entries on main throughout this branch's life — (yf)-(yj) during the
+build, (yk)-(ym) during the adversarial review, (yn)-(yo) during the rebase. Per
+the letter rule the cited entry keeps the letter and this one moves each time;
+the cross-branch arm of `audit_changelog_letters` caught two of the three
+collisions pre-push, which is exactly the race it was built for.
+
+**THE REVIEW FINDING FIRST, because it is structural and predates any
+statistic.** The fleet runs **four different sizing bases** — `equity x GROSS_X
+/ max_open` on the two live books, `RISK_USD / (day_range/2)` on 🎫 the taker,
+a flat `$50` on the family shadows, a fixed notional on the funding books —
+under **five multiplicative modifiers** (brain `[1/6.7, 6.7]`, allocation
+`[0.25, 4.0]`, the 7d governor, the (wu) drawdown rail, and SafetyRails' cap,
+which is a boolean rather than a scale). Every one is denominated in DOLLARS or
+in a multiplier on dollars. **Nowhere does the fleet compute the quantity that
+governs survival: risk at the stop, per position, as a fraction of equity.** So
+a $50 stake behind a 1.5% stop and a $240 clip behind a 4% stop were never
+comparable. On the common axis `rho = f x s`:
+
+| book | per-position notional | stop | rho |
+|---|---|---|---|
+| 🙏 avo live | 33.3% of equity (2x / 6 slots) | 10% | **3.33%** |
+| 👩 mum live | 41.7% of equity (5x / 12 slots) | 4% | **1.67%** |
+| 🎫 the taker | ~8.3% of equity (mean recent clip $83) | 7% | **0.58%** |
+| 🏛️ turnbull | ~$25 clip | 1.5% | **0.04%** |
+
+**83x, inside one fleet, unprinted.**
+
+### THE INSTRUMENT: `scripts/study_position_sizing_2026-09-07.py`
+
+Five rules on that ladder (0.25/0.5/1/2/3/5%), over each book's OWN era-scoped
+ledger, block-bootstrapped (iid and 5-day, the WORSE taken). Two fail-CLOSED
+gates: the sample must reproduce the LIVE `golive-readiness` grade exactly
+(`edge_audit.calibrate`, imported), and the trade set + drawdown convention must
+reproduce each book's published realised drawdown to 0.05pp. **Scope is the
+calibrated set only** — 27 rows the live grade does not carry are skipped BY
+NAME. Horizons capped at **10x each book's own span**; the first run projected
+👩 mum's live book 19.2x.
+
+**THE FIRST CUT GOT THE UNIT OF RISK WRONG AND ITS OWN OUTPUT CAUGHT IT.**
+Version one chained trades by OVERLAP — single-linkage clustering, which on a
+continuously-in-market book collapses the whole history into one cluster:
+measured on 🎫 the taker, **183 closes became 5 "batches", one of them 108
+legs.** The unit is now the UTC trading day.
+
+### 1 · THE RULE BARELY MATTERS; THE RUNG IS EVERYTHING
+
+At **0.5% risk per position**, all 14 calibrated books, median ratio to fixed
+dollar:
+
+| rule | ret p50 | maxDD p95 | vol/day | max P(ruin) | peak gross |
+|---|---|---|---|---|---|
+| fixed_dollar | 1.000 | 1.000 | 1.000 | **0.166** | 1.000 |
+| fixed_fraction | 1.010 | 1.004 | 1.043 | 0.000 | 0.988 |
+| vol_adjusted | 1.024 | **1.105** | **1.152** | 0.000 | **1.422** |
+| risk_per_trade | 1.009 | 1.004 | 1.046 | 0.000 | 0.988 |
+| kelly_half | 1.069 | 0.964 | 1.043 | 0.000 | 0.988 |
+| kelly_quarter | 1.067 | 0.968 | 1.043 | 0.000 | 0.988 |
+| **kelly_quarter_lb** | **1.067** | **0.783** | **0.940** | 0.000 | 0.988 |
+
+Six of seven sit inside **±7% on return**. Move the RUNG one notch instead —
+0.25% to 1% — and books with any path to losing half the account go **0 of 14
+to 5 of 14**.
+
+* **Quarter-Kelly on the LOWER BOUND is the one rule that pays for itself**:
+  mean-Kelly's return, **21.7% less drawdown**, 6% less volatility — and it is
+  the only rule that **stands a losing book down without being told** (📕 bezos
+  −51.9% to −3.6%, drawdown 60.0% to 6.1%, because its bound is negative).
+* **The volatility target is the worst compounding rule here** — +2.4% return
+  for +10.5% drawdown, +15% vol and **+42% peak gross**.
+* **Fixed dollar is the ONLY one of the five that can zero an account** (it
+  never de-risks), and its gross RISES as equity falls.
+* **RISK-PER-TRADE IS WORSE ON EVERY BOOK THAT CAN TEST IT.** Eleven of
+  fourteen books run exactly ONE stop, where `Q = R/s` makes it *arithmetically
+  identical* to fixed fraction (to 4.8e-14) — an identity, not a measured null,
+  and now published as `n_distinct_stops`. On the three books whose stops vary
+  it raised drawdown every time: 🎫 taker **8.9% to 18.2%**, 📕 bezos 60.0% to
+  66.0%, 🏛️ albanese 20.5% to 21.2% — the (nt) mechanism again, equal-risk
+  sizing charging every tight-stop loss the full R.
+
+### 2 · RISK OF RUIN IS TWO NUMBERS AND THE STRICT ONE NEVER BINDS
+
+**P(equity to 0) is 0.00 for every compounding rule at every rung** — a
+fraction of a shrinking equity cannot reach zero, so reporting it alone would be
+(po)'s check that cannot fail; it is now declared inert at the clause itself.
+The binding measure is **P(max drawdown > 50%)**: **0.00 / 0.82 / 1.00** at
+0.25% / 0.5% / 1%. The practical-ruin cliff sits between 0.25% and 1%.
+
+### 3 · THE PROPOSAL READS NO RETURN COLUMN — AND ITS FIRST OUTPUT SHOWED WHY THAT IS NOT ENOUGH
+
+`rho* = min(2%, 0.5 x largest rung with P(ruin)=0, p95 DD <= 15%
+(`golive_readiness.GOLIVE_MAX_DD`), peak gross <= 2x (`fleet_bus.BRAIN_GROSS_X`))`,
+every owner imported. Its selftest PERMUTES every return field to pin that they
+cannot move the answer.
+
+**But a rule reading no returns cannot tell "safe because it wins" from "safe
+because it loses slowly".** 🎯 the sniper carries a NEGATIVE mean (t=−0.78) and
+earned a 0.25% proposal purely because at that size its drawdown stays inside
+the bar. Edge now enters ONCE, as a PRECONDITION — a book is sized only while
+its I16 lower bound is positive (`fleet_allocation.lower_bound`) — which is
+this fleet's own **I24**, *scale a coin flip and you scale a coin flip*.
+
+Two further admissibility terms were added because the output demanded them:
+the GROSS ceiling (🌾 carry's 1% rung implied **7.5x gross** — a bleed
+threshold standing in for a price stop, times 15 concurrent legs) and the
+10x-span horizon cap.
+
+**10 of 14 books get NO proposed size**, each with a stated reason. **Every
+proposal is identical at 3, 6 and 12 months.**
+
+### 4 · THE REAL-MONEY READING, REGISTERED RATHER THAN EXECUTED
+
+👩 **mum's LIVE arm runs rho 1.67% against a proposed 0.25% (6.7x)**; 🎫 the
+taker 0.58% against 0.25% (2.3x). Mum is corroborated from three independent
+directions by **her own published row**, none previously read against the bar:
+`all_slots_stop_pct` **0.20** vs the gate's 0.15; `vol_target_at_neff1` 3.75x vs
+a configured **5.0x**; `stop_reachable` **false** (`stop_dead_above` 4.17x) — on
+the worst-margin book in her universe the venue liquidates before her −4% stop
+fires. **Stated fairly, the number that argues the other way:** her measured
+`n_eff` is 1.824 and at that credit her own `vol_target_here` is **5.06x**, so
+she is sized exactly at her framework's target, and I22 requires N_eff to be
+MEASURED, which it is.
+
+**NOT ACTED ON.** The reading rests on **10 trading days** — the sample floor
+exactly, so it dies if any one day is removed. Cutting a real-money clip 6.7x on
+ten days of a hot sample is what **I25** forbids. PRE-REGISTERED (I21):
+`PRE_REGISTERED['freqtrade-mum-lighter']` declares the at-registration numbers
+as a COMMITMENT ((tt)'s lesson), the study prints the fresh-day count and **DUE
+NOW** every run, and the read is graded on days AFTER 2026-09-07 only at
+`n_days >= 30` or 2026-10-07. Carried as `mum-live-rho-read-preregistered`,
+whose predicate closes only when the verdict is written down.
+
+### 5 · ADVERSARIAL REVIEW — 10 FINDINGS, 9 SURVIVED, 2 CHANGED THE ANSWER
+
+Five independent lenses, each finding verified by a second reviewer whose
+default was REFUTED.
+
+* **CONFIRMED, critical — the taker's breakout stop was read from a key its
+  publisher never emits.** `stop_of` tested `bars.brk_sl`; `entry_bars()` emits
+  eight keys and that is not one of them, so **0 of 276 stamped rows carry it**
+  and **148 breakout rows were priced at 3% instead of 7%** — and the selftest
+  PINNED the dead branch against a fixture this file wrote itself, the exact
+  (hj) defect. Fixed: the CONDITION comes from the ledger's own `policy.bull`
+  stamp, the VALUE from the bot's `BRK_SL` (read, not retyped), and the selftest
+  now asserts against `entry_bars()` directly. **The taker went 3% to 7%, rho
+  0.25% to 0.58%, and from no proposal to a 2.3x cut.**
+* **CONFIRMED (partial), major — `fixed_dollar`'s peak gross was priced at
+  t=0.** That rule alone holds a constant DOLLAR notional, so its gross rises as
+  equity falls; computing it at `f` understated exactly the losing paths a gross
+  ceiling exists to catch.
+* **ACCEPTED as corrections to the claims:** the risk_per_trade identity and my
+  wrong attribution of its cause (the reviewer refuted "the median fill
+  manufactured it" — those books genuinely run one stop); calibration gate 2
+  pins the trade set and the drawdown convention, NOT the path arithmetic the
+  docstring claimed; `p_ruin <= 0` is inert on compounding rules; `rho_adm`
+  moves with the `--horizon` knob on 8 of 14 books while `rho*` moves on none;
+  the edge precondition tests against ZERO rather than the (hm) random-entry
+  null, which is weaker than the fleet's own standard; the p95-loss proxy stop
+  is an undeclared free parameter; `MIN_N` is a trade floor used as a day floor.
+* **REFUTED:** that close-day equity sizing understates drawdown up to 2.25x.
+  The verifier decomposed it: the effect is a sampling-GRID artefact, isolated
+  median ratio 1.006, below 1.0 on 6 of 14 books, and it moves **0 of 14**
+  admissible rungs on the criterion `propose()` actually reads.
+
+### WHAT MOVED: NOTHING
+
+No lever written, no clip changed, no capital allocated — asserted by an **AST
+walk of the module's own call sites**, not a substring scan, because (po)'s rule
+is that a page-wide substring scan is not a structural claim. **18 of 18
+mutations reddened the guards** across four rounds, including one that INSERTS a
+`publish()` call into the file and one that empties the AST the scan walks.
+
+Full working: `STUDY_POSITION_SIZING_2026-09-07.md`.
+
 ## 2026-09-07 (yo) — SIX PRE-REGISTERED READS SAY "THE DATE IS THE BACKSTOP, NOT THE TRIGGER" AND NOTHING WAS MEASURING THE TRIGGER: 🪁 kelly's had been due for three and a half weeks, and its verdict is the branch that returns to Eamon
 
 > **[RENUMBERED (ym) -> (yn) -> (yo) at push.]** Two concurrent sessions took (ym)
@@ -13342,8 +13524,6 @@ paging correctly). The promotion pipeline is structurally dead end-to-end
 (stood-down judge, sterile funding lane since ~29-Jul, best candidate ever
 stranded at queue head) — now HONEST on the bus instead of erased. ⚖️
 Counterweight's pre-registered keep-or-retire lands ~28-Aug: three days.
-
-
 
 ## 2026-08-22 (tb) — THE SWAP EXECUTED: 💸 THE FARMER FLATTENED FOUR REAL SHORTS AND 🔮 GEORGIA TOOK THE SUB-ACCOUNT — PLUS THE ELEVEN REGISTRIES THAT EACH DECLARE "WHO IS LIVE"
 
