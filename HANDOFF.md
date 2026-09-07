@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 22:45 Sydney (12:45Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 23:41 Sydney (13:41Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `avo-supply-floor-staged-read`  ·  owner: **session**
+(zf) Eamon asked to scale 🙏 avo and 👩 mum with their higher balances. SIZE was refused with numbers -- both sit 1.33x above the ceiling the 15% drawdown bar implies (GROSS_X_MAX = 0.15/|stop|: avo 2.0 vs 1.50, mum 5.0 vs 3.75), both publish all_slots_stop_pct 0.20 against that 0.15 bar, and rho runs 3.33% (avo) and 1.67% (mum) against the (yp) study's admissible 0.5%; I22 adds that leverage leaves t invariant. SUPPLY was the real constraint: avo held 3 of 6 slots scanning 39 crypto names while 👩 mum, on the SAME HOST, scanned 72. Measured on the scout's own vols (216 markets, 114 crypto): floors 0.50/0.25/0.10/0.05 yield 32/49/70/79 names, and through carrier_universe avo's crypto goes 39 -> 53 (+14) at 0.25, every one already scanned by mum, thinnest $0.204M = 2x the measured slippage cliff. $0.05M REFUSED: it admits 9 names under the cliff, a band the cost model steps at and cannot price ((qq)/(ty)). SHIPPED STAGED at 0.25, not equalised: half the argument that set 0.5 has inverted (avo now clips $146.64 vs mum's $242.65, where (vd) recorded $684 vs $250) and half has not (hold ~3.5d vs 12h).
+
+_Still open because:_ the read is PRE-REGISTERED (I21/I26) and its trigger has not fired: graded on FRESH avo LIVE closes opened after 2026-09-07 only, never the window that motivated it (I25), at n>=20 or on 2026-10-07 whichever first. REVERT to 0.5 if realised entry slippage on the 14 new names is worse than her book's own mean by >10bps, or their mean %/trade is worse than the pre-existing 39 over the same window; ADVANCE to 0.1 (the remaining +19 names) if neither holds AND her close rate rose; anything else returns to Eamon with both numbers. Closes when the read is taken and recorded in the CHANGELOG and this row removed.
 
 ### `mum-live-rho-read-preregistered`  ·  owner: **session**
 (yp) put every book's sizing on ONE axis for the first time -- risk at the stop per position as a fraction of equity, rho = clip_fraction x stop -- and the fleet spans 83x on it (avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull 0.04%). The one real-money reading: 👩 mum's LIVE arm runs rho 1.67% (clip $240 on $576 equity = 41.7% of the account behind a 4% stop) against a proposed 0.25% and an admissible 0.5% -- 6.7x the proposal. Corroborated from three independent directions by her OWN published row: all_slots_stop_pct 0.20 against the gate's 0.15 bar, vol_target_at_neff1 3.75x against a configured 5.0x, and stop_reachable FALSE (stop_dead_above 4.17x) on the worst-margin book in her universe. NOT acted on: the study's reading rests on 10 trading days at its own 10x extrapolation cap, and her measured n_eff 1.824 puts her vol_target_here at 5.06x, i.e. exactly at her own framework's target. So it is REGISTERED, not executed.
@@ -89,14 +94,13 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (32 commit(s), entries (yo), (yp))
+## Shipped today (31 commit(s), entries (yo), (yp))
 
-- `36b3a6f` (yw) the sizing table priced a book that holds one position at a time, and these books hold five to thirteen
-- `aeaca16` (yv) the fleet's only answer to its own null was on one book of fourteen: the control arm is per-book now
-- `9579a55` (yu) the control arm computed its answer and threw it away: the placebo pair settled 21 lines before the publish
-- `bec6716` (yt) the bootstrap is OPT-IN: it was inside a hot pure function and made stats() 660x slower
-- `49f1641` (yt) the changelog entry CI correctly demanded, and two CodeQL findings that were both real
-- `b5432a3` Monte Carlo risk audit: the gate grades one path, and two of its numbers were decided by row order
+- `87eec98` [deploy-live-taker][deploy-live-mum] (zf) the live books are not small, they are idle: size refused with numbers, avo's supply floor staged 0.5 -> 0.25
+- `de8918c` Merge remote-tracking branch 'origin/main' into claude/failed-workflows-check-bn84ly
+- `13d3b18` (ze) correct in place: raising gross_x does NOT move zero dollars
+- `8e07db9` (ze) a red guard silenced the two guards behind it for three weeks, and a title-reading guard could not be cleared by fixing the title
+- `cf56b26` [deploy-live] Monte Carlo risk audit, the control arm that threw its answer away, and the sizing table that priced one position at a time (#291)
 - `69ed911` (yr) renumber the changelog header to match its commit subject — main briefly carried two (yq) entries because the final rebase auto-merged clean
 - `7f9462e` (yr) two instruments wrong in the reassuring direction: the asset key that hid co-holding, and the drawdown denominator that halved real money's hole
 - `3e205d9` (yq) an unfillable shadow order is NOT a zero-cost fill: NULL slippage, a named reason, and the coin-quality veto stops eating fabricated evidence

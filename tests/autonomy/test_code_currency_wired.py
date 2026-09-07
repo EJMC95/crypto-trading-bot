@@ -105,35 +105,63 @@ def test_code_currency_checkout_has_full_history():
         "container reads UNRESOLVED, which does not fail: a vacuous green")
 
 
-def test_code_currency_exit_code_is_not_masked():
-    """MUTATION: add `continue-on-error: true` to the job or any step -> RED.
+def _steps(job):
+    """(name, {key: value}) for each `- name:` step in a job block.
 
-    [2026-09-07 (ze)] STRUCTURAL, was a page-wide substring scan. The old form
-    asserted `"continue-on-error" not in job`, which is `(po)`'s own rule
-    ("a page-wide substring scan is not a structural claim") landing on the
-    test written to honour it: it went red on a COMMENT that named the key in
-    order to explain why the key was refused. A guard that cannot tell a
-    setting from a sentence about that setting fails in both directions —
-    it blocks a correct change, and `continue-on-error: false` (which masks
-    nothing) would have tripped it too.
-
-    It now parses the YAML and reads the actual key, on the job and on every
-    step. The `|| true` arm below stays textual on purpose: that one IS a
-    property of the command string, so text is the right basis for it.
+    Line-shaped on purpose: `requirements-test.txt` carries no yaml lib, which
+    is the convention `_job_block` above states and which `audit_deploy_coverage`
+    states again. [2026-09-07 (zg)] The first cut of these two tests used
+    `import yaml` and went RED on the CI runner while passing locally — my own
+    defect, and the more instructive half is that the guard's twin in
+    `audit_live_marker_survives_squash` swallowed the same ImportError and went
+    silently INERT instead. Line-shaped and control-pinned beats a parse that is
+    only available on some machines.
     """
-    import yaml
-    wf = yaml.safe_load(WF.read_text())
-    cc = wf["jobs"]["code-currency"]
-    assert not cc.get("continue-on-error"), (
-        "continue-on-error on the code-currency job turns BEHIND-OWN into a "
-        "warning — and a guard whose only output is a warning on a passing "
-        "run is not a guard ((gl)/(hj))")
-    for st in cc.get("steps", []):
-        assert not st.get("continue-on-error"), (
-            f"continue-on-error on step {st.get('name')!r} masks its verdict "
-            "the same way — see (gl)/(hj)")
+    out, cur = [], None
+    for ln in job.splitlines():
+        m = re.match(r"\s*- name:\s*(.+?)\s*$", ln)
+        if m:
+            cur = (m.group(1), {})
+            out.append(cur)
+            continue
+        m = re.match(r"\s*([a-z-]+):\s*(.*?)\s*$", ln)
+        if m and cur is not None and not ln.lstrip().startswith("#"):
+            cur[1].setdefault(m.group(1), m.group(2))
+    return out
+
+
+def test_the_step_parser_can_actually_see_a_step():
+    """POSITIVE CONTROL ((po)): a line parser that matches nothing would make
+    every test built on it vacuously green. Pin that it reads the real file."""
+    steps = _steps(_job_block("code-currency"))
+    assert len(steps) >= 3, f"parser found {len(steps)} steps in code-currency"
+    names = [n for n, _ in steps]
+    assert any("commit is each container running" in n for n in names), names
+    assert any("roster" in n.lower() for n in names), names
+
+
+def test_code_currency_exit_code_is_not_masked():
+    """MUTATION: add `continue-on-error: true` to any step -> RED.
+
+    [2026-09-07 (ze)/(zg)] STRUCTURAL, was a page-wide substring scan. The old
+    form asserted `"continue-on-error" not in job`, which is `(po)`'s own rule
+    ("a page-wide substring scan is not a structural claim") landing on the test
+    written to honour it: it went red on a COMMENT that named the key in order
+    to explain why the key was refused. It also could not tell
+    `continue-on-error: false` — which masks nothing — from `: true`.
+
+    It now matches the KEY with its indentation and reads the VALUE, so a
+    sentence about the setting is not the setting.
+    """
     job = _job_block("code-currency")
     for ln in job.splitlines():
+        if ln.lstrip().startswith("#"):
+            continue                       # a comment is not a setting
+        m = re.match(r"\s*continue-on-error:\s*(\S+)\s*$", ln)
+        assert not (m and m.group(1).lower() == "true"), (
+            "continue-on-error: true on the code-currency job turns BEHIND-OWN "
+            "into a warning — and a guard whose only output is a warning on a "
+            "passing run is not a guard ((gl)/(hj))")
         if "audit_code_currency" in ln:
             assert "|| true" not in ln and not re.search(r"\|\|\s*echo", ln), (
                 f"the audit's exit code is masked: {ln.strip()!r}")
@@ -153,24 +181,23 @@ def test_a_red_guard_never_silences_the_guards_behind_it():
     guard, so nothing looked missing.
 
     The condition must be the FEED's outcome, never `always()`: a dark feed
-    still has to skip the roster check (this job treats an empty feed as
-    failure by design), and `always()` would run it against a file that is not
-    there, turning a fetch outage into a fake roster finding.
+    still has to skip the roster check (this job treats an empty feed as failure
+    by design), and `always()` would run it against a file that is not there,
+    turning a fetch outage into a fake roster finding.
     """
-    import yaml
-    wf = yaml.safe_load(WF.read_text())
-    steps = wf["jobs"]["code-currency"]["steps"]
-    by_name = {s.get("name"): s for s in steps}
+    job = _job_block("code-currency")
+    steps = _steps(job)
+    by = {n: kv for n, kv in steps}
 
-    feed = [s for s in steps if "curl" in str(s.get("run", ""))]
-    assert feed and feed[0].get("id") == "feed", (
-        "the feed-fetch step lost its `id: feed` — the two guards below gate "
-        "on its outcome, and an unknown id makes that expression always false, "
+    feed = [(n, kv) for n, kv in steps if "feed" in n.lower()]
+    assert feed and feed[0][1].get("id") == "feed", (
+        "the feed-fetch step lost its `id: feed` — the two guards below gate on "
+        "its outcome, and an unknown id makes that expression always false, "
         "silently skipping both")
 
-    roster = next((s for n, s in by_name.items() if n and "roster" in n.lower()), None)
+    roster = next((kv for n, kv in steps if "roster" in n.lower()), None)
     assert roster is not None, "the roster guard left this job"
-    cond = str(roster.get("if", ""))
+    cond = roster.get("if", "")
     assert "cancelled()" in cond and "steps.feed.outcome" in cond, (
         "the roster guard must run when the guard ABOVE it fails and skip only "
         f"on a dark feed; its condition is {cond!r}")
@@ -178,12 +205,11 @@ def test_a_red_guard_never_silences_the_guards_behind_it():
         "always() would run the roster check against a feed that failed to "
         "download — a fetch outage becomes a fake roster finding")
 
-    ci = next((s for n, s in by_name.items()
-               if n and "graded" in n.lower()), None)
+    ci = next((kv for n, kv in steps if "graded" in n.lower()), None)
     assert ci is not None, "the ci-coverage guard left this job"
-    assert "cancelled()" in str(ci.get("if", "")), (
-        "audit_ci_coverage reads git history and `gh run list`, never the "
-        "feed, so a red guard above it must not skip it")
+    assert "cancelled()" in ci.get("if", ""), (
+        "audit_ci_coverage reads git history and `gh run list`, never the feed, "
+        "so a red guard above it must not skip it")
 
 
 def test_the_window_covers_a_week_of_commits():

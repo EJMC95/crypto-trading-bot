@@ -79,27 +79,45 @@ def workflow_markers(path=WORKFLOW):
     return set(re.findall(r"\[deploy-live[a-z-]*\]", body))
 
 
-def workflow_pr_types():
+def workflow_pr_types(text=None):
     """The `pull_request` trigger types on the workflow that runs this guard.
 
-    Returns None when the workflow cannot be read — an unreadable file makes
-    no claim rather than a false one (the fail-open half of the house rule;
-    the FAIL above only fires on a workflow we actually parsed).
+    **NO YAML DEPENDENCY, deliberately** — `requirements-test.txt` carries no
+    yaml lib and neither does the freqtrade image, which is the convention
+    `_job_block` and `audit_deploy_coverage` both state in their own words.
+    [2026-09-07 (zg)] The first cut of this used `import yaml` inside a
+    `try/except` that returned None, so on the CI runner it did not merely fail
+    — it **silently returned "no claim" and the guard became inert**, which is
+    the vacuous-green shape this whole file exists to prevent. Line-shaped
+    parsing, positive-control-pinned in the selftest, is the honest form here.
+
+    Returns the declared type set, `set()` when `types:` is absent (GitHub's
+    default, which lacks `edited`), or **None only when the block genuinely
+    cannot be found** — an unreadable workflow makes no claim rather than a
+    false one.
     """
-    wf = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "changelog-check.yml"
+    if text is None:
+        wf = (Path(__file__).resolve().parents[1]
+              / ".github" / "workflows" / "changelog-check.yml")
+        try:
+            text = wf.read_text(encoding="utf-8")
+        except OSError:
+            return None
+    lines = text.splitlines()
+    # find `pull_request:` nested under the `on:` mapping
     try:
-        import yaml
-        d = yaml.safe_load(wf.read_text(encoding="utf-8"))
-    except Exception:
+        i = next(i for i, ln in enumerate(lines)
+                 if re.fullmatch(r"  pull_request:\s*", ln))
+    except StopIteration:
         return None
-    # PyYAML parses a bare `on:` key as the boolean True
-    on = d.get("on", d.get(True)) or {}
-    pr = on.get("pull_request")
-    if not isinstance(pr, dict):
-        return None
-    t = pr.get("types")
-    # types omitted == GitHub's default set, which lacks `edited`
-    return set(t) if isinstance(t, list) else set()
+    # its body is everything indented deeper, up to the next 2-space key
+    for ln in lines[i + 1:]:
+        if ln.strip() and not ln.startswith("    "):
+            break
+        m = re.match(r"\s*types:\s*\[(.*?)\]\s*$", ln)
+        if m:
+            return {t.strip() for t in m.group(1).split(",") if t.strip()}
+    return set()
 
 
 def _selftest():
@@ -148,6 +166,30 @@ def _selftest():
     # (hj)/(gl) forbid as a way to kick CI. A guard whose own remedy cannot
     # clear it trains the reader to merge past it — the (gl) failure, arrived
     # at from the opposite direction.
+    # POSITIVE CONTROL FIRST ((po): empty output is not a negative result until
+    # the check has been SEEN to produce a positive one). A line-shaped parser
+    # that silently matches nothing would report every workflow as compliant.
+    _WITH = ("on:\n  pull_request:\n    branches: [main]\n"
+             "    types: [opened, synchronize, reopened, edited]\n"
+             "  push:\n    branches: [main]\n")
+    _WITHOUT = ("on:\n  pull_request:\n    branches: [main]\n"
+                "  push:\n    branches: [main]\n")
+    _NARROW = ("on:\n  pull_request:\n    branches: [main]\n"
+               "    types: [opened, synchronize]\n")
+    for label, txt, want in (("declared", _WITH, {"opened", "synchronize",
+                                                  "reopened", "edited"}),
+                             ("omitted", _WITHOUT, set()),
+                             ("narrow", _NARROW, {"opened", "synchronize"})):
+        got = workflow_pr_types(txt)
+        if got != want:
+            ok = False
+            print(f"FAIL workflow_pr_types({label}) -> {got}, expected {want} "
+                  f"— the parser cannot see the field it gates on")
+    if workflow_pr_types("name: nothing\njobs:\n  x:\n") is not None:
+        ok = False
+        print("FAIL workflow_pr_types must return None when there is no "
+              "pull_request block — an unreadable workflow makes NO claim")
+
     types = workflow_pr_types()
     if types is not None and "edited" not in types:
         ok = False

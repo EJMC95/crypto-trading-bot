@@ -1,3 +1,58 @@
+## 2026-09-07 (zg) — MY OWN GUARD SWALLOWED THE IMPORT IT NEEDED AND WENT SILENTLY INERT: `(ze)` used a yaml parser this repo deliberately does not have
+
+**CI caught this, on `(ze)`'s own push, and the instructive half is not the red
+test.** `(ze)` rewrote a page-wide substring scan into a STRUCTURAL check —
+correctly — and reached for `import yaml` to do it. This repo has a **declared
+no-yaml policy** that both `_job_block` ("*requirements-test.txt carries no yaml
+lib*") and `audit_deploy_coverage` ("*this audit deliberately has no yaml
+dependency*") state in their own words. I read neither before adding the
+dependency.
+
+**TWO SITES, AND THEY FAILED DIFFERENTLY — that is the finding.**
+* the two TESTS failed loudly: `ModuleNotFoundError: No module named 'yaml'`,
+  2 failed / 3,981 passed. Fine — a red test is a working test.
+* `audit_live_marker_survives_squash.workflow_pr_types` wrapped the same import
+  in `try/except` and returned **None**, which that function documents as "makes
+  no claim". So on the CI runner the guard did not fail — **it silently stopped
+  checking**, and its `--selftest` printed OK. A guard shipped to close a
+  vacuous-green class, itself vacuous, on its first run, in the same commit.
+  The fail-OPEN degrade was right for an unreadable FILE and wrong for a missing
+  LIBRARY: one is doubt about the world, the other is doubt about yourself.
+
+**FIXED to the repo's own convention: line-shaped parsing, control-pinned.**
+`workflow_pr_types` and the two tests now read the workflow's own line shapes,
+and — because `(po)` is exactly about a check that inspects nothing — each
+carries a **POSITIVE CONTROL**: the guard's selftest asserts the parser returns
+the declared set on a `types:` fixture, `set()` when omitted, a narrow set when
+narrow, and `None` only when there is genuinely no `pull_request` block; the
+test file gains `test_the_step_parser_can_actually_see_a_step`, which fails if
+the step parser ever reads fewer than three steps out of the real job.
+
+**AND THE STRUCTURAL PROPERTY `(ze)` WAS AFTER SURVIVES INTACT** — it did not
+have to be traded for the parser. The masking check matches
+`continue-on-error:` as a KEY with its indentation and reads the VALUE, so it
+still tells a setting from a sentence about the setting, and `: false` (which
+masks nothing) from `: true`.
+
+**VERIFIED THE WAY IT SHOULD HAVE BEEN THE FIRST TIME: the whole suite re-run
+with `yaml` made UNIMPORTABLE** (a stub on `PYTHONPATH` that raises
+`ImportError`), reproducing the runner rather than trusting the sandbox. Green
+there, and green on the guard's selftest.
+
+**MUTATIONS, 11 in total and every one applied-checked** — an earlier round of
+this same work reported a mutation "not reddening" when the `perl` substitution
+had simply **not matched**, so each mutation now asserts it changed the file
+before the verdict is read (`(po)`'s rule, collected on myself twice in one
+session). Parser: break the `types:` regex -> RED · make an absent `types:`
+report the full set -> RED · never find the block -> RED. `(ze)`'s seven arms
+re-verified under the de-yamled tests, including **two controls that both stay
+GREEN**: `continue-on-error: false`, and a COMMENT naming the key — the original
+defect, now provably closed in both directions.
+
+**Moves no money, no lever, no bot.**
+
+---
+
 ## 2026-09-07 (zf) — THE LIVE BOOKS ARE NOT SMALL, THEY ARE IDLE: size refused with numbers, supply widened on a measurement, staged rather than equalised
 
 **Eamon: *"scale the size and scale of avo Maria and mum real money bots to
