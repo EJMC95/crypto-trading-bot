@@ -3,8 +3,9 @@
 **Date:** 2026-09-07 · **Instrument:** `scripts/study_position_sizing_2026-09-07.py`
 · **Status: REPORTED. Nothing moved — no lever written, no clip changed, no
 capital allocated.** The instrument asserts that about itself in its own
-selftest (a source scan for `write_levers` / `market_open` / `publish` /
-`set_status` / `get_lever`), and 11 of 11 mutations reddened its guards.
+selftest — an AST walk of its own call sites, not a substring scan, because
+this repo's `(po)` rule is that a page-wide substring scan is not a structural
+claim. 13 of 13 mutations reddened its guards — including one that INSERTS a `publish()` call into the file, so the claim is driven rather than asserted.
 
 ---
 
@@ -310,8 +311,8 @@ rule, and what the calibration actually certifies — with every finding
 adversarially verified by a second agent whose default was REFUTED. Results are
 recorded in the CHANGELOG entry for `(yk)`.
 
-Mutation record: **11 of 11 killed** across two rounds — the I24 edge
+Mutation record: **13 of 13 killed** across three rounds — the I24 edge
 precondition, the gross ceiling, the ½ haircut, the look-ahead index, the Kelly
 `MIN_N` floor, the daily-unit key, the risk-per-trade branch, the drawdown pin's
 scale, the fixed-dollar non-compounding path, the volatility ratio's direction,
-and the lower-bound sign.
+the lower-bound sign, an inserted mutator call, and the AST scan's own vacuity.

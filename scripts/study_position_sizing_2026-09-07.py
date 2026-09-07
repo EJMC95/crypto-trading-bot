@@ -270,6 +270,36 @@ WEAK_EDGE = "edge lower bound not positive (I24) — the honest size is the prob
 
 # ------------------------------------------------------------------ the sample
 
+#: The taker lenses whose BULL_MODE exit routes to the wide breakout stop --
+#: `lighter_ticket_taker.bull_exit`'s own membership test, mirrored here because
+#: this study cannot call it without a lens argument it does not have.
+BRK_LENSES = ("breakout", "breakoutup")
+
+
+def _lens_of(tag):
+    """`long-breakoutup_sl` -> `breakoutup`. The fleet's exit convention is
+    `<side>-<lens>_<exit>`; anything that does not match returns ""."""
+    t = str(tag or "")
+    if "-" not in t:
+        return ""
+    return t.split("-", 1)[1].split("_", 1)[0]
+
+
+def taker_brk_sl():
+    """The taker's wide breakout stop, READ FROM THE BOT, or None.
+
+    Not retyped: "a retyped constant is a constant that drifts" ((gn)), and
+    this one is not in the ledger, so a study that wants it must ask the
+    module. None on any doubt, which degrades a breakout row to its stamped
+    `sl` -- the honest fallback, never a guess."""
+    try:
+        import lighter_ticket_taker as _tt
+        v = abs(float(_tt.BRK_SL))
+        return v if v > 0 else None
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
 def stop_of(bot, extra, tag):
     """Stop distance (positive fraction) for one close, or None.
 
@@ -280,10 +310,27 @@ def stop_of(bot, extra, tag):
     pol = ex.get("policy")
     if isinstance(pol, dict) and isinstance(pol.get("stoploss"), (int, float)):
         return abs(float(pol["stoploss"]))
+    # THE TAKER'S BREAKOUT ROWS RUN A WIDER STOP THAT THE LEDGER NEVER STAMPS.
+    # Under BULL_MODE the `breakout`/`breakoutup` lenses route to `bull_exit`,
+    # whose stop is BRK_SL (-7%), not the stamped `sl` (-3%).
+    #
+    # THE FIRST CUT OF THIS FUNCTION READ A `bars.brk_sl` KEY AND THAT BRANCH
+    # WAS DEAD: `lighter_ticket_taker.entry_bars()` emits eight keys and
+    # `brk_sl` is not one of them, so 0 of 276 stamped taker rows carry it and
+    # 148 breakout rows -- the book's largest tag -- were priced at 3% instead
+    # of 7%. Worse, the selftest PINNED the dead branch against a fixture this
+    # file wrote itself: the exact "a consumer is tested against a payload its
+    # publisher built" defect ((hj)). The publisher is now asserted directly.
+    #
+    # `bull` IS stamped (`extra.policy.bull`), so the CONDITION is read from
+    # the ledger and only the VALUE comes from the module -- and it is read
+    # from the bot rather than retyped, because a retyped constant drifts.
+    if isinstance(pol, dict) and pol.get("bull") and _lens_of(tag) in BRK_LENSES:
+        v = taker_brk_sl()
+        if v:
+            return v
     bars = ex.get("bars")
     if isinstance(bars, dict):
-        if "breakout" in str(tag or "") and isinstance(bars.get("brk_sl"), (int, float)):
-            return abs(float(bars["brk_sl"]))
         if isinstance(bars.get("sl"), (int, float)):
             return abs(float(bars["sl"]))
     if isinstance(ex.get("sl_frac"), (int, float)) and ex["sl_frac"] > 0:
@@ -362,6 +409,11 @@ def book_sequence(bot, shaped_entry):
         # reads as "not positive", the fail-CLOSED direction for handing out
         # size.
         "edge_lb_pct": fa.lower_bound([float(q[0]) for q in rows]),
+        # HOW MANY DISTINCT STOPS THIS BOOK ACTUALLY RAN. At 1, `Q_day` is
+        # identically `R_day / s_book`, so `risk_per_trade` IS `fixed_fraction`
+        # -- an identity, not a measurement, and the per-rule table must say so
+        # rather than let a reader take two equal rows for a measured null.
+        "n_distinct_stops": len({round(x, 9) for x in stops}),
     }
 
 
@@ -495,7 +547,15 @@ def run_paths(method, R, Q, seed_R, E0, rho, s_book, peak_conc=None,
     # `rho / s_i` and the day's individual stops are not carried separately, so
     # it is summarised at the book-median stop — stated, because a book whose
     # legs carry very different stops holds more gross than this line says.
-    per_pos = np.full((D, K), f) if is_rpt else m
+    if method == "fixed_dollar":
+        # ITS NOTIONAL IS A CONSTANT NUMBER OF DOLLARS, so its gross as a
+        # multiple of LIVE equity RISES as equity falls -- the one rule of the
+        # five for which `f` is not the per-position fraction after step 0.
+        # Computing it at `f` published the value at t=0 and understated the
+        # peak on exactly the losing paths a gross ceiling exists to catch.
+        per_pos = np.where(E[:, :-1] > 0, (f * E0) / np.maximum(E[:, :-1], 1e-12), 0.0)
+    else:
+        per_pos = np.full((D, K), f) if is_rpt else m
     gross_max = (per_pos * float(peak_conc or 1)).max(axis=1)
     rho_eff = np.full((D, K), rho) if is_rpt else (m * s_book)
     return E, {
@@ -534,6 +594,11 @@ def propose(ladder_rows, n_days=None, edge_lb=None):
     so a reader can see what drawdown alone would have permitted."""
     if n_days is not None and n_days < MIN_N:
         return None, None, THIN
+    # NOTE on `p_ruin <= 0.0`: on a COMPOUNDING rule this clause cannot fail --
+    # a fraction of a shrinking equity never reaches zero -- so on the reference
+    # rule it is inert by construction and `dd_p95`/gross do all the work. It is
+    # kept because `fixed_dollar` CAN ruin and the same predicate is applied to
+    # it elsewhere; it is declared inert here rather than read as a passed test.
     adm = [r for r in sorted(ladder_rows)
            if ladder_rows[r]["p_ruin"] <= 0.0
            and ladder_rows[r]["dd_p95"] <= DD_BAR
@@ -937,6 +1002,16 @@ def _selftest():
     _, met = run_paths("fixed_fraction", R, Q, np.array([]), 1000.0, 0.01,
                        0.05, peak_conc=4)
     assert abs(met["gross_max_p50"] - 4 * 0.2) < 1e-9, met["gross_max_p50"]
+    # ... and fixed_dollar's gross RISES as equity falls, because its notional
+    # is a constant number of dollars. Computing it at `f` published the t=0
+    # value and understated the peak on exactly the losing paths.
+    _down = np.array([[-0.1] * 5])
+    _, _fd = run_paths("fixed_dollar", _down, _down / 0.05, np.array([]),
+                       1000.0, 0.01, 0.05, peak_conc=1)
+    _, _ff = run_paths("fixed_fraction", _down, _down / 0.05, np.array([]),
+                       1000.0, 0.01, 0.05, peak_conc=1)
+    assert _fd["gross_max_p50"] > 0.2 * 1.05, _fd["gross_max_p50"]
+    assert _fd["gross_max_p50"] > _ff["gross_max_p50"], (_fd, _ff)
 
     # -- the proposal reads no return column, is half the admissible rung, is
     #    capped, and has three DISTINCT no-proposal reasons.
@@ -984,9 +1059,28 @@ def _selftest():
 
     # -- stop resolution precedence
     assert stop_of("x", {"policy": {"stoploss": -0.04}}, "t") == 0.04
-    assert stop_of("x", {"bars": {"sl": -0.03, "brk_sl": -0.07}}, "long-breakoutup") == 0.07
-    assert stop_of("x", {"bars": {"sl": -0.03, "brk_sl": -0.07}}, "long-dip") == 0.03
     assert stop_of("x", {"params": {"sl_pct": 0.025}}, None) == 0.025
+    assert _lens_of("long-breakoutup_sl") == "breakoutup"
+    assert _lens_of("short-divergence_tp") == "divergence"
+    assert _lens_of("nonsense") == ""
+    # THE TAKER'S BREAKOUT STOP, PINNED AGAINST ITS PUBLISHER — the check that
+    # would have caught the dead branch this replaced. `entry_bars()` is the
+    # thing that writes `extra.bars`, so asking IT whether `brk_sl` exists is
+    # the only form of this test that cannot pass against a fixture we wrote.
+    import lighter_ticket_taker as _tt
+    _emitted = _tt.entry_bars()
+    assert "brk_sl" not in _emitted, (
+        "entry_bars now emits brk_sl — read it from the row instead of the "
+        "module, and delete taker_brk_sl()")
+    assert "sl" in _emitted, _emitted          # not vacuous: the key it DOES emit
+    assert taker_brk_sl() == abs(float(_tt.BRK_SL)), "read from the bot, not retyped"
+    assert taker_brk_sl() != abs(float(_tt.STOP_LOSS)), "the two stops must differ"
+    _brk = {"policy": {"bull": True}, "bars": {"sl": -0.03}}
+    assert stop_of("x", _brk, "long-breakoutup_sl") == abs(float(_tt.BRK_SL))
+    assert stop_of("x", _brk, "long-breakout_sl") == abs(float(_tt.BRK_SL))
+    assert stop_of("x", _brk, "long-dip_sl") == 0.03, "only the breakout lenses"
+    assert stop_of("x", {"policy": {"bull": False}, "bars": {"sl": -0.03}},
+                   "long-breakoutup_sl") == 0.03, "no BULL_MODE, no wide stop"
     assert stop_of("band-kelly-lshadow", {}, None) == 0.05
     assert stop_of("perps-funding-spread-lshadow", {}, None) is None
 
