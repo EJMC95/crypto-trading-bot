@@ -1,3 +1,135 @@
+## 2026-09-07 (yt) — THE GATE GRADES ONE PATH, AND TWO OF ITS NUMBERS WERE DECIDED BY ROW ORDER: a Monte Carlo risk audit, a benchmark shootout, and the two smallest fixes it justifies
+
+**Eamon: *"Run Monte Carlo simulations using the bot's historical trade
+outcomes... Explain whether the bot adds genuine value."*** Sibling of `(ys)`
+/ PR #290 the same day — that pass built the BASELINE, this one resamples it.
+
+**THE INSTRUMENT REFUSES BEFORE IT SPEAKS.** `scripts/study_montecarlo_risk_2026-09-07.py`
+recomputes every book's grade from the raw ledger and compares it to the LIVE
+`golive-readiness` payload field by field; beyond tolerance it exits 2 and
+prints nothing — `(gx)`'s rule applied to itself. It PASSED 14 of 14 books,
+with two declared exemptions (below). It moves nothing, asserted by an AST
+walk of its own call sites rather than a substring scan ((po): a page-wide
+substring scan is not a structural claim).
+
+**IT FOUND TWO DEFECTS IN ITSELF FIRST, AND THAT IS THE ARGUMENT FOR THE GATE.**
+(1) It passed `era_rows` 4-TUPLES, so every close's `extra.policy` stamp — which
+rides at index [4] — was invisible, every book fell back to its DECLARED era,
+and 🎫 the taker graded **262 closes against the live 184**: a 42% wider sample,
+in the flattering direction, on the one book the fleet has ever called READY.
+(2) Its ruin curve scaled by `f / clip_frac`, which at the shipped size
+collapses to 1.0 and compounds RAW per-trade returns as if every trade risked
+the whole account — a median **6.51x** on a book whose record is **+15.9%**, and
+**P(-50%) = 96.4%** on ⚖️ Counterweight, which is down 3.5%. Neither was caught
+by the grade-reproduction gate, because that gate reads the LEDGER and not the
+SIMULATOR; `calibrate_ruin` is the second gate that does, and it is why the
+sizing numbers below can be trusted. Both pinned by mutation.
+
+**RESAMPLE DECISIONS, NOT LEGS.** This fleet closes baskets in one instant, so
+drawing legs i.i.d. treats one decision as ten and shrinks every tail. The
+batching rule is `CLUSTER_WINDOW_S`, imported rather than re-chosen. Measured,
+p95 drawdown decision-wise vs leg-wise: 👩 mum LIVE **10.79% vs 6.79% (1.59x)**,
+🙏 avo LIVE 4.44% vs 2.95% (1.51x), ⚖️ Counterweight 9.45% vs 7.15% (1.32x),
+🪁 kelly 46.00% vs 40.14% (1.15x), 🎫 taker 3.06% vs 3.04% (1.01x). The
+correction is largest on the two REAL-MONEY arms and the basket book, and
+vanishes on the one that closes its legs singly.
+
+**THE RISK FINDINGS.** The realised path flatters: 👩 mum's LIVE arm reads
+**7.08%** maxDD against the 15% bar and her resampled **p99 is 14.39%**;
+🪁 kelly's **P(maxDD > bar) is 81.9%**. Losing streaks run LONGER than chance on
+four books (mum live 7 observed vs a p95 of 5; 🌾 carry 7 vs 6) — losses cluster,
+which is the honest argument for a reserve above the observed drawdown.
+🌾 carry's edge sits INSIDE the execution-cost band: P(ending below start) goes
+**13.7% -> 52.9%** at the measured p90 slippage, corroborating `(ys)`'s finding
+that the fleet's own 17.49bps flips it negative.
+
+**DOES THE BOT ADD GENUINE VALUE? PARTLY, AND LESS THAN THE GRADE SUGGESTS.**
+Over the only window with regular bars for every arm (8.3d, 196 coins, the same
+measured 10.2bps round trip charged to the books as to the benchmarks):
+🎫 taker **+11.54%** · **buy & hold +7.82%** · 👩 mum LIVE +5.46% ·
+**volatility-only +3.08%** · 🌾 carry +2.79% · **cash 0.00%** ·
+**SMA 12/48 -4.39%** (60 flips of churn) · 🪁 kelly -11.14%. **Exactly ONE book
+beat passive holding, and it is the READY one.** But against a random-entry null
+— hold a random OTHER coin over the same windows, same side, same cost —
+**NOT ONE of the fourteen books clears p <= 0.05**: best is 🏛️ turnbull at
+**P=0.072**, then 🎫 the taker at **P=0.145**. DECLARED LIMIT, because it changes
+what the number means: that null randomises the COIN and not the TIMING, so it
+cannot refute an edge that lives in when the book is in the market — which is
+precisely the taker's thesis. Closing it needs bar data this egress cannot reach
+(`/api/v1/candlesticks` is 403 outside the container); recommended as a
+pre-registered follow-up, not asserted.
+
+**TWO CHANGES, BOTH MOVING ZERO VERDICTS** (measured: 0 of 14 books change any
+of the six bars; the READY set is identical):
+
+1. **A DETERMINISTIC TOTAL ORDER OVER ONE BOOK'S CLOSES.** `sorted(key=_key)` is
+   STABLE, so legs sharing a close stamp kept whatever order Postgres returned —
+   and `halves` splits at `mid = n // 2`. **Re-running the grader over an
+   UNCHANGED ledger could publish a different h1/h2**, which is not a property a
+   bar governing real money may have. 🙏 avo's LIVE arm sits on such a tie (five
+   legs closing on one daily-loss flatten instant, 2026-08-28T16:22:46.174888);
+   permuting only that batch moves h1 across **[+$7.27, +$17.36]** — the live
+   payload reads $17.36 and an independent recomputation from the same rows read
+   $9.67. Every ordering leaves both halves positive, so **no verdict moves**.
+   What makes it worth fixing is the neighbour: **👩 mum's LIVE arm passes this
+   same bar on h2 = -$0.02.** `stats` now also publishes `shape.halves_tie` so a
+   reader knows when the bar sat on an ordering rather than on the book.
+2. **`resampled_dd` — THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.** The
+   gate grades a 15% bar over the ONE ordering a book happened to walk and cannot
+   tell a safe book from a benign sequence. REPORTED, NEVER A BAR: `BAR_NAMES`
+   and `grade()` are byte-unchanged and a selftest asserts `dd_resampled` is not
+   in `bar_map`. Deterministic (fixed seed — a diagnostic that shimmers is one an
+   operator learns to ignore, (gl)), fail-SILENT (absent, never zero-filled: a
+   missing risk number that reads as a low one is worse than none).
+
+**EIGHT MUTATIONS VERIFIED RED** (I3), and the eighth is the point: the first
+round pinned seven and left the DENOMINATOR unpinned, so `worst / max(peak,
+book_usd)` — the `(yr)` "drawdown denominator that halved real money's hole"
+defect, in the new code — survived. It is now pinned by PROPORTIONALITY (same
+seed, same units, so the reported fraction must scale exactly with 1/book_usd).
+The others: drawdown-from-zero instead of from-peak (which ALSO survived its
+first two tests, because on an all-losing path the peak IS zero); leg-wise
+batching; a non-deterministic seed; zero-fill instead of fail-silent;
+`halves_tie` always-on; `halves_tie` on the wrong boundary; `dd_resampled`
+promoted into the bars.
+
+**REFUSALS WITH REASONS, ON THE RECORD — no parameter change is proposed.**
+👩 mum's live arm runs **5x the clip of its own control twin** ($253 vs $50
+median), so the twin cannot corroborate her DRAWDOWN, only her mean — left to
+the `mum-live-rho-read-preregistered` row, because cutting a real-money clip on
+the window that motivated it is exactly what I25 forbids; this is independent
+corroboration from her own ledger, to be read at the registered date. 🎫 the
+taker's median capture ratio is **0.275** and 34% of its trades that peaked above
++0.5% closed at a LOSS (n=92) — left alone, because `(ye)`'s `FROZEN_WHEN_READY`
+drops exactly those bracket levers while a book reads ready, and changing the
+bracket a book passed on is what that rule exists to prevent. 🪁 kelly is already
+Eamon's call under its own pre-registered read.
+
+**ALSO MEASURED, REPORTED, NOT ACTED ON:** mean pairwise correlation **+0.066**
+and **N_eff 7.55 of 14** — genuine diversification; the worst fleet days are
+SINGLE-BOOK events, not correlated drawdowns. 🎫 the taker's OOS test slice
+(+2.775%) is 4x its train slice (+0.686%), which is either a genuinely improving
+book or the I25 hot-window shape and the sample cannot yet tell them apart — its
+READY verdict rests on the era's second half. **Per-close regime attribution is
+IMPOSSIBLE from the ledger**: `extra.btc_regime_up` rides the SUMMARY row and
+never the trade, coverage **0%** across all 14 books; the split published here is
+derived from the scout's own BTC marks and covers only the 8.3-day tape.
+
+**CI AND HOUSEKEEPING.** `tests/test_selftests.py` registers this study AND
+`scripts/study_taker_ready_2026-09-06.py`, which was **already unregistered at
+HEAD** — verified by stashing this work — so `test_no_unregistered_selftest` had
+been red on main since 6-Sep. Recorded rather than folded in silently. Two CodeQL
+findings on the first push were both real and both fixed: an unclosed file in the
+selftest, and an unused `max_open` that was a FUNCTIONAL defect — the
+concurrency caveat printed "up to ? concurrent positions" on every book because
+the value was read from the golive payload, which does not carry it, instead of
+from the books' own rows (🎫 taker 8, 👩 mum 12, 🙏 avo 6).
+
+**Report:** `MONTECARLO_RISK_AUDIT_2026-09-07.md`. **Reproduce:**
+`python3 scripts/study_montecarlo_risk_2026-09-07.py --all --draws 20000`.
+Baseline P&L recorded before testing and re-verified after: no book lost rows,
+no book with an unchanged close count changed its P&L.
+
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 
 **[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position

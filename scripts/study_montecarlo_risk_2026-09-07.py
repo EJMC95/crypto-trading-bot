@@ -945,7 +945,8 @@ _FORBIDDEN = {"write_levers", "get_lever", "market_open", "publish",
 
 
 def _selftest():
-    src = open(os.path.abspath(__file__)).read()
+    with open(os.path.abspath(__file__)) as _fh:
+        src = _fh.read()
     tree = ast.parse(src)
     called = set()
     for node in ast.walk(tree):
@@ -1161,7 +1162,7 @@ def report_mc(bot, gr_live, g, args, rng, caps=None):
                   f"{100*v['p_ruin'][0.25]:8.1f}% {v['median_final']:9.2f}x "
                   f"{v['p05_final']:8.2f}x {v['mean_log']:9.4f}{mark}")
         print(f"        DECLARED LIMIT: legs are compounded SEQUENTIALLY. This "
-              f"book runs up to {live.get('max_open') or '?'} concurrent "
+              f"book runs up to {max_open or '?'} concurrent "
               f"positions, so a simultaneous adverse move across open legs is "
               f"NOT in this table — read it as a lower bound on ruin.")
     return base

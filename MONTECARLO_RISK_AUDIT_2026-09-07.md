@@ -384,6 +384,20 @@ auto-deploy path for `freqtrade-bots`; the next publish carries it. Reverting
 restores the previous payload shape exactly — no consumer reads either new
 field today, so removal is safe at any time.
 
+### Two defects CI found on the first push, both real, both fixed
+
+CodeQL flagged the new study twice and was right both times.
+
+1. **An unclosed file** in `_selftest` (`open(...).read()` without a context
+   manager). Minor, fixed.
+2. **An unused `max_open`** — which was a **functional** defect, not a lint
+   nit. The concurrency caveat under every ruin table printed *"up to ?
+   concurrent positions"* on every book, because the value was read from the
+   `golive-readiness` payload, which does not carry it, instead of from the
+   books' own rows. It now prints the real caps: 🎫 taker **8**, 👩 mum **12**,
+   🙏 avo **6**. The caveat is load-bearing — it is what tells a reader the
+   ruin figures are a lower bound — and it had been silently empty.
+
 ### What was NOT changed, and why the suite went red first
 
 `tests/test_selftests.py` gains two registry entries. Mine is required. The
