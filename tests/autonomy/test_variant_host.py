@@ -870,7 +870,7 @@ def test_a_non_control_book_payload_does_not_move():
     or every grader learns a phantom key.
 
     [2026-09-07] RE-AIMED FROM 🔮 georgia TO 🙏 avo, because georgia now HAS an
-    arm. `(yt)` measured that not one of fourteen books clears a random-entry
+    arm. `(za)` measured that not one of fourteen books clears a random-entry
     null while the fleet's own instrument for that question sat on one book;
     georgia is the largest sample in the fleet and shadow-only, so she was
     turned on. This test's PREMISE — a book with no arm publishes no block —

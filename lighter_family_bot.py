@@ -2007,7 +2007,7 @@ STRATEGIES = [
     # Revert is this literal back to 5 behind a [deploy-live-taker] marker.
     SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=6,
              style="swing-dip-4h"),
-    # [2026-09-07] CONTROL ARM ON. The `(yt)` audit's central finding is that
+    # [2026-09-07] CONTROL ARM ON. The `(za)` audit's central finding is that
     # NOT ONE of fourteen books clears a random-entry null — and the fleet's
     # own proper instrument for that question (a paired, matched-window
     # placebo) was installed on exactly ONE book. 🔮 georgia is the largest

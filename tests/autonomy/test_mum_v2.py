@@ -349,7 +349,7 @@ def test_a_book_without_a_control_arm_publishes_no_leg():
 #: narrowness is a SNAPSHOT, not a property, and when it blocks a widening the
 #: question is whether the widening is right, never whether the pin exists.
 #:
-#: The widening is right: `(yt)` measured that NOT ONE of fourteen books clears
+#: The widening is right: `(za)` measured that NOT ONE of fourteen books clears
 #: a random-entry null, and the fleet's own instrument for that question was on
 #: one book. 🔮 georgia (n=268, the largest sample in the fleet, `undecidable`
 #: at t=0.52) and georgia-v3 (newest era, so the null covers almost her whole

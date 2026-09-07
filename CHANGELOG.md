@@ -1,7 +1,9 @@
-## 2026-09-07 (yw) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
+## 2026-09-07 (zd) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
+
+**[RENUMBERED (yw) -> (zd) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
 
 **Eamon: *"Yes, if it's a step closer to making more profit"*.** The condition
-is the entry. The per-close REGIME stamp `(yt)` ranked second does **NOT** clear
+is the entry. The per-close REGIME stamp `(za)` ranked second does **NOT** clear
 it, and this does — the reasoning is recorded here rather than the work being
 done on momentum.
 
@@ -10,14 +12,14 @@ first-class output):** it is telemetry, so it moves no trade and earns nothing
 directly. Its only route to profit is a regime GATE — and (a) the fleet already
 has a PRE-REGISTERED instrument for exactly that
 (`study_regime_short_veto_2026-09-02.py`, registered 2-Sep, read due 16-Sep),
-whose binding constraint is fresh SAMPLE and not stamping; and (b) `(yt)`'s own
+whose binding constraint is fresh SAMPLE and not stamping; and (b) `(za)`'s own
 measurement is evidence AGAINST a detectable effect at reachable n — 👩 mum's
 LIVE and SHADOW arms, running the SAME POLICY, **disagree on the SIGN** of the
 regime split over ~60 closes each (live +0.842% BTC-up vs +0.105% BTC-down;
 shadow +0.336% vs +0.616%). Stamping would make a 16-Sep read marginally
 richer. It would not make a dollar, and it is not the next best use of a pass.
 
-**WHAT DOES CLEAR THE BAR: THE SIZING TABLE `(yt)` PUBLISHED IS WRONG IN THE
+**WHAT DOES CLEAR THE BAR: THE SIZING TABLE `(za)` PUBLISHED IS WRONG IN THE
 DIRECTION THAT LOSES MONEY**, and it sits directly in front of the only
 real-money sizing decision the fleet has open. Sizing is the most direct profit
 lever there is; a sizing model that flatters is worse than none.
@@ -32,7 +34,7 @@ lever there is; a sizing model that flatters is worse than none.
 | 🪁 kelly | 2.32 | 3 | 8 | 4 | 77% |
 | 🔮 georgia | 2.21 | 4 | 5 | 5 | 62% |
 
-`(yt)`'s table compounded legs SEQUENTIALLY and declared that a lower bound.
+`(za)`'s table compounded legs SEQUENTIALLY and declared that a lower bound.
 It is not a small correction: these books essentially **never hold one position
 alone**, so the sequential model priced a book that does not exist.
 
@@ -67,18 +69,20 @@ with P(-50%) = 0.0%, i.e. the model still says *size up*. That is what the model
 says; it is not a recommendation. The sample is 37.6 days in ONE regime, its
 own random-entry null is NOT cleared (P=0.145), and its test slice is 4x its
 train slice. A sizing model cannot see any of those, which is precisely why
-`(yt)`'s conclusion — no parameter change — is unchanged by this entry.
+`(za)`'s conclusion — no parameter change — is unchanged by this entry.
 
 **MOVES NOTHING.** An instrument-only change: no lever, no bot, no gate, no
 publish. `--selftest` green (the moves-nothing AST proof included),
 `tests/test_selftests.py` green.
 
-## 2026-09-07 (yv) — THE FLEET'S ONLY ANSWER TO ITS OWN NULL WAS INSTALLED ON ONE BOOK OF FOURTEEN: the control arm is per-BOOK now, and two more books have one
+## 2026-09-07 (zc) — THE FLEET'S ONLY ANSWER TO ITS OWN NULL WAS INSTALLED ON ONE BOOK OF FOURTEEN: the control arm is per-BOOK now, and two more books have one
+
+**[RENUMBERED (yv) -> (zc) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
 
 **Eamon: *"Where can we improve on from here"* -> *"Yes"*.** The second half of
-`(yu)`, and the improvement `(yt)` ranked first.
+`(zb)`, and the improvement `(za)` ranked first.
 
-**THE GAP.** `(yt)` measured that **NOT ONE of fourteen books clears a
+**THE GAP.** `(za)` measured that **NOT ONE of fourteen books clears a
 random-entry null** (best P=0.072; 🎫 the READY taker P=0.145) — and the
 fleet's own proper instrument for that question, a PAIRED matched-window
 placebo, was installed on **exactly one book**. `(hm)` has required this since
@@ -160,9 +164,11 @@ already in the ledger have no control leg and never will. Full suite green;
 `audit_image_imports`, `audit_undefined_names`, `audit_venue_purity`,
 `audit_doctrine_enforcement`, `audit_live_roster` all pass.
 
-## 2026-09-07 (yu) — THE CONTROL ARM COMPUTED ITS ANSWER AND THREW IT AWAY: the placebo pair settled 21 lines before the publish and never reached a single close
+## 2026-09-07 (zb) — THE CONTROL ARM COMPUTED ITS ANSWER AND THREW IT AWAY: the placebo pair settled 21 lines before the publish and never reached a single close
 
-**Follow-up to `(yt)`'s audit, and the first of the two improvements it
+**[RENUMBERED (yu) -> (zb) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
+
+**Follow-up to `(za)`'s audit, and the first of the two improvements it
 ranked.** Eamon: *"List improvements"* -> *"Please proceed"*.
 
 **THE DEFECT, AND IT IS THE `(gr)` SHAPE ONE INSTRUMENT OVER.** 👩 mum v2 is the
@@ -189,10 +195,10 @@ observation.** The summary row carries only a lifetime aggregate.
 * any split by tag, side, exit reason or regime; any cluster-robust treatment
   of legs that close together.
 
-The `(yt)` audit had to build a whole separate null from a sparse price tape
+The `(za)` audit had to build a whole separate null from a sparse price tape
 **because the book's own better answer was not on the row** — and that
 substitute could only randomise the COIN, not the TIMING, which is the exact
-limitation `(yt)` had to declare on 🎫 the taker.
+limitation `(za)` had to declare on 🎫 the taker.
 
 **THE FIX IS THAT `control_settle` NOW RETURNS WHAT IT ALREADY COMPUTED**, and
 `control_leg` formats it onto the close. Both hosts stamp it, sharing the
@@ -225,7 +231,7 @@ Blast radius is one field on one book's closes (only a carrier that DECLARES
 `control_arm` settles a pair), pinned by the same test that pins the summary
 block's scope.
 
-**WHAT IS NOT IN THIS ENTRY, AND WHY.** `(yt)` ranked a second improvement
+**WHAT IS NOT IN THIS ENTRY, AND WHY.** `(za)` ranked a second improvement
 beside this one: per-close REGIME stamps (`extra.btc_regime_up` rides the
 SUMMARY row and never the trade, coverage **0%** across all 14 books, so regime
 attribution is impossible from the ledger). It is the same shape — grading
@@ -236,7 +242,9 @@ surface on a real-money carrier, and this file's own rule 1 — **ship narrow,
 verify in the live payload, then widen** — cost six follow-up entries the last
 time it was ignored. It is the next pass, not this one.
 
-## 2026-09-07 (yt) — THE GATE GRADES ONE PATH, AND TWO OF ITS NUMBERS WERE DECIDED BY ROW ORDER: a Monte Carlo risk audit, a benchmark shootout, and the two smallest fixes it justifies
+## 2026-09-07 (za) — THE GATE GRADES ONE PATH, AND TWO OF ITS NUMBERS WERE DECIDED BY ROW ORDER: a Monte Carlo risk audit, a benchmark shootout, and the two smallest fixes it justifies
+
+**[RENUMBERED (yt) -> (za) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
 
 **Eamon: *"Run Monte Carlo simulations using the bot's historical trade
 outcomes... Explain whether the bot adds genuine value."*** Sibling of `(ys)`
