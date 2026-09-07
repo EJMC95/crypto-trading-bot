@@ -183,6 +183,34 @@ DESIGN = {
         "floor": "real money: no brain multiplier, no allocation read, no "
                  "tuning lane of its own.",
     },
+    # [(yj)] 👩 mum's LIVE arm and 🔭 georgia v3 were BOTH uncovered — found
+    # only because the coverage guard below stopped silently skipping. One of
+    # them is real money.
+    "freqtrade-mum-lighter": {
+        "emoji": "👩", "name": "Mum v2 (LIVE)",
+        "design": "The live expression of the deep-oversold 1h rebound, sized "
+                  "off the balance at a 5.0x gross budget over a "
+                  "correlation-ordered scan of 110 markets — the fleet's only "
+                  "live book that deploys leverage against a measured N_eff.",
+        "flies_when": "her 30 closes land inside the window her own "
+                      "`progression` counts down: 90 closes at ~9/day with "
+                      "the target already met, so what flies is the GRADE "
+                      "arriving, not the rate.",
+        "floor": "the drawdown scale and the never-lever-a-weak-edge rail sit "
+                 "inside her clip; she carries her own control arm, and her "
+                 "twin runs the same entry file so the judge's pair is real.",
+    },
+    "freqtrade-georgia-v3-lshadow": {
+        "emoji": "🔭", "name": "Georgia v3 — impulse fade",
+        "design": "Fades a >=3.0xATR14 drop over four 15m bars with the "
+                  "bracket fixed at entry (tp 2.0% / sl -1.5% / 4h cap), "
+                  "crypto-only — a NEW entry, not a rearrangement of v1's.",
+        "flies_when": "its own ledger reproduces the replay that founded it: "
+                      "the one candidate of ten that beat matched-random at "
+                      "EVERY horizon, shipped at the plateau interior.",
+        "floor": "HYPOTHESIS-grade until that ledger speaks — a replay "
+                 "founded it and only the record may promote it (I14).",
+    },
     "freqtrade-mum-lshadow": {
         "emoji": "👩", "name": "Mum v2",
         "design": "Deep-oversold rebound on 1h, OUTSIDE the uptrend — "

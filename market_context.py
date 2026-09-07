@@ -88,6 +88,20 @@ import funding_basis
 from venues.symbol_map import from_lighter
 
 BOT = "market-context"
+# [(yj)] THE COLLECTOR'S PRIVATE STATE NEEDS ITS OWN KEY.
+# `main()` wrote the per-coin SNAPSHOT to `market-context` and then, four
+# lines later, wrote `{oi_hist, btc_marks, source}` to the SAME key — and
+# `bot_pnl_store.save_state` is `state = EXCLUDED.state`, a full replace. So
+# the snapshot was destroyed microseconds after it was written, every cycle,
+# and its one consumer (`lighter_funding_bot._mctx_slice`, which reads
+# `coins` / `heat_mean_apr` / `btc_vol_1h`) has been attaching SIX NULL FIELDS
+# to every funding entry's ledger row instead of the validation dataset it was
+# built for. Nothing gates on it (`audit_bus_contract.RATCHET` says so
+# explicitly), so this cost evidence, not trades — which is exactly why it
+# could run this long unnoticed.
+# The `:` suffix is the fleet's existing shape for private durable state
+# (`:standby`, `:eqguard` — `audit_bus_contract.PRIVATE_SUFFIXES`).
+COLLECTOR_STATE = f"{BOT}:collector"
 # [2026-07-17] The VENUE this organ's raw levels come from. Stamped into the
 # persisted snapshot so a future venue swap cannot silently divide one venue's
 # open interest by another's — see the VENUE-EPOCH guard in main(). Bump this
@@ -771,7 +785,19 @@ def main():
     tape = LiqTape()
     oi_hist = {}      # hour_ts -> {coin: oi_ntl}; restart-safe via state
     btc_marks = deque(maxlen=25)   # (hour_ts, mark) for 24h realized vol
-    _saved = store.load_state(BOT) or {}
+    # [(yj)] read the collector's OWN key, falling back ONCE to the shared
+    # one so the accumulated oi_hist/btc_marks survive this split — without it
+    # the first boot after the fix loses 24h of history and publishes
+    # `oi_chg_1h`/`oi_chg_24h` as None until it re-accumulates.
+    _saved = store.load_state(COLLECTOR_STATE) or {}
+    if not _saved:
+        _legacy = store.load_state(BOT) or {}
+        if _legacy.get("oi_hist") or _legacy.get("btc_marks"):
+            _saved = _legacy
+            log.info("migrating collector state off the shared %r key "
+                     "(%d oi hours, %d btc marks)", BOT,
+                     len(_legacy.get("oi_hist") or {}),
+                     len(_legacy.get("btc_marks") or []))
     # [2026-07-17 VENUE-EPOCH GUARD] oi_hist and btc_marks are RAW LEVELS, and
     # oi_chg_1h/24h divide today's level by a persisted one. The persisted rows
     # were written from HYPERLIQUID; this loop now reads LIGHTER. The two venues
@@ -861,9 +887,10 @@ def main():
             # boot can tell whether they are comparable (see the VENUE-EPOCH
             # guard in main()). Without it, a venue swap silently divides one
             # venue's OI by another's.
-            store.save_state(BOT, {"oi_hist": {str(k): v for k, v in oi_hist.items()},
-                                   "btc_marks": list(btc_marks),
-                                   "source": SOURCE})
+            store.save_state(COLLECTOR_STATE,
+                             {"oi_hist": {str(k): v for k, v in oi_hist.items()},
+                              "btc_marks": list(btc_marks),
+                              "source": SOURCE})
             tot_liq = sum((liq.get(c) or {}).get("liq_1h", 0) for c in liq)
             log.info("ctx ok | %d coins | heat %.1f%% | btc vol %s | liq(1h) $%.0fk%s",
                      len(coins), (snapshot["heat_mean_apr"] or 0) * 100,

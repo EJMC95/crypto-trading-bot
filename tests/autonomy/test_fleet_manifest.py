@@ -72,19 +72,68 @@ def test_an_unknown_book_gets_nothing_rather_than_an_invented_purpose():
     assert FM.uncovered(["no-such-book"]) == ["no-such-book"]
 
 
-def test_every_LIVING_row_on_the_feed_has_a_design():
-    """The coverage claim, checked against the feed rather than asserted. A
-    book minted tomorrow with no design is the gap this closes, so it must
-    fail here rather than be silently skipped."""
-    feed = pathlib.Path(
-        "/tmp/claude-0/-home-user-crypto-trading-bot/"
-        "88638ad8-aca5-5b55-b800-4fdac52e033d/scratchpad/pnl.json")
-    if not feed.exists():
-        pytest.skip("no captured feed in this environment")
-    rows = [b["bot"] for b in json.loads(feed.read_text())["bots"]]
-    assert len(rows) > 10, "the feed capture is too thin to prove coverage"
+#: [(yj)] the committed living roster — see the module docstring's second half
+SNAPSHOT = (pathlib.Path(__file__).resolve().parents[1]
+            / "fixtures" / "living_rows.json")
+
+
+def _feed_rows():
+    """The live feed's rows if this environment has one, else None.
+
+    Order: an explicit `PNL_JSON` path, then any `scratchpad/pnl.json` under
+    this session's own tree — never another session's absolute path, which is
+    what made this guard skip on every CI run for weeks."""
+    import os
+    cand = []
+    if os.environ.get("PNL_JSON"):
+        cand.append(pathlib.Path(os.environ["PNL_JSON"]))
+    for base in (os.environ.get("CLAUDE_SCRATCHPAD"), "/tmp/claude-0"):
+        if base:
+            cand += sorted(pathlib.Path(base).glob("**/scratchpad/pnl.json"))
+    for p in cand:
+        try:
+            rows = [b["bot"] for b in json.loads(p.read_text())["bots"]]
+        except Exception:                                        # noqa: BLE001
+            continue
+        if len(rows) > 10:
+            return rows
+    return None
+
+
+def test_every_LIVING_row_has_a_design():
+    """The coverage claim, checked against a COMMITTED roster so it can never
+    be skipped.
+
+    [(yj)] It used to read a hard-coded absolute path inside ANOTHER session's
+    scratchpad and `pytest.skip` when it was missing — which it always was, in
+    CI and in every later session. So the test whose own docstring said a book
+    with no design "must fail here rather than be silently skipped" was
+    silently skipped, on every run, since it was written. It was covering two
+    real gaps when this was found: 🔭 georgia v3 and 👩 mum's LIVE arm, i.e.
+    a real-money book with no declared design. This repo's own rule: **empty
+    output is not a negative result**, and a check that inspects nothing
+    reports clean."""
+    snap = json.loads(SNAPSHOT.read_text())
+    rows = snap["rows"]
+    assert len(rows) > 10, "the committed roster is too thin to prove coverage"
     missing = FM.uncovered(rows)
     assert not missing, f"living rows with no declared design: {missing}"
+
+
+def test_the_committed_roster_has_not_fallen_behind_a_feed_we_can_read():
+    """The snapshot's own freshness arm. Where a feed IS readable, a row on it
+    that the snapshot lacks means a book was minted or retired and nobody
+    refreshed the fixture — the way this guard would otherwise rot a second
+    time, one book at a time."""
+    rows = _feed_rows()
+    if rows is None:
+        pytest.skip("no live feed readable here — the committed arm above "
+                    "still ran and is the guard")
+    snap = set(json.loads(SNAPSHOT.read_text())["rows"])
+    assert not (set(rows) - snap), (
+        f"the feed carries rows the committed roster does not: "
+        f"{sorted(set(rows) - snap)} — refresh tests/fixtures/living_rows.json")
+    assert not FM.uncovered(rows), FM.uncovered(rows)
 
 
 def test_it_decides_nothing():

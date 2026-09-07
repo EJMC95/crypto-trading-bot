@@ -67,7 +67,9 @@ RATCHET = {
 #: map, a writer claim — and must never be required to carry a TTL. These are
 #: not exemptions from the contract; they are outside it.
 PRIVATE_PREFIXES = ("writer:",)
-PRIVATE_SUFFIXES = (":standby", ":live", ":eqguard")
+# [(yj)] `:collector` — market_context's own oi_hist/btc_marks/source,
+# split off the shared `market-context` key it was silently overwriting.
+PRIVATE_SUFFIXES = (":standby", ":live", ":eqguard", ":collector")
 
 _SAVE = "save_state"
 #: Both read paths. `fleet_bus` wraps every consumer read in its own `_load`,

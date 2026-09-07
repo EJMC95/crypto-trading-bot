@@ -136,9 +136,17 @@ def state_fresh(payload):
 # but they ARE the fleet being managed, and the pileup scar applies to
 # whatever cohort trades one beta. Ticket Taker (scout-driven shadow book)
 # is counted too — its open_pos extra is fleet_risk-shaped.
+# [(yj)] 🔭 georgia v3 JOINS — she was minted at (vr), publishes
+# `freqtrade-georgia-v3-lshadow`, holds up to 5 long-only slots, and was in
+# NO cohort: her longs counted against neither the enforced fleet long budget
+# nor the shadow one, and her ~$997 was outside the 7d drawdown governor's
+# equity. A roster typed by hand goes stale one book at a time, and the only
+# thing that catches it is a test over the living roster — see
+# `tests/autonomy/test_risk_roster_covers_the_living_books.py`.
 FREQTRADE_BOTS = ["crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
                   "crypto-breakout-4h", "freqtrade-mum",
                   "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia",
+                  "freqtrade-georgia-v3",
                   "lighter-ticket-taker"]
 # [2026-07-15 AUDIT FIX] the LIVE Funding Farmer (perps-funding-lighter) is
 # directional-funding — it HOLDS one-sided positions (the side that receives

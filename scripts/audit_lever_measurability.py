@@ -57,6 +57,7 @@ Same caveat as the doctrine guard's own: existence, not correctness.
 """
 import argparse
 import importlib.util
+import ast
 import os
 import re
 import sys
@@ -216,20 +217,46 @@ def retired_rows(src=None):
     """The dashboard's own `RETIRED_ROWS`, parsed from source.
 
     Parsed rather than imported because importing `pnl_dashboard` pulls a
-    server; the set is a flat literal of string constants, so a regex over the
-    braces is sound — and `check` fails if it comes back empty, so a parse
-    that silently stops matching cannot read as "nothing is retired".
+    server — and parsed with the AST, not a regex.
+
+    [(yj)] It WAS a regex over the braces, on the argument that "the set is a
+    flat literal of string constants, so a regex is sound". It is not: the set
+    is INDENTED, so `\n\}` cannot match its own closing brace and the match ran
+    on to the next line-start `}` in the file — **200 lines further down, into
+    `OVERTRADE_MAX`**. Measured: **68 names parsed where 46 are declared**, 22
+    of them LIVING books (band-kelly, book-hull, book-kiyosaki,
+    lighter-perp-sniper, lighter-ticket-taker, perps-funding-spread,
+    pm-albanese, pm-turnbull...). It changed no verdict today only by luck —
+    the swallowed names are BASE ids and every `LEVER_BOOK` target carries a
+    `-lshadow` suffix, so none of them collided. The failure direction is the
+    dangerous one: an over-read retired set marks a LIVING book's lever `DEAD`,
+    and `DEAD` is exempt from the measurability ratchet, so I23's guard would
+    quietly excuse the levers it exists to chase. `check` fails on an EMPTY
+    parse, which catches under-reading and is structurally blind to this.
+
+    The AST is exact and just as import-free. A non-literal element (a name, a
+    comprehension) is skipped rather than guessed at, and the empty-parse guard
+    in `check` still covers the case where the assignment disappears entirely.
     """
     if src is None:
         with open(os.path.join(ROOT, "pnl_dashboard.py")) as fh:
             src = fh.read()
-    m = re.search(r"RETIRED_ROWS\s*=\s*\{(.*?)\n\}", src, re.S)
-    if not m:
-        m = re.search(r"RETIRED_ROWS\s*=\s*\{(.*?)\}", src, re.S)
-    if not m:
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
         return set()
-    body = re.sub(r"#[^\n]*", "", m.group(1))          # strip comments first
-    return set(re.findall(r'"([A-Za-z0-9_\-]+)"', body))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "RETIRED_ROWS"
+                   for t in node.targets):
+            continue
+        elts = getattr(node.value, "elts", None)
+        if elts is None:
+            return set()
+        return {e.value for e in elts
+                if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+    return set()
 
 
 def classify(levers, quantities, retired):

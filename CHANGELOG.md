@@ -1,3 +1,101 @@
+## 2026-09-06 (yj) — FOUR HAND-TYPED ROSTERS AND A KEY THAT OVERWROTE ITSELF: a risk control that could not see a living book, a card panel empty since July, a coverage guard that skipped every run it ever made, a retired-set parse that read 68 rows where 46 exist, and a validation dataset destroyed microseconds after it was written
+
+Same session as `(yi)`, same method — read the LIVING FEED and ask each file
+whether it still describes it — and the same shape underneath: **a list typed
+by hand goes stale one book at a time, and nothing notices, because a stale
+list is byte-identical to a correct one.** Five findings, every one verified by
+execution before it was believed.
+
+**1 · 🔭 GEORGIA V3 WAS IN NO RISK COHORT.** `fleet_risk.FREQTRADE_BOTS` is the
+roster the enforced fleet long budget and the 7d drawdown governor are computed
+over. She was minted at `(vr)`, publishes `freqtrade-georgia-v3-lshadow`, runs
+**long-only on up to 5 slots, 88 closes, ~$997** — and she is not in it. So her
+longs counted against **neither** the live budget nor the shadow one, and her
+equity sat outside the governor's cohort. **The failure direction is the wrong
+one for a risk control**: an absent book UNDER-counts, so the veto fires later
+than it should, silently. Added — and the class is closed by
+`test_every_living_freqtrade_book_is_in_the_risk_roster`, which reads the
+committed living roster rather than the file.
+
+**2 · 🌾 CARRY'S POSITION PANEL HAS BEEN EMPTY SINCE 17-JUL.** The dashboard's
+one branch for books whose open positions live in `bot_state` rather than
+`bot_pnl.extra` queried `bot IN ('perps-rsi-meanrev','perps-donchian-breakout',
+'perps-funding-carry')`. Carry writes its state under its **RESOLVED** id
+(`bot_id` in `funding_carry_bot.py` = `perps-funding-carry-lshadow`) — the bare
+base is the HL arm the LIGHTER-ONLY cut retired on 17-Jul. So the query has
+matched nothing for the fleet's best-evidenced living book for seven weeks, and
+the panel whose only source is that branch renders empty. Now
+`STATE_POSITION_ROWS`, a named declaration of RESOLVED ids with the two genuinely
+retired names kept for their frozen history, pinned by a test that fails if a
+base id reappears.
+
+**3 · THE DESIGN-COVERAGE GUARD SKIPPED EVERY RUN IT EVER MADE.**
+`test_every_LIVING_row_on_the_feed_has_a_design` read a **hard-coded absolute
+path inside ANOTHER session's scratchpad** (`.../88638ad8-aca5-.../pnl.json`)
+and `pytest.skip`ped when it was missing — which it always was, in CI and in
+every later session. Its own docstring reads *"it must fail here rather than be
+silently skipped."* **It was covering two real gaps at the moment this was
+found: 🔭 georgia v3 and 👩 MUM'S LIVE ARM — a real-money book with no declared
+design.** This is verbatim the rule this repo wrote at `(po)`: *a check that
+inspects nothing reports clean, and clean reads as evidence.* Fixed with a
+COMMITTED roster (`tests/fixtures/living_rows.json`) so the coverage arm can
+never skip, plus a second arm that fails where a live feed IS readable and
+carries a row the fixture lacks — so the fixture cannot rot the same way. Both
+designs written.
+
+**4 · THE MEASURABILITY GUARD READ 68 RETIRED ROWS WHERE 46 ARE DECLARED.**
+`audit_lever_measurability.retired_rows` parsed `pnl_dashboard.RETIRED_ROWS`
+with `re.search(r"RETIRED_ROWS\s*=\s*\{(.*?)\n\}")`. **The set is INDENTED**,
+so that end pattern cannot match its own closing brace: the match ran on ~200
+lines to the next line-start `}` in the file and swallowed 22 names out of
+`OVERTRADE_MAX` — **living books among them** (band-kelly, book-hull,
+book-kiyosaki, lighter-perp-sniper, lighter-ticket-taker, perps-funding-spread,
+pm-albanese, pm-turnbull). **It changed no verdict, and only by luck**: the
+swallowed names are BASE ids while every `LEVER_BOOK` target carries a
+`-lshadow` suffix, so none collided — stated plainly rather than sold as a
+catch. The direction is the dangerous one: an over-read retired set marks a
+LIVING book's lever `DEAD`, and `DEAD` is **exempt from I23's measurability
+ratchet**, so the guard would quietly excuse the levers it exists to chase. Its
+own fail-safe (`check` fails on an EMPTY parse) catches under-reading and is
+structurally blind to this. Now parsed with the AST — exact, still import-free —
+and pinned against the AST truth plus the living roster.
+
+**5 · `market-context` OVERWROTE ITS OWN SNAPSHOT, EVERY CYCLE.**
+`market_context.main()` wrote the per-coin snapshot to `market-context` and
+then, four lines later in the same block, wrote `{oi_hist, btc_marks, source}`
+to the SAME key. `bot_pnl_store.save_state` is `state = EXCLUDED.state` — a full
+REPLACE. So the snapshot was destroyed microseconds after it was written, and
+its one consumer, `lighter_funding_bot._mctx_slice` (reading `coins`,
+`heat_mean_apr`, `btc_vol_1h`), has been attaching **six null fields** to every
+funding entry's ledger row instead of the validation dataset it exists to
+collect. **Nothing gates on it** — `audit_bus_contract.RATCHET` says so in as
+many words — **so what this cost is EVIDENCE, not trades**, which is exactly
+why it could run this long with every organ green. The collector's private
+state moved to `market-context:collector` (the fleet's existing `:standby` /
+`:eqguard` shape, now declared in `PRIVATE_SUFFIXES`) with a **one-time
+fallback read** off the old key so the split does not discard 24h of
+accumulated OI history.
+
+**WHAT THIS COSTS AND WHAT IT BUYS (I19).** One behaviour changes: georgia v3's
+longs now count against the shadow budget, which can only tighten — correctly,
+since they are real positions. Everything else restores evidence that was being
+silently dropped: a card panel, a validation dataset, a coverage guard and a
+parse. **No book's entry rule moves and no trade changes.** Main only — none of
+these files is in `_BUILD_SHARED`, so no live pair drifts and no marker is owed.
+
+Pinned by three new files —
+`tests/autonomy/test_risk_roster_covers_the_living_books.py`,
+`test_lever_measurability_parse.py`, `test_state_keys_are_not_overwritten.py`
+— plus the rewritten coverage arm, **5 of 5 mutations verified RED** (drop
+georgia v3 from the roster; put the bare carry base back; restore the
+overrunning regex; let the coverage guard skip again; point the collector write
+back at the shared key). The duplicate-key detector carries its own **positive
+control** — `(po)`'s rule that empty output is not a negative result until the
+check has been seen to produce a positive one — and is scoped to a single
+straight-line block on purpose, so a legitimate read-modify-write (the
+`coin-vetoes` heartbeat) and two save sites in different branches of one helper
+(`xp-judge`) do not redden it into being exempted within a day.
+
 ## 2026-09-06 (yi) — THE JUDGE'S LANE MOVED TO MUM AND THREE ORGANS KEPT WATCHING THE FARMER: a receipt detector structurally blind to the living lane, a census entry written onto a retired pair, a growth promoter asking for a receipt no book on this lane can produce, and one live book's lever graded on another live book's trades
 
 `(ww)` moved the judge's serial lane from 💸 the Farmer to 👩 mum. `(ye)` then

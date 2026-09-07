@@ -498,6 +498,18 @@ OVERTRADE_LIMIT = {
                                    # — belongs in the changelog (rq) and to the
                                    # nav-cook session, not to a lit-up chip.]
 }
+#: [(yj)] Rows whose OPEN POSITIONS live in `bot_state` rather than in
+#: `bot_pnl.extra` — the only source `fetch_ledger_enrich` has for their
+#: cards. These are RESOLVED row ids, never bases: a funding book publishes
+#: its state under the id it publishes its row under, and the bare base has
+#: not existed since the venue cut. Any row added here must be one that
+#: actually writes `bot_state[<row>]`.
+STATE_POSITION_ROWS = (
+    "perps-funding-carry-lshadow",   # 🌾 carry — LIVING
+    "perps-rsi-meanrev",             # retired; frozen state kept for history
+    "perps-donchian-breakout",       # retired; frozen state kept for history
+)
+
 OVERTRADE_DEFAULT = 15
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
@@ -3013,9 +3025,17 @@ def fetch_ledger_enrich():
                         out.setdefault(r["bot"], {})["today_equity_delta"] = \
                             round(float(r["delta"]), 2)
             if g["t4"]:
-                cur.execute("SELECT bot, state FROM bot_state WHERE bot IN "
-                            "('perps-rsi-meanrev','perps-donchian-breakout',"
-                            "'perps-funding-carry')")
+                # [(yj)] THE ROW ID, NOT THE BASE. 🌾 carry publishes its
+                # state under its RESOLVED id (`bot_id` in
+                # funding_carry_bot.py, i.e. `perps-funding-carry-lshadow`
+                # since the 17-Jul LIGHTER-ONLY cut retired the bare HL arm),
+                # so this query has matched NOTHING for the fleet's
+                # best-evidenced living book since that day — its card's
+                # open-position panel, whose ONLY source is this branch, has
+                # been empty ever since. The two perps names are genuinely
+                # retired and stay for their frozen history.
+                cur.execute("SELECT bot, state FROM bot_state WHERE bot = "
+                            "ANY(%s)", (list(STATE_POSITION_ROWS),))
                 for r in cur.fetchall():
                     st = r["state"] if isinstance(r["state"], dict) else \
                         json.loads(r["state"] or "{}")
