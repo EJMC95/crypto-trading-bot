@@ -1,3 +1,78 @@
+## 2026-09-07 (yw) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
+
+**Eamon: *"Yes, if it's a step closer to making more profit"*.** The condition
+is the entry. The per-close REGIME stamp `(yt)` ranked second does **NOT** clear
+it, and this does — the reasoning is recorded here rather than the work being
+done on momentum.
+
+**WHY THE REGIME STAMP WAS REFUSED (a refusal with evidence, `(vc)`'s
+first-class output):** it is telemetry, so it moves no trade and earns nothing
+directly. Its only route to profit is a regime GATE — and (a) the fleet already
+has a PRE-REGISTERED instrument for exactly that
+(`study_regime_short_veto_2026-09-02.py`, registered 2-Sep, read due 16-Sep),
+whose binding constraint is fresh SAMPLE and not stamping; and (b) `(yt)`'s own
+measurement is evidence AGAINST a detectable effect at reachable n — 👩 mum's
+LIVE and SHADOW arms, running the SAME POLICY, **disagree on the SIGN** of the
+regime split over ~60 closes each (live +0.842% BTC-up vs +0.105% BTC-down;
+shadow +0.336% vs +0.616%). Stamping would make a 16-Sep read marginally
+richer. It would not make a dollar, and it is not the next best use of a pass.
+
+**WHAT DOES CLEAR THE BAR: THE SIZING TABLE `(yt)` PUBLISHED IS WRONG IN THE
+DIRECTION THAT LOSES MONEY**, and it sits directly in front of the only
+real-money sizing decision the fleet has open. Sizing is the most direct profit
+lever there is; a sizing model that flatters is worse than none.
+
+**MEASURED, from the ledger's own open/close stamps (`concurrency`):**
+
+| book | mean open | p90 | peak | cap | legs opened while others held |
+|---|---|---|---|---|---|
+| 🎫 taker | **4.92** | 7 | 8 | 8 | **97%** |
+| 👩 mum LIVE | **6.92** | 11 | 13 | 12 | **91%** |
+| ⚖️ Counterweight | **13.43** | 21 | 27 | 10 | **99%** |
+| 🪁 kelly | 2.32 | 3 | 8 | 4 | 77% |
+| 🔮 georgia | 2.21 | 4 | 5 | 5 | 62% |
+
+`(yt)`'s table compounded legs SEQUENTIALLY and declared that a lower bound.
+It is not a small correction: these books essentially **never hold one position
+alone**, so the sequential model priced a book that does not exist.
+
+**THE NUMBER THAT MATTERS IS GROSS, AND IT IS NOW ON THE TABLE.** At the
+SHIPPED clip: 🎫 taker `f=5.2% x 5 = **26%** of equity`; ⚖️ Counterweight
+`1.8% x 13 = **24%**`; and **👩 mum's LIVE arm `25.3% x 7 = 177%`**. That last
+one is a real-money book running ~1.8x its equity on average, and it
+corroborates the carried `mum-live-rho-read-preregistered` row from a
+completely independent direction — that row reaches the same place via
+`all_slots_stop_pct` 0.20 against a 0.15 bar. Two instruments, one conclusion,
+neither acted on: the read is pre-registered and its date has not come (I25).
+
+**THREE DEFECTS IN MY OWN MODEL, FOUND IN SEQUENCE, EACH BY CHECKING THE LAST
+FIX** — recorded because the pattern is the point:
+1. **Legs applied sequentially.** Fixed with `k_joint`: draw the measured
+   concurrency and apply the SUMMED return as ONE equity step.
+2. **Applied jointly, still drawn INDEPENDENTLY.** Concurrent legs here share a
+   lens, a side and a market move; independent draws cancel and the joint tail
+   comes out far too thin. Fixed with `block=`: a CONTIGUOUS slice of the
+   book's own open-ordered timeline, so the legs carry the co-movement they
+   actually had.
+3. **A UNIT MIX-UP IN THE DENOMINATOR.** `steps = n_draw // kj` counted
+   close-BATCHES while the block draw counted LEGS, so ⚖️ Counterweight ran
+   **3 rounds instead of 12** and the "corrected" model reported LESS ruin than
+   the sequential one it was correcting (P(-50%) 2.6% vs 49.5% at f=25%). Now
+   `len(blk) // kj`, and the two models agree at 47.1% vs 49.5% — which is the
+   sanity check that says the correction is a correction and not a new error.
+
+**WHAT THE FIXED TABLE ACTUALLY SAYS ABOUT 🎫 THE TAKER, stated plainly because
+it is the tempting reading:** its E[log] still rises to f=40% / **200% gross**
+with P(-50%) = 0.0%, i.e. the model still says *size up*. That is what the model
+says; it is not a recommendation. The sample is 37.6 days in ONE regime, its
+own random-entry null is NOT cleared (P=0.145), and its test slice is 4x its
+train slice. A sizing model cannot see any of those, which is precisely why
+`(yt)`'s conclusion — no parameter change — is unchanged by this entry.
+
+**MOVES NOTHING.** An instrument-only change: no lever, no bot, no gate, no
+publish. `--selftest` green (the moves-nothing AST proof included),
+`tests/test_selftests.py` green.
+
 ## 2026-09-07 (yv) — THE FLEET'S ONLY ANSWER TO ITS OWN NULL WAS INSTALLED ON ONE BOOK OF FOURTEEN: the control arm is per-BOOK now, and two more books have one
 
 **Eamon: *"Where can we improve on from here"* -> *"Yes"*.** The second half of

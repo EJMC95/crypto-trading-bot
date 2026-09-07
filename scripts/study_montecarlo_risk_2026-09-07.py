@@ -461,7 +461,51 @@ def sizing(full_rows, book_usd=1000.0):
             "clip_lo": min(ns), "clip_hi": max(ns)}
 
 
-def ruin_curve(units, n_draw, draws, rng, ruin_levels, fracs):
+def concurrency(full_rows, parse=None):
+    """How many of this book's positions were genuinely OPEN at once.
+
+    Reconstructed from the ledger's own open/close stamps as a sweep line, so
+    it is the book's realised behaviour rather than its configured cap.
+
+    THIS IS NOT A DETAIL, IT IS THE DOMINANT FACT for a sizing table. Measured
+    7-Sep: 🎫 the taker holds a **mean of 4.92** positions and **97% of its
+    legs opened while others were already held**; 👩 mum's live arm 6.92; and
+    ⚖️ Counterweight 13.43 against a configured cap of 10. A model that
+    compounds those legs SEQUENTIALLY is pricing a book that essentially never
+    exists — one that holds a single position at a time.
+
+    Returns {mean, p90, peak, overlap_frac, n}.
+    """
+    p = parse or _parse
+    ev = []
+    for r in full_rows:
+        o = p(r[7].get("opened_at")) if len(r) > 7 else None
+        c = r[2]
+        if o is None or c is None or c < o:
+            continue
+        ev.append((o, 1))
+        ev.append((c, -1))
+    if not ev:
+        return None
+    ev.sort()
+    cur = peak = 0
+    at_open = []
+    for _, d in ev:
+        cur += d
+        peak = max(peak, cur)
+        if d == 1:
+            at_open.append(cur)
+    if not at_open:
+        return None
+    s = sorted(at_open)
+    return {"mean": statistics.fmean(at_open),
+            "p90": s[min(len(s) - 1, int(0.9 * len(s)))],
+            "peak": peak, "n": len(at_open),
+            "overlap_frac": sum(1 for x in at_open if x > 1) / len(at_open)}
+
+
+def ruin_curve(units, n_draw, draws, rng, ruin_levels, fracs, k_joint=1,
+               block=None):
     """P(equity ever touches `level`) as the position fraction `f` varies.
 
     `units` hold per-trade returns ON THE POSITION'S NOTIONAL (`pnl_pct`).
@@ -479,22 +523,71 @@ def ruin_curve(units, n_draw, draws, rng, ruin_levels, fracs):
     was caught by the grade-reproduction gate — that gate reads the ledger,
     not the simulator. `calibrate_ruin` below is the check that does, and it
     is the reason this docstring can be trusted.
+
+    `k_joint` IS THE SECOND CORRECTION, AND IT MATTERS MORE THAN THE FIRST.
+    At `k_joint=1` the legs compound SEQUENTIALLY — one bet resolves before
+    the next is taken. That is not this fleet. Measured 7-Sep from the
+    ledger's own open/close stamps (`concurrency`): 🎫 the taker holds a mean
+    of **4.92** positions with **97%** of its legs opening while others are
+    already held; 👩 mum's live arm **6.92**; ⚖️ Counterweight **13.43**
+    against a configured cap of 10. `k_joint` draws that many legs and applies
+    their SUMMED return as ONE equity step — what "every open position moves
+    against you at once" actually costs.
+
+    THE FIRST PUBLISHED VERSION OF THIS TABLE WAS WRONG IN THE DIRECTION THAT
+    LOSES MONEY. Sequentially it read `P(-50%) = 0.0%` and a still-RISING
+    `E[log]` at f=40% on 🎫 the taker — an invitation to raise size 8x on the
+    fleet's only READY book. At that book's measured concurrency, f=40% is
+    ~197% of equity deployed. A conservative model is a fine thing for a risk
+    table to be; this was the opposite, and that is the one direction a sizing
+    model must never err in.
+
+    THE THIRD CORRECTION, AND IT IS WHY `block` EXISTS. Applying `kj` legs
+    together but DRAWING them independently captures the timing of joint
+    exposure and not the CORRELATION of joint outcomes — and concurrent legs
+    in this fleet are anything but independent: same lens, same side, same
+    market move. Independent draws cancel, so the joint tail comes out far too
+    thin. Measured on 🎫 the taker at f=40%: independent-joint reads
+    `P(-50%) = 0.0%` and an E[log] still rising, i.e. *"size up 8x"*; drawing
+    the same legs as a CONTIGUOUS BLOCK of the book's own open-ordered
+    timeline — so they carry the co-movement they actually had — is the
+    honest version. `block` is that open-ordered leg sequence; without it this
+    falls back to independent draws and SAYS SO in the caller.
     """
     out = {}
+    kj = max(1, int(k_joint))
+    blk = [x for x in (block or []) if isinstance(x, (int, float))]
     for f in fracs:
         hits = {lv: 0 for lv in ruin_levels}
         finals = []
+        # HOW MANY ROUNDS does the book cycle through its own capacity? With
+        # `kj` legs live at once and `len(blk)` legs in the sample, that is
+        # len(blk)//kj — counted in LEGS. The first cut of this used
+        # `n_draw // kj`, mixing units: `n_draw` counts close-BATCHES, so on
+        # ⚖️ Counterweight (47 batches, 155 legs, kj=13) it ran **3** rounds
+        # instead of 12 and reported LESS ruin than the sequential model it
+        # was correcting. A unit mix-up in the denominator of a risk table
+        # flatters it by exactly the factor nobody checks.
+        steps = max(1, (len(blk) // kj) if (kj > 1 and len(blk) > kj)
+                    else n_draw // kj)
         for _ in range(draws):
             eq = 1.0
             low = 1.0
-            for _ in range(n_draw):
-                for leg in units[rng.randrange(len(units))]:
-                    eq *= (1.0 + leg * f)
-                    low = min(low, eq)
-                    if eq <= 0.0:
-                        eq = 1e-9
-                        low = 0.0
-                        break
+            for _ in range(steps):
+                joint = 0.0                # the whole book moving at once
+                if kj > 1 and len(blk) > kj:
+                    i = rng.randrange(len(blk) - kj)
+                    joint = sum(blk[i:i + kj])
+                else:
+                    for _ in range(kj):
+                        for leg in units[rng.randrange(len(units))]:
+                            joint += leg
+                eq *= (1.0 + joint * f)
+                low = min(low, eq)
+                if eq <= 0.0:
+                    eq = 1e-9
+                    low = 0.0
+                    break
             finals.append(eq)
             for lv in ruin_levels:
                 if low <= lv:
@@ -1138,6 +1231,13 @@ def report_mc(bot, gr_live, g, args, rng, caps=None):
         pctu = ([[r[0]] for r in rows] if args.iid
                 else [[x[0] for x in b] for b in batches(rows)])
         cf = round(sz["clip_frac"], 4)
+        conc = concurrency(full)
+        kj = max(1, int(round(conc["mean"]))) if conc else 1
+        # the book's own OPEN-ordered leg returns: a contiguous slice of this
+        # is a set of legs that were genuinely live together, carrying the
+        # co-movement they actually had.
+        _bo = sorted(full, key=lambda r: str(r[7].get("opened_at") or ""))
+        blockseq = [r[0] for r in _bo]
         cal_ok, sim_r, book_r = calibrate_ruin(
             pctu, n_draw, cf, st.get("realised_usd", 0.0), book_usd)
         if not cal_ok:
@@ -1150,21 +1250,30 @@ def report_mc(bot, gr_live, g, args, rng, caps=None):
         fr = sorted(set(round(x, 4) for x in
                         [0.02, 0.05, 0.10, cf, 0.25, 0.40]))
         rc = ruin_curve(pctu, n_draw, max(2000, args.draws // 5),
-                        random.Random(303), [0.5, 0.25], fr)
-        print(f"    RISK OF RUIN  (compounded; f = equity fraction per position; "
-              f"calibrated: sim {100*sim_r:+.1f}% vs book {100*book_r:+.1f}% "
-              f"at the shipped f)")
-        print(f"        {'f':>7s} {'P(-50%)':>9s} {'P(-75%)':>9s} "
-              f"{'median':>9s} {'p05':>8s} {'E[log]':>9s}")
+                        random.Random(303), [0.5, 0.25], fr, k_joint=kj,
+                        block=blockseq)
+        rc_seq = ruin_curve(pctu, n_draw, max(2000, args.draws // 5),
+                            random.Random(303), [0.5, 0.25], fr, k_joint=1)
+        if conc:
+            print(f"    CONCURRENCY   mean {conc['mean']:.2f} open · p90 "
+                  f"{conc['p90']} · peak {conc['peak']} · cap "
+                  f"{max_open or '?'} · {100*conc['overlap_frac']:.0f}% of legs "
+                  f"opened while others were held")
+        print(f"    RISK OF RUIN  (f = equity fraction PER POSITION; gross = "
+              f"f x {kj} concurrent; calibrated sim {100*sim_r:+.1f}% vs book "
+              f"{100*book_r:+.1f}%)")
+        print(f"        {'f':>7s} {'gross':>7s} {'P(-50%)':>9s} {'P(-75%)':>9s} "
+              f"{'median':>9s} {'E[log]':>9s}   {'[seq P(-50%)]':>14s}")
         for f, v in sorted(rc.items()):
             mark = "  <- shipped" if abs(f - cf) < 1e-4 else ""
-            print(f"        {100*f:6.1f}% {100*v['p_ruin'][0.5]:8.1f}% "
-                  f"{100*v['p_ruin'][0.25]:8.1f}% {v['median_final']:9.2f}x "
-                  f"{v['p05_final']:8.2f}x {v['mean_log']:9.4f}{mark}")
-        print(f"        DECLARED LIMIT: legs are compounded SEQUENTIALLY. This "
-              f"book runs up to {max_open or '?'} concurrent "
-              f"positions, so a simultaneous adverse move across open legs is "
-              f"NOT in this table — read it as a lower bound on ruin.")
+            sq = rc_seq[f]["p_ruin"][0.5]
+            print(f"        {100*f:6.1f}% {100*f*kj:6.0f}% "
+                  f"{100*v['p_ruin'][0.5]:8.1f}% {100*v['p_ruin'][0.25]:8.1f}% "
+                  f"{v['median_final']:9.2f}x {v['mean_log']:9.4f}   "
+                  f"{100*sq:13.1f}%{mark}")
+        print(f"        The last column is the SEQUENTIAL model this file "
+              f"published first. Where it reads 0.0% beside a real number, it "
+              f"was inviting a size it cannot price.")
     return base
 
 
