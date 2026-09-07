@@ -1,3 +1,76 @@
+## 2026-09-07 (yo) — SIX PRE-REGISTERED READS SAY "THE DATE IS THE BACKSTOP, NOT THE TRIGGER" AND NOTHING WAS MEASURING THE TRIGGER: 🪁 kelly's had been due for three and a half weeks, and its verdict is the branch that returns to Eamon
+
+> **[RENUMBERED (ym) -> (yn) -> (yo) at push.]** A concurrent session took (ym) on main
+> while this branch was in CI; that entry keeps the letter per the letters rule.
+> Three code citations moved with it (`grep -rn`, counted).
+
+`(yl)` closed a measurement defect; this is the carried-work half of the same
+pass (I11 — *start the next pass from the carried list*). The fleet holds
+**six live pre-registered reads**, and most of their HANDOFF rows say some
+version of *"the date is the backstop, not the trigger"* — 🪁 kelly's says
+**"If fresh on-class n reaches 60 EARLIER, do the read then"** in as many
+words. **No instrument counted the sample.** So the trigger fired in silence.
+
+**MEASURED TODAY, all six, on the ledger with `is_quarantined` AND
+`is_phantom_close` applied** — the public `/trades.json` applies neither, and
+an outside consumer that skips them grades a sample the gate refuses (4,304
+rows → 4,244 admissible):
+
+| registration | bar | today | |
+|---|---|---|---|
+| 🪁 **kelly fresh read** | n ≥ 60 since 1-Sep | **n = 233** | **FIRED — 3.5 weeks early** |
+| ⚖️ counterweight fresh read | n ≥ 60 **on-class** after 1-Sep | 18 all-class (on-class is a subset) | not yet |
+| 🙏 avo live slot-6 | ≥ 10 live closes opened with ≥ 5 held | 0 since the 6-Sep change | not yet |
+| 👩 mum halt cost | ≥ 5 halt **events** after 3-Sep | 0 | not yet |
+| 👩 mum non-crypto sleeve | G ≥ 10 distinct **entry days** | G = 5 | not yet |
+| taker hold floor · regime short veto | n ≥ 30 fresh | need their own instruments to count | — |
+
+**THE READ, applied verbatim.** The registration says `m + 1.28·SE`, so this
+uses **1.28** and deliberately **not** `fleet_allocation.t_crit` — a
+registration is a commitment, not something to re-optimise at read time (I21).
+
+    fresh window (closed_at >= 2026-09-01)
+    n = 233 · mean −0.0440 %/trade · SE 0.1323 · t −0.33 · ub(m+1.28·SE) = +0.1254 %
+
+* **RETIRE if ub ≤ 0** → **NO.** The sample has *not* excluded a positive
+  mean, and I17-as-amended is explicit that retirement needs a measured
+  exclusion, never a thin or merely-negative sample.
+* **KEEP GRADING if mean > 0** → **NO.** −0.044 % is not above zero.
+* **VERDICT: RETURNS TO EAMON**, which is the registered rule's own third
+  branch. A session may not close this by picking whichever side it prefers.
+
+**AND THE CAVEAT THE VERDICT TURNS ON, because the headline flatters.** The
+fresh window reads **0.098pp better** than all-time (−0.142 % on n = 589) and
+books **+$6.42** — but it is **TAIL-DOMINATED**: the **top 3 closes are
++18.68pp of a −10.24pp total**, and **ex-top-3 the fresh mean is −0.126
+%/trade**, i.e. materially identical to all-time. So the improvement is three
+trades, not a change in the book. Reporting the headline alone would have been
+the drop-worst error this fleet already pays for ((po) 🧙 Schwager, (tx) 🎯 the
+sniper) — the concentration is printed **beside** the verdict, never as a
+branch of the registered rule.
+
+**SHIPPED AS AN INSTRUMENT, NOT A ONE-OFF.**
+`scripts/study_kelly_fresh_read_2026-09-07.py`:
+* a **CALIBRATION GATE that REFUSES** (exit 2) rather than reports — it must
+  reproduce the audit's published all-time mean within 0.10pp before it will
+  say anything (measured drift **0.037pp**, on a ledger that has grown
+  n = 383 → 589 since the audit, so it is honestly a *re-measure*, not a
+  reproduction, and the file says so);
+* owners **imported, never copied** (`store.is_quarantined`,
+  `gr.is_phantom_close`);
+* `--selftest` is OFFLINE and drives **all four verdict branches — including
+  RETIRE and KEEP GRADING, which the live data does not currently exercise.**
+  That is the point: an untaken branch of an unread rule is exactly where the
+  rot goes, and it is the same lesson `(yl)` just paid for one level up
+  (`brain_replay` was *registered* and its ledger normaliser had never been
+  driven by anything). It also pins that a 100× basis error and a dark feed
+  both REFUSE.
+
+**WHAT THIS DOES NOT DO.** No book was retired, nothing was tuned, no capital
+moved. The carried row is **updated, not closed** — the READ is done, the
+DECISION is Eamon's, and the row now says so, so the next session neither
+re-takes the read hoping for a different answer (I25) nor quietly resolves it.
+Main only ((mm)): it changes no trade any live book takes.
 ## 2026-09-06 (yn) — THE FLEET PASSED THE GO-LIVE GATE FOR THE FIRST TIME, AND A QUARTER OF THE SAMPLE THAT PASSED IT COMES FROM A LENS THE BOOK HAS ALREADY VETOED
 
 **🎫 the Ticket Taker returned `ready: True` — 6 of 6 bars, the first in this

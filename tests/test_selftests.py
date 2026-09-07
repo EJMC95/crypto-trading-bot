@@ -167,7 +167,7 @@ SELFTEST_MODULES = [
     # selftest is offline (planted control CUT, placebo KEPT, thin sample
     # not decidable, the twin-agreement arm).
     "scripts.study_mum_noncrypto_sleeve_2026-09-02",
-    # [2026-09-07 (ym)] 🪁 kelly's pre-registered keep-or-retire read. Its
+    # [2026-09-07 (yn)] 🪁 kelly's pre-registered keep-or-retire read. Its
     # n-trigger fired 3.5 weeks before the date backstop and nothing in the
     # tree was measuring it. --selftest is OFFLINE and drives all four
     # verdict branches — including RETIRE and KEEP GRADING, which the live

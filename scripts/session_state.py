@@ -152,7 +152,7 @@ CARRIED = [
                 "closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the "
                 "fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh "
                 "mean > 0, anything else returns to Eamon. "
-                "[7-Sep (ym)] THE READ HAS BEEN TAKEN -- the SAMPLE tripped it "
+                "[7-Sep (yn)] THE READ HAS BEEN TAKEN -- the SAMPLE tripped it "
                 "3.5 weeks before the date backstop (n=233 vs a bar of 60) and "
                 "nothing was measuring the trigger. Verdict: RETURNS TO EAMON. "
                 "Fresh mean -0.044%/trade, SE 0.132, t -0.33, upper bound "
