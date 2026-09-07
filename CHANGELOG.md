@@ -84,6 +84,39 @@ filtered to 8**, so appending a log row *is* updating the thread and the block
 cannot grow again. **Not executed**: it is a live shared artefact across three
 surfaces and the audit's own constraint is *do not overwrite live files*.
 
+**[CORRECTED IN PLACE, same session, per I12 — Eamon: *"I only use lighter
+exchange."*]** The first cut of the report suggested **FMP** as an off-venue
+regime feed and called the IBKR stocks side *"the largest un-audited surface
+you have"*. Both are **WITHDRAWN**: the Lighter-only rule has stood since
+17-Jul and I should not have proposed around it, and item 18's own answer is
+already on-venue (the venue's ~41 non-crypto books). Re-measured across **all
+9 Railway projects** rather than just `Trading Bots`, the framing was wrong in
+the consequential direction — there is nothing to audit off-venue because
+**nothing is trading there**, and what is actually true is more actionable.
+
+**OUTSIDE THE LIGHTER FLEET, EXACTLY TWO SERVICES RUN, AND ONE IS THE BIGGEST
+CONSUMER IN THE ACCOUNT.** `ikbr-stock-bot/ibgateway` averages **640.6 MB**
+(peak 793.9, CPU peak 0.305) — **larger than all ten idle Lighter containers
+combined (482 MB) and 2.4× `freqtrade-bots` (263 MB)**, the container running
+four books, every organ, the brain, the scout, the judge and the Parliament.
+Its own logs show IBC auto-logging in daily: `DUQ875469 Trader Workstation
+Configuration (Simulated Trading)` — a **PAPER** account, so no real money —
+and `Read-Only API checkbox is already set to: false`, i.e. configured to
+accept orders. **The service that would drive it (`bot`) is stopped, 0/0, for
+the whole 7-day window.** So it is a broker session re-established daily for no
+consumer. `trading-bot/trading-bot` (43.8 MB) is the Alpaca cron `CLAUDE.md`
+records as *"torn down"* 15-Jul — stopped, but still resident and restarting.
+Everything else across the 9 projects is 0/0 or an empty project
+(`feisty-delight`, `nurturing-appreciation`).
+
+**This also closes the 14-Jul open item, precisely rather than loosely.**
+`CLAUDE.md`: *"equities-regime-ibkr's publisher runs on an UNIDENTIFIED host …
+stop the process when found."* The project is `ikbr-stock-bot`; the plausible
+publisher is `bot`, which is **already stopped**, so the row stopped on its
+own. What was never found, and is still up, is the **gateway beside it**. Both
+are outside this repo, so `railway down` needs no code guard — nothing pushes
+to them and nothing will resurrect them.
+
 **Also named:** the highest-value unused capability is a **nightly Railway log
 sweep** — the `bot_state_history` retention bug *"said so in the logs every boot
 while nobody read them"* and `(ml)`'s stale reader were both found by a human

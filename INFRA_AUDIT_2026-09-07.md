@@ -496,23 +496,89 @@ Zoom, Read AI, Embat.
 2. **Postgres read path** — §2.5. The single biggest analytical unlock, and
    the option I prefer needs no connector at all, just a `/history.json`
    endpoint on the dashboard you already run.
-3. **FMP** — connected and unused by the fleet. Item 18 (the regime caveat)
-   says Lighter's whole 438-day tape is one falling-BTC regime and the venue's
-   ~41 non-crypto books are the only on-venue escape. FMP is off-venue, so it
-   cannot supply *evidence* under the Lighter-only backtest rule — but it can
-   supply **regime context** (a real equity/commodity index for the oracle,
-   rather than one chained from the scout's own marks). That distinction is
-   worth keeping sharp: context, never a backtest.
-4. **IBKR** — connected. The stocks side of your fleet (`ikbr-stock-bot`,
-   `ibgateway` at 697 MB, ~10× any trading bot) is entirely outside this
-   repo's instruments. Nothing grades it, nothing publishes it to
-   `/pnl.json`, and the survivorship and multiplicity findings in
-   `AUDIT_PHASE3_4` do not cover it. **That is the largest un-audited surface
-   you have**, and it is a separate piece of work rather than a connector gap.
+3. **FMP — WITHDRAWN, corrected in place per I12.** The first cut of this
+   document suggested FMP as an off-venue regime feed for the oracle. **Eamon,
+   7-Sep: *"I only use lighter exchange."*** That is the standing rule since
+   17-Jul and I should not have proposed around it. Item 18's own answer is
+   already on-venue and needs no connector: the venue's ~41 non-crypto books
+   (SPY, QQQ, WTI, XAU…) at $163.8M/day are the only regime source this fleet
+   is allowed to grade against, and `regime_oracle`'s per-asset coverage is
+   the build order that reaches them. **No third-party market-data connector
+   belongs in this fleet.**
+4. **IBKR — REFRAMED, corrected in place per I12; see §4.1.** The first cut
+   called the stocks side *"the largest un-audited surface you have"* and
+   recommended auditing it. Measured after Eamon's correction, that framing
+   was wrong in the consequential direction: there is nothing to audit,
+   because **nothing is trading there.** What is actually true is worse and
+   more actionable — an orphaned broker gateway is the single largest resource
+   consumer in the entire Railway account.
 5. **Slack** — not used by the fleet. The pager currently goes to phone push
    via the organs. A `#fleet-alerts` channel would give alerts a *history* —
    right now a push that arrives while you are asleep leaves no searchable
    record, which is how a 12.5-hour dark window `(I13)` goes unnoticed.
+
+### 4.1 Account-wide census — measured after "I only use lighter exchange"
+
+**Eamon, 7-Sep: *"I only use lighter exchange."*** So I swept all **9 Railway
+projects**, not just `Trading Bots`. Outside the Lighter fleet, exactly **two**
+services are running, and one of them is the biggest single consumer in the
+account.
+
+| Project / service | avg RAM | avg vCPU | State |
+|---|---|---|---|
+| `ikbr-stock-bot` / **`ibgateway`** | **640.6 MB** (peak 793.9) | 0.00167 (peak 0.305) | **running, logged in** |
+| `ikbr-stock-bot` / `bot` | 0 | 0 | **stopped** |
+| `trading-bot` / `trading-bot` | 43.8 MB | ~0 | running, near-dormant |
+| `trading-bot` / `market-scanner` | 0 | 0 | stopped |
+| `supportive-healing` / `crypto-trading-bot` | 0 | 0 | stopped |
+| `deploy` / `deploy` · `dash-deploy` / `dash-deploy` | 0 | 0 | stopped |
+| `feisty-delight` · `nurturing-appreciation` | — | — | **empty projects** |
+
+**`ibgateway` is an Interactive Brokers Gateway driven by IBC, auto-logging in
+daily, with no bot attached.** Its own logs, 2026-09-06 23:45:
+
+```
+IBC: detected dialog entitled: DUQ875469 Trader Workstation Configuration (Simulated Trading)
+IBC: Setting ReadOnlyApi
+IBC: Read-Only API checkbox is already set to: false
+```
+
+Three things follow, and they are all good news except the last:
+
+1. **`(Simulated Trading)` — it is a PAPER account.** No real money is exposed.
+2. **`Read-Only API` is `false`** — the gateway is configured to *accept
+   orders*. Harmless on paper; it is simply not the posture you would choose
+   for something nothing is driving.
+3. **The service that would drive it (`bot`) is stopped, and has been for the
+   whole 7-day window.** So this is a broker session being established, and
+   re-established daily, for no consumer.
+
+**The scale is the point.** At **640.6 MB average it is larger than all ten
+idle Lighter containers combined (482 MB)**, and **2.4× `freqtrade-bots`
+(263 MB)** — the container that runs four books, every organ, the brain, the
+scout, the judge and the Parliament. The single biggest thing in the account
+is a gateway to an exchange that is not used.
+
+**This also closes a 14-Jul open item, near enough to say so.** `CLAUDE.md`
+records: *"equities-regime-ibkr's publisher runs on an UNIDENTIFIED host (not
+this repo, not ~/Claude/Trading, no local process) — its row is
+dashboard-retired regardless; stop the process when found."* The project is
+`ikbr-stock-bot`. **Precisely**: the plausible publisher is `bot`, and it is
+already stopped — so the row stopped publishing on its own. What was never
+found, and is still up, is the gateway beside it. Likewise `trading-bot` —
+`CLAUDE.md` says the Alpaca cron was *"torn down"* 15-Jul; the service was
+stopped but still holds 43.8 MB and its memory floor touches 0, so it restarts.
+
+**Proposed, not executed** (both are outside this repo, so no code guard is
+needed — nothing pushes to them and nothing will resurrect them):
+```bash
+railway down --service ibgateway   --project ikbr-stock-bot
+railway down --service trading-bot --project trading-bot
+# then delete the two empty projects: feisty-delight, nurturing-appreciation
+```
+**Before the first one**, if you ever want the IBKR paper account back: note
+the gateway is only the transport. Deleting it costs you nothing but a
+re-provision, and the account itself is untouched.
 
 **What I would NOT add.** More connectors is not the constraint. Every gap
 above is either a workflow you already have the tools for, or one read-only
@@ -530,10 +596,16 @@ provisioned things doing nothing* would be the wrong direction.
    seconds of certainty, and the routing needs correcting either way.
 2. **Nightly Railway log sweep → one GitHub issue.** Two of the fleet's most
    expensive bugs sat in logs nobody read. This is one workflow.
-3. **Give me a read path to Postgres** — `/history.json` is enough, and needs
-   no credential to move. It unblocks the OI test, the MTM series, the
-   full-depth ledger and the disk tripwire, all of which this audit had to
-   record as CARRIED rather than answer.
+3. **Stop `ibgateway`.** You only use Lighter. It is an IBKR paper gateway
+   with no bot attached, re-logging in daily, API not read-only, at **640 MB
+   — bigger than all ten idle Lighter containers put together and 2.4× the
+   container that runs four books and every organ.** One command, outside
+   this repo, nothing resurrects it.
+
+Then, when you want the analysis unblocked: **a read path to Postgres** —
+`/history.json` is enough and needs no credential to move. It releases the OI
+test, the MTM series, the full-depth ledger and the disk tripwire, all of
+which this audit had to record as CARRIED rather than answer.
 
 Then Notion Option B, whenever you want it.
 
