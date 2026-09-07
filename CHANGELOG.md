@@ -1,3 +1,145 @@
+## 2026-09-07 (yl) — THE INSTRUMENT THAT VALIDATES THE BRAIN NORMALISED THE LEDGER WITH A PARTIAL COPY OF THE BRAIN'S OWN RULE: a harness graded the engines on a universe production does not have, and no fixture in the tree could ever have said so
+
+> **[RENUMBERED (yf) -> (yi) -> (yj) -> (yk) -> (yl) at push.]** Three concurrent sessions took
+> (yf), then (yi), then (yj) on main while this branch was in CI; all three of
+> those entries are on main and keep their letters, per the letters rule — mine
+> is the one that had not been pushed. Every citation of it is inside this
+> branch's own files (six, counted with `grep -rn`) and all six moved together.
+> `git log` subjects keep the old letter and are not a letter index.
+
+`brain_replay` is how this fleet checks that the brain's v3 statistics engine
+beats v2 before either sizes a real position — since `(so)`/`(sp)` the brain's
+multipliers reach **every living book, real money included**. Its
+`load_trades` docstring said it normalised the paper ledger *"exactly like
+bot_pnl_store.fetch_paper_trades does for the production brain"*. **It did
+not**, and the two ways it differed are the two halves of what a sample IS.
+
+**1 · IT IGNORED THE `tag` COLUMN.** Production prefers a stored tag over the
+reason prefix — *"'long-funding' beats 'long'"*, `bot_pnl_store.py:1761` — and
+the harness derived the bucket key from `split_reason(reason)` alone. That is
+not a cosmetic difference: `split_reason('long_decay_paid')` is
+`('long', 'decay_paid')` while `split_reason('long-funding')` is
+`('long-funding', 'trade')`, so the two disagree about the **granularity of
+the partition the brain buckets on**. Measured on the live feed the day this
+shipped: **366 of 4,288 rows** bucket differently, and it survives
+`era_filter` on both Funding Farmer arms —
+
+| arm | the harness saw | production sees |
+|---|---|---|
+| shadow | `{short 188, long 17}` | `{short-funding 162, long-funding 16, short 26, long 1}` |
+| live | `{short 116, long 5}` | `{short-funding 99, long-funding 4, short 17, long 1}` |
+
+**2 · IT NEVER APPLIED THE LEDGER QUARANTINE.** `fetch_paper_trades` withholds
+`LEDGER_QUARANTINE` rows — real trades that are not admissible evidence
+((hr)) — and `is_quarantined` had **zero occurrences** in `brain_replay.py`.
+**47 rows** the production brain refuses reached the harness that grades it.
+
+**THE CONSEQUENCE, driven end-to-end rather than argued:** every headline the
+harness prints moves.
+
+| | throttled | saved$ | half1 | half2 | forgone$ |
+|---|---|---|---|---|---|
+| v2 before | 356 | +29.597 | −10.829 | +40.426 | −132.868 |
+| v2 after | 327 | +31.218 | −6.734 | +37.952 | −125.033 |
+| v3 before | 197 | +9.703 | **−0.815** | +10.518 | −43.846 |
+| v3 after | 201 | +11.604 | **+0.068** | +11.536 | −42.139 |
+
+**v3's half-1 changes SIGN** — one of the two halves the go-live bar reads.
+**AND THE HONEST CAVEAT, because it is the (uy) report's own headline:** that
+report measured a sign flip in `saved` (+0.128 → −0.586); today `saved` does
+not flip and `h1` does. **Which number flips is a property of the window, not
+of the defect** (I25). The finding is the DIVERGENCE, which is stable; the
+flip is the symptom, which is not. Quoting one window's flip as the reason
+would have been the exact error I25 exists to stop.
+
+**FIXED THE WAY THE DOCTRINE SAYS, NOT BY PATCHING THE COPY.** *A second copy
+of a rule is a second rule* ((hj)), so the normalisation now has **ONE OWNER
+— `bot_pnl_store.normalize_paper_row`** — and both transports call it: the
+production fetch off Postgres, and the harness off the dashboard's public
+`/trades.json`.
+
+**VERIFIED, because this path has real money behind it:**
+* **DIFFERENTIAL against the pre-change body reconstructed from `HEAD`:
+  96,768 input combinations — every cross of bot/pair/reason/tag/pnl/date/
+  price/extra including junk, `None` and the real quarantine row — **all
+  identical**. The production path is behaviour-preserving.
+* On the harness the change is **exactly** tag+quarantine: 47 rows dropped
+  (**0** unexplained by `is_quarantined`), 366 `enter_tag` changes, and **no
+  other field on any surviving row moved**.
+* The five keys the harness GAINS (`duration_min`/`venue`/`open_rate`/
+  `close_rate`/`extra`) are **inert**: strip them and the score is
+  bit-identical. Independently reproduces the (uy) report's own withdrawal of
+  that finding — recorded because a withdrawn finding that is never re-checked
+  is just an unverified claim with a nicer name.
+
+**AND IT WAS CI-INVISIBLE, WHICH IS WHY A PARTIAL COPY SURVIVED IN IT.**
+`brain_replay` IS registered in `tests/test_selftests.py`, so it looked
+covered — but its `selftest()` is documented *"OFFLINE validation — no ledger
+fetch"* and exercises only the synthetic suite, and `load_trades()` is
+reachable **only from `main()`** (AST-verified). No fixture in the tree drove
+this normaliser. `tests/autonomy/test_brain_replay_normalisation.py` is the
+fixture it never had: **key names derived from the PUBLISHER's own SELECT**
+(`pnl_dashboard.fetch_paper_rows`, parsed — a fixture that invents its keys
+cannot catch the publisher dropping one), the quarantine driven off the **real
+`LEDGER_QUARANTINE` table**, and the owner pinned by **AST + identity** so a
+future hand-rolled copy fails rather than drifts. **This is the registered-
+selftest blind spot generalised: a module in `SELFTEST_MODULES` is covered
+only to the depth its own selftest reaches, and "registered" reads exactly
+like "tested" from outside.**
+
+**MUTATION-VERIFIED (I3), including the two that did NOT die:**
+* tag-preference removed from the owner → **RED** (the original defect).
+* quarantine removed from the owner → **RED** (the original defect).
+* tag-preference becomes tag-*requirement* (`_tdir or direction` → `_tdir`,
+  losing the pre-stamp fallback) → **RED**.
+* a local `split_reason` re-derivation put back into `load_trades` → **RED**
+  (the copy cannot come back quietly).
+* the transport's `side=='skip'` filter dropped → **RED**.
+* **SURVIVOR, declared: `if row is not None:` → `if True:` in `load_trades`.**
+  It is an **equivalent mutant** — the very next loop drops a non-dict
+  (`if not isinstance(t, dict)`), so appending `None` is unobservable. The
+  quarantine's real enforcement is at the OWNER, which the second mutation
+  above kills. Recorded rather than papered over, per this file's own rule
+  that a surviving mutation is reported, not quietly re-rolled.
+* **SURVIVOR, declared: adding an unused `split_reason` import.** An unused
+  import changes nothing observable; the pin is on the CALL, deliberately.
+
+**THREE EXISTING PINS RE-AIMED, NOT RELAXED (I26).** Each one FAILED when the
+literal moved, which is all three working — and one of them,
+`test_judge_policy_waiver`, failed on its own **positive control** (*"an empty
+`emitted` would make every subset check below vacuously true"*), catching
+exactly the "a check that inspects nothing reports clean" class it was written
+for. It now reads **both** literal shapes, so re-inlining the body cannot
+empty it either. Also re-aimed: `test_judge_restart`, `test_payload_contracts`
+(whose two halves are now asserted where each actually lives — the FILTER in
+the owner, the COUNT in the fetch that reports it).
+
+**DECLARED, measured inert:** the public feed's SELECT carries no `venue`
+column, so the harness passes `venue=None` while production carries the real
+venue. Driven end-to-end it changes nothing the harness computes, so it is
+**declared in the owner's docstring** rather than fixed by widening a
+real-money-adjacent SELECT for a measured-zero gain — and the new fixture
+asserts the absence, so if the feed ever gains `venue` the declaration is
+reported stale instead of rotting (I12).
+
+**DECLARED, not refactored — the third reader:**
+`scripts/study_brain_floors_2026-09-02.py::enter_tag_of` carries its own
+spelling of the tag rule. Routing it through the owner would also apply the
+quarantine, **changing the sample its calibration gate was tuned on** (it
+calibrates 3/3 against the live payload) — a real risk for zero measured gain,
+since the two agree everywhere today. It gets a **drift arm** instead (the
+`audit_lever_bounds` shape): the copy may stay, it may not silently disagree.
+`scripts/golive_readiness.py::is_adopted_close` was checked in the same sweep
+and already prefers `tag` — **no divergence there**, recorded so the next
+session does not re-check it.
+
+**WHAT THIS DOES NOT CLAIM.** No book moved, no lever moved, no capital moved:
+this is a correctness fix to a MEASUREMENT instrument. Its forward value is
+that the next `brain_replay` run grades v3-vs-v2 on the partition the brain
+actually buckets on — and the brain's multipliers size real positions on three
+live arms, so the instrument standing behind them now measures the thing they
+run. **Main only** ((mm)): it changes no trade any live book would take, so it
+buys no measured edge and rides the next deploy that does.
 ## 2026-09-06 (yk) — THE FLEET RECORDS EVIDENCE IN ONE SPELLING AND LOOKS IT UP IN ANOTHER: four venue markets sit inside 👩 mum's LIVE scan where the quality veto could never fire, the measured-cost accessor reads "unmeasured" for exactly the coins with the worst slippage, and the sentinel's meme sector is empty on the only venue we trade
 
 **The venue lists thousand-denominated memecoins as `1000BONK`. The fleet

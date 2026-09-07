@@ -111,7 +111,7 @@ def load_trades():
     production brain itself uses — `bot_pnl_store.normalize_paper_row` —
     and never by a copy of it.
 
-    [2026-09-07 (yi)] It WAS a copy, and a partial one whose own docstring
+    [2026-09-07 (yl)] It WAS a copy, and a partial one whose own docstring
     claimed it normalised "exactly like" production: it derived the bucket
     key from the reason prefix alone (ignoring the stored `tag` column
     production prefers) and never applied the ledger quarantine. So the

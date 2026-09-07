@@ -108,7 +108,7 @@ def _bot_pnl_select_cols():
 
 
 def test_the_fixtures_carry_the_publishers_own_keys():
-    # [2026-09-07 (yi)] the ledger row's dict literal moved out of
+    # [2026-09-07 (yl)] the ledger row's dict literal moved out of
     # `fetch_paper_trades` into `normalize_paper_row`, the ONE owner both it
     # and `brain_replay.load_trades` now call (the harness had carried a
     # partial copy). The pin follows the literal — re-aimed, not relaxed: it

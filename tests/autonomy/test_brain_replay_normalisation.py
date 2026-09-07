@@ -1,6 +1,6 @@
 """The replay harness must normalise the ledger with the brain's OWN owner.
 
-[2026-09-07 (yi)] `brain_replay.load_trades` carried a PARTIAL hand-written
+[2026-09-07 (yl)] `brain_replay.load_trades` carried a PARTIAL hand-written
 copy of `bot_pnl_store.fetch_paper_trades`' normalisation whose own docstring
 claimed it normalised "exactly like" it. It did not, in two ways that both
 reach the verdict:

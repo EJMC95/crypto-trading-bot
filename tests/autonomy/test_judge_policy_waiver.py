@@ -265,7 +265,7 @@ def test_the_sort_key_reads_the_key_the_publisher_actually_emits():
     assert ej._close_rank({"bot": "x", "extra": {}}) == (False, 0.0)
 
 
-# The publisher function that OWNS the ledger row's key set. [2026-09-07 (yi)]
+# The publisher function that OWNS the ledger row's key set. [2026-09-07 (yl)]
 # It used to be `fetch_paper_trades`, which built the literal inline; the
 # normalisation is now shared with `brain_replay` (which carried a partial
 # copy of it), so the literal lives in the extracted owner. The name is a

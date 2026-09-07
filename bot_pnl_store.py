@@ -1704,7 +1704,7 @@ def normalize_paper_row(bot, pair, pnl_abs, pnl_pct, opened_at, closed_at,
     agree about what a trade is: `fetch_paper_trades` below (the production
     brain's only paper ingest, straight off Postgres) and
     `brain_replay.load_trades` (the harness that VALIDATES that brain, off
-    the dashboard's public /trades.json). Until [2026-09-07 (yi)] the
+    the dashboard's public /trades.json). Until [2026-09-07 (yl)] the
     harness carried a PARTIAL hand-written copy of this body whose own
     docstring claimed it normalised "exactly like" this one, and the two
     disagreed on both halves of the sample:

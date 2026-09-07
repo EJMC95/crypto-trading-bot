@@ -879,7 +879,7 @@ class TestLedgerQuarantine:
             assert len(why) > 30, f"{pair}: a quarantine needs a real reason"
 
     def test_the_reader_actually_applies_it(self):
-        """[2026-09-07 (yi)] Re-aimed, not relaxed. The quarantine used to be
+        """[2026-09-07 (yl)] Re-aimed, not relaxed. The quarantine used to be
         applied inline in `fetch_paper_trades`; it now lives in
         `normalize_paper_row`, the ONE owner that function and
         `brain_replay.load_trades` both call — which is the whole point of
