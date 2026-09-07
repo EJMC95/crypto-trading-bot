@@ -1,0 +1,143 @@
+name: main-red
+
+# [2026-09-07 (yx)] THE COMPLEMENT OF ci-notify — AND THE GAP IT CLOSES IS MEASURED.
+#
+# `ci-notify.yml` reports every CI transition ON THE PULL REQUEST and skips main
+# BY DESIGN ("main-branch runs are post-merge CI - no PR to notify"). That was
+# right when work arrived through PRs. It is not the workflow this repo actually
+# runs: CLAUDE.md's worktree rule publishes with
+# `git rebase origin/main && git push origin HEAD:main`, so the pushes that
+# govern the fleet have NO PR — and therefore NO notification of any kind.
+#
+# MEASURED 2026-09-07: (yl) landed `scripts/study_taker_ready_2026-09-06.py`
+# with a `--selftest` and no registration at 03:16Z. `Tests` went red at run
+# #1031 (03:29Z) and was STILL red at run #1035 on HEAD ~10 hours later, with
+# eight further pushes landing on top of it. The guard that caught it
+# (`test_no_unregistered_selftest`) worked perfectly and fired into a void.
+# This is the (gl) shape one level up: not a guard whose only output is a
+# warning, but a guard whose output nobody is shown.
+#
+# THE MECHANISM IS fleet-watchdog.yml's, DELIBERATELY AND NOT A SECOND
+# INVENTION: ONE issue, opened on failure, edited in place while it stays red,
+# CLOSED on recovery — transition alerts, no email storms. No polling, no
+# `send_later`, no session wakeups (CLAUDE.md P1/P2: the replacement for a
+# check-in chain is an Action).
+#
+# WHAT IT DELIBERATELY DOES NOT FIRE ON, because a notifier that cries wolf is
+# one the operator learns to ignore ((gl)): `cancelled` is the NORMAL state
+# here — each push supersedes the run before it, and 6 of the 10 most recent
+# main runs were cancelled, not failed. ONLY an unambiguous `failure` opens an
+# issue, and only an unambiguous `success` closes one.
+#
+# THE ISSUE IS SCOPED PER WORKFLOW (`<!-- main-red:<name> -->`). Two workflows
+# report here; without the marker a green "Changelog check" would close the
+# issue a red "Tests" had just opened, on the same commit — the notifier
+# silently cancelling its own alarm.
+
+on:
+  workflow_run:
+    workflows: ["Tests", "Changelog check"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+# Keyed on the WORKFLOW, never the sha: "Tests" and "Changelog check" complete
+# on the SAME head_sha, so a sha-keyed group with cancel-in-progress (the
+# ci-notify shape) would have one event cancel the other's alert.
+concurrency:
+  group: main-red-${{ github.event.workflow_run.name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    # Exactly the complement of ci-notify's job guard, so between the two files
+    # every completed run is covered by one of them and never by both.
+    if: >-
+      github.event.workflow_run.head_branch == 'main' &&
+      (github.event.workflow_run.conclusion == 'failure' ||
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Open, update or close the main-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # Every untrusted value crosses into the script through env, never
+          # through `${{ }}` inline: `head_commit.message` is attacker-shaped
+          # text and interpolating it into a `run:` block is script injection.
+          WF: ${{ github.event.workflow_run.name }}
+          CONC: ${{ github.event.workflow_run.conclusion }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          NOW=$(date -u '+%Y-%m-%d %H:%M UTC')
+          export MARK="<!-- main-red:${WF} -->"
+
+          gh label create main-red --repo "$REPO" --color B60205 \
+            --description "main's CI is red — opened and closed automatically" 2>/dev/null || true
+
+          # The open issue for THIS workflow, found by its own marker.
+          NUM=$(gh issue list --repo "$REPO" --label main-red --state open --limit 50 \
+                  --json number,body \
+                  --jq '[.[] | select(.body | contains(env.MARK))] | .[0].number // empty' \
+                  2>/dev/null || true)
+
+          # Fetched, never interpolated (see the env note above).
+          SUBJ=$(gh api "repos/$REPO/commits/$SHA" --jq '.commit.message | split("\n")[0]' 2>/dev/null || true)
+          [ -n "${SUBJ:-}" ] || SUBJ="(subject unavailable)"
+
+          if [ "$CONC" = "success" ]; then
+            if [ -n "${NUM:-}" ]; then
+              gh issue close "$NUM" --repo "$REPO" \
+                --comment "✅ Recovered — \`$WF\` is green on main at \`${SHA:0:9}\` ($NOW)."
+              echo "issue #$NUM closed (recovered)"
+            else
+              echo "$WF green on main — nothing open, nothing to do"
+            fi
+            exit 0
+          fi
+
+          JOBS=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" --paginate \
+                  --jq '[.jobs[] | select(.conclusion=="failure") | .name] | join(", ")' \
+                  2>/dev/null || true)
+          [ -n "${JOBS:-}" ] || JOBS="(job names unavailable — open the run)"
+
+          {
+            echo "$MARK"
+            echo "## \`$WF\` is RED on main"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Commit** | \`${SHA:0:9}\` — $SUBJ |"
+            echo "| **Failing job(s)** | $JOBS |"
+            echo "| **Run** | $RUN_URL |"
+            echo "| **Last checked** | $NOW |"
+            echo
+            echo "Every push landing on main from here is landing on a red build."
+            echo "Fix forward on main, or revert the commit that broke it."
+            echo
+            echo "_Opened and maintained automatically by \`main-red\`; it closes itself"
+            echo "when \`$WF\` next succeeds on main. It never fires on a \`cancelled\` run —"
+            echo "superseded runs are the normal state here._"
+          } > body.md
+
+          if [ -z "${NUM:-}" ]; then
+            gh issue create --repo "$REPO" --label main-red \
+              --title "🔴 main is red: $WF failing at ${SHA:0:9}" --body-file body.md
+            echo "issue created"
+          else
+            gh issue edit "$NUM" --repo "$REPO" --body-file body.md >/dev/null
+            echo "issue #$NUM updated in place (still red)"
+          fi
+          {
+            echo "### 🔴 main-red"
+            echo "\`$WF\` failing on main at \`${SHA:0:9}\` — $JOBS"
+          } >> "$GITHUB_STEP_SUMMARY"

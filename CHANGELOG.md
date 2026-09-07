@@ -1,3 +1,82 @@
+## 2026-09-07 (yx) — MAIN WAS RED FOR TEN HOURS AND NOTHING SAID SO: the guard fired perfectly, into a void
+
+**Eamon asked for a review of the last 24 hours and for anything that needed
+correcting to be corrected.** The first thing the review found is that `main`
+did not build.
+
+**THE INSTANCE.** `(yl)` landed `scripts/study_taker_ready_2026-09-06.py` at
+03:16Z with a `--selftest` and no entry in `tests/test_selftests.py`.
+`test_no_unregistered_selftest` caught it immediately and correctly:
+
+    FAILED tests/test_selftests.py::test_no_unregistered_selftest
+    1 failed, 3974 passed, 23 skipped
+
+`Tests` went red on main at run **#1031 (03:29Z)** and was still red at run
+**#1035** on HEAD ~**10 hours** later. **Eight further pushes landed in that
+window**, every one of them onto a build that did not pass, and every one of
+them green-looking to the session that pushed it. Reproduced locally
+byte-for-byte before anything was changed (same single failure, same 3974
+passing).
+
+**THE INSTANCE IS ONE LINE. THE CLASS IS THE REASON IT LASTED TEN HOURS.**
+`.github/workflows/ci-notify.yml` reports CI transitions **on the pull
+request** and skips main deliberately, with its reason in its own comment:
+*"main-branch runs are post-merge CI - no PR to notify"*. That was right when
+work arrived through PRs. It is not the workflow this repo runs — CLAUDE.md's
+worktree rule publishes with `git rebase origin/main && git push origin
+HEAD:main`, so **the pushes that actually govern the fleet have no PR, and
+therefore had no notification of any kind.** Not an email, not an issue, not a
+comment. The failing run sat in the Actions tab and was never surfaced.
+
+This is the `(gl)` shape one level up. `(gl)` says a guard whose only output is
+a warning on a passing run is not a guard. This is a guard whose output is a
+**red run nobody is shown** — and it is worse, because a red build is exactly
+the state in which every subsequent push is unverified. Note also that the same
+class had already been paid for once: `tests/test_selftests.py` carries a
+`(wu)` comment recording that `(wr)` did this identical thing on 2-Sep. Fixing
+the instance twice did not close the class, which is what `audit_recurrence`
+exists to say.
+
+**SHIPPED — `.github/workflows/main-red.yml`, the exact complement of
+`ci-notify`.** Mechanism is `fleet-watchdog.yml`'s, deliberately and not a
+second invention: **ONE issue, opened on failure, edited in place while it
+stays red, closed on recovery** — transition alerts, no email storms, no
+polling, no `send_later`, no session wakeups (P1/P2: the replacement for a
+check-in chain is an Action). Design decisions, each with the failure it
+prevents:
+
+* **It never fires on `cancelled`.** 6 of the 10 most recent main runs were
+  cancelled by the push after them — the normal state here. Alerting on that
+  would make the label noise inside a day, which is `(gl)` again.
+* **The issue is scoped PER WORKFLOW** (`<!-- main-red:<name> -->`). Two
+  workflows report; without the marker a green `Changelog check` closes the
+  issue a red `Tests` just opened, on the same commit — the notifier silently
+  cancelling its own alarm.
+* **Concurrency is keyed on the workflow, not the sha.** Both watched
+  workflows finish on the *same* head_sha, so `ci-notify`'s sha-keyed
+  `cancel-in-progress: true` group would have one event cancel the other.
+* **No untrusted text reaches the shell through `${{ }}`.** A commit subject is
+  attacker-shaped and this job holds `issues: write`; the subject is fetched
+  with `gh api` into a variable instead.
+* **`actions: read` is granted**, because a `permissions:` block zeroes every
+  scope it omits — precisely how `audit_ci_coverage` shipped unable to answer
+  its own question ((pn)).
+
+**PINNED, 7 tests, 8/8 mutations RED** (`tests/autonomy/test_main_red_notifier.py`).
+The load-bearing one asserts the **complement from both files**: `ci-notify`
+must exclude main and `main-red` must require it, so a completed main run is
+handled exactly once — a later edit to either side that double-reports, or that
+reopens the hole, reddens the build. Two of the seven were wrong on their first
+cut and both were instructive: one regex captured a single line of the
+concurrency block, and the injection check was a page-wide substring scan that
+failed on **its own comment** explaining why `head_commit` is banned — `(po)`'s
+rule landing on the test written to honour it. It is a structural `${{ }}`
+match now.
+
+**MOVES NO MONEY AND NO BOT.** CI plumbing and one registration line; no lever,
+no env, no position, no grade. What it buys is that the next ten-hour red
+window is a ten-minute one.
+
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 
 **[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position
