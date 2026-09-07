@@ -419,7 +419,8 @@ def trade_metrics(rows, book_usd, regimes=None):
     return out
 
 
-def build(res, shaped=None, regimes=None, all_trades=None, feed_bots=None):
+def build(res, shaped=None, regimes=None, all_trades=None, feed_bots=None,
+          costs=None):
     """Baseline rows + cohort aggregates from an edge_audit result."""
     if res.get("refused"):
         # I8 — a refusal must name the object the reader can act on. edge_audit's
@@ -473,6 +474,18 @@ def build(res, shaped=None, regimes=None, all_trades=None, feed_bots=None):
         d["expected_streak_p95"] = es.get("p95") if isinstance(es, dict) else None
         if shaped and bot in shaped:
             d["trade"] = trade_metrics(shaped[bot]["rows"], book_usd, regimes)
+        # PER-BOOK COST supersedes the fleet mean where it is measured. The
+        # mean was the wrong number in both directions: it overcharges liquid
+        # books and undercharges thin ones, and every book's P&L is ALREADY net
+        # of its own execution (see `scripts/cost_model.py`), so charging it
+        # again was a double count rather than a stress.
+        cb = ((costs or {}).get("books") or {}).get(bot) or {}
+        cc = cb.get("cost") or {}
+        d["cost_rt_bps_measured"] = cc.get("rt_bps")
+        d["cost_coverage"] = cc.get("coverage")
+        d["fill_basis"] = (cb.get("fill_basis") or {}).get("basis")
+        d["breakeven_cost_bps"] = cb.get("breakeven_bps")
+        d["cost_headroom_x"] = cb.get("headroom_x")
         rows[bot] = d
     for name in ("live", "shadow"):
         mem = {b: r for b, r in rows.items() if r["cohort"] == name}
@@ -762,24 +775,46 @@ def render_md(bl):
       "quoting any single one as evidence is a multiplicity trap — "
       "`golive_readiness.stats` and `winners_docket` own that judgement._")
     A("")
-    A("## Cost sensitivity — what the fleet's own measured execution would take")
+    A("## Execution cost — per book, measured")
     A("")
-    A("Venue fee is **zero** (measured across all active Lighter books), so "
-      "`net after fees` above already carries the only real cost: the crossed "
-      "spread, inside the book-walked fill. The stress below charges each book "
-      "`n x %.2fbps x clip` on top — the fleet's OWN measured round trip `(qq)`."
-      % bl["measured_rt_bps"])
+    have_pb = any(r.get("cost_rt_bps_measured") for r in bl["books"].values())
+    if not have_pb:
+        A("**WITHHELD** — no per-book cost supplied (`--costs`). The "
+          "fleet-average stress this section used to print is NOT reported, "
+          "because it was wrong in two ways: 17.49bps is a MEAN over a "
+          "right-skewed distribution, and every book's P&L is already net of "
+          "its own execution, so charging it again was a double count rather "
+          "than a stress. Run `scripts/cost_model.py` and pass its output.")
+        return "\n".join(L) + "\n"
+    A("Venue fee is **zero** (measured). Every book's realised P&L is ALREADY "
+      "net of execution — by a book-walked fill, a flat modelled constant, or "
+      "an actual exchange fill (`fill basis`). So the question is not what it "
+      "would cost but **how much room there is between what it already pays "
+      "and what would erase its edge**.")
     A("")
-    A("| book | net $ | at measured cost $ | drag $ | flips sign |")
-    A("|---|---|---|---|---|")
+    A("| book | fill basis | deployed clip | cost now (RT bps) | break-even (RT bps) "
+      "| headroom | coverage |")
+    A("|---|---|---|---|---|---|---|")
     for bot, r in sorted(bl["books"].items(),
-                         key=lambda kv: -(kv[1]["net_after_fees_usd"] or 0)):
-        if r.get("net_at_measured_cost_usd") is None:
+                         key=lambda kv: -(kv[1].get("cost_headroom_x") or -9e9)):
+        if r.get("cost_rt_bps_measured") is None:
             continue
-        A("| `%s` | %s | %s | %s | %s |"
-          % (bot, _f(r["net_after_fees_usd"]),
-             _f(r["net_at_measured_cost_usd"]), _f(r.get("cost_drag_usd")),
-             "**YES**" if r.get("flips_sign_under_measured_cost") else "no"))
+        t = r.get("trade") or {}
+        A("| `%s` | %s | %s | **%s** | %s | **%s** | %s |"
+          % (bot, r.get("fill_basis") or "—",
+             _f(t.get("implied_clip_median"), "$%.0f"),
+             _f(r.get("cost_rt_bps_measured")),
+             _f(r.get("breakeven_cost_bps")),
+             _f(r.get("cost_headroom_x"), "%.2fx"),
+             _f((r.get("cost_coverage") or 0) * 100.0, "%.0f%%")))
+    A("")
+    A("**Headroom below 1.0x means the book does not survive its own "
+      "execution.** A losing book has no edge to erase, so its break-even is "
+      "0.00 and its headroom reads `—`: cost is not what is wrong with it, and "
+      "pricing it more precisely would not change that. Full "
+      "working, the calibration against the spreads the books record on their "
+      "own fills, and the per-coin detail: `scripts/cost_model.py` / "
+      "`COST_MODEL_2026-09-07.md`.")
     return "\n".join(L) + "\n"
 
 
@@ -848,6 +883,25 @@ def _selftest():
     assert "Survivorship" in render_md(build(
         {"books": {}, "_feed_rows": []}, all_trades=tr, feed_bots={"alive"})), "not rendered"
 
+    # WITHOUT per-book cost the section must WITHHOLD, never fall back to the
+    # fleet mean — that fallback is the defect this whole pass corrected.
+    md_no = render_md(build({"books": {"b": {"n": 5, "realised_usd": 1.0,
+                                             "book_usd": 1000.0,
+                                             "monte_carlo": {"clip_usd": 100.0}}},
+                             "_feed_rows": [{"bot": "b", "extra": {}}]}))
+    assert "WITHHELD" in md_no and "double count" in md_no, md_no
+    assert "at measured cost" not in md_no, md_no
+    # WITH it, headroom is reported and the fleet mean is not
+    md_yes = render_md(build(
+        {"books": {"b": {"n": 5, "realised_usd": 1.0, "book_usd": 1000.0,
+                         "monte_carlo": {"clip_usd": 100.0}}},
+         "_feed_rows": [{"bot": "b", "extra": {}}]},
+        costs={"books": {"b": {"cost": {"rt_bps": 4.0, "coverage": 1.0},
+                               "fill_basis": {"basis": "book_walked"},
+                               "breakeven_bps": 40.0, "headroom_x": 10.0}}}))
+    assert "10.00x" in md_yes and "book_walked" in md_yes, md_yes
+    assert "17.49" not in md_yes, md_yes
+
     # a refusal propagates rather than producing a baseline nobody may quote,
     # and it NAMES what disagreed (I8) instead of printing a bare bool.
     r = build({"refused": True, "calibration": {"mum": "n 91 vs 59"}})
@@ -867,6 +921,9 @@ def main(argv=None):
     ap.add_argument("--bus")
     ap.add_argument("--out", help="write the baseline JSON here")
     ap.add_argument("--md", help="write the baseline markdown here")
+    ap.add_argument("--costs", help="scripts/cost_model.py --out JSON; when "
+                                    "given, per-book measured cost replaces "
+                                    "the fleet-average stress")
     ap.add_argument("--majors", help="local {symbol: {epoch_sec: close}} 1h dump "
                                      "for the regime split; omitted = split withheld")
     ap.add_argument("--selftest", action="store_true")
@@ -886,7 +943,8 @@ def main(argv=None):
                                  for k, v in raw.items()})
     feed_bots = ({r.get("bot") for r in (res.get("_feed_rows") or [])}
                  if res.get("_feed_rows") else None)
-    bl = build(res, shaped=shaped, regimes=regimes,
+    costs = edge_audit._load_json(a.costs) if a.costs else None
+    bl = build(res, shaped=shaped, regimes=regimes, costs=costs,
                all_trades=edge_audit.load_trades(a.ledger) if a.ledger else None,
                feed_bots=feed_bots)
     if bl.get("refused"):

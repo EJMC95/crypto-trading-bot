@@ -1,3 +1,105 @@
+## 2026-09-07 (yu) — THE FLEET-AVERAGE COST WAS WRONG IN BOTH DIRECTIONS AND THE STRESS THAT USED IT WAS A DOUBLE CHARGE: per-book execution cost, measured on each book's own basket at its own deployed clip
+
+**Eamon: *"do the per-book cost modelling"*** — the brief's own first
+recommended improvement, and the one this audit's Phase-2 output had got wrong.
+
+**WHAT THE BASELINE SAID, AND WHY IT DOES NOT SURVIVE.** `(ys)` charged every
+book the fleet-wide `MEASURED_RT_BPS` of 17.49 and reported that it *"flips two
+profitable books negative"* — 🌾 carry +$12.92 → −$2.82, 🔮 georgia v1 +$12.85 →
+−$10.59. Two things are wrong with reading that as a cost verdict, and neither
+is arithmetic:
+
+1. **17.49 IS A MEAN OVER A RIGHT-SKEWED DISTRIBUTION.** Measured here on **711
+   recorded spreads across 40 coins** from the fleet's own fills: the median
+   full quoted spread runs **17.1bps in the thinnest volume band down to 2.5bps
+   in the thickest** — a **6.8×** span, monotone across six bands, fitting
+   `spread ~ vol^−0.485`. That exponent is the square-root liquidity law, not a
+   curve fit. **One mean charged to every book overcharges the liquid ones and
+   UNDERCHARGES the thin ones**, which is the dangerous direction.
+2. **THE BOOKS ALREADY PAY.** Every living book's realised P&L is already net
+   of execution. 🌾 carry is the clearest case and it is not subtle: its P&L is
+   literally `accrued - fees` (`funding_carry_bot` lines 1291/1379). **The
+   stress deducted a round trip the book had already deducted.** Charging it
+   again is a double count, not a sensitivity — and it is what produced the
+   "flips negative" headline.
+
+**SO THE QUESTION IS HEADROOM, NOT COST**, and `edge_audit` already owned half
+of it (`breakeven_cost_bps`). `scripts/cost_model.py` supplies the other half —
+what each book pays *now*, on its own basket, at its own **deployed** clip
+(never its published `caps.clip_usd`, which the sizing stack multiplies
+afterwards: carry declares $80 and deploys $300).
+
+**MEASURED, and the answer is reassuring in a way the fleet mean hid:**
+
+| book | fill basis | clip | cost now | break-even | headroom |
+|---|---|---|---|---|---|
+| 🙏 avo shadow | book_walked | $50 | 3.79bps | 179.34 | **47.3×** |
+| 🙏 avo LIVE | real_fills | $236 | 5.06bps | 235.98 | **46.6×** |
+| 🎫 taker | book_walked | $52 | 6.85bps | 118.67 | **17.3×** |
+| 👩 mum shadow | book_walked | $50 | 6.71bps | 53.74 | **8.0×** |
+| 🌾 carry | book_walked | $300 | 4.17bps | 30.35 | **7.3×** |
+| 👩 mum LIVE | real_fills | $253 | 7.26bps | 43.36 | **6.0×** |
+| 🔮 georgia v1 | book_walked | $50 | 5.03bps | 6.79 | **1.35× — thin** |
+
+**Every living book pays between 1.2 and 7.8bps round trip — not 17.49.** The
+fleet mean overstated real execution by **2–7×** on every book measured.
+**Nothing fails to survive its own execution.** 🌾 carry's true headroom is
+**7.3×**, so the "carry is unprofitable after costs" reading is withdrawn
+outright. The one book that is genuinely close is **🔮 georgia v1 at 1.35×** —
+her edge is real and it is roughly the size of her execution, which is a
+materially different and more useful statement than the fleet mean produced.
+
+**THE FILL BASIS IS DERIVED, NOT TYPED**, because a hand-kept table of it rots
+on the next broker change (the (mn) lesson, and this repo's audit-scope rule has
+rotted on a slot swap four times). Read by AST from each book's own entry file
+via `fleet_books.ROW_ENTRY` — **10 book_walked** (ShadowBroker, directly or
+through `venue_context`, so the crossed spread is inside the fill price),
+**2 real_fills** (the live rows — classified from the PAYLOAD's `extra.venue`,
+never the file, per `fleet_books`' own rule that which rows are live must not be
+written down), **2 unknown** (both Parliament, in-process bus — DECLARED, never
+guessed). The first cut of the detector reported **8 of 14 unknown** because it
+matched only the `ShadowBroker` class name and missed `venue_context`; that is
+`(po)`'s "a check that inspects the wrong thing reports clean" landing inside
+this very module, and it was found by reading the output rather than trusting
+it.
+
+**IT RE-IMPLEMENTS NOTHING.** The round trip is
+`funding_carry_bot.rt_cost_bps` — the fleet's **declared one owner** of
+*"measured adverse cost of getting `notional` IN and OUT, in bps of mid"*,
+which `study_depth_vs_volume` already imports rather than copying. The walk
+underneath is `venues.shadow.fill_from_book`, i.e. **the same code that fills
+the shadow books**, so the cost model and the fills cannot disagree. Sample from
+`edge_audit.shape`, symbols from `edge_audit.base_symbol`.
+
+**THE CALIBRATION GATE, and it passed tightly.** Four books record the venue's
+quoted spread on their own fills. The module fetches live books for the coins
+they traded and REFUSES unless it reproduces those recorded medians: 🚀 bezos
+**Δ0.06bps**, 🪁 kelly Δ1.31, 🧮 Hull Δ2.15, 🧘 douglas Δ3.73 — against a tolerance
+of 8.0. Distributional, not per-trade, and stated as such: the records are
+historical and the fetch is now, so claiming an exact match would be the
+fiction. **Fail-CLOSED in three directions** — no recorder, too few overlapping
+coins, or a mismatch all refuse, because "nothing to disagree with" must never
+read as "no disagreement".
+
+**AND THE GAP BEHIND ALL OF IT: only 4 of 14 living books record what their own
+fills cost.** Every other book's cost has to be inferred from the venue rather
+than read from its record — the exact inversion of I14, where a record exists.
+That is the cheap, obvious follow-up and it is a publish-site edit per book.
+
+**THE BASELINE IS CORRECTED, NOT PATCHED.** `baseline_snapshot` takes
+`--costs` and, without it, **WITHHOLDS the section entirely** rather than
+falling back to the fleet mean — pinned by a selftest, because a silent
+fallback to the wrong number is the defect this pass exists to remove.
+
+**FILES:** `scripts/cost_model.py` (**7/7 mutations RED** — fail-open
+calibration, unfillable clips averaged away, coverage forced to 100%, a live
+row classified from the file, `venue_context` dropped, a crossed book priced,
+and `rt_cost_bps` replaced by a local copy), `COST_MODEL_2026-09-07.md`,
+`BASELINE_2026-09-07.md` regenerated, `scripts/baseline_snapshot.py`
+(**+2 mutations RED** on the withhold). **MOVES NOTHING** — no lever, capital,
+env or position; `audit_fingerprint --check` reads 5/5 symbols unchanged, 42/42
+ledgers unrewritten. Deployment still withheld per Eamon's brief.
+
 ## 2026-09-07 (yt) — THE SURVIVORS' SUM IS NOT THE FLEET'S RESULT: 8.3x, measured — plus the fleet's first regime split, the exposure denominator nobody had printed, and an OI signal published every 30 minutes that nothing trades
 
 **Eamon's audit brief, Phases 3-5.** Phase 1 and the first cut of Phase 2 shipped

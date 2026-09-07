@@ -159,6 +159,18 @@ SELFTEST_MODULES = [
     # carrying WHAT disagreed rather than a bare bool. 6 of 6 mutations verified
     # RED (see the (ys) entry).
     "scripts.baseline_snapshot",
+    # [2026-09-07 (yu)] the PER-BOOK COST MODEL. SELFTEST_MODULES and
+    # deliberately NOT ENFORCED_AUDITS, the edge_audit reason plus one more:
+    # its live arm FETCHES ORDER BOOKS from the venue, so a CI job running it
+    # would be both non-deterministic and a load on the exchange, and its
+    # calibration gate REFUSES (exit 2) when the fetched books cannot reproduce
+    # the spreads the fleet itself recorded. The --selftest is offline and
+    # pure: the quoted-spread definition (incl. crossed and empty books),
+    # unfillable-vs-uncovered accounting, coverage, the fail-closed calibration
+    # in three directions, the fill-basis derivation from the PAYLOAD for a
+    # live row, venue_context counting as a book walk, and a wrapper resolving
+    # through its core. 7 of 7 mutations verified RED (see the (yu) entry).
+    "scripts.cost_model",
     # [2026-09-07 (ys)] REGISTERED BY A LATER SESSION, and saying so rather than
     # absorbing it silently: this study merged to main at 950b578 (yl) without a
     # registration, so `test_no_unregistered_selftest` was already RED on main
