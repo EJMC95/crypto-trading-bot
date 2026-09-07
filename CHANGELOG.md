@@ -1,3 +1,130 @@
+## 2026-09-07 (zf) — THE LIVE BOOKS ARE NOT SMALL, THEY ARE IDLE: size refused with numbers, supply widened on a measurement, staged rather than equalised
+
+**Eamon: *"scale the size and scale of avo Maria and mum real money bots to
+maximise their returns with their higher balance now"*** — then, on the
+supply-widening proposal, *"Yes please"*.
+
+**THE SIZE HALF IS A REFUSAL WITH NUMBERS, AND THE FIRST THING TO SAY IS THAT
+THE ASK WAS ALREADY SATISFIED.** `clip = equity x gross_x / max_open` is DERIVED
+from equity, so avo's **+33.0%** and mum's **+11.3%** of balance growth had
+already raised their position sizes with no action: avo clips **$146.64** and
+mum **$242.65** today. What was left to change was `gross_x`, and every measured
+number points one way:
+
+| | 🙏 avo LIVE | 👩 mum LIVE |
+|---|---|---|
+| `gross_x` configured | 2.0 | 5.0 |
+| `GROSS_X_MAX` = `0.15/\|stop\|` | 1.50 | 3.75 |
+| **over the bar-derived ceiling** | **1.333x** | **1.333x** |
+| `all_slots_stop_pct` vs the 0.15 bar | **0.20** | **0.20** |
+| rho (risk at stop / equity) | **3.33%** | **1.67%** |
+| `(yp)`'s admissible rho | 0.5% | 0.5% |
+| **over admissible** | **6.7x** | **3.3x** |
+
+`I22` adds the decisive one: leverage multiplies mean and sd alike, so **`t` is
+invariant** — it deploys more dollars and moves neither book one day closer to
+the gate. 👩 mum additionally carries a **pre-registered rho read due 7-Oct**
+finding her already oversized, so raising her would act inside the window that
+motivated it (`I25`) and pre-empt a registered read (`I21`). Those ceilings are
+Eamon's own operator envs (`(sr)`), so going further is his call; this entry
+records the price, it does not veto.
+
+**[CORRECTED IN PLACE, same session, per I12 — the first draft of this refusal
+said raising `gross_x` "moves zero dollars", and that is FALSE.** `clip` is
+proportional to `gross_x`, so it raises size whether or not the slots fill: at
++20% gross, avo's clip goes $146.64 -> $175.97 and mum's $242.65 -> $291.18. The
+44.4% / 24.8% deployment figures are real but they measure occupancy against a
+FULL-SLOT budget — a supply fact, not a reason the lever is inert. The error ran
+in the direction that made my own refusal look stronger, which is the direction
+that most needs correcting.**]**
+
+**THE SUPPLY HALF IS THE REAL FINDING: THEY ARE IDLE, NOT SMALL.** avo holds
+**3 of 6** slots and mum **3 of 12**. Measured on the scout's own `vols` (216
+markets, **114** crypto by the fleet's own `is_crypto`), the crypto population
+at each floor is **32 / 49 / 70 / 79** at **$0.50M / $0.25M / $0.10M / $0.05M** —
+and avo has been sitting at $0.50M while 👩 mum, **on the same host, in the same
+image**, runs $0.10M. Nothing but that one env string separated a 39-name
+universe from a 72-name one.
+
+**SHIPPED: avo's floor $0.50M -> $0.25M. STAGED, NOT EQUALISED — and the staging
+is the argument, not caution.** `test_avos_floor_is_stricter_than_mums` rests on
+TWO premises and exactly one has inverted:
+* the **CLIP** premise is GONE — `(vd)` recorded avo at $684 against mum's $250;
+  measured today **mum clips 1.65x AVO** ($242.65 vs $146.64);
+* the **HOLD** premise is INTACT — ~3.5d against 12h — and it is the half that
+  argues for depth **at exit**, which is the risk a thin book actually poses.
+
+So she moves toward mum without reaching her, and the ordering the surviving
+half supports is preserved rather than overridden. Through the real
+`carrier_universe` (COINS is unioned in regardless of floor, so the true gain is
+smaller than the raw band): **crypto 39 -> 53, +14 names**, every one already
+scanned by 👩 mum, **thinnest $0.204M — 2x above the only slippage cliff this
+fleet has actually measured**.
+
+**$0.05M IS REFUSED, WITH THE MEASUREMENT.** It admits **9 names under $0.1M**,
+where `(qq)` measured fills at a mean **17.49bps and a p90 of 398bps** and where
+the cost model's tier STEPS — so the band cannot be priced at all. That is
+`(ty)`'s refusal on the sniper, unchanged and re-used rather than re-argued.
+
+**EXPECTANCY PRICE (I19), stated plainly: ~zero at her horizon.** `(qu)`
+measured avo's entry excess over matched-random as NEGATIVE at 4h/8h/12h and
+~zero at 5d, where her 3.5d hold lands. **This is bought as DECIDABILITY, not
+edge** — the `(ty)` purchase — and `I26` is explicit that an expectancy-neutral
+widening on a book that cannot be graded is strictly positive, because
+decidability is the binding constraint. Her live arm is **n=15** against a
+pre-registered **50-close** criterion.
+
+**DECLARED CONSEQUENCE (I20), measured BEFORE the change rather than predicted:
+both live books already hold XAU simultaneously** — 1 of 3 positions each, one
+bet held twice on real money. The 14 new names are all in mum's universe, so the
+crypto co-holding SURFACE grows. Their cells stay disjoint by construction on one
+timeframe (avo needs `e50>e200`, mum needs NOT) but they read trend on **4h vs
+1h**, so a 4h-uptrend/1h-downtrend coin can satisfy both; bounded by
+`fleet_risk`'s per-symbol cap and the long budget. The read below is what decides
+whether it became material.
+
+**PRE-REGISTERED (I21/I26), and it is a CI-evaluated carried row rather than
+prose — the `(tt)` lesson that a defense living only in prose has not been
+written.** Graded on **FRESH avo LIVE closes opened after 2026-09-07 only**,
+never the window that motivated this (`I25`), at **n>=20 or 2026-10-07**,
+whichever first. REVERT to 0.5 if realised entry slippage on the 14 new names is
+worse than her book's own mean by >10bps, or their mean %/trade is worse than the
+pre-existing 39 over the same window; ADVANCE to 0.1 (the remaining +19) if
+neither holds AND her close rate rose; anything else returns to Eamon with both
+numbers.
+
+**👩 mum IS NOT WIDENED, and the reason is that her constraint is a different
+one.** She already runs the $0.1M floor; below it is the refused band. Her idle
+slots are an ENTRY-BAR fact, not a universe fact — `(ya)`/`(yb)` measured her
+cell firing 19 times on 2-Sep and **zero** on the two days after, with venue
+`rsi_med` at 55.9-59 against a bar of 36. More names do not make a tape oversold.
+
+**A PIN WAS RE-AIMED AND SAYS SO (I26/I12).** `test_avos_floor_is_stricter_than_mums`
+keeps its assertion — the floors still do not equalise — but its docstring
+carried the inverted clip figures as live justification, and `(vd)`'s test kept
+$684/$250 as present tense. Both corrected in place, with the historical numbers
+retained as the honest record of why 0.5 was chosen.
+
+**VERIFICATION — 6/6 mutations, including a control.** Equalise avo to mum ->
+RED · restore 0.5 -> RED · avo below the cliff -> RED · mum below the cliff ->
+RED · avo 0.3 (in-band but unregistered) -> RED · **georgia declared explicitly
+at 0.0 (no behaviour change) -> GREEN.** The new
+`test_the_staged_floor_actually_widens_avo` drives the REAL `carrier_universe`
+against a scout stub, and its first fixture was too small — four names, under the
+`len(wide) >= len(COINS)` fail-safe — so the test correctly refused to widen and
+caught my own fixture rather than the code. `MEASURED_SLIPPAGE_CLIFF_M` is now a
+named constant with its own guard, so a future session may tune these floors
+freely ABOVE the cliff and must bring new measurement to go below it.
+
+**DEPLOY — BOTH ARMS OR NEITHER.** `lighter_family_bot.py` auto-deploys to
+`family-lighter-shadow`, so merging without a marker would ship the change to
+avo's CONTROL TWIN and not to her live arm — splitting the pair and voiding the
+judge's window, the exact hazard `(yw)` had just repaired. The marker rides the
+**PR title and the commit subject** (`(xh)`: under a squash merge only the title
+survives). 🔮 georgia is untouched at 0.0 and 👩 mum's floor is byte-unchanged.
+
+---
+
 ## 2026-09-07 (ze) — A RED GUARD SILENCED THE TWO GUARDS BEHIND IT FOR THREE WEEKS, AND A GUARD THAT READS THE PR TITLE COULD NOT BE CLEARED BY FIXING THE TITLE
 
 **Eamon: *"Check for failed workflows and if we are missing something

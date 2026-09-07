@@ -308,8 +308,59 @@ FAMILY_CRYPTO_N = os.environ.get(
 #: **38.7h with 2 of 5 slots free** and 20 of 23 names giving no signal.
 #: A criterion nobody can reach decides nothing — this is the (ty) purchase
 #: ("bought as DECIDABILITY, not edge") on the book that most needs it.
+#: **[2026-09-07 (zf)] 🙏 avo 0.5 -> 0.25, STAGED — and the ordering argument
+#: that set 0.5 has HALF INVERTED, which is why this moves at all.**
+#: Eamon asked to scale the live books with their higher balances; the measured
+#: answer was that SIZE is not the constraint (both books sit 1.33x above the
+#: ceiling the 15% drawdown bar implies) and SUPPLY is: avo holds 3 of 6 slots
+#: scanning 39 crypto names while her sibling on the same host scans 72.
+#:
+#: `test_avos_floor_is_stricter_than_mums` rests on two premises — a longer HOLD
+#: and a bigger CLIP. Measured 7-Sep on the live rows: avo clips **$146.64** and
+#: mum **$242.65**, so **mum now clips 1.65x AVO** where (vd) recorded avo at
+#: $684 against mum's $250. The clip half is inverted; the HOLD half is intact
+#: (~3.5d vs 12h), and it is the half that argues for depth at EXIT. So the
+#: floor moves toward mum's without reaching it, and the ordering the surviving
+#: half supports is PRESERVED rather than overridden.
+#:
+#: MEASURED SUPPLY, on the scout's own `vols` (216 markets, 114 crypto):
+#:   $0.50M -> 32   $0.25M -> 49   $0.10M -> 70   $0.05M -> 79
+#: Through `carrier_universe` (COINS is unioned in regardless of floor, so the
+#: true gain is smaller than the raw band): avo's crypto **39 -> 53, +14 names**,
+#: every one already scanned by 👩 mum on this same host, and the thinnest is
+#: **$0.204M — 2x above the one slippage cliff the fleet has actually measured**
+#: ((qq): mean 17.49bps, p90 398bps BELOW $0.1M). $0.05M is REFUSED for exactly
+#: that reason: it admits 9 names under the cliff, into a band the cost model
+#: steps at and therefore cannot price ((ty)'s refusal, unchanged).
+#:
+#: EXPECTANCY PRICE (I19), stated: **~zero at her horizon.** (qu) measured her
+#: entry's excess over matched-random as NEGATIVE at 4h/8h/12h and ~zero at 5d,
+#: where her 3.5d hold lands. This is bought as DECIDABILITY, not edge — the
+#: (ty) purchase — and I26 is explicit that an expectancy-neutral widening on a
+#: book that cannot be graded is strictly positive, because decidability is the
+#: binding constraint. Her live arm is n=15 against a pre-registered 50-close
+#: criterion ((qu)).
+#:
+#: DECLARED CONSEQUENCE (I20): all 14 names are already in mum's universe, so
+#: the CO-HOLDING surface grows. Measured the day this shipped, BEFORE it:
+#: both live books already hold **XAU** simultaneously — 1 of 3 positions each,
+#: one bet held twice on real money. Their crypto cells stay disjoint by
+#: construction on one timeframe (avo needs `e50>e200`, mum needs NOT), but they
+#: read trend on 4h vs 1h, so a 4h-uptrend/1h-downtrend coin can satisfy both.
+#: Bounded by `fleet_risk`'s per-symbol cap and the long budget; the pre-
+#: registered read below is what decides whether it became material.
+#:
+#: PRE-REGISTERED (I21/I26 — graded on FRESH closes only, never the window that
+#: motivated this): read at **n>=20 avo LIVE closes opened after 2026-09-07**,
+#: or on **2026-10-07**, whichever first.
+#:   * REVERT to 0.5 if realised entry slippage on the NEW names is worse than
+#:     her book's own mean by more than 10bps, or their mean %/trade is worse
+#:     than the pre-existing 39 over the same window;
+#:   * ADVANCE to 0.1 (the remaining +19 names) if neither holds AND her close
+#:     rate rose;
+#:   * anything else returns to Eamon with both numbers.
 FAMILY_CRYPTO_MIN_VOL_M = os.environ.get(
-    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1,freqtrade-avo-maria:0.5")
+    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1,freqtrade-avo-maria:0.25")
 
 
 def crypto_min_vol_m(bot, raw=None):

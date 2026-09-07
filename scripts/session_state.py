@@ -85,6 +85,41 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "avo-supply-floor-staged-read",
+        "owner": "session",
+        "what": "(zf) Eamon asked to scale 🙏 avo and 👩 mum with their higher "
+                "balances. SIZE was refused with numbers -- both sit 1.33x above "
+                "the ceiling the 15% drawdown bar implies (GROSS_X_MAX = "
+                "0.15/|stop|: avo 2.0 vs 1.50, mum 5.0 vs 3.75), both publish "
+                "all_slots_stop_pct 0.20 against that 0.15 bar, and rho runs "
+                "3.33% (avo) and 1.67% (mum) against the (yp) study's admissible "
+                "0.5%; I22 adds that leverage leaves t invariant. SUPPLY was the "
+                "real constraint: avo held 3 of 6 slots scanning 39 crypto names "
+                "while 👩 mum, on the SAME HOST, scanned 72. Measured on the "
+                "scout's own vols (216 markets, 114 crypto): floors 0.50/0.25/"
+                "0.10/0.05 yield 32/49/70/79 names, and through carrier_universe "
+                "avo's crypto goes 39 -> 53 (+14) at 0.25, every one already "
+                "scanned by mum, thinnest $0.204M = 2x the measured slippage "
+                "cliff. $0.05M REFUSED: it admits 9 names under the cliff, a band "
+                "the cost model steps at and cannot price ((qq)/(ty)). SHIPPED "
+                "STAGED at 0.25, not equalised: half the argument that set 0.5 "
+                "has inverted (avo now clips $146.64 vs mum's $242.65, where (vd) "
+                "recorded $684 vs $250) and half has not (hold ~3.5d vs 12h).",
+        "why_open": "the read is PRE-REGISTERED (I21/I26) and its trigger has not "
+                    "fired: graded on FRESH avo LIVE closes opened after "
+                    "2026-09-07 only, never the window that motivated it (I25), "
+                    "at n>=20 or on 2026-10-07 whichever first. REVERT to 0.5 if "
+                    "realised entry slippage on the 14 new names is worse than "
+                    "her book's own mean by >10bps, or their mean %/trade is "
+                    "worse than the pre-existing 39 over the same window; ADVANCE "
+                    "to 0.1 (the remaining +19 names) if neither holds AND her "
+                    "close rate rose; anything else returns to Eamon with both "
+                    "numbers. Closes when the read is taken and recorded in the "
+                    "CHANGELOG and this row removed.",
+        "closes_when": lambda: not _has(
+            "lighter_family_bot.py", "freqtrade-avo-maria:0.25"),
+    },
+    {
         "id": "mum-live-rho-read-preregistered",
         "owner": "session",
         "what": "(yp) put every book's sizing on ONE axis for the first time -- "

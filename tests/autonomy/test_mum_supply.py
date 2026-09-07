@@ -318,7 +318,11 @@ def test_avo_widened_at_a_stricter_floor_and_georgia_is_untouched():
 
     🙏 avo joins the widening at $0.5M, not mum's $0.1M: she holds 3.5 DAYS
     against mum's 12h and clips $684 against $250, so a thinner book costs her
-    more. WHAT IT BUYS IS DECIDABILITY, NOT EDGE — (qu) measured her entry's
+    more. **[2026-09-07 (zf)] The floor is now $0.25M and the clip figures
+    above are HISTORICAL — avo clips $146.64 and mum $242.65 today, i.e. the
+    clip ordering inverted. Kept as written because it is the honest record of
+    why 0.5 was chosen; the correction and the current numbers live on
+    `test_avos_floor_is_stricter_than_mums` and `test_avo_floor_is_staged`.** WHAT IT BUYS IS DECIDABILITY, NOT EDGE — (qu) measured her entry's
     excess over matched-random as ~zero at 5d, where her hold lands — and her
     own pre-registered 50-close criterion is ~116 days away at 0.43 closes/day
     while she sits idle 38.7h with 2 of 5 slots free.
@@ -328,7 +332,9 @@ def test_avo_widened_at_a_stricter_floor_and_georgia_is_untouched():
     configuration rescues it. Widening a book whose dominant sleeve has no
     measured entry edge buys more no-edge trades, which is the I19 trap.
     """
-    assert fam.crypto_min_vol_m("freqtrade-avo-maria") == pytest.approx(0.5)
+    # [2026-09-07 (zf)] 0.5 -> 0.25, STAGED. See `test_avo_floor_is_staged`
+    # below for the measurement and the pre-registered read.
+    assert fam.crypto_min_vol_m("freqtrade-avo-maria") == pytest.approx(0.25)
     assert fam.crypto_width("freqtrade-avo-maria") >= 120
     assert fam.crypto_min_vol_m("freqtrade-mum") == pytest.approx(0.1)
     assert fam.crypto_min_vol_m("freqtrade-georgia") == 0.0, (
@@ -336,9 +342,126 @@ def test_avo_widened_at_a_stricter_floor_and_georgia_is_untouched():
     assert fam.crypto_width("freqtrade-georgia") == 0
 
 
+#: The one slippage cliff this fleet has actually MEASURED ((qq)): fills below
+#: $0.1M/day ran a mean 17.49bps and a p90 of 398bps. It is also where the cost
+#: model's tier STEPS, so a floor beneath it cannot be priced at all — which is
+#: why (ty) refused a $0.10M move on the sniper rather than arguing about it.
+MEASURED_SLIPPAGE_CLIFF_M = 0.1
+
+
+def test_no_widened_book_is_floored_below_the_measured_slippage_cliff():
+    """MUTATION: set any widened carrier's floor under $0.1M -> RED.
+
+    [2026-09-07 (zf)] THE SAFETY PROPERTY, and it is the one that outlives any
+    particular value. A floor is a liquidity claim; below the measured cliff
+    there is no claim to make, because the cost model steps there and the
+    measured p90 is 398bps — 23x the mean. A future session may tune these
+    floors freely ABOVE the cliff; taking one below it requires new
+    measurement, not a smaller number.
+
+    Carriers with NO floor (0.0) are out of scope by construction: they are not
+    widened, so they never reach past `COINS` and the cliff cannot bite them.
+    """
+    for bot in ("freqtrade-mum", "freqtrade-avo-maria"):
+        floor = fam.crypto_min_vol_m(bot)
+        assert floor >= MEASURED_SLIPPAGE_CLIFF_M, (
+            f"{bot}'s floor ${floor}M sits BELOW the measured slippage cliff "
+            f"${MEASURED_SLIPPAGE_CLIFF_M}M — fills there ran p90 398bps and "
+            f"the cost model cannot price the band ((qq)/(ty))")
+
+
+def test_avo_floor_is_staged_between_the_cliff_and_where_it_started():
+    """MUTATION: equalise avo to mum, or restore 0.5 -> RED.
+
+    [2026-09-07 (zf)] Eamon asked to scale the live books with their higher
+    balances. SIZE was refused with numbers (both sit 1.33x above the ceiling
+    the 15% drawdown bar implies, and rho runs 6.7x/3.3x the study's admissible
+    0.5%); SUPPLY was the real constraint — avo held 3 of 6 slots scanning 39
+    crypto names while her sibling on the SAME HOST scanned 72.
+
+    STAGED, not equalised, and the staging is the argument: half the reason avo
+    was set stricter has inverted (the clip) and half has not (the hold), so she
+    moves toward mum without reaching her. The advance to 0.1 is pre-registered
+    on her own forward closes, not taken here — (rule 1) ship narrow, verify in
+    the live payload, then widen.
+    """
+    avo = fam.crypto_min_vol_m("freqtrade-avo-maria")
+    mum = fam.crypto_min_vol_m("freqtrade-mum")
+    assert avo == pytest.approx(0.25), (
+        "avo's staged floor moved without its pre-registered read being taken")
+    assert mum < avo < 0.5, (
+        f"avo's floor ${avo}M must sit STRICTLY between mum's ${mum}M and the "
+        "$0.5M it started at — equalising discards the surviving hold-length "
+        "argument; restoring 0.5 discards the measurement that moved it")
+
+
+def test_the_staged_floor_actually_widens_avo():
+    """MUTATION: revert the floor -> RED (the universe stops growing).
+
+    A floor that changes no universe is a value edit, not a widening. Driven
+    through the real `carrier_universe` against a scout stub standing in for
+    the venue, so this measures the OWNER's behaviour and not a reimplementation
+    of it ((hj)).
+    """
+    import fleet_bus
+    # A venue slice with names either side of BOTH floors. It must carry at
+    # least len(COINS) names above the floor under test, because
+    # `carrier_universe` only extends on `len(wide) >= len(COINS)` — the
+    # fail-safe that stops a short or dark scout read from narrowing a book.
+    # (My first fixture had four and the test correctly refused to widen.)
+    vols = {
+        # comfortably above 0.5 — present at every floor
+        "BTC": 9.0, "ETH": 5.0, "SOL": 3.0, "XRP": 2.5, "DOGE": 2.0,
+        "AVAX": 1.8, "LINK": 1.5, "ATOM": 1.2, "NEAR": 1.1, "ALGO": 0.9,
+        "SUI": 0.85, "TON": 0.8, "INJ": 0.75, "TIA": 0.7, "ARB": 0.65,
+        "RUNE": 0.6, "GALA": 0.55,
+        # THE BAND UNDER TEST: admitted at 0.25, refused at 0.5
+        "OP": 0.27, "PENDLE": 0.30, "AERO": 0.29,
+        # below 0.25 but above the cliff — mum's band, not avo's
+        "FIL": 0.18, "APT": 0.14, "SEI": 0.12,
+        # below the measured slippage cliff — must never reach a widened book
+        "TINY": 0.02,
+    }
+
+    def _scout(min_vol_m=0.0, **kw):
+        return [c for c, v in sorted(vols.items(), key=lambda kv: -kv[1])
+                if v >= (min_vol_m or 0.0)]
+
+    orig = fleet_bus.scout_universe
+    try:
+        fleet_bus.scout_universe = _scout
+        wide = fam.carrier_universe(_s("freqtrade-avo-maria"))
+        narrow_raw = "freqtrade-mum:0.1,freqtrade-avo-maria:0.5"
+        assert fam.crypto_min_vol_m("freqtrade-avo-maria", narrow_raw) == 0.5
+        # names between the old and new floors must now be reachable
+        gained = {c for c, v in vols.items() if 0.25 <= v < 0.5}
+        assert len(gained) >= 2, "fixture must span the band with room to spare"
+        assert gained, "fixture no longer spans the band under test"
+        assert gained <= set(wide), (
+            f"the staged floor admits {sorted(gained)} and the universe does "
+            f"not carry them — the floor moved but the supply did not")
+        # and the sub-cliff name must NOT be reachable at any shipped floor
+        assert "TINY" not in wide, (
+            "a $0.02M name reached a widened book's universe — below the "
+            "measured slippage cliff")
+    finally:
+        fleet_bus.scout_universe = orig
+
+
 def test_avos_floor_is_stricter_than_mums():
-    """The ordering IS the argument — a longer hold at a bigger clip needs a
-    deeper book. If these ever equalise, one of them was set without reason."""
+    """The ordering IS the argument — a longer HOLD needs a deeper book. If
+    these ever equalise, one of them was set without reason.
+
+    [2026-09-07 (zf)] CORRECTED IN PLACE per I12: this rested on TWO premises
+    and one has INVERTED. Measured on the live rows — avo clips **$146.64**
+    (equity $439.92 x gross_x 2.0 / 6 slots) and mum **$242.65** ($582.37 x 5.0
+    / 12), so **mum now clips 1.65x AVO**, where (vd) recorded avo at $684
+    against mum's $250. The "bigger clip" half is gone; the HOLD half (~3.5d vs
+    12h) is intact and is the half that argues for depth AT EXIT, so the
+    ordering survives on one leg rather than two — which is exactly why (zf)
+    moved avo's floor toward mum's WITHOUT equalising it. If the hold gap ever
+    closes too, this assertion has no argument left and must be re-derived, not
+    re-pinned."""
     assert (fam.crypto_min_vol_m("freqtrade-avo-maria")
             > fam.crypto_min_vol_m("freqtrade-mum")), (
         "avo holds 7x longer at 2.7x the clip and must not sit on a thinner "
