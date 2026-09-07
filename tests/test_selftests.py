@@ -132,6 +132,19 @@ SELFTEST_MODULES = [
     # synthetic rows, and the "moves nothing" source scan. The structural
     # pins live in tests/autonomy/test_edge_audit.py.
     "scripts.edge_audit",
+    # [2026-09-07] the POSITION-SIZING study. SELFTEST_MODULES and deliberately
+    # NOT ENFORCED_AUDITS, the edge_audit reason exactly: its live arm reads the
+    # public ledger and the live golive-readiness grade, both of which move with
+    # every close and no code change, and its calibration gate REFUSES (exit 2)
+    # on a stale or absent grade — a refusal CI must never read as a pass. The
+    # --selftest is offline and pure: the daily unit (including the case that
+    # killed the first cut — overlapping holds must not chain into one unit),
+    # compounding vs non-compounding paths, the risk-per-trade identity at two
+    # stops, the vol target's small-sample bias, Kelly's fraction and its
+    # lower-bound variant, ruin handling, the gross ceiling, the proposal's
+    # return-blindness under permutation, its I24 edge precondition, and the
+    # drawdown pin against golive_readiness.stats' own routine.
+    "scripts.study_position_sizing_2026-09-07",
     # [2026-09-06] the FLEET POOLED GRADER — does a structural feature pay,
     # pooled across every book that has it? SELFTEST_MODULES and deliberately
     # NOT ENFORCED_AUDITS, the edge_audit reason exactly: its live arm reads
