@@ -76,11 +76,37 @@ no bot file, no `live.*` lever, no env, no gross, no clip. **Main only — no
 deploy marker**, per `(mm)`: it alters no trade, so it buys no measured edge and
 must not cost a real-money container restart.
 
-**THE SIZING ASK IS ANSWERED SEPARATELY AND IS A REFUSAL WITH NUMBERS** (see
-below, no code change): both live books' clips are already `equity x gross_x /
-max_open`, so the balance growth **already** raised them; and neither book spends
-the budget it has — **avo deploys 44.4% of its allowed gross, mum 24.8%** — so
-raising `gross_x` moves zero dollars. The constraint is supply, not size.
+**THE SIZING ASK IS ANSWERED SEPARATELY AND IS A REFUSAL WITH NUMBERS** (no code
+change). Both live books' clips are already `equity x gross_x / max_open`, so the
+balance growth **already** raised them: avo's clip is $146.64 and mum's $242.65
+today, up with equity and with no action taken.
+
+**[CORRECTED IN PLACE, same session, per I12 — my first draft of this paragraph
+said raising `gross_x` "moves zero dollars", and that is FALSE.** `clip` is
+proportional to `gross_x`, so it raises the per-position size whether or not the
+slots fill: at +20% gross avo's clip goes $146.64 -> $175.97 and mum's $242.65 ->
+$291.18, deploying ~$78 and ~$144 more against the 3 positions each currently
+holds. The 44.4% / 24.8% figures are real but they measure occupancy against a
+FULL-SLOT budget, which is a supply fact, not a reason the lever is inert. The
+error ran in the direction that made my own refusal look stronger than the
+evidence supports, which is the direction that most needs correcting.**]**
+
+**The refusal stands on the risk numbers instead, and they are one-sided.** Both
+books are already **1.333x above the ceiling the 15% go-live drawdown bar
+implies** (`GROSS_X_MAX = 0.15/|stop|`: avo 2.0 vs 1.50 at a 10% stop, mum 5.0 vs
+3.75 at 4%), both publish `all_slots_stop_pct` **0.20 against that 0.15 bar**, and
+on risk-at-stop per position avo runs **rho 3.33%** and mum **1.67%** against the
+`(yp)` study's admissible **0.5%** — avo 6.7x, mum 3.3x. `I22` adds that leverage
+multiplies mean and sd alike, so `t` is invariant and neither book moves closer to
+the gate. 👩 mum additionally carries a **pre-registered rho read due 7-Oct**
+finding her already oversized; raising her now would act inside the window that
+motivated it (`I25`) and pre-empt a registered read (`I21`).
+
+Those ceilings are Eamon's own operator envs (`(sr)`: *"risk appetite belongs to
+the person whose money it is"*), so going further is his call to make — this entry
+records what it costs, not a veto. The growth direction the numbers do support is
+**supply**: avo scans 49 markets and mum 104 of the venue's ~212, and both hold 3
+positions against caps of 6 and 12.
 
 ---
 
