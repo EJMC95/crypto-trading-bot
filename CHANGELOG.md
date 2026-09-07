@@ -1,3 +1,65 @@
+## 2026-09-07 (yl) — THE JUDGE'S MUM LANE IS ALIVE — and the serial machine was overwriting the census's own measurements on the one lane it runs
+
+**[RENUMBERED (yk) -> (yl) at push time** — a concurrent session's spelling/roster entry took (yk) on main while this pass's suite ran; the pushed entry keeps the letter per the letter rule.**]**
+
+**Eamon: *"Judges mum lane."*** The hub's open thread carried it as the
+standing found-but-unfixed item — *"her arm asks `fleet_tuning` for
+`xp.mum-lshadow.*` while the registry declares `xp.mum.`, so no experiment has
+EVER applied"*. **That claim is STALE and the lane is WORKING**, verified
+end-to-end on the live payload before anything was touched (I12: a doctrine
+that no longer describes the system is a defect, and so is a handoff note):
+
+* `(ye)` fixed the prefix — the host reads `fleet_bus.xp_prefix_for`, never
+  rebuilds the string — and `(yg)`/`(yi)` finished the lane move;
+* **the judge is RUNNING**, candidate `mum-vel-12-20`, `unjudgeable: []`,
+  `serial_lane: mum`, `judging 2 of 4`;
+* **both levers are OPEN on the bus** (`xp.mum.vel_lo 12.0` / `vel_hi 20.0`,
+  `set_by experiment-judge`), and — the link that actually proves it —
+  👩 mum's shadow row publishes **`vel_band: [12.0, 20.0]`** with
+  `levers {prefix: "xp.mum.", registry: true, registered_n: 4}`. The
+  judge's candidate is applied on the arm. The `VOIDED-NEVER-APPLIED`
+  verdict sitting in its history is the (yg) detector working, not a
+  live fault.
+
+**WHAT WAS ACTUALLY BROKEN, found by reading the lane's own published entry.**
+`_serial_pair_entry` mirrors the machine's state into its lane's pair entry,
+and the call site **overwrites** `_pairs[lane]` — so every census-DERIVED
+field was dropped, and the two the machine re-typed had gone stale on the
+same `(ww)` lane move that `(yi)` fixed one line above:
+
+* **`pnl_form` was the literal `"funding"`** — true of 💸 the Farmer, whose
+  lane this used to be, and FALSE of 👩 mum, a directional price book. The
+  census reads it from `fleet_bus.JUDGED_PAIRS` (the one declaration) and had
+  it right; the machine overwrote it with the stale literal. Reporting-only —
+  no gate consumes it (checked tree-wide) — but it is the fleet's only
+  promotion path describing its own book wrongly, and `pnl_form_mismatch` is
+  a declared unjudgeable reason, so a future rung reading it would inherit
+  the lie.
+* **the `(vm)` POWER REPORT was dropped entirely.** (vm) publishes power on
+  EVERY state precisely so a BLOCKED pair can say how long it has left, and
+  this inverted that again: idle 🙏 avo published `power`/`mde_pp_half`/
+  `eta_judgeable` while 👩 mum — the lane actually RUNNING, held at
+  `floors: shadow 2/30, live 2/10` — published none.
+
+**FIXED by merging onto the census entry instead of building beside it**, which
+is what the function's own docstring already promised (*"one machine, two
+views, no second copy of the rule"*): the machine stays senior for what it
+OWNS (phase, candidate, hold, src), the census stays senior for what it
+MEASURES, and any future census field survives automatically. No census (a
+dark `bot_pnl` fetch degrades `pair_census` to `{}`) falls back to the ONE
+declaration, and where even that is unreadable the key is **absent** rather
+than guessed (I8). Publish-only: no bar, no verdict, no promotion moves.
+
+Pinned by three tests in `test_judge_pairs.py` — the merge, the declaration
+match, and **the WIRING by AST**, added after the first mutation round
+measured the call site reverting to the one-argument form while both
+function-level tests stayed green (the "a substring test is not a wiring
+test" shape, in its call-site costume). 4/4 mutations RED.
+
+**THE LANE'S REAL BLOCKER IS SAMPLE, NOT PLUMBING:** `floors — shadow 2/30,
+live 2/10`. Nothing to fix there; it needs closes.
+
+
 ## 2026-09-07 (yl) — THE INSTRUMENT THAT VALIDATES THE BRAIN NORMALISED THE LEDGER WITH A PARTIAL COPY OF THE BRAIN'S OWN RULE: a harness graded the engines on a universe production does not have, and no fixture in the tree could ever have said so
 
 > **[RENUMBERED (yf) -> (yi) -> (yj) -> (yk) -> (yl) at push.]** Three concurrent sessions took

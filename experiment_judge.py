@@ -2479,7 +2479,7 @@ def lane_census(pairs, live_bot=None):
     return out
 
 
-def _serial_pair_entry(payload):
+def _serial_pair_entry(payload, census_entry=None):
     """Mirror the serial machine's top-level state into ITS OWN lane's entry —
     one machine, two views, no second copy of the rule: everything here is
     DERIVED from the payload the machine just built.
@@ -2488,7 +2488,27 @@ def _serial_pair_entry(payload):
     and its call site wrote `pairs["farmer"]`, so when `(ww)` moved the serial
     lane to 👩 mum the machine's just-built state landed on a RETIRED pair
     while `pairs["mum"]` — the lane it actually runs — kept the census's stale
-    precheck view. The lane comes from `serial_lane_id()`, the one owner."""
+    precheck view. The lane comes from `serial_lane_id()`, the one owner.
+
+    [2026-09-07] AND IT IS MERGED ONTO THE CENSUS ENTRY, NOT BUILT BESIDE IT
+    — the half of "no second copy of the rule" this function did not keep.
+    The call site OVERWRITES `_pairs[lane]`, so every census-DERIVED fact was
+    dropped and the two it re-typed went stale on the same (ww) lane move
+    that (yi) fixed one line up:
+      * `pnl_form` was the literal `"funding"` — true of 💸 the Farmer, whose
+        lane this used to be, and FALSE of 👩 mum, a directional price book.
+        The census reads it from `fleet_bus.JUDGED_PAIRS` (the one
+        declaration) and got it right; the machine overwrote it with the
+        stale literal.
+      * `power` / `mde_*` — (vm) deliberately publishes the power report on
+        EVERY state precisely so a BLOCKED pair can say how long it has left,
+        and dropping it here inverted that again: idle 🙏 avo published power
+        while 👩 mum, the lane actually RUNNING and held at `floors`,
+        published none.
+    Merging keeps the machine senior for what it owns (phase, candidate,
+    hold, src) and the census senior for what it measures — and any future
+    census field survives automatically instead of silently vanishing on the
+    one lane that matters most."""
     hold = None
     if payload.get("phase") == "running":
         le = payload.get("last_eval") or {}
@@ -2500,15 +2520,26 @@ def _serial_pair_entry(payload):
             hold = "assert_fail"
         elif str(le.get("why") or "").startswith(("floors", "h1", "h2")):
             hold = "floors"
-    entry = {"phase": payload.get("phase"),
-             "candidate": payload.get("candidate"), "hold": hold,
-             "live_bot": LIVE_BOT, "shadow_bot": SHADOW_BOT,
-             "pnl_form": "funding",
-             # provenance: THIS entry is the serial machine's own state, not
-             # the census's precheck view — the machine is senior for the
-             # lane it runs, and a reader (or a test) can tell which view
-             # it is holding.
-             "src": "machine"}
+    # census-derived facts survive; the machine overlays only what it OWNS
+    entry = dict(census_entry or {})
+    entry.update({"phase": payload.get("phase"),
+                  "candidate": payload.get("candidate"), "hold": hold,
+                  "live_bot": LIVE_BOT, "shadow_bot": SHADOW_BOT,
+                  # provenance: THIS entry is the serial machine's own state,
+                  # not the census's precheck view — the machine is senior for
+                  # the lane it runs, and a reader (or a test) can tell which
+                  # view it is holding.
+                  "src": "machine"})
+    if not entry.get("pnl_form"):
+        # No census entry (a dark bot_pnl fetch degrades `pair_census` to {}).
+        # Read the ONE declaration rather than re-typing a literal, and where
+        # even that is unreadable leave the key ABSENT — I8: unknown degrades
+        # to no claim, never to a guess, and a wrong P&L form on the fleet's
+        # only promotion path is exactly the guess that would be believed.
+        _pf = ((getattr(_bus, "JUDGED_PAIRS", {}) or {})
+               .get(serial_lane_id() or "", {}) or {}).get("pnl_form")
+        if _pf:
+            entry["pnl_form"] = _pf
     if payload.get("phase") == "stood_down":
         le = payload.get("last_eval") or {}
         spec = (le.get("retired") or {})
@@ -2686,7 +2717,12 @@ def run_once():
             # went stale under (ww)'s lane move. `or "farmer"` keeps the
             # pre-(ww) key for an unpaired machine rather than dropping the
             # entry — the census view degrades, it never disappears.
-            _pairs[serial_lane_id() or "farmer"] = _serial_pair_entry(payload)
+            _lane_id = serial_lane_id() or "farmer"
+            # [2026-09-07] the census entry is PASSED IN, not discarded — the
+            # machine overlays what it owns onto what the census measured
+            # (pnl_form from the one declaration, the (vm) power report).
+            _pairs[_lane_id] = _serial_pair_entry(payload,
+                                                  _census.get(_lane_id))
             payload["pairs"] = _pairs
             # [(vm)] the roll-up of that map: which lanes are live, which are
             # parked, and which one the serial machine below actually runs.

@@ -106,3 +106,67 @@ def test_immune_validates_pairs_against_the_imported_vocabulary():
                for s in bad), bad
     ok = im.organ_invariants(_xp("unjudgeable"), now)
     assert not any("unknown phase" in s["detail"] for s in ok), ok
+
+
+# ---------------------------------------------------------------- the serial
+# lane's own entry. [2026-09-07] The machine OVERWRITES `_pairs[lane]`, so
+# anything it does not carry is DELETED from the lane it actually runs — and
+# both things it re-typed had gone stale on (ww)'s lane move to 👩 mum:
+# `pnl_form` was the literal "funding" (💸 the Farmer's, whose lane this was),
+# and the (vm) power report was dropped, so the RUNNING pair published no ETA
+# while the IDLE one did. The fix merges onto the census entry; these pin it.
+def test_the_serial_entry_keeps_the_census_derived_facts():
+    import experiment_judge as ej
+    census = {"pnl_form": "price",
+              "power": {"live": {"n": 2, "closes_per_day": 0.4}},
+              "mde_pp_half": 4.641, "candidate": None, "hold": None}
+    entry = ej._serial_pair_entry(
+        {"phase": "running", "candidate": "mum-vel-12-20",
+         "last_eval": {"why": "floors: shadow 2/30, live 2/10"}}, census)
+    # the census measured these — the machine must not overwrite or drop them
+    assert entry["pnl_form"] == "price", (
+        "the serial entry re-typed pnl_form — it went stale as 'funding' "
+        "when the lane moved from the Farmer to mum, a price book")
+    assert entry["power"] == census["power"], (
+        "the (vm) power report was dropped from the one lane that is "
+        "RUNNING — a blocked pair must be able to say how long it has left")
+    assert entry["mde_pp_half"] == 4.641
+    # ...and the machine stays senior for the state it owns
+    assert entry["phase"] == "running" and entry["src"] == "machine"
+    assert entry["candidate"] == "mum-vel-12-20" and entry["hold"] == "floors"
+
+
+def test_the_serial_entrys_pnl_form_matches_the_one_declaration():
+    """Whatever book holds the serial lane, its published P&L form is the
+    DECLARED one — this is the assertion the hardcoded literal failed."""
+    import experiment_judge as ej
+    lane = ej.serial_lane_id()
+    if lane is None:                      # unpaired machine — nothing to pin
+        return
+    declared = fleet_bus.JUDGED_PAIRS[lane]["pnl_form"]
+    # no census (a dark bot_pnl fetch degrades pair_census to {}) -> the
+    # declaration, never a literal
+    entry = ej._serial_pair_entry({"phase": "running", "candidate": "x"}, None)
+    assert entry.get("pnl_form") == declared, (
+        f"serial lane {lane} publishes {entry.get('pnl_form')!r} against a "
+        f"declared {declared!r}")
+
+
+def test_run_once_actually_passes_the_census_entry():
+    """THE WIRING, by AST — the two tests above call `_serial_pair_entry`
+    directly, so they stay green while the CALL SITE reverts to the
+    one-argument form that drops the census entry (measured: that mutation
+    survived the first round). A merge helper nobody hands the census to is
+    the pre-fix behaviour wearing the fix's shape."""
+    import ast
+    import inspect
+    import experiment_judge as ej
+    calls = [n for n in ast.walk(ast.parse(inspect.getsource(ej.run_once)))
+             if isinstance(n, ast.Call)
+             and getattr(n.func, "id", "") == "_serial_pair_entry"]
+    assert calls, "run_once no longer builds the serial lane's entry"
+    for c in calls:
+        assert len(c.args) >= 2, (
+            "run_once calls _serial_pair_entry(payload) without the census "
+            "entry — every census-derived fact (pnl_form, the (vm) power "
+            "report) is dropped from the lane the machine actually runs")

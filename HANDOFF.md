@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 13:06 Sydney (03:06Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 13:07 Sydney (03:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -84,8 +84,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (17 commit(s))
+## Shipped today (19 commit(s))
 
+- `4e4e422` The judge's mum lane (yl): the serial machine overwrote the census's own measurements on the lane it runs — pnl_form stale as the Farmer's 'funding', the (vm) power report dropped
+- `8122704` (yj) regenerate HANDOFF.md
 - `af7ad34` (yj) the record: the changelog entry, and RENUMBERED (yf) -> (yi) -> (yj) after two sessions took those letters on main
 - `4d8eefa` (yi) the harness that validates the brain normalised the ledger with a partial copy of the brain's own rule
 - `2a5feeb` handoff: regenerate after (yi)(yj)(yk) — 16 carried, none stale
