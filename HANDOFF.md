@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 13:30 Sydney (03:30Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 15:41 Sydney (05:41Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -89,8 +89,14 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (29 commit(s), entries (yo))
+## Shipped today (27 commit(s), entries (yo), (yp))
 
+- `2554083` (ys) Phase 1 inventory + the first dated, reproducible, cost-stressed BASELINE
+- `69ed911` (yr) renumber the changelog header to match its commit subject — main briefly carried two (yq) entries because the final rebase auto-merged clean
+- `7f9462e` (yr) two instruments wrong in the reassuring direction: the asset key that hid co-holding, and the drawdown denominator that halved real money's hole
+- `3e205d9` (yq) an unfillable shadow order is NOT a zero-cost fill: NULL slippage, a named reason, and the coin-quality veto stops eating fabricated evidence
+- `cab0cd5` (yp) acknowledge golive-readiness recurrence: six mechanisms, one grading authority, and RENUMBERED (yn) -> (yp)
+- `4ffe5e7` (yn) the study report, changelog entry and carried row (renumbered yk -> yn)
 - `c0262bb` (yk) adversarial review: the taker's breakout stop was read from a key its publisher never emits, and fixed_dollar's gross was priced at t=0
 - `80065a2` (yk) the moves-nothing check is an AST walk of call sites, not a substring scan ((po): a page-wide substring scan is not a structural claim)
 - `23ac9ee` (yk) the mum-live rho finding is PRE-REGISTERED, not acted on: 10 trading days is not a mandate to cut a real-money clip 6.7x
@@ -112,14 +118,6 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `fa26156` carry: avo's judge lane is declared but her carrier is not lever-capable — the (yg) surface's first finding, deferred with its own closes_when
 - `4bf21e8` (yg) VERIFIED: both arms on 5e30671ecf64, judge un-drifted at its next cycle, resid live — and the lever surface found avo's undeclared namespace on its first loop
 - `b775b06` [deploy-live-mum] The judge's mum lane: (ye) owns the fix, this ships the lever surface and the marker that keeps mum's pair aligned; plus the pooled grader and the flinders refusal (yg)(yf)(yh) (#287)
-- `0119b9b` (ye) FROZEN_WHEN_READY is the bracket levers this tuner can WRITE — brk_trail/brk_sl are off its ladders by the (sk) ratchet and need no freeze
-- `189a9f5` (ye) re-aim the avo slot pins 5 -> 6 with the measurement (the guard did its job), and regenerate HANDOFF.md
-- `ba437e6` (ye) the record: changelog entry, three doctrine amendments in place, and RENUMBERED (yd) -> (ye) after another session took (yd) on main
-- `4c4f3ef` (yd) the freeze pin asserts the result REBINDS levers (a discarded call froze nothing; M1)
-- `2acd138` (yd) a READY book keeps the bracket it passed on (tuner freeze), and the allocation organ reaches the family shadows + the taker
-- `91390a3` [deploy-live-taker] (yd) avo LIVE 5 -> 6 slots: the twin's 6th slot took its best trades, and the arms' caps now match so the judge's avo pair is judgeable
-- `24cfb90` (yd) the judge's mum lane was inert by one string: the shadow arm rebuilt the lever prefix from a suffixed row id
-- `f9546fc` (yd) the winners' docket graded the taker on a superseded policy: era_rows was pinned by identity and fed the wrong shape
 
 ## How this file stays honest
 
