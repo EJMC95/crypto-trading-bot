@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 16:04 Sydney (06:04Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 16:44 Sydney (06:44Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -89,8 +89,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (29 commit(s), entries (yo), (yp))
+## Shipped today (32 commit(s), entries (yo), (yp))
 
+- `295b54b` (yu) Per-book execution cost: the fleet average was wrong in both directions, and the stress that used it was a double charge
+- `030433f` (yt) CodeQL: close the four file handles in audit_fingerprint
+- `065004f` (yt) regenerate HANDOFF.md
 - `e440208` (yt) Audit phases 3-5: survivorship is 8.3x, the fleet's first regime split, and the exposure denominator nobody had printed
 - `98d35c0` (ys) regenerate HANDOFF.md
 - `2554083` (ys) Phase 1 inventory + the first dated, reproducible, cost-stressed BASELINE
