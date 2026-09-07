@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 12:57 Sydney (02:57Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 13:06 Sydney (03:06Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -84,14 +84,25 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (6 commit(s))
+## Shipped today (17 commit(s))
 
+- `af7ad34` (yj) the record: the changelog entry, and RENUMBERED (yf) -> (yi) -> (yj) after two sessions took those letters on main
+- `4d8eefa` (yi) the harness that validates the brain normalised the ledger with a partial copy of the brain's own rule
+- `2a5feeb` handoff: regenerate after (yi)(yj)(yk) — 16 carried, none stale
 - `6af0bc0` [deploy-live] (yk) One spelling owner: the fleet records coin evidence as kBONK and every live consumer looks it up as 1000BONK — four markets inside mum's real-money scan where the quality veto could never fire
 - `538eee1` (yj) Four hand-typed rosters and a key that overwrote itself: georgia v3 in no risk cohort, carry's panel empty since July, a coverage guard that always skipped, a retired-set parse reading 68 for 46, and market-context destroying its own snapshot
 - `7cbef28` (yi) One lane owner: the judge moved to mum and three organs kept watching the Farmer — a blind receipt detector, a census entry on a retired pair, a growth promoter off-lane, and one live book's lever graded on another's trades
 - `fa26156` carry: avo's judge lane is declared but her carrier is not lever-capable — the (yg) surface's first finding, deferred with its own closes_when
 - `4bf21e8` (yg) VERIFIED: both arms on 5e30671ecf64, judge un-drifted at its next cycle, resid live — and the lever surface found avo's undeclared namespace on its first loop
 - `b775b06` [deploy-live-mum] The judge's mum lane: (ye) owns the fix, this ships the lever surface and the marker that keeps mum's pair aligned; plus the pooled grader and the flinders refusal (yg)(yf)(yh) (#287)
+- `0119b9b` (ye) FROZEN_WHEN_READY is the bracket levers this tuner can WRITE — brk_trail/brk_sl are off its ladders by the (sk) ratchet and need no freeze
+- `189a9f5` (ye) re-aim the avo slot pins 5 -> 6 with the measurement (the guard did its job), and regenerate HANDOFF.md
+- `ba437e6` (ye) the record: changelog entry, three doctrine amendments in place, and RENUMBERED (yd) -> (ye) after another session took (yd) on main
+- `4c4f3ef` (yd) the freeze pin asserts the result REBINDS levers (a discarded call froze nothing; M1)
+- `2acd138` (yd) a READY book keeps the bracket it passed on (tuner freeze), and the allocation organ reaches the family shadows + the taker
+- `91390a3` [deploy-live-taker] (yd) avo LIVE 5 -> 6 slots: the twin's 6th slot took its best trades, and the arms' caps now match so the judge's avo pair is judgeable
+- `24cfb90` (yd) the judge's mum lane was inert by one string: the shadow arm rebuilt the lever prefix from a suffixed row id
+- `f9546fc` (yd) the winners' docket graded the taker on a superseded policy: era_rows was pinned by identity and fed the wrong shape
 
 ## How this file stays honest
 
