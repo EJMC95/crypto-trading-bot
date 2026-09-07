@@ -200,6 +200,56 @@ DECLARED_STOP = {
 STOPLESS = {"perps-funding-spread-lshadow", "book-hull-lshadow",
             "book-kiyosaki-lshadow", "band-barnes-lshadow"}
 
+#: [I21] THE PRE-REGISTERED READ, declared with its AT-REGISTRATION numbers so
+#: the follow-up is a COMMITMENT rather than a re-derivation — the (tt) shape,
+#: which failed the first time it was left in prose. 👩 mum's LIVE arm is the
+#: study's one real-money finding and it rests on the thinnest sample in the
+#: table (10 trading days at the 10x extrapolation cap), so it is registered
+#: rather than acted on, and it is graded on FRESH days only (I25: never the
+#: window that motivated it).
+PRE_REGISTERED = {
+    "freqtrade-mum-lighter": {
+        "id": "mum-live-rho-read",
+        "registered": "2026-09-07",
+        "at_registration": {
+            "rho_now": 0.0167, "rho_adm": 0.005, "rho_star": 0.0025,
+            "n_days": 10, "n_closes": 90, "edge_lb_pct": 0.00157,
+            "extrapolation_x": 10.0,
+        },
+        "read_when": "n_days >= 30 (3x the registration sample) or 2026-10-07, "
+                     "whichever comes first",
+        "criterion": "re-run on days AFTER 2026-09-07 only. If rho_adm on the "
+                     "FRESH sample is still below her running rho, escalate the "
+                     "cut to Eamon with both numbers. If rho_adm >= rho_now the "
+                     "flag is WITHDRAWN and recorded as withdrawn. Either way "
+                     "the verdict is written down and this block is removed.",
+    },
+}
+
+
+def registration_status(bot, seq):
+    """(reg, fresh_days, due) for a pre-registered book, or (None, None, False).
+
+    `fresh_days` counts trading days strictly AFTER the registration date — the
+    only sample the criterion may be read on. Returns `due` True once the
+    read_when condition is met, so the study says so on every run instead of
+    waiting for someone to remember."""
+    reg = PRE_REGISTERED.get(bot)
+    if not reg:
+        return None, None, False
+    try:
+        cut = datetime.strptime(reg["registered"], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return reg, None, False
+    fresh = sum(1 for u in seq.get("units") or [] if u["day"] > cut)
+    due = fresh >= 30 or datetime.now(timezone.utc).date() >= _dt_date(2026, 10, 7)
+    return reg, fresh, due
+
+
+def _dt_date(y, m, d):
+    from datetime import date
+    return date(y, m, d)
+
 #: Why a book got no proposal — distinct reasons, never collapsed into one
 #: string, because "no rung is safe" and "half of a safe rung is below the
 #: smallest rung modelled" are opposite findings.
@@ -644,6 +694,9 @@ def run(ledger=None, feed=None, bus=None, draws=DRAWS,
                      graded_ready=pv.get("ready"))
         entry.update(study_book(seq, E0, draws=draws, horizon_months=horizon_months,
                                 edge_lb=seq.get("edge_lb_pct")))
+        reg, fresh, due = registration_status(bot, seq)
+        if reg:
+            entry["pre_registered"] = dict(reg, fresh_days=fresh, due=due)
         res["books"][bot] = entry
     return res
 
@@ -776,6 +829,18 @@ def render(res):
                          f"{100*f['capped_share']:.0f}%/{_pct(f['ret_p50'])}%/"
                          f"{_pct(f['dd_p95'])}%/{f['p_ruin']:.2f}")
         L.append(f"  {bot:30s} " + "  ".join(cells))
+    regs = [(b, v["pre_registered"]) for b, v in res["books"].items()
+            if v.get("pre_registered")]
+    if regs:
+        L += ["", "PRE-REGISTERED READS (I21 — graded on FRESH days only, never "
+                  "the window that motivated them)"]
+        for bot, r in regs:
+            L.append(f"  {bot}  [{r['id']}] registered {r['registered']}; "
+                     f"{r['fresh_days']} fresh trading days; "
+                     f"{'** DUE NOW **' if r['due'] else 'not yet due'}")
+            L.append(f"     read when: {r['read_when']}")
+            L.append(f"     criterion: {r['criterion']}")
+
     if res.get("skipped"):
         L += ["", f"SKIPPED ({len(res['skipped'])}, not certified by the calibration "
                   f"gate): " + ", ".join(sorted(res["skipped"]))]
@@ -936,6 +1001,22 @@ def _selftest():
                    5: {"p_ruin": 0.1, "dd_p95": 0.1}}) == 5
     assert _worse({1: {"p_ruin": 0.0, "dd_p95": 0.9},
                    5: {"p_ruin": 0.0, "dd_p95": 0.1}}) == 1
+
+    # -- the pre-registration counts FRESH days only, and says when it is due
+    from datetime import date as _date
+    _reg_bot = next(iter(PRE_REGISTERED))
+    _u = [{"day": _date(2026, 9, 1), "R": 0.0, "Q": 0.0, "L": 1},
+          {"day": _date(2026, 9, 7), "R": 0.0, "Q": 0.0, "L": 1},
+          {"day": _date(2026, 9, 8), "R": 0.0, "Q": 0.0, "L": 1}]
+    _r, _fresh, _due = registration_status(_reg_bot, {"units": _u})
+    assert _r and _fresh == 1, (_fresh,)      # only 8-Sep is after 7-Sep
+    assert registration_status("not-registered", {"units": _u}) == (None, None, False)
+    _many = [{"day": _date(2026, 10, 1), "R": 0.0, "Q": 0.0, "L": 1}] * 30
+    assert registration_status(_reg_bot, {"units": _many})[2] is True
+    # the registration is a COMMITMENT: its at-registration numbers are declared,
+    # not recomputed, so a later run cannot quietly move the thing it promised.
+    assert set(PRE_REGISTERED[_reg_bot]["at_registration"]) >= {
+        "rho_now", "rho_adm", "rho_star", "n_days", "edge_lb_pct"}
 
     # -- the study moves nothing
     with open(os.path.abspath(__file__), encoding="utf-8") as fh:

@@ -85,6 +85,40 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "mum-live-rho-read-preregistered",
+        "owner": "session",
+        "what": "(yk) put every book's sizing on ONE axis for the first time -- "
+                "risk at the stop per position as a fraction of equity, "
+                "rho = clip_fraction x stop -- and the fleet spans 83x on it "
+                "(avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull "
+                "0.04%). The one real-money reading: 👩 mum's LIVE arm runs "
+                "rho 1.67% (clip $240 on $576 equity = 41.7% of the account "
+                "behind a 4% stop) against a proposed 0.25% and an admissible "
+                "0.5% -- 6.7x the proposal. Corroborated from three independent "
+                "directions by her OWN published row: all_slots_stop_pct 0.20 "
+                "against the gate's 0.15 bar, vol_target_at_neff1 3.75x against "
+                "a configured 5.0x, and stop_reachable FALSE (stop_dead_above "
+                "4.17x) on the worst-margin book in her universe. NOT acted on: "
+                "the study's reading rests on 10 trading days at its own 10x "
+                "extrapolation cap, and her measured n_eff 1.824 puts her "
+                "vol_target_here at 5.06x, i.e. exactly at her own framework's "
+                "target. So it is REGISTERED, not executed.",
+        "why_open": "the read is pre-registered (I21) and its date has not "
+                    "arrived: scripts/study_position_sizing_2026-09-07."
+                    "PRE_REGISTERED['freqtrade-mum-lighter'] declares the "
+                    "at-registration numbers as a COMMITMENT and the study "
+                    "prints the fresh-day count and 'DUE NOW' on every run. "
+                    "Graded on days AFTER 2026-09-07 ONLY -- never the window "
+                    "that motivated it (I25) -- at n_days >= 30 or 2026-10-07, "
+                    "whichever first. If the fresh rho_adm is still below her "
+                    "running rho, the cut goes to Eamon with both numbers; if "
+                    "not, the flag is withdrawn and recorded as withdrawn. "
+                    "Cutting a real-money book's clip 6.7x on ten days of a "
+                    "hot sample is exactly what I25 forbids.",
+        "closes_when": lambda: not _has(
+            "scripts/study_position_sizing_2026-09-07.py", "mum-live-rho-read"),
+    },
+    {
         "id": "avo-judge-lane-declared-but-not-lever-capable",
         "owner": "session",
         "what": "(yg)'s lever surface, on its FIRST loop after the 6-Sep deploy, "

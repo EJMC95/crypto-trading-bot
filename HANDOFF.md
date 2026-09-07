@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 13:21 Sydney (03:21Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 13:29 Sydney (03:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `mum-live-rho-read-preregistered`  ·  owner: **session**
+(yk) put every book's sizing on ONE axis for the first time -- risk at the stop per position as a fraction of equity, rho = clip_fraction x stop -- and the fleet spans 83x on it (avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull 0.04%). The one real-money reading: 👩 mum's LIVE arm runs rho 1.67% (clip $240 on $576 equity = 41.7% of the account behind a 4% stop) against a proposed 0.25% and an admissible 0.5% -- 6.7x the proposal. Corroborated from three independent directions by her OWN published row: all_slots_stop_pct 0.20 against the gate's 0.15 bar, vol_target_at_neff1 3.75x against a configured 5.0x, and stop_reachable FALSE (stop_dead_above 4.17x) on the worst-margin book in her universe. NOT acted on: the study's reading rests on 10 trading days at its own 10x extrapolation cap, and her measured n_eff 1.824 puts her vol_target_here at 5.06x, i.e. exactly at her own framework's target. So it is REGISTERED, not executed.
+
+_Still open because:_ the read is pre-registered (I21) and its date has not arrived: scripts/study_position_sizing_2026-09-07.PRE_REGISTERED['freqtrade-mum-lighter'] declares the at-registration numbers as a COMMITMENT and the study prints the fresh-day count and 'DUE NOW' on every run. Graded on days AFTER 2026-09-07 ONLY -- never the window that motivated it (I25) -- at n_days >= 30 or 2026-10-07, whichever first. If the fresh rho_adm is still below her running rho, the cut goes to Eamon with both numbers; if not, the flag is withdrawn and recorded as withdrawn. Cutting a real-money book's clip 6.7x on ten days of a hot sample is exactly what I25 forbids.
 
 ### `avo-judge-lane-declared-but-not-lever-capable`  ·  owner: **session**
 (yg)'s lever surface, on its FIRST loop after the 6-Sep deploy, published on freqtrade-avo-maria-lshadow: {prefix: 'xp.avo.', registry: true, registered_n: 0, unregistered: [xp.avo.rsi_max, xp.avo.max_hold_min, xp.avo.vel_lo, xp.avo.vel_hi]}. Sized: fleet_bus.JUDGED_PAIRS['avo'] DECLARES xp_prefix 'xp.avo.'; fleet_tuning.LEVERS registers ZERO xp.avo.* levers; and her carrier SwingDip defines RSI_MAX but not MAX_HOLD_MIN, so lighter_family_bot.apply_book_levers returns at its own guard before asking get_lever for anything. The judge's avo lane -- judgeable since (ye) matched the caps at 6/6 -- is therefore structurally INERT: the (ye) class-closers pin that every REGISTERED xp.* lever is reachable and cannot see a declared prefix with nothing under it. Same class as (yb)/(ye), one namespace over; found by the instrument built to find it.
@@ -84,8 +89,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (23 commit(s))
+## Shipped today (26 commit(s), entries (yo))
 
+- `63b1b34` (yk) position sizing: five rules on one risk ladder, a conservative proposal that reads no return column
+- `412e0f7` changelog: record the date-matching guard REFUSED on its own measurement — 59 of 1,132 dated citations mismatch and nearly all are benign one-day drifts, the same size as the real error (yo)
+- `a8cd8d2` (yo) repoint three citations from (yn) to (yo) — they resolved, but to another session's entry
 - `2aab5df` (yn) the record for kelly's read, and RENUMBERED (ym) -> (yn) after a concurrent session took that letter on main
 - `ff5efd9` (ym) kelly's pre-registered read was DUE and nothing was measuring the trigger: taken, calibrated, verdict returns to Eamon
 - `950b578` (yl) The fleet passed the go-live gate for the first time, and a quarter of the sample that passed it comes from a lens the book has already vetoed — veto_split publishes it, class_split's sibling, moving no sample and no bar
