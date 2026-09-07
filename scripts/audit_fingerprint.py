@@ -31,7 +31,8 @@ DASH = "pnl_dashboard.py"
 
 
 def symbol_source(path, names):
-    src = open(path).read()
+    with open(path) as fh:
+        src = fh.read()
     tree = ast.parse(src)
     lines = src.splitlines(keepends=True)
     out = {}
@@ -84,18 +85,26 @@ def main(argv=None):
     ap.add_argument("--save", action="store_true")
     ap.add_argument("--check", action="store_true")
     a = ap.parse_args(argv)
-    raw = json.load(open(a.ledger))
+    with open(a.ledger) as fh:
+        raw = json.load(fh)
     trades = raw.get("trades", raw) if isinstance(raw, dict) else raw
     now = {"symbols": symbol_source(DASH, PROTECTED), "ledger": ledger_fingerprint(trades)}
     missing = [s for s in PROTECTED if s not in now["symbols"]]
     if missing:
         print("FAIL: protected symbol(s) not found: %s" % missing); return 2
     if a.save:
-        json.dump(now, open(a.state, "w"), indent=1)
+        # A context manager, not a bare open(): the state file IS this guard's
+        # evidence, and an unflushed or half-written one would make the later
+        # --check compare against partial data — i.e. the integrity guard
+        # failing silently in the reassuring direction, which is the exact
+        # class it exists to catch. CodeQL flagged all four sites on PR #290.
+        with open(a.state, "w") as fh:
+            json.dump(now, fh, indent=1)
         print("SAVED %d symbols, %d bots, %d closes" %
               (len(now["symbols"]), len(now["ledger"]), len(trades)))
         return 0
-    old = json.load(open(a.state))
+    with open(a.state) as fh:
+        old = json.load(fh)
     bad, traded = [], []
     for s in PROTECTED:
         o, n = old["symbols"].get(s, {}), now["symbols"][s]
