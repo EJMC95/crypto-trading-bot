@@ -1,3 +1,117 @@
+## 2026-09-07 (yz) — THE DRAWDOWN BAR MEANT A DIFFERENT THING ON EVERY ROW: one denominator for a paper grand and a real book below it
+
+**Eamon, 7-Sep:** *"Fix the drawdown denominator and check mum's gross vs her
+vol target."* They turned out to be the same question.
+
+**THE DEFECT.** Both drawdown paths in `golive_readiness` divide a DOLLAR hole
+by `BOOK_USD` ($1,000) — the realised curve at `stats` and the mark-to-market
+series at `mtm_drawdown`. Right for a $1,000 paper book with no top-ups;
+**wrong for a live book holding real money below that.** The 15% bar therefore
+fires at a different fraction of every book:
+
+| | peak equity | the bar fires at | = % of the real book | true peak-relative DD |
+|---|---|---|---|---|
+| 🙏 avo LIVE | $421 | $150 | **35.6%** | 13.21% (published 5.57%) |
+| 👩 mum LIVE | $582 | $150 | **25.8%** | 12.17% (published 7.08%) |
+| 12 shadow books | ~$1,000 | $150 | ~15% ✓ | unchanged |
+
+The one bar that is NOT clip-invariant ((hl) measured the other five) was
+**2.4x and 1.7x looser on real money than on paper** — precisely backwards
+from where the slack belongs. `(yr)` measured this yesterday and published
+`max_dd_frac_peak` BESIDE the bar, correctly leaving the re-spec to Eamon
+because a gate re-spec is his act. He has now made it.
+
+**BOTH HALVES MOVE, and that is the load-bearing detail.** Rebasing only the
+MTM half would leave a $1,000-denominated realised number able to win the I9
+`max()` and silently decide the bar on the old convention — and it *would*
+have: **👩 mum's realised half is the deciding one** (12.17% against the MTM's
+11.04%). `apply_mtm` now rebases both onto `peak_equity`, or neither, and says
+which in `maxdd_denom`.
+
+**MEASURED BEFORE IT SHIPPED, all 14 graded books, and then CALIBRATED against
+the shipped function rather than a hand table:**
+* **ZERO verdict flips.** Nothing that passed now fails; nothing that failed
+  now passes.
+* **`fleet_bus.dd_scale` — a REAL-MONEY sizing rail that reads this exact
+  number — moves on NO live book** (both stay under the bar, so both stay at
+  1.0). The only book whose scale moves is paper 🪁 kelly, 0.325 → 0.449.
+* **NOT UNIFORMLY STRICTER**, stated rather than buried: a book whose equity
+  peaked ABOVE $1,000 reads LOWER because the denominator grew — 🎫 the taker,
+  the fleet's **first-ever READY**, goes 5.42 → **4.58%**. A different and
+  better question, not a tightening.
+* The calibration caught my own hand table being wrong on 🧔 bezos (I predicted
+  4.01%, the code says 3.50%): his series is **6.0 days against the existing
+  7-day floor**, so `apply_mtm` returns early and correctly keeps `BOOK_USD`.
+  **The shipped code was right and the prediction was naive** — which is the
+  whole reason a harness must reproduce the live grade before it may speak.
+
+**A DEFECT IN MY OWN FIRST CUT, recorded because it is the exact class this
+bar exists to prevent.** It rebased the MTM half and set the realised half to
+`None` when `max_dd_usd` was missing — which DROPS it from the `max()`, a
+**silent loosening of the one bar that governs real money, inside the change
+written to tighten it.** And a `max()` over two different denominators is a
+number nobody can interpret. It is all-or-nothing now: both halves on peak
+equity, or neither, pinned by mutation M2. The existing selftest also caught a
+fixture that had stopped being coherent — `max_dd_frac=0.002` beside stats'
+own `max_dd_usd=0.0`, two fields describing different books, which only stopped
+mattering because nothing read the dollars.
+
+**AND THE VOL TARGET IS THE SAME QUESTION.** `vol_target_gross_x(n_eff) =
+0.15 / (|stop| / sqrt(n_eff))` — the gross that keeps an all-slots stop inside
+the 15% bar. It was already computing a book-relative bound while the gate it
+cites measured against $1,000, so the two were inconsistent: an all-slots stop
+on mum's $579 book is $116 = **11.6% of a grand** and could never reach the bar
+it is priced against. **Now 20% is 20%.**
+
+The check Eamon asked for, measured: **her gross is not stably above or below
+target — the target MOVES and she oscillates across it.** Across ~1h her
+`n_eff` went **1.516 → 1.917**, taking `vol_target_here` **4.62 → 5.19**
+against a FIXED `set` of 5.0 — so she read **+8.3% OVER** and then **−3.7%
+UNDER**, with nothing about her configuration changing. 🙏 avo reads −3.9% on
+the same measurement.
+
+**What does NOT move with the basket is the number worth watching: BOTH live
+books sit at `all_slots_stop_pct` = exactly 20.0% against a 15% bar** — both
+configured at exactly **1.333x** the fully-correlated bound. The sqrt(n_eff)
+credit is what bridges that 5pp gap, and it is a probabilistic argument
+re-earned every loop on a basket whose measured `n_eff` is under 2 on 6 and 12
+slots.
+
+**SHIPPED beside it, publish-only:** `vs_vol_target` (the ratio the question
+asks for; >1.0 = gross exceeds what this basket's independence supports) and
+`all_slots_stop_over_bar_pp`. The comment above them already said the gap "is
+the risk being taken, published not argued" — and then published the two
+operands and left the reader to divide, against a target that moves. **The bar
+is DERIVED from this module's own owner** (`vol_target_gross_x(1.0) * |stop| ==
+0.15` by construction), never retyped, so a gate re-spec cannot leave a second
+copy behind.
+
+**NO GROSS WAS CHANGED, and that is deliberate:** risk appetite is Eamon's
+((sr): *"the code's job is the arithmetic, published"*), 👩 mum already carries
+a pre-registered rho read, and cutting a live book's size on an hour of a
+moving ratio is exactly what I25 forbids. The arithmetic is now on the row
+every loop instead of in a session's scratchpad.
+
+**A PIN BLOCKED IT, AND WAS RE-AIMED RATHER THAN DELETED.** `(yr)` shipped
+`test_apply_mtm_still_decides_on_the_book_usd_fraction` — asserting the bar
+does NOT read the peak fraction — and it was exactly right when written: the
+number was REPORTED, the re-spec was Eamon's, and that pin is what stopped a
+later session making it blocking on its own. It now guards the opposite
+direction, and its stated worry (*"swapping it would silently re-verdict every
+live book"*) is answered with the measurement above rather than waived: zero
+flips, no live sizing change. I26: a pin is a snapshot, not a property. Its
+sibling on `grade()` is UNTOUCHED and still passes — `grade` is byte-unchanged
+and does no fold of its own; the fold stays upstream in `apply_mtm`, which is
+what keeps the re-spec to one place. Both were `inspect.getsource` substring
+scans, so the re-aimed one now DRIVES the function instead — `(po)`: a
+page-wide substring scan is not a structural claim, and that form would pass
+against a correct implementation that spelled the field differently.
+
+10/10 mutations RED across the two files (7 on the denominator, 3 on the vol
+target); both hosts' selftests green; full suite green. The live-host half is
+TELEMETRY — main only, no live dispatch ((mm)); the grader half publishes on
+its own 6-hourly loop.
+
 ## 2026-09-07 (yy) — "THERE'S NOTHING TELLING MUM TO JUMP ON THAT COIN": there is, it says the opposite, and the count it says it with is uninterpretable
 
 **Eamon, 7-Sep,** watching 🙏 avo run on a coin 👩 mum never touched: *"It's

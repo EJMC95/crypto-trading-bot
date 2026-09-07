@@ -138,3 +138,49 @@ def test_nothing_reads_the_refusal_names_back():
              and n.func.id == "refused_coins"]
     assert len(calls) == 1, (
         f"expected exactly one call site (the census), found {len(calls)}")
+
+
+# ---------------------------------------------------------------------------
+# [(yz)] THE VOL-TARGET GAP, PUBLISHED AS A NUMBER
+# ---------------------------------------------------------------------------
+# Eamon, 2026-09-07: *"check mum's gross vs her vol target."* Answering it
+# meant dividing two published operands by hand — against a target that MOVES:
+# measured across ~1h that day her `n_eff` went 1.516 -> 1.917, taking
+# `vol_target_here` 4.62 -> 5.19 against a FIXED `set` of 5.0, so she read
+# +8.3% OVER target and then -3.7% UNDER it with nothing about her
+# configuration changing.
+
+def test_the_bar_is_derived_from_this_modules_own_owner_never_retyped():
+    """`vol_target_gross_x(1.0) * |stop| == GOLIVE_MAX_DD` by construction.
+
+    A retyped constant is a constant that drifts (house rule), and this one
+    would drift against a gate re-spec in another file with nothing red.
+    """
+    stop = abs(float(A.S.stoploss))
+    assert abs(A.vol_target_gross_x(1.0) * stop - 0.15) < 1e-9, (
+        "the all-slots-stop bar no longer falls out of vol_target_gross_x — "
+        "if the gate's bar moved, this must follow it, not a second copy")
+
+
+def test_vol_target_credits_independence_by_sqrt_n_eff():
+    """The relaxation that bridges a 20% worst case to a 15% bar is a
+    PROBABILISTIC argument re-earned every loop — pin its shape."""
+    one = A.vol_target_gross_x(1.0)
+    assert abs(A.vol_target_gross_x(4.0) - one * 2.0) < 1e-3, (
+        "n_eff=4 must credit exactly 2x (sqrt) — a different exponent silently "
+        "re-prices every live book's headroom")
+    assert A.vol_target_gross_x(0.5) == one, (
+        "n_eff below 1 must not be credited BELOW the fully-correlated bound "
+        "and must never widen it")
+
+
+def test_a_gross_above_the_basket_target_reads_above_one():
+    """`vs_vol_target` is the ratio the question actually asks for."""
+    stop = abs(float(A.S.stoploss))
+    for n_eff, gross in ((1.516, 5.0), (1.917, 5.0)):
+        target = 0.15 / (stop / n_eff ** 0.5)
+        ratio = gross / target
+        assert (ratio > 1.0) is (gross > target)
+    # the two live readings an hour apart, on mum's own numbers
+    assert 0.15 / (0.04 / 1.516 ** 0.5) < 5.0, "she read OVER target at n_eff 1.516"
+    assert 0.15 / (0.04 / 1.917 ** 0.5) > 5.0, "and UNDER it at n_eff 1.917"

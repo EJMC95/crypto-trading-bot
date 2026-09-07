@@ -2197,6 +2197,47 @@ def main(_ctx=None, once=False):
                                    else None),
                     "vol_target_here": (vol_target_gross_x(held_n_eff)
                                         if held_n_eff else None),
+                    # [2026-09-07 (yz)] THE GAP, AS A NUMBER. Eamon, 7-Sep:
+                    # *"check mum's gross vs her vol target."* The comment
+                    # above already said the gap "is the risk being taken,
+                    # published not argued" — and then published the two
+                    # operands and left the reader to divide, so answering the
+                    # question meant a hand calculation against a target that
+                    # MOVES. Measured across ~1h that day, 👩 mum's `n_eff`
+                    # went 1.516 -> 1.917, taking `vol_target_here` 4.62 ->
+                    # 5.19 against a FIXED `set` of 5.0 — so she read +8.3%
+                    # OVER target and then -3.7% UNDER it, without anything
+                    # changing about her configuration. A ratio nobody can see
+                    # oscillate is a ratio nobody knows they are crossing.
+                    #
+                    # `vs_vol_target` > 1.0 means the configured gross exceeds
+                    # what THIS basket's measured independence supports.
+                    "vs_vol_target": (
+                        round(gross_x() / vol_target_gross_x(held_n_eff), 4)
+                        if held_n_eff and vol_target_gross_x(held_n_eff)
+                        else None),
+                    # And the half that does NOT move with the basket, which is
+                    # why it is the one worth watching: `all_slots_stop_pct` is
+                    # the DETERMINISTIC worst case (`gross_x * |stop|`), while
+                    # `vol_target_here` credits sqrt(n_eff) — a probabilistic
+                    # argument re-earned every loop. Measured the day this
+                    # shipped, BOTH live books sit at exactly 20.0% against a
+                    # 15% bar, i.e. both configured at 1.333x the fully
+                    # correlated bound; positive here = outside the bar.
+                    #
+                    # It became a MEANINGFUL comparison only with `(yz)`'s
+                    # denominator fix: while the gate divided every drawdown by
+                    # $1,000, an all-slots stop on mum's $579 book was $116 =
+                    # 11.6% of a grand and could never reach the bar it is
+                    # priced against. Now 20% is 20%.
+                    #
+                    # The bar is DERIVED from this module's own owner, never
+                    # retyped: `vol_target_gross_x(1.0) * |stop| == 0.15` by
+                    # construction, so the two cannot drift apart.
+                    "all_slots_stop_over_bar_pp": round(
+                        100 * (gross_x() * abs(float(S.stoploss))
+                               - vol_target_gross_x(1.0)
+                               * abs(float(S.stoploss))), 2),
                     # [(sy)] READ FROM THE VENUE, not a literal. The worst
                     # maintenance-margin fraction across the books this
                     # universe actually trades — 600bps, not the 300bps (sr)

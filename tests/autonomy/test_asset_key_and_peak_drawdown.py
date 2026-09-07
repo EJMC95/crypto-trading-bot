@@ -183,10 +183,68 @@ def test_the_grade_is_byte_unchanged_by_the_new_field():
     assert "GOLIVE_MAX_DD" in src or "max_dd_frac" in src
 
 
-def test_apply_mtm_still_decides_on_the_book_usd_fraction():
-    """`apply_mtm` folds the WORSE of realised and MTM into the graded number.
-    It must keep using `max_dd_frac` — swapping it for the peak fraction would
-    silently re-verdict every live book."""
-    import inspect
-    src = inspect.getsource(gr.apply_mtm)
-    assert "max_dd_frac_peak" not in src
+def test_apply_mtm_decides_on_the_peak_relative_fraction():
+    """RE-AIMED at (yz), not deleted — and the reason is recorded here.
+
+    This was `test_apply_mtm_still_decides_on_the_book_usd_fraction`, and it
+    was CORRECT when (yr) wrote it: the peak fraction shipped as REPORTED, the
+    re-spec was Eamon's to make, and this pin is what stopped a later session
+    quietly making it blocking. He made it on 7-Sep — *"Fix the drawdown
+    denominator"* — so the pin now guards the opposite direction.
+
+    Its stated worry was that swapping the fraction "would silently re-verdict
+    every live book". That was the right question and it is ANSWERED WITH A
+    MEASUREMENT rather than waived: on the live payload, all 14 graded books,
+    the change produced **zero verdict flips**, and `fleet_bus.dd_scale` — the
+    real-money sizing rail reading this number — moved on no live book. I26:
+    a pin is a snapshot, not a property; when it blocks a change the question
+    is whether the change is right, never whether the pin exists.
+
+    Driven through the function rather than grepped out of its source: the old
+    form asserted a SUBSTRING was absent, which is (po)'s "a page-wide
+    substring scan is not a structural claim" — it would have passed against a
+    correct implementation that spelled the field differently, and failed
+    against a comment that merely mentioned it.
+    """
+    stats_like = {"n": 40, "days": 40.0, "mean_pct": 0.5, "t": 3.0,
+                  "h1": 1.0, "h2": 1.0,
+                  "max_dd_frac": 0.0708, "max_dd_usd": -70.80}
+    mtm = {"n": 3761, "days": 13.0, "max_dd_frac": 0.0643,
+           "max_dd_frac_peak": 0.1104, "peak_equity": 581.96}
+
+    got = gr.apply_mtm(stats_like, mtm)
+
+    # 👩 mum's real shape: $70.80 of hole on a book that peaked at $581.96.
+    assert got["maxdd_denom"] == "peak_equity"
+    assert got["max_dd_frac"] == pytest.approx(70.80 / 581.96, rel=1e-4), (
+        "the graded fraction is not the book's own peak-relative drawdown")
+    assert got["max_dd_frac"] > mtm["max_dd_frac_peak"], (
+        "the REALISED half must be able to decide too — rebasing only the MTM "
+        "half leaves a $1,000-denominated number able to win the max()")
+
+    # The superseded reading is kept, not hidden (I12).
+    assert got["max_dd_frac_book"] == pytest.approx(0.0708)
+
+    # ONE denominator, never a mix: without the dollar figure NEITHER half
+    # moves, and the realised hole must still be able to fail the bar.
+    no_dollars = {k: v for k, v in stats_like.items() if k != "max_dd_usd"}
+    no_dollars["max_dd_frac"] = 0.40
+    kept = gr.apply_mtm(no_dollars, mtm)
+    assert kept["maxdd_denom"] == "book_usd"
+    assert kept["max_dd_frac"] == pytest.approx(0.40), (
+        "the realised half was dropped when it could not be rebased — a "
+        "silent loosening of the bar that governs real money")
+
+
+def test_the_peak_denominator_is_not_uniformly_stricter():
+    """🎫 the taker's shape, and the fleet's first-ever READY: a book whose
+    equity peaked ABOVE $1,000 reads LOWER, because the denominator grew.
+    Pinned so nobody re-sells this change as a one-way tightening."""
+    got = gr.apply_mtm(
+        {"n": 187, "days": 37.8, "mean_pct": 1.17, "t": 2.6, "h1": 1.0,
+         "h2": 1.0, "max_dd_frac": 0.0231, "max_dd_usd": -23.10},
+        {"n": 3000, "days": 30.0, "max_dd_frac": 0.0542,
+         "max_dd_frac_peak": 0.0458, "peak_equity": 1185.20})
+    assert got["max_dd_frac"] == pytest.approx(0.0458)
+    assert got["max_dd_frac"] < got["max_dd_frac_book"]
+    assert gr.bar_map(got)["maxdd"] is True
