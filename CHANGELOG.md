@@ -1,8 +1,14 @@
 ## 2026-09-07 (yo) — SIX PRE-REGISTERED READS SAY "THE DATE IS THE BACKSTOP, NOT THE TRIGGER" AND NOTHING WAS MEASURING THE TRIGGER: 🪁 kelly's had been due for three and a half weeks, and its verdict is the branch that returns to Eamon
 
-> **[RENUMBERED (ym) -> (yn) -> (yo) at push.]** A concurrent session took (ym) on main
-> while this branch was in CI; that entry keeps the letter per the letters rule.
-> Three code citations moved with it (`grep -rn`, counted).
+> **[RENUMBERED (ym) -> (yn) -> (yo) at push.]** Two concurrent sessions took (ym)
+> and then (yn) on main while this branch was in CI; both entries keep their
+> letters per the letters rule. Three code citations moved with it (`grep -rn`,
+> counted). **The second hop nearly shipped stale:** the renumber helper reported
+> "0 citations moved" and `audit_changelog_letters` stayed GREEN anyway — because
+> `(yn)` still RESOLVED, just to somebody else's entry. The guard checks that a
+> citation resolves, not that it resolves to the entry that meant it, which is the
+> `(qz)` hazard one turn further on. Caught by re-grepping after the push rather
+> than trusting the helper's own count — read back what landed.
 
 `(yl)` closed a measurement defect; this is the carried-work half of the same
 pass (I11 — *start the next pass from the carried list*). The fleet holds

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """🪁 band-kelly's PRE-REGISTERED keep-or-retire read (EDGE_AUDIT_2026-09-02 §6.1).
 
-[2026-09-07 (yn)] The registration lived as a HANDOFF row and a
+[2026-09-07 (yo)] The registration lived as a HANDOFF row and a
 `golive_readiness.DECIDED_UNTIL` date. Its own words are that the DATE is the
 BACKSTOP and the SAMPLE is the trigger — *"at n>=60 fresh closes since 1-Sep or
 on 1-Oct, whichever first"* — and nothing in the tree measured the sample. So
