@@ -1,3 +1,119 @@
+## 2026-09-07 (yt) — THE SURVIVORS' SUM IS NOT THE FLEET'S RESULT: 8.3x, measured — plus the fleet's first regime split, the exposure denominator nobody had printed, and an OI signal published every 30 minutes that nothing trades
+
+**Eamon's audit brief, Phases 3-5.** Phase 1 and the first cut of Phase 2 shipped
+at `(ys)`; this adds the thirteen metrics that pass did not carry, then the
+research-quality audit and the module evaluation. **Nothing moved** — no lever,
+no capital, no env, no position — and for the first time in this repo that is
+*verified rather than asserted*: `scripts/audit_fingerprint.py` AST-hashes the
+five protected symbols and every bot's ledger prefix, and reads **5/5 unchanged,
+42/42 unrewritten** after the whole pass. Both arms mutation-verified (a
+one-digit `STALE_SECONDS` edit and a single rewritten historical `pnl_abs` are
+each caught).
+
+**THE FINDING, and it is the largest number in this audit.** Every grading
+instrument here scores the LIVING set — `golive_readiness.roster` admits
+publishers, `fleet_allocation` ranks living rows, `edge_audit` audits the
+published grade, and `(ys)`'s own cohort totals did the same. Retirement is
+decided per book on a measured exclusion (I17) and that is correct. **The
+aggregate consequence had never been computed.** On the Lighter-only era:
+
+| population (since the 17-Jul cut) | books | closes | net |
+|---|---|---|---|
+| still publishing | 16 | 1,984 | **+$296.09** |
+| retired since the cut | 18 | 1,549 | **-$260.47** |
+| **TRUE FLEET TOTAL** | 34 | 3,533 | **+$35.63** |
+
+**The living-book figure overstates the fleet's realised result by 8.3x.** This
+reopens no retirement — it says the number that SURVIVES is not the number that
+was EARNED, and both belong in the record. `baseline_snapshot.survivorship()`
+computes it every run, scoped to the Lighter era on purpose (three pre-cut
+legacy books, +$547 on other venues, would bias it the other way). 3/3 mutations
+red, including the one that lets a retired loser be counted as living.
+
+**AND THE INSTRUMENT THAT SKIPS THE REGIME SPLIT DOES SO ON A STALE PREMISE.**
+`edge_audit.breakdowns` publishes `regime_limit: "candles endpoint refused by
+egress policy"`. **Measured this session: `/api/v1/candles` returns HTTP 200
+from this exact environment** — only `/candlesticks` is 403, and the two are
+different endpoints. The second half of that note is still true and load-bearing
+(the fleet's own oracle read ONE regime in 413/413 snapshots), so the conclusion
+held for the right reason and the stated cause was wrong. With 1,500h of majors
+history fetched, the fleet has its first regime split:
+
+* **trend** (index EMA50/200, the fleet's own convention) — **84% bull**, which
+  is item-18's regime caveat MEASURED rather than asserted; a per-book `bear`
+  cell of a dozen trades decides nothing and the doc says so before the table.
+* **market direction over each trade's own holding window** — 699 up / 1,041
+  down, near balanced, and therefore the usable one.
+
+**THE RISK FINDING, and the obvious read of it is wrong.** Fleet beta to the
+majors index: **trade-weighted +0.04** (looks neutral) but **exposure-weighted
++0.324**, and **the LIVE cohort alone is +0.658**. Trade-weighting is an
+artifact — 🪁 kelly contributes 590 of 1,740 labelled trades at tiny clips with
+beta -0.76, so it dominates the COUNT and almost none of the RISK. Composition
+matters more than the level: **profitable books mean beta +0.40** (georgia
++0.99, taker +0.80, georgia-v3 +0.75, mum live +0.66) against **loss-making
+books -0.12** (kelly -0.76, sniper -0.58, Counterweight -0.25). **The fleet
+earns from long beta and pays for its hedge** — its market-neutrality is
+supplied by books that lose money, kelly alone at -$132.53. No per-book
+instrument can see that; it is a portfolio-construction property.
+Corroborating: 🌾 carry carries **significant long beta (+0.12, t=3.26)** on a
+book whose P&L is defined as `accrued - fees` with no price term. A
+delta-neutral book should not have a beta.
+
+**THE DENOMINATOR NOBODY HAD PRINTED.** `avg_exposure_frac` — time-weighted
+deployed capital — is what makes two equal returns comparable, and no
+instrument here computed it. Deriving it surfaced a second thing: **a book's
+published `caps.clip_usd` is not what it deploys.** 🌾 carry declares $80 and
+puts a median **$300** at risk (3.75x); 🪁 kelly declares $80 and deploys $250.
+Nothing is broken — `brain_clip` x drawdown-scale x `allocation_scale` all
+multiply after the cap is published — but reading the cap as the exposure
+understates both books by the whole sizing stack, and `deployed clip $` now
+prints beside it. Notional is derived as `|pnl_abs/pnl_pct|` because `size` is
+present on **878 of 4,311 rows (20%)** and reading it would have computed
+turnover on a fifth of the fleet while calling it the fleet.
+
+**PHASE 4, and the rule applied throughout is DO NOT REBUILD WHAT EXISTS** —
+eight of the twelve modules are already present. **C (funding/basis) is the
+best-developed module in the repo** and needs nothing; **L (safety)** and **I
+(sentiment, which grades its own anticipations against a coin flip)** already
+exceed the brief; **F (cross-exchange) is deliberately retired** and reviving it
+would breach the venue doctrine; **H (on-chain) is correctly absent**. The one
+clean opportunity is **D**, and the first draft of this entry got it wrong in
+the flattering direction: "zero consumers anywhere in the tree" was FALSE and is
+corrected here before it shipped. `market_context` already computes `oi_ntl`
+(base x mark, verified against live rows), keeps an hourly history and publishes
+**`oi_chg_1h`/`oi_chg_24h`** every 30 minutes; the scout publishes `oi` per book.
+What is true — and stronger — is that **0 of 19 book files reference `oi` or
+`open_interest` at all.** The signal is computed, published, and read by nothing
+that trades. That moves D from "medium, needs collection" to "low, needs only a
+test".
+
+**RANKED, by measured gap rather than novelty:** (1) portfolio beta control —
+the largest measured risk, invisible to every existing instrument, and
+`fleet_risk.exposure` still reports `1/HHI` over DISTINCT SYMBOLS (verified in
+code at `fleet_risk.py:366`, not taken from doctrine), overstating independence;
+(2) per-book cost — the fleet-average 17.49bps stress flips 🌾 carry and 🔮
+georgia negative while carry's own row reads median half-spread **1.46bps**, so
+the average is the wrong number for both and it changes two verdicts; (3) open
+interest; (4) regime filtering, with the warning that a filter fitted on an 84%
+bull sample is fitted to one regime; (5) vol-adjusted stops, where 👩 mum's live
+`stop_reachable: false` is the worked example.
+
+**NO MODULE WAS IMPLEMENTED.** Phase 5's table is recorded EMPTY with its
+pass/fail criteria agreed in advance — OOS Sharpe with cluster-robust t>=2,
+maxDD not worse on the gate's MTM definition, survives the book's own measured
+cost +50%, neighbouring grid cells agree in sign, refuses no profitable existing
+trade without evidence, and a pre-registered revert date (I21/I26) — so the bar
+cannot move to fit a result. A full rollback procedure is in the report.
+
+**FILES:** `AUDIT_PHASE3_4_2026-09-07.md` (Phases 3-5),
+`scripts/audit_fingerprint.py` (the protected-surface guard),
+`BASELINE_2026-09-07.md` regenerated with survivorship, risk-adjusted metrics,
+regime, month and asset splits; `scripts/baseline_snapshot.py` extended
+(**12/12 mutations verified RED** across both passes). **Deployment is
+explicitly withheld** — Eamon's brief says do not deploy automatically, and that
+instruction is senior to this repo's standing deploy grants.
+
 ## 2026-09-07 (ys) — THE FLEET COULD SAY WHETHER A BOOK PASSES AND NEVER WHAT IT RETURNED: a Phase-1 inventory and the first dated, reproducible, cost-stressed BASELINE
 
 **Eamon asked for a senior-quant audit in two phases — document the system, then

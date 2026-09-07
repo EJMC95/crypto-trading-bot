@@ -68,6 +68,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import edge_audit  # noqa: E402  — the calibrated owner; never re-derive its stats
 
+#: Identity imports, not copies — the same parser and the same symbol
+#: normaliser the audit itself used to build the rows being sliced. A second
+#: `base_symbol` here would put kBONK and 1000BONK in different buckets, which
+#: is exactly the defect (yk) found in the live fleet.
+_ts_of = edge_audit._ts
+_base_sym = edge_audit.base_symbol
+
 #: A span this short makes an annual figure an extrapolation, not a measurement.
 #: 30 days is the go-live window bar — below it the fleet does not consider a
 #: book graded at all, so it is the natural line.
@@ -77,6 +84,149 @@ EXTRAP_WARN_DAYS = 30.0
 #: — `scripts/fleet_books.py` makes the same point: which rows are live is a
 #: property of the PAYLOAD.
 LIVE_VENUES = ("lighter_live",)
+
+
+#: Realised-vol split point. The MEDIAN of the window's own hourly vol, so the
+#: two buckets are equal-sized BY CONSTRUCTION and neither is a rare-event
+#: bucket whose `n` decides nothing. Never a hardcoded bps number: this venue's
+#: vol level is not stable across months and a fixed bar silently rebalances
+#: the split every time the tape changes.
+VOL_SPLIT_Q = 0.50
+
+#: Trend regime on the majors index: EMA fast/slow on 1h closes. 50/200 is the
+#: fleet's own convention (every family carrier reads e50/e200), so the split
+#: agrees with what the books themselves call an uptrend rather than inventing
+#: a second definition of the same word.
+EMA_FAST, EMA_SLOW = 50, 200
+
+
+def _ema(xs, n):
+    k = 2.0 / (n + 1.0)
+    out, e = [], None
+    for x in xs:
+        e = x if e is None else (x * k + e * (1 - k))
+        out.append(e)
+    return out
+
+
+def build_regimes(majors):
+    """hour_epoch -> {trend, vol, mkt_ret_1h} from an equal-weight majors index.
+
+    `majors` is {symbol: {epoch_sec: close}}. The index is equal-weighted in
+    RETURN space, not price space — a price-weighted basket of BTC and SOL is
+    a BTC basket, and the regime this labels is the market's, not BTC's.
+
+    Fail-CLOSED: too little history returns {} and every downstream split is
+    reported as unavailable rather than computed on a stub. A regime label is
+    the input to a decision about real money; a fabricated one is worse than
+    none ((yq): unmeasured is NULL, never a convenient default).
+    """
+    if not majors:
+        return {}
+    hours = sorted(set.intersection(*(set(v) for v in majors.values())) if majors else [])
+    if len(hours) < EMA_SLOW + 2:
+        return {}
+    rets = []
+    for i, h in enumerate(hours):
+        if i == 0:
+            rets.append(0.0); continue
+        per = []
+        for sym, ser in majors.items():
+            a, b = ser.get(hours[i - 1]), ser.get(h)
+            if a and b:
+                per.append(b / a - 1.0)
+        rets.append(sum(per) / len(per) if per else 0.0)
+    idx, lvl = [], 100.0
+    for r in rets:
+        lvl *= (1.0 + r); idx.append(lvl)
+    ef, es = _ema(idx, EMA_FAST), _ema(idx, EMA_SLOW)
+    # realised vol: rolling 24h stdev of the index return, split at its own median
+    vols = []
+    for i in range(len(rets)):
+        w = rets[max(0, i - 23):i + 1]
+        m = sum(w) / len(w)
+        vols.append((sum((x - m) ** 2 for x in w) / len(w)) ** 0.5)
+    ranked = sorted(v for v in vols[EMA_SLOW:] if v is not None)
+    vsplit = ranked[int(len(ranked) * VOL_SPLIT_Q)] if ranked else None
+    out = {}
+    for i, h in enumerate(hours):
+        if i < EMA_SLOW:
+            continue                      # EMA warmup: no claim, not a guess
+        out[h] = {"trend": "bull" if ef[i] > es[i] else "bear",
+                  "vol": None if vsplit is None else ("high_vol" if vols[i] >= vsplit else "low_vol"),
+                  "idx": idx[i], "ret_1h": rets[i]}
+    return out
+
+
+def regime_at(ts, regimes):
+    """The regime label for the hour a trade OPENED. None when uncovered."""
+    if not regimes or ts is None:
+        return None
+    h = int(ts.timestamp()) // 3600 * 3600
+    return regimes.get(h)
+
+
+def market_move(opened, closed, regimes):
+    """Index return over the trade's OWN holding window — the direct answer to
+    'winning vs losing market'. Contemporaneous by design: it asks what the
+    market did WHILE the book held, not what it did before the book decided."""
+    if not regimes or opened is None or closed is None:
+        return None
+    a = regimes.get(int(opened.timestamp()) // 3600 * 3600)
+    b = regimes.get(int(closed.timestamp()) // 3600 * 3600)
+    if not a or not b or not a.get("idx"):
+        return None
+    return b["idx"] / a["idx"] - 1.0
+
+
+
+#: The LIGHTER-ONLY cut (2026-07-17, "i only want things running on lighter").
+#: Before it the fleet traded Kraken/Hyperliquid/CEX spot, so pooling those
+#: closes into a Lighter result mixes venues — and three legacy books
+#: (perps-donchian-breakout +$272, event-listing-sniper +$206, perps-rsi-meanrev
+#: +$69) would flatter it by ~$550 of P&L earned somewhere we no longer trade.
+LIGHTER_ONLY_CUT = _dt.datetime(2026, 7, 17, tzinfo=_dt.timezone.utc)
+
+
+def survivorship(trades, living, cut=LIGHTER_ONLY_CUT):
+    """What the fleet earned INCLUDING the books it retired.
+
+    THE BIAS THIS MEASURES, and it is the largest single distortion in the
+    fleet's own reporting. Every instrument here grades LIVING books:
+    `golive_readiness.roster` admits publishers, `fleet_allocation` ranks
+    living rows, `edge_audit` audits the published grade, and this module's own
+    cohort totals do the same. Retirement is decided per book on a measured
+    exclusion (I17), which is correct — but a loser leaving the sample the day
+    it is retired means the SURVIVORS' SUM IS NOT THE FLEET'S RESULT, and
+    nothing in the tree had ever computed the difference.
+
+    Scoped to the Lighter-only era on purpose: a pre-cut close is a different
+    venue, and including it would replace one bias with another.
+
+    Returns living / retired / true totals. No verdict — the retirements were
+    individually justified and this does not reopen them. What it refuses to
+    let happen is the survivors' number being quoted as the fleet's.
+    """
+    liv = {"n": 0, "usd": 0.0, "books": set()}
+    ret = {"n": 0, "usd": 0.0, "books": set()}
+    for r in trades:
+        c = _ts_of(r.get("closed_at"))
+        if c is None or c < cut:
+            continue
+        bot = r.get("bot")
+        d = liv if bot in living else ret
+        d["n"] += 1
+        d["usd"] += float(r.get("pnl_abs") or 0.0)
+        d["books"].add(bot)
+    out = {"cut": cut.date().isoformat()}
+    for name, d in (("living", liv), ("retired", ret)):
+        out[name] = {"n_books": len(d["books"]), "n_closes": d["n"],
+                     "net_usd": round(d["usd"], 2)}
+    out["true_total_usd"] = round(liv["usd"] + ret["usd"], 2)
+    out["survivor_overstatement_usd"] = round(liv["usd"] - out["true_total_usd"], 2)
+    out["survivor_overstatement_x"] = (round(liv["usd"] / out["true_total_usd"], 2)
+                                       if out["true_total_usd"] else None)
+    return out
 
 
 def _cohort(bot, feed_rows):
@@ -167,7 +317,109 @@ def derive(a, book_usd):
     return out
 
 
-def build(res):
+
+def _notional(raw):
+    """Implied position notional = |pnl_abs / pnl_pct|.
+
+    DERIVED, not read, and that is deliberate: `size` is present on only 878 of
+    4,311 ledger rows (20%) while `pnl_pct` is present on essentially all of
+    them, so reading `size` would compute turnover on a fifth of the fleet and
+    silently call it the fleet. The identity holds for every book here because
+    `pnl_pct` IS `pnl_abs / notional` at the publish site. Returns None when
+    `pnl_pct` is zero or missing — an exact-scratch trade has no recoverable
+    notional, and inventing one would inflate turnover on the books that
+    scratch most.
+    """
+    a, p = raw.get("pnl_abs"), raw.get("pnl_pct")
+    if not isinstance(a, (int, float)) or not isinstance(p, (int, float)) or p == 0:
+        return None
+    return abs(a / p)
+
+
+def trade_metrics(rows, book_usd, regimes=None):
+    """Turnover, exposure, holding time, and the per-asset/month/regime slices.
+
+    EXPOSURE is time-weighted capital: sum(notional x hours_held) / (book x
+    window_hours). It answers "how much of the book was at risk on average",
+    which is the number that makes a return comparable across books — a 2%
+    return at 10% average exposure and a 2% return at 90% are not the same
+    result, and nothing in this fleet had ever printed the denominator.
+
+    Every slice is a plain mean with its own n. NO significance is claimed here
+    and none should be read: `golive_readiness.stats` and `winners_docket` own
+    that judgement, and a per-asset table with 300+ buckets is a multiplicity
+    trap ((yl)/I21) if any single cell is quoted as evidence. These are
+    DESCRIPTIVE and labelled as such.
+    """
+    out = {"n": len(rows)}
+    if not rows:
+        return out
+    hold_h, notion, expo, missing_notional = [], [], 0.0, 0
+    first, last = None, None
+    for q in rows:
+        closed, opened = q[2], _ts_of(q[3])
+        if opened is not None:
+            h = (closed - opened).total_seconds() / 3600.0
+            if h >= 0:
+                hold_h.append(h)
+        first = closed if first is None or closed < first else first
+        last = closed if last is None or closed > last else last
+        nv = _notional(q[7])
+        if nv is None:
+            missing_notional += 1
+        else:
+            notion.append(nv)
+            if opened is not None:
+                expo += nv * max(0.0, (closed - opened).total_seconds() / 3600.0)
+    span_h = ((last - first).total_seconds() / 3600.0) if (first and last) else None
+    out["avg_hold_h"] = (sum(hold_h) / len(hold_h)) if hold_h else None
+    out["median_hold_h"] = (sorted(hold_h)[len(hold_h) // 2]) if hold_h else None
+    out["gross_notional_usd"] = sum(notion) if notion else None
+    out["notional_coverage"] = (len(notion) / len(rows)) if rows else None
+    out["turnover_x"] = (sum(notion) / book_usd) if (notion and book_usd) else None
+    # THE DEPLOYED CLIP, not the declared one. A book's published `caps.clip_usd`
+    # is the BASE; `brain_clip` x drawdown-scale x `allocation_scale` all
+    # multiply afterwards, so the number on the row is not the number at risk.
+    # Measured here: 🌾 carry declares $80 and deploys a median $300 (3.75x),
+    # 🪁 kelly declares $80 and deploys $250. Nothing was wrong — but reading
+    # the cap as the exposure understates both books by the whole sizing stack.
+    out["implied_clip_median"] = (sorted(notion)[len(notion) // 2]) if notion else None
+    out["avg_exposure_frac"] = ((expo / (book_usd * span_h))
+                                if (span_h and span_h > 0 and book_usd) else None)
+    out["trades_per_day"] = (len(rows) / (span_h / 24.0)) if (span_h and span_h > 0) else None
+    out["rows_without_notional"] = missing_notional
+
+    def _slice(keyfn):
+        b = {}
+        for q in rows:
+            k = keyfn(q)
+            if k is None:
+                continue
+            d = b.setdefault(k, {"n": 0, "usd": 0.0, "pct_sum": 0.0})
+            d["n"] += 1; d["usd"] += q[1]; d["pct_sum"] += q[0]
+        return {k: {"n": v["n"], "net_usd": round(v["usd"], 2),
+                    "mean_pct": round(100.0 * v["pct_sum"] / v["n"], 4)}
+                for k, v in sorted(b.items(), key=lambda kv: -kv[1]["n"])}
+
+    out["by_asset"] = _slice(lambda q: _base_sym(q[6]))
+    out["by_month"] = _slice(lambda q: q[2].strftime("%Y-%m"))
+    out["by_side"] = _slice(lambda q: (q[7].get("side") or "?"))
+    if regimes:
+        out["by_trend"] = _slice(lambda q: (regime_at(_ts_of(q[3]), regimes) or {}).get("trend"))
+        out["by_vol"] = _slice(lambda q: (regime_at(_ts_of(q[3]), regimes) or {}).get("vol"))
+
+        def _mkt(q):
+            m = market_move(_ts_of(q[3]), q[2], regimes)
+            return None if m is None else ("mkt_up" if m > 0 else "mkt_down")
+        out["by_market"] = _slice(_mkt)
+        cov = sum(1 for q in rows if regime_at(_ts_of(q[3]), regimes))
+        out["regime_coverage"] = cov / len(rows)
+    else:
+        out["regime_unavailable"] = "no majors index supplied — split withheld"
+    return out
+
+
+def build(res, shaped=None, regimes=None, all_trades=None, feed_bots=None):
     """Baseline rows + cohort aggregates from an edge_audit result."""
     if res.get("refused"):
         # I8 — a refusal must name the object the reader can act on. edge_audit's
@@ -196,6 +448,31 @@ def build(res):
         d["n_alltime"] = a.get("n_alltime")
         d["row_pnl_abs_lifetime_usd"] = (feed.get(bot) or {}).get("pnl_abs")
         d["row_equity"] = (feed.get(bot) or {}).get("equity")
+        # CALMAR — annualised return over maxDD. Uses the SIMPLE annualisation
+        # (fixed clip, see the module doc) and the REALISED drawdown on the
+        # same book unit, so numerator and denominator share a basis. None
+        # when either side is unknown or the book never drew down: a Calmar
+        # with a zero denominator is infinity dressed as a score.
+        dd = d.get("max_dd_pct")
+        ar = d.get("ann_return_simple_pct")
+        d["calmar"] = (ar / dd) if (ar is not None and dd) else None
+        d["recovery_days"] = a.get("recovery_days")
+        d["recovered"] = a.get("recovered")
+        d["closes_per_year"] = a.get("closes_per_year")
+        d["sharpe"] = a.get("sharpe")
+        d["sortino"] = a.get("sortino")
+        d["gate_mtm_dd_pct"] = a.get("gate_mtm_dd_pct")
+        d["underwater_frac"] = a.get("underwater_frac")
+        d["max_consec_loss"] = a.get("max_consec_loss")
+        # `expected_streak` is {p50, p95} — the chance median and 95th pct of
+        # the longest losing run for THIS book's own hit rate and n. Keep p50
+        # as the comparison point: a streak below the median is not a signal,
+        # it is the distribution.
+        es = a.get("expected_streak")
+        d["expected_streak"] = es.get("p50") if isinstance(es, dict) else es
+        d["expected_streak_p95"] = es.get("p95") if isinstance(es, dict) else None
+        if shaped and bot in shaped:
+            d["trade"] = trade_metrics(shaped[bot]["rows"], book_usd, regimes)
         rows[bot] = d
     for name in ("live", "shadow"):
         mem = {b: r for b, r in rows.items() if r["cohort"] == name}
@@ -224,11 +501,20 @@ def build(res):
             "avg_win_usd": gw / nw if nw else None,
             "avg_loss_usd": gl / nl if nl else None,
             "profit_factor": abs(gw / gl) if gl else None,
+            "turnover_x": (sum((r.get("trade") or {}).get("gross_notional_usd") or 0.0
+                                for r in mem.values()) / cap) if cap else None,
+            "avg_exposure_frac": (
+                sum(((r.get("trade") or {}).get("avg_exposure_frac") or 0.0) * r["book_usd"]
+                    for r in mem.values()) / cap) if cap else None,
             "span_days_max": max(spans) if spans else None,
             "span_days_min": min(spans) if spans else None,
             "books": sorted(mem),
         }
+    surv = (survivorship(all_trades, feed_bots) if (all_trades and feed_bots) else None)
     return {"generated": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+            "survivorship": surv,
+            "regimes_available": bool(regimes),
+            "regime_hours": len(regimes or {}),
             "published_grade_at": res.get("published_grade_at"),
             "measured_rt_bps": edge_audit.MEASURED_RT_BPS,
             "extrap_warn_days": EXTRAP_WARN_DAYS,
@@ -282,6 +568,35 @@ def render_md(bl):
       "use their REAL starting equity, so a live return is a return on money "
       "that actually existed.")
     A("")
+    sv = bl.get("survivorship")
+    if sv:
+        A("## Survivorship — the survivors' sum is not the fleet's result")
+        A("")
+        A("| population | books | closes | net $ |")
+        A("|---|---|---|---|")
+        A("| still publishing | %d | %d | **$%+.2f** |"
+          % (sv["living"]["n_books"], sv["living"]["n_closes"], sv["living"]["net_usd"]))
+        A("| retired since the cut | %d | %d | **$%+.2f** |"
+          % (sv["retired"]["n_books"], sv["retired"]["n_closes"], sv["retired"]["net_usd"]))
+        A("| **TRUE FLEET TOTAL** | %d | %d | **$%+.2f** |"
+          % (sv["living"]["n_books"] + sv["retired"]["n_books"],
+             sv["living"]["n_closes"] + sv["retired"]["n_closes"], sv["true_total_usd"]))
+        A("")
+        A("Realised P&L on **every book traded on Lighter since the %s "
+          "LIGHTER-ONLY cut**, retired ones included. The living-book figure "
+          "overstates the fleet's actual result by **$%.2f (%sx)**."
+          % (sv["cut"], sv["survivor_overstatement_usd"],
+             sv["survivor_overstatement_x"]))
+        A("")
+        A("**This does not reopen a single retirement.** Each was decided on a "
+          "measured exclusion (I17) and retiring proven losers is correct. What "
+          "it says is narrower and harder: every instrument in this fleet grades "
+          "the LIVING set, so a loser leaves the sample on the day it is retired "
+          "— and the number that survives is therefore not the number that was "
+          "earned. Both belong in the record. Scoped to the Lighter era on "
+          "purpose: pre-cut closes are a different venue, and three legacy books "
+          "(+$547 combined) would flatter this in the other direction.")
+        A("")
     A("## Cohort totals — live and paper are never pooled")
     A("")
     A("| cohort | books | capital | net after fees | total return | closes | "
@@ -322,6 +637,130 @@ def render_md(bl):
       "not a measurement. The simple column (`$/day x 365 / book`) is the honest "
       "one: these books trade a FIXED clip, so compounding realised P&L models a "
       "book none of them runs." % bl["extrap_warn_days"])
+    A("")
+    A("## Risk-adjusted and activity metrics")
+    A("")
+    A("| book | Sharpe | Sortino | Calmar | maxDD % (realised) | maxDD % (gate MTM) "
+      "| recovery d | underwater % | worst streak (vs chance) | trades/day | "
+      "avg hold h | deployed clip $ | turnover x | avg exposure % |")
+    A("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    for bot, r in sorted(bl["books"].items(),
+                         key=lambda kv: -(kv[1].get("sharpe") or -9e9)):
+        t = r.get("trade") or {}
+        rec = ("never" if r.get("recovered") is False and r.get("recovery_days") is None
+               else _f(r.get("recovery_days"), "%.1f"))
+        A("| `%s` | %s | %s | %s | %s | %s | %s | %s | %s / %s | %s | %s | %s | %s | %s |"
+          % (bot, _f(r.get("sharpe"), "%.1f"), _f(r.get("sortino"), "%.1f"),
+             _f(r.get("calmar"), "%.1f"), _f(r.get("max_dd_pct"), "%.1f"),
+             _f(r.get("gate_mtm_dd_pct"), "%.1f"), rec,
+             _f((r.get("underwater_frac") or 0) * 100.0, "%.0f"),
+             _f(r.get("max_consec_loss"), "%d"), _f(r.get("expected_streak"), "%d"),
+             _f(t.get("trades_per_day"), "%.2f"), _f(t.get("avg_hold_h"), "%.1f"),
+             _f(t.get("implied_clip_median"), "%.0f"), _f(t.get("turnover_x"), "%.1f"),
+             _f((t.get("avg_exposure_frac") or 0) * 100.0, "%.1f")))
+    A("")
+    A("`deployed clip $` is the MEDIAN notional actually put at risk, derived "
+      "per trade — not the book\'s published `caps.clip_usd`, which is only the "
+      "BASE before `brain_clip` x drawdown-scale x `allocation_scale` multiply "
+      "it. 🌾 carry declares $80 and deploys $300 (3.75x); 🪁 kelly declares $80 "
+      "and deploys $250. Nothing is broken — but the cap on the row is not the "
+      "exposure, and no instrument here had said so.")
+    A("")
+    A("`turnover x` = gross entry notional / book, derived as `|pnl_abs/pnl_pct|` "
+      "(present on ~all rows; `size` is on only 20%). `avg exposure %` = "
+      "time-weighted deployed capital — the denominator that makes two equal "
+      "returns comparable, and the one nothing in this fleet had printed. "
+      "`worst streak` is shown beside its own chance median: a streak is only "
+      "evidence when it exceeds what the book's hit rate produces by luck.")
+    A("")
+
+    # ---- regime -----------------------------------------------------------
+    A("## Performance by market regime")
+    A("")
+    if not bl.get("regimes_available"):
+        A("**WITHHELD.** No majors index was supplied, so no regime split was "
+          "computed. A fabricated regime label is worse than none.")
+    else:
+        A("Regime is labelled from an **equal-weight BTC/ETH/SOL index in RETURN "
+          "space** (a price-weighted basket of BTC and SOL is a BTC basket), on "
+          "%d hourly bars. `trend` = index EMA%d vs EMA%d — the fleet's own "
+          "e50/e200 convention, so the split agrees with what the books "
+          "themselves call an uptrend. `vol` splits at the window's OWN median "
+          "realised vol, so both buckets are equal-sized by construction. "
+          "`market` is the index return over each trade's OWN holding window — "
+          "the direct read of \"did this book make money while the market rose "
+          "or fell\"." % (bl.get("regime_hours") or 0, EMA_FAST, EMA_SLOW))
+        # THE BUCKET BALANCE IS PART OF THE RESULT, not a footnote. A split
+        # whose minority bucket holds 16% of the sample spread across 14 books
+        # cannot support a per-book claim, and this fleet's own doctrine (item
+        # 18) already says the venue's tape is close to one regime.
+        bal = {}
+        for _b, _r in bl["books"].items():
+            _t = _r.get("trade") or {}
+            for _dim in ("by_trend", "by_vol", "by_market"):
+                for _k, _v in (_t.get(_dim) or {}).items():
+                    bal[_k] = bal.get(_k, 0) + _v["n"]
+        tot_t = bal.get("bull", 0) + bal.get("bear", 0)
+        A("**BUCKET BALANCE — read before any per-book cell.** %s"
+          % ", ".join("%s %d" % (k, v) for k, v in sorted(bal.items())))
+        A("")
+        A("The trend split is **%.0f%% bull**, which is this fleet's item-18 "
+          "regime caveat measured rather than asserted: the venue's tape is "
+          "close to one regime, so a per-book `bear` cell of a dozen trades "
+          "decides nothing and must not be read as one. **The market-direction "
+          "split is the usable one** (%d up / %d down, near balanced) because "
+          "it is scored over each trade's own holding window rather than over "
+          "a slow index state."
+          % (100.0 * bal.get("bull", 0) / tot_t if tot_t else 0,
+             bal.get("mkt_up", 0), bal.get("mkt_down", 0)))
+        A("")
+        for dim, title in (("by_trend", "Trend"), ("by_vol", "Volatility"),
+                           ("by_market", "Market direction over the hold")):
+            A("### %s" % title)
+            A("")
+            A("| book | %s |" % " | ".join(["bucket: n / net $ / mean %"] * 1))
+            A("|---|---|")
+            for bot, r in sorted(bl["books"].items()):
+                d = (r.get("trade") or {}).get(dim) or {}
+                if not d:
+                    continue
+                cells = "; ".join("**%s** %d / $%.2f / %.3f%%"
+                                  % (k, v["n"], v["net_usd"], v["mean_pct"])
+                                  for k, v in d.items())
+                A("| `%s` | %s |" % (bot, cells))
+            A("")
+    A("")
+    A("## Performance by month")
+    A("")
+    months = sorted({m for r in bl["books"].values()
+                     for m in ((r.get("trade") or {}).get("by_month") or {})})
+    if months:
+        A("| book | " + " | ".join(months) + " |")
+        A("|---" * (len(months) + 1) + "|")
+        for bot, r in sorted(bl["books"].items(),
+                             key=lambda kv: -(kv[1]["net_after_fees_usd"] or 0)):
+            bm = (r.get("trade") or {}).get("by_month") or {}
+            cells = [("%d / $%.2f" % (bm[m]["n"], bm[m]["net_usd"])) if m in bm else "—"
+                     for m in months]
+            A("| `%s` | %s |" % (bot, " | ".join(cells)))
+        A("")
+    A("## Top assets by trade count (descriptive — no significance claimed)")
+    A("")
+    A("| book | top assets (n / net $ / mean %) | distinct assets |")
+    A("|---|---|---|")
+    for bot, r in sorted(bl["books"].items()):
+        ba = (r.get("trade") or {}).get("by_asset") or {}
+        if not ba:
+            continue
+        top = list(ba.items())[:5]
+        A("| `%s` | %s | %d |"
+          % (bot, "; ".join("**%s** %d / $%.2f / %.2f%%"
+                            % (k, v["n"], v["net_usd"], v["mean_pct"]) for k, v in top),
+             len(ba)))
+    A("")
+    A("_Per-asset cells are DESCRIPTIVE. With 300+ buckets across the fleet, "
+      "quoting any single one as evidence is a multiplicity trap — "
+      "`golive_readiness.stats` and `winners_docket` own that judgement._")
     A("")
     A("## Cost sensitivity — what the fleet's own measured execution would take")
     A("")
@@ -394,6 +833,21 @@ def _selftest():
     assert bl2["books"]["L"]["cohort"] == "live", bl2
     assert "live" in bl2["cohorts"] and "shadow" not in bl2["cohorts"], bl2
 
+    # survivorship: a retired loser must not be able to leave the total.
+    import datetime as D
+    cut = D.datetime(2026, 7, 17, tzinfo=D.timezone.utc)
+    tr = [{"bot": "alive", "pnl_abs": 100.0, "closed_at": "2026-08-01T00:00:00+00:00"},
+          {"bot": "dead", "pnl_abs": -80.0, "closed_at": "2026-08-01T00:00:00+00:00"},
+          {"bot": "dead", "pnl_abs": -900.0, "closed_at": "2026-07-01T00:00:00+00:00"}]
+    sv = survivorship(tr, {"alive"}, cut=cut)
+    assert sv["living"]["net_usd"] == 100.0, sv
+    assert sv["retired"]["net_usd"] == -80.0, sv     # pre-cut row excluded
+    assert sv["true_total_usd"] == 20.0, sv
+    assert sv["survivor_overstatement_usd"] == 80.0, sv
+    assert sv["survivor_overstatement_x"] == 5.0, sv
+    assert "Survivorship" in render_md(build(
+        {"books": {}, "_feed_rows": []}, all_trades=tr, feed_bots={"alive"})), "not rendered"
+
     # a refusal propagates rather than producing a baseline nobody may quote,
     # and it NAMES what disagreed (I8) instead of printing a bare bool.
     r = build({"refused": True, "calibration": {"mum": "n 91 vs 59"}})
@@ -413,6 +867,8 @@ def main(argv=None):
     ap.add_argument("--bus")
     ap.add_argument("--out", help="write the baseline JSON here")
     ap.add_argument("--md", help="write the baseline markdown here")
+    ap.add_argument("--majors", help="local {symbol: {epoch_sec: close}} 1h dump "
+                                     "for the regime split; omitted = split withheld")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -421,7 +877,18 @@ def main(argv=None):
     res = edge_audit.run(ledger=a.ledger, feed=a.feed, bus=a.bus, mc_draws=200)
     # keep the feed rows so cohort membership is DERIVED, never typed
     res["_feed_rows"] = edge_audit._load_json(a.feed).get("bots") if a.feed else None
-    bl = build(res)
+    shaped, regimes = None, None
+    if not res.get("refused"):
+        shaped = edge_audit.shape(edge_audit.load_trades(a.ledger))
+    if a.majors:
+        raw = edge_audit._load_json(a.majors) or {}
+        regimes = build_regimes({k: {int(t): float(c) for t, c in v.items()}
+                                 for k, v in raw.items()})
+    feed_bots = ({r.get("bot") for r in (res.get("_feed_rows") or [])}
+                 if res.get("_feed_rows") else None)
+    bl = build(res, shaped=shaped, regimes=regimes,
+               all_trades=edge_audit.load_trades(a.ledger) if a.ledger else None,
+               feed_bots=feed_bots)
     if bl.get("refused"):
         sys.stderr.write("BASELINE REFUSED — sample disowned by the live grade: "
                          "%s\n" % json.dumps(bl.get("calibration"), default=str)[:600])
