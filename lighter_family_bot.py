@@ -2382,18 +2382,71 @@ def control_settle(strategy, ctrl, m, total, notional, null_px):
     Both legs accumulate or neither — an unpaired observation cannot be
     differenced against anything, so dropping it is the honest statistic.
     `null_px` is the placebo coin's mark at the real close's instant; None/0
-    drops the pair. Mutates `ctrl` in place. Never raises."""
+    drops the pair. Mutates `ctrl` in place. Never raises.
+
+    [2026-09-07] **RETURNS THE OBSERVATION IT SETTLES**, `{}` when it settles
+    nothing — see `control_leg`. This is the `(gr)` shape one instrument over:
+    the per-trade placebo return was computed HERE, folded into a running sum,
+    and dropped **21 lines before `publish_paper_trade`**, so the pair existed
+    for one loop iteration and never reached the ledger. Measured 7-Sep across
+    all 4,311 rows: **zero closes carry a control observation**, while the
+    summary row carries only the lifetime aggregate.
+
+    What the aggregate cannot do, and this return makes possible:
+      * a PAIRED statistic — the difference has no standard error without the
+        per-trade pairs, so the published `edge_pct` cannot be tested at all;
+      * ERA SCOPING — the running sum pools across every policy change, which
+        is exactly what `POLICY_ERA` exists to prevent, and this docstring's
+        own `(rp)` note already worries about the same contamination;
+      * any split by tag, side, exit reason or regime;
+      * cluster-robust treatment of legs that close together.
+
+    Returning it costs nothing (the numbers are already computed) and changes
+    no trade, no gate and no size. The accumulation is UNCHANGED, so every
+    existing caller and the published `control` block behave identically.
+    """
+    out = {}
     try:
         _ne = m.get("null_entry")
         if (getattr(strategy, "control_arm", False) and notional
                 and m.get("null_pair") and _ne and null_px
                 and float(_ne) > 0):
+            _null_ret = (float(null_px) - float(_ne)) / float(_ne)
             ctrl["n"] += 1
             ctrl["sum"] += total / notional
             ctrl["null_n"] += 1
-            ctrl["null_sum"] += (float(null_px) - float(_ne)) / float(_ne)
+            ctrl["null_sum"] += _null_ret
+            out = {"null_pair": m.get("null_pair"), "null_ret": _null_ret}
     except Exception:  # noqa: BLE001
         pass
+    return out
+
+
+def control_leg(obs):
+    """[2026-09-07] One close's control observation, as an `extra` fragment.
+
+    `{}` when there is nothing to record, so a book with no control arm and a
+    close whose placebo could not be priced both publish exactly what they
+    publish today — additive, and the absence stays honest rather than
+    becoming a zero (the `(yq)` rule: an unfillable leg is not a zero-cost
+    one).
+
+    THE REAL LEG IS NOT REPEATED HERE. When `control_settle` settles, the
+    close's own `pnl_pct` is `total / notional` — the identical expression the
+    accumulator uses — so the row already carries it and a second copy could
+    only ever drift. Pinned by `_selftest_control_leg`.
+
+    Shared by BOTH hosts by identity, like `control_draw`/`control_settle`
+    before it: the live variant host imports this rather than formatting its
+    own, so the two arms cannot disagree about the judged statistic.
+    """
+    if not isinstance(obs, dict) or not obs.get("null_pair"):
+        return {}
+    r = obs.get("null_ret")
+    if not isinstance(r, (int, float)) or not math.isfinite(r):
+        return {}
+    return {"control_leg": {"null_pair": str(obs["null_pair"]),
+                            "null_ret": round(float(r), 8)}}
 
 
 def control_block(strategy, ctrl):
@@ -2847,8 +2900,11 @@ class Book:
         # [(th)] settle via the ONE owner — shared with the live host by
         # identity, so the two arms cannot drift on the judged statistic.
         _np = m.get("null_pair")
-        control_settle(self.s, self.ctrl, m, total, notional,
-                       self.last_mark.get(_np) if _np else None)
+        # [2026-09-07] KEEP the observation — see `control_settle`. It was
+        # computed here and dropped 21 lines above the publish, so no close
+        # has ever carried its own placebo leg.
+        _ctl = control_settle(self.s, self.ctrl, m, total, notional,
+                              self.last_mark.get(_np) if _np else None)
         pct = total / notional if notional else total / STAKE_USD
         self.n_closed += 1
         self.n_wins += 1 if total > 0 else 0
@@ -2915,6 +2971,10 @@ class Book:
                           if isinstance(m.get("bars"), dict) and m["bars"] else {}),
                        **({"rsi_entry": m["rsi_entry"]}
                           if m.get("rsi_entry") is not None else {}),
+                       # [2026-09-07] this close's own placebo leg, so the
+                       # random-entry null becomes a PAIRED, era-scopable
+                       # statistic instead of a lifetime running sum.
+                       **control_leg(_ctl),
                        "policy": policy_stamp(self.s, "lighter_shadow",
                                                   shadow_scan_order_stamp(),
                                                   throttle_cap(self.s))},

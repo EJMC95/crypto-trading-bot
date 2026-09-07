@@ -103,7 +103,7 @@ from lighter_family_bot import (
     # [(th)] the control arm's ONE owner (draw/settle/publish) + the throttle
     # carrier class the entry_rank stamp keys on — imported, never re-typed:
     # these are the numbers a go-live verdict is judged on.
-    DayTraderGated, control_draw, control_settle, control_block,
+    DayTraderGated, control_draw, control_settle, control_block, control_leg,
     # [(ti)] the ONE policy-stamp builder, shared with the shadow host so
     # judge v2's parity precheck compares like with like.
     policy_stamp,
@@ -2563,8 +2563,10 @@ def main(_ctx=None, once=False):
             # control_settle, by identity), at the real close's instant — one
             # venue mid read for the placebo coin, both legs or neither ((rp)).
             _np = m.get("null_pair")
-            control_settle(S, ctrl, m, total, notional or 0.0,
-                           marks.fresh_mid(venue, _np) if _np else None)
+            # [2026-09-07] KEEP the observation — see family's
+            # `control_settle`. Telemetry only: no trade, gate or size moves.
+            _ctl = control_settle(S, ctrl, m, total, notional or 0.0,
+                                  marks.fresh_mid(venue, _np) if _np else None)
             # [(th)] STOP OVERSHOOT — the quantity every future gross notch
             # must price. G_max = 1/(|stop|+mmf) assumes the stop fires AT its
             # level; the honest ceiling divides by (|stop|+overshoot+mmf), and
@@ -2644,6 +2646,10 @@ def main(_ctx=None, once=False):
                            **({"rsi_entry": m["rsi_entry"]}
                               if m.get("rsi_entry") is not None else {}),
                            "mmf_factor": m.get("mmf_factor"),
+                           # [2026-09-07] this close's own placebo leg, via
+                           # the family owner by identity — the two arms must
+                           # not format the judged statistic differently.
+                           **control_leg(_ctl),
                            **({"non_economic": True} if _phantom else {}),
                            **({"stop_overshoot_bps": _ob}
                               if _ob is not None else {})})

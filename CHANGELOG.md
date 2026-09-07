@@ -1,3 +1,79 @@
+## 2026-09-07 (yu) — THE CONTROL ARM COMPUTED ITS ANSWER AND THREW IT AWAY: the placebo pair settled 21 lines before the publish and never reached a single close
+
+**Follow-up to `(yt)`'s audit, and the first of the two improvements it
+ranked.** Eamon: *"List improvements"* -> *"Please proceed"*.
+
+**THE DEFECT, AND IT IS THE `(gr)` SHAPE ONE INSTRUMENT OVER.** 👩 mum v2 is the
+only book in the fleet carrying its own random-entry control arm — `(ro)` built
+it precisely so `(hm)`'s *"grade a directional book against a random null, never
+against zero"* could be answered **from her own payload rather than in a study
+nobody runs**. `control_settle` computes, per trade, the real leg's return AND
+the matched placebo's return, folds both into running sums, and **returns
+nothing**. The publish site is **21 lines below it in the same function**. So
+the pair existed for one loop iteration and was discarded.
+
+**MEASURED across all 4,311 ledger rows on 7-Sep: ZERO closes carry a control
+observation.** The summary row carries only a lifetime aggregate.
+
+**WHAT THE AGGREGATE CANNOT DO**, which is the whole cost:
+* **a PAIRED statistic** — the difference of two running sums has no standard
+  error, so the published `edge_pct` is a number that can be QUOTED and never
+  TESTED. It is the headline on the fleet's only control arm.
+* **ERA SCOPING** — the sum pools across every policy change, exactly what
+  `POLICY_ERA` exists to prevent. `control_settle`'s own `(rp)` docstring
+  already worries about this contamination ("the exact contamination
+  POLICY_ERA exists to prevent, one instrument over") and then accumulates
+  across it anyway.
+* any split by tag, side, exit reason or regime; any cluster-robust treatment
+  of legs that close together.
+
+The `(yt)` audit had to build a whole separate null from a sparse price tape
+**because the book's own better answer was not on the row** — and that
+substitute could only randomise the COIN, not the TIMING, which is the exact
+limitation `(yt)` had to declare on 🎫 the taker.
+
+**THE FIX IS THAT `control_settle` NOW RETURNS WHAT IT ALREADY COMPUTED**, and
+`control_leg` formats it onto the close. Both hosts stamp it, sharing the
+formatter **by identity** with `control_draw`/`control_settle`/`control_block`
+— the `(th)` rule, so the two arms cannot format the judged statistic
+differently. **The accumulation is byte-unchanged**, so the published `control`
+block and every existing caller behave exactly as before.
+
+**THE REAL LEG IS DELIBERATELY NOT REPEATED ON THE ROW.** When the pair
+settles, the close's own `pnl_pct` IS `total / notional` — the identical
+expression the accumulator uses — so the row already carries it and a second
+copy could only ever drift. Pinned.
+
+**AN ABSENCE STAYS AN ABSENCE** (`(rp)`/`(yq)`): an unpriceable placebo
+publishes NOTHING, never a `null_ret` of 0.0. A zero is a MEASUREMENT ("the
+placebo went nowhere") and an unpriceable draw is an ABSENCE, and collapsing
+them would feed fabricated observations into the very null that decides whether
+this book has an edge. A genuine zero IS published.
+
+**SIX MUTATIONS VERIFIED RED:** the settle discarding the observation again
+(the original defect); an unpriceable placebo becoming a fabricated zero; a
+non-finite `null_ret` reaching the row (I5); the accumulator drifting; a book
+with no control arm growing the leg; and the live host formatting its own leg
+instead of importing the owner.
+
+**TELEMETRY ONLY — NO TRADE, GATE, ENTRY, EXIT OR SIZE MOVES**, so under the
+`(mm)` rule this goes to **main only** and rides the next deploy that earns
+one. Forward-only: the existing closes have no control leg and never will.
+Blast radius is one field on one book's closes (only a carrier that DECLARES
+`control_arm` settles a pair), pinned by the same test that pins the summary
+block's scope.
+
+**WHAT IS NOT IN THIS ENTRY, AND WHY.** `(yt)` ranked a second improvement
+beside this one: per-close REGIME stamps (`extra.btc_regime_up` rides the
+SUMMARY row and never the trade, coverage **0%** across all 14 books, so regime
+attribution is impossible from the ledger). It is the same shape — grading
+context computed and not stamped — but the regime lives in the LOOP while the
+close lives in a method, so it needs an entry-site stamp threaded through `m`
+like `rsi_entry`, at two sites per host. That is a second change with its own
+surface on a real-money carrier, and this file's own rule 1 — **ship narrow,
+verify in the live payload, then widen** — cost six follow-up entries the last
+time it was ignored. It is the next pass, not this one.
+
 ## 2026-09-07 (yt) — THE GATE GRADES ONE PATH, AND TWO OF ITS NUMBERS WERE DECIDED BY ROW ORDER: a Monte Carlo risk audit, a benchmark shootout, and the two smallest fixes it justifies
 
 **Eamon: *"Run Monte Carlo simulations using the bot's historical trade

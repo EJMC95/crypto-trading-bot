@@ -839,6 +839,9 @@ def test_mum_control_pair_settles_through_the_one_owner():
         assert m.control_draw is fam.control_draw
         assert m.control_settle is fam.control_settle
         assert m.control_block is fam.control_block
+        # [2026-09-07] the per-close leg formatter joins them BY IDENTITY —
+        # the two arms must not format the judged statistic differently.
+        assert m.control_leg is fam.control_leg
         with _driven(m, tape="oversold") as box:
             m.main(_ctx={"venue": box["venue"], "rails": box["rails"]},
                    once=True)
