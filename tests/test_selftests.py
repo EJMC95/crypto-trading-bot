@@ -167,6 +167,12 @@ SELFTEST_MODULES = [
     # selftest is offline (planted control CUT, placebo KEPT, thin sample
     # not decidable, the twin-agreement arm).
     "scripts.study_mum_noncrypto_sleeve_2026-09-02",
+    # [2026-09-07 (ym)] 🪁 kelly's pre-registered keep-or-retire read. Its
+    # n-trigger fired 3.5 weeks before the date backstop and nothing in the
+    # tree was measuring it. --selftest is OFFLINE and drives all four
+    # verdict branches — including RETIRE and KEEP GRADING, which the live
+    # data does not currently exercise, so the untaken branches cannot rot.
+    "scripts.study_kelly_fresh_read_2026-09-07",
     # [2026-09-02 (xn)] 👩 mum's class-aware ladder replay. --selftest is
     # OFFLINE and is the reuse pin: the generalised bracket walk must reduce
     # byte-identically to `study_mum_supply.bracket_walk`, and the vectorised

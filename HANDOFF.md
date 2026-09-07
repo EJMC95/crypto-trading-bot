@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 13:07 Sydney (03:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 13:18 Sydney (03:18Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -15,9 +15,9 @@ _Still open because:_ the fix is a DECISION with a measurement, not a one-liner:
 _Still open because:_ the rail is HELD until the criterion is met -- a cost-only study of a daily-loss halt reads 'loosen' on every ordinary halt day right up until the day it saves the book, so the burden sits on loosening. Closes when the read is taken and recorded (the PRE_REGISTERED block removed from the study).
 
 ### `kelly-fresh-read-pre-registered`  ·  owner: **OPERATOR**
-EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh mean > 0, anything else returns to Eamon. Her all-time upper bound (+0.03% on n=383) has not excluded a positive mean, so I17-as-amended forbids retiring on it today.
+EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh mean > 0, anything else returns to Eamon. [7-Sep (ym)] THE READ HAS BEEN TAKEN -- the SAMPLE tripped it 3.5 weeks before the date backstop (n=233 vs a bar of 60) and nothing was measuring the trigger. Verdict: RETURNS TO EAMON. Fresh mean -0.044%/trade, SE 0.132, t -0.33, upper bound +0.125% -- so the sample has NOT excluded a positive mean (I17-as-amended forbids retiring) and the mean is not above zero (so 'keep grading' is not met either). The fresh window reads 0.098pp better than all-time (-0.142% on n=589), but it is TAIL-DOMINATED: top-3 closes are +18.68pp of a -10.24pp total and the ex-top-3 fresh mean is -0.126%/trade, i.e. materially unchanged. Reproduce with scripts/study_kelly_fresh_read_2026-09-07.py (calibration gate REFUSES on a dark feed or a wrong basis).
 
-_Still open because:_ the read lived only in the report's prose (the I21 shape); it is now the `band-kelly` entry in golive_readiness.DECIDED_UNTIL, so the docket asks on the date. Closes when the decision is recorded and the entry removed.
+_Still open because:_ the READ is done; the DECISION is Eamon's and has not been made. The registered rule's third branch is explicitly 'returns to Eamon with both numbers', so a session may not close this by choosing one -- retiring needs a measured exclusion the sample does not provide, and 'keep grading' needs a positive mean it also does not provide. Do NOT re-take the read to try for a different answer (I25). Closes when the decision is recorded and the `band-kelly` entry is removed from golive_readiness.DECIDED_UNTIL.
 
 ### `georgia-v1-preregistered-read-10sep`  ·  owner: **session**
 🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
@@ -84,8 +84,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (19 commit(s))
+## Shipped today (20 commit(s))
 
+- `41523c9` Renumber (yl) -> (ym): the judge's mum-lane entry yields the letter to the cited brain-replay entry
 - `28a335e` The judge's mum lane (yl): the serial machine overwrote the census's own measurements on the lane it runs — pnl_form stale as the Farmer's 'funding', the (vm) power report dropped
 - `8122704` (yj) regenerate HANDOFF.md
 - `af7ad34` (yj) the record: the changelog entry, and RENUMBERED (yf) -> (yi) -> (yj) after two sessions took those letters on main

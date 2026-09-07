@@ -151,14 +151,29 @@ CARRIED = [
                 "retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh "
                 "closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the "
                 "fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh "
-                "mean > 0, anything else returns to Eamon. Her all-time upper "
-                "bound (+0.03% on n=383) has not excluded a positive mean, so "
-                "I17-as-amended forbids retiring on it today.",
-        "why_open": "the read lived only in the report's prose (the I21 shape); "
-                    "it is now the `band-kelly` entry in "
-                    "golive_readiness.DECIDED_UNTIL, so the docket asks on the "
-                    "date. Closes when the decision is recorded and the entry "
-                    "removed.",
+                "mean > 0, anything else returns to Eamon. "
+                "[7-Sep (ym)] THE READ HAS BEEN TAKEN -- the SAMPLE tripped it "
+                "3.5 weeks before the date backstop (n=233 vs a bar of 60) and "
+                "nothing was measuring the trigger. Verdict: RETURNS TO EAMON. "
+                "Fresh mean -0.044%/trade, SE 0.132, t -0.33, upper bound "
+                "+0.125% -- so the sample has NOT excluded a positive mean "
+                "(I17-as-amended forbids retiring) and the mean is not above "
+                "zero (so 'keep grading' is not met either). The fresh window "
+                "reads 0.098pp better than all-time (-0.142% on n=589), but it "
+                "is TAIL-DOMINATED: top-3 closes are +18.68pp of a -10.24pp "
+                "total and the ex-top-3 fresh mean is -0.126%/trade, i.e. "
+                "materially unchanged. Reproduce with "
+                "scripts/study_kelly_fresh_read_2026-09-07.py (calibration "
+                "gate REFUSES on a dark feed or a wrong basis).",
+        "why_open": "the READ is done; the DECISION is Eamon's and has not been "
+                    "made. The registered rule's third branch is explicitly "
+                    "'returns to Eamon with both numbers', so a session may not "
+                    "close this by choosing one -- retiring needs a measured "
+                    "exclusion the sample does not provide, and 'keep grading' "
+                    "needs a positive mean it also does not provide. Do NOT "
+                    "re-take the read to try for a different answer (I25). "
+                    "Closes when the decision is recorded and the `band-kelly` "
+                    "entry is removed from golive_readiness.DECIDED_UNTIL.",
         "closes_when": lambda: not _has("scripts/golive_readiness.py",
                                         '"band-kelly": ('),
     },
