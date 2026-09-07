@@ -173,7 +173,8 @@ def cluster_means(rows):
 # --------------------------------------------------------------------------
 def _read(src):
     if os.path.exists(src):
-        return json.load(open(src))
+        with open(src) as f:
+            return json.load(f)
     with urllib.request.urlopen(src, timeout=60) as r:
         return json.loads(r.read().decode())
 
@@ -589,7 +590,8 @@ def _selftest():
 
     # the naive-rule kinds this study nulls must be kinds the brain ACTUALLY
     # emits — a null against a kind nobody publishes measures nothing.
-    src = open(os.path.join(ROOT, "bot_learn.py")).read()
+    with open(os.path.join(ROOT, "bot_learn.py")) as f:
+        src = f.read()
     for kind in NAIVE_KINDS:
         assert f'"{kind}"' in src, kind
 
@@ -598,7 +600,8 @@ def _selftest():
     # (matched at line start: the names appear in this very list, so a bare
     # substring check fails on its own assertion — (po), landing on the test
     # written to honour it)
-    mine = open(os.path.abspath(__file__)).read()
+    with open(os.path.abspath(__file__)) as f:
+        mine = f.read()
     for owned in ("qualify_v3", "selfgrade_mult", "normalize_paper_row",
                   "weighted_bucket"):
         assert ("\ndef " + owned) not in mine, owned

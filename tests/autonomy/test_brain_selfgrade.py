@@ -26,7 +26,15 @@ import brain_stats as bs                  # noqa: E402
 import bot_learn as bl                    # noqa: E402
 
 SRC = os.path.join(ROOT, "brain_stats.py")
-_TREE = ast.parse(open(SRC).read())
+BL_SRC = os.path.join(ROOT, "bot_learn.py")
+
+
+def _read(path):
+    with open(path) as f:
+        return f.read()
+
+
+_TREE = ast.parse(_read(SRC))
 
 
 def _fn(name):
@@ -135,7 +143,7 @@ def test_the_floors_are_the_fleets_own_numbers():
 #    is the (gk) "rule nobody runs" shape.
 # --------------------------------------------------------------------------
 def test_the_brain_publishes_its_own_grade():
-    src = open(os.path.join(ROOT, "bot_learn.py")).read()
+    src = _read(BL_SRC)
     tree = ast.parse(src)
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
@@ -152,7 +160,7 @@ def test_the_grade_is_not_read_by_any_sizing_path():
 
 
 def _fn_bl(name):
-    tree = ast.parse(open(os.path.join(ROOT, "bot_learn.py")).read())
+    tree = ast.parse(_read(BL_SRC))
     for n in ast.walk(tree):
         if isinstance(n, ast.FunctionDef) and n.name == name:
             return n
