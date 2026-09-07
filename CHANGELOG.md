@@ -1,3 +1,89 @@
+## 2026-09-07 (ze) — A RED GUARD SILENCED THE TWO GUARDS BEHIND IT FOR THREE WEEKS, AND A GUARD THAT READS THE PR TITLE COULD NOT BE CLEARED BY FIXING THE TITLE
+
+**Eamon: *"Check for failed workflows and if we are missing something
+spectacular because not all of our work is getting through?"*** The workflows
+are almost all green — `railway-redeploy` 30/30, `db-backup` 58/58,
+`audit_code_currency` clean on every container. What is not getting through is
+**finished work that stops before `main`**, and two CI mechanics that made that
+invisible.
+
+**1. THE CASCADE.** `fleet-weekly-assessment`'s `code-currency` job runs three
+guards **as sequential steps**, and a step failure aborts the job. So on the
+three consecutive scheduled runs where `audit_code_currency` went red —
+**16-Aug `31979750293`, 23-Aug `32674318505`, 31-Aug `33347486090`** — it was
+right every time (23-Aug `nav-cook-shadow` BEHIND-OWN; 31-Aug
+**`family-lighter-shadow`**, the container hosting every live book's control
+twin, 3 of 9 gap commits touching its own entry file) — and the two guards
+placed behind it **executed zero times in three weeks**:
+
+* `audit_live_roster` — does the declared live roster still match the feed?
+* `audit_ci_coverage` — *was the deployed code ever graded?*
+
+A stale container bought three weeks of blindness in two checks that answer a
+different question, and **nothing looked missing**: the job's redness was fully
+explained by the first guard's own honest output. This is `(po)`'s class in its
+worst costume — not a check that inspects nothing, but a check that never runs
+while another check's correct failure stands in for its verdict.
+
+Fixed by gating each on what it actually needs — the roster guard on the FEED's
+outcome (`steps.feed.outcome == 'success'`), never `always()`, because a dark
+feed must still skip it (this job treats an empty feed as failure by design, and
+`always()` would turn a fetch outage into a fake roster finding); `audit_ci_coverage`
+on `!cancelled()` alone, since it reads git history and `gh run list` and touches
+the feed not at all. **`continue-on-error` is refused**, not overlooked: it would
+mask the exit code that `test_code_currency_exit_code_is_not_masked` exists to pin.
+
+**2. A GUARD WHOSE OWN REMEDY CANNOT CLEAR IT.** `live-marker-survives-squash`
+compares the **PULL REQUEST TITLE** against commit subjects — `(xh)` made the
+title the field that decides whether real money deploys. But `changelog-check.yml`
+used bare `on: pull_request`, whose default types are
+`opened/synchronize/reopened` and **do not include `edited`**. Measured on PR
+**#291**: the guard went red at 12:46Z asking for the marker in the title, the
+title was corrected three minutes later, and the check stayed **red with no way
+to re-run it** short of an empty commit — which `(hj)`/`(gl)` forbid as a way to
+kick CI. A guard that cannot be satisfied by doing what it asks trains the reader
+to merge past it: the `(gl)` failure reached from the opposite direction.
+`types: [opened, synchronize, reopened, edited]`, pinned in the guard's **own**
+selftest (`workflow_pr_types`, fail-open on an unreadable workflow).
+
+**3. AND MAIN WAS STILL RED WHILE THIS WAS WRITTEN.** `(yx)` reported main red
+for ten hours on 6-Sep; **it was still red ~34 hours later**, on the same one
+line — `scripts/study_taker_ready_2026-09-06.py` defines a `--selftest` and was
+never registered. Confirmed pre-existing by stashing this work and re-running on
+a clean tree. Registered here. The durable half — `main-red.yml`, `ci-notify`'s
+exact complement — is `(yx)`'s and is **still unmerged in PR #292**, which is
+itself an instance of the finding above.
+
+**MY OWN TEST FAILED ON MY OWN COMMENT, which is the reason the fix is
+structural.** `test_code_currency_exit_code_is_not_masked` asserted
+`"continue-on-error" not in job` — a page-wide substring scan — and went red on a
+COMMENT that named the key in order to explain why the key was **refused**.
+`(po)`'s rule landing on the test written to honour it. Rewording around it would
+have left the defect: that form also fails on `continue-on-error: false`, which
+masks nothing. It now parses the YAML and reads the actual key, on the job and on
+every step. **The control mutation is the proof**: `continue-on-error: false`
+stays GREEN under the new form and would have been RED under the old one.
+
+**VERIFICATION — 8/8 mutations, including that control.** Drop either `if:` ->
+RED · drop `id: feed` -> RED · gate the roster on `always()` -> RED ·
+`continue-on-error: true` -> RED · **`continue-on-error: false` -> GREEN** ·
+drop `edited` from the types -> RED · drop the `types:` line entirely -> RED.
+`audit_deploy_coverage`, `audit_doctrine_enforcement`, `audit_operator_name`,
+`audit_image_imports`, `audit_lever_bounds` all exit 0.
+
+**MOVES NO MONEY, NO LEVER, NO BOT.** CI mechanics and one test registration;
+no bot file, no `live.*` lever, no env, no gross, no clip. **Main only — no
+deploy marker**, per `(mm)`: it alters no trade, so it buys no measured edge and
+must not cost a real-money container restart.
+
+**THE SIZING ASK IS ANSWERED SEPARATELY AND IS A REFUSAL WITH NUMBERS** (see
+below, no code change): both live books' clips are already `equity x gross_x /
+max_open`, so the balance growth **already** raised them; and neither book spends
+the budget it has — **avo deploys 44.4% of its allowed gross, mum 24.8%** — so
+raising `gross_x` moves zero dollars. The constraint is supply, not size.
+
+---
+
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 
 **[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position

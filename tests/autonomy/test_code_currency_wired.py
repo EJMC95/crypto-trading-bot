@@ -106,15 +106,84 @@ def test_code_currency_checkout_has_full_history():
 
 
 def test_code_currency_exit_code_is_not_masked():
-    job = _job_block("code-currency")
-    assert "continue-on-error" not in job, (
+    """MUTATION: add `continue-on-error: true` to the job or any step -> RED.
+
+    [2026-09-07 (ze)] STRUCTURAL, was a page-wide substring scan. The old form
+    asserted `"continue-on-error" not in job`, which is `(po)`'s own rule
+    ("a page-wide substring scan is not a structural claim") landing on the
+    test written to honour it: it went red on a COMMENT that named the key in
+    order to explain why the key was refused. A guard that cannot tell a
+    setting from a sentence about that setting fails in both directions —
+    it blocks a correct change, and `continue-on-error: false` (which masks
+    nothing) would have tripped it too.
+
+    It now parses the YAML and reads the actual key, on the job and on every
+    step. The `|| true` arm below stays textual on purpose: that one IS a
+    property of the command string, so text is the right basis for it.
+    """
+    import yaml
+    wf = yaml.safe_load(WF.read_text())
+    cc = wf["jobs"]["code-currency"]
+    assert not cc.get("continue-on-error"), (
         "continue-on-error on the code-currency job turns BEHIND-OWN into a "
         "warning — and a guard whose only output is a warning on a passing "
         "run is not a guard ((gl)/(hj))")
+    for st in cc.get("steps", []):
+        assert not st.get("continue-on-error"), (
+            f"continue-on-error on step {st.get('name')!r} masks its verdict "
+            "the same way — see (gl)/(hj)")
+    job = _job_block("code-currency")
     for ln in job.splitlines():
         if "audit_code_currency" in ln:
             assert "|| true" not in ln and not re.search(r"\|\|\s*echo", ln), (
                 f"the audit's exit code is masked: {ln.strip()!r}")
+
+
+def test_a_red_guard_never_silences_the_guards_behind_it():
+    """MUTATION: drop either `if:` -> RED.
+
+    [2026-09-07 (ze)] THE INCIDENT. Steps abort a job at the first failure, so
+    the two guards placed AFTER `audit_code_currency` in this job only ever ran
+    when it passed. Measured: it went red on three consecutive scheduled runs
+    (16-Aug 31979750293, 23-Aug 32674318505, 31-Aug 33347486090) — correctly,
+    naming a BEHIND-OWN container each time — and across those three weeks
+    `audit_live_roster` and `audit_ci_coverage` executed ZERO times. A stale
+    container bought three weeks of silence in two checks that answer a
+    different question, and the job's redness was fully explained by the first
+    guard, so nothing looked missing.
+
+    The condition must be the FEED's outcome, never `always()`: a dark feed
+    still has to skip the roster check (this job treats an empty feed as
+    failure by design), and `always()` would run it against a file that is not
+    there, turning a fetch outage into a fake roster finding.
+    """
+    import yaml
+    wf = yaml.safe_load(WF.read_text())
+    steps = wf["jobs"]["code-currency"]["steps"]
+    by_name = {s.get("name"): s for s in steps}
+
+    feed = [s for s in steps if "curl" in str(s.get("run", ""))]
+    assert feed and feed[0].get("id") == "feed", (
+        "the feed-fetch step lost its `id: feed` — the two guards below gate "
+        "on its outcome, and an unknown id makes that expression always false, "
+        "silently skipping both")
+
+    roster = next((s for n, s in by_name.items() if n and "roster" in n.lower()), None)
+    assert roster is not None, "the roster guard left this job"
+    cond = str(roster.get("if", ""))
+    assert "cancelled()" in cond and "steps.feed.outcome" in cond, (
+        "the roster guard must run when the guard ABOVE it fails and skip only "
+        f"on a dark feed; its condition is {cond!r}")
+    assert "always()" not in cond, (
+        "always() would run the roster check against a feed that failed to "
+        "download — a fetch outage becomes a fake roster finding")
+
+    ci = next((s for n, s in by_name.items()
+               if n and "graded" in n.lower()), None)
+    assert ci is not None, "the ci-coverage guard left this job"
+    assert "cancelled()" in str(ci.get("if", "")), (
+        "audit_ci_coverage reads git history and `gh run list`, never the "
+        "feed, so a red guard above it must not skip it")
 
 
 def test_the_window_covers_a_week_of_commits():

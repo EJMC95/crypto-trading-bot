@@ -40,6 +40,7 @@ Exit 1 = a marker would be dropped by a squash merge.
 import argparse
 import re
 import sys
+from pathlib import Path
 
 #: The live markers the deploy gate reads. Kept in ONE place and checked
 #: against the workflow below, so a new live service cannot be added there and
@@ -78,6 +79,29 @@ def workflow_markers(path=WORKFLOW):
     return set(re.findall(r"\[deploy-live[a-z-]*\]", body))
 
 
+def workflow_pr_types():
+    """The `pull_request` trigger types on the workflow that runs this guard.
+
+    Returns None when the workflow cannot be read — an unreadable file makes
+    no claim rather than a false one (the fail-open half of the house rule;
+    the FAIL above only fires on a workflow we actually parsed).
+    """
+    wf = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "changelog-check.yml"
+    try:
+        import yaml
+        d = yaml.safe_load(wf.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    # PyYAML parses a bare `on:` key as the boolean True
+    on = d.get("on", d.get(True)) or {}
+    pr = on.get("pull_request")
+    if not isinstance(pr, dict):
+        return None
+    t = pr.get("types")
+    # types omitted == GitHub's default set, which lacks `edited`
+    return set(t) if isinstance(t, list) else set()
+
+
 def _selftest():
     ok = True
 
@@ -113,6 +137,23 @@ def _selftest():
             ok = False
             print(f"FAIL MARKERS is missing {missing} — the workflow greps for "
                   f"them, so a PR carrying one would escape this guard")
+
+    # [2026-09-07 (ze)] THE VERDICT MUST BE CLEARABLE BY THE FIELD IT READS.
+    # This guard compares the PULL REQUEST TITLE against commit subjects, so
+    # the only way to satisfy it is to edit the title — and `on: pull_request`
+    # defaults to opened/synchronize/reopened, which does NOT include `edited`.
+    # Measured on PR #291 (7-Sep): the guard went red at 12:46Z asking for the
+    # marker in the title, the title was corrected three minutes later, and the
+    # check stayed red with no way to re-run it short of an empty commit, which
+    # (hj)/(gl) forbid as a way to kick CI. A guard whose own remedy cannot
+    # clear it trains the reader to merge past it — the (gl) failure, arrived
+    # at from the opposite direction.
+    types = workflow_pr_types()
+    if types is not None and "edited" not in types:
+        ok = False
+        print("FAIL changelog-check.yml's pull_request trigger omits `edited` "
+              f"(types={sorted(types)}) — this guard reads the TITLE, so "
+              "correcting the title could never re-run it")
 
     print("audit_live_marker_survives_squash --selftest:", "OK" if ok else "FAILED")
     return 0 if ok else 1

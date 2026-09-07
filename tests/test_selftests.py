@@ -145,6 +145,14 @@ SELFTEST_MODULES = [
     # return-blindness under permutation, its I24 edge precondition, and the
     # drawdown pin against golive_readiness.stats' own routine.
     "scripts.study_position_sizing_2026-09-07",
+    # [2026-09-07 (ze)] REGISTERED LATE, and main paid for the gap. (yl) landed
+    # this study at 03:16Z on 6-Sep with a --selftest and no registration;
+    # `test_no_unregistered_selftest` reddened `Tests` at run #1031 and main was
+    # STILL red when this was written ~34h later, with a dozen pushes on top —
+    # because ci-notify reports on the PULL REQUEST and this repo pushes
+    # straight to main, so the guard fired into a void ((yx), whose `main-red.yml`
+    # closes that half and is still unmerged in PR #292).
+    "scripts.study_taker_ready_2026-09-06",
     # [2026-09-06] the FLEET POOLED GRADER — does a structural feature pay,
     # pooled across every book that has it? SELFTEST_MODULES and deliberately
     # NOT ENFORCED_AUDITS, the edge_audit reason exactly: its live arm reads
