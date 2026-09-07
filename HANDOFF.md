@@ -1,8 +1,28 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 16:44 Sydney (06:44Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 17:25 Sydney (07:25Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `survivorship-measured-but-not-consumed`  ·  owner: **session**
+(yt) measured the largest distortion in the fleet's own reporting: every grading instrument scores the LIVING set, so a loser leaves the sample the day it is retired. On the Lighter era -- living 16 books +$296.09, retired 18 books -$260.47, TRUE FLEET TOTAL +$35.63. The living-book figure overstates the realised result by 8.3x. Each retirement was individually correct (I17 measured exclusions); the aggregate had simply never been computed. `baseline_snapshot.survivorship()` now recomputes it every run.
+
+_Still open because:_ the number EXISTS and nothing CONSUMES it -- the same shape as (yo), where the fleet kept building the measurement and not the tripwire that reads it. No dashboard card, no organ, no guard reads it, so a reader of /pnl.json still sees only the survivors' sum. Closes when some published surface carries the true-total figure beside the living one.
+
+### `fleet-risk-effective-n-overstates-independence`  ·  owner: **OPERATOR**
+(yv) measured, like-for-like on the SAME held set: `fleet_risk.long_effective_n` (1/HHI over DISTINCT SYMBOLS, fleet_risk.py:366) reads 11.8 while a correlation-aware N_eff on the same 29 held names reads 2.8 -- the incumbent overstates independence by 4.2x. The organ's own docstring already warns that '23 open longs that are all crypto beta is ~one trade, and nothing said so'; the warning is right and the formula cannot express it. `scripts/fleet_beta.py` publishes the alternative BESIDE the incumbent and modifies nothing.
+
+_Still open because:_ changing `long_effective_n` changes a field live consumers read, which is a risk-policy decision rather than a session one -- and the audit's own safety constraints forbid touching filters that affect existing bots. Closes when the operator decides either to move the formula or to record why it stays.
+
+### `oi-history-is-not-reachable`  ·  owner: **session**
+(yv) THE CANDLE FIELD `i` IS NOT OPEN INTEREST. Measured on 44 coins x 1,500 bars: it rose or held in 65,956 of 65,956 bar-to-bar steps and never fell, at magnitudes (~2.4e10 on AAVE) far above any plausible level -- a cumulative counter. The real point-in-time OI is `orderBookDetails.open_interest` (BTC 2031 base ~ $162M) and its HISTORY lives only in `market_context`'s own `oi_ntl` state, which is DB-side and absent from /bus.json. So the price/OI hypothesis cannot be tested from outside the containers. `scripts/study_open_interest_2026-09-07.py` exists, carries a planted-signal positive control that passes, and REFUSES on the data rather than reporting a vacuous no-signal.
+
+_Still open because:_ the blocker is EXPOSING `oi_ntl` history (a publish-site change in market_context, or a /bus.json key), not writing the study. Closes when that history is reachable and the study runs to a real verdict.
+
+### `books-do-not-record-their-own-fill-cost`  ·  owner: **session**
+(yu) only 4 of 14 living books record the venue's quoted spread on their own fills (kelly, douglas, bezos, Hull). Every other book's execution cost has to be INFERRED from the venue rather than read from its record -- the inversion of I14, where a record exists. The four that do record are what made `scripts/cost_model.py`'s calibration gate possible at all (deltas 0.06-3.73bps against an 8.0 tolerance).
+
+_Still open because:_ it is one publish-site edit per book plus the deploy each one earns for another reason -- cheap individually, ten times over collectively, and none of them urgent. Closes when a majority of living books stamp a per-fill spread.
 
 ### `mum-live-rho-read-preregistered`  ·  owner: **session**
 (yp) put every book's sizing on ONE axis for the first time -- risk at the stop per position as a fraction of equity, rho = clip_fraction x stop -- and the fleet spans 83x on it (avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull 0.04%). The one real-money reading: 👩 mum's LIVE arm runs rho 1.67% (clip $240 on $576 equity = 41.7% of the account behind a 4% stop) against a proposed 0.25% and an admissible 0.5% -- 6.7x the proposal. Corroborated from three independent directions by her OWN published row: all_slots_stop_pct 0.20 against the gate's 0.15 bar, vol_target_at_neff1 3.75x against a configured 5.0x, and stop_reachable FALSE (stop_dead_above 4.17x) on the worst-margin book in her universe. NOT acted on: the study's reading rests on 10 trading days at its own 10x extrapolation cap, and her measured n_eff 1.824 puts her vol_target_here at 5.06x, i.e. exactly at her own framework's target. So it is REGISTERED, not executed.
@@ -89,8 +109,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (32 commit(s), entries (yo), (yp))
+## Shipped today (34 commit(s), entries (yo), (yp))
 
+- `c9a623b` (yu) CodeQL: hoist the refusal message out of the list literal
+- `d27553b` (yu) regenerate HANDOFF.md
 - `295b54b` (yu) Per-book execution cost: the fleet average was wrong in both directions, and the stress that used it was a double charge
 - `030433f` (yt) CodeQL: close the four file handles in audit_fingerprint
 - `065004f` (yt) regenerate HANDOFF.md

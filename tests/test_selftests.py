@@ -171,6 +171,25 @@ SELFTEST_MODULES = [
     # live row, venue_context counting as a book walk, and a wrapper resolving
     # through its core. 7 of 7 mutations verified RED (see the (yu) entry).
     "scripts.cost_model",
+    # [2026-09-07 (yv)] FLEET BETA — market exposure across books, the one
+    # property no per-book instrument can see. SELFTEST_MODULES and NOT
+    # ENFORCED_AUDITS, the edge_audit reason plus one: its live arm FETCHES
+    # candles for every held symbol, so CI would be non-deterministic and a
+    # load on the venue. The --selftest is offline and pure: corr_effective_n
+    # collapsing to 1 on perfectly-correlated names and equalling the count on
+    # independent ones, an unmeasurable pair returning None (never 0.0, which
+    # would BUY diversification), the MIN_N floor, the coverage gate, the
+    # short-overlap refusal WITH its positive control, and the withheld ratio
+    # when the two effective-N measures cover different populations. 6/6
+    # mutations verified RED.
+    "scripts.fleet_beta",
+    # [2026-09-07 (yv)] the OPEN-INTEREST study. SELFTEST_MODULES, same reason.
+    # Its live arm REFUSES on this venue's data (the candle field `i` is a
+    # cumulative counter, not an OI level) and exits 2 — a refusal CI must
+    # never read as a pass or a defect. The --selftest is offline and pure and
+    # carries a PLANTED-SIGNAL POSITIVE CONTROL, so a silent "no signal" can be
+    # attributed to the data rather than the method ((po)).
+    "scripts.study_open_interest_2026-09-07",
     # [2026-09-07 (ys)] REGISTERED BY A LATER SESSION, and saying so rather than
     # absorbing it silently: this study merged to main at 950b578 (yl) without a
     # registration, so `test_no_unregistered_selftest` was already RED on main

@@ -1,3 +1,110 @@
+## 2026-09-07 (yv) — THE CANDLE FIELD CALLED `i` IS NOT OPEN INTEREST, AND `1/HHI` OVER SYMBOLS OVERSTATES INDEPENDENCE BY 4.2x: the fleet's market exposure, measured across books for the first time
+
+**Eamon: *"Continue with all improvements"*** — the ranked list from the audit,
+worked through. **Nothing deployed:** his brief says do not deploy
+automatically and get approval before live deployment, and that stands over
+this repo's own grants. `audit_fingerprint --check` reads **5/5 protected
+symbols unchanged, 42/42 ledgers unrewritten**.
+
+**#3 PORTFOLIO BETA — the largest finding, and the weighting IS the finding.**
+`scripts/fleet_beta.py` (advisory; moves no lever, no capital, no promotion):
+
+| weighting | fleet beta | what it asks |
+|---|---|---|
+| trade-weighted | **+0.043** | what does the average TRADE look like |
+| **exposure-weighted** | **+0.324** | **what is the MONEY doing** |
+| live cohort | **+0.658** | what is the REAL money doing |
+
+The gap is an averaging artifact with a name: 🪁 kelly is **590 of 1,730**
+labelled trades at beta **−0.76** on an $83 average exposure, so it dominates
+the COUNT and almost none of the RISK. Composition is the real statement —
+**profitable books mean beta +0.40 (+$317.59), loss-making books −0.12
+(−$201.60)**: *a fleet that nets to zero beta by holding winners long and
+losers short is not hedged, it is paying for its neutrality, and the bill is
+the losers' P&L.*
+
+**AND `1/HHI` OVER DISTINCT SYMBOLS CANNOT SEE IT — measured like-for-like.**
+`fleet_risk.long_effective_n` (fleet_risk.py:366) reads **11.8** on the 29
+currently-held names; a correlation-aware `N_eff` on the **same 29 names, all
+29 priced**, reads **2.8**. The incumbent overstates independence **4.2x**.
+The organ's own docstring already warns that *"23 open longs that are all
+crypto beta is ~one trade, and nothing said so"* — the warning is right and
+the formula cannot express it. **NOTHING WAS MODIFIED**: the alternative is
+published BESIDE the incumbent, because that field feeds live consumers and
+the brief forbids touching filters that affect existing bots.
+**THE FIRST CUT OF THIS CLAIM WAS 10.1x AND WRONG** — it compared `hhi_n` on
+the held set against `corr_n` on the majors basket, an apples-to-oranges ratio.
+Corrected before shipping, and the module now WITHHOLDS the ratio whenever the
+two measures do not cover the same population (mutation-pinned).
+
+**#6 OPEN INTEREST — AND THIS IS THE FINDING OF THE PASS, because it corrects
+this audit's own claim.** `(yt)` asserted *"candles also carry per-bar OI (`i`),
+so 1,500h of history is available immediately per market"*. **That is FALSE.**
+Measured on 44 coins x 1,500 bars: the field rose or held in **65,956 of 65,956**
+bar-to-bar steps and **never once fell**, at magnitudes (~2.4e10 on AAVE) far
+above any plausible OI level. It is a **cumulative counter**. Real
+point-in-time OI is `orderBookDetails.open_interest` (BTC **2031 base ~ $162M**,
+plausible), and its HISTORY exists only inside `market_context`'s own `oi_ntl`
+state — DB-side, absent from `/bus.json`. **So the price/OI hypothesis cannot
+be tested from outside the containers**, and the blocker is EXPOSING that
+history, not writing a study.
+
+**I nearly shipped a vacuous refusal.** The study ran, produced 12 cells, 0
+picked on train, 0 surviving BH — a clean-looking REFUSED verdict computed
+entirely on a monotone counter. What caught it was the shape of the output:
+**12 cells where 24 were expected**, because every `OI down` quadrant was
+structurally empty. `oi_is_a_level()` now REFUSES on that signature rather than
+reporting a verdict, and the selftest carries a **planted-signal positive
+control** so a future "no signal" can be attributed to the data rather than the
+method ((po): empty output is not a negative result until the check has been
+seen to produce a positive one).
+
+**#1 mum's STOP — the risk is LATENT, not live, and my own list overstated it.**
+Her row reads `stop_reachable: false` / `stop_dead_above 4.17x` — but that is
+the worst-margin book in her 104-market UNIVERSE. On what she is **actually
+holding**: `stop_reachable_held: **true**`, `stop_dead_above_held **12.17x**`,
+`headroom.ok true (unliquidatable)`, and `leverage_now **0.83x**` against a
+configured 5.0. The honest statement is that her configured CEILING permits a
+state in which the stop is unreachable; she is not in that state and is nowhere
+near it. Recorded, not acted on.
+
+**#2 ARM-DRIFT — diagnosed, and my recommendation was wrong.** I called it "the
+cheapest fix, do it first". Measured: **my own audit commits touched NONE of the
+`_BUILD_SHARED` files.** The drift comes from three other sessions' commits —
+`(yi)`/`(yj)` on `bot_pnl_store.py` and `(yq)` on `venues/shadow.py` — which
+the shadow twins took and the marker-gated live arms correctly did not. The
+judge IS held (`hold: arm_drift`, *"ARMS ON DIFFERENT CODE ... no promotion can
+rest on it"*) on candidate `mum-vel-12-20`. **But `n_live=3` against a paired
+bar of 10, so the SAMPLE is the binding constraint, not the drift** —
+unblocking it today would promote nothing. Note also that `venues/shadow.py`
+governs SHADOW fills only, so the functional delta for a live arm taking real
+exchange fills is near nil: the guard is stamp-based and cannot tell a
+shadow-only change from one that alters live behaviour. That is a judge design
+question, not a deploy chore.
+
+**#5 SURVIVORSHIP + #8 MULTIPLICITY.** The 8.3x number recomputes every run and
+**nothing consumes it** — so it is now a `session_state` CARRIED row with a
+predicate CI evaluates, alongside three others (the `1/HHI` decision, the OI
+history exposure, and the 10 of 14 books that do not record their own fill
+cost). That is this repo's own mechanism for "cannot be silently dropped", and
+one of my four predicates fired immediately on its first `--check` because it
+matched an internal variable name rather than the exposure — the guard doing
+its job on my work. **#8 is MEASURED rather than built: 110 study/backtest
+scripts, 88 of them against essentially one Lighter tape, and 4 applying
+BH-FDR.** At alpha 0.05 across 88 tests, ~4.4 false positives are expected by
+chance alone. The register is a real build; the number is what makes the case
+for it.
+
+**FILES:** `scripts/fleet_beta.py` (**6/6 mutations RED** — an unmeasurable
+correlation reading as 0, the MIN_N floor, the coverage gate, the withheld
+ratio, N_eff not collapsing on correlated names, and a short overlap inventing
+a rho; that last one SURVIVED the first round because the test used a 1-point
+overlap that returns None through the zero-variance branch anyway — a test
+passing for the wrong reason, strengthened and re-killed),
+`scripts/study_open_interest_2026-09-07.py`, `FLEET_BETA_2026-09-07.md`,
+`STUDY_OPEN_INTEREST_2026-09-07.md`, `scripts/session_state.py` (+4 carried
+rows), `AUDIT_PHASE3_4_2026-09-07.md` corrected in place per I12.
+
 ## 2026-09-07 (yu) — THE FLEET-AVERAGE COST WAS WRONG IN BOTH DIRECTIONS AND THE STRESS THAT USED IT WAS A DOUBLE CHARGE: per-book execution cost, measured on each book's own basket at its own deployed clip
 
 **Eamon: *"do the per-book cost modelling"*** — the brief's own first
