@@ -1,3 +1,92 @@
+## 2026-09-06 (yk) — THE FLEET RECORDS EVIDENCE IN ONE SPELLING AND LOOKS IT UP IN ANOTHER: four venue markets sit inside 👩 mum's LIVE scan where the quality veto could never fire, the measured-cost accessor reads "unmeasured" for exactly the coins with the worst slippage, and the sentinel's meme sector is empty on the only venue we trade
+
+**The venue lists thousand-denominated memecoins as `1000BONK`. The fleet
+spells the same market `kBONK`.** `venues/symbol_map` is the one mapping
+between them and it works. What did not work is that **the payloads carrying
+the fleet's per-coin EVIDENCE are keyed in one spelling and every live
+consumer looks them up in the other.**
+
+`market_context.coin_quality_fold` canonicalises through `from_lighter` **on
+purpose** — the fold exists so a coin's evidence pools across the two writers,
+and its own docstring says so. So `coin-quality`, and the `coin-vetoes` it
+feeds, are keyed `kBONK`. Meanwhile every live book resolves its universe
+through `fleet_bus.scout_universe()`, which returns **the venue's own list**.
+The lookup is `sym in vetoes`. It misses. Silently, and only on the markets
+where the spelling differs — which on this venue is exactly the memecoins.
+
+**1 · IT REACHES REAL MONEY.** Measured 6-Sep against the live bus: of 114
+crypto markets, the four thousand-markets sit at ranks **37 / 46 / 63 / 86**
+by volume — and 👩 mum's LIVE arm publishes `universe: 110`. **All four are
+inside her real-money scan, and the coin-quality veto — the fleet's one
+automated per-coin restriction — was structurally unable to fire on any of
+them.** 🙏 avo's live arm scans 51 and admits the first three the same way.
+
+**2 · THE MEASURED-COST ACCESSOR SAID "UNMEASURED" FOR THE WORST COINS.**
+`fleet_bus.recorded_cost_bps` reads the same `coin-quality` payload with
+`coins.get(str(sym))`. Its own docstring is about a number *"the fleet has
+been recording since 9-Jul and nothing has ever read"* — and for the four
+coins whose slippage most deserves a floor, it kept returning `None`. Its
+contract says a caller must read `None` as *"I have no measurement"*, so this
+degraded safely; it degraded on precisely the population it was built for.
+🌾 carry's cost census (`recorded_half_spread_bps` over `scout_universe()`)
+is the consumer that was quietly blind.
+
+**3 · THE SENTINEL'S MEME SECTOR HAS BEEN EMPTY.** `SECTORS["meme"]` lists
+DOGE / SHIB / PEPE / BONK / FLOKI. This venue lists **none of those four**
+under those names. `_sector_of` strips `USDT`/`USDC`/`USD`/`PERP` and nothing
+else, so `1000BONK` resolved to `other` — a per-sector anticipation that
+cannot see its own sector's members grades nothing and moves nothing. The
+`(lv)` `{open: 0}` ambiguity, at an organ.
+
+**4 · AND THE FLEET ALREADY KNEW.** 🎫 the taker carries this at its own veto
+site — `_fleet(_vbase) in coin_vetoed or _vbase in coin_vetoed`, with a
+comment naming *"all six 1000-markets"*. **The instance was closed and the
+class was left open**, which is this repo's own definition of the circle:
+👩 mum's live arm, the funding variant host and `recorded_cost_bps` all kept
+the un-normalised test, and the taker's local copy was itself a second copy of
+a rule that had no owner.
+
+**THE FIX IS ONE OWNER.** `fleet_bus.coin_spellings(sym)` returns every
+spelling a coin may be keyed under, **most specific first**, and
+`coin_evidence_hit(mapping, sym)` is the single reader for any per-coin
+evidence payload. Four consumers now ask it: 👩 mum's + 🙏 avo's live host,
+🎫 the taker (its local copy deleted), the funding variant host, and
+`recorded_cost_bps` itself. Properties that make it safe rather than clever:
+
+* **The exact string wins**, so a payload already keyed the caller's way is
+  byte-identical in behaviour — this can only ever ADD a hit, never redirect
+  one, and an ordinary coin's spelling list is `(sym,)` exactly.
+* **It never raises and never invents a hit** — junk, `None`, a non-dict
+  mapping and an unknown coin all return `None`.
+* **`venues/symbol_map` stays the mapping**; this is a lookup helper, not a
+  rename, and with that module absent it degrades to today's behaviour.
+* **The fold is verified non-colliding against the live venue**: of 216
+  markets, NO `1000X` has a bare `X` or `kX` listed beside it, so pooling the
+  spellings cannot merge two different books' evidence. Checked, not assumed.
+
+**EXPECTANCY PRICE (I19), stated plainly.** The one behaviour that changes on
+real money is that a **restrict-only** veto becomes able to fire on four coins
+it previously could not. **Whether any of the four is vetoed today is unknown
+to this session** — the `coin-vetoes` payload is not on a public endpoint —
+so the honest claim is *"the veto can now do its job on 4 of mum's 110 names"*,
+not *"this stops N bad trades"*. The direction is the safe one: the gate is
+skip-only, it can never force an entry, and the fleet has been paying for
+slippage on those names with the measurement it collected and could not read.
+Everything else restores evidence: a cost number, a sector label, a census.
+
+Pinned by `tests/autonomy/test_coin_spelling_seam.py` (20 tests), **7 of 7
+mutations verified RED** — each restores exactly one thing this entry removes:
+`coin_spellings` returning only the raw string, the exact-spelling precedence,
+the live host's raw membership test, the funding gate's exact-key test, the
+taker's local copy, `recorded_cost_bps`'s `coins.get`, and the sentinel's bare
+`SYM2SECTOR.get`. Selftests green in all five touched modules; `audit_image_imports`
+and `audit_venue_purity` green.
+
+**DEPLOYED BOTH WAYS.** `fleet_bus.py` is in `_BUILD_SHARED`, so this moves
+every arm together — `[deploy-live]` in the subject keeps 👩 mum's and 🙏 avo's
+pairs aligned and the judge's `arm_drift` guard open. Both live rows verified
+`online`, unhalted and unlocked before the push.
+
 ## 2026-09-06 (yj) — FOUR HAND-TYPED ROSTERS AND A KEY THAT OVERWROTE ITSELF: a risk control that could not see a living book, a card panel empty since July, a coverage guard that skipped every run it ever made, a retired-set parse that read 68 rows where 46 exist, and a validation dataset destroyed microseconds after it was written
 
 Same session as `(yi)`, same method — read the LIVING FEED and ask each file

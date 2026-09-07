@@ -121,11 +121,35 @@ SYM2SECTOR = {s: sec for sec, syms in SECTORS.items() for s in syms}
 
 
 def _sector_of(sym):
+    """[(yk)] Sector for `sym`, spelling-robust.
+
+    `SECTORS["meme"]` lists DOGE/SHIB/PEPE/BONK/FLOKI — and this venue does
+    not list four of those under those names. It lists `1000SHIB`,
+    `1000PEPE`, `1000BONK`, `1000FLOKI`, which the suffix strip above leaves
+    untouched, so every one of them resolved to `other` and the sentinel's
+    meme sector was effectively empty on the only venue the fleet trades.
+    A per-sector anticipation that cannot see its sector's members grades
+    nothing and moves nothing — the (lv) `{open: 0}` ambiguity, at an organ.
+
+    `fleet_bus.coin_spellings` is the one owner of the namespace; absent it
+    this degrades to exactly the previous behaviour.
+    """
     s = str(sym).upper().split("-")[0].split("/")[0]
     for suf in ("USDT", "USDC", "USD", "PERP"):
         if s.endswith(suf) and len(s) > len(suf) + 1:
             s = s[: -len(suf)]
-    return SYM2SECTOR.get(s, "other")
+    hit = SYM2SECTOR.get(s)
+    if hit is not None:
+        return hit
+    try:
+        import fleet_bus
+        for c in fleet_bus.coin_spellings(sym):
+            hit = SYM2SECTOR.get(str(c).upper())
+            if hit is not None:
+                return hit
+    except Exception:  # noqa: BLE001 — a sector label must never raise
+        pass
+    return "other"
 
 
 # ---------------------------------------------------------------------------

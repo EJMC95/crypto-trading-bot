@@ -2946,9 +2946,13 @@ def main(_ctx=None):
             # code old, or vice-versa — matching either form vetoes correctly
             # throughout the transition. Restrict-only, so an extra match only
             # ever SKIPS an entry, never forces one.
-            _vbase = str(sym or "").split("/")[0]
-            if coin_vetoed and (_fleet(_vbase) in coin_vetoed
-                                or _vbase in coin_vetoed):
+            # [(yk)] this was the fleet's FIRST fix of this seam and it was
+            # a LOCAL one — `_fleet(base) or base`, correct here and copied
+            # nowhere, while 👩 mum's live arm and the funding host kept the
+            # un-normalised test. Same rule, one owner now; every spelling
+            # this site already matched still matches.
+            if coin_vetoed and fleet_bus.coin_evidence_hit(
+                    coin_vetoed, sym) is not None:
                 gate_census["coin_vetoed"] += 1
                 continue          # measured slippage over the bar (fail-open)
             # one NEW position per lens per cycle; never add to a held symbol

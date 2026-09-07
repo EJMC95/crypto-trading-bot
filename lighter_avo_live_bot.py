@@ -3157,10 +3157,24 @@ def main(_ctx=None, once=False):
                 if symcap_blocked(fleet_symcap, sym, cycle_sym):
                     _verdict(sym, "symcap")
                     continue
-                if sym.split("/")[0] in coin_vetoed or sym in coin_vetoed:
+                # [(yk)] THE VETO IS KEYED IN THE FLEET SPELLING AND THIS ARM
+                # SCANS THE VENUE'S. `coin-vetoes` is built by a fold that
+                # canonicalises every coin through `from_lighter` (so one
+                # coin's evidence pools), i.e. `1000BONK` is stored as
+                # `kBONK` — while this loop's `sym` comes from
+                # `scout_universe()`, which is the venue's own list. Measured
+                # 6-Sep on 👩 mum's LIVE 110-name universe: FOUR 1000-markets
+                # sit at crypto ranks 37/46/63/86, so the quality veto was
+                # structurally unable to fire on any of them, on real money.
+                # 🎫 the taker fixed exactly this at its own site and the
+                # class stayed open here — one owner now (`coin_evidence_hit`
+                # checks every spelling, most specific first). RESTRICT-only,
+                # so a newly-reachable match can only ever SKIP an entry.
+                _cvhit = _bus.coin_evidence_hit(coin_vetoed, sym)
+                if _cvhit is not None:
                     _verdict(sym, "coin_veto")
                     _PRINT(f"[avo-live] {iso(t_now)} {sym} entry SKIPPED — "
-                           f"coin veto: {coin_vetoed.get(sym) or coin_vetoed.get(sym.split('/')[0])}")
+                           f"coin veto: {_cvhit}")
                     continue
                 tag = sig["enter"]
                 gated = False

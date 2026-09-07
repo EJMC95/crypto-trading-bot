@@ -810,6 +810,28 @@ def flatten_pnl(held, is_short, entry, accrued, px_fill):
     return price_pnl, (price_pnl + (accrued or 0.0)) > 0
 
 
+def _veto_hit(vetoes, coin):
+    """[(yk)] `vetoes[<the spelling matching coin>]` or None — via the ONE
+    owner (`fleet_bus.coin_evidence_hit`).
+
+    The `coin-vetoes` payload is keyed in the FLEET spelling: its fold
+    canonicalises every coin through `from_lighter` so one coin's evidence
+    pools, storing `1000BONK` as `kBONK`. This book scans `scout_universe()`,
+    which is the VENUE's own list — so the exact-key test missed every
+    thousand-denominated market, silently.
+
+    Degrades to the exact-key test when `fleet_bus` is absent, never to "no
+    veto by accident": a missing bus already means this book reads no vetoes.
+    Pure — a lookup over the dict it is handed, no state, no I/O.
+    """
+    if fleet_bus is not None:
+        try:
+            return fleet_bus.coin_evidence_hit(vetoes, coin)
+        except Exception:  # noqa: BLE001
+            pass
+    return (vetoes or {}).get(coin)
+
+
 def entry_admission(coin, src, is_short, apr, st):
     """The entry tick's per-candidate ADMISSION ladder, pure — the ordered
     veto chain between a ranked candidate and the book/price stage.
@@ -851,7 +873,7 @@ def entry_admission(coin, src, is_short, apr, st):
         return "skip", "explore_reserved"
     if coin in st["vol_veto"]:
         return "skip", "vol_filter"
-    if coin in st["vetoes"]:
+    if _veto_hit(st["vetoes"], coin) is not None:
         return "skip", "quality_veto"
     if not is_short and st["fleet_long_veto"]:
         return "skip", "fleet_long"
@@ -3221,7 +3243,8 @@ def main():
                                  "cross-sectional median (calm-half rule)",
                                  coin, VOL_FILTER_WIN_H)
                     elif _why == "quality_veto":
-                        log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
+                        log.info("%s VETO_SKIP (%s)", coin,
+                                 _veto_hit(_vetoes, coin))
                     elif _why == "fleet_long":
                         log.info("%s FLEET_LONG_VETO_SKIP", coin)
                     elif _why == "slope":

@@ -1547,6 +1547,76 @@ def scout_funding(current_time=None):
         return {}
 
 
+#: [(yk)] Spellings the fleet's evidence payloads may be keyed under. The
+#: venue lists thousand-denominated memecoins as `1000BONK`; the fleet's own
+#: universes and ledgers spell the same market `kBONK`, and
+#: `venues/symbol_map` is the ONE mapping between them. Every payload built by
+#: folding BOTH sources — `coin-quality` and the `coin-vetoes` it feeds —
+#: canonicalises to the k-form on purpose (that fold exists precisely so one
+#: coin's evidence pools). Every LIVE consumer then looks the coin up under
+#: the spelling it scans, which is the venue's. So the lookup missed, silently,
+#: on every 1000-market.
+def coin_spellings(sym):
+    """Every spelling `sym` may be keyed under, most specific first.
+
+    A LOOKUP helper, never a rename: the caller still trades the symbol it was
+    given. Order matters — the exact string wins, so a payload that is already
+    keyed the caller's way is unaffected and this can only ever ADD a hit.
+
+    Fail-safe: with `venues.symbol_map` unavailable this degrades to the exact
+    string plus the pair base, i.e. exactly today's behaviour, never a guess.
+    """
+    raw = str(sym or "").strip()
+    if not raw:
+        return ()
+    out = [raw]
+    # the bare asset: strip a pair suffix, then a quote currency. Case is
+    # PRESERVED — upper-casing `kBONK` gives `KBONK`, a spelling nothing uses.
+    base = raw.split("/")[0].split("-")[0]
+    for suf in ("USDT", "USDC", "USD", "PERP"):
+        if base.upper().endswith(suf) and len(base) > len(suf) + 1:
+            base = base[: -len(suf)]
+    if base and base not in out:
+        out.append(base)
+    try:
+        from venues.symbol_map import from_lighter, to_lighter
+        for c in (from_lighter(base)[0], to_lighter(base)[0]):
+            if c and c not in out:
+                out.append(c)
+    except Exception:  # noqa: BLE001 — a spelling helper must never raise
+        pass
+    # The bare asset behind a thousand-denomination, both ways: `1000BONK` and
+    # `kBONK` and `BONK` name one market here. Verified against the live venue
+    # 6-Sep: of 216 markets, NO `1000X` has a bare `X` or `kX` listed beside
+    # it, so folding them cannot pool two different books' evidence.
+    for c in list(out):
+        if c.startswith("1000") and len(c) > 4:
+            for alt in ("k" + c[4:], c[4:]):
+                if alt not in out:
+                    out.append(alt)
+        elif len(c) > 1 and c[0] == "k" and c[1:].isupper():
+            for alt in ("1000" + c[1:], c[1:]):
+                if alt not in out:
+                    out.append(alt)
+    return tuple(out)
+
+
+def coin_evidence_hit(mapping, sym):
+    """`mapping[<the spelling that matches sym>]`, or None.
+
+    The ONE reader for any per-coin evidence payload — `coin-quality`,
+    `coin-vetoes`, anything folded across both spellings. A consumer doing
+    `sym in vetoes` by hand is a second copy of the namespace rule, and this
+    fleet has already paid for the first one.
+    """
+    if not isinstance(mapping, dict) or not mapping:
+        return None
+    for c in coin_spellings(sym):
+        if c in mapping:
+            return mapping[c]
+    return None
+
+
 def recorded_cost_bps(sym=None, current_time=None):
     """The fleet's OWN MEASURED execution cost per coin — `{sym: {...}}`, or a
     single coin's dict when `sym` is given. `{}` / `None` on any doubt.
@@ -1587,7 +1657,9 @@ def recorded_cost_bps(sym=None, current_time=None):
         if not isinstance(coins, dict):
             return None if sym else {}
         if sym is not None:
-            v = coins.get(str(sym))
+            # [(yk)] the payload is keyed in the FLEET spelling (the fold
+            # canonicalises via `from_lighter`); live callers pass the VENUE's.
+            v = coin_evidence_hit(coins, sym)
             return v if isinstance(v, dict) else None
         return {str(k): v for k, v in coins.items() if isinstance(v, dict)}
     except Exception:
