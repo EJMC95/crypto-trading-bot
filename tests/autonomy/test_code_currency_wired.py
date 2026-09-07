@@ -187,7 +187,6 @@ def test_a_red_guard_never_silences_the_guards_behind_it():
     """
     job = _job_block("code-currency")
     steps = _steps(job)
-    by = {n: kv for n, kv in steps}
 
     feed = [(n, kv) for n, kv in steps if "feed" in n.lower()]
     assert feed and feed[0][1].get("id") == "feed", (
