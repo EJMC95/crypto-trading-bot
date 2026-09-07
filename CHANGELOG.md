@@ -1,3 +1,108 @@
+## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
+
+**[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position
+ladder entry while this was being written. Nothing cites this entry yet, so it moves; recorded inline because
+`git log` subjects keep the old letter and the CHANGELOG headers are the reliable index.**]
+
+**Found by the fleet-wide bot audit Eamon asked for ("Audit these trading
+bots"), and adversarially verified before it shipped** — two independent
+readers were told to refute it and both returned CONFIRMED at high confidence,
+each adding a mechanism the first pass had missed.
+
+**THE DEFECT.** `venues/shadow.py::_shadow_fill` walks the live book at clip
+size and books the crossed spread — the honest, slightly pessimistic model its
+own header promises. When it *cannot* walk, it falls back to the decision
+price. That fallback is correct for the P&L (there is no better price to use)
+and it was published as a **measurement**:
+
+    fill_px, levels, top = decision_px, 0, decision_px
+    slip_bps = (fill_px - decision_px) / decision_px * 1e4 * ...   # == 0.0
+
+So `slippage_bps` went to Postgres as `0.0`, not NULL, and `book_top` reported
+a top of book that was never read.
+
+**THREE CONDITIONS COLLAPSED INTO ONE, AND THE THIRD IS FLEET-WIDE.** `fill`
+is None when the quoted side is EMPTY, when the visible depth is exhausted
+(25 REST levels — `LighterClient._rest_book`), *and* when `orderbook()` RAISES.
+The third is not thinness at all: a venue outage, a 403 or a timeout has every
+shadow book in the fleet booking perfect zero-cost fills at the same instant.
+`{levels_used: 0}` was byte-identical across all three (I1/I18), and nothing
+anywhere reads `levels_used`.
+
+**WHY IT IS NOT A COSMETIC LIE — IT FED THE ONE MECHANISM BUILT TO CATCH IT.**
+`market_context._fold_coin_quality` counts NON-NULL slippage as `measured_14d`
+and averages the same column; `measured_14d >= 5 AND slip_bps > 15` writes
+`coin-vetoes`, which **all three live books consume at their entry site**. So
+the orders that could NOT be filled satisfied the veto's n-floor and pulled its
+average toward zero — in the instrument whose entire job is to veto coins that
+are expensive to trade, on exactly the thin books it exists for. That fold's
+own 22-Jul note already states the rule this path was breaking: *"a live-arm
+row with NULL slippage is not evidence"* — written after the identical defect
+on the LIVE side inflated the same floor.
+
+**THE RULE APPLIED IS THE FLEET'S OWN, NOT A NEW ONE.** `venues/fills.
+slip_bps_of` has said it since 17-Jul — *"UNMEASURED IS ALWAYS NULL... a
+fabricated 0.000 is worse than a null"* — and 🎫 the Ticket Taker's selftest
+pins both halves: an unmeasured leg is NULL and NAMES why, while a **measured
+at-mark fill is a real 0.0** (its rule (b)). The shadow path is now held to the
+same contract: `slippage_bps` NULL when nothing was walked, `raw.measured`
+false, `raw.book_top` null rather than fabricated, and `raw.fill_src` naming
+which condition fired — `walked` / `thin-book` / `empty-side` / `no-book` /
+`venue-dark:<Exc>`.
+
+**P&L IS BYTE-IDENTICAL AND THAT IS PINNED.** The fallback still books at the
+decision price, so no shadow equity curve, no `t`, no paired bar and no go-live
+grade moves by a cent. This changes what the ledger CLAIMS to have measured,
+nothing about what it traded. `test_the_fallback_leaves_pnl_byte_identical`
+holds that line.
+
+**DIRECTION, STATED (I19).** Restrict, and it un-blinds rather than tightens:
+removing fabricated zeros RAISES the measured slippage average toward truth, so
+the coin-quality veto becomes *more* likely to fire on a genuinely expensive
+book. The n-floor of 5 is trivially reached by real walked fills on any active
+book, so the average is the binding term.
+
+**DECLARED UNMEASURED, because this machine cannot reach the database.** The
+MAGNITUDE — how many `venue_orders` rows in the trailing 14 days are fabricated
+zeros, and which coins' verdicts move — is not measured here; `DATABASE_URL` is
+unset and the Railway CLI is not linked from this worktree. The query that
+takes it, for whoever has the connection:
+
+    SELECT coin,
+           count(*) FILTER (WHERE slippage_bps = 0 AND px_fill = px_decision)
+             AS fabricated,
+           count(slippage_bps) AS measured_now,
+           round(avg(slippage_bps)::numeric, 2) AS avg_now
+    FROM venue_orders
+    WHERE shadow AND at > now() - interval '14 days'
+    GROUP BY coin ORDER BY fabricated DESC;
+
+Rows written from today carry `raw.measured`, so the two populations separate
+cleanly going forward without needing that heuristic.
+
+**THE CLASS, and where it now stands.** This is the THIRD instance of
+unmeasured-recorded-as-zero (the live Farmer 17-Jul, the Taker 17-Jul, the
+shadow broker today). After this commit every LIVING publisher of
+`venue_orders.slippage_bps` either passes a helper-computed value gated on a
+measured flag (both live books, via `_slip_bps_of`), or a variable gated on one
+(🌾 carry, and now the shared shadow broker). The only inline-arithmetic site
+left is `lighter_dislocation_bot`'s close leg, and that book has idled behind
+`SNAPBACK_RETIRED_OVERRIDE` since the (jh) retirement — it publishes nothing.
+Named rather than guarded: an AST rule strict enough to forbid inline
+arithmetic would red-flag the live host's own correctly-gated `IfExp`, and a
+guard that has to special-case the right answers is the vacuous kind (I3).
+
+**Also corrected in place (I12):** `fill_from_book`'s docstring said the thin
+book case was a *"skip"* and nothing skips — the caller fills at the decision
+price and books the trade. A comment describing a refusal the code does not
+perform is how this stayed invisible. The module header now states where the
+model is optimistic and tells a reader to count `measured` rows, never all rows.
+
+Pinned by `tests/real_money/test_shadow_and_marks.py` (+9 tests, 22 total);
+**6/6 mutations killed**, including the over-correction — a walked fill landing
+exactly on the decision price must stay a measured `0.0` and not be swept into
+the NULL bucket with the unfillable orders.
+
 ## 2026-09-07 (yp) — THE FLEET SPANS 83x ON RISK PER POSITION AND NO ORGAN HAD EVER PRINTED THE NUMBER: five sizing rules on one ladder, and the rule matters far less than the rung
 
 **Eamon:** *"Review the position-sizing logic. Compare fixed dollar / fixed

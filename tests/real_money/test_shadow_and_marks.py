@@ -169,3 +169,110 @@ def test_mid_map_skips_unreadable_coins():
 
     out = marks.mid_map(_V(), ["BTC", "DEAD", "ETH"])
     assert out == {"BTC": 100.0, "ETH": 100.0}     # DEAD absent, not None
+
+
+# ── the unmeasured fill: NULL, never a fabricated zero ───────────────────────
+# [2026-09-07] An order the book could not fill was published with
+# `slippage_bps = 0.0`, i.e. as a MEASURED zero-cost execution.
+# `market_context._fold_coin_quality` counts non-null slippage as
+# `measured_14d` — the n-floor of the coin-quality veto all three live books
+# consume at their entry site — and averages the same column. So the orders
+# that could NOT be filled satisfied the floor and pulled the average toward
+# zero, in the one mechanism whose job is to veto coins that are expensive to
+# trade. The rule pinned below is the fleet's own, already enforced for live
+# fills in venues/fills.slip_bps_of and in the Ticket Taker's selftest.
+
+def _walked_book():
+    return {"asks": [(100.5, 10.0)], "bids": [(99.5, 10.0)]}
+
+
+def test_a_walked_fill_is_measured_and_names_its_source(orders):
+    b = ShadowBroker("t-lshadow", _Venue(_walked_book()))
+    b.open("BTC", True, 1.0, 100.0)
+    row = orders[-1]
+    assert row["raw"]["measured"] is True
+    assert row["raw"]["fill_src"] == "walked"
+    assert row["raw"]["levels_used"] == 1
+    assert row["raw"]["book_top"] == 100.5
+    assert row["slippage_bps"] == pytest.approx(50.0)
+
+
+def test_a_thin_book_records_NULL_slippage_not_zero(orders):
+    # the book quotes both sides but cannot cover the clip
+    b = ShadowBroker("t-lshadow", _Venue({"asks": [(100.5, 0.1)],
+                                          "bids": [(99.5, 0.1)]}))
+    b.open("BTC", True, 5.0, 100.0)
+    row = orders[-1]
+    assert row["slippage_bps"] is None, \
+        f"an unfillable order must be NULL, never 0.0: {row['slippage_bps']!r}"
+    assert row["raw"]["measured"] is False
+    assert row["raw"]["fill_src"] == "thin-book"
+    assert row["raw"]["book_top"] is None, \
+        "no level was read, so there is no book top to report"
+    assert row["px_fill"] == 100.0        # accounting still uses the decision
+
+
+def test_an_empty_side_is_named_apart_from_a_thin_book(orders):
+    # the thinnest market of all: nothing quoted on the side we must cross
+    b = ShadowBroker("t-lshadow", _Venue({"asks": [], "bids": [(99.5, 10.0)]}))
+    b.open("BTC", True, 1.0, 100.0)
+    row = orders[-1]
+    assert row["slippage_bps"] is None
+    assert row["raw"]["fill_src"] == "empty-side"
+
+
+def test_a_dead_venue_is_named_apart_from_a_thin_book(orders):
+    # {levels_used: 0} is byte-identical between "market too thin" and "the
+    # venue is down" — and the second fires fleet-wide at once.
+    b = ShadowBroker("t-lshadow", _Venue(boom=True))
+    b.open("BTC", True, 1.0, 100.0)
+    row = orders[-1]
+    assert row["slippage_bps"] is None
+    assert row["raw"]["measured"] is False
+    assert row["raw"]["fill_src"].startswith("venue-dark:"), row["raw"]
+
+
+def test_an_empty_book_answer_is_named_apart_from_a_raise(orders):
+    b = ShadowBroker("t-lshadow", _Venue(None))
+    b.open("BTC", True, 1.0, 100.0)
+    assert orders[-1]["raw"]["fill_src"] == "no-book"
+    assert orders[-1]["slippage_bps"] is None
+
+
+def test_a_MEASURED_at_mark_fill_still_records_a_real_zero(orders):
+    # the over-correction this guards against: a genuine fill that lands
+    # exactly on the decision price is a measurement of zero slippage, and
+    # must NOT be swept into the NULL bucket with the unfillable orders.
+    b = ShadowBroker("t-lshadow", _Venue({"asks": [(100.0, 10.0)],
+                                          "bids": [(100.0, 10.0)]}))
+    b.open("BTC", True, 1.0, 100.0)
+    row = orders[-1]
+    assert row["px_fill"] == 100.0 and row["px_decision"] == 100.0
+    assert row["slippage_bps"] == 0.0, \
+        ("a walked fill at the decision price is a MEASURED zero, not an "
+         f"absence: {row['slippage_bps']!r}")
+    assert row["raw"]["measured"] is True
+
+
+def test_the_fallback_leaves_pnl_byte_identical(orders):
+    # the fix is telemetry-only: an unfillable open/close must book exactly
+    # what it booked before, or every shadow equity curve moves under it.
+    b = ShadowBroker("t-lshadow", _Venue({"asks": [(100.5, 0.1)],
+                                          "bids": [(99.5, 0.1)]}))
+    b.open("BTC", True, 5.0, 100.0)
+    assert b.pos["BTC"] == (5.0, 100.0)
+    pnl = b.close("BTC", 110.0)
+    assert pnl == pytest.approx(50.0)          # 5 units x $10, fees are zero
+    assert b.equity() == pytest.approx(1050.0)
+
+
+def test_the_close_leg_is_held_to_the_same_rule(orders):
+    # the entry-side spread gate some books carry does not sit on the close,
+    # so the exit is where an unmeasured fill is most likely to slip through.
+    b = ShadowBroker("t-lshadow", _Venue(_walked_book()))
+    b.open("BTC", True, 1.0, 100.0)
+    b.venue.book = {"asks": [(100.5, 0.01)], "bids": [(99.5, 0.01)]}
+    b.close("BTC", 100.0)
+    row = orders[-1]
+    assert row["side"] == "sell"
+    assert row["slippage_bps"] is None and row["raw"]["measured"] is False
