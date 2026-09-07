@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 01:51 Sydney (15:51Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-07 12:57 Sydney (02:57Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -84,8 +84,12 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (2 commit(s))
+## Shipped today (6 commit(s))
 
+- `6af0bc0` [deploy-live] (yk) One spelling owner: the fleet records coin evidence as kBONK and every live consumer looks it up as 1000BONK — four markets inside mum's real-money scan where the quality veto could never fire
+- `538eee1` (yj) Four hand-typed rosters and a key that overwrote itself: georgia v3 in no risk cohort, carry's panel empty since July, a coverage guard that always skipped, a retired-set parse reading 68 for 46, and market-context destroying its own snapshot
+- `7cbef28` (yi) One lane owner: the judge moved to mum and three organs kept watching the Farmer — a blind receipt detector, a census entry on a retired pair, a growth promoter off-lane, and one live book's lever graded on another's trades
+- `fa26156` carry: avo's judge lane is declared but her carrier is not lever-capable — the (yg) surface's first finding, deferred with its own closes_when
 - `4bf21e8` (yg) VERIFIED: both arms on 5e30671ecf64, judge un-drifted at its next cycle, resid live — and the lever surface found avo's undeclared namespace on its first loop
 - `b775b06` [deploy-live-mum] The judge's mum lane: (ye) owns the fix, this ships the lever surface and the marker that keeps mum's pair aligned; plus the pooled grader and the flinders refusal (yg)(yf)(yh) (#287)
 
