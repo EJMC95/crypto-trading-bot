@@ -145,6 +145,20 @@ SELFTEST_MODULES = [
     # return-blindness under permutation, its I24 edge precondition, and the
     # drawdown pin against golive_readiness.stats' own routine.
     "scripts.study_position_sizing_2026-09-07",
+    # [2026-09-07 (ze)] the BRAIN LEARNING-EFFICIENCY study. SELFTEST_MODULES
+    # and deliberately NOT ENFORCED_AUDITS, the edge_audit reason exactly: its
+    # live arms read the public ledger AND the live brain payload on /bus.json,
+    # both of which move with every publish and no code change, and its
+    # calibration gate REFUSES (exit 2) when it cannot reproduce the live
+    # brain's own multipliers — a refusal CI must never read as a pass. The
+    # --selftest is offline and pure: BH monotonicity and its empty case,
+    # Welch's zero-variance and single-sample refusals, Spearman's rank
+    # invariance, the (uf) cluster collapse, the ENTRY_KNOWN allow-list
+    # (including the four outcome fields that fooled this study's own first
+    # two cuts), that the nulled rule kinds are kinds bot_learn actually
+    # emits, and the imported-owner + moves-nothing scans. The structural pins
+    # for the organ it grades live in tests/autonomy/test_brain_selfgrade.py.
+    "scripts.study_brain_learning_efficiency_2026-09-07",
     # [2026-09-06] the FLEET POOLED GRADER — does a structural feature pay,
     # pooled across every book that has it? SELFTEST_MODULES and deliberately
     # NOT ENFORCED_AUDITS, the edge_audit reason exactly: its live arm reads

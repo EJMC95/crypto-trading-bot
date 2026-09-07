@@ -432,10 +432,22 @@ CARRIED = [
                     "stateless; the held rung lives in bot_learn's "
                     "`mult_streaks`), and rewriting the brain's ladder on the "
                     "same day 13 consumers were wired to it is the untested-"
-                    "rewrite-of-an-authority the doctrine forbids. It is now "
-                    "MEASURABLE for the first time — every close carries its "
-                    "`brain_mult` — so the next pass tests the prediction "
-                    "against real closes instead of a model.",
+                    "rewrite-of-an-authority the doctrine forbids. "
+                    "[7-Sep (ze)] THE INSTRUMENT THIS ROW ASKED FOR NOW EXISTS "
+                    "and the row's own premise is CORRECTED IN PLACE per I12: "
+                    "it read 'now MEASURABLE — every close carries its "
+                    "brain_mult', and that was true of the LEDGER and false of "
+                    "the BRAIN, which read no `extra` at all (AST-verified: "
+                    "the string appears nowhere in bot_learn.py or "
+                    "brain_stats.py). `brain_stats.selfgrade_mult` opens the "
+                    "envelope and publishes on `brain-vitals.selfgrade`. What "
+                    "still blocks the TEST is sample, not access: of 15 "
+                    "stamped buckets only 4 are gradeable (both arms >= 10 "
+                    "closes over >= 5 open-days) and NONE has yet crossed a "
+                    "rung mid-sample, which is precisely the transition the "
+                    "prediction is about. Re-read when a graded bucket steps a "
+                    "rung; the self-grade's own `mults` list per bucket is the "
+                    "tripwire.",
         "closes_when": lambda: _has("brain_stats.py", "HYSTERESIS"),
     },
     # [2026-09-02] `taker-replay-blind-to-breakoutup` DELETED — BOTH halves
