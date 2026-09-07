@@ -1,3 +1,132 @@
+## 2026-09-07 (ys) — THE FLEET COULD SAY WHETHER A BOOK PASSES AND NEVER WHAT IT RETURNED: a Phase-1 inventory and the first dated, reproducible, cost-stressed BASELINE
+
+**Eamon asked for a senior-quant audit in two phases — document the system, then
+save a baseline before anything changes.** Phase 1 changed no code, no lever, no
+env and no position; Phase 2 added one read-only instrument and two artefacts.
+
+**THE GAP, measured by grepping the tree rather than assumed.** This fleet owns
+more grading machinery than most desks: six pass/fail bars (`golive_readiness`),
+a lower-bound capital ranking (`fleet_allocation`), a BH-refereed winners docket,
+a ceiling organ, and since (wo) a full edge audit with profit factor, Sharpe,
+Sortino, concentration and P(ruin). **Not one of them writes down what a book
+RETURNED.** There was no artefact anywhere in the repo holding total return,
+annualised return, net after fees, win rate, avg win and avg loss, per book,
+dated. So "did that change help?" had no starting line to be measured from —
+which is the same shape as (yo)'s finding a week earlier: the fleet keeps
+building the measurement and not the tripwire that reads it.
+
+**`scripts/baseline_snapshot.py` RE-IMPLEMENTS NOTHING.** Every statistic is
+derived from `edge_audit.run()`, which imports `golive_readiness` for the era,
+the phantom filter, the retired-sleeve drop, `stats` and `cluster_se`, and
+`fleet_allocation.t_crit` for the critical value. **The calibration gate is
+inherited, not rebuilt** — `edge_audit` REFUSES when its sample cannot reproduce
+the live `golive-readiness` grade, and this refuses with it. Verified
+fail-CLOSED against a dark bus: exit 2, no baseline written, and the refusal
+NAMES what disagreed (I8) rather than printing the bare bool `edge_audit` hands
+back. The only arithmetic this module owns is the four ratios nobody had named,
+and each is a division of two numbers that already existed.
+
+**THREE WAYS A BASELINE LIES, each closed in the instrument rather than in
+prose:**
+* **ANNUALISATION IS FLAGGED, NEVER SILENT.** Half this fleet has a span under
+  the 30-day window bar, and annualising them is an extrapolation, not a
+  measurement — 👩 mum LIVE spans **9.4 days**, so her "587%/yr" is a 39x
+  extrapolation of ten days and 🙏 avo LIVE's is 20x. Every row carries
+  `span_days` and `extrapolation_x`, and short ones are marked ⚠.
+* **SIMPLE AND COMPOUNDED ARE BOTH SHOWN.** These books trade a FIXED clip, not
+  a fraction of equity, so compounding realised P&L models a book none of them
+  runs — and it reads absurdly high (mum LIVE: 587% simple vs **23,515%**
+  compounded). Simple is the headline; compounded sits beside it so no future
+  session re-derives the bigger number and believes it found something.
+* **LIVE AND PAPER ARE NEVER POOLED**, at any aggregate ((wp)).
+
+**THE BASELINE, 2026-09-07** — 14 books calibrated to the grade published
+04:02:43Z, 4,311 ledger closes (truncation checked per (qz): 4,311 against a
+5,000 cap, so not cut):
+
+| cohort | books | capital | net after fees | total return | closes | win rate | avg win | avg loss | PF |
+|---|---|---|---|---|---|---|---|---|---|
+| **live** | 2 | $835 | **+$164.75** | **+19.74%** | 105 | 73.3% | $4.39 | −$6.18 | 1.95 |
+| **shadow** | 12 | $12,000 | **+$34.93** | **+0.29%** | 1,637 | 47.9% | $1.79 | −$1.60 | 1.03 |
+
+**AND THE ONE NUMBER THE FLEET HAD NEVER PUT SIDE BY SIDE: real money is
+carrying the whole result.** $835 of live capital earned +$164.75 while $12,000
+of paper earned +$34.93 — and **$158.28 of that paper figure is one book**
+(🎫 the taker). Strip it and the other eleven shadow books are **−$123.35
+combined**. That is not an argument for more real money; it is the statement of
+what the baseline actually is, so a later "the fleet is up" cannot be read off a
+number two books produced.
+
+**THE COST STRESS IS WHERE IT BITES, and it found two books nobody had flagged.**
+Venue fee is zero (measured), so `realised_usd` is already net of the only real
+cost — the crossed spread, inside the shadow broker's book-walked fill. Charging
+each book the fleet's OWN measured round trip on top (`n x 17.49bps x clip`,
+(qq)) **flips two profitable books negative**: 🌾 carry **+$12.92 → −$2.82** and
+🔮 georgia v1 **+$12.85 → −$10.59**. Both are high-`n` books earning a thin mean,
+which is exactly the shape a cost term kills — and 🌾 carry is a book with an
+`established` verdict and t=2.59. Its edge is real and it is **smaller than the
+fleet's own execution noise**, which is a materially different statement from
+"it passes five of six bars". Recorded, not acted on: the stress charges a
+directional round trip to a delta-neutral funding book, which overstates its
+case, and the honest next step is carry's own measured `cost_bps` (median half
+1.46bps on its row today) rather than the fleet average. Named so the next pass
+starts from it.
+
+**PHASE 1 FOUND ONE LIVE DIVERGENCE WORTH THE WRITE-UP AND IT IS NOT A DEFECT:**
+`OversoldRebound.RSI_MAX` defaults to **38.0** in the file while both mum rows
+publish **36.0** — Eamon's own 4-Sep revert of (ya), set as an env on BOTH arms
+so the twin stays a control. Correct, deliberate, and invisible to anyone
+reading only the code. The inventory records it because a constant in a file is
+a claim about a container, not a measurement of one.
+
+**OPEN RISK FLAGS carried out of Phase 1, none acted on in this pass:** the
+live/shadow pair reads `impl_shortfall: arm-drift`, which weakens every paired
+comparison until resolved; 👩 mum LIVE publishes `stop_reachable: false`
+(`stop_dead_above 4.17x`) with `headroom.reason: liq_unpriced`, i.e. her −4% stop
+is not reachable on the worst-margin book in her 104-market universe; and
+🪁 kelly sits at **28.5% MTM drawdown** against a 15% bar with a pre-registered
+read already returned to Eamon.
+
+**THE FOURTH WAY A BASELINE LIES WAS FOUND IN THIS ONE'S OWN OUTPUT AND FIXED
+BEFORE IT SHIPPED: it does not equal the dashboard.** The baseline is
+**era-scoped** (`POLICY_ERA` — the sample that describes the book as it runs
+today) and **realised** (closed trades; open positions are marks, not evidence).
+The dashboard row's `pnl_abs` is lifetime and includes open MTM. On 🌾 carry
+those are **n=30 / +$12.92** against **n=121 / +$94.59** — a 7x gap on the same
+book, both correct, and an artefact that showed only one of them would have been
+compared to the dashboard once and distrusted forever. Every row now carries
+`n_all` and the lifetime figure beside the era one, and the doc opens with a
+four-point BASIS section (era, realised, quarantine+phantom filtered, book unit)
+that the selftest pins. **The public `/trades.json?source=paper` feed does not
+apply `LEDGER_QUARANTINE`** — `edge_audit` does, so grading straight off the feed
+uses a sample the gate refuses.
+
+**FILES:** `SYSTEM_INVENTORY_2026-09-07.md` (Phase 1, read-only),
+`BASELINE_2026-09-07.md` (generated — regenerate, do not hand-edit),
+`scripts/baseline_snapshot.py` (selftest + **9/9 mutations verified RED**:
+the extrapolation flag, the 365 in the simple annualisation, the cost drag, an
+unknown degrading to 0.0 instead of None, the refusal propagation, a compounded
+rate on a wiped-out book, the basis note, the lifetime reconciliation, and the
+cohort derived from a hardcoded name instead of the payload's own venue). The
+selftest earned its keep before it was committed: it caught a real defect in
+this session's own patch — `_feed_index` never stored `pnl_abs`, so the
+reconciliation column added to fix the gap above would have shipped rendering
+em-dashes.
+
+**A REGISTRATION GUARD WENT RED ON SOMEONE ELSE'S PUSH AND IS RECORDED, NOT
+ABSORBED.** `tests/test_selftests.py::test_no_unregistered_selftest` was already
+failing on main before this pass: `scripts/study_taker_ready_2026-09-06.py`
+merged at `950b578` (yl) without a registration. Registered here with the
+edge_audit reason verbatim, and said out loud in the test file itself, because a
+red shared build blocks every session and silently fixing another session's work
+is how authorship gets lost. Its author owns its structural pins.
+
+**MOVES NOTHING** — no lever, no capital, no promotion, no env, no position; it
+reads three public feeds and writes two files. Full suite green (exit 0).
+`audit_secret_leak` and `audit_ci_coverage` fail in this environment for
+environmental reasons only (gitleaks not installed; CI run history unreadable) —
+both fail-closed by design and neither touches these files.
+
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 
 **[RENUMBERED (yp) -> (yq) at push time.** A concurrent session took `(yp)` on main for the risk-per-position

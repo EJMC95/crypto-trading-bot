@@ -145,6 +145,30 @@ SELFTEST_MODULES = [
     # return-blindness under permutation, its I24 edge precondition, and the
     # drawdown pin against golive_readiness.stats' own routine.
     "scripts.study_position_sizing_2026-09-07",
+    # [2026-09-07 (ys)] the BASELINE SNAPSHOT — total/annualised return, net
+    # after fees, win rate, avg win/loss per book, dated and reproducible, so a
+    # later "did that change help?" has a starting line. SELFTEST_MODULES and
+    # deliberately NOT ENFORCED_AUDITS, the edge_audit reason exactly: it CALLS
+    # edge_audit.run(), so its live arm reads the public ledger and the live
+    # golive-readiness grade, both of which move with every close and no code
+    # change, and it INHERITS that module's calibration gate — a refusal (exit
+    # 2) CI must never read as either a pass or a defect. The --selftest is
+    # offline and pure: the unknown-degrades-to-None rule, the simple vs
+    # compounded annualisation, the short-span extrapolation flag, the measured
+    # -cost stress, a wiped-out book having no compounded rate, and the refusal
+    # carrying WHAT disagreed rather than a bare bool. 6 of 6 mutations verified
+    # RED (see the (ys) entry).
+    "scripts.baseline_snapshot",
+    # [2026-09-07 (ys)] REGISTERED BY A LATER SESSION, and saying so rather than
+    # absorbing it silently: this study merged to main at 950b578 (yl) without a
+    # registration, so `test_no_unregistered_selftest` was already RED on main
+    # before this pass touched anything — the guard working exactly as designed,
+    # on someone else's push. Registered here because a red shared build blocks
+    # every session, and the reason is the edge_audit one verbatim: its live arm
+    # reads the public ledger and the live golive-readiness grade, and its own
+    # calibration gate REFUSES on a stale or absent grade. The --selftest is
+    # offline and pure. Its author owns the structural pins.
+    "scripts.study_taker_ready_2026-09-06",
     # [2026-09-06] the FLEET POOLED GRADER — does a structural feature pay,
     # pooled across every book that has it? SELFTEST_MODULES and deliberately
     # NOT ENFORCED_AUDITS, the edge_audit reason exactly: its live arm reads
