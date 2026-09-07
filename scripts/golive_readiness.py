@@ -1407,8 +1407,18 @@ def resampled_dd(rows, book_usd=None, draws=None, seed=None):
         return None
 
 
-def stats(rows, book_usd=None):
+def stats(rows, book_usd=None, dd_resample=False):
     """Grade one book from its closed-trade rows.
+
+    `dd_resample=True` additionally computes `dd_resampled` (see that
+    function). **It is OPT-IN, and that is not a style choice — it is a
+    measured one.** This function is hot: eight scripts call it, several
+    inside sweep loops, and the bootstrap costs ~133ms against `stats`' own
+    ~0.2ms. Computing it unconditionally made `stats` **660x slower** and blew
+    `study_mum_noncrypto_sleeve_2026-09-02`'s selftest past its 120s CI
+    timeout — a study that has nothing to do with drawdown. The PUBLISH path
+    asks for it once per book per six hours; a study sweeping cells must not
+    pay for a diagnostic it never reads.
 
     rows: [(pnl_pct, pnl_abs, closed_at_datetime)] oldest first. Pure — the DB
     read is the caller's job so this is selftestable offline.
@@ -1527,7 +1537,10 @@ def stats(rows, book_usd=None):
     # REPORTED, NEVER A BAR, exactly as `cluster`, `mde80_pct` and
     # `class_split` are: `BAR_NAMES` is the published contract and `grade()`
     # is untouched. Making it blocking is a gate re-spec and an operator act.
-    out["dd_resampled"] = resampled_dd(rows, book_usd)
+    # OPT-IN — see the note in this function's docstring for the measurement
+    # that made it so.
+    if dd_resample:
+        out["dd_resampled"] = resampled_dd(rows, book_usd)
     # [2026-08-20 (tz)] `se_pct` — computed one line above inside `t` and then
     # thrown away, which is why the horizon could only ask "is the mean
     # negative?" and never "is it negative BEYOND NOISE?". Published so a
@@ -3314,6 +3327,33 @@ def _selftest_dd_resampled():
     assert resampled_dd(winners[:3], 1000.0) is None
     assert resampled_dd(winners, 0.0) is None
 
+    # ---- the bootstrap is OPT-IN, and stays that way ----------------------
+    # `stats` is hot: eight scripts call it, several inside sweep loops.
+    # Computing the bootstrap unconditionally cost ~133ms against `stats`' own
+    # ~0.2ms and blew an UNRELATED study's selftest past CI's 120s timeout.
+    # Two arms, because a comment is not a control:
+    #   (a) the field is ABSENT unless asked for -- a mutation restoring the
+    #       unconditional call reddens here;
+    #   (b) the default path stays CHEAP, measured against the opt-in path on
+    #       the same rows, so a future "small" default (say 200 draws) that
+    #       reintroduces the regression by degrees also reddens.
+    many = [(0.01 if i % 2 else -0.01, 10.0 if i % 2 else -10.0,
+             t0 + _td(hours=i)) for i in range(120)]
+    assert "dd_resampled" not in stats(many)
+    assert isinstance(stats(many, dd_resample=True).get("dd_resampled"), dict)
+    import time as _time
+    _a = _time.perf_counter()
+    for _ in range(20):
+        stats(many)
+    _cheap = _time.perf_counter() - _a
+    _b = _time.perf_counter()
+    stats(many, dd_resample=True)
+    _one_boot = _time.perf_counter() - _b
+    assert _cheap < _one_boot, (
+        f"20 default stats() calls ({_cheap:.3f}s) must cost less than ONE "
+        f"opt-in call ({_one_boot:.3f}s) — the bootstrap has leaked into the "
+        f"default path")
+
     # ---- the halves-tie flag ---------------------------------------------
     # It must fire ONLY when the split boundary is genuinely inside a tie.
     # Mutation: `n >= 4 and True` (always-on) reddens on the clear case;
@@ -3329,7 +3369,7 @@ def _selftest_dd_resampled():
     # must be byte-unchanged by everything above — this is the assertion that
     # keeps a diagnostic from quietly becoming a gate.
     assert BAR_NAMES == ("window", "closes", "mean", "t", "halves", "maxdd")
-    s_clear, s_tied = stats(clear), stats(tied)
+    s_clear, s_tied = stats(clear, dd_resample=True), stats(tied, dd_resample=True)
     assert grade(s_clear) == grade(s_tied), (grade(s_clear), grade(s_tied))
     assert "dd_resampled" not in bar_map(s_clear)
     assert "halves_tie" not in bar_map(s_clear)
@@ -4242,7 +4282,15 @@ def main():
         # count on purpose: a book whose era has too few closes must still
         # appear, showing its era bars dark, or narrowing the window would
         # silently REMOVE the frontrunner from the report instead of demoting it.
-        s, s_all = stats(parsed), stats(parsed_all)
+        # [2026-09-07] `dd_resample=True` on the ERA-SCOPED sample only — the
+        # authoritative one, and the one the 15% bar is graded on. The
+        # all-time reading is deliberately left without it: its whole purpose
+        # is the pooled figure the era replaced, and putting a risk
+        # distribution on it invites the two to be read together, which is the
+        # confusion the era split exists to end. This is also the ONLY call
+        # site that asks for the bootstrap (see `stats`' docstring: it is
+        # opt-in because it is ~660x the cost of the rest of the function).
+        s, s_all = stats(parsed, dd_resample=True), stats(parsed_all)
         # [2026-08-17] Attached to the ERA-SCOPED sample only, and rides on `s`
         # exactly as `cluster`/`mtm` do so `book_payload` stays the one place
         # that decides what is published. The all-time sample deliberately gets

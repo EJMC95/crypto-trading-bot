@@ -357,8 +357,11 @@ pinned by an assertion in the new selftest. Cost: 4,000 resamples per book
 inside a 6-hourly publish loop; measured at well under a second for the whole
 fleet.
 
-**Failure scenarios.** (a) The bootstrap assumes closes are exchangeable within
-a book; a book with strong serial structure beyond the 60s batching would still
+**Failure scenarios.** (0) **The one that actually happened:** computing it
+inside `stats()` unconditionally made that hot function 660x slower and blew an
+unrelated study past CI's timeout. It is now opt-in, asked for only by the
+publish path, with a selftest arm that reddens if the cost leaks back into the
+default. (a) The bootstrap assumes closes are exchangeable within a book; a book with strong serial structure beyond the 60s batching would still
 be understated — the decision-batching mitigates the dominant case and the
 residual is declared. (b) If someone later makes this blocking, it becomes a
 gate re-spec, which is an operator act — the selftest asserts it is not in
@@ -383,6 +386,37 @@ No state migration, no lever, no deploy marker. `golive-readiness` is on the
 auto-deploy path for `freqtrade-bots`; the next publish carries it. Reverting
 restores the previous payload shape exactly — no consumer reads either new
 field today, so removal is safe at any time.
+
+### The regression CI found on the second push — the worst defect in this work
+
+`resampled_dd` was called **unconditionally inside `stats()`**, which is a hot
+function: eight scripts call it, several inside sweep loops. Measured, 20 calls
+on a 120-close book:
+
+| | `stats()` × 20 |
+|---|---:|
+| before the fix | **2.656 s** |
+| after | **0.0055 s** |
+
+A **660× slowdown**, and it broke a study with nothing to do with drawdown —
+`study_mum_noncrypto_sleeve_2026-09-02`'s selftest blew CI's 120s timeout.
+Reproduced locally before fixing (33s with the bootstrap unconditional vs 2s
+without, on a machine faster than the runner), then shown passing after.
+
+**Fix:** the bootstrap is now **opt-in** (`stats(rows, dd_resample=True)`), and
+the publish path is the only caller that asks — on the era-scoped sample only,
+because the all-time reading exists to be the pooled figure the era replaced
+and a risk distribution on it invites the two to be read together.
+
+**The class is closed, not just the instance.** The selftest now asserts both
+that the field is absent by default *and* that 20 default calls cost less than
+one opt-in call — so a future "small" default (say 200 draws) that reintroduces
+the regression by degrees also reddens. Both mutations verified RED.
+
+The honest lesson: I put an expensive computation inside a shared pure function
+without asking who else calls it. The local suite passed three times before the
+push because it was slower, not broken — the CI runner's timeout is what turned
+a latent 660× regression into a visible failure.
 
 ### Two defects CI found on the first push, both real, both fixed
 
@@ -423,6 +457,9 @@ here rather than folded in silently.
   `halves_tie` always-on; `halves_tie` on the wrong boundary; `dd_resampled`
   promoted into the bars; **denominator switched to the running peak** (the
   (yr) defect — this one survived the first round and its pin was added).
+  Plus two more added after the CI regression: the bootstrap restored to the
+  default path, and a "small" 200-draw default that would reintroduce it by
+  degrees. **10 mutations, all RED.**
 - **Suites:** `golive_readiness --selftest` green; `tests/test_selftests.py`
   green (133 tests); grader-related `tests/autonomy` subset green (124 tests);
   `audit_doctrine_enforcement`, `audit_changelog_letters`,

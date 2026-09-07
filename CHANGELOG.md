@@ -115,6 +115,25 @@ IMPOSSIBLE from the ledger**: `extra.btc_regime_up` rides the SUMMARY row and
 never the trade, coverage **0%** across all 14 books; the split published here is
 derived from the scout's own BTC marks and covers only the 8.3-day tape.
 
+**AND THE WORST DEFECT IN THIS WORK WAS MINE, FOUND BY CI ON THE SECOND PUSH.**
+`resampled_dd` was called UNCONDITIONALLY inside `stats()` — a HOT function that
+eight scripts call, several inside sweep loops. Measured, 20 calls on a
+120-close book: **2.656s before, 0.0055s after — a 660x slowdown**, and it broke
+a study with nothing to do with drawdown (`study_mum_noncrypto_sleeve_2026-09-02`'s
+selftest blew CI's 120s timeout; reproduced locally at 33s-vs-2s on a machine
+faster than the runner, then shown passing). The bootstrap is now **OPT-IN**
+(`stats(rows, dd_resample=True)`) and the publish path is its only caller, on
+the ERA-SCOPED sample alone — the all-time reading exists to be the pooled
+figure the era replaced, and a risk distribution on it invites the two to be
+read together. **The class is closed, not the instance:** the selftest asserts
+both that the field is ABSENT by default AND that 20 default calls cost less
+than ONE opt-in call, so a future "small" default (200 draws, say) that
+reintroduces the regression by degrees also reddens. Both mutations verified
+RED, taking this entry's total to **10**. The honest lesson: an expensive
+computation went inside a shared pure function without asking who else calls
+it, and the local suite passed three times because it was SLOWER, not broken —
+a timeout is what turned a latent 660x regression into a visible failure.
+
 **CI AND HOUSEKEEPING.** `tests/test_selftests.py` registers this study AND
 `scripts/study_taker_ready_2026-09-06.py`, which was **already unregistered at
 HEAD** — verified by stashing this work — so `test_no_unregistered_selftest` had
