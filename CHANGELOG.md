@@ -1,3 +1,76 @@
+## 2026-09-07 (yy) — "THERE'S NOTHING TELLING MUM TO JUMP ON THAT COIN": there is, it says the opposite, and the count it says it with is uninterpretable
+
+**Eamon, 7-Sep,** watching 🙏 avo run on a coin 👩 mum never touched: *"It's
+also interesting that avo Maria just picked up a growing 140% plus trade and
+there's nothing telling mum to jump on that coin."*
+
+**THERE IS SOMETHING, AND IT WAS SAYING THE OPPOSITE THAT SAME LOOP.** 👩 mum's
+live row published `scan.verdicts.uptrend_blocked: 4` — four coins in her
+104-name universe refused **specifically because they were in an uptrend**.
+That is not an oversight, it is her defining conjunct: `OversoldRebound`
+requires **NOT (e50 > e200)** while 🙏 avo's `SwingDip` requires `e50 > e200`,
+so on a shared timeframe the two predicates are **disjoint by construction**,
+and `(qu)` measured WHY — the trend filter is *actively destructive* in mum's
+cell (adding it lowers every base's mean). A coin that is running is in an
+uptrend by definition, so it is avo's supply: all three of her open positions
+carry the tag `dip_in_uptrend`.
+
+Nor would copying it across be free. Two books on one coin is I20's one-bet-
+held-twice and I22's `n_eff` problem, and the pair is **already** co-holding
+XAU as this is written — the exact bounded leak CLAUDE.md declares (mum reads
+trend on 1h, avo on 4h, so a 4h-uptrend/1h-downtrend coin satisfies both).
+
+**THE GAP HIS OBSERVATION ACTUALLY EXPOSES IS ONE LEVEL DOWN, AND IT IS REAL.**
+`{uptrend_blocked: 4}` is **byte-identical between four coins that were about
+to fall and four that ran 140%.** The coin names existed — `cycle_verdict` is
+a per-symbol map — and `scan_census` collapsed them into an integer histogram
+one line later. So the question the observation asks, *what did the coins she
+refused go on to do?*, **could not be answered from the row's own history at
+all.** That is the `(lv)`/I18 shape — `{open: 0}` byte-identical between
+"quiet" and "structurally impossible" — landing on the fleet's real-money
+directional row, in the one census built to answer "why did nothing open?".
+
+**SHIPPED: `refused_coins`, publish-only.** The census now names the coins
+behind each REFUSAL verdict (`NAMED_REFUSALS`: uptrend_blocked, coin_veto,
+noncrypto_not_long, symcap, cooldown, clip_below_min, fleet_long_veto,
+brain_gated, notional_cap, halt_room). Declared exclusions rather than
+omissions: `no_signal`/`not_evaluated` are the high-cardinality bulk (**95 of
+mum's 104 names** in the loop that prompted this) and carry no decision;
+`held`/`opened` already ride their own maps, and a second copy is a second
+rule that can drift. Truncation is **stated, not inferred** — the true `n`
+rides beside a capped list with an explicit `truncated` flag, because a cap
+that reaches a reader's reasoning is a silent sampling step (`(qz)`). A
+verdict nothing hit is ABSENT, never an empty entry (I8: an empty dict reads
+as "refused, names unknown"). A coin that has LEFT the universe is dropped —
+`verdicts` is durable across loops (`(st)`), so an un-scoped read would report
+stale refusals as live ones.
+
+**IT MOVES NOTHING**, and that is pinned by AST rather than asserted: exactly
+one call site, and **zero `Load`-context reads** of the field anywhere in the
+module. The first cut of that check was wrong in the instructive direction —
+it counted the *publish* site, `out["refused_coins"] = ...`, as a read, which
+would have banned the field it exists to protect. Store vs Load is the
+structural distinction; a substring scan cannot make it (`(po)`).
+
+**WHAT THIS DOES NOT DO, stated so nobody reads it as a licence:** it does not
+put mum on avo's coins, and nothing here proposes it. Grading the refusals is
+a FORWARD study on the row's own accruing history over the WHOLE refused
+population — never on the one hot coin that prompted the question, which is
+I25's biased estimator by construction.
+
+**COULD NOT REPRODUCE THE 140%**, recorded rather than quietly rounded off:
+avo's largest open position reads +7.7% (MON) and her best closes are ZEC
++19.1% (3-Sep) and PUMP +12.1% (closed 12:00Z today); no basis in the payload
+— `equity/initial`, `pnl_abs/initial`, or with/without `capital_adjust` —
+lands on 140% (they give 596% / 196% / 32.4% / 90.5%). Eamon's mechanism
+observation stands and is what this entry acts on; the number is unreconciled
+and is his to point at.
+
+15 tests across the two files, **7/7 mutations RED**. Real-money host, but
+telemetry only — **main only, no live dispatch** (`(mm)`: a change that alters
+no trade buys no measured edge and costs a real-money container restart; it
+rides the next deploy that qualifies).
+
 ## 2026-09-07 (yx) — MAIN WAS RED FOR TEN HOURS AND NOTHING SAID SO: the guard fired perfectly, into a void
 
 **Eamon asked for a review of the last 24 hours and for anything that needed

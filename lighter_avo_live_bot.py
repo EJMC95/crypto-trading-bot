@@ -1028,6 +1028,65 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
 #: so the row carries the venue's own code and message verbatim.
 _LAST_REJECT = {}
 
+#: [2026-09-07 (yy)] THE REFUSAL VERDICTS WHOSE COINS ARE **NAMED**, because
+#: their COUNT ALONE IS UNINTERPRETABLE — the (lv)/I18 shape, at the row
+#: holding real money.
+#:
+#: Eamon, 7-Sep, looking at 🙏 avo running on a coin 👩 mum never touched:
+#: *"there's nothing telling mum to jump on that coin."* There IS — it is
+#: telling her the opposite, and this row published it as `uptrend_blocked: 4`
+#: that same loop. That is correct behaviour and it is deliberate: mum's cell
+#: requires **NOT (e50 > e200)** because (qu) measured the trend filter as
+#: ACTIVELY DESTRUCTIVE in it, so the uptrend supply is 🙏 avo's by
+#: construction (all three of her positions carry `dip_in_uptrend`).
+#:
+#: But `{uptrend_blocked: 4}` is **byte-identical between four coins that were
+#: about to fall and four that ran 140%**, so the question his observation
+#: actually asks — *what did the coins she refused go on to do?* — cannot be
+#: answered from this row's history at all. The names exist in `verdicts` and
+#: were being collapsed to an integer one line later.
+#:
+#: EXCLUDED, and each for a reason rather than by omission: `no_signal` and
+#: `not_evaluated` are the high-cardinality bulk (95 of mum's 104 names this
+#: loop) and carry no decision; `held` and `opened` are already published as
+#: their own maps, so naming them here would be a second copy that can drift.
+#: What is left is exactly the set where this row REFUSED a coin it looked at.
+#:
+#: REPORTED, NEVER A GATE — nothing reads this back, and grading the refusals
+#: is a study on the row's own forward history (I25: graded on the whole
+#: refused population, never on the one hot coin that prompted the question).
+NAMED_REFUSALS = ("uptrend_blocked", "coin_veto", "noncrypto_not_long",
+                  "symcap", "cooldown", "clip_below_min", "fleet_long_veto",
+                  "brain_gated", "notional_cap", "halt_room")
+
+#: Names per verdict. A cap that reaches a reader's reasoning is a silent
+#: sampling step ((qz)), so the TRUE count rides beside the list and
+#: truncation is stated rather than inferred.
+REFUSED_NAMES_CAP = 12
+
+
+def refused_coins(verdicts, universe, cap=REFUSED_NAMES_CAP):
+    """`{verdict: {"n": <true count>, "coins": [...], "truncated": bool}}` for
+    the `NAMED_REFUSALS` verdicts present this loop.
+
+    Absent keys rather than empty ones: a verdict nothing hit does not appear,
+    and an empty result returns `{}` so the caller can omit the field entirely
+    (I8 — an empty dict on the row would read as "refused, names unknown").
+    """
+    scoped = {str(c) for c in (universe or [])}
+    buckets = {}
+    for sym, why in (verdicts or {}).items():
+        if why not in NAMED_REFUSALS or str(sym) not in scoped:
+            continue
+        buckets.setdefault(why, []).append(str(sym))
+    out = {}
+    for why, coins in buckets.items():
+        coins.sort()
+        out[why] = {"n": len(coins), "coins": coins[:max(0, int(cap))]}
+        if len(coins) > cap:
+            out[why]["truncated"] = True
+    return out
+
 
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
@@ -1070,6 +1129,10 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
     # "refused, reason unknown" (I8: unknown degrades to the honest absence).
     if last_reject:
         out["venue_reject_why"] = dict(last_reject)
+    # [(yy)] the coins behind the refusal counts — see `NAMED_REFUSALS`.
+    _refused = refused_coins(verdicts, universe)
+    if _refused:
+        out["refused_coins"] = _refused
     vals = sorted(v for v in rsi_readings.values()
                   if isinstance(v, (int, float)))
     if vals and rsi_bar:
