@@ -80,9 +80,9 @@ def test_the_stamp_reports_what_is_enforced():
     other direction — the judge would then compare a policy nobody runs."""
     src = _live_src()
     assert 'policy_stamp(S, "lighter_live", "diversified",\n' in src or \
-           'policy_stamp(S, "lighter_live", "diversified", throttle_cap(S))' in src, \
+           'throttle_cap(S), True)' in src, \
         "the live stamp must pass throttle_cap(S)"
-    assert 'policy_stamp(S, "lighter_live", "diversified", None)' not in src, (
+    assert 'policy_stamp(S, "lighter_live", "diversified", None' not in src, (
         "the live host still stamps a hard-coded None — that is the exact "
         "value that made georgia's pair unjudgeable")
 
@@ -96,8 +96,8 @@ def test_both_arms_stamp_the_SAME_cap_for_georgia():
     # and REVERTED: one NEAR close at -19.506% on a -5% stop is 87% of the
     # signal. See the constant's own note.
     assert cap == 5, f"georgia's cap stays 5 — re-read (vd)"
-    shadow = fam.policy_stamp(geo, "lighter_shadow", "list", cap)
-    live = fam.policy_stamp(geo, "lighter_live", "diversified", cap)
+    shadow = fam.policy_stamp(geo, "lighter_shadow", "list", cap, True)
+    live = fam.policy_stamp(geo, "lighter_live", "diversified", cap, True)
     assert shadow["max_entries_per_hour"] == live["max_entries_per_hour"] == 5, (
         "the arms still disagree on the throttle — the pair stays unjudgeable")
 

@@ -2466,6 +2466,11 @@ CENSUS_REFUSALS = frozenset({
     # abstains (it is summed and listed in `unclassified`); a MIS-declared one
     # sends the operator at the wrong knob, which is worse than silence.
     "venue_stress", "daily_halt", "ml_gate", "blocked_other",
+    # [(zg)] the coin-quality veto, declared the day it reached a second host.
+    # An undeclared refusal abstains from `binding_gate` — so without this line
+    # a book starved entirely by the veto would report its runner-up gate and
+    # send the operator at the wrong knob (the (vm) lesson, one bucket over).
+    "coin_veto",
 })
 
 
