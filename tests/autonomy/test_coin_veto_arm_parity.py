@@ -27,6 +27,7 @@ the changelog entry.
 """
 import ast
 import datetime as dt
+import inspect
 import pathlib
 
 import pytest
@@ -243,9 +244,28 @@ class _S:
 
 def test_the_shared_builder_requires_every_host_to_answer():
     """Presence is the contract: a field neither arm stamps compares None to
-    None, reads EQUAL, and slips through the parity rung in silence."""
-    with pytest.raises(TypeError):
-        fam.policy_stamp(_S(), "lighter_shadow", "list", None)   # arity
+    None, reads EQUAL, and slips through the parity rung in silence.
+
+    Asserted on the SIGNATURE rather than by making a deliberately-wrong call.
+    Two reasons, and the second is the stronger one:
+      * a 4-argument call inside `pytest.raises(TypeError)` is a real static
+        arity error, and CodeQL flags it as one — correctly, since nothing in
+        the source says it is intentional (it reddened main on the merge of
+        the entry that added this file);
+      * `raises(TypeError)` only proves the parameter cannot be OMITTED. The
+        hole this closes is a host that stops ANSWERING, and a default value
+        re-opens it silently — `coin_veto=True` would make every caller look
+        compliant while asking nothing of the host. So the invariant is
+        "required, and no default", which is what is checked here.
+    """
+    params = inspect.signature(fam.policy_stamp).parameters
+    assert "coin_veto" in params, "the shared builder no longer takes coin_veto"
+    p = params["coin_veto"]
+    assert p.default is inspect.Parameter.empty, (
+        "coin_veto has a DEFAULT — a host that stops applying the veto would "
+        "inherit it silently, which is exactly the divergence this closes")
+    assert p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                      inspect.Parameter.POSITIONAL_ONLY)
     assert "coin_veto" in fam.policy_stamp(_S(), "lighter_shadow", "list",
                                            None, True)
 

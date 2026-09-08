@@ -1,3 +1,41 @@
+## 2026-09-08 (zh) — MAIN WENT RED ON MY OWN NEGATIVE TEST: A DELIBERATE WRONG-ARITY CALL IS STILL A WRONG-ARITY CALL
+
+**`(zg)` merged with CodeQL red, and the alert is correct.** The finding:
+
+> *Wrong number of arguments in a call — call to function `policy_stamp` with
+> too few arguments; should be no fewer than 5.*
+> `tests/autonomy/test_coin_veto_arm_parity.py:248`
+
+That line was **deliberate** — a 4-argument call inside `pytest.raises(TypeError)`
+proving the new `coin_veto` parameter is required. But nothing in the source says
+it is intentional, so a static analyser reads it as exactly what it is: a call
+with the wrong arity. **CodeQL was right and the test was the wrong shape.**
+`(yk)` already recorded that this repo's CodeQL findings "were both real"; this
+is a third, in a file that shipped hours earlier.
+
+**AND THE REWRITE IS STRICTLY STRONGER, which is why this is not a suppression.**
+`raises(TypeError)` only proves the parameter cannot be OMITTED. The hole `(zg)`
+closes is a host that stops ANSWERING — and **a default value re-opens it
+silently**: `coin_veto=True` would make every call site look compliant while
+asking nothing of either host, and the parity rung would compare two values
+neither host chose. The invariant is *required, and no default*, so the test now
+asserts it on `inspect.signature` directly.
+
+Mutation-verified RED, all three: `coin_veto=True` (a default); `*, coin_veto=False`
+(keyword-only, so no call site is forced to answer positionally); and the
+parameter removed from the builder entirely. The first is the one the old form
+would have caught by accident and the new one catches by name.
+
+**THE TRANSFERABLE RULE:** a negative test that *performs* the error it forbids
+is indistinguishable from the error. Assert the property on the signature, the
+AST or the type — never by making the wrong call and catching the exception,
+because the wrong call is still in the source and every static reader is
+entitled to believe it.
+
+**Moves no money, no lever, no bot** — a test file only, so it is main-only and
+carries no live marker.
+
+
 ## 2026-09-08 (zg) — THE COIN-QUALITY VETO RAN ON ONE ARM OF EVERY JUDGED PAIR, AND THE GUARD BUILT FOR THAT CLASS COULD NOT SEE IT
 
 **Eamon, 8-Sep: a health review of 👩 mum and her twin — *"Please fix"* on what
