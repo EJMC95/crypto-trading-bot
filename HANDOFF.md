@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-07 22:45 Sydney (12:45Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-08 17:01 Sydney (07:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -89,40 +89,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (32 commit(s), entries (yo), (yp))
+## Shipped today (1 commit(s))
 
-- `36b3a6f` (yw) the sizing table priced a book that holds one position at a time, and these books hold five to thirteen
-- `aeaca16` (yv) the fleet's only answer to its own null was on one book of fourteen: the control arm is per-book now
-- `9579a55` (yu) the control arm computed its answer and threw it away: the placebo pair settled 21 lines before the publish
-- `bec6716` (yt) the bootstrap is OPT-IN: it was inside a hot pure function and made stats() 660x slower
-- `49f1641` (yt) the changelog entry CI correctly demanded, and two CodeQL findings that were both real
-- `b5432a3` Monte Carlo risk audit: the gate grades one path, and two of its numbers were decided by row order
-- `69ed911` (yr) renumber the changelog header to match its commit subject — main briefly carried two (yq) entries because the final rebase auto-merged clean
-- `7f9462e` (yr) two instruments wrong in the reassuring direction: the asset key that hid co-holding, and the drawdown denominator that halved real money's hole
-- `3e205d9` (yq) an unfillable shadow order is NOT a zero-cost fill: NULL slippage, a named reason, and the coin-quality veto stops eating fabricated evidence
-- `cab0cd5` (yp) acknowledge golive-readiness recurrence: six mechanisms, one grading authority, and RENUMBERED (yn) -> (yp)
-- `4ffe5e7` (yn) the study report, changelog entry and carried row (renumbered yk -> yn)
-- `c0262bb` (yk) adversarial review: the taker's breakout stop was read from a key its publisher never emits, and fixed_dollar's gross was priced at t=0
-- `80065a2` (yk) the moves-nothing check is an AST walk of call sites, not a substring scan ((po): a page-wide substring scan is not a structural claim)
-- `23ac9ee` (yk) the mum-live rho finding is PRE-REGISTERED, not acted on: 10 trading days is not a mandate to cut a real-money clip 6.7x
-- `63b1b34` (yk) position sizing: five rules on one risk ladder, a conservative proposal that reads no return column
-- `412e0f7` changelog: record the date-matching guard REFUSED on its own measurement — 59 of 1,132 dated citations mismatch and nearly all are benign one-day drifts, the same size as the real error (yo)
-- `a8cd8d2` (yo) repoint three citations from (yn) to (yo) — they resolved, but to another session's entry
-- `2aab5df` (yn) the record for kelly's read, and RENUMBERED (ym) -> (yn) after a concurrent session took that letter on main
-- `ff5efd9` (ym) kelly's pre-registered read was DUE and nothing was measuring the trigger: taken, calibrated, verdict returns to Eamon
-- `950b578` (yl) The fleet passed the go-live gate for the first time, and a quarter of the sample that passed it comes from a lens the book has already vetoed — veto_split publishes it, class_split's sibling, moving no sample and no bar
-- `41523c9` Renumber (yl) -> (ym): the judge's mum-lane entry yields the letter to the cited brain-replay entry
-- `28a335e` The judge's mum lane (yl): the serial machine overwrote the census's own measurements on the lane it runs — pnl_form stale as the Farmer's 'funding', the (vm) power report dropped
-- `8122704` (yj) regenerate HANDOFF.md
-- `af7ad34` (yj) the record: the changelog entry, and RENUMBERED (yf) -> (yi) -> (yj) after two sessions took those letters on main
-- `4d8eefa` (yi) the harness that validates the brain normalised the ledger with a partial copy of the brain's own rule
-- `2a5feeb` handoff: regenerate after (yi)(yj)(yk) — 16 carried, none stale
-- `6af0bc0` [deploy-live] (yk) One spelling owner: the fleet records coin evidence as kBONK and every live consumer looks it up as 1000BONK — four markets inside mum's real-money scan where the quality veto could never fire
-- `538eee1` (yj) Four hand-typed rosters and a key that overwrote itself: georgia v3 in no risk cohort, carry's panel empty since July, a coverage guard that always skipped, a retired-set parse reading 68 for 46, and market-context destroying its own snapshot
-- `7cbef28` (yi) One lane owner: the judge moved to mum and three organs kept watching the Farmer — a blind receipt detector, a census entry on a retired pair, a growth promoter off-lane, and one live book's lever graded on another's trades
-- `fa26156` carry: avo's judge lane is declared but her carrier is not lever-capable — the (yg) surface's first finding, deferred with its own closes_when
-- `4bf21e8` (yg) VERIFIED: both arms on 5e30671ecf64, judge un-drifted at its next cycle, resid live — and the lever surface found avo's undeclared namespace on its first loop
-- `b775b06` [deploy-live-mum] The judge's mum lane: (ye) owns the fix, this ships the lever surface and the marker that keeps mum's pair aligned; plus the pooled grader and the flinders refusal (yg)(yf)(yh) (#287)
+- `45ff703` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
 
 ## How this file stays honest
 
