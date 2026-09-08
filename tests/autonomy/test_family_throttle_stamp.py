@@ -43,10 +43,10 @@ def test_the_stamp_always_carries_the_field_presence_not_truthiness():
     # PRESENCE is the contract: a host with no throttle answers None, and the
     # KEY must still be there. Truthiness would make "no throttle" and "never
     # answered" the same byte-string, which is the hole this closes.
-    st = fam.policy_stamp(_Plain(), "lighter_shadow", "list", None)
+    st = fam.policy_stamp(_Plain(), "lighter_shadow", "list", None, True)
     assert "max_entries_per_hour" in st, "the field is absent — unstamped again"
     assert st["max_entries_per_hour"] is None
-    st3 = fam.policy_stamp(_Plain(), "lighter_shadow", "list", 3)
+    st3 = fam.policy_stamp(_Plain(), "lighter_shadow", "list", 3, True)
     assert st3["max_entries_per_hour"] == 3
 
 
@@ -57,8 +57,8 @@ def test_each_host_answers_for_itself_not_the_strategy():
     # give DIFFERENT answers for the SAME strategy — that is the divergence.
     gated = _georgia()
     shadow = fam.policy_stamp(gated, "lighter_shadow", "list",
-                              fam.throttle_cap(gated))
-    live = fam.policy_stamp(gated, "lighter_live", "diversified", None)
+                              fam.throttle_cap(gated), True)
+    live = fam.policy_stamp(gated, "lighter_live", "diversified", None, True)
     assert shadow["max_entries_per_hour"] == gated.MAX_ENTRIES_PER_HOUR
     assert live["max_entries_per_hour"] is None
     assert shadow["max_entries_per_hour"] != live["max_entries_per_hour"], \
@@ -200,4 +200,4 @@ def test_a_zero_cap_throttles_to_zero_rather_than_unthrottling(monkeypatch):
 
     # and the stamp reports the 0 rather than erasing it
     assert fam.policy_stamp(s, "lighter_shadow", "list",
-                            fam.throttle_cap(s))["max_entries_per_hour"] == 0
+                            fam.throttle_cap(s), True)["max_entries_per_hour"] == 0
