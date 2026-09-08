@@ -121,6 +121,29 @@ jobs:
       - name: The guard must still be able to see (negative fixtures)
         run: python3 scripts/session_state.py --selftest
 
+  test-imports:
+    name: A test may not import what CI does not install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-09-07 (zh)] The vacuous-red twin of the born-dark guard above.
+      # `audit_image_imports` asks "does this module import something its
+      # IMAGE does not ship?"; nothing asked the same of the TEST job, and on
+      # 2026-09-07 a bare `import yaml` inside a test function reddened the
+      # suite -- PyYAML is present in the dev container and absent in CI, so
+      # it passed locally and failed in the only regime that gates the build
+      # ((pn)'s two-regimes class, [[a-guard-has-two-regimes-ci-has-no-database]]).
+      #
+      # Runs on the CHEAP side of that boundary: a stdlib-only AST walk, no
+      # pip install, so it answers in seconds BEFORE the 6-minute suite job
+      # rather than after it. A GUARDED import (try/except ImportError, or
+      # pytest.importorskip) is accepted -- that is the pattern
+      # `test_margin_truth` already uses correctly.
+      - name: The guard must still be able to see (positive + negative fixtures)
+        run: python3 scripts/audit_test_imports.py --selftest
+      - name: No test imports a module the CI job will not have
+        run: python3 scripts/audit_test_imports.py
+
   operator-name:
     name: His name is Eamon — a quote is credited to a person, not a role
     runs-on: ubuntu-latest

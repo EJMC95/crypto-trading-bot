@@ -1,3 +1,87 @@
+## 2026-09-07 (zh) — A TEST MAY NOT IMPORT WHAT CI DOES NOT INSTALL: the vacuous-red twin of the born-dark guard
+
+**Eamon:** *"It keeps saying failed workflows PR run on GitHub."* Diagnosing
+that found the failures were on ANOTHER session's branch (PR #293), not his,
+and one of them is a class this repo has now paid for twice in a day.
+
+**THE INSTANCE.** Two tests in `tests/autonomy/test_code_currency_wired.py`
+called a bare `import yaml`. `requirements-test.txt` has no yaml —
+**deliberately**, its own header saying it installs *"the minimum needed"* —
+and the edited file's own docstring says it a second time: *"requirements-test.txt
+carries no yaml lib, and the properties pinned here are line-shaped."* The
+convention was written at the top of the file being edited and walked past.
+CI: `2 failed, 3981 passed`.
+
+**WHY IT PASSED LOCALLY, which is the whole class.** `yaml` IS importable in
+the dev container (PyYAML 6.0.1, pulled in transitively) and is NOT installed
+in CI. So the author ran it, saw green, and pushed a red build — `(pn)`'s
+two-regimes shape ([[a-guard-has-two-regimes-ci-has-no-database]]) landing on
+the test job instead of on a guard's fallbacks. It is the exact mirror of
+`audit_image_imports`: that one asks *"does this module import something its
+IMAGE does not ship?"* and **nothing asked the same question of the TEST job.**
+
+**SHIPPED: `scripts/audit_test_imports.py`**, wired as its own CI job on the
+CHEAP side of the boundary — a stdlib-only AST walk, no pip install, so it
+answers in seconds before the six-minute suite rather than after it. It walks
+every import in `tests/**` **at any depth**, because both failing imports sat
+INSIDE test functions where a module-level scan reports a clean file.
+
+**TWO THINGS THE FIRST CUT GOT WRONG, both found by running it rather than
+reading it, and both recorded because they are the interesting part:**
+
+1. **It banned guarded imports, and the tree refuted that in one pass.** The
+   first rule was "no `try: import x / except ImportError`", on the argument
+   that a silent skip is a vacuous green. Run against the real tree it
+   immediately flagged `test_workflow_shell_syntax` (yaml) and
+   `test_margin_truth` (`lighter`) — **both on main, both green, and the
+   second is the model of doing it right**, because its except branch asserts
+   the DEGRADED behaviour rather than skipping. So the defect is not "imports
+   something optional", it is **imports it with no fallback**. Guarded imports
+   and `pytest.importorskip` are accepted now.
+2. **It reported 70 repo-local modules as third-party.** `golive_readiness`,
+   `edge_audit` and every `audit_*` live under `scripts/` and are imported by
+   bare name after a `sys.path.insert`. A guard crying wolf on its own
+   codebase is how a guard gets exempted and then guards nothing (`(mz)`).
+   `PATH_INSERTED_DIRS` fixes it.
+
+**AND WHAT CI ACTUALLY HAS IS PARSED FROM THE WORKFLOW, NOT RETYPED.**
+`tests.yml` installs `requirements-test.txt` and then greps a small alternation
+out of `requirements.txt` (`lighter-sdk`, `websockets`). That pattern is read
+from the workflow text, so the guard cannot drift from the job it models; an
+unreadable file falls back to a declared tuple, which is the CONSERVATIVE
+direction — a smaller available set can only produce more findings, never
+fewer. The rest of `requirements.txt` is the IMAGE's dependency set and is
+deliberately NOT treated as available, because doing so would hide this exact
+class.
+
+**THE POSITIVE CONTROL IS THE REAL INCIDENT, AND IT NEARLY DIDN'T HAPPEN.**
+This file's own rule — *"empty output is not a negative result until the check
+has been seen to produce a positive one"* — is why the guard was run against
+PR #293's file rather than trusted. It reported CLEAN, and for about a minute
+that read as "the guard does not work". **It was the premise that was stale:
+#293 had already fixed the import and now parses the workflow as text.** Run
+against the commit CI actually failed on (`de8918c`), the guard reports
+**line 124 — the line CI reported.** That control is now pinned in the
+selftest. The correction also stands against my own earlier report to Eamon
+that the yaml failure was "still live" on #293: it is not, and they fixed it
+themselves.
+
+**A LETTER RACE, twice, inside one entry.** This shipped as `(zg)`; while it
+was being written PR #293 grew from `(ze)(zf)` to `(ze)(zf)(zg)`. Moved to
+`(zh)` and every citation repointed — recorded here because `git log` subjects
+keep the old letter and the CHANGELOG headers are the reliable index. It is
+the third such collision today and the measured cost stands: **8 of 33 commits
+(24%) in the preceding 24h were pure letter-collision repair.**
+
+`ALLOWED_UNDECLARED` ships EMPTY, which is the correct resting state — an
+entry there is a dependency nobody has declared, i.e. the thing the guard
+exists to surface. Registered in `SELFTEST_MODULES` **and** `ENFORCED_AUDITS`
+in the same commit that adds the script, which is this file's own standing
+rule and precisely what `(yl)` missed hours earlier when a `--selftest` with
+no registration reddened main for ten hours.
+
+Moves no money, no lever and no bot: a CI guard and its registration.
+
 ## 2026-09-07 (zd) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
 
 **[RENUMBERED (yw) -> (zd) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
