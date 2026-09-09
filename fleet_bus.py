@@ -172,7 +172,7 @@ JUDGED_PAIRS = {
                            "bounce_take", "range_top", "max_hold", "trade",
                            "delisted", "trend_breakdown", "flip"),
         "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
-                          "scan_order"),
+                          "scan_order", "coin_veto"),
         "growth": {},
         "control_role": "load_bearing",
         "host_file": "lighter_avo_live_bot.py",
@@ -194,7 +194,7 @@ JUDGED_PAIRS = {
                            "bounce_take", "range_top", "max_hold", "trade",
                            "delisted", "trend_breakdown", "flip"),
         "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
-                          "scan_order", "max_entries_per_hour"),
+                          "scan_order", "max_entries_per_hour", "coin_veto"),
         # [2026-08-26] THE SECOND ENTRY-POLICY DIVERGENCE ON THIS PAIR, and it
         # is NOT waived: it is MEASURED MATERIAL, and neither host stamps it
         # yet, so it is declared REQUIRED and blocks until they do.
@@ -279,7 +279,7 @@ JUDGED_PAIRS = {
                            "bounce_take", "range_top", "max_hold", "trade",
                            "delisted", "trend_breakdown", "flip"),
         "policy_fields": ("strategy", "venue", "stoploss", "roi", "sides",
-                          "scan_order"),
+                          "scan_order", "coin_veto"),
         "growth": {},
         "control_role": "load_bearing",
         "host_file": "lighter_avo_live_bot.py",
