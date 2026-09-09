@@ -290,6 +290,90 @@ that predates its own experiment; the floor is currently bound by `window`, so
 the number is right today.
 
 
+## 2026-09-07 (zh) — A TEST MAY NOT IMPORT WHAT CI DOES NOT INSTALL: the vacuous-red twin of the born-dark guard
+
+**Eamon:** *"It keeps saying failed workflows PR run on GitHub."* Diagnosing
+that found the failures were on ANOTHER session's branch (PR #293), not his,
+and one of them is a class this repo has now paid for twice in a day.
+
+**THE INSTANCE.** Two tests in `tests/autonomy/test_code_currency_wired.py`
+called a bare `import yaml`. `requirements-test.txt` has no yaml —
+**deliberately**, its own header saying it installs *"the minimum needed"* —
+and the edited file's own docstring says it a second time: *"requirements-test.txt
+carries no yaml lib, and the properties pinned here are line-shaped."* The
+convention was written at the top of the file being edited and walked past.
+CI: `2 failed, 3981 passed`.
+
+**WHY IT PASSED LOCALLY, which is the whole class.** `yaml` IS importable in
+the dev container (PyYAML 6.0.1, pulled in transitively) and is NOT installed
+in CI. So the author ran it, saw green, and pushed a red build — `(pn)`'s
+two-regimes shape ([[a-guard-has-two-regimes-ci-has-no-database]]) landing on
+the test job instead of on a guard's fallbacks. It is the exact mirror of
+`audit_image_imports`: that one asks *"does this module import something its
+IMAGE does not ship?"* and **nothing asked the same question of the TEST job.**
+
+**SHIPPED: `scripts/audit_test_imports.py`**, wired as its own CI job on the
+CHEAP side of the boundary — a stdlib-only AST walk, no pip install, so it
+answers in seconds before the six-minute suite rather than after it. It walks
+every import in `tests/**` **at any depth**, because both failing imports sat
+INSIDE test functions where a module-level scan reports a clean file.
+
+**TWO THINGS THE FIRST CUT GOT WRONG, both found by running it rather than
+reading it, and both recorded because they are the interesting part:**
+
+1. **It banned guarded imports, and the tree refuted that in one pass.** The
+   first rule was "no `try: import x / except ImportError`", on the argument
+   that a silent skip is a vacuous green. Run against the real tree it
+   immediately flagged `test_workflow_shell_syntax` (yaml) and
+   `test_margin_truth` (`lighter`) — **both on main, both green, and the
+   second is the model of doing it right**, because its except branch asserts
+   the DEGRADED behaviour rather than skipping. So the defect is not "imports
+   something optional", it is **imports it with no fallback**. Guarded imports
+   and `pytest.importorskip` are accepted now.
+2. **It reported 70 repo-local modules as third-party.** `golive_readiness`,
+   `edge_audit` and every `audit_*` live under `scripts/` and are imported by
+   bare name after a `sys.path.insert`. A guard crying wolf on its own
+   codebase is how a guard gets exempted and then guards nothing (`(mz)`).
+   `PATH_INSERTED_DIRS` fixes it.
+
+**AND WHAT CI ACTUALLY HAS IS PARSED FROM THE WORKFLOW, NOT RETYPED.**
+`tests.yml` installs `requirements-test.txt` and then greps a small alternation
+out of `requirements.txt` (`lighter-sdk`, `websockets`). That pattern is read
+from the workflow text, so the guard cannot drift from the job it models; an
+unreadable file falls back to a declared tuple, which is the CONSERVATIVE
+direction — a smaller available set can only produce more findings, never
+fewer. The rest of `requirements.txt` is the IMAGE's dependency set and is
+deliberately NOT treated as available, because doing so would hide this exact
+class.
+
+**THE POSITIVE CONTROL IS THE REAL INCIDENT, AND IT NEARLY DIDN'T HAPPEN.**
+This file's own rule — *"empty output is not a negative result until the check
+has been seen to produce a positive one"* — is why the guard was run against
+PR #293's file rather than trusted. It reported CLEAN, and for about a minute
+that read as "the guard does not work". **It was the premise that was stale:
+#293 had already fixed the import and now parses the workflow as text.** Run
+against the commit CI actually failed on (`de8918c`), the guard reports
+**line 124 — the line CI reported.** That control is now pinned in the
+selftest. The correction also stands against my own earlier report to Eamon
+that the yaml failure was "still live" on #293: it is not, and they fixed it
+themselves.
+
+**A LETTER RACE, twice, inside one entry.** This shipped as `(zg)`; while it
+was being written PR #293 grew from `(ze)(zf)` to `(ze)(zf)(zg)`. Moved to
+`(zh)` and every citation repointed — recorded here because `git log` subjects
+keep the old letter and the CHANGELOG headers are the reliable index. It is
+the third such collision today and the measured cost stands: **8 of 33 commits
+(24%) in the preceding 24h were pure letter-collision repair.**
+
+`ALLOWED_UNDECLARED` ships EMPTY, which is the correct resting state — an
+entry there is a dependency nobody has declared, i.e. the thing the guard
+exists to surface. Registered in `SELFTEST_MODULES` **and** `ENFORCED_AUDITS`
+in the same commit that adds the script, which is this file's own standing
+rule and precisely what `(yl)` missed hours earlier when a `--selftest` with
+no registration reddened main for ten hours.
+
+Moves no money, no lever and no bot: a CI guard and its registration.
+
 ## 2026-09-07 (zd) — THE SIZING TABLE PRICED A BOOK THAT HOLDS ONE POSITION AT A TIME, AND THESE BOOKS HOLD FIVE TO THIRTEEN: gross exposure, measured
 
 **[RENUMBERED (yw) -> (zd) at push time.** PR #290 — a concurrent session's open branch — claims (ys)(yt)(yu)(yv)(yw) as a CONTIGUOUS block, and its (ys) is already cited in 11 files. Both sides picked "next free" against `origin/main`, where the letters were free, which is exactly the stale-snapshot race the letter rule names. THIS SIDE MOVED: breaking their block would orphan (ys) from its siblings and rewrite citations across 11 files, where moving this one costs only its own diff. Recorded inline because `git log` subjects keep the OLD letter — the CHANGELOG headers are the reliable index, not the commit log.**
@@ -686,6 +770,290 @@ from the books' own rows (🎫 taker 8, 👩 mum 12, 🙏 avo 6).
 `python3 scripts/study_montecarlo_risk_2026-09-07.py --all --draws 20000`.
 Baseline P&L recorded before testing and re-verified after: no book lost rows,
 no book with an unchanged close count changed its P&L.
+
+## 2026-09-07 (yz) — THE DRAWDOWN BAR MEANT A DIFFERENT THING ON EVERY ROW: one denominator for a paper grand and a real book below it
+
+**Eamon, 7-Sep:** *"Fix the drawdown denominator and check mum's gross vs her
+vol target."* They turned out to be the same question.
+
+**THE DEFECT.** Both drawdown paths in `golive_readiness` divide a DOLLAR hole
+by `BOOK_USD` ($1,000) — the realised curve at `stats` and the mark-to-market
+series at `mtm_drawdown`. Right for a $1,000 paper book with no top-ups;
+**wrong for a live book holding real money below that.** The 15% bar therefore
+fires at a different fraction of every book:
+
+| | peak equity | the bar fires at | = % of the real book | true peak-relative DD |
+|---|---|---|---|---|
+| 🙏 avo LIVE | $421 | $150 | **35.6%** | 13.21% (published 5.57%) |
+| 👩 mum LIVE | $582 | $150 | **25.8%** | 12.17% (published 7.08%) |
+| 12 shadow books | ~$1,000 | $150 | ~15% ✓ | unchanged |
+
+The one bar that is NOT clip-invariant ((hl) measured the other five) was
+**2.4x and 1.7x looser on real money than on paper** — precisely backwards
+from where the slack belongs. `(yr)` measured this yesterday and published
+`max_dd_frac_peak` BESIDE the bar, correctly leaving the re-spec to Eamon
+because a gate re-spec is his act. He has now made it.
+
+**BOTH HALVES MOVE, and that is the load-bearing detail.** Rebasing only the
+MTM half would leave a $1,000-denominated realised number able to win the I9
+`max()` and silently decide the bar on the old convention — and it *would*
+have: **👩 mum's realised half is the deciding one** (12.17% against the MTM's
+11.04%). `apply_mtm` now rebases both onto `peak_equity`, or neither, and says
+which in `maxdd_denom`.
+
+**MEASURED BEFORE IT SHIPPED, all 14 graded books, and then CALIBRATED against
+the shipped function rather than a hand table:**
+* **ZERO verdict flips.** Nothing that passed now fails; nothing that failed
+  now passes.
+* **`fleet_bus.dd_scale` — a REAL-MONEY sizing rail that reads this exact
+  number — moves on NO live book** (both stay under the bar, so both stay at
+  1.0). The only book whose scale moves is paper 🪁 kelly, 0.325 → 0.449.
+* **NOT UNIFORMLY STRICTER**, stated rather than buried: a book whose equity
+  peaked ABOVE $1,000 reads LOWER because the denominator grew — 🎫 the taker,
+  the fleet's **first-ever READY**, goes 5.42 → **4.58%**. A different and
+  better question, not a tightening.
+* The calibration caught my own hand table being wrong on 🧔 bezos (I predicted
+  4.01%, the code says 3.50%): his series is **6.0 days against the existing
+  7-day floor**, so `apply_mtm` returns early and correctly keeps `BOOK_USD`.
+  **The shipped code was right and the prediction was naive** — which is the
+  whole reason a harness must reproduce the live grade before it may speak.
+
+**A DEFECT IN MY OWN FIRST CUT, recorded because it is the exact class this
+bar exists to prevent.** It rebased the MTM half and set the realised half to
+`None` when `max_dd_usd` was missing — which DROPS it from the `max()`, a
+**silent loosening of the one bar that governs real money, inside the change
+written to tighten it.** And a `max()` over two different denominators is a
+number nobody can interpret. It is all-or-nothing now: both halves on peak
+equity, or neither, pinned by mutation M2. The existing selftest also caught a
+fixture that had stopped being coherent — `max_dd_frac=0.002` beside stats'
+own `max_dd_usd=0.0`, two fields describing different books, which only stopped
+mattering because nothing read the dollars.
+
+**AND THE VOL TARGET IS THE SAME QUESTION.** `vol_target_gross_x(n_eff) =
+0.15 / (|stop| / sqrt(n_eff))` — the gross that keeps an all-slots stop inside
+the 15% bar. It was already computing a book-relative bound while the gate it
+cites measured against $1,000, so the two were inconsistent: an all-slots stop
+on mum's $579 book is $116 = **11.6% of a grand** and could never reach the bar
+it is priced against. **Now 20% is 20%.**
+
+The check Eamon asked for, measured: **her gross is not stably above or below
+target — the target MOVES and she oscillates across it.** Across ~1h her
+`n_eff` went **1.516 → 1.917**, taking `vol_target_here` **4.62 → 5.19**
+against a FIXED `set` of 5.0 — so she read **+8.3% OVER** and then **−3.7%
+UNDER**, with nothing about her configuration changing. 🙏 avo reads −3.9% on
+the same measurement.
+
+**What does NOT move with the basket is the number worth watching: BOTH live
+books sit at `all_slots_stop_pct` = exactly 20.0% against a 15% bar** — both
+configured at exactly **1.333x** the fully-correlated bound. The sqrt(n_eff)
+credit is what bridges that 5pp gap, and it is a probabilistic argument
+re-earned every loop on a basket whose measured `n_eff` is under 2 on 6 and 12
+slots.
+
+**SHIPPED beside it, publish-only:** `vs_vol_target` (the ratio the question
+asks for; >1.0 = gross exceeds what this basket's independence supports) and
+`all_slots_stop_over_bar_pp`. The comment above them already said the gap "is
+the risk being taken, published not argued" — and then published the two
+operands and left the reader to divide, against a target that moves. **The bar
+is DERIVED from this module's own owner** (`vol_target_gross_x(1.0) * |stop| ==
+0.15` by construction), never retyped, so a gate re-spec cannot leave a second
+copy behind.
+
+**NO GROSS WAS CHANGED, and that is deliberate:** risk appetite is Eamon's
+((sr): *"the code's job is the arithmetic, published"*), 👩 mum already carries
+a pre-registered rho read, and cutting a live book's size on an hour of a
+moving ratio is exactly what I25 forbids. The arithmetic is now on the row
+every loop instead of in a session's scratchpad.
+
+**[MERGE RECONCILIATION — the other side left the handoff and this is it.]**
+PR #291 landed on main while this branch was open, adding `resampled_dd` to
+the same file. Its author saw this change coming and wrote the hazard down:
+*"Once that lands, a reader comparing this number to the published
+`max_dd_pct` would be comparing two denominators — which is precisely the
+'meant a different thing on every row' defect that PR exists to end,
+reproduced one field over. So the denominator travels WITH the number, and
+`denom_usd` is what a consumer rebases by. **Whoever merges second
+reconciles.**"* Done here, in `apply_mtm` — the one place that holds both the
+resampled draws and the peak equity. The three quantiles are a pure scale and
+rebase EXACTLY. **`p_over_bar` does not**: it is a COUNT over a threshold,
+recoverable only from the draws themselves, and on a live book whose peak sits
+BELOW `denom_usd` it **understates** — the alarming direction, the same
+failure this entry exists to end. So it is nulled with its reason and kept
+under `p_over_bar_at_book_denom` rather than silently rescaled (a fabricated
+number) or silently dropped (a lost one). No letter was minted for this: it is
+what makes THIS change correct in the merged tree, not a separate one.
+
+**A PIN BLOCKED IT, AND WAS RE-AIMED RATHER THAN DELETED.** `(yr)` shipped
+`test_apply_mtm_still_decides_on_the_book_usd_fraction` — asserting the bar
+does NOT read the peak fraction — and it was exactly right when written: the
+number was REPORTED, the re-spec was Eamon's, and that pin is what stopped a
+later session making it blocking on its own. It now guards the opposite
+direction, and its stated worry (*"swapping it would silently re-verdict every
+live book"*) is answered with the measurement above rather than waived: zero
+flips, no live sizing change. I26: a pin is a snapshot, not a property. Its
+sibling on `grade()` is UNTOUCHED and still passes — `grade` is byte-unchanged
+and does no fold of its own; the fold stays upstream in `apply_mtm`, which is
+what keeps the re-spec to one place. Both were `inspect.getsource` substring
+scans, so the re-aimed one now DRIVES the function instead — `(po)`: a
+page-wide substring scan is not a structural claim, and that form would pass
+against a correct implementation that spelled the field differently.
+
+10/10 mutations RED across the two files (7 on the denominator, 3 on the vol
+target); both hosts' selftests green; full suite green. The live-host half is
+TELEMETRY — main only, no live dispatch ((mm)); the grader half publishes on
+its own 6-hourly loop.
+
+## 2026-09-07 (yy) — "THERE'S NOTHING TELLING MUM TO JUMP ON THAT COIN": there is, it says the opposite, and the count it says it with is uninterpretable
+
+**Eamon, 7-Sep,** watching 🙏 avo run on a coin 👩 mum never touched: *"It's
+also interesting that avo Maria just picked up a growing 140% plus trade and
+there's nothing telling mum to jump on that coin."*
+
+**THERE IS SOMETHING, AND IT WAS SAYING THE OPPOSITE THAT SAME LOOP.** 👩 mum's
+live row published `scan.verdicts.uptrend_blocked: 4` — four coins in her
+104-name universe refused **specifically because they were in an uptrend**.
+That is not an oversight, it is her defining conjunct: `OversoldRebound`
+requires **NOT (e50 > e200)** while 🙏 avo's `SwingDip` requires `e50 > e200`,
+so on a shared timeframe the two predicates are **disjoint by construction**,
+and `(qu)` measured WHY — the trend filter is *actively destructive* in mum's
+cell (adding it lowers every base's mean). A coin that is running is in an
+uptrend by definition, so it is avo's supply: all three of her open positions
+carry the tag `dip_in_uptrend`.
+
+Nor would copying it across be free. Two books on one coin is I20's one-bet-
+held-twice and I22's `n_eff` problem, and the pair is **already** co-holding
+XAU as this is written — the exact bounded leak CLAUDE.md declares (mum reads
+trend on 1h, avo on 4h, so a 4h-uptrend/1h-downtrend coin satisfies both).
+
+**THE GAP HIS OBSERVATION ACTUALLY EXPOSES IS ONE LEVEL DOWN, AND IT IS REAL.**
+`{uptrend_blocked: 4}` is **byte-identical between four coins that were about
+to fall and four that ran 140%.** The coin names existed — `cycle_verdict` is
+a per-symbol map — and `scan_census` collapsed them into an integer histogram
+one line later. So the question the observation asks, *what did the coins she
+refused go on to do?*, **could not be answered from the row's own history at
+all.** That is the `(lv)`/I18 shape — `{open: 0}` byte-identical between
+"quiet" and "structurally impossible" — landing on the fleet's real-money
+directional row, in the one census built to answer "why did nothing open?".
+
+**SHIPPED: `refused_coins`, publish-only.** The census now names the coins
+behind each REFUSAL verdict (`NAMED_REFUSALS`: uptrend_blocked, coin_veto,
+noncrypto_not_long, symcap, cooldown, clip_below_min, fleet_long_veto,
+brain_gated, notional_cap, halt_room). Declared exclusions rather than
+omissions: `no_signal`/`not_evaluated` are the high-cardinality bulk (**95 of
+mum's 104 names** in the loop that prompted this) and carry no decision;
+`held`/`opened` already ride their own maps, and a second copy is a second
+rule that can drift. Truncation is **stated, not inferred** — the true `n`
+rides beside a capped list with an explicit `truncated` flag, because a cap
+that reaches a reader's reasoning is a silent sampling step (`(qz)`). A
+verdict nothing hit is ABSENT, never an empty entry (I8: an empty dict reads
+as "refused, names unknown"). A coin that has LEFT the universe is dropped —
+`verdicts` is durable across loops (`(st)`), so an un-scoped read would report
+stale refusals as live ones.
+
+**IT MOVES NOTHING**, and that is pinned by AST rather than asserted: exactly
+one call site, and **zero `Load`-context reads** of the field anywhere in the
+module. The first cut of that check was wrong in the instructive direction —
+it counted the *publish* site, `out["refused_coins"] = ...`, as a read, which
+would have banned the field it exists to protect. Store vs Load is the
+structural distinction; a substring scan cannot make it (`(po)`).
+
+**WHAT THIS DOES NOT DO, stated so nobody reads it as a licence:** it does not
+put mum on avo's coins, and nothing here proposes it. Grading the refusals is
+a FORWARD study on the row's own accruing history over the WHOLE refused
+population — never on the one hot coin that prompted the question, which is
+I25's biased estimator by construction.
+
+**COULD NOT REPRODUCE THE 140%**, recorded rather than quietly rounded off:
+avo's largest open position reads +7.7% (MON) and her best closes are ZEC
++19.1% (3-Sep) and PUMP +12.1% (closed 12:00Z today); no basis in the payload
+— `equity/initial`, `pnl_abs/initial`, or with/without `capital_adjust` —
+lands on 140% (they give 596% / 196% / 32.4% / 90.5%). Eamon's mechanism
+observation stands and is what this entry acts on; the number is unreconciled
+and is his to point at.
+
+15 tests across the two files, **7/7 mutations RED**. Real-money host, but
+telemetry only — **main only, no live dispatch** (`(mm)`: a change that alters
+no trade buys no measured edge and costs a real-money container restart; it
+rides the next deploy that qualifies).
+
+## 2026-09-07 (yx) — MAIN WAS RED FOR TEN HOURS AND NOTHING SAID SO: the guard fired perfectly, into a void
+
+**Eamon asked for a review of the last 24 hours and for anything that needed
+correcting to be corrected.** The first thing the review found is that `main`
+did not build.
+
+**THE INSTANCE.** `(yl)` landed `scripts/study_taker_ready_2026-09-06.py` at
+03:16Z with a `--selftest` and no entry in `tests/test_selftests.py`.
+`test_no_unregistered_selftest` caught it immediately and correctly:
+
+    FAILED tests/test_selftests.py::test_no_unregistered_selftest
+    1 failed, 3974 passed, 23 skipped
+
+`Tests` went red on main at run **#1031 (03:29Z)** and was still red at run
+**#1035** on HEAD ~**10 hours** later. **Eight further pushes landed in that
+window**, every one of them onto a build that did not pass, and every one of
+them green-looking to the session that pushed it. Reproduced locally
+byte-for-byte before anything was changed (same single failure, same 3974
+passing).
+
+**THE INSTANCE IS ONE LINE. THE CLASS IS THE REASON IT LASTED TEN HOURS.**
+`.github/workflows/ci-notify.yml` reports CI transitions **on the pull
+request** and skips main deliberately, with its reason in its own comment:
+*"main-branch runs are post-merge CI - no PR to notify"*. That was right when
+work arrived through PRs. It is not the workflow this repo runs — CLAUDE.md's
+worktree rule publishes with `git rebase origin/main && git push origin
+HEAD:main`, so **the pushes that actually govern the fleet have no PR, and
+therefore had no notification of any kind.** Not an email, not an issue, not a
+comment. The failing run sat in the Actions tab and was never surfaced.
+
+This is the `(gl)` shape one level up. `(gl)` says a guard whose only output is
+a warning on a passing run is not a guard. This is a guard whose output is a
+**red run nobody is shown** — and it is worse, because a red build is exactly
+the state in which every subsequent push is unverified. Note also that the same
+class had already been paid for once: `tests/test_selftests.py` carries a
+`(wu)` comment recording that `(wr)` did this identical thing on 2-Sep. Fixing
+the instance twice did not close the class, which is what `audit_recurrence`
+exists to say.
+
+**SHIPPED — `.github/workflows/main-red.yml`, the exact complement of
+`ci-notify`.** Mechanism is `fleet-watchdog.yml`'s, deliberately and not a
+second invention: **ONE issue, opened on failure, edited in place while it
+stays red, closed on recovery** — transition alerts, no email storms, no
+polling, no `send_later`, no session wakeups (P1/P2: the replacement for a
+check-in chain is an Action). Design decisions, each with the failure it
+prevents:
+
+* **It never fires on `cancelled`.** 6 of the 10 most recent main runs were
+  cancelled by the push after them — the normal state here. Alerting on that
+  would make the label noise inside a day, which is `(gl)` again.
+* **The issue is scoped PER WORKFLOW** (`<!-- main-red:<name> -->`). Two
+  workflows report; without the marker a green `Changelog check` closes the
+  issue a red `Tests` just opened, on the same commit — the notifier silently
+  cancelling its own alarm.
+* **Concurrency is keyed on the workflow, not the sha.** Both watched
+  workflows finish on the *same* head_sha, so `ci-notify`'s sha-keyed
+  `cancel-in-progress: true` group would have one event cancel the other.
+* **No untrusted text reaches the shell through `${{ }}`.** A commit subject is
+  attacker-shaped and this job holds `issues: write`; the subject is fetched
+  with `gh api` into a variable instead.
+* **`actions: read` is granted**, because a `permissions:` block zeroes every
+  scope it omits — precisely how `audit_ci_coverage` shipped unable to answer
+  its own question ((pn)).
+
+**PINNED, 7 tests, 8/8 mutations RED** (`tests/autonomy/test_main_red_notifier.py`).
+The load-bearing one asserts the **complement from both files**: `ci-notify`
+must exclude main and `main-red` must require it, so a completed main run is
+handled exactly once — a later edit to either side that double-reports, or that
+reopens the hole, reddens the build. Two of the seven were wrong on their first
+cut and both were instructive: one regex captured a single line of the
+concurrency block, and the injection check was a page-wide substring scan that
+failed on **its own comment** explaining why `head_commit` is banned — `(po)`'s
+rule landing on the test written to honour it. It is a structural `${{ }}`
+match now.
+
+**MOVES NO MONEY AND NO BOT.** CI plumbing and one registration line; no lever,
+no env, no position, no grade. What it buys is that the next ten-hour red
+window is a ten-minute one.
 
 ## 2026-09-07 (yq) — THE SHADOW FILL MODEL PUBLISHED A FABRICATED ZERO, AND THE COIN-QUALITY VETO ATE IT AS EVIDENCE: an order the book could not fill was recorded as a measured zero-cost execution
 

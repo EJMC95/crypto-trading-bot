@@ -183,10 +183,125 @@ def test_the_grade_is_byte_unchanged_by_the_new_field():
     assert "GOLIVE_MAX_DD" in src or "max_dd_frac" in src
 
 
-def test_apply_mtm_still_decides_on_the_book_usd_fraction():
-    """`apply_mtm` folds the WORSE of realised and MTM into the graded number.
-    It must keep using `max_dd_frac` — swapping it for the peak fraction would
-    silently re-verdict every live book."""
-    import inspect
-    src = inspect.getsource(gr.apply_mtm)
-    assert "max_dd_frac_peak" not in src
+def test_apply_mtm_decides_on_the_peak_relative_fraction():
+    """RE-AIMED at (yz), not deleted — and the reason is recorded here.
+
+    This was `test_apply_mtm_still_decides_on_the_book_usd_fraction`, and it
+    was CORRECT when (yr) wrote it: the peak fraction shipped as REPORTED, the
+    re-spec was Eamon's to make, and this pin is what stopped a later session
+    quietly making it blocking. He made it on 7-Sep — *"Fix the drawdown
+    denominator"* — so the pin now guards the opposite direction.
+
+    Its stated worry was that swapping the fraction "would silently re-verdict
+    every live book". That was the right question and it is ANSWERED WITH A
+    MEASUREMENT rather than waived: on the live payload, all 14 graded books,
+    the change produced **zero verdict flips**, and `fleet_bus.dd_scale` — the
+    real-money sizing rail reading this number — moved on no live book. I26:
+    a pin is a snapshot, not a property; when it blocks a change the question
+    is whether the change is right, never whether the pin exists.
+
+    Driven through the function rather than grepped out of its source: the old
+    form asserted a SUBSTRING was absent, which is (po)'s "a page-wide
+    substring scan is not a structural claim" — it would have passed against a
+    correct implementation that spelled the field differently, and failed
+    against a comment that merely mentioned it.
+    """
+    stats_like = {"n": 40, "days": 40.0, "mean_pct": 0.5, "t": 3.0,
+                  "h1": 1.0, "h2": 1.0,
+                  "max_dd_frac": 0.0708, "max_dd_usd": -70.80}
+    mtm = {"n": 3761, "days": 13.0, "max_dd_frac": 0.0643,
+           "max_dd_frac_peak": 0.1104, "peak_equity": 581.96}
+
+    got = gr.apply_mtm(stats_like, mtm)
+
+    # 👩 mum's real shape: $70.80 of hole on a book that peaked at $581.96.
+    assert got["maxdd_denom"] == "peak_equity"
+    assert got["max_dd_frac"] == pytest.approx(70.80 / 581.96, rel=1e-4), (
+        "the graded fraction is not the book's own peak-relative drawdown")
+    assert got["max_dd_frac"] > mtm["max_dd_frac_peak"], (
+        "the REALISED half must be able to decide too — rebasing only the MTM "
+        "half leaves a $1,000-denominated number able to win the max()")
+
+    # The superseded reading is kept, not hidden (I12).
+    assert got["max_dd_frac_book"] == pytest.approx(0.0708)
+
+    # ONE denominator, never a mix: without the dollar figure NEITHER half
+    # moves, and the realised hole must still be able to fail the bar.
+    no_dollars = {k: v for k, v in stats_like.items() if k != "max_dd_usd"}
+    no_dollars["max_dd_frac"] = 0.40
+    kept = gr.apply_mtm(no_dollars, mtm)
+    assert kept["maxdd_denom"] == "book_usd"
+    assert kept["max_dd_frac"] == pytest.approx(0.40), (
+        "the realised half was dropped when it could not be rebased — a "
+        "silent loosening of the bar that governs real money")
+
+
+def test_the_peak_denominator_is_not_uniformly_stricter():
+    """🎫 the taker's shape, and the fleet's first-ever READY: a book whose
+    equity peaked ABOVE $1,000 reads LOWER, because the denominator grew.
+    Pinned so nobody re-sells this change as a one-way tightening."""
+    got = gr.apply_mtm(
+        {"n": 187, "days": 37.8, "mean_pct": 1.17, "t": 2.6, "h1": 1.0,
+         "h2": 1.0, "max_dd_frac": 0.0231, "max_dd_usd": -23.10},
+        {"n": 3000, "days": 30.0, "max_dd_frac": 0.0542,
+         "max_dd_frac_peak": 0.0458, "peak_equity": 1185.20})
+    assert got["max_dd_frac"] == pytest.approx(0.0458)
+    assert got["max_dd_frac"] < got["max_dd_frac_book"]
+    assert gr.bar_map(got)["maxdd"] is True
+
+
+def test_dd_resampled_is_reconciled_onto_the_same_denominator():
+    """The concurrent-merge handoff: *"Whoever merges second reconciles."*
+
+    PR #291's `resampled_dd` computes against `book_usd` because that is what
+    `stats.max_dd_frac` used at that point in the pipeline, and its author
+    named the hazard the (yz) rebase would create — a reader comparing
+    `dd_resampled` to the published `max_dd_pct` compares two denominators,
+    "the defect that PR exists to end, reproduced one field over".
+
+    `apply_mtm` is the one place holding both, so it reconciles them.
+    """
+    s_in = {"n": 40, "days": 40.0, "mean_pct": 0.5, "t": 3.0, "h1": 1.0,
+            "h2": 1.0, "max_dd_frac": 0.0708, "max_dd_usd": -70.80,
+            "dd_resampled": {"draws": 400, "decisions": 30,
+                             "p50_pct": 5.0, "p95_pct": 10.0, "p99_pct": 12.0,
+                             "p_over_bar": 0.02, "denom_usd": 1000.0,
+                             "maxdd_denom": "book_usd"}}
+    mtm = {"n": 3761, "days": 13.0, "max_dd_frac": 0.0643,
+           "max_dd_frac_peak": 0.1104, "peak_equity": 500.0}
+
+    got = gr.apply_mtm(s_in, mtm)["dd_resampled"]
+
+    # $1,000 -> $500 peak doubles every quantile. An EXACT scale, not a model.
+    assert got["p50_pct"] == pytest.approx(10.0)
+    assert got["p95_pct"] == pytest.approx(20.0)
+    assert got["p99_pct"] == pytest.approx(24.0)
+    assert got["denom_usd"] == pytest.approx(500.0)
+    assert got["maxdd_denom"] == "peak_equity"
+
+    # A COUNT over a threshold cannot be rescaled from quantiles, and where
+    # peak < denom_usd it UNDERSTATES — the alarming direction. Nulled with a
+    # reason, and KEPT under a name that states its basis: neither fabricated
+    # nor lost.
+    assert got["p_over_bar"] is None
+    assert got["p_over_bar_at_book_denom"] == pytest.approx(0.02)
+    assert "UNDERSTATES" in got["p_over_bar_why"]
+
+    # The caller's dict is never mutated (apply_mtm's standing contract).
+    assert s_in["dd_resampled"]["p50_pct"] == 5.0
+    assert s_in["dd_resampled"]["maxdd_denom"] == "book_usd"
+
+
+def test_dd_resampled_is_left_alone_when_the_bar_did_not_rebase():
+    """No rebase, no reconciliation — the two are already on one denominator,
+    and touching it would invent a mismatch rather than close one."""
+    s_in = {"n": 40, "days": 40.0, "mean_pct": 0.5, "t": 3.0, "h1": 1.0,
+            "h2": 1.0, "max_dd_frac": 0.40,          # no max_dd_usd
+            "dd_resampled": {"p50_pct": 5.0, "p_over_bar": 0.02,
+                             "denom_usd": 1000.0, "maxdd_denom": "book_usd"}}
+    got = gr.apply_mtm(s_in, {"n": 3000, "days": 30.0, "max_dd_frac": 0.01,
+                              "max_dd_frac_peak": 0.005, "peak_equity": 2000.0})
+    assert got["maxdd_denom"] == "book_usd"
+    assert got["dd_resampled"]["p50_pct"] == 5.0
+    assert got["dd_resampled"]["p_over_bar"] == 0.02
+    assert "p_over_bar_at_book_denom" not in got["dd_resampled"]

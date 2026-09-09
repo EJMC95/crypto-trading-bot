@@ -1033,6 +1033,65 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
 #: so the row carries the venue's own code and message verbatim.
 _LAST_REJECT = {}
 
+#: [2026-09-07 (yy)] THE REFUSAL VERDICTS WHOSE COINS ARE **NAMED**, because
+#: their COUNT ALONE IS UNINTERPRETABLE — the (lv)/I18 shape, at the row
+#: holding real money.
+#:
+#: Eamon, 7-Sep, looking at 🙏 avo running on a coin 👩 mum never touched:
+#: *"there's nothing telling mum to jump on that coin."* There IS — it is
+#: telling her the opposite, and this row published it as `uptrend_blocked: 4`
+#: that same loop. That is correct behaviour and it is deliberate: mum's cell
+#: requires **NOT (e50 > e200)** because (qu) measured the trend filter as
+#: ACTIVELY DESTRUCTIVE in it, so the uptrend supply is 🙏 avo's by
+#: construction (all three of her positions carry `dip_in_uptrend`).
+#:
+#: But `{uptrend_blocked: 4}` is **byte-identical between four coins that were
+#: about to fall and four that ran 140%**, so the question his observation
+#: actually asks — *what did the coins she refused go on to do?* — cannot be
+#: answered from this row's history at all. The names exist in `verdicts` and
+#: were being collapsed to an integer one line later.
+#:
+#: EXCLUDED, and each for a reason rather than by omission: `no_signal` and
+#: `not_evaluated` are the high-cardinality bulk (95 of mum's 104 names this
+#: loop) and carry no decision; `held` and `opened` are already published as
+#: their own maps, so naming them here would be a second copy that can drift.
+#: What is left is exactly the set where this row REFUSED a coin it looked at.
+#:
+#: REPORTED, NEVER A GATE — nothing reads this back, and grading the refusals
+#: is a study on the row's own forward history (I25: graded on the whole
+#: refused population, never on the one hot coin that prompted the question).
+NAMED_REFUSALS = ("uptrend_blocked", "coin_veto", "noncrypto_not_long",
+                  "symcap", "cooldown", "clip_below_min", "fleet_long_veto",
+                  "brain_gated", "notional_cap", "halt_room")
+
+#: Names per verdict. A cap that reaches a reader's reasoning is a silent
+#: sampling step ((qz)), so the TRUE count rides beside the list and
+#: truncation is stated rather than inferred.
+REFUSED_NAMES_CAP = 12
+
+
+def refused_coins(verdicts, universe, cap=REFUSED_NAMES_CAP):
+    """`{verdict: {"n": <true count>, "coins": [...], "truncated": bool}}` for
+    the `NAMED_REFUSALS` verdicts present this loop.
+
+    Absent keys rather than empty ones: a verdict nothing hit does not appear,
+    and an empty result returns `{}` so the caller can omit the field entirely
+    (I8 — an empty dict on the row would read as "refused, names unknown").
+    """
+    scoped = {str(c) for c in (universe or [])}
+    buckets = {}
+    for sym, why in (verdicts or {}).items():
+        if why not in NAMED_REFUSALS or str(sym) not in scoped:
+            continue
+        buckets.setdefault(why, []).append(str(sym))
+    out = {}
+    for why, coins in buckets.items():
+        coins.sort()
+        out[why] = {"n": len(coins), "coins": coins[:max(0, int(cap))]}
+        if len(coins) > cap:
+            out[why]["truncated"] = True
+    return out
+
 
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
@@ -1075,6 +1134,10 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
     # "refused, reason unknown" (I8: unknown degrades to the honest absence).
     if last_reject:
         out["venue_reject_why"] = dict(last_reject)
+    # [(yy)] the coins behind the refusal counts — see `NAMED_REFUSALS`.
+    _refused = refused_coins(verdicts, universe)
+    if _refused:
+        out["refused_coins"] = _refused
     vals = sorted(v for v in rsi_readings.values()
                   if isinstance(v, (int, float)))
     if vals and rsi_bar:
@@ -2139,6 +2202,47 @@ def main(_ctx=None, once=False):
                                    else None),
                     "vol_target_here": (vol_target_gross_x(held_n_eff)
                                         if held_n_eff else None),
+                    # [2026-09-07 (yz)] THE GAP, AS A NUMBER. Eamon, 7-Sep:
+                    # *"check mum's gross vs her vol target."* The comment
+                    # above already said the gap "is the risk being taken,
+                    # published not argued" — and then published the two
+                    # operands and left the reader to divide, so answering the
+                    # question meant a hand calculation against a target that
+                    # MOVES. Measured across ~1h that day, 👩 mum's `n_eff`
+                    # went 1.516 -> 1.917, taking `vol_target_here` 4.62 ->
+                    # 5.19 against a FIXED `set` of 5.0 — so she read +8.3%
+                    # OVER target and then -3.7% UNDER it, without anything
+                    # changing about her configuration. A ratio nobody can see
+                    # oscillate is a ratio nobody knows they are crossing.
+                    #
+                    # `vs_vol_target` > 1.0 means the configured gross exceeds
+                    # what THIS basket's measured independence supports.
+                    "vs_vol_target": (
+                        round(gross_x() / vol_target_gross_x(held_n_eff), 4)
+                        if held_n_eff and vol_target_gross_x(held_n_eff)
+                        else None),
+                    # And the half that does NOT move with the basket, which is
+                    # why it is the one worth watching: `all_slots_stop_pct` is
+                    # the DETERMINISTIC worst case (`gross_x * |stop|`), while
+                    # `vol_target_here` credits sqrt(n_eff) — a probabilistic
+                    # argument re-earned every loop. Measured the day this
+                    # shipped, BOTH live books sit at exactly 20.0% against a
+                    # 15% bar, i.e. both configured at 1.333x the fully
+                    # correlated bound; positive here = outside the bar.
+                    #
+                    # It became a MEANINGFUL comparison only with `(yz)`'s
+                    # denominator fix: while the gate divided every drawdown by
+                    # $1,000, an all-slots stop on mum's $579 book was $116 =
+                    # 11.6% of a grand and could never reach the bar it is
+                    # priced against. Now 20% is 20%.
+                    #
+                    # The bar is DERIVED from this module's own owner, never
+                    # retyped: `vol_target_gross_x(1.0) * |stop| == 0.15` by
+                    # construction, so the two cannot drift apart.
+                    "all_slots_stop_over_bar_pp": round(
+                        100 * (gross_x() * abs(float(S.stoploss))
+                               - vol_target_gross_x(1.0)
+                               * abs(float(S.stoploss))), 2),
                     # [(sy)] READ FROM THE VENUE, not a literal. The worst
                     # maintenance-margin fraction across the books this
                     # universe actually trades — 600bps, not the 300bps (sr)
