@@ -162,6 +162,25 @@ SELFTEST_MODULES = [
     # (sa) rule applied to a negative result: a founding claim nobody can
     # re-run is a rumour with a number attached, and so is a refusal.
     "scripts.study_flinders_zband_2026-09-06",
+    # [2026-09-07 (yx)] 🎫 the taker's READY stress test — the drift/(hm)
+    # alternative asked of the fleet's first-ever `ready: True`. SELFTEST_MODULES
+    # and deliberately NOT ENFORCED_AUDITS, the edge_audit reason exactly: its
+    # live arm reads the public ledger and the live `golive-readiness` grade,
+    # both of which move with every close and no code change, and its
+    # calibration gate REFUSES (exit 2) on a stale or absent grade — a refusal
+    # CI must never read as a pass. The --selftest is offline and pure (the
+    # side/lens/exit parse, naive vs cluster t, and all three refusal arms).
+    #
+    # SECOND INSTANCE OF THE SAME CI-RED CLASS, recorded rather than quietly
+    # fixed: the (wu) note twelve lines below is the FIRST — (wr) landed a
+    # study on main with a --selftest and no registration. This time (yl)
+    # landed `study_taker_ready_2026-09-06.py` at 03:16Z 7-Sep and main's
+    # Tests workflow was RED from run #1031 (03:29Z) to the fix, ~10h, while
+    # eight further pushes landed on top of it. Nothing said so, because
+    # `ci-notify.yml` skips `head_branch == 'main'` by design and this repo
+    # pushes straight to main — so the guard fired into a void. The registration
+    # below closes the instance; the silence is closed by `main-red.yml`.
+    "scripts.study_taker_ready_2026-09-06",
     # [2026-09-02 (wu)] PORTED from the in-flight health-check branch, the CI-red
     # rule: (wr) landed this study on main with a --selftest and no registration,
     # so test_no_unregistered_selftest is red on main itself. Its selftest is
@@ -471,6 +490,14 @@ SELFTEST_MODULES = [
     # bot_pnl_store._BUILD_SHARED, and putting it there re-stamped 22 images
     # (build_n 17 -> 18) for a module none of them import — the (fd) trap.
     "scripts.lighter_margin_model",
+    # [2026-09-07 (zh)] A test may not import what CI does not install — the
+    # vacuous-red twin of the born-dark guard. Registered in the SAME commit
+    # that adds the script, which is this file's own standing rule and the
+    # exact thing (yl) missed hours earlier: a --selftest with no registration
+    # reddened main for ~10h. Its --selftest is offline and pure, and carries
+    # the POSITIVE CONTROL (an unguarded `import yaml` inside a test function),
+    # verified against the real failing commit rather than a sketch of it.
+    "scripts.audit_test_imports",
 ]
 
 # Heavier live-fixture harnesses that need the real signer SDK. Skipped when the
@@ -535,6 +562,7 @@ ENFORCED_AUDITS = [
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
     "scripts/audit_deploy_coverage.py",   # every shipped file has a deploy path (CI-gating)
     "scripts/audit_changelog_letters.py",  # sync-channel citations resolve (CI-gating)
+    "scripts/audit_test_imports.py",      # tests import only what CI installs (CI-gating)
     # [2026-08-16 (ox)] THE SCAN, not just the --selftest. This guard was in
     # SELFTEST_MODULES only, so `pytest` ran its negative fixture and never
     # pointed it at the repo: the scan lived solely in changelog-check.yml, and

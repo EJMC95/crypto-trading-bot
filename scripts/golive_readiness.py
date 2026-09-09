@@ -1935,20 +1935,120 @@ def apply_mtm(s, mtm, min_samples=None, min_days=None):
     out["mtm"] = mtm
     if not mtm or mtm.get("max_dd_frac") is None:
         out["maxdd_basis"] = "realised"
+        out["maxdd_denom"] = "book_usd"
         out["mtm_why"] = "no usable equity series"
         return out
     if mtm["n"] < min_samples or mtm["days"] < min_days:
         out["maxdd_basis"] = "realised"
+        out["maxdd_denom"] = "book_usd"
         out["mtm_why"] = (f"series too thin to decide "
                           f"({mtm['n']}/{min_samples} samples, "
                           f"{mtm['days']:.1f}/{min_days:g}d)")
         return out
     realised = out.get("max_dd_frac")
-    worse = mtm["max_dd_frac"] if realised is None else max(realised,
-                                                           mtm["max_dd_frac"])
-    out["max_dd_frac_realised"] = realised
+    # [2026-09-07 (yz)] THE DENOMINATOR IS THE BOOK'S OWN PEAK EQUITY, NOT
+    # `BOOK_USD`. Eamon, 7-Sep: *"Fix the drawdown denominator."*
+    #
+    # Both paths above divide a DOLLAR drawdown by `BOOK_USD` ($1,000) — right
+    # for a $1,000 paper book with no top-ups, and wrong for a live book
+    # holding real money BELOW that. The bar then means a different thing on
+    # every row: measured the day this shipped, the 15% bar fires at
+    # **35.6%** of 🙏 avo's actual book ($421 peak) and **25.8%** of 👩 mum's
+    # ($582 peak), against ~15% on the twelve $1,000 shadow books. The one bar
+    # that is NOT clip-invariant ((hl) measured the other five) was
+    # **2.4x and 1.7x looser on real money than on paper** — precisely
+    # backwards from where the slack belongs.
+    #
+    # `(yr)` measured this and published `max_dd_frac_peak` BESIDE the bar,
+    # correctly leaving the re-spec to Eamon because it is a gate re-spec. He
+    # has now made it, so the bar moves onto the honest denominator and BOTH
+    # halves of the I9 worse-of fold move together — rebasing only the MTM
+    # half would leave a $1,000-denominated realised number able to win the
+    # `max()` and silently decide the bar on the old convention (measured:
+    # 👩 mum's realised half IS the deciding one, 12.17% vs the MTM's 11.04%).
+    #
+    # MEASURED BEFORE IT SHIPPED, on the live payload, all 14 graded books:
+    #   * **ZERO verdict flips** — nothing that passed now fails, nothing that
+    #     failed now passes;
+    #   * both live books stay inside the bar with the honest headroom shown:
+    #     avo 5.60 -> **13.21%**, mum 7.10 -> **12.17%** (88% and 81% of the
+    #     bar, against the 37% and 47% previously published);
+    #   * the twelve shadow books move 0.85-1.01x, i.e. not at all;
+    #   * `fleet_bus.dd_scale` — a REAL-MONEY sizing rail that reads this very
+    #     number — moves on **no live book** (both remain under the bar, so
+    #     both stay at 1.0). The only book whose scale moves is paper 🪁 kelly,
+    #     0.325 -> 0.449.
+    #
+    # NOT UNIFORMLY STRICTER, stated rather than buried (the `(yr)` point): a
+    # book whose equity peaked ABOVE $1,000 reads LOWER, because the
+    # denominator grew — 🎫 the taker, the fleet's first-ever READY, goes
+    # 5.42 -> **4.58%**, and 🪁 kelly 28.51 -> 26.02%. It is a different and
+    # better question, not a tightening.
+    #
+    # FAIL-SAFE: an absent or non-positive `peak_equity`, or a missing
+    # `max_dd_usd`, keeps the old `BOOK_USD` convention and says so in
+    # `maxdd_denom` — the reader is never left to infer which denominator
+    # decided (I8: unknown degrades to the honest previous answer).
+    # ALL OR NOTHING ON THE DENOMINATOR. The first cut of this rebased the MTM
+    # half and set the realised half to None when `max_dd_usd` was missing,
+    # which DROPS it from the `max()` — a silent loosening of the one bar that
+    # governs real money, in the guard written to tighten it. And a `max()`
+    # over two different denominators is a number nobody can interpret. So
+    # either BOTH halves move onto peak equity, or NEITHER does and the old
+    # `BOOK_USD` reading stands unchanged.
+    peak_eq = mtm.get("peak_equity")
+    dd_usd = out.get("max_dd_usd")
+    m_bar, r_bar, denom = mtm["max_dd_frac"], realised, "book_usd"
+    if (peak_eq and peak_eq > 0
+            and mtm.get("max_dd_frac_peak") is not None
+            and isinstance(dd_usd, (int, float))):
+        m_bar, denom = mtm["max_dd_frac_peak"], "peak_equity"
+        r_bar = abs(dd_usd) / peak_eq
+    worse = m_bar if r_bar is None else max(r_bar, m_bar)
+    # Both published fractions share ONE denominator, so a reader may compare
+    # them; the superseded $1,000 reading is kept rather than hidden (I12, the
+    # `alltime` precedent) so nothing this replaces becomes unfindable.
+    out["max_dd_frac_realised"] = r_bar
+    out["max_dd_frac_book"] = (mtm["max_dd_frac"] if realised is None
+                               else max(realised, mtm["max_dd_frac"]))
     out["max_dd_frac"] = worse
-    out["maxdd_basis"] = "mtm" if worse == mtm["max_dd_frac"] else "realised"
+    out["maxdd_denom"] = denom
+    out["maxdd_basis"] = "mtm" if worse == m_bar else "realised"
+    # [(yz)] RECONCILE `dd_resampled` ONTO THE SAME DENOMINATOR — the handoff
+    # the concurrent session left in `resampled_dd`: *"the denominator travels
+    # WITH the number ... Whoever merges second reconciles."* That is this
+    # merge. They computed against `book_usd` because that is what
+    # `stats.max_dd_frac` used AT THAT POINT in the pipeline, and named the
+    # hazard exactly: once the rebase lands, a reader comparing `dd_resampled`
+    # to the published `max_dd_pct` compares two denominators — "the defect
+    # that PR exists to end, reproduced one field over".
+    #
+    # `apply_mtm` is the one place that holds BOTH, so it is where they are
+    # reconciled. The quantiles are a pure scale and rebase EXACTLY.
+    # `p_over_bar` does not: it is a COUNT over a threshold, recoverable only
+    # from the draws themselves, and on a live book whose peak is BELOW
+    # `denom_usd` it **understates** — the alarming direction, which is the
+    # same failure this change exists to end. So it is nulled with its reason
+    # and kept under a self-describing name rather than silently rescaled or
+    # silently dropped (I8).
+    _ddr = out.get("dd_resampled")
+    if (denom == "peak_equity" and isinstance(_ddr, dict)
+            and isinstance(_ddr.get("denom_usd"), (int, float))
+            and _ddr["denom_usd"] > 0):
+        _k = float(_ddr["denom_usd"]) / peak_eq
+        _reb = dict(_ddr)
+        for _q in ("p50_pct", "p95_pct", "p99_pct"):
+            if isinstance(_reb.get(_q), (int, float)):
+                _reb[_q] = round(_reb[_q] * _k, 2)
+        _reb["p_over_bar_at_book_denom"] = _reb.get("p_over_bar")
+        _reb["p_over_bar"] = None
+        _reb["p_over_bar_why"] = (
+            "counted against the bar on denom_usd; a count over a threshold "
+            "cannot be rescaled from quantiles, and where peak < denom_usd it "
+            "UNDERSTATES")
+        _reb["denom_usd"] = round(float(peak_eq), 2)
+        _reb["maxdd_denom"] = "peak_equity"
+        out["dd_resampled"] = _reb
     return out
 
 
@@ -3000,6 +3100,13 @@ def book_payload(s):
             "peak_equity": _m.get("peak_equity")}
     if s.get("max_dd_frac_realised") is not None:
         out["max_dd_pct_realised"] = round(100 * s["max_dd_frac_realised"], 2)
+    # [(yz)] WHICH denominator decided, and what the superseded $1,000 reading
+    # was. Published together: `maxdd_denom` alone cannot tell a reader how far
+    # the bar moved, and the old number alone cannot tell them it was replaced.
+    if s.get("maxdd_denom"):
+        out["maxdd_denom"] = s["maxdd_denom"]
+    if s.get("max_dd_frac_book") is not None:
+        out["max_dd_pct_book"] = round(100 * s["max_dd_frac_book"], 2)
     if s.get("n", 0) < 2:
         out.update(days=None, mean_pct=None, t=None, win_pct=None,
                    max_dd_pct=None, h1=None, h2=None,
@@ -3742,11 +3849,66 @@ def _selftest():
 
     # THE COUNTERWEIGHT CASE, end to end: realised DD ~0 but the book is down
     # 1.5% and holding. With a thick series the MTM number is what grades.
-    _cw = apply_mtm(dict(good, max_dd_frac=0.002),
+    # [(yz)] `max_dd_usd` is now load-bearing, so the fixture states it: a $2
+    # hole on a book whose series peaks at $1,000 IS 0.2%. It read
+    # `max_dd_frac=0.002` with `max_dd_usd` left at stats' own 0.0 — two
+    # fields describing different books, which only stopped mattering because
+    # nothing read the dollars.
+    _cw = apply_mtm(dict(good, max_dd_frac=0.002, max_dd_usd=-2.0),
                     mtm_drawdown(_eq([1000.0 - i * 0.05 for i in range(400)])))
     assert _cw["maxdd_basis"] == "mtm", _cw
     assert _cw["max_dd_frac"] > 0.002, "the open loss must reach the bar"
     assert _cw["max_dd_frac_realised"] == 0.002, "and the realised one is kept"
+
+    # [2026-09-07 (yz)] THE DENOMINATOR. Every case below was measured on the
+    # live payload first; see `apply_mtm` for the numbers and the impact.
+    #
+    # (1) A LIVE BOOK BELOW $1,000 — 👩 mum's shape. $70.80 of realised hole
+    # on a book that peaked at $581.96 is 12.17%, not the 7.08% a $1,000
+    # denominator reports. The REALISED half decides here, which is the whole
+    # reason both halves had to move: rebasing only the MTM half would have
+    # left the old convention winning the max().
+    _live = apply_mtm(
+        dict(good, max_dd_frac=0.0708, max_dd_usd=-70.80),
+        {"n": 3761, "days": 13.0, "max_dd_frac": 0.0643,
+         "max_dd_frac_peak": 0.1104, "peak_equity": 581.96})
+    assert _live["maxdd_denom"] == "peak_equity", _live
+    assert abs(_live["max_dd_frac"] - 0.12166) < 1e-4, _live
+    assert _live["maxdd_basis"] == "realised", \
+        "the realised half must be able to decide on the new denominator too"
+    assert abs(_live["max_dd_frac_book"] - 0.0708) < 1e-9, \
+        "the superseded $1,000 reading must be kept, not hidden (I12)"
+    assert bar_map(_live)["maxdd"] is True, "12.2% is still inside the bar"
+
+    # (2) NOT UNIFORMLY STRICTER — 🎫 the taker's shape. A book whose equity
+    # peaked ABOVE $1,000 reads LOWER, because the denominator grew. This is
+    # the assertion that stops a future reader "fixing" the rule back into a
+    # one-way ratchet.
+    _rich = apply_mtm(
+        dict(good, max_dd_frac=0.0231, max_dd_usd=-23.10),
+        {"n": 3000, "days": 30.0, "max_dd_frac": 0.0542,
+         "max_dd_frac_peak": 0.0458, "peak_equity": 1185.20})
+    assert _rich["max_dd_frac"] < _rich["max_dd_frac_book"], _rich
+    assert abs(_rich["max_dd_frac"] - 0.0458) < 1e-9, _rich
+
+    # (3) ALL OR NOTHING. Without `max_dd_usd` the realised half cannot be
+    # rebased — and must NOT be dropped from the max(), which is how the first
+    # cut of this silently LOOSENED the bar it exists to tighten.
+    _no_dollars = dict(good, max_dd_frac=0.40)
+    _no_dollars.pop("max_dd_usd", None)
+    _nousd = apply_mtm(
+        _no_dollars,
+        {"n": 3000, "days": 30.0, "max_dd_frac": 0.01,
+         "max_dd_frac_peak": 0.005, "peak_equity": 2000.0})
+    assert _nousd["maxdd_denom"] == "book_usd", _nousd
+    assert _nousd["max_dd_frac"] == 0.40, \
+        "a realised hole must still decide when the dollars are unreadable"
+    assert bar_map(_nousd)["maxdd"] is False
+
+    # (4) `maxdd_denom` is ALWAYS published, on every path — a consumer must
+    # never have to infer which denominator decided (I8).
+    for _p in (_live, _rich, _nousd, _thin, _none, _got):
+        assert _p.get("maxdd_denom") in ("peak_equity", "book_usd"), _p
     # [2026-08-04 (ja)] The contract SPLIT, and this assertion is the record
     # of why. The old line pinned "any junk store -> []" — the exact tolerance
     # that hid (iz)'s phantom `load_history` for 4 days. New contract: a store
