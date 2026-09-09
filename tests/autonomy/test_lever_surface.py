@@ -24,14 +24,18 @@ sys.path.insert(0, ROOT)
 import fleet_bus                      # noqa: E402
 import lighter_family_bot as fam      # noqa: E402
 
+#: [(zj)] the surface is now carrier-aware, so every call needs the strategy
+#: whose consumable set it reports. mum is the carrier that holds all four.
+MUM = next(x for x in fam.STRATEGIES if x.bot == "freqtrade-mum")
+
 
 def test_surface_reports_registered_names_and_flags_unregistered():
-    clean = fam.lever_surface("xp.mum.")
+    clean = fam.lever_surface(MUM, "xp.mum.")
     assert clean["prefix"] == "xp.mum." and clean["registry"] is True
     assert clean["registered_n"] == len(fam.MUM_LEVER_ATTRS)
     assert "unregistered" not in clean, clean
     # the exact string the bug produced — must read as a DEFECT, not as clean
-    bad = fam.lever_surface("xp.mum-lshadow.")
+    bad = fam.lever_surface(MUM, "xp.mum-lshadow.")
     assert bad["registry"] is True and bad["registered_n"] == 0
     assert set(bad["unregistered"]) == {
         "xp.mum-lshadow." + bar for bar, _a, _c in fam.MUM_LEVER_ATTRS}
@@ -40,15 +44,15 @@ def test_surface_reports_registered_names_and_flags_unregistered():
 def test_unregistered_key_is_absent_when_clean_never_an_empty_list():
     """An empty list is something a reader learns to skim past; absence is
     the only clean value, so the key's presence alone means 'bug'."""
-    assert "unregistered" not in fam.lever_surface("xp.mum.")
-    assert fam.lever_surface("xp.mum-lshadow.")["unregistered"]
+    assert "unregistered" not in fam.lever_surface(MUM, "xp.mum.")
+    assert fam.lever_surface(MUM, "xp.mum-lshadow.")["unregistered"]
 
 
 def test_no_prefix_is_a_first_class_answer():
     """`xp_prefix_for_arm` returns "" for a row that is nobody's shadow arm
     or an image without fleet_bus; the surface must publish that as-is."""
-    assert fam.lever_surface("") == {"prefix": ""}
-    assert fam.lever_surface(None) == {"prefix": None}
+    assert fam.lever_surface(MUM, "") == {"prefix": ""}
+    assert fam.lever_surface(MUM, None) == {"prefix": None}
 
 
 def test_the_surface_is_fed_by_the_owner_not_a_second_resolution():
@@ -56,14 +60,14 @@ def test_the_surface_is_fed_by_the_owner_not_a_second_resolution():
     `lever_surface` the result of `xp_prefix_for_arm(b.bot_id)` — the same
     call the lever apply uses — never its own string."""
     src = inspect.getsource(fam.family_publish_extra)
-    assert '"levers": lever_surface(xp_prefix_for_arm(b.bot_id))' in src, src
+    assert '"levers": lever_surface(b.s, xp_prefix_for_arm(b.bot_id))' in src, src
 
 
 def test_the_surface_reads_true_for_mums_shadow_arm():
     """End to end through the owners: mum's shadow row resolves the declared
     prefix and every one of her registered knobs is found under it."""
     shadow = fleet_bus.JUDGED_PAIRS["mum"]["shadow_bot"]
-    out = fam.lever_surface(fam.xp_prefix_for_arm(shadow))
+    out = fam.lever_surface(MUM, fam.xp_prefix_for_arm(shadow))
     assert out["prefix"] == "xp.mum."
     assert out["registry"] is True
     assert out["registered_n"] == len(fam.MUM_LEVER_ATTRS)

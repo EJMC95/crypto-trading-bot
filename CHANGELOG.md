@@ -1,3 +1,87 @@
+## 2026-09-09 (zj) — 🙏 AVO'S JUDGE LANE WAS INERT BY ONE MISSING ATTRIBUTE, AND HER ROW ADVERTISED FOUR LEVERS TO FIX IT — THREE OF WHICH HER CARRIER CANNOT HOLD
+
+**Carried since 6-Sep as `avo-judge-lane-declared-but-not-lever-capable` (I11:
+carried work outranks new work), and still true this morning** on the fleet's
+second real-money book — the one currently up **+$126.97 (+29%)**.
+
+**TWO DEFECTS, one cause: `apply_book_levers` and `lever_surface` were two
+independent readings of MUM's attribute list, neither of which had ever asked
+the carrier anything.**
+
+* **The applier guarded `RSI_MAX and MAX_HOLD_MIN` and returned at the first
+  miss.** `SwingDip` has `RSI_MAX = 42.0` and **no `MAX_HOLD_MIN`**, so 🙏
+  avo's arm consumed **nothing**, however many levers were registered. The
+  registered-but-inert shape I18 exists to prevent — one namespace over from
+  `(ye)`, found by the surface `(yg)` built to find it.
+* **The surface derived its names from `MUM_LEVER_ATTRS` with no reference to
+  the carrier at all**, so her row published `unregistered: [rsi_max,
+  max_hold_min, vel_lo, vel_hi]` — an instruction to register **four** names,
+  **three of which `SwingDip` can never hold** and none of which the applier
+  would have set. A detector must name an object the operator can act on (I8);
+  this named three that do not exist.
+
+Because both derived from the same wrong source, they could disagree with
+reality in the same direction and **never with each other** — which is why
+this survived a dedicated lever-surface entry.
+
+**SHIPPED: `consumable_lever_attrs(strategy)`, the ONE owner both now read** —
+the subset of `MUM_LEVER_ATTRS` the carrier's CLASS actually defines. Keyed on
+the class, never the instance: `apply_book_levers` mutates the instance, so an
+instance-keyed read would report a knob as consumable only after something had
+already written it (mutation-verified).
+
+**WHAT THE OLD GUARD WAS REALLY PROTECTING IS PRESERVED, and it is the reason
+this filters rather than simply dropping the check.** `mum_env_defaults` falls
+back to *mum's own numbers* for an attribute a carrier lacks, so touching a
+missing attr would **INVENT a knob** — a 1440-minute hold on a book with no
+time stop. Skipping the attribute is the correct half of that guard; refusing
+the whole carrier was not.
+
+**EXPECTANCY PRICE: ZERO, MEASURED ON EVERY LIVING CARRIER.** mum keeps all
+four (identical); 🙏 avo resolves `xp.avo.rsi_max`, which is unregistered, to
+her own default **42.0 — the value she already ran**; 🔮 georgia v3 holds
+`MAX_HOLD_MIN` but is nobody's judged arm (`xp_prefix_for_arm` → `""`) so she
+stays a no-op and cannot pick up a neighbour's namespace. **No book gains a
+knob and no value moves** — pinned by a test that drives the real carriers
+against the shipped registry.
+
+**HER ROW NOW READS HONESTLY:** `consumable: ["rsi_max"], registered_n: 0,
+unregistered: ["xp.avo.rsi_max"]` — **one actionable name instead of four
+fictional ones** — and her lane is MECHANICALLY CAPABLE, so registering that
+lever is a one-line act rather than a rewrite.
+
+**AND THE REGISTRATION IS DELIBERATELY NOT IN THIS ENTRY — a refusal with
+evidence (the un-amendable core, and `(vd)`'s "say what it WOULD take").** A
+cage must fit a measured value, and there is no measurement to fit:
+`(qu)` asked her entry exit-free over **1,156 signals / 475d / 23 coins** and
+**0 of 21 cells survive BH at FDR 0.05**; her own arms hold **n=18 live /
+n=34 shadow**. A dose-response on `rsi_max` cannot be estimated from either, so
+any `lo`/`hi` I wrote today would be the "lever set on a hunch with no number"
+the doctrine names. **What it would take:** her exit-free signal test re-run at
+several `rsi_max` cells on the CURRENT tape, with a random-entry null (I14/hm)
+and a permutation across cells to price the selection (`(uz)`'s ~1.85 t-unit
+premium) — an instrument, not a guess, and its own pass.
+
+**THE READ-TRIGGER SWEEP, run in the same pass because `(yo)` cost this fleet a
+read that fired 3.5 weeks early with nothing watching:** every pre-registered
+row whose criterion is *"n≥X **or** DATE, whichever first"* was measured
+against the live ledger. **None has tripped** — mum-rho 3/30 fresh days ·
+mum-halt-cost **0/5** halt events (no daily-loss halt since 3-Sep) ·
+avo-slot-6 0/10 · counterweight 21/60 (upper bound) · mum-noncrypto-sleeve
+**6/10** entry days (the closest, up from 4). 🔮 georgia v1's is date-only and
+due **tomorrow, 10-Sep**.
+
+**Main only** (`(mm)`): it changes no trade any book takes, so it buys no
+measured edge and rides the next deploy that earns one rather than restarting
+two real-money containers. Pinned by
+`tests/autonomy/test_carrier_consumable_levers.py` (11 tests), **5/5 mutations
+RED**: the all-or-nothing guard restored; the surface deriving from mum's
+attrs again; the owner reading the instance; the applier dropping the filter
+and inventing the missing knob; and a carrier's value silently moving. The
+class-closer is an AST assertion that **both** functions call the shared owner
+— a second derivation is how this arrived.
+
+
 ## 2026-09-09 (zi) — THE GO-LIVE t BAR AND ITS OWN CLUSTER READ DISAGREE ON EXACTLY THE TWO BOOKS HOLDING REAL MONEY, AND NOTHING SAID SO
 
 **Found by reading yesterday's own review back.** The (zg) health review reported
