@@ -26,8 +26,13 @@ attribution is never confounded):
             live >= LIVE_MIN_CLOSES for a fair pair), run the PAIRED
             evaluation: promote only if the shadow arm's mean per-trade
             pnl_pct is positive AND beats the live arm's by MARGIN_PP on
-            the full window AND on both halves. Abandon at MAX_DAYS
-            without clearing (verdict logged, cooldown, next candidate).
+            the full window AND on both halves. Expire at MAX_DAYS
+            without clearing — ABANDONED if the floors were met (a
+            result), UNDERPOWERED if they never were (not one) — and a
+            candidate whose OWN measured rate projects its floors past
+            MAX_DAYS but inside MAX_DAYS_EXTENDED is extended to that day,
+            re-evaluated every cycle ((zn)). Verdict logged, cooldown,
+            next candidate.
   PROMOTED  assert the live.funding.* counterpart(s) — this judge is the
             ONLY writer of that prefix — and keep the xp levers, so both
             arms run the same bars again (the control arm is restored).
@@ -91,6 +96,19 @@ SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT") or _DEF_SHADOW
 LIVE_BOT = os.environ.get("XPJ_LIVE_BOT") or _DEF_LIVE
 MIN_DAYS = float(os.environ.get("XPJ_MIN_DAYS", "7"))
 MAX_DAYS = float(os.environ.get("XPJ_MAX_DAYS", "14"))
+#: [(zn)] THE HARD CEILING a candidate that is STARVING ITS OWN ARM may run to.
+#: Eamon, 9-Sep: *"extend max_days for gate-narrowing candidates"*. MAX_DAYS
+#: is the clock a candidate gets by default; a candidate whose OWN measured
+#: rate projects its sample floors past that clock but inside THIS one is
+#: extended, every cycle, to exactly the day the projection names — never
+#: to the ceiling. 2x the base clock, i.e. one extra clock: measured need on
+#: the day this shipped was 16.3d (`mum-vel-12-20`), and a halved-turnover
+#: candidate on a quiet tape reads ~18d, so 28 covers the realistic cases
+#: with room. At the base rate this corresponds to a shadow arm closing at
+#: least ~1.07/day — below that, no clock this lane can afford will grade it.
+#: The COST is serial-lane time: worst case +14d per candidate, and the
+#: extension fires only when the projection says the sample WILL arrive.
+MAX_DAYS_EXTENDED = float(os.environ.get("XPJ_MAX_DAYS_EXTENDED", "28"))
 # [2026-07-17 IMB-07] the done-list AGES: a finite candidate universe (3
 # statics + <=6 incubator lever-sets) with a lifetime done-list permanently
 # self-exhausted the pipeline — an ABANDONED/FADED candidate becomes
@@ -2366,7 +2384,7 @@ HORIZON_MIN_N = int(os.environ.get("XPJ_HORIZON_MIN_N", "3"))
 
 
 def sample_horizon(ev, days, min_closes=None, live_min=None, max_days=None,
-                   min_n=None):
+                   min_n=None, max_days_extended=None):
     """WILL THIS CANDIDATE EVER GET A SAMPLE — at the rate IT is producing,
     never the rate its arm ran before it started.
 
@@ -2410,6 +2428,7 @@ def sample_horizon(ev, days, min_closes=None, live_min=None, max_days=None,
     mc = MIN_CLOSES if min_closes is None else int(min_closes)
     lm = LIVE_MIN_CLOSES if live_min is None else int(live_min)
     md = MAX_DAYS if max_days is None else float(max_days)
+    mx = MAX_DAYS_EXTENDED if max_days_extended is None else float(max_days_extended)
     mn = HORIZON_MIN_N if min_n is None else int(min_n)
     import math                       # local, exactly as `_pair_power` does
     if not isinstance(ev, dict):
@@ -2422,6 +2441,7 @@ def sample_horizon(ev, days, min_closes=None, live_min=None, max_days=None,
         return None
     try:
         out = {"days_elapsed": round(d, 2), "max_days": md,
+               "max_days_extended": mx,
                "min_n": mn, "rate": {}, "days_req": {}, "have": {}, "need": {}}
         unprojectable, dead = [], []
         for label, need in (("shadow", mc), ("live", lm)):
@@ -2471,15 +2491,87 @@ def sample_horizon(ev, days, min_closes=None, live_min=None, max_days=None,
             return out
         binding = max(out["days_req"], key=lambda k: out["days_req"][k])
         total = out["days_req"][binding]
+        # [(zn)] `reachable` keeps its (zl) meaning — inside the BASE clock —
+        # and `reachable_extended` is the reading against the clock a starving
+        # candidate can actually be given. Both published, so "not reachable"
+        # beside "clock extended to 16.3d" reads as one story, not a
+        # contradiction.
         out.update(days_req_total=total, binding=binding,
                    reachable=bool(total <= md),
+                   reachable_extended=bool(total <= mx),
                    why=(f"{total:.1f}d needed at this candidate's OWN rate "
                         f"({', '.join(f'{k} {v}/day' for k, v in sorted(out['rate'].items()))}), "
-                        f"bound by {binding}; the clock stops at {md:g}d"))
+                        f"bound by {binding}; base clock {md:g}d, "
+                        f"extendable to {mx:g}d"))
         return out
     except Exception:  # noqa: BLE001
         return None
 
+
+
+def effective_max_days(ev, max_days=None, max_days_extended=None):
+    """THE CLOCK THIS CANDIDATE ACTUALLY GETS, THIS CYCLE — `(days, extension)`.
+
+    Eamon, 9-Sep: *"extend max_days for gate-narrowing candidates."* The
+    (zl) measurement behind it: `mum-vel-12-20` narrowed its own arm's entry
+    gate, the velocity band halved the shadow's close rate relative to the
+    live control, and at its own rate the 30-close floor needed **16.3d
+    against a 14-day clock** — so the candidate would have run out of clock
+    before it could be judged either way, and been recorded UNDERPOWERED.
+    Three of mum's four queued candidates change their arm's close rate; on a
+    fixed clock, "be more selective" was a class this judge could not grade.
+
+    HOW IT DECIDES. The candidate's OWN projection (`ev["horizon"]`, the (zl)
+    block) names the day its floors arrive at its measured rate. If that day
+    lies past the base clock but inside `MAX_DAYS_EXTENDED`, the clock is
+    extended **to exactly that day** — never to the ceiling. It is
+    RE-EVALUATED EVERY CYCLE from the growing sample, so it self-corrects in
+    both directions: a rate that improves shortens the extension, a rate that
+    collapses past the ceiling withdraws it and the candidate expires on the
+    base clock. No margin is added on purpose — the re-evaluation IS the
+    margin, and a fixed margin would be a second, retyped constant.
+
+    NO "GATE-NARROWING" LABEL IS DETECTED, deliberately. The actuator does
+    not need the cause: a candidate slow because it is selective and one slow
+    because the tape went quiet both need the same thing — the days their own
+    rate says they need — and the lane pays the same for both. A hand-typed
+    `direction` on each candidate spec would be the retyped constant that
+    drifts, and incubator-proposed candidates would arrive without one. The
+    control-adjusted ratio that names the CAUSE is a report, and belongs on
+    the pair's power block, not in the clock.
+
+    FAIL-CLOSED TOWARD THE BASE CLOCK, and that direction is the safety of it:
+    an extension is a COST to a serial, scarce lane, so absence of evidence
+    never buys one. No horizon, an unreadable one, a thin (UNPROJECTABLE)
+    arm, a dead arm, floors already met, or a need past the ceiling all
+    return `MAX_DAYS`. A candidate that cannot make it even with the extra
+    clock is not fed more lane; it expires UNDERPOWERED — which is not a
+    refutation — and comes back after `DONE_RETRY_D`.
+
+    WHAT THIS DOES NOT TOUCH: the paired bar, the floors, the margin, the
+    live arm (the candidate runs on the SHADOW twin), and the sole-writer
+    rule on `live.*`. More clock changes how long a candidate may TRY to
+    reach the evidence; it never changes what counts as evidence."""
+    md = MAX_DAYS if max_days is None else float(max_days)
+    mx = MAX_DAYS_EXTENDED if max_days_extended is None else float(max_days_extended)
+    hz = ev.get("horizon") if isinstance(ev, dict) else None
+    if not isinstance(hz, dict) or hz.get("met"):
+        return md, None
+    need = hz.get("days_req_total")
+    if isinstance(need, bool) or not isinstance(need, (int, float)):
+        return md, None
+    need = float(need)
+    if need != need or need in (float("inf"), float("-inf")):
+        return md, None
+    if need <= md or need > mx:
+        return md, None
+    ext = {"from": md, "to": round(need, 1), "ceiling": mx,
+           "binding": hz.get("binding"),
+           "why": (f"clock extended {md:g}d -> {need:.1f}d: this candidate's "
+                   f"own rate puts its {hz.get('binding')} floor at "
+                   f"{need:.1f}d, inside the {mx:g}d ceiling — re-evaluated "
+                   f"every cycle, withdrawn if the rate falls past it")}
+    return need, ext
 
 
 def expiry_verdict(ev, max_days=None):
@@ -3205,7 +3297,14 @@ def run_once():
                         promote_baseline={"live_mean_pct": ev.get("live_mean_pct"),
                                           "n_live": ev.get("n_live")},
                         note=f"PROMOTED {cand['name']}")
-        if days >= MAX_DAYS:
+        # [(zn)] THE CLOCK IS THE CANDIDATE'S OWN, this cycle. Computed and
+        # PUBLISHED before the compare so a candidate running past 14d says
+        # why on the payload, and so the extension is re-derived from the
+        # growing sample every cycle rather than latched once.
+        _eff_max, _ext = effective_max_days(ev)
+        ev["clock"] = {"max_days": MAX_DAYS, "effective": round(_eff_max, 1),
+                       "extended": _ext is not None, "extension": _ext}
+        if days >= _eff_max:
             # [(zl)] ABANDONED MEANS REFUTED — IT MUST NOT ALSO MEAN NEVER
             # SAMPLED. This appended one verdict whatever the reason, so
             # "we measured it and it lost" and "we never got enough closes to
