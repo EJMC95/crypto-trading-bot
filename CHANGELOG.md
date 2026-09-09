@@ -338,6 +338,25 @@ feed before dispatch), so the commit carries `[deploy-live]` in its SUBJECT
 readback, never by the green run. The live books' behaviour is unchanged —
 the roster of a shared module moved, nothing they trade.
 
+**READBACK (stamps, never the green run).** Run `34353565105` deployed all
+seven services (freqtrade-bots, pnl-dashboard, market-context,
+family-lighter-shadow, tide-rider-lighter-live, trail-blazer-live, mum-live;
+13:02–13:07Z); Railway shows every one SUCCESS with its predecessor REMOVED,
+and the dashboard reader flipped (boot 13:03:20Z). `audit_code_currency` on
+the feed at 13:19:33Z: avo-maria-lighter, avo-maria-lshadow, mum-lighter,
+mum-lshadow and georgia-v3-lshadow ALL **CURRENT at e81b74e**;
+georgia-lshadow ABSENT from the feed (15 rows). The arms are ALIGNED again —
+avo-live and both family twins publish `build_shared 9e6985630f4e`. Two
+things the readback taught, recorded so the next deploy does not re-learn
+them: mum-live's FIRST loop takes ~6 minutes (BOOT 13:06:57Z, first publish
+13:13:40Z; the previous container took the same), so her row reads ~10 min
+stale after every deploy and `audit_code_currency` correctly annotates it
+*"describes its LAST publish, not a running process (I1)"* — the old
+container's final write, not a missed deploy; and a twin's row can carry the
+OLD stamp for one publish after the new container is up (avo's twin at
+13:13:03Z, refreshed by 13:18Z) — read the stamps twice, five minutes apart,
+before calling a deploy landed or missed.
+
 ### ALSO FOUND AND FIXED ON THE WAY — a guard that was red on main, locally, for everyone on 3.9
 
 The post-rebase suite left exactly two failures and both were
