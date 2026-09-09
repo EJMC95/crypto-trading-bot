@@ -156,7 +156,23 @@ his, not mine — and it is now a number on the payload instead of a comparison
 nobody was making.
 
 
-## 2026-09-08 (zh) — MAIN WENT RED ON MY OWN NEGATIVE TEST: A DELIBERATE WRONG-ARITY CALL IS STILL A WRONG-ARITY CALL
+## 2026-09-08 (zk) — MAIN WENT RED ON MY OWN NEGATIVE TEST: A DELIBERATE WRONG-ARITY CALL IS STILL A WRONG-ARITY CALL
+
+**[RENUMBERED (zh) -> (zk) at push time.** A concurrent session merged PR
+#292 to main while this branch was in flight, carrying its own `(zh)` — *A
+test may not import what CI does not install*. Both sides picked "next free"
+against an `origin/main` where the letter genuinely was free, which is
+exactly the stale-snapshot race the letter rule names, and
+`audit_changelog_letters`' cross-branch arm caught it on the PR rather than
+after the merge. **THIS SIDE MOVED, decided by citations and not by who
+pushed first:** their entry is cited from TRACKED CODE —
+`.github/workflows/changelog-check.yml:129` and `tests/test_selftests.py:493`
+— while mine was cited nowhere outside its own header, so moving theirs
+would break a workflow and a test while moving mine costs one line.
+(zi) and (zj) are unaffected and keep their letters; (ze)/(zf) are claimed
+by the still-open #293/#294, so (zk) is the next genuinely free letter.
+Recorded inline because `git log` subjects keep the OLD letter — the
+CHANGELOG headers are the reliable index, not the commit log.**
 
 **`(zg)` merged with CodeQL red, and the alert is correct.** The finding:
 
