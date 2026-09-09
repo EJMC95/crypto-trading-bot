@@ -531,6 +531,109 @@ def test_headroom_fails_closed_on_an_unreadable_count():
 
 
 # ---------------------------------------------------------------------------
+# 5b. REACH IS READ FROM THE COHORT THE VETO ENFORCES, NOT THE POOLED PAIR.
+#
+# INCIDENT (9-Sep). `(wp)` split the long budget per cohort on 2-Sep and made
+# `fleet_bus.cohort_long_state` the one reader; every enforcing consumer moved
+# with it and this review did not. Measured on the live payload: pooled 20/20
+# (light RED) while the live cohort sat at 10/20 and the shadow cohort at
+# 16/26 — TEN free slots on each side of a ceiling the review published as
+# "0 long slot(s) left ... the NEXT long is refused fleet-wide". Over the
+# trailing 8 days that shape held in 105 of 1,945 readable `bot_state_history`
+# samples (5.4%) and NOT ONCE was either cohort at budget.
+#
+# Per (hj): the cohorts map is built by `fleet_risk.cohort_view` — the
+# PUBLISHER — never hand-written here, and the assertions are on VALUES.
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def cohort_risk_payload(risk_payload):
+    """The 9-Sep shape: pooled AT budget, both cohorts with headroom."""
+    fr, st = risk_payload
+    st = dict(st)
+    # pooled at budget — the number the review used to read
+    st["long_positions"], st["long_budget"] = fr.LONG_BUDGET, fr.LONG_BUDGET
+    st["light"] = fr.light_for(fr.LONG_BUDGET, fr.LONG_BUDGET)
+    # ...and the cohorts the veto actually reads, shaped by the publisher
+    st["cohorts"] = fr.cohort_view({"live": fr.LIVE_LONG_BUDGET // 2,
+                                    "shadow": fr.SHADOW_LONG_BUDGET // 2})
+    return fr, st
+
+
+def test_reach_is_read_per_cohort_not_from_the_pooled_pair(cohort_risk_payload):
+    fr, st = cohort_risk_payload
+    er, _ = _import_both()
+    assert er.long_budget_headroom(st) == 0, (
+        "fixture must reproduce the incident: the POOLED pair reads at budget")
+    assert st["light"] == "red", "fixture must reproduce the pooled RED"
+    for cohort in er.BUDGET_COHORTS:
+        head = er.long_budget_headroom(st, cohort)
+        assert head is not None and head > 0, (
+            f"{cohort} cohort has headroom in the fixture; the review must "
+            f"see it rather than the pooled 0 — got {head!r}")
+    # and the number must be the VETO's own, not a re-derivation
+    import fleet_bus
+    for cohort in er.BUDGET_COHORTS:
+        lp, lb = fleet_bus.cohort_long_state(st, cohort)
+        assert er.long_budget_headroom(st, cohort) == max(0, lb - lp)
+
+
+def test_the_pooled_light_is_never_rendered_as_the_enforced_long_ceiling(
+        cohort_risk_payload):
+    """A pooled RED over two green cohorts is a real published state — the
+    line must carry the enforced per-cohort counts beside it."""
+    fr, st = cohort_risk_payload
+    er, _ = _import_both()
+    line = er.risk_line(st)
+    for cohort in er.BUDGET_COHORTS:
+        lp, lb = er._cohort_long_state(st, cohort)
+        assert f"{cohort} {lp}/{lb}" in line, (
+            f"the enforced {cohort} count must appear in the risk line: {line}")
+
+
+def test_the_reach_line_is_silent_when_every_cohort_has_headroom(
+        cohort_risk_payload):
+    """THE INCIDENT, end to end: the pooled pair says 0 slots and RED; no
+    cohort is near its bound; the review must publish NO ceiling."""
+    fr, st = cohort_risk_payload
+    er, _ = _import_both()
+    assert er.long_budget_headroom(st) == 0 and st["light"] == "red"
+    assert er.reach_line(st) is None, (
+        "a pooled RED over cohorts with headroom must not publish a REACH "
+        f"ceiling — got {er.reach_line(st)!r}")
+
+
+def test_the_reach_line_fires_on_the_cohort_that_is_actually_tight(
+        cohort_risk_payload):
+    """...and it must still fire — a guard that never fires is not a guard."""
+    fr, st = cohort_risk_payload
+    er, _ = _import_both()
+    st = dict(st)
+    # live cohort AT its bound, shadow still free: only live may be reported
+    st["cohorts"] = fr.cohort_view({"live": fr.LIVE_LONG_BUDGET,
+                                    "shadow": fr.SHADOW_LONG_BUDGET // 2})
+    line = er.reach_line(st)
+    assert line and "live cohort has only 0 long slot(s) left" in line, line
+    assert f"({fr.LIVE_LONG_BUDGET}/{fr.LIVE_LONG_BUDGET})" in line, line
+    assert "shadow cohort" not in line, (
+        f"a cohort with headroom must not be reported as a ceiling: {line}")
+
+
+def test_a_cohort_reading_degrades_exactly_as_the_veto_does(risk_payload):
+    """A publisher still on the pre-(wp) shape must give the review the same
+    answer it gives the BOTS — `cohort_long_state` degrades to the pooled pair
+    so a legacy payload keeps vetoing exactly as before. The review must
+    inherit that, not invent a safer answer of its own."""
+    fr, st = risk_payload
+    er, _ = _import_both()
+    assert "cohorts" not in st, "fixture must be the pre-(wp) payload shape"
+    pooled = er.long_budget_headroom(st)
+    for cohort in er.BUDGET_COHORTS:
+        assert er.long_budget_headroom(st, cohort) == pooled
+    assert "ENFORCED per cohort" not in er.risk_line(st), (
+        "a payload with no cohorts map must render exactly as it did before")
+
+
+# ---------------------------------------------------------------------------
 # 6. Arm drift must distinguish DIFFERENT CODE from a DIFFERENT FILE SET.
 #
 # (fd), 29-Jul: `build_compute` hashes only the `_BUILD_SHARED` names that

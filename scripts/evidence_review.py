@@ -447,27 +447,129 @@ def risk_line(st):
     the same shape ("21 gross vs long budget 20"). Each side is now shown
     against its own bound; `gross` is retained as context, never as a
     comparand.
+
+    [2026-09-09] AND THE POOLED PAIR IS NO LONGER WHAT THE VETO READS. Since
+    `(wp)` the enforced bound is per cohort, so the pooled `longs N/B` is shown
+    with the cohort pair beside it — a pooled RED over two green cohorts is a
+    real published state (measured 9-Sep: pooled 20/20 red, live 10/20, shadow
+    16/26) and must not read as a ceiling. `cohorts` is rendered only when the
+    publisher supplies it, so an older payload renders exactly as before.
     """
     dd7 = st.get("fleet_dd_7d")
     lp, lb = st.get("long_positions"), st.get("long_budget")
     sp, sb = st.get("short_positions"), st.get("short_budget")
+    coh = ""
+    if isinstance(st.get("cohorts"), dict):
+        parts = []
+        for c in BUDGET_COHORTS:
+            clp, clb = _cohort_long_state(st, c)
+            if clp is not None:
+                parts.append(f"{c} {clp}/{clb}")
+        if parts:
+            coh = " [longs ENFORCED per cohort: " + ", ".join(parts) + "]"
     return (f"🚦 fleet-risk light {st.get('light')} — longs {lp}/{lb}, "
-            f"shorts {sp}/{sb} (gross {st.get('gross')}); "
+            f"shorts {sp}/{sb} (gross {st.get('gross')}){coh}; "
             f"7d DD {float(dd7 or 0):.2%}, clip_scale {st.get('clip_scale')}"
             + ("  ** DD GOVERNOR BEYOND -5% **" if (dd7 or 0) <= -0.05 else ""))
 
 
-def long_budget_headroom(st):
+#: The budget cohorts the L2 veto actually enforces, in report order. Real
+#: money first — a ceiling on the live cohort is the one that costs money.
+BUDGET_COHORTS = ("live", "shadow")
+
+
+def _cohort_long_state(st, cohort):
+    """-> (long_positions, long_budget) for ONE budget cohort, or (None, None).
+
+    `fleet_bus.cohort_long_state` is the ONE owner ((wp)); this is only the
+    import guard, matching `lighter_family_bot._cohort_long_state`'s idiom.
+    An unimportable `fleet_bus` reads as "cannot say" (None) rather than as a
+    pooled number wearing a cohort's name — the whole point of the fix.
+    """
+    try:
+        import fleet_bus
+    except Exception:
+        return (None, None)
+    try:
+        lp, lb = fleet_bus.cohort_long_state(st if isinstance(st, dict) else {},
+                                             cohort)
+        return (int(lp), int(lb))
+    except Exception:
+        return (None, None)
+
+
+def long_budget_headroom(st, cohort=None):
     """-> longs still admissible before the L2 veto refuses, or None if unknown.
 
     Fail-CLOSED on a missing/unparseable count: `None` means "cannot say", and
     a caller must never read that as headroom. Never negative.
+
+    [2026-09-09] `cohort` ("live"|"shadow") is the reading that MATTERS, and
+    the pooled path below is legacy context only.
+
+    INCIDENT this fixes. `(wp)` split the long budget per cohort on 2-Sep and
+    made `fleet_bus.cohort_long_state` the one reader; every enforcing consumer
+    moved with it (`lighter_family_bot._cohort_long_state(_fr, "shadow")`,
+    `lighter_funding_bot`, `lighter_trend_bot`). This review did not, so for a
+    week it kept computing REACH from the POOLED pair — a number no consumer
+    enforces any more. Measured on the live payload the morning it was caught:
+    pooled 20/20 (light RED) while the live cohort sat at 10/20 and the shadow
+    cohort at 16/26, i.e. TEN free slots on each side of a ceiling the review
+    reported as "0 long slot(s) left ... the NEXT long is refused fleet-wide".
+    Over the trailing 8 days of `bot_state_history` that shape held in 105 of
+    1,945 readable samples (5.4%) and NOT ONCE was either cohort actually at
+    budget. Wrong in the ALARMING direction, on the exact ceiling this review
+    exists to watch for REACH — the same shape as the gross-vs-long incident
+    above, one authority-split later.
+
+    Delegated to `fleet_bus.cohort_long_state`, never re-typed: the review must
+    give the answer the VETO will give, including its degrade-to-pooled
+    fallback for a publisher still on the old shape ((hj): pin re-use by
+    identity, because the copy is always the one that drifts).
     """
+    if cohort is not None:
+        lp, lb = _cohort_long_state(st, cohort)
+        return None if lp is None else max(0, lb - lp)
     try:
         lp, lb = int(st["long_positions"]), int(st["long_budget"])
     except (KeyError, TypeError, ValueError):
         return None
     return max(0, lb - lp)
+
+
+#: A cohort is reported as TIGHT at or below this many free long slots.
+REACH_WARN_SLOTS = 2
+
+
+def reach_line(st):
+    """-> the 🚦 REACH line when a BUDGET COHORT is near its bound, else None.
+
+    [2026-09-09] Extracted from `scan_new_evidence` for the same reason
+    `risk_line` was ((hw): "an inline block is only ever testable by
+    duplication") — and this one had shipped a false alarm for a week while
+    living inline, which is precisely the cost of an untestable block.
+
+    REACH is read PER COHORT, because that is what the veto enforces since
+    `(wp)`. The pooled pair mixes paper into real money in both directions and
+    can read RED with ten free slots on each side (measured 9-Sep: pooled
+    20/20, live 10/20, shadow 16/26), so a pooled ceiling is a false alarm on
+    the one number this review exists to watch for REACH. Silence here means
+    "no cohort is near its bound", never "the payload was unreadable" — an
+    unreadable cohort degrades through `cohort_long_state` to the pooled pair,
+    exactly as the veto does.
+    """
+    tight = []
+    for c in BUDGET_COHORTS:
+        h = long_budget_headroom(st, c)
+        if h is not None and h <= REACH_WARN_SLOTS:
+            lp, lb = _cohort_long_state(st, c)
+            tight.append(f"{c} cohort has only {h} long slot(s) left under "
+                         f"the L2 veto ({lp}/{lb})")
+    if not tight:
+        return None
+    return ("🚦 REACH: " + "; ".join(tight)
+            + " — at 0 the NEXT long in that cohort is refused regardless "
+              "of its edge")
 
 
 def long_budget_occupancy(risk, alloc=None, top=4):
@@ -1044,12 +1146,9 @@ def scan_new_evidence(cur, errors):
         st, _ = load_state(cur, "fleet-risk")
         if st:
             items.append(risk_line(st))
-            head = long_budget_headroom(st)
-            if head is not None and head <= 2:
-                items.append(f"🚦 REACH: only {head} long slot(s) left under the "
-                             f"L2 veto ({st.get('long_positions')}/"
-                             f"{st.get('long_budget')}) — at 0 the NEXT long is "
-                             "refused fleet-wide regardless of its edge")
+            reach = reach_line(st)
+            if reach:
+                items.append(reach)
                 # WHO holds it. A ceiling with no attribution cannot be acted
                 # on, and the breakdown was already in the payload.
                 al, _ = load_state(cur, "fleet-allocation")
