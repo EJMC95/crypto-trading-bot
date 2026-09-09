@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-09 22:31 Sydney (12:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 22:49 Sydney (12:49Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -23,11 +23,6 @@ _Still open because:_ the rail is HELD until the criterion is met -- a cost-only
 EDGE_AUDIT_2026-09-02.md section 6.1 pre-registered a keep-or-retire read on 🪁 kelly at the (vy) $80 clip: at n>=60 fresh closes since 1-Sep or on 1-Oct, whichever first -- RETIRE if the fresh upper bound (m+1.28*SE) <= 0, keep grading if the fresh mean > 0, anything else returns to Eamon. [7-Sep (yo)] THE READ HAS BEEN TAKEN -- the SAMPLE tripped it 3.5 weeks before the date backstop (n=233 vs a bar of 60) and nothing was measuring the trigger. Verdict: RETURNS TO EAMON. Fresh mean -0.044%/trade, SE 0.132, t -0.33, upper bound +0.125% -- so the sample has NOT excluded a positive mean (I17-as-amended forbids retiring) and the mean is not above zero (so 'keep grading' is not met either). The fresh window reads 0.098pp better than all-time (-0.142% on n=589), but it is TAIL-DOMINATED: top-3 closes are +18.68pp of a -10.24pp total and the ex-top-3 fresh mean is -0.126%/trade, i.e. materially unchanged. Reproduce with scripts/study_kelly_fresh_read_2026-09-07.py (calibration gate REFUSES on a dark feed or a wrong basis).
 
 _Still open because:_ the READ is done; the DECISION is Eamon's and has not been made. The registered rule's third branch is explicitly 'returns to Eamon with both numbers', so a session may not close this by choosing one -- retiring needs a measured exclusion the sample does not provide, and 'keep grading' needs a positive mean it also does not provide. Do NOT re-take the read to try for a different answer (I25). Closes when the decision is recorded and the `band-kelly` entry is removed from golive_readiness.DECIDED_UNTIL.
-
-### `georgia-v1-preregistered-read-10sep`  ·  owner: **session**
-🔮 georgia v1 was on the (wt) September slate and DEFERRED on Eamon's confirmed date ('On 10 sep'): her cap-5 trajectory carries the pre-registered claim georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, days-to-gate ~187 predicted at a higher mean). ON 10-SEP: grade the claim on her post-cap closes ONLY. Prediction fails -> retire via lighter_family_bot.RETIRED_BOOKS key 'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + both halves + slate-test update; holds -> record the keep with the fresh number. Either way, close this row with the verdict.
-
-_Still open because:_ retiring her before the registration's own read voids it (I21/I25); the docket's ~4,233d pools ~200 pre-cap closes against ~25 post-cap ones.
 
 ### `avo-live-slot-6-preregistered-read`  ·  owner: **session**
 🙏 avo's LIVE cap went 5 -> 6 at (ye) (6-Sep) on the twin's own record: the 4 shadow trades opened with >=5 already held earned +6.877%/trade (+$13.76, 53% of its +$25.80) vs +1.027% for the other 28, and the (sr) premise '6 never' had become false (6 held 8.3% of the time, peak 7). PRE-REGISTERED READ (I21/I26 — graded on FRESH live closes only, never the window that motivated it): at >=10 LIVE closes opened with >=5 held, or on 6-Oct, whichever first — REVERT the literal to 5 (lighter_family_bot.STRATEGIES, [deploy-live-taker]) if their mean <= the live book's other closes' mean over the same window; KEEP if greater; record either verdict as 'avo-live-slot-6 READ:' in the CHANGELOG and remove this row.
@@ -64,11 +59,6 @@ The brain's `t` is computed on DOLLARS (`brain_stats.weighted_bucket` reads `pro
 
 _Still open because:_ the fix is hysteresis in the PUBLISHER (`qualify_v3` is stateless; the held rung lives in bot_learn's `mult_streaks`), and rewriting the brain's ladder on the same day 13 consumers were wired to it is the untested-rewrite-of-an-authority the doctrine forbids. It is now MEASURABLE for the first time — every close carries its `brain_mult` — so the next pass tests the prediction against real closes instead of a model.
 
-### `ceiling-slots-georgia`  ·  owner: **session**
-**(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 days at full occupancy — an 11x speed-up'. Measured: her mean hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE slots need ~46 opens/day. Her signal supplies 40.9/day at best. **Full occupancy is unreachable by construction, and it was never the lever — CLOSES are.** She is flat 68.4% of the time not because something refuses her but because she exits in under 3 hours. (sv) took the one gate that cut closes for no quality reason (the 2/h throttle, +0.633pp in favour of the entry it refused, six splits) from 2 -> 3.
-
-_Still open because:_ the step is DELIBERATELY one notch: rank 3 has n=1 in her whole life because the cap was 2, so everything above it is extrapolation. `entry_rank` now rides every close, so the next step is graded from a query — re-run `scripts/study_georgia_entry_rank_2026-08-22.py` once rank-3 rows exist and take 3 -> 4 only if it holds. [26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, crash-dominated — decides NOTHING either way; 3 of the six (sv) controls have flipped negative, so the 3->4 step is REFUSED on current data and 3->2 reversion equally unsupported. The OTHER half is now MEASURED AND CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 paired, both intrabar conventions) put every widening below the harness's own +0.246pp calibration error, roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees between conventions, and the 1440m max_hold fired 0 of 207 closes ever — exits are a dead dial on this book; the mean lever is ENTRY quality (rank1 +0.023% vs rank2 +0.656% on her own ledger).
-
 ### `ceiling-capital-inversion`  ·  owner: **OPERATOR**
 Capital sits in INVERSE proportion to measured edge: the two worst books run at 88-102% of capacity (⚖️ Counterweight -1.433%, 🛢️ Garrett -1.460%) while 👩 mum at +4.658%/trade is capped at FOUR slots and 🙏 avo at +1.085% uses 40% of six. `fleet_allocation` computes the right answer and is ADVISORY with consumers on three funding books only.
 
@@ -89,12 +79,15 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (4 commit(s))
+## Shipped today (7 commit(s))
 
-- `c02c9b1` (zn) CodeQL: math.isfinite in place of the need != need NaN idiom
-- `245f03b` (zn) a candidate that narrows its own arm gets the clock its own rate says it needs -- bounded, re-derived every cycle, never on a hunch
+- `bdb2733` [deploy-live] (zo) georgia v1's pre-registered read taken: the cap-5 prediction failed on her own post-cap closes — retired on I17's undecidable call; the ledger gains a terminal GRADED state; the ladder harness reads STRATEGIES
+- `d3a82ea` (zn) A candidate that narrows its own arm gets the clock its own rate says it needs — bounded, re-derived every cycle, never on a hunch (#298)
+- `b47abc4` (zi) The gate horizon's rate denominator included 27 days on which the real-money book did not exist: it starts at the first in-era OPEN now, and the denominator is published
 - `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
 - `5059cbc` (yx)(yy)(yz)(zh) 24h review: a red main nobody was shown, an uninterpretable refusal count, a drawdown bar that meant something different on every row, and the guard for tests that import what CI lacks (#292)
+- `8a4768f` (zg) regenerate HANDOFF.md
+- `29ecd4e` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
 
 ## How this file stays honest
 
