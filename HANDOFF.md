@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-09 15:42 Sydney (05:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 16:12 Sydney (06:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -89,17 +89,13 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (9 commit(s))
+## Shipped today (5 commit(s))
 
-- `510f566` (zl) a starved candidate was recorded as a refuted one: split UNDERPOWERED from ABANDONED and project the candidate's OWN rate
-- `e0161c6` (zk) regenerate HANDOFF.md
-- `ba25f90` (zk) RENUMBERED (zh) -> (zk): a concurrent session merged its own (zh) to main while this branch was in flight
-- `a396b5c` Merge remote-tracking branch 'origin/main' into claude/mum-shadow-mum-review-oh15sb
-- `f9c0b20` (zj) correct the avo carried row in place: the mechanism half shipped, only the cage remains
-- `3597e9f` (zj) avo's judge lane was inert by one missing attribute, and her row advertised four levers to fix it -- three of which her carrier cannot hold
+- `451d978` (zi) The gate horizon's rate denominator included 27 days on which the real-money book did not exist: it starts at the first in-era OPEN now, and the denominator is published
+- `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
 - `5059cbc` (yx)(yy)(yz)(zh) 24h review: a red main nobody was shown, an uninterpretable refusal count, a drawdown bar that meant something different on every row, and the guard for tests that import what CI lacks (#292)
-- `5f894d4` (zi) regenerate HANDOFF.md
-- `8e15d6a` (zi) The go-live t bar and its own cluster read disagree on exactly the two books holding real money, and nothing said so
+- `8a4768f` (zg) regenerate HANDOFF.md
+- `29ecd4e` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
 
 ## How this file stays honest
 

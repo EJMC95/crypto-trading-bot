@@ -1,3 +1,110 @@
+## 2026-09-09 (zi) — THE GATE HORIZON'S RATE DENOMINATOR INCLUDED 27 DAYS ON WHICH THE REAL-MONEY BOOK DID NOT EXIST: (la) needed one holding period and used the era boundary as its stand-in
+
+**Eamon, 9-Sep: *"ship the rate denominator fix"*** — the growth item of that
+morning's daily brief, found reading 🙏 avo's live row against the gate's
+horizon for it.
+
+**THE DEFECT, MEASURED ON THE LIVE PAYLOAD (05:45Z).** `golive-readiness`
+published 🙏 avo-maria-lighter — REAL MONEY — as `closes binds: ~36.1d at 0.33
+closes/day → 2026-10-15`. That rate is `n / (now − era_start)` = 18 / 54.2d,
+and her era is `{since: 2026-07-17, source: declared}`: the family-wide
+accrual-fix date, inherited from the shared strategy declaration. But **this
+row did not become the live arm until 13-Aug** ((ma)), and the ledger agrees to
+the day: her first in-era OPEN is **13-Aug**, first close 17-Aug. So **27.5 of
+the 54.2 denominator days were days on which the arm held no capital and could
+not have closed anything.** Her own row was publishing the other readings the
+whole time — gate close-span **0.81/day**, `progression.close_rate_day_7d`
+**1.00/day**, `days_to_target_7d` **12.0** — three organs, three rates, ~3×
+apart, with the calendar built on the slowest.
+
+**WHY THIS IS A CORRECTION OF (la), NOT A REVERSAL.** (la) moved the base from
+the first close to `min(first_close, era_start)` on an argument that is
+correct: *"a book that HOLDS necessarily takes one holding period to produce
+its first in-era close — and measuring the rate from that close prices the
+wait out of existence"* (🌾 carry, 65–70h holds, would have read 2–3×
+optimistic on the fleet's only go-live candidate). **The quantity that argument
+needs is ONE HOLDING PERIOD.** The era boundary was a stand-in for it, and a
+stand-in is only as good as the gap between the two: on carry the gap is 2.2
+days; on a live arm whose era is a family-wide date from a month before it was
+funded, the gap is 27.5 days of nothing. **The first in-era OPEN *is* the
+quantity (la) needed, measured on the book's own first trade.** By construction
+`era_start ≤ first_open ≤ first_close` (the era is keyed on the OPEN), so the
+new base sits BETWEEN the two options (la) weighed and keeps its protection in
+full — the open→close wait is still inside the denominator.
+
+**WHAT DOES NOT MOVE, and it is the stall the doctrine actually measured: the
+TRAILING gap.** The denominator still ends at `now`, so a book that stops
+closing dilutes its own rate exactly as before (dad's span-rate read 2.2× its
+age-rate after a 7–11d stall — that stall is between the LAST close and now,
+and this touches none of it). Only the LEAD-IN gap moves, and a lead-in gap is
+bounded by the book's first trade. It is PUBLISHED, never absorbed:
+`rate_lead_in_days` beside `rate_cpd`, so a book genuinely starving before its
+first in-era open shows the credit it was granted instead of hiding it
+(I6/I23). The denominator itself is published too — `rate_basis`
+(`first-open` | `era` | `first-close`), `rate_since`, `rate_basis_days` — and
+declared in the defaults so every early-return path carries the keys (the I6
+shape the block already states for `t_basis`).
+
+**MEASURED BEFORE/AFTER on every living book, from the public ledger with the
+grader's own quarantine + phantom filters applied:**
+
+| book | era | first in-era open | lead-in | `rate_cpd` before → after | ETA |
+|---|---|---|---|---|---|
+| 🙏 **avo LIVE** | 17-Jul declared | **13-Aug** | **27.5d** | **0.33 → 0.67** (2.03×) | `closes` binds: **36.2d → 17.8d** (15-Oct → ~27-Sep) |
+| 👩 mum LIVE | 19-Aug declared | 28-Aug | 8.4d | 5.02 → 8.57 | `window` binds — date IMMUNE |
+| 👩 mum shadow | 19-Aug declared | 24-Aug | 4.7d | 4.77 → 6.20 | `window` binds — immune |
+| 🙏 avo shadow | 17-Jul declared | 23-Jul | 6.8d | 0.63 → 0.72 | READY |
+| 🌾 carry — (la)'s case | 31-Jul declared | 2-Aug | 2.2d | 0.84 → 0.89 | `halves` — unprojectable |
+| 🎫 taker · ⚖️ Counterweight · 🔮 georgia v1 | stamp / declared | = era | 0.0d | unchanged | — |
+| 6 books with NO declared era | — | = first working day | — | 0.99–1.00× | hold joins the denominator, (la)'s direction |
+
+**Exactly one published date moves, and it is the real-money one.** 👩 mum has
+the identical shape (era 19-Aug vs a first open 28-Aug) and is completely
+immune because `window` binds and that bar is pure calendar — precisely the
+case (kz) recorded. The new avo rate (0.67/day) is still BELOW her own row's
+1.00/day, because the 4 days between her first open and first close, and the
+8 days she traded at a $15 clip before the (sr) deposit, are correctly inside
+the denominator now — the fix is conservative relative to the book's own
+telemetry, not a match to it.
+
+**SHIPPED (`scripts/golive_readiness.py`, ships only in `freqtrade-bots`, so
+this is main + the auto-deploy — no live marker; it changes NO trade):**
+* `first_era_open(scoped_rows)` — THE ONE OWNER of the quantity, a `min()`
+  over the open column and never `rows[0]`, because `scoped_rows` is ordered by
+  CLOSE and a book that holds closes a later-opened trade first (every basket
+  book, every rebalance; carry's overlapping 65–70h holds). Fail-safe in the
+  direction that loses a projection rather than fabricating one: an unreadable
+  open is SKIPPED, never coerced to 0.0 (an epoch-0 open hands the rate a
+  56-year denominator and reads every book as dead); no readable open ⇒ None.
+* `gate_horizon(..., first_open=)` — the base becomes the first open when it is
+  well-formed (`era ≤ open ≤ close`, the era floor applying only when an era is
+  declared); a missing, junk, tz-naive-mishandled, future, after-close or
+  before-era open falls back to the pre-(zi) `min(first_close, era_epoch)`
+  EXACTLY. Both publish-path call sites read the owner (AST-pinned — a second
+  copy of this rule is a second rule, (hj)).
+* The WINDOW floor, the (kz) age floor and the (ks) n-floor are untouched —
+  they are calendar and count, not throughput.
+
+**Pinned by `tests/autonomy/test_horizon_rate_denominator.py` (16 tests;
+12/12 mutations RED via `scripts/mutate.py`):** the fix made inert; the era
+floor dropped; the after-close refusal dropped; the `None` guard dropped (the
+first draft evaluated the floor before it and the fail-safe test caught the
+TypeError — I3 doing its job on the guard's own author); the no-era credit
+forced; `max` for `min` in the owner;
+tz-naive read as local; the lead-in zeroed; the denominator swapped for the
+first-close age (the fixture's open sits 2.7d off the close ON PURPOSE so
+`approx` cannot hide that swap — it did, in the first draft); the owner
+returning None forever; a call site deriving the open inline; the
+unreadable-stamp skip removed. Plus (la)'s protection pinned in the other
+direction: a holding book's rate must be LOWER than its first-close rate, and a
+20-day trailing stall must still dilute.
+
+**ERA NOT RESET, no bar moves, nothing promoted.** The horizon is REPORTED,
+never a bar ((ks)); what changes is that a real-money book's decidability date
+stops reading five weeks late on the dashboard's 🚦 chip, the daily review's 🔭
+line and the docket. **The daily brief's §5 proposal was this fix; its §6 kept
+the avo cap 6 → 7 REFUSED behind the (ye) pre-registration — that stands.**
+
 ## 2026-09-09 (zl) — "ABANDONED" MEANT BOTH "WE MEASURED IT AND IT LOST" AND "WE NEVER GOT ENOUGH CLOSES TO ASK", ON THE FLEET'S ONLY PATH TO MORE REAL MONEY
 
 **The 🧪 judge's serial lane is scarce and its clock is hard: `MIN_DAYS` 7,
