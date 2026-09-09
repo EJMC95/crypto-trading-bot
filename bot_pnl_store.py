@@ -89,6 +89,95 @@ def _get_conn():
         return None
 
 
+# ---------------------------------------------------------------------------
+# [(zq)] BOOT-TIME DDL ON A HOT TABLE IS A LOCK CONVOY — SKIP IT WHEN THE SCHEMA
+# IS ALREADY COMPLETE, AND BOUND IT WHEN IT IS NOT.
+# ---------------------------------------------------------------------------
+# Measured 9-Sep on the live dashboard: /trades.json requests of 90-250 s,
+# /pnl.json 499 at 45 s, then everything draining at once, with CPU idle on the
+# dashboard AND on Postgres — the signature of lock queueing, not of work. The
+# lock: every process here runs `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` at
+# its first DB touch, and Postgres takes ACCESS EXCLUSIVE for that statement
+# BEFORE discovering the column exists and there is nothing to do. One such
+# ALTER queued behind a long SELECT (a 5000-row ledger read) makes every later
+# SELECT on that table queue behind the ALTER. A fleet redeploy boots ~20
+# processes inside two minutes, each firing nine of them at the two hottest
+# tables — which is why the stall followed the 05:55Z and 12:47Z deploys.
+#
+# TWO HALVES. (1) `_existing_columns` is a plain read of information_schema
+# (ACCESS SHARE — conflicts with nothing) and the ALTER runs ONLY for a column
+# that is genuinely missing. In production every column exists, so boot takes
+# zero exclusive locks. (2) The ALTER that does run — a real migration — holds
+# a bounded `lock_timeout`, so a queued DDL gives up in seconds instead of
+# holding the queue for the length of the slowest read; the caller leaves its
+# `_ready` flag unset and the next call retries. FAIL-SAFE in the direction of
+# today's behaviour: if information_schema cannot be read, every column is
+# treated as missing and the ALTER path runs exactly as before.
+DDL_LOCK_TIMEOUT_S = float(os.environ.get("BOT_PNL_DDL_LOCK_TIMEOUT_S", "3"))
+
+#: the columns each ensure-function adds beyond its CREATE TABLE — ONE list per
+#: table, read by both the skip check and the ALTER, so they cannot disagree.
+#: bot_pnl.pnl_daily [2026-07-08]: bot-supplied daily P&L; the dashboard prefers
+#: it over its cross-snapshot equity delta when present.
+BOT_PNL_COLUMNS = (("pnl_daily", "DOUBLE PRECISION"),)
+#: paper_trades — venue/shadow [2026-07-09 LIGHTER GATE-0]: venue provenance so
+#: shadow/testnet/live rows are queryable apart from the HL paper era (venue
+#: NULL = hl paper). side/tag/entry_price/exit_price/size/extra [2026-07-15
+#: EVIDENCE]: the learning-layer widening — WHERE the trade happened, the
+#: publisher's own tag, and a JSONB extra for entry-time context. **side='skip'
+#: is RESERVED for gate-rejection log rows — every trade reader must exclude it
+#: (fetch_paper_trades does; per-bot aggregates are safe because skips publish
+#: under a separate '<bot>-skips' name).**
+PAPER_TRADES_COLUMNS = (
+    ("venue", "TEXT"), ("shadow", "BOOLEAN"), ("side", "TEXT"), ("tag", "TEXT"),
+    ("entry_price", "DOUBLE PRECISION"), ("exit_price", "DOUBLE PRECISION"),
+    ("size", "DOUBLE PRECISION"), ("extra", "JSONB"),
+)
+
+
+def _existing_columns(conn, table):
+    """Column names the live `table` already has — a READ, never a lock.
+    `None` when it cannot say, so the caller falls back to the ALTER path."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = %s", (table,))
+            return {str(r[0]) for r in cur.fetchall()}
+    except Exception:  # noqa: BLE001 — unreadable catalogue -> today's path
+        return None
+
+
+def _add_columns_if_missing(conn, table, wanted, lock_timeout_s=None):
+    """ALTER only what is absent, under a bounded lock. Returns True when every
+    wanted column is present afterwards (so the caller may mark itself ready),
+    False when a lock timed out or an ALTER failed (leave `_ready` unset; the
+    next call retries). Identifiers go through psycopg2.sql, never f-strings."""
+    from psycopg2 import sql as _sql
+    lt = DDL_LOCK_TIMEOUT_S if lock_timeout_s is None else float(lock_timeout_s)
+    have = _existing_columns(conn, table)
+    missing = [(n, t) for n, t in wanted if have is None or n not in have]
+    if not missing:
+        return True
+    ok = True
+    with conn.cursor() as cur:
+        cur.execute(_sql.SQL("SET lock_timeout = {}").format(
+            _sql.Literal(f"{int(max(lt, 0.001) * 1000)}ms")))
+        try:
+            for name, typ in missing:
+                try:
+                    cur.execute(_sql.SQL(
+                        "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} " + typ
+                    ).format(_sql.Identifier(table), _sql.Identifier(name)))
+                except Exception as e:  # noqa: BLE001 — lock_timeout included
+                    print(f"[bot_pnl_store] DDL on {table}.{name} deferred: {e}")
+                    ok = False
+                    break
+        finally:
+            cur.execute(_sql.SQL("SET lock_timeout = 0"))
+    return ok
+
+
 def _ensure_table(conn):
     global _table_ready
     if _table_ready:
@@ -115,10 +204,10 @@ def _ensure_table(conn):
         # its server-side equity-curve delta when present — lets bots with an
         # authoritative broker daily figure (Alpaca equity vs last_equity)
         # override the glitch-prone cross-snapshot estimate.
-        cur.execute(
-            "ALTER TABLE bot_pnl ADD COLUMN IF NOT EXISTS pnl_daily DOUBLE PRECISION"
-        )
-    _table_ready = True
+    # [(zq)] the ALTER runs only if pnl_daily is genuinely missing — see
+    # DDL_LOCK_TIMEOUT_S. Unset `_table_ready` on a deferred DDL so we retry.
+    if _add_columns_if_missing(conn, "bot_pnl", BOT_PNL_COLUMNS):
+        _table_ready = True
 
 
 # ---------------------------------------------------------------------------
@@ -1280,22 +1369,13 @@ def _ensure_paper_trades_table(conn):
         )
         # [2026-07-09 LIGHTER GATE-0] venue provenance so shadow/testnet/live
         # rows are queryable apart from the HL paper era (venue NULL = hl paper).
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS venue TEXT")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS shadow BOOLEAN")
-        # [2026-07-15 EVIDENCE] learning-layer widening (revives the 7-Jul
-        # b82c5aa design that never reached the deployed line): WHERE the trade
-        # happened (prices/size/side), the publisher's own tag, and a JSONB
-        # extra for entry-time context (e.g. the sniper's book microstructure).
-        # side='skip' is reserved for gate-rejection log rows — every trade
-        # reader must exclude it (fetch_paper_trades does; per-bot aggregates
-        # are safe because skips publish under a separate '<bot>-skips' name).
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS side TEXT")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS tag TEXT")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS entry_price DOUBLE PRECISION")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS exit_price DOUBLE PRECISION")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS size DOUBLE PRECISION")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS extra JSONB")
-    _paper_trades_table_ready = True
+        # [(zq)] the eight ADD COLUMNs below used to run unconditionally here
+        # — nine exclusive locks per booting process on the fleet's hottest
+        # table. They now run only for a column that is genuinely missing,
+        # under a bounded lock_timeout; the column list is PAPER_TRADES_COLUMNS.
+        # (The comments that explained each column live beside that list.)
+    if _add_columns_if_missing(conn, "paper_trades", PAPER_TRADES_COLUMNS):
+        _paper_trades_table_ready = True
 
 
 def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,

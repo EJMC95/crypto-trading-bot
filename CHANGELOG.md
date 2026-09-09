@@ -1,3 +1,102 @@
+## 2026-09-09 (zq) — THE DASHBOARD'S STALLS WERE A LOCK CONVOY THE FLEET LIT ON ITSELF AT EVERY REDEPLOY: NINE EXCLUSIVE-LOCK NO-OP ALTERs PER BOOTING PROCESS, ON ITS HOTTEST TABLE
+
+**[RENUMBERED TWICE at push time: (zo) -> (zp) -> (zq).** Another session's `(zo)` — 🔮 georgia v1's pre-registered read — reached main first (cited from twenty-two tracked files); minutes later another session's `(zp)` — the regime-veto identifiability read — did too (cited from `session_state.py`, `test_selftests.py` and three study scripts). This entry was cited from its own five files both times; the cited entry keeps the letter (rule 3). **Four collisions on one branch in one day is the finding the letters guard cannot make: it sees `origin/main`, never the other OPEN branches.** Recorded inline because `git log` subjects keep the old letters.**
+
+**Found while a PR's CI was red on a guard that reads the live feed, and
+established by the doctrine's own order** — rule out the PR (the guard is
+byte-identical to main, my diff touches nothing it reads, and it passes locally
+the moment the feed answers), then name the service. Measured twice, each within
+minutes of a fleet redeploy (05:55Z after #296, 12:47Z after #298):
+
+| endpoint | observed | |
+|---|---|---|
+| `/trades.json` | **90–250 s** per request; two completed at 248 s and 163 s | queued |
+| `/pnl.json` | **499 at 45 s** (CI's guard), 499 at 60 s (my probes) | queued behind them |
+| `/watchdog.json` | **3 ms** | no DB — not queued |
+| dashboard CPU / memory | 0.002 of 24 cores / 0.3 GB | idle |
+| Postgres CPU / memory | 0.007 / 0.76 GB, checkpoints every 5 min throughout, no restart | idle |
+
+Idle CPU on both ends with minute-long waits is **lock queueing, not work**, and
+the release was visible: at 06:16:50 the whole backlog drained in one burst,
+Postgres logging ~15 backends dropping *"connection reset by peer"* in the same
+second — one of them **"unexpected EOF on client connection with an open
+transaction"**. The baseline is the same disease at low grade: p50 **3–6 s** per
+request all day on a JSON endpoint that should answer in milliseconds.
+
+**THE LOCK.** Every `_ensure_*` in `bot_pnl_store` ran `ALTER TABLE … ADD COLUMN
+IF NOT EXISTS` at a process's first DB touch — ×8 on `paper_trades`, ×1 on
+`bot_pnl`. Postgres takes **ACCESS EXCLUSIVE** for that statement *before*
+discovering the column exists and there is nothing to do; ACCESS EXCLUSIVE
+conflicts with a plain SELECT, and a lock request queued behind a running
+SELECT makes **every later SELECT on that table queue behind it** — Postgres
+will not let a weaker lock jump a waiting stronger one. So one slow 5000-row
+ledger read in flight + one no-op ALTER behind it = every reader waits for the
+slowest reader, then all drain at once. A fleet redeploy boots ~20 processes
+inside two minutes, each firing nine of them. The pollers that supplied the
+slow reads were the fleet's own — `Python-urllib/3.9` is `freqtradeorg/
+freqtrade:stable`, i.e. `freqtrade-bots` on Railway's egress, not a Mac.
+
+**CORRECTED IN PLACE before it shipped (I12):** my first reading said the ALTERs
+ran *"on every publish and every fetch"*. They do not — each `_ensure_*` guards
+itself with a once-per-process flag; I had read the call sites and not the
+bodies. Once per process is still nine exclusive locks per boot per process,
+which is what a redeploy multiplies. The sentence is corrected here, in the
+Context Hub and in the Session Log so the wrong mechanism does not outlive the
+right one.
+
+**SHIPPED — two halves, both pinned, both fail-safe toward today's behaviour:**
+* **SKIP.** `_existing_columns` reads `information_schema.columns` — a plain
+  read, ACCESS SHARE, conflicts with nothing — and the ALTER runs **only for a
+  column that is genuinely missing**. In production every column exists, so
+  **boot takes zero exclusive locks**. The class-closer test asserts exactly
+  that: a complete schema executes no `ALTER` at all.
+* **BOUND.** An ALTER that must run (a real migration) holds
+  `SET lock_timeout` (`DDL_LOCK_TIMEOUT_S`, env `BOT_PNL_DDL_LOCK_TIMEOUT_S`,
+  **3 s**) and gives up rather than holding the queue for the length of the
+  slowest read; the reset runs in a `finally`; the caller leaves its `_ready`
+  flag **unset** so the next call retries. Stops at the first failure — no
+  pile-up of queued DDL.
+* The column lists are **ONE owner** (`BOT_PNL_COLUMNS`, `PAPER_TRADES_COLUMNS`),
+  read by both the skip check and the ALTER so they cannot disagree; the
+  per-column provenance comments (venue/shadow provenance; the learning-layer
+  widening; **`side='skip'` reserved for gate-rejection rows, every reader must
+  exclude it**) moved beside the list. Identifiers go through `psycopg2.sql`,
+  never f-strings — pinned.
+* **An unreadable catalogue treats every column as missing and runs the ALTER
+  path exactly as before** — never worse than yesterday. The dangerous
+  fail-open shape (unknown catalogue → skip all DDL) is mutation-red; the
+  "unknown vs empty" mutant is EQUIVALENT by construction (both mean "ALTER
+  everything") and is recorded as such rather than claimed as a kill.
+
+**THREE CONSUMERS WERE SCRAPING THE STORE'S SOURCE FOR THE ALTER TEXT** to learn
+the schema — `test_card_dead_reads`, `test_exit_telemetry`, and
+`scripts/evidence_review.py`'s own selftest — and all three went red the moment
+the columns had one owner. Re-aimed at the owner list ((hj): read the rule,
+never a second copy of it); the raw-ALTER regex in the card test stays as a
+tripwire for any raw ALTER that returns. **No behaviour, bar, lever or trade
+moves.** 7 mutations red (one equivalent, named), suite green, all guards OK.
+
+**THIS FILE IS IN `_BUILD_SHARED`, SO IT SHIPS WITH `[deploy-live]` — in the PR
+title AND the squash subject ((xh)) — and the arms move TOGETHER.** Earlier
+today `(zj)` moved one arm without the other (a shared-file change, main-only by
+design), the shadow host auto-redeployed, and the 🧪 judge held BOTH real-money
+pairs on `ARMS ON DIFFERENT CODE` for ~6 h until run 705 deployed `mum-live` +
+`tide-rider-lighter-live`; the judge re-matched at 12:44Z and **restarted
+`mum-vel-12-20`'s clock, losing 1.94 days** — the (pt) trap, walked into again.
+This deploy re-matches the arms in the same push, at a cost of whatever the
+candidate accrued since 12:44Z. **THE RULE THIS LEAVES, for any file in
+`_BUILD_SHARED`:** it is real-money surface by construction, because the judge
+compares the two arms' `build_shared`; a main-only change to it is not
+"deliberately no live marker", it is a guaranteed judge hold. Neither live row
+is halted (verified before dispatch); stamp readback on all four rows is the
+proof, never the green run.
+
+**DECLARED, NOT FIXED:** the 3–6 s baseline p50 is only partly this — the
+dashboard is a stdlib `ThreadingHTTPServer` opening a fresh `psycopg2.connect`
+per request with no pooling, and `/pnl.json`'s read path is unmeasured; that is
+its own instrument. And `audit_changelog_letters` still cannot see across OPEN
+pull requests (`(ze)` doubled between #293 and #294 all day).
+
 ## 2026-09-09 (zp) — THE PRE-REGISTERED REGIME VETO SAID `CONFIRMED` ON A BOOK WHERE ITS TREATMENT HAD ZERO VARIANCE: veto-vs-pass was shorts-vs-longs, and the rule could not tell the difference
 
 **The read was TAKEN three days before its date backstop, because the SAMPLE

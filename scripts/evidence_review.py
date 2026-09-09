@@ -1944,9 +1944,11 @@ def selftest():
         f"column, found {len(_pt)}"
     _store_src = (_pl0.Path(__file__).resolve().parents[1]
                   / "bot_pnl_store.py").read_text(encoding="utf-8")
-    assert "ADD COLUMN IF NOT EXISTS entry_price" in _store_src, \
-        "the publisher no longer declares entry_price as a column — re-derive " \
-        "where the phantom signature's entry price comes from before trusting it"
+    # [(zq)] the publisher declares its ledger columns in ONE owner list now
+    # (PAPER_TRADES_COLUMNS); the ALTER text this used to scrape is gone.
+    import bot_pnl_store as _bps
+    assert any(n == "entry_price" for n, _t in _bps.PAPER_TRADES_COLUMNS), \
+        "the publisher no longer declares entry_price as a column — re-derive where the phantom signature's entry price comes from before trusting it"
 
     # THE WIRING, not just the helper. Drive the real function with Avo's real
     # 23/24-Aug shape — 9 phantom halts + 4 traded closes — and read the

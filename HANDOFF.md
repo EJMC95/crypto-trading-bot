@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-09 23:20 Sydney (13:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 04:22 Sydney (18:22Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -79,18 +79,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (10 commit(s))
+## Shipped today (1 commit(s), entries (zq))
 
-- `88a3d2c` (zp) regenerate HANDOFF.md after the regime-veto read
-- `eba4513` (zp) The pre-registered regime veto said CONFIRMED on a book where its treatment had zero variance: veto-vs-pass was shorts-vs-longs, and the rule could not tell the difference
-- `e81b74e` (zo) regenerate HANDOFF.md after the rebase onto (zn)/#298
-- `bdb2733` [deploy-live] (zo) georgia v1's pre-registered read taken: the cap-5 prediction failed on her own post-cap closes — retired on I17's undecidable call; the ledger gains a terminal GRADED state; the ladder harness reads STRATEGIES
-- `d3a82ea` (zn) A candidate that narrows its own arm gets the clock its own rate says it needs — bounded, re-derived every cycle, never on a hunch (#298)
-- `b47abc4` (zi) The gate horizon's rate denominator included 27 days on which the real-money book did not exist: it starts at the first in-era OPEN now, and the denominator is published
-- `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
-- `5059cbc` (yx)(yy)(yz)(zh) 24h review: a red main nobody was shown, an uninterpretable refusal count, a drawdown bar that meant something different on every row, and the guard for tests that import what CI lacks (#292)
-- `8a4768f` (zg) regenerate HANDOFF.md
-- `29ecd4e` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
+- `114ad10` Merge origin/main (88a3d2c) into claude/mum-shadow-mum-review-oh15sb; RENUMBERED (zp) -> (zq)
 
 ## How this file stays honest
 

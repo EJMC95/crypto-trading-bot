@@ -107,6 +107,12 @@ def test_card_no_longer_reads_columns_bot_pnl_does_not_have():
     # which would make this guard fire on a LEGITIMATE read.
     cols |= set(re.findall(
         r"ALTER TABLE bot_pnl\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?(\w+)", ddl))
+    # [(zq)] the columns ADDED after CREATE live in ONE owner list now
+    # (bot_pnl_store.BOT_PNL_COLUMNS), not in ALTER text to be scraped — read
+    # the owner, exactly as the dashboard must. The regex above stays for any
+    # raw ALTER that might return; today it matches nothing, by design.
+    import bot_pnl_store as _S
+    cols |= {n for n, _t in _S.BOT_PNL_COLUMNS}
     assert {"bot", "equity", "pnl_abs", "updated_at", "pnl_daily"} <= cols, \
         sorted(cols)
 
