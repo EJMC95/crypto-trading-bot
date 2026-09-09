@@ -90,7 +90,7 @@ def _get_conn():
 
 
 # ---------------------------------------------------------------------------
-# [(zp)] BOOT-TIME DDL ON A HOT TABLE IS A LOCK CONVOY — SKIP IT WHEN THE SCHEMA
+# [(zq)] BOOT-TIME DDL ON A HOT TABLE IS A LOCK CONVOY — SKIP IT WHEN THE SCHEMA
 # IS ALREADY COMPLETE, AND BOUND IT WHEN IT IS NOT.
 # ---------------------------------------------------------------------------
 # Measured 9-Sep on the live dashboard: /trades.json requests of 90-250 s,
@@ -204,7 +204,7 @@ def _ensure_table(conn):
         # its server-side equity-curve delta when present — lets bots with an
         # authoritative broker daily figure (Alpaca equity vs last_equity)
         # override the glitch-prone cross-snapshot estimate.
-    # [(zp)] the ALTER runs only if pnl_daily is genuinely missing — see
+    # [(zq)] the ALTER runs only if pnl_daily is genuinely missing — see
     # DDL_LOCK_TIMEOUT_S. Unset `_table_ready` on a deferred DDL so we retry.
     if _add_columns_if_missing(conn, "bot_pnl", BOT_PNL_COLUMNS):
         _table_ready = True
@@ -1369,7 +1369,7 @@ def _ensure_paper_trades_table(conn):
         )
         # [2026-07-09 LIGHTER GATE-0] venue provenance so shadow/testnet/live
         # rows are queryable apart from the HL paper era (venue NULL = hl paper).
-        # [(zp)] the eight ADD COLUMNs below used to run unconditionally here
+        # [(zq)] the eight ADD COLUMNs below used to run unconditionally here
         # — nine exclusive locks per booting process on the fleet's hottest
         # table. They now run only for a column that is genuinely missing,
         # under a bounded lock_timeout; the column list is PAPER_TRADES_COLUMNS.

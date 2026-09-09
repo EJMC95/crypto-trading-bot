@@ -1944,7 +1944,7 @@ def selftest():
         f"column, found {len(_pt)}"
     _store_src = (_pl0.Path(__file__).resolve().parents[1]
                   / "bot_pnl_store.py").read_text(encoding="utf-8")
-    # [(zp)] the publisher declares its ledger columns in ONE owner list now
+    # [(zq)] the publisher declares its ledger columns in ONE owner list now
     # (PAPER_TRADES_COLUMNS); the ALTER text this used to scrape is gone.
     import bot_pnl_store as _bps
     assert any(n == "entry_price" for n, _t in _bps.PAPER_TRADES_COLUMNS), \

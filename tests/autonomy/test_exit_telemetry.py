@@ -126,7 +126,7 @@ def test_the_ledger_can_carry_prices_at_every_layer():
     never sent it" — the two are indistinguishable from the endpoint alone."""
     store = (_ROOT / "bot_pnl_store.py").read_text()
     assert "entry_price=None, exit_price=None" in store, "writer signature"
-    # [(zp)] declared in the owner list now, not in scraped ALTER text
+    # [(zq)] declared in the owner list now, not in scraped ALTER text
     import bot_pnl_store as _S
     assert ("entry_price", "DOUBLE PRECISION") in _S.PAPER_TRADES_COLUMNS, "DB column"
     assert "entry_price=EXCLUDED.entry_price" in store, "upsert carries it"

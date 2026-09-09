@@ -106,6 +106,14 @@ PRE_REGISTERED = {
              "own mean; REFUTE when the vetoed set at n>=MIN_N has "
              "mean-t_crit*SE >= 0, or reads >= the passed mean on >=10 passed "
              "closes; else NOT DECIDABLE (publish n_req)."),
+    #: [2026-09-09 (zp)] ADDED AFTER THE FIRST READ, and declared as an
+    #: addition rather than folded in silently. It is a PRECONDITION, not a
+    #: change to the bar: it can only withdraw a verdict the confounded
+    #: comparison would have produced, never produce one. The registered
+    #: ADOPT/REFUTE thresholds are untouched.
+    "precondition": ("IDENTIFIED — some side must carry BOTH labels at "
+                     "n>=MIN_PASS_N, or the veto/pass split is the long/short "
+                     "split and the verdict is `not_identified` (zp)"),
     "kill": ("the oracle lags the regime by more than the books' hold — "
              "visible here as a vetoed set that is not worse than the passed "
              "set at the same n"),
@@ -231,8 +239,80 @@ def _bounds(quads):
     return out
 
 
-def decide(veto, pas, book_mean_pct, min_n=MIN_N):
-    """The PRE_REGISTERED rule, applied to two graded sets. Pure."""
+def identifiability(by_side, min_cell=MIN_PASS_N):
+    """Can the LABEL be told apart from the SIDE on this sample? Pure.
+
+    [2026-09-09 (zp)] THE PRECONDITION THIS RULE SHIPPED WITHOUT. `decide`
+    compares the VETOED set against the PASSED set. On a window where the
+    oracle's verdict never moves, those two sets ARE the two sides: with BTC
+    reading `LONG-window` on every snapshot, "short in LONG-window" and
+    "short" are the same predicate, so the comparison is shorts-vs-longs and
+    the oracle contributes nothing. Measured on this instrument's own first
+    post-registration read (9-Sep): every book that reached the n floor was
+    collinear -- 🪁 kelly Cramer's V 0.981 (73 of 73 vetoed closes were
+    shorts; 182 of 184 passed were longs) and 🚀 bezos V 1.000 (31 shorts
+    vetoed, 6 longs passed, zero crossover) -- because BTC read `LONG-window`
+    in 351 of 351 snapshots of the registered window. The rule returned
+    `confirmed` on bezos off that table.
+
+    This fleet has ALREADY measured the shorts-lose fact (EDGE_AUDIT §1b) and
+    already REFUSED to act on it (the 2-Sep expansion-research refusal: 🪁
+    kelly's short side is undecidable by tail, t=-4.32 -> -1.35 -> -0.52 once
+    outcome-conditioned exits and the three worst closes are put back). So an
+    unguarded `confirmed` here would have re-shipped a refused side cut under
+    a new name.
+
+    IDENTIFIED = at least one side carries BOTH labels at >= `min_cell`, i.e.
+    somewhere in the sample there is a comparison in which the label varies
+    and the side does not. Anything less is not weak evidence, it is a
+    confounded design, and this returns False so `decide` can refuse.
+    """
+    cells, table, diffs = [], {}, {}
+    for side, d in (by_side or {}).items():
+        v = ((d or {}).get("veto") or {})
+        pss = ((d or {}).get("pass") or {})
+        nv, npass = v.get("n", 0), pss.get("n", 0)
+        table[f"{side}/veto"], table[f"{side}/pass"] = nv, npass
+        if nv >= min_cell and npass >= min_cell:
+            cells.append(side)
+            mv, mp = v.get("mean_pct"), pss.get("mean_pct")
+            if mv is not None and mp is not None:
+                diffs[side] = round(mv - mp, 4)
+    # DIRECTION on the identified comparison. The hypothesis says a trade
+    # taken AGAINST the regime does WORSE, so a supporting cell is NEGATIVE.
+    # None when no cell can be priced — unmeasurable is never a finding (I6).
+    #
+    # `all`, NOT `any`, and the choice is deliberate: the veto this rule would
+    # adopt acts on BOTH sides of the book, so an identified cell showing it
+    # HURTS one side is material evidence against adopting it, even when the
+    # other side agrees. `any` would let a book confirm on its short cell
+    # while its long cell said the veto costs money. Strictly more
+    # conservative, and it can still only withdraw a confirm, never create
+    # one. (Found by mutation: `any` survived the round that killed the rest.)
+    agrees = (all(d < 0 for d in diffs.values()) if diffs else None)
+    # DECLARED LIMIT: this is a SIGN, with no significance and no power behind
+    # it. Measured on the pooled window the day it shipped, three of the four
+    # verdicts it touches rest on |z| < 1 (🧘 douglas -0.32, 💸 farmer-shadow
+    # -0.95, 🎫 taker -0.05) and 🪁 kelly's block rests on +0.830pp at z=+1.01
+    # (permutation P=0.220). It is SAFE because it is one-directional — it can
+    # only withdraw a confirm — but `within_side_agrees: True` is NOT evidence
+    # and must never be reported as corroboration in the ordinary sense. The
+    # honest upgrade is a power test here; until then read it as "the sign did
+    # not contradict", which is all it says.
+    return {"identified": bool(cells), "within_side_cells": sorted(cells),
+            "min_cell": min_cell, "table": table,
+            "within_side_diff_pp": diffs, "within_side_agrees": agrees}
+
+
+def decide(veto, pas, book_mean_pct, min_n=MIN_N, ident=None):
+    """The PRE_REGISTERED rule, applied to two graded sets. Pure.
+
+    `ident` is the (zp) IDENTIFIABILITY PRECONDITION -- `identifiability()`'s
+    verdict for this book. It is strictly CONSERVATIVE: it can only withdraw a
+    `confirmed`/`refuted` that the confounded comparison would have produced,
+    never create one, so it cannot loosen the registered bar in the adopt
+    direction. Omitted (None) it is not applied, which keeps every pre-(zp)
+    call site and selftest arm reading exactly as it did."""
     n = veto.get("n", 0)
     if n < min_n or veto.get("ub_pct") is None:
         t = abs(veto.get("t") or 0.0)
@@ -241,9 +321,33 @@ def decide(veto, pas, book_mean_pct, min_n=MIN_N):
         return {"verdict": "not_decidable",
                 "why": f"vetoed n={n} < {min_n}" if n < min_n else "vetoed set ungradeable",
                 "n_req": n_req}
+    if ident is not None and not ident.get("identified"):
+        return {"verdict": "not_identified",
+                "why": ("the label does not vary within a side at n>="
+                        f"{ident.get('min_cell')} ({ident.get('table')}) -- "
+                        "veto-vs-pass here is shorts-vs-longs, which is a "
+                        "SIDE cut and not a regime measurement (zp)")}
     pass_ok = pas.get("n", 0) >= MIN_PASS_N and pas.get("mean_pct") is not None
-    if veto["ub_pct"] <= 0 and (book_mean_pct is None or not pass_ok
-                                or pas["mean_pct"] >= book_mean_pct):
+    would_confirm = (veto["ub_pct"] <= 0 and (book_mean_pct is None or not pass_ok
+                                              or pas["mean_pct"] >= book_mean_pct))
+    # [(zp)] THE CROSS-SIDE COMPARISON MAY NOT CROWN A VETO THE IDENTIFIED
+    # ONE CONTRADICTS. `identified` alone is not enough: a book can hold a
+    # within-side cell AND still be confirmed on the shorts-vs-longs split
+    # that swamps it. Measured on the pooled window the day this shipped --
+    # 🪁 kelly read `confirmed` (vetoed ub -0.049% on n=258) while its own
+    # within-side cell ran BACKWARDS by +0.830pp (shorts in LONG-window
+    # -0.357% vs shorts outside it -1.187%). Strictly conservative: this can
+    # only withdraw a CONFIRM, never create one, and it deliberately does NOT
+    # gate `refuted` -- a contradicting within-side cell is evidence FOR
+    # refutation, so blocking that direction too would be a bias, not a guard.
+    if would_confirm and ident is not None and ident.get("within_side_agrees") is False:
+        return {"verdict": "not_corroborated",
+                "why": ("the cross-side split would confirm, but the IDENTIFIED "
+                        "comparison (label varying, side fixed) contradicts it: "
+                        f"within-side veto-minus-pass {ident.get('within_side_diff_pp')} "
+                        "pp -- positive means the trades this veto would remove "
+                        "did BETTER than the ones it keeps (zp)")}
+    if would_confirm:
         return {"verdict": "confirmed",
                 "why": (f"vetoed upper bound {veto['ub_pct']:+.3f}% <= 0 on n={n}"
                         + (f"; passed mean {pas['mean_pct']:+.3f}% >= book {book_mean_pct:+.3f}%"
@@ -285,14 +389,24 @@ def grade_book(bot, quads, oracle, since=None, crypto=None):
         by_side[side][lab].append(q)
     labelled = sum(len(v) for v in sets.values())
     veto, pas = _bounds(sets["veto"]), _bounds(sets["pass"])
+    # [(zp)] the BOUNDED per-side cells, computed ONCE and used for both the
+    # published `by_side` and the identifiability verdict. Passing counts
+    # alone here silently starved the corroboration gate of the means it
+    # needs — it read `within_side_agrees: None` (unpriceable) on a live
+    # payload that could be priced perfectly well, so the gate never fired.
+    # Caught by running the guard against the real ledger, not the selftest.
+    by_side_b = {s_: {k: _bounds(v) for k, v in d.items()}
+                 for s_, d in by_side.items()}
+    ident = identifiability(by_side_b)
     book = _bounds(quads if since is None else [q for q in quads
                                                  if _ts(q[3]) and _ts(q[3]) > since])
     out = {"bot": bot, "n": n_total, "labelled": labelled,
            "coverage": round(labelled / n_total, 3) if n_total else None,
            "unknown": dict(unknown), "basis": dict(basis),
            "book": book, "veto": veto, "pass": pas,
-           "by_side": {s: {k: _bounds(v) for k, v in d.items()} for s, d in by_side.items()},
-           "decision": decide(veto, pas, book.get("mean_pct"))}
+           "by_side": by_side_b,
+           "identifiability": ident,
+           "decision": decide(veto, pas, book.get("mean_pct"), ident=ident)}
     # the counterfactual, stated as $ and as the mean the book would have had
     if sets["veto"] and pas.get("n", 0) >= 2:
         out["if_vetoed"] = {"mean_pct": pas.get("mean_pct"), "n": pas.get("n"),
@@ -327,11 +441,13 @@ def render(res):
     L = ["# regime short-veto study — pre-registered, read-only",
          f"oracle: {res['oracle']['n_snapshots']} snapshots {res['oracle']['span']} · "
          f"BTC verdicts {res['oracle']['btc_verdicts']}",
-         "", "| book | n | cover | veto n | veto mean% | ub% | t_cl | pass n | pass mean% | book mean% | verdict |",
-         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
+         "", "| book | n | cover | ident | veto n | veto mean% | ub% | t_cl | pass n | pass mean% | book mean% | verdict |",
+         "|---|---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for bot, b in res["books"].items():
         v, p, k = b["veto"], b["pass"], b["book"]
-        L.append(f"| {bot} | {b['n']} | {b['coverage']} | {v.get('n', 0)} | "
+        idn = (b.get("identifiability") or {}).get("identified")
+        L.append(f"| {bot} | {b['n']} | {b['coverage']} | "
+                 f"{'yes' if idn else 'NO'} | {v.get('n', 0)} | "
                  f"{v.get('mean_pct', '—')} | {v.get('ub_pct', '—')} | {v.get('t_cluster', '—')} | "
                  f"{p.get('n', 0)} | {p.get('mean_pct', '—')} | {k.get('mean_pct', '—')} | "
                  f"{b['decision']['verdict']}: {b['decision']['why']} |")
@@ -410,6 +526,79 @@ def _selftest():
                   {"n": 40, "mean_pct": -0.1}, 0.1)["verdict"] == "refuted", "crowd was right"
     nd = decide({"n": 12, "ub_pct": 0.2, "lb_pct": -0.6, "mean_pct": -0.2, "t": -1.0}, {"n": 0}, 0.1)
     assert nd["verdict"] == "not_decidable" and nd["n_req"] and nd["n_req"] > 12
+    # [(zp)] THE IDENTIFIABILITY PRECONDITION
+    # a sample whose label never varies within a side is NOT identified...
+    collinear = {"short": {"veto": {"n": 73}, "pass": {"n": 2}},
+                 "long": {"pass": {"n": 182}, "veto": {"n": 0}}}
+    idc = identifiability(collinear)
+    assert idc["identified"] is False and idc["within_side_cells"] == [], idc
+    # ...and it BLOCKS a verdict the confounded comparison would have produced
+    confirmable = ({"n": 40, "ub_pct": -0.1, "lb_pct": -0.9, "mean_pct": -0.5, "t": -2.5},
+                   {"n": 40, "mean_pct": 0.3}, 0.1)
+    assert decide(*confirmable)["verdict"] == "confirmed"
+    assert decide(*confirmable, ident=idc)["verdict"] == "not_identified", \
+        "a collinear sample must never be CONFIRMED"
+    refutable = ({"n": 40, "ub_pct": 0.9, "lb_pct": 0.1, "mean_pct": 0.5, "t": 2.5},
+                 {"n": 40, "mean_pct": 0.3}, 0.1)
+    assert decide(*refutable)["verdict"] == "refuted"
+    assert decide(*refutable, ident=idc)["verdict"] == "not_identified", \
+        "a collinear sample must never REFUTE either"
+    # [(zp)] CORROBORATION: an identified cell that CONTRADICTS blocks a confirm
+    contra = identifiability({"short": {"veto": {"n": 258, "mean_pct": -0.357},
+                                        "pass": {"n": 13, "mean_pct": -1.187}}})
+    assert contra["identified"] is True and contra["within_side_agrees"] is False, contra
+    assert decide(*confirmable, ident=contra)["verdict"] == "not_corroborated", \
+        "a confirm the identified comparison contradicts must not be crowned"
+    # ...and it does NOT block a REFUTE (a contradicting cell supports refuting)
+    assert decide(*refutable, ident=contra)["verdict"] == "refuted"
+    # an identified cell that AGREES lets the confirm through
+    agreeing = identifiability({"short": {"veto": {"n": 36, "mean_pct": -0.913},
+                                          "pass": {"n": 31, "mean_pct": -0.717}}})
+    assert agreeing["within_side_agrees"] is True, agreeing
+    assert decide(*confirmable, ident=agreeing)["verdict"] == "confirmed"
+    # [(zp)] MIXED cells: one agreeing, one contradicting -> NOT corroborated.
+    # This is the `all` vs `any` choice, pinned so it cannot drift back.
+    mixed = identifiability({"short": {"veto": {"n": 30, "mean_pct": -1.0},
+                                       "pass": {"n": 30, "mean_pct": -0.2}},
+                             "long": {"veto": {"n": 30, "mean_pct": +2.0},
+                                      "pass": {"n": 30, "mean_pct": +0.1}}})
+    assert mixed["identified"] is True, mixed
+    assert mixed["within_side_agrees"] is False, \
+        "a veto that HURTS one side must not be corroborated by the other"
+    assert decide(*confirmable, ident=mixed)["verdict"] == "not_corroborated"
+
+    # an UNPRICEABLE cell is None, never False — unmeasurable is not a finding (I6)
+    nomeans = identifiability({"short": {"veto": {"n": 20}, "pass": {"n": 20}}})
+    assert nomeans["identified"] is True and nomeans["within_side_agrees"] is None, nomeans
+    assert decide(*confirmable, ident=nomeans)["verdict"] == "confirmed"
+
+    # a sample WITH a within-side cell is identified and the rule runs normally
+    balanced = {"short": {"veto": {"n": 23}, "pass": {"n": 47}},
+                "long": {"veto": {"n": 26}, "pass": {"n": 42}}}
+    idb = identifiability(balanced)
+    assert idb["identified"] is True and idb["within_side_cells"] == ["long", "short"], idb
+    assert decide(*confirmable, ident=idb)["verdict"] == "confirmed"
+    # the floor binds: one close short of MIN_PASS_N is not a cell
+    edge = {"short": {"veto": {"n": MIN_PASS_N}, "pass": {"n": MIN_PASS_N - 1}}}
+    assert identifiability(edge)["identified"] is False
+    edge2 = {"short": {"veto": {"n": MIN_PASS_N}, "pass": {"n": MIN_PASS_N}}}
+    assert identifiability(edge2)["identified"] is True
+    # omitting `ident` leaves every pre-(zp) call site byte-identical
+    assert decide(*confirmable, ident=None)["verdict"] == "confirmed"
+    # and grade_book publishes it: the synthetic ledger is BOTH sides in BOTH
+    # regimes, so it is identified — a collinear one would read NO
+    assert g["identifiability"]["identified"] is True, g["identifiability"]
+    # [(zp)] THE WIRING, not just the function. `identifiability` needs the
+    # per-side MEANS, and the first version of this passed it bare COUNTS —
+    # so `within_side_agrees` read None (unpriceable) on every real book and
+    # the corroboration gate could never fire. The selftest called the
+    # function directly and stayed green through it. This arm drives
+    # grade_book end-to-end and fails if the means stop arriving.
+    assert g["identifiability"]["within_side_diff_pp"], \
+        "grade_book starved identifiability of the per-side means"
+    assert g["identifiability"]["within_side_agrees"] is not None, \
+        "the corroboration gate is unpriceable on a payload that can be priced"
+
     # normalise tolerates junk and orders by time
     raw = [{"ts": "2026-09-01T02:00:00+00:00", "payload": {"pairs": {"BTC": {"verdict": "LONG-window"}}}},
            {"ts": "junk", "payload": {"pairs": {}}}, "nope",
@@ -439,10 +628,22 @@ def main(argv=None):
     ap.add_argument("--since", help="ISO stamp: grade only closes OPENED after it (default: none)")
     ap.add_argument("--pooled", action="store_true",
                     help="grade the WHOLE window instead of the registered fresh sample — NOT the registered read")
+    ap.add_argument("--fresh", action="store_true",
+                    help="the REGISTERED read (the default). Accepted because "
+                         "both HANDOFF.md and session_state.py instruct the "
+                         "reader to run this with `--fresh`, and until (zp) "
+                         "that command ERRORED — a pre-registered read whose "
+                         "documented invocation does not parse is the (po) "
+                         "check-that-inspects-nothing shape one step earlier, "
+                         "and it is how a re-arm gets run on the wrong window. "
+                         "Mutually exclusive with --pooled.")
     ap.add_argument("--bots", help="comma list of books to grade (default: all)")
     ap.add_argument("--json", help="write the full result here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
+    if getattr(a, "fresh", False) and a.pooled:
+        print("REFUSING: --fresh and --pooled name different windows (zp)")
+        return 2
     if a.selftest:
         _selftest()
         return 0

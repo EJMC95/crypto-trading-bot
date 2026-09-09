@@ -1,6 +1,6 @@
-## 2026-09-09 (zp) — THE DASHBOARD'S STALLS WERE A LOCK CONVOY THE FLEET LIT ON ITSELF AT EVERY REDEPLOY: NINE EXCLUSIVE-LOCK NO-OP ALTERs PER BOOTING PROCESS, ON ITS HOTTEST TABLE
+## 2026-09-09 (zq) — THE DASHBOARD'S STALLS WERE A LOCK CONVOY THE FLEET LIT ON ITSELF AT EVERY REDEPLOY: NINE EXCLUSIVE-LOCK NO-OP ALTERs PER BOOTING PROCESS, ON ITS HOTTEST TABLE
 
-**[RENUMBERED (zo) -> (zp) at push time.** Another session's `(zo)` — 🔮 georgia v1's pre-registered read — reached main first and is cited from twenty-two tracked files; this entry was cited from five, all its own. The cited entry keeps the letter (rule 3). Recorded inline because `git log` subjects keep the old letter.**
+**[RENUMBERED TWICE at push time: (zo) -> (zp) -> (zq).** Another session's `(zo)` — 🔮 georgia v1's pre-registered read — reached main first (cited from twenty-two tracked files); minutes later another session's `(zp)` — the regime-veto identifiability read — did too (cited from `session_state.py`, `test_selftests.py` and three study scripts). This entry was cited from its own five files both times; the cited entry keeps the letter (rule 3). **Four collisions on one branch in one day is the finding the letters guard cannot make: it sees `origin/main`, never the other OPEN branches.** Recorded inline because `git log` subjects keep the old letters.**
 
 **Found while a PR's CI was red on a guard that reads the live feed, and
 established by the doctrine's own order** — rule out the PR (the guard is
@@ -96,6 +96,201 @@ dashboard is a stdlib `ThreadingHTTPServer` opening a fresh `psycopg2.connect`
 per request with no pooling, and `/pnl.json`'s read path is unmeasured; that is
 its own instrument. And `audit_changelog_letters` still cannot see across OPEN
 pull requests (`(ze)` doubled between #293 and #294 all day).
+
+## 2026-09-09 (zp) — THE PRE-REGISTERED REGIME VETO SAID `CONFIRMED` ON A BOOK WHERE ITS TREATMENT HAD ZERO VARIANCE: veto-vs-pass was shorts-vs-longs, and the rule could not tell the difference
+
+**The read was TAKEN three days before its date backstop, because the SAMPLE
+tripped it** — `(yo)`'s lesson, applied on purpose this time. The edge audit's
+hypothesis #3 (`regime-short-veto`, registered 2-Sep 09:30Z) needs n≥30 in the
+largest living vetoed set; 🪁 kelly's reached **73**.
+
+**WHAT THE REGISTERED RULE SAID.** Two books cleared the floor on the fresh
+window: 🪁 kelly `undecided` (vetoed ub **+0.0066%** — it missed the ADOPT bar
+by sixty-six ten-thousandths of a percentage point) and 🚀 bezos **`confirmed`**
+(vetoed n=31, mean −0.830%, ub −0.187%). Taken at face value the instrument
+said: adopt the veto on 🚀 bezos.
+
+**WHY BOTH READINGS ARE UNINTERPRETABLE, AND IT IS ONE NUMBER.** BTC read
+`LONG-window` in **351 of 351** snapshots after the registration stamp, and
+every crypto coin rides BTC's verdict by the declared `btc-proxy` rule. So on
+this window *"short in `LONG-window`"* and *"short"* are **the same
+predicate**:
+
+| book | long/pass | long/veto | short/pass | short/veto | Cramér's V |
+|---|---:|---:|---:|---:|---:|
+| 🪁 kelly | 182 | 0 | 2 | 73 | **0.981** |
+| 🚀 bezos | 6 | 0 | 0 | 31 | **1.000** |
+
+V = 1.000 means the label **IS** the side. `decide()` compares the vetoed set
+against the passed set, so on 🚀 bezos it compared **31 shorts against 6 longs**
+and called it a regime finding. **Fleet-wide on the fresh window there are ZERO
+identified cells** — no book carries both labels at n≥10 inside one side.
+
+This matters because the fleet already knows the answer to the question it was
+actually asking. EDGE_AUDIT §1b: every mixed book's loss is its short side. And
+the 2-Sep expansion-research pass **already refused to act on it** — 🪁 kelly's
+short side is undecidable by tail, t = −4.32 → −1.35 → −0.52 once
+outcome-conditioned exits and the three worst closes go back in. **An unguarded
+`confirmed` would have re-shipped a refused side cut under a new name** — and
+acting on 🚀 bezos would have removed **31 of its 37 closes (83.8%)**, leaving
+six: an off-switch, not a filter, against I17 and I22.
+
+**THE IDENTIFIED TEST, WHERE ONE EXISTS.** The oracle's FULL history from the
+database is **3,020 snapshots, 11-Jul → 9-Sep** (the public bus caps at 200h,
+which is why the registration's own declared limit read "418 of 418"), and over
+that window BTC does vary — SHORT 1,300 / LONG 961 / chop 458 / flat 301. So
+the within-side comparison exists there: **11 cells** at n≥10 on both labels.
+Statistic: precision-weighted (veto − pass), which the hypothesis says is
+NEGATIVE. Null: the oracle's whole verdict series **circularly rotated** against
+its own timestamps — same marginals, same autocorrelation, no relation to
+returns (the null `study_regime_split_2026-09-07.py` used to refuse the
+long-side filter; a scatter null is too easy on an autocorrelated label).
+
+| population | cells | observed | null p05/median/p95 | **P** |
+|---|---:|---:|---|---:|
+| all books | 11 | **+0.221 pp** | −0.184 / +0.070 / +0.392 | **0.858** |
+| living only | 5 | **+0.294 pp** | −0.135 / +0.046 / +0.240 | **0.983** |
+| ⚖️ counterweight alone (best case) | 2 | −2.268 pp | −5.12 / −0.99 / +5.01 | 0.310 |
+
+**Wrong sign, null not crossed.** Six cells support the hypothesis, five
+contradict. Even the most favourable book — ⚖️ Counterweight, the only one with
+genuinely balanced labels (V = 0.056) and both cells pointing the right way —
+reads P = 0.310 against a null whose median is already −0.99, and it was
+selected as best-of-N, which I25 prices at ~1.85 t-units.
+
+**THE POOLED NULL IS AN ABSENCE OF POWER, NOT A REFUTATION — and an adversarial
+pass corrected the first draft here.** A null with no MDE beside it is
+uninterpretable. Across the 11 cells Cochran's Q = 16.70 (df 10), **I² = 40.1%**,
+tau² = 0.313, so a fixed-effect summary is inadmissible; random-effects reads
+**+0.109 pp, SE 0.308, z = +0.35, MDE80 = 0.862 pp**. The four effects the edge
+audit hypothesised are 💸 farmer −0.640, 🪁 kelly −0.410, 🛢️ garrett −2.409,
+⚖️ counterweight −4.044 %/trade — so this design could have detected the two
+LARGE ones and **had no power at all for the two that matter operationally**.
+The precise statement is therefore narrower than "the mechanism fails": **no
+identified comparison anywhere in the fleet is powered to detect the effect that
+was hypothesised, and the registered window contains no identified comparison at
+all.**
+
+**"The two largest cells run backwards" is WITHDRAWN, not softened.** That
+ranking is by the VETO arm; ranked by effective n — 1/(1/n_v+1/n_p), the
+quantity that bounds a two-sample comparison — 🪁 kelly falls to **8th** at 12.4
+and second by power is 💸 the farmer shadow's shorts at −0.722 pp, running
+**WITH** the hypothesis. Across all 11 cells the split is **6 with / 5 against**:
+a coin flip. (kelly's shorts do read veto −0.357% (n=258) vs pass −1.187%
+(n=13), +0.830 pp, robust to trimming across 23 coins and 20 days — at
+permutation **P = 0.220**. 🔮 georgia's longs, +0.324 pp at **P = 0.127**.)
+
+**TWO POOLED CONFIRMS SURVIVE THE GUARD AND BOTH ARE ON RETIRED BOOKS** — 🧘
+douglas (−0.196 pp) and 💸 the farmer's shadow (−0.722 pp). Every pooled
+confirmation that survives identification is on a book the fleet no longer runs.
+**And half the hypothesis has zero fleet-wide support:** on the fresh window
+`long/veto = 0` on **every living book without exception** (mum-live 0/36,
+avo-live 0/6, georgia-v3 0/76, taker 0/43, kelly 0/182, bezos 0/6 …), because a
+"long in SHORT-window" needs a SHORT-window verdict and there was none. **Any
+adoption would be a shorts-only rule — a side cut — including on the two
+real-money books.**
+
+**VERDICT: NOT IDENTIFIED — and the two books fail differently.** 🪁 kelly is
+unidentified by DEGREE (2 discordant rows of 257, both running *against* the
+hypothesis). 🚀 bezos is **not estimable as ALGEBRA**: min-cell = 0 exactly, the
+veto set IS the short set row-for-row, and `[1, is_short, is_veto]` has **rank 2
+of 3** — the label coefficient does not exist. Its `confirmed` was additionally
+carried by **three trades** (worst 3 of 31 = 49.4% of the vetoed total; drop two
+and the ADOPT stops firing) on a **7-day-old book with no shadow twin**, so the
+registration's CONFIRMED branch — *"build the veto shadow-first, graded against
+its un-gated twin"* — was unexecutable on it regardless.
+
+Nothing adopted, no lever moved, no book changed. `not_identified` and
+`not_corroborated` land in the registration's own third branch, so **no
+amendment to the registration was needed to honour this** and exactly ONE re-arm
+remains. **Re-armed conditionally, with a method requirement:** it fires when
+BTC leaves `LONG-window` or on the 16-Sep backstop; **no session may quote a
+probability for that turn** (the oracle's 59-day history holds seven runs and
+exactly ONE `LONG-window` run — the current, open, 19.50-day one, already longer
+than the longest *completed* run of any kind: zero completed LONG runs means no
+distribution); and **the cell a turn produces must be DAY-PAIRED before it
+counts**, because on a single-regime tape the label IS the calendar epoch, so
+the identified cell everyone is waiting for arrives confounded with time by
+construction (the I25 shape). If the window still has no variance at that read,
+the registration **CLOSES as untestable** rather than re-arming again.
+
+**AN ORDERING CONSTRAINT THAT WAS WRITTEN NOWHERE.** 🪁 kelly's own
+keep-or-retire read was taken 7-Sep and **RETURNS TO EAMON** — undecided, with
+him now. A short veto on her removes **73 of 257 fresh closes (28%)** on exactly
+the side that verdict turns on, so adopting one before he decides
+**re-specifies the book mid-registration and voids the 7-Sep read** — the `(tt)`
+failure I21 was amended for. **Order: Eamon's decision first, any veto second.**
+And if a next read is pointed anywhere it is **⚖️ Counterweight, not kelly** —
+the only LIVING book whose identified cells agree on both sides (−3.258 pp and
+−0.596 pp, labels balanced at V = 0.056), which already carries its own
+pre-registered 1-Oct read to hang this on.
+
+**WHAT SHIPPED — the class, not the instance.** The defect is not that the rule
+got one book wrong; it is that **it could not tell a regime measurement from a
+side cut**, and would have said `confirmed` again next read. Two preconditions
+now sit in front of the registered bars, **both strictly conservative — each can
+only withdraw a verdict the confounded comparison would have produced, never
+create one**, so the registered ADOPT threshold is untouched:
+
+* **`identifiability()`** — a verdict requires some side to carry BOTH labels at
+  n≥10, else `not_identified` with the contingency table as the reason.
+* **The corroboration gate** — a `confirmed` is withdrawn when the identified
+  comparison CONTRADICTS it. `identified` alone was not enough: on the pooled
+  window 🪁 kelly read `confirmed` (ub −0.049% on n=258) while its own
+  within-side cell ran backwards by +0.830 pp. It deliberately does **not** gate
+  `refuted` — a contradicting cell is evidence FOR refutation, so blocking that
+  direction too would be a bias, not a guard.
+
+Measured on the live payload after: 🚀 bezos `confirmed → not_identified`,
+🪁 kelly fresh `undecided → not_identified`, 🪁 kelly pooled `confirmed →
+not_corroborated`, 🧘 douglas pooled **stays `confirmed`** (its within-side cell
+agrees at −0.196 pp). **The guard discriminates; it is not a blanket refusal.**
+
+**THREE DEFECTS IN MY OWN WORK, recorded because each would have produced a
+confident wrong number:**
+* **The corroboration gate shipped INERT for one round.** `grade_book` handed
+  `identifiability()` bare COUNTS, so it read `within_side_agrees: None`
+  (unpriceable) on every real book and the gate could never fire — while the
+  selftest, which called the function directly with means, stayed green. Caught
+  by running the guard against the live ledger, not the suite. The wiring is now
+  driven end-to-end in the selftest.
+* **`any` vs `all` across multiple identified cells SURVIVED a mutation round.**
+  Settled deliberately as `all`: the veto acts on BOTH sides, so a cell showing
+  it hurts one side is material even when the other agrees.
+* **An adversarial review found the `since` filter and the pass-side half of the
+  cell floor unpinned** in the new instrument — correct in the shipped code,
+  untested. Both now pinned, boundary included.
+* **THE REGISTERED READ'S OWN DOCUMENTED COMMAND DID NOT RUN.** `HANDOFF.md` and
+  `session_state.py` both say *"run it with `--fresh`"*, and `--fresh` existed on
+  **none of the three** registered instruments (this one, the taker hold floor,
+  mum's non-crypto sleeve) — the flags are `--since`/`--pooled`. A pre-registered
+  read whose documented invocation errors is the `(po)` shape one step earlier,
+  and it is how a re-arm gets run on the wrong window. All three now accept
+  `--fresh` and **refuse `--fresh --pooled` together** rather than silently
+  preferring one.
+* **`within_side_agrees` is a SIGN, not a test** — no significance, no power;
+  three of the four verdicts the gate touches rest on |z| < 1. It is SAFE
+  because one-directional, but `agrees: True` must never be read as
+  corroboration in the ordinary sense. Declared in the code. The `precondition`
+  key added to `PRE_REGISTERED` today is likewise named as what it is: a
+  mid-flight amendment, declared, conservative-only, thresholds untouched — the
+  acceptable form of an I21 boundary case.
+
+New instrument: `scripts/study_regime_veto_identifiability_2026-09-09.py`
+(Cramér's V, the within-side comparison, the rotation null; its selftest pins
+that the O(1) anchored labelling is byte-identical to naively rotating the whole
+oracle at five rotations — the optimisation that makes 2,000 draws affordable).
+Mutation rounds: **6/6** on the parent's two preconditions, **9/9** on the new
+instrument. Full working: `STUDY_REGIME_VETO_IDENTIFIABILITY_2026-09-09.md`.
+
+**DECLARED LIMIT, and it is the thing to fix if anyone wants this tested
+properly:** the oracle grades **31 coins** with its own verdict and everything
+else rides the BTC proxy — 🪁 kelly's fresh basis is 251 proxy / 6 own, and the
+coins it actually trades (USELESS, ARB, VVV, DASH, XMR, PUMP…) are low-cap alts
+the oracle has never graded. So part of "unidentified" is **oracle coverage**,
+which is a fixable instrumentation problem rather than a dead hypothesis. It
+does not change today's verdict — a coverage failure and a false hypothesis are
+equally un-actionable — but it names where the next attempt would have to start.
 
 ## 2026-09-09 (zo) — 🔮 GEORGIA v1'S PRE-REGISTERED READ, TAKEN: THE CAP-5 PREDICTION FAILED ON HER OWN POST-CAP CLOSES, SHE IS RETIRED ON THE UNDECIDABLE CALL — AND THE CLAIM COULD NEVER HAVE GRADED ITSELF, BECAUSE ITS OWNER FIELD IS `null` IN EXACTLY THE STATE THAT DECIDES IT
 
