@@ -1,3 +1,97 @@
+## 2026-09-09 (zl) — "ABANDONED" MEANT BOTH "WE MEASURED IT AND IT LOST" AND "WE NEVER GOT ENOUGH CLOSES TO ASK", ON THE FLEET'S ONLY PATH TO MORE REAL MONEY
+
+**The 🧪 judge's serial lane is scarce and its clock is hard: `MIN_DAYS` 7,
+`MIN_CLOSES` 30 shadow / 10 live, `MAX_DAYS` 14 — and at 14 days it appended
+one verdict, `ABANDONED`, and pushed *"14d without clearing the bar"*,
+whatever the reason.** So a candidate that was measured and lost and a
+candidate whose sample never existed were **byte-identical in the record**.
+That is the (lv) ambiguity landing on the one mechanism that turns shadow
+evidence into real money, and it is the I17/(tz) split one level up:
+`unreachable` had to be separated from `underpowered` for BOOKS because a
+thin sample is not an exclusion. A candidate that starves its own arm is
+exactly that shape.
+
+**FOUND BY MEASURING THE RUNNING CANDIDATE, WITH THE LIVE ARM AS A CONTROL
+(I25 — a baseline that feels the same tide, never the window alone).**
+`mum-vel-12-20` (an RSI-velocity entry band on 👩 mum's shadow twin) at 39.1h:
+
+| arm | opens/day BEFORE | opens/day IN-EXPERIMENT | ratio |
+|---|---|---|---|
+| SHADOW (band ON) | 7.52 | **1.84** | **0.245** |
+| LIVE (control, no band) | 7.76 | 3.68 | 0.474 |
+
+The tape halved both arms; **the band halved the shadow AGAIN** (0.245/0.474 =
+**0.52**). And the projection could not see it, because it was computed on the
+wrong sample: `_eta_judgeable` sizes its terms from `_pair_power`'s trailing
+**14 days** — the rate the arm ran *before* this candidate narrowed its gate —
+so the pair published `eta_judgeable` **bound by `window` at 7.0d** with a
+`shadow_closes` term of **4.4d**. On the candidate's own rate the shadow arm
+needs **16.3d for its 30 closes, against a 14-day clock**. That ETA is not
+wrong for a PAIR; it is wrong for a CANDIDATE, because **a gate-narrowing
+candidate changes the very quantity the projection is built from.**
+
+**NOT AN EDGE CASE — THE QUEUE'S NORMAL CASE. Three of mum's four candidates
+change their own arm's close rate:** `vel-12-20` and `rsi-32` narrow the entry
+gate, `hold-2880` halves turnover. Only `hold-720` speeds it up. And `rsi-32`
+is the sharp one: at `rsi_max` 32.0 the shadow's own live scan of 102 coins
+reads `rsi_min` **33.3** — it admits **nothing** on today's tape, so it would
+sit at zero closes for 14 days and be recorded as *"14d without clearing the
+bar"*. It has already been voided once for an unrelated reason ((ye)).
+
+**SHIPPED — TWO HALVES, BOTH REPORT-ONLY:**
+* **`sample_horizon(ev, days)`** — the candidate's own sample horizon, attached
+  to `ev` on **every** cycle rather than only at expiry, so a starving
+  candidate is visible while it still has days left. Publishes per-arm rate,
+  `days_req`, the binding arm, `reachable`, and `verdict_if_expired`.
+  **FAIL-CLOSED toward keeping a candidate alive:** an arm below
+  `HORIZON_MIN_N` (3) is `reachable: None` — UNPROJECTABLE, never a `False`
+  that would read as a refutation, because a rate from two numbers is not a
+  rate; ZERO closes is the one downward-decidable case (`reachable: False`,
+  named); floors already met ⇒ `met: True` and no projection.
+* **`expiry_verdict(ev)`** — one owner for the name the clock writes.
+  `ABANDONED` is a RESULT (floors reached, bar not cleared); **`UNDERPOWERED`**
+  is the absence of one. **Fail-closed toward `UNDERPOWERED`, and that
+  direction is the whole safety of the split**: under-claiming a real negative
+  costs nothing (the candidate stands down and enters `done` either way) while
+  over-claiming one retires an idea on a verdict about a sample nobody took.
+
+**WHAT DID NOT MOVE, deliberately.** No bar, no lever, no control flow: an
+expired candidate still stands down, still cools down, still enters `done` —
+the lane is SERIAL, and a looping candidate is worse than a mislabelled one.
+`MAX_DAYS` is untouched. **The live reading today is that `mum-vel-12-20` is
+projected UNREACHABLE (16.3d needed, 14d clock) — so the standing question is
+Eamon's, not this entry's: extend the clock for gate-narrowing candidates,
+lower `MIN_CLOSES` for them, or accept that "be more selective" is a class this
+judge cannot grade.** Each is a policy act on the promotion path and owes its
+own measured price (I19). Stated with the number rather than taken.
+
+**THE MUTATION ROUND FOUND A DEFECT IN MY OWN TEST, which is what it is for
+(I3).** 13 mutations; 12 red, and **M7 — making the attach unreachable with
+`if False:` — SURVIVED**, because the wiring test was a substring scan and
+`if False: ev["horizon"] = _hz` leaves every character of the attach in the
+file. That is this repo's own rule (*a page-wide substring scan is not a
+structural claim*) and the same vacuous-guard shape (zk) recorded two entries
+ago. Re-asserted on the AST: the innermost `If` whose **direct body** holds the
+assignment must test `_hz is not None`. 13/13 red after.
+
+**AND THE HARNESS LIED TWICE BEFORE IT TOLD THE TRUTH — recorded because both
+faults are documented traps this file already carries.** Round 1 reported
+**10 of 10 mutations SURVIVED**: `echo "$out" | grep -q` under `pipefail`, the
+exact inversion CLAUDE.md documents — `grep -q` exits at the first match,
+SIGPIPEs the producer, and the pipeline status turns a successful match into a
+miss. Round 2 replaced the pipe with `case` and reported **11 of 11 SURVIVED**:
+the pattern was `*failed*` and pytest prints `FAILED`, while `tail -4` captured
+only those uppercase lines and never the lowercase summary — a check matching
+nothing, reporting clean, and clean read as evidence ((po), third costume).
+**THE RULE THAT COMES OUT OF IT: key a mutation round on the runner's EXIT
+CODE, never on scraped text** — and a mutation round that reports 100%
+survival is reporting a broken harness, not a weak guard.
+
+Verified: judge `--selftest` OK, full suite green, `audit_deploy_coverage` OK
+(`experiment_judge.py` is on the `freqtrade-bots` push path, so this ships on
+merge). **Main-only, no live marker: it moves no trade, no lever and no
+real-money value** — the (mm) rule, stated as required.
+
 ## 2026-09-09 (zj) — 🙏 AVO'S JUDGE LANE WAS INERT BY ONE MISSING ATTRIBUTE, AND HER ROW ADVERTISED FOUR LEVERS TO FIX IT — THREE OF WHICH HER CARRIER CANNOT HOLD
 
 **Carried since 6-Sep as `avo-judge-lane-declared-but-not-lever-capable` (I11:

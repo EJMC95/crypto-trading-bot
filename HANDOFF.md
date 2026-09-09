@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-09 15:15 Sydney (05:15Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 15:37 Sydney (05:37Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -89,8 +89,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (7 commit(s))
+## Shipped today (8 commit(s))
 
+- `e0161c6` (zk) regenerate HANDOFF.md
 - `ba25f90` (zk) RENUMBERED (zh) -> (zk): a concurrent session merged its own (zh) to main while this branch was in flight
 - `a396b5c` Merge remote-tracking branch 'origin/main' into claude/mum-shadow-mum-review-oh15sb
 - `f9c0b20` (zj) correct the avo carried row in place: the mechanism half shipped, only the cage remains
