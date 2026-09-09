@@ -759,6 +759,107 @@ dashboard is a stdlib `ThreadingHTTPServer` opening a fresh `psycopg2.connect`
 per request with no pooling, and `/pnl.json`'s read path is unmeasured; that is
 its own instrument. And `audit_changelog_letters` still cannot see across OPEN
 pull requests (`(ze)` doubled between #293 and #294 all day).
+## 2026-09-09 (zs) — THE DAILY REVIEW CARRIED TWO STALE COPIES OF RULES THAT HAD MOVED: a REACH ceiling computed on a number no consumer enforces, and a maxDD bar graded realised-only beside a grader that folds MTM
+
+**[RENUMBERED (zn) -> (zq) -> (zr) -> (zs) at push time.** This entry was written as `(zn)`, renumbered to `(zq)` when `(zn)` landed on main via #298 while it sat unpushed, and renumbered again to `(zr)` when `(zq)` — the lock-convoy entry above — reached main via #300 first and is cited from its own five files. The cited entry keeps the letter (rule 3). **That is SIX collisions on this one branch in a day** — the fourth and fifth were found by the guard, and the SIXTH by re-running it after a second fetch, because `origin/main` gained `(zr)` (a real-money mum deploy, #302) during this very session, and it corroborates the finding the entry above already makes: the letters guard sees `origin/main` and never the other OPEN branches, so a letter free at write time is not a letter free at push time. Recorded inline because `git log` subjects keep the old letters.**
+
+**The daily evidence review (scheduled task `daily-evidence-review`) is the
+instrument that is supposed to catch a stale copy of a rule; this morning it
+was carrying two of its own.** Both are the "second copy of a rule is a second
+rule" class ((hj)) and both were found by reading the review's own output
+against the organs it quotes — not by re-reading its code.
+
+**1 · REACH.** `(wp)` split the long budget per cohort on 2-Sep and made
+`fleet_bus.cohort_long_state` the one reader; every enforcing consumer moved
+(`lighter_family_bot`, `lighter_funding_bot`, `lighter_trend_bot` all call
+`_cohort_long_state(fr, <cohort>)`). The review kept computing headroom from
+the POOLED pair. **Measured on the live payload 9-Sep 05:45Z: pooled 20/20,
+light RED, and the review published "0 long slot(s) left under the L2 veto —
+the NEXT long is refused fleet-wide regardless of its edge" while the live
+cohort sat at 10/20 and the shadow cohort at 16/26** — ten free slots on each
+side of a ceiling no consumer enforces. Over the trailing 8 days of
+`bot_state_history` that shape held in **105 of 1,945 readable samples
+(5.4%) and NOT ONCE was either cohort at budget.** Wrong in the ALARMING
+direction on the exact number the review's growth section exists to watch —
+the gross-vs-long incident of 1-Aug again, one authority split later.
+Fixed: `long_budget_headroom(st, cohort)` delegates to
+`fleet_bus.cohort_long_state` (so the review answers exactly as the veto
+does, degrade-to-pooled included), `reach_line` is extracted from the inline
+block for the reason `risk_line` was ((hw)), and `risk_line` renders the
+enforced per-cohort counts beside the pooled pair.
+
+**2 · maxDD.** `gate_status` graded on `stats()` alone — realised-only —
+while the canonical grader has folded the MTM equity series (worse of both,
+I9) since `(ia)`/`(iz)`. **On the fleet's first READY book the review printed
+🎫 the taker at maxDD 2.5% beside a published 4.6% (basis `mtm`).** Harmless
+today; the missing half is the one that flips verdicts (⚖️ Counterweight
+passed realised 0.2% while −$15 MTM). Fixed: the grader's own
+`mtm_drawdown(equity_series(bot))` folded through the grader's own
+`apply_mtm` before `grade`; the basis printed on every gate line; the blanket
+"the bar above is REALISED-only" caveat — stale since the fold shipped (I12)
+— replaced by a per-book census naming only candidates whose series could
+not decide. `DATABASE_URL` is bridged from `DATABASE_PUBLIC_URL` at import,
+because the task exports only the latter and `bot_pnl_store` snapshots the
+former — without it the fold would have graded realised under the job's own
+invocation and said nothing. **The fetch is SCOPED** (`mtm_for`): worse-of-both
+cannot pass a failing book, so the series is pulled only for books clearing
+every evidence bar — the first run appeared to time out at ten minutes, and
+the scope is exact; but **the timeout was not the fetch (3.4 s for the taker's
+9,986 samples) — it was §3 below, CORRECTED IN PLACE per I12** the same night.
+
+Pinned in `tests/test_review_currency.py` (+9 tests, publisher-built payloads
+via `fleet_risk.cohort_view` / `golive_readiness.mtm_drawdown`, wiring pinned
+by AST): **8 of 8 mutations red** across three rounds, including the
+hand-rolled-copy-instead-of-delegating and the fold-never-fed shapes.
+
+**Declared, not fixed:** `bot_state_history` compacts `cohorts` to a LIST
+(`[n, budget, light]`) where the live payload is a dict, so
+`fleet_bus.cohort_long_state` cannot read history and any historical cohort
+analysis silently degrades to the pooled read (measured: a first pass read
+0 of 1,992 samples blocked because the accessor fell through). Consumers read
+`bot_state`, not history, so no veto is affected. **Also declared: the
+scheduler did not fire on 7 or 8 Sep** — every scheduled task ran in one
+catch-up burst at 05:45Z (15:45 AEST) today, so there is no evidence review
+for those two days and five jobs shared the tree for an hour.
+
+**3 · THE REVIEW STALLED THE FLEET'S PUBLISHES THREE TIMES TODAY, and the
+"timeout" above was the symptom.** With psycopg2's default (autocommit off)
+the review's first SELECT opened a transaction that was never committed, so a
+read-only script held ACCESS SHARE on `bot_pnl` and `paper_trades` for its
+whole run. `bot_pnl_store._ensure_table` runs `ALTER TABLE bot_pnl ADD COLUMN
+IF NOT EXISTS pnl_daily` on EVERY process start, read paths included — and
+once `DATABASE_URL` was bridged, the grader's lazy `experiment_judge` import
+(`fleet_bus.living_pair_default` → `fetch_bot_pnl`) ran that ALTER on a
+SECOND connection of the same process. It queued behind the first, and
+**every bot's `INSERT INTO bot_pnl`, the dashboard's reads and
+`bot_equity_history` queued behind the ALTER's pending exclusive request.**
+Measured in `pg_stat_activity` at 12:41Z: **13 backends waiting, blockers =
+this script's own two pids**; in `bot_state_history`: every key silent
+**06:04–06:17Z, 06:17–06:43Z and 12:40–12:43Z — both real-money rows' in-loop
+`:equity` snapshots included, i.e. the live trading loops sat in `publish()`
+for up to 26 minutes.** Zero live closes fell inside those windows
+(`paper_trades`), so nothing on the record was missed; positions were
+unmanaged for that time and that is the exposure, stated plainly. Found by
+`faulthandler.dump_traceback_later` on the hung run (no py-spy here) and
+confirmed by `pg_blocking_pids`. **Fixed on the review side:** `connect()` is
+autocommit with `SET lock_timeout='5s'` and
+`idle_in_transaction_session_timeout='60s'`, and `_harden_store_session` puts
+the same `lock_timeout` on the store's session so the review's own ALTER can
+never queue the fleet behind anyone else either. 3/3 mutations red. With the
+lock gone the review runs in **17 seconds**. **The store-side class stays
+OPEN** and is carried in HANDOFF
+(`store-ensure-table-alter-on-every-start-stalls-the-fleet`): any long-lived
+reader anywhere re-creates the stall through any organ process that starts.
+That is the general finding — a DDL-on-every-start in a shared publisher
+turns one idle transaction into a fleet-wide outage — and it belongs in the
+publisher, deployed with the live markers, not patched at midnight from a
+job that may not deploy.
+
+Main only, NOT pushed: the daily task may not push. Three commits sit on local
+`main` rebased onto `origin/main`; push after `audit_changelog_letters`.
+**[RENUMBERED (zi) -> (zn) -> (zq) at push time** — (zn) was taken on main by PR #298 (cited from `experiment_judge.py`) while this sat unpushed; — three concurrent sessions took
+(zi), (zj), (zl), (zm) on main while this ran; the commit subjects keep (zi),
+which is exactly why the headers here are the index and `git log` is not.]
 
 ## 2026-09-09 (zp) — THE PRE-REGISTERED REGIME VETO SAID `CONFIRMED` ON A BOOK WHERE ITS TREATMENT HAD ZERO VARIANCE: veto-vs-pass was shorts-vs-longs, and the rule could not tell the difference
 
