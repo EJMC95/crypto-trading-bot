@@ -3324,12 +3324,45 @@ def main(_ctx=None, once=False):
                 # documented as 1.00x, with a -10% stop underneath it. Expanding
                 # a real-money book past its own equity is a LEVERAGE decision,
                 # and I22 is explicit that leverage adds no decidability and is
-                # admissible only as the output of a measured vol target, which
-                # this book does not have. So the brain may SHRINK Avo and not
-                # grow it — the same `min(1.0, ...)` shape as `live.clip_scale`,
-                # and the same reason. Its expand side is an operator/gate
-                # decision, not a bus read. 💸 the Farmer keeps BOTH directions:
-                # it has a real notional cap and, since (sp), a rail that TRIMS.
+                # admissible only as the output of a measured vol target. So the
+                # brain may SHRINK a live book and not grow it — the same
+                # `min(1.0, ...)` shape as `live.clip_scale`, and the same
+                # reason. Its expand side is an operator/gate decision, not a
+                # bus read. 💸 the Farmer keeps BOTH directions: it has a real
+                # notional cap and, since (sp), a rail that TRIMS.
+                #
+                # [2026-09-09 (zi)] THE STATED REASON WAS STALE AND THE REFUSAL
+                # IS STILL RIGHT — corrected in place per I12, because a
+                # safety comment that misdescribes its own justification is the
+                # thing this file's own rules keep paying for.
+                #
+                # It read "...a measured vol target, which THIS BOOK DOES NOT
+                # HAVE", and described 🙏 avo at ~$63 equity, clip $15.70, cap
+                # $200 — a geometry neither live book has run for weeks. Both
+                # publish `leverage.vol_target_here` every loop now, so the
+                # precondition the sentence named as missing is MET, and a
+                # reader checking it would conclude the refusal had expired.
+                #
+                # It has not. Measured 9-Sep at each book's OWN geometry, on
+                # the brain's OWN published opinion (1.5x on both twins'
+                # only tag):
+                #
+                #   🙏 avo  clip $147.00 -> $220.50 · gross 2.00x -> 3.00x eq
+                #           all-slots-stop 20.0% -> 30.0%  (+15.0pp over the bar)
+                #   👩 mum  clip $238.54 -> $357.81 · gross 5.00x -> 7.50x eq
+                #           all-slots-stop 20.0% -> 30.0%  (+15.0pp over the bar)
+                #           and full gross $4,293.72 BREACHES her own $3,005.67
+                #           notional cap by $1,288
+                #
+                # So the expand is refused for a reason SPECIFIC TO EACH BOOK
+                # rather than inherited from avo's old shape: both already sit
+                # at 1.33x the 15% drawdown bar at brain 1.0x, and 1.5x takes
+                # them to 2x it. The refusal is what holds that line. Whether
+                # 20% is the right resting place is a RISK-APPETITE question
+                # and Eamon's ((sr): "the code's job is the arithmetic,
+                # published") — `all_slots_stop_over_bar_pp` and
+                # `vs_vol_target` publish it every loop since (yz), so it is
+                # readable rather than re-litigated.
                 #
                 # (2) **A REDUCE MUST MAKE THE BOOK SMALLER, NOT RETIRE IT.**
                 # The floor below is $5 against a $15.70 clip, so any rung at
