@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-09 16:11 Sydney (06:11Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 22:31 Sydney (12:31Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -89,8 +89,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (2 commit(s))
+## Shipped today (4 commit(s))
 
+- `c02c9b1` (zn) CodeQL: math.isfinite in place of the need != need NaN idiom
+- `245f03b` (zn) a candidate that narrows its own arm gets the clock its own rate says it needs -- bounded, re-derived every cycle, never on a hunch
 - `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
 - `5059cbc` (yx)(yy)(yz)(zh) 24h review: a red main nobody was shown, an uninterpretable refusal count, a drawdown bar that meant something different on every row, and the guard for tests that import what CI lacks (#292)
 

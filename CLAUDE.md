@@ -1150,6 +1150,22 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   swept-CLEAN ((kw), I4). `books` membership itself is unchanged — that
   contract did not move. An era move voids every previously reported date for
   that book; consumers re-derive each publish, never cache.
+  **[9-Sep (zi)] THE RATE'S DENOMINATOR STARTS AT THE BOOK'S FIRST IN-ERA
+  OPEN — corrected in place per I12, because "rate over ERA AGE" above was
+  true and no longer describes the grader.** (la) needed ONE HOLDING PERIOD in
+  the denominator and used the era boundary as its stand-in; on 🙏 avo's LIVE
+  arm the era was a family-wide date (17-Jul) from **27.5 days before the row
+  became the live arm** (13-Aug), so `rate_cpd` read 0.33/day against her own
+  1.00/day and her `closes`-bound ETA sat five weeks late (15-Oct → ~27-Sep).
+  The first open IS (la)'s quantity, measured: `era ≤ open ≤ close` by
+  construction, so the open→close hold stays inside the denominator and the
+  TRAILING stall (last close → now, the one the doctrine measured) is
+  untouched. Published beside the rate — `rate_basis` / `rate_since` /
+  `rate_basis_days` / `rate_lead_in_days` — so the credit is visible, never
+  absorbed. Exactly one date moved the day it shipped, the real-money one;
+  `window`-bound books (👩 mum) are immune by construction, the (kz) case.
+  ENFORCED BY: `scripts/golive_readiness.py::first_era_open`,
+  `tests/autonomy/test_horizon_rate_denominator.py::test_la_is_preserved_a_holding_book_is_not_graded_from_its_first_close`
 - `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
   market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA

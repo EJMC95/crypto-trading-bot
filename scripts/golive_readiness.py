@@ -434,6 +434,49 @@ def _era_parse(parse=None):
     return _p
 
 
+def first_era_open(scoped_rows, parse=None):
+    """-> datetime of the EARLIEST in-era OPEN in `scoped_rows`, or None.
+
+    THE ONE OWNER of the rate denominator's start (zi). `scoped_rows` is
+    `era_rows(..., detail=True)["scoped_rows"]` — full rows, `r[3]` the open
+    stamp.
+
+    It is a `min()` over the column and never `rows[0]`, because those rows
+    are ordered by CLOSE: a book that HOLDS can close a later-opened trade
+    first, which is not an edge case here — every basket book does it at every
+    rebalance, and 🌾 carry's 65-70h holds overlap by construction. Reading
+    `rows[0][3]` would have been right for a serial book and quietly wrong for
+    most of this fleet.
+
+    FAIL-SAFE, and in the direction that costs a projection rather than
+    fabricating one: a row whose open cannot be read is SKIPPED (never coerced
+    to 0.0 — an epoch-0 open would hand the rate a 56-year denominator and
+    read every book as dead), and no readable open at all returns None, which
+    `gate_horizon` reads as "keep the pre-(zi) base".
+    """
+    from datetime import datetime, timezone
+    p = _era_parse(parse)
+    best = None
+    for r in scoped_rows or ():
+        if not (isinstance(r, (list, tuple)) and len(r) > 3):
+            continue
+        try:
+            ts = p(r[3])
+        except Exception:             # noqa: BLE001 — unreadable stamp: skip
+            continue
+        if ts is None or not isinstance(ts, (int, float)) \
+                or not math.isfinite(ts):
+            continue
+        if best is None or ts < best:
+            best = ts
+    if best is None:
+        return None
+    try:
+        return datetime.fromtimestamp(best, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # STAMP-DERIVED POLICY BOUNDARIES [2026-08-04 (jf)]
 # ---------------------------------------------------------------------------
@@ -2395,7 +2438,8 @@ def roster_admits(updated_at, now, max_age_h=48.0):
         return False
 
 
-def gate_horizon(s, first_close=None, era_epoch=None, now=None):
+def gate_horizon(s, first_close=None, era_epoch=None, now=None,
+                 first_open=None):
     """-> the horizon dict for one era-scoped sample. Pure and offline.
 
     s           stats() output (post apply_mtm) for the ERA-SCOPED sample.
@@ -2403,6 +2447,13 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     era_epoch   epoch float of the era boundary, for the window FLOOR when the
                 book is too thin to have a rate (carry: era 31-Jul -> 30-Aug).
     now         injected for determinism in tests; defaults to UTC now.
+    first_open  datetime of the first in-era OPEN — the RATE denominator's
+                start when it is well-formed (`era <= open <= close`). See
+                (zi) at the rate block: (la)'s quantity is one holding
+                period, and this measures it instead of assuming it from a
+                boundary that can predate the arm's working life. Omitted or
+                malformed ⇒ the pre-(zi) `min(first_close, era_epoch)` base,
+                unchanged. Never touches the WINDOW floor, which is calendar.
 
     Verdicts (each one earns its keep in _selftest):
       ready        all six bars pass today — go-live stays an operator act.
@@ -2430,7 +2481,16 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
            # behind it. Declared in the DEFAULTS so every early-return path
            # carries the keys — a consumer must never have to infer the basis
            # from a key's absence (the I6 shape: an absence is not evidence).
-           "t_basis": "iid", "n_eff": None}
+           "t_basis": "iid", "n_eff": None,
+           # [(zi)] and the same rule for the RATE's denominator, which was
+           # the one number behind every projected date that a reader could
+           # not see: which instant it starts at, how many days long it is,
+           # what chose that instant, and — when the first in-era open did —
+           # how much era lead-in the book was credited. Published, never
+           # absorbed: a book starving before its first in-era open shows the
+           # credit in `rate_lead_in_days` instead of hiding it in the rate.
+           "rate_basis": None, "rate_since": None, "rate_basis_days": None,
+           "rate_lead_in_days": None}
 
     def _floor_eta():
         """Window FLOOR from the first close (preferred) or the era epoch."""
@@ -2508,17 +2568,79 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     # would read 2-3x its true throughput, on the fleet's ONLY go-live
     # candidate, published as a confident `on_track` date. Same I1 argument
     # as close-span vs age: the denominator must contain the quiet part.
+    #
+    # [2026-09-09 (zi)] AND THE QUANTITY (la) NEEDED IS ONE HOLDING PERIOD,
+    # WHICH THE LEDGER MEASURES — the era epoch merely bounds it. Read (la)'s
+    # own words: "a book that HOLDS necessarily takes one holding period to
+    # produce its first in-era close". The FIRST IN-ERA OPEN *is* that
+    # quantity, measured on the book's own first trade instead of assumed
+    # from a boundary that may predate the book's working life by weeks.
+    # By construction `era_start <= first_open <= first_close` (the era is
+    # keyed on the OPEN), so this base sits BETWEEN the two options (la)
+    # weighed and keeps its protection in full: the open→close wait is still
+    # inside the denominator.
+    #
+    # MEASURED on the live payload the day this shipped — 🙏 avo's LIVE arm,
+    # REAL MONEY. Her era is `{since: 2026-07-17, source: declared}`, the
+    # family-wide accrual date, but this row did not become the live arm
+    # until 13-Aug and its first close is 22.3d old. So 27 of the 54.2d
+    # denominator were days on which the arm held no capital and could not
+    # have closed anything: `rate_cpd` read 0.33/day where her own row
+    # published 1.00/day over 7 days, and the `closes` bar — the one that
+    # BINDS her — projected 2026-10-15 against her own ~12d. Three organs,
+    # three rates, 3x apart, with the calendar built on the slowest.
+    #
+    # WHAT THIS DOES **NOT** TOUCH, because it is the stall the doctrine
+    # actually measured: the TRAILING gap. The denominator still ends at
+    # `now`, so a book that stops closing still dilutes its own rate exactly
+    # as before (dad's span-rate read 2.2x its age-rate after a 7-11d stall —
+    # that stall is between the LAST close and now, and is untouched). Only
+    # the LEAD-IN gap moves, and a lead-in gap is bounded by the book's first
+    # trade. It is PUBLISHED (`rate_lead_in_days`) rather than absorbed, so a
+    # book that is genuinely starving before its first in-era open shows the
+    # credit it was granted instead of hiding it (I6/I23: the decider must
+    # publish the quantity it decided on).
+    #
+    # FAIL-SAFE INTO THE OLD BEHAVIOUR: a missing, junk, or out-of-order open
+    # (after the first close, or before the era boundary — neither is
+    # constructible from `era_rows`, so either means the caller passed
+    # something else) falls back to `min(first_close, era_epoch)` exactly.
+    # The change can only ever act on a well-formed reading.
     rate_base = fc
+    era_dt = None
     if isinstance(era_epoch, (int, float)) and math.isfinite(era_epoch):
         try:
-            _e = datetime.fromtimestamp(era_epoch, tz=timezone.utc)
-            if _e < rate_base:
-                rate_base = _e
+            era_dt = datetime.fromtimestamp(era_epoch, tz=timezone.utc)
         except (OverflowError, OSError, ValueError):
-            pass                      # junk epoch: keep the first-close base
+            era_dt = None             # junk epoch: keep the first-close base
+    if era_dt is not None and era_dt < rate_base:
+        rate_base = era_dt
+    fo = first_open if isinstance(first_open, datetime) else None
+    if fo is not None and fo.tzinfo is None:
+        fo = fo.replace(tzinfo=timezone.utc)
+    # The era is the FLOOR on the base when one is declared (an in-era open
+    # cannot precede its era; one that does is not from `era_rows`). With NO
+    # era there is no floor: the first open is simply where the book's working
+    # life began, and using it there moves the rate in (la)'s own direction —
+    # the open→close hold joins the denominator (measured −1% or less on the
+    # six undeclared-era books the day this shipped). `fo <= fc` refuses a row
+    # set whose first open post-dates its first close in either case.
+    if fo is not None and (era_dt is None or rate_base <= fo) and fo <= fc:
+        # the credit is against an ERA; with none declared there is nothing
+        # to credit and the field says so rather than printing a negative.
+        out["rate_lead_in_days"] = _fin(
+            (fo - rate_base).total_seconds() / 86400.0, 2) \
+            if era_dt is not None and rate_base is era_dt else None
+        rate_base = fo
+        out["rate_basis"] = "first-open"
+    else:
+        out["rate_basis"] = "era" if rate_base is era_dt else "first-close"
+        out["rate_lead_in_days"] = None
     rate_age_d = (now - rate_base).total_seconds() / 86400.0
     rate = n / (rate_age_d if rate_age_d > 0 else age_d)
     out["rate_cpd"] = _fin(rate, 2)
+    out["rate_since"] = rate_base.date().isoformat()
+    out["rate_basis_days"] = _fin(rate_age_d, 1)
 
     mean = s.get("mean_pct")
 
@@ -4580,7 +4702,9 @@ def main():
                 hz_f = gate_horizon(
                     apply_mtm(s, mtm_drawdown(equity_series(bot))),
                     first_close=(parsed[0][2] if parsed else None),
-                    era_epoch=_era_ep)
+                    era_epoch=_era_ep,
+                    first_open=first_era_open(ed.get("scoped_rows") or [],
+                                              parse=parse_ts))
             except Exception:      # noqa: BLE001
                 hz_f = {"verdict": None, "why": "horizon unavailable"}
             # [(ld)] Below-floor books are docket candidates too — 📊
@@ -4680,7 +4804,10 @@ def main():
         # lost projection; a crashed grader is a lost gate.
         try:
             hz = gate_horizon(s, first_close=(parsed[0][2] if parsed else None),
-                              era_epoch=_era_ep)
+                              era_epoch=_era_ep,
+                              first_open=first_era_open(
+                                  ed.get("scoped_rows") or [],
+                                  parse=parse_ts))
         except Exception as e:      # noqa: BLE001
             hz = {"verdict": None, "why": f"horizon error: {e}"}
         # [(ld)] Docket input. ERA AGE, never `s["days"]` — (lb) established
