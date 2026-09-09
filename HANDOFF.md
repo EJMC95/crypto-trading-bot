@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-08 17:01 Sydney (07:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 12:20 Sydney (02:20Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -91,7 +91,7 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 ## Shipped today (1 commit(s))
 
-- `45ff703` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
+- `8e15d6a` (zi) The go-live t bar and its own cluster read disagree on exactly the two books holding real money, and nothing said so
 
 ## How this file stays honest
 
