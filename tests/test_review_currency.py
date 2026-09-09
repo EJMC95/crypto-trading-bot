@@ -634,6 +634,80 @@ def test_a_cohort_reading_degrades_exactly_as_the_veto_does(risk_payload):
 
 
 # ---------------------------------------------------------------------------
+# 5c. THE GATE FOLDS THE MTM DRAWDOWN THE WAY THE GRADER DOES (I9).
+#
+# INCIDENT (9-Sep). `gate_status` graded on `stats()` alone — realised-only —
+# while the canonical grader has folded the MTM equity series (worse of both)
+# since (ia)/(iz). Measured on the fleet's first READY book: the review printed
+# 🎫 the taker at maxDD 2.5% beside a published 4.6% with basis `mtm`. Same
+# bar, two answers — and the missing half is the one that flips verdicts
+# (⚖️ Counterweight passed realised 0.2% while −$15 MTM, (ia)).
+#
+# Per (hj): the MTM read is built by the grader's OWN `mtm_drawdown`, and the
+# wiring — not just the function — is pinned, because a function that folds
+# correctly and a call site that never hands it a series look identical from
+# the report ((po)).
+# ---------------------------------------------------------------------------
+def _equity_series(n, top, bottom):
+    import datetime as dt
+    t0 = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    half = n // 2
+    eqs = ([1000.0 + (top - 1000.0) * i / max(1, half - 1) for i in range(half)]
+           + [top - (top - bottom) * i / max(1, n - half - 1) for i in range(n - half)])
+    return [(t0 + dt.timedelta(hours=i), e) for i, e in enumerate(eqs)]
+
+
+def test_the_gate_folds_the_mtm_drawdown_the_way_the_grader_does():
+    er, g = _import_both()
+    rows = _mk([0.02] * 40)                       # every bar passes on realised
+    status, why, s = er.gate_status(rows)
+    assert status == "pass" and s["maxdd_basis"] == "realised", (status, why)
+    assert "(realised)" in why, why
+    # a 20% peak-to-trough MTM hole, thick enough for the grader to decide
+    mtm = g.mtm_drawdown(_equity_series(300, 1100.0, 880.0))
+    assert mtm["n"] >= g.MTM_MIN_SAMPLES and mtm["days"] >= g.MTM_MIN_DAYS
+    status2, why2, s2 = er.gate_status(rows, mtm)
+    assert status2 == "fail" and "maxDD" in why2, (status2, why2)
+    assert s2["maxdd_basis"] == "mtm"
+    assert s2["max_dd_frac"] >= 0.15
+    assert s2["max_dd_frac"] in (pytest.approx(mtm["max_dd_frac"]),
+                                 pytest.approx(mtm["max_dd_frac_peak"])), (
+        "the folded number must be the GRADER's MTM read, not a re-derivation")
+
+
+def test_a_thin_or_dark_series_degrades_to_realised_and_says_so():
+    er, g = _import_both()
+    rows = _mk([0.02] * 40)
+    thin = g.mtm_drawdown(_equity_series(6, 1100.0, 500.0))    # 60% hole, n=6
+    status, why, s = er.gate_status(rows, thin)
+    assert status == "pass" and s["maxdd_basis"] == "realised", (status, why)
+    assert "too thin" in (s.get("mtm_why") or ""), s.get("mtm_why")
+    status, why, s = er.gate_status(rows, g.mtm_drawdown([]))  # dark -> None
+    assert status == "pass" and s["maxdd_basis"] == "realised"
+
+
+def test_the_production_call_site_hands_the_gate_the_graders_own_series(
+        review_code):
+    """The wiring, not the function: the era-scoped `gate_status(rows, ...)`
+    call must build its second argument from `equity_series` through
+    `mtm_drawdown` — a fold that is never fed is a fold that never ran."""
+    import ast
+    tree = ast.parse(review_code)
+    hits = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "gate_status" and node.args
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "rows"):
+            hits.append(node)
+    assert hits, "no production gate_status(rows, ...) call site found"
+    for call in hits:
+        assert len(call.args) >= 2, "gate_status is called without an MTM read"
+        second = ast.unparse(call.args[1])
+        assert "mtm_drawdown" in second and "equity_series" in second, second
+
+
+# ---------------------------------------------------------------------------
 # 6. Arm drift must distinguish DIFFERENT CODE from a DIFFERENT FILE SET.
 #
 # (fd), 29-Jul: `build_compute` hashes only the `_BUILD_SHARED` names that

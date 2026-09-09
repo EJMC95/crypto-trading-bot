@@ -42,6 +42,14 @@ import re
 import statistics
 import sys
 
+# [2026-09-09] `bot_pnl_store` reads DATABASE_URL ONCE, at import. The daily
+# task exports only DATABASE_PUBLIC_URL (`connect()` accepts either), so the
+# MTM fold below — `equity_series` -> `fetch_state_history` — would read a
+# dark store and silently grade REALISED-only under the job's own invocation.
+# Bridge it here, before the first import that could snapshot it.
+if not os.environ.get("DATABASE_URL") and os.environ.get("DATABASE_PUBLIC_URL"):
+    os.environ["DATABASE_URL"] = os.environ["DATABASE_PUBLIC_URL"]
+
 # The ONLY bot_state key this script may write. See module docstring.
 REVIEW_KEY = "evidence-review"
 ALERTS_KEY = "fleet-alerts"
@@ -110,13 +118,13 @@ for _p in (_HERE, os.path.dirname(_HERE)):
 # count, so the review and the grader cannot disagree about the sample any more
 # than they can about the bars.
 try:                                     # run as a script (sys.path[0]=scripts/)
-    from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
+    from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES, apply_mtm, equity_series, mtm_drawdown,
                                   GOLIVE_MIN_DAYS, bar_map, book_payload,
                                   drop_retired_sleeves, era_rows, gate_horizon,
                                   grade, is_phantom_close, retired_sleeves,
                                   same_pair_overlaps, stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
-    from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
+    from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES, apply_mtm, equity_series, mtm_drawdown,
                                           GOLIVE_MIN_DAYS, bar_map,
                                           book_payload, drop_retired_sleeves,
                                           era_rows, gate_horizon, grade,
@@ -339,22 +347,35 @@ def tstat(vals):
     return round(statistics.mean(v) / (sd / len(v) ** 0.5), 2)
 
 
-def gate_status(rows):
+def gate_status(rows, mtm=None):
     """('pass'|'fail', reason, stats) for one book, per the CANONICAL gate.
 
     `rows` is [(pnl_pct, pnl_abs, closed_at_datetime)] oldest first — the shape
     `golive_readiness.stats` takes. All bars (>=30d, >=30 closes, mean>0, t>=2,
     both halves +, maxDD<15%) come from the imported grader; this function only
     formats. Win rate is REPORTED and is not a bar (CHANGELOG (fk)).
+
+    [2026-09-09] `mtm` is `mtm_drawdown(equity_series(bot))` — the grader's own
+    MTM read — and it is folded through the grader's own `apply_mtm` (worse of
+    realised and MTM, I9) BEFORE `grade`. Until today this graded on `stats()`
+    alone, i.e. realised-only, while the canonical grader has folded MTM since
+    (ia)/(iz): measured 9-Sep on the fleet's first READY book, this review
+    printed 🎫 the taker at maxDD 2.5% beside a published 4.6% (basis `mtm`).
+    Same bar, two answers — the "second copy of a rule" class, with the half
+    that can flip a verdict missing (⚖️ Counterweight passed realised 0.2%
+    while −$15 MTM, (ia)). `None` degrades to realised exactly as the grader
+    does, and the basis is printed so a realised-only line can never be read
+    as an MTM pass.
     """
-    s = stats(rows, book_usd=START_EQUITY)
+    s = apply_mtm(stats(rows, book_usd=START_EQUITY), mtm)
     passes, fails = grade(s)
     if s.get("n", 0) < 2:
         return "fail", s.get("why", "ungradeable"), s
     why = (f"n={s['n']}, {s['days']:.1f}d, mean {100*s['mean_pct']:+.3f}%, "
            f"t={s['t']:.2f}, halves {s['h1']:+.2f}/{s['h2']:+.2f}, "
            f"WR {s['win_rate']:.1%} (reported, not a bar), "
-           f"maxDD {100*(s['max_dd_frac'] or 0):.1f}%")
+           f"maxDD {100*(s['max_dd_frac'] or 0):.1f}% "
+           f"({s.get('maxdd_basis') or 'realised'})")
     return ("pass", why, s) if passes else ("fail", "; ".join(fails), s)
 
 
@@ -968,6 +989,7 @@ def scan_new_evidence(cur, errors):
                          ORDER BY 2 DESC""")
         cands = [r[0] for r in cur.fetchall()]
         passers, near = [], []
+        mtm_realised = []   # books whose maxDD bar could NOT fold MTM
         horizon_lines, horizon_tally = [], {}
         # [2026-08-16 (nk)] Which sleeves does each book still run? Straight
         # from the books' OWN bot_pnl payloads, the same source the grader
@@ -1033,7 +1055,12 @@ def scan_new_evidence(cur, errors):
             # canonical grader runs — so review and grader cannot disagree
             # about the sample any more than about the bars.
             rows, rows_all, era_iso = era_rows(bot, quads)
-            status, why, s = gate_status(rows)
+            # [2026-09-09] The MTM series is the grader's own read, folded
+            # by the grader's own rule — see `gate_status`. A dark history
+            # returns [] -> None -> realised, and says so in `maxdd_basis`.
+            status, why, s = gate_status(rows, mtm_drawdown(equity_series(bot)))
+            if s.get("maxdd_basis") != "mtm":
+                mtm_realised.append(f"{bot} ({s.get('mtm_why') or 'no series'})")
             # [2026-08-06 (ks)] GATE HORIZON — the hand calendar, computed.
             # The canonical `gate_horizon` (one owner, same doctrine as
             # bar_map/era_rows above: the review FORMATS, it never re-derives).
@@ -1136,11 +1163,18 @@ def scan_new_evidence(cur, errors):
         # started accruing an MTM series on 30-Jul; until ~30d exists the bar
         # stays realised-only. State it every run rather than let a reader take
         # a maxdd pass as an MTM pass.
-        if passers or near:
-            items.append("⚠️ maxdd caveat ((hl)): the bar above is REALISED-only; "
-                         "MTM drawdown can be materially larger and can flip the "
-                         "verdict. Re-grade any candidate under MTM once "
-                         "bot_state_history '<bot>:equity' has ~30d.")
+        # [2026-09-09] The bar above now folds MTM per book ((ia)/(iz), I9), so
+        # the blanket "REALISED-only" caveat this used to print was stale the
+        # day the fold shipped (I12). What remains true is per book: a book
+        # whose series was dark or too thin is graded realised-only and CAN be
+        # hiding an open drawdown — name those, and only those.
+        _lead = [x.split(" (", 1)[0] for x in passers + near]
+        _flag = [m for m in mtm_realised if m.split(" (", 1)[0] in _lead]
+        if _flag:
+            items.append("⚠️ maxdd caveat ((hl)): these candidates are graded "
+                         "REALISED-only because their MTM equity series could "
+                         "not decide — an open drawdown is invisible to that "
+                         "read and can flip the verdict: " + "; ".join(_flag))
 
     with Section(errors, "fleet-risk"):
         st, _ = load_state(cur, "fleet-risk")
