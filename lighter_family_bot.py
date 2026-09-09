@@ -2225,6 +2225,25 @@ MUM_LEVER_ATTRS = (("rsi_max", "RSI_MAX", float),
                    ("vel_hi", "VEL_HI", float))
 
 
+def consumable_lever_attrs(strategy):
+    """[(zj)] The subset of `MUM_LEVER_ATTRS` THIS carrier can actually take.
+
+    THE ONE OWNER, read by both `apply_book_levers` (which sets them) and
+    `lever_surface` (which reports them), so the row can never advertise a
+    lever the applier would not consume — they were two independent readings
+    of mum's attribute list, and on 🙏 avo they disagreed with reality in the
+    same direction: the surface published FOUR unregistered names while her
+    carrier can hold exactly ONE and the applier set none at all.
+
+    Keyed on the CLASS, never the instance: `apply_book_levers` mutates the
+    instance, so an instance-keyed read would report a knob as consumable
+    only after something had already written it.
+    """
+    cls = type(strategy)
+    return tuple((bar, attr, cast) for bar, attr, cast in MUM_LEVER_ATTRS
+                 if hasattr(cls, attr))
+
+
 def mum_env_defaults(strategy):
     """The ENV-DEFAULT values of mum's two knobs — re-read from the class's
     own definitions so a lever expiry reverts cleanly (never from mutated
@@ -2251,7 +2270,7 @@ def xp_prefix_for_arm(bot_id):
         return ""
 
 
-def lever_surface(prefix):
+def lever_surface(strategy, prefix):
     """[(yb), re-landed (yg)] WHAT THIS ARM'S LEVER SURFACE ACTUALLY IS — the
     half of the fix that stops the defect recurring SILENTLY.
 
@@ -2279,7 +2298,14 @@ def lever_surface(prefix):
     except Exception:  # noqa: BLE001
         out["registry"] = False
         return out
-    names = [prefix + bar for bar, _attr, _cast in MUM_LEVER_ATTRS]
+    # [(zj)] FROM THE CARRIER'S OWN CONSUMABLE SET, never from mum's
+    # attribute list. Derived from `MUM_LEVER_ATTRS` regardless of carrier,
+    # this told 🙏 avo's reader to register four names, three of which her
+    # carrier cannot hold and none of which the applier would have set — an
+    # instruction that names an object the operator cannot act on (I8).
+    attrs = consumable_lever_attrs(strategy)
+    out["consumable"] = [bar for bar, _attr, _cast in attrs]
+    names = [prefix + bar for bar, _attr, _cast in attrs]
     missing = [n for n in names if n not in getattr(_tuning, "LEVERS", {})]
     out["registry"] = True
     out["registered_n"] = len(names) - len(missing)
@@ -2296,7 +2322,18 @@ def apply_book_levers(strategy, prefix):
     moved levers. Only 👩 mum's carrier has these knobs; every other book is a
     no-op. Fail-OPEN: an image without fleet_tuning, or a dark rail, runs the
     env defaults — the operator's setting, never a stale overlay."""
-    if not hasattr(strategy, "RSI_MAX") or not hasattr(strategy, "MAX_HOLD_MIN"):
+    # [(zj)] PER-ATTRIBUTE, not all-or-nothing. This read `RSI_MAX and
+    # MAX_HOLD_MIN` and returned at the first miss, so 🙏 avo's carrier —
+    # which HAS `RSI_MAX` and not `MAX_HOLD_MIN` — consumed nothing, and her
+    # judge lane was structurally inert however many levers were registered.
+    # What the old guard was really protecting is preserved and is the reason
+    # this iterates `consumable_lever_attrs`: `mum_env_defaults` falls back to
+    # mum's own numbers for an attribute a carrier lacks, so touching a
+    # missing attr would INVENT a knob (a 1440-minute hold on a book with no
+    # time stop). Skipping it is the correct half of that guard; refusing the
+    # whole carrier was not.
+    attrs = consumable_lever_attrs(strategy)
+    if not attrs:
         return {}
     base = mum_env_defaults(strategy)
     moved = {}
@@ -2304,7 +2341,7 @@ def apply_book_levers(strategy, prefix):
         import fleet_tuning as _tuning
     except Exception:  # noqa: BLE001
         _tuning = None
-    for bar, attr, cast in MUM_LEVER_ATTRS:
+    for bar, attr, cast in attrs:
         val = base[bar]
         if _tuning is not None and prefix:
             try:
@@ -2727,7 +2764,7 @@ def family_publish_extra(b, mode, regime, t0):
             # defect instead of 38h of a judge lane that "set nothing".
             # Read through THEIR owner ((ye) `xp_prefix_for_arm`), never a
             # second resolution of the same string.
-            "levers": lever_surface(xp_prefix_for_arm(b.bot_id)),
+            "levers": lever_surface(b.s, xp_prefix_for_arm(b.bot_id)),
             **_control_extra(b), **_census_extra(b),
             **spend_extra(b, t0),
             **_census_series_extra(b, t0)}

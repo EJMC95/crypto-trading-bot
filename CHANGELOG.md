@@ -1,3 +1,330 @@
+## 2026-09-09 (zl) — "ABANDONED" MEANT BOTH "WE MEASURED IT AND IT LOST" AND "WE NEVER GOT ENOUGH CLOSES TO ASK", ON THE FLEET'S ONLY PATH TO MORE REAL MONEY
+
+**The 🧪 judge's serial lane is scarce and its clock is hard: `MIN_DAYS` 7,
+`MIN_CLOSES` 30 shadow / 10 live, `MAX_DAYS` 14 — and at 14 days it appended
+one verdict, `ABANDONED`, and pushed *"14d without clearing the bar"*,
+whatever the reason.** So a candidate that was measured and lost and a
+candidate whose sample never existed were **byte-identical in the record**.
+That is the (lv) ambiguity landing on the one mechanism that turns shadow
+evidence into real money, and it is the I17/(tz) split one level up:
+`unreachable` had to be separated from `underpowered` for BOOKS because a
+thin sample is not an exclusion. A candidate that starves its own arm is
+exactly that shape.
+
+**FOUND BY MEASURING THE RUNNING CANDIDATE, WITH THE LIVE ARM AS A CONTROL
+(I25 — a baseline that feels the same tide, never the window alone).**
+`mum-vel-12-20` (an RSI-velocity entry band on 👩 mum's shadow twin) at 39.1h:
+
+| arm | opens/day BEFORE | opens/day IN-EXPERIMENT | ratio |
+|---|---|---|---|
+| SHADOW (band ON) | 7.52 | **1.84** | **0.245** |
+| LIVE (control, no band) | 7.76 | 3.68 | 0.474 |
+
+The tape halved both arms; **the band halved the shadow AGAIN** (0.245/0.474 =
+**0.52**). And the projection could not see it, because it was computed on the
+wrong sample: `_eta_judgeable` sizes its terms from `_pair_power`'s trailing
+**14 days** — the rate the arm ran *before* this candidate narrowed its gate —
+so the pair published `eta_judgeable` **bound by `window` at 7.0d** with a
+`shadow_closes` term of **4.4d**. On the candidate's own rate the shadow arm
+needs **16.3d for its 30 closes, against a 14-day clock**. That ETA is not
+wrong for a PAIR; it is wrong for a CANDIDATE, because **a gate-narrowing
+candidate changes the very quantity the projection is built from.**
+
+**NOT AN EDGE CASE — THE QUEUE'S NORMAL CASE. Three of mum's four candidates
+change their own arm's close rate:** `vel-12-20` and `rsi-32` narrow the entry
+gate, `hold-2880` halves turnover. Only `hold-720` speeds it up. And `rsi-32`
+is the sharp one: at `rsi_max` 32.0 the shadow's own live scan of 102 coins
+reads `rsi_min` **33.3** — it admits **nothing** on today's tape, so it would
+sit at zero closes for 14 days and be recorded as *"14d without clearing the
+bar"*. It has already been voided once for an unrelated reason ((ye)).
+
+**SHIPPED — TWO HALVES, BOTH REPORT-ONLY:**
+* **`sample_horizon(ev, days)`** — the candidate's own sample horizon, attached
+  to `ev` on **every** cycle rather than only at expiry, so a starving
+  candidate is visible while it still has days left. Publishes per-arm rate,
+  `days_req`, the binding arm, `reachable`, and `verdict_if_expired`.
+  **FAIL-CLOSED toward keeping a candidate alive:** an arm below
+  `HORIZON_MIN_N` (3) is `reachable: None` — UNPROJECTABLE, never a `False`
+  that would read as a refutation, because a rate from two numbers is not a
+  rate; ZERO closes is the one downward-decidable case (`reachable: False`,
+  named); floors already met ⇒ `met: True` and no projection.
+* **`expiry_verdict(ev)`** — one owner for the name the clock writes.
+  `ABANDONED` is a RESULT (floors reached, bar not cleared); **`UNDERPOWERED`**
+  is the absence of one. **Fail-closed toward `UNDERPOWERED`, and that
+  direction is the whole safety of the split**: under-claiming a real negative
+  costs nothing (the candidate stands down and enters `done` either way) while
+  over-claiming one retires an idea on a verdict about a sample nobody took.
+
+**WHAT DID NOT MOVE, deliberately.** No bar, no lever, no control flow: an
+expired candidate still stands down, still cools down, still enters `done` —
+the lane is SERIAL, and a looping candidate is worse than a mislabelled one.
+`MAX_DAYS` is untouched. **The live reading today is that `mum-vel-12-20` is
+projected UNREACHABLE (16.3d needed, 14d clock) — so the standing question is
+Eamon's, not this entry's: extend the clock for gate-narrowing candidates,
+lower `MIN_CLOSES` for them, or accept that "be more selective" is a class this
+judge cannot grade.** Each is a policy act on the promotion path and owes its
+own measured price (I19). Stated with the number rather than taken.
+
+**THE MUTATION ROUND FOUND A DEFECT IN MY OWN TEST, which is what it is for
+(I3).** 13 mutations; 12 red, and **M7 — making the attach unreachable with
+`if False:` — SURVIVED**, because the wiring test was a substring scan and
+`if False: ev["horizon"] = _hz` leaves every character of the attach in the
+file. That is this repo's own rule (*a page-wide substring scan is not a
+structural claim*) and the same vacuous-guard shape (zk) recorded two entries
+ago. Re-asserted on the AST: the innermost `If` whose **direct body** holds the
+assignment must test `_hz is not None`. 13/13 red after.
+
+**AND THE HARNESS LIED TWICE BEFORE IT TOLD THE TRUTH — recorded because both
+faults are documented traps this file already carries.** Round 1 reported
+**10 of 10 mutations SURVIVED**: `echo "$out" | grep -q` under `pipefail`, the
+exact inversion CLAUDE.md documents — `grep -q` exits at the first match,
+SIGPIPEs the producer, and the pipeline status turns a successful match into a
+miss. Round 2 replaced the pipe with `case` and reported **11 of 11 SURVIVED**:
+the pattern was `*failed*` and pytest prints `FAILED`, while `tail -4` captured
+only those uppercase lines and never the lowercase summary — a check matching
+nothing, reporting clean, and clean read as evidence ((po), third costume).
+**THE RULE THAT COMES OUT OF IT: key a mutation round on the runner's EXIT
+CODE, never on scraped text** — and a mutation round that reports 100%
+survival is reporting a broken harness, not a weak guard.
+
+Verified: judge `--selftest` OK, full suite green, `audit_deploy_coverage` OK
+(`experiment_judge.py` is on the `freqtrade-bots` push path, so this ships on
+merge). **Main-only, no live marker: it moves no trade, no lever and no
+real-money value** — the (mm) rule, stated as required.
+
+## 2026-09-09 (zj) — 🙏 AVO'S JUDGE LANE WAS INERT BY ONE MISSING ATTRIBUTE, AND HER ROW ADVERTISED FOUR LEVERS TO FIX IT — THREE OF WHICH HER CARRIER CANNOT HOLD
+
+**Carried since 6-Sep as `avo-judge-lane-declared-but-not-lever-capable` (I11:
+carried work outranks new work), and still true this morning** on the fleet's
+second real-money book — the one currently up **+$126.97 (+29%)**.
+
+**TWO DEFECTS, one cause: `apply_book_levers` and `lever_surface` were two
+independent readings of MUM's attribute list, neither of which had ever asked
+the carrier anything.**
+
+* **The applier guarded `RSI_MAX and MAX_HOLD_MIN` and returned at the first
+  miss.** `SwingDip` has `RSI_MAX = 42.0` and **no `MAX_HOLD_MIN`**, so 🙏
+  avo's arm consumed **nothing**, however many levers were registered. The
+  registered-but-inert shape I18 exists to prevent — one namespace over from
+  `(ye)`, found by the surface `(yg)` built to find it.
+* **The surface derived its names from `MUM_LEVER_ATTRS` with no reference to
+  the carrier at all**, so her row published `unregistered: [rsi_max,
+  max_hold_min, vel_lo, vel_hi]` — an instruction to register **four** names,
+  **three of which `SwingDip` can never hold** and none of which the applier
+  would have set. A detector must name an object the operator can act on (I8);
+  this named three that do not exist.
+
+Because both derived from the same wrong source, they could disagree with
+reality in the same direction and **never with each other** — which is why
+this survived a dedicated lever-surface entry.
+
+**SHIPPED: `consumable_lever_attrs(strategy)`, the ONE owner both now read** —
+the subset of `MUM_LEVER_ATTRS` the carrier's CLASS actually defines. Keyed on
+the class, never the instance: `apply_book_levers` mutates the instance, so an
+instance-keyed read would report a knob as consumable only after something had
+already written it (mutation-verified).
+
+**WHAT THE OLD GUARD WAS REALLY PROTECTING IS PRESERVED, and it is the reason
+this filters rather than simply dropping the check.** `mum_env_defaults` falls
+back to *mum's own numbers* for an attribute a carrier lacks, so touching a
+missing attr would **INVENT a knob** — a 1440-minute hold on a book with no
+time stop. Skipping the attribute is the correct half of that guard; refusing
+the whole carrier was not.
+
+**EXPECTANCY PRICE: ZERO, MEASURED ON EVERY LIVING CARRIER.** mum keeps all
+four (identical); 🙏 avo resolves `xp.avo.rsi_max`, which is unregistered, to
+her own default **42.0 — the value she already ran**; 🔮 georgia v3 holds
+`MAX_HOLD_MIN` but is nobody's judged arm (`xp_prefix_for_arm` → `""`) so she
+stays a no-op and cannot pick up a neighbour's namespace. **No book gains a
+knob and no value moves** — pinned by a test that drives the real carriers
+against the shipped registry.
+
+**HER ROW NOW READS HONESTLY:** `consumable: ["rsi_max"], registered_n: 0,
+unregistered: ["xp.avo.rsi_max"]` — **one actionable name instead of four
+fictional ones** — and her lane is MECHANICALLY CAPABLE, so registering that
+lever is a one-line act rather than a rewrite.
+
+**AND THE REGISTRATION IS DELIBERATELY NOT IN THIS ENTRY — a refusal with
+evidence (the un-amendable core, and `(vd)`'s "say what it WOULD take").** A
+cage must fit a measured value, and there is no measurement to fit:
+`(qu)` asked her entry exit-free over **1,156 signals / 475d / 23 coins** and
+**0 of 21 cells survive BH at FDR 0.05**; her own arms hold **n=18 live /
+n=34 shadow**. A dose-response on `rsi_max` cannot be estimated from either, so
+any `lo`/`hi` I wrote today would be the "lever set on a hunch with no number"
+the doctrine names. **What it would take:** her exit-free signal test re-run at
+several `rsi_max` cells on the CURRENT tape, with a random-entry null (I14/hm)
+and a permutation across cells to price the selection (`(uz)`'s ~1.85 t-unit
+premium) — an instrument, not a guess, and its own pass.
+
+**THE READ-TRIGGER SWEEP, run in the same pass because `(yo)` cost this fleet a
+read that fired 3.5 weeks early with nothing watching:** every pre-registered
+row whose criterion is *"n≥X **or** DATE, whichever first"* was measured
+against the live ledger. **None has tripped** — mum-rho 3/30 fresh days ·
+mum-halt-cost **0/5** halt events (no daily-loss halt since 3-Sep) ·
+avo-slot-6 0/10 · counterweight 21/60 (upper bound) · mum-noncrypto-sleeve
+**6/10** entry days (the closest, up from 4). 🔮 georgia v1's is date-only and
+due **tomorrow, 10-Sep**.
+
+**Main only** (`(mm)`): it changes no trade any book takes, so it buys no
+measured edge and rides the next deploy that earns one rather than restarting
+two real-money containers. Pinned by
+`tests/autonomy/test_carrier_consumable_levers.py` (11 tests), **5/5 mutations
+RED**: the all-or-nothing guard restored; the surface deriving from mum's
+attrs again; the owner reading the instance; the applier dropping the filter
+and inventing the missing knob; and a carrier's value silently moving. The
+class-closer is an AST assertion that **both** functions call the shared owner
+— a second derivation is how this arrived.
+
+
+## 2026-09-09 (zm) — THE GO-LIVE t BAR AND ITS OWN CLUSTER READ DISAGREE ON EXACTLY THE TWO BOOKS HOLDING REAL MONEY, AND NOTHING SAID SO
+
+**[RENUMBERED (zi) -> (zm) at push time.** A concurrent session's PR #297 —
+*"The expand refusal's stated reason had expired"* — carries its own `(zi)`, and
+both branches were open at once, so `audit_changelog_letters` passed on each:
+**it compares the working tree against `origin/main`, and neither entry was on
+main yet.** Both sides cite the letter twice from tracked code (theirs
+`lighter_avo_live_bot.py` + `scripts/session_state.py`; mine
+`scripts/golive_readiness.py` + this entry's test), so rule 3's "the CITED
+entry keeps the letter" does not separate them on count. **Moved anyway, and
+deliberately:** theirs is the one citing the REAL-MONEY host, and its whole
+subject is an I12 correct-in-place of a comment in that file, so its letter is
+load-bearing to its own record; mine is contained in two files this PR already
+touches. Recorded inline per rule 4 because `git log` subjects keep the old
+letter. **The gap this exposes is real and is NOT closed here:** the guard
+cannot see across OPEN pull requests, only against main — the same class was
+live on `(ze)` between #293 and #294 the same morning.**
+
+**Found by reading yesterday's own review back.** The (zg) health review reported
+👩 mum's published `t=2.01` beside a cluster-robust `t_cluster=1.45` and called
+it *"the grader being honest"*. It is — and the honesty stops one field short:
+nothing anywhere says the two bases **disagree about the verdict**.
+
+**MEASURED on the live payload, all 14 books carrying both statistics:**
+
+| book | n | iid `t` | cluster `t` | max_batch | |
+|---|---|---|---|---|---|
+| 👩 **mum LIVE** | 100 | **2.01 PASS** | **1.45 FAIL** | 8 | 💰 real money |
+| 🙏 **avo LIVE** | 18 | **2.65 PASS** | **1.86 FAIL** | 5 | 💰 real money |
+| the other 12 (all shadow) | — | — | — | ≤4 | **0 disagree** |
+
+**Two of fourteen, both real money, both PERMISSIVE** — the bar admits where the
+cluster-robust read of the same sample refuses. **It is not a coincidence and it
+names its own cause:** the LIVE arms carry a flatten (the daily-loss halt) that
+closes a whole basket in one instant, so they batch **8 and 5** legs where their
+paper twins batch 4. The iid `t` counts those legs as independent draws; the
+cluster read does not. *The books with the mechanism that breaks the iid
+assumption are exactly the books that hold money.*
+
+**WHAT THIS DOES NOT DO, AND THE RESTRAINT IS THE POINT: THE BAR DOES NOT MOVE.**
+`(ky)` published the cluster read beside `t` and deliberately left the gate on
+the iid value, saying why in the source — *"changing a go-live bar is a policy
+act, not a fix"*. That is still true and it is Eamon's call, exactly as `(yr)`
+left the peak-relative drawdown reported-not-a-bar. Moving it here would also be
+a **tightening on real money with no measured harm**, which I26 forbids: a lower
+statistic is uncertainty, not damage.
+
+**WHAT WAS MISSING is that the disagreement was INVISIBLE.** To notice it a
+reader had to hand-compare `t` against `cluster.t_cluster` **and** know which
+basis the bar used — and the basis is stated only in a source comment. That is
+the `(lv)` `{open: 0}` ambiguity sitting on **the gate that governs real money**,
+and it is why this went unremarked through every prior grade.
+
+**SHIPPED:** `golive_readiness.t_bar_bases` → `books.<bot>.t_bar`, publishing
+`basis` (the statistic `grade()` actually used, as DATA rather than a comment),
+both `t` values, `passes_iid` / `passes_cluster`, `agree`, and `permissive`.
+**`permissive` is deliberately ASYMMETRIC**: a book the bar REFUSES while the
+cluster read would pass stays on paper and costs nothing; the reverse is the
+only direction that can put money behind a weaker number.
+
+**FAIL-CLOSED INTO SILENCE, never into a false agreement.** No cluster block, a
+non-finite or absent statistic, a degenerate single cluster, or clustering that
+found no batches at all (`n_clusters == n`, where the two numbers are identical
+by construction) all return `None`. Publishing `agree: true` for a book whose
+cluster read does not exist would be a fabricated reassurance about real money —
+the opposite of the point. 🌾 carry returns `None` today for exactly that reason
+(`max_batch: 1`).
+
+**MOVES NO MONEY, NO LEVER, NO BOT, AND NO VERDICT.** `grade()` and `BAR_NAMES`
+are byte-unchanged; re-running the shipped `grade()` over all 14 live books
+reproduces every `ready` verdict exactly. Publish-only, so **main only** per
+`(mm)` — it rides the next deploy that earns one, and restarts no real-money
+container.
+
+Pinned by `tests/autonomy/test_t_bar_basis_disagreement.py` (21 tests), **7/7
+mutations RED** — the load-bearing one being an **AST assertion that `grade()`
+never READS the cluster statistic**, so a later edit cannot silently re-spec the
+go-live bar behind a publish. Also red: a vacuous owner; a fabricated `agree`;
+`>` for `>=` at the boundary (a second copy of the bar's own rule, (hj));
+`permissive` losing its asymmetry; the field computed and never published; and a
+degenerate cluster compared anyway.
+
+**THE DECISION THIS HANDS EAMON, stated because publishing it is the whole
+value:** mum's live arm is `on_track` for **27-Sep**, and on that date she will
+be graded READY on an iid `t` her own cluster read does not support. Whether the
+bar should move to the cluster basis for books that batch is a gate re-spec —
+his, not mine — and it is now a number on the payload instead of a comparison
+nobody was making.
+
+
+## 2026-09-08 (zk) — MAIN WENT RED ON MY OWN NEGATIVE TEST: A DELIBERATE WRONG-ARITY CALL IS STILL A WRONG-ARITY CALL
+
+**[RENUMBERED (zh) -> (zk) at push time.** A concurrent session merged PR
+#292 to main while this branch was in flight, carrying its own `(zh)` — *A
+test may not import what CI does not install*. Both sides picked "next free"
+against an `origin/main` where the letter genuinely was free, which is
+exactly the stale-snapshot race the letter rule names, and
+`audit_changelog_letters`' cross-branch arm caught it on the PR rather than
+after the merge. **THIS SIDE MOVED, decided by citations and not by who
+pushed first:** their entry is cited from TRACKED CODE —
+`.github/workflows/changelog-check.yml:129` and `tests/test_selftests.py:493`
+— while mine was cited nowhere outside its own header, so moving theirs
+would break a workflow and a test while moving mine costs one line.
+(zj) is unaffected and keeps its letter; (ze)/(zf) are claimed
+by the still-open #293/#294, so (zk) is the next genuinely free letter.
+**[CORRECTED IN PLACE per I12: this said "(zi) and (zj) are unaffected and
+keep their letters", and (zi) did not — hours later the same morning it
+collided with PR #297's own (zi) and moved to (zm). A sentence asserting a
+letter is safe goes stale the moment another open branch claims it, which is
+this note's own subject.]**
+Recorded inline because `git log` subjects keep the OLD letter — the
+CHANGELOG headers are the reliable index, not the commit log.**
+
+**`(zg)` merged with CodeQL red, and the alert is correct.** The finding:
+
+> *Wrong number of arguments in a call — call to function `policy_stamp` with
+> too few arguments; should be no fewer than 5.*
+> `tests/autonomy/test_coin_veto_arm_parity.py:248`
+
+That line was **deliberate** — a 4-argument call inside `pytest.raises(TypeError)`
+proving the new `coin_veto` parameter is required. But nothing in the source says
+it is intentional, so a static analyser reads it as exactly what it is: a call
+with the wrong arity. **CodeQL was right and the test was the wrong shape.**
+`(yk)` already recorded that this repo's CodeQL findings "were both real"; this
+is a third, in a file that shipped hours earlier.
+
+**AND THE REWRITE IS STRICTLY STRONGER, which is why this is not a suppression.**
+`raises(TypeError)` only proves the parameter cannot be OMITTED. The hole `(zg)`
+closes is a host that stops ANSWERING — and **a default value re-opens it
+silently**: `coin_veto=True` would make every call site look compliant while
+asking nothing of either host, and the parity rung would compare two values
+neither host chose. The invariant is *required, and no default*, so the test now
+asserts it on `inspect.signature` directly.
+
+Mutation-verified RED, all three: `coin_veto=True` (a default); `*, coin_veto=False`
+(keyword-only, so no call site is forced to answer positionally); and the
+parameter removed from the builder entirely. The first is the one the old form
+would have caught by accident and the new one catches by name.
+
+**THE TRANSFERABLE RULE:** a negative test that *performs* the error it forbids
+is indistinguishable from the error. Assert the property on the signature, the
+AST or the type — never by making the wrong call and catching the exception,
+because the wrong call is still in the source and every static reader is
+entitled to believe it.
+
+**Moves no money, no lever, no bot** — a test file only, so it is main-only and
+carries no live marker.
+
+
 ## 2026-09-08 (zg) — THE COIN-QUALITY VETO RAN ON ONE ARM OF EVERY JUDGED PAIR, AND THE GUARD BUILT FOR THAT CLASS COULD NOT SEE IT
 
 **Eamon, 8-Sep: a health review of 👩 mum and her twin — *"Please fix"* on what

@@ -2357,6 +2357,160 @@ def _eta_judgeable(power, now, min_days=None, min_closes=None, live_min=None):
         return None
 
 
+#: [(zl)] the smallest in-window close count that can size a candidate's own
+#: rate. Below it the projection is UNPROJECTABLE, never optimistic: one close
+#: in six hours extrapolates to 4/day and would hide exactly the starvation
+#: this measures. Same floor discipline as `fleet_allocation.MIN_N` — a rate
+#: from two numbers is not a rate.
+HORIZON_MIN_N = int(os.environ.get("XPJ_HORIZON_MIN_N", "3"))
+
+
+def sample_horizon(ev, days, min_closes=None, live_min=None, max_days=None,
+                   min_n=None):
+    """WILL THIS CANDIDATE EVER GET A SAMPLE — at the rate IT is producing,
+    never the rate its arm ran before it started.
+
+    `_eta_judgeable` answers the same question for the PAIR and sizes its rate
+    from a trailing 14-day window, which is right for a standing pair and wrong
+    for a running candidate: **a candidate that narrows an entry gate changes
+    the very rate the projection is computed from.** Measured 9-Sep on
+    `mum-vel-12-20`, 39h in, with the live arm as the control that feels the
+    same tide (I25):
+
+        SHADOW (band on)   7.52 opens/day before  ->  1.84 in-experiment (0.245)
+        LIVE   (control)   7.76 opens/day before  ->  3.68 in-experiment (0.474)
+
+    The tape halved both arms; the band halved the shadow AGAIN (0.245/0.474 =
+    0.52). So the pair published `eta_judgeable` bound by `window` at 7.0d with
+    a `shadow_closes` term of 4.4d, while the candidate's own rate needs ~12d
+    for its 30 closes. That gap matters because `MAX_DAYS` is 14: a candidate
+    that starves its arm harder simply runs out of clock.
+
+    AND THE CLOCK'S VERDICT WAS AMBIGUOUS, which is the half with teeth.
+    `days >= MAX_DAYS` appended **ABANDONED** whatever the reason, so
+    "we measured it and it lost" and "we never got enough closes to ask" were
+    byte-identical in the record — the (lv) ambiguity on the fleet's ONLY
+    designed path to more real money, and the I17/(tz) shape one level up:
+    `unreachable` had to be split from `underpowered` for books for exactly
+    this reason. Three of mum's four queued candidates change their own arm's
+    close rate (`vel-12-20` and `rsi-32` narrow the gate, `hold-2880` halves
+    turnover), so this is the queue's normal case, not an edge.
+
+    FAIL-CLOSED, in the direction that keeps a candidate alive:
+      * fewer than `min_n` closes on an arm -> that arm's `days_req` is None
+        and `reachable` is None (UNPROJECTABLE) — never a number extrapolated
+        from noise, and never a `False` that would read as a refutation;
+      * ZERO closes is the one exception and the clearest answer there is:
+        the rate is 0, so no window suffices — `reachable: False`, named;
+      * floors already met -> `met: True` and no projection at all.
+    REPORT ONLY: nothing here promotes, abandons, or moves a lever. It names
+    the verdict the clock WOULD write (`verdict_if_expired`) so a reader can
+    see a starving candidate while it still has days left, rather than after
+    it has been recorded as refuted.  Never raises."""
+    mc = MIN_CLOSES if min_closes is None else int(min_closes)
+    lm = LIVE_MIN_CLOSES if live_min is None else int(live_min)
+    md = MAX_DAYS if max_days is None else float(max_days)
+    mn = HORIZON_MIN_N if min_n is None else int(min_n)
+    import math                       # local, exactly as `_pair_power` does
+    if not isinstance(ev, dict):
+        return None
+    try:
+        d = float(days)
+        if not math.isfinite(d) or d <= 0:
+            return None
+    except (TypeError, ValueError):
+        return None
+    try:
+        out = {"days_elapsed": round(d, 2), "max_days": md,
+               "min_n": mn, "rate": {}, "days_req": {}, "have": {}, "need": {}}
+        unprojectable, dead = [], []
+        for label, need in (("shadow", mc), ("live", lm)):
+            n = ev.get(f"n_{label}")
+            n = (int(n) if isinstance(n, int) and not isinstance(n, bool)
+                 else None)
+            out["have"][label], out["need"][label] = n, need
+            if n is None:
+                out["rate"][label] = out["days_req"][label] = None
+                unprojectable.append(label)
+                continue
+            out["rate"][label] = round(n / d, 2)
+            if n >= need:                       # this arm is already there
+                out["days_req"][label] = 0.0
+            elif n == 0:
+                out["days_req"][label] = None
+                dead.append(label)
+            elif n < mn:
+                out["days_req"][label] = None
+                unprojectable.append(label)
+            else:
+                out["days_req"][label] = round(d * need / n, 1)
+        out["met"] = all(isinstance(out["have"][k], int)
+                         and out["have"][k] >= out["need"][k]
+                         for k in ("shadow", "live"))
+        if out["met"]:
+            out.update(days_req_total=0.0, binding=None, reachable=True,
+                       verdict_if_expired="ABANDONED",
+                       why="both floors already met — the clock now measures "
+                           "the bar, not the sample")
+            return out
+        # Not sampled yet, so an expiry here is UNDERPOWERED, never a refutation.
+        out["verdict_if_expired"] = "UNDERPOWERED"
+        if dead:
+            out.update(days_req_total=None, binding=f"{dead[0]}",
+                       reachable=False,
+                       why=(f"the {'/'.join(dead)} arm has closed NOTHING in "
+                            f"{d:.1f}d — no window reaches the floor at a rate "
+                            f"of zero, so this candidate cannot be judged"))
+            return out
+        if unprojectable:
+            out.update(days_req_total=None, binding=f"{unprojectable[0]}",
+                       reachable=None,
+                       why=(f"the {'/'.join(unprojectable)} arm has fewer than "
+                            f"{mn} closes in {d:.1f}d — too few to size a rate, "
+                            f"so the horizon is UNPROJECTABLE rather than long"))
+            return out
+        binding = max(out["days_req"], key=lambda k: out["days_req"][k])
+        total = out["days_req"][binding]
+        out.update(days_req_total=total, binding=binding,
+                   reachable=bool(total <= md),
+                   why=(f"{total:.1f}d needed at this candidate's OWN rate "
+                        f"({', '.join(f'{k} {v}/day' for k, v in sorted(out['rate'].items()))}), "
+                        f"bound by {binding}; the clock stops at {md:g}d"))
+        return out
+    except Exception:  # noqa: BLE001
+        return None
+
+
+
+def expiry_verdict(ev, max_days=None):
+    """THE NAME THE CLOCK WRITES AT `MAX_DAYS`, and the reason — one owner,
+    so the branch cannot drift from the projection that fed it.
+
+    Returns `(verdict, why)`. `ABANDONED` is a RESULT: the arms reached their
+    sample floors and the candidate did not clear the bar. `UNDERPOWERED` is
+    the absence of one: the clock ran out before the sample existed, so
+    nothing about the idea was measured.
+
+    FAIL-CLOSED TOWARD `UNDERPOWERED`, deliberately, and this is the whole
+    safety of the split: an unreadable or missing horizon must never be
+    written down as a refutation that did not happen. Under-claiming a real
+    negative costs nothing here — the candidate stands down and enters `done`
+    either way — while over-claiming one retires an idea on a verdict about a
+    sample that was never taken."""
+    md = MAX_DAYS if max_days is None else float(max_days)
+    hz = (ev.get("horizon") if isinstance(ev, dict) else None)
+    met = bool(hz.get("met")) if isinstance(hz, dict) else False
+    if met:
+        return "ABANDONED", f"{md:g}d without clearing the bar"
+    need = None
+    if isinstance(hz, dict) and isinstance(hz.get("days_req_total"), (int, float)):
+        need = hz["days_req_total"]
+    return "UNDERPOWERED", (
+        f"{md:g}d without ever reaching the sample floors — NOT a refutation: "
+        f"nothing was measured"
+        + (f"; this candidate's own rate needed {need:.1f}d" if need else ""))
+
+
 def _epoch(now):
     """`now` as EPOCH SECONDS, whichever way a caller expresses it.
 
@@ -2937,6 +3091,15 @@ def run_once():
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
                           drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
+        # [(zl)] the candidate's OWN sample horizon, on EVERY cycle — not only
+        # at expiry. `eta_judgeable` sizes its rate from the pair's trailing
+        # 14d, which is the rate the arm ran BEFORE this candidate narrowed its
+        # gate; measured on `mum-vel-12-20` that overstated the shadow arm by
+        # 3.7x. REPORT ONLY: it moves nothing, and it is what lets a starving
+        # candidate be seen while it still has days left to run.
+        _hz = sample_horizon(ev, days)
+        if _hz is not None:
+            ev["horizon"] = _hz
         # ARM DRIFT -> HOLD, exactly as ARM SKEW below and for the same reason:
         # the comparison is structurally invalid, so no window fixes it and the
         # candidate is not at fault. Do not promote, do not age toward ABANDONED.
@@ -3043,15 +3206,30 @@ def run_once():
                                           "n_live": ev.get("n_live")},
                         note=f"PROMOTED {cand['name']}")
         if days >= MAX_DAYS:
-            verdicts.append({"name": cand["name"], "verdict": "ABANDONED",
+            # [(zl)] ABANDONED MEANS REFUTED — IT MUST NOT ALSO MEAN NEVER
+            # SAMPLED. This appended one verdict whatever the reason, so
+            # "we measured it and it lost" and "we never got enough closes to
+            # ask" were byte-identical in the record — on the fleet's ONLY
+            # designed path to more real money. It is the I17/(tz) split one
+            # level up: `unreachable` had to be separated from `underpowered`
+            # for books because a thin sample is not an exclusion, and a
+            # candidate that starves its own arm is the same shape. Three of
+            # mum's four queued candidates change their arm's close rate, so
+            # this is the queue's normal case.
+            # CONTROL FLOW IS UNCHANGED and deliberately so: the lane is
+            # SERIAL and scarce, so an expired candidate still stands down,
+            # still cools down, still enters `done`. What changes is that the
+            # record now says which question was answered.
+            _vname, _why = expiry_verdict(ev)
+            verdicts.append({"name": cand["name"], "verdict": _vname,
                              "ts": iso(now), "eval": ev})
-            send_push(f"experiment abandoned: {cand['name']}",
-                      f"{MAX_DAYS:g}d without clearing the bar — {ev.get('why')}")
+            send_push(f"experiment {_vname.lower()}: {cand['name']}",
+                      f"{_why} — {ev.get('why')}")
             return save(phase="idle", done=done + [cand["name"]],
                         done_at={**done_at, cand["name"]: now}, current=None,
                         spec={}, started_ts=None,
                         cooldown_until=now + COOLDOWN_H * 3600, last_eval=ev,
-                        note=f"ABANDONED {cand['name']}")
+                        note=f"{_vname} {cand['name']}: {_why}")
         return save(last_eval=ev, note=f"day {days:.1f}/{MIN_DAYS:g}: {ev.get('why')}")
 
     if phase == "promoted":

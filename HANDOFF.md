@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-08 17:01 Sydney (07:01Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 15:42 Sydney (05:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -12,7 +12,7 @@ _Still open because:_ the read is pre-registered (I21) and its date has not arri
 ### `avo-judge-lane-declared-but-not-lever-capable`  ·  owner: **session**
 (yg)'s lever surface, on its FIRST loop after the 6-Sep deploy, published on freqtrade-avo-maria-lshadow: {prefix: 'xp.avo.', registry: true, registered_n: 0, unregistered: [xp.avo.rsi_max, xp.avo.max_hold_min, xp.avo.vel_lo, xp.avo.vel_hi]}. Sized: fleet_bus.JUDGED_PAIRS['avo'] DECLARES xp_prefix 'xp.avo.'; fleet_tuning.LEVERS registers ZERO xp.avo.* levers; and her carrier SwingDip defines RSI_MAX but not MAX_HOLD_MIN, so lighter_family_bot.apply_book_levers returns at its own guard before asking get_lever for anything. The judge's avo lane -- judgeable since (ye) matched the caps at 6/6 -- is therefore structurally INERT: the (ye) class-closers pin that every REGISTERED xp.* lever is reachable and cannot see a declared prefix with nothing under it. Same class as (yb)/(ye), one namespace over; found by the instrument built to find it.
 
-_Still open because:_ the fix is a DECISION with a measurement, not a one-liner: (a) give SwingDip a hold bound so the guard passes and register xp.avo.rsi_max + max_hold_min with cages (a behaviour change on a real-money carrier -> (qu)'s measurement first), or (b) narrow apply_book_levers to per-attribute and register only xp.avo.rsi_max (cage TBD against her rsi<42 cell), or (c) withdraw xp_prefix from JUDGED_PAIRS['avo'] so the judge stops reporting a lane that cannot apply. Whichever ships, the surface's own over-report (it derives names from MUM_LEVER_ATTRS, not from the carrier's consumable set) is fixed in the SAME push -- and that push touches lighter_family_bot.py, so it MUST carry [deploy-live] (both markers): a shadow-only redeploy re-splits both live pairs (measured 6-Sep 15:31Z, the judge read ARMS ON DIFFERENT CODE). Deferred rather than restarting two real-money books for a report-shape fix at the tail of the deploy that found it.
+_Still open because:_ [9-Sep (zj)] THE MECHANISM HALF IS DONE -- DO NOT REBUILD IT (the (xj) stale-row trap: a row that describes work already shipped gets it done twice). Option (b)'s first half shipped: `consumable_lever_attrs` is the ONE owner both `apply_book_levers` and `lever_surface` read, the all-or-nothing RSI_MAX-and-MAX_HOLD_MIN guard is now per-attribute, and the surface derives names from the CARRIER's consumable set -- so her row reads {consumable: ['rsi_max'], registered_n: 0, unregistered: ['xp.avo.rsi_max']} instead of four names three of which SwingDip cannot hold. Her lane is MECHANICALLY CAPABLE and zero values moved on any carrier (pinned). WHAT REMAINS IS ONLY THE CAGE, and it is REFUSED-WITH-EVIDENCE until measured: a cage must fit a measured value and there is none -- (qu) asked her entry exit-free over 1,156 signals / 475d / 23 coins and 0 of 21 cells survive BH at FDR 0.05, while her own arms hold n=18 live / n=34 shadow, so no rsi_max dose-response is estimable from either. TO CLOSE THIS: re-run her exit-free signal test at several rsi_max cells on the CURRENT tape, with a random-entry null (I14/hm) and a permutation across cells to price the selection ((uz)'s ~1.85 t-unit premium); register xp.avo.rsi_max + the live.avo.rsi_max mirror at the measured bounds, or record the refusal and withdraw xp_prefix from JUDGED_PAIRS['avo'] (option (c)) so the judge stops reporting a lane nothing can drive. Either way it is a REGISTRY edit, not a host edit, so it no longer needs a live marker.
 
 ### `mum-halt-cost-preregistered-read`  ·  owner: **session**
 (xv) pre-registered whether 👩 mum's daily-loss halt costs or saves her, paired same-coin against her never-halting shadow twin. At registration her ledger holds exactly ONE daily-loss halt (2-Sep 17:19:45Z, 8 legs, +1.76pp/leg cost against the twin) -- one flatten instant is ONE observation, not eight, so it decides nothing. READ at n>=5 halt EVENTS occurring AFTER 2026-09-03: LOOSEN only if mean paired cost > 1.0pp/leg AND the sign is consistent across events; otherwise KEEP. Instrument: scripts/study_mum_halt_cost_2026-09-03.py (its calibration gate REFUSES unless it reproduces both the registered event and the registered baseline).
@@ -89,9 +89,17 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (1 commit(s))
+## Shipped today (9 commit(s))
 
-- `45ff703` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
+- `510f566` (zl) a starved candidate was recorded as a refuted one: split UNDERPOWERED from ABANDONED and project the candidate's OWN rate
+- `e0161c6` (zk) regenerate HANDOFF.md
+- `ba25f90` (zk) RENUMBERED (zh) -> (zk): a concurrent session merged its own (zh) to main while this branch was in flight
+- `a396b5c` Merge remote-tracking branch 'origin/main' into claude/mum-shadow-mum-review-oh15sb
+- `f9c0b20` (zj) correct the avo carried row in place: the mechanism half shipped, only the cage remains
+- `3597e9f` (zj) avo's judge lane was inert by one missing attribute, and her row advertised four levers to fix it -- three of which her carrier cannot hold
+- `5059cbc` (yx)(yy)(yz)(zh) 24h review: a red main nobody was shown, an uninterpretable refusal count, a drawdown bar that meant something different on every row, and the guard for tests that import what CI lacks (#292)
+- `5f894d4` (zi) regenerate HANDOFF.md
+- `8e15d6a` (zi) The go-live t bar and its own cluster read disagree on exactly the two books holding real money, and nothing said so
 
 ## How this file stays honest
 
