@@ -704,7 +704,28 @@ def test_the_production_call_site_hands_the_gate_the_graders_own_series(
     for call in hits:
         assert len(call.args) >= 2, "gate_status is called without an MTM read"
         second = ast.unparse(call.args[1])
-        assert "mtm_drawdown" in second and "equity_series" in second, second
+        assert "mtm_for" in second, second
+    # ...and the helper it names really is the grader's series through the
+    # grader's drawdown — the wiring is pinned end to end, not by name alone.
+    helper = [n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "mtm_for"]
+    assert helper, "mtm_for is not defined"
+    body = ast.unparse(helper[0])
+    assert "mtm_drawdown(equity_series(" in body, body
+
+
+def test_the_mtm_fetch_is_scoped_to_books_it_can_decide(monkeypatch):
+    """Worse-of-both cannot pass a failing book, so the series is fetched only
+    where it can change the verdict — the timeout that motivated the scope."""
+    er, g = _import_both()
+    calls = []
+    monkeypatch.setattr(er, "equity_series",
+                        lambda bot, **kw: calls.append(bot) or [])
+    er.mtm_for("fails-on-t", _mk([0.02, -0.02] * 20))     # mean ~0, t fails
+    assert calls == [], "a book failing an evidence bar must not fetch"
+    er.mtm_for("passes", _mk([0.02] * 40))
+    er.mtm_for("window-only", _mk([0.02] * 40, span_days=5.0))
+    assert calls == ["passes", "window-only"], calls
 
 
 # ---------------------------------------------------------------------------

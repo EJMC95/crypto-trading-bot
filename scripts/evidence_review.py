@@ -379,6 +379,32 @@ def gate_status(rows, mtm=None):
     return ("pass", why, s) if passes else ("fail", "; ".join(fails), s)
 
 
+def mtm_for(bot, rows):
+    """The grader's own MTM read for `bot` — fetched ONLY when it can decide.
+
+    `apply_mtm` folds the WORSE of realised and MTM, so it can only ever fail a
+    book that passes on realised; a book already failing an evidence bar has
+    the same verdict with or without the series. That monotonicity is why the
+    fetch is scoped: `equity_series` pulls the book's whole history (the
+    taker's is ~10k samples) over the public URL, and pulling it for every
+    living book took the review past a ten-minute timeout on the day the fold
+    shipped. Fetching for the books that clear every evidence bar — passers
+    and window-only near-misses — is exact, not an approximation.
+
+    Returns None (-> `apply_mtm` grades realised and says so) for every other
+    book, for a dark history, and for an unreadable series.
+    """
+    try:
+        s0 = stats(rows, book_usd=START_EQUITY)
+        if s0.get("n", 0) < 2:
+            return None
+        if not set(blocking_bars(s0)) <= {"window"}:
+            return None
+        return mtm_drawdown(equity_series(bot))
+    except Exception:
+        return None
+
+
 def ledger_pooled(cur, bot):
     """[(pair, hours)] where this book's ledger proves a SECOND WRITER.
 
@@ -1056,9 +1082,10 @@ def scan_new_evidence(cur, errors):
             # about the sample any more than about the bars.
             rows, rows_all, era_iso = era_rows(bot, quads)
             # [2026-09-09] The MTM series is the grader's own read, folded
-            # by the grader's own rule — see `gate_status`. A dark history
+            # by the grader's own rule — see `gate_status` and `mtm_for`
+            # (fetched only where it can change the verdict). A dark history
             # returns [] -> None -> realised, and says so in `maxdd_basis`.
-            status, why, s = gate_status(rows, mtm_drawdown(equity_series(bot)))
+            status, why, s = gate_status(rows, mtm_for(bot, rows))
             if s.get("maxdd_basis") != "mtm":
                 mtm_realised.append(f"{bot} ({s.get('mtm_why') or 'no series'})")
             # [2026-08-06 (ks)] GATE HORIZON — the hand calendar, computed.
