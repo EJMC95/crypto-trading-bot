@@ -197,8 +197,15 @@ def test_a_dark_organ_is_never_graded_and_never_clean():
                           ratchet={"live_rows_without_a_justification_claim": 0},
                           today=dt.date(2026, 8, 27))
     assert rc == 2, (rc, lines)
-    assert all(g["status"] == "DARK"
-               for g in cl.grade_all({}, cl.CLAIMS, dt.date(2026, 8, 27)))
+    # [2026-09-09 (zo)] every UNGRADED row is DARK; a row whose read has been
+    # RECORDED is GRADED even when the organ is dark — the recorded read is
+    # the authority, and a dark organ cannot un-take a read
+    graded = cl.grade_all({}, cl.CLAIMS, dt.date(2026, 9, 10))
+    assert all(g["status"] == ("GRADED" if r.get("graded") else "DARK")
+               for r, g in zip(cl.CLAIMS, graded)), [
+        (g["id"], g["status"]) for g in graded]
+    assert any(r.get("graded") for r in cl.CLAIMS), (
+        "the table holds no graded row — georgia's read was recorded at (zo)")
 
 
 # --------------------------------------------------------------------- ratchet
@@ -349,3 +356,78 @@ def test_selftest_is_offline_and_green(mod):
     r = subprocess.run([sys.executable, "-m", mod, "--selftest"], cwd=ROOT,
                        capture_output=True, text=True, timeout=120, env=env)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# ------------------------------------------------------------------- graded
+def _graded_row(**over):
+    """A prediction row with its read recorded — the (zo) shape."""
+    row = dict(cl._fixture()[3], covers=())            # the UNRESOLVED fixture
+    row["graded"] = {"on": "2026-08-27", "verdict": "FAILED",
+                     "why": "post-cap n=75: t bar unreachable"}
+    row.update(over)
+    return row
+
+
+def test_a_graded_prediction_is_terminal_never_stale_never_dark():
+    """[2026-09-09 (zo)] The first prediction to reach its date pointed at a
+    field (`horizon.eta_days`) that an `undecidable` book never populates, so
+    as written it could only read UNRESOLVED forever. A read taken by an
+    instrument and RECORDED on the row is the authority from then on: the
+    status is GRADED whatever the organ publishes — a value, a rename, or
+    nothing at all."""
+    row = _graded_row()
+    assert cl.validate([row]) == [], cl.validate([row])
+    today = dt.date(2026, 8, 27)
+    for states in ({}, {"k": {}}, {"k": {"books": {"b": {"missing": 9.0}}}},
+                   {"k": {"books": {"b": {"missing": 1.0}}}}):
+        g = cl.grade(row, states, today)
+        assert g["status"] == "GRADED", (states, g)
+        assert "FAILED" in g["why"] and "unreachable" in g["why"]
+    # ...and the freshness audit reports it and passes
+    rc, lines = acf.audit(claims=[row], states={"k": {}}, rows=(),
+                          sh_text="", docker_text="", today=today,
+                          ratchet={"live_rows_without_a_justification_claim": 0})
+    assert rc == 0, lines
+    # the PER-ROW line, not the header: the LIVE summary already prints
+    # "GRADED 1", so `any("GRADED" in x)` was VACUOUS — measured by mutation
+    # (the branch that prints the row survived its own deletion). Pin the
+    # line that names the row and carries the read's own words.
+    assert any(x.startswith("  GRADED: ") and "unresolved" in x
+               and "unreachable" in x for x in lines), lines
+    # the same row WITHOUT the record is UNRESOLVED and fails — the mutation
+    # that removes the short-circuit is caught here, not by a substring
+    bare = dict(row); bare.pop("graded")
+    assert cl.grade(bare, {"k": {}}, today)["status"] == "UNRESOLVED"
+    assert acf.audit(claims=[bare], states={"k": {}}, rows=(), sh_text="",
+                     docker_text="", today=today,
+                     ratchet={"live_rows_without_a_justification_claim": 0})[0] == 1
+
+
+def test_a_grade_stamped_before_its_own_date_is_refused():
+    """I25 with a stamp on: a prediction may not be graded on the window that
+    motivated it. `grade_after` is the commitment; a `graded.on` earlier than
+    it is refused at DECLARATION, before any organ is read."""
+    early = _graded_row(grade_after="2026-09-10",
+                        graded={"on": "2026-09-09", "verdict": "FAILED",
+                                "why": "x"})
+    bad = cl.validate([early])
+    assert bad and any("BEFORE grade_after" in b for b in bad), bad
+    # and the short-circuit does NOT fire on a malformed record — it grades
+    # as an ordinary (here UNRESOLVED) row rather than as a terminal pass
+    assert cl.grade(early, {"k": {}}, dt.date(2026, 9, 10))["status"] != "GRADED"
+    for mutant in ({"on": "2026-09-10", "verdict": "MAYBE", "why": "x"},
+                   {"on": "2026-09-10", "verdict": "HELD"},
+                   {"on": "not-a-date", "verdict": "HELD", "why": "x"},
+                   {"on": "2026-09-10", "verdict": "HELD", "why": "   "},
+                   "FAILED"):
+        r = _graded_row(grade_after="2026-09-10", graded=mutant)
+        assert cl.validate([r]), mutant
+        assert cl.grade(r, {"k": {}}, dt.date(2026, 9, 10))["status"] != "GRADED"
+
+
+def test_the_real_tables_graded_rows_are_well_formed():
+    for row in cl.CLAIMS:
+        if row.get("graded") is not None:
+            assert cl.graded_problem(row) is None, (row["id"],
+                                                    cl.graded_problem(row))
+            assert row["graded"]["on"] >= row["grade_after"], row["id"]

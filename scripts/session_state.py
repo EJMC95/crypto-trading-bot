@@ -222,25 +222,16 @@ CARRIED = [
         "closes_when": lambda: not _has("scripts/golive_readiness.py",
                                         '"band-kelly": ('),
     },
-    {
-        "id": "georgia-v1-preregistered-read-10sep",
-        "owner": "session",
-        "what": "🔮 georgia v1 was on the (wt) September slate and DEFERRED "
-                "on Eamon's confirmed date ('On 10 sep'): her cap-5 "
-                "trajectory carries the pre-registered claim "
-                "georgia-entry-cap-5-days-to-gate (grade_after 10-Sep, "
-                "days-to-gate ~187 predicted at a higher mean). ON 10-SEP: "
-                "grade the claim on her post-cap closes ONLY. Prediction "
-                "fails -> retire via lighter_family_bot.RETIRED_BOOKS key "
-                "'freqtrade-georgia' (override GEORGIA_RETIRED_OVERRIDE) + "
-                "both halves + slate-test update; holds -> record the keep "
-                "with the fresh number. Either way, close this row with the "
-                "verdict.",
-        "why_open": "retiring her before the registration's own read voids "
-                    "it (I21/I25); the docket's ~4,233d pools ~200 pre-cap "
-                    "closes against ~25 post-cap ones.",
-        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 9, 10),
-    },
+    # [2026-09-09 (zo)] `georgia-v1-preregistered-read-10sep` DELETED — the
+    # read was TAKEN (Eamon: "take georgia's read now", a day early) and the
+    # (vb) prediction FAILED on her post-cap closes: n=75 whose own policy
+    # stamp reads cap 5, mean -0.0025%/trade vs +0.108% predicted, t -0.02,
+    # t bar unreachable where 187d was promised. Retired via
+    # lighter_family_bot.RETIRED_BOOKS (GEORGIA_RETIRED_OVERRIDE), both
+    # halves, slate test flipped, claim row GRADED in claims_ledger — every
+    # act the row named. Cited as I17's UNDECIDABLE call (8,094 closes to
+    # t=2), never a measured exclusion (post-cap ub +0.196% > 0). Instrument:
+    # scripts/study_georgia_cap5_read_2026-09-09.py.
     {
         "id": "avo-live-slot-6-preregistered-read",
         "owner": "session",
@@ -465,43 +456,13 @@ CARRIED = [
     # steers only the divergence bracket, and the taker's selftest pins the
     # decoupling by AST. No widening shipped (the 48->96 evidence died to
     # leave-one-symbol-out); behaviour-neutral at ship.
-    {
-        "id": "ceiling-slots-georgia",
-        "owner": "session",
-        "what": "**(sv) ANSWERED THE CENSUS QUESTION AND THE ANSWER RETIRES THE "
-                "HEADLINE.** This row read '83.5 DAYS at 0.5 of 5 slots, 7.6 "
-                "days at full occupancy — an 11x speed-up'. Measured: her mean "
-                "hold is **2.6h**, so occupancy = closes/day x 2.6/24 and FIVE "
-                "slots need ~46 opens/day. Her signal supplies 40.9/day at "
-                "best. **Full occupancy is unreachable by construction, and it "
-                "was never the lever — CLOSES are.** She is flat 68.4% of the "
-                "time not because something refuses her but because she exits "
-                "in under 3 hours. (sv) took the one gate that cut closes for "
-                "no quality reason (the 2/h throttle, +0.633pp in favour of the "
-                "entry it refused, six splits) from 2 -> 3.",
-        "why_open": "the step is DELIBERATELY one notch: rank 3 has n=1 in her "
-                    "whole life because the cap was 2, so everything above it "
-                    "is extrapolation. `entry_rank` now rides every close, so "
-                    "the next step is graded from a query — re-run "
-                    "`scripts/study_georgia_entry_rank_2026-08-22.py` once "
-                    "rank-3 rows exist and take 3 -> 4 only if it holds. "
-                    "[26-Aug (tm) pass]: rank-3 today reads n=3, 0% win, "
-                    "crash-dominated — decides NOTHING either way; 3 of the "
-                    "six (sv) controls have flipped negative, so the 3->4 "
-                    "step is REFUSED on current data and 3->2 reversion "
-                    "equally unsupported. The OTHER half is now MEASURED AND "
-                    "CLOSED: the calibrated LAG-1 hold/roi sweep (n=100 "
-                    "paired, both intrabar conventions) put every widening "
-                    "below the harness's own +0.246pp calibration error, "
-                    "roi-x2's gain is h2-NEGATIVE, trail-only sign-disagrees "
-                    "between conventions, and the 1440m max_hold fired 0 of "
-                    "207 closes ever — exits are a dead dial on this book; "
-                    "the mean lever is ENTRY quality (rank1 +0.023% vs rank2 "
-                    "+0.656% on her own ledger).",
-        # closes when the next throttle decision has been taken on rank-3 data
-        "closes_when": lambda: _has(
-            "lighter_family_bot.py", 'GEORGIA_MAX_ENTRIES_PER_HOUR", "4"'),
-    },
+    # [2026-09-09 (zo)] `ceiling-slots-georgia` DELETED — its SUBJECT retired
+    # under it (the (vj) rule: a row pointed at a corpse is re-pointed or
+    # closed with a reason). The entry-rank question it carried is answered
+    # by the read that retired her: the cap 3 -> 5 admitted 4 of 75 post-cap
+    # trades (ranks 4-5) and her mean is ~zero at every rank, so the "next
+    # notch" this row waited for had nothing to move. Its closes_when watched
+    # for a cap of "4" that will now never ship.
     # [2026-09-02, (ww) readback] `family-shadow-stale-writer` CLOSED on the feed
     # readback, the only thing that could close it: at 06:33Z the family rows
     # stamp 97dbe3986551/15 (the (wv) build), 👩 mum-lshadow publishes the

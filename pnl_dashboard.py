@@ -215,6 +215,18 @@ RETIRED_ROWS = {
                 "perps-funding-lighter-lshadow",
                 "nav-cook-lshadow",
                 "book-grimes-lshadow",
+                # [2026-09-09 (zo)] 🔮 georgia v1's SHADOW — the slate's
+                # deferral resolved at her pre-registered cap-5 read, taken a
+                # day early on Eamon's ask. The (vb) prediction (days-to-gate
+                # 187 +-60 at a HIGHER mean) FAILED on the 75 closes her own
+                # policy stamp marks as cap-5: mean -0.0025%/trade, t -0.02,
+                # t bar unreachable. Retired on I17's UNDECIDABLE call (the
+                # organ: 8,094 closes ~ 4.3 years to t=2), NOT a measured
+                # exclusion (post-cap upper bound +0.196% > 0). Zero open
+                # positions; v3 (freqtrade-georgia-v3-lshadow) keeps trading.
+                # Hide half; prune half in cleanup_legacy_bots; the guard is
+                # lighter_family_bot.RETIRED_BOOKS (GEORGIA_RETIRED_OVERRIDE).
+                "freqtrade-georgia-lshadow",
                 "perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",

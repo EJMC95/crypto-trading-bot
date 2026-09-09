@@ -30,7 +30,10 @@ def test_family_slate_books_are_out_and_greens_stay(monkeypatch):
     # retirement (0 in-era closes ever, ~2.4 closes/30d). The row-scope rule is
     # what this line guards and it is UNCHANGED — two living books still prove
     # the guard did not idle the shared process.
-    for keep in ("freqtrade-avo-maria", "freqtrade-georgia"):
+    # [2026-09-09 (zo)] freqtrade-georgia (v1) left this list the same way
+    # mum did — retired at her pre-registered cap-5 read. Three living books
+    # still prove the guard did not idle the shared process.
+    for keep in ("freqtrade-avo-maria", "freqtrade-mum", "freqtrade-georgia-v3"):
         assert keep in live, f"{keep} must stay alive — the (mr) row-scope rule"
     assert live, "the family process must still run books"
 

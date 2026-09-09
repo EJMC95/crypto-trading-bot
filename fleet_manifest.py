@@ -154,14 +154,20 @@ DESIGN = {
                  "grade says (I14).",
     },
     "freqtrade-georgia-lshadow": {
-        "emoji": "🔮", "name": "Georgia",
+        "emoji": "🔮", "name": "Georgia v1 (RETIRED 9-Sep)",
         "design": "Intraday 15m day-trading across three tags — trend "
                   "breakout, range mean-reversion and bounce pullback — each "
                   "graded on its own.",
-        "flies_when": "it FILLS ITS SLOTS. 5 of 6 go-live bars, failing only "
-                      "t; 310 closes from gradeable at 0.5 of 5 slots (83.5 "
-                      "days) or 7.6 days at full occupancy. It is the closest "
-                      "book in the fleet to real money ((sm)).",
+        # [2026-09-09 (zo)] corrected in place per I12: this read "the closest
+        # book in the fleet to real money" for weeks after the organ said
+        # `undecidable` at 8,094 closes. Retired at her pre-registered cap-5
+        # read (the (vb) prediction FAILED: post-cap mean -0.0025%/trade vs
+        # +0.108% promised). I17's UNDECIDABLE call, not a measured loser.
+        "flies_when": "it does not — RETIRED (zo): 5 of 6 bars but the sixth "
+                      "(t) needs ~8,094 closes at 5.1/day, ~4.3 years, because "
+                      "her mean (+0.06%/trade) is precise about a number too "
+                      "small to prove. Her v3 (ImpulseFade) is a different "
+                      "book and keeps trading.",
         "floor": "its trailing stop is NOT the leak — reclaim 74% against a "
                  "placebo of 75%. Do not widen it.",
     },

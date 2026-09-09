@@ -78,7 +78,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lighter_family_bot import (atr_series, live_strategies)  # noqa: E402
+from lighter_family_bot import (atr_series, STRATEGIES)  # noqa: E402
 
 DASH = "https://pnl-dashboard-production-858c.up.railway.app"
 B = "https://mainnet.zklighter.elliot.ai"
@@ -163,10 +163,20 @@ def split_tag_exit(reason):
 
 
 def carrier_for(bot_row):
-    """The LIVE strategy object whose constants govern this row. Imported, never
-    retyped — a retyped constant is a constant that drifts."""
+    """The DECLARED strategy object whose constants govern this row. Imported,
+    never retyped — a retyped constant is a constant that drifts.
+
+    [2026-09-09 (zo)] `STRATEGIES`, not the living roster: this harness
+    replays a book's OWN ledger under alternative exits, and a retired book's
+    ledger is still its record (I14) — 🔮 georgia v1, the book this file was
+    built for, retired at her cap-5 read with 289 closes that remain graded
+    history. Reading the LIVING roster made her carrier vanish (`None`) the
+    moment she retired, which would have silently un-calibrated every sweep
+    over the ledger that motivated the instrument. Retirement is a fact
+    about what TRADES, not about whose constants govern a closed row.
+    """
     base = bot_row.replace("-lshadow", "")
-    for s in live_strategies():
+    for s in STRATEGIES:
         if s.bot == base:
             return s
     return None

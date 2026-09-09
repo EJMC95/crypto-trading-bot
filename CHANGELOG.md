@@ -1,3 +1,171 @@
+## 2026-09-09 (zo) — 🔮 GEORGIA v1'S PRE-REGISTERED READ, TAKEN: THE CAP-5 PREDICTION FAILED ON HER OWN POST-CAP CLOSES, SHE IS RETIRED ON THE UNDECIDABLE CALL — AND THE CLAIM COULD NEVER HAVE GRADED ITSELF, BECAUSE ITS OWNER FIELD IS `null` IN EXACTLY THE STATE THAT DECIDES IT
+
+> **[RENUMBERED (zn) -> (zo) at push.]** A concurrent session's LOCAL main
+> (`d12b834`, unpushed at the time) already carried a `(zn)` entry — the
+> review's two stale rule copies. Neither was cited on origin yet, so this
+> one moved rather than racing the push. Every citation in the tree and in
+> the memory files moved with it (`grep -rl`, counted before and after).
+
+**Eamon, 9-Sep (16:10 AEST): *"take georgia's read now"* → *"complete
+fixes"*.** The read was registered for 10-Sep and he asked for it a day early;
+at 5.7 closes/day the sample is the same on both days, and the ledger's date
+rule is honoured in the record (below).
+
+### THE READ — on the only honest basis
+
+The (vb) prediction, verbatim from the ledger: cap `MAX_ENTRIES_PER_HOUR`
+3 → 5 takes days-to-gate **344 → 187 (±60)** *at a HIGHER mean* — book-at-cap-5
+replayed at **mean +0.108%/trade, iid t +2.54, 5.47 closes/day**.
+
+The basis is the bot's OWN stamp, keyed on the OPEN ((hc): a trade's policy is
+fixed when it is taken): the sample is every close whose `extra.policy.
+max_entries_per_hour` reads **5** — never `closed_at >= 27-Aug`, which admits
+trades opened under cap 3 that happened to close later (4 of 79 by close-date
+were exactly that). Quarantine and phantom filters applied as the grader
+applies them; calibration gate reproduces the grader's era mean to
+**0.001pp** (all-time n=289 +0.063% vs era n=277 +0.064%).
+
+| | predicted | measured (post-cap, n=75, 13.1d) |
+|---|---|---|
+| closes/day | 5.47 | **5.72** |
+| mean %/trade | **+0.108%** | **−0.0025%** |
+| iid t | +2.54 | **−0.02** |
+| days-to-gate (t=2) | **187 [127, 247]** | **UNREACHABLE** (mean ≤ 0) |
+
+**The throughput limb DELIVERED and the mean limb did not.** The cap was live
+and working — 5.72/day against 5.47 promised — and it moved **4 of 75 trades**
+(ranks 4–5: +0.616, +0.352, −0.623, −1.260%). Her mean is ~zero at every rank;
+raising the cap could not have changed that, and the replay's rank-3/4/5 means
+(+0.313/+0.290/+0.233%) did not survive contact with her ledger. Pre-cap
+contrast: n=214, +0.086%/trade, t +0.55.
+
+**VERDICT: the prediction FAILS.** The registered consequence (HANDOFF row
+`georgia-v1-preregistered-read-10sep`, the slate's deferral comment in
+`RETIRED_BOOKS`, the memory file): prediction fails → retire. Done, every act
+the row named.
+
+### HOW IT IS CITED, and why that sentence is load-bearing
+
+**I17's UNDECIDABLE call, not a measured exclusion.** The organ: era n=277,
+t=0.50, binding bar `t`, `n_req_t` **8,094 closes** at 5.12/day = **~4.3
+years**. Her post-cap upper bound is **+0.196% > 0** — the sample has NOT
+excluded a positive mean, and I17-as-amended forbids retiring on that alone.
+What retires her is the class I17 names in its first paragraph and the fleet
+has used three times (🌊 by rate, 🧙 by tail, 📊 by rate): a book that cannot
+reach its own bar is a keep-or-retire call, and the call is now made. The
+instrument prints the upper bound BESIDE the verdict precisely so no future
+session cites this as "her sample excluded a positive mean". It did not.
+
+Zero open positions at the retirement, so nothing froze. Her v3 row
+(`freqtrade-georgia-v3-lshadow`, ImpulseFade) is a different strategy and
+keeps trading — the `RETIRED_BOOKS` key is exact-match, never a suffix strip,
+because v3 shares the prefix (mutation-verified: a `startswith` sweep reddens
+the slate test on v3).
+
+### THE TRAP — a registration that could never resolve
+
+The claim's owner is `golive-readiness::books.freqtrade-georgia-lshadow.
+horizon.eta_days`. On an `undecidable` book the organ publishes **`eta_days:
+null`** (the number lives in `raw_days`). So in the one state that decides
+the claim, the field it points at does not exist: as registered it could
+only ever read UNRESOLVED after 10-Sep — a failure by absence, indistinguishable
+from a renamed field — and never HOLDS or STALE. The HANDOFF row had already
+said *"grade the claim on her post-cap closes ONLY"*; nothing in the tree
+could do that, so a human would have, by hand, which is the (gk) shape.
+
+**Fixed at the class, not the instance.** `claims_ledger` gains a terminal
+**GRADED** state: a row may carry `graded = {on, verdict, why}`, validated at
+DECLARATION (`graded_problem`: ISO date, verdict ∈ {HELD, FAILED}, a non-empty
+why, and **`on` may not precede `grade_after`** — grading a prediction before
+its date is I25 with a stamp on). `grade()` short-circuits it: GRADED whatever
+the organ says — a value, a rename, or nothing — because the recorded read is
+the authority now, not the organ. `audit_claim_freshness` reports it and
+passes. **The row STAYS in the table**: the ledger is the record of what was
+claimed AND what came of it, in one diff-reviewable place. Georgia's row is
+the first, `graded.on = 2026-09-10` (the ledger refused 09-09 against its own
+`grade_after`, exactly as designed — the read was taken 9-Sep Sydney on
+Eamon's ask; the sample is identical).
+
+### THE INSTRUMENT
+
+`scripts/study_georgia_cap5_read_2026-09-09.py` — the (yo) shape: the
+registered numbers held as a COMMITMENT, a calibration gate that REFUSES
+(exit 2) on a dark feed or a wrong basis, the policy-stamp selector, and a
+selftest that drives **HOLDS** (the branch the live data never exercised),
+three FAILS shapes (unreachable / too slow / too fast — a prediction is a
+number, not a floor), the sufficiency floor, the stamp basis (a cap-3 row and
+an unstamped row are excluded whatever their dates), the 100× basis error and
+the dark feed. Registered in `tests/test_selftests.py`.
+
+### WHAT MOVED, and the mutations
+
+* `lighter_family_bot.RETIRED_BOOKS` gains `freqtrade-georgia` →
+  `GEORGIA_RETIRED_OVERRIDE`; `pnl_dashboard.RETIRED_ROWS` +
+  `cleanup_legacy_bots.LEGACY_BOTS` gain `freqtrade-georgia-lshadow` (both
+  halves). Ledger untouched (289 closes stay).
+* `scripts/claims_ledger.py` GRADED state + the georgia row graded;
+  `scripts/audit_claim_freshness.py` reports it.
+* `scripts/session_state.py`: `georgia-v1-preregistered-read-10sep` DELETED
+  (done) and `ceiling-slots-georgia` DELETED (subject retired under it — the
+  (vj) rule; its "next notch" waited on a cap of 4 that will never ship).
+* `fleet_manifest.py` georgia entry corrected in place — it still read *"the
+  closest book in the fleet to real money"* weeks after the organ said
+  undecidable.
+* Six tests/selftests that hard-coded her shadow as LIVING re-pointed
+  (`test_september_slate` flipped to the retired state + a GRADED-claim pin;
+  `test_retirement_consistency`, `test_live_throttle_parity`,
+  `test_georgia_throttle` — DayTraderGated now has ZERO living users, pinned;
+  `test_red_stop_slate`, `test_review_retired_roster`, `evidence_review`'s
+  selftest) — and a SECOND wave the full suite found, twelve more failures in
+  six files: `test_georgia_stop_tags` (resolved her through `live_strategies()`
+  to test a strategy-object property that outlives the book → `STRATEGIES`),
+  `test_mum_v2` and `test_dashboard_money` (her twin as "the living example";
+  the dashboard's double-life fixture has now moved FOUR times in seven
+  weeks — mum → georgia → mum), `test_lever_measurability_parse` +
+  `test_fleet_manifest` + `test_risk_roster…` (all read
+  `tests/fixtures/living_rows.json`, refreshed), and the LADDER harness —
+  `study_ladder_exit_sweep.carrier_for` read the LIVING roster, so the
+  moment she retired the carrier of the ledger it was built for returned
+  `None` and every sweep over it would have silently un-calibrated; it reads
+  `STRATEGIES` now (a retired book's ledger is still its record, I14), and the
+  two `test_ladder_exits_declared` pins moved to 🙏 avo's real rungs. The
+  audit-scope rule's list-rot, in tests: **eighteen tests in twelve files**
+  named her as the living example of a property that outlives her.
+* **Mutations, via `scripts/mutate.py`**: **10 of 10 killed, after one survivor exposed a defect in my own guard.** Rounds A–F: the ledger's short-circuit, its date rule and its verdict set (3/3); the `RETIRED_BOOKS` entry and a `startswith` sweep that would have taken v3 with her (2/2); each retirement half (1/1 each); the instrument's stamp basis and its unreachable branch (2/2). The freshness audit's per-row GRADED line SURVIVED its own deletion on the first run: the test asserted `any("GRADED" in x)` and the LIVE header line already printed `GRADED 1` — a vacuous substring test, the class this repo has recorded four times. Re-pinned on the per-row line that names the row and carries the read's words; killed on the re-run.
+
+### DEPLOY
+
+`lighter_family_bot.py` ships in BOTH live images, so a shadow-only redeploy
+would re-split the live pairs on `build_shared` ((xd)/(yg): the judge read
+ARMS ON DIFFERENT CODE the last time). Neither live row is halted (read on the
+feed before dispatch), so the commit carries `[deploy-live]` in its SUBJECT
+((hj)/(xh)) and the three family services move together. Verified by stamp
+readback, never by the green run. The live books' behaviour is unchanged —
+the roster of a shared module moved, nothing they trade.
+
+### ALSO FOUND AND FIXED ON THE WAY — a guard that was red on main, locally, for everyone on 3.9
+
+The post-rebase suite left exactly two failures and both were
+`scripts/audit_test_imports.py` — the `(zh)` guard for tests that import what
+CI lacks — and it was red on the UNTOUCHED main worktree too: it flagged
+`import os`, `import sys`, `import datetime` in hundreds of tests it had no
+reason to look at. Cause, one line: it reads `sys.stdlib_module_names`, which
+exists only on Python ≥3.10; this repo's dev venv is **3.9.6**, so the stdlib
+set was EMPTY and every stdlib import read as undeclared. CI runs 3.11 and was
+green, so nobody saw it — a false red on every dev machine is the (gl) shape
+in reverse: it trains a reader to ignore `test_enforced_audit_guard`, the one
+place a real finding would surface. `_stdlib_names()` now falls back to the
+interpreter's own stdlib directory plus its builtins when the attribute is
+absent; the selftest pins the thirteen names the false red actually listed and
+that `yaml` is NOT among them; both mutations (skip the fallback, drop the
+builtins) reddened. Not the same house as this entry — recorded here rather
+than parked, per (vd).
+
+**Carried:** 🪁 kelly's read still returns to Eamon (open since (yo)); ⚖️
+counterweight's read is NOT due (n=21 fresh of 60; fresh mean +2.70% — do not
+pre-empt it); the tx-budget skips on live orders (11 of 84) are a measurement
+loss on real money and still open.
+
 ## 2026-09-09 (zn) — A CANDIDATE THAT NARROWS ITS OWN ARM NOW GETS THE CLOCK ITS OWN RATE SAYS IT NEEDS — BOUNDED, RE-DERIVED EVERY CYCLE, NEVER ON A HUNCH
 
 **Eamon, 9-Sep:** *"extend max_days for gate-narrowing candidates."* The

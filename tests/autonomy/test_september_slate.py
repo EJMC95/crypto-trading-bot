@@ -8,11 +8,14 @@ grader's own CURRENT verdict, read live before shipping:
     🧭 nav-cook       unreachable  ub −0.020% ≤ 0 (n=38)
     📐 grimes         no_rate      0 closes ever; gate open 0/31 retests
 
-🔮 georgia v1 was on the slate and is DEFERRED, not retired — her cap-5
-trajectory carries a pre-registered prediction (claims_ledger
+🔮 georgia v1 was on the slate and was DEFERRED, not retired — her cap-5
+trajectory carried a pre-registered prediction (claims_ledger
 `georgia-entry-cap-5-days-to-gate`, grade_after 10-Sep) and retiring her
-before its read voids a registered prediction (I21/I25). Pinned here so a
-"tidy-up" cannot silently retire her early OR silently drop the deferral.
+before its read would have voided a registered prediction (I21/I25).
+[2026-09-09 (zo)] THE READ WAS TAKEN and the prediction FAILED (post-cap
+n=75, mean -0.0025%/trade vs +0.108% predicted, t bar unreachable), so she
+is RETIRED — on I17's UNDECIDABLE call, and the claim row is GRADED rather
+than deleted, so the ledger keeps what was claimed AND what came of it.
 
 What this file pins, per the (nf)/(mr) precedents:
   * every retired row is in BOTH halves (RETIRED_ROWS hides, LEGACY_BOTS
@@ -22,8 +25,10 @@ What this file pins, per the (nf)/(mr) precedents:
   * the funding guard is ROW-scoped by RESOLVED id — the garrett variant and
     the farmer shadow idle, an unlisted variant does not, and the LIVE arm's
     (ta) mechanism is untouched;
-  * georgia v1 is NOT retired and her v3 row is NOT retired.
+  * georgia v1 IS retired (both halves + RETIRED_BOOKS + a GRADED claim)
+    and her v3 row is NOT retired.
 """
+import datetime as dt
 import os
 import sys
 
@@ -52,23 +57,49 @@ def test_every_slate_row_is_in_both_halves():
         assert row in clb.LEGACY_BOTS, f"{row} not pruned (LEGACY_BOTS)"
 
 
-def test_georgia_is_deferred_not_retired():
-    """Both directions: she must not be swept into the slate early, and the
-    deferral must not quietly become a retirement without the 10-Sep read."""
+def test_georgia_v1_retired_at_her_read_and_v3_stays(monkeypatch):
+    """[2026-09-09 (zo)] The deferral resolved the way the registration said
+    it would if the prediction failed. Both directions again: v1 is retired in
+    BOTH halves and in the family guard (driven through live_strategies(),
+    not grepped), the override resurrects exactly her, and v3 — a different
+    strategy sharing the name prefix — is untouched (exact-match key, never a
+    suffix strip)."""
     import pnl_dashboard as pd
     import cleanup_legacy_bots as clb
     import lighter_family_bot as fam
-    for row in ("freqtrade-georgia-lshadow", "freqtrade-georgia-v3-lshadow"):
-        assert row not in pd.RETIRED_ROWS, f"{row} hidden — the deferral says 10-Sep"
-        assert row not in clb.LEGACY_BOTS, f"{row} pruned — same"
-    assert "freqtrade-georgia" not in fam.RETIRED_BOOKS
+    assert "freqtrade-georgia-lshadow" in pd.RETIRED_ROWS
+    assert "freqtrade-georgia-lshadow" in clb.LEGACY_BOTS
+    assert "freqtrade-georgia-v3-lshadow" not in pd.RETIRED_ROWS
+    assert "freqtrade-georgia-v3-lshadow" not in clb.LEGACY_BOTS
+    assert fam.RETIRED_BOOKS.get("freqtrade-georgia") == "GEORGIA_RETIRED_OVERRIDE"
     assert "freqtrade-georgia-v3" not in fam.RETIRED_BOOKS
-    # ...and the pre-registered read the deferral rests on still exists
+    for env in fam.RETIRED_BOOKS.values():
+        monkeypatch.delenv(env, raising=False)
+    live = {s.bot for s in fam.live_strategies()}
+    assert "freqtrade-georgia" not in live, "v1 still trades — the guard is inert"
+    assert "freqtrade-georgia-v3" in live, "v3 was swept out with v1 — key drift"
+    monkeypatch.setenv("GEORGIA_RETIRED_OVERRIDE", "run")
+    assert "freqtrade-georgia" in {s.bot for s in fam.live_strategies()}, (
+        "GEORGIA_RETIRED_OVERRIDE=run did not resurrect her")
+
+
+def test_georgias_claim_is_graded_not_deleted():
+    """The pre-registered claim STAYS in the ledger with its read recorded —
+    the ledger is the record of what was claimed AND what came of it. The
+    grade is dated on/after grade_after (the ledger refuses earlier), names
+    FAILED, and carries the number it turned on."""
     sys.path.insert(0, os.path.join(ROOT, "scripts"))
     import claims_ledger as cl
     row = next(c for c in cl.CLAIMS
                if c["id"] == "georgia-entry-cap-5-days-to-gate")
     assert row["grade_after"] == "2026-09-10", row["grade_after"]
+    g = row.get("graded")
+    assert g and g["verdict"] == "FAILED", g
+    assert g["on"] >= row["grade_after"], (g["on"], row["grade_after"])
+    assert "UNDECIDABLE" in g["why"] and "+0.196%" in g["why"], g["why"]
+    assert cl.graded_problem(row) is None
+    # and the ledger grades it TERMINAL whatever the organ says — even DARK
+    assert cl.grade(row, {}, dt.date(2026, 9, 10))["status"] == "GRADED"
 
 
 def test_the_funding_guard_is_row_scoped_and_override_respected(monkeypatch):

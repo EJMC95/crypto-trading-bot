@@ -205,6 +205,12 @@ SELFTEST_MODULES = [
     # verdict branches — including RETIRE and KEEP GRADING, which the live
     # data does not currently exercise, so the untaken branches cannot rot.
     "scripts.study_kelly_fresh_read_2026-09-07",
+    # [2026-09-09 (zo)] 🔮 georgia v1's pre-registered cap-5 read. Its
+    # selftest drives HOLDS — the branch the live data never exercised — plus
+    # the three FAILS shapes and the policy-stamp basis (a cap-3 row and an
+    # unstamped row are excluded whatever their dates), so the untaken
+    # branch cannot rot.
+    "scripts.study_georgia_cap5_read_2026-09-09",
     # [2026-09-07] the MONTE CARLO RISK AUDIT + benchmark shootout. The gate
     # grades a 15% drawdown bar over the ONE path a book happened to walk;
     # this resamples the book's own decisions and reports the distribution

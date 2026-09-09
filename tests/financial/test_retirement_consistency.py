@@ -91,9 +91,13 @@ def test_the_34_67_double_count_fix_is_locked():
     assert "freqtrade-georgia-lighter" in LEGACY
     assert "freqtrade-mum-lighter" not in RETIRED
     assert "freqtrade-mum-lighter" not in LEGACY
-    # the SHADOW twin keeps trading as the control arm — never filtered.
-    assert "freqtrade-georgia-lshadow" not in RETIRED
-    assert "freqtrade-georgia-lshadow" not in LEGACY
+    # [2026-09-09 (zo)] the SHADOW twin followed her a week later, at her
+    # pre-registered cap-5 read (prediction FAILED; I17 undecidable call).
+    # Both halves, like every retirement; v3 is a different book and stays.
+    assert "freqtrade-georgia-lshadow" in RETIRED
+    assert "freqtrade-georgia-lshadow" in LEGACY
+    assert "freqtrade-georgia-v3-lshadow" not in RETIRED
+    assert "freqtrade-georgia-v3-lshadow" not in LEGACY
 
 
 def test_is_live_bot_matches_the_live_suffix():

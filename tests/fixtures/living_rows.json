@@ -1,6 +1,6 @@
 {
- "_why": "[(yj)] The living roster, captured from the public /pnl.json so the fleet_manifest coverage guard has something real to check in an environment with no feed. It was pinned to an absolute path in ANOTHER session's scratchpad, so it skipped on every CI run while its own docstring said it must not. Refresh it whenever a book is minted or retired; the live-feed arm of that test fails if this list falls behind a feed it can actually read.",
- "captured": "2026-09-06T23:34:04+00:00",
+ "_why": "[(yj)] The living roster, captured from the public /pnl.json so the fleet_manifest coverage guard has something real to check in an environment with no feed. It was pinned to an absolute path in ANOTHER session's scratchpad, so it skipped on every CI run while its own docstring said it must not. Refresh it whenever a book is minted or retired; the live-feed arm of that test fails if this list falls behind a feed it can actually read. [(zo) 9-Sep] freqtrade-georgia-lshadow removed: retired at her pre-registered cap-5 read (the prediction failed; I17 undecidable call). Her v3 row stays.",
+ "captured": "2026-09-09T06:40:00+00:00",
  "source": "https://pnl-dashboard-production-858c.up.railway.app/pnl.json",
  "rows": [
   "band-kelly-lshadow",
@@ -9,7 +9,6 @@
   "book-kiyosaki-lshadow",
   "freqtrade-avo-maria-lighter",
   "freqtrade-avo-maria-lshadow",
-  "freqtrade-georgia-lshadow",
   "freqtrade-georgia-v3-lshadow",
   "freqtrade-mum-lighter",
   "freqtrade-mum-lshadow",

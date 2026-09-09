@@ -38,10 +38,19 @@ def test_every_live_ladder_book_is_declared_unsweepable():
 
 def test_the_two_known_ladder_books_are_covered():
     """georgia is the book that surfaced this; avo maria is the fleet's
-    best-evidenced book and rides the same SwingDip ladder — naming both
-    stops a future reader assuming the exclusion is georgia-specific."""
-    assert "freqtrade-georgia-lshadow" in sweep.UNSWEEPABLE_EXITS
+    best-evidenced book and rides a ladder of her own — naming both stops a
+    future reader assuming the exclusion is georgia-specific.
+    [2026-09-09 (zo)] georgia v1 RETIRED at her cap-5 read, and the declaration
+    is DERIVED from the living roster, so she leaves it the day she leaves the
+    fleet — pinned in that direction too. Her carrier still carries the ladder
+    (read from STRATEGIES): the exclusion was a property of the carrier, never
+    of the book."""
     assert "freqtrade-avo-maria-lshadow" in sweep.UNSWEEPABLE_EXITS
+    assert "freqtrade-georgia-lshadow" not in sweep.UNSWEEPABLE_EXITS, (
+        "a retired book is back in a LIVE-derived declaration — the "
+        "derivation stopped reading live_strategies()")
+    geo = next(s for s in fam.STRATEGIES if s.bot == "freqtrade-georgia")
+    assert len(getattr(geo, "roi", None) or {}) > 1, "her carrier lost its ladder"
 
 
 def test_a_fixed_stop_carrier_is_NOT_excluded():
@@ -75,10 +84,12 @@ def test_a_fixed_stop_carrier_is_NOT_excluded():
 def test_the_reason_names_the_ladder_and_the_rule_space():
     """A declaration whose reason is vague is a snooze. It must carry the
     actual rungs and say what rule space it falls outside of."""
-    why = sweep.UNSWEEPABLE_EXITS["freqtrade-georgia-lshadow"]
+    # [2026-09-09 (zo)] read on 🙏 avo — georgia v1 retired and the map is
+    # live-derived. Her SwingDip ladder's real rungs, not placeholders.
+    why = sweep.UNSWEEPABLE_EXITS["freqtrade-avo-maria-lshadow"]
     assert "ladder" in why.lower()
-    assert "1.8%" in why, why          # the real first rung, not a placeholder
-    assert "720m" in why, why          # the real last rung
+    assert "0m:20%" in why, why        # the real first rung, not a placeholder
+    assert "20160m" in why, why        # the real last rung
     assert "ratchet" in why.lower()
 
 

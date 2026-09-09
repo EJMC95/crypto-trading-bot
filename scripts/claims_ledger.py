@@ -36,7 +36,7 @@ it at declaration time — before any network, in `--selftest`, offline — so a
 unfalsifiable number cannot enter the ledger at all. That is what stops this
 becoming the thing it exists to catch.
 
-FOUR VERDICTS, and the distinctions are load-bearing:
+FIVE VERDICTS, and the distinctions are load-bearing:
 
   HOLDS       the live number is inside the row's declared tolerance.
   STALE       it is outside. The doctrine is wrong NOW and says so.
@@ -48,6 +48,20 @@ FOUR VERDICTS, and the distinctions are load-bearing:
   DARK        the organ did not answer. **Never graded** — an unread number is
               not a matching number, and the run exits 2 rather than 0 (I1/I5:
               unknown degrades to unknown, never to a measurement).
+  GRADED      [2026-09-09 (zo)] a PREDICTION whose read has been TAKEN and
+              RECORDED on the row itself (`graded={on, verdict, why}`) — a
+              terminal state. It never fails, never goes STALE and never
+              reads DARK, because the organ is no longer the authority on
+              it: the recorded read is. Built for the first prediction to
+              reach its date, 🔮 georgia's cap-5 claim, whose owner field
+              (`horizon.eta_days`) is `null` on an `undecidable` book — so
+              as written it could only ever read UNRESOLVED, and the honest
+              grade (her post-cap closes, per the HANDOFF row) had to be
+              taken by an instrument and written back. A graded row STAYS in
+              the table: the ledger is the record of what was claimed AND
+              what came of it, in one diff-reviewable place. A row may be
+              graded only AFTER its `grade_after` — grading a prediction
+              before its date is the I25 hot-window error with a stamp on.
 
 WHAT IT IS NOT, stated so nobody stretches it: publish-only. It moves no
 capital, writes no lever, promotes nothing, and is junior to every gate — the
@@ -211,6 +225,27 @@ CLAIMS = [
         "grade_after": "2026-09-10",
         "cites": ("CHANGELOG.md",),
         "covers": (),
+        # [2026-09-09 (zo)] THE READ, taken on the post-cap closes (the rows
+        # whose OWN policy stamp reads max_entries_per_hour=5, keyed on the
+        # OPEN) by scripts/study_georgia_cap5_read_2026-09-09.py — because
+        # the owner field above is `null` on an `undecidable` book, so this
+        # row could never have resolved as written. Recorded here per the
+        # HANDOFF row's own instruction ("grade the claim on her post-cap
+        # closes ONLY"). Dated 10-Sep: Eamon asked for the read on 9-Sep
+        # Sydney ("take georgia's read now") and the ledger refuses a grade
+        # stamped before grade_after — the sample (n=75, the claim's own
+        # sufficiency floor) is the same on both days at 5.7 closes/day.
+        "graded": {
+            "on": "2026-09-10",
+            "verdict": "FAILED",
+            "why": "post-cap n=75 (own stamp cap=5, keyed on the open): mean "
+                   "-0.0025%/trade vs +0.108% predicted, t -0.02 vs +2.54, "
+                   "5.72 closes/day vs 5.47 (the throughput limb delivered; "
+                   "the mean limb did not) -> t bar UNREACHABLE where 187d "
+                   "[127, 247] was predicted. Retired on I17's UNDECIDABLE "
+                   "call (organ: 8,094 closes ~4.3y), NOT a measured "
+                   "exclusion — post-cap upper bound +0.196% > 0.",
+        },
     },
 ]
 
@@ -283,9 +318,14 @@ def validate(claims=None):
             continue
         extra = set(row) - {"id", "subject", "kind", "claim", "number", "tol",
                             "as_of", "owner", "owner_ref", "grade_after",
-                            "cites", "covers"}
+                            "cites", "covers", "graded"}
         if extra:
             bad.append(f"{rid}: unknown field(s) {sorted(extra)}")
+        g = row.get("graded")
+        if g is not None:
+            why = graded_problem(row)
+            if why:
+                bad.append(f"{rid}: {why}")
         if rid in seen:
             bad.append(f"{rid}: duplicate id — every citation of it is now "
                        f"ambiguous (the changelog-letter failure, in a table)")
@@ -321,6 +361,39 @@ def validate(claims=None):
     return bad
 
 
+GRADED_VERDICTS = ("HELD", "FAILED")
+
+
+def graded_problem(row):
+    """-> a reason the row's `graded` record is malformed, or None.
+
+    A graded row is a COMMITMENT that a read was taken; the shape is checked
+    at declaration so a half-written record cannot silently retire a claim
+    from grading. The date rule is the load-bearing one: a prediction graded
+    BEFORE its own `grade_after` is a read taken on the window that motivated
+    it (I25), and the ledger refuses to carry one.
+    """
+    g = row.get("graded")
+    if not isinstance(g, dict):
+        return "`graded` must be a dict {on, verdict, why}"
+    missing = {"on", "verdict", "why"} - set(g)
+    if missing:
+        return f"`graded` is missing {sorted(missing)}"
+    on = _date(g["on"])
+    if on is None:
+        return f"`graded.on` is not an ISO date: {g['on']!r}"
+    gafter = _date(row.get("grade_after"))
+    if gafter is not None and on < gafter:
+        return (f"`graded.on` {on} is BEFORE grade_after {gafter} — a "
+                f"prediction may not be graded on the window that motivated "
+                f"it (I25)")
+    if g["verdict"] not in GRADED_VERDICTS:
+        return f"`graded.verdict` {g['verdict']!r} is not one of {GRADED_VERDICTS}"
+    if not isinstance(g["why"], str) or not g["why"].strip():
+        return "`graded.why` must name the number the read turned on"
+    return None
+
+
 def grade(row, states, today=None):
     """-> {status, live, drift, why} for ONE row against a states map.
 
@@ -337,6 +410,16 @@ def grade(row, states, today=None):
            "live": None, "drift": None}
     gafter = _date(row["grade_after"]) or today
     due = today >= gafter
+    g = row.get("graded")
+    if isinstance(g, dict) and not graded_problem(row):
+        # terminal: the recorded read is the authority now, not the organ.
+        # `live` is still reported when the organ answers, for the reader.
+        live = (_num(resolve(states[key], path))
+                if isinstance((states or {}).get(key), dict) else None)
+        out.update(status="GRADED", live=live,
+                   why=f"read taken {g['on']}: prediction {g['verdict']} — "
+                       f"{g['why']}")
+        return out
     if key not in (states or {}):
         out.update(status="DARK",
                    why=f"organ '{key}' published nothing readable — an unread "
@@ -373,7 +456,8 @@ def grade_all(states, claims=None, today=None):
 
 
 def counts(rows):
-    out = {s: 0 for s in ("HOLDS", "STALE", "PENDING", "UNRESOLVED", "DARK")}
+    out = {s: 0 for s in ("HOLDS", "STALE", "PENDING", "UNRESOLVED", "DARK",
+                          "GRADED")}
     for r in rows:
         out[r["status"]] = out.get(r["status"], 0) + 1
     return out
@@ -390,8 +474,10 @@ def build(rows, today=None):
         "moves_capital": False,
         "rule": ("every claim names (organ_key, dotted.path); the organ's own "
                  "published number is compared to the declared one against the "
-                 "row's declared tolerance. DARK is never graded, and a "
-                 "registered prediction is PENDING until its grade_after."),
+                 "row's declared tolerance. DARK is never graded, a "
+                 "registered prediction is PENDING until its grade_after, and "
+                 "a prediction whose read was taken is GRADED — terminal, the "
+                 "recorded read being the authority."),
         "n_claims": len(rows),
         "counts": counts(rows),
         "claims": {r["id"]: r for r in rows},
@@ -457,7 +543,8 @@ def render(payload):
     L = [f"THE LEDGER OF CLAIMS — {payload['n_claims']} claim(s), "
          f"source {payload.get('source', '?')}",
          f"  HOLDS {c['HOLDS']}  STALE {c['STALE']}  PENDING {c['PENDING']}  "
-         f"UNRESOLVED {c['UNRESOLVED']}  DARK {c['DARK']}", ""]
+         f"UNRESOLVED {c['UNRESOLVED']}  DARK {c['DARK']}  "
+         f"GRADED {c.get('GRADED', 0)}", ""]
     for r in payload["claims"].values():
         L.append(f"  [{r['status']:<10}] {r['id']}  ({r['kind']})")
         L.append(f"      owner {r['owner']}")

@@ -47,6 +47,12 @@ LEGACY_BOTS = [
     "perps-funding-lighter-lshadow",
     "nav-cook-lshadow",
     "book-grimes-lshadow",
+    # [2026-09-09 (zo)] 🔮 georgia v1's SHADOW — the prune half of the read
+    # that closed the slate's deferral (see pnl_dashboard.RETIRED_ROWS for
+    # the numbers). LEDGER untouched (289 closes stay in paper_trades); this
+    # removes only the frozen summary row so it cannot go stale and page.
+    # Her v3 row is a different strategy and stays.
+    "freqtrade-georgia-lshadow",
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
     # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the

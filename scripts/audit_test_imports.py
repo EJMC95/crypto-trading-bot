@@ -237,10 +237,44 @@ def _imported_names(tree):
     return names
 
 
+def _stdlib_names():
+    """The interpreter's stdlib top-level names, on EVERY interpreter.
+
+    [2026-09-09] `sys.stdlib_module_names` is 3.10+. On 3.9 — this repo's dev
+    venv — the attribute is absent, the set read EMPTY, and every `import os`
+    in every test was reported as undeclared: this guard was RED on main
+    itself, locally, while green in CI (3.11). A false red is the (gl) shape
+    — it trains a reader to ignore `test_enforced_audit_guard`, which is the
+    one place a real finding would surface. Fallback: derive the set from
+    the interpreter's own stdlib directory and its builtins, which every
+    Python has.
+    """
+    names = set(getattr(sys, "stdlib_module_names", ()) or ())
+    if not names:
+        import sysconfig
+        names |= set(sys.builtin_module_names)
+        for key in ("stdlib", "platstdlib"):
+            base = sysconfig.get_paths().get(key)
+            if not base or not os.path.isdir(base):
+                continue
+            for fn in os.listdir(base):
+                if fn.endswith(".py"):
+                    names.add(fn[:-3])
+                elif (os.path.isdir(os.path.join(base, fn))
+                      and not fn.startswith(("site-packages", "__pycache__",
+                                             "lib-dynload", "config-"))):
+                    names.add(fn)
+            dyn = os.path.join(base, "lib-dynload")
+            if os.path.isdir(dyn):
+                for fn in os.listdir(dyn):
+                    names.add(fn.split(".")[0])
+    return names | {"__future__"}
+
+
 def scan(root=None):
     """[(relpath, lineno, module)] for every undeclared third-party import."""
     root = root or ROOT
-    stdlib = set(getattr(sys, "stdlib_module_names", ())) | {"__future__"}
+    stdlib = _stdlib_names()
     declared = _requirement_names(os.path.join(root, "requirements-test.txt"))
     # ...plus only what CI additionally installs from requirements.txt. The
     # rest of that file is the IMAGE's dependency set and is NOT in the test
@@ -435,6 +469,15 @@ def _selftest():
         assert _ci_extra_names(td) == set(CI_EXTRA_FALLBACK), \
             "an unmatched workflow must fall back, never return empty"
         assert _ci_extra_names("/no/such/root") == set(CI_EXTRA_FALLBACK)
+
+    # [2026-09-09] the stdlib set must be POPULATED on every interpreter this
+    # repo runs on: on 3.9 `sys.stdlib_module_names` is absent and the set
+    # read empty, flagging every `import os` in the tree (a false red on main
+    # itself). These are the names the false red actually listed.
+    core = {"os", "sys", "ast", "re", "io", "json", "datetime", "pathlib",
+            "importlib", "subprocess", "tokenize", "tempfile", "textwrap"}
+    assert core <= _stdlib_names(), sorted(core - _stdlib_names())
+    assert "yaml" not in _stdlib_names(), "a third-party name leaked into stdlib"
 
     print("audit_test_imports selftest OK (depth, relative/dotted imports, "
           "requirements parsing with aliases and markers, guarded-import "

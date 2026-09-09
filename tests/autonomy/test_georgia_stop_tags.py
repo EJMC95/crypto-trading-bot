@@ -16,13 +16,16 @@ import lighter_family_bot as fam
 
 
 def _georgia():
-    """The LIVE roster's Georgia — resolved through `live_strategies()` so a
-    retirement makes this test disappear with the book rather than pin a
-    constant on a corpse."""
-    for b in fam.live_strategies():
-        if str(getattr(b, "bot", "")).endswith("georgia"):
+    """Georgia's STRATEGY OBJECT — resolved through `STRATEGIES`, not
+    `live_strategies()`. [2026-09-09 (zo)] v1 is RETIRED (her cap-5 read
+    failed), and the property these tests pin — the per-tag stop multipliers
+    the carrier applies — belongs to the strategy object and outlives the
+    book; her ledger (289 closes) is still graded by instruments that read
+    this carrier. A deleted strategy class would still fail here, loudly."""
+    for b in fam.STRATEGIES:
+        if str(getattr(b, "bot", "")) == "freqtrade-georgia":
             return b
-    raise AssertionError("could not locate Georgia in live_strategies()")
+    raise AssertionError("could not locate Georgia in STRATEGIES")
 
 
 def _dist(strategy, tag, atr, px):

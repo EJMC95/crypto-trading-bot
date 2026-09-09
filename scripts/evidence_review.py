@@ -1510,9 +1510,11 @@ def selftest():
             assert _dead in RETIRED, f"{_dead} is retired but still graded"
         # ...and the bare-name trap must not take a LIVING book with it.
         # [2026-08-19] mum left this list when it was RETIRED (I17 no_rate).
-        # The guard is unchanged and still has two living subjects — the point
-        # was never mum, it is that membership stays EXACT-match.
-        for _alive in ("freqtrade-georgia-lshadow",
+        # [2026-09-09 (zo)] georgia v1 left it the same way (her cap-5 read
+        # failed) and mum v2 rejoins — the guard is unchanged and still has
+        # two living subjects; the point was never any one book, it is that
+        # membership stays EXACT-match (her v3 shares the bare name).
+        for _alive in ("freqtrade-mum-lshadow", "freqtrade-georgia-v3-lshadow",
                        "freqtrade-avo-maria-lshadow"):
             assert _alive not in RETIRED, (
                 f"{_alive} is a LIVING book — `LEGACY_BOTS` carries its "

@@ -217,7 +217,7 @@ def audit(bus_json=None, claims=None, today=None, sh_text=None,
     L.append("")
     L.append(f"LIVE ({source}) — HOLDS {c['HOLDS']}  STALE {c['STALE']}  "
              f"PENDING {c['PENDING']}  UNRESOLVED {c['UNRESOLVED']}  "
-             f"DARK {c['DARK']}")
+             f"DARK {c['DARK']}  GRADED {c.get('GRADED', 0)}")
     for g in graded:
         if g["status"] in ("STALE", "UNRESOLVED"):
             rc = 1
@@ -227,6 +227,10 @@ def audit(bus_json=None, claims=None, today=None, sh_text=None,
                      f"`number`/`as_of` in scripts/claims_ledger.py")
         elif g["status"] == "PENDING":
             L.append(f"  PENDING: {g['id']} — graded from {g['grade_after']}")
+        elif g["status"] == "GRADED":
+            # [(zo)] terminal — reported, never a failure and never DARK:
+            # the recorded read is the authority, not the organ
+            L.append(f"  GRADED: {g['id']} — {g['why']}")
     if c["DARK"]:
         L.append(f"  {c['DARK']} claim(s) DARK — the organ did not answer, so "
                  f"they are NOT graded. Inconclusive, never clean.")

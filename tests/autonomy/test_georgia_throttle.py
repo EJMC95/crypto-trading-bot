@@ -146,11 +146,15 @@ def test_a_book_without_a_throttle_publishes_NO_rank():
 
 def test_the_blast_radius_is_one_living_book():
     """DayTraderGated is 🔮 georgia and the RETIRED crypto-intraday-15m, so
-    this change reaches exactly one row that still trades."""
+    this change reached exactly one row that still traded.
+    [2026-09-09 (zo)] georgia v1 is retired too (her cap-5 read failed), so
+    the carrier now has ZERO living users — pinned as such, so a new
+    DayTraderGated book cannot inherit her throttle unnoticed."""
     users = [s.bot for s in fam.STRATEGIES
              if isinstance(s, fam.DayTraderGated)]
+    assert "freqtrade-georgia" in users, users
     living = [b for b in users if b not in fam.RETIRED_BOOKS]
-    assert living == ["freqtrade-georgia"], (users, living)
+    assert living == [], (users, living)
 
 
 def test_capacity_is_not_an_era_reset():

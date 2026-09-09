@@ -90,7 +90,10 @@ def test_the_stamp_reports_what_is_enforced():
 def test_both_arms_stamp_the_SAME_cap_for_georgia():
     """THE PARITY THE JUDGE ACTUALLY CHECKS, driven through the real builder
     rather than asserted about it."""
-    geo = next(s for s in fam.live_strategies() if s.bot == "freqtrade-georgia")
+    # [2026-09-09 (zo)] from STRATEGIES, not live_strategies(): v1 is retired
+    # and the property pinned here is the BUILDER's parity (both hosts stamp
+    # the cap the strategy object carries), which outlives the book.
+    geo = next(s for s in fam.STRATEGIES if s.bot == "freqtrade-georgia")
     cap = fam.throttle_cap(geo)
     # [2026-08-28 (vd)] STAYS 5. A cut to 2 was measured (permutation P=0.0244)
     # and REVERTED: one NEAR close at -19.506% on a -5% stop is 87% of the

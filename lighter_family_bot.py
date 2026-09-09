@@ -2110,17 +2110,30 @@ RETIRED_BOOKS = {
     "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
     "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
     "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
-    # [2026-09-02] 🔮 georgia v1 was ON the September slate and is DEFERRED,
-    # not retired — a refusal with evidence: her cap-5 trajectory carries a
+    # [2026-09-02] 🔮 georgia v1 was ON the September slate and was DEFERRED,
+    # not retired — a refusal with evidence: her cap-5 trajectory carried a
     # PRE-REGISTERED prediction (claims_ledger `georgia-entry-cap-5-days-to-
     # gate`, registered 27-Aug, grade_after 10-Sep, days-to-gate ~187 at a
-    # higher mean) and the docket's ~4,233d horizon pools ~200 pre-cap closes
-    # against ~25 post-cap ones — the trajectory the prediction is ABOUT has
-    # not had time to exist (its own words). Retiring her before her read
-    # date voids a registered prediction, the I21/I25 shape. DECIDE AT THE
-    # 10-Sep GRADE: prediction fails -> retire here (the key is
-    # "freqtrade-georgia", override GEORGIA_RETIRED_OVERRIDE); holds -> she
-    # has earned the clock the prediction promised.
+    # higher mean). Retiring her before her read date would have voided a
+    # registered prediction, the I21/I25 shape.
+    # [2026-09-09 (zo)] THE READ WAS TAKEN (Eamon: "take georgia's read now",
+    # a day early) AND THE PREDICTION FAILED on its own post-cap population —
+    # the 75 closes whose OWN policy stamp reads max_entries_per_hour=5
+    # (keyed on the OPEN, (hc)): mean -0.0025%/trade (predicted +0.108%),
+    # t -0.02 (predicted +2.54), so the t bar is UNREACHABLE at any n where
+    # 187 days was promised. The throughput limb DID deliver (5.72 closes/day
+    # vs 5.47 predicted) — the cap was live and working; it simply moved
+    # 4 of 75 trades (ranks 4-5) and her mean is ~zero at every rank.
+    # RETIRED on I17's UNDECIDABLE call — the organ: era n=277, t=0.50,
+    # n_req(t) 8,094 closes at 5.12/day ~ 4.3 YEARS — and NOT as a measured
+    # loser: her post-cap upper bound is +0.196% > 0, so nobody may cite this
+    # as "her sample excluded a positive mean". It did not. Instrument:
+    # scripts/study_georgia_cap5_read_2026-09-09.py (calibration gate
+    # REFUSES on a dark feed or a wrong basis). Zero open positions at the
+    # retirement, so nothing froze; her v3 row (freqtrade-georgia-v3) is a
+    # different strategy and is NOT retired. Exact-match key, never a
+    # suffix strip — v3 shares the prefix.
+    "freqtrade-georgia":   "GEORGIA_RETIRED_OVERRIDE",
     # [2026-08-19 (ro)] 👩 mum's (rd) retirement was REVERSED by the operator
     # ("unretire mum and bring her back to life") and she is deliberately NOT
     # listed here. She returns as v2 — a different strategy (OversoldRebound,
