@@ -33,9 +33,9 @@ speeds it up.
 WHAT THIS DOES NOT DO, deliberately: it moves no bar and no control flow. An
 expired candidate still stands down, still cools down, still enters `done` —
 the lane is SERIAL and scarce, and a candidate that loops would be worse than
-one that is mislabelled. `MAX_DAYS` is untouched: extending the clock for
-starving candidates is a policy act on the promotion path and needs its own
-measured price (I19), which is Eamon's call, not this entry's.
+one that is mislabelled. `MAX_DAYS` was untouched HERE: extending the clock
+for starving candidates is a policy act on the promotion path, and Eamon made
+it the same day — see (zn) / `test_candidate_clock_extension.py`.
 """
 import ast
 import os
@@ -255,11 +255,17 @@ def test_the_expiry_branch_reads_the_owner_and_never_hardcodes_a_name():
 def test_no_bar_and_no_control_flow_moved():
     """A candidate that expires must still stand down, cool down and enter
     `done`: the lane is SERIAL, and a looping candidate is worse than a
-    mislabelled one. MAX_DAYS itself is untouched — extending it is a policy
-    act with its own price (I19)."""
+    mislabelled one.
+
+    [CORRECTED IN PLACE per I12 at (zn).] This read "MAX_DAYS itself is
+    untouched — extending it is a policy act with its own price", and pinned
+    the literal `if days >= MAX_DAYS:`. Eamon took that policy act the same
+    day, so the expiry now compares against `effective_max_days`' value; the
+    base clock is still 14 and the control flow at expiry is still the same
+    three acts. `test_candidate_clock_extension.py` owns the extension."""
     assert ej.MAX_DAYS == 14.0
     assert ej.MIN_CLOSES == 30 and ej.LIVE_MIN_CLOSES == 10
     src = pathlib.Path(ej.__file__).read_text()
-    branch = src.split("if days >= MAX_DAYS:")[1].split("return save(")[1][:400]
+    branch = src.split("if days >= _eff_max:")[1].split("return save(")[1][:400]
     for keep in ('phase="idle"', "done=done + [cand", "cooldown_until=now"):
         assert keep in branch, f"the expiry branch stopped doing {keep!r}"

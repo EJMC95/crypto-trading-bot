@@ -1,3 +1,86 @@
+## 2026-09-09 (zn) — A CANDIDATE THAT NARROWS ITS OWN ARM NOW GETS THE CLOCK ITS OWN RATE SAYS IT NEEDS — BOUNDED, RE-DERIVED EVERY CYCLE, NEVER ON A HUNCH
+
+**Eamon, 9-Sep:** *"extend max_days for gate-narrowing candidates."* The
+policy act `(zl)` handed him, taken the same day, on the number `(zl)` put in
+front of him: `mum-vel-12-20` halved its own shadow arm's close rate relative
+to the live control (7.52 → 1.84 opens/day against 7.76 → 3.68), and at its
+own rate the 30-close floor needed **16.3d against a 14-day clock** — so the
+candidate would have run out of clock before it could be judged either way,
+and three of mum's four queued candidates change their arm's rate. On a fixed
+clock, *"be more selective"* was a class the 🧪 judge structurally could not
+grade: it was **decidability, not edge**, that the clock was refusing (I17,
+I22 — a sample the gate cannot grade is not a slow winner).
+
+**THE SHAPE, AND THE THREE I DID NOT BUILD.** The clock is extended **to
+exactly the day the candidate's own `(zl)` projection names**, never to the
+ceiling, and it is **re-derived every cycle** from the growing sample — so it
+self-corrects in both directions (measured on the live numbers: 16.3d at day
+1.6, 16.2d at day 14 with the sample grown, back to the base clock the cycle
+the floors are met) and needs no margin, because the re-evaluation IS the
+margin and a fixed margin would be a second retyped constant. Rejected, with
+reasons: (1) **a `direction: narrow` label on each candidate spec** — a
+hand-typed label is the constant that drifts ((fd)/(gu)), and
+incubator-proposed candidates would arrive without one; (2) **detecting
+narrowing by the control-adjusted rate ratio** — that names the CAUSE, and the
+actuator does not need the cause: a candidate slow because it is selective and
+one slow because the tape went quiet need the same thing, the days their own
+rate says, and the lane pays the same for both (the ratio belongs on the
+pair's power block as a report, not in the clock); (3) **a flat raise of
+`MAX_DAYS`** — hands every slow candidate the same 28 days regardless of need,
+and the lane is SERIAL: four candidates at 14d is 56d to cycle the queue, at a
+flat 28d it is 112d.
+
+**SHIPPED.** `MAX_DAYS_EXTENDED` (env `XPJ_MAX_DAYS_EXTENDED`, **28** — 2× the
+base clock, i.e. one extra clock; the measured need was 16.3d and a
+halved-turnover candidate on a quiet tape reads ~18d, so it covers the
+realistic cases with room; at the base rate it corresponds to a shadow arm
+closing at least ~1.07/day, below which no clock this lane can afford will
+grade it). `effective_max_days(ev)` is the ONE owner of the clock a candidate
+gets this cycle; the expiry branch reads its value and publishes
+`last_eval.clock = {max_days, effective, extended, extension}` on every cycle
+BEFORE the compare, so a candidate running past 14d says why on the payload.
+`sample_horizon` publishes `max_days_extended` and `reachable_extended`
+beside the unchanged `(zl)` `reachable`, so *"not reachable"* beside *"clock
+extended to 16.3d"* reads as one story. **THE COST, stated (I19):** serial-lane
+time — worst case +14d per candidate, and only when the projection says the
+sample WILL arrive. On today's queue: `vel-12-20` +2.3d. No real-money
+exposure: the candidate runs on the SHADOW twin; the paired bar, floors,
+margin and the `live.*` sole-writer rule are byte-unchanged (pinned).
+
+**FAIL-CLOSED TOWARD THE BASE CLOCK, and that direction is the safety of it.**
+An extension is a cost to a scarce lane, so absence of evidence never buys
+one: no horizon, an unreadable one, a thin (UNPROJECTABLE) arm, a dead arm,
+floors already met, or a need past the ceiling all leave the clock at 14. A
+candidate that cannot make it even with the extra clock is not fed more lane —
+it expires `UNDERPOWERED` (not a refutation) and returns after
+`DONE_RETRY_D`. The `(zl)` test that pinned the literal `if days >= MAX_DAYS:`
+and said extending it *"is a policy act… not this entry's"* is corrected in
+place per I12 — the act was taken.
+
+**DECLARED LIMIT:** the horizon tracks the full-window floors (30/10). The
+paired bar's per-half rung (15/5, `(vm)`) is a second floor the clock does not
+project; a candidate whose closes bunch into one half can be `met` on the
+full window and still fail the halves, and expires `ABANDONED` exactly as it
+did before this entry. That is the same behaviour as yesterday, named rather
+than fixed, because the per-half projection is its own instrument.
+
+**12 mutations, 12 red — one of them an EQUIVALENT MUTANT until a test reached
+it.** M8 (accept a bool `need`) survived at the default clocks because `True`
+collapses to 1.0, which is inside the base clock and returns it either way; the
+guard was unobservable there, not wrong. Rather than call the mutation
+meaningless, the test now drives the owner at explicit small clocks where 1.0
+would fall in the extension band, with a real 1.0 beside it as the control.
+The class-closer is an AST pin that the expiry `if` compares `days` against
+the owner's returned name and never against `MAX_DAYS`, and that the owner
+call and the `clock` publish are the two sibling statements immediately before
+it — a fixed clock or a latched extension cannot be reintroduced quietly.
+
+Verified: judge `--selftest` OK, full suite green, all guards OK.
+`experiment_judge.py` rides the `freqtrade-bots` push path — and it must land
+before **21-Sep 14:13Z**, day 14 of the running candidate, or `mum-vel-12-20`
+expires on the old clock. Main-only, no live marker: nothing here touches a
+live row.
+
 ## 2026-09-09 (zi) — THE GATE HORIZON'S RATE DENOMINATOR INCLUDED 27 DAYS ON WHICH THE REAL-MONEY BOOK DID NOT EXIST: (la) needed one holding period and used the era boundary as its stand-in
 
 **Eamon, 9-Sep: *"ship the rate denominator fix"*** — the growth item of that
