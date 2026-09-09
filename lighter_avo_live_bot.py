@@ -104,6 +104,11 @@ from lighter_family_bot import (
     # carrier class the entry_rank stamp keys on — imported, never re-typed:
     # these are the numbers a go-live verdict is judged on.
     DayTraderGated, control_draw, control_settle, control_block, control_leg,
+    # [(zg)] the coin-quality veto READ, now one owner shared with the twin —
+    # the rule lived only here and the control arm traded coins this arm
+    # refuses. Behaviour on THIS arm is unchanged: same payload, same TTL env,
+    # same fail-open.
+    coin_veto_map,
     # [(ti)] the ONE policy-stamp builder, shared with the shadow host so
     # judge v2's parity precheck compares like with like.
     policy_stamp,
@@ -2781,9 +2786,12 @@ def main(_ctx=None, once=False):
             # false: the host ENFORCES `throttle_cap(S)` in the entry loop, so
             # the stamp reports what it applies. The argument is still the
             # HOST's to answer — the answer changed, not the contract.
+            # [(zg)] `coin_veto` moved INSIDE the shared builder — it was a
+            # live-only key bolted on here, which is precisely why the twin
+            # never had to answer it and the parity rung never compared it.
             return {**policy_stamp(S, "lighter_live", "diversified",
-                                   throttle_cap(S)),
-                    "brain_gate": "row+shadow", "coin_veto": True}
+                                   throttle_cap(S), True),
+                    "brain_gate": "row+shadow"}
 
         def _flatten_all(why):
             """Emergency flatten reads the VENUE, not meta — an untracked
@@ -2916,18 +2924,10 @@ def main(_ctx=None, once=False):
         # moment either was edited — a second copy of a rule is a second rule.
         live_scale = _clip_scale_now()
 
-        coin_vetoed = {}
-        try:
-            vp = store.load_state("coin-vetoes") or {}
-            cv = vp.get("coins") or {}
-            if isinstance(cv, dict) and cv:
-                vage = (t_now - parse_ts(vp.get("updated")
-                                         or vp.get("ts"))).total_seconds()
-                if 0 <= vage <= float(vp.get("ttl_sec")
-                                      or QUALITY_VETO_TTL_S):
-                    coin_vetoed = cv
-        except Exception:  # noqa: BLE001
-            pass
+        # [(zg)] ONE owner, shared with the shadow twin. This arm keeps its own
+        # `QUALITY_VETO_TTL_S` env and passes it in, so the real-money contract
+        # is byte-identical to the inline block this replaced.
+        coin_vetoed = coin_veto_map(t_now, QUALITY_VETO_TTL_S)
 
         # [2026-09-02] the maxdd DENOMINATOR is the FUNDED book, not the frozen
         # birth seed — `baseline` (state.initial_equity) stays the P&L anchor,

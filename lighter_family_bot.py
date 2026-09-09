@@ -2355,7 +2355,72 @@ def _cohort_long_state(fr, cohort):
                 10**9 if _lb is None else int(_lb))
 
 
-def policy_stamp(strategy, venue, scan_order, max_entries_per_hour):
+#: [2026-09-08 (zg)] THE COIN-QUALITY VETO'S TTL AND SWITCH, on the SHADOW
+#: host. The live host keeps its own `QUALITY_VETO_TTL_S` env and passes it in,
+#: so porting the rule here changes no real-money contract — the two arms share
+#: the READ, not the environment.
+COIN_VETO_TTL_S = float(os.environ.get("COIN_VETO_TTL_S", "5400"))
+
+#: Revert path. `FAMILY_COIN_VETO=off` puts the shadow host back to its
+#: pre-(zg) behaviour — and the policy stamp then reports `False`, so the arms
+#: DIVERGE and the judge blocks on `policy_mismatch` rather than quietly
+#: computing a biased gap. Reverting the port is allowed; hiding it is not.
+COIN_VETO_ON = str(os.environ.get("FAMILY_COIN_VETO", "on")).lower() \
+    not in ("0", "off", "false", "no")
+
+
+def _fb_coin_evidence_hit(mapping, sym):
+    """`fleet_bus.coin_evidence_hit` behind this module's lazy-import style.
+
+    The spelling fold is fleet_bus's ONE owner (it checks every spelling of a
+    coin, most specific first) and the live host calls exactly it — a `sym in
+    mapping` here would be a second copy of the namespace rule, which is the
+    defect that put the veto on one arm only. Any doubt returns None = no
+    veto, so an import failure cannot invent a refusal.
+    """
+    try:
+        import fleet_bus
+        return fleet_bus.coin_evidence_hit(mapping, sym)
+    except Exception:  # noqa: BLE001 — fail-safe open
+        return None
+
+
+def coin_veto_map(now=None, ttl_default=COIN_VETO_TTL_S):
+    """-> `{coin: reason}` the fleet's coin-quality vetoes, or `{}` on any doubt.
+
+    [2026-09-08 (zg)] THE ONE OWNER OF THE READ, shared by BOTH arms — (hj): a
+    second copy of a rule is a second rule, and this one had no copy at all on
+    the shadow side. Measured 8-Sep: `lighter_avo_live_bot` read `coin-vetoes`
+    and refused entries on it; `lighter_family_bot` contained the string
+    ZERO times. So every judged pair's control arm was trading a coin
+    population its live arm refuses, and mum's `policy_fields` did not carry
+    `coin_veto`, so the (sk) parity stage could not see it either — a live/
+    shadow entry-policy divergence that was invisible by construction.
+
+    FAIL-OPEN on every doubt, exactly as the live host has always failed: a
+    dark, stale, empty or unparseable payload vetoes NOTHING. An organ outage
+    must never silently narrow a book's universe (the `scout_universe`
+    contract), and this rule only ever REMOVES candidates, so failing open is
+    the direction that cannot invent a refusal.
+    """
+    try:
+        vp = store.load_state("coin-vetoes") or {}
+        cv = vp.get("coins") or {}
+        if not isinstance(cv, dict) or not cv:
+            return {}
+        now = now or datetime.now(timezone.utc)
+        stamp = vp.get("updated") or vp.get("ts")
+        age = (now - datetime.fromisoformat(
+            str(stamp).replace("Z", "+00:00"))).total_seconds()
+        if 0 <= age <= float(vp.get("ttl_sec") or ttl_default):
+            return cv
+    except Exception:  # noqa: BLE001 — fail-safe open
+        pass
+    return {}
+
+
+def policy_stamp(strategy, venue, scan_order, max_entries_per_hour,
+                 coin_veto):
     """[(ti)] THE ONE BUILDER of the (jf) policy stamp, shared by BOTH arms.
 
     Judge v2's fairness precheck (P1) compares the two arms' stamps on the
@@ -2387,6 +2452,15 @@ def policy_stamp(strategy, venue, scan_order, max_entries_per_hour):
         # ("venue", "bull", "lenses", "sides") only, so this field moves no
         # era boundary — verified before shipping, and pinned by a test.
         "max_entries_per_hour": max_entries_per_hour,
+        # [(zg)] THE SAME CONTRACT AS THE FIELD ABOVE, for the same reason: an
+        # explicit argument each host answers, so a host that stops applying
+        # the coin-quality veto says so in the stamp instead of comparing
+        # None-to-None through the parity rung in silence. It is in mum's,
+        # avo's and georgia's `policy_fields`, so a divergence BLOCKS.
+        # ERA-SAFE, identically: `golive_readiness.stamp_state` builds its
+        # signature from POLICY_SIG_FIELDS ("venue", "bull", "lenses",
+        # "sides") only, so this field moves no era boundary.
+        "coin_veto": bool(coin_veto),
     }
 
 
@@ -3018,7 +3092,8 @@ class Book:
                        **control_leg(_ctl),
                        "policy": policy_stamp(self.s, "lighter_shadow",
                                                   shadow_scan_order_stamp(),
-                                                  throttle_cap(self.s))},
+                                                  throttle_cap(self.s),
+                                                  COIN_VETO_ON)},
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass
@@ -3353,6 +3428,11 @@ def main():
             fleet_gov = 1.0
             fleet_symcap = None
 
+        # [(zg)] the fleet's coin-quality vetoes, read ONCE per cycle through
+        # the owner the live host also calls. Fail-open by construction, so a
+        # dark market-context service cannot narrow any shadow book.
+        coin_vetoed = coin_veto_map() if COIN_VETO_ON else {}
+
         for b in books:
             store.heartbeat(b.bot_id)
             # [2026-08-04 SEED GUARD] a book whose durable state could not be
@@ -3428,7 +3508,7 @@ def main():
                       "capped": 0, "cooldown": 0, "vetoed": 0,
                       "noncrypto_ungated": 0, "budget_headroom": 0,
                       "symcap": 0, "throttled": 0, "brain_gate": 0,
-                      "opened": 0}
+                      "coin_veto": 0, "opened": 0}
 
             # [(wp)] offer order = the live host's rule (see SHADOW_SCAN_ORDER).
             # Returns come off the same cache the loop reads one line below,
@@ -3659,6 +3739,19 @@ def main():
                     b.scan["throttled"] += 1
                     log.info("%s %s entry throttled (max %d/h)", b.bot_id, coin,
                              DayTraderGated.MAX_ENTRIES_PER_HOUR)
+                    continue
+                # [2026-09-08 (zg)] THE COIN-QUALITY VETO, ported from the live
+                # host so a judged pair's CONTROL ARM stops trading a coin
+                # population its live arm refuses. Same owner for the spelling
+                # fold (`coin_evidence_hit` checks every spelling, most
+                # specific first) and the same rung in the ladder — after the
+                # throttle, ahead of the brain gate — so the two arms refuse in
+                # the same ORDER as well as on the same rule. RESTRICT-only.
+                _cvhit = _fb_coin_evidence_hit(coin_vetoed, coin)
+                if _cvhit is not None:
+                    b.scan["coin_veto"] += 1
+                    log.info("%s %s entry SKIPPED — coin veto: %s",
+                             b.bot_id, coin, _cvhit)
                     continue
                 tag = sig["enter"]
                 # [2026-07-21 BRAIN ACTS] the brain's regime_timing finding

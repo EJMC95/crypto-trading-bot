@@ -1,3 +1,99 @@
+## 2026-09-08 (zg) — THE COIN-QUALITY VETO RAN ON ONE ARM OF EVERY JUDGED PAIR, AND THE GUARD BUILT FOR THAT CLASS COULD NOT SEE IT
+
+**Eamon, 8-Sep: a health review of 👩 mum and her twin — *"Please fix"* on what
+it found.** The review's verdict was that both arms are working; this is the one
+finding that was a real defect rather than a false alarm.
+
+**MEASURED, on both hosts' source and the live payload.** `lighter_avo_live_bot`
+loads `coin-vetoes`, refuses entries on it, and stamps `coin_veto: True` on every
+close. `lighter_family_bot` — **the host that runs every judged pair's CONTROL
+ARM** — contained the string `coin_veto` **zero times**. So the twin traded a
+coin population its live arm refuses, and `control_role: "load_bearing"` was not
+true of it.
+
+**AND THE PARITY STAGE COULD NOT REPORT IT.** `(sk)` built judge v2's fairness
+precheck for exactly this class — two arms on different entry policies — but
+mum's `policy_fields` read `("strategy","venue","stoploss","roi","sides",
+"scan_order")`. `coin_veto` was not in it, so the rung never compared the field.
+**The one divergence that was already STAMPED was the one nobody looked at** —
+and unlike 🔮 georgia's `max_entries_per_hour`, which is declared REQUIRED and
+BLOCKS, nothing declared this one at all. Live vetoes today: MSTR, POL, SHEIN,
+SKR, USELESS.
+
+**THE EXPECTANCY PRICE (I19), and the gain is deliberately NOT banked.** The
+port would have refused, across the family shadow host's whole ledger:
+
+| book | refused | share of its trades | mean | $ |
+|---|---|---|---|---|
+| 👩 mum-lshadow | 4 × POL | 4.0% | −1.643%/trade | −$3.29 |
+| 🔮 georgia-lshadow | 5 × MSTR | 1.8% | −0.966%/trade | −$2.28 |
+| 🙏 avo-maria-lshadow | 0 | — | — | — |
+| 🔮 georgia-v3-lshadow | 0 | — | — | — |
+| **total** | **9 of 533** | **1.7%** | | **−$5.56** |
+
+Every refused close is loss-making — **and that is partly circular and is stated
+so**: these coins are vetoed BECAUSE their stop rate or measured slip crossed a
+bar, so "the refused set lost money" is a trigger the population satisfies
+structurally (I7). The honest claim is that the change costs **no measured
+expectancy** and is bounded at 4.0% of the worst-affected book's trades, so it
+starves nothing (I17/I26). **It is bought as PARITY, not edge.** For reference
+the live arms already pay it: 👩 mum-live 2 × POL at −4.104%/trade, −$23.23.
+
+**SHIPPED — one owner, one gate, one contract:**
+* **`lighter_family_bot.coin_veto_map()`** is now the ONE owner of the read
+  ((hj): a second copy of a rule is a second rule, and this one had *no* copy on
+  the shadow side). The live host imports and calls it, passing its own
+  `QUALITY_VETO_TTL_S`, so **the real-money contract is byte-identical** to the
+  inline block it replaced. FAIL-OPEN on every doubt — dark, empty, unstamped,
+  junk-stamped, stale, future-stamped, non-dict, or a raising store all veto
+  NOTHING, because an organ outage must never narrow a book's universe and this
+  rule only ever REMOVES candidates.
+* **The shadow host consumes it** at the same rung of the ladder as the live host
+  (after the throttle, ahead of the brain gate), through the same
+  `fleet_bus.coin_evidence_hit` spelling fold — `sym in mapping` would be a
+  second copy of the namespace rule, and kPOL/1000POL are POL. Restrict-only;
+  the branch ends the candidate.
+* **`policy_stamp` takes `coin_veto` as an argument each host answers for
+  itself** — the `(uv)`/`(vd)` shape — and it joins `policy_fields` on **mum, avo
+  AND georgia**. A future arm that stops applying the veto now reads
+  `policy_mismatch` and BLOCKS instead of the judge computing a biased gap.
+  ERA-SAFE: `golive_readiness.stamp_state` builds its signature from
+  POLICY_SIG_FIELDS only, so the new field moves no era boundary.
+* **`coin_veto` is a declared `CENSUS_REFUSALS` bucket.** An undeclared refusal
+  abstains from `binding_gate`, so a book starved by the veto would have named
+  its runner-up gate and sent the operator at the wrong knob — the `(vm)` lesson
+  one bucket over.
+
+**ERA NOT RESET.** An entry-side coin screen is ordinary tuning under `(hc)` —
+the `(lk)` crypto screen on 🌾 carry and the `(ty)` screen on 🎯 the sniper are
+the precedents. Nothing earlier becomes wrong.
+
+**REVERT: `FAMILY_COIN_VETO=off`** on `family-lighter-shadow`. The stamp then
+reports `False`, the arms diverge, and the judge blocks on `policy_mismatch` —
+**reverting the port is allowed; hiding it is not**, which is the whole defect
+this entry closes.
+
+**DECLARED TRANSIENT:** between the deploy and each arm's next close, the newer
+arm stamps `coin_veto` while the other's latest close does not, so the pair may
+read `policy_mismatch` for a few hours. Both arms close ~5/day; it resolves
+itself, and the reason names the field.
+
+Pinned by `tests/autonomy/test_coin_veto_arm_parity.py` (26 tests), **10/10
+mutations verified RED**: the branch losing its `continue`; a bare membership
+test replacing the spelling fold; `coin_veto` dropped from mum's `policy_fields`;
+the freshness check removed; a vacuous owner returning `{}` forever; the live
+host keeping its own copy of the read; the `b.scan` bucket undeclared; the stamp
+passing a raw env string instead of a bool; the census declaration removed; and a
+pair silently waiving the field instead of porting it.
+
+**NOT TOUCHED, on purpose:** the review's other two findings. 👩 mum's
+daily-loss halt cost (−$43.13 on 8 legs, 33% of her gross profit) is governed by
+the carried `mum-halt-cost-preregistered-read` and needs n≥5 halt events — acting
+on 1–2 is exactly what I25 forbids. The judge's mum ETA rests on a 14-day rate
+that predates its own experiment; the floor is currently bound by `window`, so
+the number is right today.
+
+
 ## 2026-09-07 (zh) — A TEST MAY NOT IMPORT WHAT CI DOES NOT INSTALL: the vacuous-red twin of the born-dark guard
 
 **Eamon:** *"It keeps saying failed workflows PR run on GitHub."* Diagnosing
