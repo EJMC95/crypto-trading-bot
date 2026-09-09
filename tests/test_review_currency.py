@@ -729,6 +729,67 @@ def test_the_mtm_fetch_is_scoped_to_books_it_can_decide(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# 5d. A READ-ONLY REVIEW MUST NEVER HOLD A TRANSACTION OPEN ACROSS ITS RUN.
+#
+# INCIDENT (9-Sep). With psycopg2's default (autocommit off) the review's
+# first SELECT opened a transaction that was never committed, so it held
+# ACCESS SHARE on `bot_pnl` for the whole run; `bot_pnl_store._ensure_table`'s
+# `ALTER TABLE bot_pnl ADD COLUMN IF NOT EXISTS`, run by the grader's lazy
+# import of `experiment_judge` on a second connection of the SAME process,
+# queued behind it — and every bot's `INSERT INTO bot_pnl` queued behind the
+# ALTER. Measured: 13 backends waiting in pg_stat_activity; every key in
+# bot_state_history silent 06:04-06:17Z, 06:17-06:43Z and 12:40-12:43Z,
+# both real-money rows' in-loop equity snapshots included.
+# ---------------------------------------------------------------------------
+class _FakeCursor:
+    def __init__(self, log): self.log = log
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def execute(self, sql, *a): self.log.append(sql)
+    def fetchone(self): return None
+
+
+class _FakeConn:
+    def __init__(self):
+        self.autocommit = False
+        self.log = []
+    def cursor(self): return _FakeCursor(self.log)
+
+
+def test_the_review_connection_is_autocommit_with_a_lock_timeout(monkeypatch):
+    er, _ = _import_both()
+    import psycopg2
+    fake = _FakeConn()
+    monkeypatch.setattr(psycopg2, "connect", lambda url, **kw: fake)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    conn = er.connect()
+    assert conn is fake
+    assert conn.autocommit is True, "a never-committed transaction held the fleet's locks"
+    assert any("lock_timeout" in s for s in conn.log), conn.log
+    assert any("idle_in_transaction_session_timeout" in s for s in conn.log), conn.log
+
+
+def test_the_stores_session_gets_the_same_lock_timeout(monkeypatch):
+    er, _ = _import_both()
+    import bot_pnl_store as store
+    fake = _FakeConn()
+    monkeypatch.setattr(store, "_get_conn", lambda: fake)
+    assert er._harden_store_session() is True
+    assert any("lock_timeout" in s for s in fake.log), fake.log
+    monkeypatch.setattr(store, "_get_conn", lambda: None)
+    assert er._harden_store_session() is False        # dark store: no-op
+
+
+def test_main_hardens_the_store_session_right_after_connecting(review_code):
+    import ast
+    tree = ast.parse(review_code)
+    main = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "main"][0]
+    src = ast.unparse(main)
+    assert "_harden_store_session()" in src, "main never hardens the store session"
+    assert src.index("connect()") < src.index("_harden_store_session()")
+
+
+# ---------------------------------------------------------------------------
 # 6. Arm drift must distinguish DIFFERENT CODE from a DIFFERENT FILE SET.
 #
 # (fd), 29-Jul: `build_compute` hashes only the `_BUILD_SHARED` names that

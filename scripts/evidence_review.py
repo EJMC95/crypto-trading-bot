@@ -680,7 +680,54 @@ def connect():
         sys.exit("no DATABASE_URL/DATABASE_PUBLIC_URL — get it with:\n"
                  "  railway variables --service Postgres --kv | grep DATABASE_PUBLIC_URL")
     import psycopg2
-    return psycopg2.connect(url)
+    conn = psycopg2.connect(url)
+    # [2026-09-09] AUTOCOMMIT, AND A LOCK TIMEOUT — THIS SCRIPT STALLED THE
+    # FLEET'S PUBLISHES THREE TIMES IN ONE DAY. With the psycopg2 default
+    # (autocommit off) the first SELECT opened a transaction that was never
+    # committed, so this read-only review held ACCESS SHARE on `bot_pnl` and
+    # `paper_trades` for its whole run. Harmless until something wanted an
+    # exclusive lock: `bot_pnl_store._ensure_table` runs `ALTER TABLE bot_pnl
+    # ADD COLUMN IF NOT EXISTS` on EVERY process start (read paths included),
+    # and once `DATABASE_URL` was bridged above, the grader's lazy import of
+    # `experiment_judge` ran that ALTER on a SECOND connection of this same
+    # process. It queued behind the first — and every bot's `INSERT INTO
+    # bot_pnl`, the dashboard's reads and `bot_equity_history` queued behind
+    # the ALTER's pending exclusive request. Measured in `pg_stat_activity`
+    # 12:41Z: 13 backends waiting, blockers = this script's own two pids; in
+    # `bot_state_history`: every key silent 06:04-06:17Z and 06:17-06:43Z and
+    # 12:40-12:43Z, INCLUDING both real-money rows' in-loop `:equity`
+    # snapshots — i.e. the live trading loops sat in `publish()` for up to
+    # 26 minutes. A reader must never be able to do that: autocommit means no
+    # transaction outlives its statement; `lock_timeout` means a statement of
+    # ours that cannot get its lock in 5s fails (and a soft section reports
+    # it) instead of queueing the fleet; the idle-in-transaction timeout is
+    # the belt for a future edit that turns autocommit back off.
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute("SET lock_timeout = '5s'")
+        cur.execute("SET idle_in_transaction_session_timeout = '60s'")
+    return conn
+
+
+def _harden_store_session():
+    """Put the same `lock_timeout` on `bot_pnl_store`'s own session.
+
+    The store's connection is autocommit already, but its `_ensure_table`
+    ALTER needs ACCESS EXCLUSIVE and will queue the whole fleet behind
+    itself if ANY other session holds an open transaction on `bot_pnl`. From
+    a review that should fail fast and grade realised, never stall the
+    publishers. A dark store (no URL, no connection) is a no-op.
+    """
+    try:
+        import bot_pnl_store as store
+        conn = store._get_conn()
+        if conn is None:
+            return False
+        with conn.cursor() as cur:
+            cur.execute("SET lock_timeout = '5s'")
+        return True
+    except Exception:
+        return False
 
 
 def load_state(cur, key):
@@ -1620,6 +1667,7 @@ def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     errors = []
     conn = connect()
+    _harden_store_session()
     with conn.cursor() as cur:
         verdicts = verify_alerts(cur, errors)
         evidence = scan_new_evidence(cur, errors)
