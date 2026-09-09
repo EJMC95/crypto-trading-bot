@@ -85,7 +85,7 @@ def workflow_pr_types(text=None):
     **NO YAML DEPENDENCY, deliberately** — `requirements-test.txt` carries no
     yaml lib and neither does the freqtrade image, which is the convention
     `_job_block` and `audit_deploy_coverage` both state in their own words.
-    [2026-09-07 (zg)] The first cut of this used `import yaml` inside a
+    [2026-09-07 (zh)] The first cut of this used `import yaml` inside a
     `try/except` that returned None, so on the CI runner it did not merely fail
     — it **silently returned "no claim" and the guard became inert**, which is
     the vacuous-green shape this whole file exists to prevent. Line-shaped

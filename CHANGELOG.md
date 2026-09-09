@@ -1,4 +1,10 @@
-## 2026-09-07 (zg) — MY OWN GUARD SWALLOWED THE IMPORT IT NEEDED AND WENT SILENTLY INERT: `(ze)` used a yaml parser this repo deliberately does not have
+## 2026-09-07 (zh) — MY OWN GUARD SWALLOWED THE IMPORT IT NEEDED AND WENT SILENTLY INERT: `(ze)` used a yaml parser this repo deliberately does not have
+
+**[RENUMBERED (zg) -> (zh) at merge time.** A concurrent session merged a different
+`(zg)` to main on 8-Sep — *"the coin-quality veto ran on one arm of every judged
+pair"* — while this branch sat unmerged. Theirs is on main and cited; mine was
+cited only inside my own diff, so per the letter rule this side moves. `git log`
+subjects on this branch keep the old letter; the CHANGELOG header is the index.**]
 
 **CI caught this, on `(ze)`'s own push, and the instructive half is not the red
 test.** `(ze)` rewrote a page-wide substring scan into a STRUCTURAL check —

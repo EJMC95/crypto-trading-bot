@@ -110,7 +110,7 @@ def _steps(job):
 
     Line-shaped on purpose: `requirements-test.txt` carries no yaml lib, which
     is the convention `_job_block` above states and which `audit_deploy_coverage`
-    states again. [2026-09-07 (zg)] The first cut of these two tests used
+    states again. [2026-09-07 (zh)] The first cut of these two tests used
     `import yaml` and went RED on the CI runner while passing locally — my own
     defect, and the more instructive half is that the guard's twin in
     `audit_live_marker_survives_squash` swallowed the same ImportError and went
@@ -143,7 +143,7 @@ def test_the_step_parser_can_actually_see_a_step():
 def test_code_currency_exit_code_is_not_masked():
     """MUTATION: add `continue-on-error: true` to any step -> RED.
 
-    [2026-09-07 (ze)/(zg)] STRUCTURAL, was a page-wide substring scan. The old
+    [2026-09-07 (ze)/(zh)] STRUCTURAL, was a page-wide substring scan. The old
     form asserted `"continue-on-error" not in job`, which is `(po)`'s own rule
     ("a page-wide substring scan is not a structural claim") landing on the test
     written to honour it: it went red on a COMMENT that named the key in order
