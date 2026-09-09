@@ -199,6 +199,15 @@ SELFTEST_MODULES = [
     # selftest is offline (planted control CUT, placebo KEPT, thin sample
     # not decidable, the twin-agreement arm).
     "scripts.study_mum_noncrypto_sleeve_2026-09-02",
+    # [2026-09-09 (zp)] the IDENTIFIABILITY instrument for the regime short-veto
+    # read: Cramer's V between label and side, the within-side (identified)
+    # comparison, and a circular ROTATION null that preserves the verdict
+    # series' marginals AND autocorrelation. Its --selftest is offline and
+    # pure: it pins that the rotation preserves both, that the anchored O(1)
+    # labelling is byte-identical to the naive rotate-then-relabel path at
+    # five rotations, a planted within-side effect recovered at P<=0.05, a
+    # placebo not recovered, and the n>=10 cell floor.
+    "scripts.study_regime_veto_identifiability_2026-09-09",
     # [2026-09-07 (yo)] 🪁 kelly's pre-registered keep-or-retire read. Its
     # n-trigger fired 3.5 weeks before the date backstop and nothing in the
     # tree was measuring it. --selftest is OFFLINE and drives all four

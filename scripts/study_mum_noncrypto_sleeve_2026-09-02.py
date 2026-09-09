@@ -471,9 +471,21 @@ def main(argv=None):
                     help="ledger row cap; a count equal to it is REFUSED as truncation ((qz))")
     ap.add_argument("--pooled", action="store_true",
                     help="grade the WHOLE window instead of the registered fresh sample — NOT the registered read")
+    ap.add_argument("--fresh", action="store_true",
+                    help="the REGISTERED read (the default). Accepted because "
+                         "both HANDOFF.md and session_state.py instruct the "
+                         "reader to run this with `--fresh`, and until (zp) "
+                         "that command ERRORED — a pre-registered read whose "
+                         "documented invocation does not parse is the (po) "
+                         "check-that-inspects-nothing shape one step earlier, "
+                         "and it is how a re-arm gets run on the wrong window. "
+                         "Mutually exclusive with --pooled.")
     ap.add_argument("--json")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
+    if getattr(a, "fresh", False) and a.pooled:
+        print("REFUSING: --fresh and --pooled name different windows (zp)")
+        return 2
     if a.selftest:
         _selftest()
         return 0
