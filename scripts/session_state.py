@@ -268,8 +268,28 @@ CARRIED = [
                     "the registration lacked: its predicate fires on 1-Oct, "
                     "so CI reds until a session actually PERFORMS the read "
                     "and closes this row with the verdict in the CHANGELOG. "
-                    "If fresh on-class n reaches 60 EARLIER, do the read "
-                    "then — the date is the backstop, not the trigger.",
+                    "[9-Sep (zp)] CHECKED ON EAMON'S ASK, AND THE TRIGGER "
+                    "HAS NOT FIRED — fresh on-class n=13 against the bar of "
+                    "60, 47 short, measured on a feed refreshed the same "
+                    "hour (era rows 158, newest close 9-Sep 00:40Z). "
+                    "CORRECTED IN PLACE per I12, because the sentence below "
+                    "used to end 'the date is the backstop, not the trigger' "
+                    "and for THIS book that is measurably backwards: at "
+                    "the observed 1.52 on-class closes/day since 1-Sep, "
+                    "n=60 arrives ~10-Oct — NINE DAYS AFTER the 1-Oct date. "
+                    "So the DATE binds first and the read will be taken at "
+                    "n~44, ~27% below the registration's own floor. That "
+                    "is recorded now, BEFORE the read, so the schedule is "
+                    "decided on arithmetic rather than on the result; NO "
+                    "THRESHOLD IS MOVED (I21 — the registered bars are a "
+                    "commitment). Expect the 'returns to Eamon' branch and "
+                    "read the power, not just the sign. REPORTED, not the "
+                    "read: fresh on-class mean +0.538%/trade, SE 1.519, "
+                    "t=+0.35, net +$1.23 — a POSITIVE mean, which is "
+                    "exactly why taking it early would have manufactured a "
+                    "'keep grading' verdict from a sample that decides "
+                    "nothing (this book closes ~10 legs at once, so its "
+                    "per-trade dispersion is enormous).",
         # Deliberately date-only: the predicate firing means the read is DUE,
         # and the honest way to close the row is to run the read and record
         # the verdict — deleting it without the verdict is the thing the
