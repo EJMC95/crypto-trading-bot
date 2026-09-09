@@ -3147,7 +3147,7 @@ def book_payload(s):
     # choice to leave the gate on the iid value is deliberate and untouched.
     if isinstance(s.get("cluster"), dict):
         out["cluster"] = s["cluster"]
-    # [2026-09-09 (zi)] AND WHETHER THE TWO BASES AGREE ABOUT THE BAR, because
+    # [2026-09-09 (zm)] AND WHETHER THE TWO BASES AGREE ABOUT THE BAR, because
     # on the day this shipped the ONLY two books where they disagree were the
     # TWO HOLDING REAL MONEY, and both disagreed in the PERMISSIVE direction:
     #

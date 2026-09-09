@@ -176,7 +176,23 @@ class-closer is an AST assertion that **both** functions call the shared owner
 — a second derivation is how this arrived.
 
 
-## 2026-09-09 (zi) — THE GO-LIVE t BAR AND ITS OWN CLUSTER READ DISAGREE ON EXACTLY THE TWO BOOKS HOLDING REAL MONEY, AND NOTHING SAID SO
+## 2026-09-09 (zm) — THE GO-LIVE t BAR AND ITS OWN CLUSTER READ DISAGREE ON EXACTLY THE TWO BOOKS HOLDING REAL MONEY, AND NOTHING SAID SO
+
+**[RENUMBERED (zi) -> (zm) at push time.** A concurrent session's PR #297 —
+*"The expand refusal's stated reason had expired"* — carries its own `(zi)`, and
+both branches were open at once, so `audit_changelog_letters` passed on each:
+**it compares the working tree against `origin/main`, and neither entry was on
+main yet.** Both sides cite the letter twice from tracked code (theirs
+`lighter_avo_live_bot.py` + `scripts/session_state.py`; mine
+`scripts/golive_readiness.py` + this entry's test), so rule 3's "the CITED
+entry keeps the letter" does not separate them on count. **Moved anyway, and
+deliberately:** theirs is the one citing the REAL-MONEY host, and its whole
+subject is an I12 correct-in-place of a comment in that file, so its letter is
+load-bearing to its own record; mine is contained in two files this PR already
+touches. Recorded inline per rule 4 because `git log` subjects keep the old
+letter. **The gap this exposes is real and is NOT closed here:** the guard
+cannot see across OPEN pull requests, only against main — the same class was
+live on `(ze)` between #293 and #294 the same morning.**
 
 **Found by reading yesterday's own review back.** The (zg) health review reported
 👩 mum's published `t=2.01` beside a cluster-robust `t_cluster=1.45` and called
@@ -263,8 +279,13 @@ pushed first:** their entry is cited from TRACKED CODE —
 `.github/workflows/changelog-check.yml:129` and `tests/test_selftests.py:493`
 — while mine was cited nowhere outside its own header, so moving theirs
 would break a workflow and a test while moving mine costs one line.
-(zi) and (zj) are unaffected and keep their letters; (ze)/(zf) are claimed
+(zj) is unaffected and keeps its letter; (ze)/(zf) are claimed
 by the still-open #293/#294, so (zk) is the next genuinely free letter.
+**[CORRECTED IN PLACE per I12: this said "(zi) and (zj) are unaffected and
+keep their letters", and (zi) did not — hours later the same morning it
+collided with PR #297's own (zi) and moved to (zm). A sentence asserting a
+letter is safe goes stale the moment another open branch claims it, which is
+this note's own subject.]**
 Recorded inline because `git log` subjects keep the OLD letter — the
 CHANGELOG headers are the reliable index, not the commit log.**
 
