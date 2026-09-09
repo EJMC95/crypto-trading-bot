@@ -2560,9 +2560,10 @@ def effective_max_days(ev, max_days=None, max_days_extended=None):
     need = hz.get("days_req_total")
     if isinstance(need, bool) or not isinstance(need, (int, float)):
         return md, None
+    import math                       # local, exactly as `sample_horizon` does
     need = float(need)
-    if need != need or need in (float("inf"), float("-inf")):
-        return md, None
+    if not math.isfinite(need):       # NaN and ±inf alike — CodeQL rightly
+        return md, None               # flagged the `need != need` idiom
     if need <= md or need > mx:
         return md, None
     ext = {"from": md, "to": round(need, 1), "ceiling": mx,
