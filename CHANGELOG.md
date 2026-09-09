@@ -1,3 +1,77 @@
+## 2026-09-09 (zi) — THE GO-LIVE t BAR AND ITS OWN CLUSTER READ DISAGREE ON EXACTLY THE TWO BOOKS HOLDING REAL MONEY, AND NOTHING SAID SO
+
+**Found by reading yesterday's own review back.** The (zg) health review reported
+👩 mum's published `t=2.01` beside a cluster-robust `t_cluster=1.45` and called
+it *"the grader being honest"*. It is — and the honesty stops one field short:
+nothing anywhere says the two bases **disagree about the verdict**.
+
+**MEASURED on the live payload, all 14 books carrying both statistics:**
+
+| book | n | iid `t` | cluster `t` | max_batch | |
+|---|---|---|---|---|---|
+| 👩 **mum LIVE** | 100 | **2.01 PASS** | **1.45 FAIL** | 8 | 💰 real money |
+| 🙏 **avo LIVE** | 18 | **2.65 PASS** | **1.86 FAIL** | 5 | 💰 real money |
+| the other 12 (all shadow) | — | — | — | ≤4 | **0 disagree** |
+
+**Two of fourteen, both real money, both PERMISSIVE** — the bar admits where the
+cluster-robust read of the same sample refuses. **It is not a coincidence and it
+names its own cause:** the LIVE arms carry a flatten (the daily-loss halt) that
+closes a whole basket in one instant, so they batch **8 and 5** legs where their
+paper twins batch 4. The iid `t` counts those legs as independent draws; the
+cluster read does not. *The books with the mechanism that breaks the iid
+assumption are exactly the books that hold money.*
+
+**WHAT THIS DOES NOT DO, AND THE RESTRAINT IS THE POINT: THE BAR DOES NOT MOVE.**
+`(ky)` published the cluster read beside `t` and deliberately left the gate on
+the iid value, saying why in the source — *"changing a go-live bar is a policy
+act, not a fix"*. That is still true and it is Eamon's call, exactly as `(yr)`
+left the peak-relative drawdown reported-not-a-bar. Moving it here would also be
+a **tightening on real money with no measured harm**, which I26 forbids: a lower
+statistic is uncertainty, not damage.
+
+**WHAT WAS MISSING is that the disagreement was INVISIBLE.** To notice it a
+reader had to hand-compare `t` against `cluster.t_cluster` **and** know which
+basis the bar used — and the basis is stated only in a source comment. That is
+the `(lv)` `{open: 0}` ambiguity sitting on **the gate that governs real money**,
+and it is why this went unremarked through every prior grade.
+
+**SHIPPED:** `golive_readiness.t_bar_bases` → `books.<bot>.t_bar`, publishing
+`basis` (the statistic `grade()` actually used, as DATA rather than a comment),
+both `t` values, `passes_iid` / `passes_cluster`, `agree`, and `permissive`.
+**`permissive` is deliberately ASYMMETRIC**: a book the bar REFUSES while the
+cluster read would pass stays on paper and costs nothing; the reverse is the
+only direction that can put money behind a weaker number.
+
+**FAIL-CLOSED INTO SILENCE, never into a false agreement.** No cluster block, a
+non-finite or absent statistic, a degenerate single cluster, or clustering that
+found no batches at all (`n_clusters == n`, where the two numbers are identical
+by construction) all return `None`. Publishing `agree: true` for a book whose
+cluster read does not exist would be a fabricated reassurance about real money —
+the opposite of the point. 🌾 carry returns `None` today for exactly that reason
+(`max_batch: 1`).
+
+**MOVES NO MONEY, NO LEVER, NO BOT, AND NO VERDICT.** `grade()` and `BAR_NAMES`
+are byte-unchanged; re-running the shipped `grade()` over all 14 live books
+reproduces every `ready` verdict exactly. Publish-only, so **main only** per
+`(mm)` — it rides the next deploy that earns one, and restarts no real-money
+container.
+
+Pinned by `tests/autonomy/test_t_bar_basis_disagreement.py` (21 tests), **7/7
+mutations RED** — the load-bearing one being an **AST assertion that `grade()`
+never READS the cluster statistic**, so a later edit cannot silently re-spec the
+go-live bar behind a publish. Also red: a vacuous owner; a fabricated `agree`;
+`>` for `>=` at the boundary (a second copy of the bar's own rule, (hj));
+`permissive` losing its asymmetry; the field computed and never published; and a
+degenerate cluster compared anyway.
+
+**THE DECISION THIS HANDS EAMON, stated because publishing it is the whole
+value:** mum's live arm is `on_track` for **27-Sep**, and on that date she will
+be graded READY on an iid `t` her own cluster read does not support. Whether the
+bar should move to the cluster basis for books that batch is a gate re-spec —
+his, not mine — and it is now a number on the payload instead of a comparison
+nobody was making.
+
+
 ## 2026-09-08 (zh) — MAIN WENT RED ON MY OWN NEGATIVE TEST: A DELIBERATE WRONG-ARITY CALL IS STILL A WRONG-ARITY CALL
 
 **`(zg)` merged with CodeQL red, and the alert is correct.** The finding:

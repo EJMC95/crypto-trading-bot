@@ -3040,6 +3040,27 @@ def book_payload(s):
     # choice to leave the gate on the iid value is deliberate and untouched.
     if isinstance(s.get("cluster"), dict):
         out["cluster"] = s["cluster"]
+    # [2026-09-09 (zi)] AND WHETHER THE TWO BASES AGREE ABOUT THE BAR, because
+    # on the day this shipped the ONLY two books where they disagree were the
+    # TWO HOLDING REAL MONEY, and both disagreed in the PERMISSIVE direction:
+    #
+    #   👩 mum LIVE   n=100  t=2.01 PASS   t_cluster=1.45 FAIL   max_batch=8
+    #   🙏 avo LIVE   n= 18  t=2.65 PASS   t_cluster=1.86 FAIL   max_batch=5
+    #   ...and 0 of the 12 shadow books disagree at all.
+    #
+    # That is not a coincidence and it names its own cause: the LIVE arms
+    # carry a flatten (the daily-loss halt) that closes a whole basket in one
+    # instant, so they batch 8 and 5 legs where their paper twins batch 4. The
+    # iid `t` counts those legs as independent draws; `t_cluster` does not.
+    # `(ky)`'s choice to leave the BAR on the iid value is deliberate and is
+    # NOT touched here — changing a go-live bar is a policy act and Eamon's,
+    # exactly as `(yr)` left the peak-relative drawdown reported-not-a-bar.
+    # What was missing is that the disagreement was INVISIBLE: a reader had to
+    # hand-compare `t` against `cluster.t_cluster` and know the bar's basis to
+    # notice, which is the `(lv)` ambiguity at the gate that governs real
+    # money. So it is PUBLISHED, never enforced — `grade()` and `BAR_NAMES`
+    # are byte-unchanged and pinned so.
+    out["t_bar"] = t_bar_bases(s)
     # [2026-09-02, edge-audit follow-up] the shape block (see `stats`), in
     # percentage points and dollars, plus the derived fields a monitor reads:
     # `hit_margin_pp` = trailing hit rate minus the book's own break-even
@@ -3131,6 +3152,49 @@ def grade(s, legacy=False):
     if not (s["h1"] > 0 and s["h2"] > 0):
         fails.append(f"halves {s['h1']:+.2f}/{s['h2']:+.2f} not both positive")
     return not fails, fails
+
+
+def t_bar_bases(s):
+    """-> `{basis, t_iid, t_cluster, passes_iid, passes_cluster, agree,
+    permissive}`, or `None` when the comparison cannot be made honestly.
+
+    REPORTED, NEVER A BAR. `basis` names the statistic `grade()` actually
+    used (always "iid" — stated as data rather than assumed by the reader),
+    and `permissive` is the one flag a real-money reader wants: the bar
+    PASSED and the cluster-robust read of the same sample would not.
+
+    Fail-CLOSED into silence, never into a false agreement: any doubt — no
+    cluster block, a non-finite or absent statistic, a degenerate single
+    cluster, or clustering that found no batches at all (`n_clusters == n`,
+    where the two statistics are the same number by construction) — returns
+    None. Publishing `agree: True` for a book whose cluster read does not
+    exist would be a fabricated reassurance on the gate that governs real
+    money, which is the opposite of the point.
+    """
+    if not isinstance(s, dict):
+        return None
+    clus = s.get("cluster")
+    if not isinstance(clus, dict):
+        return None
+    t, tc, g, n = s.get("t"), clus.get("t_cluster"), clus.get("n_clusters"), s.get("n")
+    for v in (t, tc):
+        if not isinstance(v, (int, float)) or isinstance(v, bool) \
+                or not math.isfinite(float(v)):
+            return None
+    if not isinstance(g, int) or isinstance(n, bool) or not isinstance(n, int):
+        return None
+    if not 1 < g < n:                     # degenerate, or no batching at all
+        return None
+    p_iid, p_clu = float(t) >= GOLIVE_MIN_T, float(tc) >= GOLIVE_MIN_T
+    return {"basis": "iid", "bar": GOLIVE_MIN_T,
+            "t_iid": round(float(t), 2), "t_cluster": round(float(tc), 2),
+            "passes_iid": p_iid, "passes_cluster": p_clu,
+            "agree": p_iid == p_clu,
+            # the asymmetry is the point: a book the bar REFUSES while the
+            # cluster read would pass costs nothing (it stays on paper), and
+            # one the bar ADMITS while the honest statistic refuses is the
+            # only direction that can put money behind a weaker number.
+            "permissive": bool(p_iid and not p_clu)}
 
 
 def _selftest_sleeves():
