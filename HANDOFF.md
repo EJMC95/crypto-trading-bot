@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-09 22:49 Sydney (12:49Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-09 23:07 Sydney (13:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -81,13 +81,13 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 
 ## Shipped today (7 commit(s))
 
+- `10d190a` [deploy-live] (zo) the dashboard's stalls were a lock convoy the fleet lit on itself at every redeploy: skip the no-op boot DDL, bound the real one
+- `e81b74e` (zo) regenerate HANDOFF.md after the rebase onto (zn)/#298
 - `bdb2733` [deploy-live] (zo) georgia v1's pre-registered read taken: the cap-5 prediction failed on her own post-cap closes — retired on I17's undecidable call; the ledger gains a terminal GRADED state; the ladder harness reads STRATEGIES
 - `d3a82ea` (zn) A candidate that narrows its own arm gets the clock its own rate says it needs — bounded, re-derived every cycle, never on a hunch (#298)
 - `b47abc4` (zi) The gate horizon's rate denominator included 27 days on which the real-money book did not exist: it starts at the first in-era OPEN now, and the denominator is published
 - `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
 - `5059cbc` (yx)(yy)(yz)(zh) 24h review: a red main nobody was shown, an uninterpretable refusal count, a drawdown bar that meant something different on every row, and the guard for tests that import what CI lacks (#292)
-- `8a4768f` (zg) regenerate HANDOFF.md
-- `29ecd4e` [deploy-live-mum][deploy-live-taker] (zg) The coin-quality veto ran on one arm of every judged pair, and the guard built for that class could not see it
 
 ## How this file stays honest
 
