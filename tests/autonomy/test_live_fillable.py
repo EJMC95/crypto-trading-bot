@@ -301,3 +301,22 @@ def test_the_taker_declares_by_ASKING_the_module_never_by_a_literal():
         f"live_policy.lenses must ASK the module, not restate it: {inner}"
     assert "allowed_sides('lighter_live'" in inner, \
         f"live_policy.sides must ASK the module, not restate it: {inner}"
+
+
+def test_the_card_renders_it_and_says_EMPTY_loudest():
+    """The reader this exists for is a human about to switch a book on, so the
+    verdict has to reach the 🚦 card — and the INERT state must be the loudest
+    thing on it, not a tooltip.
+
+    Mutation: drop the chip, or render `inert` in the same colour as the
+    ordinary veto chip => this reddens.
+    """
+    src = (ROOT / "pnl_dashboard.py").read_text()
+    tree = ast.parse(src)
+    assert any(isinstance(n, ast.Constant) and n.value == "live_fillable"
+               for n in ast.walk(tree)), "the card never reads live_fillable"
+    assert "live arm fills NOTHING" in src
+    # the inert branch must not share the veto chip's amber
+    i = src.index("live arm fills NOTHING")
+    around = src[i - 900:i]
+    assert "#f85149" in around, "an empty live arm must render red, not amber"

@@ -2208,6 +2208,27 @@ def golive_card():
                     f'veto {_nv.get("n")}/{b.get("n")}'
                     + (f' &rarr; {_stm:+.2f}%' if isinstance(_stm, (int, float))
                        else '') + '</span>')
+            # [(aan)] AND WHAT A **LIVE** ARM COULD HAVE FILLED — the chip
+            # that faces a PROMOTION rather than a grade. `veto_split` above
+            # keys on the arm being graded; on a book whose live mode runs a
+            # narrower policy the two subsets differ, and on 🎫 the taker they
+            # are exactly inverted: `veto` reads "-> +1.38%" for a family no
+            # live arm may fill. Rendered RED when the live arm's fillable set
+            # is EMPTY, because that is the one state in which a green `6/6
+            # READY` is actively misleading about real money.
+            lfp = b.get("live_fillable") if isinstance(
+                b.get("live_fillable"), dict) else None
+            if lfp and (lfp.get("why") or lfp.get("inert")):
+                _ef = (lfp.get("effective") or {})
+                _inert = lfp.get("inert") is True
+                _col = ("#f85149", ".16") if _inert else ("#d29922", ".14")
+                era_chip += (
+                    f'<span title="{html.escape(str(lfp.get("why") or ""))}" '
+                    f'style="color:{_col[0]};background:rgba(248,81,73,{_col[1]})'
+                    f';border-radius:3px;padding:0 3px;font-size:.75em">'
+                    + ('live arm fills NOTHING' if _inert
+                       else f'live {_ef.get("n")}/{b.get("n")}')
+                    + '</span>')
             # [(zu)] THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.
             # `(za)` shipped `dd_resampled` because *"the gate grades a 15%
             # bar over the ONE ordering a book happened to walk and cannot
