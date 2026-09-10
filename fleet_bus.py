@@ -1245,7 +1245,7 @@ def cohort_long_state(payload, cohort):
     veto, matching the consumers' own `_lb = 10**9 if _lb is None` idiom
     (0 is a REAL budget).
 
-    [2026-09-10 (zt)] IT READS THE HISTORY'S COMPACTED LIST SHAPE TOO.
+    [2026-09-10 (zw)] IT READS THE HISTORY'S COMPACTED LIST SHAPE TOO.
     `fleet_risk.save_history` writes `cohorts` as
     `{k: [long_positions, long_budget, light]}` (fleet_risk.py, the
     `save_history(RISK_KEY, ...)` call) to keep 17k snapshots small, while

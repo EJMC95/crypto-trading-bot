@@ -203,7 +203,7 @@ def _history_cohorts_from_the_real_writer(live_n, shadow_n):
 
 
 def test_the_history_list_shape_is_read_and_never_reads_as_an_unbindable_budget():
-    """[2026-09-10 (zt)] `cohort_long_state` knew the LIVE key's dict and not
+    """[2026-09-10 (zw)] `cohort_long_state` knew the LIVE key's dict and not
     the HISTORY's compacted list, so every history payload fell through to a
     pooled branch that history does not populate — returning `(0, 10**9)`:
     no longs held, against a budget that can never bind. Measured the day it
