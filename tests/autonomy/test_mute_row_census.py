@@ -52,6 +52,7 @@ import pytest
 
 import bot_pnl_store as store
 import lighter_book_hull_bot as hull
+import lighter_book_kiyosaki_bot as kiyo
 import lighter_funding_spread_bot as cw
 from parliament import strategies as pm
 
@@ -577,11 +578,11 @@ def test_a_pm_book_that_never_reaches_its_entry_phase_still_has_a_census():
 # ============================================================ publish-only ====
 def test_each_row_asks_for_a_window_it_can_actually_fill():
     """`census_window`'s default row limit assumes a 30s loop. These books run
-    at 300s (⚖️/🧮) and 60s (🏛️), so the default over-fetches by up to 10x on
+    at 300s (⚖️/🧮/🏦) and 60s (🏛️), so the default over-fetches by up to 10x on
     every loop forever — and a limit set too LOW is worse than that: the window
     silently becomes a SAMPLE. Each caller passes a limit derived from its own
     cadence, and it must cover a full day at that cadence with headroom."""
-    for mod in (hull, cw):
+    for mod in (hull, cw, kiyo):
         assert mod.CENSUS_LIMIT * mod.LOOP_SECONDS >= 24 * 3600, mod.__name__
         assert mod.CENSUS_LIMIT < 2880, \
             f"{mod.__name__} gains nothing over census_window's own default"
@@ -589,6 +590,7 @@ def test_each_row_asks_for_a_window_it_can_actually_fill():
     # ...and the call sites actually pass it (a constant nothing reads is the
     # registered-but-inert failure wearing a telemetry hat).
     for src in (inspect.getsource(hull.main), inspect.getsource(cw.main),
+                inspect.getsource(kiyo.main),
                 inspect.getsource(pm.PMBot.publish)):
         assert "census_window(" in src and "limit=CENSUS_LIMIT" in src
 

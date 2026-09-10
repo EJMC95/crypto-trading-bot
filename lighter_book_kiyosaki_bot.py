@@ -163,6 +163,18 @@ MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "1e6"))
 CLIP_USD = float(os.environ.get("RICHDAD_CLIP_USD", "80"))
 MAX_POSITIONS = int(os.environ.get("RICHDAD_MAX_POSITIONS", "6"))
 
+#: [2026-09-10] How many stored census rows a 24h window needs at THIS book's
+#: cadence, with 50% headroom for restarts. `census_window`'s own default
+#: assumes a 30s loop (~2,880 rows) and this book runs at 300s, so the default
+#: would fetch ~10x what it can use every 5 minutes, forever. DERIVED from
+#: `LOOP_SECONDS` rather than typed, so a cadence change carries the window
+#: with it ((sa)'s rule); if it ever binds, `census_window` says so in
+#: `truncated` ((qz)) rather than letting a sampled window read as an
+#: exhaustive one. Same derivation and same reasons as sibling 🧮 Hull's, and
+#: the headroom is measured, not assumed: this book's own `:equity` series
+#: recorded 286 loops in the trailing 24h on the day this shipped.
+CENSUS_LIMIT = max(200, int(1.5 * 24 * 3600 / max(1.0, LOOP_SECONDS)))
+
 # ---- lesson 3: pay yourself first ------------------------------------------
 # decay-close only when net after ALL fees clears this margin — scaled from
 # the parent's $0.10-on-$300 to this book's $80 clip (the Barnesy number).
@@ -410,7 +422,7 @@ def build_state(positions, hot_since, last_ts, now=None):
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, open_pnl, realized):
+def build_extra(census, positions, open_pnl, realized, census_24h=None):
     """The published `extra` — ONE builder, so the payload the dashboard,
     board and immune organ read is the payload the selftest asserted on
     (a consumer is tested against a payload its publisher built, (hj))."""
@@ -448,6 +460,26 @@ def build_extra(census, positions, open_pnl, realized):
                  "flip_grace_h": FLIP_GRACE_H,
                  "crypto_only": not ALLOW_NONCRYPTO},
         "scan": census,
+        # [2026-09-10] the census SUMMED over the trailing 24h — the
+        # denominator a single loop's `{eligible: 0}` has never had. Until
+        # this shipped the row published `scan` and nothing else, so "which
+        # gate is starving this book, and at what RATE?" was answerable only
+        # at the instant: 🧮 Hull had 3,906 stored samples and this book had
+        # ZERO. `None` (never a zero-filled dict) when the history is dark or
+        # empty, which is the whole contract of `census_window` — a fabricated
+        # zero reads as "measured, nothing refused" when the truth is "no
+        # data" (I1). Sibling 🧮 Hull's key, same shape, same readers.
+        #
+        # THE OTHER HALF IS DELIBERATELY NOT HERE. "At cap?" is already exact
+        # in this book's `<bot>:equity` series, which carries `open`
+        # (= len(positions)) every loop — measured 10-Sep: at cap 0 of 286
+        # loops in 24h, 34 of 2,018 (1.7%) over 7d, mean 4.70 of 6, against
+        # 🧮 Hull's 285 of 285. A `capped` census bucket would be a second
+        # copy of a fact the fleet already stores ((hj)), and one derived from
+        # `scan_census`'s `held` would be WORSE than the copy: `held` counts
+        # only coins still in the fund map, so it understates occupancy on
+        # exactly the position this book has a `delisted` exit for.
+        "census_24h": census_24h or None,
         "income_statement": income_statement(positions, realized),
     }
 
@@ -683,7 +715,21 @@ def main():
             # ---- publish -------------------------------------------------
             open_pnl = sum(position_pnl(p) for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
-            extra = build_extra(census, positions, open_pnl, realized)
+            # [2026-09-10] THE CENSUS BECOMES A SERIES. Accumulate FIRST, then
+            # read the window, so this loop's refusals are inside the number
+            # the row publishes (🧮 Hull's ordering, deliberately identical —
+            # a window read before the store is a day that always ends one
+            # loop ago). Both calls never raise (the store's contract) and
+            # neither reads or moves a gate: PUBLISH-ONLY, and it must stay
+            # that way.
+            try:
+                store.snapshot_census(bot_id, census)
+                _cen24 = store.census_window(bot_id, hours=24,
+                                             limit=CENSUS_LIMIT)
+            except Exception:  # noqa: BLE001
+                _cen24 = None
+            extra = build_extra(census, positions, open_pnl, realized,
+                                census_24h=_cen24)
             try:
                 store.publish(
                     bot_id, status="online", equity=equity,
@@ -863,6 +909,24 @@ def _selftest():
     assert extra["caps"]["payback_bar_true"] > extra["caps"]["enter_apr"]
     assert extra["scan"]["scanned"] == 6
     assert extra["income_statement"]["assets"] == 1
+    # [2026-09-10] THE CENSUS SERIES. A dark window is None and NEVER {} — a
+    # zero-filled rollup reads as "measured, nothing refused" when the truth
+    # is "no data" (I1), which is the defect the series exists to remove.
+    assert extra["census_24h"] is None, "a dark window is None, never {}"
+    assert build_extra(cen, positions, 1.23, 4.56,
+                       census_24h={"loops": 3})["census_24h"] == {"loops": 3}
+    # ...and every census key must be COUNTABLE and DECLARED by the store, or
+    # the rollup silently drops it or abstains from `binding_gate` ((vm)) —
+    # both invisible from the row, so pin the shape at the publisher.
+    assert all(store._census_number(v) is not None for v in cen.values()), cen
+    assert not (set(cen) & set(store.CENSUS_RESERVED)), cen
+    assert set(cen) <= (set(store.CENSUS_DENOMINATORS)
+                        | set(store.CENSUS_REFUSALS)), \
+        sorted(set(cen) - set(store.CENSUS_DENOMINATORS)
+               - set(store.CENSUS_REFUSALS))
+    # a full day of THIS book's loops must fit the window it asks for, or the
+    # rollup is a SAMPLE reported as a day.
+    assert CENSUS_LIMIT * LOOP_SECONDS >= 24 * 3600 and CENSUS_LIMIT < 2880
     # [(lz)] the book must NAME what it holds. This book shares its gate with
     # 🌾 carry and 🎸 Barnesy's carry sleeve (~20% TRUE / $2M / crypto-only),
     # and the venue's crypto population at that bar is four coins — so the
