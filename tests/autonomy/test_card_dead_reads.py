@@ -247,7 +247,7 @@ def test_fetch_golive_dd_reads_both_sections_of_the_real_payload():
 
 
 def test_the_drawdown_carries_its_own_denominator():
-    """[(zt)] THE DENOMINATOR TRAVELS WITH THE NUMBER, and this is the reason.
+    """[(zu)] THE DENOMINATOR TRAVELS WITH THE NUMBER, and this is the reason.
 
     `(yz)` rebased both drawdown halves onto each book's own PEAK EQUITY,
     because dividing a dollar hole by a flat $1,000 made the 15% bar fire at

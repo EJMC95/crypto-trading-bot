@@ -54,7 +54,7 @@ UNPAGEABLE_OK = {
     # staleness is visible on the vitals card. If it ever gains an actuator
     # consumer, it leaves this set the same day.
     "fleet-allocation",
-    # [2026-09-10 (zt)] Both joined ORGAN_SPECS the day they were found
+    # [2026-09-10 (zu)] Both joined ORGAN_SPECS the day they were found
     # publishing with NO vitals row at all (the (iy) shape). Each fails SAFE,
     # so each is a visible card reading rather than a page:
     #   coin-quality      -- a dark fold makes every consumer read "unmeasured"

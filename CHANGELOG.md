@@ -1,4 +1,18 @@
-## 2026-09-10 (zt) — THE WEEK'S TELEMETRY REACHED THE CARD, AND THE PAGE WAS STILL RUNNING THE GO-LIVE GATE THE FLEET RETIRED IN JULY
+## 2026-09-10 (zu) — THE WEEK'S TELEMETRY REACHED THE CARD, AND THE PAGE WAS STILL RUNNING THE GO-LIVE GATE THE FLEET RETIRED IN JULY
+
+> **[RENUMBERED (zt) -> (zu) at push.]** A concurrent session landed its own
+> `(zt)` on main — ⚖️ Counterweight's sample-definition entry — while this
+> branch was in CI, and `audit_changelog_letters`' cross-branch arm caught the
+> collision pre-push, which is exactly the race it exists for. **Both sides
+> cite the letter from tracked code**, so rule 3's "the CITED entry keeps it"
+> does not separate them on presence: theirs is already ON MAIN (5 citations
+> across `golive_readiness.py`, `session_state.py`, a study and
+> `test_selftests.py`), where moving it would rewrite committed history in the
+> grader; mine was unpushed and contained in files this change already touches.
+> **This side moved** — 42 citations, counted with `-l` and reconciled rather
+> than piped through `head` ((qz)). Recorded inline because `git log` subjects
+> keep the OLD letter, which is why the CHANGELOG headers are the index and the
+> commit log is not.
 
 **Eamon, 10-Sep:** *"update the pnl dashboard to reflect of the latest tech and
 implements we have made over the last week."*

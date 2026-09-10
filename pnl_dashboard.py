@@ -618,13 +618,13 @@ LABELS = {
 # One-line strategy brief per bot (shared by its venue variants — the chips
 # say WHERE it runs, this says WHAT it does + current units).
 DESCRIPTIONS = {
-    # [(zt)] UNITS REMOVED — they were "$50 × 4 slots" while her LIVE arm ran
+    # [(zu)] UNITS REMOVED — they were "$50 × 4 slots" while her LIVE arm ran
     # 12 slots at a $221.90 clip and 5x gross. Same defect as the Farmer's
     # below, on a REAL-MONEY row: prose describes the MECHANISM, `live_units`
     # renders what the process published.
     "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; entries also read the BREADTH of the oversold ((zr) — how many coins qualify in the same pass, inert until its lever moves); carries its OWN random-entry control arm, so its edge is graded against a matched-random null and never against zero",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
-    # [(zt)] UNITS AND THE LEVERAGE CEILING REMOVED. This read "÷ 5 slots,
+    # [(zu)] UNITS AND THE LEVERAGE CEILING REMOVED. This read "÷ 5 slots,
     # levered 1.4× of a 1.5× drawdown budget" — the cap went 5 → 6 at (ye) on
     # her twin's own record, the gross is an OPERATOR env since (sr) ("risk
     # appetite belongs to the person whose money it is"), and both numbers are
@@ -645,7 +645,7 @@ DESCRIPTIONS = {
     # only ever drift. The bot publishes them now and `live_units` renders them.
     # Describe the MECHANISM here; never the numbers.
     "perps-funding-lighter": "holds the side that RECEIVES funding, vol-vetoed, stop-guarded",
-    # [(zt)] "on HL data" names the arm RETIRED on 17-Jul. The living row is
+    # [(zu)] "on HL data" names the arm RETIRED on 17-Jul. The living row is
     # the Lighter shadow book — the fleet's best-evidenced funding book — and
     # the card was describing its dead twin.
     "perps-funding-carry":  "holds the side that RECEIVES funding above a TRUE-apr gate once the rate has PERSISTED, delta-neutral modelled so P&L is accrual minus fees with no price term; closes on decay-paid (the fleet's measured best exit — income first repays the round trip) or on a sign flip that outlives the grace window. Crypto perps only: a closed underlying market satisfies a persistence bar structurally, which is how the non-crypto sleeve lost every dollar it made",
@@ -658,7 +658,7 @@ DESCRIPTIONS = {
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
     "band-kelly":           "holds the OPPOSITE side of the fleet's measured losers over exactly the windows the loser would have traded — v1 mirrors retired 🧲 Snap Back: LONG the premium-rich dislocations it shorted, SHORT the discounts it bought, exit when the ghost's own rules (converged/stop/2h) would have exited · refused/waiting mirror families publish in extra.roster · env-only, single-policy clock",
     "nav-cook":             "rides the SAME dislocations 🪁 band-kelly mirrors, in the band it REFUSES — premium [45,60) bps, strictly below the mirror's 60bps floor, so the two TILE the surface and every event this book takes is one band-kelly declines (I20 by BAND, not by row id) · non-crypto by nature (the band's crypto population is n=4) with pre-IPO excluded as the only class measured negative · 4h hold, exits on the venue's own index residual · env-only, single-policy clock",
-    # [(zt)] IT ADVERTISED A CONFIG THAT WAS REVERTED FIVE WEEKS EARLIER. The
+    # [(zu)] IT ADVERTISED A CONFIG THAT WAS REVERTED FIVE WEEKS EARLIER. The
     # 30-Jul K 5→8 / universe 30→60 widening was undone 4-Aug on its OWN
     # pre-registered criterion (n rose and t FELL, so the wider cross-section
     # was worse than the hand list) — the live row has published k=5 ever
@@ -666,7 +666,7 @@ DESCRIPTIONS = {
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, dollar-neutral legs rebalanced daily. It runs the K plateau CENTRE both validations cleared — the 30-Jul widening was reverted 4-Aug on its own pre-registered criterion. Its caps line is the gate actually in force",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",
-    # [(zt)] THE LIVE ARM DESCRIBED HERE HAS NOT EXISTED SINCE 13-Aug (ma),
+    # [(zu)] THE LIVE ARM DESCRIBED HERE HAS NOT EXISTED SINCE 13-Aug (ma),
     # when 🙏 Avo Maria took its sub-account — the card was still telling the
     # operator which lens the real money trades. I12: a description that no
     # longer describes the system is a defect, not history.
@@ -715,7 +715,7 @@ def live_units(row):
         bits.append(f"{int(e['max_open'])} slots")
     if _num(e.get("enter_apr")):
         bits.append(f"enter ≥{e['enter_apr']:.2%} TRUE apr")
-    # [(zt)] GROSS LEVERAGE IS A SIZING UNIT AND IT BELONGS HERE. Since (sr)
+    # [(zu)] GROSS LEVERAGE IS A SIZING UNIT AND IT BELONGS HERE. Since (sr)
     # the clip is `equity × gross_x ÷ slots`, so `clip × slots` no longer tells
     # a reader what the book has deployed — and gross_x is an OPERATOR env that
     # moves without a code change, which is exactly the class of number this
@@ -1413,7 +1413,7 @@ def autonomy_rail_card():
             tn = s.get("scout-tuner") or {}
             ntn = len(tn.get("enacted") or {})
             txt = f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}'
-            # [2026-09-10 (zt)] THE READY FREEZE, ON THE RAIL THAT DOES IT.
+            # [2026-09-10 (zu)] THE READY FREEZE, ON THE RAIL THAT DOES IT.
             # `(ye)` gave "freeze its bars first" an actuator: while the tuned
             # book reads READY on a fresh gate payload, every bracket lever is
             # dropped from the enactment, because a book that passed the gate
@@ -1465,7 +1465,7 @@ def autonomy_rail_card():
             if ln.get("serial_lane"):
                 bits.append(f'lane {ln["serial_lane"]}'
                             + (f' ({ln["judging"]})' if ln.get("judging") else ''))
-            # [2026-09-10 (zt)] THE CANDIDATE'S OWN CLOCK AND ITS OWN SAMPLE
+            # [2026-09-10 (zu)] THE CANDIDATE'S OWN CLOCK AND ITS OWN SAMPLE
             # HORIZON. `(zl)` measured that a candidate which NARROWS its arm's
             # entry gate changes the very rate any projection is built from —
             # `mum-vel-12-20` halved its own shadow arm's close rate against the
@@ -2004,7 +2004,7 @@ def golive_card():
                     f'{"PASS" if on else "not yet"}" style="color:{col};'
                     f'background:{bg};border-radius:3px;padding:0 3px;'
                     f'font-size:.8em">{glyph}</span>')
-            # [2026-09-10 (zt)] THE ½ BAR CAN BE DECIDED BY ROW ORDER, AND
+            # [2026-09-10 (zu)] THE ½ BAR CAN BE DECIDED BY ROW ORDER, AND
             # `(za)` SHIPPED THE FLAG THAT SAYS SO. When the halves split
             # boundary falls inside a batch of legs sharing one close instant,
             # h1/h2 depend on which of them sorted first rather than on the
@@ -2056,7 +2056,7 @@ def golive_card():
                     f'{at.get("bars_passed", "?")}/6, t{(at.get("t") or 0):+.2f}." '
                     f'style="color:#8250df;background:rgba(130,80,223,.14);'
                     f'border-radius:3px;padding:0 3px;font-size:.75em">'
-                    # [(zt)] `[5:]` assumed a bare DATE. A policy-stamp era
+                    # [(zu)] `[5:]` assumed a bare DATE. A policy-stamp era
                     # carries a full ISO INSTANT, so 🎫 the taker's chip read
                     # `era 07-30T11:09:46+00:00` — the one book at the bar,
                     # with the longest chip on the card. Trim to the date part
@@ -2121,7 +2121,7 @@ def golive_card():
                         f'style="color:{_col};background:{_bg};'
                         f'border-radius:3px;padding:0 3px;font-size:.75em">'
                         f'{_txt}</span>')
-            # [2026-09-10 (zt)] THE BAR AND ITS OWN CLUSTER-ROBUST READ
+            # [2026-09-10 (zu)] THE BAR AND ITS OWN CLUSTER-ROBUST READ
             # DISAGREE — AND NOW THE CARD SAYS SO.
             # `(zm)` published `t_bar` because the two bases disagree on exactly
             # the two books holding REAL MONEY and nothing anywhere said so. The
@@ -2161,7 +2161,7 @@ def golive_card():
                     f'style="color:#8b949e;background:rgba(110,118,129,.10);'
                     f'border-radius:3px;padding:0 3px;font-size:.75em">'
                     f't strict</span>')
-            # [(zt)] HOW MUCH OF THE GRADED SAMPLE THE BOOK WILL NEVER TRADE
+            # [(zu)] HOW MUCH OF THE GRADED SAMPLE THE BOOK WILL NEVER TRADE
             # AGAIN. `(yn)` shipped `veto_split` on the fleet's FIRST-EVER
             # `ready` verdict, having measured that a QUARTER of the sample
             # that passed came from lenses the book has since vetoed by its own
@@ -2181,7 +2181,7 @@ def golive_card():
                     f'veto {_nv.get("n")}/{b.get("n")}'
                     + (f' &rarr; {_stm:+.2f}%' if isinstance(_stm, (int, float))
                        else '') + '</span>')
-            # [(zt)] THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.
+            # [(zu)] THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.
             # `(za)` shipped `dd_resampled` because *"the gate grades a 15%
             # bar over the ONE ordering a book happened to walk and cannot
             # tell a safe book from a benign sequence."* Measured: 👩 mum's
@@ -2940,7 +2940,7 @@ def fetch_golive_dd():
                 pct_v = None
             out[bot] = {"pct": pct_v,
                         "basis": rec.get("maxdd_basis"),
-                        # [(zt)] `(yz)` — book_usd vs the book's own peak
+                        # [(zu)] `(yz)` — book_usd vs the book's own peak
                         # equity. Absent on an older payload, which renders as
                         # no denominator rather than an assumed one.
                         "denom": rec.get("maxdd_denom"),
@@ -3353,7 +3353,7 @@ def _orders_html(extra):
 
 
 # ---------------------------------------------------------------------------
-# [2026-09-10 (zt)] THE WEEK'S TELEMETRY REACHES THE CARD.
+# [2026-09-10 (zu)] THE WEEK'S TELEMETRY REACHES THE CARD.
 #
 # In the week of 3–10 Sep the books started publishing the numbers doctrine
 # had been asking for — a per-book random-entry CONTROL ARM ((zc)/(zb), I14:
@@ -3458,7 +3458,7 @@ def _t_leverage(leverage):
         bits.append(f'<span class="{"neg" if vs > 1.0 else ""}">vs vol target {vs:.2f}</span>')
     if stop_pct is not None:
         s = f'all-slots stop {100 * stop_pct:.0f}%'
-        # [(zt)] THE MEASURED FIGURE BESIDE THE MODELLED ONE. `all_slots_stop_pct`
+        # [(zu)] THE MEASURED FIGURE BESIDE THE MODELLED ONE. `all_slots_stop_pct`
         # prices every stop AT its level; `(xp)` measured that mum's own fills
         # land 12–62bps PAST it, and the publisher ships that as
         # `all_slots_stop_pct_measured`. Showing only the modelled number
@@ -3470,7 +3470,7 @@ def _t_leverage(leverage):
         if over is not None and over > 0:
             s = f'<span class="neg">{s} (+{over:g}pp over the bar)</span>'
         bits.append(s)
-    # [(zt)] THE STOP THE BOOK IS ACTUALLY HOLDING. `stop_reachable` prices the
+    # [(zu)] THE STOP THE BOOK IS ACTUALLY HOLDING. `stop_reachable` prices the
     # WORST book in the universe; `stop_reachable_held` prices the basket it
     # holds right now, and the two disagree on both live rows — reporting only
     # the first reads as permanent alarm and trains the operator to ignore it.
@@ -3486,7 +3486,7 @@ def _t_leverage(leverage):
                     + '</span>')
     elif reach is True:
         bits.append('stop reachable ✓')
-    # [(zt)] THE RUIN GATE'S OWN VERDICT. `headroom` is `rails.headroom_check`
+    # [(zu)] THE RUIN GATE'S OWN VERDICT. `headroom` is `rails.headroom_check`
     # — is there room between this book's stop and its liquidation — and it
     # reads `{ok: false, reason: "liq_unpriced"}` on BOTH real-money rows.
     # UNPRICED is not UNSAFE and must not render as danger: the venue quotes no
@@ -3618,7 +3618,7 @@ def _t_margin(margin):
         bits.append(f'gross ${gross:,.0f}')
     if lev is not None:
         bits.append(f'{lev:.2f}×')
-    # [(zt)] `nearest_liq` IS NOT A NUMBER. The publisher emits the nearest
+    # [(zu)] `nearest_liq` IS NOT A NUMBER. The publisher emits the nearest
     # position as a DICT (coin + its distance), so reading it through `_fin`
     # returned None on every populated payload and the row would have printed
     # "liq unpriced" for a book whose liquidation distance WAS priced —
@@ -3716,7 +3716,7 @@ def _t_levers(levers):
                     if isinstance(consumable, list) and consumable else ""))
 
 
-#: [(zt)] 🎫 THE TAKER'S GATE ORDER, DECLARED — BECAUSE THE PAYLOAD CANNOT
+#: [(zu)] 🎫 THE TAKER'S GATE ORDER, DECLARED — BECAUSE THE PAYLOAD CANNOT
 #: CARRY IT. `(xs)` built `gate_census` in gate order on purpose and said how to
 #: read it: *"`tickets_in` is the denominator, each counter is one gate's
 #: refusal, and the first large counter names the binding gate."* That
@@ -3763,7 +3763,7 @@ def _t_gate_census(gate_census, slot_census):
             body += f' → offered {off}'
         if isinstance(opened, int):
             body += f' · opened {opened}'
-        # [(zt)] ALL THREE slot throttles, not just the cap. `(uo)` built this
+        # [(zu)] ALL THREE slot throttles, not just the cap. `(uo)` built this
         # census to answer WHICH constraint binds — `slots_full` says the cap
         # turned away earned trades, `lens_once` says the per-lens-per-cycle
         # throttle did, `held_sym` says the book already holds that coin — and
@@ -3796,7 +3796,7 @@ def _t_lens_evidence(lens_evidence, lens_veto):
     if not cells:
         return None
     cells.sort(key=lambda c: -c[0])
-    # [(zt)] a lens can be VETOED and carry no evidence row of its own (a
+    # [(zu)] a lens can be VETOED and carry no evidence row of its own (a
     # standing veto whose era sample fell below the floor). Dropping it made
     # the published veto list unreadable from the row that claims to show it.
     orphan = sorted(v for v in vetoed if not any(v == c[1] for c in cells))
@@ -3835,7 +3835,7 @@ def _t_holdwatch(holdwatch):
                                                 "the ghost's exit — reported, never a bar"))
 
 
-#: [(zt)] Census keys that are a MEASUREMENT of the scan, not a refusal
+#: [(zu)] Census keys that are a MEASUREMENT of the scan, not a refusal
 #: COUNT. The two hosts publish different shapes — the live variant host nests
 #: its refusals under `verdicts`, the family shadow host puts them flat beside
 #: bars, medians and read-counts — so a flat census has to be filtered or a
@@ -3906,7 +3906,7 @@ def _t_caps(caps):
         if isinstance(v, bool):
             return "yes" if v else "no"
         if isinstance(v, float):
-            # [(zt)] `%g` renders a $1,000,000 volume floor as "1e+06", which
+            # [(zu)] `%g` renders a $1,000,000 volume floor as "1e+06", which
             # an operator has to decode. Whole numbers above 10k get thousands
             # separators; everything else keeps %g's compactness.
             if v == int(v) and abs(v) >= 10_000:
@@ -4017,7 +4017,7 @@ def _t_held(held):
     if isinstance(held, dict):
         if not held:
             return None
-        # [(zt)] the shared-tag shortcut may only fire when EVERY coin carries
+        # [(zu)] the shared-tag shortcut may only fire when EVERY coin carries
         # that tag. With one coin untagged it printed the other's tag against
         # both — a fabricated attribution, and the tag names the strategy that
         # opened the position.
@@ -4034,7 +4034,7 @@ def _t_held(held):
     return None
 
 
-#: [(zt)] WHAT EACH RENDERER ACTUALLY READS, derived from its OWN source at
+#: [(zu)] WHAT EACH RENDERER ACTUALLY READS, derived from its OWN source at
 #: import time — never a hand-typed list, which is the constant that drifts.
 #:
 #: THE DEFECT THIS CLOSES, and it was introduced by the first cut of this very
@@ -4059,7 +4059,7 @@ def _reader_subkeys(fn_name, param):
     Cached: this parses a 400KB module, and `card()` would otherwise re-parse
     it a dozen times per book. The FAIL DIRECTION is deliberate and is the safe
     one — an empty set consumes nothing, so the raw dump keeps everything and
-    the page degrades to its pre-(zt) verbosity rather than hiding a field.
+    the page degrades to its pre-(zu) verbosity rather than hiding a field.
     **It is also how the first cut of this function shipped dead**: `ast` was
     not imported here, `NameError` is an `Exception`, and the bare handler
     turned a missing import into a silent no-op — this repo's own
@@ -4276,7 +4276,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     status = (row.get("status") or "?")
     dot = "warn" if stale else ("off" if status in ("halted", "error") else "on")
     extra = row.get("extra") or {}
-    # [(zt)] the structured telemetry rows, computed FIRST so the raw dump
+    # [(zu)] the structured telemetry rows, computed FIRST so the raw dump
     # below can subtract exactly what they rendered.
     tele_rows, tele_used = telemetry_rows(extra)
     if isinstance(extra, dict):
@@ -4415,7 +4415,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     _dd = en.get("golive_dd")
     if _dd and _dd.get("pct") is not None:
         _basis = _dd.get("basis")
-        # [(zt)] THE DENOMINATOR TRAVELS WITH THE NUMBER. `(yz)` rebased both
+        # [(zu)] THE DENOMINATOR TRAVELS WITH THE NUMBER. `(yz)` rebased both
         # drawdown halves onto the book's own PEAK EQUITY, because dividing a
         # dollar hole by a flat $1,000 made the 15% bar fire at 35.6% of 🙏
         # avo's real book and 25.8% of 👩 mum's — *"the one bar that is NOT
@@ -4482,7 +4482,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     if spark:
         _svg, _dd = spark
         rows.append(f'<div class="row"><span>7d equity · DD {_dd:+.1f}%</span><b>{_svg}</b></div>')
-    # [(zt)] the week's telemetry — control arm, spend, leverage, gates …
+    # [(zu)] the week's telemetry — control arm, spend, leverage, gates …
     rows.extend(tele_rows)
     # live open positions passed through by the freqtrade poller
     open_pos_html = ""
@@ -4596,7 +4596,7 @@ def render():
     # stage, with the go-live gate READ per bot from the grader that owns it
     # (see fetch_golive_stages / classify_stage — never recomputed here).
     try:
-        # [(zt)] the CANONICAL grader, imported — not a second local gate.
+        # [(zu)] the CANONICAL grader, imported — not a second local gate.
         gates = fetch_golive_stages()
     except Exception:  # noqa: BLE001
         gates = {}
@@ -4622,7 +4622,7 @@ def render():
         # can never auto-promote to "ready" on gates alone); this only makes
         # their distance from the bar visible. "control"/"scanner" stay off by
         # design — a reference book isn't on the promotion track.
-        # [(zt)] "control" joins the list. 🌾 carry sat under "not on the
+        # [(zu)] "control" joins the list. 🌾 carry sat under "not on the
         # promotion track" with NO gate row while the grader had it at 5 of 6
         # — a reference book is still a book with a record, and hiding its
         # distance from the bar is the same omission one heading over.
@@ -5550,7 +5550,7 @@ ORGAN_SPECS = [
     # cannot afford: fleet-alerts/fleet-tuning/xp-queue are EVENT-typed for
     # exactly this reason. The ledger + odometer history are kept; if Gap Scout
     # is ever resurrected (GAPSCOUT_RETIRED_OVERRIDE=run) restore this line.
-    # [2026-09-10 (zt)] TWO ORGANS WERE PUBLISHING ON THEIR OWN CADENCE WITH
+    # [2026-09-10 (zu)] TWO ORGANS WERE PUBLISHING ON THEIR OWN CADENCE WITH
     # NO ROW HERE, so /vitals could not grade them and the watchdog could not
     # see them — the (iy) fleet-allocation shape ("worse than unpageable,
     # invisible"), found by diffing this list against the live `bot_state`
@@ -6155,7 +6155,7 @@ def ops_strip_html():
     # fleet_risk emits lowercase green/yellow/red ([2026-07-15 AUDIT FIX]:
     # the map keyed AMBER, so the warning state rendered gray).
     lcol = {"GREEN": "#1a7f37", "YELLOW": "#b8860b", "RED": "#d1242f"}.get(light, "#5b7184")
-    # [2026-09-10 (zt)] THE LIGHT THE CONSUMERS ENFORCE IS THE COHORT'S, AND THE
+    # [2026-09-10 (zu)] THE LIGHT THE CONSUMERS ENFORCE IS THE COHORT'S, AND THE
     # STRIP WAS LEADING WITH THE ONE NUMBER NOBODY OBEYS.
     # `(wp)`/`(wy)` split the long budget per cohort — *"a paper position carries
     # no risk to a real-money book and a real position carries none to a paper
@@ -6212,7 +6212,7 @@ def ops_strip_html():
     else:
         parts.append(_chip("Risk light", light, lcol,
                            "fleet_risk is dark — this is not a measurement"))
-    # [(zt)] THE DRAWDOWN GOVERNOR'S CHIPS BELONG TO EVERY BRANCH ABOVE.
+    # [(zu)] THE DRAWDOWN GOVERNOR'S CHIPS BELONG TO EVERY BRANCH ABOVE.
     # These three sat inside the old single `if fr:` block, and splitting that
     # block for the cohort read left them stranded in the DARK branch — so the
     # 7-day drawdown and the governor's `clip_scale`, an actuator that shrinks
@@ -6422,7 +6422,7 @@ def _iso_dt(s):
 
 
 # ---------------------------------------------------------------------------
-# [2026-09-10 (zt)] THE SECOND GO-LIVE GATE THAT USED TO LIVE HERE IS DELETED.
+# [2026-09-10 (zu)] THE SECOND GO-LIVE GATE THAT USED TO LIVE HERE IS DELETED.
 #
 # `GATE_MIN_TRADES_30D / GATE_MIN_WR / GATE_MAX_DD / GATE_MIN_AGE_DAYS` and
 # `fetch_gate_metrics()` re-implemented a promotion bar — win rate above 55%
@@ -6454,7 +6454,7 @@ CONTROL_BASES = {"perps-funding-carry"}
 
 
 # ---------------------------------------------------------------------------
-# [2026-09-10 (zt)] THE PAGE RAN A SECOND GO-LIVE GATE, AND IT WAS THE ONE THE
+# [2026-09-10 (zu)] THE PAGE RAN A SECOND GO-LIVE GATE, AND IT WAS THE ONE THE
 # FLEET RETIRED.
 #
 # `(fk)` re-specified the gate on 29-Jul and REMOVED win rate as a bar, because
