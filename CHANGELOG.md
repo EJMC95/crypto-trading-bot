@@ -1,3 +1,77 @@
+## 2026-09-10 (aae) — 🙏 AVO'S VOLUME FLOOR WAS A PROXY FOR A THING THE FLEET NOW MEASURES DIRECTLY — AND TWO OF THE THREE WORST-EXECUTING COINS SIT ABOVE IT
+
+**Eamon, 10-Sep:** *"measure it properly"* — on widening 🙏 avo's universe,
+after `(aac)` measured her slot cap as NOT the binding constraint and named
+supply instead.
+
+**THE GAP WAS DELIBERATE, SO THIS IS A RE-DERIVATION AND NOT AN OVERRIDE.**
+`(vd)` set her floor at $0.5M rather than mum's $0.1M on 28-Aug with a stated
+reason: *"she holds 3.5 days against mum's 12h and clips $684 against mum's
+$250. A bigger position held ~7x longer on a thinner book is a different
+liquidity question."* That reasoning is sound and is left standing. **Both of
+its inputs have since moved**, which is I12's case exactly.
+
+**THE ARITHMETIC, from (vd)'s OWN ratio.** $684 clip / $0.5M floor =
+**0.1368% of daily volume**. Her clip today is **$165.95** — **4.1x smaller**
+(gross_x and slot count both moved since). Holding that same ratio gives a
+floor of **$0.121M**. Shipped at **$0.15M**: strictly ABOVE the derivation
+((gv)'s inside-the-bar habit) and **1.5x** `(qq)`'s $0.1M cliff.
+
+**AND THE PROXY IS MEASURABLY THE WRONG INSTRUMENT FOR THE JOB.** A volume
+floor is a stand-in for execution quality. The fleet now measures execution
+quality **directly, per coin, on realised fills** — `market_context.
+coin_quality` vetoes >15bps on n>=5, and all three live books consume it at
+the entry site. Measured 10-Sep, the three coins vetoed for SLIPPAGE:
+
+| coin | $M/day | vs avo's $0.5M floor | measured slip |
+|---|---|---|---|
+| AI | 0.210 | in the excluded band | **52.77bps** |
+| SHEIN | 0.740 | **above it — she scans it** | 20.25bps |
+| USELESS | **3.856** | **7.7x above it** | 18.69bps |
+
+**Two of the three sit ABOVE the floor, and the worst is 7.7x above it.** The
+floor was excluding 32 crypto names to manage a risk it demonstrably does not
+screen, while the direct veto catches the offenders at any volume. That is a
+measured harm of the PROXY — I26's burden-of-proof-on-the-refusal, discharged
+against the refusal rather than the widening.
+
+**ADMITS 20 CRYPTO NAMES, 33 -> 53** (PENDLE, DASH, AAVE, ZRO, AVAX, EIGEN,
+ONDO, MON, APT, CRV, TIA, WIF, ICP, WLFI, VIRTUAL, JUP, OP...). One of the 20
+— AI — is **already slip-vetoed**, so the direct veto is demonstrably live on
+this exact band.
+
+**DECLARED BLIND SPOT, and it is why $0.15M and not the derived $0.121M or
+mum's $0.10M: the veto needs n>=5 MEASURED FILLS**, so a newly admitted coin
+is unprotected until it has traded five times. **The floor is the only screen a
+coin has on its FIRST fill** — which is precisely why it is lowered
+proportionately rather than removed.
+
+**EXPECTANCY PRICE, unchanged from (vd) and stated: NEUTRAL at her horizon.**
+`(qu)` measured her entry's excess over matched-random as ~zero at 5d, where
+her hold lands. Bought as **DECIDABILITY, not edge** ((ty)) — she holds nothing
+**41% of the time** and averages **1.34 of 6 slots** ((aac)).
+
+**A PIN RE-AIMED, NEVER DELETED (I26).** `test_avos_floor_is_stricter_than_
+mums` passes **UNCHANGED** — 0.15 > 0.10 — because the ORDERING is the
+argument and the ordering survived. The value pin moved with its derivation
+recorded beside it. NEW guard: `test_no_family_floor_sits_at_or_below_the_
+measured_slippage_cliff` pins the DURABLE property a value pin cannot — no
+family floor may sit at or below $0.1M — because `(aae)`'s own re-derivation
+is the case where a value-only pin protects nothing. 3/3 mutations red
+(0.05 caught by the cliff guard, 0.10 by the ordering, 0.5 by the value).
+
+**PRE-REGISTERED REVERT (I21/I25 — judged against her OWN other closes in the
+SAME window, never the window that motivated this):** read at **n>=30 fresh
+live closes on admitted coins** (entry volume < $0.5M) or on **2026-10-10**,
+whichever first. REVERT to $0.5M if those closes' mean is worse than her
+>=$0.5M closes' mean over the same window by more than one SE of the
+difference; KEEP if not worse; anything else returns to Eamon with both
+numbers. Recorded as 'avo-floor-0.15 READ:' in the CHANGELOG.
+
+Both arms move together — the floor is keyed on the BARE bot id, so the live
+host and the shadow host resolve the same value and the judge's pair keeps its
+parity. Era NOT reset: universe width is capacity, i.e. ordinary tuning ((hc)).
+
 ## 2026-09-10 (aac) — 🙏 AVO'S SLOT CAP IS NOT THE CONSTRAINT: REFUSED WITH EVIDENCE, AND MY OWN CENSUS READING WAS THE ARTIFACT
 
 **Eamon, 10-Sep:** *"your proposal sounds good, proceed"* — on re-measuring

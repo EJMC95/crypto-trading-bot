@@ -328,12 +328,44 @@ def test_avo_widened_at_a_stricter_floor_and_georgia_is_untouched():
     configuration rescues it. Widening a book whose dominant sleeve has no
     measured entry edge buys more no-edge trades, which is the I19 trap.
     """
-    assert fam.crypto_min_vol_m("freqtrade-avo-maria") == pytest.approx(0.5)
+    # [2026-09-10 (aae)] 0.5 -> 0.15. The pin is RE-AIMED, not deleted (I26):
+    # (vd)'s ratio was $684 clip / $0.5M floor = 0.1368% of daily volume, and
+    # her clip is $165.95 today — 4.1x smaller — which puts the same ratio at
+    # $0.121M. Shipped strictly above it. `test_avos_floor_is_stricter_than_
+    # mums` below passes UNCHANGED, because the ORDERING is the argument and
+    # the ordering is what survived.
+    assert fam.crypto_min_vol_m("freqtrade-avo-maria") == pytest.approx(0.15)
     assert fam.crypto_width("freqtrade-avo-maria") >= 120
     assert fam.crypto_min_vol_m("freqtrade-mum") == pytest.approx(0.1)
     assert fam.crypto_min_vol_m("freqtrade-georgia") == 0.0, (
         "georgia must stay unwidened — her dominant sleeve is measured DEAD")
     assert fam.crypto_width("freqtrade-georgia") == 0
+
+
+def test_no_family_floor_sits_at_or_below_the_measured_slippage_cliff():
+    """[2026-09-10 (aae)] THE DURABLE PROPERTY, pinned where a VALUE cannot be.
+
+    A volume floor's one non-negotiable job is to keep the cheapest admitted
+    coin ABOVE `(qq)`'s measured slippage cliff — mean 17.49bps and p90
+    **398bps** under $0.1M/day. Below that line a fill is *"not supply, it is
+    noise bought at a spread"* (this floor's own derivation).
+
+    Pinned as a PROPERTY rather than a number because the numbers legitimately
+    move: `(aae)` re-derived avo's floor from her clip (0.5 -> 0.15) and the
+    ordering test below still passed, which is exactly the case where a
+    value-only pin gives no protection at all. What must never move is the
+    cliff.
+
+    NOTE the veto that supersedes the proxy cannot replace it here: the
+    coin-quality slip veto needs **n>=5 measured fills**, so the floor is the
+    only screen a newly admitted coin has on its FIRST fill.
+    """
+    cliff = 0.1
+    for bot in ("freqtrade-mum", "freqtrade-avo-maria"):
+        f = fam.crypto_min_vol_m(bot)
+        assert f >= cliff, (
+            f"{bot}'s floor {f} sits below (qq)'s ${cliff}M/day slippage "
+            "cliff — the one thing a volume floor exists to prevent")
 
 
 def test_avos_floor_is_stricter_than_mums():

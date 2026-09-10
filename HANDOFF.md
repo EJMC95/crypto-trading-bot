@@ -1,17 +1,14 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 18:29 Sydney (08:29Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 18:43 Sydney (08:43Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
-**🕳️ FEED DARK**
-
-- `/pnl.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/pnl.json) — no book state read. This section is blind, not clear.
-
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` is DECLARED LIVE and **absent from the feed** — check the service is publishing.
-- `freqtrade-mum-lighter` is DECLARED LIVE and **absent from the feed** — check the service is publishing.
+- `freqtrade-avo-maria-lighter` was shut **32% of the last 13.8d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 19:56 Sydney (protections_locked).
+- `freqtrade-mum-lighter` was shut **15% of the last 13.8d** (49h), mostly `slguard` (29h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -61,6 +58,11 @@ _Still open because:_ the READ is done; the DECISION is Eamon's and has not been
 🙏 avo's LIVE cap went 5 -> 6 at (ye) (6-Sep) on the twin's own record: the 4 shadow trades opened with >=5 already held earned +6.877%/trade (+$13.76, 53% of its +$25.80) vs +1.027% for the other 28, and the (sr) premise '6 never' had become false (6 held 8.3% of the time, peak 7). PRE-REGISTERED READ (I21/I26 — graded on FRESH live closes only, never the window that motivated it): at >=10 LIVE closes opened with >=5 held, or on 6-Oct, whichever first — REVERT the literal to 5 (lighter_family_bot.STRATEGIES, [deploy-live-taker]) if their mean <= the live book's other closes' mean over the same window; KEEP if greater; record either verdict as 'avo-live-slot-6 READ:' in the CHANGELOG and remove this row.
 
 _Still open because:_ the read date has not arrived and the live arm has no post-change closes yet; this row is the tripwire the registration would otherwise lack (the I21 prose shape).
+
+### `avo-floor-0.15-preregistered-read`  ·  owner: **session**
+🙏 avo's crypto volume floor went $0.5M -> $0.15M at (aae) (10-Sep), RE-DERIVED from (vd)'s own ratio rather than overridden: $684 clip / $0.5M = 0.1368% of daily volume, and her clip is $165.95 today (4.1x smaller), which puts the same ratio at $0.121M. Shipped strictly above it and 1.5x (qq)'s $0.1M cliff. The proxy was measurably the wrong instrument — 2 of the 3 coins vetoed for SLIPPAGE sit ABOVE the old floor (SHEIN $0.740M, USELESS $3.856M = 7.7x it). Admits 20 crypto names, 33 -> 53. PRE-REGISTERED READ (I21/I25 — judged against her OWN other closes in the SAME window, never the window that motivated it): at >=30 fresh LIVE closes on admitted coins (entry volume < $0.5M), or on 10-Oct, whichever first — REVERT to 0.5 (lighter_family_bot.FAMILY_CRYPTO_MIN_VOL_M, [deploy-live]) if their mean is worse than her >=$0.5M closes' mean over the same window by more than one SE of the difference; KEEP if not worse; anything else returns to Eamon with both numbers. Record as 'avo-floor-0.15 READ:' in the CHANGELOG and remove this row.
+
+_Still open because:_ the read date has not arrived and the live arm has no closes on an admitted coin yet. DECLARED BLIND SPOT this read exists to watch: the coin-quality slip veto needs n>=5 MEASURED FILLS, so a newly admitted coin is unprotected on its first fills and the floor is its only screen — which is why the floor was lowered proportionately rather than removed.
 
 ### `counterweight-preregistered-fresh-read`  ·  owner: **session**
 ⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 10-Oct, whichever first. [10-Sep (zt)] BASIS DECLARED: CLOSED-after 1-Sep, not opened-after -- it was ambiguous and two sessions read it differently on the same day (n=13 vs n=21, 2.2pp of mean, 16 days of trigger date). Pinned in code by scripts/study_counterweight_fresh_read_2026-09-10.py, which reports BOTH bases and REFUSES to take the read before the trigger fires. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
@@ -112,8 +114,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (40 commit(s), entries (zt))
+## Shipped today (41 commit(s), entries (zt))
 
+- `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact
 - `98738b3` (aab) the handoff reads the live fleet: two books have been READY for six days and nothing said so
 - `fc48964` (zy)(zz)(aaa) the letter guard sees open branches; Rich Dad gets a census series; Hull's cap raise measured and deferred to one turnover
 - `c62297f` (zw) pin skip_if_same, the baseline flag, and next_letter's extra_claimed — the preventive half had no test at all

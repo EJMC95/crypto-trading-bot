@@ -296,8 +296,36 @@ FAMILY_CRYPTO_N = os.environ.get(
 #: [2026-08-28 (vd)] 🙏 avo joins at a STRICTER floor than mum, and the gap
 #: is deliberate: she holds **3.5 days** against mum's 12h and clips
 #: **$684** against mum's $250. A bigger position held ~7x longer on a
-#: thinner book is a different liquidity question, so her floor is $0.5M
-#: (~32 crypto names, 2x her current 15) rather than mum's $0.1M (~67).
+#: thinner book is a different liquidity question, so her floor is ~~$0.5M
+#: (~32 crypto names, 2x her current 15)~~ rather than mum's $0.1M (~67).
+#: **[2026-09-10 (aae)] 0.5 -> 0.15, CORRECTED IN PLACE per I12: the gap is
+#: still deliberate and still stricter than mum's — only its VALUE was stale,
+#: because BOTH inputs of the derivation above have moved.**
+#:   * **The clip is 4.1x smaller.** $684 when this was written, **$165.95**
+#:     today. (vd)'s own ratio is $684 / $0.5M = **0.1368% of daily volume**;
+#:     holding that ratio at today's clip gives **$0.121M**. Shipped at
+#:     **$0.15M** — strictly ABOVE the derivation ((gv)'s inside-the-bar
+#:     habit) and 1.5x (qq)'s $0.1M cliff. The ORDERING this floor exists to
+#:     express is untouched (0.15 > mum's 0.10), and
+#:     `test_avos_floor_is_stricter_than_mums` passes UNCHANGED — a pin
+#:     re-aimed, never deleted (I26).
+#:   * **And volume is a PROXY the fleet no longer needs for this job.** The
+#:     coin-quality veto measures execution DIRECTLY, per coin, on realised
+#:     fills (>15bps on n>=5, `market_context.coin_quality`), and all three
+#:     live books consume it at the entry site. Measured 10-Sep, the three
+#:     coins vetoed for SLIPPAGE are **AI $0.210M, SHEIN $0.740M and USELESS
+#:     $3.856M** — two of the three sit ABOVE this floor, and the worst is
+#:     **7.7x above it**. So the floor excludes 32 crypto names to manage a
+#:     risk it measurably does NOT screen, while the direct veto catches the
+#:     offenders at any volume.
+#:   * **DECLARED BLIND SPOT, and it is why the value is $0.15M rather than
+#:     the derived $0.121M or mum's $0.10M:** that veto needs **n>=5 measured
+#:     fills**, so a newly admitted coin is unprotected until it has traded
+#:     five times. The floor is the only screen a coin has on its FIRST fill.
+#:   * Admits **20 crypto names (33 -> 53)**; one of them (AI) is already
+#:     slip-vetoed, so the veto is demonstrably live on this band. Expectancy
+#:     price unchanged from (vd): NEUTRAL at her horizon by (qu)'s
+#:     measurement — bought as DECIDABILITY, not edge ((ty)).
 #:
 #: WHAT THIS BUYS, stated honestly: **decidability, not edge.** (qu)
 #: measured her entry's excess over matched-random as NEGATIVE at 4h/8h/12h
@@ -309,7 +337,7 @@ FAMILY_CRYPTO_N = os.environ.get(
 #: A criterion nobody can reach decides nothing — this is the (ty) purchase
 #: ("bought as DECIDABILITY, not edge") on the book that most needs it.
 FAMILY_CRYPTO_MIN_VOL_M = os.environ.get(
-    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1,freqtrade-avo-maria:0.5")
+    "FAMILY_CRYPTO_MIN_VOL_M", "freqtrade-mum:0.1,freqtrade-avo-maria:0.15")
 
 
 def crypto_min_vol_m(bot, raw=None):

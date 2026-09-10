@@ -357,6 +357,37 @@ CARRIED = [
         "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 6),
     },
     {
+        "id": "avo-floor-0.15-preregistered-read",
+        "owner": "session",
+        "subject": ("freqtrade-avo-maria-lighter",),
+        "what": "🙏 avo's crypto volume floor went $0.5M -> $0.15M at (aae) "
+                "(10-Sep), RE-DERIVED from (vd)'s own ratio rather than "
+                "overridden: $684 clip / $0.5M = 0.1368% of daily volume, and "
+                "her clip is $165.95 today (4.1x smaller), which puts the same "
+                "ratio at $0.121M. Shipped strictly above it and 1.5x (qq)'s "
+                "$0.1M cliff. The proxy was measurably the wrong instrument — "
+                "2 of the 3 coins vetoed for SLIPPAGE sit ABOVE the old floor "
+                "(SHEIN $0.740M, USELESS $3.856M = 7.7x it). Admits 20 crypto "
+                "names, 33 -> 53. PRE-REGISTERED READ (I21/I25 — judged "
+                "against her OWN other closes in the SAME window, never the "
+                "window that motivated it): at >=30 fresh LIVE closes on "
+                "admitted coins (entry volume < $0.5M), or on 10-Oct, "
+                "whichever first — REVERT to 0.5 (lighter_family_bot."
+                "FAMILY_CRYPTO_MIN_VOL_M, [deploy-live]) if their mean is "
+                "worse than her >=$0.5M closes' mean over the same window by "
+                "more than one SE of the difference; KEEP if not worse; "
+                "anything else returns to Eamon with both numbers. Record as "
+                "'avo-floor-0.15 READ:' in the CHANGELOG and remove this row.",
+        "why_open": "the read date has not arrived and the live arm has no "
+                    "closes on an admitted coin yet. DECLARED BLIND SPOT this "
+                    "read exists to watch: the coin-quality slip veto needs "
+                    "n>=5 MEASURED FILLS, so a newly admitted coin is "
+                    "unprotected on its first fills and the floor is its only "
+                    "screen — which is why the floor was lowered "
+                    "proportionately rather than removed.",
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 10),
+    },
+    {
         "id": "counterweight-preregistered-fresh-read",
         "owner": "session",
         "what": "⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a "
