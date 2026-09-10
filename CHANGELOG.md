@@ -199,6 +199,23 @@ them; **verified by `extra.live_policy` appearing on the row, never by a green
 run**. No live marker: nothing here changes a trade, and there is no live
 taker row to restart.
 
+**VERIFIED, and the receipt is the point.** Railway Redeploy #34542875366
+succeeded on this SHA (`freqtrade-bots`, `pnl-dashboard`); the taker's row was
+then read TWICE (ages 37s and 51s, build `cd2bf9c7b453`/17, svc
+`freqtrade-bots`) and carries
+`extra.live_policy = {lenses: ["divergence"], sides: {divergence: ["short"], …}}`.
+Driving the REAL post-deploy payload through the REAL grader:
+`published_live_policy` parses it, `live_fillable` returns
+**inert=true · allowed=46 · effective=0 · unfillable=162 ·
+blocked_by={lens_not_allowed: 162, side_not_allowed: 0, lens_vetoed: 46}** —
+and `grade()` still returns **ready=True, 6/6**, which is the design working:
+it moves no bar. **REMAINING LAG, declared rather than discovered later:**
+`golive-readiness` publishes on a 6-hourly loop and its last publish
+(20:48Z) predates this deploy, so the PUBLISHED payload — and therefore the
+🚦 card chip and HANDOFF's gate line — carry the verdict only from the next
+cycle (~02:48Z). The code path is proven end-to-end; what is pending is one
+turn of an organ's own clock.
+
 **CAVEAT ON THE SAMPLE, recorded rather than absorbed:** the 46 era closes
 span **10 distinct bracket configurations** (tp ∈ {0.03, 0.04, 0.06},
 max_hold_h ∈ {24, 48, 72}, brk_range ∈ {0.95, 0.97}). Single-POLICY by the era
