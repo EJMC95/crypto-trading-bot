@@ -140,7 +140,10 @@ def test_the_semantic_arms_each_move_on_their_own_field():
     m["fleet_risk"]["cohorts"] = {"live": {"long_positions": 1, "long_budget": 6},
                                   "shadow": {"long_positions": 2, "long_budget": 20}}
     r = _rows(m)["fleet_risk"]
-    assert r["state"] == "fixed?" and "live 1/6" in r["why"] and "shadow 2/20" in r["why"]
+    # [(aah)] `ok`, not `fixed?`: fleet_risk is in CONFIRMED. This arm exists to
+    # prove the COHORT FIELDS reach the row, and it still does that — re-aimed
+    # rather than treated as a reason not to confirm a fix that shipped.
+    assert r["state"] == "ok" and "live 1/6" in r["why"] and "shadow 2/20" in r["why"]
     m = copy.deepcopy(OB.FIXTURE_BUS)
     m["event_sentinel"]["sources_ok"]["gdelt"] = True
     for g in m["event_sentinel"]["playbook_grades"].values():
@@ -148,7 +151,28 @@ def test_the_semantic_arms_each_move_on_their_own_field():
     assert _rows(m)["event_sentinel"]["state"] == "watch"
     m = copy.deepcopy(OB.FIXTURE_BUS)
     m["golive_readiness"]["decision_docket"] = []
-    assert _rows(m)["golive_readiness"]["state"] == "fixed?"
+    assert _rows(m)["golive_readiness"]["state"] == "ok"     # [(aah)] CONFIRMED
+
+
+def test_a_confirmation_closes_a_claim_without_masking_a_regression():
+    """[(aah)] `fixed?` had no terminal state, so five of twenty rows read
+    'confirm me' forever — the cry-wolf shape. A CONFIRMED organ grades `ok`;
+    the same organ FAILING its own check still grades `watch`, so the
+    confirmation can never hide a new fault."""
+    assert set(OB.CONFIRMED) <= set(OB.REVIEW_2SEP), "confirm only what was watched"
+    assert all(OB.REVIEW_2SEP[o] == "watch" for o in OB.CONFIRMED), \
+        "a confirmation is meaningless on a row the baseline never flagged"
+    m = copy.deepcopy(OB.FIXTURE_BUS)
+    m["golive_readiness"]["decision_docket"] = []
+    assert _rows(m)["golive_readiness"]["state"] == "ok"
+    # the same organ, regressed: the confirmation must not survive a real fault
+    m["golive_readiness"]["decision_docket"] = [{"book": "a-book"}]
+    assert _rows(m)["golive_readiness"]["state"] == "watch"
+    # and an UNconfirmed cleared watch still asks for a human
+    m = copy.deepcopy(OB.FIXTURE_BUS)
+    m["fleet_immune"]["sick"] = []
+    assert "fleet_immune" not in OB.CONFIRMED
+    assert _rows(m)["fleet_immune"]["state"] == "fixed?"
 
 
 def test_selftest_is_green():

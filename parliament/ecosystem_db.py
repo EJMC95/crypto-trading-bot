@@ -32,6 +32,29 @@ import time
 
 log = logging.getLogger("parliament.db")
 
+#: [(aag)] HOW LONG A CLOSED TRADE IS KEPT — and it is the ML's FOOD, which is
+#: why it is its own number and not `prune`'s general `keep_days`.
+#:
+#: MEASURED 10-Sep, and the whole finding is here: 🔭 Keating's ensemble reads
+#: `ready: false` forever because `MLEngine.n_seen` is an INSTANCE attribute
+#: reset to 0 on every boot and rebuilt only from the trades still in this
+#: table — so the ceiling on what it can ever learn is exactly
+#: `TRADE_KEEP_DAYS x the close rate`, never the bar. At the old 30 days that
+#: pool held **90 closes against a 200 bar**, and the best 7-day burst the
+#: Parliament has ever run (5.86/day) projects to 176 — still short. The
+#: ensemble was not warming up; it was structurally unable to arm, and
+#: `oos_acc` sat byte-identical at 0.5082 for 22.5h across 5 boots because it
+#: is a deterministic REPLAY of one fixed sample, not a live measurement.
+#:
+#: 90 days is DERIVED, not picked: 200 / (90 closes / 30d) = 66.7 days is the
+#: bare minimum at the observed rate, and 90 carries ~1.35x margin so a quiet
+#: fortnight does not disarm the ensemble it just armed. Signals and candles
+#: KEEP the 30-day retention below — candles are the bulky table and the ML
+#: does not read them; a closed trade row is ~200 bytes, so 3x of them is
+#: ~50 KB. `ml.TRAIN_DAYS` is this same object, so the pruner and the training
+#: query cannot drift apart ((hj): a second copy of a rule is a second rule).
+TRADE_KEEP_DAYS = float(os.environ.get("PARL_TRADE_KEEP_DAYS", "90"))
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS signals (
     ts REAL NOT NULL, scanner TEXT NOT NULL, sym TEXT NOT NULL,
@@ -287,11 +310,18 @@ class EcosystemDB:
         except Exception:  # noqa: BLE001
             return None
 
-    def prune(self, keep_days: float = 30.0) -> None:
-        cutoff = time.time() - keep_days * 86400
+    def prune(self, keep_days: float = 30.0,
+              trade_days: float | None = None) -> None:
+        """Drop aged rows. TRADES have their own, LONGER retention — see
+        `TRADE_KEEP_DAYS`: they are the ML's only training food and deleting
+        one is deleting a sample the ensemble can never see again."""
+        now = time.time()
+        cutoff = now - keep_days * 86400
+        t_cut = now - (TRADE_KEEP_DAYS if trade_days is None
+                       else float(trade_days)) * 86400
         self._exec("DELETE FROM signals WHERE ts < ?", (cutoff,))
         self._exec("DELETE FROM trades WHERE closed_ts IS NOT NULL"
-                   " AND closed_ts < ?", (cutoff,))
+                   " AND closed_ts < ?", (t_cut,))
         self._exec("DELETE FROM candles WHERE ts < ?", (int(cutoff),))
 
 

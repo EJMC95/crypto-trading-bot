@@ -21,6 +21,20 @@ ENSEMBLE: weight_i = max(0, oos_acc_i - 0.5) (decayed EMA) — a model that
 cannot beat a coin flip out-of-sample gets weight ZERO. Cold or edge-less
 ensemble -> p = 0.5 and ready=False.
 
+ARMING [(aag)]: `ready` is TWO bars, not one — `n_seen >= MIN_READY_SAMPLES`
+AND the best model measurably better than chance (`acc_z() >= ACC_Z_BAR`).
+The count alone was the whole rule until 10-Sep, and a count is not evidence:
+driven on pure noise the bench reaches ~0.538 decayed accuracy by luck, which
+under the old rule ARMED `ml_gate` and started refusing entries on nothing.
+`is_ready()` is the single owner; `readiness()` publishes the distance and
+names the binding constraint, so `ready: false` is never again byte-identical
+between "warming up" and "structurally impossible".
+
+DURABLE [(aaj)]: `n_seen`, `acc` and the trained-id set are PERSISTED, so the
+prequential history survives the container instead of being recomputed from
+whatever the store still holds. Model WEIGHTS are deliberately NOT persisted —
+`warm()` re-feeds the retained rows update-only at boot; see `_STATE_KEY`.
+
 AUTHORITY (fleet doctrine — reduce-only, like the brain's stake mults):
 the ML gate may SKIP an entry or SHRINK its stake; it can never boost
 above 1.0x or conjure an entry. Cold model = neutral. numpy absent =
@@ -38,6 +52,8 @@ try:
 except Exception:  # noqa: BLE001 — degraded: gates neutral, nothing trains
     np = None
 
+from .ecosystem_db import TRADE_KEEP_DAYS
+
 log = logging.getLogger("parliament.ml")
 
 # Fixed feature order — the contract between featurize() at entry time and
@@ -48,6 +64,26 @@ FEATURES = ["direction", "ret4", "rsi_n", "vol_ratio", "funding_apr_n",
 MIN_READY_SAMPLES = int(os.environ.get("PARL_ML_MIN_SAMPLES", "200"))
 ACC_HALFLIFE = 200.0            # samples; decayed OOS accuracy EMA
 WINDOW = 1500                   # refit window for ridge/stumps/knn
+NUM_T = (int, float)            # NB bool subclasses int — reject it explicitly
+
+#: [(aag)] THE TRAINING HORIZON IS THE RETENTION, BY IDENTITY. `n_seen` resets
+#: to 0 on every boot and is rebuilt from the rows still in the `trades` table,
+#: so the ceiling on what this ensemble can ever learn is the size of that
+#: pool — never `MIN_READY_SAMPLES`. Pointing the query at the pruner's own
+#: constant is what stops the two drifting apart ((hj)). Full measurement in
+#: `ecosystem_db.TRADE_KEEP_DAYS`.
+TRAIN_DAYS = TRADE_KEEP_DAYS
+
+#: [(aag)] A COUNT IS NOT EVIDENCE — the bar that decides whether the ensemble
+#: may ACT. `ready` used to mean "has seen 200 rows", so the gate would arm at
+#: whatever accuracy happened to obtain: measured 10-Sep the best model read
+#: **0.5082**, which is 0.23 SE from a coin flip, and `ml_gate` would then have
+#: refused live entries on noise. This is I15/I16 in an actuator — rank on a
+#: measured lower bound, never on the bare number. One-sided z on the decayed
+#: accuracy against 0.5; 1.28 is the fleet's own one-sided 90% value
+#: (`fleet_allocation.Z_LOWER`), pinned to it by test rather than imported, so
+#: the Parliament keeps its self-contained import graph (born-dark rule).
+ACC_Z_BAR = float(os.environ.get("PARL_ML_ACC_Z", "1.28"))
 
 
 def featurize(sym: str, direction: int, data, signal: dict | None = None) -> dict:
@@ -293,11 +329,87 @@ class MLEngine:
         self.n_seen = 0
         self._trained_ids: set[str] = set()
         self._trained_order: list[str] = []   # insertion order for the trim
+        #: [(aag)] trainable rows inside `TRAIN_DAYS` at the last pass — the
+        #: CEILING on `n_seen`, which is what makes "cold" and "unreachable"
+        #: distinguishable. None until a pass has run: UNKNOWN, never 0, or a
+        #: dark DB would publish a confident `unreachable` (I6).
+        self._pool: int | None = None
+        #: [(aaj)] set once, on the first training pass — see `_restore_state`.
+        self._restored = False
+        self._provenance = "cold"
+        self._warmed = 0
+
+    # -- readiness ------------------------------------------------------------
+    def acc_z(self) -> float | None:
+        """One-sided z of the BEST model's decayed accuracy against a coin flip.
+
+        The EMA's memory is about one halflife of samples, so its effective n is
+        `min(n_seen, ACC_HALFLIFE)` — deliberately the CONSERVATIVE reading. The
+        true effective n of an EMA with smoothing a is (2-a)/a ~ 576 here, which
+        would make the bar EASIER to clear; using the halflife keeps it stricter,
+        the fail-safe direction for something that gates entries. None when there
+        is nothing to grade."""
+        vals = [v for v in self.acc.values() if isinstance(v, (int, float))]
+        if not vals or self.n_seen <= 0:
+            return None
+        n_eff = min(float(self.n_seen), ACC_HALFLIFE)
+        se = (0.25 / n_eff) ** 0.5
+        if se <= 0:
+            return None
+        return (max(vals) - 0.5) / se
+
+    def readiness(self) -> dict:
+        """WHY `ready` is what it is — the distance and the binding constraint.
+
+        `ready: false` was byte-identical between "warming up, ready Tuesday"
+        and "structurally impossible, forever" ((lv): a component that produces
+        nothing must publish its own census at its own bar). It reads
+        `unreachable` when the training POOL itself cannot hold the bar, which
+        names the gate that actually binds (I18) — the retention window, not
+        the sample count."""
+        z, pool = self.acc_z(), self._pool
+        d = {"n_seen": self.n_seen, "min_samples": MIN_READY_SAMPLES,
+             # [(aaj)] where this history came from. A restored `n_seen` and a
+             # replayed one are byte-identical numbers about different things.
+             "provenance": self._provenance, "warmed": self._warmed,
+             "n_short": max(0, MIN_READY_SAMPLES - self.n_seen),
+             "pool": pool, "train_days": TRAIN_DAYS,
+             "acc_z": None if z is None else round(z, 3),
+             "acc_z_bar": ACC_Z_BAR}
+        if not self.enabled:
+            d["verdict"], d["blocked_by"] = "disabled", "numpy absent"
+        elif self.n_seen < MIN_READY_SAMPLES:
+            if isinstance(pool, int) and pool < MIN_READY_SAMPLES:
+                d["verdict"] = "unreachable"
+                d["blocked_by"] = (
+                    f"the {TRAIN_DAYS:g}d training pool holds {pool} trainable "
+                    f"closes against a {MIN_READY_SAMPLES} bar — the RETENTION "
+                    f"binds, not the count; more time alone never arms this")
+            else:
+                d["verdict"] = "cold"
+                d["blocked_by"] = f"{d['n_short']} more sample(s)"
+        elif z is None or z < ACC_Z_BAR:
+            best = max([v for v in self.acc.values()
+                        if isinstance(v, (int, float))], default=None)
+            d["verdict"] = "edgeless"
+            d["blocked_by"] = (
+                f"best model {'unknown' if best is None else format(best, '.4f')} is "
+                f"z={'unknown' if z is None else round(z, 2)} from a coin flip, under "
+                f"the {ACC_Z_BAR} bar — a count is not evidence")
+        else:
+            d["verdict"], d["blocked_by"] = "ready", None
+        return d
+
+    def is_ready(self) -> bool:
+        """The ONE owner of the arming decision — `predict` and `snapshot` both
+        call it, so the payload can never claim a readiness inference does not
+        have (the `bar_map`-bound-to-`grade` discipline)."""
+        return self.readiness()["verdict"] == "ready"
 
     # -- inference ------------------------------------------------------------
     def predict(self, features: dict) -> tuple[float, bool]:
         """(p_win, ready). Neutral 0.5/False when cold, disabled, or edgeless."""
-        if not self.enabled or self.n_seen < MIN_READY_SAMPLES:
+        if not self.is_ready():
             return 0.5, False
         x = vector(features)
         num = den = 0.0
@@ -314,9 +426,90 @@ class MLEngine:
             return 0.5, False
         return max(0.01, min(0.99, num / den)), True
 
+    # -- durable learning state -----------------------------------------------
+    #: [(aaj)] WHAT IS PERSISTED, AND — the load-bearing half — WHAT IS NOT.
+    #:
+    #: NOT the model weights. Three of the five are `_WindowModel`s holding up
+    #: to WINDOW raw samples each, so serialising them would duplicate the
+    #: `trades` table into a ~1 MB blob rewritten every training pass, and it
+    #: would put a numpy array's SHAPE in durable storage — where a later
+    #: `FEATURES` extension (the module docstring invites one: "extend by
+    #: APPENDING") silently restores weights of the wrong dimension. The window
+    #: models are a FUNCTION of the retained rows and the DB already holds
+    #: those, so they are rebuilt by `warm()` instead.
+    #:
+    #: What genuinely cannot be recovered is the PREQUENTIAL history: `acc`
+    #: depends on the order of the samples and on predictions made by model
+    #: states that no longer exist, and `n_seen` on rows the retention has
+    #: since dropped. Those are the two the boot was destroying, and those are
+    #: what this stores — three small scalars-and-strings, no arrays.
+    _STATE_KEY = "keating.ml.state"
+    _STATE_V = 1
+    #: ids kept durable. Bounded well under the trim in `train_from_db`; the
+    #: retained window holds ~a few hundred rows at any measured close rate.
+    _TRAINED_KEEP = 4000
+
+    def _save_state(self) -> None:
+        """Never raises: a dark store costs the memory, never the training."""
+        if not self.enabled or self.db is None:
+            return
+        try:
+            self.db.remember(self._STATE_KEY, {
+                "v": self._STATE_V,
+                "dim": len(FEATURES),
+                "models": [m.name for m in self.models],
+                "n_seen": int(self.n_seen),
+                "acc": {k: float(v) for k, v in self.acc.items()},
+                "trained": list(self._trained_order[-self._TRAINED_KEEP:]),
+            })
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _restore_state(self) -> str:
+        """-> a provenance word, PUBLISHED, never a bare bool.
+
+        Fail-safe is one-directional: any doubt returns without mutating a
+        single field, so the engine falls back to the boot replay it has always
+        done. A restore that half-lands is the only outcome worse than none —
+        `acc` describing a roster or a feature space that is not the one in
+        memory is a confident number about the wrong thing."""
+        if not self.enabled or self.db is None:
+            return "no-db"
+        try:
+            st = self.db.recall(self._STATE_KEY)
+        except Exception:  # noqa: BLE001
+            return "unreadable"
+        if not isinstance(st, dict) or not st:
+            return "none"
+        if st.get("v") != self._STATE_V:
+            return "version-changed"
+        if st.get("dim") != len(FEATURES):
+            return "features-changed"
+        if list(st.get("models") or []) != [m.name for m in self.models]:
+            return "roster-changed"
+        acc, n = st.get("acc"), st.get("n_seen")
+        if (not isinstance(acc, dict) or not isinstance(n, int)
+                or isinstance(n, bool) or n < 0):
+            return "junk"
+        if set(acc) != set(self.acc) or not all(
+                isinstance(v, NUM_T) and not isinstance(v, bool)
+                and 0.0 <= v <= 1.0 for v in acc.values()):
+            return "junk"
+        ids = st.get("trained")
+        if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+            return "junk"
+        self.acc = {k: float(v) for k, v in acc.items()}
+        self.n_seen = int(n)
+        self._trained_order = list(ids)
+        self._trained_ids = set(ids)
+        return "restored"
+
     # -- learning -------------------------------------------------------------
-    def learn(self, features: dict, won: bool) -> None:
-        """Prequential: score each model's PRIOR prediction, then update it."""
+    def learn(self, features: dict, won: bool, *, score: bool = True) -> None:
+        """Prequential: score each model's PRIOR prediction, then update it.
+
+        `score=False` is the WARM path — see `warm()`. One function with a flag
+        rather than two, so the update half cannot drift between them."""
         if not self.enabled:
             return
         x = vector(features)
@@ -324,23 +517,56 @@ class MLEngine:
         decay = 0.5 ** (1.0 / ACC_HALFLIFE)
         for m in self.models:
             try:
-                p = m.predict(x)
-                hit = 1.0 if (p >= 0.5) == bool(won) else 0.0
-                self.acc[m.name] = self.acc[m.name] * decay + hit * (1 - decay)
+                if score:
+                    p = m.predict(x)
+                    hit = 1.0 if (p >= 0.5) == bool(won) else 0.0
+                    self.acc[m.name] = self.acc[m.name] * decay + hit * (1 - decay)
                 m.update(x, y)
             except Exception as e:  # noqa: BLE001
                 log.warning("model %s update failed (%s)", m.name, e)
-        self.n_seen += 1
+        if score:
+            self.n_seen += 1
+
+    def warm(self, features: dict, won: bool) -> None:
+        """[(aaj)] Rebuild model state from a sample ALREADY counted — update,
+        never score.
+
+        A RESTORED `acc`/`n_seen` describes models that do not exist any more:
+        the objects are fresh at every boot. So the retained rows have to be
+        re-fed or the bench would sit UNTRAINED behind an `n_seen` claiming
+        otherwise — the exact catastrophe that makes persisting the counters
+        alone worse than persisting nothing. But re-SCORING them would count
+        the same closes into the prequential EMA a second time and flatter it,
+        which is what made the old boot-replay a deterministic artifact in the
+        first place. Update only."""
+        self.learn(features, won, score=False)
 
     def train_from_db(self) -> int:
         """Replay closed trades (with stored features) not yet learned —
         restart-proof memory, and the door other bots' rows come in through."""
         if not self.enabled or self.db is None:
             return 0
-        rows = self.db.closed_trades(days=30.0)
-        rows = [r for r in rows
-                if r["features"] and r["pnl_abs"] is not None
-                and r["trade_id"] not in self._trained_ids]
+        rows = self.db.closed_trades(days=TRAIN_DAYS)
+        trainable = [r for r in rows
+                     if r["features"] and r["pnl_abs"] is not None]
+        self._pool = len(trainable)
+        if not self._restored:
+            # [(aaj)] ONCE per process, and BEFORE the new-row filter, because
+            # what it restores is exactly the set that filter reads.
+            self._restored = True
+            self._provenance = self._restore_state()
+            if self._provenance == "restored":
+                # The counters came back; the MODELS did not (fresh objects at
+                # every boot). Re-feed the rows they already account for —
+                # update-only, so the prequential EMA is not double-counted.
+                warm = sorted((r for r in trainable
+                               if r["trade_id"] in self._trained_ids),
+                              key=lambda r: r["closed_ts"] or 0)
+                for r in warm:
+                    self.warm(r["features"], r["pnl_abs"] > 0)
+                self._warmed = len(warm)
+        rows = [r for r in trainable
+                if r["trade_id"] not in self._trained_ids]
         rows.sort(key=lambda r: r["closed_ts"] or 0)
         for r in rows:
             self.learn(r["features"], r["pnl_abs"] > 0)
@@ -356,12 +582,14 @@ class MLEngine:
             keep = self._trained_order[-10000:]
             self._trained_order = keep
             self._trained_ids = set(keep)
+        self._save_state()
         return len(rows)
 
     # -- reporting ------------------------------------------------------------
     def snapshot(self) -> dict:
         return {"enabled": self.enabled, "n_seen": self.n_seen,
-                "ready": self.enabled and self.n_seen >= MIN_READY_SAMPLES,
+                "ready": self.is_ready(),
+                "readiness": self.readiness(),
                 "oos_acc": {k: round(v, 4) for k, v in self.acc.items()}}
 
     async def run_forever(self, interval: float = 300.0, beat=None):
@@ -369,5 +597,8 @@ class MLEngine:
         while True:
             n = self.train_from_db()
             if beat:
-                beat("keating.ml", f"+{n} samples (n={self.n_seen})")
+                r = self.readiness()
+                beat("keating.ml",
+                     f"+{n} samples (n={self.n_seen}/{MIN_READY_SAMPLES}, "
+                     f"pool={r['pool']}, {r['verdict']})")
             await asyncio.sleep(interval)

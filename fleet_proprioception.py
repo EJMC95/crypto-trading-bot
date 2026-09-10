@@ -286,6 +286,32 @@ def _iso(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
 
 
+
+def trim_episodes(episodes):
+    """-> (kept, room, evicted). THE one owner of the ledger trim.
+
+    [(aal)] Hoisted out of the build so a test can drive the REAL rule: it lived
+    inline, and a test that re-implemented it would have stayed green through
+    any change to it — a second copy of a rule is a second rule ((hj)).
+
+    `(hl)`'s ordering is preserved exactly and re-pinned: GRADED rows hold the
+    budget FIRST, because they are the only rows `lever_verdicts` can use —
+    including the live-lane rows whose verdicts revert a real-money lever — so a
+    burst of ungradeable ones must never evict them. Chronological order is
+    restored on the way out so every downstream "newest episode" read is
+    unchanged.
+    """
+    all_graded = [e for e in episodes if e.get("status") == "graded"]
+    graded = all_graded[-EP_CAP:]
+    rest = [e for e in episodes if e.get("status") != "graded"]
+    room = max(0, EP_CAP - len(graded))
+    evicted = {"graded": max(0, len(all_graded) - len(graded)),
+               "recorded": max(0, len(rest) - room)}
+    kept = sorted(graded + rest[-room:] if room else graded,
+                  key=lambda e: float(e.get("end") or 0))
+    return kept, room, evicted
+
+
 def _parse_ts(s):
     try:
         d = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
@@ -1139,11 +1165,7 @@ def run_once():
     # burst likely rather than theoretical. Graded rows now hold the budget
     # first; recorded rows fill what is left. Chronological order restored so
     # every downstream "newest episode" read is unchanged.
-    _graded = [e for e in episodes if e.get("status") == "graded"][-EP_CAP:]
-    _rest = [e for e in episodes if e.get("status") != "graded"]
-    _room = max(0, EP_CAP - len(_graded))
-    episodes = sorted(_graded + _rest[-_room:] if _room else _graded,
-                      key=lambda e: float(e.get("end") or 0))
+    episodes, _room, _evicted = trim_episodes(episodes)
 
     # stamp start metrics on newly opened groups (feed reads done above)
     for g, cur in open_next.items():
@@ -1163,6 +1185,12 @@ def run_once():
     now_hurt = {k for k, v in verdicts.items() if v.get("verdict") == "hurting"}
     counts = {"open": len(open_next),
               "episodes": len(episodes),
+              # [(aal)] the ceiling beside the count, and the room left for a
+              # row that is not yet gradeable. `room` hitting 0 is the moment
+              # graded rows start evicting each other.
+              "ep_cap": EP_CAP,
+              "room": _room,
+              "evicted": _evicted,
               "graded": sum(1 for e in episodes if e.get("status") == "graded"),
               "helping": sum(1 for v in verdicts.values()
                              if v.get("verdict") == "helping"),

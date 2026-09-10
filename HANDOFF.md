@@ -1,14 +1,14 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 19:24 Sydney (09:24Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 00:15 Sydney (14:15Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` was shut **32% of the last 13.8d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
-- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 19:56 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **15% of the last 13.8d** (50h), mostly `slguard` (30h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-avo-maria-lighter` was shut **31% of the last 14.0d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 02:01 Sydney (protections_locked).
+- `freqtrade-mum-lighter` was shut **16% of the last 14.0d** (55h), mostly `slguard` (34h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -109,50 +109,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (42 commit(s), entries (zt))
+## Shipped today (2 commit(s))
 
-- `d2c6547` [deploy-live] (aae) avo's volume floor was a proxy for a thing the fleet now measures directly — re-derived 0.5 -> 0.15 from (vd)'s own clip ratio
-- `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact
-- `98738b3` (aab) the handoff reads the live fleet: two books have been READY for six days and nothing said so
-- `fc48964` (zy)(zz)(aaa) the letter guard sees open branches; Rich Dad gets a census series; Hull's cap raise measured and deferred to one turnover
-- `c62297f` (zw) pin skip_if_same, the baseline flag, and next_letter's extra_claimed — the preventive half had no test at all
-- `b2c3665` (zw) drive the open-branch arm from main(): a 24-mutation round left 8 alive and every survivor was the WIRING, not the comparison
-- `f1fa9ae` (zw) the letters guard sees OPEN BRANCHES, not just origin/main — nine renumbers in one day, and (ze)/(zf) are held on branches it cannot see
-- `055be0b` (zw) pin the census wiring by AST: a mutation round showed the substring check left BOTH halves deletable
-- `95eb6ae` (zw) 🏦 Rich Dad publishes a census TIME SERIES, not just this loop's instant — its refusals were a sample of n=1 cycle
-- `6195699` (zw)(zx) renumber: origin took (zt) and (zu) — ninth collision today; both letters picked by checking every OPEN BRANCH, not just origin/main
-- `7c76fa8` (zw) renumber the cohort-reader citations: origin took (zt)
-- `ea7bdfc` (zt) regenerate HANDOFF after the daily review
-- `c14f08d` (zt) changelog: the cohort reader's history-shape blind spot, measured at 2,174 of 17,261 snapshots
-- `bb394ea` (zu) renumber: origin took (zs) for the Counterweight date move — seventh collision on this branch today
-- `121d2fc` (zt) the cohort reader knew the live key's dict and not the history's compacted list: 2,174 fleet-risk snapshots read as '0 longs against a budget of 1e9'
-- `0282715` (zq) the record: the daily review's two stale rule copies and the publish stall it caused (renumbered (zn)->(zq): (zn) landed on main via #298 while this sat unpushed); store-side hazard CARRIED; HANDOFF regenerated
-- `5674619` (zn) the review stalled the fleet's publishes three times today: a never-committed read transaction held bot_pnl while the grader's lazy import ran the store's ALTER on a second connection — autocommit, lock_timeout, idle-in-transaction timeout, and the store session hardened
-- `387daad` (zi) the MTM fetch is scoped to the books it can decide — worse-of-both cannot pass a failing book, and fetching every living book's series took the review past a 10-minute timeout
-- `ca35883` (zi) the daily review graded the maxDD bar REALISED-only while the canonical grader folds MTM — the taker read 2.5% here beside a published 4.6% (basis mtm)
-- `feb42c6` (zi) the daily review's REACH ceiling was computed on a number no consumer enforces: pooled 20/20 RED over two cohorts with ten free slots each
-- `40c5397` (zv) The four findings the review ran out of budget to verify — and one says (zu) mislabelled a real-money number
-- `d47c580` (zu) the health banner's three permanently-true lines, and two more descriptions
-- `0f2d863` (zu) correct the renumber count: 41 citations moved, the 42nd was the generated HANDOFF
-- `8074820` (zu) the spend row's days-to-gate is days-to-DECIDABILITY, and said so
-- `7a8e1cc` (zu) regenerate HANDOFF.md after the dashboard pass
-- `0cbdd64` (zu) RENUMBERED (zt) -> (zu): a concurrent session landed its own (zt) on main
-- `5d31030` (zt) The week's telemetry reaches the card — and the page was still running the go-live gate the fleet retired in July
-- `250a9df` (zt) regenerate HANDOFF.md after the basis declaration
-- `ab9db2f` (zt) Two sessions read ⚖️ Counterweight's sample definition differently on the same day — the fleet's only pre-registered read with no instrument
-- `a4e0351` (zs) regenerate HANDOFF.md after the counterweight date move
-- `ad1096c` (zs) ⚖️ Counterweight's read moves 1-Oct → 10-Oct so it lands on the sample its own registration asked for
-- `4ea9511` [deploy-live-mum][deploy-live-taker] (zr) "Fix mum": nothing malfunctioned, the loss was the geometry, and her edge lives in the breadth of the oversold — the record, an inert lever, a judge candidate (#302)
-- `4ebbe35` [deploy-live] (zq) The dashboard's stalls were a lock convoy the fleet lit on itself at every redeploy: skip the no-op boot DDL, bound the real one (#300)
-- `4692b68` (zo) readback: all five living family rows CURRENT at e81b74e, arms aligned on one build_shared, georgia v1 off the feed
-- `3009c2e` (zp) counterweight read CHECKED not taken: the trigger has not fired (n=13 of 60) — and the DATE will bind before the sample, so it lands at n~44
-- `88a3d2c` (zp) regenerate HANDOFF.md after the regime-veto read
-- `eba4513` (zp) The pre-registered regime veto said CONFIRMED on a book where its treatment had zero variance: veto-vs-pass was shorts-vs-longs, and the rule could not tell the difference
-- `e81b74e` (zo) regenerate HANDOFF.md after the rebase onto (zn)/#298
-- `bdb2733` [deploy-live] (zo) georgia v1's pre-registered read taken: the cap-5 prediction failed on her own post-cap closes — retired on I17's undecidable call; the ledger gains a terminal GRADED state; the ladder harness reads STRATEGIES
-- `d3a82ea` (zn) A candidate that narrows its own arm gets the clock its own rate says it needs — bounded, re-derived every cycle, never on a hunch (#298)
-- `b47abc4` (zi) The gate horizon's rate denominator included 27 days on which the real-money book did not exist: it starts at the first in-era OPEN now, and the denominator is published
-- `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
+- `f87491f` (aak) CodeQL: a dead local left in the pageability test
+- `2673e60` (aak) the Parliament's websocket has never once connected, and the code knew — it said so in a log line nobody reads
 
 ## How this file stays honest
 

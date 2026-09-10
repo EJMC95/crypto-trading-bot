@@ -1,3 +1,444 @@
+## 2026-09-10 (aal) — 🦾 THE EPISODE LEDGER HAS BEEN FULL FOR AT LEAST A DAY, AND `episodes: 120` READS LIKE A COUNT
+
+**Eamon: *"continue fixes."*** The last unaddressed finding from the `(aak)`
+sweep, and the one with a TRAJECTORY rather than just a blind spot.
+
+**MEASURED.** 🦾 proprioception publishes `counts.episodes: 120` — **exactly
+`EP_CAP`** — and it has been pinned there for the entire 24h bus history while
+`graded` moved 88 → 89 and `open` cycled 3 ↔ 4. **That is I7 in a payload
+field**: a value the system satisfies STRUCTURALLY is not a measurement, and
+`120` is byte-identical between *"we have 120 episodes"* and *"we are full and
+evicting"*.
+
+**WHY IT IS MORE THAN TIDINESS.** `(hl)` made GRADED rows hold the budget first
+— correctly, because they are the only rows `lever_verdicts` can use, including
+the live-lane rows whose verdicts revert a real-money lever. Graded is at **89
+of 120 and grows ~1/day**, so `room` reaches **zero in about a month**. Past
+that point ungraded rows are dropped entirely AND **the oldest GRADED rows
+begin evicting each other** — the verdicts that steer the growth rail would
+start turning over with nothing saying so. The field that would have shown it
+coming is the one that reads as a count.
+
+**SHIPPED, publish-only:** `ep_cap`, `room`, and `evicted: {graded, recorded}`
+beside the count, measured at the trim and published from the same pass so the
+two cannot disagree. Nothing is evicted differently; the eviction is simply
+readable now, and `room` trending toward 0 is the early warning that did not
+exist.
+
+**AND THE TRIM GAINED ONE OWNER, because the first version of this test was
+wrong in the way this repo keeps paying for.** The trim lived inline in the
+build, so my test re-implemented it — and a test that re-implements a rule
+stays green through every change to the real one ((hj): a second copy of a rule
+is a second rule). `trim_episodes()` is hoisted out and BOTH sides call it, the
+build asserts it is the only place `EP_CAP` is applied, and the mutation that
+reverts `(hl)`'s graded-first ordering now reddens — which it could not have
+done against my copy.
+
+5 tests, **6/6 mutations behaved** (5 RED + a surviving null control).
+Publish-only: moves no capital, writes no lever, changes no verdict.
+
+## 2026-09-10 (aak) — 🏛️ THE PARLIAMENT'S WEBSOCKET HAS NEVER ONCE CONNECTED, AND THE CODE KNEW: IT SAYS SO IN A LOG LINE NOBODY READS
+
+**Eamon: *"see if learning, health, the entire system can be improved further"*
+→ *"check for anything else going unread too."*** This is the answer to the
+second half, and the first instance of the class.
+
+**HOW IT WAS FOUND, and the method is the transferable part.** Having fixed two
+frozen-counter defects by hand ((aag), (aai)), I tried to build the general
+instrument — a sweep for published numbers that stop moving. **It was REFUSED
+by its own positive control, and that is the useful result.** `parliament
+ml.n_seen` — the very defect that motivated it — shows **2 distinct values over
+24h**, so a "never moved" test MISSES it. Re-cast as *longest stall as a
+fraction of the window*, it ranks the defect **#1 at 99.3%** — but the six
+entries beneath it (`lens_7d` windows, playbook grades) are all slow because
+the Parliament had **zero closes**, not because anything is broken. Median
+stall 38%, p90 78.6%. **A bar anywhere useful flags 7 fields, 6 of them benign
+— the (gl) cry-wolf shape, so no guard ships.** Recorded so nobody rebuilds it:
+the discriminating question is *"did it stall while its own INPUT was
+available?"*, and that is per-field knowledge a generic sweep cannot have.
+
+**WHAT THE SWEEP DID FIND is better than what it was built for.** 🏛️ the
+Parliament runs ten scanners; two have emitted **zero** signals. `new_listing`
+is expected (a market-set diff on a venue that lists ~1 book a month — the (qi)
+shape). `orderbook_imbalance` is not: **0 signals in 183 runs**, because it
+iterates `data.ws_books`, which is **empty and always has been**.
+
+**`data.ws` HAS NEVER EMITTED ONE BEAT** in the container's life — the beats map
+publishes AGES, and the key is simply absent. The `websockets` wheel IS in the
+image (`Dockerfile.freqtrade:31`), so this is not the born-dark class; the loop
+runs and cannot connect. **AND THE CODE ALREADY KNEW.** At `fails == 4` it
+logs *"ws unavailable (cloud-IP CDN block is a known state) — REST snapshots
+carry on; retrying quietly"* and then backs off to a silent 600s retry forever.
+The system had the diagnosis, correctly, and put it somewhere no reader of
+`/bus.json` can reach.
+
+**THE COST, MEASURED, and it lands on the bench `(aag)` and `(aaj)` just spent
+two entries repairing:** `featurize`'s **`imb` feature is a constant 0.0 in
+every sample the ML has ever learned from** — one of eleven features carrying
+no information — plus one scanner of ten structurally mute, and every
+`ws_books` read in `strategies.py` missing. None of it is a defect of OURS: the
+venue CDN-blocks cloud IPs and REST-only is the designed degradation. **It is
+an INVISIBLE one, which is the whole problem** — `{n: 0}` on the scanner was
+byte-identical between "the venue is quiet" and "this has never worked" ((lv)).
+
+**SHIPPED — publish it, do not "fix" it.** `data.ws` now carries
+`{ok, books, fails, last_ok, why}` every publish, so the degradation is READ
+rather than inferred. The `why` is the exception's **class name, never its
+text**: `/bus.json` is public and unauthenticated, and an exception string can
+carry a URL or a header.
+
+**AND THE CLASS IS CLOSED, because the instance was never the point.** I13
+requires the unpageable set to be **declared, not defaulted into**, and the
+fleet enforces exactly that for its own organs — `tests/autonomy/
+test_organ_pageability.py`. **That guard cannot reach here**: the Parliament
+runs its own supervisor with its own `EXPECTED_BEATS`, so a task added to
+`parliament_main` is unpageable **by default** and nothing says so. Measured:
+**of eight supervised tasks, five sat outside the table**, and one of them had
+been dead the whole time. `brain.UNPAGEABLE_OK` now declares each with a
+REASON, and `tests/autonomy/test_parliament_pageability.py` fails the push that
+adds an undeclared one.
+
+Two things the guard caught immediately, both mine: it reddened on my own
+`"as data.candles.1h"` exemption — **a cross-reference is not a reason** — and
+writing it forced the honest version of the finding, because the naive test
+compares TASK names when `data.candles.fast` beats as `data.candles.1h`;
+reading the task name overstates the count.
+
+`data.ws` stays UNPAGEABLE and that is deliberate: paging on a known venue-side
+block would page forever, which is how a real stall later gets ignored. It is
+now *visible* instead. Publish-only, no behaviour change, no live marker;
+6 tests; parliament selftest + full suite green.
+  ENFORCED BY: `parliament/brain.py::UNPAGEABLE_OK`, `tests/autonomy/test_parliament_pageability.py::test_no_beat_is_unpageable_without_being_declared`
+
+**AND THE SAME CLASS ON THE REAL-MONEY SURFACE — FIXED, NOT CARRIED.**
+`venues/lighter_client.py` does this exactly: the order-book websocket goes
+degraded, sets `degraded_logged = True`, logs **once per process** and
+publishes **nothing** — I4's named anti-pattern verbatim, on the client BOTH
+live books price against. So *"are 👩 mum and 🙏 avo reading order books from
+the websocket or from governed REST snapshots?"* was unanswerable from any
+feed, and it bears on fill quality. `LighterClient.ws_health()` now answers it,
+and **the number that matters is not the connection state but what the book
+actually PRICED off** — `orderbook()` counts its own two paths at the site that
+serves them, so the ratio cannot drift from what was served. It is consumed:
+`extra.book_feed` on the live row, guarded, because an accessor that can break
+a real-money publish is worse than the blindness it fixes — an accessor with no
+consumer would have been the registered-but-inert failure (I18) this very
+session kept finding elsewhere.
+
+**MAIN ONLY, NO LIVE MARKER, and that is the rule rather than caution.** `(mm)`
+is explicit: a change that alters no trade the book would take buys zero
+measured edge and costs a real-money container restart, which is not free
+([[lighter-flatten-silent-halt-redeploy-incident]]). This is publish-only —
+every gate, cap, veto and clip is untouched — so it rides the next deploy that
+DOES qualify.
+
+## 2026-09-10 (aaj) — 🔭 THE ENSEMBLE'S MEMORY SURVIVES THE CONTAINER NOW — AND THE THING IT DELIBERATELY DOES NOT PERSIST IS THE POINT
+
+**Eamon: *"fix the above corrections."*** `(aag)` closed with a **DECLARED, NOT
+FIXED** paragraph and he asked for it closed; that paragraph is corrected in
+place per I12, because a "declared, not fixed" that HAS been fixed is the
+stalest kind of note. **The fix is not the one it anticipated.**
+
+**WHAT WAS BROKEN.** `MLEngine.n_seen`, `acc` and `_trained_ids` are instance
+attributes, so every boot threw the prequential history away and rebuilt it by
+replaying whatever the store still held. Two consequences, both measured:
+`oos_acc` was **byte-identical at 0.5082 for 22.5h across five boots** — a
+deterministic function of the retained window rather than a measurement — and
+**a row the pruner dropped was a row forgotten**, so `n_seen` was permanently
+ceilinged by the pool. `(aag)` raised that ceiling; this removes it.
+
+**THE TRAP, AND IT IS WHY THE OBVIOUS FIX IS WORSE THAN NOTHING.** Persisting
+the COUNTERS alone would restore `n_seen: 200` beside **five freshly
+constructed, untrained models** — arming `ml_gate` on random weights, which is
+strictly worse than the inert bench we had. So the retained rows must be
+re-fed. But re-SCORING them is exactly what made the old boot replay an
+artifact. Hence `warm()`: `learn(..., score=False)` — update the models, touch
+neither the EMA nor the count. One function with a flag rather than two, so the
+update half cannot drift between them.
+
+**WHAT IS NOT PERSISTED, DELIBERATELY, AND PINNED SO IT IS NOT QUIETLY
+REVERSED.** Not the model weights. **Three of the five are `_WindowModel`s
+holding up to `WINDOW` = 1,500 raw samples each**, so serialising them would
+duplicate the `trades` table into a ~1 MB blob rewritten every training pass —
+and it would put a numpy array's SHAPE into durable storage, where a later
+`FEATURES` extension (the module docstring invites one: *"extend by
+APPENDING"*) silently restores weights of the wrong dimension. Those models are
+a FUNCTION of the retained rows and the DB already holds those. What genuinely
+cannot be recovered is the prequential history — `acc` depends on the sample
+ORDER and on predictions made by model states that no longer exist, `n_seen` on
+rows the retention has since dropped — so that, and only that, is stored: six
+JSON scalars, strings and one id list. `test_no_model_weights_reach_durable_
+storage` pins the shape and the size.
+
+**THE RESTORE IS ONE-DIRECTIONALLY FAIL-SAFE.** A restore that HALF-lands is
+the only outcome worse than none: `acc` describing a roster or a feature space
+that is not the one in memory is a confident number about the wrong thing (I6).
+So every check runs BEFORE a single field is assigned, and any doubt returns a
+provenance word without mutating anything — the engine then falls back to the
+boot replay it has always done. Seven refusal paths, each driven:
+`features-changed` · `roster-changed` · `version-changed` · `junk` (acc out of
+range, acc not a dict, `n_seen` a bool, ids not strings) · `unreadable` ·
+`none` · `no-db`. A mutation assigning `n_seen` before the last validation is
+RED.
+
+**AND THE PROVENANCE IS PUBLISHED** (`readiness().provenance` / `.warmed`),
+because a restored `n_seen` and a replayed one are byte-identical numbers about
+different things — the same I1 reasoning that motivated the whole `(aag)`
+census.
+
+**MEASURED END-TO-END against a real `EcosystemDB`, not a fixture:** boot 1
+learns 260 rows and reads `prov: none`; boot 2 reads `prov: restored,
+warmed: 260`, carries `n_seen` and `acc` EXACTLY, and — the catastrophe check —
+predicts **identically** (`p(up) 0.959`, `p(dn) 0.050`), so the warm pass really
+did rebuild the bench; boot 3 learns only the **12** genuinely new rows. And the
+claim that matters: with 200 learned and **80 aged out of the store**, `n_seen`
+holds at **200 against a pool of 120** — 80 samples the store no longer has are
+still counted, where the old code would have collapsed to 120.
+
+**14 tests, 8/8 mutations RED plus a surviving null control.** Two of my own
+verifications were wrong before they were right and both are recorded rather
+than tidied away: a retention test that printed `n_seen=0 pool=0` and read as a
+PASS (every seeded row lay outside the window — the "check that inspects
+nothing reports clean" rule, again), and a comment claiming `NUM_T` rejects
+`bool` when `bool` subclasses `int` — the validator now rejects it explicitly.
+
+Shadow-only, publish-only in effect: on the live bench this changes no verdict
+today (`unreachable` before, `unreachable` after — the pool still holds 90
+against a 200 bar). What it buys is that the first `ready`, when the `(aag)`
+retention fills, is earned on a genuine online history rather than on a replay.
+Full suite green.
+
+## 2026-09-10 (aai) — 🛡️ THE RESTART DETECTOR IS BLIND EXACTLY WHEN ITS OWN COUNTER BREAKS, AND THE EVIDENCE WAS PILING UP IN A FIELD NOTHING READS
+
+**Eamon: *"fix the above corrections."*** Found while diagnosing `(aag)` and
+reported to him rather than fixed in-line, because it is a different house:
+`fleet_immune.restart_churn` is the guard for a publisher that keeps
+RESTARTING, and it has a hole in the shape of its own best feature.
+
+**THE MECHANISM.** `(od)` made the publisher's own DURABLE counter
+authoritative — correctly, because *"two sightings N apart mean exactly N
+deaths, whatever the sampling phase"*, where the `data.cycles` reset heuristic
+aliases with the sampler. That branch ends in **`continue`**. So the moment
+`restarts` is a NUMBER, the reset heuristic below it is **structurally
+unreachable** — and the counter can be a number and still be *stuck*.
+
+`parliament.brain.note_restart` is exactly that shape: it `recall`s, adds one,
+`remember`s, and **swallows every exception**. A dark DB degrades to `None` and
+is handled (the auth branch is skipped). But if the **WRITE** fails while the
+**READ** succeeds — a read-only volume, a rolled-back transaction — every boot
+recomputes the same `n` from the same stale row. The counter then publishes a
+number, **never decreases** (so it is not a restore), and **never advances** —
+so `auth > prev_auth` is never true, `auth_deaths` stays `[]`, and
+`len(deaths) >= min_n` can never fire. **The detector reports perfect health on
+the one fault it exists to catch**, while `resets` — which is still faithfully
+recording every `data.cycles` regression — accumulates real boots in a field
+that the `continue` guarantees nobody reads.
+
+**That is I4 inside the guard itself**, and I4's own worked example is the same
+mechanism: `save_state` returned False for three days while the brain kept
+publishing fresh vitals off a frozen state.
+
+**THE DISCRIMINATOR IS MOVEMENT, NOT DEATHS — and getting that wrong is the
+whole difficulty.** The obvious check ("deaths empty while resets pile up")
+**FALSE-FIRES ON EVERY ORDINARY DEPLOY RUN**, because `(oi)` deliberately
+ABSORBS a deploy's increment without recording a death: an all-deploy window
+leaves `deaths` empty too, and the two states are byte-identical in that field.
+Measured on the live 24h series the day this shipped — **5 resets, 5 counter
+advances, 0 deaths** — a naive `not deaths` arm would have paged the operator
+about a perfectly healthy fleet, which is the `(gl)` cry-wolf shape aimed at his
+phone. So `auth_moves` records **every** advance, deploy or not, and the arm
+fires only on `resets >= min_n` **with zero advances in the same window**. The
+two counts come from the same call, so they cannot alias apart: a working
+counter advances in the very sample that observes the reset.
+
+**REPLAYED ON THE REAL PAYLOAD** (281 samples, the same 24h that motivated
+`(aag)`): `resets 5 · auth_moves 5 · auth_deaths 0 · findings NONE`. Quiet, and
+quiet for the right reason.
+
+**I8 — the detail names the STORE, not the organ.** *"The Parliament
+restarted"* would be a complete diagnosis and an unactionable one; the operator's
+action is on the durable store (most likely the persist volume refusing writes),
+and the message says so, says the restart count on the row **understates**, and
+says **THIS detector is blind until the write lands** — a guard that has lost
+its own senses must announce that, not just go quiet.
+
+**SIX TESTS, 9 MUTATIONS RUN AND ALL BEHAVED — 7 RED, 2 GREEN, AND THE TWO
+GREENS ARE THE POINT.** One is the null control. The other is `elif` → `if`,
+which I predicted RED and which **survived**; the honest reading is that my
+prediction was wrong rather than the test weak — `deaths` is extended only
+inside the branch that appends to `moves`, so the two reports are **mutually
+exclusive by construction**. That is now pinned structurally, so a future edit
+filling `deaths` off the movement path fails here first. **A third mutation
+also survived and found a genuinely weak test of mine**: the `prev_auth` guard
+is unreachable from a bare first sighting (`resets` is empty, the count bar
+refuses first), so the test asserting it proved nothing. Its reachable path is a
+publisher that gains the field LATE — an older build accumulates resets with no
+`restarts` key, a deploy adds it, and the first sighting with a value lands on
+an already-over-the-bar reset list. Without the guard that fires FROZEN on a
+counter it has never seen advance, which is a claim about a control group it
+does not have (I6). Re-aimed, and the mutation is red.
+
+**AND MY OWN AST CHECK WAS ONE OF THE THINGS THE MUTATIONS CAUGHT.** The
+exclusivity test's first cut read `ast.walk(n.test.__class__ and n)` — which
+evaluates to `ast.walk(n)` — so it matched an OUTER `if`, inspected the wrong
+body, and passed on a tree that had a death recorded outside the movement
+branch. `(po)`'s rule landing on the test written to honour it, for the second
+time in two days: **empty output is not a negative result until the check has
+been seen to produce a positive one.**
+
+Publish-only, restrict-only, moves no money and no lever; `fleet_immune` is a
+shadow organ and this arm only ever ADDS a finding. Full suite green.
+  ENFORCED BY: `fleet_immune.py::restart_churn`, `tests/autonomy/test_immune_restart_churn.py::TestAFrozenAuthoritativeCounterIsItselfTheFinding`
+
+## 2026-09-10 (aag) — 🔭 KEATING'S ENSEMBLE WAS NEVER WARMING UP: THE POOL IT LEARNS FROM IS SMALLER THAN ITS OWN BAR, AND A COUNT WAS STANDING IN FOR EVIDENCE
+
+**Eamon: *"Fix sick organs."*** `scripts/organ_board.py` grades twenty organs on
+what they PRODUCE rather than on their pulse, and it read **ok 10 · watch 3 ·
+fixed? 5 · idle 2 · dark 0**. Zero dark — every key fresh and in-TTL — so this
+was never a liveness problem. Of the three `watch` rows, **two are the organ
+WORKING** and are recorded here so no later session "fixes" them:
+
+* 🧬 `strategy_incubator` reads `champion_is False` because its champion (net
+  +$35.59, **h2 −$21.48**) fails the both-halves floor, and its own proposal
+  path prints *"champion is not STABLE (streak 0/3) — one cycle's fittest is a
+  max over the population, not evidence"*. It scored **1,574** genotypes that
+  cycle and refused all of them. That is the anti-overfit floor doing its job.
+* 🛡️ `fleet_immune` reads `watch` because it HAS a finding — 👩 mum's live hit
+  rate at 18 of 30 — and its own text routes it correctly (*"watch the SHAPE,
+  not the P&L, and check the twin (I25)"*). Checked: the twin passes `halves`
+  and the live arm's h2 is the 2-Sep daily-loss halt already carried as a
+  pre-registered read dated 7-Oct. **Nothing moved** — I25 forbids judging a
+  change against the window that motivated it.
+
+**THE ONE REAL DEFECT IS 🏛️ THE PARLIAMENT'S ML LAYER, AND IT IS I1 WEARING A
+NEW COAT.** `ml.n_seen` sat at **85** and `oos_acc` at **0.5082 — byte-identical
+for 22.5 hours across five boots**. A frozen number reads exactly like a healthy
+one, and here it is worse than frozen: it is a *deterministic replay artifact*.
+`MLEngine.n_seen` and `_trained_ids` are INSTANCE attributes reset to 0 on every
+`__init__`, so each boot re-learns the same rows in the same order and recomputes
+the same accuracy. It was never measuring anything.
+
+**AND THE BAR WAS UNREACHABLE BY ARITHMETIC.** `n_seen` is rebuilt only from the
+trades still in the ecosystem DB, and `EcosystemDB.prune` was **DELETING** closed
+trades at 30 days — so the ceiling on what the bench could ever learn is
+`retention × close rate`, never `MIN_READY_SAMPLES`. Measured off the public
+ledger: **90 pm-* closes in the trailing 30 days against a 200 bar**, and the best
+7-day burst the Parliament has ever run (**5.86/day**) projects to **176 — still
+short**. The five boots in 24h are all ordinary DEPLOYS, verified: every
+`data.cycles` reset carries a new `build` stamp and a `restarts` increment, and
+`fleet_immune`'s `(oi)` discriminator correctly logged `auth_deaths: []`. The
+supervisor is healthy; the ensemble was structurally inert.
+
+**FED, PER I17-AS-AMENDED.** `ecosystem_db.TRADE_KEEP_DAYS` (90) is the new owner
+of trade retention, and `ml.TRAIN_DAYS` **is that same object** so the query and
+the deleter cannot drift ((hj) — a second copy of a rule is a second rule; pinned
+by AST so `train_from_db` may not carry a retyped literal). 90 is DERIVED, not
+picked: `200 / (90/30d) = 66.7d` is the bare minimum at the observed rate, and 90
+carries ~1.35× margin so a quiet fortnight cannot disarm an ensemble that just
+armed. **Signals and candles KEEP the 30-day retention** — candles are the bulky
+table and the ML does not read them; a closed trade row is ~200 bytes, so 3× of
+them is ~50 KB.
+
+**AND THE EXPECTANCY PRICE OF FEEDING IT IS PAID IN THE SAME COMMIT (I19), because
+arming this gate on the old rule would have been a regression I shipped.** `ready`
+meant `n_seen >= 200` and nothing else, so the gate would arm at whatever accuracy
+happened to obtain — and `ml_gate` then REFUSES entries at `p_win < 0.45`.
+**Measured, not argued: driven on pure noise (labels independent of the features)
+the bench reaches 0.5380 decayed accuracy at n=400 by luck alone**, and under the
+old rule that armed. `ready` now takes a second bar — the best model must be
+`z >= ACC_Z_BAR` (1.28, the fleet's own one-sided value, pinned by identity to
+`fleet_allocation.Z_LOWER`) from a coin flip, on the EMA's effective n
+(`min(n_seen, ACC_HALFLIFE)` — deliberately the conservative reading; the true
+EMA effective n is ~576 and would make the bar EASIER). Today's live bench reads
+**z = 0.15**. `is_ready()` is the single owner, so `predict()` and `snapshot()`
+can never disagree.
+
+**AND `ready: false` STOPS BEING TWO DIFFERENT THINGS.** `readiness()` publishes
+the distance and the binding constraint — `{n_seen, min_samples, n_short, pool,
+train_days, acc_z, acc_z_bar, verdict, blocked_by}` — with verdicts
+`disabled | unreachable | cold | edgeless | ready`. Replayed on the live 10-Sep
+payload it reads **`unreachable`**, naming the retention rather than the count
+((lv): a component that produces nothing must publish its own census at its own
+bar; I18: the binding constraint must be the one you name). At `pool 270` the
+same state reads **`cold`, 115 more samples** — a countdown that resolves by
+trading instead of a block that never resolves. An UNKNOWN pool never reads
+`unreachable` (I6 — a dark DB has no control group).
+
+**WHEN IT PAYS OFF, STATED SO NOBODY RE-DIAGNOSES IT NEXT WEEK:** the rows the
+old 30-day pruner already deleted are gone for good, so the pool grows FORWARD
+from today's 90 and nothing ages out until day 90. At the trailing-30d rate
+(3.0/day) that is **~37 days to the 200 bar**; at the recent 7-day rate
+(5.86/day), **~19**. Until then the row publishes `unreachable` -> `cold` and
+says which. **Behaviour today is BYTE-IDENTICAL** — `n_seen 85 < 200` returned
+`(0.5, False)` before and `unreachable` returns `(0.5, False)` now — so this
+lands on the two books changing nothing they trade.
+
+**PRICED AND SCOPED:** two SHADOW books ($1k paper each, zero real money, the
+(hn) routing table's "shadow book logic → build it"), and the change is a
+strict TIGHTENING of the actuator today — the gate is closed now and closed
+after. Nothing reaches real money; the Parliament is shadow-forever by design.
+No live marker, and `parliament/**` is already on the `freqtrade-bots`
+auto-deploy path (`audit_deploy_coverage` OK).
+
+**11 tests, 9/9 mutations RED — plus a NULL CONTROL that SURVIVED**, because the
+hub's own standing lesson is that a harness reporting 100% survival is a broken
+harness, and one that can only ever report RED is equally blind. The positive
+control (`test_a_planted_edge_still_arms`, p_up 0.97 at acc 0.786) is
+load-bearing: a gate that never opens is trivially stable and useless ((om)).
+`parliament_main --selftest` green, full suite green, six repo audits OK.
+
+~~**DECLARED, NOT FIXED:** the models' own weights are still rebuilt from the DB on
+every boot rather than persisted...~~ **[CLOSED THE SAME DAY by `(aaj)`, on
+Eamon's *"fix the above corrections"* — corrected in place per I12 rather than
+left standing, because a "declared, not fixed" that HAS been fixed is the
+stalest kind of note.** The fix is not the one this paragraph anticipated: the
+weights are still not serialised, deliberately and with a reason, and what is
+persisted instead is the prequential history. See `(aaj)`.]
+
+## 2026-09-10 (aah) — THE ORGAN BOARD'S `fixed?` HAD NO TERMINAL STATE, SO FIVE OF TWENTY ROWS SAID "CONFIRM ME" FOREVER
+
+Same pass as `(aag)`. `scripts/organ_board.py` grades an organ `fixed?` when the
+pinned 2-Sep `(wp)` baseline read `watch` and the payload reads clean now, and it
+deliberately **never self-promotes** — the board may not decide its own baseline
+is stale, which is right. But nothing could ever RETIRE one either, so a row that
+cleared on 3-Sep still read *"confirm"* every run a week later. On 10-Sep **five
+of twenty rows** did. A permanent "confirm me" is the `(gl)` cry-wolf shape aimed
+at the reader of a weekly board: it trains them to skim the one column that is
+supposed to mean something. Structurally the same as `(zo)`'s claim that could
+only ever read UNRESOLVED, and the same remedy — a state the thing can finish in.
+
+**`CONFIRMED` is a dated HUMAN reading, and all five were checked against the live
+payload rather than waved through:**
+
+| organ | the 2-Sep watch | today, and why it is closed |
+|---|---|---|
+| `fleet_risk` | `light red`, POOLED long 20/20 | `(wp)`/`(wy)` split the budget per cohort — live **9/20 green**, shadow **10/26 green** |
+| `xp_judge` | `judging 0 of 4`, avo AND mum `unjudgeable` | the `(ye)` lever-prefix and `(zg)` parity fixes landed — **judging 2 of 4**, `unjudgeable []` |
+| `impl_shortfall` | `stood_down (live arm retired)` after `(ta)` | reads **`xp-contaminated`** — the organ REFUSING an invalid live-vs-shadow comparison while the judge runs a candidate on the twin. Its correct output, not a silence |
+| `event_sentinel` | `gdelt False` — a dead source | GDELT up, playbook grades earning (best 0.75 of 8) |
+| `golive_readiness` | `docket 7` — seven books awaiting an I17 call | the `(wt)` September slate took five and `(zo)` took georgia's — **docket 0** |
+
+**`REVIEW_2SEP` IS UNTOUCHED.** The 2-Sep reading is the record; I12 corrects a
+doctrine that no longer describes the system, it does not rewrite what was
+measured. And a **CONFIRMED organ that REGRESSES still reads `watch`** — the
+promotion only ever applies to a row already grading `ok`, so a confirmation can
+never mask a new fault. Pinned in both directions.
+
+**THE PIN THAT HAD TO MOVE, AND WHY THAT IS THE RULE NOT AN EXCEPTION.** Three
+test arms asserted `fixed?` on `fleet_risk` and `golive_readiness` — organs this
+entry confirms. **A test that asserts an organ's CURRENT state is a snapshot, not
+a property**, and when it blocks a correct change the question is whether the
+change is right, never whether the pin exists (the `(qu)`/I26 rule, at an organ
+instead of a book). All three are RE-AIMED and say so: each still proves the
+thing it was built to prove (the cohort fields reach the row; the docket field
+moves the state), and the `fixed?` MECHANISM stays exercised by the
+`fleet_immune` arm, which is deliberately an UNCONFIRMED organ.
+
+Board after: **ok 15 · watch 3 · fixed? 0 · idle 2 · dark 0**, and the three
+`watch` rows are the two working organs plus 🏛️ the Parliament, whose fix is
+`(aag)`. Selftest green (20 organs, baseline pinned, 4 mutations red), 9 semantic
+tests green including a new both-directions arm. Moves no money, no lever, no bot.
+
 ## 2026-09-10 (aaf) — 🎫 THE TAKER'S NULL: RANDOM BEATS IT ON EVERY FAMILY, AND THE ONE FAMILY IT COULD TRADE LIVE IS NEGATIVE
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* →

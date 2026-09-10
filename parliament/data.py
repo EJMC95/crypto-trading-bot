@@ -159,6 +159,16 @@ class LighterData:
         self.funding: dict[str, float] = {}     # sym -> TRUE apr %
         self.candles: dict[tuple, list[dict]] = {}   # (sym, res) -> bars
         self.ws_books: dict[str, dict] = {}     # sym -> {ts, imb, spread_bps, mid}
+        #: [(aak)] the ws feed's OWN liveness, published. `ws_books` empty is
+        #: byte-identical between "the venue is quiet" and "we have never once
+        #: connected" — and on Railway it is always the second: the venue CDN
+        #: blocks cloud IPs, which this loop already KNOWS (see the fails==4
+        #: log below) and told nobody. Measured 10-Sep: `data.ws` had never
+        #: beaten, `scan_orderbook_imbalance` emitted 0 of 183 runs, and
+        #: `featurize`'s `imb` was a constant 0.0 — one of the ML bench's
+        #: eleven features carrying no information at all.
+        self.ws_state: dict = {"ok": False, "books": 0, "fails": 0,
+                               "last_ok": None, "why": "not started"}
         self.watchlist: list[str] = list(WATCH_CORE)
         # [2026-07-28] books' own holdings the candle pass must follow —
         # sym -> last-touch ts; bounded + self-expiring (see track()).
@@ -320,6 +330,8 @@ class LighterData:
             import websockets
         except Exception:  # noqa: BLE001 — wheel absent: REST-only mode
             log.info("websockets wheel absent — ws accelerator off")
+            self.ws_state = {"ok": False, "books": 0, "fails": 0,
+                             "last_ok": None, "why": "websockets wheel absent"}
             return
         fails = 0
         while True:
@@ -375,10 +387,23 @@ class LighterData:
                                 snap = self._book_metrics(books[mid])
                                 if snap:
                                     self.ws_books[sym] = snap
+                        self.ws_state = {"ok": True,
+                                         "books": len(self.ws_books),
+                                         "fails": 0, "last_ok": time.time(),
+                                         "why": None}
                         if beat:
                             beat("data.ws", f"{len(self.ws_books)} books")
             except Exception as e:  # noqa: BLE001 — reconnect with backoff
                 fails += 1
+                self.ws_state = {
+                    "ok": False, "books": len(self.ws_books), "fails": fails,
+                    "last_ok": self.ws_state.get("last_ok"),
+                    # [(aak)] the class of failure, never the raw text: an
+                    # exception string can carry a URL or a header and this
+                    # payload is public (/bus.json, no auth).
+                    "why": type(e).__name__ + (
+                        " (cloud-IP CDN block is the known state on Railway)"
+                        if fails >= 4 else "")}
                 wait = min(600.0, 5.0 * (2 ** min(fails, 6)))
                 if fails <= 3:
                     log.warning("ws dropped (%s); retry in %.0fs", e, wait)

@@ -529,6 +529,18 @@ class _BookCache(threading.Thread):
         self._lock = threading.Lock()
         self._wake = threading.Event()
         self.started_ok = threading.Event()
+        #: [(aak)] THE DEGRADATION THAT ONLY EVER REACHED A LOG LINE.
+        #: When the venue CDN blocks this host the watcher goes quiet and
+        #: `orderbook()` serves governed REST snapshots instead — correct, and
+        #: invisible: it is logged ONCE per process behind `degraded_logged`,
+        #: which is I4's named anti-pattern ("never report a persistent
+        #: condition with a one-shot warning") on the client BOTH live books
+        #: price against. Nothing published, so "are mum and avo reading the
+        #: websocket or REST?" was unanswerable from any feed. Read it with
+        #: `ws_health()`; the reason is an exception CLASS, never its text,
+        #: because the payloads this reaches are public and unauthenticated.
+        self._ws_health: dict = {"ok": False, "fails": 0, "last_ok": None,
+                                 "why": "not started", "books": 0}
 
     def subscribe(self, market_id: int):
         with self._lock:
@@ -591,6 +603,9 @@ class _BookCache(threading.Thread):
                     if fails:
                         log.info("book ws reconnected after %d failure(s)", fails)
                     fails, backoff, degraded_logged = 0, 1.0, False
+                    self._ws_health = {"ok": True, "fails": 0,
+                                       "last_ok": time.time(), "why": None,
+                                       "books": len(self.books)}
                     while not self._wake.is_set():
                         msg = json.loads(ws.recv(timeout=30))
                         mt = msg.get("type")
@@ -609,6 +624,14 @@ class _BookCache(threading.Thread):
                                 self.updated[mid] = time.time()
             except Exception as e:  # noqa: BLE001 — reconnect forever
                 fails += 1
+                self._ws_health = {
+                    "ok": False, "fails": fails,
+                    "last_ok": self._ws_health.get("last_ok"),
+                    "books": len(self.books),
+                    "why": type(e).__name__ + (
+                        " (cloud-IP CDN block is the known state on Railway; "
+                        "orderbook() is serving governed REST snapshots)"
+                        if fails > 3 else "")}
                 # A few quick retries; then assume the venue ws is blocked from
                 # this host (cloud-IP CDN 400) and go QUIET — orderbook() falls
                 # back to governed REST snapshots, which work. Retry every 10 min
@@ -664,6 +687,10 @@ class LighterClient(VenueClient):
         self._books = _BookCache(self.host)
         self._books.start()
         self._rest_books: dict[int, tuple[float, dict]] = {}   # market_id -> (ts, book)
+        #: [(aak)] where each `orderbook()` answer actually came from — see
+        #: `ws_health()`. Counts, not a rate: a rate needs a window and this is
+        #: read by publishers that already carry their own.
+        self._book_src: dict = {"ws": 0, "rest": 0}
         # [(xt)] fills the governor declined, kept for a LATER read against a
         # refilled bucket. Bounded and self-expiring — see drain_pending_fills.
         self._pending_fills: "OrderedDict[str, dict]" = OrderedDict()
@@ -849,10 +876,36 @@ class LighterClient(VenueClient):
         self._books.subscribe(m["id"])
         book = self._books.get(m["id"])
         if book is not None:
+            self._book_src["ws"] = self._book_src.get("ws", 0) + 1
             return book
         # ws not warm (the Railway norm — CDN blocks cloud-IP ws) -> governed
         # REST snapshot, TTL-cached so guard + strategy don't double-pay
+        # [(aak)] COUNTED, because the connection state alone does not say what
+        # the book actually PRICED off. This ratio is the consequence a reader
+        # cares about, and it was nowhere.
+        self._book_src["rest"] = self._book_src.get("rest", 0) + 1
         return self._rest_book(m["id"])
+
+    def ws_health(self) -> dict:
+        """[(aak)] Is this client's order book coming from the websocket or from
+        governed REST snapshots?
+
+        Unanswerable from any feed until now: the watcher logs its degradation
+        ONCE per process behind `degraded_logged` (I4's named anti-pattern) and
+        `orderbook()` falls back silently, by design. Both live books price
+        against this client, so publish it beside the row and let the reader
+        see which one they are on. Never raises — an accessor that can break a
+        publish is worse than the blindness it fixes."""
+        try:
+            h = dict(getattr(self._books, "_ws_health", None) or
+                     {"ok": False, "why": "unknown"})
+            ws, rest = self._book_src.get("ws", 0), self._book_src.get("rest", 0)
+            tot = ws + rest
+            h["reads"] = {"ws": ws, "rest": rest,
+                          "rest_pct": round(100.0 * rest / tot, 1) if tot else None}
+            return h
+        except Exception:  # noqa: BLE001
+            return {"ok": False, "why": "ws_health failed"}
 
     def _rest_book(self, market_id, force=False):
         now = time.time()
