@@ -478,6 +478,97 @@ def ledger_reason(tag, exit_reason):
     return f"{ledger_tag(tag)}_{exit_reason}"
 
 
+def oversold_breadth(strategy, coins, get_bars, extra_for=None, memo=None):
+    """[2026-09-10 (zr)] THE BREADTH PRE-PASS — ONE owner, read by both the
+    shadow loop and the live host (a second copy is a second rule, (hj)).
+
+    Counts the coins in `coins` whose LATEST CLOSED candle satisfies the
+    carrier's own shipped entry rule (`signals()["enter"]`), held or not —
+    market breadth of the oversold, not free-slot count. Only a carrier that
+    declares `BREADTH_MIN` is measured; every other book gets None, so the
+    gate below is a structural no-op for 🙏 avo and 🔮 georgia.
+
+    `read` is the number of coins the rule could be evaluated on; a coin with
+    no bars or a `None` verdict (warm-up, dark indicators) is neither counted
+    nor read — an unreadable coin must not be booked as "not oversold" (I8).
+    `memo` (coin -> (candle ts, bars-in-force, verdict)) makes the pass cost
+    ~nothing between candles: a verdict is reused only for the SAME closed
+    candle under the SAME levers, so a lever that moves mid-hour re-evaluates.
+    Never raises: a gauge that can break a live loop is worse than none.
+    """
+    if not hasattr(type(strategy), "BREADTH_MIN"):
+        return None
+    try:
+        in_force = tuple(sorted(mum_bars(strategy).items()))
+    except Exception:  # noqa: BLE001
+        in_force = ()
+    n = read = 0
+    for coin in coins:
+        try:
+            bars = get_bars(coin)
+        except Exception:  # noqa: BLE001
+            bars = None
+        if not bars or not bars.get("t"):
+            continue
+        ts = bars["t"][-1]
+        hit = None
+        if memo is not None:
+            prev = memo.get(coin)
+            if prev and prev[0] == ts and prev[1] == in_force:
+                hit = prev[2]
+        if hit is None:
+            try:
+                sig = strategy.signals(
+                    bars, extra_for(coin) if extra_for else {})
+            except Exception:  # noqa: BLE001
+                sig = None
+            if sig is None:
+                continue
+            hit = bool(sig.get("enter"))
+            if memo is not None:
+                memo[coin] = (ts, in_force, hit)
+        read += 1
+        n += 1 if hit else 0
+    return {"n": n, "read": read, "of": len(coins)}
+
+
+def breadth_thin(strategy, breadth):
+    """[(zr)] The gate's ONE decision: True iff the breadth floor is ARMED
+    (`BREADTH_MIN` > 1) and this loop's breadth sits below it.
+
+    INERT at 1 — a coin that enters is itself breadth 1, so the shipped
+    default can never refuse. Armed but unreadable REFUSES (the (xl)
+    fail-closed shape: a gate that cannot measure does not fall through to
+    the unfiltered rule). A conjunct beside `enter`, so it can only ever
+    REMOVE an entry the shipped cell admitted — restrict-only by
+    construction, which is what makes it safe to arm on a real-money book.
+    """
+    try:
+        bar = int(getattr(strategy, "BREADTH_MIN", 1))
+    except (TypeError, ValueError):
+        bar = 1
+    if bar <= 1:
+        return False
+    if not isinstance(breadth, dict):
+        return True
+    try:
+        return int(breadth.get("n")) < bar
+    except (TypeError, ValueError):
+        return True
+
+
+def breadth_n_of(breadth):
+    """The count to STAMP on a position at open (copied to the close row
+    as `extra.breadth_n`, I23), or None when nothing was measured — never a
+    fabricated 0, which would read as "no coin was oversold" (I8)."""
+    if not isinstance(breadth, dict):
+        return None
+    try:
+        return int(breadth.get("n"))
+    except (TypeError, ValueError):
+        return None
+
+
 def census_no_entry_why(strategy, sig):
     """The census bucket for a coin that produced no entry — ONE owner, read
     by both the shadow loop and the live host (a second copy is a second
@@ -1313,6 +1404,36 @@ class OversoldRebound(Carrier):
     VEL_LO = -999.0                     # inert: no floor on the fall
     VEL_HI = 999.0                      # inert: no ceiling on it
     VEL_LOOKBACK = 4                    # bars — the window the band was measured on
+    #: [2026-09-10 (zr)] THE BREADTH OF THE OVERSOLD — how many coins in her
+    #: own universe satisfy the shipped entry cell on the SAME closed candle.
+    #: `rsi<bar` says THIS coin is low; breadth says whether the whole market
+    #: went there with it, and on her own ledger that is where the money is.
+    #:
+    #: MEASURED 9-Sep on BOTH arms, the motivating day EXCLUDED (I25): closes
+    #: opened in a same-loop batch of >=3 read +1.114%/trade (live n=37) and
+    #: +1.003% (twin n=41), stop rate 2.7% / 2.4%, positive in every ISO week
+    #: and under a coin jackknife; closes opened alone or in a pair read
+    #: -0.037% (live n=63) / +0.243% (twin n=57) with a 9.5-10.5% stop rate.
+    #: Four of the six stops that cost the live book $56 on 9-Sep were
+    #: single/pair entries. The per-trade t (4.7 / 4.5) is INFLATED by the
+    #: batches themselves: the 37 live batch closes are SEVEN open-events
+    #: (7 of 7 positive, event-level t +5.7) and a permutation of event sizes
+    #: across her 64 events reads P=0.097 live / 0.137 twin. HYPOTHESIS-GRADE,
+    #: stated as such — the (kw)/(ky)/I21 shape: a bucket whose closes batch
+    #: is graded by its events, never by its trades.
+    #:
+    #: SHIPPED INERT at 1 — a coin that enters is itself breadth 1, so `enter`
+    #: is byte-identical to the pre-(zr) rule. Reached through the judge
+    #: (`xp.mum.breadth_min` on the SHADOW twin, candidate `mum-breadth-3`,
+    #: `live.mum.breadth_min` judge-promoted only) — the fleet's designed path
+    #: from a shadow hypothesis to real money, which is the right instrument
+    #: for a P=0.10 finding. What ships on BOTH arms today is the RECORD:
+    #: `breadth_n` on every close (I23), `breadth_*` in the census, so the
+    #: forward read is a query rather than a reconstruction. RESTRICT-only by
+    #: construction (a conjunct at the entry site; see `breadth_thin`).
+    #: `MUM_BREADTH_MIN` is the env override for Eamon's own forward test,
+    #: never the measured recommendation.
+    BREADTH_MIN = int(os.environ.get("MUM_BREADTH_MIN", "1"))
     control_arm = True                  # publishes its own random-entry null
     census = True                       # publishes why nothing opened (I18)
     #: v1 positions (opened 2026-07-12) are flattened on the first v2 loop —
@@ -2235,7 +2356,9 @@ def shadow_scan_order(coins, held, rets):
 MUM_LEVER_ATTRS = (("rsi_max", "RSI_MAX", float),
                    ("max_hold_min", "MAX_HOLD_MIN", int),
                    ("vel_lo", "VEL_LO", float),
-                   ("vel_hi", "VEL_HI", float))
+                   ("vel_hi", "VEL_HI", float),
+                   # [(zr)] the breadth floor — an int (a count of coins)
+                   ("breadth_min", "BREADTH_MIN", int))
 
 
 def consumable_lever_attrs(strategy):
@@ -2265,7 +2388,8 @@ def mum_env_defaults(strategy):
     return {"rsi_max": float(getattr(cls, "RSI_MAX", 36.0)),
             "max_hold_min": float(getattr(cls, "MAX_HOLD_MIN", 1440)),
             "vel_lo": float(getattr(cls, "VEL_LO", -999.0)),
-            "vel_hi": float(getattr(cls, "VEL_HI", 999.0))}
+            "vel_hi": float(getattr(cls, "VEL_HI", 999.0)),
+            "breadth_min": float(getattr(cls, "BREADTH_MIN", 1))}
 
 
 def xp_prefix_for_arm(bot_id):
@@ -2680,6 +2804,17 @@ def _census_extra(b):
             out["vel_in_band"] = sum(1 for v in vv if lo <= v < hi)
     except Exception:  # noqa: BLE001
         pass
+    # [(zr)] THE BREADTH GAUGE, published whether or not the floor is armed —
+    # the distribution the judge's `mum-breadth-3` candidate will cut from,
+    # visible before anyone arms it (the (xl) discipline). ABSENT until the
+    # pre-pass has measured, never a fabricated 0 (I8).
+    try:
+        if isinstance(getattr(b, "breadth", None), dict):
+            out["breadth_n"] = int(b.breadth.get("n") or 0)
+            out["breadth_read"] = int(b.breadth.get("read") or 0)
+            out["breadth_min"] = int(getattr(b.s, "BREADTH_MIN", 1) or 1)
+    except Exception:  # noqa: BLE001
+        pass
     # [2026-08-27 (vm)] THE TERM NOBODY COULD SEE, and it is why 👩 mum's
     # binding gate MOVED with nothing on the row saying so. Measured on her
     # live payload 27-Aug: `rsi_bar 36.0 · rsi_min 27.8 · near_bar 5 ·
@@ -2837,6 +2972,10 @@ class Book:
         #: VEL_LOOKBACK bars). I23: a knob must record the quantity it cuts,
         #: and this is the one `xp.mum.vel_*` gates on.
         self.last_vel = {}
+        #: [(zr)] this loop's oversold BREADTH (`oversold_breadth`), None until
+        #: the pre-pass has run, and the per-candle memo behind it.
+        self.breadth = None
+        self.breadth_memo = {}
         # [2026-08-27 (vm)] THE OTHER CONJUNCT. 👩 mum's rule is `rsi <
         # RSI_MAX and NOT uptrend and v > 0`; (rr) gauged the RSI half and
         # the trend half had no gauge at all, so a bar that is MET while
@@ -3136,6 +3275,10 @@ class Book:
                           if isinstance(m.get("bars"), dict) and m["bars"] else {}),
                        **({"rsi_entry": m["rsi_entry"]}
                           if m.get("rsi_entry") is not None else {}),
+                       # [(zr)] the oversold breadth at the OPEN (I23); absent,
+                       # never 0, on the pre-(zr) rows and on other carriers
+                       **({"breadth_n": m["breadth_n"]}
+                          if m.get("breadth_n") is not None else {}),
                        # [2026-09-07] this close's own placebo leg, so the
                        # random-entry null becomes a PAIRED, era-scopable
                        # statistic instead of a lifetime running sum.
@@ -3553,7 +3696,7 @@ def main():
             # INSIDE the instrument built to close it.
             b.scan = {"scanned": 0, "held": 0, "no_bars": 0, "no_px": 0,
                       "no_signal": 0, "uptrend_blocked": 0, "no_read": 0,
-                      "vel_blocked": 0,
+                      "vel_blocked": 0, "breadth_thin": 0,
                       "stale_candle": 0, "locked": 0,
                       "capped": 0, "cooldown": 0, "vetoed": 0,
                       "noncrypto_ungated": 0, "budget_headroom": 0,
@@ -3582,6 +3725,14 @@ def main():
                     _rets[_c] = _fb_ret.bar_returns(cache.get(_c, b.s.tf))
                 except Exception:  # noqa: BLE001 — telemetry never breaks the loop
                     _rets[_c] = {}
+            # [(zr)] THE BREADTH PRE-PASS — before any entry is offered, so
+            # the first coin in scan order sees the same count as the last.
+            # None for carriers without `BREADTH_MIN`; the loop reads it
+            # through `breadth_thin`, which is a no-op at the shipped 1.
+            b.breadth = oversold_breadth(
+                b.s, list(b.coins), lambda _c: cache.get(_c, b.s.tf),
+                extra_for=lambda _c: {"btc_regime_up": regime},
+                memo=b.breadth_memo)
             for coin in shadow_scan_order(b.coins, list(b.broker.pos), _rets):
                 bars = cache.get(coin, b.s.tf)
                 b.scan["scanned"] += 1
@@ -3745,6 +3896,12 @@ def main():
                     # not `no_signal` — a verdict the rule never gave.
                     b.scan[census_no_entry_why(b.s, sig)] += 1
                     continue
+                # [(zr)] the breadth floor — a conjunct at the SAME rung on
+                # both hosts (right after the coin's own signal, ahead of the
+                # lock), so the arms refuse in the same order. Inert at 1.
+                if breadth_thin(b.s, b.breadth):
+                    b.scan["breadth_thin"] += 1
+                    continue
                 if locked:
                     b.scan["locked"] += 1
                     continue
@@ -3850,6 +4007,9 @@ def main():
                     stop_px = entry_px * (1 - dist)
                 _meta = {"entry": entry_px, "opened_ts": t0, "tag": tag,
                          "accrued": 0.0, "stop_px": stop_px,
+                         # [(zr)] the breadth this entry was admitted at —
+                         # the quantity `breadth_min` cuts, recorded (I23)
+                         "breadth_n": breadth_n_of(b.breadth),
                          # [(wv)] the bars in force at entry (mum's judge
                          # receipt) + the RSI this entry was admitted at —
                          # the quantity rsi_max cuts, recorded (I23).

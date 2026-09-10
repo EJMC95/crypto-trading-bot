@@ -441,7 +441,11 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               # judge's OWN selftest the moment the candidate was queued,
               # which is that guard doing exactly its job.
               "xp.mum.vel_lo": "live.mum.vel_lo",
-              "xp.mum.vel_hi": "live.mum.vel_hi"}
+              "xp.mum.vel_hi": "live.mum.vel_hi",
+              # [(zr)] the oversold-breadth floor — `mum-breadth-3`'s lever;
+              # without this mapping the candidate could not name its live
+              # twin and the judge would refuse the spec as invalid state.
+              "xp.mum.breadth_min": "live.mum.breadth_min"}
 
 # [2026-09-02 (ww)] 👩 MUM'S CANDIDATES — hand-declared and MEASURED, in
 # order. The incubator's funding genes are the Farmer's and cannot breed
@@ -472,6 +476,20 @@ XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
 MUM_CANDIDATES = [
     {"name": "mum-vel-12-20",
      "levers": {"xp.mum.vel_lo": 12.0, "xp.mum.vel_hi": 20.0}},
+    # [(zr)] breadth-3 — enter only when >=3 coins in her universe are
+    #        oversold on the same candle. On her OWN ledger (9-Sep excluded,
+    #        I25) closes opened in a batch of >=3 read +1.114%/trade live
+    #        (n=37) / +1.003% twin (n=41), stop rate 2.7% / 2.4%, positive in
+    #        every ISO week and under a coin jackknife; alone-or-pair closes
+    #        read -0.037% / +0.243% with 9.5-10.5% stops. NOT PROVEN: the
+    #        batch closes are SEVEN live open-events (7/7 positive, event-t
+    #        +5.7) and a permutation of event sizes over her 64 events reads
+    #        P=0.097 (twin P=0.137) — hypothesis-grade, which is exactly why
+    #        it is a CANDIDATE and not a setting. Queued behind vel-12-20
+    #        (the stronger prior: tape p=0.0033) rather than pre-empting it.
+    #        A gate-narrowing candidate: the (zn) clock extension applies.
+    #        THE JUDGE'S OWN PAIRED BAR IS THE CRITERION — no second rule.
+    {"name": "mum-breadth-3", "levers": {"xp.mum.breadth_min": 3.0}},
     {"name": "mum-rsi-32", "levers": {"xp.mum.rsi_max": 32.0}},
     {"name": "mum-hold-720", "levers": {"xp.mum.max_hold_min": 720.0}},
     {"name": "mum-hold-2880", "levers": {"xp.mum.max_hold_min": 2880.0}},
@@ -985,7 +1003,10 @@ LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      # exists to refuse. The release paths that do apply are
                      # the judge's own fade-watch and lever TTL expiry.
                      "live.mum.vel_lo": (-999.0, "up"),
-                     "live.mum.vel_hi": (999.0, "down")}
+                     "live.mum.vel_hi": (999.0, "down"),
+                     # [(zr)] a HIGHER breadth floor admits fewer entries
+                     # (tighter = up); env default 1 = inert, from the class.
+                     "live.mum.breadth_min": (1.0, "up")}
 
 
 def proposal_fade(proposals, live_levers, now):
@@ -3594,6 +3615,11 @@ def _selftest_body():
         _mm = _re.search(_attr + r' = (-?[0-9.]+)', _fam_src)
         assert _mm, f"could not read OversoldRebound.{_attr} from lighter_family_bot.py"
         _src_def[_lv] = float(_mm.group(1))
+    # [(zr)] the oversold-breadth floor pins to the same class; its env
+    # default is the INERT value (1 — a coin that enters is itself breadth 1).
+    _mm = _re.search(r'MUM_BREADTH_MIN"\s*,\s*"(\d+)"', _fam_src)
+    assert _mm, "could not read MUM_BREADTH_MIN default from lighter_family_bot.py"
+    _src_def["live.mum.breadth_min"] = float(_mm.group(1))
     for _key, (_v, _dir) in LIVE_ENV_DEFAULTS.items():
         assert _src_def[_key] == _v, (
             f"LIVE_ENV_DEFAULTS[{_key}]={_v} has DRIFTED from the funding bot's "

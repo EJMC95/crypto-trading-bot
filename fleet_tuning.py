@@ -477,6 +477,18 @@ LEVERS = {
         "note": "👩 mum twin: MAX rsi points dropped over 4 bars; measured band "
                 "ends 20 (a violent fall keeps falling). env default 999 (inert)",
         "env_default": 999.0},
+    # [(zr)] the oversold BREADTH floor: enter only when >= this many coins in
+    # her universe satisfy the entry cell on the same candle. Measured on her
+    # own ledger (batch >=3: +1.1%/trade both arms; alone/pair: ~0 with 3-4x
+    # the stop rate) but only SEVEN batch events, permutation P~0.10 — so the
+    # judge tests it (`mum-breadth-3`) and nothing else moves it. env default
+    # 1 = inert (a coin that enters is itself breadth 1); the cage's `lo` IS
+    # the inert value so the rail can only ever tighten from here.
+    "xp.mum.breadth_min": {
+        "kind": "int", "lo": 1, "hi": 8, "lane": "lighter-xp",
+        "note": "👩 mum twin: MIN coins oversold on the same candle before any "
+                "entry; measured cell starts at 3. env default 1 (inert)",
+        "env_default": 1},
     "live.mum.vel_lo": {
         "kind": "float", "lo": -999.0, "hi": 20.0, "lane": "lighter-live",
         "note": "👩 mum LIVE dip-velocity floor — judge-promoted only; "
@@ -487,6 +499,11 @@ LEVERS = {
         "note": "👩 mum LIVE dip-velocity ceiling — judge-promoted only; "
                 "env default 999 (inert)",
         "env_default": 999.0},
+    "live.mum.breadth_min": {
+        "kind": "int", "lo": 1, "hi": 8, "lane": "lighter-live",
+        "note": "👩 mum LIVE oversold-breadth floor — judge-promoted only; "
+                "env default 1 (inert)",
+        "env_default": 1},
     #: [(ya)] 36 -> 38, tracking the carrier — see the xp twin above.
     "live.mum.rsi_max": {
         "kind": "float", "lo": 28.0, "hi": 38.0, "lane": "lighter-live",
