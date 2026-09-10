@@ -320,3 +320,33 @@ def test_the_card_renders_it_and_says_EMPTY_loudest():
     i = src.index("live arm fills NOTHING")
     around = src[i - 900:i]
     assert "#f85149" in around, "an empty live arm must render red, not amber"
+
+
+def test_the_handoff_qualifies_a_READY_book_whose_live_arm_is_inert():
+    """HANDOFF is the first thing a session reads (I11), and for six days it
+    said `READY — 6/6 bars` about a book whose live arm could fill none of the
+    closes that earned it.
+
+    Mutation: drop the `inert` branch, or emit the note without the
+    live_fillable read => this reddens.
+    """
+    import importlib
+    ss = importlib.import_module("session_state")   # driven, not grepped
+    bus = {"golive_readiness": {"books": {
+        "inert-book": {"ready": True,
+                       "bars": {"window": True, "closes": True, "mean": True,
+                                "t": True, "halves": True, "maxdd": True},
+                       "live_fillable": {"inert": True,
+                                         "why": "its live arm fills nothing",
+                                         "effective": {"n": 0},
+                                         "unfillable": {"n": 208}}},
+        "clean-book": {"ready": True,
+                       "bars": {"window": True, "closes": True, "mean": True,
+                                "t": True, "halves": True, "maxdd": True}}}}}
+    out = ss.fleet_signals(pnl={"bots": []}, bus=bus)
+    gate = " ".join(out.get("gate") or [])
+    assert "inert-book" in gate and "FILL NOTHING" in gate.upper()
+    assert "clean-book" in gate
+    # the clean book must NOT be given the warning
+    clean_seg = [g for g in out["gate"] if "clean-book" in g][0]
+    assert "FILL NOTHING" not in clean_seg.upper()

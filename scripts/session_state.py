@@ -896,10 +896,27 @@ def fleet_signals(pnl=_FETCH, bus=_FETCH):
             continue
         passed = sum(1 for x in bars.values() if x is True)
         if v.get("ready") is True:
+            # [(aan)] READY DESCRIBES THE GRADED ARM, AND ON A BOOK WHOSE LIVE
+            # MODE RUNS A NARROWER POLICY THAT IS NOT THE ARM BEING PROMOTED.
+            # This line said "READY — 6/6 bars" for six days about 🎫 the
+            # taker, whose live allow-list could fill NONE of the 208 closes
+            # that earned it. The handoff is the first thing a session reads
+            # (I11), so the qualification belongs HERE, not only on the card.
+            lf = v.get("live_fillable") if isinstance(
+                v.get("live_fillable"), dict) else None
+            note = ""
+            if lf and lf.get("inert") is True:
+                note = (" **BUT ITS LIVE ARM WOULD FILL NOTHING** — "
+                        + str(lf.get("why") or "").strip())
+            elif lf and (lf.get("unfillable") or {}).get("n"):
+                _ef, _uf = (lf.get("effective") or {}), (lf.get("unfillable") or {})
+                note = (f" Its LIVE arm could have filled {_ef.get('n')} of "
+                        f"{(_ef.get('n') or 0) + (_uf.get('n') or 0)} of those "
+                        f"closes — read `live_fillable` before promoting.")
             out["gate"].append(
                 f"`{bot}` is **READY — {passed}/{len(bars)} bars**. Going live "
                 "is Eamon's explicit act; it is never an automatic consequence "
-                "of passing.")
+                "of passing." + note)
         elif passed == len(bars) - 1:
             missing = sorted(k for k, x in bars.items() if x is not True)
             out["gate"].append(
