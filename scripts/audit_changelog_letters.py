@@ -1342,6 +1342,72 @@ def _selftest():
                         "refs/remotes/origin/good"], \
         "an unresolvable ref must be skipped, never end the sweep"
 
+    # ---- THE ARM MUST FIRE FROM `main()`, NOT ONLY FROM ITS PURE HELPER ----
+    # [2026-09-10 (zw)] A 24-mutation round killed 16 and left EIGHT alive, and
+    # every survivor was in `main()`'s wiring rather than in the comparison:
+    # `if open_clashes:` -> `if False and open_clashes:` disabled the whole
+    # detection and nothing went red. That is the same shape this session found
+    # in 🏦 Rich Dad an hour earlier, and it is the shape this file's own
+    # doctrine names — a helper can be perfect while the arm that calls it is
+    # dead. So `main()` is driven end-to-end here against stubbed git seams: a
+    # planted CHANGELOG this tree ADDS a letter to, and a stub branch that
+    # holds the same letter for a different title.
+    import contextlib
+    import io
+    import tempfile
+
+    _g = globals()
+    _saved = {k: _g[k] for k in ("CHANGELOG", "origin_branch_refs",
+                                 "origin_branch_changelogs",
+                                 "_baseline_changelog",
+                                 "dangling_code_citations")}
+    try:
+        _base_txt = ("## 2026-08-01 (aa) — base one\n\nbody\n")
+        _mine_txt = ("## 2026-08-02 (ab) — MY entry\n\nbody\n\n"
+                     + _base_txt)
+        _their = [("refs/remotes/origin/claude/rival",
+                   scan("## 2026-08-02 (ab) — THEIR different entry\n\nbody\n\n"
+                        + _base_txt)[0])]
+        _fd, _tmp = tempfile.mkstemp(suffix=".md")
+        os.close(_fd)
+        open(_tmp, "w", encoding="utf-8").write(_mine_txt)
+        _g["CHANGELOG"] = _tmp
+        _g["origin_branch_refs"] = lambda: (["refs/remotes/origin/claude/rival"], 0)
+        _g["origin_branch_changelogs"] = lambda refs, **k: (_their, False)
+        _g["_baseline_changelog"] = lambda **k: _base_txt
+        # the fixture CHANGELOG holds two letters; the real tree's citations
+        # resolve against the REAL file, so that arm is stubbed OUT rather
+        # than allowed to fail this fixture for an unrelated reason.
+        _g["dangling_code_citations"] = lambda *a, **k: []
+
+        _buf = io.StringIO()
+        with contextlib.redirect_stdout(_buf):
+            _rc = main()
+        _out = _buf.getvalue()
+        assert _rc == 1, (
+            "main() did not FAIL on a letter an open branch already holds — "
+            "the open-branch arm is wired but inert")
+        assert "OPEN-BRANCH CHANGELOG LETTER COLLISION" in _out, _out[:400]
+        assert "(ab)" in _out and "claude/rival" in _out, _out[:400]
+
+        # POSITIVE CONTROL, so the assertion above is testing the ARM and not a
+        # main() that fails on everything: the same tree with a branch holding
+        # the SAME title is a rebase, not a race, and must pass — and the OK
+        # line must PUBLISH how many branches it compared, or a swept-nothing
+        # run is byte-identical to a swept-clean one.
+        _g["origin_branch_changelogs"] = lambda refs, **k: (
+            [("refs/remotes/origin/claude/rival", scan(_mine_txt)[0])], False)
+        _buf = io.StringIO()
+        with contextlib.redirect_stdout(_buf):
+            _rc2 = main()
+        _out2 = _buf.getvalue()
+        assert _rc2 == 0, _out2[:400]
+        assert "1 open origin branch(es) compared" in _out2, _out2[:400]
+    finally:
+        _g.update(_saved)
+        with contextlib.suppress(Exception):
+            os.unlink(_tmp)
+
     print(f"audit_changelog_letters selftest OK (fires on a duplicate; ignores "
           f"the pre-{ERA_START} restart era and letterless headers; skips "
           f"sibling worktrees; sees open origin branches; sees {len(real)} "
