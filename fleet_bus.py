@@ -1243,7 +1243,24 @@ def cohort_long_state(payload, cohort):
     keep vetoing exactly as it did — never veto nothing, never veto on a
     number from the other cohort). A missing budget reads as 10**9, i.e. no
     veto, matching the consumers' own `_lb = 10**9 if _lb is None` idiom
-    (0 is a REAL budget)."""
+    (0 is a REAL budget).
+
+    [2026-09-10 (zt)] IT READS THE HISTORY'S COMPACTED LIST SHAPE TOO.
+    `fleet_risk.save_history` writes `cohorts` as
+    `{k: [long_positions, long_budget, light]}` (fleet_risk.py, the
+    `save_history(RISK_KEY, ...)` call) to keep 17k snapshots small, while
+    the LIVE key keeps the dict. This reader only knew the dict, so a
+    history payload fell all the way through to the pooled branch — and
+    history carries no pooled `long_positions`/`long_budget` either, so the
+    result was `(0, 10**9)`: *no longs held, against a budget that can never
+    bind*. Measured 10-Sep: 2,174 of 17,261 `fleet-risk` history rows are
+    the list shape, i.e. every retrospective study of budget pressure over
+    that window read "the budget never binds" by construction. NO LIVE VETO
+    WAS AFFECTED — every enforcing consumer reads the live key, which is
+    and was the dict (verified against the live payload the day this
+    shipped: live (9, 20), shadow (14, 26)). The positional contract is
+    the writer's, so it is read positionally and length-checked, never
+    zipped against a names list this module would have to keep in sync."""
     p = payload if isinstance(payload, dict) else {}
     c = (p.get("cohorts") or {}).get(str(cohort)) if isinstance(
         p.get("cohorts"), dict) else None
@@ -1255,6 +1272,15 @@ def cohort_long_state(payload, cohort):
                 return int(lp), int(lb)
         except (TypeError, ValueError):
             # an unparseable return is skipped, never scored as 0.0
+            pass
+    elif isinstance(c, (list, tuple)) and len(c) >= 2:
+        try:
+            lp, lb = c[0], c[1]
+            if lp is not None and lb is not None:
+                return int(lp), int(lb)
+        except (TypeError, ValueError):
+            # same contract as the dict branch: unparseable is SKIPPED to
+            # the pooled fallback, never scored as a zero-position cohort
             pass
     try:
         lp = int(p.get("long_positions") or 0)

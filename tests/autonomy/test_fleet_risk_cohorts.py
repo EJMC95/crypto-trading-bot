@@ -186,3 +186,88 @@ def test_fleet_risk_publishes_the_cohort_block_beside_the_pooled_pair():
     src = Path(_ROOT, "fleet_risk.py").read_text()
     assert '"cohorts": {' in src and '"long_positions": fleet_long' in src
     assert fr.LIVE_LONG_BUDGET >= 0
+
+
+def _history_cohorts_from_the_real_writer(live_n, shadow_n):
+    """Build the `cohorts` block EXACTLY as `fleet_risk.save_history` writes it.
+
+    The publisher builds the dict with `fleet_risk.cohort_view` and then
+    compacts each entry POSITIONALLY. We call the real `cohort_view` and
+    apply the writer's own compaction, so this is the publisher's payload and
+    not a fixture that "looks like" it ((hj): a consumer is tested against a
+    payload its publisher built).
+    """
+    view = fr.cohort_view({"live": live_n, "shadow": shadow_n})
+    return {k: [v["long_positions"], v["long_budget"], v["light"]]
+            for k, v in view.items()}
+
+
+def test_the_history_list_shape_is_read_and_never_reads_as_an_unbindable_budget():
+    """[2026-09-10 (zt)] `cohort_long_state` knew the LIVE key's dict and not
+    the HISTORY's compacted list, so every history payload fell through to a
+    pooled branch that history does not populate — returning `(0, 10**9)`:
+    no longs held, against a budget that can never bind. Measured the day it
+    was found: 2,174 of 17,261 `fleet-risk` history rows carry the list
+    shape, so every retrospective study of budget pressure over that window
+    was wrong by construction. No live veto was affected (they read the live
+    key, which is the dict) — this is a MEASUREMENT defect, and the number
+    it corrupted is the one the REACH option is argued from.
+    """
+    hist = {"light": "green", "long": 23,
+            "cohorts": _history_cohorts_from_the_real_writer(9, 14)}
+    # history carries NO pooled pair — this is what made the fallback lethal
+    assert "long_positions" not in hist and "long_budget" not in hist
+
+    live = fb.cohort_long_state(hist, "live")
+    shadow = fb.cohort_long_state(hist, "shadow")
+    assert live == (9, fr.LIVE_LONG_BUDGET), live
+    assert shadow == (14, fr.SHADOW_LONG_BUDGET), shadow
+
+    # the exact defect: never the unbindable pair, and never zero longs while
+    # the payload plainly records longs held
+    for got in (live, shadow):
+        assert got != (0, 10 ** 9), "read as an unbindable budget again"
+        assert got[0] > 0 and got[1] < 10 ** 9
+
+    # a FULL cohort must still read as full through the list shape, or the
+    # fix would repair the study and leave the veto reading GO at budget
+    full = {"cohorts": _history_cohorts_from_the_real_writer(
+        fr.LIVE_LONG_BUDGET, 0)}
+    lp, lb = fb.cohort_long_state(full, "live")
+    assert lp >= lb, (lp, lb)
+
+    # degradation is UNCHANGED: a junk/short list is skipped to the pooled
+    # pair, never scored as a zero-position cohort
+    assert fb.cohort_long_state(
+        {"long_positions": 1, "long_budget": 5,
+         "cohorts": {"live": ["x", "y", "green"]}}, "live") == (1, 5)
+    assert fb.cohort_long_state(
+        {"long_positions": 1, "long_budget": 5,
+         "cohorts": {"live": [7]}}, "live") == (1, 5)
+    assert fb.cohort_long_state(
+        {"long_positions": 1, "long_budget": 5,
+         "cohorts": {"live": []}}, "live") == (1, 5)
+
+
+def test_the_writer_still_compacts_positionally_in_the_order_the_reader_assumes():
+    """The list shape is a POSITIONAL contract between `fleet_risk`'s
+    `save_history` call and `fleet_bus.cohort_long_state`. Pin it at the
+    writer by AST, so re-ordering the compaction (or adding a field in front
+    of the counts) reddens here instead of silently swapping budget and
+    positions in every future study.
+    """
+    tree = ast.parse(Path(fr.__file__).read_text())
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.DictComp):
+            continue
+        if not isinstance(node.value, (ast.List, ast.Tuple)):
+            continue
+        keys = [e.slice.value for e in node.value.elts
+                if isinstance(e, ast.Subscript)
+                and isinstance(getattr(e, "slice", None), ast.Constant)]
+        if "long_positions" in keys:
+            found.append(keys)
+    assert found, "no positional cohort compaction found in fleet_risk"
+    for keys in found:
+        assert keys[:2] == ["long_positions", "long_budget"], keys
