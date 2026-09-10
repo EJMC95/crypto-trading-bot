@@ -2588,6 +2588,21 @@ def main(_ctx=None, once=False):
                     "successor": _rspec.get("successor"),
                 }
                 status = "halted"
+            # [(aak)] WHICH BOOK IS THIS REAL-MONEY ROW PRICING OFF?
+            # `venues/lighter_client` falls back from the order-book websocket
+            # to governed REST snapshots when the venue CDN blocks this host —
+            # correct, designed, and reported ONCE per process in a log line
+            # (I4's named anti-pattern). Both live books price against that
+            # client, so the answer belonged on the row and was nowhere. Counts
+            # come from `orderbook()` itself, so the ratio cannot drift from
+            # what was actually served. Fail-safe: a client that cannot answer
+            # stamps NOTHING rather than a confident `ok`.
+            try:
+                _wsh = venue.ws_health()
+                if isinstance(_wsh, dict):
+                    payload["book_feed"] = _wsh
+            except Exception:  # noqa: BLE001
+                pass
             try:
                 store.publish(
                     BOT_ROW, status=status,

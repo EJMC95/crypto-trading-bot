@@ -1,3 +1,98 @@
+## 2026-09-10 (aak) — 🏛️ THE PARLIAMENT'S WEBSOCKET HAS NEVER ONCE CONNECTED, AND THE CODE KNEW: IT SAYS SO IN A LOG LINE NOBODY READS
+
+**Eamon: *"see if learning, health, the entire system can be improved further"*
+→ *"check for anything else going unread too."*** This is the answer to the
+second half, and the first instance of the class.
+
+**HOW IT WAS FOUND, and the method is the transferable part.** Having fixed two
+frozen-counter defects by hand ((aag), (aai)), I tried to build the general
+instrument — a sweep for published numbers that stop moving. **It was REFUSED
+by its own positive control, and that is the useful result.** `parliament
+ml.n_seen` — the very defect that motivated it — shows **2 distinct values over
+24h**, so a "never moved" test MISSES it. Re-cast as *longest stall as a
+fraction of the window*, it ranks the defect **#1 at 99.3%** — but the six
+entries beneath it (`lens_7d` windows, playbook grades) are all slow because
+the Parliament had **zero closes**, not because anything is broken. Median
+stall 38%, p90 78.6%. **A bar anywhere useful flags 7 fields, 6 of them benign
+— the (gl) cry-wolf shape, so no guard ships.** Recorded so nobody rebuilds it:
+the discriminating question is *"did it stall while its own INPUT was
+available?"*, and that is per-field knowledge a generic sweep cannot have.
+
+**WHAT THE SWEEP DID FIND is better than what it was built for.** 🏛️ the
+Parliament runs ten scanners; two have emitted **zero** signals. `new_listing`
+is expected (a market-set diff on a venue that lists ~1 book a month — the (qi)
+shape). `orderbook_imbalance` is not: **0 signals in 183 runs**, because it
+iterates `data.ws_books`, which is **empty and always has been**.
+
+**`data.ws` HAS NEVER EMITTED ONE BEAT** in the container's life — the beats map
+publishes AGES, and the key is simply absent. The `websockets` wheel IS in the
+image (`Dockerfile.freqtrade:31`), so this is not the born-dark class; the loop
+runs and cannot connect. **AND THE CODE ALREADY KNEW.** At `fails == 4` it
+logs *"ws unavailable (cloud-IP CDN block is a known state) — REST snapshots
+carry on; retrying quietly"* and then backs off to a silent 600s retry forever.
+The system had the diagnosis, correctly, and put it somewhere no reader of
+`/bus.json` can reach.
+
+**THE COST, MEASURED, and it lands on the bench `(aag)` and `(aaj)` just spent
+two entries repairing:** `featurize`'s **`imb` feature is a constant 0.0 in
+every sample the ML has ever learned from** — one of eleven features carrying
+no information — plus one scanner of ten structurally mute, and every
+`ws_books` read in `strategies.py` missing. None of it is a defect of OURS: the
+venue CDN-blocks cloud IPs and REST-only is the designed degradation. **It is
+an INVISIBLE one, which is the whole problem** — `{n: 0}` on the scanner was
+byte-identical between "the venue is quiet" and "this has never worked" ((lv)).
+
+**SHIPPED — publish it, do not "fix" it.** `data.ws` now carries
+`{ok, books, fails, last_ok, why}` every publish, so the degradation is READ
+rather than inferred. The `why` is the exception's **class name, never its
+text**: `/bus.json` is public and unauthenticated, and an exception string can
+carry a URL or a header.
+
+**AND THE CLASS IS CLOSED, because the instance was never the point.** I13
+requires the unpageable set to be **declared, not defaulted into**, and the
+fleet enforces exactly that for its own organs — `tests/autonomy/
+test_organ_pageability.py`. **That guard cannot reach here**: the Parliament
+runs its own supervisor with its own `EXPECTED_BEATS`, so a task added to
+`parliament_main` is unpageable **by default** and nothing says so. Measured:
+**of eight supervised tasks, five sat outside the table**, and one of them had
+been dead the whole time. `brain.UNPAGEABLE_OK` now declares each with a
+REASON, and `tests/autonomy/test_parliament_pageability.py` fails the push that
+adds an undeclared one.
+
+Two things the guard caught immediately, both mine: it reddened on my own
+`"as data.candles.1h"` exemption — **a cross-reference is not a reason** — and
+writing it forced the honest version of the finding, because the naive test
+compares TASK names when `data.candles.fast` beats as `data.candles.1h`;
+reading the task name overstates the count.
+
+`data.ws` stays UNPAGEABLE and that is deliberate: paging on a known venue-side
+block would page forever, which is how a real stall later gets ignored. It is
+now *visible* instead. Publish-only, no behaviour change, no live marker;
+6 tests; parliament selftest + full suite green.
+  ENFORCED BY: `parliament/brain.py::UNPAGEABLE_OK`, `tests/autonomy/test_parliament_pageability.py::test_no_beat_is_unpageable_without_being_declared`
+
+**AND THE SAME CLASS ON THE REAL-MONEY SURFACE — FIXED, NOT CARRIED.**
+`venues/lighter_client.py` does this exactly: the order-book websocket goes
+degraded, sets `degraded_logged = True`, logs **once per process** and
+publishes **nothing** — I4's named anti-pattern verbatim, on the client BOTH
+live books price against. So *"are 👩 mum and 🙏 avo reading order books from
+the websocket or from governed REST snapshots?"* was unanswerable from any
+feed, and it bears on fill quality. `LighterClient.ws_health()` now answers it,
+and **the number that matters is not the connection state but what the book
+actually PRICED off** — `orderbook()` counts its own two paths at the site that
+serves them, so the ratio cannot drift from what was served. It is consumed:
+`extra.book_feed` on the live row, guarded, because an accessor that can break
+a real-money publish is worse than the blindness it fixes — an accessor with no
+consumer would have been the registered-but-inert failure (I18) this very
+session kept finding elsewhere.
+
+**MAIN ONLY, NO LIVE MARKER, and that is the rule rather than caution.** `(mm)`
+is explicit: a change that alters no trade the book would take buys zero
+measured edge and costs a real-money container restart, which is not free
+([[lighter-flatten-silent-halt-redeploy-incident]]). This is publish-only —
+every gate, cap, veto and clip is untouched — so it rides the next deploy that
+DOES qualify.
+
 ## 2026-09-10 (aaj) — 🔭 THE ENSEMBLE'S MEMORY SURVIVES THE CONTAINER NOW — AND THE THING IT DELIBERATELY DOES NOT PERSIST IS THE POINT
 
 **Eamon: *"fix the above corrections."*** `(aag)` closed with a **DECLARED, NOT

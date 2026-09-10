@@ -83,6 +83,37 @@ def _expected_beats():
 
 EXPECTED_BEATS = _expected_beats()
 
+#: [(aak)] THE BEATS THAT ARE DELIBERATELY NOT PAGED — declared, not defaulted.
+#:
+#: I13's rule is that the unpageable set must be DECLARED; the fleet enforces it
+#: for fleet organs (`tests/autonomy/test_organ_pageability.py`), and that guard
+#: cannot reach HERE because the Parliament runs its own supervisor with its own
+#: beats table. So a task added to `parliament_main` was unpageable BY DEFAULT,
+#: silently — and one of them has been dead this whole time.
+#:
+#: MEASURED 10-Sep: of the eight supervised tasks, five sat outside
+#: `EXPECTED_BEATS`, and `data.ws` had never emitted a single beat in the
+#: container's life. It is the one genuinely optional member — the venue CDN
+#: blocks cloud IPs, the loop degrades to REST-only by design — so it stays
+#: unpageable, but its state is now PUBLISHED (`data.ws`) so the degradation is
+#: readable instead of inferred from a scanner that never fires.
+UNPAGEABLE_OK = {
+    "howard": "the supervisor itself — it is what DOES the paging, so a page "
+              "on its own silence could never be delivered; its liveness is "
+              "the key's own `updated` stamp, which the fleet watchdog reads",
+    "data.candles.1h": "a candle poll; `data.market` already pages for the "
+                       "same fetch layer and fires far sooner (120s vs the "
+                       "candle cadence), so this would only ever duplicate it",
+    "data.candles.15m": "as data.candles.1h — the same fetch layer, and the "
+                        "same duplicate page; the fast and slow polls share "
+                        "`data.market`'s failure mode entirely",
+    "data.ws": "OPTIONAL BY DESIGN and dark on this deployment: the venue's "
+               "websocket CDN blocks cloud IPs, the loop degrades to REST-only "
+               "and the scanners fall back to snapshot fields. Paging on it "
+               "would page forever on a known state — the (gl) cry-wolf shape. "
+               "Its state is published at `data.ws` instead.",
+}
+
 
 class Howard:
     def __init__(self, db, bus=None, ml=None, tuners=None, bots=None):
@@ -365,7 +396,16 @@ class Howard:
             "data": {"books": len(getattr(data, "market", {}) or {}),
                      "watchlist": list(getattr(data, "watchlist", []) or []),
                      "cycles": getattr(data, "cycles", 0),
-                     "errors": getattr(data, "errors", 0)} if data else {},
+                     "errors": getattr(data, "errors", 0),
+                     # [(aak)] the ws accelerator's OWN liveness. It degrades
+                     # to REST-only BY DESIGN and said so only in a log line at
+                     # fails==4, so an empty `ws_books` read the same as a
+                     # quiet venue. Two named consumers depend on it and both
+                     # were silently inert: `scan_orderbook_imbalance` (0 of
+                     # 183 runs) and `featurize`'s `imb` feature (constant 0.0
+                     # in every sample the ML bench has ever learned from).
+                     "ws": dict(getattr(data, "ws_state", None) or
+                                {"ok": False, "why": "unknown"})} if data else {},
             "scanners": {"emitted": getattr(scanners, "emitted", 0),
                          # the full 10-scanner bench, quiet members included —
                          # per-scanner counts/last-fire so no scanner can go
