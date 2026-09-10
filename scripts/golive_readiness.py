@@ -890,6 +890,219 @@ def veto_split(rows, vetoed, tag_of=None):
     return out
 
 
+def published_live_policy(extra):
+    """A book's OWN declared LIVE-ARM allow-list, or None.
+
+    THE ONE OWNER of *"what would a LIVE arm of this book be permitted to
+    fill?"* — a question nothing in this fleet could answer until `(aan)`, and
+    the only question a go-live decision actually turns on.
+
+    [(aan)] WHY THIS EXISTS, and it was found on the one book that has ever
+    been offered for promotion. 🎫 the taker read `ready: True`, 6 of 6 bars,
+    for six days, and Eamon said *"i will put the two books that are ready
+    live tomorrow"*. Its graded era is two families:
+
+        long-breakoutup    n=162   +1.382%/trade   t=+2.70
+        short-divergence   n= 46   -0.788%/trade   t=-1.31
+
+    and `lighter_ticket_taker.LIVE_LENSES` is `{"divergence"}` with
+    `LIVE_SIDES` `{"divergence": {"short"}}`. So **77.9% of the sample that
+    passed the six bars comes from a family no live arm may fill**, and the
+    only family it may fill is the losing one. The gate was not wrong — it
+    grades the SHADOW policy honestly, and the shadow trades five lenses on
+    both sides — but nothing put the graded sample and the live allow-list
+    side by side, so `ready` read as *"safe to switch on"* when the live arm's
+    fillable set was in fact EMPTY.
+
+    THE BOOK DECLARES, THE GRADER DERIVES — the `published_class_screen` /
+    `published_lens_veto` direction, and load-bearing here: the allow-list
+    lives in the LIVE image's own module constants, and a second copy in this
+    grader would be a second rule ((hj)). The publishing arm can always answer
+    it, because `allowed_lenses` / `allowed_sides` take the mode EXPLICITLY —
+    a shadow process asks what a live one would permit and publishes the
+    answer.
+
+    Shape: `{"lenses": (sorted...), "sides": {lens: (sorted...)}}`.
+
+    THREE-VALUED for the reason its two siblings are: `None` means the book
+    declares nothing, and must never be read as *"a live arm may fill
+    everything"* (I6) — that reads a silence as a permission, in the direction
+    that puts real money on an ungraded policy. An explicitly EMPTY
+    `{"lenses": []}` is a declaration and says the opposite: a live arm may
+    fill nothing at all.
+    """
+    try:
+        e = extra if isinstance(extra, dict) else {}
+        caps = e.get("caps") if isinstance(e.get("caps"), dict) else {}
+        lp = e.get("live_policy", caps.get("live_policy"))
+        if not isinstance(lp, dict):
+            return None
+        lenses = lp.get("lenses")
+        sides = lp.get("sides")
+        if not isinstance(lenses, (list, tuple)) or not isinstance(sides, dict):
+            return None
+        if any(not isinstance(x, str) or not x for x in lenses):
+            return None
+        out_sides = {}
+        for k, v in sides.items():
+            if not isinstance(k, str) or not k:
+                return None
+            if not isinstance(v, (list, tuple)):
+                return None
+            if any(not isinstance(x, str) or not x for x in v):
+                return None
+            out_sides[k] = tuple(sorted(set(v)))
+        return {"lenses": tuple(sorted(set(lenses))), "sides": out_sides}
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def live_fillable(rows, live_policy, vetoed=None, tag_of=None):
+    """The graded sample split by whether this book's LIVE arm could have
+    filled it — REPORTED, never a bar. `veto_split`'s twin, facing the other
+    arm.
+
+    [(aan)] `veto_split` answers *"how much of this sample will the book never
+    trade again?"* and `(yn)` shipped it saying, in its own words, that the
+    number a go-live decision needs is the one *"for the configuration the
+    book will actually run"*. On the SHADOW arm that is `still_tradeable`, and
+    on the taker that subset is the FLATTERING one — n=162, +1.382%/trade,
+    t=+2.70. **For a go-live decision the configuration that will actually run
+    is the LIVE arm's, and there it is exactly inverted**: every one of those
+    162 closes is a lens `LIVE_LENSES` excludes. A reader taking `(yn)`'s
+    number to a promotion decision reads the most flattering subset of the
+    sample and the one no live arm can produce. Corrected in place per I12 in
+    that module's own docstring; this is the instrument that makes the right
+    subset readable rather than recomputable ((vm)/`class_split`).
+
+    TWO SUBSETS, and separating them is the point, because the two gates have
+    different lifetimes:
+      * `allowed`   — what the live arm may STRUCTURALLY fill (the per-mode
+        lens + side allow-lists). Changing it is two deliberate edits to a
+        real-money module `(hj)`.
+      * `effective` — `allowed` minus the book's own currently-VETOED lenses.
+        A veto is evidence-reversible ((yn)), so folding it into one number
+        would report a temporary switch as a permanent property.
+    `inert` is about `effective`: the live arm fills NOTHING today.
+
+    Measured on the live payload the day this shipped, 🎫 the taker:
+    `allowed` n=46 (-0.788%/trade), `effective` **n=0** — its whole permitted
+    lens set (`divergence`) sits inside its own published
+    `lens_veto: ["dip", "divergence"]`. All ten (lens, side) pairs block, 162
+    at the lens allow-list, 1 side pair at the side allow-list, the last at
+    the veto. **A go-live would not have been a bad trade; it would have been
+    a no-op wearing a decision.**
+
+    **THIS MOVES NO SAMPLE, ERA OR BAR.** `BAR_NAMES` is untouched, `grade()`
+    never sees it, and `ready` still means exactly what it has always meant —
+    the six bars pass on the graded sample. That sample is the SHADOW book's
+    and the shadow book earned it; publishing `ready: False` here would grade
+    a healthy paper book on a hypothetical arm's restrictions.
+
+    FAIL-SILENT: no declaration, no split. An unparseable tag returns None
+    rather than a guess — `veto_split`'s rule, for its reason (I6): a wrong
+    split riding on a go-live decision is worse than no split.
+
+    `vetoed` is the book's own `published_lens_veto` — passed rather than
+    re-derived, so this and `veto_split` cannot disagree about one book's
+    veto set. `None` there means the book publishes none, and `effective`
+    then equals `allowed` with `vetoed: None` published beside it, never `[]`.
+
+    `tag_of` extracts the entry tag, defaulting to `r[5]` — the grader's row
+    shape, the same element `veto_split` and `drop_retired_sleeves` read. The
+    tag is `'<side>-<lens>'`, split on the FIRST hyphen only, exactly as
+    `sleeve_of` documents and `bot_pnl_store.split_reason` composes it.
+    """
+    if live_policy is None or not rows:
+        return None
+    try:
+        allow_lenses = set(live_policy.get("lenses") or ())
+        allow_sides = {k: set(v) for k, v in
+                       (live_policy.get("sides") or {}).items()}
+    except Exception:      # noqa: BLE001
+        return None
+    get = tag_of if tag_of is not None else (
+        lambda r: r[5] if len(r) > 5 else None)
+    vset = None if vetoed is None else {str(v) for v in vetoed}
+
+    allowed, blocked, effective = [], [], []
+    census = {"lens_not_allowed": 0, "side_not_allowed": 0, "lens_vetoed": 0}
+    try:
+        for r in rows:
+            t = get(r)
+            if not isinstance(t, str) or "-" not in t:
+                return None      # an unreadable tag is not a guess (I6)
+            side, lens = t.split("-", 1)
+            if not side or not lens:
+                return None
+            if lens not in allow_lenses:
+                census["lens_not_allowed"] += 1
+                blocked.append(r)
+            elif side not in allow_sides.get(lens, set()):
+                census["side_not_allowed"] += 1
+                blocked.append(r)
+            else:
+                allowed.append(r)
+                # The veto is a gate the live arm evaluates AFTER both
+                # allow-lists (lighter_ticket_taker's entry loop, in that
+                # order), so membership is decided here rather than by a
+                # set-difference afterwards — identical rows must not be
+                # collapsed by tuple equality.
+                if vset is not None and lens in vset:
+                    census["lens_vetoed"] += 1
+                else:
+                    effective.append(r)
+    except Exception:      # noqa: BLE001
+        return None
+
+    def _side(rs):
+        if not rs:
+            return {"n": 0, "net_usd": 0.0}
+        st = stats([(r[0], r[1], r[2]) for r in rs])
+        if st.get("n", 0) < 2:
+            return {"n": st.get("n", 0),
+                    "net_usd": round(sum((r[1] or 0) for r in rs), 2)}
+        return {"n": st["n"], "net_usd": round(st["realised_usd"], 2),
+                "mean_pct": round(100 * st["mean_pct"], 3),
+                "t": round(st["t"], 2)}
+
+    out = {"allow": {"lenses": sorted(allow_lenses),
+                     "sides": {k: sorted(v) for k, v in
+                               sorted(allow_sides.items())}},
+           "vetoed": (None if vset is None else sorted(vset)),
+           "allowed": _side(allowed),
+           "effective": _side(effective),
+           "unfillable": _side(blocked),
+           "blocked_by": census,
+           "inert": not effective}
+    # (I8) a report whose consumer is a DECISION must name the thing the
+    # decision is about — and here the decision is real money, so the sentence
+    # says what a live arm would do, not what the sample looks like.
+    if out["unfillable"]["n"] or out["inert"]:
+        uf, al, ef = out["unfillable"], out["allowed"], out["effective"]
+        pct = 100.0 * uf["n"] / len(rows) if rows else 0.0
+        out["why"] = (
+            f"A LIVE arm of this book could have filled {ef['n']} of "
+            f"{len(rows)} graded closes. {uf['n']} ({pct:.1f}%) are outside "
+            f"its own live allow-list"
+            + (f" — {uf['net_usd']:+.2f}"
+               + (f", {uf['mean_pct']:+.3f}%/trade, t={uf['t']:+.2f}"
+                  if uf.get("mean_pct") is not None else "") + " it may never "
+               "fill" if uf["n"] else "")
+            + f". Structurally fillable: n={al['n']}"
+            + (f", {al['net_usd']:+.2f}, {al['mean_pct']:+.3f}%/trade, "
+               f"t={al['t']:+.2f}" if al.get("mean_pct") is not None else "")
+            + (f"; of those, {census['lens_vetoed']} sit in a lens the book "
+               f"has itself VETOED" if census["lens_vetoed"] else "")
+            + ". "
+            + ("THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the "
+               "SHADOW policy only, and a go-live today fills nothing. "
+               if out["inert"] else "")
+            + "The era is deliberately NOT re-cut and no bar moves: the "
+              "graded sample is the shadow book's record and the shadow book "
+              "earned it.")
+    return out
+
 def class_split(rows, screen, is_crypto=None, pair_of=None):
     """The graded sample split by instrument class — REPORTED, never a bar.
 
@@ -3130,10 +3343,17 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "veto_split": ((c.get("veto_split") or {})
                            if (c.get("veto_split") or {}).get("why")
                            else None),
+            # [(aan)] and what a LIVE arm could have filled — the one of the
+            # three a PROMOTION turns on, and the only surface that carries it
+            # to the person deciding.
+            "live_fillable": ((c.get("live_fillable") or {})
+                              if (c.get("live_fillable") or {}).get("why")
+                              else None),
             "why": " · ".join(
                 x for x in (hz.get("why") or "",
                             (c.get("class_split") or {}).get("why") or "",
-                            (c.get("veto_split") or {}).get("why") or "")
+                            (c.get("veto_split") or {}).get("why") or "",
+                            (c.get("live_fillable") or {}).get("why") or "")
                 if x),
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
@@ -3363,6 +3583,9 @@ def book_payload(s):
     # [(yn)] the LENS veto split, on the same footing and for the same reason.
     if isinstance(s.get("veto_split"), dict):
         out["veto_split"] = s["veto_split"]
+    # [(aan)] REPORTED beside, never a bar — see `live_fillable`.
+    if isinstance(s.get("live_fillable"), dict):
+        out["live_fillable"] = s["live_fillable"]
     return out
 
 
@@ -4596,7 +4819,10 @@ def main():
     # map is deliberately three-valued (see `published_class_screen`), so a
     # book absent from `bot_pnl` reads None and its split is descriptive only,
     # never a finding.
-    _class_screen, _lens_veto = {}, {}
+    # [(aan)] and each book's declared LIVE-ARM allow-list, for
+    # `live_fillable`. Same sweep, same fetch, same three-valued contract —
+    # a book that declares nothing gets no split.
+    _class_screen, _lens_veto, _live_policy = {}, {}, {}
     try:
         for _r in (store.fetch_bot_pnl() or []):
             _rs = retired_sleeves(_r.get("extra"))
@@ -4607,6 +4833,9 @@ def main():
             # [(yn)] the book's own live veto set, read from its publish and
             # never re-derived — see `published_lens_veto`.
             _lens_veto[str(_r.get("bot"))] = published_lens_veto(
+                _r.get("extra"))
+            # [(aan)] what a LIVE arm of this book would be permitted to fill.
+            _live_policy[str(_r.get("bot"))] = published_live_policy(
                 _r.get("extra"))
     except Exception as e:      # noqa: BLE001 — a lost filter, never a lost grade
         _sleeve_err = f"{type(e).__name__}: {e}"
@@ -4700,6 +4929,14 @@ def main():
         # pooled reading the era replaced.
         s["veto_split"] = veto_split(
             ed.get("scoped_rows") or [], _lens_veto.get(bot))
+        # [(aan)] the same footing again, facing the OTHER arm: what could a
+        # LIVE arm of this book have filled? `veto_split` answers it for the
+        # arm being graded; on a book whose live mode runs a narrower policy
+        # the two subsets are different, and on 🎫 the taker they are exactly
+        # inverted. Era-scoped only, for the reason both siblings are.
+        s["live_fillable"] = live_fillable(
+            ed.get("scoped_rows") or [], _live_policy.get(bot),
+            vetoed=_lens_veto.get(bot))
         if s_all.get("n", 0) < a.min_closes:
             # [2026-08-06 (kv)] BELOW THE FLOOR IS NOT INVISIBLE ANY MORE.
             # `continue` used to be the whole story, and it hid exactly the

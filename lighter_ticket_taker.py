@@ -3329,6 +3329,32 @@ def main(_ctx=None):
                # PUBLISH-ONLY: every value here was already computed and used
                # by the entry loop above. No decision changes.
                "lens_veto": sorted(lens_vetoed),
+               # [(aan)] WHAT A **LIVE** ARM OF THIS BOOK WOULD BE PERMITTED
+               # TO FILL — published by whichever arm is running, because
+               # `allowed_lenses` / `allowed_sides` take the mode EXPLICITLY
+               # and a shadow process can therefore answer the question about
+               # a live one. Read by `golive_readiness.published_live_policy`
+               # / `live_fillable`.
+               #
+               # WHY IT HAD TO BE PUBLISHED. On 10-Sep this book read
+               # `ready: True`, 6 of 6 bars, and its graded era was 162
+               # `long-breakoutup` (+1.382%/trade, t=+2.70) and 46
+               # `short-divergence` (-0.788%/trade, t=-1.31). `LIVE_LENSES`
+               # is {divergence}, so 77.9% of the sample that passed was a
+               # family no live arm may fill, and the only family it may fill
+               # is the losing one — which this book's OWN `lens_veto` above
+               # has ALSO vetoed, making a live arm's fillable set empty. The
+               # allow-list lives here, in the real-money image; the grader
+               # must not carry a second copy of it ((hj)), so the book
+               # declares and the grader derives — the `lens_veto` /
+               # `caps.crypto_only` direction, one field over.
+               #
+               # PUBLISH-ONLY: derived from the module constants the entry
+               # loop already evaluates. No decision changes.
+               "live_policy": {
+                   "lenses": sorted(allowed_lenses("lighter_live")),
+                   "sides": {l: sorted(allowed_sides("lighter_live", l))
+                             for l in sorted(ALL_LENSES)}},
                "lens_evidence": {k: {"n": n,
                                      "mean_pct": round(m, 3),
                                      "t": round(t, 2)}
