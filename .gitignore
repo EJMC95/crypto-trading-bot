@@ -76,3 +76,8 @@ scripts/.sqz_cache/
 scripts/.ladder_cache/
 scripts/.band_kelly_horizon_cache/
 scripts/.ext_veto_cache/
+
+# [(aan)] study tape caches — a registered selftest module writes megabytes
+# of venue candles beside itself; untracked and unignored is one `git add -A`
+# away from being committed.
+scripts/.*_tape*/
