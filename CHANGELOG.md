@@ -1,3 +1,42 @@
+## 2026-09-10 (aal) — 🦾 THE EPISODE LEDGER HAS BEEN FULL FOR AT LEAST A DAY, AND `episodes: 120` READS LIKE A COUNT
+
+**Eamon: *"continue fixes."*** The last unaddressed finding from the `(aak)`
+sweep, and the one with a TRAJECTORY rather than just a blind spot.
+
+**MEASURED.** 🦾 proprioception publishes `counts.episodes: 120` — **exactly
+`EP_CAP`** — and it has been pinned there for the entire 24h bus history while
+`graded` moved 88 → 89 and `open` cycled 3 ↔ 4. **That is I7 in a payload
+field**: a value the system satisfies STRUCTURALLY is not a measurement, and
+`120` is byte-identical between *"we have 120 episodes"* and *"we are full and
+evicting"*.
+
+**WHY IT IS MORE THAN TIDINESS.** `(hl)` made GRADED rows hold the budget first
+— correctly, because they are the only rows `lever_verdicts` can use, including
+the live-lane rows whose verdicts revert a real-money lever. Graded is at **89
+of 120 and grows ~1/day**, so `room` reaches **zero in about a month**. Past
+that point ungraded rows are dropped entirely AND **the oldest GRADED rows
+begin evicting each other** — the verdicts that steer the growth rail would
+start turning over with nothing saying so. The field that would have shown it
+coming is the one that reads as a count.
+
+**SHIPPED, publish-only:** `ep_cap`, `room`, and `evicted: {graded, recorded}`
+beside the count, measured at the trim and published from the same pass so the
+two cannot disagree. Nothing is evicted differently; the eviction is simply
+readable now, and `room` trending toward 0 is the early warning that did not
+exist.
+
+**AND THE TRIM GAINED ONE OWNER, because the first version of this test was
+wrong in the way this repo keeps paying for.** The trim lived inline in the
+build, so my test re-implemented it — and a test that re-implements a rule
+stays green through every change to the real one ((hj): a second copy of a rule
+is a second rule). `trim_episodes()` is hoisted out and BOTH sides call it, the
+build asserts it is the only place `EP_CAP` is applied, and the mutation that
+reverts `(hl)`'s graded-first ordering now reddens — which it could not have
+done against my copy.
+
+5 tests, **6/6 mutations behaved** (5 RED + a surviving null control).
+Publish-only: moves no capital, writes no lever, changes no verdict.
+
 ## 2026-09-10 (aak) — 🏛️ THE PARLIAMENT'S WEBSOCKET HAS NEVER ONCE CONNECTED, AND THE CODE KNEW: IT SAYS SO IN A LOG LINE NOBODY READS
 
 **Eamon: *"see if learning, health, the entire system can be improved further"*

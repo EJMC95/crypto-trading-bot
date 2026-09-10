@@ -1,18 +1,21 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 00:04 Sydney (14:04Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 00:15 Sydney (14:15Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
-**🕳️ FEED DARK**
-
-- `/pnl.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/pnl.json) — no book state read. This section is blind, not clear.
-- `/bus.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/bus.json) — no gate verdicts read. This section is blind, not clear.
-
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` is DECLARED LIVE and **absent from the feed** — check the service is publishing.
-- `freqtrade-mum-lighter` is DECLARED LIVE and **absent from the feed** — check the service is publishing.
+- `freqtrade-avo-maria-lighter` was shut **31% of the last 14.0d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 02:01 Sydney (protections_locked).
+- `freqtrade-mum-lighter` was shut **16% of the last 14.0d** (55h), mostly `slguard` (34h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+
+**🚦 AT THE GATE**
+
+- `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
+- `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
 
@@ -106,10 +109,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (0 commit(s))
+## Shipped today (2 commit(s))
 
-_Nothing yet today._
-
+- `f87491f` (aak) CodeQL: a dead local left in the pageability test
+- `2673e60` (aak) the Parliament's websocket has never once connected, and the code knew — it said so in a log line nobody reads
 
 ## How this file stays honest
 
