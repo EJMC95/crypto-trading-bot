@@ -1,8 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 04:22 Sydney (18:22Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 10:03 Sydney (00:03Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `mum-breadth-candidate-preregistered`  ·  owner: **session**
+(zr) 👩 mum's edge lives in the BREADTH of the oversold, on her own record (9-Sep excluded, I25): closes opened in a same-loop batch of >=3 coins read +1.114%/trade live (n=37) / +1.003% twin (n=41) with a 2.7%/2.4% stop rate, positive in every ISO week and under a coin jackknife; closes opened alone or in a pair read -0.037% / +0.243% with 9.5-10.5% stops. Four of the six stops that cost the live book $56 on 9-Sep were single/pair entries. HONEST SIZE: the live batch closes are SEVEN open-events (7/7 positive, event-level t +5.7) and a permutation of event sizes across her 64 events reads P=0.097 (twin P=0.137) -- hypothesis-grade. SHIPPED: the breadth pre-pass + `breadth_n` stamp on every close on BOTH hosts, an INERT caged lever pair (xp.mum.breadth_min / live.mum.breadth_min, env default 1), and the judge candidate `mum-breadth-3` queued BEHIND `mum-vel-12-20`. No trade, gate or size moved on either arm.
+
+_Still open because:_ the read is the JUDGE'S OWN PAIRED BAR (I21 -- graded on fresh shadow closes under the candidate against the live control, never the window that motivated it): it starts when `mum-vel-12-20` resolves (ETA ~16-Sep) and runs ~4-12 days at the narrowed rate under the (zn) extended clock. PROMOTE only on the judge's bar; a refutation is recorded in the CHANGELOG as 'mum-breadth-3 READ:' with the paired numbers. A session may NOT arm MUM_BREADTH_MIN on the live arm itself -- 7 events is not evidence for real money, and the shadow twin is mid-experiment.
 
 ### `mum-live-rho-read-preregistered`  ·  owner: **session**
 (yp) put every book's sizing on ONE axis for the first time -- risk at the stop per position as a fraction of equity, rho = clip_fraction x stop -- and the fleet spans 83x on it (avo-live 3.33%, mum-live 1.67%, the taker 0.30%, turnbull 0.04%). The one real-money reading: 👩 mum's LIVE arm runs rho 1.67% (clip $240 on $576 equity = 41.7% of the account behind a 4% stop) against a proposed 0.25% and an admissible 0.5% -- 6.7x the proposal. Corroborated from three independent directions by her OWN published row: all_slots_stop_pct 0.20 against the gate's 0.15 bar, vol_target_at_neff1 3.75x against a configured 5.0x, and stop_reachable FALSE (stop_dead_above 4.17x) on the worst-margin book in her universe. NOT acted on: the study's reading rests on 10 trading days at its own 10x extrapolation cap, and her measured n_eff 1.824 puts her vol_target_here at 5.06x, i.e. exactly at her own framework's target. So it is REGISTERED, not executed.
@@ -79,9 +84,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (1 commit(s), entries (zq))
+## Shipped today (1 commit(s))
 
-- `114ad10` Merge origin/main (88a3d2c) into claude/mum-shadow-mum-review-oh15sb; RENUMBERED (zp) -> (zq)
+- `4ebbe35` [deploy-live] (zq) The dashboard's stalls were a lock convoy the fleet lit on itself at every redeploy: skip the no-op boot DDL, bound the real one (#300)
 
 ## How this file stays honest
 

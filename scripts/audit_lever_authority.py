@@ -275,6 +275,23 @@ QUANTITIES = {
         "abs": False, "dir": "ge", "to_q": 1.0 / 60.0, "unit": "hours",
         "min_n": MIN_N_LEDGER, "precision": 0.01, "censor_at": 24.0,
         "gate": "OversoldRebound.custom_exit — max_hold iff age >= cap (LIVE)"},
+    # [2026-09-10 (zr)] 👩 mum's oversold-BREADTH floor. The quantity it cuts
+    # — how many coins satisfied her entry cell on the candle this position
+    # was admitted — is stamped `breadth_n` on every close from (zr) on, by
+    # BOTH hosts through one owner (lighter_family_bot.breadth_n_of). Whole
+    # coins, so precision 1.
+    "xp.mum.breadth_min": {
+        "source": "ledger:freqtrade-mum-lshadow",
+        "extract": ("xfield", ("breadth_n", None)),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "coins",
+        "min_n": MIN_N_LEDGER, "precision": 1.0,
+        "gate": "lighter_family_bot.breadth_thin — enter iff breadth_n >= BREADTH_MIN (shadow twin)"},
+    "live.mum.breadth_min": {
+        "source": "ledger:freqtrade-mum-lighter",
+        "extract": ("xfield", ("breadth_n", None)),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "coins",
+        "min_n": MIN_N_LEDGER, "precision": 1.0,
+        "gate": "lighter_family_bot.breadth_thin — enter iff breadth_n >= BREADTH_MIN (LIVE)"},
     "live.funding.max_hold_h": {
         "source": "ledger:perps-funding-lighter-lighter", "extract": ("hold_h", None),
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "hours",

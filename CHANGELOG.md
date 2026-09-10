@@ -1,3 +1,180 @@
+## 2026-09-10 (zr) — "FIX MUM": NOTHING MALFUNCTIONED, THE LOSS WAS THE GEOMETRY EAMON CHOSE, AND THE AUTOPSY FOUND WHERE HER EDGE ACTUALLY LIVES — IN THE BREADTH OF THE OVERSOLD, SEVEN EVENTS DEEP
+
+**Eamon, 10-Sep (Sydney morning): *"Fix mum real money and shadow bot."*** The
+live row had gone from **$583.72 / +$63.30** to **$531.50 / +$11.08** in a day
+and the twin read −$12.10 on the day. This entry is the diagnosis, the one
+measured finding it produced, what shipped on it, and what deliberately did
+not.
+
+**WHAT HAPPENED, from her own logs and ledger (all 9-Sep UTC).** The book was
+already **−3.9% in 30 minutes** (equity 584.82 at 19:32 → 562.94 at 20:02)
+when the 20:00 candle closed, and at the 20:02:41 loop she filled every free
+slot in one pass — NVDA, CASHCAT, CRCL, TRUMP, AAVE, **7/12 → 12/12** — into a
+dump that then ran to 23:00 (BTC 78.5k → 78.0k, FARTCOIN −7.6%, PENGU −3.5%,
+ENA −3.7% over the window). Six −4% stops followed between 21:37 and 22:52 —
+CASHCAT, SKY, FARTCOIN, PENGU, TRUMP, ENA — **−$55.80**, fills 10–50bps past
+the level (`overshoot_p90_bps` 51.9 on a 300s stop check). The stop-loss guard
+locked new entries at 21:52:52 for its configured 6 bars (until 03:52Z) on the
+third stop, exactly per `slguard {lookback 24, trades 3, stop 6}`; the three
+positions already open kept running to their stops, as designed. The twin took
+four of the same six at 1x (FARTCOIN, PENGU, SPX, ENA, −$13.72) and locked at
+22:40 — same rule, same fires. Day: live 14 closes −$34.66 realised (+ ~−$13
+open MTM), twin 7 closes −$11.30.
+
+**RULED OUT, each checked rather than assumed:** both arms CURRENT at HEAD
+`4ebbe35` (`audit_code_currency`, `build_shared e03752532dbf` on both — the
+18:37Z `[deploy-live]` moved them TOGETHER, and the 🧪 judge's `mum-vel-12-20`
+clock did NOT restart on it: `days_elapsed 0.42` at 22:48 from its 12:44 start);
+the 19:02:40 container restart restored the equity guard's last read 4 minutes
+old and the slguard latch is persisted, so no rail lost its memory; the five
+same-minute entries exhausted the venue's **tx budget only on the fill
+MEASUREMENT** (`skipped:budget(0.9 tok, reserve 6.0)`) — `_run` acquires the
+governor with a blocking wait for ORDERS while telemetry is the one path that
+skips, so a stop can never be starved by a measurement, and a refused close
+retries every loop ("position keeps its manager"); `two_writers false`,
+`same_pair_overlaps 0`; the daily halt (`abs $105`, binding) was not reached
+at −$38.84. **THREE THINGS THAT LOOK BROKEN AND ARE NOT:** `verdicts.held 8`
+against 4 open positions is the durable verdict map FROZEN at 21:47 because
+the entry loop does not run while `entries_shut: protections_locked` (the (st)
+design: a coin the loop never reaches keeps its previous verdict); the twin's
+`census_24h.uptrend_blocked 150` equalling `loops 150` is a coincidence — it
+evaluates signals only on the ~24 fresh-candle loops (`stale_candle 11567`),
+~6 blocked coins per fresh loop; and `headroom.ok false / liq_unpriced` on
+every held leg is the DECLARED cross-margin state (`fleet_immune.HEADROOM_OK`,
+(wp)) with the account-level distance published beside it — `liq_gap_held_pct
+−0.4954`, i.e. the held basket can fall 49.5% before liquidation.
+
+**SO THE DOLLAR SIZE OF THE DAY IS THE GEOMETRY, NOT A DEFECT.** Six of twelve
+$221 slots stopping at −4.1..−4.5% on a $531 book is −10% by construction at
+`gross_x 5.0` — half of the published `all_slots_stop_pct 0.20`, which sits
+5pp above the gate's 15% bar and which (zi) already put to Eamon as HIS
+decision on 9-Sep. For the record and nothing else: the same six stops cost
+**−$42 at gross 3.75** (the 15%-bar geometry) and **−$17 at the admissible rho
+0.5%** the (yp) study proposed — and her +$271 of `roi` wins scale the same
+way, per-trade % being clip-invariant ((hl)). **NOTHING WAS MOVED.** He set 5x
+with the training wheels off; the rho read is PRE-REGISTERED for 7-Oct
+(`mum-live-rho-read-preregistered`) and cutting a real-money clip on the day
+of a hot window is precisely what I25 forbids. The decision stays his, now with
+today's arithmetic attached.
+
+**THE FINDING — measured because the day's shape (a batch, then stops) made it
+worth asking, and it came back the OPPOSITE way round.** Group every close by
+how many positions opened in the same loop (opens within 90s):
+
+| arm (9-Sep EXCLUDED, I25) | opened alone or in a pair | opened in a batch of ≥3 |
+|---|---|---|
+| 👩 live, n | 63 | 37 |
+| mean %/trade · per-trade t | **−0.037% · −0.14** | **+1.114% · +4.65** |
+| stop rate | 9.5% | 2.7% |
+| $ | −$7.66 | +$86.25 |
+| 👩 twin, n | 57 | 41 |
+| mean · t | **+0.243% · +0.92** | **+1.003% · +4.50** |
+| stop rate | 10.5% | 2.4% |
+
+Dose-response by batch size (live / twin): k=1 −0.14 / −0.06 · k=2 −0.66 /
++0.17 · k=3 +1.51 / +0.37 · k=4 +1.52 / +1.44 · k≥5 +0.75 / +1.03 %/trade.
+Batch entries are positive in EVERY ISO week on both arms (35: +1.43/+1.37 ·
+36: +1.02/+0.98 · 37: +1.48/–) and under a coin jackknife (worst drop keeps
+t +4.02 live / +3.91 twin; top coin XPL is 16–18% of the cell's $). The obvious
+confound — "a singleton is just the last slot filled late into a full book" —
+is REFUTED: singletons lose or read ≈0 at every free-slot count (live, ex-day:
+0–2 free +0.085%, 3–5 free −0.023%, 6–12 free −0.120%), 50 of 63 opened at the
+top of the hour like the batches, and the twin's slots were rarely binding.
+Four of the six stops that cost the live book $56 were single/pair entries
+(FARTCOIN 19:02, ENA 17:03, SKY 12:37, PENGU 16:03 = −$42.2); the 20:02 batch
+of five lost two (−$13.6). **The plausible mechanism is old:** a coin oversold
+ALONE is idiosyncratic weakness that keeps falling; many coins oversold on the
+SAME candle is a market washout that reverts — her cell is a mean-reversion
+cell, and breadth is what tells the two apart.
+
+**THE HONEST SIZE, and it is smaller than the per-trade t — the (kw)/(ky)/I21
+shape, applied before it could bite.** The 37 live batch closes are **SEVEN
+open-events** (all 7 positive, event-level t +5.71; twin 9 events, 8 positive,
++4.17), and a permutation of event SIZES across her 64 open-events —
+"is event size associated with event return at all?" — reads **P=0.097 live,
+0.137 twin**. Day-clustered: batch days +1.253%/t +3.85 vs single days
+−0.002%/t −0.01 (live). The two arms share the same signals, so the twin is a
+consistency check, not an independent replication. Her matched-window placebo
+(`control_leg`) carries breadth on only 4+3 closes — uninformative yet. And the
+tape study that would settle it — breadth per hour over 460d of her universe —
+cannot run from this egress (the venue's candle endpoint answers 403/405
+behind a WAF here). **Verdict: hypothesis-grade.** Strong enough to point the
+fleet's instrument at; not strong enough to gate real money on the day it was
+found, from the window that found it.
+
+**WHAT SHIPPED — THE RECORD, THE INERT ACTUATOR, AND THE CANDIDATE.**
+* **`lighter_family_bot.oversold_breadth`** — ONE owner, the pre-pass both
+  hosts run before any entry is offered: the count of coins in the book's own
+  universe whose latest closed candle satisfies the shipped entry rule
+  (`signals()["enter"]`, held or not — market breadth, not free slots). Only a
+  carrier declaring `BREADTH_MIN` is measured (None for 🙏 avo / 🔮 georgia);
+  unreadable coins are neither counted nor read (I8); a per-candle memo keyed
+  on (candle ts, bars in force) makes it cost ~nothing between candles and
+  re-evaluate when a lever moves mid-hour; never raises.
+* **`breadth_thin`** — the gate's one decision, at the SAME rung on both hosts
+  (right after the coin's own signal, ahead of the lock): True iff
+  `BREADTH_MIN > 1` and breadth sits below it. **INERT at the shipped 1** — a
+  coin that enters is itself breadth 1 — so `enter` is byte-identical to
+  yesterday on both arms. RESTRICT-only (a conjunct), FAIL-CLOSED when armed
+  and unreadable (the (xl) shape). Refusals book `breadth_thin`, DECLARED in
+  `CENSUS_REFUSALS` so an armed floor that starves a book names itself.
+* **`breadth_n`** stamped at the OPEN on both hosts and copied to the close
+  row (absent, never 0, on pre-(zr) rows — I23: the knob records the quantity
+  it cuts), and the census publishes `breadth_n / breadth_read / breadth_min`
+  every loop whether or not the floor is armed, so the forward read is a
+  query. `audit_lever_authority.QUANTITIES` carries the spec for both lanes.
+* **`xp.mum.breadth_min` / `live.mum.breadth_min`** — registered, `int`, caged
+  **[1, 8]** with `lo` = the inert value so the rail can only tighten, judge-
+  owned on the live lane, consumed through `MUM_LEVER_ATTRS` (so `mum_bars`
+  receipts it and `apply_book_levers` sets it, per-attribute), mapped in
+  `XP_TO_LIVE`, released "up" in `LIVE_ENV_DEFAULTS` (a HIGHER floor is
+  tighter). The judge's own selftest now derives its default from the class.
+* **`mum-breadth-3`** queued in `MUM_CANDIDATES` **BEHIND `mum-vel-12-20`**
+  (the stronger prior: tape p=0.0033 vs this P≈0.10), never pre-empting it. A
+  gate-narrowing candidate, so the (zn) extended clock applies; at ~2.5–3
+  twin closes/day it reaches its 30 in ~10–12 days once it starts (~16-Sep).
+  **THE JUDGE'S PAIRED BAR IS THE CRITERION** — promotion to real money runs
+  through the fleet's designed path or not at all.
+* **Carried:** `mum-breadth-candidate-preregistered` in `session_state.py`,
+  closing on the CHANGELOG line that records the candidate's read (the name,
+  the word READ, a colon). A session may NOT arm `MUM_BREADTH_MIN` on the
+  live arm on this evidence, and the twin is mid-experiment.
+
+**DEPLOYS BOTH WAYS, on purpose:** `lighter_family_bot.py` is in every family
+image's shared set, so a main-only merge would leave the twin on new code and
+the live arms on old — `ARMS ON DIFFERENT CODE`, the (zj) trap walked into
+twice yesterday. `[deploy-live-mum][deploy-live-taker]` in the PR TITLE and the
+commit subject ((xh): the title is what a squash lands), never `[deploy-live]`,
+which would restart 🔮 georgia's retired host. Neither live row is halted
+(mum `online`, locked until 03:52Z; avo `online`). The joint deploy keeps the
+pair matched, so `mum-vel-12-20`'s clock survives it as it survived 18:37Z.
+Stamp readback on all four family rows is the proof, never the green run.
+
+**TESTS: `tests/autonomy/test_mum_breadth_gate.py`, 21 tests**, plus the (ww)
+exact-dict receipt test updated for the fifth bar. **11 of 11 mutations RED**,
+each caught by a named test: the armed gate never refusing; the default armed
+at 3 (caught by the (xl) registry-matches-class arm); the pre-pass never
+counting a hit; the lever dropped from `MUM_LEVER_ATTRS`; the live host's gate
+removed; the refusal undeclared; armed-and-unreadable falling open; the memo
+ignoring the bars in force; the live close row dropping the stamp; the
+candidate pre-empting the running one; the twin's open stamp dropped.
+**RECORDED AGAINST MYSELF: the mutation harness printed SURVIVED on all
+eleven** — its verdict matched a lowercase `failed` against pytest's uppercase
+`FAILED` — the identical (zq) trap from the day before, and the raw lines
+(`FAILED tests/...::<test>` with a non-zero exit on every mutation) are what
+this count is read from. A harness that reports 100% survival is a broken
+harness before it is a finding. Suite green; both hosts' `--selftest` and the
+judge's pass; every changelog-check audit OK.
+
+**NOT DONE, with reasons:** no clip, gross, slot or stop moved (his geometry,
+his registered read); no entry throttle (`max_entries_per_hour`) — the batch
+IS the good cell, a throttle would spread exactly the entries that earn; no
+faster stop check (the 300s cadence cost ~$3 of overshoot today, but a faster
+poll also STOPS the wicks that recover inside five minutes, which needs
+intra-loop tape this egress cannot fetch); no "book falling fast → pause
+entries" brake — a second gate on the same day's shape, unmeasured. Each is a
+study before it is a knob.
+
 ## 2026-09-09 (zq) — THE DASHBOARD'S STALLS WERE A LOCK CONVOY THE FLEET LIT ON ITSELF AT EVERY REDEPLOY: NINE EXCLUSIVE-LOCK NO-OP ALTERs PER BOOTING PROCESS, ON ITS HOTTEST TABLE
 
 **[RENUMBERED TWICE at push time: (zo) -> (zp) -> (zq).** Another session's `(zo)` — 🔮 georgia v1's pre-registered read — reached main first (cited from twenty-two tracked files); minutes later another session's `(zp)` — the regime-veto identifiability read — did too (cited from `session_state.py`, `test_selftests.py` and three study scripts). This entry was cited from its own five files both times; the cited entry keeps the letter (rule 3). **Four collisions on one branch in one day is the finding the letters guard cannot make: it sees `origin/main`, never the other OPEN branches.** Recorded inline because `git log` subjects keep the old letters.**

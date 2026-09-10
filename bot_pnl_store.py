@@ -2551,6 +2551,10 @@ CENSUS_REFUSALS = frozenset({
     # a book starved entirely by the veto would report its runner-up gate and
     # send the operator at the wrong knob (the (vm) lesson, one bucket over).
     "coin_veto",
+    # [(zr)] 👩 mum's oversold-breadth floor, declared the day it shipped on
+    # both hosts — an undeclared refusal abstains from `binding_gate`, and a
+    # book starved by an armed floor must name the floor, not its runner-up.
+    "breadth_thin",
 })
 
 

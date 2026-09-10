@@ -85,6 +85,37 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "mum-breadth-candidate-preregistered",
+        "owner": "session",
+        "what": "(zr) 👩 mum's edge lives in the BREADTH of the oversold, on "
+                "her own record (9-Sep excluded, I25): closes opened in a "
+                "same-loop batch of >=3 coins read +1.114%/trade live (n=37) / "
+                "+1.003% twin (n=41) with a 2.7%/2.4% stop rate, positive in "
+                "every ISO week and under a coin jackknife; closes opened alone "
+                "or in a pair read -0.037% / +0.243% with 9.5-10.5% stops. "
+                "Four of the six stops that cost the live book $56 on 9-Sep "
+                "were single/pair entries. HONEST SIZE: the live batch closes "
+                "are SEVEN open-events (7/7 positive, event-level t +5.7) and a "
+                "permutation of event sizes across her 64 events reads P=0.097 "
+                "(twin P=0.137) -- hypothesis-grade. SHIPPED: the breadth "
+                "pre-pass + `breadth_n` stamp on every close on BOTH hosts, an "
+                "INERT caged lever pair (xp.mum.breadth_min / "
+                "live.mum.breadth_min, env default 1), and the judge candidate "
+                "`mum-breadth-3` queued BEHIND `mum-vel-12-20`. No trade, gate "
+                "or size moved on either arm.",
+        "why_open": "the read is the JUDGE'S OWN PAIRED BAR (I21 -- graded on "
+                    "fresh shadow closes under the candidate against the live "
+                    "control, never the window that motivated it): it starts "
+                    "when `mum-vel-12-20` resolves (ETA ~16-Sep) and runs "
+                    "~4-12 days at the narrowed rate under the (zn) extended "
+                    "clock. PROMOTE only on the judge's bar; a refutation is "
+                    "recorded in the CHANGELOG as 'mum-breadth-3 READ:' with "
+                    "the paired numbers. A session may NOT arm MUM_BREADTH_MIN "
+                    "on the live arm itself -- 7 events is not evidence for "
+                    "real money, and the shadow twin is mid-experiment.",
+        "closes_when": lambda: _has("CHANGELOG.md", "mum-breadth-3 READ:"),
+    },
+    {
         "id": "mum-live-rho-read-preregistered",
         "owner": "session",
         "what": "(yp) put every book's sizing on ONE axis for the first time -- "

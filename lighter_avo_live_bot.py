@@ -125,6 +125,11 @@ from lighter_family_bot import (
     # [(wv)] the judge's lever surface + the receipt stamp, from the ONE owner
     apply_book_levers as _fam_apply_book_levers,
     mum_bars as _fam_mum_bars,
+    # [(zr)] the breadth pre-pass, gate and stamp — ONE owner shared with the
+    # twin by identity, so the two arms count and refuse on the same rule.
+    oversold_breadth as _fam_oversold_breadth,
+    breadth_thin as _fam_breadth_thin,
+    breadth_n_of as _fam_breadth_n_of,
     OversoldRebound as _FamOversoldRebound,
 )
 from venues import marks
@@ -1032,6 +1037,9 @@ def manage_exit_reason(strategy, m, px, profit, age_min, sig, bars):
 #: block is an OPERATOR action with the VENUE, and no code may route around it,
 #: so the row carries the venue's own code and message verbatim.
 _LAST_REJECT = {}
+#: [(zr)] the breadth pre-pass memo (coin -> (candle ts, bars, verdict)) —
+#: per process, like `_LAST_REJECT`; a restart simply re-evaluates once.
+_BREADTH_MEMO = {}
 
 #: [2026-09-07 (yy)] THE REFUSAL VERDICTS WHOSE COINS ARE **NAMED**, because
 #: their COUNT ALONE IS UNINTERPRETABLE — the (lv)/I18 shape, at the row
@@ -1096,7 +1104,7 @@ def refused_coins(verdicts, universe, cap=REFUSED_NAMES_CAP):
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
                 strategy=None, uptrend=None, enter=None, last_reject=None,
-                enter_bar=None, bb=None):
+                enter_bar=None, bb=None, breadth=None):
     """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
     directional row.
 
@@ -1185,6 +1193,15 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 out["both_terms_n"] = fresh
                 if stale:
                     out["both_terms_stale_n"] = stale
+    except Exception:  # noqa: BLE001 — a gauge must never break a live loop
+        pass
+    # [(zr)] THE BREADTH GAUGE — the same three keys the twin publishes, off
+    # the same owner's dict. ABSENT until measured, never a fabricated 0.
+    try:
+        if isinstance(breadth, dict):
+            out["breadth_n"] = int(breadth.get("n") or 0)
+            out["breadth_read"] = int(breadth.get("read") or 0)
+            out["breadth_min"] = int(getattr(strategy, "BREADTH_MIN", 1) or 1)
     except Exception:  # noqa: BLE001 — a gauge must never break a live loop
         pass
     # [(ya)] 🙏 avo's BB DIP TERM — the conjunct that actually binds her in a
@@ -1966,6 +1983,9 @@ def main(_ctx=None, once=False):
         cycle_verdict = {}
         entries_shut = None
         nc_verdicts = {}
+        # [(zr)] this cycle's oversold breadth; None until the pre-pass runs,
+        # so a halt-path publish carries no fabricated count (I8).
+        breadth_now = None
         # [(sr)] None, not 1.0 — the halt/kill paths publish before the scan
         # computes these, and "not measured yet" must not read as "one bet".
         held_n_eff = held_rho = None
@@ -2507,7 +2527,8 @@ def main(_ctx=None, once=False):
                     (closed_win[-1].get("ts") if closed_win else None), t0,
                     strategy=S, uptrend=last_uptrend, enter=last_enter,
                     last_reject=(_LAST_REJECT or None),
-                    enter_bar=last_enter_bar, bb=last_bb),
+                    enter_bar=last_enter_bar, bb=last_bb,
+                    breadth=breadth_now),
                 # Advisory only: top liquid Lighter markets this arm is not
                 # currently scanning (for measured universe-evolution reviews).
                 "evolve": {
@@ -2754,6 +2775,9 @@ def main(_ctx=None, once=False):
                               else {}),
                            **({"rsi_entry": m["rsi_entry"]}
                               if m.get("rsi_entry") is not None else {}),
+                           # [(zr)] copied from the open, never computed here
+                           **({"breadth_n": m["breadth_n"]}
+                              if m.get("breadth_n") is not None else {}),
                            "mmf_factor": m.get("mmf_factor"),
                            # [2026-09-07] this close's own placebo leg, via
                            # the family owner by identity — the two arms must
@@ -3163,6 +3187,13 @@ def main(_ctx=None, once=False):
         if isinstance(held_n_eff, (int, float)):
             spend_n_eff = held_n_eff          # [(te)] carried for the census
 
+        # [(zr)] THE BREADTH PRE-PASS, before any entry is offered — the same
+        # owner and the same instant the shadow twin uses. None for a carrier
+        # without `BREADTH_MIN`; inert (never refuses) at the shipped 1.
+        breadth_now = _fam_oversold_breadth(
+            S, list(universe), lambda _c: cache.get(_c, S.tf),
+            extra_for=lambda _c: {"btc_regime_up": regime}, memo=_BREADTH_MEMO)
+
         if entries_ok:
             # THE ONLY BEHAVIOURAL CHANGE: the sequence candidates are offered
             # in. Every gate, veto, cap and sizing rule below is untouched, so
@@ -3242,6 +3273,11 @@ def main(_ctx=None, once=False):
                     # `uptrend_blocked`, not a `no_signal` byte-identical to
                     # "no low rsi anywhere" (I18).
                     _verdict(sym, census_no_entry_why(S, sig), sig=sig)
+                    continue
+                # [(zr)] the breadth floor, at the SAME rung as the twin (right
+                # after the coin's own signal). Restrict-only; inert at 1.
+                if _fam_breadth_thin(S, breadth_now):
+                    _verdict(sym, "breadth_thin")
                     continue
                 px = marks.fresh_mid(venue, sym)
                 if not px:
@@ -3507,6 +3543,10 @@ def main(_ctx=None, once=False):
                 cycle_stop_committed += _one_stop
                 meta[sym] = {"entry": fpx or px, "opened_ts": t0, "tag": tag,
                              "accrued": 0.0, "size": size,
+                             # [(zr)] the oversold breadth this entry was
+                             # admitted at — the quantity `breadth_min` cuts
+                             # (I23), born at the OPEN like `entry_rank`
+                             "breadth_n": _fam_breadth_n_of(breadth_now),
                              # [(wv)] the bars in force at entry (the judge's
                              # receipt on this arm) + the admitted RSI (I23)
                              "bars": _fam_mum_bars(S),
