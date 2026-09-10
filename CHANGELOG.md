@@ -401,6 +401,59 @@ across cells to price the selection.
 fleet can HONESTLY SAY about a read that governs a keep-or-retire decision on a
 living book, which is worth more than the deploy it does not need.
 
+## 2026-09-10 (zw) — THE COHORT READER KNEW THE LIVE KEY'S DICT AND NOT THE HISTORY'S COMPACTED LIST, SO 2,174 SNAPSHOTS READ AS "NO LONGS HELD, AGAINST A BUDGET THAT CANNOT BIND"
+
+**[RENUMBERED (zt) -> (zw) at push time.** `origin/main` took `(zt)` for the Counterweight sample-definition entry (#304) while this sat unpushed; the merged, cited entry keeps the letter (rule 3). **`(zw)` was chosen by checking every OPEN BRANCH as well as `origin/main`** — the very thing the shipped guard cannot do, and the reason this is the NINTH collision on this branch today. Measured while picking it: `(ze)` is held by two open branches and `(zf)` by one, and all three are INVISIBLE to `audit_changelog_letters` — so a session picking `(ze)` today would read it as free and collide on push.**
+
+Found by the daily review while clearing its own carried option #5 from 9-Sep.
+That option described the defect as *"the accessor wants a dict and silently
+falls through to the pooled read"*. **The fallback is the half that was wrong,
+and it is the half that matters**: a `fleet-risk` HISTORY payload carries no
+pooled `long_positions`/`long_budget` either, so the fall-through does not
+land on a pooled number — it lands on the accessor's own no-veto default and
+returns **`(0, 10**9)`**. Not "slightly off": *zero longs held, against a
+budget of one billion*, on a payload that plainly records longs held.
+
+| | `cohorts` shape | `cohort_long_state(live)` | `(shadow)` |
+|---|---|---|---|
+| LIVE key (`bot_state`) | `{"live": {"long_positions": 9, "long_budget": 20, ...}}` | **(9, 20)** ✓ | (14, 26) ✓ |
+| HISTORY (`bot_state_history`) | `{"live": [9, 20, "green"]}` | **(0, 1000000000)** ✗ | (0, 1000000000) ✗ |
+
+**MEASURED: 2,174 of 17,261 `fleet-risk` history rows carry the list shape.**
+
+**NO LIVE VETO WAS AFFECTED, and that was checked rather than assumed** —
+every enforcing consumer (`lighter_family_bot`, `lighter_ticket_taker`,
+`lighter_avo_live_bot`, `lighter_funding_bot`, `lighter_trend_bot`) reads the
+LIVE key, which is and was the dict; verified against the live payload the day
+this shipped. So this is a MEASUREMENT defect, not a real-money one — which is
+exactly why it was worth fixing today rather than filing: **the number it
+corrupts is the one the REACH option is argued from**, and `(zi)` had already
+found the review quoting a pooled ceiling no consumer enforces. A study asking
+"how often did the live cohort sit at budget?" over that window could only ever
+answer "never".
+
+**WHY THE SHAPE EXISTS AND WHY THE READER IS THE RIGHT PLACE TO FIX IT.** The
+compaction is deliberate — `fleet_risk.save_history` writes
+`{k: [long_positions, long_budget, light]}` to keep 17k snapshots small — so
+the writer is not the bug and re-inflating it would cost the storage the
+compaction bought. The reader learns the second shape, positionally and
+length-checked.
+
+**THE DEGRADATION CONTRACT IS UNCHANGED, which is the part a widening usually
+breaks:** an unparseable or too-short list is SKIPPED to the pooled branch
+exactly as an unparseable dict already was — never scored as a zero-position
+cohort, because "no veto" must never be manufactured from junk. Pinned in both
+directions: a FULL cohort read through the list shape must still read
+`lp >= lb`, or the fix would have repaired the study and left a veto reading GO
+at budget.
+
+**PINNED, AND THE FIXTURE IS THE PUBLISHER'S** ((hj) — a consumer is tested
+against a payload its publisher built): the test calls the real
+`fleet_risk.cohort_view` and applies the writer's own compaction, and a second
+test pins the POSITIONAL contract at the writer BY AST, so re-ordering the
+compaction reddens here instead of silently swapping budget and positions in
+every future study. 4/4 mutations verified RED — including the writer reorder
+and an off-by-one on the length check.
 
 ## 2026-09-10 (zs) — ⚖️ COUNTERWEIGHT'S READ MOVES 1-Oct → 10-Oct SO IT LANDS ON THE SAMPLE ITS OWN REGISTRATION ASKED FOR: the date was going to bind before the n floor, and nothing said so
 
