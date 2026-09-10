@@ -121,7 +121,28 @@ it is still the honest fleet-wide picture.
   card's horizon chip projects the binding BAR. On 👩 mum's live row they read
   **14.4d and 66.6d on the same page**; a bare "to gate" invited the reader to
   take the smaller one.
-* **Five card descriptions corrected (I12).** 👩 mum's REAL-MONEY card said
+* **THE HEALTH BANNER'S THREE PERMANENTLY-TRUE LINES.** The served page's
+  ambient health line — the first thing under the cockpit strip — read
+  *"🔭 Georgia v3: 22 closed trades in 24h (>15) — over-trading vs design ·
+  🪁 the Mirror: 65 in 24h (>40) · V5 probation breach: since-rework P&L
+  −15.47"*, and all three were false. `crypto-intraday-15m` was **RETIRED
+  15-Aug** on an `unreachable` verdict, so its frozen ledger can never improve
+  and that probation was permanently true — 26 days of it. The two over-trade
+  bars were measured against each book's own ledger (21 full days, today
+  excluded): 🔭 georgia v3 runs a **median 12/day, p90 18, max 20** and had NO
+  entry at all, so she was graded against the 15/day default written for slower
+  books; 🪁 kelly runs a **median 26, p90 69, max 93** against a bar of 40 — the
+  bar sat BELOW her own p90. Both are now set the nav-cook way, just past
+  anything the book has ever done (25 and 95). The retired-book probation is
+  deleted, the ambient checks skip `RETIRED_ROWS`, and the all-clear stopped
+  advertising a check that no longer runs. The banner now renders nothing and
+  the green line shows — which is what an ambient check is for.
+* **Five card descriptions corrected (I12), then two more.** 🧮 Hull claimed a
+  `[$2M,$10M)` band against a published `min_vol` of **$1M** and a
+  Garrett|Hull|Farmer tiling whose other two tiles were **retired 2-Sep**; 👩
+  mum's REAL-MONEY card claimed `RSI(14)<25` against a published `rsi_bar` of
+  **36.0** — a judge-movable lever — and a "12h carry-bounded cap" against an
+  ROI ladder her own `policy` runs to 1440 minutes. 👩 mum's REAL-MONEY card said
   "$50 × 4 slots" while she runs 12 slots at a $221.90 clip and 5× gross; 🙏
   avo's said "÷ 5 slots, levered 1.4× of a 1.5× drawdown budget" against 6
   slots at 2.0× and an operator-set ceiling; ⚖️ Counterweight advertised the

@@ -488,10 +488,27 @@ OVERTRADE_LIMIT = {
                                    # day can flip-and-refill more than 15
     "book-douglas":          30,   # 🧘 The Zone — 1h impulse fades, ~12h max
                                    # hold; a violent day can cycle 4 slots
+    # [(zu)] 🔭 Georgia v3 had NO entry, so a 15m impulse fade with a 4h max
+    # hold was graded against the 15/day default written for slower books and
+    # the banner read "22 closed trades in 24h (>15) — over-trading vs design"
+    # on a book doing exactly what it was built to do. MEASURED over 13 full
+    # days of her own ledger: median 12/day, p90 18, max 20. 25 is 2x her
+    # median and above everything she has done, the nav-cook convention.
+    "freqtrade-georgia-v3":  25,   # 🔭 Georgia v3 — 15m impulse fade, 4h max
+                                   # hold x 5 slots
     "book-bezos":            36,   # 🚀 Jeff Bezos-inspired Day-1 flywheel
                                    # profile: lower trigger + shorter holds can
                                    # cycle faster than Douglas under stress.
-    "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
+    # [(zu)] MEASURED, because the birth estimate below was firing on ordinary
+    # days. 21 full days of this book's own ledger: median 26 closes/day, p90
+    # 69, max 93 — so a bar at 40 sat BELOW its own p90 and lit the health
+    # banner on a large share of healthy days (it read "65 closed trades in 24h
+    # (>40)" the day this was measured, which is inside its normal range). The
+    # bar is a RUNAWAY detector, so it belongs just past anything the book has
+    # ever done: 95 is above the 21-day max. The birth reasoning was right
+    # about the mechanism and wrong about the magnitude, which is exactly the
+    # nav-cook correction one entry below.
+    "band-kelly":            95,   # 🪁 the Mirror — 90s loop, median hold
                                    # ~5min (the ghost's own cadence); a
                                    # dislocation-storm day cycles 4 slots fast
     "nav-cook":             120,   # 🧭 the Navigator. MEASURED on its first
@@ -622,7 +639,12 @@ DESCRIPTIONS = {
     # 12 slots at a $221.90 clip and 5x gross. Same defect as the Farmer's
     # below, on a REAL-MONEY row: prose describes the MECHANISM, `live_units`
     # renders what the process published.
-    "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; entries also read the BREADTH of the oversold ((zr) — how many coins qualify in the same pass, inert until its lever moves); carries its OWN random-entry control arm, so its edge is graded against a matched-random null and never against zero",
+    # [(zu)] TWO MORE RUNTIME NUMBERS OUT OF THE PROSE. It said "RSI(14)<25"
+    # while her live row publishes `rsi_bar 36.0` — the bar is a judge-movable
+    # lever (`xp.mum.rsi_max` / `live.mum.rsi_max`), so prose can only ever
+    # drift from it — and "12h carry-bounded cap" against an ROI ladder her own
+    # `policy` runs to 1440 minutes. The bar in force is on the row.
+    "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys OVERSOLD coins OUTSIDE an uptrend (the cell avo cannot take, by construction), bracket predefined at entry, carry-bounded max hold — the RSI bar itself is a judge-movable lever, so the figure in force is the one on the row. Entries also read the BREADTH of the oversold ((zr) — how many coins qualify in the same pass, inert until its lever moves); carries its OWN random-entry control arm, so its edge is graded against a matched-random null and never against zero",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
     # [(zu)] UNITS AND THE LEVERAGE CEILING REMOVED. This read "÷ 5 slots,
     # levered 1.4× of a 1.5× drawdown budget" — the cap went 5 → 6 at (ye) on
@@ -655,7 +677,12 @@ DESCRIPTIONS = {
     "book-bezos":           "Jeff Bezos-inspired Day 1 flywheel expression — runs on the proven Douglas execution engine with higher-liquidity intake and faster cycle defaults (lower impulse bar, asymmetric bracket, shorter hold), Lighter-only shadow and env-only profile",
     "book-grimes":          "The Art & Science of TA as rules — a structural setup roster (pullback/failtest/keltner; breakout is Schwager's supply) behind a rolling replay gate: a setup may enter only while its trailing 120d record on the venue's own tape clears the bar (n≥20, net>0, t≥0.5); the scorecard is published every loop",
     "book-schwager":        "Market Wizards as rules — 4h Donchian-20 breakouts with EMA20>50 confirm; cut losses at 2×ATR, ride winners on a wide 3.5×ATR chandelier trail, NO profit target and NO pyramid (measured and refuted); one position per coin",
-    "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
+    # [(zu)] THE BAND AND THE TILING BOTH MOVED. This asserted a $2M floor
+    # while the row publishes `min_vol 1000000` ($1M), and named a
+    # Garrett|Hull|Farmer tiling whose OTHER TWO TILES were retired on 2-Sep
+    # (wt) — so the card described a three-book carve-up of which one book
+    # remains. Numbers come from `caps` on the row; prose says what it does.
+    "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the MID band of TRUE |apr| × volume, the cell no other living book enters. Its floor is DERIVED from payback velocity — funding must repay the round trip inside the max hold, the no-arbitrage cost band's own edge — rather than chosen; 24h flip grace because basis noise is not signal (measured); adverse-basis entry veto. The band edges publish in caps, and the Garrett and Farmer tiles either side of it were retired 2-Sep, so this is the last of that tiling still trading",
     "band-kelly":           "holds the OPPOSITE side of the fleet's measured losers over exactly the windows the loser would have traded — v1 mirrors retired 🧲 Snap Back: LONG the premium-rich dislocations it shorted, SHORT the discounts it bought, exit when the ghost's own rules (converged/stop/2h) would have exited · refused/waiting mirror families publish in extra.roster · env-only, single-policy clock",
     "nav-cook":             "rides the SAME dislocations 🪁 band-kelly mirrors, in the band it REFUSES — premium [45,60) bps, strictly below the mirror's 60bps floor, so the two TILE the surface and every event this book takes is one band-kelly declines (I20 by BAND, not by row id) · non-crypto by nature (the band's crypto population is n=4) with pre-IPO excluded as the only class measured negative · 4h hold, exits on the venue's own index residual · env-only, single-policy clock",
     # [(zu)] IT ADVERTISED A CONFIG THAT WAS REVERTED FIVE WEEKS EARLIER. The
@@ -4650,7 +4677,12 @@ def render():
         # [2026-07-16 FIX] STOCKS holds BASE names but rows are venue-suffixed
         # (equities-regime-lshadow), so this skip never matched. Latent while
         # `quality` was empty for those rows — unifying the ledgers arms it.
-        if b in SCANNERS or venue_variant(b)[0] in STOCKS:
+        # [(zu)] RETIRED rows are skipped. `fetch_rows` can still return a
+        # frozen row before `cleanup_legacy_bots` prunes it, and an ambient
+        # health check on a book that no longer trades can only ever produce a
+        # permanent false line — which is how an operator learns to ignore the
+        # banner entirely.
+        if b in RETIRED_ROWS or b in SCANNERS or venue_variant(b)[0] in STOCKS:
             continue
         q = quality.get(b) or {}
         eq = r.get("equity")
@@ -4661,12 +4693,23 @@ def render():
         if (q.get("n24") or 0) > _ot:
             checks.append(f"{label_for(b)}: {q['n24']} closed trades in 24h "
                           f"(>{_ot}) — over-trading vs design")
-    _era5 = (quality.get("crypto-intraday-15m") or {}).get("era") or {}
-    if (_era5.get("pnl") or 0) < -5:
-        checks.append(f"V5 probation breach: since-rework P&L {money(_era5.get('pnl'))}")
+    # [(zu)] THE "V5 PROBATION BREACH" LINE IS DELETED. It graded
+    # `crypto-intraday-15m` against a "since 3 Jul rework" era — and that book
+    # was RETIRED on 15-Aug (nf) on an `unreachable` verdict. Its frozen ledger
+    # cannot improve, so the condition was permanently true: the served page
+    # carried "V5 probation breach: since-rework P&L -15.47" for 26 days, at
+    # the top of the operator's health banner, about a book that has not traded
+    # in nearly a month. A probation on a retired book is not a health check;
+    # it is I12 rot on the fleet's most prominent ambient line, and it sat
+    # beside two other permanently-true lines fixed in the same pass.
     health_html = ('<div class="banner">HEALTH: ' + " · ".join(html.escape(c) for c in checks) + "</div>"
                    if checks else
-                   '<div class="okline">Health ✓ persistence intact · no over-trading · probation within bounds</div>')
+                   # [(zu)] the all-clear may only name checks that still RUN. It claimed
+                   # "probation within bounds" after the probation check was deleted
+                   # with its retired book — an all-clear for a test nobody performs is
+                   # the same rot as the false alarm it replaced.
+                   '<div class="okline">Health ✓ persistence intact · '
+                   'no over-trading vs each book\'s own measured rate</div>')
 
     # [2026-07-15 OPERATING HUB] fleet cockpit strip — risk light, budget
     # usage, drawdown governor, venue stress, alert pressure. One glance =

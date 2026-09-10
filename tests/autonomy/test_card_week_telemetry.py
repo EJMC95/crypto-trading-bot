@@ -1019,3 +1019,74 @@ def test_the_spend_row_does_not_claim_to_be_the_gate_eta():
                          "days_to_gate_basis": "measured_rate"})
     assert "decidable in 14.4d" in out
     assert "NOT the gate ETA" in out
+
+
+# --------------------------------------------------------------------------
+# the ambient health banner: three permanently-true lines
+# --------------------------------------------------------------------------
+def test_the_retired_books_probation_check_is_gone():
+    """`crypto-intraday-15m` was RETIRED 15-Aug on an `unreachable` verdict, so
+    its frozen ledger can never improve and the condition was permanently true:
+    the served page carried "V5 probation breach: since-rework P&L -15.47" for
+    26 days at the top of the operator's health banner. A probation on a
+    retired book is not a health check."""
+    src = (_ROOT / "pnl_dashboard.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Constant) and isinstance(n.value, str):
+            assert "V5 probation breach" not in n.value, (
+                "the retired book's probation line is back")
+
+
+def test_the_ambient_checks_skip_retired_rows():
+    """A frozen row can outlive its retirement until `cleanup_legacy_bots`
+    prunes it, and an ambient check on a book that no longer trades can only
+    produce a permanent false line."""
+    fn = next(n for n in ast.walk(ast.parse(
+        (_ROOT / "pnl_dashboard.py").read_text(encoding="utf-8")))
+        if isinstance(n, ast.FunctionDef) and n.name == "render")
+    src = ast.unparse(fn)
+    assert "RETIRED_ROWS" in src, "render() no longer filters retired rows"
+    i = src.index("OVERTRADE_LIMIT")
+    assert "RETIRED_ROWS" in src[:i], (
+        "the over-trading check runs before any retired-row filter")
+
+
+def test_the_overtrade_bars_sit_above_each_books_measured_normal():
+    """The nav-cook convention: ~2x observed normal, so the card flags a real
+    DOUBLING rather than lighting up on healthy behaviour.
+
+    MEASURED over each book's own ledger (21 full days, today excluded):
+      🔭 georgia v3 — median 12/day, p90 18, max 20 → had NO entry at all and
+         was graded against the 15/day default; the banner read "22 in 24h".
+      🪁 kelly      — median 26/day, p90 69, max 93 → a bar of 40 sat BELOW its
+         own p90; the banner read "65 in 24h", inside its normal range."""
+    assert dash.OVERTRADE_LIMIT["freqtrade-georgia-v3"] == 25
+    assert dash.OVERTRADE_LIMIT["band-kelly"] == 95
+    for base, observed_max in (("freqtrade-georgia-v3", 20), ("band-kelly", 93)):
+        assert dash.OVERTRADE_LIMIT[base] > observed_max, (
+            f"{base}'s bar sits inside its own measured range")
+
+
+def test_hull_and_mum_no_longer_assert_a_number_their_row_contradicts():
+    """🧮 Hull claimed a $2M floor against a published `min_vol` of $1M and a
+    three-book tiling whose other two tiles retired 2-Sep. 👩 mum claimed
+    "RSI(14)<25" against a published `rsi_bar` of 36.0 — a judge-movable
+    lever."""
+    hull = dash.DESCRIPTIONS["book-hull"]
+    assert "$2M" not in hull and "$10M" not in hull
+    assert "retired 2-Sep" in hull
+    mum = dash.DESCRIPTIONS["freqtrade-mum"]
+    assert "RSI(14)<25" not in mum and "12h carry-bounded" not in mum
+    assert "lever" in mum
+
+
+def test_the_all_clear_only_names_checks_that_still_run():
+    """It claimed "probation within bounds" after the probation check was
+    deleted with its retired book. An all-clear for a test nobody performs is
+    the same rot as the false alarm it replaced."""
+    src = (_ROOT / "pnl_dashboard.py").read_text(encoding="utf-8")
+    line = next(n.value for n in ast.walk(ast.parse(src))
+                if isinstance(n, ast.Constant) and isinstance(n.value, str)
+                and "Health ✓" in n.value)
+    assert "probation" not in line
