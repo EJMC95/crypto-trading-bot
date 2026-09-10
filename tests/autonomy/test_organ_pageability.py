@@ -54,6 +54,18 @@ UNPAGEABLE_OK = {
     # staleness is visible on the vitals card. If it ever gains an actuator
     # consumer, it leaves this set the same day.
     "fleet-allocation",
+    # [2026-09-10 (zt)] Both joined ORGAN_SPECS the day they were found
+    # publishing with NO vitals row at all (the (iy) shape). Each fails SAFE,
+    # so each is a visible card reading rather than a page:
+    #   coin-quality      -- a dark fold makes every consumer read "unmeasured"
+    #                        (`fleet_bus.recorded_cost_bps` returns None/{}),
+    #                        which proposes nothing and sizes nothing. Its
+    #                        SERVICE's liveness is already pageable via
+    #                        `coin-vetoes`, published by the same process.
+    #   tuning-proposals  -- a dark channel proposes nothing, and every
+    #                        proposal is replay-gated by the tuner anyway.
+    # Either leaves this set the day an actuator consumes it fail-OPEN.
+    "coin-quality", "tuning-proposals",
 }
 
 

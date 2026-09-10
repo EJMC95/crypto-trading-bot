@@ -13,6 +13,7 @@ Railway service with DATABASE_URL pointed at the Postgres plugin.
 Deps: psycopg2-binary (see requirements.txt). Falls back to a clear message if
 the DB is unreachable so the page never hard-crashes.
 """
+import ast
 import os
 import json
 import time
@@ -617,11 +618,20 @@ LABELS = {
 # One-line strategy brief per bot (shared by its venue variants — the chips
 # say WHERE it runs, this says WHAT it does + current units).
 DESCRIPTIONS = {
-    "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; carries its OWN random-entry control arm · $50 × 4 slots",
+    # [(zt)] UNITS REMOVED — they were "$50 × 4 slots" while her LIVE arm ran
+    # 12 slots at a $221.90 clip and 5x gross. Same defect as the Farmer's
+    # below, on a REAL-MONEY row: prose describes the MECHANISM, `live_units`
+    # renders what the process published.
+    "freqtrade-mum":       "OversoldRebound · 1h — REVIVED 19-Aug (ro): buys RSI(14)<25 OUTSIDE an uptrend (the cell avo cannot take), bracket predefined at entry, 12h carry-bounded cap; entries also read the BREADTH of the oversold ((zr) — how many coins qualify in the same pass, inert until its lever moves); carries its OWN random-entry control arm, so its edge is graded against a matched-random null and never against zero",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
-    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 6 slots; LIVE clips = equity × gross_x ÷ 5 slots, levered 1.4× of a 1.5× drawdown budget (funded + levered 21-Aug (sr); slot swap 13-Aug)",
+    # [(zt)] UNITS AND THE LEVERAGE CEILING REMOVED. This read "÷ 5 slots,
+    # levered 1.4× of a 1.5× drawdown budget" — the cap went 5 → 6 at (ye) on
+    # her twin's own record, the gross is an OPERATOR env since (sr) ("risk
+    # appetite belongs to the person whose money it is"), and both numbers are
+    # published every loop. The row's Leverage line carries the consequence.
+    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength; the LIVE arm sizes each clip as equity × gross_x ÷ slots and offers candidates in DIVERSIFIED order, so what most lowers basket correlation is offered first — the scan order changes, no gate does",
     "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",
-    "freqtrade-georgia-v3": "ImpulseFade · 15m — NEW ENTRY (vr), not a rearrangement of v1: fades a ≥3.0×ATR14 drop over 4 bars, bracket tp 2.0% / sl −1.5% / 4h max hold, crypto-only. The only candidate of ten surviving every horizon against matched-random (+0.140%..+0.178%/trade, t_cl +2.49..+6.01); shipped at the plateau INTERIOR, never the grid edge. HYPOTHESIS-grade — replay only, its own ledger decides · $50 × 5 slots",
+    "freqtrade-georgia-v3": "ImpulseFade · 15m — NEW ENTRY (vr), not a rearrangement of v1: fades a ≥3.0×ATR14 drop over 4 bars, bracket tp 2.0% / sl −1.5% / 4h max hold, crypto-only. The only candidate of ten surviving every horizon against matched-random (+0.140%..+0.178%/trade, t_cl +2.49..+6.01); shipped at the plateau INTERIOR, never the grid edge. HYPOTHESIS-grade — replay only, its own ledger decides",
     "crypto-trend-daily":  "daily 50/200-EMA golden cross — long through uptrends, cash after the death cross; holds for weeks",
     "crypto-intraday-15m": "DayTraderV5Gated · 1h — Georgia's engine at the validated 1h settings · 29 pairs, 5 slots",
     "crypto-swing-daily":  "SwingDipV1 · 1d — the validated daily dip-buyer · 29 pairs, 8 slots",
@@ -635,7 +645,10 @@ DESCRIPTIONS = {
     # only ever drift. The bot publishes them now and `live_units` renders them.
     # Describe the MECHANISM here; never the numbers.
     "perps-funding-lighter": "holds the side that RECEIVES funding, vol-vetoed, stop-guarded",
-    "perps-funding-carry":  "funding-rate carry on HL data — the Funding Farmer's origin strategy",
+    # [(zt)] "on HL data" names the arm RETIRED on 17-Jul. The living row is
+    # the Lighter shadow book — the fleet's best-evidenced funding book — and
+    # the card was describing its dead twin.
+    "perps-funding-carry":  "holds the side that RECEIVES funding above a TRUE-apr gate once the rate has PERSISTED, delta-neutral modelled so P&L is accrual minus fees with no price term; closes on decay-paid (the fleet's measured best exit — income first repays the round trip) or on a sign flip that outlives the grace window. Crypto perps only: a closed underlying market satisfies a persistence bar structurally, which is how the non-crypto sleeve lost every dollar it made",
     "band-barnes":          "three funding sleeves under one $1k roof — carry harvest (≥20% TRUE, decay-paid discipline, $80×4), funding-extreme directional (top |APR|, 10% stop, $40×4), x-sect L/S rank (K=5/side, $33 legs, 24h rebalance) · closes tagged per sleeve · config FROZEN 30d from birth ((hm))",
     "book-kiyosaki":        "Rich Dad Poor Dad as rules — holds only funding-RECEIVING positions (assets), delta-neutral modelled so P&L is pure cash flow; sells a position the moment it persists as a liability; decay-closes only after income repays all costs (pay yourself first); entries must repay their round trip within the payback bar (financial literacy)",
     "book-douglas":         "Trading in the Zone as rules — fades extreme 1h impulses (>2.5×ATR24) with a bracket predefined at entry (stop 1.0×/target 1.5×ATR, 12h expiry, never widened); same size every trade, outcomes cannot alter execution; publishes its rolling 20-trade sample in R-multiples",
@@ -645,10 +658,19 @@ DESCRIPTIONS = {
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
     "band-kelly":           "holds the OPPOSITE side of the fleet's measured losers over exactly the windows the loser would have traded — v1 mirrors retired 🧲 Snap Back: LONG the premium-rich dislocations it shorted, SHORT the discounts it bought, exit when the ghost's own rules (converged/stop/2h) would have exited · refused/waiting mirror families publish in extra.roster · env-only, single-policy clock",
     "nav-cook":             "rides the SAME dislocations 🪁 band-kelly mirrors, in the band it REFUSES — premium [45,60) bps, strictly below the mirror's 60bps floor, so the two TILE the surface and every event this book takes is one band-kelly declines (I20 by BAND, not by row id) · non-crypto by nature (the band's crypto population is n=4) with pre-IPO excluded as the only class measured negative · 4h hold, exits on the venue's own index residual · env-only, single-policy clock",
-    "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
+    # [(zt)] IT ADVERTISED A CONFIG THAT WAS REVERTED FIVE WEEKS EARLIER. The
+    # 30-Jul K 5→8 / universe 30→60 widening was undone 4-Aug on its OWN
+    # pre-registered criterion (n rose and t FELL, so the wider cross-section
+    # was worse than the hand list) — the live row has published k=5 ever
+    # since. The gate in force is on the row; this says what the book does.
+    "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, dollar-neutral legs rebalanced daily. It runs the K plateau CENTRE both validations cleared — the 30-Jul widening was reverted 4-Aug on its own pre-registered criterion. Its caps line is the gate actually in force",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",
-    "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets · SHADOW arm takes all four lenses (breakout/dip/momentum/divergence) so the brain keeps grading them; the LIVE arm is DIVERGENCE-ONLY — the brain grades the other three negative at n≈1300–2600 · each close tagged by lens",
+    # [(zt)] THE LIVE ARM DESCRIBED HERE HAS NOT EXISTED SINCE 13-Aug (ma),
+    # when 🙏 Avo Maria took its sub-account — the card was still telling the
+    # operator which lens the real money trades. I12: a description that no
+    # longer describes the system is a defect, not history.
+    "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets, each close tagged <side>-<lens>_<exit> so every lens is graded separately — and the book VETOES a lens on its OWN realised record rather than on the scout's forward proxy (I14: the record outranks the proxy, and at the right horizon the two can disagree in sign). Its live arm was retired 13-Aug (ma); this shadow arm is the fleet's best-tracked book and the first ever to pass all six go-live bars",
     "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
     "equities-regime":      "the venue's 10 non-crypto books: index-likes long above the 200d SMA (±1% band), single names + commodities on a 20/50 cross · $100 × up to 10 slots [30-Jul: 3→10 books, clip $250→$100]",
@@ -693,6 +715,13 @@ def live_units(row):
         bits.append(f"{int(e['max_open'])} slots")
     if _num(e.get("enter_apr")):
         bits.append(f"enter ≥{e['enter_apr']:.2%} TRUE apr")
+    # [(zt)] GROSS LEVERAGE IS A SIZING UNIT AND IT BELONGS HERE. Since (sr)
+    # the clip is `equity × gross_x ÷ slots`, so `clip × slots` no longer tells
+    # a reader what the book has deployed — and gross_x is an OPERATOR env that
+    # moves without a code change, which is exactly the class of number this
+    # function exists to render from the payload instead of from prose.
+    if _num(e.get("gross_x")) and e["gross_x"] != 1:
+        bits.append(f"{e['gross_x']:g}× gross")
     return " · ".join(bits)
 
 
@@ -1383,9 +1412,25 @@ def autonomy_rail_card():
         def b_tuner():
             tn = s.get("scout-tuner") or {}
             ntn = len(tn.get("enacted") or {})
-            return row("scout-tuner", "🔧 Scout tuner",
-                       f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}',
-                       Y if ntn else None)
+            txt = f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}'
+            # [2026-09-10 (zt)] THE READY FREEZE, ON THE RAIL THAT DOES IT.
+            # `(ye)` gave "freeze its bars first" an actuator: while the tuned
+            # book reads READY on a fresh gate payload, every bracket lever is
+            # dropped from the enactment, because a book that passed the gate
+            # on one bracket must keep it. That is the growth rail deliberately
+            # NOT acting, and a rail that is not acting is byte-identical to a
+            # rail with nothing to do — the exact ambiguity this fleet keeps
+            # paying for. `dropped: []` under a live freeze is a real and
+            # common reading (the sweep wanted nothing this cycle), so the
+            # freeze STATE is what is shown, not just its casualties.
+            rf = tn.get("ready_freeze")
+            if isinstance(rf, dict) and rf.get("ready") is True and rf.get("fresh"):
+                nd = len(rf.get("dropped") or [])
+                txt += (f' · 🧊 bracket FROZEN ({html.escape(str(rf.get("book")))} '
+                        f'reads READY)'
+                        + (f' — {nd} lever{"" if nd == 1 else "s"} withheld'
+                           if nd else ''))
+            return row("scout-tuner", "🔧 Scout tuner", txt, Y if ntn else None)
 
         def b_incubator():
             ic = s.get("strategy-incubator") or {}
@@ -1412,9 +1457,52 @@ def autonomy_rail_card():
         def b_judge():
             xj = s.get("xp-judge") or {}
             ph = xj.get("phase")
-            return row("xp-judge", "⚖️ XP judge",
-                       f'{_s(ph)} · {xj.get("candidate") or "—"}',
-                       G if ph == "promoted" else (Y if ph == "running" else M))
+            bits = [f'{_s(ph)} · {xj.get("candidate") or "—"}']
+            # [(yi)/(ww)] WHICH LANE the serial machine is on, and how many of
+            # the declared pairs it can judge at all. It moved from 💸 the
+            # Farmer to 👩 mum and three organs kept watching the Farmer.
+            ln = xj.get("lanes") if isinstance(xj.get("lanes"), dict) else {}
+            if ln.get("serial_lane"):
+                bits.append(f'lane {ln["serial_lane"]}'
+                            + (f' ({ln["judging"]})' if ln.get("judging") else ''))
+            # [2026-09-10 (zt)] THE CANDIDATE'S OWN CLOCK AND ITS OWN SAMPLE
+            # HORIZON. `(zl)` measured that a candidate which NARROWS its arm's
+            # entry gate changes the very rate any projection is built from —
+            # `mum-vel-12-20` halved its own shadow arm's close rate against the
+            # live control — so "we measured it and it lost" and "we never got
+            # enough closes to ask" were byte-identical at expiry. `(zn)` then
+            # gave such a candidate the clock its own rate says it needs,
+            # re-derived every cycle. Both facts live in `last_eval` and neither
+            # reached any surface: the lane is SERIAL, so a candidate burning
+            # days it cannot use is the fleet's only path to more real money
+            # standing still.
+            le = xj.get("last_eval") if isinstance(xj.get("last_eval"), dict) else {}
+            ck = le.get("clock") if isinstance(le.get("clock"), dict) else {}
+            hz = le.get("horizon") if isinstance(le.get("horizon"), dict) else {}
+            eff, elapsed = _f(ck.get("effective")), _f(hz.get("days_elapsed"))
+            if eff is not None:
+                bits.append(
+                    (f'day {elapsed:.1f}/{eff:g}' if elapsed is not None
+                     else f'clock {eff:g}d')
+                    + (' <b>EXTENDED</b>' if ck.get("extended") else ''))
+            if hz:
+                if hz.get("met") is True:
+                    bits.append('floors met')
+                else:
+                    req, binding = _f(hz.get("days_req_total")), hz.get("binding")
+                    reach = hz.get("reachable")
+                    if req is not None:
+                        bits.append(f'needs {req:g}d'
+                                    + (f' ({binding})' if binding else ''))
+                    if reach is False:
+                        bits.append(f'UNREACHABLE — expires '
+                                    f'{_s(hz.get("verdict_if_expired"))}')
+                    elif reach is None and req is None:
+                        bits.append('sample UNPROJECTABLE')
+            _hurt = (hz.get("reachable") is False)
+            return row("xp-judge", "⚖️ XP judge", " · ".join(bits),
+                       R if _hurt else
+                       (G if ph == "promoted" else (Y if ph == "running" else M)))
 
         def b_immune():
             im = s.get("fleet-immune") or {}
@@ -1916,6 +2004,29 @@ def golive_card():
                     f'{"PASS" if on else "not yet"}" style="color:{col};'
                     f'background:{bg};border-radius:3px;padding:0 3px;'
                     f'font-size:.8em">{glyph}</span>')
+            # [2026-09-10 (zt)] THE ½ BAR CAN BE DECIDED BY ROW ORDER, AND
+            # `(za)` SHIPPED THE FLAG THAT SAYS SO. When the halves split
+            # boundary falls inside a batch of legs sharing one close instant,
+            # h1/h2 depend on which of them sorted first rather than on the
+            # book — *"re-running the grader over an UNCHANGED ledger could
+            # publish a different h1/h2"*. Measured on the live payload: TRUE
+            # on exactly two of thirteen graded books, and they are 🙏 avo's
+            # LIVE REAL-MONEY arm and 🎫 the taker, the fleet's first-ever
+            # READY. Both painted a flat green ½ identical to three clean
+            # passes. REPORTED, never a bar — the verdict does not move
+            # ((za) permuted the tied batch and every ordering still passed);
+            # what moves is that a reader can see it. `.get` chaining and an
+            # `is True` test, so an older payload renders exactly as before.
+            _shape = b.get("shape") if isinstance(b.get("shape"), dict) else {}
+            if _shape.get("halves_tie") is True:
+                chips.append(
+                    '<span title="TIED HALVES: the split boundary falls inside '
+                    'a batch of legs that share one close instant, so h1/h2 '
+                    'depend on row ORDER rather than on the book ((za)). The '
+                    'bar still passes under every ordering measured — this is '
+                    'reported, not a failure." style="color:#d29922;'
+                    'background:rgba(210,153,34,.14);border-radius:3px;'
+                    'padding:0 2px;font-size:.75em">tie</span>')
             np_ = b.get("bars_passed") or 0
             is_ready = bot in ready or b.get("ready")
             # The (fk) divergence, shown rather than asserted: a book the NEW
@@ -1945,7 +2056,13 @@ def golive_card():
                     f'{at.get("bars_passed", "?")}/6, t{(at.get("t") or 0):+.2f}." '
                     f'style="color:#8250df;background:rgba(130,80,223,.14);'
                     f'border-radius:3px;padding:0 3px;font-size:.75em">'
-                    f'era {html.escape(str(era.get("since"))[5:])}</span>')
+                    # [(zt)] `[5:]` assumed a bare DATE. A policy-stamp era
+                    # carries a full ISO INSTANT, so 🎫 the taker's chip read
+                    # `era 07-30T11:09:46+00:00` — the one book at the bar,
+                    # with the longest chip on the card. Trim to the date part
+                    # first, then drop the year, so both era sources render the
+                    # same `MM-DD`.
+                    f'era {html.escape(str(era.get("since"))[:10][5:])}</span>')
             # [2026-07-30 (hf)] LEDGER INTEGRITY. A book whose ledger shows a
             # same-pair overlap cannot have come from one process, so its `n` is
             # not one book's trades and none of the six bars means what it says.
@@ -2004,6 +2121,102 @@ def golive_card():
                         f'style="color:{_col};background:{_bg};'
                         f'border-radius:3px;padding:0 3px;font-size:.75em">'
                         f'{_txt}</span>')
+            # [2026-09-10 (zt)] THE BAR AND ITS OWN CLUSTER-ROBUST READ
+            # DISAGREE — AND NOW THE CARD SAYS SO.
+            # `(zm)` published `t_bar` because the two bases disagree on exactly
+            # the two books holding REAL MONEY and nothing anywhere said so. The
+            # live arms carry a daily-loss flatten that closes a whole basket in
+            # one instant, so they batch 8 and 5 legs where their paper twins
+            # batch 4 — and the iid `t` the gate grades on counts those legs as
+            # independent draws while the cluster-robust read does not. *The
+            # books with the mechanism that breaks the iid assumption are
+            # exactly the books that hold money.*
+            # `permissive` is deliberately ASYMMETRIC and so is this chip: a
+            # book the bar REFUSES while the cluster read would pass stays on
+            # paper and costs nothing; the reverse is the only direction that
+            # can put money behind a weaker number. THE BAR IS UNTOUCHED —
+            # moving it is a gate re-spec and Eamon's act ((zm), I26: a lower
+            # statistic is uncertainty, not measured harm). This only makes the
+            # comparison readable instead of one nobody was making.
+            tb = b.get("t_bar") if isinstance(b.get("t_bar"), dict) else None
+            if tb and tb.get("permissive"):
+                era_chip += (
+                    f'<span title="PERMISSIVE — the go-live t bar PASSES this '
+                    f'book on the iid statistic (t={tb.get("t_iid")}) while its '
+                    f'own cluster-robust read of the SAME sample does NOT '
+                    f'(t={tb.get("t_cluster")}, bar {tb.get("bar")}). The '
+                    f'sample batches, so those closes are not independent '
+                    f'draws. The bar is deliberately unchanged — a gate re-spec '
+                    f'is an operator act (zm)." '
+                    f'style="color:#d1242f;background:rgba(209,36,47,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f't permissive</span>')
+            elif tb and tb.get("passes_cluster") and not tb.get("passes_iid"):
+                era_chip += (
+                    f'<span title="The bar REFUSES this book on the iid '
+                    f'statistic (t={tb.get("t_iid")}) while its cluster-robust '
+                    f'read would pass (t={tb.get("t_cluster")}). This is the '
+                    f'harmless direction — the book stays on paper — but it is '
+                    f'closer to the bar than the headline t suggests." '
+                    f'style="color:#8b949e;background:rgba(110,118,129,.10);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f't strict</span>')
+            # [(zt)] HOW MUCH OF THE GRADED SAMPLE THE BOOK WILL NEVER TRADE
+            # AGAIN. `(yn)` shipped `veto_split` on the fleet's FIRST-EVER
+            # `ready` verdict, having measured that a QUARTER of the sample
+            # that passed came from lenses the book has since vetoed by its own
+            # realised record. It is REPORTED, never a bar — the era is
+            # deliberately not re-cut, because a veto lifts on the lens's own
+            # next evidence — but a reader looking at `6/6 READY` has to be
+            # able to see it without re-deriving it (the `class_split` rule).
+            vsp = b.get("veto_split") if isinstance(b.get("veto_split"), dict) else None
+            _nv = (vsp or {}).get("now_vetoed") if vsp else None
+            if isinstance(_nv, dict) and (_nv.get("n") or 0) > 0:
+                _stl = (vsp.get("still_tradeable") or {}) if vsp else {}
+                _stm = _stl.get("mean_pct")
+                era_chip += (
+                    f'<span title="{html.escape(str(vsp.get("why") or ""))}" '
+                    f'style="color:#d29922;background:rgba(210,153,34,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f'veto {_nv.get("n")}/{b.get("n")}'
+                    + (f' &rarr; {_stm:+.2f}%' if isinstance(_stm, (int, float))
+                       else '') + '</span>')
+            # [(zt)] THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.
+            # `(za)` shipped `dd_resampled` because *"the gate grades a 15%
+            # bar over the ONE ordering a book happened to walk and cannot
+            # tell a safe book from a benign sequence."* Measured: 👩 mum's
+            # LIVE arm shows 12.0% against the 15% bar while her own published
+            # p95 is 23.2%, p99 31.8%, and 3.15% of resampled orderings
+            # BREACH the bar. The column showed the most flattering of the
+            # three numbers the grader publishes. It rides the tooltip rather
+            # than the column: the bar is still the single path, and moving
+            # the graded number is a gate re-spec, not a reporting fix.
+            _dd_title = "max drawdown (the single path the book walked)"
+            _ddr = b.get("dd_resampled") if isinstance(
+                b.get("dd_resampled"), dict) else None
+            if _ddr:
+                _p95, _p99 = _ddr.get("p95_pct"), _ddr.get("p99_pct")
+                _pov = _ddr.get("p_over_bar_at_book_denom")
+                _parts = []
+                if isinstance(_p95, (int, float)) and not isinstance(_p95, bool):
+                    _parts.append(f"p95 {_p95:.1f}%")
+                if isinstance(_p99, (int, float)) and not isinstance(_p99, bool):
+                    _parts.append(f"p99 {_p99:.1f}%")
+                if isinstance(_pov, (int, float)) and not isinstance(_pov, bool):
+                    _parts.append(f"P(over the 15% bar) {100 * _pov:.1f}%")
+                if _parts:
+                    _dd_title += " — resampled over decision orderings: " \
+                        + " · ".join(_parts)
+            elif b.get("max_dd_pct") is not None:
+                # (za) made the block fail-SILENT so a missing risk number can
+                # never read as a low one; say that rather than imply a clean
+                # distribution. Reads the payload, NOT the local `dd`, which is
+                # bound further down — the first cut referenced it here and
+                # every golive_card() render raised into its own fail-silent
+                # `except`, blanking the whole card. A card that renders "" on
+                # an internal error is exactly why that must be caught by a
+                # test rather than by eye.
+                _dd_title += " — no resampled distribution published"
             miss = "; ".join(str(x) for x in (b.get("fails") or [])[:2])
             col = ("#1a7f37" if is_ready else
                    "#d29922" if np_ >= 5 else "#8b949e")
@@ -2024,7 +2237,7 @@ def golive_card():
                 f'title="win rate — REPORTED, not a bar since (fk)">'
                 f'{(b.get("win_pct") or 0):.0f}%</span>'
                 f'<span class="muted" style="width:52px;text-align:right" '
-                f'title="max drawdown">'
+                f'title="{html.escape(_dd_title)}">'
                 f'{"n/a" if dd is None else f"{dd:.1f}%"}</span>'
                 f'<span class="muted" style="width:180px;overflow:hidden;'
                 f'text-overflow:ellipsis">{html.escape(miss)}</span></div>')
@@ -2727,6 +2940,10 @@ def fetch_golive_dd():
                 pct_v = None
             out[bot] = {"pct": pct_v,
                         "basis": rec.get("maxdd_basis"),
+                        # [(zt)] `(yz)` — book_usd vs the book's own peak
+                        # equity. Absent on an older payload, which renders as
+                        # no denominator rather than an assumed one.
+                        "denom": rec.get("maxdd_denom"),
                         "why": rec.get("why_absent") or rec.get("mtm_why")}
     return out
 
@@ -3135,6 +3352,902 @@ def _orders_html(extra):
     return f'<div class="sub">Open orders ({len(items)})</div>{"".join(items)}'
 
 
+# ---------------------------------------------------------------------------
+# [2026-09-10 (zt)] THE WEEK'S TELEMETRY REACHES THE CARD.
+#
+# In the week of 3–10 Sep the books started publishing the numbers doctrine
+# had been asking for — a per-book random-entry CONTROL ARM ((zc)/(zb), I14:
+# a directional book is graded against a null, never against zero), the I22
+# SPEND census, the LEVERAGE block with its vol target and all-slots-stop
+# arithmetic ((yz)/(yp): "published, not argued"), the judge's LEVER SURFACE
+# ((yg)/(zj)), 🎫 the taker's GATE CENSUS ((xs)), the entry-veto ledger with its
+# 30-day lockout cost ((vm)/(xg)), the measured stop OVERSHOOT ((xp)) — and the
+# card rendered every one of them as `leverage: {'mmf': 0.2, 'set': 5.0, …}`,
+# a 900-character wall in the raw `extra` dump. A number nobody can read on
+# the page is a number that gets re-derived by hand in the next session, which
+# is the (vm)/`class_split` rule at the reporting layer: *a number a decision
+# depends on must be READABLE, not recomputable.*
+#
+# CONTRACT. Each block renders ONE `.row` line from the publisher's OWN keys,
+# degrades to no row on a missing or junk-shaped block (never a fabricated
+# zero — quiet and dark are different facts), and is wrapped so one odd payload
+# cannot drop its neighbours (the autonomy-rail lesson). A block that rendered
+# is removed from the raw dump; one that did not stays visible there, so a
+# shape this code cannot read is never silently hidden. Every key read here is
+# pinned by AST against the publisher's dict literal
+# (tests/autonomy/test_card_week_telemetry.py) — the (hj) rule: a consumer is
+# tested against the payload its publisher builds.
+# ---------------------------------------------------------------------------
+
+def _fin(x):
+    """A finite real number (bools excluded) or None."""
+    if isinstance(x, bool) or not isinstance(x, (int, float)):
+        return None
+    try:
+        return float(x) if x == x and x not in (float("inf"), float("-inf")) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _trow(label, body, title=None, extra_span=""):
+    """One card row. `body` is ALREADY-ESCAPED html; `label`/`title` are text."""
+    t = f' title="{html.escape(str(title))}"' if title else ""
+    return (f'<div class="row"{t}><span>{html.escape(label)}{extra_span}</span>'
+            f'<b style="text-align:right;max-width:70%;white-space:normal">'
+            f'{body}</b></div>')
+
+
+def _t_control(control):
+    n, edge = control.get("n"), _fin(control.get("edge_pct"))
+    mean, null = _fin(control.get("mean_pct")), _fin(control.get("null_pct"))
+    basis = control.get("basis")
+    if not isinstance(n, int) or isinstance(n, bool):
+        return None
+    if n <= 0 or edge is None or mean is None or null is None:
+        body = f'<span class="muted">arm running · {n} settled · no edge yet</span>'
+    else:
+        body = (f'n{n} · book {mean:+.2f}% · null {null:+.2f}% → '
+                f'<span class="{cls(edge)}">edge {edge:+.2f}%/trade</span>')
+    return _trow("Random-entry control", body,
+                 basis or "the book's own matched-window placebo (I14)")
+
+
+def _t_spend(spend):
+    scanned, held = spend.get("markets_scanned"), spend.get("markets_held")
+    n_eff, gross = _fin(spend.get("n_eff")), _fin(spend.get("gross_x"))
+    sides, days = spend.get("sides"), _fin(spend.get("days_to_gate_obs"))
+    basis = spend.get("days_to_gate_basis")
+    if scanned is None and n_eff is None:
+        return None
+    bits = []
+    if scanned is not None:
+        bits.append(f'{html.escape(str(scanned))} scanned')
+    if held is not None:
+        bits.append(f'{html.escape(str(held))} held')
+    if n_eff is not None:
+        bits.append(f'N<sub>eff</sub> {n_eff:.2f}')
+    if sides:
+        bits.append(html.escape(str(sides)))
+    if gross is not None:
+        bits.append(f'{gross:g}×')
+    bits.append(f'{days:g}d to gate' if days is not None
+                else '<span class="muted">no rate yet</span>')
+    return _trow("Spend (I22)", " · ".join(bits),
+                 "I22 spend census: markets scanned, N_eff of what it holds "
+                 "(correlation-aware, never a symbol count), sides, gross "
+                 "leverage, days-to-gate (a FLOOR). "
+                 + (str(basis) if basis else ""))
+
+
+def _t_leverage(leverage):
+    set_x, now_x = _fin(leverage.get("set")), _fin(leverage.get("leverage_now"))
+    vs = _fin(leverage.get("vs_vol_target"))
+    stop_pct = _fin(leverage.get("all_slots_stop_pct"))
+    over = _fin(leverage.get("all_slots_stop_over_bar_pp"))
+    reach = leverage.get("stop_reachable")
+    dead_above = _fin(leverage.get("stop_dead_above"))
+    n_eff, rho = _fin(leverage.get("n_eff")), _fin(leverage.get("basket_rho"))
+    vt_here = _fin(leverage.get("vol_target_here"))
+    liq_gap, dep = _fin(leverage.get("liq_gap_pct")), _fin(leverage.get("deployed_at_full"))
+    if set_x is None:
+        return None
+    bits = [f'{set_x:g}× set']
+    if now_x is not None:
+        bits.append(f'{now_x:.2f}× now')
+    if vs is not None:
+        bits.append(f'<span class="{"neg" if vs > 1.0 else ""}">vs vol target {vs:.2f}</span>')
+    if stop_pct is not None:
+        s = f'all-slots stop {100 * stop_pct:.0f}%'
+        # [(zt)] THE MEASURED FIGURE BESIDE THE MODELLED ONE. `all_slots_stop_pct`
+        # prices every stop AT its level; `(xp)` measured that mum's own fills
+        # land 12–62bps PAST it, and the publisher ships that as
+        # `all_slots_stop_pct_measured`. Showing only the modelled number
+        # understates the book's worst case against the 15% gate bar, which is
+        # the one direction that matters here.
+        meas = _fin(leverage.get("all_slots_stop_pct_measured"))
+        if meas is not None and abs(meas - stop_pct) >= 0.001:
+            s += f' (measured {100 * meas:.1f}%)'
+        if over is not None and over > 0:
+            s = f'<span class="neg">{s} (+{over:g}pp over the bar)</span>'
+        bits.append(s)
+    # [(zt)] THE STOP THE BOOK IS ACTUALLY HOLDING. `stop_reachable` prices the
+    # WORST book in the universe; `stop_reachable_held` prices the basket it
+    # holds right now, and the two disagree on both live rows — reporting only
+    # the first reads as permanent alarm and trains the operator to ignore it.
+    reach_held = leverage.get("stop_reachable_held")
+    dead_held = _fin(leverage.get("stop_dead_above_held"))
+    if reach is False and reach_held is True:
+        bits.append('<span class="muted">stop reachable on the HELD basket'
+                    + (f' (dead above {dead_held:g}×)' if dead_held is not None
+                       else '') + '</span>')
+    elif reach is False:
+        bits.append('<span class="neg">stop DEAD'
+                    + (f' above {dead_above:g}×' if dead_above is not None else '')
+                    + '</span>')
+    elif reach is True:
+        bits.append('stop reachable ✓')
+    # [(zt)] THE RUIN GATE'S OWN VERDICT. `headroom` is `rails.headroom_check`
+    # — is there room between this book's stop and its liquidation — and it
+    # reads `{ok: false, reason: "liq_unpriced"}` on BOTH real-money rows.
+    # UNPRICED is not UNSAFE and must not render as danger: the venue quotes no
+    # liquidation for those legs, so the gate has no measurement (I6/I8).
+    hd = leverage.get("headroom")
+    if isinstance(hd, dict) and "ok" in hd:
+        why = str(hd.get("reason") or "")
+        if hd.get("ok") is True:
+            bits.append('ruin gate ✓')
+        elif why in ("liq_unpriced", "unpriced", "unknown"):
+            bits.append(f'<span class="muted">ruin gate UNPRICED'
+                        f'{" (" + html.escape(why) + ")" if why else ""}</span>')
+        else:
+            bits.append(f'<span class="neg">ruin gate BLOCKED'
+                        f'{" (" + html.escape(why) + ")" if why else ""}</span>')
+    tip = ("Published, not argued ((sr)/(yz)): gross_x is Eamon's env; the row "
+           "carries the consequence every loop. vs vol target >1.0 = gross "
+           "exceeds what the held basket's measured independence supports.")
+    if vt_here is not None and n_eff is not None:
+        tip += f" vol_target_here {vt_here:.2f}× at N_eff {n_eff:.2f}"
+        if rho is not None:
+            tip += f" (basket ρ {rho:+.2f})"
+        tip += "."
+    if dep is not None:
+        tip += f" Deployed at full ${dep:,.0f}."
+    if liq_gap is not None:
+        tip += f" Liquidation gap {100 * liq_gap:+.1f}%."
+    return _trow("Leverage", " · ".join(bits), tip)
+
+
+def _t_halt(halt):
+    """The DAILY-LOSS HALT's geometry — the rail that stops a real-money book
+    for the rest of the UTC day.
+
+    Both live rows publish it and nothing read it. `binding` says which of the
+    two limits actually governs (an absolute dollar cap or a fraction of
+    equity), and `basket_move_now_pct` is how far the held basket must move to
+    reach it — the number that turns "we have a halt" into "we are this far
+    from it". `basket_move_now_state` is published precisely so a MEASURED
+    distance and an assumed one are not the same string."""
+    abs_usd, frac = _fin(halt.get("abs_usd")), _fin(halt.get("daily_loss_frac"))
+    binding = halt.get("binding")
+    now_pct = _fin(halt.get("basket_move_now_pct"))
+    state = halt.get("basket_move_now_state")
+    full = _fin(halt.get("basket_move_at_full_gross_pct"))
+    if abs_usd is None and frac is None:
+        return None
+    bits = []
+    if abs_usd is not None:
+        bits.append(f'${abs_usd:,.0f}'
+                    + (' <b>binds</b>' if binding == "abs" else ''))
+    if frac is not None:
+        bits.append(f'{100 * frac:.0f}% of equity'
+                    + (' <b>binds</b>' if binding == "frac" else ''))
+    if now_pct is not None:
+        s = f'basket move to halt {100 * now_pct:.1f}%'
+        if state and state != "measured":
+            s += f' <span class="muted">({html.escape(str(state))})</span>'
+        bits.append(s)
+    if full is not None:
+        bits.append(f'{100 * full:.1f}% at full gross')
+    return _trow("Daily halt", " · ".join(bits),
+                 "the rail that stops this book for the rest of the UTC day — "
+                 "which limit binds, and how far the HELD basket has to move to "
+                 "reach it. A restart wipes a memory-only halt, so this is the "
+                 "geometry, not the current state.")
+
+
+def _t_progression(progression):
+    total, c7 = progression.get("closed_total"), progression.get("closed_7d")
+    rate7 = _fin(progression.get("close_rate_day_7d"))
+    rem, tgt = progression.get("closes_remaining"), progression.get("target_closes")
+    d7 = _fin(progression.get("days_to_target_7d"))
+    if not isinstance(total, int) or isinstance(total, bool):
+        return None
+    bits = [f'{total} closes']
+    if isinstance(c7, int) and not isinstance(c7, bool):
+        bits.append(f'{c7} in 7d' + (f' ({rate7:g}/day)' if rate7 is not None else ''))
+    if (isinstance(rem, int) and isinstance(tgt, int)
+            and not isinstance(rem, bool) and not isinstance(tgt, bool)):
+        if rem <= 0:
+            bits.append(f'<span class="pos">{tgt}-close target met</span>')
+        else:
+            bits.append(f'{rem} to {tgt}'
+                        + (f' · ~{d7:g}d' if d7 is not None else
+                           ' · <span class="muted">no 7d rate</span>'))
+    return _trow("Progression", " · ".join(bits),
+                 "closes toward the 30-close go-live bar, at the trailing-7d rate")
+
+
+def _t_cap_slots(extra):
+    cap_slots, max_open = extra.get("cap_slots"), extra.get("max_open")
+    if (isinstance(cap_slots, int) and isinstance(max_open, int)
+            and not isinstance(cap_slots, bool) and cap_slots < max_open):
+        return _trow("Cap funds", f'<span class="neg">{cap_slots} of {max_open} slots</span>',
+                     "(sr): the operator's fixed-dollar notional cap — not the "
+                     "signal — is what holds this book below its declared "
+                     "capacity; the only field that says so BEFORE the refusal")
+    return None
+
+
+def _t_stop_overshoot(stop_overshoot):
+    n, unmeasured = stop_overshoot.get("n"), stop_overshoot.get("unmeasured_n")
+    p90, worst = _fin(stop_overshoot.get("p90_bps")), _fin(stop_overshoot.get("worst_bps"))
+    if not isinstance(n, int) or isinstance(n, bool):
+        return None
+    if n <= 0:
+        body = '<span class="muted">none measured yet</span>'
+    else:
+        body = f'n{n}' + (f' · p90 {p90:g}bps' if p90 is not None else '') \
+            + (f' · worst {worst:g}bps' if worst is not None else '')
+    if isinstance(unmeasured, int) and unmeasured > 0:
+        body += f' · <span class="muted">{unmeasured} unmeasured</span>'
+    return _trow("Stop overshoot", body,
+                 "(xp): how far past its level each stop actually filled — "
+                 "reported, never a clamp; the all-slots-stop line assumes fills "
+                 "AT the level")
+
+
+def _t_margin(margin):
+    mode, gross, lev = margin.get("mode"), _fin(margin.get("gross")), _fin(margin.get("leverage"))
+    nearest, unknown = margin.get("nearest_liq"), margin.get("liq_unknown")
+    if gross is None and lev is None:
+        return None
+    bits = []
+    if mode:
+        bits.append(html.escape(str(mode)))
+    if gross is not None:
+        bits.append(f'gross ${gross:,.0f}')
+    if lev is not None:
+        bits.append(f'{lev:.2f}×')
+    # [(zt)] `nearest_liq` IS NOT A NUMBER. The publisher emits the nearest
+    # position as a DICT (coin + its distance), so reading it through `_fin`
+    # returned None on every populated payload and the row would have printed
+    # "liq unpriced" for a book whose liquidation distance WAS priced —
+    # a dead read on a real-money risk number, which is the exact class the
+    # card-dead-reads tests exist for. Both shapes are accepted: a bare number
+    # for any payload that carries one, and the dict's own distance field.
+    _frac, _coin = None, None
+    if isinstance(nearest, dict):
+        # `venues/lighter_client.margin_state_from`:
+        #     nearest = {"coin": c, "dist_frac": d, "liq": …, "mark": …}
+        # `dist_frac` is a FRACTION and the module says so in as many words —
+        # *"`dist_frac`, NOT `dist_pct`. This is a FRACTION"* — because
+        # `imf_pct` (a percent) sits in the same row. Rendering it without the
+        # ×100 would print a 30%-away liquidation as "0.3%", i.e. imminent.
+        _frac, _coin = _fin(nearest.get("dist_frac")), nearest.get("coin")
+    if _frac is not None:
+        bits.append(f'nearest liq {100 * _frac:.1f}% away'
+                    + (f' ({html.escape(str(_coin))})' if _coin else ''))
+    else:
+        bits.append('<span class="muted">liq unpriced'
+                    + (f' ({len(unknown)})' if isinstance(unknown, list) and unknown else '')
+                    + '</span>')
+    return _trow("Margin (venue)", " · ".join(bits),
+                 "the venue's own margin read for the held basket — gross "
+                 "notional, effective leverage, nearest liquidation distance "
+                 "(unpriced when the venue does not quote one)")
+
+
+def _t_entry_vetoes(entry_vetoes):
+    shut, why = entry_vetoes.get("shut_now"), entry_vetoes.get("shut_reason")
+    until, coin = entry_vetoes.get("locked_until"), entry_vetoes.get("coin_veto")
+    flv, lock = entry_vetoes.get("fleet_long_veto"), entry_vetoes.get("lockout_hours_30d")
+    halt = entry_vetoes.get("halt_days_30d")
+    if "shut_now" not in entry_vetoes and coin is None:
+        return None
+    bits, tip = [], []
+    if shut:
+        s = f'SHUT — {html.escape(str(why or shut))}'
+        syd = _pipe_syd(until) if until else None
+        if syd:
+            s += f' until {html.escape(syd)}'
+        bits.append(f'<span class="neg">{s}</span>')
+    elif "shut_now" in entry_vetoes:
+        # the publisher EVALUATED the rails this loop and none is shutting the
+        # book — a real measurement, and the only case that earns green.
+        bits.append('<span class="pos">open</span>')
+    else:
+        # a container too old to publish `shut_now` says nothing about whether
+        # entries are shut; green here would be a fabricated all-clear on a
+        # real-money entry gate (I6).
+        bits.append('<span class="muted">rails unreported</span>')
+    if isinstance(coin, dict):
+        bits.append(f'{len(coin)} coin veto{"" if len(coin) == 1 else "es"}')
+        if coin:
+            tip.append("coin vetoes: " + "; ".join(f"{k}: {v}" for k, v in sorted(coin.items())[:8]))
+    if flv is True:
+        bits.append('<span class="neg">FLEET LONG VETO</span>')
+    if isinstance(lock, dict) and _fin(lock.get("total")) is not None:
+        days = (halt or {}).get("days_any") if isinstance(halt, dict) else None
+        bits.append(f'lockout 30d {_fin(lock["total"]):.1f}h'
+                    + (f' ({days}d)' if isinstance(days, int) else ''))
+        tip.append("lockout hours 30d by rail: "
+                   + ", ".join(f"{k} {_fin(v):.1f}" for k, v in lock.items()
+                               if k not in ("total", "loops", "span_h") and _fin(v) is not None))
+    return _trow("Entry gates", " · ".join(bits),
+                 " · ".join(tip) or "(lw)/(vm): every gate that can stop this "
+                 "book, and what the rails cost over 30 days")
+
+
+def _t_levers(levers):
+    prefix, registry = levers.get("prefix"), levers.get("registry")
+    consumable, reg_n = levers.get("consumable"), levers.get("registered_n")
+    unreg = levers.get("unregistered")
+    if "prefix" not in levers:
+        return None
+    if not prefix:
+        return _trow("Judge lane", '<span class="muted">none — outside a judged pair</span>',
+                     "(yg): this arm reads no xp.* lever namespace")
+    body = f'{html.escape(str(prefix))}*'
+    if registry is False:
+        body += ' · <span class="neg">registry dark</span>'
+    else:
+        n_c = len(consumable) if isinstance(consumable, list) else None
+        if isinstance(reg_n, int):
+            body += (f' · {reg_n}' + (f' of {n_c}' if n_c is not None else '')
+                     + ' registered')
+        if isinstance(unreg, list) and unreg:
+            body += (' · <span class="neg">UNREGISTERED: '
+                     + html.escape(", ".join(str(u) for u in unreg)) + '</span>')
+    return _trow("Judge lane", body,
+                 "(yg)/(zj): which xp.* namespace this arm reads and whether "
+                 "the registry holds it — an UNREGISTERED name is a wire the "
+                 "judge cannot drive (the (ye) 38-hour class)"
+                 + (f"; consumable: {', '.join(map(str, consumable))}"
+                    if isinstance(consumable, list) and consumable else ""))
+
+
+#: [(zt)] 🎫 THE TAKER'S GATE ORDER, DECLARED — BECAUSE THE PAYLOAD CANNOT
+#: CARRY IT. `(xs)` built `gate_census` in gate order on purpose and said how to
+#: read it: *"`tickets_in` is the denominator, each counter is one gate's
+#: refusal, and the first large counter names the binding gate."* That
+#: instruction is unfollowable from `/pnl.json`, because **Postgres `jsonb`
+#: sorts object keys by (length, bytes) on write** — measured on the live
+#: payload, the census arrives `no_mark, tickets_in, coin_vetoed, lens_vetoed,
+#: …`, so the publisher's order is destroyed in transit and `items[0]` is
+#: whichever key is SHORTEST, not the denominator. Every jsonb-backed key in
+#: this fleet has the same property; it is invisible because almost nothing
+#: reads order.
+#: So the order is DECLARED here and pinned by AST against the publisher's own
+#: `gate_census = {...}` literal (`tests/autonomy/test_card_week_telemetry.py`):
+#: a new gate, a renamed one or a reordered one reddens the build instead of
+#: silently mis-reporting which gate binds. A counter the payload carries and
+#: this list does not is rendered LAST under `?` rather than dropped — I8:
+#: unknown degrades to honest, never to a guess.
+TAKER_GATE_ORDER = ("tickets_in", "lens_not_allowed", "side_not_allowed",
+                    "lens_vetoed", "bull_blocked", "quality_blocked",
+                    "coin_vetoed", "no_mark", "spread_blocked",
+                    "long_budget", "notional_cap", "fill_missing")
+
+
+def _t_gate_census(gate_census, slot_census):
+    def _int(k):
+        v = gate_census.get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) else None
+    total = _int("tickets_in")
+    if total is None:
+        return None
+    refused = [f'{html.escape(k)} {_int(k)}' for k in TAKER_GATE_ORDER[1:]
+               if (_int(k) or 0) > 0]
+    undeclared = sorted(k for k, v in gate_census.items()
+                        if k not in TAKER_GATE_ORDER
+                        and isinstance(v, int) and not isinstance(v, bool)
+                        and v > 0)
+    refused += [f'<span class="neg">? {html.escape(k)} '
+                f'{gate_census[k]}</span>' for k in undeclared]
+    body = f'{total} in'
+    if refused:
+        body += ' → ' + " · ".join(refused)
+    if isinstance(slot_census, dict):
+        off, opened = slot_census.get("offered"), slot_census.get("opened")
+        if isinstance(off, int):
+            body += f' → offered {off}'
+        if isinstance(opened, int):
+            body += f' · opened {opened}'
+        # [(zt)] ALL THREE slot throttles, not just the cap. `(uo)` built this
+        # census to answer WHICH constraint binds — `slots_full` says the cap
+        # turned away earned trades, `lens_once` says the per-lens-per-cycle
+        # throttle did, `held_sym` says the book already holds that coin — and
+        # rendering only the first left the other two unreadable.
+        for _k, _lab, _c in (("slots_full", "slots full", "neg"),
+                             ("lens_once", "lens already taken", "muted"),
+                             ("held_sym", "already held", "muted")):
+            _v = slot_census.get(_k)
+            if isinstance(_v, int) and not isinstance(_v, bool) and _v > 0:
+                body += f' · <span class="{_c}">{_lab} ×{_v}</span>'
+    return _trow("Ticket gates (cycle)", body,
+                 "(xs)/(uo): read in GATE ORDER — tickets_in is what the scout "
+                 "offered, each counter is one gate's refusal, offered is what "
+                 "survived to the slot throttles; the first large counter names "
+                 "the binding gate. The order is declared by the card and pinned "
+                 "to the bot's own literal: Postgres jsonb sorts object keys by "
+                 "length, so the payload itself cannot carry it.")
+
+
+def _t_lens_evidence(lens_evidence, lens_veto):
+    vetoed = {str(v) for v in lens_veto} if isinstance(lens_veto, list) else set()
+    cells = []
+    for lens, ev in lens_evidence.items():
+        if not isinstance(ev, dict):
+            continue
+        n, t, m = ev.get("n"), _fin(ev.get("t")), _fin(ev.get("mean_pct"))
+        if not isinstance(n, int) or t is None or m is None:
+            continue
+        cells.append((t, lens, n, m))
+    if not cells:
+        return None
+    cells.sort(key=lambda c: -c[0])
+    # [(zt)] a lens can be VETOED and carry no evidence row of its own (a
+    # standing veto whose era sample fell below the floor). Dropping it made
+    # the published veto list unreadable from the row that claims to show it.
+    orphan = sorted(v for v in vetoed if not any(v == c[1] for c in cells))
+    body = " · ".join(
+        (f'<span class="{"neg" if lens in vetoed else cls(m)}">'
+         f'{"🚫 " if lens in vetoed else ""}{html.escape(str(lens))} n{n} t{t:+.1f} {m:+.2f}%</span>')
+        for t, lens, n, m in cells)
+    if orphan:
+        body += (' · <span class="neg">🚫 ' + html.escape(", ".join(orphan))
+                 + ' <span class="muted">(vetoed, no era sample)</span></span>')
+    return _trow("Lens record (own ledger)", body,
+                 "(lj)/I14: the book's OWN realised per-lens evidence, era-scoped "
+                 "— 🚫 = vetoed by its own record; the record outranks the proxy")
+
+
+def _t_holdwatch(holdwatch):
+    cells = []
+    for k, v in holdwatch.items():
+        if not isinstance(v, dict):
+            continue
+        m, t, n = _fin(v.get("mean_pct")), _fin(v.get("t")), v.get("n")
+        if m is None:
+            continue
+        # (I15) n travels with the mean — this block's own publisher says a
+        # mean with no dispersion is "a number no decision can be made on",
+        # and ships `n`/`sd_pct`/`t` for exactly that reason.
+        cells.append(f'<span class="{cls(m)}">{html.escape(str(k))} {m:+.2f}%'
+                     + (f' t{t:+.1f}' if t is not None else '')
+                     + (f' <span class="muted">n{n}</span>'
+                        if isinstance(n, int) and not isinstance(n, bool) else '')
+                     + '</span>')
+    if not cells:
+        return None
+    return _trow("Hold past exit (telemetry)", " · ".join(cells),
+                 str(holdwatch.get("note") or "extra %/trade from holding past "
+                                                "the ghost's exit — reported, never a bar"))
+
+
+#: [(zt)] Census keys that are a MEASUREMENT of the scan, not a refusal
+#: COUNT. The two hosts publish different shapes — the live variant host nests
+#: its refusals under `verdicts`, the family shadow host puts them flat beside
+#: bars, medians and read-counts — so a flat census has to be filtered or a
+#: median RSI renders as "rsi_med 40.4 coins refused". The family host already
+#: maintains this distinction itself: its 24h rollup publishes an
+#: `unclassified` list naming exactly these fields.
+_CENSUS_NOT_A_REFUSAL = {
+    "held", "opened", "scanned", "universe", "hours", "loops", "age_s",
+    "truncated", "unclassified", "binding_gate", "entries_shut",
+    "rsi_bar", "rsi_med", "rsi_min", "rsi_read", "near_bar",
+    "vel_med", "vel_p90", "vel_read", "vel_band", "vel_in_band",
+    "bb_med", "bb_min", "bb_read", "bb_below_n", "both_terms_n",
+    "breadth_n", "breadth_read", "breadth_min", "breadth_thin",
+    "idle_open_h", "idle_close_h", "outside_uptrend_n", "refused_coins",
+    "ungraded", "enter_bar", "budget_headroom",
+}
+
+
+def _scan_refusals(scan):
+    """[(k, n)] refusal counters, biggest first, from EITHER census shape."""
+    src_map = scan.get("verdicts") if isinstance(scan.get("verdicts"), dict) else scan
+    return sorted(((k, v) for k, v in src_map.items()
+                   if k not in _CENSUS_NOT_A_REFUSAL
+                   and isinstance(v, int) and not isinstance(v, bool) and v > 0),
+                  key=lambda kv: -kv[1])
+
+
+def _t_scan(scan):
+    universe, shut = scan.get("universe"), scan.get("entries_shut")
+    if universe is None:
+        universe = scan.get("scanned")
+    bn, br, bm = scan.get("breadth_n"), scan.get("breadth_read"), scan.get("breadth_min")
+    counts = _scan_refusals(scan)
+    if not counts and universe is None:
+        return None
+    bits = []
+    if isinstance(universe, int):
+        bits.append(f'{universe} scanned')
+    if isinstance(scan.get("opened"), int):
+        bits.append(f'opened {scan["opened"]}')
+    bits.extend(f'{html.escape(str(k))} {v}' for k, v in counts[:5])
+    if shut:
+        bits.append(f'<span class="neg">entries SHUT: {html.escape(str(shut))}</span>')
+    if isinstance(bn, int) and isinstance(br, int):
+        bits.append(f'breadth {bn}/{br}' + (f' (min {bm})' if isinstance(bm, int) else ''))
+    return _trow("Scan census", " · ".join(bits),
+                 "(st)/(yy): why nothing opened this loop, verdict by verdict — "
+                 "and (zr)'s breadth: how many of the read universe satisfy the "
+                 "entry rule at once")
+
+
+def _t_caps(caps):
+    """The GATE IN FORCE, from the book's own `caps` receipt.
+
+    `(go)`'s rule — publish the gate in force so the row is a receipt — and
+    these books are exactly the ones whose config lives in env vars with no
+    tuning lane, so the payload is the ONLY place the running value exists.
+    Nested entries (🌾 carry's `cost_bps`, 🪁 kelly's `dip` sleeve) are counted
+    and NOT flattened, and their presence means the key is left in the raw dump
+    as well — a partly-rendered block must never hide the part it could not
+    render."""
+    flat = [(k, v) for k, v in sorted(caps.items())
+            if isinstance(v, (int, float, str, bool)) and v is not None]
+    nested = [k for k, v in caps.items() if isinstance(v, (dict, list))]
+    if not flat:
+        return None, False
+    def _fmt(v):
+        if isinstance(v, bool):
+            return "yes" if v else "no"
+        if isinstance(v, float):
+            # [(zt)] `%g` renders a $1,000,000 volume floor as "1e+06", which
+            # an operator has to decode. Whole numbers above 10k get thousands
+            # separators; everything else keeps %g's compactness.
+            if v == int(v) and abs(v) >= 10_000:
+                return f"{int(v):,}"
+            return f"{v:g}"
+        if isinstance(v, int) and abs(v) >= 10_000:
+            return f"{v:,}"
+        return str(v)
+    body = " · ".join(f'{html.escape(k)} {html.escape(_fmt(v))}' for k, v in flat)
+    if nested:
+        body += (f' · <span class="muted">+{len(nested)} nested '
+                 f'({html.escape(", ".join(sorted(nested)))})</span>')
+    return _trow("Caps (gate in force)", body,
+                 "the book's own published config — for an env-only book with "
+                 "no tuning lane this is the only place the RUNNING value "
+                 "exists; prose can only ever drift from it"), not nested
+
+
+def _t_sources(sources, dir_by_src, dir_basis_by_src, hold_h_by_src):
+    """🎯 the sniper's PER-SOURCE census, side and evidence basis.
+
+    `(tx)` built the census because the row published `watching: 212` and
+    nothing per source while one source had had ZERO supply for 86 days and
+    another had been empty for 66 — `{admitted: 0}` being byte-identical
+    between "quiet" and "structurally impossible" (I18/(lv)).
+    `(uf)` then added `dir_basis_by_src` for the mirror reason: the row
+    published two `short`s in the same shape while only ONE of them was
+    measured, and no reader could tell them apart. Both facts are REPORTED,
+    never a gate (I15)."""
+    cells = []
+    for name in sorted(sources):
+        s = sources.get(name)
+        if not isinstance(s, dict):
+            continue
+        side = (dir_by_src or {}).get(name)
+        hold = _fin((hold_h_by_src or {}).get(name))
+        basis = (dir_basis_by_src or {}).get(name)
+        adm = s.get("admitted")
+        # the first ZERO in the funnel names the gate that took the supply;
+        # an absent scan verdict is UNKNOWN, never "fresh".
+        scan = s.get("scan")
+        stages = [(k, v) for k, v in s.items()
+                  if isinstance(v, int) and not isinstance(v, bool)]
+        killer = next((k for k, v in stages if v == 0 and k != "admitted"), None)
+        mark = ("✓" if basis == "measured" else
+                "⚠" if basis else "?")
+        col = "pos" if basis == "measured" else "muted"
+        cells.append(
+            f'<span class="{col}">{html.escape(str(name))}'
+            + (f' {html.escape(str(side))}' if side else '')
+            + (f'/{hold:g}h' if hold is not None else '')
+            + f' {mark}</span>'
+            + (f' <span class="muted">{adm} adm</span>'
+               if isinstance(adm, int) else '')
+            + (f' <span class="muted">({html.escape(str(killer))} 0)</span>'
+               if killer and adm == 0 else '')
+            + ('' if scan else ' <span class="neg">scan UNKNOWN</span>'))
+    if not cells:
+        return None
+    return _trow("Sources", " · ".join(cells),
+                 "per-source census at each source's OWN bar — side, hold, and "
+                 "whether that side's direction is MEASURED (✓) or "
+                 "hypothesis-grade (⚠). The named counter is the first stage "
+                 "that read zero, i.e. the gate that took the supply; "
+                 "`0 admitted` alone cannot tell quiet from impossible")
+
+
+def _t_census_24h(c):
+    """The scan census SUMMED over the trailing day — the denominator a single
+    loop's counters do not have.
+
+    `(vm)`: *"`no_signal: 22` on ONE loop and on 960 of them are the same
+    integer and opposite facts, and until the series existed every family row
+    published only the first."* `binding_gate` is the publisher's OWN verdict
+    for which gate took the supply over the window — read, never re-derived —
+    and `age_s` is the rollup cache's own age, because a cache that quietly
+    froze would be I1 living inside the instrument built to answer I18."""
+    loops, hours = c.get("loops"), _fin(c.get("hours"))
+    if not isinstance(loops, int) or isinstance(loops, bool):
+        return None
+    bits = [f'{loops} loops'
+            + (f' / {hours:.1f}h' if hours is not None else '')]
+    if isinstance(c.get("opened"), int):
+        bits.append(f'opened {c["opened"]}')
+    bg = c.get("binding_gate")
+    if bg:
+        n = c.get(bg)
+        bits.append(f'binding: <b>{html.escape(str(bg))}</b>'
+                    + (f' {n:,}' if isinstance(n, int) and not isinstance(n, bool)
+                       else ''))
+    else:
+        bits.extend(f'{html.escape(str(k))} {v:,}'
+                    for k, v in _scan_refusals(c)[:3])
+    age = _fin(c.get("age_s"))
+    tip = ("(vm): the same counters summed over the trailing 24h, so a refusal "
+           "finally has a denominator. `binding_gate` is the publisher's own "
+           "verdict for which gate took the supply.")
+    if age is not None:
+        tip += f" Rollup cache age {age / 60:.0f}m."
+        if age > 3600:
+            bits.append(f'<span class="neg">rollup {age / 3600:.1f}h old</span>')
+    if c.get("truncated"):
+        bits.append('<span class="muted">truncated</span>')
+    return _trow("Census 24h", " · ".join(bits), tip)
+
+
+def _t_held(held):
+    if isinstance(held, dict):
+        if not held:
+            return None
+        # [(zt)] the shared-tag shortcut may only fire when EVERY coin carries
+        # that tag. With one coin untagged it printed the other's tag against
+        # both — a fabricated attribution, and the tag names the strategy that
+        # opened the position.
+        vals = list(held.values())
+        tags = {str(v) for v in vals if v is not None}
+        if len(tags) == 1 and all(v is not None for v in vals):
+            body = html.escape(" · ".join(map(str, held)) + f" · {tags.pop()}")
+        else:
+            body = html.escape(" · ".join(f"{k} ({v})" if v is not None else str(k)
+                                          for k, v in held.items()))
+        return _trow(f"Held ({len(held)})", body)
+    if isinstance(held, list) and held:
+        return _trow(f"Held ({len(held)})", html.escape(" · ".join(map(str, held))))
+    return None
+
+
+#: [(zt)] WHAT EACH RENDERER ACTUALLY READS, derived from its OWN source at
+#: import time — never a hand-typed list, which is the constant that drifts.
+#:
+#: THE DEFECT THIS CLOSES, and it was introduced by the first cut of this very
+#: block: a renderer that showed 8 of `leverage`'s 26 fields marked the WHOLE
+#: key consumed, so 18 published numbers — the daily-loss halt geometry, the
+#: ruin gate's `headroom` verdict, the MEASURED all-slots stop, the held-basket
+#: liquidation gap — vanished from the raw dump they had been visible in. That
+#: is strictly worse than the wall of text it replaced: a summary that DELETES
+#: its own detail. Found by an adversarial review of this change.
+#: So a block is never consumed wholesale. `card()` subtracts exactly the
+#: sub-keys the renderer read and dumps the REMAINDER, so every published field
+#: is either on a row or still in the dump — and extending a renderer shrinks
+#: the residue automatically, with no second list to update.
+_SUBKEY_CACHE = {}
+
+
+def _reader_subkeys(fn_name, param):
+    """{"literal", …} for `param.get("literal")` inside `fn_name`, receiver
+    scoped to the BARE parameter name (a `(x.get("a") or {}).get("b")` receiver
+    is a BoolOp — a SUB-dict read, not a key of this block).
+
+    Cached: this parses a 400KB module, and `card()` would otherwise re-parse
+    it a dozen times per book. The FAIL DIRECTION is deliberate and is the safe
+    one — an empty set consumes nothing, so the raw dump keeps everything and
+    the page degrades to its pre-(zt) verbosity rather than hiding a field.
+    **It is also how the first cut of this function shipped dead**: `ast` was
+    not imported here, `NameError` is an `Exception`, and the bare handler
+    turned a missing import into a silent no-op — this repo's own
+    fail-open-except trap, in the code written to close a hiding bug."""
+    key = (fn_name, param)
+    if key in _SUBKEY_CACHE:
+        return _SUBKEY_CACHE[key]
+    try:
+        tree = ast.parse(_SELF_SRC)
+    except Exception:  # noqa: BLE001
+        _SUBKEY_CACHE[key] = set()
+        return set()
+    out = set()
+    for fn in ast.walk(tree):
+        if not (isinstance(fn, ast.FunctionDef) and fn.name == fn_name):
+            continue
+        for n in ast.walk(fn):
+            if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                    and n.func.attr == "get"
+                    and isinstance(n.func.value, ast.Name)
+                    and n.func.value.id == param
+                    and n.args and isinstance(n.args[0], ast.Constant)
+                    and isinstance(n.args[0].value, str)):
+                out.add(n.args[0].value)
+    _SUBKEY_CACHE[key] = out
+    return out
+
+
+def _reads_whole_block(fn_name, param):
+    """True when `fn_name` ITERATES `param` — `for … in param`,
+    `param.items()`, `.values()`, `.keys()`, `sorted(param)`.
+
+    Such a renderer visits every key by construction, so `_reader_subkeys`'s
+    `.get("literal")` scan finds nothing and the block would be dumped in full
+    beside the row that already rendered it. This is a PROPERTY OF THE CODE and
+    is read off the code, never a hand-maintained list of renderer names — the
+    constant that drifts."""
+    key = ("~whole", fn_name, param)
+    if key in _SUBKEY_CACHE:
+        return _SUBKEY_CACHE[key]
+    hit = False
+    try:
+        tree = ast.parse(_SELF_SRC)
+    except Exception:  # noqa: BLE001
+        _SUBKEY_CACHE[key] = False
+        return False
+    for fn in ast.walk(tree):
+        if not (isinstance(fn, ast.FunctionDef) and fn.name == fn_name):
+            continue
+        for n in ast.walk(fn):
+            # `for x in param:` / comprehension over param
+            if isinstance(n, (ast.For, ast.comprehension)):
+                it = n.iter
+                if isinstance(it, ast.Name) and it.id == param:
+                    hit = True
+                if (isinstance(it, ast.Call) and isinstance(it.func, ast.Attribute)
+                        and it.func.attr in ("items", "values", "keys")
+                        and isinstance(it.func.value, ast.Name)
+                        and it.func.value.id == param):
+                    hit = True
+                if (isinstance(it, ast.Call) and isinstance(it.func, ast.Name)
+                        and it.func.id in ("sorted", "list", "len")
+                        and it.args and isinstance(it.args[0], ast.Name)
+                        and it.args[0].id == param):
+                    hit = True
+    _SUBKEY_CACHE[key] = hit
+    return hit
+
+
+try:
+    _SELF_SRC = open(__file__, encoding="utf-8").read()
+except Exception:  # noqa: BLE001
+    _SELF_SRC = ""
+
+
+def telemetry_rows(extra):
+    """-> (rows_html, consumed) for the structured blocks in a bot's `extra`.
+
+    `consumed` is `{block: set(sub-keys the row rendered)}` — never a bare set
+    of block names. `card()` dumps whatever each block still holds beyond that,
+    so a summary can never delete the detail it summarised (see
+    `_reader_subkeys`). A block whose renderer declined leaves an EMPTY entry
+    and is dumped whole."""
+    rows, used = [], {}
+    if not isinstance(extra, dict):
+        return rows, used
+
+    def _try(keys, fn, *args):
+        try:
+            r = fn(*args)
+        except Exception:  # noqa: BLE001
+            r = None
+        if r:
+            rows.append(r)
+            for k in keys:
+                used.setdefault(k, set())
+                # the FIRST key of each tuple is the renderer's own parameter;
+                # companion keys (slot_census beside gate_census) are consumed
+                # only as far as that renderer reads them, same rule.
+                used[k] |= _reader_subkeys(fn.__name__, k)
+                # a renderer that ITERATES the block has visited all of it
+                if _reads_whole_block(fn.__name__, k):
+                    blk = extra.get(k)
+                    if isinstance(blk, dict):
+                        used[k] |= set(blk)
+                    else:
+                        used[k] |= {"~scalar"}
+
+    control = extra.get("control")
+    if isinstance(control, dict):
+        _try(("control",), _t_control, control)
+    progression = extra.get("progression")
+    if isinstance(progression, dict):
+        _try(("progression",), _t_progression, progression)
+    spend = extra.get("spend")
+    if isinstance(spend, dict):
+        _try(("spend",), _t_spend, spend)
+    leverage = extra.get("leverage")
+    if isinstance(leverage, dict):
+        _try(("leverage",), _t_leverage, leverage)
+        if isinstance(leverage.get("halt"), dict):
+            try:
+                _hr = _t_halt(leverage["halt"])
+            except Exception:  # noqa: BLE001
+                _hr = None
+            if _hr:
+                rows.append(_hr)
+                # `halt` is a SUB-key of `leverage`; the residue rule works on
+                # top-level keys, so this one is folded in explicitly.
+                used.setdefault("leverage", set()).add("halt")
+    _try((), _t_cap_slots, extra)
+    margin = extra.get("margin")
+    if isinstance(margin, dict):
+        _try(("margin",), _t_margin, margin)
+    stop_overshoot = extra.get("stop_overshoot")
+    if isinstance(stop_overshoot, dict):
+        _try(("stop_overshoot",), _t_stop_overshoot, stop_overshoot)
+    entry_vetoes = extra.get("entry_vetoes")
+    if isinstance(entry_vetoes, dict):
+        _try(("entry_vetoes",), _t_entry_vetoes, entry_vetoes)
+    levers = extra.get("levers")
+    if isinstance(levers, dict):
+        _try(("levers",), _t_levers, levers)
+    gate_census, slot_census = extra.get("gate_census"), extra.get("slot_census")
+    if isinstance(gate_census, dict):
+        _try(("gate_census", "slot_census"), _t_gate_census, gate_census, slot_census)
+    lens_evidence, lens_veto = extra.get("lens_evidence"), extra.get("lens_veto")
+    if isinstance(lens_evidence, dict):
+        _try(("lens_evidence", "lens_veto"), _t_lens_evidence, lens_evidence, lens_veto)
+    holdwatch = extra.get("holdwatch")
+    if isinstance(holdwatch, dict):
+        _try(("holdwatch",), _t_holdwatch, holdwatch)
+    sources = extra.get("sources")
+    if isinstance(sources, dict):
+        _try(("sources", "dir_by_src", "dir_basis_by_src", "hold_h_by_src"),
+             _t_sources, sources, extra.get("dir_by_src"),
+             extra.get("dir_basis_by_src"), extra.get("hold_h_by_src"))
+    caps = extra.get("caps")
+    if isinstance(caps, dict) and caps:
+        # `_t_caps` returns (row, fully_rendered): a caps block with nested
+        # entries renders its scalars AND stays in the raw dump.
+        try:
+            _r, _full = _t_caps(caps)
+        except Exception:  # noqa: BLE001
+            _r, _full = None, False
+        if _r:
+            rows.append(_r)
+            # a caps block with nested sleeves is only PARTLY rendered, so the
+            # scalars leave the dump and the sleeves stay — the same residue
+            # rule every other block follows.
+            used.setdefault("caps", set())
+            if _full:
+                used["caps"] |= set(caps)
+            else:
+                used["caps"] |= {k for k, v in caps.items()
+                                 if not isinstance(v, (dict, list))}
+    scan = extra.get("scan")
+    if isinstance(scan, dict):
+        _try(("scan",), _t_scan, scan)
+    census = extra.get("census_24h")
+    if isinstance(census, dict):
+        _try(("census_24h",), _t_census_24h, census)
+    held = extra.get("held")
+    if held is not None:
+        _try(("held",), _t_held, held)
+    return rows, used
+
+
 def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
          enrich=None, extra_html=""):
     open_trades = open_trades or {}
@@ -3163,13 +4276,36 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     status = (row.get("status") or "?")
     dot = "warn" if stale else ("off" if status in ("halted", "error") else "on")
     extra = row.get("extra") or {}
+    # [(zt)] the structured telemetry rows, computed FIRST so the raw dump
+    # below can subtract exactly what they rendered.
+    tele_rows, tele_used = telemetry_rows(extra)
     if isinstance(extra, dict):
         _HIDE = {"positions", "open_orders", "open_pos", "err", "src", "port"}
+
+        def _residue(key, val):
+            """What is left of `val` after the rows rendered it — or None when
+            nothing is. NEVER hides a sub-key no row showed."""
+            shown = tele_used.get(key)
+            if shown is None:
+                return val                      # no renderer touched it
+            if not isinstance(val, dict):
+                # a list/scalar block (e.g. `held` as a list) is either fully
+                # rendered or not rendered at all — there are no sub-keys to
+                # subtract.
+                return None if shown else val
+            left = {k: v for k, v in val.items() if k not in shown}
+            return left or None
+
         # [2026-08-04 (iy)] None values are dropped: shadow arms publish
         # cap_usd=null (no cap env by design) and the raw join rendered
         # "cap_usd: None" on two cards. An absent value is not a datum.
-        _bits = {k: v for k, v in extra.items()
-                 if k not in _HIDE and v is not None}
+        _bits = {}
+        for k, v in extra.items():
+            if k in _HIDE or v is None:
+                continue
+            r = _residue(k, v)
+            if r is not None:
+                _bits[k] = r
         extra_bits = " · ".join(f"{k}: {html.escape(str(v))}" for k, v in _bits.items())
     else:
         extra_bits = html.escape(str(extra))
@@ -3279,8 +4415,19 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     _dd = en.get("golive_dd")
     if _dd and _dd.get("pct") is not None:
         _basis = _dd.get("basis")
-        _bl = f' title="worse of realised and mark-to-market; basis: {_basis}"' \
-            if _basis else ""
+        # [(zt)] THE DENOMINATOR TRAVELS WITH THE NUMBER. `(yz)` rebased both
+        # drawdown halves onto the book's own PEAK EQUITY, because dividing a
+        # dollar hole by a flat $1,000 made the 15% bar fire at 35.6% of 🙏
+        # avo's real book and 25.8% of 👩 mum's — *"the one bar that is NOT
+        # clip-invariant, 2.4x and 1.7x looser on real money than on paper"*.
+        # A reader comparing two books' drawdowns has to know which
+        # denominator each was computed on, or the comparison is the same
+        # "meant a different thing on every row" defect one field over.
+        _den = _dd.get("denom")
+        _bl = (f' title="worse of realised and mark-to-market'
+               + (f'; basis: {_basis}' if _basis else '')
+               + (f'; denominator: {_den}' if _den else '')
+               + '"') if (_basis or _den) else ""
         rows.append(f'<div class="row"><span>Max Drawdown</span>'
                     f'<b style="color:#f85149"{_bl}>{_dd["pct"]:.1f}%</b></div>')
     else:
@@ -3335,6 +4482,8 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     if spark:
         _svg, _dd = spark
         rows.append(f'<div class="row"><span>7d equity · DD {_dd:+.1f}%</span><b>{_svg}</b></div>')
+    # [(zt)] the week's telemetry — control arm, spend, leverage, gates …
+    rows.extend(tele_rows)
     # live open positions passed through by the freqtrade poller
     open_pos_html = ""
     _op = extra.get("open_pos") if isinstance(extra, dict) else None
@@ -3444,9 +4593,11 @@ def render():
     # [2026-07-10] Real-money Lighter bots get their OWN section at the top of the
     # page, not interspersed with the paper fleet. is_live_bot = <bot>-lighter rows.
     # [2026-07-15 LIFECYCLE SECTIONS] Everything else is grouped by promotion
-    # stage, with the go-live gates COMPUTED per bot (see fetch_gate_metrics).
+    # stage, with the go-live gate READ per bot from the grader that owns it
+    # (see fetch_golive_stages / classify_stage — never recomputed here).
     try:
-        gates = fetch_gate_metrics()
+        # [(zt)] the CANONICAL grader, imported — not a second local gate.
+        gates = fetch_golive_stages()
     except Exception:  # noqa: BLE001
         gates = {}
 
@@ -3471,7 +4622,11 @@ def render():
         # can never auto-promote to "ready" on gates alone); this only makes
         # their distance from the bar visible. "control"/"scanner" stay off by
         # design — a reference book isn't on the promotion track.
-        if stg in ("ready", "proving", "experiment"):
+        # [(zt)] "control" joins the list. 🌾 carry sat under "not on the
+        # promotion track" with NO gate row while the grader had it at 5 of 6
+        # — a reference book is still a book with a record, and hiding its
+        # distance from the bar is the same omission one heading over.
+        if stg != "scanner":
             _ok, chips = _gate_eval(gates.get(b) or {})
             extra = f'<div class="gates">{chips}</div>'
         staged[stg].append(_mk(b, extra))
@@ -3754,18 +4909,24 @@ async function botAdmin(action, bot){
     # even when empty — the bar itself is information (what promotion takes).
     _stage_meta = [
         ("ready", "🟢 Ready for live",
-         "passes every house gate (≥{n} trades/30d · WR &gt;{wr}% · dd &lt;{dd}% · "
-         "{age}d record) — going live still needs your sign-off + GO_LIVE_CHECKLIST".format(
-             n=GATE_MIN_TRADES_30D, wr=int(GATE_MIN_WR * 100),
-             dd=int(-GATE_MAX_DD * 100), age=GATE_MIN_AGE_DAYS)),
+         "passes all six bars of the fleet's OWN go-live grader — "
+         "&ge;30d · &ge;30 closes · mean &gt; 0 · t &ge; 2.0 · both halves "
+         "positive · maxDD &lt; 15%. Win rate is REPORTED, not a bar ((fk): "
+         "it is orthogonal to expectancy, and the fleet's best-evidenced book "
+         "wins 38.8% of its trades). Read from `golive-readiness`, never "
+         "recomputed here; a dark grader promotes nobody. Going live still "
+         "needs your sign-off + GO_LIVE_CHECKLIST"),
         ("proving", "🔵 Proving",
          "shadow/paper books building the 30-day record the gates demand"),
         ("experiment", "🧪 Experiments",
-         "evidence collectors — unvalidated by design (census/lens/listing theses); "
-         "they graduate through the validation doctrine, not through P&amp;L"),
+         "evidence collectors — minted to answer a census/lens/listing "
+         "question rather than to earn. The label describes why a book "
+         "EXISTS, not what its record says: one that passes all six bars "
+         "moves to Ready, because the grader's verdict outranks the label"),
         ("control", "⚖️ Controls &amp; references",
-         "kept for comparison (delta-neutral / venue A/B baselines), not on the "
-         "promotion track"),
+         "kept for comparison (delta-neutral / venue A/B baselines). They "
+         "carry gate rows too — a reference book still has a record, and its "
+         "distance from the bar is worth reading"),
         ("scanner", "🛰 Scanners &amp; fleet organs",
          "market intelligence and the learning loop — optimistic-fill paper is "
          "never folded into trading P&amp;L"),
@@ -4044,6 +5205,26 @@ def _organ_vital(key, st):
             return _v("{} coin(s) vetoed{}",
                       None if _cv is None else len(_cv),
                       f" · {', '.join(sorted(_cv)[:3])}" if _cv else "")
+        if key == "coin-quality":
+            # n coins folded, and how many carry a MEASURED slippage sample —
+            # the two are different facts: a coin can be present with orders
+            # and no measurable fill ((yq): a fabricated zero was eaten as
+            # evidence once already).
+            _c = st.get("coins")
+            _n = None if not isinstance(_c, dict) else len(_c)
+            _m = (None if not isinstance(_c, dict) else
+                  sum(1 for v in _c.values()
+                      if isinstance(v, dict) and v.get("slip_bps") is not None))
+            return _v("{} coins folded · {} with measured slip", _n, _m)
+        if key == "tuning-proposals":
+            _pr = st.get("proposals")
+            _n = None if not isinstance(_pr, dict) else len(_pr)
+            _r = (None if not isinstance(_pr, dict) else
+                  sum(1 for v in _pr.values()
+                      if isinstance(v, dict) and v.get("direction") == "restrict"))
+            # an EMPTY channel is the healthy resting state — (wy)'s heartbeat
+            # is what makes "nobody is proposing" distinguishable from "dead".
+            return _v("{} open ({} restrict)", _n, _r)
         if key == "market-pulse":
             # [2026-07-17 AUDIT] mood/panic live under `latest` (market_pulse.py
             # :408) — reading them TOP-LEVEL got None for both, and `or 0` then
@@ -4369,6 +5550,29 @@ ORGAN_SPECS = [
     # cannot afford: fleet-alerts/fleet-tuning/xp-queue are EVENT-typed for
     # exactly this reason. The ledger + odometer history are kept; if Gap Scout
     # is ever resurrected (GAPSCOUT_RETIRED_OVERRIDE=run) restore this line.
+    # [2026-09-10 (zt)] TWO ORGANS WERE PUBLISHING ON THEIR OWN CADENCE WITH
+    # NO ROW HERE, so /vitals could not grade them and the watchdog could not
+    # see them — the (iy) fleet-allocation shape ("worse than unpageable,
+    # invisible"), found by diffing this list against the live `bot_state`
+    # table rather than against itself.
+    #   coin-quality — market_context's 14-day fold of the fleet's OWN measured
+    #     execution cost (`venue_orders.spread_bps`/`slippage_bps`), served by
+    #     `fleet_bus.recorded_cost_bps`. It is a SLOW fold (QUALITY_EVERY_H)
+    #     published by the same service as `coin-vetoes`, so a dark row here
+    #     with `coin-vetoes` fresh means the FOLD stopped while the service
+    #     lives — and every consumer then silently reads "unmeasured", which
+    #     is the accessor's own documented fail-safe and therefore invisible.
+    #     ttl 64800 = 1.2x its own published 54000, one missed fold.
+    #   tuning-proposals — the organs' proposal channel to the tuners. `(wy)`
+    #     gave it a heartbeat precisely BECAUSE it read dark past its TTL, and
+    #     the Autonomy card has consumed it since 21-Jul; it never had a
+    #     vitals row to be graded on.
+    # Both NON-critical and declared in tests/autonomy/test_organ_pageability
+    # .UNPAGEABLE_OK: each fails SAFE (an unmeasured cost proposes nothing, a
+    # dark channel proposes nothing), so their staleness is a visible card
+    # reading, not a 3am page.
+    ("coin-quality",       "💱 Coin quality — measured execution cost", False, 64800),
+    ("tuning-proposals",   "🗳️ Organ proposals — the tuners' inbox",   False, 7200),
     ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
     ("evidence-review",    "🧾 Evidence review (daily + operator)",   False, None),
     # [2026-07-21] 🏛️ the Parliament — Howard's vitals (6 books, 10-scanner
@@ -4951,14 +6155,73 @@ def ops_strip_html():
     # fleet_risk emits lowercase green/yellow/red ([2026-07-15 AUDIT FIX]:
     # the map keyed AMBER, so the warning state rendered gray).
     lcol = {"GREEN": "#1a7f37", "YELLOW": "#b8860b", "RED": "#d1242f"}.get(light, "#5b7184")
-    parts.append(_chip("Risk light", light, lcol,
-                       f"fleet_risk mode={fr.get('mode', '?')} — long-budget veto is "
-                       f"ENFORCED in the strategies via fleet_bus"))
-    if fr:
+    # [2026-09-10 (zt)] THE LIGHT THE CONSUMERS ENFORCE IS THE COHORT'S, AND THE
+    # STRIP WAS LEADING WITH THE ONE NUMBER NOBODY OBEYS.
+    # `(wp)`/`(wy)` split the long budget per cohort — *"a paper position carries
+    # no risk to a real-money book and a real position carries none to a paper
+    # one, so one count for both is a category error in BOTH directions"* — and
+    # every veto consumer now reads `fleet_bus.cohort_long_state`, i.e.
+    # `cohorts.<mine>`. This strip kept rendering the POOLED light, in the first
+    # position an operator reads. MEASURED on the live payload the day this
+    # shipped: pooled **YELLOW at 15L/20** while the enforced cohorts both read
+    # **GREEN** (live 9/20, shadow 14/26) — the cockpit calling caution over a
+    # ceiling neither population is near, which is exactly how an operator
+    # learns to ignore the light.
+    # The pooled pair is KEPT, muted and last: it is still published, it is the
+    # honest whole-fleet picture, and deleting it would hide the fleet-wide
+    # crowding the split deliberately stopped enforcing. It just stops leading.
+    _cohorts = fr.get("cohorts") if isinstance(fr.get("cohorts"), dict) else None
+    _co = {k: _cohorts.get(k) for k in ("live", "shadow")} if _cohorts else {}
+    if _co.get("live") and _co.get("shadow") and all(
+            isinstance(v, dict) for v in _co.values()):
+        for _name, _icon, _tip in (
+                ("live", "🔴", "REAL MONEY — the cohort the live books' "
+                               "long-budget veto actually reads"),
+                ("shadow", "🔵", "paper — the shadow cohort's own budget, so "
+                                 "the judge's control twins are never vetoed "
+                                 "on positions their live arms cannot see")):
+            _c = _co[_name]
+            _lt = str(_c.get("light") or "?").upper()
+            parts.append(_chip(
+                f"{_icon} {_name}",
+                f"{_lt} · {_c.get('long_positions', '?')}L/"
+                f"{_c.get('long_budget', '?')}",
+                {"GREEN": "#1a7f37", "YELLOW": "#b8860b",
+                 "RED": "#d1242f"}.get(_lt, "#5b7184"),
+                f"{_tip} — fleet_risk mode={fr.get('mode', '?')}, ENFORCED in "
+                f"the strategies via fleet_bus.cohort_long_state"))
+        parts.append(_chip(
+            "pooled", f"{light} · {fr.get('long_positions', '?')}L/"
+                      f"{fr.get('long_budget', '?')} · "
+                      f"{fr.get('short_positions', '?')}S/"
+                      f"{fr.get('short_budget', '?')}",
+            None,
+            "the whole-fleet count — still published, but NO consumer enforces "
+            "it since (wp) gave each cohort its own budget. Shown last because "
+            "it is the fleet-wide picture, never the gate."))
+    elif fr:
+        # pre-(wp) payload (or a cohort block this reader cannot parse): the
+        # pooled light is all there is, and it IS the enforced number there.
+        parts.append(_chip("Risk light", light, lcol,
+                           f"fleet_risk mode={fr.get('mode', '?')} — long-budget "
+                           f"veto is ENFORCED in the strategies via fleet_bus"))
         parts.append(_chip(
             "Book", f"{fr.get('long_positions', '?')}L/{fr.get('long_budget', '?')} · "
                     f"{fr.get('short_positions', '?')}S/{fr.get('short_budget', '?')}",
             None, "directional positions vs fleet budget (live + shadow cohort)"))
+    else:
+        parts.append(_chip("Risk light", light, lcol,
+                           "fleet_risk is dark — this is not a measurement"))
+    # [(zt)] THE DRAWDOWN GOVERNOR'S CHIPS BELONG TO EVERY BRANCH ABOVE.
+    # These three sat inside the old single `if fr:` block, and splitting that
+    # block for the cohort read left them stranded in the DARK branch — so the
+    # 7-day drawdown and the governor's `clip_scale`, an actuator that shrinks
+    # every consuming book's clip, rendered only when fleet_risk was dead. Both
+    # the regression and this note are the point: the ops strip is the first
+    # line an operator reads, and a chip that silently stops rendering is
+    # indistinguishable from a healthy fleet. Found by an adversarial review of
+    # this very change, which is what I3 is for.
+    if fr:
         eq, dd, cs = (fr.get("fleet_equity"), fr.get("fleet_dd_7d"),
                       fr.get("clip_scale"))
         if eq is not None:
@@ -5159,156 +6422,141 @@ def _iso_dt(s):
 
 
 # ---------------------------------------------------------------------------
-# [2026-07-15 LIFECYCLE SECTIONS] The main grid is grouped by promotion stage,
-# and the house go-live gates (Rules in CLAUDE.md: 30-day WR > 55% AND max
-# drawdown < 15%, plus enough trades and a full 30-day record) are COMPUTED
-# per bot, not asserted. A bot that passes every gate surfaces in "READY FOR
-# LIVE" automatically — the promotion pipeline as a standing page section.
+# [2026-09-10 (zt)] THE SECOND GO-LIVE GATE THAT USED TO LIVE HERE IS DELETED.
+#
+# `GATE_MIN_TRADES_30D / GATE_MIN_WR / GATE_MAX_DD / GATE_MIN_AGE_DAYS` and
+# `fetch_gate_metrics()` re-implemented a promotion bar — win rate above 55%
+# among them — that `(fk)` RETIRED on 29-Jul for cause: win rate is orthogonal
+# to expectancy, and this fleet's best-evidenced book wins 38.8% of its trades.
+# It drove the page's "🟢 Ready for live" heading, and on the live payload the
+# day it was removed it disagreed with the fleet's own grader on THREE of five
+# books — promoting 👩 mum's twin and 💼 turnbull, both of which the grader
+# refuses, while filing 🎫 the taker (READY, 6 of 6, the first in this fleet's
+# history) under "unvalidated by design".
+#
+# It is DELETED rather than left unused: dead code with a plausible name is how
+# a second copy of a rule comes back ((hj)), and this one also ran a per-render
+# UNION query over two ledgers to compute a number nothing may act on.
+# `classify_stage` / `_gate_eval` read `golive-readiness` — see below.
+# ---------------------------------------------------------------------------
 
-GATE_MIN_TRADES_30D = 20
-GATE_MIN_AGE_DAYS = 30
-GATE_MIN_WR = 0.55
-GATE_MAX_DD = -0.15
-
-# Books that are evidence collectors by design — never candidates until their
-# thesis is validated through the doctrine (census / lens grading / overlap).
+# The two COLLECTOR LABELS survive the deletion above, and they are a different
+# thing from a gate: they say why a book was MINTED, not whether its record
+# clears the bar. `classify_stage` treats the grader's `ready` as senior to
+# both — a collector that passes all six bars is at the bar.
+#
+# Books that are evidence collectors by design — minted to answer a
+# census/lens/listing question rather than to earn.
 EXPERIMENT_BASES = {"lighter-ticket-taker", "lighter-dislocation",
                     "lighter-perp-sniper", "event-listing-sniper"}
-# Reference books: kept for comparison, not on the promotion track.
+# Reference books: kept for comparison (delta-neutral / venue A/B baselines).
 CONTROL_BASES = {"perps-funding-carry"}
 
-_GATES_CACHE = {"data": None, "ts": 0.0}
 
+# ---------------------------------------------------------------------------
+# [2026-09-10 (zt)] THE PAGE RAN A SECOND GO-LIVE GATE, AND IT WAS THE ONE THE
+# FLEET RETIRED.
+#
+# `(fk)` re-specified the gate on 29-Jul and REMOVED win rate as a bar, because
+# *"win rate is orthogonal to expectancy"* and the fleet's best-evidenced book
+# wins 38.8% of its trades. `scripts/golive_readiness.py` has been the single
+# owner ever since, and `(hj)` recorded what happens when a second copy lives
+# on: *"a second copy of a rule is a second rule"* — `evidence_review` kept one
+# through the same re-spec and, one day later, admitted a t=0.65 book and
+# rejected the fleet's best.
+#
+# The dashboard kept the other copy — `n30 ≥ 20 · WR > 55% · dd < 15% · age ≥
+# 30d` — and used it for the most prominent promotion signal on the page.
+# MEASURED on the live payload the day this was fixed, the two disagreed on
+# THREE of five books, in both directions:
+#
+#   👩 mum shadow      "🟢 Ready for live"      grader: 4/6 (window 15.7d, t 1.94)
+#   💼 turnbull        "🟢 Ready for live"      grader: 5/6 (t 1.56)
+#   🎫 the taker       "🧪 Experiments"          grader: READY — 6 of 6, the
+#                                                fleet's FIRST EVER
+#
+# So the page promoted two books the fleet's own grader refuses, on a bar that
+# was deleted for cause — and buried the one book that actually passed under a
+# heading reading *"unvalidated by design"*. That is I15's own warning landing
+# on a REPORT: *when a bad idea is removed from a report, grep for it in the
+# things that ACT* — and a promotion signal an operator reads before funding a
+# book acts.
+#
+# The gate is IMPORTED now, never re-derived: the section reads the grader's
+# published `ready` / `bars` / `fails`. Two properties are load-bearing:
+#   * FAIL-CLOSED. A dark or stale grader promotes NOBODY and says so — the
+#     opposite of the old path, where a book could be "ready" because a local
+#     query happened to succeed.
+#   * `ready` is SENIOR to the collector labels. A book filed as an experiment
+#     or a control that passes all six bars is shown as passing; those labels
+#     describe why a book was minted, not what its record says now.
+# ---------------------------------------------------------------------------
 
-def fetch_gate_metrics(ttl=600):
-    """{bot: {n30, w30, wr, dd, age_days}} from the union ledger + equity
-    history. Cached ~10 min — the page refreshes every 30s and these
-    aggregates move slowly.
-    [2026-07-15 AUDIT FIXES] dd walks hourly MIN/MAX buckets (hourly AVG
-    understated true peak-to-trough); age comes from the bot's FIRST-EVER
-    snapshot (measuring inside the 30d window pinned the age gate at the
-    boundary); failures never populate the cache (a cold-start DB blip froze
-    all-failed gate chips for 10 min); the TEXT-timestamp cast is guarded by
-    pg_input_is_valid (a prefix-date garbage value aborted the whole union)."""
-    now = time.time()
-    if _GATES_CACHE["data"] is not None and now - _GATES_CACHE["ts"] < ttl:
-        return _GATES_CACHE["data"]
-    import psycopg2
+def fetch_golive_stages():
+    """{bot: grade-dict} from the grader's own payload, or {} when it is dark.
+
+    Covers `books` AND `below_floor` so a thin book gets its honest chips
+    rather than vanishing. Freshness is the grader's own contract (I1)."""
+    st = fetch_states(["golive-readiness"]).get("golive-readiness") or {}
+    if not isinstance(st, dict) or not _state_fresh(st):
+        return {}
     out = {}
-    try:
-        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT to_regclass('public.bot_trades') AS bt, "
-                            "to_regclass('public.paper_trades') AS pt, "
-                            "to_regclass('public.bot_equity_history') AS eh")
-                has_bt, has_pt, has_eh = cur.fetchone()
-                parts = []
-                if has_bt:
-                    parts.append("SELECT bot, close_ts, profit_abs FROM bot_trades "
-                                 "WHERE is_open IS NOT TRUE AND close_ts IS NOT NULL")
-                if has_pt:
-                    # [2026-07-16] exclude side='skip' + NULL pnl: those rows are
-                    # the sniper's gate-REJECTION logs, not trades. They land
-                    # under a separate bot id today (event-listing-sniper-skips),
-                    # so this only drops a phantom gate row — but if skips were
-                    # ever written under a real bot id they'd silently inflate
-                    # n30 and crater its win rate. Same guard as fetch_bot_quality.
-                    parts.append("SELECT bot, closed_at::timestamptz, pnl_abs "
-                                 "FROM paper_trades WHERE closed_at IS NOT NULL "
-                                 "AND pg_input_is_valid(closed_at, 'timestamptz') "
-                                 "AND side IS DISTINCT FROM 'skip' "
-                                 "AND pnl_abs IS NOT NULL")
-                if parts:
-                    cur.execute(
-                        f"""SELECT bot,
-                                   COUNT(*) FILTER (WHERE close_ts > now() - interval '30 days'),
-                                   COUNT(*) FILTER (WHERE close_ts > now() - interval '30 days'
-                                                      AND profit_abs > 0)
-                            FROM ({" UNION ALL ".join(parts)}) t(bot, close_ts, profit_abs)
-                            GROUP BY bot""")
-                    for bot, n30, w30 in cur.fetchall():
-                        out.setdefault(bot, {})["n30"] = int(n30)
-                        out[bot]["w30"] = int(w30)
-                if has_eh:
-                    cur.execute(
-                        """SELECT bot, date_trunc('hour', ts) AS h,
-                                  MIN(equity), MAX(equity)
-                           FROM bot_equity_history
-                           WHERE ts > now() - interval '30 days' AND equity IS NOT NULL
-                           GROUP BY bot, 2 ORDER BY bot, 2""")
-                    series = {}
-                    for bot, h, lo, hi in cur.fetchall():
-                        series.setdefault(bot, []).append((float(lo), float(hi)))
-                    for bot, buckets in series.items():
-                        peak, ddv = None, 0.0
-                        for lo, hi in buckets:
-                            peak = hi if peak is None or hi > peak else peak
-                            if peak:
-                                ddv = min(ddv, lo / peak - 1.0)
-                        out.setdefault(bot, {})["dd"] = ddv
-                    cur.execute("SELECT bot, MIN(ts) FROM bot_equity_history "
-                                "WHERE equity IS NOT NULL GROUP BY bot")
-                    for bot, f in cur.fetchall():
-                        if f is None:
-                            continue
-                        age = (dt.datetime.now(dt.timezone.utc)
-                               - f.replace(tzinfo=f.tzinfo or dt.timezone.utc))
-                        out.setdefault(bot, {})["age_days"] = \
-                            age.total_seconds() / 86400.0
-        finally:
-            conn.close()
-    except Exception:
-        # serve the last good cache or the partial once — NEVER cache failure
-        if _GATES_CACHE["data"] is not None:
-            return _GATES_CACHE["data"]
-        for m in out.values():
-            n, w = m.get("n30") or 0, m.get("w30") or 0
-            m["wr"] = (w / n) if n else None
-        return out
-    for m in out.values():
-        n, w = m.get("n30") or 0, m.get("w30") or 0
-        m["wr"] = (w / n) if n else None
-    _GATES_CACHE["data"] = out
-    _GATES_CACHE["ts"] = now
+    for section in ("books", "below_floor"):
+        for bot, rec in (st.get(section) or {}).items():
+            if isinstance(rec, dict):
+                out[bot] = rec
     return out
 
 
-def _gate_eval(m):
-    """(all_pass, chips_html) for one bot's gate metrics."""
-    n30 = m.get("n30") or 0
-    wr = m.get("wr")
-    dd = m.get("dd")
-    age = m.get("age_days")
-    def chip(ok, text):
-        mark = "✓" if ok else "✗"
-        colr = "#1a7f37" if ok else "#a3121b"
-        return f'<span style="color:{colr};white-space:nowrap">{text} {mark}</span>'
-    c1 = chip(n30 >= GATE_MIN_TRADES_30D, f"{n30}/{GATE_MIN_TRADES_30D} trades·30d")
-    c2 = chip(wr is not None and wr >= GATE_MIN_WR,
-              f"WR {wr * 100:.0f}%" if wr is not None else "WR —")
-    c3 = chip(dd is not None and dd >= GATE_MAX_DD,
-              f"dd {dd * 100:+.1f}%" if dd is not None else "dd —")
-    c4 = chip(age is not None and age >= GATE_MIN_AGE_DAYS,
-              f"age {age:.0f}/{GATE_MIN_AGE_DAYS}d" if age is not None else "age —")
-    ok = (n30 >= GATE_MIN_TRADES_30D and wr is not None and wr >= GATE_MIN_WR
-          and dd is not None and dd >= GATE_MAX_DD
-          and age is not None and age >= GATE_MIN_AGE_DAYS)
-    return ok, ("Go-live gates: " + " · ".join((c1, c2, c3, c4)))
+def _gate_eval(rec):
+    """(ready, chips_html) for one book, from the GRADER's own bar map.
+
+    `rec` is the grader's per-book dict. An absent/dark record is NOT ready
+    and renders as unknown — never as a pass, and never as four green chips
+    from a rule the fleet retired."""
+    if not isinstance(rec, dict) or not isinstance(rec.get("bars"), dict):
+        return False, ('<span class="muted">Go-live gate: unknown — the '
+                       'grader has not published a grade for this book</span>')
+    bars = rec["bars"]
+    chips = []
+    for key, glyph, tip in GOLIVE_BARS:
+        on = bool(bars.get(key))
+        colr = "#1a7f37" if on else "#a3121b"
+        chips.append(f'<span style="color:{colr};white-space:nowrap" '
+                     f'title="{html.escape(tip)}">{glyph} {"✓" if on else "✗"}</span>')
+    ready = bool(rec.get("ready"))
+    tail = ""
+    miss = "; ".join(str(x) for x in (rec.get("fails") or [])[:2])
+    if miss:
+        tail = f' <span class="muted">— {html.escape(miss)}</span>'
+    n, t = rec.get("n"), rec.get("t")
+    head = f'Go-live gate {rec.get("bars_passed", 0)}/6'
+    if isinstance(n, int):
+        head += f' <span class="muted">n{n}'
+        if isinstance(t, (int, float)) and not isinstance(t, bool):
+            head += f' · t{t:+.2f}'
+        head += '</span>'
+    return ready, (head + ": " + " · ".join(chips) + tail)
 
 
-def classify_stage(bot, gates):
+def classify_stage(bot, stages):
     """'ready' | 'proving' | 'experiment' | 'control' | 'scanner' for one
     NON-live display bot. Live rows keep their own section."""
     base, _suf = venue_variant(bot)
     if bot in SCANNERS or base in SCANNERS:
         return "scanner"
+    ready, _chips = _gate_eval(stages.get(bot) or {})
+    # the grader's verdict outranks the collector label: a book minted as an
+    # evidence collector that has since passed all six bars IS at the bar, and
+    # burying it under "unvalidated by design" is how the fleet's first-ever
+    # READY book went unremarked on its own dashboard.
+    if ready:
+        return "ready"
     if base in EXPERIMENT_BASES:
         return "experiment"
     if base in CONTROL_BASES:
         return "control"
-    ok, _chips = _gate_eval(gates.get(bot) or {})
-    return "ready" if ok else "proving"
+    return "proving"
 
 
 def _svg_chart(series, color, label, height=170, width=760, fmt=None):

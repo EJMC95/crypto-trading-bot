@@ -232,16 +232,50 @@ def test_fetch_golive_dd_reads_both_sections_of_the_real_payload():
     A reader that took only `books` would leave those six with no line at all
     — which is the defect, re-made one level up."""
     payload = {
-        "books": {"a-lshadow": {"max_dd_pct": 13.1, "maxdd_basis": "mtm"}},
+        "books": {"a-lshadow": {"max_dd_pct": 13.1, "maxdd_basis": "mtm",
+                                "maxdd_denom": "peak_equity"}},
         "below_floor": {"b-lshadow": {"max_dd_pct": None,
                                       "why_absent": "no closed trades"}},
     }
     D.fetch_states = lambda keys: {"golive-readiness": payload}
     got = D.fetch_golive_dd()
     assert set(got) == {"a-lshadow", "b-lshadow"}, got
-    assert got["a-lshadow"] == {"pct": 13.1, "basis": "mtm", "why": None}
+    assert got["a-lshadow"] == {"pct": 13.1, "basis": "mtm",
+                                "denom": "peak_equity", "why": None}
     assert got["b-lshadow"]["pct"] is None
     assert got["b-lshadow"]["why"] == "no closed trades"
+
+
+def test_the_drawdown_carries_its_own_denominator():
+    """[(zt)] THE DENOMINATOR TRAVELS WITH THE NUMBER, and this is the reason.
+
+    `(yz)` rebased both drawdown halves onto each book's own PEAK EQUITY,
+    because dividing a dollar hole by a flat $1,000 made the 15% bar fire at
+    35.6% of 🙏 avo's real book and 25.8% of 👩 mum's — the one go-live bar
+    that is NOT clip-invariant, measurably looser on real money than on paper.
+    A card that prints two books' drawdowns side by side without saying which
+    denominator each was computed on reproduces *"the drawdown bar meant a
+    different thing on every row"* one field over.
+
+    An OLDER payload carries no `maxdd_denom`; that must render as no
+    denominator, never as an assumed one."""
+    D.fetch_states = lambda keys: {"golive-readiness": {"books": {
+        "peak-lshadow": {"max_dd_pct": 12.2, "maxdd_basis": "realised",
+                         "maxdd_denom": "peak_equity"},
+        "old-lshadow": {"max_dd_pct": 4.4, "maxdd_basis": "mtm"}}}}
+    got = D.fetch_golive_dd()
+    assert got["peak-lshadow"]["denom"] == "peak_equity"
+    assert got["old-lshadow"]["denom"] is None, (
+        "an absent maxdd_denom must stay absent — assuming one is the "
+        "fabricated-reassurance direction")
+
+    row = _row()
+    html_peak = D.card("peak-lshadow", row, enrich={"golive_dd": got["peak-lshadow"]})
+    assert "peak_equity" in html_peak, (
+        "the denominator never reached the card")
+    html_old = D.card("old-lshadow", row, enrich={"golive_dd": got["old-lshadow"]})
+    assert "denominator" not in html_old, (
+        "an older payload must not grow a denominator the grader never sent")
 
 
 def test_a_junk_max_dd_degrades_to_unknown_not_to_a_number():

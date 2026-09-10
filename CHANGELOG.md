@@ -1,3 +1,180 @@
+## 2026-09-10 (zt) — THE WEEK'S TELEMETRY REACHED THE CARD, AND THE PAGE WAS STILL RUNNING THE GO-LIVE GATE THE FLEET RETIRED IN JULY
+
+**Eamon, 10-Sep:** *"update the pnl dashboard to reflect of the latest tech and
+implements we have made over the last week."*
+
+The week to 10-Sep shipped the numbers doctrine had been asking for — a
+per-book random-entry CONTROL ARM ((zc)/(zb)), the I22 SPEND census, the
+LEVERAGE block with its vol target and all-slots-stop arithmetic ((yz)/(yp)),
+the judge's LEVER SURFACE ((yg)/(zj)), 🎫 the taker's GATE CENSUS ((xs)), the
+entry-veto ledger with its 30-day lockout cost ((vm)/(xg)), the measured stop
+OVERSHOOT ((xp)), the t-bar disagreement ((zm)), the vetoed-lens split ((yn)),
+the tied-halves flag and the resampled drawdown ((za)), the ready-freeze
+((ye)) and the candidate clock ((zl)/(zn)). **The operator card rendered every
+one of them as one 900-character line of `leverage: {'mmf': 0.2, 'set': 5.0,
+…}` in the raw `extra` dump.** That is the `class_split` rule going unserved at
+the reporting layer: *a number a decision depends on must be READABLE, not
+recomputable.*
+
+### 1 · THE PAGE RAN A SECOND GO-LIVE GATE AND IT WAS THE RETIRED ONE
+
+`(fk)` removed win rate as a promotion bar on 29-Jul for cause. The dashboard
+kept its own copy — `n30 ≥ 20 · WR > 55% · dd < 15% · age ≥ 30d` — and drove
+the page's most prominent promotion signal with it. **MEASURED on the live
+payload: the two gates disagreed on THREE of five books, in both directions.**
+
+| book | the page said | the fleet's grader says |
+|---|---|---|
+| 👩 mum's twin | 🟢 **Ready for live** | 4/6 — window 15.7d, t 1.94 |
+| 💼 turnbull | 🟢 **Ready for live** | 5/6 — t 1.56 |
+| 🎫 the taker | 🧪 Experiments, *"unvalidated by design"* | **READY, 6 of 6 — the first in this fleet's history** |
+
+So it promoted two books the grader refuses, on a bar deleted because it would
+reject 🌾 carry (38.8% win rate, the best-evidenced book here) — and buried the
+one book that actually passed. That is `(hj)`'s *"a second copy of a rule is a
+second rule"* and I15's *"when a bad idea is removed from a report, grep for it
+in the things that ACT"*, on the surface an operator reads before funding a
+book.
+
+**FIXED by IMPORT, not by re-derivation.** `classify_stage` / `_gate_eval` read
+`golive-readiness`'s own `bars` / `ready` / `fails`. Two properties are
+load-bearing: **fail-CLOSED** (a dark or stale grader promotes NOBODY — under
+the old path a book was "ready" because a local query happened to succeed), and
+**`ready` is SENIOR to the collector label** (a book minted as an experiment or
+a control that passes all six bars is shown as passing; the label says why a
+book EXISTS, not what its record is). The 121 lines of retired gate are
+**deleted**, not left unused — dead code with a plausible name is how a second
+copy comes back, and this one also ran a per-render UNION query over two
+ledgers to compute a number nothing may act on. ⚖️ Counterweight and 🌾 carry
+gained gate rows they never had.
+
+### 2 · POSTGRES `jsonb` SORTS OBJECT KEYS, SO A PUBLISHED ORDER IS NOT A CONTRACT
+
+`(xs)` built 🎫 the taker's gate census in gate order and said how to read it:
+*"`tickets_in` is the denominator, each counter is one gate's refusal, and the
+first large counter names the binding gate."* **That instruction is
+unfollowable from the payload.** `jsonb` sorts object keys by (length, bytes)
+on write, so the census arrives `no_mark, tickets_in, coin_vetoed, …` and
+`items[0]` is whichever key is SHORTEST. Every jsonb-backed key in this fleet
+has the property; it is invisible because almost nothing reads order.
+
+The order is **DECLARED** in the card and pinned by AST against the bot's own
+literal, so a new gate or a reordered one reddens the build instead of silently
+mis-reporting which gate binds; an undeclared counter renders LAST under `?`
+rather than being dropped (I8). The live row now reads
+`15 in → lens_vetoed 14 · bull_blocked 1 → offered 0` — one line, and the story
+is that 14 of 15 tickets died on the lens veto.
+
+### 3 · THE COCKPIT LED WITH THE ONE LIGHT NO CONSUMER OBEYS
+
+`(wp)`/`(wy)` gave each cohort its own long budget — *"a paper position carries
+no risk to a real-money book and a real position carries none to a paper
+one"* — and every veto consumer reads `fleet_bus.cohort_long_state`. The ops
+strip kept rendering the POOLED light, first on the page. **Measured: pooled
+YELLOW at 15L/20 while both enforced cohorts read GREEN** (live 9/20, shadow
+14/26). The cohorts lead now; the pooled pair is kept, muted and last, because
+it is still the honest fleet-wide picture.
+
+### 4 · WHAT ELSE REACHED A SURFACE
+
+* **Per-book rows** for the control arm, spend, leverage, margin, stop
+  overshoot, entry gates, the judge lane, ticket gates, the lens record, hold
+  telemetry, the scan census and its 24h rollup, caps, and the sniper's
+  per-source census with its `measured` / `unsupported` direction basis.
+* **🚦 the grader's card**: a `t permissive` chip where the bar admits a book
+  its own cluster-robust read refuses ((zm) — TRUE on 🙏 avo's LIVE arm), a
+  `t strict` chip for the harmless direction, `veto 46/205 → +1.49%` on the
+  READY taker ((yn)), a `tie` chip where the ½ bar was decided by row ORDER
+  ((za) — TRUE on exactly two books, and they are the live avo arm and the
+  READY taker), the resampled drawdown distribution in the drawdown tooltip
+  ((za): 👩 mum's live arm shows 12.0% against a 15% bar while her own p99 is
+  31.8% and 3.15% of orderings breach it), and an era chip that stopped
+  printing `era 07-30T11:09:46+00:00`.
+* **🤖 the rail**: the bracket FREEZE while a READY book is being tuned ((ye)),
+  and the judge candidate's own clock and sample horizon ((zl)/(zn)) — a
+  serial lane burning days it cannot use is the fleet's only path to more real
+  money standing still.
+* **Two organs joined `ORGAN_SPECS`** — `coin-quality` and `tuning-proposals`
+  were publishing on their own cadence with NO vitals row, so /vitals could not
+  grade them and the watchdog could not see them (the (iy) *"worse than
+  unpageable, invisible"* shape). Found by diffing the list against the live
+  `bot_state` table rather than against itself. Both fail SAFE, so both are
+  declared in `UNPAGEABLE_OK` with reasons.
+* **Five card descriptions corrected (I12).** 👩 mum's REAL-MONEY card said
+  "$50 × 4 slots" while she runs 12 slots at a $221.90 clip and 5× gross; 🙏
+  avo's said "÷ 5 slots, levered 1.4× of a 1.5× drawdown budget" against 6
+  slots at 2.0× and an operator-set ceiling; ⚖️ Counterweight advertised the
+  K=8 widening REVERTED on 4-Aug by its own pre-registered criterion; 🎫 the
+  taker described the real-money policy of a live arm retired 13-Aug; 🌾 carry
+  named its HL arm, retired 17-Jul. The numbers are gone from the prose and
+  `live_units` renders them from the payload — plus `gross_x`, which is a
+  sizing unit since `clip = equity × gross_x ÷ slots`.
+
+### 5 · THE ADVERSARIAL REVIEW FOUND THE WORST DEFECT IN MY OWN CHANGE
+
+Six independent lenses over the changelog, the live payloads, the dashboard and
+the rendered page produced 59 candidates; each was verified by a second agent
+whose default was REFUTED. **18 confirmed, and two of the high-severity ones
+were defects this session had just introduced:**
+
+* **THE SUMMARY DELETED ITS OWN DETAIL.** The first cut rendered 8 of
+  `leverage`'s 26 fields and marked the WHOLE key consumed — so the daily-loss
+  halt geometry, the ruin gate's verdict, the MEASURED all-slots stop and the
+  held-basket liquidation gap dropped off a page they had been visible on. That
+  is strictly worse than the wall of text it replaced. **Closed as a class, not
+  an instance:** a block is never consumed wholesale. `card()` subtracts
+  exactly the sub-keys the renderer read — extracted from the renderer's OWN
+  AST at import — and dumps the remainder, so every published field is either
+  on a row or still in the dump, and extending a renderer shrinks the residue
+  with no second list to maintain. A renderer that ITERATES its block is
+  detected the same way and consumes all of it.
+* **THE GOVERNOR CHIPS FELL INTO A DEAD BRANCH.** Splitting the ops strip's
+  single `if fr:` for the cohort read stranded `fleet_equity` / `fleet_dd_7d` /
+  `clip_scale` in the DARK branch, so the drawdown governor — an actuator that
+  shrinks every consuming book's clip — rendered only when fleet_risk was dead.
+  I looked straight at that render and did not see it.
+
+Also confirmed and fixed: `_t_margin` read `nearest_liq` as a number while the
+publisher emits `{coin, dist_frac, …}` — a dead read on a real-money risk
+number, and `dist_frac` is a FRACTION, so rendering it raw would have printed a
+30%-away liquidation as "0.3%"; a mixed `held` map attributed one coin's tag to
+an untagged coin; `slot_census` rendered 3 of its 5 throttles; an ABSENT
+`shut_now` printed a green "open" all-clear on a real-money entry gate; a
+vetoed lens with no era sample vanished from the row that publishes the veto
+list; `_t_progression` accepted booleans as counts; `_t_holdwatch` dropped
+every sample size beside its means.
+
+**AND THREE DEFECTS IN THE GUARDS THEMSELVES**, which is what I3 is for: the
+sub-key extractor shipped DEAD because `ast` was not imported here and a bare
+`except Exception` turned the NameError into a no-op — this repo's own
+fail-open-except trap, inside the code written to close a hiding bug; a test
+asserting `_gate_eval` re-derives no bar was a SUBSTRING scan and failed on
+`nowrap`, which contains `wr` — the *"a page-wide substring scan is not a
+structural claim"* trap, reproduced in the test enforcing a structural
+property, now an AST assertion; and `_dd_title` referenced a local bound 20
+lines later, so every `golive_card()` render raised into its own fail-silent
+`except` and blanked the entire card — caught because six tests went red, never
+by eye.
+
+**PINNED** by `tests/autonomy/test_card_week_telemetry.py` (77 tests): every
+key each renderer reads is required to be a subset of the keys extracted from
+its PUBLISHER's AST, with a positive control on both extractors because an
+extractor that finds nothing makes the subset check vacuously true; the taker's
+gate order against the bot's own literal, in order; fail-safety on every
+renderer; escaping on every payload-derived string; units (a fraction rendered
+as a percent, `dist_frac` ×100); the ops strip's cohort lead AND the governor
+regression; the grader-driven promotion section and its fail-closed direction;
+and a RATCHET on card prose — measured at 14 remaining, every one a retired
+book (history, kept per I12) or a 🏛️ Parliament book that publishes no clip.
+
+**MOVES NO MONEY, NO LEVER, NO BOT AND NO VERDICT.** The dashboard is a reader:
+no bar changed, no book was promoted or retired, `golive_readiness` is
+byte-unchanged. What changed is which books the page SAYS are at the bar, and
+that now matches the fleet's own grader exactly. Full suite green; every CI
+audit green; verified by rendering the real page against production data rather
+than by a green run.
+
+
 ## 2026-09-10 (zt) — TWO SESSIONS READ ⚖️ COUNTERWEIGHT'S SAMPLE DEFINITION DIFFERENTLY ON THE SAME DAY, AND NOTHING IN THE TREE COULD SAY WHICH WAS RIGHT: the fleet's only pre-registered read with no instrument
 
 **Eamon, 10-Sep:** *"continue"* / *"and fix"*. Nothing on the carried list was
@@ -84,6 +261,7 @@ across cells to price the selection.
 fleet can HONESTLY SAY about a read that governs a keep-or-retire decision on a
 living book, which is worth more than the deploy it does not need.
 
+
 ## 2026-09-10 (zs) — ⚖️ COUNTERWEIGHT'S READ MOVES 1-Oct → 10-Oct SO IT LANDS ON THE SAMPLE ITS OWN REGISTRATION ASKED FOR: the date was going to bind before the n floor, and nothing said so
 
 **Eamon, 10-Sep:** *"move the date to 10-Oct so it hits n=60"* — after `(zp)`
@@ -164,6 +342,7 @@ the `(zp)` check avoided: the fresh mean is **POSITIVE**, so taking the read
 early would have manufactured a *"keep grading"* verdict out of n=13 at
 t=+0.35 — a sample that decides nothing on a book which closes ~10 legs at once
 and therefore carries enormous per-trade dispersion (SE 1.519pp).
+
 
 ## 2026-09-10 (zr) — "FIX MUM": NOTHING MALFUNCTIONED, THE LOSS WAS THE GEOMETRY EAMON CHOSE, AND THE AUTOPSY FOUND WHERE HER EDGE ACTUALLY LIVES — IN THE BREADTH OF THE OVERSOLD, SEVEN EVENTS DEEP
 
