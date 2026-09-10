@@ -41,7 +41,6 @@ def _beat_names():
     """The names tasks actually beat under — NOT the task names. `data.candles.fast`
     beats as `data.candles.1h`, and reading the task name instead is how a naive
     version of this test overstates the finding."""
-    tree = ast.parse((ROOT / "parliament" / "data.py").read_text())
     names = set()
     for f in (ROOT / "parliament").glob("*.py"):
         t = ast.parse(f.read_text())
