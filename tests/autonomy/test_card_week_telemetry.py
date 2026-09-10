@@ -1006,3 +1006,16 @@ def test_a_partial_renderer_still_leaves_its_residue():
                            "some_unshown_counter": 3, "rsi_med": 40.4}}})
     assert "Scan census" in out and "91 scanned" in out
     assert "rsi_med" in out, "a census field no row showed was hidden"
+
+
+def test_the_spend_row_does_not_claim_to_be_the_gate_eta():
+    """I22's `days_to_gate_obs` is `(2/S_d)^2` — days to DECIDABILITY at the
+    book's own Sharpe — and the 🚦 card's horizon chip projects the binding
+    BAR. They read 14.4d and 66.6d for 👩 mum's live arm on the same page, so a
+    bare "to gate" invites a reader to take the smaller one as the answer."""
+    out = dash._t_spend({"markets_scanned": 91, "markets_held": 3,
+                         "n_eff": 2.07, "sides": "long", "gross_x": 5.0,
+                         "days_to_gate_obs": 14.4,
+                         "days_to_gate_basis": "measured_rate"})
+    assert "decidable in 14.4d" in out
+    assert "NOT the gate ETA" in out

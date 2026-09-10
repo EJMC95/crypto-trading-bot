@@ -114,6 +114,11 @@ it is still the honest fleet-wide picture.
   unpageable, invisible"* shape). Found by diffing the list against the live
   `bot_state` table rather than against itself. Both fail SAFE, so both are
   declared in `UNPAGEABLE_OK` with reasons.
+* **`days_to_gate_obs` stopped calling itself the gate ETA.** I22's number is
+  `(2/S_d)^2` — days to DECIDABILITY at the book's own Sharpe — and the 🚦
+  card's horizon chip projects the binding BAR. On 👩 mum's live row they read
+  **14.4d and 66.6d on the same page**; a bare "to gate" invited the reader to
+  take the smaller one.
 * **Five card descriptions corrected (I12).** 👩 mum's REAL-MONEY card said
   "$50 × 4 slots" while she runs 12 slots at a $221.90 clip and 5× gross; 🙏
   avo's said "÷ 5 slots, levered 1.4× of a 1.5× drawdown budget" against 6

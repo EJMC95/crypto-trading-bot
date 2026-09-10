@@ -3430,12 +3430,20 @@ def _t_spend(spend):
         bits.append(html.escape(str(sides)))
     if gross is not None:
         bits.append(f'{gross:g}×')
-    bits.append(f'{days:g}d to gate' if days is not None
+    # [(zu)] NAME THE QUANTITY. This is I22's `(2/S_d)^2` — how fast the
+    # DESIGN can become decidable at its own measured Sharpe — and it is NOT
+    # the grader's gate ETA, which projects the binding BAR. On 👩 mum's live
+    # row they read 14.4d and 66.6d on the same page, and a bare "to gate"
+    # invites a reader to treat the smaller one as the answer.
+    bits.append(f'decidable in {days:g}d' if days is not None
                 else '<span class="muted">no rate yet</span>')
     return _trow("Spend (I22)", " · ".join(bits),
                  "I22 spend census: markets scanned, N_eff of what it holds "
                  "(correlation-aware, never a symbol count), sides, gross "
-                 "leverage, days-to-gate (a FLOOR). "
+                 "leverage, and days-to-DECIDABILITY — (2/S_d)^2 at the book's "
+                 "own measured Sharpe, a FLOOR. This is NOT the gate ETA: the "
+                 "🚦 card's horizon chip projects the binding BAR and the two "
+                 "can differ several-fold on the same book. "
                  + (str(basis) if basis else ""))
 
 
