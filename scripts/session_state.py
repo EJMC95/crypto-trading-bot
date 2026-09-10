@@ -85,6 +85,71 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "hull-cap-13-deferred-to-one-turnover",
+        "owner": "session",
+        "what": "(aaa) 🧮 Hull's cap raise (MAX_POSITIONS 10 -> 13 with "
+                "CLIP_USD 80 -> 60 at constant gross) is MEASURED AND "
+                "DEFERRED, not refused. The cap binds hard -- 83.2% of 3,906 "
+                "census snapshots at cap, 37.6% at cap WITH an eligible coin "
+                "it cannot take, 2,809 coin-snapshots denied -- and the "
+                "marginal coin is FREE, because the |apr| ranking is "
+                "degenerate at the venue's 10.512% resting pin (ranks 1-10 "
+                "and 11+ both mean 10.5000%, delta 0.0000pp; all 16 positions "
+                "this book has ever opened carry entry_apr 0.10512 exactly). "
+                "Expectancy price measures to ZERO (-0.0024pp/trade). The "
+                "gain is +12.5% to +16.7% closes, NOT the +30% first claimed, "
+                "and it buys ~10 days to the 30-close bar, not a rescue -- "
+                "the grader's `undecidable/130d` is a RAMP ARTIFACT of the "
+                "cap itself moving 4->6->10 inside the measured window.",
+        "why_open": "DEFERRED on four measured reasons, any one of which "
+                    "would be enough: (1) the two tapes DISAGREE IN SIGN -- "
+                    "250d settled fundings read -15%, 42d live venue with MTM "
+                    "folded reads +1.6% -- and (ne) is explicit that two "
+                    "calibrating conventions with opposite verdicts REFUTE a "
+                    "finding rather than ship it; (2) the last cap change "
+                    "(26-Aug, 4->6->10) has NOT completed one MAX_HOLD_H "
+                    "turnover (504h = 21d, so ~16-Sep), and changing again "
+                    "first makes neither change separately gradeable (I11/"
+                    "I25); (3) the migration transient carries 10 legacy $80 "
+                    "legs beside 3 new $60 ones = $980 = 98% of the book for "
+                    "up to 504h, above the module's own 80% assert; (4) the "
+                    "urgency was the ramp artifact and it is gone. READ ON OR "
+                    "AFTER 16-SEP: ship if the two tapes then agree in sign "
+                    "on a re-run, keep deferring if they do not. The "
+                    "marginal-coin finding stands and needs no re-measuring. "
+                    "Closes when the CHANGELOG records the read.",
+        "closes_when": lambda: _has("CHANGELOG.md", "hull-cap-13 READ:"),
+    },
+    {
+        "id": "taker-random-entry-null-blocked-on-ci",
+        "owner": "session",
+        "what": "(zy) 🎫 the taker is READY on all six bars for a SIXTH day "
+                "(n=204, +0.970%/trade, t=2.25 and DRIFTING DOWN from 2.60 on "
+                "6-Sep) and still owes the (hm) random-entry null -- the one "
+                "test between READY and a defensible go-live, because on this "
+                "venue a random entry earns +0.2 to +1.1%/trade for free and "
+                "the whole tape is one falling-BTC regime. A full design was "
+                "produced 10-Sep (matched draws on the lens's OWN coins "
+                "through the taker's real bracket, cluster-robust treatment "
+                "for overlapping closes, and a REFUSING calibration gate) and "
+                "was BLOCKED by adversarial review 3/3 on CI-red defects, so "
+                "nothing was applied.",
+        "why_open": "THE THREE BLOCKERS ARE NAMED AND REPRODUCED, so the next "
+                    "session starts from them rather than re-designing: (1) "
+                    "the study does `os.environ.setdefault('TT_BULL_MODE', "
+                    "'on')` at import and relies on winning a race with "
+                    "`import lighter_ticket_taker` -- it MUTATES process-"
+                    "global env and reddens three already-green selftests; "
+                    "(2) the registered selftest runs 84-107s against a HARD "
+                    "`TIMEOUT = 120` in tests/test_selftests.py, before CI's "
+                    "coverage multiplier; (3) the `edits` array registers the "
+                    "new module in SELFTEST_MODULES but no edit CREATES the "
+                    "file, so applying it verbatim is red on its own. The "
+                    "engineering core was verified sound by all three lenses. "
+                    "Closes when the CHANGELOG records the null's verdict.",
+        "closes_when": lambda: _has("CHANGELOG.md", "taker random-entry null READ:"),
+    },
+    {
         "id": "mum-breadth-candidate-preregistered",
         "owner": "session",
         "what": "(zr) 👩 mum's edge lives in the BREADTH of the oversold, on "

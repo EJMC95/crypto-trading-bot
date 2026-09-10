@@ -1,3 +1,204 @@
+## 2026-09-10 (aaa) — 🧮 HULL'S CAP RAISE IS DEFERRED, NOT REFUSED — AND THE THREE NUMBERS THAT MOTIVATED IT WERE ALL WRONG IN THE OPTIMISTIC DIRECTION
+
+The 10-Sep daily review measured 🧮 Hull at cap **83.2%** of 3,906 census
+snapshots and denying an eligible coin in **37.6%** of them (2,809
+coin-snapshots), and proposed `HULL_CLIP_USD` 80 -> 60 with
+`HULL_MAX_POSITIONS` 10 -> 13 at constant gross. A full replay against two
+independent tapes says the direction is right, the case is weaker than the
+review claimed, and **the timing is wrong**. Deferred with a date.
+
+**THE ONE FINDING THAT SURVIVED INTACT, AND IT IS THE OPPOSITE OF THE WORRY.**
+The review flagged adverse selection: `candidates()` sorts `-abs(apr)`, so
+slots 11-13 should take weaker coins. **They do not, because the ranking is
+DEGENERATE.** Lighter's crypto resting funding default is **10.512% TRUE** and
+the whole in-band population sits on it: over **22,525 admissible
+coin-snapshots** in 30 days, mean |apr| at ranks 1-10 is **10.5000%** and at
+ranks 11+ is **10.5000%** — delta **+0.0000pp**. Corroborated by the book's own
+record: all 16 positions it has ever opened carry `entry_apr = 0.10512`
+exactly, and the row publishes `n_at_pin: 158` of 232 scanned. Break-even |apr|
+is 5.214% at the 504h max hold and 7.821% at the payback horizon — the latter
+IS `APR_LO_EFF`, by construction. **Every admitted coin enters at 2.01x the
+max-hold break-even.** The marginal coin is free.
+
+**THREE NUMBERS FROM THE REVIEW, CORRECTED IN PLACE (I12).**
+* *"+30% slots ~= +30% closes"* — the least defensible of three estimates.
+  Measured: **+12.5%** (8 staggered 28-day windows, 9.00 -> 10.12 closes, cap 13
+  never worse and strictly better in 5 of 8) to **+16.7%** (steady state,
+  17.14 -> 20.00 closes/30d). The +28.2% occupancy/hold identity is the one the
+  review reached for and the weakest.
+* *"n=5 lifetime, ~5 months to 30 closes"* — **a RAMP ARTIFACT.** The grader's
+  `undecidable / rate_cpd 0.19 / 130d` is measured from 14-Aug across a window
+  in which the cap itself went **4 -> 6 -> 10**, the last four slots filling on
+  26-Aug. At live occupancy (9.831/10) and live mean hold (401.1h) the rate is
+  **17.6 closes/30d**, not 5.7. **30 closes lands ~late-Oct at cap 10 and
+  ~mid-Oct at cap 13** — the change buys **~10 days, not a rescue.**
+* *"expectancy price bounded but unquantified"* — it measures to **ZERO**:
+  steady-state mean %/trade +0.3691% -> +0.3667% (**-0.0024pp**).
+
+**WHY IT IS DEFERRED ANYWAY — four measured reasons, not inertia (I26).**
+1. **THE TWO TAPES DISAGREE ON THE DOLLAR SIGN.** Tape A (250d settled
+   fundings, realised-only) reads **-15%**; tape B (42d live venue, MTM folded,
+   8 staggered windows) reads **+1.6%**. This repo's own `(ne)` precedent is
+   explicit: two calibrating conventions with opposite verdicts ⇒ the finding
+   is REFUTED, not shipped.
+2. **THE LAST CAP CHANGE HAS NOT COMPLETED ONE TURNOVER.** The cap moved to 10
+   on **26-Aug**; holds are **504h = 21 days**, so the first full turnover
+   lands **~16-Sep**. Changing again now means neither change is separately
+   gradeable — the I11/I25 shape, and the proposal's own risk list says so.
+3. **THE MIGRATION TRANSIENT BREACHES THE BOOK'S OWN BOUND.** `_open_position`
+   fixes notional at entry and nothing rewrites it, so for up to 504h the book
+   carries 10 legacy $80 legs beside 3 new $60 ones = **$980 = 98% of the
+   book**, above the 80% steady-state gross the module's own assert states.
+4. The urgency was the ramp artifact, and it is gone.
+
+**PRE-REGISTERED (I21 — a decision with a date, not a maybe): read on or after
+16-Sep**, when the 26-Aug cap change has completed one full `MAX_HOLD_H`.
+SHIP if the two tapes then agree in sign on a re-run; keep deferring if they
+still disagree; and either way the marginal-coin finding above stands and does
+not need re-measuring. Carried as `hull-cap-13-deferred-to-one-turnover`.
+
+**REFUSED OUTRIGHT, with numbers, so no future session re-proposes them:**
+cap 13 x $80 (gross $1,040 = **104% of the book**, the biggest number in the
+sweep at +39.8%) and cap 10 x $100 — both are leverage above 1x on a book whose
+`N_eff` has never been measured (I22, six prior rejections) and both break the
+module's own `CLIP * MAX_POSITIONS <= 0.80 * START_EQUITY` assert; cap 16 x $50
+(**-11.4%**) and cap 20 x $40 (**-18.5%**) — past 13 the marginal coin genuinely
+does start to cost; shortening `MAX_HOLD_H` to buy closes (break-even |apr| at a
+252h hold is **10.429%** against a venue pin of **10.512%** — any hold under
+~250h makes this book's ENTIRE supply break-even-or-worse, and it is `(hl)`
+denominator shrinkage besides); and lowering `APR_LO_EFF` for supply (**77.67%**
+of the tier is already in band; the floor buys ~1% more).
+
+**AN I23 FINDING FOUND ON THE WAY, recorded because the next clip move must not
+be made blind:** `PAYBACK_MARGIN = 0.07` is an ABSOLUTE DOLLAR, so the
+`decay_paid` bar is 0.3875% of notional at $80 and **0.4167% at $60** — cutting
+the clip TIGHTENS the exit by 7.5%. `BLEED_FRAC` is a fraction and is invariant.
+**"Per-trade % is clip-invariant" is true of this book everywhere except here.**
+Measured effect on today's tape: 0.0000pp.
+
+**AND A STUDY DRIFT, unfixed and declared:**
+`scripts/study_books_cohort_2026-08-13.py` hardcodes `CAP = 4` while the bot
+runs 10 — drifted TWICE. The founding cell still reproduces EXACTLY at CAP=4
+(n=50, $6.69, t=+3.92), so it is not yet wrong; `MARGIN = 1.3` is a
+clip-INVARIANT stand-in for the bot's clip-DEPENDENT dollar and they coincide
+only at $80, which is the silent one.
+
+## 2026-09-10 (zy) — THE LETTER GUARD COULD ONLY EVER REPORT A COLLISION AFTER THE RIVAL LANDED ON MAIN, AND THE DAY IT WAS FIXED IT HAD ALREADY COST NINE RENUMBERS
+
+**One entry was renumbered FIVE times in a day** — `(zn) -> (zq) -> (zr) ->
+(zs) -> (zu) -> (zx)` — and a sixth letter went the same way `(zt) -> (zw)`.
+Nine collisions total. Every one cost real work: entries are cited BY LETTER
+from tracked code (567 python files' citations are checked on every push), and
+`git log` subjects keep the OLD letter, so the commit log is not a letter index.
+
+**THE MECHANISM.** `_baseline_changelog()` returned `git show
+origin/main:CHANGELOG.md` and nothing else, so `cross_branch` compares this
+tree against MAIN ONLY. While a rival letter sits on an unmerged branch or an
+open PR, both files are internally unique and **both runs are green**. The
+letter is free at write time and taken at push time, every time.
+
+**MEASURED, and the guard was green while both were true:** this tree and
+`origin/claude/audit-9sep` both carried `(zt)` for different entries. `(ze)` is
+held by TWO open branches for different entries and `(zf)` by one — all three
+invisible. And `origin/main` moved twice DURING the session that fixed this,
+taking `(zr)`, `(zs)`, then `(zt)` for a third entry.
+
+**THE LOAD-BEARING DESIGN DECISION IS THE SUBTRACTION, NOT THE WIDENING.**
+Comparing this tree against all 96 refs raw yields **592 findings** (worst
+single branch: 278, a rewritten CHANGELOG), and up to **10,997** treating each
+branch in turn as mine. That is `(mz)`'s shape exactly — a guard reddening on a
+pre-existing backlog gets exempted within a day and then guards nothing.
+Reducing BOTH sides to what they **ADD relative to origin/main** takes
+**592 -> 1**, and the 1 is the real `(zt)` clash. Adversarial worst case over
+82 branches: **2**. The subtraction is also the whole answer to stale refs — a
+merged or abandoned branch adds nothing, so it can never produce a permanent
+false collision, and no age cutoff is needed (the refined count is 1 at every
+cutoff from 1 day to infinity).
+
+**TWO HALVES, and the second is the one that stops the renumbers.**
+DETECT: `open_branch_clashes` in `main()`. PREVENT: `--next` now counts letters
+held by open branches, so the letter is free at write time AND at push time.
+Counterfactual on the real incident: from a tip of `zs` the old `--next` prints
+`zt` — the letter audit-9sep was already using; the new one steps past it. Run
+live the day it shipped it printed `zy`, correctly skipping `ze`/`zf`
+(open-branch-held) and `zw`/`zx` (this session's).
+
+**`git ls-remote` REFUSED WITH NUMBERS:** it returns SHAs, and a SHA whose
+objects are absent cannot be read, so its only possible finding is *"a branch
+exists that I cannot inspect"* — a warning on a passing run, which `(gl)`
+already measured as not a guard. It is also a 0.83s network call on every push.
+All 97 heads it reports were already local. **The blind spot is DECLARED** (a
+branch pushed since this clone last fetched) and the run publishes how many
+branches it compared, so a stale clone is never byte-identical to a clean sweep.
+
+**COST, CORRECTED IN PLACE BEFORE IT SHIPPED (I12):** the design note said
+2.7s; end-to-end measures **5.3s** — the 2.7s counted the sweep's three stages
+and not the citation walk beside them. ~25% of the 20s budget, not 10%. An
+optimistic cost figure quoted as a design argument is worse than none.
+
+**THREE DEFECTS THE ADVERSARIAL REVIEW CAUGHT BEFORE IT LANDED**, each a named
+class this repo has paid for: a **second copy of the letter-picking rule** (the
+`--next` block re-implemented `next_letter`'s body inline, leaving the real
+function dead at its only call site — fixed by `next_letter(extra_claimed=)`);
+a **silent cap** (`return refs[:CAP]` — the `(qz)` trap in one line, now
+returning its own truncation so a capped sweep says so); and a **stale comment**
+shipped with the change.
+
+**AND THE MUTATION ROUND IS THE REAL STORY.** 24 mutations: 16 killed, **8
+survived, and every survivor was the WIRING rather than the comparison** —
+including `if open_clashes:` -> `if False and open_clashes:`, which disables the
+entire detection with nothing going red. The pure helper was perfectly pinned
+and the arm that calls it was not tested at all. `main()` is now driven
+end-to-end against stubbed git seams with a positive control, plus the
+`skip_if_same` half (a session that has just pushed is exactly when its next
+letter matters). **23 of 24 now red.** This is the same shape found in 🏦 Rich
+Dad an hour earlier in the same session, which is the generalisable finding:
+**a substring check on source can pin a helper and leave both halves of its
+wiring deletable.**
+  ENFORCED BY: `scripts/audit_changelog_letters.py::open_branch_clashes`, `scripts/audit_changelog_letters.py::next_letter`
+
+## 2026-09-10 (zz) — 🏦 RICH DAD THREW ITS CENSUS AWAY EVERY LOOP, SO ITS REFUSALS WERE A SAMPLE OF n=1 CYCLE
+
+Found by the daily review while measuring whether 🧮 Hull's cap binds. Hull
+could be answered — **83.2% at cap over 3,906 snapshots, 2,809 coin-snapshots
+denied a slot** — because it calls `store.snapshot_census`. Enumerating every
+`%:census` key in `bot_state_history` (GROUP BY, **no LIMIT**) returns exactly
+10 series and Rich Dad is not one of them, while its row reads
+`census_24h: null` and `eligible: 0` at 5 of 6 slots.
+
+**Without a series you can only read the CURRENT INSTANT.** "Is Rich Dad
+starved, or at cap, or both?" is unanswerable as a RATE — which is one level up
+from the ambiguity I18 exists to remove: the census makes `{open: 0}`
+unambiguous *now*, and a missing series makes the rate unmeasurable forever.
+
+**THE FIX IS THE HULL WIRING, VERBATIM AND MINIMAL** — no new abstraction, no
+store change: `CENSUS_LIMIT` derived from `LOOP_SECONDS` (300s ⇒ 432 rows;
+`census_window`'s own default assumes a 30s loop and would over-fetch ~6.7x
+forever), the two store calls accumulate-BEFORE-read so this loop's refusals are
+inside the number the row publishes, and `census_24h` carries `or None` so a
+dark history is None and never a zero-filled dict (I1 — a fabricated
+`{eligible: 0}` reads as *"measured, nothing refused"*).
+
+**THE SHAPE CONTRACT WAS VERIFIED, NOT ASSUMED:** all 8 buckets are plain ints
+and all 8 are DECLARED (`scanned`/`held`/`eligible` in `CENSUS_DENOMINATORS`,
+the rest in `CENSUS_REFUSALS`), round-tripped on the LIVE payload — `dropped 0`,
+`unclassified []`, `binding_gate "cold"`. So `scan_census` is untouched and
+`extra.scan` stays byte-identical.
+
+**THE MUTATION ROUND IS WHY THIS ENTRY EXISTS RATHER THAN A ONE-LINER.** The
+proposal's own test was a SUBSTRING check on `main`'s source (`"census_window("
+in src and "limit=CENSUS_LIMIT" in src`), and it left **both halves of the
+wiring deletable**: replacing `store.snapshot_census(bot_id, census)` with
+`pass` stayed GREEN (the substring still matched the surviving `census_window`
+call two lines below), and so did rewriting `census_24h=_cen24` to
+`census_24h=None`. A book would then READ a window it never WROTE, or
+accumulate one and discard it at the publish — in both cases publishing a
+permanently-null field while every gate still reported its per-loop counts.
+Both are now pinned **by AST at the call node**, not by its spelling.
+4 of 8 mutations killed by the roster test; the 2 that mattered killed by the
+new pins. **A substring test is not a wiring test.**
+  ENFORCED BY: `tests/autonomy/test_mute_row_census.py::test_the_snapshot_call_itself_is_present_on_every_census_publisher`, `tests/autonomy/test_mute_row_census.py::test_the_rollup_reaches_the_payload_and_is_never_hard_coded_none`
+
 ## 2026-09-10 (zv) — THE FOUR FINDINGS THE REVIEW RAN OUT OF BUDGET TO VERIFY, AND ONE OF THEM SAYS (zu) MISLABELLED A REAL-MONEY NUMBER
 
 **Eamon, 10-Sep: *"yes please"*** — pick up the candidate findings `(zu)`'s

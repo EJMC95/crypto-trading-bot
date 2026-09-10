@@ -1,8 +1,18 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 12:06 Sydney (02:06Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 17:12 Sydney (07:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
+
+### `hull-cap-13-deferred-to-one-turnover`  ·  owner: **session**
+(aaa) 🧮 Hull's cap raise (MAX_POSITIONS 10 -> 13 with CLIP_USD 80 -> 60 at constant gross) is MEASURED AND DEFERRED, not refused. The cap binds hard -- 83.2% of 3,906 census snapshots at cap, 37.6% at cap WITH an eligible coin it cannot take, 2,809 coin-snapshots denied -- and the marginal coin is FREE, because the |apr| ranking is degenerate at the venue's 10.512% resting pin (ranks 1-10 and 11+ both mean 10.5000%, delta 0.0000pp; all 16 positions this book has ever opened carry entry_apr 0.10512 exactly). Expectancy price measures to ZERO (-0.0024pp/trade). The gain is +12.5% to +16.7% closes, NOT the +30% first claimed, and it buys ~10 days to the 30-close bar, not a rescue -- the grader's `undecidable/130d` is a RAMP ARTIFACT of the cap itself moving 4->6->10 inside the measured window.
+
+_Still open because:_ DEFERRED on four measured reasons, any one of which would be enough: (1) the two tapes DISAGREE IN SIGN -- 250d settled fundings read -15%, 42d live venue with MTM folded reads +1.6% -- and (ne) is explicit that two calibrating conventions with opposite verdicts REFUTE a finding rather than ship it; (2) the last cap change (26-Aug, 4->6->10) has NOT completed one MAX_HOLD_H turnover (504h = 21d, so ~16-Sep), and changing again first makes neither change separately gradeable (I11/I25); (3) the migration transient carries 10 legacy $80 legs beside 3 new $60 ones = $980 = 98% of the book for up to 504h, above the module's own 80% assert; (4) the urgency was the ramp artifact and it is gone. READ ON OR AFTER 16-SEP: ship if the two tapes then agree in sign on a re-run, keep deferring if they do not. The marginal-coin finding stands and needs no re-measuring. Closes when the CHANGELOG records the read.
+
+### `taker-random-entry-null-blocked-on-ci`  ·  owner: **session**
+(zy) 🎫 the taker is READY on all six bars for a SIXTH day (n=204, +0.970%/trade, t=2.25 and DRIFTING DOWN from 2.60 on 6-Sep) and still owes the (hm) random-entry null -- the one test between READY and a defensible go-live, because on this venue a random entry earns +0.2 to +1.1%/trade for free and the whole tape is one falling-BTC regime. A full design was produced 10-Sep (matched draws on the lens's OWN coins through the taker's real bracket, cluster-robust treatment for overlapping closes, and a REFUSING calibration gate) and was BLOCKED by adversarial review 3/3 on CI-red defects, so nothing was applied.
+
+_Still open because:_ THE THREE BLOCKERS ARE NAMED AND REPRODUCED, so the next session starts from them rather than re-designing: (1) the study does `os.environ.setdefault('TT_BULL_MODE', 'on')` at import and relies on winning a race with `import lighter_ticket_taker` -- it MUTATES process-global env and reddens three already-green selftests; (2) the registered selftest runs 84-107s against a HARD `TIMEOUT = 120` in tests/test_selftests.py, before CI's coverage multiplier; (3) the `edits` array registers the new module in SELFTEST_MODULES but no edit CREATES the file, so applying it verbatim is red on its own. The engineering core was verified sound by all three lenses. Closes when the CHANGELOG records the null's verdict.
 
 ### `mum-breadth-candidate-preregistered`  ·  owner: **session**
 (zr) 👩 mum's edge lives in the BREADTH of the oversold, on her own record (9-Sep excluded, I25): closes opened in a same-loop batch of >=3 coins read +1.114%/trade live (n=37) / +1.003% twin (n=41) with a 2.7%/2.4% stop rate, positive in every ISO week and under a coin jackknife; closes opened alone or in a pair read -0.037% / +0.243% with 9.5-10.5% stops. Four of the six stops that cost the live book $56 on 9-Sep were single/pair entries. HONEST SIZE: the live batch closes are SEVEN open-events (7/7 positive, event-level t +5.7) and a permutation of event sizes across her 64 events reads P=0.097 (twin P=0.137) -- hypothesis-grade. SHIPPED: the breadth pre-pass + `breadth_n` stamp on every close on BOTH hosts, an INERT caged lever pair (xp.mum.breadth_min / live.mum.breadth_min, env default 1), and the judge candidate `mum-breadth-3` queued BEHIND `mum-vel-12-20`. No trade, gate or size moved on either arm.
@@ -35,7 +45,7 @@ _Still open because:_ the READ is done; the DECISION is Eamon's and has not been
 _Still open because:_ the read date has not arrived and the live arm has no post-change closes yet; this row is the tripwire the registration would otherwise lack (the I21 prose shape).
 
 ### `counterweight-preregistered-fresh-read`  ·  owner: **session**
-⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 10-Oct, whichever first. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
+⚖️ Counterweight was KEPT 1-Sep under I17-as-amended with a PRE-REGISTERED read (I21, recorded in CLAUDE.md's acknowledged-recurrence line for perps-funding-spread): grade the FRESH on-class closes (class_split, closes AFTER 1-Sep only — never the window that motivated the keep) at n>=60 or on 10-Oct, whichever first. [10-Sep (zt)] BASIS DECLARED: CLOSED-after 1-Sep, not opened-after -- it was ambiguous and two sessions read it differently on the same day (n=13 vs n=21, 2.2pp of mean, 16 days of trigger date). Pinned in code by scripts/study_counterweight_fresh_read_2026-09-10.py, which reports BOTH bases and REFUSES to take the read before the trigger fires. RETIRE without further debate if the fresh on-class upper bound (m+1.28*SE) <= 0; keep grading if the fresh mean > 0; anything else returns to Eamon with both numbers.
 
 _Still open because:_ the read date has not arrived. This row is the tripwire the registration lacked: its predicate fires on 1-Oct, so CI reds until a session actually PERFORMS the read and closes this row with the verdict in the CHANGELOG. [9-Sep (zp)] CHECKED ON EAMON'S ASK, AND THE TRIGGER HAS NOT FIRED — fresh on-class n=13 against the bar of 60, 47 short, measured on a feed refreshed the same hour (era rows 158, newest close 9-Sep 00:40Z). CORRECTED IN PLACE per I12, because the sentence below used to end 'the date is the backstop, not the trigger' and for THIS book that is measurably backwards: at the observed 1.52 on-class closes/day since 1-Sep, n=60 arrives ~10-Oct — NINE DAYS AFTER the 1-Oct date. So the DATE binds first and the read will be taken at n~44, ~27% below the registration's own floor. That is recorded now, BEFORE the read, so the schedule is decided on arithmetic rather than on the result; NO THRESHOLD IS MOVED (I21 — the registered bars are a commitment). Expect the 'returns to Eamon' branch and read the power, not just the sign. REPORTED, not the read: fresh on-class mean +0.538%/trade, SE 1.519, t=+0.35, net +$1.23 — a POSITIVE mean, which is exactly why taking it early would have manufactured a 'keep grading' verdict from a sample that decides nothing (this book closes ~10 legs at once, so its per-trade dispersion is enormous). [10-Sep (zs)] EAMON MOVED THE BACKSTOP 1-Oct -> 10-Oct on that arithmetic, so the read lands near the registration's own n floor rather than ~27% under it. NO THRESHOLD MOVED. Declared per I21: the amendment was NOT blind (the interim +0.538%/t=+0.35 was visible) and is admissible on arithmetic — a larger sample shrinks SE, and RETIRE fires on m+1.28*SE <= 0, so more closes make RETIREMENT more reachable when the mean is negative; it tightens both bounds, it does not favour keeping. DECLARED SHORTFALL: at the measured 1.43 closes/day 10-Oct projects to n~56, not 60 — the date is a BACKSTOP and the n>=60 branch still fires early if it is met; ~13-Oct is the date that would make the floor near-certain, and that is Eamon's to move again.
 
@@ -84,16 +94,33 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (21 commit(s))
+## Shipped today (38 commit(s), entries (zt))
 
-- `97f5983` (zt) changelog: the cohort reader's history-shape blind spot, measured at 2,174 of 17,261 snapshots
-- `538c263` (zu) renumber: origin took (zs) for the Counterweight date move — seventh collision on this branch today
-- `11d16da` (zt) the cohort reader knew the live key's dict and not the history's compacted list: 2,174 fleet-risk snapshots read as '0 longs against a budget of 1e9'
-- `4878b05` (zq) the record: the daily review's two stale rule copies and the publish stall it caused (renumbered (zn)->(zq): (zn) landed on main via #298 while this sat unpushed); store-side hazard CARRIED; HANDOFF regenerated
-- `5229707` (zn) the review stalled the fleet's publishes three times today: a never-committed read transaction held bot_pnl while the grader's lazy import ran the store's ALTER on a second connection — autocommit, lock_timeout, idle-in-transaction timeout, and the store session hardened
-- `6401747` (zi) the MTM fetch is scoped to the books it can decide — worse-of-both cannot pass a failing book, and fetching every living book's series took the review past a 10-minute timeout
-- `77f81a8` (zi) the daily review graded the maxDD bar REALISED-only while the canonical grader folds MTM — the taker read 2.5% here beside a published 4.6% (basis mtm)
-- `1c805e5` (zi) the daily review's REACH ceiling was computed on a number no consumer enforces: pooled 20/20 RED over two cohorts with ten free slots each
+- `c62297f` (zw) pin skip_if_same, the baseline flag, and next_letter's extra_claimed — the preventive half had no test at all
+- `b2c3665` (zw) drive the open-branch arm from main(): a 24-mutation round left 8 alive and every survivor was the WIRING, not the comparison
+- `f1fa9ae` (zw) the letters guard sees OPEN BRANCHES, not just origin/main — nine renumbers in one day, and (ze)/(zf) are held on branches it cannot see
+- `055be0b` (zw) pin the census wiring by AST: a mutation round showed the substring check left BOTH halves deletable
+- `95eb6ae` (zw) 🏦 Rich Dad publishes a census TIME SERIES, not just this loop's instant — its refusals were a sample of n=1 cycle
+- `6195699` (zw)(zx) renumber: origin took (zt) and (zu) — ninth collision today; both letters picked by checking every OPEN BRANCH, not just origin/main
+- `7c76fa8` (zw) renumber the cohort-reader citations: origin took (zt)
+- `ea7bdfc` (zt) regenerate HANDOFF after the daily review
+- `c14f08d` (zt) changelog: the cohort reader's history-shape blind spot, measured at 2,174 of 17,261 snapshots
+- `bb394ea` (zu) renumber: origin took (zs) for the Counterweight date move — seventh collision on this branch today
+- `121d2fc` (zt) the cohort reader knew the live key's dict and not the history's compacted list: 2,174 fleet-risk snapshots read as '0 longs against a budget of 1e9'
+- `0282715` (zq) the record: the daily review's two stale rule copies and the publish stall it caused (renumbered (zn)->(zq): (zn) landed on main via #298 while this sat unpushed); store-side hazard CARRIED; HANDOFF regenerated
+- `5674619` (zn) the review stalled the fleet's publishes three times today: a never-committed read transaction held bot_pnl while the grader's lazy import ran the store's ALTER on a second connection — autocommit, lock_timeout, idle-in-transaction timeout, and the store session hardened
+- `387daad` (zi) the MTM fetch is scoped to the books it can decide — worse-of-both cannot pass a failing book, and fetching every living book's series took the review past a 10-minute timeout
+- `ca35883` (zi) the daily review graded the maxDD bar REALISED-only while the canonical grader folds MTM — the taker read 2.5% here beside a published 4.6% (basis mtm)
+- `feb42c6` (zi) the daily review's REACH ceiling was computed on a number no consumer enforces: pooled 20/20 RED over two cohorts with ten free slots each
+- `40c5397` (zv) The four findings the review ran out of budget to verify — and one says (zu) mislabelled a real-money number
+- `d47c580` (zu) the health banner's three permanently-true lines, and two more descriptions
+- `0f2d863` (zu) correct the renumber count: 41 citations moved, the 42nd was the generated HANDOFF
+- `8074820` (zu) the spend row's days-to-gate is days-to-DECIDABILITY, and said so
+- `7a8e1cc` (zu) regenerate HANDOFF.md after the dashboard pass
+- `0cbdd64` (zu) RENUMBERED (zt) -> (zu): a concurrent session landed its own (zt) on main
+- `5d31030` (zt) The week's telemetry reaches the card — and the page was still running the go-live gate the fleet retired in July
+- `250a9df` (zt) regenerate HANDOFF.md after the basis declaration
+- `ab9db2f` (zt) Two sessions read ⚖️ Counterweight's sample definition differently on the same day — the fleet's only pre-registered read with no instrument
 - `a4e0351` (zs) regenerate HANDOFF.md after the counterweight date move
 - `ad1096c` (zs) ⚖️ Counterweight's read moves 1-Oct → 10-Oct so it lands on the sample its own registration asked for
 - `4ea9511` [deploy-live-mum][deploy-live-taker] (zr) "Fix mum": nothing malfunctioned, the loss was the geometry, and her edge lives in the breadth of the oversold — the record, an inert lever, a judge candidate (#302)
