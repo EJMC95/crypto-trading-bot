@@ -259,9 +259,18 @@ def _read(path):
         return ""
 
 
-def next_letter(text, paths=()):
-    """The letter a new entry should take: the first free one AFTER the tip."""
-    claimed = claimed_letters(text, paths)
+def next_letter(text, paths=(), extra_claimed=()):
+    """The letter a new entry should take: the first free one AFTER the tip.
+
+    [2026-09-10 (zw)] `extra_claimed` exists so the OPEN-BRANCH letters can be
+    folded in WITHOUT the CLI re-implementing this function. The `--next` block
+    had grown its own `claimed_letters -> latest -> next_free` chain to do
+    exactly that, which left this function dead at its only real call site and
+    put two copies of the picking rule one file apart — "A SECOND COPY OF A
+    RULE IS A SECOND RULE", and the copy that drifts is the one nobody runs.
+    A letter an abandoned branch burns costs nothing: the sequence is bijective
+    base-26 and unbounded."""
+    claimed = claimed_letters(text, paths) | set(extra_claimed)
     tip = latest({l for _d, l, _t in scan(text)[0]})
     return next_free(claimed, start=succ(tip) if tip else "a")
 
@@ -506,7 +515,209 @@ def cross_branch(mine, theirs, my_text=None):
     return out
 
 
-def _baseline_changelog():
+def _git(*a, timeout=20):
+    """Every git call this guard makes, through ONE owner. Fail-safe: None.
+
+    [2026-09-10] Hoisted out of `_baseline_changelog`, where it was nested, so
+    the open-branch arm below cannot grow a second copy of the same rule with
+    its own timeout and its own idea of what a failure looks like — the
+    "A SECOND COPY OF A RULE IS A SECOND RULE" class this repo already paid
+    for in the go-live gate. A non-zero exit, a missing git, a timeout and a
+    ref that does not resolve all collapse to None, which every caller reads
+    as "no arm", never as "clean".
+    """
+    import subprocess
+    try:
+        r = subprocess.run(("git",) + a, cwd=ROOT, capture_output=True,
+                           text=True, timeout=timeout)
+    except Exception:                          # noqa: BLE001 — no git, no arm
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+#: [2026-09-10] Wall-clock ceiling on the open-branch arm's git reads, and a
+#: cap on how many refs it will even try. MEASURED on this repo the day the
+#: arm shipped: 98 remote-tracking refs, 96 once main/HEAD/self are excluded,
+#: 82 carrying a readable CHANGELOG.md. CORRECTED IN PLACE (I12) the day it
+#: shipped: the design note said 2.7s, and the END-TO-END run measures
+#: **5.3s** wall (`time audit_changelog_letters.py`, warm) — the 2.7s figure
+#: counted the sweep's three stages and not the citation walk they run beside.
+#: ~25% of this budget, not 10%. The number is quoted here because it is the
+#: argument for the budget existing, so an optimistic one is worse than none. The budget exists for
+#: the repo this becomes, not the one it is: a clone that has fetched 500 dead
+#: branches must degrade to a PARTIAL answer that SAYS SO, never to a hung
+#: push. Over budget is reported, never silently truncated — a cap that
+#: reaches your reasoning without declaring itself is the (qz) trap.
+OPEN_BRANCH_BUDGET_S = 20.0
+OPEN_BRANCH_REF_CAP = 400
+
+
+def _open_refs(for_each_ref_out, head="", upstream=""):
+    """-> [refname] from `for-each-ref` output. Pure, so the selftest drives it.
+
+    SELF IS EXCLUDED, and it has to be: my own upstream, and any ref parked on
+    my own HEAD, carry MY entries — so a title I am editing in place would
+    otherwise collide with the copy I pushed an hour ago, i.e. the guard
+    reddening on its own author with nothing to fix. That is the (um) shape,
+    which this file has already paid for once.
+    """
+    skip = {"refs/remotes/origin/main", "refs/remotes/origin/HEAD"}
+    if upstream:
+        skip.add("refs/remotes/" + upstream.strip())
+    refs = []
+    for line in (for_each_ref_out or "").splitlines():
+        name, _tab, oid = line.partition("\t")
+        name, oid = name.strip(), oid.strip()
+        if not name or name in skip:
+            continue
+        if head and oid == head:
+            continue                           # a ref parked on my own commit
+        refs.append(name)
+    # [2026-09-10 (zw)] The cap RETURNS ITS OWN TRUNCATION rather than
+    # swallowing it. `return refs[:CAP]` is the (qz) trap in one line: a cap
+    # that reaches a caller's reasoning without declaring itself is an
+    # undeclared sampling step, and this one would have read as "I compared
+    # every open branch" while silently ignoring the 401st. The caller prints
+    # the dropped count, so a truncated sweep is never byte-identical to a
+    # complete one.
+    return refs[:OPEN_BRANCH_REF_CAP], max(0, len(refs) - OPEN_BRANCH_REF_CAP)
+
+
+def origin_branch_refs():
+    """-> [refname] for every OPEN branch on origin, newest tip first.
+
+    [2026-09-10] LOCAL REFS, NOT `git ls-remote`, and the choice is measured
+    rather than assumed. `ls-remote` is the obvious candidate — it is the only
+    thing that sees a branch this clone has never fetched — and it cannot do
+    this job: it returns SHAs, and a SHA whose objects are absent cannot be
+    read (`git show <sha>:CHANGELOG.md` fails), so the only finding it could
+    ever produce is *"a branch exists that I cannot inspect"*. That is a
+    WARNING on a passing run, which `(gl)` measured as not a guard at all.
+    It is also a 0.83s NETWORK call on every push and would take this arm's
+    fail-safe-open promise offline with it. MEASURED here: all 97 heads
+    `ls-remote` reports were already present locally, so the network buys
+    nothing today either.
+    THE DECLARED BLIND SPOT, therefore: a branch pushed since this clone last
+    fetched is invisible to this arm. `git fetch` closes it; the arm prints
+    how many branches it compared so a stale clone is never byte-identical to
+    a clean one.
+
+    Self-exclusion and the cap live in `_open_refs`, which is pure.
+
+    Returns `(refs, dropped)` — `dropped` is how many refs the cap discarded,
+    so a truncated sweep can SAY SO instead of reading as a complete one.
+    """
+    return _open_refs(
+        _git("for-each-ref", "--sort=-committerdate",
+             "--format=%(refname)\t%(objectname)", "refs/remotes/origin"),
+        head=(_git("rev-parse", "HEAD") or "").strip(),
+        upstream=(_git("rev-parse", "--abbrev-ref", "--symbolic-full-name",
+                       "@{u}") or "").strip())
+
+
+def origin_branch_changelogs(refs, budget_s=None, _read_ref=None):
+    """-> ([(ref, entries)], truncated). One `git show` per ref, budgeted.
+
+    A ref whose CHANGELOG.md is absent or unreadable is SKIPPED and the sweep
+    CONTINUES — 14 of this repo's 98 refs predate the file and they are
+    scattered through the list, so stopping at the first one would silently
+    truncate the answer. Deliberately NOT one multi-revision `git grep`, which
+    is the fast-looking option and is unsafe: MEASURED while designing this, a
+    single ref without CHANGELOG.md aborts the whole invocation with `fatal:
+    unable to resolve revision`, and piped through `wc -l` that failure reads
+    as **zero matches** — a clean scan. One subprocess per ref keeps every
+    failure local to the ref that caused it.
+
+    `_read_ref` exists so the selftest can drive the loop offline; production
+    never passes it.
+    """
+    import time
+    read = _read_ref or (lambda r: _git("show", r + ":CHANGELOG.md",
+                                        timeout=10))
+    budget = OPEN_BRANCH_BUDGET_S if budget_s is None else budget_s
+    out, t0, truncated = [], time.time(), False
+    for r in refs:
+        if time.time() - t0 > budget:
+            truncated = True
+            break
+        txt = read(r)
+        if not txt:
+            continue
+        out.append((r, scan(txt)[0]))
+    return out, truncated
+
+
+def origin_claimed_letters(branches):
+    """-> {letter} that ANY open origin branch's CHANGELOG already carries."""
+    out = set()
+    for _ref, entries in branches:
+        out |= {l for _d, l, _t in entries}
+    return out
+
+
+def open_branch_clashes(mine, base, branches, my_text=None):
+    """-> {letter: (my_title, their_title, [refs])} for a letter THIS tree is
+    adding that an OPEN origin branch is also adding, for a different entry.
+
+    [2026-09-10] WHY, and it is the last blind spot in the letter guard.
+    `cross_branch` compares against `origin/main` ONLY, so it can only ever
+    report a collision AFTER the rival letter has landed — while the rival is
+    still an open branch or an open PR, both sides are internally unique and
+    both are green. MEASURED on 10-Sep, the day this shipped: ONE entry was
+    renumbered FIVE times in a single session — (zn) -> (zq) -> (zr) -> (zs)
+    -> (zu) — a sixth letter was taken for a separate fix, and a seventh
+    collision followed; `origin/main` itself gained two of those letters
+    DURING the session. Seven collisions in one day, every one of them a
+    grep-and-repoint across 565 python files' citations, because `git log`
+    subjects keep the old letter. While this very fix was being measured an
+    EIGHTH arrived: `origin/claude/audit-9sep` and this tree both held (zt),
+    the guard reported OK, and then origin/main took (zt) for a THIRD entry.
+
+    THE ARM IS SCOPED BY SUBTRACTION, and that is the whole of why it can be
+    left switched on. Comparing my tree against all 98 refs raw produces
+    **592 findings** on this repo today, and up to **10,997** for one branch
+    carrying a rewritten CHANGELOG — a guard that reddens on a pre-existing
+    backlog is exempted within a day and then guards nothing ((mz)). So both
+    sides are first reduced to what they ADD relative to origin/main: an entry
+    already on main is not a claim by anyone, which retires every merged,
+    squash-merged and stale-but-identical branch at once, with no age cutoff
+    to tune and no `git merge-base` walk to pay for. MEASURED after: **592 ->
+    1**, and the 1 is the real live (zt) clash. Re-measured adversarially by
+    treating each of the 82 branches in turn as "mine": the worst case is
+    **2 findings**, against 10,997 for the raw comparison.
+
+    THE BOUND IS STRUCTURAL, not tuned: a finding must be a letter this tree
+    adds, so the arm can never report more letters than the entries in this
+    session's own diff — typically one or two.
+
+    Escapes are NOT re-implemented here: the comparison itself is
+    `cross_branch`, so a declared CORRECTED IN PLACE and a declared renumber
+    are honoured on an open branch exactly as they are against main.
+    """
+    base_by = {l: t for _d, l, t in base}
+    my_claim = {l for _d, l, t in mine if base_by.get(l) != t}
+    if not my_claim:
+        return {}
+    out = {}
+    for ref, entries in branches:
+        theirs_new = [(d, l, t) for d, l, t in entries if base_by.get(l) != t]
+        # TWO PASSES, cheap one first. `my_text` costs a regex sweep of the
+        # whole 3.6MB changelog PER BRANCH (measured: 4.0s across 82 branches,
+        # ~60% of this arm's cost) and can only ever REMOVE findings, both
+        # escapes being suppressions. So ask the cheap question first and pay
+        # for the escapes only on a branch that actually collides — about 1 in
+        # 82. Measured after: 4.0s -> 0.9s.
+        if not cross_branch(mine, theirs_new):
+            continue
+        for letter, (mine_t, their_t) in cross_branch(
+                mine, theirs_new, my_text=my_text).items():
+            if letter not in my_claim:
+                continue                       # their clash with main, not mine
+            out.setdefault(letter, (mine_t, their_t, []))[2].append(ref)
+    return out
+
+
+def _baseline_changelog(skip_if_same=True):
     """origin/main's CHANGELOG, or None when it is unavailable/irrelevant.
 
     Fail-SAFE OPEN and deliberately so: no git, a shallow clone with no
@@ -522,19 +733,17 @@ def _baseline_changelog():
     had also been copied into CLAUDE.md's letter rule, where a session would
     actually read it and conclude the arm cannot fire on the workflow this repo
     uses. Both corrected together.
-    """
-    import subprocess
-    def _git(*a):
-        try:
-            r = subprocess.run(("git",) + a, cwd=ROOT, capture_output=True,
-                               text=True, timeout=20)
-        except Exception:                      # noqa: BLE001 — no git, no arm
-            return None
-        return r.stdout if r.returncode == 0 else None
 
+    [2026-09-10] `skip_if_same=False` is for the OPEN-BRANCH arm only. This
+    arm asks whether HEAD has DIVERGED, which is right for it; the open-branch
+    arm asks about the WORKING TREE, and a session that has just pushed (HEAD
+    == origin/main) and is writing its next entry is precisely the window in
+    which a letter is chosen. The default is unchanged, so every existing
+    caller and test behaves exactly as before.
+    """
     base = (_git("rev-parse", "origin/main") or "").strip()
     mine = (_git("rev-parse", "HEAD") or "").strip()
-    if not base or base == mine:
+    if not base or (skip_if_same and base == mine):
         return None                            # nothing to compare against
     # NOTE: deliberately NOT skipped when the local branch is called "main".
     # My first cut excluded it, and that disabled this arm in the exact
@@ -551,6 +760,7 @@ def main():
         return 1
     _raw = open(CHANGELOG, encoding="utf-8").read()
     entries, dups = scan(_raw)
+    _open_n, _open_trunc = 0, False
     # [2026-08-06 (lc)] A HEADER THAT IS NOT A HEADER. Checked FIRST: every other arm
     # here reasons over the index, and an entry missing from the index cannot
     # be found duplicated, cited or clashing. Fixing it is one newline.
@@ -607,6 +817,43 @@ def main():
                   "this arm exists for). A deliberate renumber is declared "
                   "inline: 'RENUMBERED (x) -> (y)'.\n")
             return 1
+    # [2026-09-10] THE OPEN-BRANCH ARM — the collision `cross_branch` above
+    # structurally CANNOT see. It compares against origin/main, so a rival
+    # letter is only visible once it has already landed; while the rival is an
+    # unmerged branch or an open PR both files are internally unique and both
+    # runs are green. See `open_branch_clashes` for the 10-Sep measurement
+    # (seven renumbers in one day) and for why both sides are first reduced to
+    # what they ADD relative to main (592 raw findings on this repo -> 1).
+    _open_base = base_text or _baseline_changelog(skip_if_same=False)
+    if _open_base:
+        _ob_refs, _ob_dropped = origin_branch_refs()
+        _branches, _open_trunc = origin_branch_changelogs(_ob_refs)
+        _open_n = len(_branches)
+        open_clashes = open_branch_clashes(entries, scan(_open_base)[0],
+                                           _branches, my_text=_raw)
+        if open_clashes:
+            print("\nOPEN-BRANCH CHANGELOG LETTER COLLISION — a letter this "
+                  "tree is ADDING is already\nspoken for by an UNMERGED "
+                  "branch on origin. Both sides are internally unique and "
+                  "both\nare green today; every citation goes ambiguous at "
+                  "the merge:\n")
+            for letter, (mine_t, their_t, refs) in sorted(open_clashes.items()):
+                print(f"  ({letter})")
+                print(f"      this tree   : {mine_t[:84]}")
+                print(f"      their entry : {their_t[:84]}")
+                for r in refs:
+                    print("      on branch   : "
+                          + r.replace("refs/remotes/", ""))
+            print("\nFIX: take a letter free EVERYWHERE — `python3 "
+                  "scripts/audit_changelog_letters.py --next`\ncounts open "
+                  "origin branches now, so moving YOUR entry is always "
+                  "available and is one\ncommand. If yours is the entry CITED "
+                  "FROM TRACKED CODE it keeps the letter and the\nother "
+                  "branch moves instead (rule 3); either way record the move "
+                  "inline, because\n`git log` subjects keep the old letter. "
+                  "Run `git fetch` first — this arm reads only\nbranches this "
+                  "clone has already fetched.\n")
+            return 1
     if dups:
         print(f"\nDUPLICATE CHANGELOG LETTERS (era >= {ERA_START}) — every "
               f"cross-reference to these is ambiguous:\n")
@@ -642,9 +889,16 @@ def main():
               "lived only in a commit body because its entry was never "
               "written.\n")
         return 1
+    # [2026-09-10] The branch count is PUBLISHED, never assumed. A run that
+    # compared zero open branches (a shallow CI checkout has no
+    # remote-tracking refs but its own) is byte-identical to a clean sweep
+    # unless it says so — the (po)/(lv) rule this repo keeps paying for.
     print(f"audit_changelog_letters: OK — {len(entries)} lettered entries since "
           f"{ERA_START}, every letter unique, no glued header, "
           f"{len(_py)} python files' citations all resolve"
+          + (f", {_open_n} open origin branch(es) compared"
+             if _open_n else ", NO open origin branches compared")
+          + (" [BUDGET TRUNCATED]" if _open_trunc else "")
           + (f" ({len(LETTERS_OK)} declared)" if LETTERS_OK else ""))
     return 0
 
@@ -935,9 +1189,163 @@ def _selftest():
     finally:
         shutil.rmtree(_tmp, ignore_errors=True)
 
+    # ---- [2026-09-10] THE OPEN-BRANCH ARM ---------------------------------
+    # THE INCIDENT: one entry was renumbered FIVE times in a single session —
+    # (zn) -> (zq) -> (zr) -> (zs) -> (zu) — a sixth letter went to a separate
+    # fix and a seventh collision followed, and while this fix was being
+    # measured an EIGHTH arrived: this tree and origin/claude/audit-9sep both
+    # held (zt) and the guard printed OK, because the rival was an unmerged
+    # branch and origin/main is the only thing `cross_branch` can see.
+    # FIXTURES ARE ASSEMBLED, never spelled: a literal bracketed letter in
+    # this file RESERVES it for real, the trap this module's own docstrings
+    # already record twice.
+    _obr = lambda x: "(" + x + ")"                               # noqa: E731
+    _ob_main = f"## 2026-09-10 {_obr('zk')} — an entry already on main\n\nb\n"
+    _ob_base = scan(_ob_main)[0]
+    _ob_my_txt = _ob_main + f"\n## 2026-09-10 {_obr('zl')} — MY NEW ENTRY\n\nb\n"
+    _ob_my = scan(_ob_my_txt)[0]
+    _ob_their = scan(_ob_main + f"\n## 2026-09-10 {_obr('zl')} — THEIR "
+                     "DIFFERENT ENTRY\n\nb\n")[0]
+    _ob_hit = open_branch_clashes(_ob_my, _ob_base,
+                                  [("refs/remotes/origin/claude/x", _ob_their)],
+                                  my_text=_ob_my_txt)
+    assert set(_ob_hit) == {"zl"}, _ob_hit
+    assert _ob_hit["zl"][2] == ["refs/remotes/origin/claude/x"], _ob_hit
+    # THE NOISE CONTROL, and it is the whole reason this arm can stay switched
+    # on. A branch whose colliding letter is ALREADY ON MAIN is adding
+    # nothing, so it is quiet — which retires every merged, squash-merged and
+    # stale-identical branch at once. MEASURED on this repo without the
+    # subtraction: 592 findings across 98 refs, and 10,997 for a single branch
+    # carrying a rewritten changelog. A guard that reddens on a pre-existing
+    # backlog is exempted within a day and then guards nothing ((mz)).
+    assert open_branch_clashes(_ob_my, _ob_base, [("r", scan(_ob_main)[0])],
+                               my_text=_ob_my_txt) == {}, \
+        "a letter already on main is nobody's claim"
+    # THE SUBTRACTION ON MY SIDE, pinned: a letter I merely CARRY from main,
+    # which a branch is rewriting under me, is that branch's race with main —
+    # not mine, and not something I could fix by editing my own file. Without
+    # this filter the arm reports other people's collisions on every run.
+    _ob_carry = scan(f"## 2026-09-10 {_obr('zk')} — THEIR REWRITE OF A MAIN "
+                     "ENTRY\n\nb\n")[0]
+    assert open_branch_clashes(_ob_my, _ob_base, [("r", _ob_carry)],
+                               my_text=_ob_my_txt) == {}, \
+        "a letter I merely carry from main is not my claim"
+    # THE SUBTRACTION ON THEIR SIDE, pinned: a branch merely CARRYING main's
+    # copy of a letter I am changing is not a SECOND collision — that finding
+    # belongs to the cross_branch arm, and repeating it once per branch is
+    # exactly how the unsubtracted comparison reached 592.
+    _ob_edit_txt = f"## 2026-09-10 {_obr('zk')} — I CHANGED THIS ENTRY\n\nb\n"
+    assert open_branch_clashes(scan(_ob_edit_txt)[0], _ob_base,
+                               [("r", scan(_ob_main)[0])],
+                               my_text=_ob_edit_txt) == {}, \
+        "a branch carrying main's copy is not a second collision"
+    # THE PURE REF FILTER: main, HEAD, my own upstream and any ref parked on
+    # my own commit are excluded — comparing me against myself would redden
+    # the guard on its own author, with nothing to fix ((um)).
+    _ob_out = ("refs/remotes/origin/main\tAAA\n"
+               "refs/remotes/origin/HEAD\tAAA\n"
+               "refs/remotes/origin/claude/mine\tHHH\n"
+               "refs/remotes/origin/claude/self\tMYHEAD\n"
+               "refs/remotes/origin/claude/other\tBBB\n")
+    assert _open_refs(_ob_out, head="MYHEAD",
+                      upstream="origin/claude/mine") == (
+        ["refs/remotes/origin/claude/other"], 0), _open_refs(
+            _ob_out, "MYHEAD", "origin/claude/mine")
+    # POSITIVE CONTROL: with no HEAD and no upstream the same input yields the
+    # three non-main refs, so the assertion above is testing the filter and
+    # not an empty walk.
+    assert len(_open_refs(_ob_out)[0]) == 3, _open_refs(_ob_out)
+    assert _open_refs("") == ([], 0) and _open_refs(None) == ([], 0)
+    # a letter only THEY add is THEIR race with main, not a finding I can fix
+    _ob_theirs_only = scan(_ob_main + f"\n## 2026-09-10 {_obr('zm')} — only "
+                           "theirs\n\nb\n")[0]
+    assert open_branch_clashes(_ob_my, _ob_base, [("r", _ob_theirs_only)],
+                               my_text=_ob_my_txt) == {}
+    # SAME letter + SAME title is a shared entry, never a race
+    assert open_branch_clashes(_ob_my, _ob_base, [("r", _ob_my)],
+                               my_text=_ob_my_txt) == {}
+    # FAIL-SAFE OPEN: no branches, or nothing of my own to claim, finds nothing
+    assert open_branch_clashes(_ob_my, _ob_base, [], my_text=_ob_my_txt) == {}
+    assert open_branch_clashes(_ob_base, _ob_base, [("r", _ob_their)],
+                               my_text=_ob_main) == {}
+    # THE ESCAPES ARE INHERITED, not re-implemented — the comparison IS
+    # `cross_branch`, so a declared in-place correction (I12) is honoured on
+    # an open branch exactly as it is against main...
+    _ob_corr_txt = (_ob_main + f"\n## 2026-09-10 {_obr('zl')} — MY NEW ENTRY, "
+                    "24 HOURS\n\n> **[CORRECTED IN PLACE per I12.]** was "
+                    "'four days'\n")
+    _ob_corr_their = scan(_ob_main + f"\n## 2026-09-10 {_obr('zl')} — MY NEW "
+                          "ENTRY, FOUR DAYS\n\nb\n")[0]
+    assert open_branch_clashes(scan(_ob_corr_txt)[0], _ob_base,
+                               [("r", _ob_corr_their)],
+                               my_text=_ob_corr_txt) == {}, \
+        "a declared in-place correction must not read as an open-branch race"
+    # ...and the SAME edit without the declaration still fires.
+    _ob_undecl = (_ob_main + f"\n## 2026-09-10 {_obr('zl')} — MY NEW ENTRY, "
+                  "24 HOURS\n\nb\n")
+    assert set(open_branch_clashes(scan(_ob_undecl)[0], _ob_base,
+                                   [("r", _ob_corr_their)],
+                                   my_text=_ob_undecl)) == {"zl"}, \
+        "no declaration ⇒ still a race"
+    # ...and so is a DECLARED renumber that actually carries the displaced
+    # entry, which is the repair this guard's own FIX text prescribes.
+    _ob_rn_txt = (_ob_main + f"\n## 2026-09-10 {_obr('zl')} — MY OWN ENTRY"
+                  f"\n\nb\n\n## 2026-09-10 {_obr('zm')} — THEIR DISPLACED "
+                  "ENTRY\n\n> RENUMBERED " + _obr('zl') + " -> " + _obr('zm')
+                  + " at the merge\n\nb\n")
+    _ob_rn_their = scan(_ob_main + f"\n## 2026-09-10 {_obr('zl')} — THEIR "
+                        "DISPLACED ENTRY\n\nb\n")[0]
+    assert open_branch_clashes(scan(_ob_rn_txt)[0], _ob_base,
+                               [("r", _ob_rn_their)],
+                               my_text=_ob_rn_txt) == {}, \
+        "a declared renumber carrying the displaced entry must not clash"
+    # `origin_claimed_letters` is what makes `--next` PREVENTIVE rather than
+    # merely diagnostic: measured at the incident, from a tip of `zs` the old
+    # rule handed out the very letter audit-9sep was already using.
+    assert origin_claimed_letters([("r", _ob_their)]) == {"zk", "zl"}
+    assert origin_claimed_letters([]) == set()
+    # THE LIVE GIT ARMS must never raise, whatever this checkout is, and must
+    # never compare me against myself.
+    _ob_refs, _ob_dropped = origin_branch_refs()
+    assert isinstance(_ob_refs, list), type(_ob_refs)
+    assert isinstance(_ob_dropped, int) and _ob_dropped >= 0, _ob_dropped
+    # the cap must REPORT its truncation, never swallow it ((qz))
+    _capped, _drop = _open_refs("\n".join(
+        f"refs/remotes/origin/b{i}\tdead{i}" for i in range(OPEN_BRANCH_REF_CAP + 7)))
+    assert len(_capped) == OPEN_BRANCH_REF_CAP and _drop == 7, (len(_capped), _drop)
+    assert "refs/remotes/origin/main" not in _ob_refs
+    assert "refs/remotes/origin/HEAD" not in _ob_refs
+    _ob_bl, _ob_tr = origin_branch_changelogs(_ob_refs[:2])
+    assert isinstance(_ob_bl, list) and _ob_tr is False
+    # AN EXHAUSTED BUDGET MUST SAY SO. A partial sweep that reports itself as
+    # complete is the (qz) silent-cap trap, in the guard whose whole job is to
+    # not miss a letter.
+    _ob_bl0, _ob_tr0 = origin_branch_changelogs(["refs/remotes/origin/main"],
+                                                budget_s=-1.0)
+    assert _ob_bl0 == [] and _ob_tr0 is True, (_ob_bl0, _ob_tr0)
+    # AN UNRESOLVABLE REF IS SKIPPED AND THE SWEEP CONTINUES. 14 of this
+    # repo's 98 refs predate CHANGELOG.md and they are scattered through the
+    # list, so ending the sweep at the first one would silently drop every
+    # branch after it — a partial answer wearing a complete one's output.
+    # Driven offline, so this pins the LOOP and not the checkout.
+    _ob_seen = []
+
+    def _ob_read(r):
+        _ob_seen.append(r)
+        return _ob_main if r.endswith("/good") else None
+
+    _ob_mix, _ = origin_branch_changelogs(
+        ["refs/remotes/origin/no-such-ref", "refs/remotes/origin/good"],
+        _read_ref=_ob_read)
+    assert [r for r, _e in _ob_mix] == ["refs/remotes/origin/good"], _ob_mix
+    assert _ob_seen == ["refs/remotes/origin/no-such-ref",
+                        "refs/remotes/origin/good"], \
+        "an unresolvable ref must be skipped, never end the sweep"
+
     print(f"audit_changelog_letters selftest OK (fires on a duplicate; ignores "
           f"the pre-{ERA_START} restart era and letterless headers; skips "
-          f"sibling worktrees; sees {len(real)} real entries)")
+          f"sibling worktrees; sees open origin branches; sees {len(real)} "
+          f"real entries)")
     return 0
 
 
@@ -946,6 +1354,10 @@ if __name__ == "__main__":
         # [(pd)] THE ONE PLACE THAT PICKS A LETTER, so no session has to write
         # an enumerator again. Counts headers AND citations across tracked
         # files; degrades to headers-only if git is unavailable.
+        # [2026-09-10 (zw)] It now also counts every letter held by origin/main
+        # and by an OPEN origin branch, and it does so by handing them to
+        # `next_letter` rather than re-deriving the pick here — see that
+        # function for why the inline copy was removed.
         import subprocess
         _txt = open(CHANGELOG, encoding="utf-8").read()
         try:
@@ -954,6 +1366,19 @@ if __name__ == "__main__":
                 capture_output=True, text=True, timeout=30).stdout.split()
         except Exception:                    # noqa: BLE001 — degrade, never block
             _files = []
-        print(next_letter(_txt, _files))
+        # [2026-09-10] THE PREVENTIVE HALF, and it is the half that stops
+        # the renumber rather than reporting it. MEASURED against the 10-Sep
+        # incident: from a tip of `zs` this printed a letter
+        # `origin/claude/audit-9sep` was already using, and with open branches
+        # counted it steps past it instead — the eighth collision of that day
+        # does not happen. Letters an abandoned branch burns cost nothing: the
+        # sequence is bijective base-26 and unbounded, and 9 were held this
+        # way on the day this shipped.
+        _branches, _ = origin_branch_changelogs(origin_branch_refs()[0])
+        _extra = set(origin_claimed_letters(_branches))
+        _base = _baseline_changelog(skip_if_same=False)
+        if _base:
+            _extra |= {l for _d, l, _t in scan(_base)[0]}
+        print(next_letter(_txt, _files, extra_claimed=_extra))
         sys.exit(0)
     sys.exit(_selftest() if "--selftest" in sys.argv else main())

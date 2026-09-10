@@ -2590,6 +2590,25 @@ All new bots:
   letter + same title is a rebase and stays quiet. Fail-safe open: no git, a
   shallow clone with no `origin/main`, or a HEAD that already EQUALS
   `origin/main` ⇒ arm disabled.
+  **[2026-09-10] CORRECTED IN PLACE (I12) — "compares against `origin/main`"
+  was the whole defect, and it is no longer the whole guard.** `origin/main`
+  is only where a rival letter ends up; while it is an OPEN branch or an open
+  PR both files are internally unique and both runs are green. MEASURED
+  10-Sep: one entry renumbered FIVE times in a session (zn -> zq -> zr -> zs
+  -> zu), a sixth letter taken for a separate fix, a seventh collision after
+  that — and an eighth found while fixing it, `(zt)` held by this tree and by
+  `origin/claude/audit-9sep` with the guard reporting OK. `open_branch_clashes`
+  now also compares every branch in `refs/remotes/origin`, with BOTH sides
+  reduced to what they ADD relative to main — without that subtraction the
+  same comparison yields **592 findings** here (10,997 for one branch with a
+  rewritten changelog) and would be exempted within a day; with it, **1**, and
+  a merged or dead branch can never produce a permanent false collision.
+  **PICK THE LETTER WITH `python3 scripts/audit_changelog_letters.py --next`**
+  — it counts open branches now, so it hands you one that is free everywhere.
+  DECLARED BLIND SPOT: local refs only (no network — `ls-remote` returns SHAs
+  whose objects are absent and could only ever emit a warning), so **run `git
+  fetch` first**; the run prints how many branches it compared, and zero is
+  never byte-identical to clean.
   **[16-Aug (ns)] CORRECTED IN PLACE (I12): this line used to say "on `main` ⇒
   arm disabled", and that is FALSE — it describes a behaviour deliberately
   removed.** The arm keys on whether HEAD has **diverged** from `origin/main`,
