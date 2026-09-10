@@ -28,7 +28,7 @@ from dataclasses import asdict
 from typing import Any, Iterable
 
 from .logging_setup import get
-from .models import MarketMeta
+from .models import MarketMeta, contained_path
 
 log = get("market_metadata")
 
@@ -127,7 +127,10 @@ class MetadataStore:
 
     def save(self, markets: list[MarketMeta]) -> tuple[str, str]:
         ver = self.version(markets)
-        path = os.path.join(self.dir, f"markets_{ver}.json")
+        # `ver` is our own content hash and is already safe; routing it
+        # through the same helper keeps ONE rule for every path this package
+        # writes rather than a judgement call per site.
+        path = contained_path(self.dir, f"markets_{ver}.json")
         payload = {"version": ver, "fetched_at": time.time(),
                    "markets": [asdict(m) for m in markets]}
         with open(path, "w") as fh:

@@ -45,6 +45,13 @@ LIVE_SOAK_SIGNALS = 100
 LIVE_CONFIRMATION_PHRASE = "I_UNDERSTAND_THE_RISK"
 FLATTEN_CONFIRMATION_PHRASE = "CLOSE_ALL_POSITIONS"
 
+#: The ONLY environment variables `LiveGate` copies. Anything not on this list
+#: — including every other secret in the process environment — never reaches
+#: the gate object. Adding a name here is a deliberate act.
+_GATE_ENV_KEYS = ("ENABLE_LIVE_TRADING", "LIVE_CONFIRMATION",
+                  "LIGHTER_ACCOUNT_INDEX", "LIGHTER_API_KEY_INDEX",
+                  "LIGHTER_API_PRIVATE_KEY", "LIVE_SOAK_OVERRIDE")
+
 
 @dataclass
 class RiskConfig:
@@ -295,7 +302,14 @@ class LiveGate:
 
     def __init__(self, cfg: AppConfig, env: dict[str, str] | None = None):
         self.cfg = cfg
-        self.env = dict(os.environ if env is None else env)
+        # LEAST PRIVILEGE ON SECRET MATERIAL. `dict(os.environ)` would copy
+        # LIGHTER_API_PRIVATE_KEY onto a long-lived object that is passed
+        # around and, in `preflight`, partially rendered. This gate needs to
+        # know only whether each of six variables is SET and, for two of
+        # them, what they say -- so it keeps exactly those and nothing else.
+        # The private key is reduced to a boolean here and never stored.
+        src = os.environ if env is None else env
+        self.env = {k: src.get(k, "") for k in _GATE_ENV_KEYS}
 
     def kill_switch_present(self) -> bool:
         return os.path.exists(os.path.join(self.cfg.runtime_dir, "KILL_SWITCH"))

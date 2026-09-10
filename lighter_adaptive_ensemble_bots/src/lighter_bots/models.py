@@ -270,3 +270,52 @@ class Trade:
 
 def now() -> float:
     return time.time()
+
+
+# --------------------------------------------------- filesystem boundary ---
+#: Characters a path component may contain. Anything else is replaced, so a
+#: separator, a traversal or a NUL can never survive into a filename.
+_SAFE_CHARS = set("abcdefghijklmnopqrstuvwxyz"
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+
+
+def safe_filename(name: str, *, fallback: str = "unnamed",
+                  max_len: int = 96) -> str:
+    """Reduce an untrusted string to a single, safe path COMPONENT.
+
+    WHY THIS EXISTS, and it is not hypothetical: market symbols are read from
+    the venue's own `orderBookDetails` response and were being interpolated
+    straight into cache filenames (`f"{symbol}_{tf}.json"`). A venue --
+    compromised, buggy, or simply listing a market with an unusual name --
+    could therefore choose a path outside the data directory. The tape cache
+    is written on every data command, so this is reachable in BACKTEST mode
+    with no credentials configured at all.
+
+    The rule is allowlist, not denylist: anything outside `_SAFE_CHARS`
+    becomes `_`. A denylist here (strip "..", strip "/") is the version that
+    keeps being bypassed, because the interesting inputs are the ones nobody
+    listed. Leading dots are stripped so a component can never be `.`, `..`
+    or a hidden file, and an empty result becomes `fallback` rather than the
+    empty string -- `os.path.join(d, "")` silently yields the DIRECTORY."""
+    cleaned = "".join(c if c in _SAFE_CHARS else "_" for c in str(name))
+    cleaned = cleaned.lstrip(".")[:max_len]
+    return cleaned or fallback
+
+
+def contained_path(directory: str, *parts: str) -> str:
+    """Join `parts` under `directory` and REFUSE to escape it.
+
+    Belt and braces: every part is passed through `safe_filename`, and the
+    resolved result is then required to sit inside the resolved directory.
+    The second check is what catches a symlink or an unforeseen encoding --
+    sanitising and then verifying is cheap, and only one of the two has to
+    hold for the write to be safe."""
+    import os as _os
+    root = _os.path.realpath(directory)
+    joined = _os.path.join(root, *[safe_filename(p) for p in parts])
+    resolved = _os.path.realpath(joined)
+    if resolved != root and not resolved.startswith(root + _os.sep):
+        raise ValueError(
+            f"refusing to write outside {directory!r}: {joined!r} resolves to "
+            f"{resolved!r}")
+    return joined

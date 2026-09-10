@@ -23,7 +23,7 @@ from .lighter_adapter import (MockLighterAdapter, NativeLighterAdapter,
                               build_capability_report)
 from .logging_setup import setup
 from .market_metadata import MarketRegistry, MetadataStore, discover
-from .models import Mode
+from .models import Mode, contained_path
 from .paper_trader import Runner, SoakRecord
 from .walk_forward import robust, run as wf_run, selection_premium, sensitivity
 
@@ -289,14 +289,26 @@ def cmd_report(args) -> int:
         if args.date and args.date not in name:
             continue
         print(f"--- {name}")
+        # `name` comes from a directory listing, so a symlink in reports/
+        # could otherwise read any file the process can. `contained_path`
+        # resolves and refuses anything outside the directory.
+        try:
+            target = contained_path(cfg.reports_dir, name)
+        except ValueError as exc:
+            print(f"    skipped: {exc}")
+            continue
         if name.endswith(".json"):
             try:
-                print(json.dumps(json.load(
-                    open(os.path.join(cfg.reports_dir, name))), indent=1)[:4000])
+                with open(target) as fh:
+                    print(json.dumps(json.load(fh), indent=1)[:4000])
             except (OSError, ValueError):
                 pass
         else:
-            print(open(os.path.join(cfg.reports_dir, name)).read()[:4000])
+            try:
+                with open(target) as fh:
+                    print(fh.read()[:4000])
+            except OSError:
+                pass
         found = True
     if not found:
         print("no reports found")

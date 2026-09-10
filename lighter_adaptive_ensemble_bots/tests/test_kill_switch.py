@@ -150,3 +150,31 @@ def test_health_render_names_every_failure(tmp_path):
     for name in ("market_metadata", "websocket", "nonce_manager",
                  "account_reconciled", "regime_tradable"):
         assert name in text
+
+
+def test_the_live_gate_never_copies_the_whole_environment(tmp_path):
+    """Least privilege on secret material.
+
+    An earlier version did `dict(os.environ)`, which copied every secret in
+    the process onto a long-lived object that is passed around and partially
+    rendered by `preflight`. The gate needs six names; it keeps six names."""
+    from lighter_bots.config import _GATE_ENV_KEYS
+    env = dict(ENV_OK)
+    env["UNRELATED_API_SECRET"] = "sk-should-never-be-copied"
+    env["AWS_SECRET_ACCESS_KEY"] = "also-not-ours"
+    gate = LiveGate(_cfg(tmp_path), env=env)
+    assert set(gate.env) == set(_GATE_ENV_KEYS)
+    blob = repr(gate.env)
+    assert "sk-should-never-be-copied" not in blob
+    assert "also-not-ours" not in blob
+
+
+def test_the_gate_still_reads_the_variables_it_does_keep(tmp_path):
+    """The narrowing must not have broken the gate: with everything present
+    it opens, and dropping one of the kept names closes it."""
+    gate = LiveGate(_cfg(tmp_path), env=dict(ENV_OK))
+    assert gate.evaluate(**ALL_OK).allowed
+    missing = {k: v for k, v in ENV_OK.items()
+               if k != "LIGHTER_API_PRIVATE_KEY"}
+    closed = LiveGate(_cfg(tmp_path), env=missing).evaluate(**ALL_OK)
+    assert not closed.allowed and "api_private_key" in closed.blockers

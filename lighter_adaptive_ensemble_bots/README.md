@@ -240,8 +240,30 @@ Recorded because they are the reason to write tests that can fail:
    pruning ran against `time.time()`, so historical timestamps were deleted the
    moment they were written. A backtest would have reported a trade rate the
    live system could never take, and nothing would have said so.
+3. **A backtest overwrote live strategy health and the trade budget.** Same
+   `state/` directory, and `record()` writes — so a replayed losing streak
+   would have arrived as a PAUSED live strategy.
+4. **Walk-forward measured its span across all timeframes**, so a fold landed
+   where the execution tape did not exist and reported *"0 trades"* — which
+   reads as a strategy declining to trade and is actually "there is no tape
+   here".
 
-Both now have tests that fail if they return.
+And two found by CodeQL on the pull request, both fixed with mutation-verified
+tests (6 of 6 mutations killed):
+
+5. **Venue-supplied symbols reached a filesystem path.** Market symbols come
+   from Lighter's own `orderBookDetails` response and were interpolated
+   straight into cache filenames (`f"{symbol}_{tf}.json"`). A venue listing a
+   market with an unusual name could therefore choose a path outside the data
+   directory — reachable in BACKTEST mode with no credentials configured at
+   all. `models.safe_filename` (allowlist, not denylist) plus
+   `models.contained_path` (sanitise, then resolve and verify) are now the one
+   owner for every path this package writes.
+6. **The live gate copied the entire process environment**, private key
+   included, onto a long-lived object that `preflight` partially renders. It
+   now keeps exactly the six names it reads, declared in `_GATE_ENV_KEYS`.
+
+All six have tests that fail if they return.
 
 ---
 

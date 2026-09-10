@@ -149,7 +149,8 @@ class HealthRegistry:
         if not os.path.exists(self.path):
             return
         try:
-            raw = json.load(open(self.path))
+            with open(self.path) as fh:
+                raw = json.load(fh)
         except (OSError, ValueError):
             return
         for k, v in (raw or {}).items():
@@ -169,7 +170,8 @@ class HealthRegistry:
             d["state"] = h.state.value
             out[k] = d
         tmp = self.path + ".tmp"
-        json.dump(out, open(tmp, "w"), indent=1, default=str)
+        with open(tmp, "w") as fh:
+            json.dump(out, fh, indent=1, default=str)
         os.replace(tmp, self.path)
 
     def get(self, key: str) -> StrategyHealth:
@@ -346,7 +348,8 @@ class TradeBudget:
         if not os.path.exists(self.path):
             return
         try:
-            raw = json.load(open(self.path))
+            with open(self.path) as fh:
+                raw = json.load(fh)
         except (OSError, ValueError):
             return
         self.entries = [EntryRecord(**e) for e in raw.get("entries", [])]
@@ -372,11 +375,12 @@ class TradeBudget:
         if len(self.seen_signal_ids) > 20000:
             self.seen_signal_ids = set(list(self.seen_signal_ids)[-10000:])
         tmp = self.path + ".tmp"
-        json.dump({"entries": [asdict(e) for e in self.entries],
-                   "seen_signal_ids": sorted(self.seen_signal_ids),
-                   "cooldown_until": self.cooldown_until,
-                   "global_lockout_until": self.global_lockout_until},
-                  open(tmp, "w"), indent=1)
+        with open(tmp, "w") as fh:
+            json.dump({"entries": [asdict(e) for e in self.entries],
+                       "seen_signal_ids": sorted(self.seen_signal_ids),
+                       "cooldown_until": self.cooldown_until,
+                       "global_lockout_until": self.global_lockout_until},
+                      fh, indent=1)
         os.replace(tmp, self.path)
 
     def _since(self, seconds: float, now: float,

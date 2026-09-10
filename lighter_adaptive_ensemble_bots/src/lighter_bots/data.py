@@ -22,7 +22,7 @@ import urllib.request
 from typing import Any, Iterable, Sequence
 
 from .logging_setup import get
-from .models import Candle
+from .models import Candle, contained_path, safe_filename
 
 log = get("data")
 
@@ -113,7 +113,10 @@ class CandleSource:
         self.sleep_s = sleep_s
 
     def _path(self, symbol: str, tf: str) -> str:
-        return os.path.join(self.raw, f"{symbol}_{tf}.json")
+        """`symbol` comes from the VENUE, so it is untrusted input reaching a
+        filesystem path -- see `models.safe_filename`."""
+        return contained_path(self.raw, f"{safe_filename(symbol)}_"
+                                        f"{safe_filename(tf)}.json")
 
     def load_cached(self, symbol: str, tf: str) -> list[Candle]:
         p = self._path(symbol, tf)

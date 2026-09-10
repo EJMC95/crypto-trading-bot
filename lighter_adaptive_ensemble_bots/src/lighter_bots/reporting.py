@@ -11,7 +11,7 @@ import os
 import time
 from typing import Any
 
-from .models import Regime
+from .models import Regime, contained_path
 
 
 def _f(v: Any, nd: int = 2, dash: str = "n/a") -> str:
@@ -24,8 +24,11 @@ def _f(v: Any, nd: int = 2, dash: str = "n/a") -> str:
 
 
 def write_json(reports_dir: str, name: str, payload: dict[str, Any]) -> str:
+    """`name` reaches the filesystem, and `daily_report` builds it from a
+    caller-supplied date, so it is sanitised at this boundary rather than at
+    each call site (one owner -- a second copy of a rule is a second rule)."""
     os.makedirs(reports_dir, exist_ok=True)
-    path = os.path.join(reports_dir, name)
+    path = contained_path(reports_dir, name)
     with open(path, "w") as fh:
         json.dump(payload, fh, indent=1, default=str, sort_keys=True)
     return path

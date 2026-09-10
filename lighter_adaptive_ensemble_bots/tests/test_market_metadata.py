@@ -110,3 +110,117 @@ def test_snapshot_round_trips(tmp_path):
     got_ver, markets, ts = store.load_latest()
     assert got_ver == ver and len(markets) == 2 and ts > 0
     assert MarketRegistry(markets).get("BTC").complete
+
+
+# --------------------------------------------- the filesystem boundary -----
+# Market symbols are read from the VENUE's own orderBookDetails response and
+# were being interpolated straight into cache filenames. That is untrusted
+# input reaching a path, and it is reachable in BACKTEST mode with no
+# credentials configured at all.
+import os                                                    # noqa: E402
+
+from lighter_bots.data import CandleSource                   # noqa: E402
+from lighter_bots.models import contained_path, safe_filename  # noqa: E402
+
+NUL = chr(0)
+LF = chr(10)
+RTL = chr(0x202E)          # right-to-left override
+E_ACUTE = chr(0xE9)
+
+HOSTILE = [
+    "../../../../etc/passwd",
+    "..%s..%swindows" % (chr(92), chr(92)),
+    "BTC/../../escape",
+    "/absolute/path",
+    ".hidden",
+    "..",
+    ".",
+    "",
+    "with space",
+    "semi;colon",
+    "null" + NUL + "byte",
+    "new" + LF + "line",
+]
+
+
+@pytest.mark.parametrize("bad", HOSTILE)
+def test_a_hostile_symbol_can_never_escape_the_data_directory(bad, tmp_path):
+    src = CandleSource("https://example.invalid", str(tmp_path))
+    path = src._path(bad, "1h")
+    root = os.path.realpath(os.path.join(str(tmp_path), "raw"))
+    assert os.path.realpath(path).startswith(root + os.sep)
+    assert os.path.basename(path) == os.path.basename(os.path.normpath(path))
+
+
+@pytest.mark.parametrize("bad", HOSTILE)
+def test_safe_filename_yields_a_single_harmless_component(bad):
+    got = safe_filename(bad)
+    assert got, "an empty component makes os.path.join return the DIRECTORY"
+    assert os.sep not in got and "/" not in got and chr(92) not in got
+    assert not got.startswith("."), "no traversal, no hidden file"
+    assert NUL not in got and LF not in got
+
+
+def test_safe_filename_leaves_ordinary_symbols_alone():
+    for good in ("BTC", "ETH", "US100", "XAU", "1000PEPE", "kBONK"):
+        assert safe_filename(good) == good
+
+
+def test_safe_filename_is_an_allowlist_not_a_denylist():
+    """A denylist is the version that keeps getting bypassed. Anything outside
+    the allowed set must be replaced, including characters nobody thought to
+    enumerate."""
+    assert safe_filename("a" + RTL + "b") == "a_b"
+    assert safe_filename("a" + NUL + "b") == "a_b"
+    assert safe_filename(E_ACUTE) == "_"
+
+
+def test_contained_path_refuses_a_name_that_is_a_symlink_out(tmp_path):
+    """The case the resolve step exists for: something has planted a SYMLINK
+    inside the target directory, and a write to that ordinary-looking name
+    would follow it out.
+
+    An earlier version of this test passed the symlink AS the directory,
+    which proves nothing -- resolving the directory the caller chose is
+    correct, and the assertion failed for that reason. The threat is a
+    symlink the caller did NOT choose sitting at the name being written."""
+    root = tmp_path / "reports"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "backtest.json").symlink_to(outside / "stolen.json")
+    with pytest.raises(ValueError):
+        contained_path(str(root), "backtest.json")
+
+
+def test_sanitising_alone_cannot_be_bypassed_by_a_separator(tmp_path):
+    """The first line of defence, stated separately from the second: a name
+    containing a separator is collapsed to ONE component, so it can never
+    reach a nested symlink in the first place."""
+    got = contained_path(str(tmp_path), "link/escape.json")
+    assert os.path.dirname(got) == os.path.realpath(str(tmp_path))
+
+
+def test_contained_path_allows_a_normal_name(tmp_path):
+    got = contained_path(str(tmp_path), "backtest.json")
+    assert got == os.path.join(os.path.realpath(str(tmp_path)),
+                               "backtest.json")
+
+
+def test_report_writing_cannot_escape_its_directory(tmp_path):
+    from lighter_bots.reporting import write_json
+    p = write_json(str(tmp_path), "../../escaped.json", {"a": 1})
+    assert os.path.realpath(p).startswith(os.path.realpath(str(tmp_path)))
+    assert not (tmp_path.parent / "escaped.json").exists()
+
+
+def test_the_cache_round_trips_a_sanitised_symbol(tmp_path):
+    """The hardening must not break the ordinary path: a saved series must
+    still be readable back under the same symbol."""
+    from lighter_bots.models import Candle
+    src = CandleSource("https://example.invalid", str(tmp_path))
+    bars = [Candle(1_700_000_000 + i * 3600, 1.0, 2.0, 0.5, 1.5, 10.0)
+            for i in range(5)]
+    src.save("BTC", "1h", bars)
+    back = src.load_cached("BTC", "1h")
+    assert len(back) == 5 and back[0].ts == bars[0].ts

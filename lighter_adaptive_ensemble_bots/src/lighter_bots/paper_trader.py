@@ -66,14 +66,16 @@ class SoakRecord:
         if not os.path.exists(p):
             return cls()
         try:
-            return cls(**json.load(open(p)))
+            with open(p) as fh:
+                return cls(**json.load(fh))
         except (OSError, ValueError, TypeError):
             return cls()
 
     def save(self, state_dir: str) -> None:
         os.makedirs(state_dir, exist_ok=True)
         tmp = os.path.join(state_dir, "soak.json.tmp")
-        json.dump(asdict(self), open(tmp, "w"), indent=1)
+        with open(tmp, "w") as fh:
+            json.dump(asdict(self), fh, indent=1)
         os.replace(tmp, os.path.join(state_dir, "soak.json"))
 
 
