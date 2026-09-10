@@ -595,6 +595,62 @@ def test_each_row_asks_for_a_window_it_can_actually_fill():
         assert "census_window(" in src and "limit=CENSUS_LIMIT" in src
 
 
+def test_the_snapshot_call_itself_is_present_on_every_census_publisher():
+    """[2026-09-10 (zw)] THE SUBSTRING CHECK ABOVE DOES NOT PIN THE WIRING, and
+    a mutation round proved it: deleting `store.snapshot_census(bot_id, census)`
+    outright — replacing the whole call with `pass` — left the test above GREEN,
+    because `limit=CENSUS_LIMIT` still appears in the surviving `census_window`
+    call two lines below. A book would then READ a window it never WROTE to, so
+    `census_24h` would converge on the empty rollup while every gate still
+    published its per-loop counts: the exact "measured, nothing refused" reading
+    I1 exists to forbid, and byte-identical to a healthy book on a quiet day.
+
+    So this asserts the CALL NODE by AST, not its spelling — the
+    "a substring test is not a wiring test" rule applied to the accumulate half.
+    """
+    import ast
+
+    for mod, fn in ((hull, "main"), (cw, "main"), (kiyo, "main")):
+        tree = ast.parse(inspect.getsource(getattr(mod, fn)))
+        calls = [n for n in ast.walk(tree)
+                 if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Attribute)
+                 and n.func.attr == "snapshot_census"]
+        assert calls, (
+            f"{mod.__name__}.{fn} reads a census window it never writes to — "
+            "restore the store.snapshot_census(...) call")
+        # and it must be handed the census, not a literal
+        for c in calls:
+            assert c.args and not isinstance(c.args[-1], ast.Constant), \
+                f"{mod.__name__}: snapshot_census got a constant, not the census"
+
+
+def test_the_rollup_reaches_the_payload_and_is_never_hard_coded_none():
+    """[2026-09-10 (zw)] The second survivor from the same round: rewriting the
+    builder call's `census_24h=_cen24` to `census_24h=None` also stayed GREEN.
+    That is the publish half of the same defect — the window is accumulated and
+    read, and then thrown away at the one line that would have shown it — and it
+    is worse than not wiring it at all, because the row keeps a `census_24h` key
+    that is permanently null while looking like a book whose history is dark.
+
+    Pinned by AST at the CALL SITE: the keyword must be fed a NAME, never a
+    constant. `or None` inside the builder is the legitimate dark-history
+    degradation and is unaffected — that is a different line, and its own two
+    mutations are already killed.
+    """
+    import ast
+
+    for mod in (hull, kiyo):
+        tree = ast.parse(inspect.getsource(mod.main))
+        kws = [k for n in ast.walk(tree) if isinstance(n, ast.Call)
+               for k in n.keywords if k.arg == "census_24h"]
+        assert kws, f"{mod.__name__}.main no longer passes census_24h"
+        for k in kws:
+            assert not isinstance(k.value, ast.Constant), (
+                f"{mod.__name__}: census_24h is hard-coded — the trailing-day "
+                "rollup is accumulated, read, and then discarded at the publish")
+
+
 def test_none_of_the_new_surfaces_can_move_a_lever_or_an_order():
     """Rule 6, asserted of the diff rather than believed: the census surfaces
     added by (vm) contain no lever write, no order path and no gate read."""
