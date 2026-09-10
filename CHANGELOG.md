@@ -1,3 +1,65 @@
+## 2026-09-10 (zs) — ⚖️ COUNTERWEIGHT'S READ MOVES 1-Oct → 10-Oct SO IT LANDS ON THE SAMPLE ITS OWN REGISTRATION ASKED FOR: the date was going to bind before the n floor, and nothing said so
+
+**Eamon, 10-Sep:** *"move the date to 10-Oct so it hits n=60"* — after `(zp)`
+checked the read on his ask and found the trigger had not fired.
+
+**THE DEFECT THIS FIXES IS IN THE REGISTRATION'S OWN SCHEDULE, not in the
+book.** ⚖️ Counterweight was KEPT 1-Sep with a pre-registered re-read at
+**"n≥60 fresh on-class closes after 1-Sep OR 1-Oct, whichever first"**, and the
+carried row's guidance said *"the date is the backstop, not the trigger."* For
+this book that is measurably backwards. Measured 9-Sep on a feed refreshed the
+same hour (era rows 158, newest close 9-Sep 00:40Z):
+
+| | |
+|---|---|
+| fresh on-class closes since 1-Sep | **13** — 47 short of the floor |
+| observed rate | **1.43 on-class closes/day** |
+| projected n at **1-Oct** (old backstop) | **~43** — ~27% UNDER the registration's own floor |
+| projected n at **10-Oct** (new backstop) | **~56** |
+
+So the DATE was going to bind first and the read would have been taken on a
+sample the registration itself had already declared too small. That is the
+mirror of `(yo)`: there the sample tripped weeks before the date and nothing
+was watching; here the date trips before the sample and the rule said nothing
+about the shortfall.
+
+**WHAT MOVED, AND WHAT DID NOT.** Only the backstop DATE. **The n≥60 floor and
+both decision bounds are untouched**, and the *"whichever first"* structure is
+unchanged — an early n≥60 still fires early. Three sites, all of which had to
+agree or the docket and the handoff would disagree about the same read:
+`golive_readiness.DECIDED_UNTIL["perps-funding-spread"]` (the executable one —
+the docket prints `decision_overdue` past it), the `session_state` carried row
+(`what` + `closes_when`), and CLAUDE.md's acknowledged-recurrence line for
+`perps-funding-spread`, which is where the registration is recorded. 🪁 kelly's
+own 1-Oct entry in the SAME table is a DIFFERENT read and is deliberately
+untouched — verified after the edit (`band-kelly` still reads `2026-10-01`), and
+`tests/autonomy/test_edge_audit_followups.py` pins kelly's date, not this one.
+
+**DECLARED, BECAUSE I21 REQUIRES IT: THIS AMENDMENT WAS NOT BLIND.** The interim
+number was visible when it was made — fresh on-class **n=13, mean +0.538%/trade,
+SE 1.519, t=+0.35, net +$1.23**. It is admissible anyway, on arithmetic rather
+than on taste, and the argument is the one that matters: **a larger sample
+shrinks SE, and RETIRE fires on `m + 1.28·SE ≤ 0`, so more closes make the
+RETIREMENT branch MORE reachable whenever the mean is negative.** Moving to a
+bigger sample tightens both bounds — it is not a pro-keep amendment. Priced:
+~13 extra paper closes, **≈ +$0.4** on either basis (pooled on-class or fresh),
+i.e. nil.
+
+**AND THE SHORTFALL IS DECLARED RATHER THAN GLOSSED.** Eamon's stated purpose
+was *"so it hits n=60"*, and at the measured 1.43 closes/day **10-Oct projects
+to n≈56, not 60**. The date is a BACKSTOP, so if the rate holds up the n≥60
+branch fires on its own; **~13-Oct is the date that would make the floor
+near-certain**, and moving it again is his call. Recording the gap rather than
+silently letting the stated purpose miss is the whole point of writing the
+projection down.
+
+**WHY THIS WAS RECORDED BEFORE THE READ AND NOT AFTER.** The schedule is now
+decided on arithmetic that was public before any verdict existed. Note the trap
+the `(zp)` check avoided: the fresh mean is **POSITIVE**, so taking the read
+early would have manufactured a *"keep grading"* verdict out of n=13 at
+t=+0.35 — a sample that decides nothing on a book which closes ~10 legs at once
+and therefore carries enormous per-trade dispersion (SE 1.519pp).
+
 ## 2026-09-10 (zr) — "FIX MUM": NOTHING MALFUNCTIONED, THE LOSS WAS THE GEOMETRY EAMON CHOSE, AND THE AUTOPSY FOUND WHERE HER EDGE ACTUALLY LIVES — IN THE BREADTH OF THE OVERSOLD, SEVEN EVENTS DEEP
 
 **Eamon, 10-Sep (Sydney morning): *"Fix mum real money and shadow bot."*** The

@@ -291,7 +291,7 @@ CARRIED = [
                 "acknowledged-recurrence line for perps-funding-spread): "
                 "grade the FRESH on-class closes (class_split, closes AFTER "
                 "1-Sep only — never the window that motivated the keep) at "
-                "n>=60 or on 1-Oct, whichever first. RETIRE without further "
+                "n>=60 or on 10-Oct, whichever first. RETIRE without further "
                 "debate if the fresh on-class upper bound (m+1.28*SE) <= 0; "
                 "keep grading if the fresh mean > 0; anything else returns "
                 "to Eamon with both numbers.",
@@ -320,12 +320,25 @@ CARRIED = [
                     "exactly why taking it early would have manufactured a "
                     "'keep grading' verdict from a sample that decides "
                     "nothing (this book closes ~10 legs at once, so its "
-                    "per-trade dispersion is enormous).",
+                    "per-trade dispersion is enormous). [10-Sep (zs)] EAMON "
+                    "MOVED THE BACKSTOP 1-Oct -> 10-Oct on that arithmetic, so "
+                    "the read lands near the registration's own n floor rather "
+                    "than ~27% under it. NO THRESHOLD MOVED. Declared per I21: "
+                    "the amendment was NOT blind (the interim +0.538%/t=+0.35 "
+                    "was visible) and is admissible on arithmetic — a larger "
+                    "sample shrinks SE, and RETIRE fires on m+1.28*SE <= 0, so "
+                    "more closes make RETIREMENT more reachable when the mean "
+                    "is negative; it tightens both bounds, it does not favour "
+                    "keeping. DECLARED SHORTFALL: at the measured 1.43 "
+                    "closes/day 10-Oct projects to n~56, not 60 — the date is "
+                    "a BACKSTOP and the n>=60 branch still fires early if it "
+                    "is met; ~13-Oct is the date that would make the floor "
+                    "near-certain, and that is Eamon's to move again.",
         # Deliberately date-only: the predicate firing means the read is DUE,
         # and the honest way to close the row is to run the read and record
         # the verdict — deleting it without the verdict is the thing the
         # preamble says somebody has to justify.
-        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 1),
+        "closes_when": lambda: _dt.date.today() >= _dt.date(2026, 10, 10),
     },
     {
         "id": "regime-short-veto-preregistered-read",

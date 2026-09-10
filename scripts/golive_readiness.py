@@ -2279,11 +2279,28 @@ DECIDED_UNTIL = {
         # working exactly as designed, on a decision nobody had recorded
         # here. Corrected in place per I12 to the pre-registered re-read:
         # n>=60 fresh on-class closes after 1-Sep or 1-Oct, whichever first.
-        "2026-10-01",
+        #
+        # [2026-09-10 (zs)] THE BACKSTOP MOVES 1-Oct -> 10-Oct, EAMON'S CALL,
+        # so the read lands on a sample that meets the registration's OWN n
+        # floor instead of ~27% under it. Measured 9-Sep on a same-hour feed:
+        # fresh on-class n=13 at 1.43 closes/day, so 1-Oct projects to n~43
+        # and 10-Oct to n~56. THE THRESHOLDS ARE UNTOUCHED (n>=60, and the
+        # RETIRE/KEEP bounds) -- only the backstop date moves, and the
+        # "whichever first" structure means an early n=60 still fires early.
+        # DECLARED, because I21 requires it: this amendment was NOT made blind
+        # -- the interim mean (+0.538%/trade, SE 1.519, t=+0.35) was visible.
+        # It is admissible anyway on arithmetic rather than on taste: a LARGER
+        # sample shrinks SE, and RETIRE fires on m+1.28*SE <= 0, so more closes
+        # make the retirement branch MORE reachable whenever the mean is
+        # negative. This is not a pro-keep amendment; it tightens both bounds.
+        # Priced: ~13 extra paper closes, ~+$0.4 either basis -- nil.
+        "2026-10-10",
         "KEPT 1-Sep (Eamon, 'Address all of the above' (wa)) under "
         "I17-as-amended: on-class upper bound (m+1.28*SE ~ +0.41%) has NOT "
         "excluded a positive mean. PRE-REGISTERED re-read at n>=60 fresh "
-        "on-class closes after 1-Sep or on 1-Oct, whichever first: RETIRE "
+        "on-class closes after 1-Sep or on 10-Oct ((zs): 1-Oct moved on "
+        "Eamon's call so the read meets the n floor; thresholds untouched), "
+        "whichever first: RETIRE "
         "if the fresh on-class upper bound <= 0; keep grading if the fresh "
         "mean > 0; anything else returns to Eamon. CLAUDE.md "
         "acknowledged-recurrence line for perps-funding-spread.",
