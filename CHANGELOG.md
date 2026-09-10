@@ -1,3 +1,89 @@
+## 2026-09-10 (zt) — TWO SESSIONS READ ⚖️ COUNTERWEIGHT'S SAMPLE DEFINITION DIFFERENTLY ON THE SAME DAY, AND NOTHING IN THE TREE COULD SAY WHICH WAS RIGHT: the fleet's only pre-registered read with no instrument
+
+**Eamon, 10-Sep:** *"continue"* / *"and fix"*. Nothing on the carried list was
+due, so the target was whatever is actually broken. This was.
+
+**THE DEFECT.** ⚖️ Counterweight's pre-registered keep-or-retire read says
+*"grade the FRESH on-class closes ... closes AFTER 1-Sep only"*. That sentence
+is **ambiguous between CLOSED-after and OPENED-after**, and on 9/10-Sep two
+sessions resolved it in opposite directions against the same ledger:
+
+| basis | on-class n | mean | t | ub@1.28 | n≥60 trigger fires |
+|---|---:|---:|---:|---:|---|
+| OPENED-after (`(zp)`/`(zs)`) | 13 | +0.538% | +0.35 | +2.483% | ~13-Oct |
+| **CLOSED-after (`(zj)`)** | **21** | **+2.703%** | **+1.30** | **+5.370%** | **~27-Sep** |
+
+**62% difference in n, 2.2pp in the mean, 16 days in the trigger date.** Both
+readings are positive today so nothing was decided wrongly — but *the same
+ambiguity on a mean near zero decides RETIRE versus KEEP*, on a live book.
+
+**THE ROOT CAUSE, and it is the I21 shape this fleet keeps paying for.**
+Measured across every pre-registered read in the fleet: 🪁 kelly has an
+instrument, 🔮 georgia has one, 👩 mum's halt-cost and non-crypto-sleeve reads
+have one, the regime short-veto has one — **⚖️ Counterweight's was the ONLY one
+that lived purely in prose**, in three sites, with nothing computing it. *A
+defense that lives only in prose has not been written*, and here the prose was
+not even unambiguous.
+
+**THE BASIS IS NOW DECLARED — CLOSED-after — chosen on the words and the stated
+purpose, not on the number.** The words *"closes AFTER 1-Sep"* name the EVENT,
+and an event "after 1-Sep" is one that HAPPENED after it. The purpose —
+*"never the window that motivated the keep"* — means the evidence the 1-Sep
+decision was actually made on, i.e. trades that had already CLOSED by then; a
+trade that closed 3-Sep was not in that evidence and is genuinely fresh. The
+policy-era question (keyed on the OPEN, `(hc)`) is a SEPARATE filter already
+applied upstream by `edge_audit.shape` — this clause is about the evidence
+window, not about which policy the trade ran under.
+
+**DISCLOSED, because choosing a basis after seeing both numbers deserves it:**
+the chosen basis is the one that reads BETTER today (+2.703% vs +0.538%). It is
+chosen on the words; both bases are positive; neither triggers RETIRE; and the
+instrument **prints BOTH on every run** so the choice stays auditable rather
+than buried.
+
+**SHIPPED: `scripts/study_counterweight_fresh_read_2026-09-10.py`** — the
+missing instrument, modelled on its siblings. It pins the basis in code (the
+`basis` argument is REQUIRED — there is no silent default, because a silent
+default is exactly how this became ambiguous), implements the registered rule
+unchanged, carries the at-registration commitment, reports both bases, and
+**REFUSES to take the read before the trigger fires**. Its calibration gate
+fails CLOSED on a dark ledger and on a population smaller than the one the keep
+was made on. Live run today: calibration passes (era on-class n=137 ≥ the 116
+at the keep), **NOT DUE — n=21 of 60, backstop 10-Oct not reached, no verdict
+taken.**
+
+**Mutation-verified 7/7**, and one survivor is worth naming because it is the
+class this entry is about: `when <= cut` → `when < cut` **survived** the first
+round — a close landing EXACTLY on the cut instant, which no fixture sat on.
+Pinned now. The boundary of an ambiguous definition is precisely where an
+ambiguous definition does its damage.
+
+**`(zs)` IS CORRECTED IN PLACE per I12.** Its projection — *"1-Oct projects to
+n~43"* — is the OPENED-after number, computed on a basis that had not been
+declared. On the now-declared basis the sample trigger fires **~27-Sep, before
+the original 1-Oct date**, so the backstop never binds and **that date move
+changed nothing**. It is harmless rather than wrong (*"whichever first"* means
+the n≥60 branch fires on its own), and the entry now says so with both columns.
+
+**REFUSED IN THE SAME PASS, with evidence, so it is not re-proposed.** The
+other candidate fix on the carried list was registering 🙏 avo's judge lane
+(`xp.avo.rsi_max`) — her lane is declared and the registry holds zero entries,
+so it is still structurally inert. **`(zj)` already refused that registration
+deliberately** and said what it would take: a cage must fit a measured value,
+and `(qu)` measured **0 of 21 cells surviving BH at FDR 0.05** across 1,156
+signals / 475d / 23 coins, with her own arms at n=18 live / n=34 shadow — no
+dose-response on `rsi_max` is estimable from either. My own first instinct was
+to inherit mum's cage shape (`[default−10, default]` → `[32, 42]`), and **that
+is a hunch wearing a derivation's clothes** — exactly the "lever set on a hunch
+with no number" the doctrine names. The refusal stands. What it would take is
+unchanged and recorded at `(zj)`: her exit-free signal test re-run at several
+`rsi_max` cells on the current tape, with a random-entry null and a permutation
+across cells to price the selection.
+
+**Main only** (`(mm)`): it changes no trade any book takes. It changes what the
+fleet can HONESTLY SAY about a read that governs a keep-or-retire decision on a
+living book, which is worth more than the deploy it does not need.
+
 ## 2026-09-10 (zs) — ⚖️ COUNTERWEIGHT'S READ MOVES 1-Oct → 10-Oct SO IT LANDS ON THE SAMPLE ITS OWN REGISTRATION ASKED FOR: the date was going to bind before the n floor, and nothing said so
 
 **Eamon, 10-Sep:** *"move the date to 10-Oct so it hits n=60"* — after `(zp)`
@@ -52,6 +138,25 @@ branch fires on its own; **~13-Oct is the date that would make the floor
 near-certain**, and moving it again is his call. Recording the gap rather than
 silently letting the stated purpose miss is the whole point of writing the
 projection down.
+
+**[10-Sep (zt)] CORRECTED IN PLACE per I12 — THE PROJECTION ABOVE RESTS ON AN
+UNDECLARED BASIS, AND ON THE ONE NOW DECLARED THIS DATE MOVE WAS UNNECESSARY.**
+The registration says *"closes AFTER 1-Sep"* and that is ambiguous between
+CLOSED-after and OPENED-after. The numbers above are OPENED-after; `(zj)` had
+counted CLOSED-after the same day and got a different answer, and nothing in
+the tree could say which was right:
+
+| basis | n today | mean | t | n=60 arrives |
+|---|---:|---:|---:|---|
+| OPENED-after (used above) | 13 | +0.538% | +0.35 | ~13-Oct |
+| **CLOSED-after (now declared)** | **21** | **+2.703%** | **+1.30** | **~27-Sep** |
+
+**On the declared basis the sample trigger fires ~27-Sep — BEFORE the original
+1-Oct date — so the backstop never binds and this move changed nothing.** It is
+HARMLESS rather than wrong: *"whichever first"* means the n≥60 branch fires on
+its own, and a later backstop only matters if the sample stays slow. The move
+stands; the reasoning that motivated it was computed on a basis that had not
+been declared, and that is the defect `(zt)` fixes.
 
 **WHY THIS WAS RECORDED BEFORE THE READ AND NOT AFTER.** The schedule is now
 decided on arithmetic that was public before any verdict existed. Note the trap

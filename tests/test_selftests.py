@@ -208,6 +208,14 @@ SELFTEST_MODULES = [
     # five rotations, a planted within-side effect recovered at P<=0.05, a
     # placebo not recovered, and the n>=10 cell floor.
     "scripts.study_regime_veto_identifiability_2026-09-09",
+    # [2026-09-10 (zt)] ⚖️ Counterweight's pre-registered read, which was the
+    # ONLY one in the fleet with no instrument — and so the only one whose
+    # sample basis two sessions resolved differently on the same day (n=13
+    # opened-after vs n=21 closed-after, 2.2pp of mean). The selftest pins
+    # that the basis SELECTS DIFFERENT ROWS, that it has no silent default,
+    # every arm of the registered rule including the ub==0 boundary, and that
+    # calibration fails closed on a dark and on a thin ledger.
+    "scripts.study_counterweight_fresh_read_2026-09-10",
     # [2026-09-07 (yo)] 🪁 kelly's pre-registered keep-or-retire read. Its
     # n-trigger fired 3.5 weeks before the date backstop and nothing in the
     # tree was measuring it. --selftest is OFFLINE and drives all four
