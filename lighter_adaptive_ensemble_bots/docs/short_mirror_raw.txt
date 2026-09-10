@@ -1,0 +1,63 @@
+==============================================================================
+SHORT MIRRORS OF 👩 mum AND 🙏 avo — Lighter's own tape
+==============================================================================
+
+[calibration] positive control: PASS
+   long/max_hold    n= 21 mean=+2.000% (want +2.00) branch=1.00 ok
+   long/roi         n= 21 mean=+2.000% (want +2.00) branch=1.00 ok
+   long/sl          n= 21 mean=-4.000% (want -4.00) branch=1.00 ok
+   short/max_hold   n= 21 mean=+2.000% (want +2.00) branch=1.00 ok
+   short/roi        n= 21 mean=+2.000% (want +2.00) branch=1.00 ok
+   short/sl         n= 21 mean=-4.000% (want -4.00) branch=1.00 ok
+[bot_pnl_store] disabled: DATABASE_URL not set
+
+[tape] 25 crypto books >= $1.0M, top 30 by 24h volume: BTC, ETH, SOL, HYPE, LIT, ZEC, PUMP, NEAR, USELESS, XRP, BNB, PONS...
+   1h: 24 coins, 208d   4h: 24 coins, 500d
+
+[calibration] the SHIPPED long cells through this same walker
+   mum-long n=1830 mean=-0.034% t=-0.64 rate=275.3/30d
+   avo-long n= 237 mean=-0.660% t=-0.98 rate=15.4/30d
+
+------------------------------------------------------------------------------
+S1 mum-mirror (overbought fade, 1h SHORT)
+------------------------------------------------------------------------------
+   rsi bar     n    mean%       t     h1%     h2%  maxdd%   /30d  hold_h
+        58  3495   -0.108   -2.51  -0.103  -0.113  507.15  534.7     3.0
+        60  3077   -0.110   -2.39  -0.066  -0.154  459.41  470.8     3.0
+        62  2744   -0.102   -2.08  -0.056  -0.148  419.42  419.8     3.0
+        64  2334   -0.138   -2.59  -0.078  -0.199  456.29  357.1     3.0
+        66  1995   -0.153   -2.64  -0.026  -0.279  463.18  305.2     3.0
+        70  1402   -0.183   -2.60  -0.064  -0.302  395.39  214.6     3.0
+  selection premium: best t=-2.08 vs median -2.55 over 6 cells  => +0.47 t-units of picking
+
+  SHIPPED BAR (62) @ 5.0bps/side: n=2744
+    mean -0.102%/trade  t=-2.08  halves -0.056/-0.148  win 69.0%  maxDD 419.42%
+    rate 419.8 closes/30d
+    RANDOM-ENTRY NULL (hm): null mean -0.139%  EXCESS +0.037%/trade  P(random >= signal) = 0.187  [300 draws]
+    friction  0.0bps/side -> mean -0.002%  t=-0.04
+    friction  2.0bps/side -> mean -0.042%  t=-0.85
+    friction 10.0bps/side -> mean -0.202%  t=-4.12
+    exits: max_hold n=94 -1.27%  roi n=1888 +1.57%  sl n=762 -4.10%
+
+------------------------------------------------------------------------------
+S2 avo-mirror (rip in a downtrend, 4h SHORT)
+------------------------------------------------------------------------------
+   rsi bar     n    mean%       t     h1%     h2%  maxdd%   /30d  hold_h
+        52   425   +0.352   +0.85  +0.971  -0.263  187.04   28.1    64.0
+        55   416   +0.364   +0.88  +1.050  -0.322  175.49   27.5    64.0
+        58   398   +0.389   +0.93  +1.144  -0.366  180.99   26.3    64.0
+        61   370   +0.315   +0.71  +0.791  -0.162  187.82   24.5    64.0
+        64   322   +0.043   +0.09  +1.004  -0.919  263.24   21.3    68.0
+        68   244   -0.203   -0.34  +0.326  -0.732  204.36   16.7    68.0
+  selection premium: best t=+0.93 vs median +0.78 over 6 cells  => +0.15 t-units of picking
+
+  SHIPPED BAR (58) @ 5.0bps/side: n=398
+    mean +0.389%/trade  t=+0.93  halves +1.144/-0.366  win 61.3%  maxDD 180.99%
+    rate 26.3 closes/30d over 454d  =>  days-to-gate 2092
+    RANDOM-ENTRY NULL (hm): null mean +0.070%  EXCESS +0.319%/trade  P(random >= signal) = 0.137  [300 draws]
+    friction  0.0bps/side -> mean +0.489%  t=+1.17
+    friction  2.0bps/side -> mean +0.449%  t=+1.07
+    friction 10.0bps/side -> mean +0.289%  t=+0.69
+    exits: roi n=13 +19.28%  signal n=257 +4.66%  sl n=128 -10.10%
+
+==============================================================================

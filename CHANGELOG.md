@@ -294,6 +294,120 @@ Instrument this pass: `scripts/golive_readiness.py::live_fillable`. Pinned by
 `(aaf)` closed `taker-random-entry-null-blocked-on-ci` last night; this closes
 the class that made it necessary.
 
+## 2026-09-10 (aam) — TWO SHORT MIRRORS OF 👩 mum AND 🙏 avo, MEASURED AND BOTH REFUSED — AND THE ENSEMBLE SYSTEM THAT REFUSAL ARGUES FOR
+
+**Eamon, 10-Sep:** *"On days like today where the market is down, we need 2 bots
+that work like Avo and mum that short these sorts of occasions"* → then, the
+same session, the full spec for **`lighter_adaptive_ensemble_bots`** and *"please
+use all of our current progress and work ... make these a show stopper to
+highlight how far we have come"*.
+
+**THE TWO BOOKS WERE MEASURED BEFORE ANY BOT CODE WAS WRITTEN, AND NEITHER
+CLEARS ITS OWN GATE.** Instrument `scripts/study_short_mirrors_2026-09-10.py`;
+full working `STUDY_SHORT_MIRRORS_2026-09-10.md`. Mirrors taken from the shipped
+carriers, not invented: mum's `rsi<38 AND NOT e50>e200` → `rsi>62 AND NOT
+e50<e200`; avo's `e50>e200 AND rsi<42 AND close<BB_lo` → `e50<e200 AND rsi>58
+AND close>BB_hi`. Brackets mirrored in magnitude. LAG-1 entry, bracket walked
+from the entry bar forward, stop wins a same-bar tie, 24 crypto books ≥$1M —
+**208d at 1h, 500d at 4h.**
+
+**CALIBRATED FIRST, BOTH GATES DECLARED.** Positive control **6 of 6 arms
+exact** — a planted ±2%/day recovers **+2.000%** through `max_hold`, ±40%/day
+recovers the ladder bar **+2.000%** through `roi` and the stop **−4.000%**
+through `sl`, on BOTH sides (a sign-flipped short side would read every cell
+backwards). Long reproduction REPORTED and it does **not** match the live books
+(mum's cell −0.034%/t=−0.64, avo's −0.660%/t=−0.98), so the harness speaks about
+CELLS, not about mum or avo — stated because it bounds every number below. It
+does corroborate `(qu)`: avo's entry reads negative here too.
+
+* **S1, the mum mirror — REFUTED.** Negative at every RSI bar (58→70), **t
+  −2.08 to −2.64**, both halves negative, **n=2,744** at the shipped bar.
+  Random-entry null (hm): **excess +0.037%/trade, P(random ≥ signal)=0.187** —
+  indistinguishable from drawing an entry minute at random. **The loss is
+  friction**: 0bps/side −0.002% → 2bps −0.042% → 5bps −0.102% → 10bps −0.202%,
+  at **420–535 closes/30d** on a 3-hour median hold. It wins **69%** of its
+  trades and loses money — I15 in one line.
+* **S2, the avo mirror — NOT REFUTED, NOT A BOOK.** **Excess +0.319%/trade**
+  over matched-random (null +0.070%), a **plateau** across four adjacent bars
+  (+0.35/+0.36/+0.39/+0.32), selection premium only **+0.15 t-units**, and
+  friction-robust (+0.489% at 0bps → +0.289% at 10bps). But **t=+0.93**,
+  **P=0.137**, **h2 NEGATIVE** (+1.144/−0.366), and **days-to-gate 2,092**
+  against I22's bar of **60**. A design that cannot be decided inside 60 days is
+  a STUDY, not a book: no row, no clock, no capital, no budget slot.
+
+**NO ROW WAS MINTED and no living book was touched.** I20's supply check and
+I22's spend census both sit in front of the act, and a Portuguese cohort name is
+not a reason to mint a book — the naming rule says so itself.
+
+**WHY THAT REFUSAL PRODUCED A SYSTEM.** I22's arithmetic is the argument:
+`t = S_d·√T` ⇒ days-to-gate `(2/S_d)²`, and for independent sleeves
+`S_d² = Σ S_i²`. S2 is ONE term. Eamon had already named the disease on 20-Aug —
+*"one construct, one set of tradeables, one set of entry and exits"* — and his
+own spec the same day is the cure.
+
+**SHIPPED: `lighter_adaptive_ensemble_bots/`** — 24 modules, 14 test files,
+**250 tests green**, backtest-first, long AND short, live trading gated behind
+eleven conditions and a signer that is off in code.
+
+* **Lighter-native, read from the INSTALLED SDK and the live API** — no invented
+  REST paths, no CCXT assumption. Capability report: `lighter-sdk` **1.1.2**
+  (the package's own `__version__` still reads 1.0.0 — both reported), **33 of
+  33** capabilities available, **0 problems**. `GROUPING_TYPE_ONE_TRIGGERS_A_ONE_CANCELS_THE_OTHER`
+  is load-bearing: entry + protective stop as ONE transaction, so there is no
+  window in which a filled position has no stop.
+* **THE BASIS-POINT TRAP IS ENCODED AND PINNED.** `maintenance_margin_fraction:
+  120` is **1.20%**, `min_initial_margin_fraction: 200` is 2.00% ⇒ a **50x**
+  market cap; maintenance is READ, never derived from initial. Misreading it
+  scales every liquidation estimate ~100x. Same for the settled funding series
+  being **percent per HOUR**.
+* **Leverage is not a reason to take more risk.** Size comes from the stop; if
+  liquidation would sit inside it, leverage is **walked down** (measured: a
+  wider stop takes 10x → 8x automatically) and **refused outright** when nothing
+  works — never a silent 1x fallback.
+* **The S1 refutation is enforced in code, not filed.** `momentum_component`
+  caps RSI at 15 of 100 points and scores an RSI extreme at **ZERO** for a
+  short, pinned by `test_an_rsi_extreme_scores_ZERO_on_momentum_for_a_short`.
+* **No look-ahead, structurally**, and the precompute that makes the backtester
+  usable (hours → **39s**) is licensed by `assert_causal` rather than assumed. A
+  test plants a spike in the FUTURE and requires an identical result.
+
+**FOUR REAL DEFECTS THE TESTS CAUGHT, all in my own code, all now pinned:**
+1. **A single losing trade PAUSED every strategy** — drawdown was normalised by
+   the strategy's own cumulative P&L, which starts at zero, so one −$1 trade read
+   as 100%. Now measured against a reference equity captured once; unknown
+   reference SKIPS the condition and says so.
+2. **Every overtrading budget silently did nothing in a backtest** — entry
+   pruning ran against `time.time()`, so historical timestamps were deleted the
+   moment they were written. A backtest would have reported a trade rate the
+   live system could never take.
+3. **A backtest overwrote live strategy health and the trade budget** — same
+   `state/` directory, and `record()` writes. A replayed losing streak would have
+   arrived as a PAUSED live strategy.
+4. **Walk-forward measured its span across ALL timeframes**, so a fold landed
+   where the 15m execution tape did not exist and reported **"0 trades"** — which
+   reads as a strategy declining to trade and is actually "there is no tape
+   here". The silent-nothing class the doctrine names.
+
+**MEASURED, and reported rather than sold:** an 8-market 31-day backtest returns
++0.85% with Sharpe 0.75 — **and the robustness gate REFUSES it** (SOL and ZEC
+each carry >100% of P&L, top-3 trades are 261%, halves disagree). A real
+180/60/60 walk-forward on 354d of 1h tape reads **+0.27% on six markets and
+−1.56% on four** — the universe flips the sign, the `(oe)` churn lesson
+reproducing on a new system. **No profitability is claimed anywhere.**
+
+**THE EXISTING FLEET DASHBOARD IS UNTOUCHED** (spec §17): `SLOW_LOOP`,
+`STALE_SECONDS`, `CURRENT_BOTS`, `EXPECTED`, `LABELS` and every existing bot row
+are unmodified. What ships instead is the verifier that would make such a patch
+provable — `dashboard_patch.py` snapshots `/pnl.json`, refuses any diff touching
+a protected name, enforces append-only merges and treats an **unreadable feed as
+a failure**, never as "nothing changed". Baseline of the live feed (15 rows) in
+`lighter_adaptive_ensemble_bots/docs/pnl_baseline.json`.
+
+**ZERO REAL MONEY MOVED. NO LIVE MARKER.** `NativeLighterAdapter` is constructed
+`allow_signing=False` everywhere in the CLI: it builds, validates and reports
+every transaction and sends none. Enabling signing is a deliberate code change,
+not a config flag — the last safeguard after the other eleven are satisfied.
+
 ## 2026-09-10 (aal) — 🦾 THE EPISODE LEDGER HAS BEEN FULL FOR AT LEAST A DAY, AND `episodes: 120` READS LIKE A COUNT
 
 **Eamon: *"continue fixes."*** The last unaddressed finding from the `(aak)`

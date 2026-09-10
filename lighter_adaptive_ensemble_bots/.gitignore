@@ -1,0 +1,24 @@
+# Fetched tape. Large, reproducible, and it changes every hour -- committing it
+# would make the diff useless and the repo heavy. Re-fetch with any data
+# command, or `discover-markets` + `backtest`.
+data/raw/*.json
+
+# Runtime state is per-machine and per-run: nonces, health, budgets, soak.
+# A nonce store in particular must NEVER be shared between machines.
+state/*.json
+state/*.tmp
+
+# The kill switch is an operational act, never a committed file. The .example
+# is tracked; the switch itself is not.
+runtime/KILL_SWITCH
+
+# Generated reports, except the ones deliberately kept as evidence.
+reports/*.json
+reports/*.log
+!reports/pnl_baseline.json
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/

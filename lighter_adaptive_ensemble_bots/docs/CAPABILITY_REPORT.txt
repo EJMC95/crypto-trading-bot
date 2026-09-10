@@ -1,0 +1,43 @@
+Lighter capability report
+  lighter-sdk : 1.1.2 (dist) / 1.0.0 (lighter.__version__)
+  base_url    : https://mainnet.zklighter.elliot.ai
+  chain_id    : 304
+  API classes : 13
+
+  [yes] public_market_metadata    REST /api/v1/orderBookDetails
+  [yes] market_id_symbol_mapping  orderBookDetails.symbol/market_id
+  [yes] tick_size                 derived from price_decimals
+  [yes] quantity_step             derived from size_decimals
+  [yes] minimum_order_size        min_base_amount / min_quote_amount
+  [yes] mark_price                orderBookDetails.mark_price
+  [yes] index_price               orderBookDetails.index_price
+  [yes] order_book                OrderApi
+  [yes] recent_trades             OrderApi.trades
+  [yes] ohlcv                     CandlestickApi / REST /api/v1/candles
+  [yes] funding_rate              FundingApi / REST /api/v1/fundings   -- settled series is quoted in PERCENT PER HOUR
+  [yes] open_interest             orderBookDetails.open_interest
+  [yes] account_equity            AccountApi
+  [yes] available_collateral      AccountApi
+  [yes] open_positions            AccountApi.account
+  [yes] active_orders             OrderApi.account_active_orders
+  [yes] inactive_orders           OrderApi.account_inactive_orders
+  [yes] fills                     OrderApi.trades
+  [yes] order_create              SignerClient.create_order
+  [yes] order_modify              SignerClient.modify_order
+  [yes] order_cancel              SignerClient.cancel_order
+  [yes] batch_transactions        SignerClient.send_tx_batch
+  [yes] reduce_only_exits         create_order(reduce_only=)
+  [yes] stop_loss_orders          SignerClient.create_sl_order / create_sl_limit_order
+  [yes] take_profit_orders        SignerClient.create_tp_order / create_tp_limit_order
+  [yes] post_only                 ORDER_TIME_IN_FORCE_POST_ONLY
+  [yes] ioc                       ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL
+  [yes] good_til_time             ORDER_TIME_IN_FORCE_GOOD_TILL_TIME
+  [yes] twap                      ORDER_TYPE_TWAP   -- constant exposed; not used by this system
+  [yes] leverage_config           SignerClient.update_leverage
+  [yes] margin_mode_config        CROSS_MARGIN_MODE / ISOLATED_MARGIN_MODE
+  [yes] grouped_orders_oto_oco    SignerClient.create_grouped_orders   -- entry + stop + target as ONE transaction
+  [yes] websocket                 lighter.WsClient
+
+  order types      : limit=0, market=1, stop_loss=2, stop_loss_limit=3, take_profit=4, take_profit_limit=5, twap=6
+  time in force    : gtt=1, ioc=0, post_only=2
+  grouping types   : oco=2, oto=1, otoco=3
