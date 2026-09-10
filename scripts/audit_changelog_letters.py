@@ -1403,10 +1403,47 @@ def _selftest():
         _out2 = _buf.getvalue()
         assert _rc2 == 0, _out2[:400]
         assert "1 open origin branch(es) compared" in _out2, _out2[:400]
+        # THE `skip_if_same` HALF, and it is the reason the arm asks for a
+        # baseline of its own. `_baseline_changelog()` returns None when HEAD
+        # already EQUALS origin/main — correct for the cross-branch arm, which
+        # has nothing to compare — but the OPEN-BRANCH question is about the
+        # WORKING TREE, so a session that has just pushed still has to be told
+        # its next letter is spoken for. Driven by making the default call
+        # return None and only the explicit one return the base: if main()
+        # ever drops `skip_if_same=False` this goes green-to-red.
+        _g["_baseline_changelog"] = (
+            lambda skip_if_same=True, **k: None if skip_if_same else _base_txt)
+        _g["origin_branch_changelogs"] = lambda refs, **k: (_their, False)
+        _buf = io.StringIO()
+        with contextlib.redirect_stdout(_buf):
+            _rc3 = main()
+        assert _rc3 == 1, (
+            "the open-branch arm went quiet when HEAD == origin/main — a "
+            "session that just pushed is exactly when the next letter matters")
+        assert "OPEN-BRANCH CHANGELOG LETTER COLLISION" in _buf.getvalue()
     finally:
         _g.update(_saved)
         with contextlib.suppress(Exception):
             os.unlink(_tmp)
+
+    # ---- `_baseline_changelog` ITSELF honours the flag (mut19's target) ----
+    _saved_git = globals()["_git"]
+    try:
+        globals()["_git"] = lambda *a, **k: (
+            "SAME" if a[:1] == ("show",) else "SAME")
+        # base == mine: skipped by default, RETURNED when asked explicitly
+        assert _baseline_changelog() is None
+        assert _baseline_changelog(skip_if_same=False) == "SAME"
+    finally:
+        globals()["_git"] = _saved_git
+
+    # ---- THE PREVENTIVE HALF: `next_letter` must honour extra_claimed ----
+    # This is what `--next` uses to step past a letter an OPEN BRANCH holds,
+    # and it is the half that stops the renumber rather than reporting it.
+    _nl_txt = "## 2026-08-01 (aa) — one\n\nbody\n"
+    assert next_letter(_nl_txt) == "ab", next_letter(_nl_txt)
+    assert next_letter(_nl_txt, extra_claimed={"ab"}) == "ac"
+    assert next_letter(_nl_txt, extra_claimed={"ab", "ac"}) == "ad"
 
     print(f"audit_changelog_letters selftest OK (fires on a duplicate; ignores "
           f"the pre-{ERA_START} restart era and letterless headers; skips "
