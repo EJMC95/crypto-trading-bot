@@ -283,11 +283,21 @@ def test_the_taker_declares_by_ASKING_the_module_never_by_a_literal():
     """
     src = (ROOT / "lighter_ticket_taker.py").read_text()
     tree = ast.parse(src)
-    lit = [n for n in ast.walk(tree)
-           if isinstance(n, ast.Constant) and n.value == "live_policy"]
-    assert lit, "the taker does not publish live_policy"
-    unp = ast.unparse(tree)
-    assert "allowed_lenses('lighter_live')" in unp, \
-        "live_policy.lenses must ASK the module, not restate it"
-    assert "allowed_sides('lighter_live'" in unp, \
-        "live_policy.sides must ASK the module, not restate it"
+    # Scoped to the `live_policy` VALUE NODE, never the whole module: the
+    # module-wide substring form of this check SURVIVED its own mutation
+    # round, because `allowed_lenses("lighter_live")` also appears in the
+    # taker's selftest. A guard satisfied by an unrelated occurrence is the
+    # (po) inspects-nothing rule inside the test written to prevent it.
+    value = None
+    for n in ast.walk(tree):
+        if not isinstance(n, ast.Dict):
+            continue
+        for k, v in zip(n.keys, n.values):
+            if isinstance(k, ast.Constant) and k.value == "live_policy":
+                value = v
+    assert value is not None, "the taker does not publish live_policy"
+    inner = ast.unparse(value)
+    assert "allowed_lenses('lighter_live')" in inner, \
+        f"live_policy.lenses must ASK the module, not restate it: {inner}"
+    assert "allowed_sides('lighter_live'" in inner, \
+        f"live_policy.sides must ASK the module, not restate it: {inner}"
