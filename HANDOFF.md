@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 09:39 Sydney (23:39Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 09:42 Sydney (23:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
@@ -8,7 +8,7 @@ _Generated 2026-09-11 09:39 Sydney (23:39Z) by `scripts/session_state.py`. Do no
 
 - `freqtrade-avo-maria-lighter` was shut **31% of the last 14.4d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **18% of the last 14.4d** (64h), mostly `slguard` (44h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **19% of the last 14.4d** (64h), mostly `slguard` (44h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -18,6 +18,11 @@ _Generated 2026-09-11 09:39 Sydney (23:39Z) by `scripts/session_state.py`. Do no
 - `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
+
+### `live-vs-graded-policy-two-mechanisms-uncovered`  ·  owner: **session**
+(aan) shipped `golive_readiness.live_fillable`, which closes ONE of the three mechanisms by which a book's LIVE arm can run a narrower or different policy than the arm the go-live gate grades: the per-mode LENS/SIDE allow-list. A fleet sweep of all 14 graded books confirms the other two are real and UNCOVERED. (2) THE LEVER LANE: `apply_tuning()` returns {} on 🎫 the taker's live arm, so a live arm takes NO growth-rail lever while the graded shadow ran tuner-moved bars -- its era spans 19 distinct bracket settings (tp in {0.03,0.04,0.05,0.06}, max_hold_h in {24,48,72}, brk_range in {0.91,0.93,0.95,0.97}). Intersecting both taker mechanisms: **2 of 208 closes (1.0%) are BOTH live-fillable AND booked at bars a live arm would run.** (3) THE CAPACITY PIN: ⚖️ Counterweight's live arm pins `K = GOLIVE_K` and refuses the `fundspread.k` lever; K is a rank truncation, so it changes WHICH coins are held. LATENT today (env default K=5 == GOLIVE_K=5, no lever open), not absent. AND A SECOND CONFIRMED BOOK, DIRECTION INVERTED: 👩 mum's shadow is NARROWER than live -- the judge's `xp.mum.vel_lo/vel_hi` steer the twin only, the velocity band is an ENTRY filter, and her own census reads `vel_in_band 2 of vel_read 102`, so the graded sample is a strict SUBSET of the live population. CLAUDE.md already says 'while running, the twin is an EXPERIMENT arm, not a control arm'; the GRADER does not know it.
+
+_Still open because:_ DELIBERATELY NOT SHIPPED IN (aan), under the fleet's own 'SHIP NARROW, VERIFY IN THE LIVE PAYLOAD, THEN WIDEN' rule -- (fz) changed six surfaces in one pass and produced six follow-up entries repairing itself. `live_fillable` is verified end-to-end on the deployed payload for mechanism (1) ONLY; mechanisms (2) and (3) have no instrument. THE PRIOR ART TO START FROM, both found by the sweep: the experiment judge ALREADY detects live/shadow policy divergence precisely (`policy_stamp` as ONE builder shared by both hosts, `policy_fields`, `policy_waived`, publishing `unjudgeable:policy_mismatch`) -- but it gates PROMOTION, and nothing equivalent gates the GO-LIVE GATE; and ⚖️ Counterweight is the ONE book that solved the gate half, its `golive_blocker` keyed on the LIVE row id with the (ry) note 'a READY SHADOW twin must never arm the LIVE arm' -- no other book has that guard, and its honest cost is that the gate is then unpassable until a live arm has its own 30-close ledger. NOTE the class was named in PROSE seven weeks ago on this same book -- lighter_ticket_taker.py:361-365, (hr) 31-Jul: 'the shadow arm was admitting books the money arm would never touch -- which is not a conservative difference, it is a grading error in the permissive direction' -- and that entry fixed the INSTANCE and left the class open. FLAGGED, NOT COUNTED: scanned-universe width differs on both live pairs (mum 94 live vs 103 shadow, avo 63 vs 77) and universe is not a policy_stamp field, so a real narrowing would be invisible to the era, the judge AND the gate -- unattributed, verify before acting. Closes when the CHANGELOG records 'live-vs-graded mechanisms READ:' with a verdict on each of (2) and (3).
 
 ### `hull-cap-13-deferred-to-one-turnover`  ·  owner: **session**
 (aaa) 🧮 Hull's cap raise (MAX_POSITIONS 10 -> 13 with CLIP_USD 80 -> 60 at constant gross) is MEASURED AND DEFERRED, not refused. The cap binds hard -- 83.2% of 3,906 census snapshots at cap, 37.6% at cap WITH an eligible coin it cannot take, 2,809 coin-snapshots denied -- and the marginal coin is FREE, because the |apr| ranking is degenerate at the venue's 10.512% resting pin (ranks 1-10 and 11+ both mean 10.5000%, delta 0.0000pp; all 16 positions this book has ever opened carry entry_apr 0.10512 exactly). Expectancy price measures to ZERO (-0.0024pp/trade). The gain is +12.5% to +16.7% closes, NOT the +30% first claimed, and it buys ~10 days to the 30-close bar, not a rescue -- the grader's `undecidable/130d` is a RAMP ARTIFACT of the cap itself moving 4->6->10 inside the measured window.
@@ -109,8 +114,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (39 commit(s), entries (zt))
+## Shipped today (40 commit(s), entries (zt))
 
+- `0faaa04` (aan) verified on the deployed payload: live_policy on the row, live_fillable inert=true, ready unchanged at 6/6
 - `1b94335` (aan) the growth lens: breakoutup TIES random, not beaten — and two structural blockers on re-aiming LIVE_SIDES; (aaf) corrected in place
 - `6f5c972` (aan) gitignore the study tape caches — 3.5MB untracked beside a registered selftest
 - `b3b3833` (aan) the taker's go-live is a no-op: its live arm may fill one family and the book has vetoed it

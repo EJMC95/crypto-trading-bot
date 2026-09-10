@@ -234,6 +234,61 @@ detectable at **n=288 ≈ 23-Nov** on evidence the book generates for free. What
 is NOT available is a bar-lowering or a window re-cut, and what is NOT
 supported is a retirement — the upper bound forbids it.
 
+**IT IS A CLASS — SMALL, UNEVEN, AND THREE MECHANISMS DEEP.** A sweep of all
+14 graded books (plus both live rows) says so, and the honest count matters
+more than a big one: **2 CONFIRMED** (🎫 taker, 👩 mum's shadow), **1 LATENT**
+(⚖️ Counterweight), 7 with NO LIVE PATH AT ALL (hard `SystemExit` unless
+`VENUE=lighter_shadow`), 2 live rows graded on their OWN live ledgers, and 2
+whose live entry policy is identical today (🎯 sniper, 🙏 avo). What makes it a
+class rather than three coincidences is that the instances arrive through
+**three different mechanisms, none visible to the grader** — `POLICY_SIG_FIELDS`
+is exactly `("venue","bull","lenses","sides")`, carrying no bracket, no
+universe and no lever state:
+1. **the per-mode allow-list** — what `(aan)` closes;
+2. **the LEVER LANE** — `apply_tuning()` returns `{}` on the taker's live arm,
+   so a live arm takes NO growth-rail lever while the graded shadow ran
+   tuner-moved bars across **19 distinct bracket settings**. **Intersecting
+   both taker mechanisms: 2 of 208 closes — 1.0% — are BOTH live-fillable AND
+   booked at bars a live arm would run.** That is the sharpest number in this
+   entry;
+3. **the CAPACITY PIN** — ⚖️ Counterweight's live arm pins `K = GOLIVE_K` and
+   refuses `fundspread.k`; K is a rank truncation, so it changes WHICH coins
+   are held. Latent today (K=5 == GOLIVE_K=5, no lever open), not absent.
+
+**AND THE SECOND CONFIRMED BOOK RUNS THE OTHER WAY.** 👩 mum's graded shadow is
+**NARROWER** than live: the judge's `xp.mum.vel_lo/vel_hi` steer the twin only,
+the velocity band is an ENTRY filter, and her own census reads **`vel_in_band 2
+of vel_read 102`** — so the graded sample is a strict SUBSET of the live
+population, failing to represent it as surely as the taker's superset does.
+Not a defect in the judge (CLAUDE.md: *"while running, the twin is an
+EXPERIMENT arm, not a control arm"*) — the GRADER does not know it. She reads
+`ready: False` today, so nothing is authorised wrongly.
+
+**THE CLASS WAS NAMED IN PROSE SEVEN WEEKS AGO, ON THIS SAME BOOK.**
+`lighter_ticket_taker.py:361-365`, `(hr)` 31-Jul: *"the shadow arm was
+admitting books the money arm would never touch — which is not a conservative
+difference, it is a grading error in the permissive direction."* That entry
+fixed the INSTANCE and left the class open — the I11 *"a fix closes a class or
+it is not finished"* shape, at seven weeks' remove. **Two pieces of prior art
+to build the rest on**, both found by the sweep: the experiment judge ALREADY
+detects live/shadow policy divergence precisely (`policy_stamp` as ONE builder
+shared by both hosts, publishing `unjudgeable:policy_mismatch`) — but it gates
+PROMOTION, and nothing equivalent gates the GO-LIVE GATE; and ⚖️ Counterweight
+is the ONE book that solved the gate half, its `golive_blocker` keyed on the
+LIVE row id with the `(ry)` note *"a READY SHADOW twin must never arm the LIVE
+arm"*. Its honest cost, which should be stated rather than discovered: the gate
+is then unpassable until a live arm has its own 30-close ledger.
+
+**MECHANISMS (2) AND (3) ARE DELIBERATELY NOT SHIPPED HERE** — one surface per
+pass, verified in the live payload, because `(fz)` changed six at once and
+produced six follow-up entries repairing itself. CARRIED as
+`live-vs-graded-policy-two-mechanisms-uncovered`. **FLAGGED, NOT COUNTED:**
+scanned-universe width differs on both live pairs (mum 94 live vs 103 shadow,
+avo 63 vs 77) and universe is not a `policy_stamp` field, so a real narrowing
+would be invisible to the era, the judge AND the gate — unattributed, verify
+before acting. **NOT counted as this class at all:** every sizing/capital
+asymmetry, because per-trade % is invariant to clip ((hl), measured).
+
 Instrument this pass: `scripts/golive_readiness.py::live_fillable`. Pinned by
 `tests/autonomy/test_live_fillable.py` (29 tests). Closes nothing carried —
 `(aaf)` closed `taker-random-entry-null-blocked-on-ci` last night; this closes

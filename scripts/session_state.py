@@ -93,6 +93,70 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "live-vs-graded-policy-two-mechanisms-uncovered",
+        "owner": "session",
+        "what": "(aan) shipped `golive_readiness.live_fillable`, which closes "
+                "ONE of the three mechanisms by which a book's LIVE arm can "
+                "run a narrower or different policy than the arm the go-live "
+                "gate grades: the per-mode LENS/SIDE allow-list. A fleet "
+                "sweep of all 14 graded books confirms the other two are real "
+                "and UNCOVERED. (2) THE LEVER LANE: `apply_tuning()` returns "
+                "{} on 🎫 the taker's live arm, so a live arm takes NO "
+                "growth-rail lever while the graded shadow ran tuner-moved "
+                "bars -- its era spans 19 distinct bracket settings (tp in "
+                "{0.03,0.04,0.05,0.06}, max_hold_h in {24,48,72}, brk_range "
+                "in {0.91,0.93,0.95,0.97}). Intersecting both taker "
+                "mechanisms: **2 of 208 closes (1.0%) are BOTH live-fillable "
+                "AND booked at bars a live arm would run.** (3) THE CAPACITY "
+                "PIN: ⚖️ Counterweight's live arm pins `K = GOLIVE_K` and "
+                "refuses the `fundspread.k` lever; K is a rank truncation, so "
+                "it changes WHICH coins are held. LATENT today (env default "
+                "K=5 == GOLIVE_K=5, no lever open), not absent. AND A SECOND "
+                "CONFIRMED BOOK, DIRECTION INVERTED: 👩 mum's shadow is "
+                "NARROWER than live -- the judge's `xp.mum.vel_lo/vel_hi` "
+                "steer the twin only, the velocity band is an ENTRY filter, "
+                "and her own census reads `vel_in_band 2 of vel_read 102`, so "
+                "the graded sample is a strict SUBSET of the live population. "
+                "CLAUDE.md already says 'while running, the twin is an "
+                "EXPERIMENT arm, not a control arm'; the GRADER does not know "
+                "it.",
+        "why_open": "DELIBERATELY NOT SHIPPED IN (aan), under the fleet's own "
+                    "'SHIP NARROW, VERIFY IN THE LIVE PAYLOAD, THEN WIDEN' "
+                    "rule -- (fz) changed six surfaces in one pass and "
+                    "produced six follow-up entries repairing itself. "
+                    "`live_fillable` is verified end-to-end on the deployed "
+                    "payload for mechanism (1) ONLY; mechanisms (2) and (3) "
+                    "have no instrument. THE PRIOR ART TO START FROM, both "
+                    "found by the sweep: the experiment judge ALREADY "
+                    "detects live/shadow policy divergence precisely "
+                    "(`policy_stamp` as ONE builder shared by both hosts, "
+                    "`policy_fields`, `policy_waived`, publishing "
+                    "`unjudgeable:policy_mismatch`) -- but it gates "
+                    "PROMOTION, and nothing equivalent gates the GO-LIVE "
+                    "GATE; and ⚖️ Counterweight is the ONE book that solved "
+                    "the gate half, its `golive_blocker` keyed on the LIVE "
+                    "row id with the (ry) note 'a READY SHADOW twin must "
+                    "never arm the LIVE arm' -- no other book has that guard, "
+                    "and its honest cost is that the gate is then unpassable "
+                    "until a live arm has its own 30-close ledger. NOTE the "
+                    "class was named in PROSE seven weeks ago on this same "
+                    "book -- lighter_ticket_taker.py:361-365, (hr) 31-Jul: "
+                    "'the shadow arm was admitting books the money arm would "
+                    "never touch -- which is not a conservative difference, "
+                    "it is a grading error in the permissive direction' -- "
+                    "and that entry fixed the INSTANCE and left the class "
+                    "open. FLAGGED, NOT COUNTED: scanned-universe width "
+                    "differs on both live pairs (mum 94 live vs 103 shadow, "
+                    "avo 63 vs 77) and universe is not a policy_stamp field, "
+                    "so a real narrowing would be invisible to the era, the "
+                    "judge AND the gate -- unattributed, verify before "
+                    "acting. Closes when the CHANGELOG records "
+                    "'live-vs-graded mechanisms READ:' with a verdict on "
+                    "each of (2) and (3).",
+        "closes_when": lambda: _has("CHANGELOG.md",
+                                    "live-vs-graded mechanisms READ:"),
+    },
+    {
         "id": "hull-cap-13-deferred-to-one-turnover",
         "owner": "session",
         "what": "(aaa) 🧮 Hull's cap raise (MAX_POSITIONS 10 -> 13 with "
