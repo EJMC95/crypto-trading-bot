@@ -1926,12 +1926,78 @@ def mtm_drawdown(samples, book_usd=None):
             "peak_equity": peak_eq}
 
 
-def equity_series(bot, store=None, limit=20000):
+#: How many `<bot>:equity` samples the MTM read asks for. The read is
+#: `ORDER BY ts DESC LIMIT`, so this is a TRAILING window: a book that has
+#: published more than this many snapshots is graded on its most recent
+#: `EQUITY_LIMIT`, not on its whole life.
+EQUITY_LIMIT = int(os.environ.get("GOLIVE_EQUITY_LIMIT", "20000"))
+
+#: [2026-09-10 (zv)] THE READ'S OWN RECEIPT — {bot: {rows, limit, truncated}}.
+#: The `fleet_bus.last_sizing[bot]` pattern, and here for the same reason: the
+#: caller needs a fact about the READ that the returned list cannot carry.
+#:
+#: WHY. `equity_series` returns points, and a truncated read and a complete
+#: one return the same SHAPE of list — the only difference is that one of them
+#: silently stops describing the book. Measured on the live payload 10-Sep,
+#: three books sit at EXACTLY the cap (🎯 sniper, 🏗️ albanese, 💼 turnbull,
+#: all n=20000 over ~14.2-14.7 days) and 🪁 kelly is at 16,762 and climbing.
+#: That is the `(qz)` signature this repo already has doctrine for: *a result
+#: exactly equal to its own limit is a truncation signature*, and nothing was
+#: comparing the two numbers.
+#:
+#: WHICH WAY IT FAILS, stated because it decides whether this matters: a
+#: trailing sub-window's peak-to-trough is a max over a SUBSET of the pairs the
+#: full series offers, so truncation can only ever UNDERSTATE the drawdown —
+#: the permissive direction, on the one go-live bar that is not clip-invariant.
+#: It also shrinks `peak_equity`, which since (yz) is the bar's own
+#: denominator. NO LIVE BOOK IS AT THE CAP TODAY (👩 mum 4,524 / 🙏 avo 8,000)
+#: and no verdict moves; at their measured ~288 snapshots/day both reach it in
+#: roughly ten more weeks, which is the point of publishing it now.
+#:
+#: PUBLISH-ONLY. `grade` and `bar_map` are byte-unchanged and the flag gates
+#: nothing: making truncation refuse a verdict is a gate re-spec, and that is
+#: Eamon's act (the (yr)/(yz) precedent), not a session's.
+last_series_read = {}
+
+
+def _note_series_read(bot, rows, limit):
+    """Record the read's receipt. Never raises; always leaves a record, so an
+    ABSENT entry means `equity_series` was not called for that book rather
+    than 'it was called and read nothing'."""
+    try:
+        last_series_read[str(bot)] = {
+            "rows": int(rows), "limit": int(limit),
+            "truncated": int(rows) >= int(limit) > 0,
+        }
+    except (TypeError, ValueError):
+        pass
+
+
+def book_mtm(bot, store=None, limit=None):
+    """`mtm_drawdown` over `equity_series`, with the READ's truncation receipt
+    folded into the returned dict so it rides `apply_mtm`'s `out["mtm"]` to
+    the published payload.
+
+    Returns exactly what `mtm_drawdown` returns (including None on a series
+    too thin to decide), plus `truncated` / `window_limit` when there is a
+    verdict — so every existing consumer of that dict is unaffected."""
+    m = mtm_drawdown(equity_series(bot, store=store, limit=limit))
+    if isinstance(m, dict):
+        rec = last_series_read.get(str(bot)) or {}
+        m["truncated"] = bool(rec.get("truncated"))
+        m["window_limit"] = rec.get("limit")
+    return m
+
+
+def equity_series(bot, store=None, limit=None):
     """[(ts, equity)] from `<bot>:equity` in bot_state_history — the series
     `snapshot_equity` writes. Returns [] on a dark DB or any error: the caller
     treats empty as "grade on realised", which is exactly today's behaviour, so
     an unavailable history can never change a verdict.
     """
+    limit = EQUITY_LIMIT if limit is None else limit
+    _note_series_read(bot, 0, limit)               # the honest default: a read
+                                                   # that never happened read 0
     if store is None:
         try:
             import bot_pnl_store as store          # noqa: PLC0415
@@ -1948,6 +2014,10 @@ def equity_series(bot, store=None, limit=20000):
         rows = read(str(bot) + ":equity", limit=limit) or []
     except Exception:                              # noqa: BLE001
         return []
+    # [(zv)] the RAW row count, before the parse filter below drops
+    # unreadable rows — a filtered count could sit under the cap on a read
+    # that WAS truncated, which is a false negative on the one signal here.
+    _note_series_read(bot, len(rows), limit)
     out = []
     for r in rows:
         try:
@@ -4719,7 +4789,7 @@ def main():
                 # with a date instead of `unreachable`. Inside the fail-soft
                 # try, so a series read failure still costs one annotation.
                 hz_f = gate_horizon(
-                    apply_mtm(s, mtm_drawdown(equity_series(bot))),
+                    apply_mtm(s, book_mtm(bot)),
                     first_close=(parsed[0][2] if parsed else None),
                     era_epoch=_era_ep,
                     first_open=first_era_open(ed.get("scoped_rows") or [],
@@ -4764,7 +4834,7 @@ def main():
         # provisional verdict is never mistaken for a graded one. The equity
         # series is the one (hq) started; a book without one grades exactly as
         # it did before.
-        s = apply_mtm(s, mtm_drawdown(equity_series(bot)))
+        s = apply_mtm(s, book_mtm(bot))
         ok, fails = grade(s)
         # [2026-07-30 (hf)] LEDGER INTEGRITY IS A PRECONDITION, not a bar. It
         # does not join BAR_NAMES — that tuple is the published contract the

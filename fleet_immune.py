@@ -805,6 +805,137 @@ def flatten_stuck_sickness(bot_rows, seen, now=None, ok=None):
     return out
 
 
+#: [2026-09-09 (zv)] How long a LIVE leg may sit THROUGH its own published
+#: stop before it is a stop that is NOT EXECUTING rather than one the manager
+#: has not reached yet. The variant host evaluates every held leg once per
+#: trading pass (LOOP_SECONDS=300) and closes with a market order bounded 2%
+#: through the book, so a healthy stop clears within one pass, two at most.
+#: 900s is three passes — far outside normal and far inside the damage (a leg
+#: that keeps sliding while the daily-loss halt is the only rail left).
+STOP_STUCK_S = float(os.environ.get("IMMUNE_STOP_STUCK_S", "900"))
+#: How far THROUGH the stop a leg must sit before it counts. Measured on 👩
+#: mum's own stop closes: overshoot p90 51.7bps, worst 62.4bps (n=7, 9-Sep) —
+#: a fill half a percent past a -4% level is the venue's ordinary slippage,
+#: not a missed stop. 1.0pp is ~2x the worst measured overshoot.
+STOP_OVERSHOOT_PP = float(os.environ.get("IMMUNE_STOP_OVERSHOOT_PP", "1.0"))
+#: Books whose held legs may LEGITIMATELY sit through the published stop —
+#: the FLATTEN_STUCK_OK idiom: declared with a reason, never defaulted into.
+#: EMPTY, and that is the point: a real-money leg through its stop is exactly
+#: the condition this exists to page on.
+STOP_STUCK_OK = {}
+
+
+def _leg_return(pos, side):
+    """Unrealised return of one venue-truth leg from the live host's
+    `extra.margin.positions[sym]` — entry, size and value (mark notional) —
+    for a book whose every leg is `side`. None on any junk, never 0.0 (a zero
+    reads as "flat", which would silence a real reading)."""
+    try:
+        entry = float(pos.get("entry"))
+        size = abs(float(pos.get("size")))
+        value = float(pos.get("value"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not (entry > 0 and size > 0 and value > 0):
+        return None
+    mark = value / size
+    return (mark / entry - 1.0) if side == "long" else (1.0 - mark / entry)
+
+
+def stop_stuck_sickness(bot_rows, seen, now=None, ok=None):
+    """A LIVE book holding a leg THROUGH its own protective stop, and holding
+    it — the exit path's liveness, watched from outside (I13).
+
+    [2026-09-09 (zv)] WHY THIS EXISTS. On the variant host a stop or ROI
+    close the venue REFUSES is caught, printed to the container log and
+    skipped (`close {sym} failed: ... — position keeps its manager`); the
+    only reject telemetry on the row sits in the ENTRY branch, the row keeps
+    `status: online`, and nothing pages until the daily-loss halt fires and
+    `flatten_stuck_sickness` finally sees it. Between those two points a
+    real-money leg can slide from -4% to the halt with every rail reading
+    green. The class is byte-identical from outside to a healthy book: a
+    fresh row, a manager running, a position still on (I1/I18). What the
+    row DOES carry is venue truth — `extra.margin.positions[sym]` with the
+    venue's own entry/size/value — and its policy stop, so the condition is
+    fully observable without the host saying a word.
+
+    THE RULE: a leg whose unrealised return sits more than STOP_OVERSHOOT_PP
+    through the published `policy.stoploss`, continuously for STOP_STUCK_S
+    (three trading passes), pages naming the SERVICE, the COIN and the
+    numbers (I8). `seen` is this organ's own first-seen map {bot:sym -> ts},
+    persisted by the caller exactly like `flatten_seen`; a leg that clears
+    (closed, or back inside the stop) is forgotten so the next episode starts
+    its own clock.
+
+    FAIL-SAFE THROUGHOUT: real-money rows only (a `-lighter` row id or
+    `policy.venue == lighter_live` — the dashboard's own definition); a STALE
+    row is skipped (I1 — death is the watchdog's); a HALTED row is skipped
+    (the flatten owns it, and `flatten_stuck_sickness` pages that); a row
+    that does not publish `policy.stoploss` and `margin.positions` is silent
+    (deploy latency is not sickness, the headroom_sickness rule); a book that
+    is not single-sided is skipped, because the margin block carries no side
+    and a guessed side is a wrong number on real money; junk never raises
+    and never fires."""
+    allow = STOP_STUCK_OK if ok is None else ok
+    t_now = float(now if now is not None else now_ts())
+    out, live = [], set()
+    for r in bot_rows or []:
+        if not isinstance(r, dict) or _row_stale(r, t_now):
+            continue
+        extra = r.get("extra") if isinstance(r.get("extra"), dict) else {}
+        bot = str(r.get("bot") or "")
+        pol = extra.get("policy") if isinstance(extra.get("policy"), dict) else {}
+        if not (bot.endswith("-lighter") or pol.get("venue") == "lighter_live"):
+            continue
+        if str(r.get("status") or "").lower() == "halted":
+            continue
+        try:
+            stop = float(pol.get("stoploss"))
+        except (TypeError, ValueError):
+            continue
+        if not stop < 0.0:
+            continue
+        sides = pol.get("sides")
+        if sides == ["long"]:
+            side = "long"
+        elif sides == ["short"]:
+            side = "short"
+        else:
+            continue
+        margin = extra.get("margin") if isinstance(extra.get("margin"), dict) else {}
+        positions = margin.get("positions")
+        if not isinstance(positions, dict):
+            continue
+        bar = stop - STOP_OVERSHOOT_PP / 100.0
+        for sym, pos in positions.items():
+            ret = _leg_return(pos, side)
+            if ret is None or ret > bar:
+                continue
+            key = f"{bot}:{sym}"
+            live.add(key)
+            since = seen.get(key)
+            if not isinstance(since, (int, float)):
+                seen[key] = t_now          # first sighting — start the clock
+                continue
+            held_for = t_now - float(since)
+            if held_for < STOP_STUCK_S or bot in allow:
+                continue
+            out.append({
+                "organ": bot,
+                "detail": (f"{sym} sits at {ret * 100:+.2f}% against a "
+                           f"{stop * 100:.1f}% stop for {held_for / 60.0:.0f} min "
+                           f"on service {extra.get('svc') or 'unknown'} — the "
+                           f"protective stop is NOT EXECUTING (a refused close "
+                           f"is only logged in the container); the daily-loss "
+                           f"halt is the only rail left"),
+            })
+    # forget legs that are closed or back inside the stop, so the next
+    # episode's clock starts at its own beginning rather than inheriting one
+    for gone in set(seen).difference(live):
+        seen.pop(gone, None)
+    return out
+
+
 # [2026-07-31 (hu)] Rows whose publisher LEGITIMATELY carries no `extra.svc`.
 # The BORN_DARK_OK idiom: a deliberate omission is DECLARED with a reason, so
 # silence is never an option. These three run on services in the LIVE-MARKER
@@ -1443,9 +1574,14 @@ def run_once():
     # organ's own first-seen map IS the sensor — without persisting it every
     # cycle is a first sighting and the detector can never fire.
     flatten_seen = dict(prior.get("flatten_seen") or {})
+    # [2026-09-09 (zv)] the stuck-stop memory, {bot:sym -> first-seen ts}.
+    # Same shape, same reason: the row carries no "through the stop
+    # since", so the organ's own first-seen map IS the sensor.
+    stop_seen = dict(prior.get("stop_seen") or {})
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
             + headroom_sickness(bot_rows)
             + flatten_stuck_sickness(bot_rows, flatten_seen, now)
+            + stop_stuck_sickness(bot_rows, stop_seen, now)
             + stale_writer_sickness(bot_rows)
             + restart_churn(states, churn_seen, now)
             + brain_amnesia(states.get("learning-brain"),
@@ -1483,6 +1619,9 @@ def run_once():
         # Persisted for the same reason as the two maps around it; a book that
         # clears the condition is dropped by the detector itself.
         "flatten_seen": flatten_seen,
+        # [2026-09-09 (zv)] {bot:sym -> first-seen ts} for the stuck-stop
+        # sensor; a leg that clears is dropped by the detector itself.
+        "stop_seen": stop_seen,
         # ...and WHICH counters are watched, so an organ that is NOT watched
         # is visible here rather than silently unmonitored.
         "churn_watched": sorted(RESTART_COUNTERS),
@@ -2148,7 +2287,35 @@ def _selftest():
     # a HEALED finding drops out of the ledger, so a recurrence pages afresh
     assert _notify_cycle(["A"], _T, set(), _T + 8 * 3600, True)[0] == []
 
-    print("fleet_immune selftest OK (notify ledger delivered!=seen, filtration age+antibody, lever sickness, "
+    # ---- [2026-09-09 (zv)] STOP NOT EXECUTING -----------------------------
+    # mum's real 9-Sep margin shape: SPY entry 765.86 x 0.3102; 223.0 is -6.1%
+    # against a -4% stop. First sighting is silent, three passes later it
+    # pages naming service + coin; the +0.11% capture stays clean.
+    def _mrow(spy_value, status="online", age=248):
+        return {"bot": "freqtrade-mum-lighter", "status": status, "age_sec": age,
+                "extra": {"svc": "mum-live",
+                          "policy": {"sides": ["long"], "venue": "lighter_live",
+                                     "stoploss": -0.04},
+                          "margin": {"positions": {
+                              "SPY": {"size": 0.3102, "entry": 765.86, "value": spy_value},
+                              "XAU": {"size": 0.0547, "entry": 4379.47, "value": 240.891689}}}}}
+    _ss = {}
+    assert stop_stuck_sickness([_mrow(237.827238)], _ss, now) == [] and _ss == {}
+    assert stop_stuck_sickness([_mrow(223.0)], _ss, now) == [] and \
+        _ss == {"freqtrade-mum-lighter:SPY": now}, "first sighting starts the clock"
+    assert stop_stuck_sickness([_mrow(223.0)], _ss, now + STOP_STUCK_S - 1) == []
+    _sk = stop_stuck_sickness([_mrow(223.0)], _ss, now + STOP_STUCK_S + 1)
+    assert [x["organ"] for x in _sk] == ["freqtrade-mum-lighter"], _sk
+    assert "mum-live" in _sk[0]["detail"] and "SPY" in _sk[0]["detail"], _sk
+    assert stop_stuck_sickness([_mrow(223.0, status="halted")], {}, now + 10**6) == [], \
+        "a halted book is the flatten detector's"
+    assert stop_stuck_sickness([_mrow(223.0, age=STALE_ROW_S + 1)], {}, now + 10**6) == [], \
+        "a stale row is the watchdog's (I1)"
+    _ss2 = {"freqtrade-mum-lighter:SPY": now}
+    assert stop_stuck_sickness([_mrow(237.827238)], _ss2, now + 60) == [] and _ss2 == {}, \
+        "a recovered leg is forgotten"
+
+    print("fleet_immune selftest OK (stop-not-executing, notify ledger delivered!=seen, filtration age+antibody, lever sickness, "
           "organ invariants, bot-row sickness, death!=sickness, "
           "application invariant)")
 

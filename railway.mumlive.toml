@@ -1,0 +1,27 @@
+# [2026-09-09 (zv)] Service-specific Railway config for the REAL-MONEY service
+# `mum-live` ONLY — the mirror of railway.tickettaker.toml for 👩 mum's slot.
+#
+# INERT UNTIL THE OPERATOR POINTS THE SERVICE AT IT. Railway applies a
+# config-as-code file only when the service's "Railway Config File" setting
+# names this path, and that setting is a Railway UI step this repo cannot
+# perform. The audit-9sep pass read the live service config (read-only) and
+# found `mum-live` carries NO restartPolicyType — Railway's default is
+# ON_FAILURE with a retry cap — while `tide-rider-lighter-live` gets "always"
+# from its own toml. Every exit of a live perp (stop, ROI ladder, delist
+# give-up, daily-loss flatten, kill-switch flatten) runs IN-PROCESS and
+# Lighter holds no resting stop, so an exit-then-no-restart abandons funded
+# legs. Same image, same entry file: FAMILY_LIVE_BOOK on the service selects
+# mum. Nothing here changes what the book trades.
+#
+# Activation (operator): Railway -> mum-live -> Settings -> Config-as-code ->
+# "railway.mumlive.toml"; it takes effect on that service's NEXT deploy
+# ([deploy-live-mum] marker or an explicit dispatch), never on landing here.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.avolive"
+
+[deploy]
+startCommand = "python -u lighter_avo_live_bot.py"
+# Restart on any exit, no retry cap — the running process IS the position
+# manager (see the note above and railway.tickettaker.toml).
+restartPolicyType = "always"

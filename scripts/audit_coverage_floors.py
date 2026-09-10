@@ -29,7 +29,40 @@ from pathlib import Path
 
 # repo-relative file -> minimum line-coverage percent
 FLOORS = {
-    # the two live real-money bots
+    # [2026-09-10 (zv)] THE LIVE-HOST FILES ENTER THE RATCHET, AND THE HEADING
+    # BELOW THEM IS CORRECTED IN PLACE (I12) — it read "the two live
+    # real-money bots" over 🎫 the taker and 💸 the Farmer, and NEITHER has
+    # been a live arm since 13-Aug (ma) and 22-Aug (ta) respectively. So the
+    # one table in the repo that calls itself "the real-money surface's
+    # coverage RATCHET" floored two retired arms and left the actual live
+    # surface — `fleet_books.DECLARED_LIVE` = 🙏 avo + 👩 mum, both running
+    # `lighter_avo_live_bot.py` and importing their strategy from
+    # `lighter_family_bot.py` — with no floor at all. A change could have
+    # deleted every assertion on the running real-money host and this guard
+    # would still have printed a clean table.
+    #
+    # These are NOT aspirations, which is what the doctrine above forbids:
+    # 67 test files already drive these two modules (test_variant_host,
+    # test_avo_cap_slots, test_mum_v2, test_halt_room_gate,
+    # test_daily_halt_failclosed, test_live_exit_parity, ...). They enter at
+    # ground already held.
+    #
+    # MEASURED CI's WAY (the recipe in tests.yml: whole suite, subprocess-
+    # aware, SDK present) but on the LOCAL 3.9 interpreter rather than CI's
+    # 3.11, because a session cannot run the CI job. That basis is calibrated
+    # rather than assumed: the same local run reproduces all 27 pre-existing
+    # floors with ZERO breaches and a minimum slack of +1.4pp, and where a
+    # floor's note records its CI measurement the local read sits within
+    # ~1.5pp either way. So these two enter ~3pp under measured instead of
+    # the table's usual ~2 — one extra point bought against the interpreter
+    # difference, declared rather than hidden. Raise them from a real CI
+    # measurement in the next PR that touches either file.
+    "lighter_avo_live_bot.py": 80,     # measured 83.4 local (1443 stmts)
+    "lighter_family_bot.py": 57,       # measured 60.7 local (1449 stmts)
+    # the shadow taker and the Farmer — REAL-MONEY-CAPABLE hosts, both now
+    # running shadow-only arms (see the note above); floored since 2026-07-29
+    # and kept, because both still carry live order paths and the Farmer is
+    # 🛢️ Garrett's host.
     "lighter_ticket_taker.py": 90,     # measured 92 (the --selftest-live harness)
     # [2026-07-30] 45 -> 50. Finding 14 of the coverage second pass: the (en)
     # exit-ladder and (eq) flatten seams raised this file ~6pp and NEITHER

@@ -1514,11 +1514,28 @@ LEVER_GRANDFATHER = os.environ.get("LEVER_GRANDFATHER", "on").strip().lower() \
     not in ("off", "0", "no", "false", "disabled")
 
 
-def entry_bars():
+def entry_bars(lens=None):
     """The bars in force RIGHT NOW, stamped into a new position's meta —
     exit bars (governing) plus the entry filters that admitted it
-    (attribution; the filters never re-apply mid-position)."""
-    return {"tp": TAKE_PROFIT, "sl": STOP_LOSS, "max_hold_h": MAX_HOLD_H,
+    (attribution; the filters never re-apply mid-position).
+
+    [2026-09-09 (zv)] THE CLOCK SPLIT REACHES THE STAMP. (wr) gave the
+    breakout TREND exit its own hold (`BRK_MAX_HOLD_H`) inside `bull_exit`,
+    and the replay honours it there — but the RUNNING manager grafts the
+    ENTRY-STAMPED hold over bull_exit's tuple ((dg): bars priced at entry
+    govern the trade), and this stamp wrote `MAX_HOLD_H` — the divergence
+    lever `taker.max_hold_h` — on EVERY lens. So in the book a breakout was
+    still clocked by the divergence lever while the replay that tunes that
+    lever clocked it by BRK_MAX_HOLD_H: behaviour-neutral only while both
+    read 48, and the (sk)-measured +0.22..0.57pp harm the moment the sweep
+    (grid [24, 48, 72], cage lo 24) or a sentinel restrict enacts 24. Stamp
+    the hold the lens is actually priced under; (dg)'s invariant is kept
+    exactly — a mid-position lever move still cannot re-time an open
+    breakout, because the stamp is still what governs."""
+    hold = MAX_HOLD_H
+    if BULL_MODE and lens in ("breakout", "breakoutup"):
+        hold = BRK_MAX_HOLD_H
+    return {"tp": TAKE_PROFIT, "sl": STOP_LOSS, "max_hold_h": hold,
             "div_gap_pp": DIV_GAP_PP, "div_vol_m": DIV_VOL_M,
             "dip_range": DIP_RANGE, "brk_range": BRK_RANGE,
             "momo_chg": MOMO_CHG}
@@ -3168,7 +3185,8 @@ def main(_ctx=None):
                          "evidence": ev,
                          # [2026-07-22 FLAP FIX] the bars priced at entry
                          # govern this trade — see pos_bars/entry_bars.
-                         "bars": entry_bars()}
+                         # [(zv)] ...and the LENS picks which clock is stamped.
+                         "bars": entry_bars(lens)}
             opened_syms.add(sym)
             opened_lenses.add(lens)
             slot_census["opened"] += 1
@@ -3413,6 +3431,19 @@ def selftest():
     assert set(entry_bars()) == {"tp", "sl", "max_hold_h", "div_gap_pp",
                                  "div_vol_m", "dip_range", "brk_range",
                                  "momo_chg"}
+    # [(zv)] the stamp carries the clock the LENS is priced under: under
+    # BULL_MODE a breakout stamps BRK_MAX_HOLD_H, divergence stamps the
+    # lever; with bull off every lens stamps the lever (the replay's default)
+    _bm = BULL_MODE
+    try:
+        globals()["BULL_MODE"] = True
+        assert entry_bars("breakoutup")["max_hold_h"] == BRK_MAX_HOLD_H
+        assert entry_bars("breakout")["max_hold_h"] == BRK_MAX_HOLD_H
+        assert entry_bars("divergence")["max_hold_h"] == MAX_HOLD_H
+        globals()["BULL_MODE"] = False
+        assert entry_bars("breakoutup")["max_hold_h"] == MAX_HOLD_H
+    finally:
+        globals()["BULL_MODE"] = _bm
 
     # accounting round-trip incl. funding drag (long pays, short receives)
     b = PaperBroker(start_equity=1000.0, fee_bps=4.0)

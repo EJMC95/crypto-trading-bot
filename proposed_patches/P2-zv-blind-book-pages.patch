@@ -1,0 +1,284 @@
+From 991311955c4cb36f38720552c8f233d768044af8 Mon Sep 17 00:00:00 2001
+From: Eamon <emcmpg@gmail.com>
+Date: Thu, 10 Sep 2026 16:06:18 +1000
+Subject: [PATCH] PROPOSED P2 (zv): a blind book that still holds positions
+ must page, not publish a green row
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ lighter_avo_live_bot.py                 |  47 +++++-
+ tests/autonomy/test_blind_book_pages.py | 203 ++++++++++++++++++++++++
+ 2 files changed, 249 insertions(+), 1 deletion(-)
+ create mode 100644 tests/autonomy/test_blind_book_pages.py
+
+diff --git a/lighter_avo_live_bot.py b/lighter_avo_live_bot.py
+index a93fc42..292bc36 100644
+--- a/lighter_avo_live_bot.py
++++ b/lighter_avo_live_bot.py
+@@ -1721,8 +1721,53 @@ def main(_ctx=None, once=False):
+         if not restored:
+             _restore()
+             if not restored:
++                # [2026-09-10 (zv)] A BOOK THAT CANNOT READ ITS OWN STATE IS
++                # BLIND, NOT HEALTHY — and until now it published a GREEN row.
++                #
++                # The refusal above is right and stays (`_restore` will not
++                # seed a fresh book over the record). What was wrong is what
++                # this path then TELLS THE FLEET. `store.heartbeat` is
++                # `UPDATE bot_pnl SET updated_at = now()` and nothing else —
++                # deliberately, so a slow scan never reads as a dead bot — so
++                # the row keeps the PREVIOUS container's `status: "online"`
++                # and its `open_trades`, and only the timestamp moves. The
++                # watchdog's rule is `status not in (None, online, halted,
++                # paper)` (fleet_watchdog_svc.py), and its other arm is
++                # staleness; a fresh green row satisfies both.
++                #
++                # Meanwhile this branch `continue`s BEFORE the equity read,
++                # the positions read, the kill-switch flatten, the daily-loss
++                # flatten and the manage/exit loop. So a Postgres read that
++                # keeps failing produces a book with REAL LEGS, NO position
++                # manager, no stop (Lighter holds no resting stop — the
++                # running process IS the manager) and a row that looks
++                # perfect, in 300-second blocks, for as long as it lasts.
++                # `restored` is set once and never re-checked, so a
++                # long-running process is immune: this is reachable ONLY on a
++                # restart, which is exactly the window Eamon's standing rule
++                # is about ("dont restart things untill bots have cleared
++                # their current orders").
++                #
++                # THE FIX IS A STATUS STRING, NOT A BEHAVIOUR CHANGE. Nothing
++                # about the loop's cadence, its refusal to seed, or what the
++                # book trades moves. A blind book that still HOLDS pages; a
++                # blind book that is FLAT is correctly silent, because a flat
++                # shut book is not an emergency. Unknown exposure pages too —
++                # it must never read as flat (I8: unknown degrades to the
++                # honest alarm, never to a guess).
++                _blind_legs, _blind_known = 0, False
+                 try:
+-                    store.heartbeat(BOT_ROW)
++                    _blind_legs = len(venue.positions() or {})
++                    _blind_known = True
++                except Exception as e:  # noqa: BLE001
++                    _PRINT(f"[avo-live] {iso(t_now)} state read FAILED and "
++                           f"positions unreadable ({e!r}) — exposure UNKNOWN, "
++                           f"paging")
++                try:
++                    if _blind_legs or not _blind_known:
++                        store.set_status(BOT_ROW, "error")
++                    else:
++                        store.heartbeat(BOT_ROW)
+                 except Exception:  # noqa: BLE001
+                     pass
+                 if once:
+diff --git a/tests/autonomy/test_blind_book_pages.py b/tests/autonomy/test_blind_book_pages.py
+new file mode 100644
+index 0000000..d793900
+--- /dev/null
++++ b/tests/autonomy/test_blind_book_pages.py
+@@ -0,0 +1,203 @@
++"""[2026-09-10 (zv)] A BOOK THAT CANNOT READ ITS OWN STATE MUST NOT PUBLISH A
++GREEN ROW WHILE IT HOLDS REAL POSITIONS.
++
++Eamon, 10-Sep: *"dont restart things untill bots have cleared their current
++orders or you just lose more money"*. Priced against the code, the ROUTINE
++restart is cheap — state lives in Postgres, so a held position keeps its
++ROI-ladder rung, its max_hold clock and its entry-stamped bars, and the extra
++blind window is a fraction of the 300s pass that already exists. The expensive
++case is this one, and it is reachable ONLY on a restart.
++
++THE MECHANISM, traced. `_restore()` refuses to seed on a failed state read —
++correct, and it stays ("refusing to seed a fresh book over the record"). The
++loop then takes the `if not restored:` branch, which `continue`s BEFORE the
++equity read, the positions read, the kill-switch flatten, the daily-loss
++flatten and the manage/exit loop. So nothing manages the book. What it DID
++publish was `store.heartbeat`, which is `UPDATE bot_pnl SET updated_at = now()`
++and nothing else — deliberately, so a slow scan never reads as dead. The row
++therefore keeps the PREVIOUS container's `status: "online"` and its
++`open_trades`, and only the timestamp moves.
++
++`fleet_watchdog_svc` pages on `status not in (None, online, halted, paper)` and
++on staleness. A fresh green row satisfies both. So: real legs, no manager, no
++stop (Lighter holds no resting stop — the running process IS the manager), and
++a row that looks perfect, in 300-second blocks, for as long as the read keeps
++failing. `restored` is set once and never re-checked, so a long-running process
++is immune; only a restart can enter it.
++
++THE FIX IS A STATUS STRING. Nothing about the loop's cadence, its refusal to
++seed, or what the book trades moves. Holding-and-blind pages; flat-and-blind
++stays silent (a flat shut book is not an emergency); UNKNOWN exposure pages
++too, because unknown must never read as flat (I8).
++"""
++import contextlib
++import importlib
++import os
++import sys
++from pathlib import Path
++
++import pytest
++
++ROOT = Path(__file__).resolve().parents[2]
++if str(ROOT) not in sys.path:
++    sys.path.insert(0, str(ROOT))
++
++pytestmark = pytest.mark.autonomy
++
++
++@contextlib.contextmanager
++def _blind_book(book, legs, positions_raises=False):
++    """Drive `main()` one cycle as `book` with the state read FAILING and the
++    venue reporting `legs` open positions. Yields the capture box."""
++    import bot_pnl_store as store
++
++    saved_env = dict(os.environ)
++    saved = {k: getattr(store, k, None)
++             for k in ("heartbeat", "set_status", "claim_writer",
++                       "load_state_checked", "service_name")}
++    box = {"status": [], "heartbeat": 0}
++    os.environ["FAMILY_LIVE_BOOK"] = book
++    os.environ["MUM_VENUE"] = os.environ["AVO_VENUE"] = "lighter_live"
++    os.environ.setdefault("FREQTRADE_MUM_MAX_NOTIONAL", "3000")
++    os.environ.setdefault("FREQTRADE_AVO_MARIA_MAX_NOTIONAL", "1700")
++    try:
++        m = importlib.reload(importlib.import_module("lighter_avo_live_bot"))
++        # the state read FAILS — the whole premise
++        store.load_state_checked = lambda key: (False, None)
++        store.claim_writer = lambda bot, now=None: (True, None)
++        store.service_name = lambda: "test"
++        store.heartbeat = lambda bot: box.__setitem__("heartbeat",
++                                                      box["heartbeat"] + 1)
++        store.set_status = lambda bot, st: box["status"].append((bot, st))
++        m._PRINT = lambda *a, **k: None
++
++        class _Venue:
++            """Only what `main()` touches before the blind branch, plus the
++            surface it would touch after it (which this path must never
++            reach — `test_it_changes_no_trading_behaviour_on_the_blind_path`
++            pins that, and these raise if it ever does)."""
++
++            def supports(self, coin):
++                return coin in ("BTC", "ETH")
++
++            def positions(self):
++                if positions_raises:
++                    raise RuntimeError("venue unreachable")
++                return {f"C{i}": {"size": 1.0} for i in range(legs)}
++
++            def funding_map(self):
++                return {}
++
++            def candles(self, coin, interval, start_ms, end_ms):
++                return []
++
++            def pop_capital_moves(self):
++                return []
++
++            def account_value(self):
++                raise AssertionError(
++                    "the blind path reached the equity read — it must "
++                    "`continue` before it")
++
++            def market_open(self, *a, **k):
++                raise AssertionError("the blind path opened a position")
++
++            def market_close(self, *a, **k):
++                raise AssertionError("the blind path closed a position")
++
++        class _Rails:
++            live = True
++            max_notional = 1000.0
++            max_daily_loss = 30.0
++
++            def kill_check(self):
++                return False
++
++            def equity_scale(self, equity, gross):
++                return self.max_notional
++
++        m.main(_ctx={"venue": _Venue(), "rails": _Rails()}, once=True)
++        yield box
++    finally:
++        for k, v in saved.items():
++            if v is not None:
++                setattr(store, k, v)
++        os.environ.clear()
++        os.environ.update(saved_env)
++        with contextlib.suppress(Exception):
++            importlib.reload(importlib.import_module("lighter_avo_live_bot"))
++
++
++# ------------------------------------------------------------- the finding
++@pytest.mark.parametrize("book", ["freqtrade-mum", "freqtrade-avo-maria"])
++def test_a_blind_book_HOLDING_positions_pages(book):
++    """The row must stop saying `online` while real legs sit unmanaged."""
++    with _blind_book(book, legs=3) as box:
++        assert box["status"], \
++            "a blind book holding 3 legs published no status — it is still " \
++            "heart-beating a green row over the last container's open_trades"
++        assert box["status"][-1][1] == "error", box["status"]
++        assert box["heartbeat"] == 0, \
++            "it must NOT also heartbeat — that is the green row this fixes"
++
++
++@pytest.mark.parametrize("book", ["freqtrade-mum", "freqtrade-avo-maria"])
++def test_a_blind_book_that_is_FLAT_stays_silent(book):
++    """The control group. A flat shut book is not an emergency, and a detector
++    that pages on it trains the operator to ignore it ((hh))."""
++    with _blind_book(book, legs=0) as box:
++        assert box["heartbeat"] >= 1, "a flat blind book must still heartbeat"
++        assert not box["status"], \
++            f"a FLAT blind book paged {box['status']} — noise"
++
++
++def test_unknown_exposure_pages_rather_than_reading_as_flat():
++    """I8: unknown degrades to the honest alarm, never to a guess. If the
++    venue read raises we do not know whether legs are open, and 'assume flat'
++    is the one answer that can lose money."""
++    with _blind_book("freqtrade-mum", legs=0, positions_raises=True) as box:
++        assert box["status"] and box["status"][-1][1] == "error", box
++        assert box["heartbeat"] == 0, box
++
++
++def test_the_status_it_publishes_is_one_the_watchdog_actually_pages_on():
++    """Testing the consumer against the publisher ((hj)): 'error' is only
++    useful if the watchdog's own rule treats it as not-online."""
++    src = (ROOT / "fleet_watchdog_svc.py").read_text()
++    assert '"online", "halted", "paper"' in src or \
++           "'online', 'halted', 'paper'" in src, \
++        "the watchdog's allow-set moved — re-check that 'error' still pages"
++    with _blind_book("freqtrade-mum", legs=2) as box:
++        assert box["status"][-1][1] not in (None, "online", "halted", "paper")
++
++
++# ------------------------------------------------- the refusal is untouched
++def test_the_seed_REFUSAL_itself_is_unchanged():
++    """The fix must not tempt anyone into seeding a fresh book over the
++    record — that refusal is the reason this path exists at all."""
++    src = (ROOT / "lighter_avo_live_bot.py").read_text()
++    assert "seed a fresh book over the record" in src, \
++        "the seed refusal is gone — that is a far worse bug than the one fixed"
++
++
++def test_it_changes_no_trading_behaviour_on_the_blind_path():
++    """The blind branch must still `continue` without reaching the equity
++    read, the flattens or the manage loop — this is a status change only."""
++    import ast
++    tree = ast.parse((ROOT / "lighter_avo_live_bot.py").read_text())
++    fn = next(n for n in ast.walk(tree)
++              if isinstance(n, ast.FunctionDef) and n.name == "main")
++    # locate the `if not restored:` branch that ends in `continue`
++    branches = [n for n in ast.walk(fn) if isinstance(n, ast.If)
++                and isinstance(n.test, ast.UnaryOp)
++                and isinstance(n.test.operand, ast.Name)
++                and n.test.operand.id == "restored"]
++    assert branches, "the blind branch is gone — rewrite this test"
++    inner = max(branches, key=lambda b: len(b.body))
++    called = {n.func.attr for n in ast.walk(inner)
++              if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
++    for forbidden in ("market_open", "market_close", "account_value"):
++        assert forbidden not in called, \
++            f"the blind path now calls {forbidden} — it must only observe"
++    assert "positions" in called, "it must read exposure to decide"
++    assert {"set_status", "heartbeat"} <= called, called
+-- 
+2.50.1 (Apple Git-155)
+

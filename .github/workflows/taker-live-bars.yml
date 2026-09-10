@@ -47,16 +47,50 @@ name: Taker exit bracket
 #
 # REVERSIBLE IN ONE DISPATCH: re-run with the previous values.
 
+#
+# [2026-09-10 (zv)] THE `tide-rider-lighter-live` OPTION IS REMOVED, AND THIS
+# WORKFLOW NO LONGER RESTARTS A REAL-MONEY CONTAINER. Corrected in place per
+# I12, because the header above describes a service that has not run this bot
+# since 13-Aug.
+#
+# WHAT CHANGED UNDER IT: `(ma)` swapped that slot — `tide-rider-lighter-live`
+# now runs 🙏 Avo Maria (`lighter_avo_live_bot.py`), and the Ticket Taker's
+# live arm is RETIRED. The taker survives only as the $1k shadow twin inside
+# `freqtrade-bots`.
+#
+# WHY THAT MAKES THE OLD DEFAULT A PURE COST. MEASURED 10-Sep:
+# `grep -c 'TT_TP\|TT_SL\|TT_MAX_HOLD_H\|TT_BULL_MODE'` returns **0** for
+# `lighter_avo_live_bot.py`, **0** for `lighter_family_bot.py` and **25** for
+# `lighter_ticket_taker.py`. So dispatching this at its own default set TT_*
+# variables on a container that reads none of them, and then ran
+# `railway redeploy --yes` on a REAL-MONEY book — benefit zero by
+# construction, cost one restart of a book that was holding positions
+# (9 open across the two live books at the moment this was written).
+#
+# THIS ALREADY HAPPENED ONCE AND WAS RECORDED, which is why it is closed now
+# rather than noted again: the sibling `taker-bull-mode.yml` header says of its
+# own first dispatch, *"a NO-OP that bounced a real-money container"*. That was
+# a wrong belief about one variable; this is the same shape made STRUCTURAL by
+# the slot swap, so it would have recurred on every dispatch.
+#
+# Eamon, 10-Sep: *"dont restart things untill bots have cleared their current
+# orders or you just lose more money"* — a real-money restart that buys nothing
+# is the cheapest possible thing to stop doing.
+#
+# RESTORING IT IS A DELIBERATE EDIT, not a dropdown (the `LIVE_SIDES`
+# precedent: real money on a new path is an explicit edit). If a taker live arm
+# is ever revived, add its service back to BOTH the `options:` list and the
+# `case` guard, and pin it in
+# `tests/autonomy/test_taker_var_workflows_target_the_shadow.py`.
 on:
   workflow_dispatch:
     inputs:
       arm:
         description: "Which Ticket Taker arm"
         required: true
-        default: "tide-rider-lighter-live"
+        default: "lighter-ticket-taker"
         type: choice
         options:
-          - "tide-rider-lighter-live"   # REAL MONEY
           - "lighter-ticket-taker"      # the $1k shadow twin
       tp:
         description: "TT_TP take-profit, fraction (0.02-0.12)"
@@ -104,8 +138,10 @@ jobs:
             echo "::error::RAILWAY_TOKEN secret is not set."; exit 1
           fi
           case "${ARM_IN}" in
-            tide-rider-lighter-live|lighter-ticket-taker) ;;
-            *) echo "::error::arm must be one of the two taker services — refusing"; exit 1 ;;
+            lighter-ticket-taker) ;;
+            tide-rider-lighter-live)
+              echo "::error::tide-rider-lighter-live runs 🙏 Avo Maria since (ma) 13-Aug, not the Ticket Taker. It reads NO TT_* variable (measured: 0 hits in lighter_avo_live_bot.py and lighter_family_bot.py), so this would restart a REAL-MONEY book for zero effect — refusing."; exit 1 ;;
+            *) echo "::error::arm must be the taker shadow twin — refusing"; exit 1 ;;
           esac
           # Strict format FIRST (rejects expressions, whitespace, exponents),
           # then a numeric range check. Both must pass — a range test alone

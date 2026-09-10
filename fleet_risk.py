@@ -224,6 +224,39 @@ def cohort_longs(by_bot, freqtrade_bots=None, perps_bots=None):
     return out
 
 
+def cohort_overlap(expo, venues):
+    """[2026-09-09 (zv)] DUPLICATE POSITIONS WITHIN A COHORT — the same base
+    held LONG by two or more books of the SAME kind of money. Measured on the
+    9-Sep 06:03Z payload: both real-money books held SPY and XAU at once
+    (👩 mum 4 legs, 🙏 avo 6), i.e. one bet held twice on real money, while
+    the only published view of it — `pair_concentration` — pooled paper into
+    the count (SPY 2 / XAU 2 there were exactly the two live books, but
+    nothing said so, and a paper twin holding SPY would have read 3).
+
+    ADVISORY BY CONSTRUCTION (I16): this publishes a number and moves nothing.
+    The per-symbol pileup cap stays the enforcing surface and stays pooled —
+    scoping it per cohort changes which trades the live books take, which
+    needs its expectancy price first (I19). `expo` is the exposure view's own
+    [(bot, base, side)]; `venues` is {bot: venue} for the rows the light
+    counted (absent => modelled, the venue_cohort fail-safe direction). A
+    base is counted once per BOOK. Pure; selftested."""
+    per = {"live": {}, "shadow": {}}
+    for name, base, side in expo or []:
+        if side != "long":
+            continue
+        cohort = venue_cohort((venues or {}).get(name))
+        per[cohort].setdefault(str(base).upper(), set()).add(name)
+    out = {}
+    for cohort, by_base in per.items():
+        overlap = {b: len(bots) for b, bots in by_base.items() if len(bots) >= 2}
+        out[cohort] = {
+            "long_distinct": len(by_base),
+            "overlap": dict(sorted(overlap.items(), key=lambda kv: (-kv[1], kv[0]))),
+            "overlap_n": len(overlap),
+        }
+    return out
+
+
 def cohort_view(cohorts):
     """[2026-09-02 (wy)] The published `cohorts` map: per cohort its long
     count, its OWN budget and its OWN light (the same `light_for` ladder the
@@ -661,6 +694,12 @@ def main():
                                          key=lambda kv: -kv[1]) if v >= 2}
     exposure = exposure_concentration(expo, uncovered=expo_uncovered,
                                       over=expo_over)
+    # [(zv)] the per-cohort duplicate-position view rides the cohorts map;
+    # `cohort_view` is unchanged and the history line below still reads only
+    # its three original fields.
+    _cohort_payload = cohort_view(_cohorts)
+    for _k, _v in cohort_overlap(expo, venues_seen).items():
+        _cohort_payload.setdefault(_k, {}).update(_v)
 
     # [2026-07-21 PER-SYMBOL PILEUP CAP — advisory-first, N3 follow-through]
     # A week of 168h history (n=2,019) showed the 20-slot long budget binding
@@ -828,7 +867,7 @@ def main():
         # paper into a real-money gate (evidence_board's live UP ladder) and
         # real money into the paper twins' veto. Consumers of real money read
         # `cohorts.live.light`; the pooled `light` is unchanged for display.
-        "cohorts": cohort_view(_cohorts),
+        "cohorts": _cohort_payload,
         "gross": gross,
         # [2026-08-03 (iv)] PUBLISHED AT LAST. `per_bot` has been computed on
         # every cycle since this organ shipped and thrown away at the publish
@@ -1005,7 +1044,25 @@ def selftest():
     _, dd2, sc2 = dd_governor([[_old, 1100.0]], 1000.0, _now)
     assert dd2 is not None and abs(dd2 - (1000.0 / 1100.0 - 1.0)) < 1e-3, dd2
     assert sc2 == 0.5, sc2                       # -9.1% is past DD_HALF
-    print("[fleet-risk] selftest OK (exposure_concentration + dd_governor)")
+    # [(zv)] cohort overlap: the 9-Sep shape — two LIVE books both long SPY
+    # and XAU, a paper taker long SPY. Live overlap names SPY and XAU at 2;
+    # the paper book does NOT lift SPY to 3 and its own cohort has no overlap.
+    _ov = cohort_overlap(
+        [("freqtrade-mum", "SPY", "long"), ("freqtrade-mum", "XAU", "long"),
+         ("freqtrade-mum", "COIN", "long"),
+         ("freqtrade-avo-maria", "SPY", "long"), ("freqtrade-avo-maria", "XAU", "long"),
+         ("freqtrade-avo-maria", "BTC", "short"),      # a short is not a pileup
+         ("lighter-ticket-taker", "SPY", "long"),
+         ("lighter-ticket-taker", "SPY", "long")],     # twice in one book = one book
+        {"freqtrade-mum": "lighter_live", "freqtrade-avo-maria": "lighter_live",
+         "lighter-ticket-taker": "lighter_shadow"})
+    assert _ov["live"]["overlap"] == {"SPY": 2, "XAU": 2}, _ov
+    assert _ov["live"]["overlap_n"] == 2 and _ov["live"]["long_distinct"] == 3, _ov
+    assert _ov["shadow"]["overlap"] == {} and _ov["shadow"]["long_distinct"] == 1, _ov
+    assert cohort_overlap([], {}) == {"live": {"long_distinct": 0, "overlap": {}, "overlap_n": 0},
+                                      "shadow": {"long_distinct": 0, "overlap": {}, "overlap_n": 0}}
+    assert cohort_overlap(None, None)["live"]["overlap"] == {}
+    print("[fleet-risk] selftest OK (exposure_concentration + dd_governor + cohort_overlap)")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,232 @@
+## 2026-09-09 (zv) — THE AUDIT-9SEP PASS: A REAL-MONEY LEG THROUGH ITS OWN STOP HAD NO WATCHER BETWEEN THE STOP AND THE HALT · THE SAME BASE HELD BY BOTH LIVE BOOKS WAS VISIBLE ONLY POOLED WITH PAPER · AND THE (wr) CLOCK SPLIT HELD IN THE REPLAY, NOT IN THE BOOK
+
+**Eamon's brief, 9-Sep:** an inspect-first improvement audit under hard rules —
+no deploy, no push, no restart, no trade; `SLOW_LOOP` / `STALE_SECONDS` /
+`EXPECTED` / `LABELS` / `CURRENT_BOTS` and every existing bot definition
+byte-for-byte unchanged unless he approves; higher backtest profit is not a
+better strategy. Ten read-only subsystem readers, 94 raw weaknesses, the
+top 22 adversarially verified (two lenses each), then a proposal panel.
+Report: `AUDIT_2026-09-09_IMPROVEMENTS.md`. Branch `claude/audit-9sep`,
+pushed as a BRANCH on Eamon's instruction, never to main; the P&L feed was
+read before and after and no existing row's accounting moved (the diffs are
+live trading only — the branch touches no publisher, no dashboard, and no bot
+except the one change Eamon approved below).
+
+**WHAT SHIPPED (two organ changes, advisory/monitoring only, no bot touched):**
+
+1. **`fleet_immune.stop_stuck_sickness` — the exit path's liveness, watched
+   from outside (I13).** On the variant host that runs both real-money books a
+   REFUSED close is caught, printed once to the container log and skipped
+   (`close {sym} failed: ... — position keeps its manager`, line ~3073); the
+   row's only reject telemetry sits in the ENTRY branch, `status` stays
+   `online`, and nothing pages until the daily-loss halt fires and
+   `flatten_stuck_sickness` finally sees a halted row. Between "the stop
+   should have fired" and "the halt fired" a real-money leg can slide from
+   −4% to the halt with every rail reading green — the class the memory
+   `a-venue-403-kills-a-live-book-silently` records at 8.2h dark. What the row
+   DOES carry is venue truth: `extra.margin.positions[sym]` (the venue's own
+   entry / size / value) beside `policy.stoploss` and `policy.sides`. The
+   detector pages a leg sitting more than 1.0pp THROUGH its published stop
+   (mum's measured overshoot: p90 51.7bps, worst 62.4bps, n=7 — ordinary
+   slippage must not page) continuously for 900s (three trading passes),
+   naming the service, the coin and the numbers (I8). Real-money rows only;
+   stale rows are the watchdog's (I1); HALTED rows are the flatten
+   detector's; a row that publishes no stop or no margin block is deploy
+   latency, not sickness; a mixed-side book is skipped rather than guessed.
+   Own memory `stop_seen` persisted beside `flatten_seen`. Measured on the
+   9-Sep 06:03Z capture: every one of the ten live legs sat between +0.1% and
+   +0.8%, so the shipped payload reads CLEAN (a detector that pages on day
+   one trains ignoring). `tests/autonomy/test_immune_stop_stuck.py` (23
+   tests on the real published shapes) + a selftest arm; 7 of 7 mutations
+   red via `scripts/mutate.py` — one of them a mis-targeted round, because
+   `set(seen) - live` also lives in the flatten detector and the harness
+   replaces the FIRST match: the loop is now `set(seen).difference(live)` so
+   a future mutation lands on the right function.
+
+2. **`fleet_risk.cohort_overlap` — the same base held LONG by two books of the
+   SAME kind of money.** Measured 9-Sep: 👩 mum (4 legs) and 🙏 avo (6 legs)
+   both held SPY and XAU — one bet held twice on real money — and the only
+   published view of it, `pair_concentration`, pools paper into the count, so
+   `SPY: 2` could not say whether that was two live books or a live book and
+   its paper twin. Publishes `cohorts.{live,shadow}.{overlap, overlap_n,
+   long_distinct}` beside the (wp)/(wy) split; `cohort_view` is unchanged so
+   every old reader still reads it. ADVISORY by construction (I16): the
+   per-symbol pileup cap stays pooled and stays the enforcing surface —
+   scoping it per cohort changes which trades the live books take and owes
+   its expectancy price first (I19); the measurement plan is in the report.
+   `tests/autonomy/test_fleet_risk_cohort_overlap.py` + a selftest arm; 4 of 4
+   mutations red.
+
+**P1 — A BOT DEFINITION, EXPORTED AS A PATCH FOR APPROVAL AND THEN APPLIED
+ON EAMON'S WORD (*"approve P1, apply the patch and push the branch"*, 9-Sep
+23:10 AEST): `lighter_ticket_taker.entry_bars(lens)`.** (wr) gave the breakout
+trend exit its own hold (`BRK_MAX_HOLD_H`) inside `bull_exit`, and the replay
+honours it there. The RUNNING manager does not: per the (dg) flap-fix it
+grafts the ENTRY-STAMPED hold over bull_exit's tuple (line ~2566), and the
+stamp (`entry_bars`, line ~1521) wrote `MAX_HOLD_H` — the divergence lever
+`taker.max_hold_h` — on EVERY lens. Measured read-only with MAX_HOLD_H=24 and
+BRK_MAX_HOLD_H=48: a 30h-old flat breakoutup position returns None (run on)
+through the replay and "hold" (exit) through the manager. Both existing pins
+were green — `test_breakout_cage_redecision` checks bull_exit alone, and the
+taker selftest pins that a breakout honours its ENTRY stamp — because the
+defect sits between them: the stamp itself. Behaviour-neutral today (both
+constants read 48, no `taker.max_hold_h` lever in force, `apply_ready_freeze`
+drops it while the book reads READY) and the (sk)-measured +0.22..0.57pp harm
+on the fleet's only READY book the moment the sweep's grid [24, 48, 72] or a
+sentinel restrict enacts 24 — on 156 of 198 era closes. The fix stamps the hold
+the LENS is priced under; (dg)'s invariant is kept exactly (the stamp still
+governs, so a mid-position lever move still cannot re-time an open breakout).
+Shipped with its test (`test_taker_breakout_clock_stamp.py`, 6 tests, red on
+the unpatched taker, 3 of 3 mutations red, taker selftest green). The branch
+first carried it only as an exported patch with the taker byte-identical;
+Eamon approved it and it is applied in this same branch. Zero expectancy
+change at today's constants — a correctness fix that closes a latent class.
+It reaches the SHADOW taker via the `freqtrade-bots` image on the merge to
+main; the taker's live arm is retired, so no real-money container restarts.
+
+**AN OPERATOR ACTION, found by reading the live service config (read-only):
+`mum-live` has NO restart policy.** Railway's config for the service carries
+`runtime V2, numReplicas 1` and no `restartPolicyType`, so it runs on the
+platform default — on-failure with a retry cap — while `tide-rider-lighter-
+live` gets `always` from `railway.tickettaker.toml`. Every exit of a live perp
+runs in-process and the venue holds no resting stop, so an exit-then-no-restart
+abandons funded legs (4 real positions at capture). `railway.mumlive.toml` is
+added as the mirror file, INERT until the service's config-as-code setting
+names it — that repoint is Eamon's act, recorded in the report as H-4. Also
+observed and not acted on: both live services show a STAGED, undeployed patch
+(id a622602b…, `config: {}`), worth a deliberate accept-or-discard.
+
+**AND THE ONE FINDING THE VERIFICATION STAGE ADDED, SHIPPED IN THE SAME
+BRANCH: the coverage RATCHET did not floor the real-money surface it names.**
+`scripts/audit_coverage_floors.py` calls itself "the real-money surface's
+coverage RATCHET" and its `FLOORS` table (27 entries) contained neither
+`lighter_avo_live_bot.py` nor `lighter_family_bot.py` — the variant host that
+runs BOTH live books and the module they import their strategy from — while
+its heading still read *"the two live real-money bots"* over 🎫 the taker and
+💸 the Farmer, neither of which has been a live arm since (ma) 13-Aug and (ta)
+22-Aug. So a change could have deleted every assertion on the running
+real-money host and this guard would have printed a clean table. Three
+verification verdicts, none refuting; the record is silent on it (0 hits in
+CLAUDE.md, HANDOFF.md and the memory index). **MEASURED, not assumed**: the
+whole suite under the tests.yml recipe (subprocess-aware, SDK present) reads
+**83.4%** and **60.7%**; they enter at **80** and **57**. The basis is
+calibrated rather than trusted — the same local run reproduces all 27
+pre-existing floors with **zero breaches** and a minimum slack of +1.4pp — and
+because it runs on 3.9 where CI runs 3.11 they enter ~3pp under measured
+instead of the table's usual ~2, one point bought against the interpreter gap
+and declared in the table. Both floors mutation-verified: dropping either
+file's coverage in the report trips the guard and names the file, and the
+untouched report stays green. The stale heading is corrected in place (I12).
+
+**AND THE GRADER'S MTM WINDOW STOPS TRUNCATING SILENTLY.** The go-live
+drawdown bar's mark-to-market leg reads `<bot>:equity` through
+`fetch_state_history`, whose SQL is `ORDER BY ts DESC LIMIT %s` — so the
+20,000-sample cap yields the NEWEST 20,000 and a book past it is graded on a
+trailing window rather than on its life, with nothing comparing the returned
+count to the cap. **MEASURED on the live payload 10-Sep 02:00Z, three books sit
+at EXACTLY the cap** — 🎯 sniper, 🏗️ albanese and 💼 turnbull, all `mtm.n =
+20000` over 14.2–14.7 days — and 🪁 kelly is at 16,762 and climbing. That is
+`(qz)`'s own signature (*a result exactly equal to its own limit is a
+truncation signature*) inside the fleet's own grader. **WHICH WAY IT FAILS, and
+why it is worth publishing:** a trailing sub-window's peak-to-trough is a max
+over a SUBSET of the pairs the full series offers, so truncation can only
+UNDERSTATE the drawdown — the permissive direction on the one go-live bar that
+is not clip-invariant — and it shrinks `peak_equity`, which since (yz) is that
+bar's own denominator. **NO LIVE BOOK IS AT THE CAP TODAY** (👩 mum 4,524, 🙏
+avo 8,000) and **no verdict moves**; at their measured ~288 snapshots/day both
+reach it in roughly ten weeks, which is the argument for publishing it now
+rather than after. SHIPPED: `EQUITY_LIMIT`, a read receipt
+(`last_series_read[bot]` — the `fleet_bus.last_sizing` pattern, and here for
+the same reason: a fact about the READ that the returned list cannot carry),
+and `book_mtm()` as the ONE composer that folds `truncated`/`window_limit` into
+the dict `apply_mtm` already publishes. The receipt counts RAW rows, before the
+parse filter — a filtered count can sit under the cap on a read that WAS
+truncated, which is a false negative on the only signal here. **PUBLISH-ONLY:**
+`grade` and `bar_map` are byte-unchanged and the flag gates nothing; making
+truncation refuse a verdict is a gate re-spec, i.e. Eamon's act, not a
+session's ((yr)/(yz) precedent). Pinned by
+`tests/autonomy/test_mtm_series_truncation.py` (13 tests, including a DRIVEN
+proof of the understatement direction and an AST pin that `book_mtm` is the
+only composer); 7 of 7 mutations red — one of them a survivor on the first
+round that exposed an accepted-and-ignored `limit` argument in my own new
+function.
+
+**AND EAMON'S RESTART RULE GOT PRICED, THEN GOT ITS TWO REAL TARGETS.**
+Eamon, 10-Sep: *"dont restart things untill bots have cleared their current
+orders or you just lose more money"*. Priced against the code rather than
+agreed with: a ROUTINE restart is CHEAP, because the load-bearing state is in
+Postgres, not memory — a held position keeps its ROI-ladder rung, its max_hold
+clock, its entry-stamped bars, its cooldown and its protections latch, and
+`claim_writer` re-takes its own dead replica's claim rather than standing down.
+The extra blind window is roughly one missed 300s exit pass on top of a 300s
+pass that already exists, and its price is MEASURED on 👩 mum's own fills
+(`stop_overshoot` p90 51.9bps, worst 62.4, n=13 — the adverse drift between a
+stop level being crossed and the next pass catching it): about **$0.02 per
+restart**, generously bounded at $0.11. **So the rule is right in spirit and
+wrong in magnitude for the routine case — and exactly right about two specific
+things, both now closed or proposed.**
+
+**SHIPPED — two workflows restarted a REAL-MONEY container to set variables it
+cannot read.** `taker-live-bars.yml` and `taker-bull-mode.yml` both DEFAULTED
+their `arm` input to `tide-rider-lighter-live`, set `TT_*` env vars and ran
+`railway redeploy --yes`. That was correct when written; `(ma)` swapped the
+slot on 13-Aug and it now runs 🙏 Avo Maria, whose host reads NO `TT_*` at all
+— MEASURED: `grep -c 'TT_TP|TT_SL|TT_MAX_HOLD_H|TT_BULL_MODE'` is **0** in
+`lighter_avo_live_bot.py`, **0** in `lighter_family_bot.py`, **25** in
+`lighter_ticket_taker.py`. So each dispatch at its own default bounced a
+real-money book for a benefit of exactly zero. It had already happened once and
+been RECORDED rather than closed — the bull-mode header calls its own first
+dispatch *"a NO-OP that bounced a real-money container"* — and the slot swap
+turned that one-off belief into a structural certainty on every dispatch. The
+live service is removed from both `options:` lists and refused by name in both
+`case` guards with a message saying what actually runs there now (I8); the
+default is the $1k shadow twin, the only arm that reads these vars. Restoring
+it is a deliberate edit, not a dropdown (the `LIVE_SIDES` precedent). Pinned by
+`tests/autonomy/test_taker_var_workflows_target_the_shadow.py` (10 tests,
+including one that fails if a live host ever STARTS reading `TT_*`, so the
+premise cannot rot); 3 of 3 hand-run YAML mutations red — `scripts/mutate.py`
+correctly REFUSED to score them, because it compiles a mutant before trusting
+it and a `.yml` is not Python.
+
+**PROPOSED, NOT APPLIED (P2, a real-money bot definition — Eamon's
+byte-for-byte rule): a blind book that still holds positions must page.** The
+one restart-only state whose cost is NOT a bounded 300s window: if the Postgres
+state read fails at boot, `_restore()` refuses to seed (correct, and it stays)
+and the loop takes a branch that `continue`s BEFORE the equity read, the
+positions read, the kill-switch flatten, the daily-loss flatten and the
+manage/exit loop. What it published there was `store.heartbeat`, which is
+`UPDATE bot_pnl SET updated_at = now()` and nothing else — so the row kept the
+PREVIOUS container's `status: "online"` and its `open_trades`, and only the
+timestamp moved. The watchdog pages on `status not in (None, online, halted,
+paper)` and on staleness; a fresh green row satisfies both. Real legs, no
+manager, no stop (Lighter holds none — the running process IS the manager), an
+immaculate row, in 300s blocks, for as long as the read fails. `restored` is
+set once and never re-checked, so a long-running process is immune: this is
+reachable ONLY on a restart, which is precisely the window Eamon's rule names.
+The patch is a STATUS STRING and nothing else — holding-and-blind pages,
+flat-and-blind stays silent, UNKNOWN exposure pages (I8: unknown must never
+read as flat). Exported to `proposed_patches/P2-zt-blind-book-pages.patch`
+with its test (8 tests, RED on the unpatched bot, 4 of 4 mutations red) and the
+bot file RESET to byte-identical. Two defects in my own first cut were caught
+before export: it referenced `LOG_TAG`/`now_utc()`, neither of which exists in
+that file — a NameError on a real-money loop — and its test asserted a refusal
+string that spans a line break.
+
+**REFUSED WITH EVIDENCE — no strategy-parameter change ships.** Every
+performance-shaped candidate the brief lists is already measured on this
+fleet's own tape: regime filters (7-Sep: never crosses the rotated-label null,
+P 0.115–0.331, an off-switch in 6 of 13 OOS months); per-trade inverse-vol
+sizing (6-Sep: mum −0.131pp, avo −0.349pp, her edge is her HIGH-vol tercile);
+leverage as an edge (six studies, `t` invariant); cooldowns as a Douglas
+overlay (+$27.01 → −$11.32); TP retunes on the sniper (0 of 367 cells survive
+BH); the Monte Carlo audit's own verdict (7-Sep: "I propose no parameter
+change"). Re-proposing any of them would be motion, not growth. Three further
+findings stay REPORTED with numbers and no code (GROSS_X_MAX at 20 above the
+stop-alive ceiling — Eamon's on-record (yl) setting; the 20,000-sample MTM
+series cap on three books; six slippage owners across the harnesses) — each
+with its measurement plan in the report, none pre-empting a pre-registered
+read.
+
 ## 2026-09-10 (zu) — THE WEEK'S TELEMETRY REACHED THE CARD, AND THE PAGE WAS STILL RUNNING THE GO-LIVE GATE THE FLEET RETIRED IN JULY
 
 > **[RENUMBERED (zt) -> (zu) at push.]** A concurrent session landed its own
