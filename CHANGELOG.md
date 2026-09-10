@@ -1,3 +1,179 @@
+## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
+
+**Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —
+tomorrow being today. This is the answer, and then the guard that means the
+next session does not have to re-derive it by hand.
+
+**THE VERDICT: 🎫 THE TAKER CANNOT GO LIVE, AND IT IS NOT CLOSE.** `(aaf)`
+refused it last night on the `(hm)` random-entry null (random beat it on every
+family: pooled P=0.590, short-divergence P=0.660, long-breakoutup P=0.520).
+This pass attacked that refusal from three independent directions, found it
+**stronger than it was written**, and closed the class that let a green
+`6/6 READY` stand for six days in front of it.
+
+**IT IS A NO-OP, NOT A LOSS — driven, not argued.** Running the taker's OWN
+gate functions against the LIVE published payloads (`brain-lens-forward` 0.8h
+old, its own row's `lens_veto`), every one of the ten (lens, side) pairs a
+live arm could be offered is BLOCKED, in the entry loop's own order:
+
+| pair | blocked at |
+|---|---|
+| 8 of 10 (breakout/breakoutup/dip/momentum, both sides) | gate 1 — `LIVE_LENSES = {divergence}` |
+| `long-divergence` | gate 2 — `LIVE_SIDES = {divergence: {short}}` |
+| **`short-divergence`** — the one pair that clears both allow-lists | **gate 4 — the book's own `lens_veto: ["dip","divergence"]`** |
+
+**A live taker arm today fills nothing at all.** The permitted set is a subset
+of the vetoed set. And the veto does not depend on the shadow's ledger: the
+brain's forward grade alone vetoes `divergence` on the short side
+(eavg4h −0.410% over 701 episodes), so a FRESH live arm with an empty ledger
+vetoes it too — verified by calling `vetoed_lenses(..., realised={})`.
+
+**THE RECORD, AND IT IS THE RETIRED LIVE ARM'S OWN (I14).** The cleanest
+evidence is not the shadow's. `lighter-ticket-taker-lighter` — the real-money
+arm retired 13-Aug — has an era-scoped record of **n=30, 100%
+`short-divergence`, −1.1851%/trade, t=−1.789, −$3.40, win 30.0%**, and its
+upper bound at the fleet's own `fleet_allocation.t_crit(30)=1.3114` is
+**−0.3163% ≤ 0 — a MEASURED EXCLUSION under I17-as-amended.** The arm that
+would actually go live already traded this exact family with real money and
+its own sample has excluded a positive mean.
+
+**THE SHADOW CORROBORATES, AND ONE WORD IS WITHDRAWN.** Its era
+`short-divergence` reads n=46, −0.7882%/trade, t=−1.296, −$17.35, both halves
+negative. Every robustness cut leaves it negative: drop-worst-3 −0.382%,
+drop-BEST-3 −1.333% (t=−2.380), **0 of 19 leave-one-UTC-day-out and 0 of 20
+leave-one-coin-out flip the sign**, 3 of 4 quartiles negative, three
+bootstraps put P(mean>0) at 0.094–0.161, cluster-robust t −0.99 (by day) /
+−1.25 (by coin). The slot-contention escape is measured FALSE — the book sat
+at its 8-slot cap only **10.6%** of era time, so breakoutup did not crowd
+divergence out. **BUT: at the grader's exact era boundary its upper bound is
+`+0.0029%` at `t_crit(46)=1.3006` — it does NOT exclude a positive mean.** On
+the shadow alone the honest phrase is *"negative, thin, and one trade from an
+exclusion"* (a 00:00 30-Jul boundary gives n=47 and ub −0.0591%, which does
+exclude). **Cite the live arm's 30, not the shadow's 46.** A positive control
+says the boundary sweep is not machinery that manufactures negatives:
+long-breakoutup stays +1.29% to +1.65% at every start.
+
+**AND THE FAMILY IS DORMANT.** Last `short-divergence` close **20-Aug** —
+21.7 days ago. The book has closed **65 long-breakoutup trades in September
+and zero divergence**.
+
+**WHERE THE BOOK'S RECORD ACTUALLY LIVES, AND WHY IT IS UNREACHABLE.**
+`long-breakoutup` is **162 of 208 closes (77.9%)**, +1.3816%/trade, t=+2.689,
++$134.00, I16 claim **+0.72%/trade** — and `allowed_sides("lighter_live",
+"breakoutup")` returns the EMPTY SET. **78% of the 6-of-6 READY verdict is
+earned by a family no live arm may fill, and the only family it may fill is
+the one its own veto has switched off.** Promoting `breakoutup` instead is not
+available either: `(aaf)` measured random beating it at **P=0.520** — dead
+even with a coin flip, which licenses nothing.
+
+---
+
+**THE CLASS, STATED NARROWLY BECAUSE THE BROAD VERSION IS FALSE.** It is NOT
+true that "nothing compared the two" — an adversarial lens refuted that with
+four counts, and it is right: `veto_split` publishes the identical 162/46
+split **on the taker's own go-live row**; `brain-stake-mults` publishes
+`short-divergence` as the taker's ONLY bucket, graded `reduce` at t=−1.43;
+`EDGE_AUDIT_2026-09-02.md` tabulated it and wrote the conclusion in prose
+**eight days early**; and `(aaf)` made the exact `LIVE_SIDES` reconciliation
+by name. **The defensible gap is narrower and is the `(gk)` shape: no
+STANDING, published field reconciles the graded sample against the live
+allow-list. The catch depended on a session choosing to run a one-off
+script.**
+
+**AND `veto_split`'s LABEL IS INVERTED FOR A PROMOTION — corrected in place
+per I12.** `(yn)` shipped it saying the number a go-live decision needs is the
+one *"for the configuration the book will actually run"*. For the arm being
+GRADED that is `still_tradeable`; for the arm being PROMOTED it is the exact
+inverse. On this book `still_tradeable` names the **162 closes no live arm can
+fill** and files the flattering +1.382%/t=+2.70 under it. The name is kept —
+it is accurate for the shadow, and renaming a published field breaks its
+consumers — and the correction plus `live_fillable` now sit in its docstring.
+
+**SHIPPED — `golive_readiness.live_fillable`, `veto_split`'s twin facing the
+other arm.** Two subsets, because the two gates have different lifetimes:
+`allowed` (the structural allow-lists — two deliberate edits to a real-money
+module) and `effective` (`allowed` minus the book's own vetoed lenses — a veto
+lifts on the lens's own next evidence). `inert` keys on `effective`. Plus a
+`blocked_by` census in the entry loop's own gate order, so `{n: 0}` is never
+byte-identical between *"quiet"* and *"structurally impossible"* (I18/(lv)).
+On the taker: `allowed` n=46, `effective` **n=0**, `unfillable` n=162,
+`inert: true`.
+
+**THE BOOK DECLARES, THE GRADER DERIVES** — the `published_class_screen` /
+`published_lens_veto` direction, load-bearing here because the allow-list
+lives in the LIVE image's own constants and a second copy in the grader is a
+second rule `(hj)`. The taker publishes `extra.live_policy` by **calling**
+`allowed_lenses("lighter_live")` / `allowed_sides("lighter_live", l)` — those
+take the mode EXPLICITLY, so a shadow process can answer the question about a
+live one. THREE-VALUED: a book that declares nothing gets no split, and `None`
+must never read as *"a live arm may fill everything"* — that is a silence read
+as a permission, with real money on the other side (I6).
+
+**IT MOVES NO SAMPLE, ERA OR BAR.** `BAR_NAMES` untouched, `grade()` never
+sees it, `ready` still means what it always meant. The graded sample is the
+SHADOW book's record and the shadow book earned it; publishing `ready: false`
+would grade a healthy paper book on a hypothetical arm's restrictions.
+Consumers: the 🚦 card (RED chip `live arm fills NOTHING` — the one state in
+which a green 6/6 is actively misleading), the decision docket, and
+**HANDOFF**, which said `READY — 6/6 bars` unqualified for six days and is the
+first thing a session reads (I11).
+
+**NO REAL MONEY WAS EVER AT RISK, and saying so is part of the record.**
+`/pnl.json` carries no live taker row — the arm was retired 13-Aug and 🙏 avo
+took the sub-account. The only actuator that reads the taker's `ready` is
+`lighter_scout_tuner.apply_ready_freeze`, whose production record is
+`dropped: []` (zero levers withheld); `golive_blocker`, the only real-money
+gate reading `ready`, is scoped to the funding-spread row and never reads the
+taker. 🙏 avo — the other READY book, already live — is NOT exposed to this
+class: both her arms trade `long-dip-in-uptrend`, so her live arm fills the
+same family her twin is graded on, and `live_fillable` is correctly absent for
+her (she declares no `live_policy`).
+
+**THE MUTATION THAT SURVIVED ROUND ONE, recorded because it is the point.**
+`test_the_taker_declares_by_ASKING_the_module_never_by_a_literal` asserted
+`"allowed_lenses('lighter_live')" in ast.unparse(tree)` over the WHOLE module
+— and the taker's own selftest contains that call, so replacing the payload
+with a hard-coded `["divergence"]` stayed GREEN. That is the `(po)`
+inspects-nothing rule inside the guard written to prevent exactly this drift.
+Re-scoped to the `live_policy` VALUE NODE; M6 red on round two. A second
+self-inflicted one, kept because it is the same lesson: a `'"live_fillable"'
+in ast.unparse(fn)` check failed on GOOD code because `ast.unparse` normalises
+quote style — now asserted on the assignment target node.
+**10 mutations, all red:** silence→permission · veto no longer empties
+`effective` · side allow-list stops gating · unreadable tag becomes a guess ·
+joins `BAR_NAMES` · literal lenses · literal sides · publish path passes the
+veto set as the policy · card drops the RED chip · handoff drops the inert
+branch.
+
+**DECLARED, AND IT IS THE `(iz)` SHAPE THIS FLEET HAS PAID FOR:** until the
+taker's `live_policy` publish DEPLOYS to `freqtrade-bots`, `live_fillable`
+returns `None` on the live payload — a declared enforcement that cannot fire.
+Both halves are on the `freqtrade-bots` auto-deploy path, so the merge ships
+them; **verified by `extra.live_policy` appearing on the row, never by a green
+run**. No live marker: nothing here changes a trade, and there is no live
+taker row to restart.
+
+**CAVEAT ON THE SAMPLE, recorded rather than absorbed:** the 46 era closes
+span **10 distinct bracket configurations** (tp ∈ {0.03, 0.04, 0.06},
+max_hold_h ∈ {24, 48, 72}, brk_range ∈ {0.95, 0.97}). Single-POLICY by the era
+signature, NOT single-bracket — `(hm)`'s *"freeze its bars first"* is unmet on
+this family. It does not rescue the verdict (every cut is negative) but it
+bounds how precisely −0.788% can be read.
+
+**THE DECISION THIS LEAVES EAMON**, and it is his: the taker's shadow is a
+healthy, cheap paper book earning +1.38%/trade on `long-breakoutup` that
+**cannot be promoted in any measured configuration** — its one live-able
+family is excluded by the live arm's own record, and its earning family is
+beaten by a coin flip. The options are (a) keep grading it as paper, which
+costs nothing, (b) re-aim `LIVE_SIDES` at `breakoutup`, which `(aaf)` refuses
+on the null, or (c) an I17 keep-or-decide call. **Nothing here is resolved by
+lowering a bar or re-cutting a window.**
+
+Instrument this pass: `scripts/golive_readiness.py::live_fillable`. Pinned by
+`tests/autonomy/test_live_fillable.py` (29 tests). Closes nothing carried —
+`(aaf)` closed `taker-random-entry-null-blocked-on-ci` last night; this closes
+the class that made it necessary.
+
 ## 2026-09-10 (aal) — 🦾 THE EPISODE LEDGER HAS BEEN FULL FOR AT LEAST A DAY, AND `episodes: 120` READS LIKE A COUNT
 
 **Eamon: *"continue fixes."*** The last unaddressed finding from the `(aak)`
