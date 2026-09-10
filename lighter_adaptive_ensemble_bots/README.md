@@ -281,6 +281,65 @@ changed". A baseline read of the live feed (15 bot rows) is in
 
 ---
 
+## Measured results, and what they say
+
+**Run on Lighter's own tape, reported exactly as they came out.** None of this
+is a claim of profitability; two of the three readings are negative.
+
+### 1. An 8-market, 31-day backtest — and the robustness gate refuses it
+
+`+0.851%` total return, Sharpe `0.748`, max drawdown `5.33%`, 162 trades,
+`1` liquidation violation (a gap through a stop *and* through the estimated
+liquidation price — counted, not hidden).
+
+```
+ROBUSTNESS: REFUSED
+  - SOL carries 145% of P&L (> 60%)
+  - ZEC carries 176% of P&L (> 60%)
+  - top 3 trades are 261% of P&L (> 80%): tail-dependent
+  - halves disagree (h1 +246.02 / h2 -160.90)
+```
+
+A positive number that the system's own gate declines to accept is the whole
+point of having the gate.
+
+### 2. A real 180/60/60 walk-forward — and the universe flips the sign
+
+On 354 days of 1h tape: **+0.27% on six markets, −1.56% on four.** Same rule,
+same window, same split; only the traded universe differs. Universe choice is
+not a detail, and a single walk-forward number quoted without it is not a
+result.
+
+### 3. The parameter sweep — every cell is negative
+
+21 cells over the full 354-day, 4-market tape. Returns span **−2.9% to −11.4%**
+and Sharpe **−0.27 to −1.34**. **There is no configuration in this sweep that
+makes money on this tape.** The selection premium is **+0.66 Sharpe units** —
+that is what picking the best cell buys before any out-of-sample tape is seen,
+and it is larger than the spread most people would call an edge.
+
+Read together, the three readings say: the machinery works, the risk controls
+bind, and **the edge is not established.** That is the honest state of it.
+
+### Two knobs the sweep proved INERT
+
+The sweep is also a lever audit, and it found two settings that change nothing:
+
+* **`strategy.minimum_reward_risk` is structurally inert.** 1.2 / 1.4 / 1.8 give
+  byte-identical results, because `signals.evaluate` places TP2 at a fixed
+  multiple of the stop (`tp2_r`), so reward/risk is ~2.0 for *every* signal by
+  construction. The bar can never bind. Fixing it means deriving targets from
+  **structure** (the next swing or range boundary) rather than from R — a design
+  change that needs its own measurement, so it is DECLARED here rather than
+  quietly patched. `test_signals.py::test_reward_risk_is_currently_structurally_constant`
+  pins the current behaviour so the next session cannot miss it.
+* **`risk.max_leverage` above ~5 is inert on this tape.** 5 / 8 / 10 are
+  identical, because sizing comes from the stop and the notional caps bind
+  first. Raising the leverage ceiling does nothing here — which is exactly what
+  the design intends and worth seeing measured rather than assumed.
+
+---
+
 ## What must be verified before live trading on Lighter
 
 Read this section before risking money. Every line is a real failure mode.

@@ -1,0 +1,44 @@
+  BTC: 1h=8499  4h=1999
+  ETH: 1h=8499  4h=1999
+  SOL: 1h=8499  4h=1999
+  HYPE: 1h=8499  4h=1999
+==========================================================================
+WALK-FORWARD
+==========================================================================
+  folds                      1
+  folds_with_trades          1
+  test_return_pct_mean       -1.5584
+  test_return_pct_median     -1.5584
+  test_folds_positive        0
+  test_trades_total          55
+  worst_fold_pct             -1.5584
+  best_fold_pct              -1.5584
+  mean_max_drawdown_pct      2.9826
+    fold  0: test trades=55    return%=   -1.558 maxDD%=   2.98
+==========================================================================
+
+parameter                              value  trades      ret%   sharpe   maxDD%
+strategy.long_minimum_score               56     550    -8.355   -0.939    15.36
+strategy.long_minimum_score               62     564    -8.438   -0.926    15.07
+strategy.long_minimum_score               68     527   -11.333   -1.341    17.59
+strategy.long_minimum_score               74     515   -11.322   -1.335    16.84
+strategy.short_minimum_score              56     556    -5.120   -0.544    12.19
+strategy.short_minimum_score              62     564    -8.438   -0.926    15.07
+strategy.short_minimum_score              68     556    -4.657   -0.457    12.90
+strategy.short_minimum_score              74     521   -10.358   -1.234    13.56
+strategy.adx_threshold                    15     576    -2.862   -0.265    12.69
+strategy.adx_threshold                    20     564    -8.438   -0.926    15.07
+strategy.adx_threshold                    25     577    -5.978   -0.599    13.77
+strategy.atr_stop_buffer                 0.0     600    -5.282   -0.522    12.50
+strategy.atr_stop_buffer                0.25     564    -8.438   -0.926    15.07
+strategy.atr_stop_buffer                 0.5     547   -11.363   -1.248    17.88
+strategy.minimum_reward_risk             1.2     564    -8.438   -0.926    15.07
+strategy.minimum_reward_risk             1.4     564    -8.438   -0.926    15.07
+strategy.minimum_reward_risk             1.8     564    -8.438   -0.926    15.07
+risk.max_leverage                          2     565    -7.383   -0.796    14.09
+risk.max_leverage                          5     564    -8.438   -0.926    15.07
+risk.max_leverage                          8     564    -8.438   -0.926    15.07
+risk.max_leverage                         10     564    -8.438   -0.926    15.07
+
+SELECTION PREMIUM (sharpe): best -0.265 vs median -0.9259 over 21 cells => +0.6609
+  the premium is what picking the best cell buys you before any out-of-sample tape is seen

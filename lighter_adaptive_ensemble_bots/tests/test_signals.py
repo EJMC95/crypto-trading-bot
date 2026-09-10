@@ -186,3 +186,31 @@ def test_both_sides_are_reachable_from_the_same_engine():
                 assert s.stop < s.entry and all(t > s.entry for t in s.targets)
             else:
                 assert s.stop > s.entry and all(t < s.entry for t in s.targets)
+
+
+def test_reward_risk_is_currently_structurally_constant():
+    """A DECLARED limitation, pinned so it cannot be forgotten.
+
+    `strategy.minimum_reward_risk` cannot bind: targets are placed at fixed
+    multiples of the stop (`tp1_r`, `tp2_r`), so every admissible signal has
+    reward/risk == tp2_r exactly. The 354-day sweep measured 1.2 / 1.4 / 1.8
+    producing byte-identical results, which is the observable consequence.
+
+    Fixing it means deriving targets from STRUCTURE (the next swing or range
+    boundary) instead of from R -- a design change that needs its own
+    measurement. When that lands, this test SHOULD fail, and its failure is
+    the signal that the knob has become real."""
+    c = StrategyConfig(tp2_r=2.0)
+    seen = set()
+    for tape in (ramp(300, drift=0.004, wiggle=0.003),
+                 ramp(300, drift=-0.004, wiggle=0.003),
+                 ramp(300, drift=0.001, wiggle=0.008)):
+        for side, regime in (("long", Regime.BULLISH), ("short", Regime.BEARISH)):
+            sig, _r = S.evaluate("BTC", tape, side, regime, c, spread_bps=2.0)
+            if sig is not None:
+                seen.add(round(sig.reward_risk, 6))
+    if not seen:
+        pytest.skip("no setup fired on any synthetic tape")
+    assert seen == {2.0}, (
+        "reward/risk is no longer a constant -- if targets are now structural, "
+        "delete this test and re-measure minimum_reward_risk as a live bar")
