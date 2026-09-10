@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 15:05 Sydney (05:05Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 15:10 Sydney (05:10Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Carried — pick these up FIRST (I11)
 
@@ -84,8 +84,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (14 commit(s))
+## Shipped today (17 commit(s))
 
+- `0cbdd64` (zu) RENUMBERED (zt) -> (zu): a concurrent session landed its own (zt) on main
+- `5d31030` (zt) The week's telemetry reaches the card — and the page was still running the go-live gate the fleet retired in July
+- `250a9df` (zt) regenerate HANDOFF.md after the basis declaration
 - `ab9db2f` (zt) Two sessions read ⚖️ Counterweight's sample definition differently on the same day — the fleet's only pre-registered read with no instrument
 - `a4e0351` (zs) regenerate HANDOFF.md after the counterweight date move
 - `ad1096c` (zs) ⚖️ Counterweight's read moves 1-Oct → 10-Oct so it lands on the sample its own registration asked for
