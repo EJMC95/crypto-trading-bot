@@ -275,6 +275,148 @@ class TestThePublisherSeriesIsSenior:
             "the publisher series must be consulted, or the count aliases"
 
 
+class TestAFrozenAuthoritativeCounterIsItselfTheFinding:
+    """[(aai)] The auth branch ends in `continue`, so once the publisher's own
+    durable counter is a NUMBER the reset heuristic below is unreachable.
+
+    THE HOLE THAT LEAVES. `note_restart` recalls, adds one, remembers, and
+    swallows every exception. If the WRITE fails while the READ succeeds — a
+    read-only volume, a rolled-back transaction — every boot recomputes the
+    same n from the same stale row: the counter publishes a number, never
+    decreases, and never advances. `auth > prev_auth` is then never true,
+    `deaths` is empty forever, and the detector is silent while `resets` fills
+    with real boots nothing reads. I4 inside the guard itself.
+
+    The discriminator is MOVEMENT, not deaths: `deaths` deliberately absorbs a
+    deploy's increment ((oi)), so an all-deploy window leaves it empty too.
+    """
+
+    @staticmethod
+    def _p(cycles, restarts, build, now):
+        return {"parliament": {"updated": FI._iso(now), "ttl_sec": 900,
+                               "data": {"cycles": cycles},
+                               "restarts": restarts, "build": build,
+                               "health": {"stalled": []}}}
+
+    def _run(self, boots, restarts_of, build_of, now, seen=None):
+        """`boots` boots, each a cycles-regression, then a cycle that runs on."""
+        seen, out = ({} if seen is None else seen), []
+        FI.restart_churn(self._p(50, restarts_of(0), build_of(0), now), seen, now)
+        for i in range(1, boots + 1):
+            FI.restart_churn(self._p(0, restarts_of(i), build_of(i), now), seen, now)
+            out = FI.restart_churn(self._p(30, restarts_of(i), build_of(i), now),
+                                   seen, now)
+        return seen, out
+
+    def test_a_frozen_counter_beside_real_boots_is_reported(self):
+        now = FI.now_ts()
+        seen, out = self._run(FI.RESTART_CHURN_N, lambda i: 116, lambda i: "b0", now)
+        assert len(out) == 1, out
+        d = out[0]["detail"]
+        assert "FROZEN" in d and "restarts" in d, d
+        assert seen["parliament"]["auth_deaths"] == [], \
+            "the deaths counter is exactly what CANNOT see this"
+        assert len(seen["parliament"]["resets"]) >= FI.RESTART_CHURN_N
+
+    def test_an_ordinary_deploy_run_never_fires_it(self):
+        """The (gl) cry-wolf bar. A deploy resets `data.cycles` AND advances
+        the counter, so N deploys must stay silent — `deaths` is empty there
+        too, which is precisely why `deaths` cannot be the discriminator."""
+        now = FI.now_ts()
+        seen, out = self._run(FI.RESTART_CHURN_N + 3,
+                              lambda i: 100 + i, lambda i: "b%d" % i, now)
+        assert out == [], out
+        assert seen["parliament"]["auth_deaths"] == []
+        assert len(seen["parliament"]["auth_moves"]) >= FI.RESTART_CHURN_N
+
+    def test_a_real_crash_loop_still_reports_as_a_crash_loop(self):
+        """A working counter with an UNCHANGED build is the (oi) death case —
+        it must keep its own, more precise message, not be reclassified."""
+        now = FI.now_ts()
+        _, out = self._run(FI.RESTART_CHURN_N,
+                           lambda i: 100 + i, lambda i: "b0", now)
+        assert len(out) == 1 and "RESTART(s)" in out[0]["detail"], out
+        assert "FROZEN" not in out[0]["detail"]
+
+    def test_it_holds_the_same_bar_as_every_other_arm(self):
+        now = FI.now_ts()
+        _, out = self._run(FI.RESTART_CHURN_N - 1, lambda i: 116,
+                           lambda i: "b0", now)
+        assert out == [], "under the count bar it claims nothing"
+
+    def test_a_counter_that_only_APPEARS_late_is_not_read_as_frozen(self):
+        """The `prev_auth` guard, exercised on the one path that can reach it.
+
+        A single first-sighting call cannot test it: `resets` is empty there,
+        so the count bar refuses first and the guard is never consulted — the
+        first cut of this test asserted exactly that and a mutation removing
+        the guard SURVIVED it. The reachable path is a publisher that gains
+        the field LATE: an older build accumulates resets with no `restarts`
+        key at all, then a deploy adds it, so the first sighting WITH a value
+        lands on an already-over-the-bar reset list. Without the guard that
+        fires FROZEN on a counter it has never seen advance — which is a
+        claim about a control group it does not have (I6)."""
+        now = FI.now_ts()
+        seen = {}
+
+        def bare(cycles):      # the payload BEFORE the field exists
+            d = self._p(cycles, 0, "b0", now)["parliament"]
+            del d["restarts"]
+            return {"parliament": d}
+
+        FI.restart_churn(bare(50), seen, now)
+        for _ in range(FI.RESTART_CHURN_N):
+            FI.restart_churn(bare(0), seen, now)
+            FI.restart_churn(bare(30), seen, now)
+        assert len(seen["parliament"]["resets"]) >= FI.RESTART_CHURN_N
+        assert "auth_last" not in seen["parliament"], "no counter seen yet"
+        assert FI.restart_churn(self._p(30, 116, "b0", now), seen, now) == []
+
+    def test_the_two_reports_are_mutually_exclusive_by_construction(self):
+        """WHY this arm is an `elif` and why that is not load-bearing today.
+
+        A mutation flipping it to `if` SURVIVED, and the honest reading is that
+        the mutation is a NO-OP rather than the test being weak: `deaths` is
+        extended only inside the very branch that appends to `moves`, so a
+        non-empty `deaths` implies a non-empty `moves` and the frozen arm's
+        `not moves` can never hold beside it. That is a STRUCTURAL property, so
+        it is pinned structurally — if someone later fills `deaths` on a path
+        that does not record movement, the two reports could both fire on one
+        organ and this fails first."""
+        def calls(nodes, obj, attr):
+            return [c for stmt in nodes for c in ast.walk(stmt)
+                    if isinstance(c, ast.Call)
+                    and getattr(c.func, "attr", None) == attr
+                    and getattr(getattr(c.func, "value", None), "id", None) == obj]
+
+        fn = ast.parse(textwrap.dedent(
+            inspect.getsource(FI.restart_churn))).body[0]
+        # the movement branch = the INNERMOST `if` that records a move. Taking
+        # any `if` whose SUBTREE contains one matches the outer branches too,
+        # and then the check inspects the wrong body and passes on anything —
+        # the first cut of this test did exactly that and a mutation survived.
+        branches = [n for n in ast.walk(fn) if isinstance(n, ast.If)
+                    and calls(n.body, "moves", "append")]
+        assert branches, "no branch records auth movement"
+        branch = min(branches, key=lambda n: len(list(ast.walk(n))))
+        inside = calls(branch.body, "deaths", "extend")
+        every = calls(fn.body, "deaths", "extend")
+        assert inside, "deaths must be extended INSIDE the movement branch"
+        assert len(every) == len(inside), (
+            "a death recorded outside the movement branch would let BOTH "
+            "reports fire on one organ — the `elif` would then be load-bearing")
+
+    def test_the_detail_names_the_store_not_the_organ(self):
+        """I8 — the operator's action is on the durable store; saying 'the
+        Parliament restarted' would be a complete diagnosis and an
+        unactionable one."""
+        now = FI.now_ts()
+        _, out = self._run(FI.RESTART_CHURN_N, lambda i: 116, lambda i: "b0", now)
+        d = out[0]["detail"]
+        assert "store" in d and "volume" in d
+        assert "blind" in d, "it must say the detector itself is compromised"
+
+
 class TestFailSafeTowardSilence:
     @pytest.mark.parametrize("states", [
         {},

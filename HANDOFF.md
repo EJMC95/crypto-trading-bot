@@ -1,18 +1,21 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 23:15 Sydney (13:15Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 23:42 Sydney (13:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
-
-**🕳️ FEED DARK**
-
-- `/bus.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/bus.json) — no gate verdicts read. This section is blind, not clear.
 
 **💵 REAL MONEY, RIGHT NOW**
 
 - `freqtrade-avo-maria-lighter` was shut **31% of the last 14.0d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 02:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **16% of the last 14.0d** (54h), mostly `slguard` (33h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **16% of the last 14.0d** (54h), mostly `slguard` (34h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+
+**🚦 AT THE GATE**
+
+- `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
+- `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
 
@@ -106,8 +109,10 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (34 commit(s), entries (zt))
+## Shipped today (36 commit(s), entries (zt))
 
+- `ad51efb` (aag) CodeQL: the AST pin leaked the file handle it read
+- `72df290` (aag)(aah) 🔭 Keating's ensemble was never warming up: its training pool is smaller than its own bar, and a count was standing in for evidence
 - `0df3303` (aaf) the taker's random-entry null: random beats it on every family, and the one family LIVE_SIDES admits is negative
 - `d2c6547` [deploy-live] (aae) avo's volume floor was a proxy for a thing the fleet now measures directly — re-derived 0.5 -> 0.15 from (vd)'s own clip ratio
 - `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact

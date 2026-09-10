@@ -23,6 +23,7 @@ The positive control is load-bearing: a gate that never opens is trivially
 stable and useless ((om)), so `test_a_planted_edge_still_arms` must stay green.
 """
 import ast
+import json
 import random
 import time
 from pathlib import Path
@@ -181,3 +182,138 @@ def test_the_bar_is_the_fleets_own_critical_value():
     import fleet_allocation
     assert ACC_Z_BAR == fleet_allocation.Z_LOWER, (ACC_Z_BAR,
                                                    fleet_allocation.Z_LOWER)
+
+
+# -- (aaj) durable learning across a boot ------------------------------------
+
+class TestLearningSurvivesTheBoot:
+    """[(aaj)] `n_seen`, `acc` and `_trained_ids` are instance attributes, so
+    every boot threw the prequential history away and rebuilt it from whatever
+    the store still held — which is why `oos_acc` sat byte-identical at 0.5082
+    for 22.5h across five boots. It was a deterministic function of the
+    retained window, not a measurement.
+
+    THE TRAP THIS DESIGN AVOIDS: persisting the counters ALONE is worse than
+    persisting nothing. The model objects are fresh at every boot, so a
+    restored `n_seen` of 200 beside untrained models would arm `ml_gate` on
+    random weights. `warm()` re-feeds the retained rows update-only, and
+    `test_a_restored_engine_still_has_trained_models` is what proves it.
+    """
+
+    @staticmethod
+    def _seed(db, n, rng, first=0):
+        now = time.time()
+        for i in range(first, first + n):
+            f = {k: rng.uniform(-1, 1) for k in FEATURES}
+            won = (f["trend"] + 0.5 * f["ret4"] + 0.2 * rng.gauss(0, 1)) > 0
+            ts = now - (first + n - i) * 3600
+            db.record_trade("t%d" % i, "pm-x", "parliament", "BTC", "long",
+                            "tg", ts - 60, ts, 1.0, 1.1, 1.0,
+                            (0.5 if won else -0.5), "tp", f)
+
+    def _booted(self, n=240, seed=5):
+        db, rng = EcosystemDB(path=":memory:"), random.Random(seed)
+        self._seed(db, n, rng)
+        a = MLEngine(db=db); a.train_from_db()
+        b = MLEngine(db=db); b.train_from_db()      # <- the restart
+        return db, a, b
+
+    def test_learning_accumulates_across_a_boot(self):
+        _, a, b = self._booted()
+        assert b._provenance == "restored", b._provenance
+        assert b.n_seen == a.n_seen > 0
+        assert b.acc == a.acc, "the prequential EMA is CARRIED, not recomputed"
+
+    def test_a_restored_engine_still_has_trained_models(self):
+        """The catastrophe check. Counters without models is the one outcome
+        worse than no persistence at all."""
+        _, a, b = self._booted()
+        up = {k: 0.0 for k in FEATURES} | {"trend": 0.9, "ret4": 0.5}
+        dn = {k: 0.0 for k in FEATURES} | {"trend": -0.9, "ret4": -0.5}
+        assert b._warmed > 0, "the retained rows must be re-fed"
+        assert b.predict(up)[0] > 0.6 > 0.4 > b.predict(dn)[0], (
+            b.predict(up), b.predict(dn))
+        assert abs(b.predict(up)[0] - a.predict(up)[0]) < 1e-9
+
+    def test_warming_never_double_counts_into_the_prequential_ema(self):
+        """Re-scoring the retained rows is exactly what made the old boot
+        replay an artifact; `warm()` updates without scoring or counting."""
+        db, rng = EcosystemDB(path=":memory:"), random.Random(4)
+        self._seed(db, 60, rng)
+        m = MLEngine(db=db); m.train_from_db()
+        acc, n = dict(m.acc), m.n_seen
+        rows = db.closed_trades(days=TRADE_KEEP_DAYS)
+        for r in rows:
+            m.warm(r["features"], r["pnl_abs"] > 0)
+        assert m.acc == acc and m.n_seen == n
+
+    def test_learning_survives_rows_ageing_out_of_the_store(self):
+        """The point of persisting at all: the old ceiling on `n_seen` was the
+        pool, so a pruned row was a forgotten one."""
+        db, rng = EcosystemDB(path=":memory:"), random.Random(9)
+        self._seed(db, 200, rng)
+        a = MLEngine(db=db); a.train_from_db()
+        db._exec("DELETE FROM trades WHERE trade_id IN (%s)"
+                 % ",".join("'t%d'" % i for i in range(80)))
+        b = MLEngine(db=db); b.train_from_db()
+        assert b.n_seen == a.n_seen == 200
+        assert b._pool == 120 and b.n_seen > b._pool, (b.n_seen, b._pool)
+
+    def test_only_new_rows_are_learned_after_a_restore(self):
+        db, rng = EcosystemDB(path=":memory:"), random.Random(6)
+        self._seed(db, 50, rng)
+        a = MLEngine(db=db); a.train_from_db()
+        self._seed(db, 7, rng, first=50)
+        c = MLEngine(db=db)
+        assert c.train_from_db() == 7, "the retained 50 must not be re-learned"
+        assert c.n_seen == a.n_seen + 7
+
+    @pytest.mark.parametrize("label,mutate", [
+        ("features", lambda st: st.update(dim=st["dim"] + 1)),
+        ("roster", lambda st: st.update(models=st["models"][:-1])),
+        ("version", lambda st: st.update(v=99)),
+        ("acc range", lambda st: st.update(acc={k: 7.0 for k in st["acc"]})),
+        ("acc shape", lambda st: st.update(acc="not-a-dict")),
+        ("n_seen bool", lambda st: st.update(n_seen=True)),
+        ("ids shape", lambda st: st.update(trained=[1, 2, 3])),
+    ])
+    def test_a_doubtful_blob_falls_back_to_replay_and_never_half_restores(
+            self, label, mutate):
+        """One-directional fail-safe: any doubt mutates NOTHING. A restore that
+        half-lands is worse than none — `acc` describing a roster or a feature
+        space that is not the one in memory is a confident number about the
+        wrong thing (I6)."""
+        db, rng = EcosystemDB(path=":memory:"), random.Random(3)
+        self._seed(db, 40, rng)
+        a = MLEngine(db=db); a.train_from_db()
+        st = db.recall(MLEngine._STATE_KEY)
+        mutate(st)
+        db.remember(MLEngine._STATE_KEY, st)
+        b = MLEngine(db=db); b.train_from_db()
+        assert b._provenance != "restored", b._provenance
+        assert b.n_seen == a.n_seen, "it must REPLAY cleanly, not half-restore"
+        assert b._warmed == 0
+
+    def test_no_model_weights_reach_durable_storage(self):
+        """A deliberate design choice, pinned so it is not quietly reversed:
+        three of the five models hold up to WINDOW raw samples, so serialising
+        them would duplicate the `trades` table AND put a numpy array's SHAPE
+        in durable storage, where a later FEATURES extension restores weights
+        of the wrong dimension."""
+        db, rng = EcosystemDB(path=":memory:"), random.Random(2)
+        self._seed(db, 120, rng)
+        m = MLEngine(db=db); m.train_from_db()
+        st = db.recall(MLEngine._STATE_KEY)
+        assert set(st) == {"v", "dim", "models", "n_seen", "acc", "trained"}
+        blob = json.dumps(st)
+        assert len(blob) < 200_000, "a weights blob would be far larger"
+        assert "array" not in blob and "ndarray" not in blob
+
+    def test_the_provenance_is_published(self):
+        """A restored `n_seen` and a replayed one are byte-identical numbers
+        about different things (I1)."""
+        _, a, b = self._booted(n=60)
+        assert a.readiness()["provenance"] == "none"
+        assert b.readiness()["provenance"] == "restored"
+        assert b.readiness()["warmed"] == b._warmed > 0
+        assert MLEngine().readiness()["provenance"] == "cold"

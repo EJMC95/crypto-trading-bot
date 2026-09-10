@@ -1098,11 +1098,19 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
             prev_auth = mem.get("auth_last")
             deaths = [float(t) for t in (mem.get("auth_deaths") or [])
                       if isinstance(t, (int, float))]
+            # [(aai)] EVERY time the counter ADVANCES, deploy or not. `deaths`
+            # cannot serve here: (oi) deliberately absorbs a deploy's increment
+            # without recording it, so an all-deploy window leaves `deaths`
+            # empty and would be indistinguishable from a counter that never
+            # moved at all. This list is the one that separates them.
+            moves = [float(t) for t in (mem.get("auth_moves") or [])
+                     if isinstance(t, (int, float))]
             cur_build = _dotted(st, build_path) if build_path else None
             prev_build = mem.get("auth_build")
             deployed = (cur_build is not None and prev_build is not None
                         and cur_build != prev_build)
             if isinstance(prev_auth, (int, float)) and auth > prev_auth:
+                moves.append(float(now))
                 if deployed:
                     # [(oi)] A NEW IMAGE EXPLAINS THE RESTART. Absorb the
                     # increment without counting it: a deploy restarts the
@@ -1115,8 +1123,10 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
             if cur_build is not None:
                 seen[key]["auth_build"] = cur_build
             deaths = [t for t in deaths if now - t <= window_s]
+            moves = [t for t in moves if now - t <= window_s]
             seen[key]["auth_last"] = float(auth)
             seen[key]["auth_deaths"] = deaths
+            seen[key]["auth_moves"] = moves
             seen[key]["basis"] = (
                 f"publisher's own counter (now {auth:g}), "
                 f"deploy-discriminated by build stamp"
@@ -1133,6 +1143,48 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
                                f"reset heuristic. The key stays FRESH on every "
                                f"boot, so no age check can see this, and "
                                f"in-process state is lost each time"),
+                })
+            elif len(resets) >= min_n and not moves and isinstance(
+                    prev_auth, (int, float)):
+                # [(aai)] THE AUTHORITATIVE COUNTER CAN BE FROZEN, AND THIS
+                # BRANCH `continue`s — so a stuck counter blinds the WHOLE
+                # detector while the evidence piles up in `resets`, a field
+                # nothing then reads. That is I4 inside the guard itself: a
+                # silent write failure makes the organ amnesiac while it looks
+                # healthy, and `note_restart` is exactly that shape — it
+                # `recall`s, adds one, `remember`s, and swallows every
+                # exception. If the WRITE fails while the READ succeeds (a
+                # read-only volume, a rolled-back transaction), every boot
+                # recomputes the same n from the same stale row: the counter
+                # publishes a NUMBER, never decreases, and never advances, so
+                # `auth > prev_auth` is never true and `deaths` is empty
+                # forever.
+                #
+                # The discriminator is MOVEMENT, not deaths. N boots observed
+                # in the window with ZERO counter advances in the same window
+                # is the fault; N boots WITH advances is an ordinary deploy
+                # run and stays quiet — which is why `moves` counts deploy
+                # increments too. Both counts come from the same call, so they
+                # cannot alias apart: a working counter advances in the very
+                # sample that observes the reset.
+                #
+                # I8 — the object the operator can act on is the STORE, not
+                # the organ: the detector is blind until that write lands.
+                hrs = window_s / 3600.0
+                out.append({
+                    "organ": key,
+                    "detail": (f"{label}: the durable restart counter "
+                               f"({auth_path}) is FROZEN at {auth:g} while "
+                               f"{len(resets)} boot(s) were observed in "
+                               f"{hrs:.0f}h — a monotone counter that never "
+                               f"advances across a restart is not evidence of "
+                               f"health, it is a counter that is not being "
+                               f"written. Most likely its durable store is "
+                               f"refusing writes (the persist volume); until "
+                               f"it does, THIS detector is blind to a real "
+                               f"crash-loop and the restart count on the row "
+                               f"understates. Read `resets` on this key for "
+                               f"what was actually seen"),
                 })
             continue
 

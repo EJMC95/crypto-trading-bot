@@ -1,3 +1,161 @@
+## 2026-09-10 (aaj) — 🔭 THE ENSEMBLE'S MEMORY SURVIVES THE CONTAINER NOW — AND THE THING IT DELIBERATELY DOES NOT PERSIST IS THE POINT
+
+**Eamon: *"fix the above corrections."*** `(aag)` closed with a **DECLARED, NOT
+FIXED** paragraph and he asked for it closed; that paragraph is corrected in
+place per I12, because a "declared, not fixed" that HAS been fixed is the
+stalest kind of note. **The fix is not the one it anticipated.**
+
+**WHAT WAS BROKEN.** `MLEngine.n_seen`, `acc` and `_trained_ids` are instance
+attributes, so every boot threw the prequential history away and rebuilt it by
+replaying whatever the store still held. Two consequences, both measured:
+`oos_acc` was **byte-identical at 0.5082 for 22.5h across five boots** — a
+deterministic function of the retained window rather than a measurement — and
+**a row the pruner dropped was a row forgotten**, so `n_seen` was permanently
+ceilinged by the pool. `(aag)` raised that ceiling; this removes it.
+
+**THE TRAP, AND IT IS WHY THE OBVIOUS FIX IS WORSE THAN NOTHING.** Persisting
+the COUNTERS alone would restore `n_seen: 200` beside **five freshly
+constructed, untrained models** — arming `ml_gate` on random weights, which is
+strictly worse than the inert bench we had. So the retained rows must be
+re-fed. But re-SCORING them is exactly what made the old boot replay an
+artifact. Hence `warm()`: `learn(..., score=False)` — update the models, touch
+neither the EMA nor the count. One function with a flag rather than two, so the
+update half cannot drift between them.
+
+**WHAT IS NOT PERSISTED, DELIBERATELY, AND PINNED SO IT IS NOT QUIETLY
+REVERSED.** Not the model weights. **Three of the five are `_WindowModel`s
+holding up to `WINDOW` = 1,500 raw samples each**, so serialising them would
+duplicate the `trades` table into a ~1 MB blob rewritten every training pass —
+and it would put a numpy array's SHAPE into durable storage, where a later
+`FEATURES` extension (the module docstring invites one: *"extend by
+APPENDING"*) silently restores weights of the wrong dimension. Those models are
+a FUNCTION of the retained rows and the DB already holds those. What genuinely
+cannot be recovered is the prequential history — `acc` depends on the sample
+ORDER and on predictions made by model states that no longer exist, `n_seen` on
+rows the retention has since dropped — so that, and only that, is stored: six
+JSON scalars, strings and one id list. `test_no_model_weights_reach_durable_
+storage` pins the shape and the size.
+
+**THE RESTORE IS ONE-DIRECTIONALLY FAIL-SAFE.** A restore that HALF-lands is
+the only outcome worse than none: `acc` describing a roster or a feature space
+that is not the one in memory is a confident number about the wrong thing (I6).
+So every check runs BEFORE a single field is assigned, and any doubt returns a
+provenance word without mutating anything — the engine then falls back to the
+boot replay it has always done. Seven refusal paths, each driven:
+`features-changed` · `roster-changed` · `version-changed` · `junk` (acc out of
+range, acc not a dict, `n_seen` a bool, ids not strings) · `unreadable` ·
+`none` · `no-db`. A mutation assigning `n_seen` before the last validation is
+RED.
+
+**AND THE PROVENANCE IS PUBLISHED** (`readiness().provenance` / `.warmed`),
+because a restored `n_seen` and a replayed one are byte-identical numbers about
+different things — the same I1 reasoning that motivated the whole `(aag)`
+census.
+
+**MEASURED END-TO-END against a real `EcosystemDB`, not a fixture:** boot 1
+learns 260 rows and reads `prov: none`; boot 2 reads `prov: restored,
+warmed: 260`, carries `n_seen` and `acc` EXACTLY, and — the catastrophe check —
+predicts **identically** (`p(up) 0.959`, `p(dn) 0.050`), so the warm pass really
+did rebuild the bench; boot 3 learns only the **12** genuinely new rows. And the
+claim that matters: with 200 learned and **80 aged out of the store**, `n_seen`
+holds at **200 against a pool of 120** — 80 samples the store no longer has are
+still counted, where the old code would have collapsed to 120.
+
+**14 tests, 8/8 mutations RED plus a surviving null control.** Two of my own
+verifications were wrong before they were right and both are recorded rather
+than tidied away: a retention test that printed `n_seen=0 pool=0` and read as a
+PASS (every seeded row lay outside the window — the "check that inspects
+nothing reports clean" rule, again), and a comment claiming `NUM_T` rejects
+`bool` when `bool` subclasses `int` — the validator now rejects it explicitly.
+
+Shadow-only, publish-only in effect: on the live bench this changes no verdict
+today (`unreachable` before, `unreachable` after — the pool still holds 90
+against a 200 bar). What it buys is that the first `ready`, when the `(aag)`
+retention fills, is earned on a genuine online history rather than on a replay.
+Full suite green.
+
+## 2026-09-10 (aai) — 🛡️ THE RESTART DETECTOR IS BLIND EXACTLY WHEN ITS OWN COUNTER BREAKS, AND THE EVIDENCE WAS PILING UP IN A FIELD NOTHING READS
+
+**Eamon: *"fix the above corrections."*** Found while diagnosing `(aag)` and
+reported to him rather than fixed in-line, because it is a different house:
+`fleet_immune.restart_churn` is the guard for a publisher that keeps
+RESTARTING, and it has a hole in the shape of its own best feature.
+
+**THE MECHANISM.** `(od)` made the publisher's own DURABLE counter
+authoritative — correctly, because *"two sightings N apart mean exactly N
+deaths, whatever the sampling phase"*, where the `data.cycles` reset heuristic
+aliases with the sampler. That branch ends in **`continue`**. So the moment
+`restarts` is a NUMBER, the reset heuristic below it is **structurally
+unreachable** — and the counter can be a number and still be *stuck*.
+
+`parliament.brain.note_restart` is exactly that shape: it `recall`s, adds one,
+`remember`s, and **swallows every exception**. A dark DB degrades to `None` and
+is handled (the auth branch is skipped). But if the **WRITE** fails while the
+**READ** succeeds — a read-only volume, a rolled-back transaction — every boot
+recomputes the same `n` from the same stale row. The counter then publishes a
+number, **never decreases** (so it is not a restore), and **never advances** —
+so `auth > prev_auth` is never true, `auth_deaths` stays `[]`, and
+`len(deaths) >= min_n` can never fire. **The detector reports perfect health on
+the one fault it exists to catch**, while `resets` — which is still faithfully
+recording every `data.cycles` regression — accumulates real boots in a field
+that the `continue` guarantees nobody reads.
+
+**That is I4 inside the guard itself**, and I4's own worked example is the same
+mechanism: `save_state` returned False for three days while the brain kept
+publishing fresh vitals off a frozen state.
+
+**THE DISCRIMINATOR IS MOVEMENT, NOT DEATHS — and getting that wrong is the
+whole difficulty.** The obvious check ("deaths empty while resets pile up")
+**FALSE-FIRES ON EVERY ORDINARY DEPLOY RUN**, because `(oi)` deliberately
+ABSORBS a deploy's increment without recording a death: an all-deploy window
+leaves `deaths` empty too, and the two states are byte-identical in that field.
+Measured on the live 24h series the day this shipped — **5 resets, 5 counter
+advances, 0 deaths** — a naive `not deaths` arm would have paged the operator
+about a perfectly healthy fleet, which is the `(gl)` cry-wolf shape aimed at his
+phone. So `auth_moves` records **every** advance, deploy or not, and the arm
+fires only on `resets >= min_n` **with zero advances in the same window**. The
+two counts come from the same call, so they cannot alias apart: a working
+counter advances in the very sample that observes the reset.
+
+**REPLAYED ON THE REAL PAYLOAD** (281 samples, the same 24h that motivated
+`(aag)`): `resets 5 · auth_moves 5 · auth_deaths 0 · findings NONE`. Quiet, and
+quiet for the right reason.
+
+**I8 — the detail names the STORE, not the organ.** *"The Parliament
+restarted"* would be a complete diagnosis and an unactionable one; the operator's
+action is on the durable store (most likely the persist volume refusing writes),
+and the message says so, says the restart count on the row **understates**, and
+says **THIS detector is blind until the write lands** — a guard that has lost
+its own senses must announce that, not just go quiet.
+
+**SIX TESTS, 9 MUTATIONS RUN AND ALL BEHAVED — 7 RED, 2 GREEN, AND THE TWO
+GREENS ARE THE POINT.** One is the null control. The other is `elif` → `if`,
+which I predicted RED and which **survived**; the honest reading is that my
+prediction was wrong rather than the test weak — `deaths` is extended only
+inside the branch that appends to `moves`, so the two reports are **mutually
+exclusive by construction**. That is now pinned structurally, so a future edit
+filling `deaths` off the movement path fails here first. **A third mutation
+also survived and found a genuinely weak test of mine**: the `prev_auth` guard
+is unreachable from a bare first sighting (`resets` is empty, the count bar
+refuses first), so the test asserting it proved nothing. Its reachable path is a
+publisher that gains the field LATE — an older build accumulates resets with no
+`restarts` key, a deploy adds it, and the first sighting with a value lands on
+an already-over-the-bar reset list. Without the guard that fires FROZEN on a
+counter it has never seen advance, which is a claim about a control group it
+does not have (I6). Re-aimed, and the mutation is red.
+
+**AND MY OWN AST CHECK WAS ONE OF THE THINGS THE MUTATIONS CAUGHT.** The
+exclusivity test's first cut read `ast.walk(n.test.__class__ and n)` — which
+evaluates to `ast.walk(n)` — so it matched an OUTER `if`, inspected the wrong
+body, and passed on a tree that had a death recorded outside the movement
+branch. `(po)`'s rule landing on the test written to honour it, for the second
+time in two days: **empty output is not a negative result until the check has
+been seen to produce a positive one.**
+
+Publish-only, restrict-only, moves no money and no lever; `fleet_immune` is a
+shadow organ and this arm only ever ADDS a finding. Full suite green.
+  ENFORCED BY: `fleet_immune.py::restart_churn`, `tests/autonomy/test_immune_restart_churn.py::TestAFrozenAuthoritativeCounterIsItselfTheFinding`
+
 ## 2026-09-10 (aag) — 🔭 KEATING'S ENSEMBLE WAS NEVER WARMING UP: THE POOL IT LEARNS FROM IS SMALLER THAN ITS OWN BAR, AND A COUNT WAS STANDING IN FOR EVIDENCE
 
 **Eamon: *"Fix sick organs."*** `scripts/organ_board.py` grades twenty organs on
@@ -95,12 +253,13 @@ control (`test_a_planted_edge_still_arms`, p_up 0.97 at acc 0.786) is
 load-bearing: a gate that never opens is trivially stable and useless ((om)).
 `parliament_main --selftest` green, full suite green, six repo audits OK.
 
-**DECLARED, NOT FIXED:** the models' own weights are still rebuilt from the DB on
-every boot rather than persisted. That is CORRECT while the pool holds the whole
-training set — but it means the accuracy EMA is recomputed, not carried, so the
-first `ready` will be earned on a replay of the retained window rather than on a
-truly online history. Persisting model state is a separate build with its own
-serialization risk, and it is not the binding constraint today.
+~~**DECLARED, NOT FIXED:** the models' own weights are still rebuilt from the DB on
+every boot rather than persisted...~~ **[CLOSED THE SAME DAY by `(aaj)`, on
+Eamon's *"fix the above corrections"* — corrected in place per I12 rather than
+left standing, because a "declared, not fixed" that HAS been fixed is the
+stalest kind of note.** The fix is not the one this paragraph anticipated: the
+weights are still not serialised, deliberately and with a reason, and what is
+persisted instead is the prequential history. See `(aaj)`.]
 
 ## 2026-09-10 (aah) — THE ORGAN BOARD'S `fixed?` HAD NO TERMINAL STATE, SO FIVE OF TWENTY ROWS SAID "CONFIRM ME" FOREVER
 

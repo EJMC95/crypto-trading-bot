@@ -30,6 +30,11 @@ under the old rule ARMED `ml_gate` and started refusing entries on nothing.
 names the binding constraint, so `ready: false` is never again byte-identical
 between "warming up" and "structurally impossible".
 
+DURABLE [(aaj)]: `n_seen`, `acc` and the trained-id set are PERSISTED, so the
+prequential history survives the container instead of being recomputed from
+whatever the store still holds. Model WEIGHTS are deliberately NOT persisted —
+`warm()` re-feeds the retained rows update-only at boot; see `_STATE_KEY`.
+
 AUTHORITY (fleet doctrine — reduce-only, like the brain's stake mults):
 the ML gate may SKIP an entry or SHRINK its stake; it can never boost
 above 1.0x or conjure an entry. Cold model = neutral. numpy absent =
@@ -59,6 +64,7 @@ FEATURES = ["direction", "ret4", "rsi_n", "vol_ratio", "funding_apr_n",
 MIN_READY_SAMPLES = int(os.environ.get("PARL_ML_MIN_SAMPLES", "200"))
 ACC_HALFLIFE = 200.0            # samples; decayed OOS accuracy EMA
 WINDOW = 1500                   # refit window for ridge/stumps/knn
+NUM_T = (int, float)            # NB bool subclasses int — reject it explicitly
 
 #: [(aag)] THE TRAINING HORIZON IS THE RETENTION, BY IDENTITY. `n_seen` resets
 #: to 0 on every boot and is rebuilt from the rows still in the `trades` table,
@@ -328,6 +334,10 @@ class MLEngine:
         #: distinguishable. None until a pass has run: UNKNOWN, never 0, or a
         #: dark DB would publish a confident `unreachable` (I6).
         self._pool: int | None = None
+        #: [(aaj)] set once, on the first training pass — see `_restore_state`.
+        self._restored = False
+        self._provenance = "cold"
+        self._warmed = 0
 
     # -- readiness ------------------------------------------------------------
     def acc_z(self) -> float | None:
@@ -359,6 +369,9 @@ class MLEngine:
         the sample count."""
         z, pool = self.acc_z(), self._pool
         d = {"n_seen": self.n_seen, "min_samples": MIN_READY_SAMPLES,
+             # [(aaj)] where this history came from. A restored `n_seen` and a
+             # replayed one are byte-identical numbers about different things.
+             "provenance": self._provenance, "warmed": self._warmed,
              "n_short": max(0, MIN_READY_SAMPLES - self.n_seen),
              "pool": pool, "train_days": TRAIN_DAYS,
              "acc_z": None if z is None else round(z, 3),
@@ -413,9 +426,90 @@ class MLEngine:
             return 0.5, False
         return max(0.01, min(0.99, num / den)), True
 
+    # -- durable learning state -----------------------------------------------
+    #: [(aaj)] WHAT IS PERSISTED, AND — the load-bearing half — WHAT IS NOT.
+    #:
+    #: NOT the model weights. Three of the five are `_WindowModel`s holding up
+    #: to WINDOW raw samples each, so serialising them would duplicate the
+    #: `trades` table into a ~1 MB blob rewritten every training pass, and it
+    #: would put a numpy array's SHAPE in durable storage — where a later
+    #: `FEATURES` extension (the module docstring invites one: "extend by
+    #: APPENDING") silently restores weights of the wrong dimension. The window
+    #: models are a FUNCTION of the retained rows and the DB already holds
+    #: those, so they are rebuilt by `warm()` instead.
+    #:
+    #: What genuinely cannot be recovered is the PREQUENTIAL history: `acc`
+    #: depends on the order of the samples and on predictions made by model
+    #: states that no longer exist, and `n_seen` on rows the retention has
+    #: since dropped. Those are the two the boot was destroying, and those are
+    #: what this stores — three small scalars-and-strings, no arrays.
+    _STATE_KEY = "keating.ml.state"
+    _STATE_V = 1
+    #: ids kept durable. Bounded well under the trim in `train_from_db`; the
+    #: retained window holds ~a few hundred rows at any measured close rate.
+    _TRAINED_KEEP = 4000
+
+    def _save_state(self) -> None:
+        """Never raises: a dark store costs the memory, never the training."""
+        if not self.enabled or self.db is None:
+            return
+        try:
+            self.db.remember(self._STATE_KEY, {
+                "v": self._STATE_V,
+                "dim": len(FEATURES),
+                "models": [m.name for m in self.models],
+                "n_seen": int(self.n_seen),
+                "acc": {k: float(v) for k, v in self.acc.items()},
+                "trained": list(self._trained_order[-self._TRAINED_KEEP:]),
+            })
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _restore_state(self) -> str:
+        """-> a provenance word, PUBLISHED, never a bare bool.
+
+        Fail-safe is one-directional: any doubt returns without mutating a
+        single field, so the engine falls back to the boot replay it has always
+        done. A restore that half-lands is the only outcome worse than none —
+        `acc` describing a roster or a feature space that is not the one in
+        memory is a confident number about the wrong thing."""
+        if not self.enabled or self.db is None:
+            return "no-db"
+        try:
+            st = self.db.recall(self._STATE_KEY)
+        except Exception:  # noqa: BLE001
+            return "unreadable"
+        if not isinstance(st, dict) or not st:
+            return "none"
+        if st.get("v") != self._STATE_V:
+            return "version-changed"
+        if st.get("dim") != len(FEATURES):
+            return "features-changed"
+        if list(st.get("models") or []) != [m.name for m in self.models]:
+            return "roster-changed"
+        acc, n = st.get("acc"), st.get("n_seen")
+        if (not isinstance(acc, dict) or not isinstance(n, int)
+                or isinstance(n, bool) or n < 0):
+            return "junk"
+        if set(acc) != set(self.acc) or not all(
+                isinstance(v, NUM_T) and not isinstance(v, bool)
+                and 0.0 <= v <= 1.0 for v in acc.values()):
+            return "junk"
+        ids = st.get("trained")
+        if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+            return "junk"
+        self.acc = {k: float(v) for k, v in acc.items()}
+        self.n_seen = int(n)
+        self._trained_order = list(ids)
+        self._trained_ids = set(ids)
+        return "restored"
+
     # -- learning -------------------------------------------------------------
-    def learn(self, features: dict, won: bool) -> None:
-        """Prequential: score each model's PRIOR prediction, then update it."""
+    def learn(self, features: dict, won: bool, *, score: bool = True) -> None:
+        """Prequential: score each model's PRIOR prediction, then update it.
+
+        `score=False` is the WARM path — see `warm()`. One function with a flag
+        rather than two, so the update half cannot drift between them."""
         if not self.enabled:
             return
         x = vector(features)
@@ -423,13 +517,29 @@ class MLEngine:
         decay = 0.5 ** (1.0 / ACC_HALFLIFE)
         for m in self.models:
             try:
-                p = m.predict(x)
-                hit = 1.0 if (p >= 0.5) == bool(won) else 0.0
-                self.acc[m.name] = self.acc[m.name] * decay + hit * (1 - decay)
+                if score:
+                    p = m.predict(x)
+                    hit = 1.0 if (p >= 0.5) == bool(won) else 0.0
+                    self.acc[m.name] = self.acc[m.name] * decay + hit * (1 - decay)
                 m.update(x, y)
             except Exception as e:  # noqa: BLE001
                 log.warning("model %s update failed (%s)", m.name, e)
-        self.n_seen += 1
+        if score:
+            self.n_seen += 1
+
+    def warm(self, features: dict, won: bool) -> None:
+        """[(aaj)] Rebuild model state from a sample ALREADY counted — update,
+        never score.
+
+        A RESTORED `acc`/`n_seen` describes models that do not exist any more:
+        the objects are fresh at every boot. So the retained rows have to be
+        re-fed or the bench would sit UNTRAINED behind an `n_seen` claiming
+        otherwise — the exact catastrophe that makes persisting the counters
+        alone worse than persisting nothing. But re-SCORING them would count
+        the same closes into the prequential EMA a second time and flatter it,
+        which is what made the old boot-replay a deterministic artifact in the
+        first place. Update only."""
+        self.learn(features, won, score=False)
 
     def train_from_db(self) -> int:
         """Replay closed trades (with stored features) not yet learned —
@@ -440,6 +550,21 @@ class MLEngine:
         trainable = [r for r in rows
                      if r["features"] and r["pnl_abs"] is not None]
         self._pool = len(trainable)
+        if not self._restored:
+            # [(aaj)] ONCE per process, and BEFORE the new-row filter, because
+            # what it restores is exactly the set that filter reads.
+            self._restored = True
+            self._provenance = self._restore_state()
+            if self._provenance == "restored":
+                # The counters came back; the MODELS did not (fresh objects at
+                # every boot). Re-feed the rows they already account for —
+                # update-only, so the prequential EMA is not double-counted.
+                warm = sorted((r for r in trainable
+                               if r["trade_id"] in self._trained_ids),
+                              key=lambda r: r["closed_ts"] or 0)
+                for r in warm:
+                    self.warm(r["features"], r["pnl_abs"] > 0)
+                self._warmed = len(warm)
         rows = [r for r in trainable
                 if r["trade_id"] not in self._trained_ids]
         rows.sort(key=lambda r: r["closed_ts"] or 0)
@@ -457,6 +582,7 @@ class MLEngine:
             keep = self._trained_order[-10000:]
             self._trained_order = keep
             self._trained_ids = set(keep)
+        self._save_state()
         return len(rows)
 
     # -- reporting ------------------------------------------------------------
