@@ -259,6 +259,44 @@ REVIEW_2SEP = {
     "brain_vitals": "ok", "fleet_regen": "idle", "tuning_proposals": "ok", "fleet_tuning": "ok",
 }
 
+#: [(aah)] THE TERMINAL STATE `fixed?` NEVER HAD — a dated HUMAN confirmation.
+#:
+#: `fixed?` is deliberately not self-promoting: the board may not decide its own
+#: baseline is stale. But nothing could ever retire one either, so a row that
+#: cleared on 3-Sep still read `fixed? — confirm` on every run a week later, and
+#: on 10-Sep FIVE of twenty rows did. A permanent "confirm me" is the (gl)
+#: cry-wolf shape pointed at the reader of a weekly board: it trains them to
+#: skim exactly the column that is supposed to mean something. Same shape as
+#: `(zo)`'s claim that could only ever read UNRESOLVED, and the same remedy — a
+#: state the thing can actually finish in.
+#:
+#: `REVIEW_2SEP` above is UNTOUCHED. The 2-Sep reading is the record; I12
+#: corrects a doctrine that no longer describes the system, it does not rewrite
+#: what was measured. A row here says only "a human read the live payload on
+#: this date and agreed the 2-Sep finding is closed", with the evidence.
+#:
+#: A CONFIRMED organ THAT REGRESSES STILL READS `watch` — the promotion below
+#: only ever applies to a row already grading `ok`, so a confirmation can never
+#: mask a new fault. Pinned by selftest in both directions.
+CONFIRMED = {
+    "fleet_risk": "2026-09-10: the 2-Sep watch was `light red` with the POOLED "
+                  "long budget at 20/20; (wp)/(wy) split it per cohort and the "
+                  "payload now carries them — live 9/20 green, shadow 10/26 green",
+    "xp_judge": "2026-09-10: was `judging 0 of 4` with avo and mum BOTH "
+                "unjudgeable; the (ye) lever-prefix and (zg) parity fixes "
+                "landed and it now judges 2 of 4 with `unjudgeable []`",
+    "impl_shortfall": "2026-09-10: was `stood_down (live arm retired)` after the "
+                      "(ta) Farmer retirement; it reads `xp-contaminated` now, "
+                      "which is the organ REFUSING an invalid live-vs-shadow "
+                      "comparison while the judge runs a candidate on the twin — "
+                      "its correct output, not a silence",
+    "event_sentinel": "2026-09-10: the watch was `gdelt False`, a dead source; "
+                      "GDELT is up and the playbook grades are earning",
+    "golive_readiness": "2026-09-10: was `docket 7` — seven books awaiting an "
+                        "I17 keep-or-retire call; the (wt) September slate took "
+                        "five and (zo) took georgia's, so the docket is empty",
+}
+
 
 def grade(bus, pnl, now):
     """PURE: rows [{organ, state, why}] in CHECKS order. Liveness first (I1), then output."""
@@ -276,7 +314,8 @@ def grade(bus, pnl, now):
             state, why = "watch", f"field absent: {e}"
         except Exception as e:                    # never a crash, never a silent ok
             state, why = "watch", f"check error: {e!r}"
-        if state == "ok" and REVIEW_2SEP.get(organ) == "watch":
+        if (state == "ok" and REVIEW_2SEP.get(organ) == "watch"
+                and organ not in CONFIRMED):
             state, why = "fixed?", f"read watch on 2-Sep (wp), clean now — confirm: {why}"
         out.append({"organ": organ, "state": state, "why": why})
     return out
@@ -347,9 +386,17 @@ def selftest():
     bare = {o: {"updated": FIXTURE_NOW.isoformat(), "ttl_sec": 60} for o, _ in CHECKS}
     for r in grade(bare, FIXTURE_PNL, FIXTURE_NOW):
         assert r["state"] == "watch" and "absent" in r["why"], r
-    # one semantics arm + the baseline claim: a cleared watch reads fixed?, never ok
+    # one semantics arm + the baseline claim. [(aah)] This arm asserted `fixed?`
+    # on fleet_risk and fleet_risk is now CONFIRMED — a test that pins an
+    # organ's stale state is a snapshot, not a property, so it is RE-AIMED
+    # rather than used as a reason to leave the confirmation out. The `fixed?`
+    # mechanism itself stays exercised by the fleet_immune arm above, which is
+    # deliberately an UNconfirmed organ.
     _, r = _mut(fleet_risk={"long_positions": 3, "cohorts": {"live": {"long_positions": 1, "long_budget": 6}}})
-    assert r["fleet_risk"]["state"] == "fixed?" and "live 1/6" in r["fleet_risk"]["why"], r["fleet_risk"]
+    assert r["fleet_risk"]["state"] == "ok" and "live 1/6" in r["fleet_risk"]["why"], r["fleet_risk"]
+    # ...and a CONFIRMED organ that REGRESSES is never masked by its confirmation
+    _, r = _mut(fleet_risk={"light": "red", "long_positions": 20, "long_budget": 20})
+    assert r["fleet_risk"]["state"] == "watch", r["fleet_risk"]
     assert grade(FIXTURE_BUS, {"bots": []}, FIXTURE_NOW)[1]["state"] == "watch"   # no living bots -> no opinions
     # (d) an empty/unparseable bus is a dark FEED -> exit 2 (never a table of twenty darks read as a result)
     assert feed_dark({}, FIXTURE_PNL) and feed_dark(FIXTURE_BUS, {"bots": []}) and not feed_dark(FIXTURE_BUS, FIXTURE_PNL)

@@ -1,3 +1,151 @@
+## 2026-09-10 (aag) — 🔭 KEATING'S ENSEMBLE WAS NEVER WARMING UP: THE POOL IT LEARNS FROM IS SMALLER THAN ITS OWN BAR, AND A COUNT WAS STANDING IN FOR EVIDENCE
+
+**Eamon: *"Fix sick organs."*** `scripts/organ_board.py` grades twenty organs on
+what they PRODUCE rather than on their pulse, and it read **ok 10 · watch 3 ·
+fixed? 5 · idle 2 · dark 0**. Zero dark — every key fresh and in-TTL — so this
+was never a liveness problem. Of the three `watch` rows, **two are the organ
+WORKING** and are recorded here so no later session "fixes" them:
+
+* 🧬 `strategy_incubator` reads `champion_is False` because its champion (net
+  +$35.59, **h2 −$21.48**) fails the both-halves floor, and its own proposal
+  path prints *"champion is not STABLE (streak 0/3) — one cycle's fittest is a
+  max over the population, not evidence"*. It scored **1,574** genotypes that
+  cycle and refused all of them. That is the anti-overfit floor doing its job.
+* 🛡️ `fleet_immune` reads `watch` because it HAS a finding — 👩 mum's live hit
+  rate at 18 of 30 — and its own text routes it correctly (*"watch the SHAPE,
+  not the P&L, and check the twin (I25)"*). Checked: the twin passes `halves`
+  and the live arm's h2 is the 2-Sep daily-loss halt already carried as a
+  pre-registered read dated 7-Oct. **Nothing moved** — I25 forbids judging a
+  change against the window that motivated it.
+
+**THE ONE REAL DEFECT IS 🏛️ THE PARLIAMENT'S ML LAYER, AND IT IS I1 WEARING A
+NEW COAT.** `ml.n_seen` sat at **85** and `oos_acc` at **0.5082 — byte-identical
+for 22.5 hours across five boots**. A frozen number reads exactly like a healthy
+one, and here it is worse than frozen: it is a *deterministic replay artifact*.
+`MLEngine.n_seen` and `_trained_ids` are INSTANCE attributes reset to 0 on every
+`__init__`, so each boot re-learns the same rows in the same order and recomputes
+the same accuracy. It was never measuring anything.
+
+**AND THE BAR WAS UNREACHABLE BY ARITHMETIC.** `n_seen` is rebuilt only from the
+trades still in the ecosystem DB, and `EcosystemDB.prune` was **DELETING** closed
+trades at 30 days — so the ceiling on what the bench could ever learn is
+`retention × close rate`, never `MIN_READY_SAMPLES`. Measured off the public
+ledger: **90 pm-* closes in the trailing 30 days against a 200 bar**, and the best
+7-day burst the Parliament has ever run (**5.86/day**) projects to **176 — still
+short**. The five boots in 24h are all ordinary DEPLOYS, verified: every
+`data.cycles` reset carries a new `build` stamp and a `restarts` increment, and
+`fleet_immune`'s `(oi)` discriminator correctly logged `auth_deaths: []`. The
+supervisor is healthy; the ensemble was structurally inert.
+
+**FED, PER I17-AS-AMENDED.** `ecosystem_db.TRADE_KEEP_DAYS` (90) is the new owner
+of trade retention, and `ml.TRAIN_DAYS` **is that same object** so the query and
+the deleter cannot drift ((hj) — a second copy of a rule is a second rule; pinned
+by AST so `train_from_db` may not carry a retyped literal). 90 is DERIVED, not
+picked: `200 / (90/30d) = 66.7d` is the bare minimum at the observed rate, and 90
+carries ~1.35× margin so a quiet fortnight cannot disarm an ensemble that just
+armed. **Signals and candles KEEP the 30-day retention** — candles are the bulky
+table and the ML does not read them; a closed trade row is ~200 bytes, so 3× of
+them is ~50 KB.
+
+**AND THE EXPECTANCY PRICE OF FEEDING IT IS PAID IN THE SAME COMMIT (I19), because
+arming this gate on the old rule would have been a regression I shipped.** `ready`
+meant `n_seen >= 200` and nothing else, so the gate would arm at whatever accuracy
+happened to obtain — and `ml_gate` then REFUSES entries at `p_win < 0.45`.
+**Measured, not argued: driven on pure noise (labels independent of the features)
+the bench reaches 0.5380 decayed accuracy at n=400 by luck alone**, and under the
+old rule that armed. `ready` now takes a second bar — the best model must be
+`z >= ACC_Z_BAR` (1.28, the fleet's own one-sided value, pinned by identity to
+`fleet_allocation.Z_LOWER`) from a coin flip, on the EMA's effective n
+(`min(n_seen, ACC_HALFLIFE)` — deliberately the conservative reading; the true
+EMA effective n is ~576 and would make the bar EASIER). Today's live bench reads
+**z = 0.15**. `is_ready()` is the single owner, so `predict()` and `snapshot()`
+can never disagree.
+
+**AND `ready: false` STOPS BEING TWO DIFFERENT THINGS.** `readiness()` publishes
+the distance and the binding constraint — `{n_seen, min_samples, n_short, pool,
+train_days, acc_z, acc_z_bar, verdict, blocked_by}` — with verdicts
+`disabled | unreachable | cold | edgeless | ready`. Replayed on the live 10-Sep
+payload it reads **`unreachable`**, naming the retention rather than the count
+((lv): a component that produces nothing must publish its own census at its own
+bar; I18: the binding constraint must be the one you name). At `pool 270` the
+same state reads **`cold`, 115 more samples** — a countdown that resolves by
+trading instead of a block that never resolves. An UNKNOWN pool never reads
+`unreachable` (I6 — a dark DB has no control group).
+
+**WHEN IT PAYS OFF, STATED SO NOBODY RE-DIAGNOSES IT NEXT WEEK:** the rows the
+old 30-day pruner already deleted are gone for good, so the pool grows FORWARD
+from today's 90 and nothing ages out until day 90. At the trailing-30d rate
+(3.0/day) that is **~37 days to the 200 bar**; at the recent 7-day rate
+(5.86/day), **~19**. Until then the row publishes `unreachable` -> `cold` and
+says which. **Behaviour today is BYTE-IDENTICAL** — `n_seen 85 < 200` returned
+`(0.5, False)` before and `unreachable` returns `(0.5, False)` now — so this
+lands on the two books changing nothing they trade.
+
+**PRICED AND SCOPED:** two SHADOW books ($1k paper each, zero real money, the
+(hn) routing table's "shadow book logic → build it"), and the change is a
+strict TIGHTENING of the actuator today — the gate is closed now and closed
+after. Nothing reaches real money; the Parliament is shadow-forever by design.
+No live marker, and `parliament/**` is already on the `freqtrade-bots`
+auto-deploy path (`audit_deploy_coverage` OK).
+
+**11 tests, 9/9 mutations RED — plus a NULL CONTROL that SURVIVED**, because the
+hub's own standing lesson is that a harness reporting 100% survival is a broken
+harness, and one that can only ever report RED is equally blind. The positive
+control (`test_a_planted_edge_still_arms`, p_up 0.97 at acc 0.786) is
+load-bearing: a gate that never opens is trivially stable and useless ((om)).
+`parliament_main --selftest` green, full suite green, six repo audits OK.
+
+**DECLARED, NOT FIXED:** the models' own weights are still rebuilt from the DB on
+every boot rather than persisted. That is CORRECT while the pool holds the whole
+training set — but it means the accuracy EMA is recomputed, not carried, so the
+first `ready` will be earned on a replay of the retained window rather than on a
+truly online history. Persisting model state is a separate build with its own
+serialization risk, and it is not the binding constraint today.
+
+## 2026-09-10 (aah) — THE ORGAN BOARD'S `fixed?` HAD NO TERMINAL STATE, SO FIVE OF TWENTY ROWS SAID "CONFIRM ME" FOREVER
+
+Same pass as `(aag)`. `scripts/organ_board.py` grades an organ `fixed?` when the
+pinned 2-Sep `(wp)` baseline read `watch` and the payload reads clean now, and it
+deliberately **never self-promotes** — the board may not decide its own baseline
+is stale, which is right. But nothing could ever RETIRE one either, so a row that
+cleared on 3-Sep still read *"confirm"* every run a week later. On 10-Sep **five
+of twenty rows** did. A permanent "confirm me" is the `(gl)` cry-wolf shape aimed
+at the reader of a weekly board: it trains them to skim the one column that is
+supposed to mean something. Structurally the same as `(zo)`'s claim that could
+only ever read UNRESOLVED, and the same remedy — a state the thing can finish in.
+
+**`CONFIRMED` is a dated HUMAN reading, and all five were checked against the live
+payload rather than waved through:**
+
+| organ | the 2-Sep watch | today, and why it is closed |
+|---|---|---|
+| `fleet_risk` | `light red`, POOLED long 20/20 | `(wp)`/`(wy)` split the budget per cohort — live **9/20 green**, shadow **10/26 green** |
+| `xp_judge` | `judging 0 of 4`, avo AND mum `unjudgeable` | the `(ye)` lever-prefix and `(zg)` parity fixes landed — **judging 2 of 4**, `unjudgeable []` |
+| `impl_shortfall` | `stood_down (live arm retired)` after `(ta)` | reads **`xp-contaminated`** — the organ REFUSING an invalid live-vs-shadow comparison while the judge runs a candidate on the twin. Its correct output, not a silence |
+| `event_sentinel` | `gdelt False` — a dead source | GDELT up, playbook grades earning (best 0.75 of 8) |
+| `golive_readiness` | `docket 7` — seven books awaiting an I17 call | the `(wt)` September slate took five and `(zo)` took georgia's — **docket 0** |
+
+**`REVIEW_2SEP` IS UNTOUCHED.** The 2-Sep reading is the record; I12 corrects a
+doctrine that no longer describes the system, it does not rewrite what was
+measured. And a **CONFIRMED organ that REGRESSES still reads `watch`** — the
+promotion only ever applies to a row already grading `ok`, so a confirmation can
+never mask a new fault. Pinned in both directions.
+
+**THE PIN THAT HAD TO MOVE, AND WHY THAT IS THE RULE NOT AN EXCEPTION.** Three
+test arms asserted `fixed?` on `fleet_risk` and `golive_readiness` — organs this
+entry confirms. **A test that asserts an organ's CURRENT state is a snapshot, not
+a property**, and when it blocks a correct change the question is whether the
+change is right, never whether the pin exists (the `(qu)`/I26 rule, at an organ
+instead of a book). All three are RE-AIMED and say so: each still proves the
+thing it was built to prove (the cohort fields reach the row; the docket field
+moves the state), and the `fixed?` MECHANISM stays exercised by the
+`fleet_immune` arm, which is deliberately an UNCONFIRMED organ.
+
+Board after: **ok 15 · watch 3 · fixed? 0 · idle 2 · dark 0**, and the three
+`watch` rows are the two working organs plus 🏛️ the Parliament, whose fix is
+`(aag)`. Selftest green (20 organs, baseline pinned, 4 mutations red), 9 semantic
+tests green including a new both-directions arm. Moves no money, no lever, no bot.
+
 ## 2026-09-10 (aaf) — 🎫 THE TAKER'S NULL: RANDOM BEATS IT ON EVERY FAMILY, AND THE ONE FAMILY IT COULD TRADE LIVE IS NEGATIVE
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* →

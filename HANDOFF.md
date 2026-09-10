@@ -1,21 +1,18 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 19:24 Sydney (09:24Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 23:15 Sydney (13:15Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
+**🕳️ FEED DARK**
+
+- `/bus.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/bus.json) — no gate verdicts read. This section is blind, not clear.
+
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` was shut **32% of the last 13.8d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
-- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 19:56 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **15% of the last 13.8d** (50h), mostly `slguard` (30h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
-
-**🚦 AT THE GATE**
-
-- `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
-- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
-- `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
-- `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
+- `freqtrade-avo-maria-lighter` was shut **31% of the last 14.0d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 02:01 Sydney (protections_locked).
+- `freqtrade-mum-lighter` was shut **16% of the last 14.0d** (54h), mostly `slguard` (33h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 ## Carried — pick these up FIRST (I11)
 
@@ -109,8 +106,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (42 commit(s), entries (zt))
+## Shipped today (34 commit(s), entries (zt))
 
+- `0df3303` (aaf) the taker's random-entry null: random beats it on every family, and the one family LIVE_SIDES admits is negative
 - `d2c6547` [deploy-live] (aae) avo's volume floor was a proxy for a thing the fleet now measures directly — re-derived 0.5 -> 0.15 from (vd)'s own clip ratio
 - `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact
 - `98738b3` (aab) the handoff reads the live fleet: two books have been READY for six days and nothing said so
@@ -144,15 +142,6 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `ad1096c` (zs) ⚖️ Counterweight's read moves 1-Oct → 10-Oct so it lands on the sample its own registration asked for
 - `4ea9511` [deploy-live-mum][deploy-live-taker] (zr) "Fix mum": nothing malfunctioned, the loss was the geometry, and her edge lives in the breadth of the oversold — the record, an inert lever, a judge candidate (#302)
 - `4ebbe35` [deploy-live] (zq) The dashboard's stalls were a lock convoy the fleet lit on itself at every redeploy: skip the no-op boot DDL, bound the real one (#300)
-- `4692b68` (zo) readback: all five living family rows CURRENT at e81b74e, arms aligned on one build_shared, georgia v1 off the feed
-- `3009c2e` (zp) counterweight read CHECKED not taken: the trigger has not fired (n=13 of 60) — and the DATE will bind before the sample, so it lands at n~44
-- `88a3d2c` (zp) regenerate HANDOFF.md after the regime-veto read
-- `eba4513` (zp) The pre-registered regime veto said CONFIRMED on a book where its treatment had zero variance: veto-vs-pass was shorts-vs-longs, and the rule could not tell the difference
-- `e81b74e` (zo) regenerate HANDOFF.md after the rebase onto (zn)/#298
-- `bdb2733` [deploy-live] (zo) georgia v1's pre-registered read taken: the cap-5 prediction failed on her own post-cap closes — retired on I17's undecidable call; the ledger gains a terminal GRADED state; the ladder harness reads STRATEGIES
-- `d3a82ea` (zn) A candidate that narrows its own arm gets the clock its own rate says it needs — bounded, re-derived every cycle, never on a hunch (#298)
-- `b47abc4` (zi) The gate horizon's rate denominator included 27 days on which the real-money book did not exist: it starts at the first in-era OPEN now, and the denominator is published
-- `2faa3a1` (zj)(zk)(zl)(zm) avo's judge lane, inert by one missing attribute · a negative test that performs its own error · a starved candidate recorded as a refuted one · and the t bar that disagrees with its own cluster read on both real-money books (#296)
 
 ## How this file stays honest
 

@@ -21,6 +21,15 @@ ENSEMBLE: weight_i = max(0, oos_acc_i - 0.5) (decayed EMA) — a model that
 cannot beat a coin flip out-of-sample gets weight ZERO. Cold or edge-less
 ensemble -> p = 0.5 and ready=False.
 
+ARMING [(aag)]: `ready` is TWO bars, not one — `n_seen >= MIN_READY_SAMPLES`
+AND the best model measurably better than chance (`acc_z() >= ACC_Z_BAR`).
+The count alone was the whole rule until 10-Sep, and a count is not evidence:
+driven on pure noise the bench reaches ~0.538 decayed accuracy by luck, which
+under the old rule ARMED `ml_gate` and started refusing entries on nothing.
+`is_ready()` is the single owner; `readiness()` publishes the distance and
+names the binding constraint, so `ready: false` is never again byte-identical
+between "warming up" and "structurally impossible".
+
 AUTHORITY (fleet doctrine — reduce-only, like the brain's stake mults):
 the ML gate may SKIP an entry or SHRINK its stake; it can never boost
 above 1.0x or conjure an entry. Cold model = neutral. numpy absent =
@@ -38,6 +47,8 @@ try:
 except Exception:  # noqa: BLE001 — degraded: gates neutral, nothing trains
     np = None
 
+from .ecosystem_db import TRADE_KEEP_DAYS
+
 log = logging.getLogger("parliament.ml")
 
 # Fixed feature order — the contract between featurize() at entry time and
@@ -48,6 +59,25 @@ FEATURES = ["direction", "ret4", "rsi_n", "vol_ratio", "funding_apr_n",
 MIN_READY_SAMPLES = int(os.environ.get("PARL_ML_MIN_SAMPLES", "200"))
 ACC_HALFLIFE = 200.0            # samples; decayed OOS accuracy EMA
 WINDOW = 1500                   # refit window for ridge/stumps/knn
+
+#: [(aag)] THE TRAINING HORIZON IS THE RETENTION, BY IDENTITY. `n_seen` resets
+#: to 0 on every boot and is rebuilt from the rows still in the `trades` table,
+#: so the ceiling on what this ensemble can ever learn is the size of that
+#: pool — never `MIN_READY_SAMPLES`. Pointing the query at the pruner's own
+#: constant is what stops the two drifting apart ((hj)). Full measurement in
+#: `ecosystem_db.TRADE_KEEP_DAYS`.
+TRAIN_DAYS = TRADE_KEEP_DAYS
+
+#: [(aag)] A COUNT IS NOT EVIDENCE — the bar that decides whether the ensemble
+#: may ACT. `ready` used to mean "has seen 200 rows", so the gate would arm at
+#: whatever accuracy happened to obtain: measured 10-Sep the best model read
+#: **0.5082**, which is 0.23 SE from a coin flip, and `ml_gate` would then have
+#: refused live entries on noise. This is I15/I16 in an actuator — rank on a
+#: measured lower bound, never on the bare number. One-sided z on the decayed
+#: accuracy against 0.5; 1.28 is the fleet's own one-sided 90% value
+#: (`fleet_allocation.Z_LOWER`), pinned to it by test rather than imported, so
+#: the Parliament keeps its self-contained import graph (born-dark rule).
+ACC_Z_BAR = float(os.environ.get("PARL_ML_ACC_Z", "1.28"))
 
 
 def featurize(sym: str, direction: int, data, signal: dict | None = None) -> dict:
@@ -293,11 +323,80 @@ class MLEngine:
         self.n_seen = 0
         self._trained_ids: set[str] = set()
         self._trained_order: list[str] = []   # insertion order for the trim
+        #: [(aag)] trainable rows inside `TRAIN_DAYS` at the last pass — the
+        #: CEILING on `n_seen`, which is what makes "cold" and "unreachable"
+        #: distinguishable. None until a pass has run: UNKNOWN, never 0, or a
+        #: dark DB would publish a confident `unreachable` (I6).
+        self._pool: int | None = None
+
+    # -- readiness ------------------------------------------------------------
+    def acc_z(self) -> float | None:
+        """One-sided z of the BEST model's decayed accuracy against a coin flip.
+
+        The EMA's memory is about one halflife of samples, so its effective n is
+        `min(n_seen, ACC_HALFLIFE)` — deliberately the CONSERVATIVE reading. The
+        true effective n of an EMA with smoothing a is (2-a)/a ~ 576 here, which
+        would make the bar EASIER to clear; using the halflife keeps it stricter,
+        the fail-safe direction for something that gates entries. None when there
+        is nothing to grade."""
+        vals = [v for v in self.acc.values() if isinstance(v, (int, float))]
+        if not vals or self.n_seen <= 0:
+            return None
+        n_eff = min(float(self.n_seen), ACC_HALFLIFE)
+        se = (0.25 / n_eff) ** 0.5
+        if se <= 0:
+            return None
+        return (max(vals) - 0.5) / se
+
+    def readiness(self) -> dict:
+        """WHY `ready` is what it is — the distance and the binding constraint.
+
+        `ready: false` was byte-identical between "warming up, ready Tuesday"
+        and "structurally impossible, forever" ((lv): a component that produces
+        nothing must publish its own census at its own bar). It reads
+        `unreachable` when the training POOL itself cannot hold the bar, which
+        names the gate that actually binds (I18) — the retention window, not
+        the sample count."""
+        z, pool = self.acc_z(), self._pool
+        d = {"n_seen": self.n_seen, "min_samples": MIN_READY_SAMPLES,
+             "n_short": max(0, MIN_READY_SAMPLES - self.n_seen),
+             "pool": pool, "train_days": TRAIN_DAYS,
+             "acc_z": None if z is None else round(z, 3),
+             "acc_z_bar": ACC_Z_BAR}
+        if not self.enabled:
+            d["verdict"], d["blocked_by"] = "disabled", "numpy absent"
+        elif self.n_seen < MIN_READY_SAMPLES:
+            if isinstance(pool, int) and pool < MIN_READY_SAMPLES:
+                d["verdict"] = "unreachable"
+                d["blocked_by"] = (
+                    f"the {TRAIN_DAYS:g}d training pool holds {pool} trainable "
+                    f"closes against a {MIN_READY_SAMPLES} bar — the RETENTION "
+                    f"binds, not the count; more time alone never arms this")
+            else:
+                d["verdict"] = "cold"
+                d["blocked_by"] = f"{d['n_short']} more sample(s)"
+        elif z is None or z < ACC_Z_BAR:
+            best = max([v for v in self.acc.values()
+                        if isinstance(v, (int, float))], default=None)
+            d["verdict"] = "edgeless"
+            d["blocked_by"] = (
+                f"best model {'unknown' if best is None else format(best, '.4f')} is "
+                f"z={'unknown' if z is None else round(z, 2)} from a coin flip, under "
+                f"the {ACC_Z_BAR} bar — a count is not evidence")
+        else:
+            d["verdict"], d["blocked_by"] = "ready", None
+        return d
+
+    def is_ready(self) -> bool:
+        """The ONE owner of the arming decision — `predict` and `snapshot` both
+        call it, so the payload can never claim a readiness inference does not
+        have (the `bar_map`-bound-to-`grade` discipline)."""
+        return self.readiness()["verdict"] == "ready"
 
     # -- inference ------------------------------------------------------------
     def predict(self, features: dict) -> tuple[float, bool]:
         """(p_win, ready). Neutral 0.5/False when cold, disabled, or edgeless."""
-        if not self.enabled or self.n_seen < MIN_READY_SAMPLES:
+        if not self.is_ready():
             return 0.5, False
         x = vector(features)
         num = den = 0.0
@@ -337,10 +436,12 @@ class MLEngine:
         restart-proof memory, and the door other bots' rows come in through."""
         if not self.enabled or self.db is None:
             return 0
-        rows = self.db.closed_trades(days=30.0)
-        rows = [r for r in rows
-                if r["features"] and r["pnl_abs"] is not None
-                and r["trade_id"] not in self._trained_ids]
+        rows = self.db.closed_trades(days=TRAIN_DAYS)
+        trainable = [r for r in rows
+                     if r["features"] and r["pnl_abs"] is not None]
+        self._pool = len(trainable)
+        rows = [r for r in trainable
+                if r["trade_id"] not in self._trained_ids]
         rows.sort(key=lambda r: r["closed_ts"] or 0)
         for r in rows:
             self.learn(r["features"], r["pnl_abs"] > 0)
@@ -361,7 +462,8 @@ class MLEngine:
     # -- reporting ------------------------------------------------------------
     def snapshot(self) -> dict:
         return {"enabled": self.enabled, "n_seen": self.n_seen,
-                "ready": self.enabled and self.n_seen >= MIN_READY_SAMPLES,
+                "ready": self.is_ready(),
+                "readiness": self.readiness(),
                 "oos_acc": {k: round(v, 4) for k, v in self.acc.items()}}
 
     async def run_forever(self, interval: float = 300.0, beat=None):
@@ -369,5 +471,8 @@ class MLEngine:
         while True:
             n = self.train_from_db()
             if beat:
-                beat("keating.ml", f"+{n} samples (n={self.n_seen})")
+                r = self.readiness()
+                beat("keating.ml",
+                     f"+{n} samples (n={self.n_seen}/{MIN_READY_SAMPLES}, "
+                     f"pool={r['pool']}, {r['verdict']})")
             await asyncio.sleep(interval)
