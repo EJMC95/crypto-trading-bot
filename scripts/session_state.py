@@ -129,35 +129,6 @@ CARRIED = [
         "closes_when": lambda: _has("CHANGELOG.md", "hull-cap-13 READ:"),
     },
     {
-        "id": "taker-random-entry-null-blocked-on-ci",
-        "owner": "session",
-        "what": "(zy) 🎫 the taker is READY on all six bars for a SIXTH day "
-                "(n=204, +0.970%/trade, t=2.25 and DRIFTING DOWN from 2.60 on "
-                "6-Sep) and still owes the (hm) random-entry null -- the one "
-                "test between READY and a defensible go-live, because on this "
-                "venue a random entry earns +0.2 to +1.1%/trade for free and "
-                "the whole tape is one falling-BTC regime. A full design was "
-                "produced 10-Sep (matched draws on the lens's OWN coins "
-                "through the taker's real bracket, cluster-robust treatment "
-                "for overlapping closes, and a REFUSING calibration gate) and "
-                "was BLOCKED by adversarial review 3/3 on CI-red defects, so "
-                "nothing was applied.",
-        "why_open": "THE THREE BLOCKERS ARE NAMED AND REPRODUCED, so the next "
-                    "session starts from them rather than re-designing: (1) "
-                    "the study does `os.environ.setdefault('TT_BULL_MODE', "
-                    "'on')` at import and relies on winning a race with "
-                    "`import lighter_ticket_taker` -- it MUTATES process-"
-                    "global env and reddens three already-green selftests; "
-                    "(2) the registered selftest runs 84-107s against a HARD "
-                    "`TIMEOUT = 120` in tests/test_selftests.py, before CI's "
-                    "coverage multiplier; (3) the `edits` array registers the "
-                    "new module in SELFTEST_MODULES but no edit CREATES the "
-                    "file, so applying it verbatim is red on its own. The "
-                    "engineering core was verified sound by all three lenses. "
-                    "Closes when the CHANGELOG records the null's verdict.",
-        "closes_when": lambda: _has("CHANGELOG.md", "taker random-entry null READ:"),
-    },
-    {
         "id": "mum-breadth-candidate-preregistered",
         "owner": "session",
         "what": "(zr) 👩 mum's edge lives in the BREADTH of the oversold, on "

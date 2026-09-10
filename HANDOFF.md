@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 18:43 Sydney (08:43Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 19:24 Sydney (09:24Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
@@ -8,7 +8,7 @@ _Generated 2026-09-10 18:43 Sydney (08:43Z) by `scripts/session_state.py`. Do no
 
 - `freqtrade-avo-maria-lighter` was shut **32% of the last 13.8d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 19:56 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **15% of the last 13.8d** (49h), mostly `slguard` (29h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **15% of the last 13.8d** (50h), mostly `slguard` (30h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -23,11 +23,6 @@ _Generated 2026-09-10 18:43 Sydney (08:43Z) by `scripts/session_state.py`. Do no
 (aaa) 🧮 Hull's cap raise (MAX_POSITIONS 10 -> 13 with CLIP_USD 80 -> 60 at constant gross) is MEASURED AND DEFERRED, not refused. The cap binds hard -- 83.2% of 3,906 census snapshots at cap, 37.6% at cap WITH an eligible coin it cannot take, 2,809 coin-snapshots denied -- and the marginal coin is FREE, because the |apr| ranking is degenerate at the venue's 10.512% resting pin (ranks 1-10 and 11+ both mean 10.5000%, delta 0.0000pp; all 16 positions this book has ever opened carry entry_apr 0.10512 exactly). Expectancy price measures to ZERO (-0.0024pp/trade). The gain is +12.5% to +16.7% closes, NOT the +30% first claimed, and it buys ~10 days to the 30-close bar, not a rescue -- the grader's `undecidable/130d` is a RAMP ARTIFACT of the cap itself moving 4->6->10 inside the measured window.
 
 _Still open because:_ DEFERRED on four measured reasons, any one of which would be enough: (1) the two tapes DISAGREE IN SIGN -- 250d settled fundings read -15%, 42d live venue with MTM folded reads +1.6% -- and (ne) is explicit that two calibrating conventions with opposite verdicts REFUTE a finding rather than ship it; (2) the last cap change (26-Aug, 4->6->10) has NOT completed one MAX_HOLD_H turnover (504h = 21d, so ~16-Sep), and changing again first makes neither change separately gradeable (I11/I25); (3) the migration transient carries 10 legacy $80 legs beside 3 new $60 ones = $980 = 98% of the book for up to 504h, above the module's own 80% assert; (4) the urgency was the ramp artifact and it is gone. READ ON OR AFTER 16-SEP: ship if the two tapes then agree in sign on a re-run, keep deferring if they do not. The marginal-coin finding stands and needs no re-measuring. Closes when the CHANGELOG records the read.
-
-### `taker-random-entry-null-blocked-on-ci`  ·  owner: **session**
-(zy) 🎫 the taker is READY on all six bars for a SIXTH day (n=204, +0.970%/trade, t=2.25 and DRIFTING DOWN from 2.60 on 6-Sep) and still owes the (hm) random-entry null -- the one test between READY and a defensible go-live, because on this venue a random entry earns +0.2 to +1.1%/trade for free and the whole tape is one falling-BTC regime. A full design was produced 10-Sep (matched draws on the lens's OWN coins through the taker's real bracket, cluster-robust treatment for overlapping closes, and a REFUSING calibration gate) and was BLOCKED by adversarial review 3/3 on CI-red defects, so nothing was applied.
-
-_Still open because:_ THE THREE BLOCKERS ARE NAMED AND REPRODUCED, so the next session starts from them rather than re-designing: (1) the study does `os.environ.setdefault('TT_BULL_MODE', 'on')` at import and relies on winning a race with `import lighter_ticket_taker` -- it MUTATES process-global env and reddens three already-green selftests; (2) the registered selftest runs 84-107s against a HARD `TIMEOUT = 120` in tests/test_selftests.py, before CI's coverage multiplier; (3) the `edits` array registers the new module in SELFTEST_MODULES but no edit CREATES the file, so applying it verbatim is red on its own. The engineering core was verified sound by all three lenses. Closes when the CHANGELOG records the null's verdict.
 
 ### `mum-breadth-candidate-preregistered`  ·  owner: **session**
 (zr) 👩 mum's edge lives in the BREADTH of the oversold, on her own record (9-Sep excluded, I25): closes opened in a same-loop batch of >=3 coins read +1.114%/trade live (n=37) / +1.003% twin (n=41) with a 2.7%/2.4% stop rate, positive in every ISO week and under a coin jackknife; closes opened alone or in a pair read -0.037% / +0.243% with 9.5-10.5% stops. Four of the six stops that cost the live book $56 on 9-Sep were single/pair entries. HONEST SIZE: the live batch closes are SEVEN open-events (7/7 positive, event-level t +5.7) and a permutation of event sizes across her 64 events reads P=0.097 (twin P=0.137) -- hypothesis-grade. SHIPPED: the breadth pre-pass + `breadth_n` stamp on every close on BOTH hosts, an INERT caged lever pair (xp.mum.breadth_min / live.mum.breadth_min, env default 1), and the judge candidate `mum-breadth-3` queued BEHIND `mum-vel-12-20`. No trade, gate or size moved on either arm.
@@ -114,8 +109,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (41 commit(s), entries (zt))
+## Shipped today (42 commit(s), entries (zt))
 
+- `d2c6547` [deploy-live] (aae) avo's volume floor was a proxy for a thing the fleet now measures directly — re-derived 0.5 -> 0.15 from (vd)'s own clip ratio
 - `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact
 - `98738b3` (aab) the handoff reads the live fleet: two books have been READY for six days and nothing said so
 - `fc48964` (zy)(zz)(aaa) the letter guard sees open branches; Rich Dad gets a census series; Hull's cap raise measured and deferred to one turnover

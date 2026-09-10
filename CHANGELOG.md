@@ -1,3 +1,90 @@
+## 2026-09-10 (aaf) — 🎫 THE TAKER'S NULL: RANDOM BEATS IT ON EVERY FAMILY, AND THE ONE FAMILY IT COULD TRADE LIVE IS NEGATIVE
+
+**Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* →
+*"sounds good"* on running the (hm) random-entry null first.
+
+**THE VERDICT: DO NOT PUT 🎫 THE TAKER LIVE.** Not on a preference — on the
+test the fleet's own doctrine requires for a directional book, with a
+calibration gate that reproduces the ledger to **0.009pp**.
+
+| family | n | taker | coin flip | excess | P(null>=taker) | clustered t |
+|---|---|---|---|---|---|---|
+| POOLED | 206 | +0.953% | **+1.064%** | −0.111pp | **0.590** | +0.74 |
+| **short-divergence** | 46 | **−0.788%** | −0.564% | −0.224pp | **0.660** | −0.80 |
+| long-breakoutup | 160 | +1.454% | **+1.532%** | −0.078pp | **0.520** | +1.49 |
+
+**Random wins in all three splits.** Same result (hm) got six times on this
+book in July; this is confirmation on the CURRENT era and the CURRENT policy,
+not a re-run of an old finding.
+
+**AND THE SPLIT IS THE REAL FINDING, larger than the null itself.**
+`lighter_ticket_taker.LIVE_SIDES` is `{"divergence": {"short"}}` — one lens,
+one side. The era ledger is **160 `long-breakoutup` and 46
+`short-divergence`**, so:
+* **78% of the 6-of-6 READY verdict is earned by a family the live arm cannot
+  fill**, and
+* **the ONLY family it could fill is losing money on its own record:
+  −0.788%/trade.**
+
+A go-live would have switched on the negative 22% and left the positive 78%
+behind. The gate is not wrong — it grades the SHADOW policy honestly, and the
+shadow trades both sides on five lenses. Nothing reconciles that verdict with
+what `LIVE_SIDES` permits, and nobody had put the two side by side.
+
+**METHOD, and every piece is the book's own.** Entries: 200 matched-random
+entry hours per close on the SAME coin inside the era window ((hm)'s
+construction). Exits: `exit_reason` IMPORTED, routed by the module's own
+`bull_exit(lens)` — trend exit with `BRK_TRAIL` off a bar-by-bar `peak_ret`
+for breakout, fixed bracket for divergence — with the max-hold GRAFTED from
+each close's `extra.bars` stamp exactly as the live call site does. 41,200
+counterfactual trades; a null "run" is a whole alternative BOOK (one draw
+index across every close), never a single alternative trade. Clustered by UTC
+day so overlapping holds are not independent draws ((kw)). Tape: 1h closes,
+**49 of 49 coins covered**.
+
+**CALIBRATION: replayed +0.962%/trade against the ledger's +0.953% on the same
+206 closes — |drift| 0.009pp against a 0.60pp tolerance.** The harness
+reproduces the book almost exactly, which is what earns it the right to say
+what would have happened ((gx)).
+
+**DECLARED DIVERGENCE:** the walk steps 1h closes while the live loop decides
+every ~5 min, so exits land later here. The convention is IDENTICAL on both
+sides of the contrast, so it cancels where it matters and the calibration gate
+bounds where it does not.
+
+**THE THREE CARRIED BLOCKERS ARE CLOSED, and two by construction:**
+(1) **no env mutation** — the prior design did
+`os.environ.setdefault("TT_BULL_MODE","on")` at import and raced the taker's
+import, reddening three unrelated selftests; this asks `bull_exit` and
+**REFUSES** (exit 2) when the routing cannot be reproduced, with the mode
+passed in the COMMAND; (2) **selftest runs in 0.066s** against the hard 120s
+cap, because everything heavy lives in `report()`; (3) the file exists and is
+registered in `SELFTEST_MODULES`.
+
+**TWO DEFECTS MY OWN TESTS FOUND, both recorded because they are the point:**
+`exit_reason` takes DATETIMES not epochs (caught on the selftest's first run;
+fixed at my call site, NOT by coercing inside `exit_reason`, which would have
+put a second copy of the taker's clock in a study file). And **mutation M2
+SURVIVED round one**: the max-hold graft assertion sat behind
+`if rt is not None` — "only when BULL_MODE is on" — which SKIPS in a bare test
+process, so replacing the stamped hold with 999.0 stayed green. That is the
+(po) inspects-nothing rule inside the guard written to prevent it. Now driven
+by a local attribute with restore (never `os.environ`), and the REFUSAL path
+is asserted too. Round two: M1/M2 red. **One DECLARED EQUIVALENT MUTANT** —
+the `else 0.0` trail fallback mirrors the live call site's (dg) inertness
+guard and is unreachable under `bull_exit`'s contract, so no test can redden
+it; kept rather than deleted, because dropping a guard the bot carries would
+make the walk diverge from the loop it reproduces.
+
+**WHAT THIS DOES NOT SAY.** It does not retire the book — its shadow keeps
+trading and the `long-breakoutup` family is its own question (also beaten by
+random, at P=0.520, so not a promotion candidate either). It does not touch 🙏
+avo, who is ALREADY LIVE: her READY 6/6 is on her PAPER TWIN, the control arm,
+so there was never a switch to throw there.
+
+Instrument: `scripts/study_taker_random_null_2026-09-10.py`.
+Closes the carried row `taker-random-entry-null-blocked-on-ci`.
+
 ## 2026-09-10 (aae) — 🙏 AVO'S VOLUME FLOOR WAS A PROXY FOR A THING THE FLEET NOW MEASURES DIRECTLY — AND TWO OF THE THREE WORST-EXECUTING COINS SIT ABOVE IT
 
 **Eamon, 10-Sep:** *"measure it properly"* — on widening 🙏 avo's universe,

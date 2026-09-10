@@ -229,6 +229,7 @@ SELFTEST_MODULES = [
     # branch cannot rot.
     "scripts.study_georgia_cap5_read_2026-09-09",
     "scripts.study_avo_cap_2026-09-10",
+    "scripts.study_taker_random_null_2026-09-10",
     # [2026-09-07] the MONTE CARLO RISK AUDIT + benchmark shootout. The gate
     # grades a 15% drawdown bar over the ONE path a book happened to walk;
     # this resamples the book's own decisions and reports the distribution
