@@ -9,8 +9,10 @@
 > across `golive_readiness.py`, `session_state.py`, a study and
 > `test_selftests.py`), where moving it would rewrite committed history in the
 > grader; mine was unpushed and contained in files this change already touches.
-> **This side moved** — 42 citations, counted with `-l` and reconciled rather
-> than piped through `head` ((qz)). Recorded inline because `git log` subjects
+> **This side moved** — 41 citations across five files, enumerated with `-l`
+> and reconciled against a `wc -l` count rather than piped through `head`
+> ((qz)); the 42nd hit was `HANDOFF.md`, which is generated and was
+> regenerated. Recorded inline because `git log` subjects
 > keep the OLD letter, which is why the CHANGELOG headers are the index and the
 > commit log is not.
 
