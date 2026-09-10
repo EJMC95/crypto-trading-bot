@@ -62,9 +62,55 @@ and zero divergence**.
 +$134.00, I16 claim **+0.72%/trade** — and `allowed_sides("lighter_live",
 "breakoutup")` returns the EMPTY SET. **78% of the 6-of-6 READY verdict is
 earned by a family no live arm may fill, and the only family it may fill is
-the one its own veto has switched off.** Promoting `breakoutup` instead is not
-available either: `(aaf)` measured random beating it at **P=0.520** — dead
-even with a coin flip, which licenses nothing.
+the one its own veto has switched off.**
+
+**SO THE GROWTH QUESTION WAS ASKED PROPERLY: RE-AIM `LIVE_SIDES` AT
+`breakoutup`? THE CANDIDATE IS REAL AND IT STILL FAILS — FOUR WAYS.** Graded
+alone through the fleet's own owner it is a clean **6 of 6** (n=162, 41.0d,
++1.3816%/trade, t=+2.698, cluster-robust **+2.70**, halves +52.30/+81.70,
+maxDD 4.21%, `grade=(True, [])`) — a BETTER reading than the pooled book.
+* **The null.** Re-run at **1,000 draws** (MC SE of P = 0.016): excess over
+  matched-random **−0.007pp, P=0.500**. **CORRECTED IN PLACE per I12 —
+  `(aaf)`'s headline *"random beats it on every family"* OVER-READS this one.**
+  It is true of `short-divergence` (P=0.762) and of POOLED (0.581); on
+  `long-breakoutup` the honest word is **TIED**. That distinction runs in the
+  FEED direction and is load-bearing: the one-sided upper bound on the excess
+  is **+0.68pp > 0**, so the sample has excluded NOTHING and **I17-as-amended
+  forbids retiring this book on it.** `(aaf)`'s per-family digits are also MC
+  noise (0.520 → 0.575 → 0.500 across three runs) — **quote the verdict, never
+  the third decimal.**
+* **Every implementable entry-time filter makes it MONOTONICALLY WORSE**, the
+  book's own conviction score included: `brk_quality` ≥0.3/0.4/0.5/0.6 →
+  −0.067 / −0.139 / −0.605 / **−0.821pp**; `up_strength` ≥0.1→≥0.4 −0.165 →
+  −0.565pp; `vol_m` ≥3 −1.040pp. The one positive implementable cut
+  (`range_pos ≥ 0.97`, +0.582pp) reads familywise **P=0.250**. The two cuts
+  that clear 0.05 naively are **outcome-conditioned** — realised hold >24h,
+  `exit_reason='hold'` — which is I21's trap: you cannot filter at entry on how
+  long a trade will turn out to run. And the excess is propped by **3 of 162
+  trades** (35% of the family's total; drop them → −0.530pp, P=0.830).
+* **`LIVE_LENSES = {"breakoutup"}` WOULD FILL NOTHING, and the fix reinstates
+  `(hj)`.** The entry loop drops a ticket at `if lens not in _allowed` **before**
+  the `breakout → breakoutup` relabel, so the label the live arm would need does
+  not exist at the gate. Admitting plain `breakout` live instead puts BOTH the
+  up-regime confirmation (`bull_entry_ok`) and the trend exit (`bull_exit`)
+  behind **`TT_BULL_MODE`, an env var read at import that defaults to `off`** —
+  which is precisely the defect `(hj)` moved real money off on 30-Jul: *"the
+  ONLY thing standing between real money and the measured-losing side of this
+  lens was an ENV VAR that defaults to off."*
+* **There is no live taker to reconfigure.** `/pnl.json` carries one taker row
+  and it is the shadow. Go-live is a new sub-account, keys and a marker-gated
+  build — Eamon's act plus a deploy, not a two-constant edit. And the module's
+  OWN pre-declared prerequisite (`lighter_ticket_taker.py:651`) reads *"only
+  then, and only if proven, live"* — steps 1–3 are satisfied; *"only if
+  proven"* is the clause the null just failed.
+
+**WHAT WOULD MAKE IT PROMOTABLE, as a number rather than a hope** (test SE =
+the null run sd, 0.536pp at n=162): to clear P≤0.05 the family's mean must
+exceed the null's p95 of **+2.329%/trade** against its realised +1.382% — a
+gap of **+0.947pp**. To DETECT a true excess at 80% power: **+2.00pp → n=72
+(~18d)**, +1.50 → 128 (32d), **+1.00 → 288 (~73d, i.e. ~23-Nov)**, +0.50 →
+1,151 (291d), +0.25 → 4,603 (~3.2 years). Observed excess: **−0.007pp**.
+`golive_readiness._mde80` agrees in scale at 1.443pp/trade.
 
 ---
 
@@ -160,14 +206,16 @@ signature, NOT single-bracket — `(hm)`'s *"freeze its bars first"* is unmet on
 this family. It does not rescue the verdict (every cut is negative) but it
 bounds how precisely −0.788% can be read.
 
-**THE DECISION THIS LEAVES EAMON**, and it is his: the taker's shadow is a
+**THE DECISION THIS LEAVES EAMON**, and it is his: 🎫 the taker's shadow is a
 healthy, cheap paper book earning +1.38%/trade on `long-breakoutup` that
-**cannot be promoted in any measured configuration** — its one live-able
-family is excluded by the live arm's own record, and its earning family is
-beaten by a coin flip. The options are (a) keep grading it as paper, which
-costs nothing, (b) re-aim `LIVE_SIDES` at `breakoutup`, which `(aaf)` refuses
-on the null, or (c) an I17 keep-or-decide call. **Nothing here is resolved by
-lowering a bar or re-cutting a window.**
+**cannot be promoted in any measured configuration today** — its one live-able
+family is excluded by the LIVE arm's own record, and its earning family ties a
+coin flip. **KEEP GRADING IS THE RECOMMENDATION, and it is a feed not a
+holding pattern (I17-as-amended/I26):** the breakoutup excess has excluded
+nothing, the family closes ~3.95/day, and a true +1.00pp edge becomes
+detectable at **n=288 ≈ 23-Nov** on evidence the book generates for free. What
+is NOT available is a bar-lowering or a window re-cut, and what is NOT
+supported is a retirement — the upper bound forbids it.
 
 Instrument this pass: `scripts/golive_readiness.py::live_fillable`. Pinned by
 `tests/autonomy/test_live_fillable.py` (29 tests). Closes nothing carried —
@@ -633,6 +681,19 @@ calibration gate that reproduces the ledger to **0.009pp**.
 **Random wins in all three splits.** Same result (hm) got six times on this
 book in July; this is confirmation on the CURRENT era and the CURRENT policy,
 not a re-run of an old finding.
+
+**[11-Sep (aan)] CORRECTED IN PLACE per I12 — "wins in all three" OVER-READS
+`long-breakoutup`, and the over-read runs in the direction that could license a
+retirement this evidence forbids.** Re-run at **1,000 draws** (MC SE of P =
+0.016) on the same instrument: POOLED P=0.581, `short-divergence` P=0.762,
+**`long-breakoutup` excess −0.007pp at P=0.500 — TIED with random, not beaten.**
+The one-sided upper bound on that excess is **+0.68pp > 0**, so the sample has
+excluded NOTHING and I17-as-amended forbids retiring the book on it. The
+per-family digits above are also Monte-Carlo noise at 200 draws (this cell read
+0.520 / 0.575 / 0.500 across three runs) — **quote the verdict, never the third
+decimal.** The verdict itself is unchanged and stands: no family beats random,
+so nothing here is promotable. See (aan) for the re-run and for the two
+STRUCTURAL blockers on re-aiming `LIVE_SIDES` at `breakoutup`.
 
 **AND THE SPLIT IS THE REAL FINDING, larger than the null itself.**
 `lighter_ticket_taker.LIVE_SIDES` is `{"divergence": {"short"}}` — one lens,
