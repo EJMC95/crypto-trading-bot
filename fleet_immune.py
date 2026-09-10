@@ -42,6 +42,7 @@ phone. Run-once; run_all.sh loops it. --selftest is offline.
 """
 import json
 import os
+import pathlib
 import re
 import sys
 import time
@@ -1753,7 +1754,7 @@ def _selftest():
     assert not any("lshadow" in d or "avo-maria" in d or "kelly" in d or "nobound" in d
                    for d in _sh_det), _sh_det
     # the KEY must be fetched, or the scanner above is dead code
-    _src = open(os.path.abspath(__file__)).read()
+    _src = pathlib.Path(os.path.abspath(__file__)).read_text()
     assert '"golive-readiness")' in _src or '"golive-readiness",' in _src, \
         "golive-readiness is scanned but never fetched — inert scanner"
     # regime-oracle must flag ALL FOUR impossible values in the fixture and

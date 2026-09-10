@@ -13,6 +13,8 @@ growing ~1/day, `room` reaches zero in about a month; past that, ungraded rows
 are dropped entirely and the oldest GRADED rows begin evicting each other, so
 the verdicts would start turning over with nothing saying so.
 """
+import pathlib
+
 import pytest
 
 import fleet_proprioception as FP
@@ -34,7 +36,7 @@ _trim = FP.trim_episodes
 
 def test_the_cap_is_published_beside_the_count():
     """Otherwise the reader cannot tell a full ledger from a busy one."""
-    src = open(FP.__file__).read()
+    src = pathlib.Path(FP.__file__).read_text()
     assert '"ep_cap": EP_CAP,' in src
     assert '"room": _room,' in src and '"evicted": _evicted,' in src
 
