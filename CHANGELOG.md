@@ -1,3 +1,62 @@
+## 2026-09-10 (aac) — 🙏 AVO'S SLOT CAP IS NOT THE CONSTRAINT: REFUSED WITH EVIDENCE, AND MY OWN CENSUS READING WAS THE ARTIFACT
+
+**Eamon, 10-Sep:** *"your proposal sounds good, proceed"* — on re-measuring
+her right cap rather than overriding `(ne)`'s measured refusal of cap 8.
+
+**THE ANSWER IS NO, AND THE NUMBER THAT SAYS SO ALSO CORRECTS ME.** Earlier the
+same session I read her live census — `verdicts: {held: 3, opened: 2,
+slots_full: 42}` — and told Eamon she was slot-bound, 42 of 47 markets turned
+away. **That was ONE LOOP during a correlated market-wide dip**, and I built a
+diagnosis on it. Her own ledger over 57.5 days says the opposite.
+
+Instrument: `scripts/study_avo_cap_2026-09-10.py` (decision rule PRE-DECLARED
+before any number was seen, I21; calibration REFUSES rather than reports).
+
+| | twin (control) | live (real money) |
+|---|---|---|
+| observed | 57.5d, n=37 | 26.2d, n=18 |
+| mean occupancy | **2.90 of 6** | **1.34 of 6** |
+| **time AT cap** | **7.7%** | **0.0%** |
+| time holding NOTHING | 8% | **41%** |
+| opens per burst | **27 singles, 5 pairs** | 12 singles, 3 pairs |
+| marginal slot (held>=4) | +2.980%/t vs +2.264% rest | n=3, too thin |
+| difference | **+0.716pp (SE 1.736, t +0.41)** | — |
+
+**THE CAP DOES NOT BIND — 7.7% and 0.0% against a pre-declared 20% bar — so
+raising it is INERT (I18), not harmful.** The marginal slot is not worse
+either (t=+0.41, indistinguishable), so this is a refusal on REACH, not on
+expectancy: there is nothing wrong with slot 7, there is nothing to put in it.
+
+**THE CLEANEST FINDING IS THE BURST COLUMN: she opens ONE AT A TIME.** 27
+singles against 5 pairs on the twin, never 3 or more. *A book that opens one at
+a time cannot be slot-bound however full it looks at an instant* — and that
+column is immune to the blind spot below, because the live census independently
+shows `opened: 2` in the very loop I mis-read.
+
+**INDEPENDENT CORROBORATION THAT THE OCCUPANCY CODE IS RIGHT:** it reproduces
+`(ye)`'s published figures from a different direction — `(ye)` measured the
+twin at *"6 held 8.3% of its life (peak 7)"*; this reads **7.7% at cap, peak
+7**, on more data since.
+
+**A DECLARED BLIND SPOT, found and published rather than left to be noticed.**
+Occupancy is reconstructed from CLOSED trades, because a close is the only row
+carrying both timestamps — so positions open RIGHT NOW are invisible, and both
+arms are at 6 of 6 as this ships. `open_now()` prints that beside the figure
+with an AT-CAP-NOW flag. Bounded: at most ~3.5pp (twin) and ~6.4pp (live) of
+unseen time, so both stay far under the 20% bar and the verdict survives.
+
+**WHAT IS ACTUALLY BINDING, and it is the I18 point exactly.** She holds
+**nothing 41% of the time** on the live arm and averages 1.34 of 6 slots. The
+constraint is SUPPLY, not capacity — I diagnosed the wrong gate from one
+snapshot and the ledger named the right one. Her scan is **47 markets** against
+👩 mum's **91**, which is the thread `(vd)` already pulled once (*"🙏 avo
+scanned 23 while mum scanned 98"*). That widening is I26-shaped — bounded,
+reversible, on a book that is empty most of the time — but it owes its own
+measurement and its own expectancy price, so it is ESCALATED, not shipped here.
+
+NO LEVER MOVED. The unread `avo-live-slot-6-preregistered-read` (6-Oct) is
+untouched and still decides whether **6** was right.
+
 ## 2026-09-10 (aab) — THE HANDOFF READS THE LIVE FLEET NOW: TWO BOOKS HAVE BEEN READY FOR SIX DAYS AND NOTHING SAID SO
 
 **Eamon, 10-Sep:** *"set up the bots to send you important information so you
