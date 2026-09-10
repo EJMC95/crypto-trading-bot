@@ -1,3 +1,77 @@
+## 2026-09-10 (aab) — THE HANDOFF READS THE LIVE FLEET NOW: TWO BOOKS HAVE BEEN READY FOR SIX DAYS AND NOTHING SAID SO
+
+**Eamon, 10-Sep:** *"set up the bots to send you important information so you
+have all of it in case I forget to ask and miss things, that way you can bring
+them up whenever I start a session."*
+
+**The mechanism already existed and was advertised but never built.** This
+file's own module docstring has claimed since `(sl)` that *"STUCK is read from
+the live fleet — books with no closes, levers pinned at a cage end, organs past
+their own TTL"*. `session_state.py` **read no feed at all** — no `urlopen`, no
+`/pnl.json`, no `/bus.json`, nothing. The section was promised in the one
+document every session is told to read FIRST (I11) and never written, which is
+the `(ac)` doc-rot shape at the worst possible site: a session reads the
+promise and stops looking.
+
+**THE COST, MEASURED IN ONE SESSION.** Three things bit today and every one was
+sitting in a payload the whole time:
+* 🎫 the taker and 🙏 avo's twin are **both READY, 6 of 6 bars** — the fleet's
+  own declared forward metric (*"BOOKS THAT CAN BE GRADED, THEN GO LIVE"*) —
+  and `taker-random-entry-null-blocked-on-ci` records the taker has been READY
+  for a **sixth day**. Nothing surfaced it at session start.
+* 👩 mum's LIVE arm was **shut by `slguard`** at that moment, locked to 19:56
+  Sydney. A real-money book not trading, and the session found it by digging.
+* 🙏 avo's **98h of `maxdd` lockout is PRE-FIX RESIDUE** — her rail was
+  dividing by her frozen $62.80 birth seed instead of funded equity, so 20% of
+  the seed was **$12.56**, less than one stop on her leveraged clip. Fixed at
+  `40a311f` (1-Sep), verified in her running container (`d47c580` calls
+  `maxdd_ref`), deployed by 3-Sep. **A session nearly acted on it as a current
+  condition.**
+
+**SHIPPED: `fleet_signals()` + a `## Fleet signals` section that renders FIRST**
+— before Carried, because I1 reads liveness before it reads content and a live
+book that is SHUT right now outranks any work queue. Four groups, each naming
+an object the operator can act on (I8): FEED DARK · STALENESS · REAL MONEY,
+RIGHT NOW · AT THE GATE.
+
+**THREE RULES IT FOLLOWS, because a briefing that misleads is worse than none:**
+* **The feed's own verdict, never a retyped threshold.** Staleness rides
+  `meta.feed_stale` / `meta.n_stale`; the dashboard owns which per-row bar
+  applies to a stock, a sniper and everything else, and a second copy of that
+  rule is a second rule `(hj)`.
+* **A dark feed is never byte-identical to a clean one** `(kw)`/I4. An
+  unreachable feed says so loudly, per feed; quiet says *"Feed read, nothing
+  flagged"* explicitly, so an empty section can never be mistaken for an unread
+  one.
+* **The gate is IMPORTED, not recomputed** — `golive_readiness` is the one
+  grading authority and this reads its published verdict.
+* **The rolling-window trap is printed inline** on every lockout line, because
+  it is exactly what cost this session an hour: a 14-day window keeps reporting
+  a rail that has since been fixed.
+
+**IT DOES NOT CRY WOLF** `(gl)`: a book three bars out is not listed, a quiet
+live book produces nothing, and only a book AT the gate or ONE bar short is
+named — with the failing bar named too.
+
+**`--check` renders NOTHING now.** It is the CI arm, and rendering there would
+make every push depend on the dashboard being up. A guard has two regimes and
+the CI one has no network.
+
+**TWO DEFECTS THE TESTS FOUND IN MY OWN CODE, both recorded because they are
+the point of writing them:** (1) `fleet_signals(pnl=None)` meant *"go fetch"*,
+so neither a caller nor the selftest could express *"this feed is dark"* — a
+`_FETCH` sentinel now separates the two, since `None` is a REAL value here (it
+is what a failed fetch returns). (2) Mutation **M1 SURVIVED** the first round:
+deleting the `/pnl.json` dark branch left the `/bus.json` one, so the list was
+still non-empty and the assertion passed — **one feed could have gone dark in
+silence.** The test now requires BOTH feeds named and checks each independently.
+Second round: **5/5 killed**, including M1 and a Sydney→UTC mutation on the
+lockout clock.
+
+DECLARED, not claimed: levers-pinned-at-a-cage-end and organ-TTL — the other
+two things the old docstring promised — remain UNBUILT, and the corrected
+docstring says so rather than quietly covering them.
+
 ## 2026-09-10 (aaa) — 🧮 HULL'S CAP RAISE IS DEFERRED, NOT REFUSED — AND THE THREE NUMBERS THAT MOTIVATED IT WERE ALL WRONG IN THE OPTIMISTIC DIRECTION
 
 The 10-Sep daily review measured 🧮 Hull at cap **83.2%** of 3,906 census

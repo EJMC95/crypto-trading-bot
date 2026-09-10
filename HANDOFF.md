@@ -1,6 +1,18 @@
 # HANDOFF — start here
 
-_Generated 2026-09-10 17:12 Sydney (07:12Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-10 18:22 Sydney (08:22Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+
+## Fleet signals — read before anything else
+
+**🕳️ FEED DARK**
+
+- `/pnl.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/pnl.json) — no book state read. This section is blind, not clear.
+- `/bus.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/bus.json) — no gate verdicts read. This section is blind, not clear.
+
+**💵 REAL MONEY, RIGHT NOW**
+
+- `freqtrade-avo-maria-lighter` is DECLARED LIVE and **absent from the feed** — check the service is publishing.
+- `freqtrade-mum-lighter` is DECLARED LIVE and **absent from the feed** — check the service is publishing.
 
 ## Carried — pick these up FIRST (I11)
 
@@ -94,8 +106,11 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (38 commit(s), entries (zt))
+## Shipped today (41 commit(s), entries (zt))
 
+- `635e22a` wip: strengthen dark-feed assertions
+- `7cc8be8` wip: fleet signals section
+- `fc48964` (zy)(zz)(aaa) the letter guard sees open branches; Rich Dad gets a census series; Hull's cap raise measured and deferred to one turnover
 - `c62297f` (zw) pin skip_if_same, the baseline flag, and next_letter's extra_claimed — the preventive half had no test at all
 - `b2c3665` (zw) drive the open-branch arm from main(): a 24-mutation round left 8 alive and every survivor was the WIRING, not the comparison
 - `f1fa9ae` (zw) the letters guard sees OPEN BRANCHES, not just origin/main — nine renumbers in one day, and (ze)/(zf) are held on branches it cannot see

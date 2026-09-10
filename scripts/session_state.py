@@ -21,8 +21,16 @@ is typed by hand.
 
   * **SHIPPED** is read from git — commits since local midnight, and the
     changelog letters they carry.
-  * **STUCK** is read from the live fleet — books with no closes, levers pinned
-    at a cage end, organs past their own TTL.
+  * **FLEET SIGNALS** are read from the live fleet — staleness on the feed's
+    own verdict, any live book shut right now, and any book at or one bar from
+    the go-live gate. [2026-09-10, CORRECTED IN PLACE per I12: this line read
+    *"STUCK is read from the live fleet — books with no closes, levers pinned at
+    a cage end, organs past their own TTL"* from (sl) until today, and **no such
+    section existed and this file read no feed at all**. A handoff that
+    advertises a check it does not run is worse than one that admits the gap —
+    a session reads the promise and stops looking. `fleet_signals()` is that
+    section, built to Eamon's ask on 10-Sep; levers-at-a-cage-end and
+    organ-TTL remain UNBUILT and are deliberately not claimed here.]
   * **CARRIED** is the one hand-written part, and every entry carries a
     `closes_when` PREDICATE that this script evaluates against the repo. An
     item whose predicate says DONE is reported as **CLOSE THIS** and fails
@@ -779,6 +787,166 @@ def shipped_today(now=None, since=None):
     return rows, letters
 
 
+#: The public read-only feeds. Overridable so a test drives a fixture and so a
+#: session behind a proxy can point at a mirror. No auth, no DATABASE_URL — this
+#: has to work from a laptop and from CI.
+FEED_URL = os.environ.get(
+    "SESSION_STATE_FEED",
+    "https://pnl-dashboard-production-858c.up.railway.app/pnl.json")
+BUS_URL = os.environ.get(
+    "SESSION_STATE_BUS",
+    "https://pnl-dashboard-production-858c.up.railway.app/bus.json")
+
+
+def _fetch(url, timeout=6.0):
+    """-> parsed JSON, or None on ANY trouble. Never raises and never hangs:
+    a session must be able to start when the feed is down, and a 30-second
+    stall at `--write` is how a tool stops being run."""
+    try:
+        import urllib.request
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+#: Sentinel for "go and fetch it". `None` is a REAL value here — it is what a
+#: failed fetch returns — so it cannot double as the default, or a caller (and
+#: the selftest) has no way to say "this feed is dark" without unplugging the
+#: network. Found by the selftest on the first run.
+_FETCH = object()
+
+
+def fleet_signals(pnl=_FETCH, bus=_FETCH):
+    """WHAT THE BOOKS ARE REPORTING THAT NOBODY THOUGHT TO ASK.
+
+    **Eamon, 2026-09-10: "set up the bots to send you important information so
+    you have all of it in case I forget to ask and miss things, that way you can
+    bring them up whenever I start a session."**
+
+    This file's own module docstring has claimed since (sl) that *"STUCK is read
+    from the live fleet"* and it never read a feed at all — the section was
+    advertised and never built, which is the (ac) doc-rot shape in the one file
+    every session starts from. Three things bit a single session on 10-Sep and
+    every one of them was sitting in a payload the whole time:
+
+      * 🎫 the taker and 🙏 avo's twin had BOTH reached `ready` 6/6 — the
+        fleet's first-ever gate passes, its own declared forward metric
+        ("BOOKS THAT CAN BE GRADED, THEN GO LIVE"), and nothing surfaced it;
+      * 👩 mum's LIVE arm was locked out by `slguard` at that moment;
+      * 🙏 avo's 98h of `maxdd` lockout was PRE-FIX residue, and a session
+        nearly acted on it as a current condition.
+
+    THREE RULES THIS FOLLOWS, because a briefing that misleads is worse than
+    none:
+      * **I1 — liveness before semantics.** Staleness is reported FIRST and
+        from the feed's OWN verdict (`meta.feed_stale` / `meta.n_stale`), never
+        re-derived here: the dashboard owns which per-row threshold applies to a
+        stock, a sniper and everything else, and a second copy of that rule is a
+        second rule.
+      * **A dark feed is never byte-identical to a clean one** ((kw), I4). An
+        unreachable feed reports DARK loudly; it does not silently render an
+        empty, reassuring section.
+      * **The gate is IMPORTED, not recomputed** — `golive_readiness` is the
+        fleet's one grading authority and this reads its published verdict.
+
+    -> {"dark": [str], "gate": [str], "live": [str], "stale": [str]}
+    """
+    pnl = _fetch(FEED_URL) if pnl is _FETCH else pnl
+    bus = _fetch(BUS_URL) if bus is _FETCH else bus
+    out = {"dark": [], "gate": [], "live": [], "stale": []}
+
+    if not isinstance(pnl, dict):
+        out["dark"].append(
+            f"`/pnl.json` UNREACHABLE ({FEED_URL}) — no book state read. "
+            "This section is blind, not clear.")
+    if not isinstance(bus, dict):
+        out["dark"].append(
+            f"`/bus.json` UNREACHABLE ({BUS_URL}) — no gate verdicts read. "
+            "This section is blind, not clear.")
+
+    # ---- I1: liveness first, on the feed's own verdict ------------------
+    rows = (pnl or {}).get("bots") or []
+    meta = (pnl or {}).get("meta") or {}
+    if isinstance(pnl, dict):
+        if meta.get("feed_stale"):
+            out["stale"].append("**the FEED ITSELF is stale** — every reading "
+                                "below is suspect until it refreshes.")
+        n_stale = meta.get("n_stale")
+        if isinstance(n_stale, int) and n_stale > 0:
+            aged = sorted(
+                ((r.get("bot"), r.get("age_sec")) for r in rows
+                 if isinstance(r, dict) and isinstance(r.get("age_sec"),
+                                                       (int, float))),
+                key=lambda kv: -kv[1])[:n_stale]
+            out["stale"].append(
+                f"the feed reports **{n_stale} stale row(s)**; oldest: "
+                + ", ".join(f"`{b}` {a/3600.0:.1f}h" for b, a in aged))
+
+    # ---- the payoff event: a book at the gate ---------------------------
+    g = (bus or {}).get("golive_readiness") or {}
+    books = (g.get("books") if isinstance(g, dict) else None) or {}
+    for bot, v in sorted(books.items()):
+        if not isinstance(v, dict):
+            continue
+        bars = v.get("bars") or v.get("bar_map") or {}
+        if not isinstance(bars, dict) or not bars:
+            continue
+        passed = sum(1 for x in bars.values() if x is True)
+        if v.get("ready") is True:
+            out["gate"].append(
+                f"`{bot}` is **READY — {passed}/{len(bars)} bars**. Going live "
+                "is Eamon's explicit act; it is never an automatic consequence "
+                "of passing.")
+        elif passed == len(bars) - 1:
+            missing = sorted(k for k, x in bars.items() if x is not True)
+            out["gate"].append(
+                f"`{bot}` is one bar short ({passed}/{len(bars)}) — "
+                f"failing: {', '.join(missing)}.")
+
+    # ---- real money, right now -----------------------------------------
+    try:
+        import fleet_books as _fb
+        live = _fb.live_rows_from_feed(pnl) or list(_fb.DECLARED_LIVE)
+    except Exception:                                        # noqa: BLE001
+        live = []
+    by_id = {r.get("bot"): r for r in rows if isinstance(r, dict)}
+    for bot in live:
+        r = by_id.get(bot)
+        if not isinstance(r, dict):
+            out["live"].append(f"`{bot}` is DECLARED LIVE and **absent from "
+                               "the feed** — check the service is publishing.")
+            continue
+        ev = (r.get("extra") or {}).get("entry_vetoes") or {}
+        if ev.get("shut_now"):
+            until = ev.get("locked_until")
+            when = ""
+            if isinstance(until, str):
+                try:
+                    t = _dt.datetime.fromisoformat(until.replace("Z", "+00:00"))
+                    when = f" until {t.astimezone(SYD).strftime('%H:%M')} Sydney"
+                except ValueError:
+                    when = f" until {until}"
+            out["live"].append(
+                f"`{bot}` is **SHUT right now** — `{ev.get('shut_now')}`"
+                f"{when} ({ev.get('shut_reason') or 'no reason published'}).")
+        lo = ev.get("lockout_hours_30d") or {}
+        tot, span = lo.get("total"), lo.get("span_h")
+        if isinstance(tot, (int, float)) and isinstance(span, (int, float)) \
+                and span > 0 and tot / span >= 0.10:
+            worst = max(((k, v) for k, v in lo.items()
+                         if k not in ("total", "span_h", "loops")
+                         and isinstance(v, (int, float))),
+                        key=lambda kv: kv[1], default=(None, 0))
+            out["live"].append(
+                f"`{bot}` was shut **{tot/span:.0%} of the last "
+                f"{span/24.0:.1f}d** ({tot:.0f}h), mostly `{worst[0]}` "
+                f"({worst[1]:.0f}h). NOTE: a rolling window keeps reporting a "
+                "rail that has since been FIXED — date the events before "
+                "acting on this.")
+    return out
+
+
 def _dead_rows():
     """Row ids the fleet has retired, from the two registries that declare it.
 
@@ -833,15 +1001,37 @@ def carried_status():
     return out
 
 
-def render(now=None):
+def render(now=None, signals=None):
     now = now or _dt.datetime.now(SYD)
     rows, letters = shipped_today(now)
     status = carried_status()
+    if signals is None:
+        signals = fleet_signals()
     L = []
     L.append("# HANDOFF — start here\n")
     L.append(f"_Generated {now.strftime('%Y-%m-%d %H:%M')} Sydney "
              f"({now.astimezone(_dt.timezone.utc).strftime('%H:%M')}Z) by "
              "`scripts/session_state.py`. Do not hand-edit: regenerate it._\n")
+
+    # Liveness and real money come before the work queue: I1 reads `age_sec`
+    # before it reads content, and a live book that is SHUT right now outranks
+    # any carried item. Quiet is stated explicitly — an empty section here must
+    # never be mistakable for an unread one ((kw)).
+    L.append("## Fleet signals — read before anything else\n")
+    order = (("dark", "🕳️ FEED DARK"), ("stale", "⏳ STALENESS (I1)"),
+             ("live", "💵 REAL MONEY, RIGHT NOW"), ("gate", "🚦 AT THE GATE"))
+    if not any(signals.get(k) for k, _ in order):
+        L.append("_Feed read, nothing flagged: no stale rows, no live book "
+                 "shut, no book at or one bar from the gate._\n")
+    for key, title in order:
+        items = signals.get(key) or []
+        if not items:
+            continue
+        L.append(f"**{title}**\n")
+        for s in items:
+            L.append(f"- {s}")
+        L.append("")
+
     L.append("## Carried — pick these up FIRST (I11)\n")
     open_items = [(i, d) for i, d in status if not d]
     done_items = [(i, d) for i, d in status if d]
@@ -881,12 +1071,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
-    text = render()
-    if a.write:
-        with open(HANDOFF, "w") as fh:
-            fh.write(text + "\n")
-        print(f"wrote {HANDOFF}")
     if a.check:
+        # [2026-09-10] `--check` is the CI arm and renders NOTHING: since
+        # `render` learned to read the live feeds, rendering here would make
+        # every push depend on the dashboard being up. A guard has two regimes
+        # and the CI one has no network.
         stale = [i["id"] for i, d in carried_status() if d]
         if stale:
             print("audit_session_state: FAIL — carried item(s) whose own "
@@ -907,7 +1096,12 @@ def main(argv=None):
         print(f"audit_session_state: OK — {len(CARRIED)} carried item(s), "
               "none stale, none orphaned.")
         return 0
-    if not a.write:
+    text = render()
+    if a.write:
+        with open(HANDOFF, "w") as fh:
+            fh.write(text + "\n")
+        print(f"wrote {HANDOFF}")
+    else:
         print(text)
     return 0
 
@@ -961,10 +1155,103 @@ def selftest():
     assert _has("no_such_file.py", "x") is False
 
     # the render names the owner, so an OPERATOR item cannot look like session
-    # work a future pass will just pick up
-    txt = render()
+    # work a future pass will just pick up. `signals={}` keeps the selftest
+    # OFF the network — the fetch is exercised separately, below, against
+    # fixtures shaped like the real publishers.
+    txt = render(signals={})
     assert "owner: **OPERATOR**" in txt and "owner: **session**" in txt, txt[:400]
     assert "Shipped today" in txt and "Carried" in txt
+
+    # ---- fleet_signals ---------------------------------------------------
+    # A DARK FEED IS NOT A CLEAN ONE. This is the whole point of the section:
+    # the failure it must never have is rendering silence that reads as "all
+    # well" ((kw), I4).
+    dark = fleet_signals(pnl=None, bus=None)
+    assert dark["dark"], "an unreachable feed must SAY so"
+    _d = " ".join(dark["dark"])
+    # BOTH feeds are named. Asserting only that the list is non-empty let a
+    # mutation delete the /pnl.json branch and stay GREEN on the /bus.json one
+    # — i.e. one feed could go dark in silence. Caught by mutation M1.
+    assert "/pnl.json" in _d and "/bus.json" in _d, _d
+    assert _d.count("blind, not clear") == 2, _d
+    # and each feed is independently reported, not just the pair
+    only_bus = fleet_signals(pnl={"bots": [], "meta": {}}, bus=None)
+    assert len(only_bus["dark"]) == 1 and "/bus.json" in only_bus["dark"][0]
+    only_pnl = fleet_signals(pnl=None, bus={})
+    assert len(only_pnl["dark"]) == 1 and "/pnl.json" in only_pnl["dark"][0]
+    dtxt = render(signals=dark)
+    assert "FEED DARK" in dtxt and "nothing flagged" not in dtxt
+
+    # ...and quiet is stated explicitly, so an EMPTY section is never
+    # mistakable for an UNREAD one.
+    qtxt = render(signals={"dark": [], "stale": [], "live": [], "gate": []})
+    assert "nothing flagged" in qtxt
+
+    # a READY book is surfaced — this is the fleet's declared forward metric
+    # and on 10-Sep two books reached it with nothing to announce it
+    bus_fx = {"golive_readiness": {"books": {
+        "book-ready": {"ready": True,
+                       "bars": {"window": True, "closes": True, "mean": True,
+                                "t": True, "halves": True, "maxdd": True}},
+        "book-one-short": {"ready": False,
+                           "bars": {"window": True, "closes": True,
+                                    "mean": True, "t": False, "halves": True,
+                                    "maxdd": True}},
+        "book-far": {"ready": False,
+                     "bars": {"window": True, "closes": False, "mean": False,
+                              "t": False, "halves": True, "maxdd": True}}}}}
+    sig = fleet_signals(pnl={"bots": [], "meta": {}}, bus=bus_fx)
+    joined = " ".join(sig["gate"])
+    assert "book-ready" in joined and "READY" in joined, joined
+    assert "book-one-short" in joined and "t" in joined, joined
+    # a book three bars out is NOT noise-listed — a section that flags
+    # everything trains the reader to ignore it ((gl))
+    assert "book-far" not in joined, joined
+    # going live stays an explicit operator act, and the briefing says so
+    assert "explicit act" in joined
+
+    # a live book SHUT right now is surfaced, with the time in Sydney
+    pnl_fx = {"meta": {"feed_stale": False, "n_stale": 0}, "bots": [
+        {"bot": "freqtrade-mum-lighter", "age_sec": 10, "extra": {
+            "entry_vetoes": {"shut_now": "slguard",
+                             "shut_reason": "protections_locked",
+                             "locked_until": "2026-09-10T09:56:59+00:00",
+                             "lockout_hours_30d": {"total": 48.3,
+                                                   "span_h": 330.5,
+                                                   "slguard": 28.1,
+                                                   "cooldown": 13.3}}}}]}
+    sig = fleet_signals(pnl=pnl_fx, bus={})
+    live = " ".join(sig["live"])
+    assert "SHUT right now" in live and "slguard" in live, live
+    assert "19:56 Sydney" in live, live          # 09:56Z -> AEST, never bare UTC
+    assert "15%" in live and "slguard" in live, live
+    # the rolling-window trap that cost this session an hour is stated inline
+    assert "has since been FIXED" in live, live
+
+    # a DECLARED-live row missing from the feed is itself a signal: that is a
+    # real-money book whose service has stopped publishing, and silence about
+    # it is the worst possible reading
+    gone = " ".join(fleet_signals(pnl=pnl_fx, bus={})["live"])
+    assert "freqtrade-avo-maria-lighter" in gone and "absent" in gone, gone
+
+    # a quiet live book produces NO live signal — the section must not cry wolf
+    def _q(bot):
+        return {"bot": bot, "age_sec": 10, "extra": {"entry_vetoes": {
+            "shut_now": None,
+            "lockout_hours_30d": {"total": 1.0, "span_h": 330.5}}}}
+    quiet = {"meta": {"feed_stale": False, "n_stale": 0},
+             "bots": [_q("freqtrade-mum-lighter"),
+                      _q("freqtrade-avo-maria-lighter")]}
+    assert fleet_signals(pnl=quiet, bus={})["live"] == []
+
+    # I1: staleness rides the FEED's OWN verdict, never a threshold retyped here
+    stale_fx = {"meta": {"feed_stale": True, "n_stale": 1}, "bots": [
+        {"bot": "sleepy-book", "age_sec": 99999, "extra": {}},
+        {"bot": "awake-book", "age_sec": 5, "extra": {}}]}
+    st = " ".join(fleet_signals(pnl=stale_fx, bus={})["stale"])
+    assert "FEED ITSELF is stale" in st and "sleepy-book" in st, st
+    assert "awake-book" not in st, st
+
     print("session_state selftest OK")
     return 0
 
