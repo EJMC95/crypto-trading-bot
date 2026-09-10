@@ -827,6 +827,19 @@ def veto_split(rows, vetoed, tag_of=None):
     UNDERSTATES the forward book, which is the point: the split is not a
     warning, it is the number the decision actually needs.
 
+    **[(aan)] CORRECTED IN PLACE per I12 — "the forward book" is the SHADOW
+    arm's, and for a PROMOTION that is the wrong arm.** `still_tradeable` is
+    what THIS arm keeps trading. Where a book's LIVE mode runs a narrower
+    policy the live arm's forward set is a different subset, and on 🎫 the
+    taker it is the exact inverse: `LIVE_LENSES` is `{"divergence"}`, so all
+    162 closes filed here as `still_tradeable` (+1.382%/trade, t=+2.70) are a
+    family no live arm may fill, and the 46 filed as `now_vetoed` are the only
+    ones it may. A reader carrying this number to a go-live decision reads the
+    most flattering subset of the sample and the one no live arm can produce.
+    The NAME is kept — it is accurate for the arm being graded, and renaming a
+    published field breaks its consumers — and `live_fillable` publishes the
+    other arm's subset beside it. Read that one before promoting anything.
+
     This is `class_split`'s argument on a different screen — *a number a
     decision depends on must be READABLE, not recomputable* — and it carries
     the same three refusals: **it moves no sample, no era and no bar.**
