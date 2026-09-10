@@ -2474,9 +2474,30 @@ def main(_ctx=None, once=False):
                     # measured trajectory. Whether the guard should REFUSE that
                     # state is Eamon's call, not a side effect of a telemetry
                     # pass — REPORTED, and it is now visible enough to decide.
-                    "days_to_gate_basis": ("measured_rate"
-                                           if (st.get("closed") or 0)
-                                           else "birth_window"),
+                    # [(zv)] THE BASIS SAID `measured_rate` ON A VALUE THAT
+                    # IS NEVER A MEASURED RATE. The number above is
+                    # `max(0, 30 - age_days)` — the birth countdown, exactly
+                    # as this block's own comments say — but the basis flipped
+                    # to "measured_rate" the moment the book had ONE close, so
+                    # a consumer reading the pair concluded "14.4 days at the
+                    # measured rate" on a figure that is pure calendar. It was
+                    # false on BOTH real-money rows (mum: age 15.64d ->
+                    # `days_to_gate_obs` 14.4, basis `measured_rate`), and the
+                    # dashboard duly rendered it as a decidability estimate
+                    # beside the grader's own 66.6d.
+                    # The wording now MATCHES `lighter_family_bot.spend_extra`
+                    # by construction rather than by memory — one quantity,
+                    # one description, on every host that publishes it. The
+                    # `birth_window` token is kept verbatim for the zero-close
+                    # branch because `audit_book_spend` admits a declared
+                    # unknown on it. Computing a REAL `(2/S_d)^2` here is a
+                    # separate, measured change: it would move what
+                    # `MAX_DAYS_TO_GATE` gates on, so it owes its own number.
+                    "days_to_gate_basis": (
+                        ("birth countdown to the 30-day window bar; the "
+                         "book's own rate supersedes it once its ledger can "
+                         "carry an S_d")
+                        if (st.get("closed") or 0) else "birth_window"),
                     "closes_obs": int(st.get("closed") or 0),
                 },
                 "initial_equity": base_eq,

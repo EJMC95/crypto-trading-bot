@@ -1009,16 +1009,19 @@ def test_a_partial_renderer_still_leaves_its_residue():
 
 
 def test_the_spend_row_does_not_claim_to_be_the_gate_eta():
-    """I22's `days_to_gate_obs` is `(2/S_d)^2` — days to DECIDABILITY at the
-    book's own Sharpe — and the 🚦 card's horizon chip projects the binding
-    BAR. They read 14.4d and 66.6d for 👩 mum's live arm on the same page, so a
-    bare "to gate" invites a reader to take the smaller one as the answer."""
+    """[(zv)] CORRECTED. This test shipped at (zu) asserting
+    "decidable in 14.4d", which pinned a MISLABEL: (zu) took I22's definition
+    of `days_to_gate_obs` as `(2/S_d)^2` and never checked the publishers,
+    every one of which computes `max(0, 30 - age_days)`. The property that
+    survives is the one this test was really for — the row must not read as
+    the gate ETA, which the 🚦 card owns. What it IS is asserted in
+    `test_the_spend_row_names_the_calendar_it_actually_shows`."""
     out = dash._t_spend({"markets_scanned": 91, "markets_held": 3,
                          "n_eff": 2.07, "sides": "long", "gross_x": 5.0,
                          "days_to_gate_obs": 14.4,
-                         "days_to_gate_basis": "measured_rate"})
-    assert "decidable in 14.4d" in out
+                         "days_to_gate_basis": "birth countdown"})
     assert "NOT the gate ETA" in out
+    assert "decidable in" not in out
 
 
 # --------------------------------------------------------------------------
@@ -1090,3 +1093,103 @@ def test_the_all_clear_only_names_checks_that_still_run():
                 if isinstance(n, ast.Constant) and isinstance(n.value, str)
                 and "Health ✓" in n.value)
     assert "probation" not in line
+
+
+# --------------------------------------------------------------------------
+# [(zv)] the four findings the review could not verify before it ran out
+# --------------------------------------------------------------------------
+def test_the_spend_row_names_the_calendar_it_actually_shows():
+    """(zu) RELABELLED THIS WRONG AND THIS TEST IS THE CORRECTION.
+
+    I22 defines `days_to_gate_obs` as `(2/S_d)^2`, and (zu) rendered it
+    "decidable in Nd" on that definition. **Every publisher computes it as
+    `max(0, 30 - age_days)`** — the birth countdown to the 30-day window bar.
+    Measured: both live rows published 14.4 against `progression.age_days`
+    15.64, while the grader's own horizon for 👩 mum read 66.6d."""
+    out = dash._t_spend({"markets_scanned": 91, "markets_held": 3,
+                         "n_eff": 2.07, "sides": "long", "gross_x": 5.0,
+                         "days_to_gate_obs": 14.4,
+                         "days_to_gate_basis": "birth countdown to the 30-day "
+                                               "window bar"})
+    assert "≥14.4d of the 30d window" in out
+    assert "decidable" not in out, "the (zu) mislabel is back"
+    assert "NOT the gate ETA" in out and "floor" in out
+
+
+def test_every_host_computes_the_same_birth_countdown():
+    """The claim the label rests on, checked against the publishers rather
+    than trusted: if any host ever computes a real `(2/S_d)^2` here, this
+    reddens and the dashboard's wording has to be revisited."""
+    import re as _re
+    for mod in ("lighter_avo_live_bot.py", "lighter_family_bot.py",
+                "lighter_book_douglas_bot.py"):
+        src = (_ROOT / mod).read_text(encoding="utf-8")
+        i = src.index('"days_to_gate_obs"')
+        window = src[i:i + 260]
+        assert _re.search(r"30\.0\s*-", window), (
+            f"{mod} no longer publishes `30 - age` for days_to_gate_obs; the "
+            f"Spend row's wording assumes it does")
+
+
+def test_the_live_hosts_basis_describes_its_own_value():
+    """It read `measured_rate` the moment a book had one close, on a number
+    that is pure calendar — false on BOTH real-money rows."""
+    src = (_ROOT / "lighter_avo_live_bot.py").read_text(encoding="utf-8")
+    i = src.index('"days_to_gate_basis"')
+    block = src[i:i + 420]
+    assert '"measured_rate"' not in block, "the false basis string is back"
+    assert "birth countdown" in block
+    assert '"birth_window"' in block, (
+        "the zero-close token is what audit_book_spend admits a declared "
+        "unknown on — it must survive")
+
+
+def test_the_liquidation_read_shows_the_basket_actually_held():
+    """`liq_gap_pct(mmf, G) = mmf - 1/G`. At 👩 mum's CONFIGURED 5x gross that
+    is 0.20 - 0.20 = 0.0, and the tooltip read "Liquidation gap +0.0%" — a
+    statement about a deployment she is not at, phrased as though she were at
+    the boundary now. Her HELD basket reads -0.7122."""
+    out = dash._t_leverage({"set": 5.0, "leverage_now": 1.3121,
+                            "liq_gap_pct": 0.0, "liq_gap_held_pct": -0.7122})
+    assert "liq at -71% held" in out
+    assert "CONFIGURED gross" in out and "actually held" in out
+    # an unmeasurable mmf publishes None — and 0.0 here would read as "at
+    # liquidation", so absence must render nothing at all.
+    bare = dash._t_leverage({"set": 5.0})
+    assert "liq at" not in bare
+
+
+def test_the_rail_that_shut_the_book_is_named_before_its_vocabulary():
+    """`why or shut` meant `shut_reason` ALWAYS won, so `shut_now` was
+    unreachable whenever the book was actually shut: 👩 mum's live row read
+    `shut_now: "slguard"` and the card rendered `protections_locked`."""
+    out = dash._t_entry_vetoes({"shut_now": "slguard",
+                                "shut_reason": "protections_locked",
+                                "coin_veto": {}})
+    assert "slguard" in out
+    assert "protections_locked" in out, "the vocabulary is still worth having"
+    assert out.index("slguard") < out.index("protections_locked")
+    # a DISTINCTIVE token, not "x": the first cut of this assertion counted
+    # "x" and found 3, because it is a substring of `text-align` and
+    # `max-width` in the row's own markup — the substring trap this file
+    # already records twice.
+    same = dash._t_entry_vetoes({"shut_now": "slguard",
+                                 "shut_reason": "slguard", "coin_veto": {}})
+    assert same.count("slguard") == 1, "a duplicated reason is rendered twice"
+
+
+def test_a_judge_pair_prefers_its_fields_over_contradicting_prose():
+    """mum's pair carried `note: "no candidate in this pair's queue"` beside
+    `candidate: "mum-vel-12-20"`. A publisher's prose is a snapshot; its
+    fields are the state."""
+    rows = dash._pipe_pairs({"pairs": {"mum": {
+        "phase": "running", "hold": "floors", "candidate": "mum-vel-12-20",
+        "note": "judgeable; no candidate in this pair's queue",
+        "eta_judgeable": {"eta": "2026-09-17", "binding": "window"}}}})
+    detail = rows[0][4]
+    assert "mum-vel-12-20" in detail and "no candidate" not in detail
+    assert "hold: floors" in detail and "2026-09-17" in detail
+    # a pair with no fields still falls back to the note rather than blank
+    bare = dash._pipe_pairs({"pairs": {"x": {"phase": "idle",
+                                             "note": "nothing queued"}}})
+    assert bare[0][4] == "nothing queued"

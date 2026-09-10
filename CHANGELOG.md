@@ -1,3 +1,101 @@
+## 2026-09-10 (zv) — THE FOUR FINDINGS THE REVIEW RAN OUT OF BUDGET TO VERIFY, AND ONE OF THEM SAYS (zu) MISLABELLED A REAL-MONEY NUMBER
+
+**Eamon, 10-Sep: *"yes please"*** — pick up the candidate findings `(zu)`'s
+adversarial review produced but could not verify: seven verifier agents hit a
+session limit before returning a verdict.
+
+**FIVE OF THE SEVEN WERE DUPLICATES** of findings the same sweep confirmed
+through a different lens and `(zu)` already fixed (the retired win-rate gate,
+`all_slots_stop_pct_measured`, `dd_resampled`, the absent `shut_now`, the
+spend label). **Four were genuinely open, all four are real, and each was
+verified against the publisher's own source before anything moved.**
+
+### 1 · THE ONE THAT MATTERS: `(zu)` NAMED A REAL-MONEY NUMBER WRONG
+
+`(zu)` found the Spend row printing `14.4d to gate` beside the grader's own
+`66.6d` for 👩 mum's LIVE arm and relabelled it **"decidable in 14.4d"**, on
+I22's definition of `days_to_gate_obs` as `(2/S_d)^2`. **It never checked the
+publisher.** Every host in this fleet computes it as:
+
+    round(max(0.0, 30.0 - (t0 - born_ts) / 86400.0), 1)
+
+— the **birth countdown to the 30-day window bar**. `lighter_avo_live_bot`,
+`lighter_family_bot` and `lighter_book_douglas_bot` agree, and the live host's
+own comment says so in as many words: *"It is the birth countdown."* Measured:
+both live rows publish `days_to_gate_obs 14.4` against
+`progression.age_days 15.64`, i.e. exactly `30 − age`. So the number is neither
+a decidability estimate NOR a gate ETA — it is calendar, and a floor. `(zu)`
+replaced one wrong reading with another, and this corrects it in place (I12):
+the row now reads **`≥14.2d of the 30d window`** and its tooltip says what the
+figure is, what it is not, and which card owns the gate ETA.
+
+**AND THE DEFECT IS NOT ONLY THE DASHBOARD'S.** The live host published
+`days_to_gate_basis: "measured_rate"` the moment a book had ONE close — **on a
+value that is never a measured rate** — so a consumer reading the pair
+concluded *"14.4 days at the measured rate"* about pure calendar. It was false
+on **both real-money rows**. The basis now carries the family host's own honest
+wording, **matched by identity rather than by memory** so one quantity cannot
+grow two descriptions, and the `birth_window` token survives verbatim on the
+zero-close branch because `audit_book_spend` admits a declared unknown on it.
+**DECLARED, NOT FIXED:** computing a REAL `(2/S_d)^2` here would move what
+`MAX_DAYS_TO_GATE` gates on, so it is a separate change that owes its own
+measurement — three publisher comments and the guard's own docstring still
+describe the value as `(2/S_d)^2` while none of them computes it.
+
+**A pin blocked the correction and was RE-AIMED rather than deleted** (I26 — *a
+pin is a snapshot, not a property*): `test_variant_host` asserted the literal
+`"measured_rate"`, which was correct about the string and false about the value
+beside it. It now requires the basis to DESCRIBE the value and to match the
+family host's wording.
+
+### 2 · THE LIQUIDATION READ WAS A CEILING RENDERED AS THE PRESENT
+
+`liq_gap_pct(mmf, G) = mmf − 1/G` is the adverse move that liquidates. At 👩
+mum's **configured** 5× gross that is `0.20 − 1/5 = 0.0`, and the card's tooltip
+read **"Liquidation gap +0.0%"** — a statement about a deployment she is not at,
+phrased as though she were at the boundary now. Her **held** basket reads
+`liq_gap_held_pct −0.7122`. Both render now, each labelled, the same shape
+`(zu)` already gave `stop_reachable` vs `stop_reachable_held`; live today it
+reads `liq at −61% held` in the body with the configured-gross figure in the
+tooltip. An unmeasurable mmf is `None` and prints nothing — `0.0` here would
+read as *at liquidation*.
+
+### 3 · THE RAIL THAT SHUT THE BOOK WAS UNREACHABLE
+
+`s = f'SHUT — {why or shut}'` meant `shut_reason` **always** won, so `shut_now`
+could never render while the book was actually shut. Measured on 👩 mum's live
+row: `shut_now: "slguard"` (the stop-loss guard) displayed as the generic
+`"protections_locked"`. The rail comes first now and the vocabulary follows it
+in parentheses — `SHUT — slguard (protections_locked)` — and a reason that
+equals the rail is not printed twice.
+
+### 4 · A PAIR'S PROSE CONTRADICTED ITS OWN FIELDS
+
+`_pipe_pairs` rendered `note`, and 🧪 the judge's mum pair carried
+`note: "judgeable; no candidate in this pair's queue"` beside
+`candidate: "mum-vel-12-20"`, `hold: "floors"` and an `eta_judgeable`. **A
+publisher's prose is a snapshot; its fields are the state.** The card builds
+the detail from the fields and falls back to the note only when the pair
+carries none — live today 🙏 avo's pair reads
+`judgeable ≥2026-10-08 (shadow_closes)` instead of a sentence.
+
+### AND TWO DEFECTS IN MY OWN TESTS, BOTH THE SAME TRAP
+
+`(zu)` shipped `test_the_spend_row_does_not_claim_to_be_the_gate_eta` asserting
+`"decidable in 14.4d"` — **a test that pinned the mislabel**, which is why the
+correction had to start by reddening it. And this pass's first
+`shut_now` assertion counted the token `"x"` and found **3**, because `x` is a
+substring of `text-align` and `max-width` in the row's own markup — *a
+page-wide substring scan is not a structural claim*, for the third time in two
+entries, in the file that records the rule.
+
+**MOVES NO MONEY, NO LEVER, NO BOT AND NO VERDICT.** The publisher change is a
+string: no trade, gate or size differs, so **main only** per `(mm)` — it rides
+the next live deploy that earns one. Pinned by six new tests in
+`tests/autonomy/test_card_week_telemetry.py` (87 there now, 71 test functions with parametrisation), including one that
+checks the `30 − age` arithmetic in all three publishers, so if any host ever
+computes a real `(2/S_d)^2` the dashboard's wording reddens instead of drifting.
+
 ## 2026-09-10 (zu) — THE WEEK'S TELEMETRY REACHED THE CARD, AND THE PAGE WAS STILL RUNNING THE GO-LIVE GATE THE FLEET RETIRED IN JULY
 
 > **[RENUMBERED (zt) -> (zu) at push.]** A concurrent session landed its own

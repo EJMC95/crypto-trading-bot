@@ -2587,7 +2587,26 @@ def _pipe_pairs(judge):
                 detail = f'{detail or ""} → {sd["successor"]}'.strip()
         else:
             cls = PIPE_PAIR_PHASE.get(phase, PIPE_UNKNOWN)
-            head, wake, detail = phase or "?", None, p.get("note")
+            head, wake = phase or "?", None
+            # [(zv)] PREFER THE FIELDS OVER THE PROSE — the note can contradict
+            # the object it sits in. Measured on the live payload: mum's pair
+            # carried `note: "judgeable; no candidate in this pair's queue"`
+            # beside `candidate: "mum-vel-12-20"` and `hold: "floors"`, and the
+            # card rendered the note. A publisher's prose is a snapshot; its
+            # fields are the state.
+            _cand, _hold = p.get("candidate"), p.get("hold")
+            _bits = []
+            if _cand:
+                _bits.append(f'candidate {_cand}')
+            if _hold:
+                _bits.append(f'hold: {_hold}')
+            _eta = p.get("eta_judgeable") if isinstance(
+                p.get("eta_judgeable"), dict) else None
+            if _eta and _eta.get("eta"):
+                _bits.append(f'judgeable ≥{_eta["eta"]}'
+                             + (f' ({_eta["binding"]})' if _eta.get("binding")
+                                else ''))
+            detail = " · ".join(_bits) if _bits else p.get("note")
         # the stamp census IS the measurement, so show it where it exists
         st = p.get("stamps") if isinstance(p.get("stamps"), dict) else None
         if st:
@@ -3457,20 +3476,27 @@ def _t_spend(spend):
         bits.append(html.escape(str(sides)))
     if gross is not None:
         bits.append(f'{gross:g}×')
-    # [(zu)] NAME THE QUANTITY. This is I22's `(2/S_d)^2` — how fast the
-    # DESIGN can become decidable at its own measured Sharpe — and it is NOT
-    # the grader's gate ETA, which projects the binding BAR. On 👩 mum's live
-    # row they read 14.4d and 66.6d on the same page, and a bare "to gate"
-    # invites a reader to treat the smaller one as the answer.
-    bits.append(f'decidable in {days:g}d' if days is not None
+    # [(zv)] NAME THE QUANTITY — AND (zu) NAMED IT WRONG. That entry relabelled
+    # this "decidable in Nd" on I22's definition of `days_to_gate_obs` as
+    # `(2/S_d)^2`. **Every publisher in this fleet computes it as
+    # `max(0, 30 - age_days)`** — the birth countdown to the 30-day window bar,
+    # verified in `lighter_avo_live_bot`, `lighter_family_bot` and
+    # `lighter_book_douglas_bot`. So it is neither a decidability estimate nor
+    # the gate ETA: it is the calendar remaining on one bar, and a FLOOR.
+    # Measured on 👩 mum's live row the day this was corrected: the card said
+    # 14.4d beside the grader's own 66.6d, and BOTH live books published
+    # exactly `30 - age_days` (age 15.64d -> 14.4d).
+    bits.append(f'<span class="muted">≥{days:g}d of the 30d window</span>'
+                if days is not None
                 else '<span class="muted">no rate yet</span>')
     return _trow("Spend (I22)", " · ".join(bits),
                  "I22 spend census: markets scanned, N_eff of what it holds "
-                 "(correlation-aware, never a symbol count), sides, gross "
-                 "leverage, and days-to-DECIDABILITY — (2/S_d)^2 at the book's "
-                 "own measured Sharpe, a FLOOR. This is NOT the gate ETA: the "
-                 "🚦 card's horizon chip projects the binding BAR and the two "
-                 "can differ several-fold on the same book. "
+                 "(correlation-aware, never a symbol count), sides and gross "
+                 "leverage. The last figure is the CALENDAR remaining on the "
+                 "30-day window bar — `max(0, 30 - age)`, a floor. It is NOT a "
+                 "decidability estimate and NOT the gate ETA: the 🚦 card's "
+                 "horizon chip projects the binding BAR from the book's own "
+                 "measured rate, and the two differ several-fold. "
                  + (str(basis) if basis else ""))
 
 
@@ -3547,8 +3573,27 @@ def _t_leverage(leverage):
         tip += "."
     if dep is not None:
         tip += f" Deployed at full ${dep:,.0f}."
+    # [(zv)] THE LIQUIDATION READ BELONGS IN THE BODY, AND THE HELD ONE IS THE
+    # REAL NUMBER. `liq_gap_pct(mmf, G) = mmf - 1/G` is the adverse move that
+    # liquidates, published NEGATIVE. At 👩 mum's CONFIGURED 5x gross that is
+    # `0.20 - 1/5 = 0.0` — so the tooltip read "Liquidation gap +0.0%", which
+    # is a statement about a deployment she is not at, phrased as though she
+    # were at the boundary now. Her HELD basket reads `-0.7122`: a 71% adverse
+    # move. Both are true and only one is current, so both render, each
+    # labelled — the same shape as `stop_reachable` vs `stop_reachable_held`
+    # above. An unmeasurable mmf is None and prints nothing (never 0.0, which
+    # here would read as "at liquidation").
+    held_gap = _fin(leverage.get("liq_gap_held_pct"))
+    if held_gap is not None:
+        bits.append(f'liq at {100 * held_gap:.0f}% held'
+                    if abs(held_gap) >= 0.1 else
+                    f'<span class="neg">liq at {100 * held_gap:.1f}% HELD</span>')
     if liq_gap is not None:
-        tip += f" Liquidation gap {100 * liq_gap:+.1f}%."
+        tip += (f" Liquidation needs a {100 * liq_gap:.1f}% move at the "
+                f"CONFIGURED gross")
+        if held_gap is not None:
+            tip += f" and {100 * held_gap:.1f}% on the basket actually held"
+        tip += " (negative = the direction that hurts a long book)."
     return _trow("Leverage", " · ".join(bits), tip)
 
 
@@ -3691,7 +3736,15 @@ def _t_entry_vetoes(entry_vetoes):
         return None
     bits, tip = [], []
     if shut:
-        s = f'SHUT — {html.escape(str(why or shut))}'
+        # [(zv)] THE RAIL THAT IS ACTUALLY SHUTTING THE BOOK COMES FIRST.
+        # This read `why or shut`, so `shut_reason` ALWAYS won and `shut_now`
+        # was unreachable whenever the book was shut — measured on 👩 mum's
+        # live row, `shut_now: "slguard"` (the stop-loss guard) rendered as
+        # the generic `"protections_locked"`. The two are different facts:
+        # `shut_now` names the rail, `shut_reason` is its vocabulary.
+        s = 'SHUT — ' + html.escape(str(shut))
+        if why and str(why) != str(shut):
+            s += f' ({html.escape(str(why))})'
         syd = _pipe_syd(until) if until else None
         if syd:
             s += f' until {html.escape(syd)}'

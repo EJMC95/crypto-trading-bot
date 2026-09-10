@@ -628,7 +628,21 @@ def test_mum_boots_and_completes_a_cycle_as_HERSELF():
         assert spend["sides"] == "long"
         if spend.get("closes_obs"):
             assert 0.0 <= spend["days_to_gate_obs"] <= 30.0, spend
-            assert spend["days_to_gate_basis"] == "measured_rate", spend
+            # [(zv)] RE-AIMED, and I26's rule is the reason: a pin is a
+            # snapshot, not a property. This asserted the literal
+            # "measured_rate", which was FALSE about the value beside it —
+            # `days_to_gate_obs` is `max(0, 30 - age_days)`, a birth countdown,
+            # on every host that publishes it. The pin now requires the basis
+            # to DESCRIBE that, and to match the family host's wording by
+            # identity so one quantity cannot grow two descriptions.
+            import lighter_family_bot as _fam
+            assert spend["days_to_gate_basis"].startswith("birth countdown"), \
+                spend
+            assert "measured_rate" != spend["days_to_gate_basis"], spend
+            _fam_src = open(_fam.__file__, encoding="utf-8").read()
+            assert spend["days_to_gate_basis"].split(";")[0] in _fam_src, (
+                "the live host's basis wording has drifted from the family "
+                "host's — one quantity, one description", spend)
         else:
             assert spend["days_to_gate_obs"] is None, (
                 "a book with no closes must publish NULL, not a floor that "
