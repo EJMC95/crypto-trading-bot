@@ -25,10 +25,11 @@ stable and useless ((om)), so `test_a_planted_edge_still_arms` must stay green.
 import ast
 import random
 import time
+from pathlib import Path
 
 import pytest
 
-from parliament import ecosystem_db as edb
+from parliament import ml as _ml_mod
 from parliament.ecosystem_db import TRADE_KEEP_DAYS, EcosystemDB
 from parliament.ml import (ACC_Z_BAR, FEATURES, MIN_READY_SAMPLES, TRAIN_DAYS,
                            MLEngine)
@@ -132,7 +133,7 @@ def test_the_training_window_is_the_pruners_retention_by_identity():
     """Not 'both happen to say 90' — the query must READ the constant, or the
     next edit to one silently starves the other."""
     assert TRAIN_DAYS == TRADE_KEEP_DAYS
-    src = ast.parse(open(edb.__file__.replace("ecosystem_db.py", "ml.py")).read())
+    src = ast.parse(Path(_ml_mod.__file__).read_text())
     fn = next(n for n in ast.walk(src)
               if isinstance(n, ast.FunctionDef) and n.name == "train_from_db")
     calls = [c for c in ast.walk(fn) if isinstance(c, ast.Call)
