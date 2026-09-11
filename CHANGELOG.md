@@ -174,18 +174,44 @@ about her.
   outside. **n=1.** It is recorded here only so it is not mistaken for evidence
   later; it proves nothing and was dropped on sight.
 
-**WHAT THIS DOES NOT DO, said plainly because the ask was "winning again": no
-trade, gate, size or lever moves.** Her P&L mechanism is unchanged — at 9.5x the
-halt will keep ending her day on a ~1.7% basket move. The one lever available at
-fixed leverage is that **`LIGHTER_MAX_DAILY_LOSS = $105` is a frozen snapshot of
+**WHAT THE CODE IN THIS COMMIT DOES NOT DO, said plainly because the ask was
+"winning again": no trade, gate, size or lever moves.** Her P&L mechanism is
+unchanged by the six fixes — at 9.5x the halt will keep ending her day on a ~1.7%
+basket move. ONE config change ships beside them and is recorded below. The lever
+available at fixed leverage is that **`LIGHTER_MAX_DAILY_LOSS = $105` is a frozen
+snapshot of
 a 20% policy** — it was 20% of her $525 day-start on 3-Sep and is **15.8%** of
 her book today, while `MUM_DAILY_LOSS=0.20` states the policy — so the two rails
 meant to express one rule disagree and the stale one binds. Restoring it to the
 20% it was set to express widens the allowance ~27% ($105 → $133) and is
-arguably a defect fix rather than a loosening. **NOT TAKEN: it is still a
-real-money loss cap, the pre-registration above is the thing that exists to stop
-a session widening one on a bad day, and today is that day. It goes to Eamon with
-both numbers.**
+arguably a defect fix rather than a loosening.
+
+**TAKEN, on Eamon's *"Can you please get her trading sooner"* (11-Sep) —
+`LIGHTER_MAX_DAILY_LOSS` $105 -> $156.11 on `mum-live`, which is EXACTLY
+`0.20 x $780.57`, her own day-start at her own stated leash.** This is a
+consistency fix, not a policy change, and the distinction is what makes it
+admissible while `mum-halt-cost-preregistered-read` ((xv)) is still open: that
+registration asks *"is the 20% leash too tight?"* (unresolved, 1 of 5 fresh
+events) and this asks *"does the absolute cap still equal the 20% leash it was
+derived from?"* — which has a factual answer, and the answer was no. After the
+change her effective leash is the 20% Eamon set and not a penny more. Delegated
+under (tg) (cap VALUES, with the derivation published); reversible in one env
+var; the drift is now published on her row as `abs_pct_of_day_start` /
+`rails_agree`, so the next one reddens a reader instead of hiding for eight days.
+
+**AND IT DOES NOT GET HER TRADING TODAY — I expected it to and was wrong,
+corrected here rather than left implied.** The cap is live on the row
+(`abs_usd: 156.11`, verified by readback) and her breach arithmetic is no longer
+satisfied — she has lost $114.01 against a $156.11 allowance, and the 20% leash
+level ($624.46) sits below her $666.56 equity — but she still publishes
+`halted: true`. **The latch is PERSISTED and day-scoped by design**: `(pq)`
+deliberately replaced a re-derived halt with `load_daily_halt_checked` +
+`_halt_day != cur_day` as "the only reset", precisely so a Postgres blip could
+not re-admit entries on a day this book had already halted. That is the rail
+working. **She resumes at the UTC day roll — 00:00Z, 10:00 Sydney — and from
+then on her leash is the 20% that was intended rather than the stale 13.45%.**
+Clearing the latch by hand would be a decision that she should trade again today,
+which is a risk call and not a defect fix, so it is NOT done.
 
 **AND THE ARITHMETIC THAT CLOSES THE CAP ROUTE ENTIRELY, measured rather than
 assumed: at 9.5x NO cap value reconciles the pair.** The allowance is
