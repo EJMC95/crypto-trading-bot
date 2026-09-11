@@ -1,4 +1,83 @@
 
+## 2026-09-11 (abh) — THE DURABLE DAILY-LOSS LATCH GETS AN AUDITABLE RELEASE, AND IT CANNOT DISABLE THE RAIL: 👩 mum's latch outlived the constant that caused it
+
+**Eamon, 11-Sep: *"I want to resume trading now"*, then *"Ive given you
+permission"*.** `(abg)` had just corrected her daily cap and reported — correctly
+— that the correction does NOT un-halt her, because the latch is persisted and
+day-scoped. He asked for the release anyway. This is it, built to the existing
+contract rather than invented, and the reason it is admissible is arithmetic
+rather than permission.
+
+**THE LATCH OUTLIVED THE CONSTANT THAT CAUSED IT.** She latched at **11:11:16Z**
+against `LIGHTER_MAX_DAILY_LOSS = $105` — a frozen snapshot of her own **20%**
+leash taken at a **$525** day-start on 3-Sep. `(abg)` corrected it to **$156.11**
+= `0.20 x $780.57`, her real day-start. Under the corrected cap **she was never in
+breach**: lost **$114.01** against a **$156.11** allowance, and the 20% level
+(**$624.46**) sits below her **$666.56** equity. So this releases a latch that a
+now-fixed constant wrote, not a protection that currently condemns the book —
+and that distinction is what makes it a defect consequence rather than an
+override.
+
+**WHY THERE WAS NO RELEASE, AND WHY THAT WAS RIGHT.** `(pq)` made the halt
+durable because a re-derived one let a single Postgres blip re-admit entries on a
+day a real-money book had already halted, and `(vg)` says of the sibling lock
+that *"a redeploy must not be a way to bypass a protection"* — which is why
+"unlock her" could not be done by deploying. `(vg)` then hit exactly this wall on
+that lock and solved it with `FAMILY_CLEAR_GUARD`: explicit, operator-only,
+opt-in, named per book, logged. **`FAMILY_CLEAR_DAILY_HALT` is that same contract
+applied to the daily latch**, because a second shape for one problem is a second
+rule ((hj)).
+
+**THE LOAD-BEARING SAFETY PROPERTY: IT DROPS THE LATCH AND NEVER SUPPRESSES THE
+RAIL.** The release sits in the halt RESTORE branch; the breach is re-derived
+from live equity against the persisted day-start **later in the same cycle**, and
+that rail is untouched — it does not consult the release flag and is not guarded
+by it. So a book that is GENUINELY still in breach **re-halts on the same cycle
+and re-saves the record**. The release is therefore only ever effective on a book
+the current rail no longer condemns, which is self-limiting by construction and
+is exactly the case it was built for. Pinned by AST, not by reading:
+`test_the_release_never_suppresses_the_rail_only_the_latch` asserts the clear
+runs strictly BEFORE the rail and that the rail's own condition mentions neither
+`_halt_cleared` nor `_clear_halt_books`.
+
+**AND IT IS ONCE PER PROCESS, NOT WHILE-SET.** Leaving the env set must not
+re-clear on every later cycle — that would turn a one-shot release into the rail
+being permanently off for that book. The flag is latched BEFORE the clearing
+write, so a failed write cannot leave the release armed to fire again each cycle.
+Both are mutation-verified (H1, H7).
+
+**VISIBILITY, because (vg)'s own warning is that an unlock nobody can see is how
+a protection goes missing quietly.** It logs loudly with the record it cleared,
+writes `{halted_date: None, cleared_at, cleared_record}` — **preserving** what was
+cleared rather than deleting the key — and publishes `entry_vetoes.halt_cleared`
+on the row, because a log line is not visible on the feed. The env names the book
+explicitly and **a wildcard is not expressible**: there is no "clear every book".
+
+**TESTS: `tests/autonomy/test_daily_halt_release.py`, 8 tests, 7/7 mutations
+killed with a POSITIVE CONTROL** (a reworded comment must SURVIVE, or the harness
+is not distinguishing anything — the same discipline `(abg)`'s harness needed
+after mislabelling 14 kills as survivals). Killed: the release firing every cycle,
+ignoring the book list, the env frozen at import instead of read at boot, the
+receipt dropped, the loud log softened, the audit fields dropped, and the flag
+latched after the write.
+
+**STATED PLAINLY, because it is the honest half:** this gets her trading ~11 hours
+sooner and **changes nothing about why she loses**. At 9.5x the halt still fires
+at a ~1.7% adverse basket move against her 4.00% stop, so her bracket still
+cannot run on a red day; her all-in average is **−0.099%/trade** (about
+**−$3.58/day** at her $395 clip and 9.1 closes/day) against **+0.171%/trade** on
+the exits she shares with her winning twin. The 11 hours bought are ~4 trades at
+a negative expectation. That was put to Eamon before building this, he asked for
+it anyway, and it is his money and his call — recorded, not re-litigated. The
+three options that would actually move her P&L remain open and remain his, and
+are listed in `(abg)`.
+
+**Era NOT reset** (no policy field moves; a latch release is not (hc) tuning).
+Revert: unset `FAMILY_CLEAR_DAILY_HALT`. **The env MUST be unset after the
+release lands** — it is once-per-process, so leaving it set would release the
+latch again on the next restart, which is a different and worse thing than what
+was asked for.
+
 ## 2026-09-11 (abg) — 👩 MUM'S STRATEGY WAS NEVER THE PROBLEM: HER OWN TWIN IS WINNING THE SAME ENTRIES, AND THE WHOLE GAP IS ONE EXIT FAMILY THE TWIN DOES NOT HAVE — plus six defects in the rails that publish it, one of them mine, caught pre-ship
 
 **Eamon, 11-Sep: *"Please get mum live trading properly please Lucy, she needs to

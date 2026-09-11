@@ -775,6 +775,26 @@ def _rails_agree(ds, rails, tol=0.01):
     return abs(cap / ds - DAILY_LOSS_LIMIT) <= tol
 
 
+#: [2026-09-11 (abh)] Books whose DURABLE daily-loss latch is dropped once at
+#: boot, comma-separated row ids. The (vg) `FAMILY_CLEAR_GUARD` contract, applied
+#: to the other lock: operator-only, opt-in, named per book, logged, and
+#: published on the row. Read through a function rather than a module constant so
+#: the value is the RUNNING env at boot rather than whatever was set when this
+#: module was first imported — a stale import-time read is how an operator action
+#: appears to do nothing.
+def _clear_halt_books():
+    return {b.strip() for b in
+            os.environ.get("FAMILY_CLEAR_DAILY_HALT", "").split(",")
+            if b.strip()}
+
+
+#: One-element list so the loop can latch "already cleared" without `global`.
+#: ONCE PER PROCESS: leaving the env set must not clear the latch again on a
+#: later cycle, or the rail would be permanently off for this book rather than
+#: released once.
+_halt_cleared = [False]
+
+
 def halt_vs_stop(day_start_equity, rails, stop_frac, gross, overshoot_bps=None):
     """THE TWO RAILS, READ AGAINST EACH OTHER. `{}` of published numbers, or
     `None` when unmeasurable.
@@ -2211,7 +2231,53 @@ def main(_ctx=None, once=False):
                        f"halted={halted_today} and blocking NEW entries this "
                        f"cycle; exits unaffected", flush=True)
             elif _halt:
-                halted_today = True
+                # [2026-09-11 (abh)] THE DAILY LATCH HAS A RELEASE NOW, and it
+                # is the (vg) `FAMILY_CLEAR_GUARD` shape for the same reason
+                # that one exists: the latch is DURABLE on purpose, so a
+                # redeploy must not clear it — and that correctly left NO way
+                # to resume a book mid-day, which (vg) already named a gap on
+                # the sibling lock ("'unlock her' could not be done by
+                # deploying ... the explicit, auditable way").
+                #
+                # WHY IT IS SAFE, and this is the whole design: it drops the
+                # stale LATCH, it does not suppress the RAIL. The breach is
+                # re-derived from live equity against the persisted day-start
+                # further down this same cycle (:3231), so a book that is
+                # GENUINELY still in breach re-halts immediately and re-saves
+                # the record. The clear is therefore only ever effective on a
+                # book the current rail no longer condemns — which is exactly
+                # the case it was built for.
+                #
+                # THE CASE IT WAS BUILT FOR, 11-Sep: 👩 mum latched at 11:11Z
+                # against a $105 cap that was a frozen snapshot of her own 20%
+                # leash taken at a $525 day-start. (abg) corrected the cap to
+                # $156.11 = 0.20 x her real $780.57 day-start, and under the
+                # CORRECTED cap she was never in breach (lost $114.01 against a
+                # $156.11 allowance; the 20% level $624.46 sits below her
+                # $666.56 equity). Eamon, 11-Sep: *"I want to resume trading
+                # now"*. So this releases a latch a now-fixed constant caused.
+                #
+                # ONCE PER PROCESS, operator-only, and LOUD: an unlock nobody
+                # can see is how a protection goes missing quietly ((vg)'s own
+                # words). The receipt publishes on the row as
+                # `entry_vetoes.halt_cleared` so the act is visible on the feed
+                # and not only in a log line nobody tails.
+                if BOT_ROW in _clear_halt_books() and not _halt_cleared[0]:
+                    _halt_cleared[0] = True
+                    _PRINT(f"[avo-live] {iso(t_now)} DAILY HALT LATCH CLEARED "
+                           f"by operator env for {BOT_ROW} (record was "
+                           f"{_halt!r}) — the RAIL still governs and re-halts "
+                           f"this same cycle if the book is really in breach",
+                           flush=True)
+                    try:
+                        store.save_state(BOT_ROW + ":halt",
+                                         {"halted_date": None,
+                                          "cleared_at": iso(t_now),
+                                          "cleared_record": _halt})
+                    except Exception:  # noqa: BLE001 — never block the loop
+                        pass
+                else:
+                    halted_today = True
 
         # Loop-scope defaults so the publish helper is callable from the
         # kill/halt paths, which run BEFORE the entry section assigns these.
@@ -2699,6 +2765,12 @@ def main(_ctx=None, once=False):
                     # Non-zero means the halt rail turned a signal away before
                     # it could become the trade that ended the day.
                     "halt_room_skips": halt_room_skips,
+                    # [(abh)] THE RECEIPT for an operator latch release. True
+                    # only when THIS process dropped a durable daily-loss latch
+                    # via `FAMILY_CLEAR_DAILY_HALT`. An unlock nobody can see is
+                    # how a protection goes missing quietly ((vg)), and a log
+                    # line is not visible on the feed — this is.
+                    "halt_cleared": bool(_halt_cleared[0]),
                     # [(xg)] WHETHER THE GATE IS ARMED ON THIS BOOK AT ALL, and
                     # the geometry that decided it. `armed: false` with a
                     # stop_share near 1.0 means one slot-stop is this book's
