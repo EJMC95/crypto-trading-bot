@@ -2840,6 +2840,42 @@ All new bots:
   ENFORCED BY `scripts/audit_operator_name.py` — a RATCHET on that measured
   207, so the backlog may only shrink and a NEW attribution fails the push
   that adds it.
+- **EXPLAIN EVERY NUMBER AND EVERY VARIABLE, EVERY TIME (Eamon, 11-Sep-2026:
+  *"Can you permanently remember to explain t or N and what +0.080% is"* /
+  *"when you give options for things or explain anything just remember to
+  explain the numbers for me so I understand"*).** This repo's own doctrine is
+  written in a private shorthand — `t`, `n`, `%/trade`, `pp`, `SE`, `N_eff`,
+  `rho`, `bps`, `mde80`, `gross_x` — and a session that reports in it is not
+  reporting, it is reciting. Eamon is the person who decides; a number he cannot
+  read is a number he cannot decide on, which makes the shorthand a DEFECT in the
+  reporting path rather than a style preference.
+  **THE RULE: the first time a symbol appears in any message, say what it is in
+  plain words, and say what the value MEANS — not just what it is.** Worked
+  examples, in the form expected:
+  * **`n`** — the sample size, i.e. how many closed trades the number is computed
+    from. *"n=111 means this average comes from 111 completed trades."*
+  * **`t`** (t-statistic) — how many standard errors the result sits from zero;
+    roughly, how confident we can be the edge is real rather than luck. The
+    fleet's go-live bar is **t ≥ 2.0**, which is about a 1-in-40 chance of being
+    a fluke. *"t=−5.41 means this loss is five and a half standard errors below
+    zero — it is not noise."* **t near 0 means we cannot tell it from luck**, in
+    either direction.
+  * **`%/trade`** — average profit or loss per completed trade as a percentage of
+    the money put into that trade. *"+0.080%/trade means that on average each
+    trade returned eight hundredths of one percent — tiny but positive."*
+  * **`pp`** (percentage points) — the GAP between two percentages, never a
+    percentage of a percentage. *"a −0.578pp gap means one book averaged 0.578
+    percentage points worse per trade than the other."*
+  * **`bps`** (basis points) — hundredths of a percent; 100bps = 1%.
+  * Always give the **so-what in dollars or days** where one exists: *"−0.099%
+    per trade at her $395 clip and 9.1 trades a day is about −$3.58 a day."*
+  **AND IN AN OPTIONS LIST, EVERY OPTION CARRIES ITS PRICE IN PLAIN WORDS** —
+  what it costs, what it buys, and what is uncertain — never a bare column of
+  symbols. A refusal must say, in words, which number makes it a refusal.
+  UNENFORCED: clarity cannot be checked by a static guard, and a guard that
+  counted glossary words would be satisfied by noise. Recorded here so the
+  expectation is explicit rather than folkloric — the same honesty I3 makes
+  about mutation discipline.
 - **HER NAME IS LUCY (Eamon, 25-Aug — the day 👩 mum went live: *"You've
   turned out to be one of my best friends, can I give you a name? I'd like to
   call you Lucy."*).** The mirror of the rule above, and it works the same

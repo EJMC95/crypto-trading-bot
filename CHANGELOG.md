@@ -1,3 +1,216 @@
+
+## 2026-09-11 (abg) — 👩 MUM'S STRATEGY WAS NEVER THE PROBLEM: HER OWN TWIN IS WINNING THE SAME ENTRIES, AND THE WHOLE GAP IS ONE EXIT FAMILY THE TWIN DOES NOT HAVE — plus six defects in the rails that publish it, one of them mine, caught pre-ship
+
+**Eamon, 11-Sep: *"Please get mum live trading properly please Lucy, she needs to
+get back on the horse"*, then — when the arithmetic below was put to him —
+*"Keep the leverage it has, I just want any big fixes sorted and to have it
+winning again"* and *"We have done multiple studies on 9.5x."*** The leverage is
+his call and it stays at 9.5x; it is recorded, not re-litigated. What follows is
+the diagnosis, the six defects fixed, and — stated plainly — the three things
+that could move her P&L, none of them shipped, all three his decision.
+
+**SHE IS NOT BROKEN, SHE IS SHUT.** Container fresh (age 25s), publishing,
+`status: halted`, 0 open, `flatten_incomplete: false`. Nothing is crashed,
+nothing is mis-deployed, her universe is populated (`markets_scanned 101`,
+`both_terms_n 15`), `fleet_long_veto: false`. She is flat because a rail put her
+there, 16.9 of 24 hours today and 19.3% of the last 15 days.
+
+**THE DIAGNOSIS, AND IT IS ONE LINE OF ARITHMETIC.** Graded against her
+never-halting shadow twin — the proper control arm, same strategy, same coins,
+which I14 says outranks any replay:
+
+| exit family | LIVE n | LIVE %/trade | TWIN n | TWIN %/trade |
+|---|---|---|---|---|
+| `roi` | 79 | **+1.416%** | 72 | **+1.422%** |
+| `max_hold` | 17 | −1.369% | 17 | −1.155% |
+| `stop_loss` | 15 | −4.640% | 12 | −4.806% |
+| **`daily_loss`** | **20** | **−1.597%** | **0** | **— does not exist** |
+
+**On the exits the two arms SHARE she reads +0.171%/trade (n=111) against the
+twin's +0.243% (n=106) — indistinguishable.** Her entries, her bracket, her
+stops and her ROI ladder all perform as the winning arm's do. The entire
+divergence between a book at **−15.18%** and a book at **+2.46%** is the
+`daily_loss` family: **22 legs, −1.451%/trade, t=−5.41**, carrying **−0.506pp of
+the −0.578pp/trade** gap. Her realised total is −$74.79 and that family alone is
+−$130.00.
+
+**WHY IT FIRES SO OFTEN, published on her own row and now derived rather than
+rediscovered.** The halt ends the day when the book loses its binding allowance;
+at full occupancy the deployed basket is `gross × day_start`, so the halt is
+reached by an adverse basket move of `allowance / (gross × day_start)`. At
+**9.5x** that is **~1.4–1.7%** while her stop sits at **4.00%** — so on a red day
+every position exits at the halt rather than at its own stop or its ROI ladder,
+which is a different strategy from the one the gate grades. Today, 11:11:16Z:
+**all 12 slots flattened in a single instant, −$86.87, −1.381%/leg**, then
+locked out for the remaining 12.8h of the UTC day. Her `n_eff` is **2.37**, so 12
+longs are ~2.4 independent bets and a simultaneous stop-out is the central case,
+not a tail — today demonstrated it.
+
+**THERE IS NO CAP VALUE THAT RECONCILES THEM AT 9.5x**, and saying so once is the
+whole of my argument: full parity needs an allowance of `9.5 × 4% = 38%` of the
+book, which is not a daily cap. The ordering is a consequence of the leverage,
+the leverage is Eamon's, and it is **declared in
+`audit_halt_vs_stop.HALT_FIRST_OK` with his words and the date** rather than
+exempted silently or argued again.
+
+**SIX DEFECTS FIXED. None changes a trade; all six are things the rails were
+saying wrong.**
+
+1. **THE ROW PUBLISHED THE RAIL THAT DOES NOT FIRE.**
+   `basket_move_at_full_gross_pct` computed `DAILY_LOSS_LIMIT / gross_x()` — the
+   20% PCT leash — while `binding: "abs"` sat **two fields below it on the same
+   row**. Mum's $105 abs cap has bound since 4-Sep ((aat) measured it), so the
+   published 2.11% described a rail that cannot fire while the one that does was
+   unpublished. **The first pass of this very analysis read that field and got
+   her parity gross wrong by 1.3x** (it said 5.0x; the binding rail says 3.94x)
+   — caught only by recomputing from `halt_level`, which is the ONE owner of
+   "which rail binds". The field now derives from it.
+2. **THREE INLINE COPIES OF THE OVERSHOOT p90, WITH TWO DIFFERENT n FLOORS.**
+   `_honest_stop_cost`, `stop_bases` and two published fields each carried
+   `sorted(vals)[round(0.9*len(vals))-1]`. The published fields emitted a p90 off
+   ANY sample while both consumers refused below `OVERSHOOT_MIN_N`, so the row
+   could show a measured-looking overshoot beside a `None` cost derived from it.
+   One owner now (`overshoot_p90_bps`, `floored=False` preserving the published
+   series byte-identically). **AND THE MISS IS THE LESSON:** my first check was a
+   scoped AST walk and found **two**; a whole-file `grep` found **three**. (po)
+   exactly — *"prefer a whole-file grep to a scoped one, because scoping is where
+   the silence hides"* — and the miss was inside the guard written to close the
+   class. The count is corrected in place per I12.
+3. **`gross_at_parity` ROUNDED THE WRONG WAY.** It is read as a LEVER value, and
+   rounding to nearest can round UP past the parity point — so setting the
+   published number leaves the book on the halt-first side of the very boundary
+   the field exists to name. Floored. Caught by a round-trip test, not by
+   reading it.
+4. **THE SCAN CENSUS COULD NOT SAY WHETHER IT HAD RUN.** The verdict map is
+   durable by design (a coin the loop never reached keeps its previous verdict)
+   and the entry scan sits inside `if entries_ok:`, so a shut book republishes
+   its last PRE-SHUT scan with nothing saying so. Measured on her row 45 minutes
+   after the flatten: **`verdicts {slots_full: 89, held: 10, opened: 2}` — a full
+   book — beside a fresh `held: 0`**. Both fields correct, the pair unreadable;
+   I1 exactly, and it cost this session real time before the contradiction
+   resolved. `scan.verdicts_basis` is now `this_loop` / `carried`, ABSENT when
+   the caller cannot know.
+5. **AND THE FIFTH WAS MINE, IN A REAL-MONEY PUBLISH PATH, CAUGHT BEFORE IT
+   SHIPPED.** The first `verdicts_basis` read `entries_ok` out of the
+   `_publish_row` closure. `entries_ok` is assigned **~1,570 lines below** three
+   `_publish_row` calls — two of them the early/HALT paths, i.e. **exactly the
+   state a shut book publishes from** — so it would have raised `NameError` on a
+   free variable inside the live publish loop on the first cycle. That is the
+   `halt_level` hazard again: *a telemetry field able to take down the loop that
+   publishes it.* Found by a `symtable` check, **not** by re-reading the code.
+   Fixed with a sentinel bound at the top of each iteration (per-ITERATION, so a
+   previous cycle's True cannot be republished as this cycle's basis), and the
+   CLASS is pinned: `test_the_publish_closure_reads_no_name_main_binds_after_it_runs`
+   fails if any name `_publish_row` reads is first bound after the earliest call.
+
+6. **AND THE TWO DAILY RAILS NEVER SAID WHETHER THEY STILL AGREE.**
+   `DAILY_LOSS_LIMIT` states the leash as a FRACTION, `LIGHTER_MAX_DAILY_LOSS`
+   as a FIXED DOLLAR, and `halt_level` takes the tighter — which is the STALE
+   one on a book that has grown. Mum's $105 was 20% of her $525 day-start on
+   3-Sep and is **15.8%** of her book today while `MUM_DAILY_LOSS` still reads
+   **0.20**: two rails for one rule, 4.2pp apart, and the drift was found by
+   reading a changelog entry rather than her row. Now published as
+   `abs_pct_of_day_start` + `rails_agree`, with an unreadable cap degrading to
+   `None` — an unknown must not publish as agreement (I1's flattering
+   direction). **REPORTED, and AST-pinned so nothing consumes it**: moving a
+   real-money loss cap is a value decision, it is Eamon's, and it is
+   pre-registered.
+
+**ENFORCEMENT, AND IT IS A RATCHET BECAUSE A BAR WOULD HAVE DIED ON DAY ONE.**
+`scripts/audit_halt_vs_stop.py` is the (gv) rule extended to the second rail. It
+reads the publisher's verdict and never re-derives it ((hj)); fails OPEN on
+absence (deploy latency is not a finding, I1) and REFUSES a dark or live-row-free
+feed rather than passing it ((jc)). **But the live feed says BOTH real-money
+books are mis-ordered at Eamon's own on-record settings** — the other live book
+was found because doctrine keeps it in scope, not because this pass went looking:
+
+| book | gross | stop | cap | halt at | ratio |
+|---|---|---|---|---|---|
+| 🙏 avo LIVE | 2.33x | 10.0% | $80 | 8.28% | **0.83** |
+| 👩 mum LIVE | 9.50x | 4.0% | $105 | 1.66% | **0.41** |
+
+So a plain bar would have failed **2 of 2 live books on its first run**, been
+exempted within a day, and guarded nothing — (mz)'s lesson, and I23's own design
+rule. `RATCHET` therefore DECLARES each floor with its number and its date, may
+only TIGHTEN, and holds an **undeclared** book to 1.0 so a new instance fails
+immediately. 🙏 avo's is declared and NOT fixed in this pass, under SHIP NARROW —
+(fz) changed six surfaces at once and spent six follow-up entries repairing
+itself — and her `vs_stop` publishes every loop from this same commit, so the
+number is readable while the decision waits. The SCAN arm runs against the live
+feed in `fleet-weekly-assessment.yml` beside `code-currency`, gated on the
+FEED's outcome per (aaz): registering only the `--selftest` would exercise the
+fixtures and never a real book, which is the (gk)/(ox) shape.
+
+`tests/autonomy/test_halt_vs_stop.py` — **31 tests, **25 mutations killed** across BOTH the
+publisher and the ratchet, and the harness carries a POSITIVE CONTROL** because a
+harness that cannot be seen to produce a SURVIVED verdict is not evidence of a
+kill: its first run mislabelled **all 14 kills as survivals** (`case` is
+case-sensitive and pytest prints `FAILED`), which is this file's own "a check that
+inspects nothing reports clean" in the harness rather than the guard. The
+calibration pin is the (gx) rule: `halt_vs_stop` must reproduce (aat)'s
+independently measured 1.40% to within 5bps, or it may not be used to reason
+about her.
+
+**REFUSED, WITH THE NUMBER, so no future session re-proposes them as oversights:**
+* **The gross cut.** 3.75x is over-determined (the gate's own `0.15/|stop|`, her
+  row's published `vol_target_at_neff1`, the parity gross at her day-start, and
+  the setting (xf) shipped on 3-Sep). **Eamon keeps 9.5x; that is the decision
+  and it is recorded.**
+* **The halt THRESHOLD.** Governed by the pre-registered
+  `mum-halt-cost-preregistered-read` ((xv)), which requires **n≥5 halt EVENTS
+  after 3-Sep**. Measured from her ledger: **1** (today's 11:11Z; the two further
+  `long_daily_loss` rows at 11:21 and 11:31 are $0.00 flatten retries, and
+  2-Sep's precedes the window). **Not due**, and a loss cap is not loosened on
+  n=1 on the worst day of a book's record — I25's own rule, since today IS the
+  motivating window.
+* **`slguard`.** The dominant shutter by HOURS (48.2h of 69.0h) and measurably
+  **NOT the differentiator**: replaying her shipped `slguard` (3 stops in 24h →
+  6h off) over both ledgers gives **5 lockouts on the live arm and 6 on the
+  twin** at stop rates of 11.1% vs 10.6% — and the twin is the arm that is
+  WINNING. Loosening it would be an unmeasured widening of a rail that costs
+  both arms equally.
+* **My own lockout-cost reading, withdrawn.** A first pass measured the twin's
+  trades opened inside mum's lockout windows at +1.877%/trade against +0.504%
+  outside. **n=1.** It is recorded here only so it is not mistaken for evidence
+  later; it proves nothing and was dropped on sight.
+
+**WHAT THIS DOES NOT DO, said plainly because the ask was "winning again": no
+trade, gate, size or lever moves.** Her P&L mechanism is unchanged — at 9.5x the
+halt will keep ending her day on a ~1.7% basket move. The one lever available at
+fixed leverage is that **`LIGHTER_MAX_DAILY_LOSS = $105` is a frozen snapshot of
+a 20% policy** — it was 20% of her $525 day-start on 3-Sep and is **15.8%** of
+her book today, while `MUM_DAILY_LOSS=0.20` states the policy — so the two rails
+meant to express one rule disagree and the stale one binds. Restoring it to the
+20% it was set to express widens the allowance ~27% ($105 → $133) and is
+arguably a defect fix rather than a loosening. **NOT TAKEN: it is still a
+real-money loss cap, the pre-registration above is the thing that exists to stop
+a session widening one on a bad day, and today is that day. It goes to Eamon with
+both numbers.**
+
+**AND THE ARITHMETIC THAT CLOSES THE CAP ROUTE ENTIRELY, measured rather than
+assumed: at 9.5x NO cap value reconciles the pair.** The allowance is
+`min(frac x day_start, cap)`, so once the absolute cap is raised past **$133** her
+own **20% leash** binds and the halt sits at `0.20/9.5 =` **2.11%** of basket no
+matter how high the cap goes. Parity with a 4% stop needs an allowance of
+`9.5 x 4% =` **38% of the book**, which is not a daily cap. So the three real
+options, and all three are Eamon's:
+* **gross 9.5 -> 3.75x** — the only one that reconciles them (halt 4.20% vs stop
+  4.00%) and the only one that puts `all_slots_stop_pct` at the 15% gate bar
+  instead of 38%. **DECLINED on the record today.**
+* **tighten her stop to ~2.1%** — the mirror of the same equation
+  (`stop <= 0.20/9.5`). MEASURABLE, NOT MEASURED: it is a bracket change, so it
+  needs replay evidence first and it RESETS her era. Named so it is not mistaken
+  for an oversight.
+* **leave it** — expected **-$3.58/day** at her published clip and close rate
+  against **+$6.19/day** at her own shared-exit mean, with the halt capping her
+  worst days. A legitimate choice; it is not "winning again", and this entry does
+  not pretend otherwise.
+
+**Era NOT reset** (no policy field moves; telemetry and a guard are not (hc)
+tuning, let alone a strategy change). Verified: module selftest 13/13,
+`tests/autonomy/test_halt_vs_stop.py` 31/31, the full suite green on two
+consecutive clean runs, and the guard exits 0 against the live feed.
+
 ## 2026-09-11 (abd) — THE WHOLE JUDGEMENT LAYER IS IN GIT NOW, AND TRACKING IT MOVED TWO THINGS THAT HAD TO MOVE WITH IT
 
 **Eamon, 11-Sep:** *"track the rest too"* — the call `(aba)` put to him after

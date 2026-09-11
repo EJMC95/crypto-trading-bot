@@ -624,9 +624,9 @@ def stop_bases(ov, stop=None):
     out = {"nominal": sl}
     try:
         vals = [float(v) for v in ((ov or {}).get("vals") or [])]
-        if vals and int((ov or {}).get("n") or 0) >= OVERSHOOT_MIN_N:
-            p90 = sorted(vals)[max(0, int(round(0.9 * len(vals))) - 1)]
-            out["measured_p90"] = sl + max(0.0, p90) / 1e4
+        p90 = overshoot_p90_bps(ov)          # floored: the one owner
+        if vals and p90 is not None:
+            out["measured_p90"] = sl + max(0.0, float(p90)) / 1e4
             out["measured_worst"] = sl + max(0.0, max(vals)) / 1e4
     except (TypeError, ValueError):
         pass
@@ -754,6 +754,134 @@ def halt_level(day_start_equity, rails):
 HALT_GATE_MAX_STOP_SHARE = float(_env("HALT_GATE_MAX_STOP_SHARE", "0.5"))
 
 
+def _rails_agree(ds, rails, tol=0.01):
+    """Do the pct leash and the absolute cap still state the SAME daily leash?
+
+    `None` when the cap is unreadable — an unknown must not read as agreement,
+    which is the flattering direction (I1). `tol` is 1pp of day-start: the two
+    rails are dollars-vs-fraction and will never be bit-equal, so the question
+    is whether they have drifted MATERIALLY apart, not whether they round the
+    same way.
+    """
+    cap = getattr(rails, "max_daily_loss", None)
+    try:
+        if isinstance(cap, bool) or not isinstance(cap, (int, float)):
+            return None
+        cap = float(cap)
+        if not math.isfinite(cap) or not (ds > 0):
+            return None
+    except (TypeError, ValueError):
+        return None
+    return abs(cap / ds - DAILY_LOSS_LIMIT) <= tol
+
+
+def halt_vs_stop(day_start_equity, rails, stop_frac, gross, overshoot_bps=None):
+    """THE TWO RAILS, READ AGAINST EACH OTHER. `{}` of published numbers, or
+    `None` when unmeasurable.
+
+    [2026-09-11 (abg)] `(gv)` established that **a stop must be reconcilable
+    with the gate that judges it** and built `test_stop_vs_gate` for the 15%
+    drawdown bar. The same book has a SECOND rail nobody read against the stop:
+    the daily-loss halt. They are the same quantity in different units — the
+    halt is a DOLLAR allowance on the book, the stop a PERCENT move on a
+    position — and which one fires first is decided entirely by the gross that
+    converts between them.
+
+    Measured on 👩 mum, 11-Sep, and it is the whole of her divergence from her
+    winning twin: at `gross 9.5x` her binding allowance ($105) is reached by a
+    **1.42%** adverse basket move while her stop sits at **4.00%**, so on any
+    red day every position exits at the halt instead of at its own stop or its
+    ROI ladder. Her ledger: 22 `daily_loss` legs at **-1.451%/trade, t=-5.41**,
+    an exit family her never-halting twin does not have at all, accounting for
+    **-0.506pp of the -0.578pp/trade** gap between a book at -15% and a book at
+    +2.5%. On the exits the two arms SHARE she reads +0.171%/trade against the
+    twin's +0.243% — indistinguishable. The strategy was never the problem.
+
+    THE ALLOWANCE IS THE BINDING RAIL, NOT THE LEASH. `halt_level` already owns
+    "which rail binds" and the tighter one fires, so the allowance is
+    `min(frac x day_start, cap)`. Reading the pct leash alone is how the first
+    pass of this analysis got the parity gross wrong by 1.3x: mum's abs cap has
+    bound since 4-Sep ((aat) measured it), so her allowance is $105 and not the
+    $156 her 20% leash implies.
+
+    `gross_at_parity` is the LEVER: the gross at which the two rails agree. It
+    is equity-DEPENDENT while an absolute cap binds (a fixed dollar is a
+    growing fraction of a shrinking book), which is exactly why it is computed
+    every loop from the book's own day-start rather than written down once.
+
+    REPORTED, NEVER A GATE. Nothing here refuses an entry, sizes one, or moves
+    a lever — `gross_x` stays the operator env `(sr)` made it ("risk appetite
+    belongs to the person whose money it is; the code's job is the arithmetic,
+    published"). A mis-ordered pair is a fact about the configuration, not an
+    opinion about it — and `scripts/audit_halt_vs_stop.py` is what turns the
+    fact into a build failure.
+    """
+    try:
+        ds, stop, g = float(day_start_equity), abs(float(stop_frac)), float(gross)
+    except (TypeError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in (ds, stop, g)):
+        return None
+    if not (ds > 0 and stop > 0 and g > 0):
+        return None
+    level, binding = halt_level(ds, rails)
+    if level is None:
+        return None
+    allowance = ds - level
+    if not (allowance > 0):
+        return None
+    halt_at = allowance / (g * ds)          # basket move that ends the day
+    # The stop's real cost is where it FILLS, not where it is written: (xp)
+    # measures the overshoot and mum's p90 is 62.4bps on a 4% stop. Degrades to
+    # None rather than to the nominal — an unmeasured fill must not read as a
+    # measured one ((lv)/I18, the byte-identical trap).
+    fill_at = None
+    try:
+        if overshoot_bps is not None and math.isfinite(float(overshoot_bps)):
+            fill_at = stop + float(overshoot_bps) / 10_000.0
+    except (TypeError, ValueError):
+        fill_at = None
+    return {"halt_at_basket_pct": round(halt_at, 5),
+            "stop_at_basket_pct": round(stop, 5),
+            "stop_fill_at_basket_pct": (round(fill_at, 5)
+                                        if fill_at is not None else None),
+            "stop_fires_first": halt_at >= stop,
+            "stop_fill_fires_first": (None if fill_at is None
+                                      else halt_at >= fill_at),
+            # FLOORED, never rounded: this number is read as a LEVER value, so
+            # it must be a gross that actually achieves parity. Rounding to
+            # nearest can round UP past the parity point, and then setting the
+            # published value leaves the book on the halt-first side of the very
+            # boundary the field exists to name. Caught by the round-trip test.
+            "gross_at_parity": math.floor(
+                (allowance / (ds * stop)) * 10_000) / 10_000,
+            "allowance_usd": round(allowance, 2),
+            "binding": binding or "pct",
+            # [(abg)] DOES THE ABSOLUTE CAP STILL EXPRESS THE POLICY IT WAS SET
+            # FROM? `DAILY_LOSS_LIMIT` states the leash as a FRACTION and the
+            # abs cap states it as a FIXED DOLLAR, so the moment equity moves
+            # the two stop agreeing — and `halt_level` takes the tighter, which
+            # is the stale one on a book that has grown. 👩 mum's $105 was 20% of
+            # her $525 day-start on 3-Sep ((aat) dated it) and is 15.8% of her
+            # book today, while `MUM_DAILY_LOSS` still says 0.20: two rails for
+            # one rule, silently 4.2pp apart, and the drift was found by reading
+            # a changelog entry rather than the row. Published so the next drift
+            # is visible instead of archaeological.
+            #
+            # REPORTED, NEVER ACTED ON. Moving a real-money loss cap is a value
+            # decision: it is Eamon's, it is pre-registered under
+            # `mum-halt-cost-preregistered-read` ((xv), n>=5 fresh halt events),
+            # and nothing here reads these two fields.
+            "abs_pct_of_day_start": (
+                round(float(getattr(rails, "max_daily_loss", None)) / ds, 4)
+                if isinstance(getattr(rails, "max_daily_loss", None),
+                              (int, float))
+                and not isinstance(getattr(rails, "max_daily_loss", None), bool)
+                and math.isfinite(float(getattr(rails, "max_daily_loss")))
+                else None),
+            "rails_agree": _rails_agree(ds, rails)}
+
+
 def halt_gate_share(clip, stop_frac, day_start_equity, rails):
     """`(share, armed)` — one slot-stop as a fraction of the book's whole daily
     allowance, and whether the halt-room gate is meaningful at that geometry.
@@ -820,6 +948,36 @@ def halt_room(equity, day_start_equity, rails):
 OVERSHOOT_MIN_N = _bus.LB_CAP_MIN_N
 
 
+def overshoot_p90_bps(ov, floored=True):
+    """[(abg)] THE ONE OWNER of "this book's measured stop overshoot".
+
+    The expression `sorted(vals)[round(0.9*len(vals))-1]` had THREE inline
+    copies — `_honest_stop_cost`, `stop_bases`, and the row's two p90 fields —
+    and a second copy of a rule is a second rule ((hj)). They also disagreed on
+    the n floor: the published fields emitted a p90 off ANY sample while the two
+    consumers refused below `OVERSHOOT_MIN_N`, so the row could show a
+    measured-looking overshoot beside a `None` cost derived from it.
+
+    COUNT CORRECTED IN PLACE (I12): this said TWO, because a scoped AST check
+    found two. A whole-file `grep` found three — the (po) rule exactly
+    ("prefer a whole-file grep to a scoped one, because scoping is where the
+    silence hides"), and the miss was in the guard written to close the class.
+
+    `floored=False` reproduces the row field's historical behaviour exactly, so
+    that published series does not break; every CONSUMER takes the floored read,
+    because a 2-fill p90 is not a measurement.
+    """
+    try:
+        vals = list((ov or {}).get("vals") or [])
+        if not vals:
+            return None
+        if floored and int((ov or {}).get("n") or 0) < OVERSHOOT_MIN_N:
+            return None
+        return sorted(vals)[max(0, int(round(0.9 * len(vals))) - 1)]
+    except Exception:  # noqa: BLE001 — a telemetry field never breaks the loop
+        return None
+
+
 def _honest_stop_cost(ov, gx=None, stop=None):
     """What an all-slots stop ACTUALLY costs, as a fraction of equity.
 
@@ -832,10 +990,9 @@ def _honest_stop_cost(ov, gx=None, stop=None):
     sample, and never the fire-at-level number wearing this name.
     """
     try:
-        vals = list((ov or {}).get("vals") or [])
-        if int((ov or {}).get("n") or 0) < OVERSHOOT_MIN_N or not vals:
+        p90 = overshoot_p90_bps(ov)          # floored: the one owner
+        if p90 is None:
             return None
-        p90 = sorted(vals)[max(0, int(round(0.9 * len(vals))) - 1)]
         # a NEGATIVE overshoot is a fill BETTER than the level; it does not
         # earn leverage, so the cost floors at the fire-at-level assumption.
         over = max(0.0, float(p90)) / 1e4
@@ -1172,7 +1329,7 @@ def refused_coins(verdicts, universe, cap=REFUSED_NAMES_CAP):
 def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
                 ungraded, entries_shut, last_open_ts, last_close_ts, t_now,
                 strategy=None, uptrend=None, enter=None, last_reject=None,
-                enter_bar=None, bb=None, breadth=None):
+                enter_bar=None, bb=None, breadth=None, scanned=None):
     """WHY DID NOTHING OPEN? — the I18 rule, at the fleet's real-money
     directional row.
 
@@ -1201,6 +1358,19 @@ def scan_census(verdicts, rsi_readings, rsi_bar, universe, held,
             verdicts.get(str(sym), "not_evaluated"), 0) + 1
     out = {"universe": len(universe), "held": len(held),
            "verdicts": dict(sorted(counts.items(), key=lambda kv: -kv[1]))}
+    # [2026-09-11 (abg)] DID THE SCAN RUN THIS LOOP? The verdict map is DURABLE
+    # on purpose (see `cycle_verdict` — a coin the loop never reached keeps its
+    # previous verdict rather than being silently reset), and the entry scan
+    # sits inside `if entries_ok:`. So on a shut book the row republishes the
+    # last PRE-SHUT scan and nothing says so: measured on 👩 mum 11-Sep, the row
+    # carried `verdicts {slots_full: 89, held: 10, opened: 2}` — a full book —
+    # beside a fresh `held: 0`, 45 minutes after the halt flattened all 12 legs.
+    # Both fields were correct and the pair was unreadable, which is I1 exactly
+    # ("a frozen row and a healthy one are byte-identical if you compare
+    # content") and cost a live diagnosis real time. `None` from a caller that
+    # does not know degrades to ABSENT, never to a claim either way.
+    if scanned is not None:
+        out["verdicts_basis"] = "this_loop" if scanned else "carried"
     if entries_shut:
         out["entries_shut"] = entries_shut
     if ungraded:
@@ -1764,6 +1934,22 @@ def main(_ctx=None, once=False):
         t0 = time.time()
         t_now = now()
         cur_day = t_now.date().isoformat()
+        # [2026-09-11 (abg)] WHETHER THIS ITERATION REACHED THE ENTRY SCAN, for
+        # `scan.verdicts_basis`. Bound HERE, at the top of the iteration, for
+        # two reasons that are both defects caught before they shipped:
+        #   * `entries_ok` is assigned ~1,570 lines below, and THREE
+        #     `_publish_row` calls run before it (the two early/halt paths in
+        #     this loop and `_telemetry_sleep`'s). Reading it from the publish
+        #     closure raises NameError on a free variable — on the halt paths,
+        #     i.e. exactly the state a shut book publishes from. That is the
+        #     `halt_level` hazard again: a telemetry field able to take down
+        #     the loop that publishes it.
+        #   * and re-binding it per ITERATION rather than once before the loop
+        #     stops a True from the previous cycle being republished as this
+        #     cycle's basis — a stale claim is worse than no claim (I1).
+        # None means "this publish happened before the scan decision", which the
+        # census prints as ABSENT rather than as either verdict.
+        scan_ran = None
 
         # ---- one book, one writer (top of the cycle, before any act) -------
         _ok_writer, _other = store.claim_writer(BOT_ROW)
@@ -2194,6 +2380,15 @@ def main(_ctx=None, once=False):
             # read once per publish and shared by the three fields below.
             _mmf = worst_mmf(universe)
             _stop_ok, _stop_ceiling = stop_reachable(_mmf)
+            # [(abg)] THE DAILY HALT READ AGAINST THE STOP IT CAN PRE-EMPT.
+            # Computed here so both the halt block's own
+            # `basket_move_at_full_gross_pct` and its `vs_stop` read ONE value
+            # — the field and the verdict derived from it must never disagree.
+            # Floored overshoot (a thin fill sample is not a measurement), and
+            # the whole dict degrades to None on a dark day-start rather than
+            # asserting an ordering from an unknown (I1).
+            _hvs = halt_vs_stop(day_start_equity, rails, S.stoploss, gross_x(),
+                                overshoot_p90_bps(ov))
             # [(wp)] and the MEASURED one: the held basket at the venue's
             # own leverage (gross/equity off the margin read), never the
             # full-slot bound. None when any leg's margin is unreadable.
@@ -2298,9 +2493,7 @@ def main(_ctx=None, once=False):
                     # measurement is the flattering direction — the exact
                     # byte-identical trap (lv)/I18 exists to close.
                     "all_slots_stop_pct_measured": _honest_stop_cost(ov),
-                    "overshoot_p90_bps": (sorted(ov["vals"])[
-                        max(0, int(round(0.9 * len(ov["vals"]))) - 1)]
-                        if ov.get("vals") else None),
+                    "overshoot_p90_bps": overshoot_p90_bps(ov, floored=False),
                     "overshoot_n": int(ov.get("n") or 0),
                     # [(sr)] THE HELD BASKET'S MEASURED INDEPENDENCE. n_eff ~1
                     # means the slots are one bet wearing five names and the
@@ -2430,8 +2623,24 @@ def main(_ctx=None, once=False):
                     "halt": {
                         "daily_loss_frac": DAILY_LOSS_LIMIT,
                         "abs_usd": getattr(rails, "max_daily_loss", None),
-                        "basket_move_at_full_gross_pct": round(
-                            DAILY_LOSS_LIMIT / gross_x(), 4),
+                        # [(abg)] THE BINDING RAIL, not the leash. This read
+                        # `DAILY_LOSS_LIMIT / gross_x()` — the PCT leash — while
+                        # `binding` two fields below said "abs" on this very
+                        # row: mum's $105 cap has bound since 4-Sep ((aat)), so
+                        # the published 2.11% described a rail that does not
+                        # fire while the one that does sat unpublished. A reader
+                        # acting on it reads the wrong rail, and the first pass
+                        # of (abg) did exactly that and got her parity gross
+                        # wrong by 1.3x. `halt_vs_stop` derives it from
+                        # `halt_level`, the ONE owner of which rail binds.
+                        # 4dp preserves this field's PUBLISHED precision
+                        # exactly — `vs_stop` carries 5dp for the new consumer,
+                        # and changing an existing series' resolution as a side
+                        # effect of a refactor is the silent drift this repo
+                        # keeps paying for. Caught by `test_variant_host`.
+                        "basket_move_at_full_gross_pct": (
+                            round(_hvs["halt_at_basket_pct"], 4)
+                            if _hvs else None),
                         "basket_move_now_pct": (
                             round(DAILY_LOSS_LIMIT * eq / _open_ntl, 4)
                             if (eq and _open_ntl) else None),
@@ -2448,6 +2657,15 @@ def main(_ctx=None, once=False):
                         # non-numeric cap inside the publish path.
                         "binding": halt_level(day_start_equity, rails)[1]
                         or "pct",
+                        # [(abg)] ...AND WHETHER THE BOOK'S OWN BRACKET CAN RUN
+                        # AT ALL. `stop_fires_first: false` says every red-day
+                        # position exits at the halt rather than at the stop or
+                        # the ROI ladder the book's edge was MEASURED on — a
+                        # different strategy from the graded one, and on mum it
+                        # was the entire -0.578pp/trade gap to her twin.
+                        # `gross_at_parity` is the lever that fixes it.
+                        # REPORTED, never a gate: see halt_vs_stop.
+                        "vs_stop": _hvs,
                     },
                 },
                 "held": {c: (meta.get(c) or {}).get("tag")
@@ -2634,9 +2852,7 @@ def main(_ctx=None, once=False):
                 "stop_overshoot": {
                     "n": int(ov.get("n") or 0),
                     "unmeasured_n": int(ov.get("unmeasured_n") or 0),
-                    "p90_bps": (sorted(ov["vals"])[
-                        max(0, int(round(0.9 * len(ov["vals"]))) - 1)]
-                        if ov.get("vals") else None),
+                    "p90_bps": overshoot_p90_bps(ov, floored=False),
                     "worst_bps": (max(ov["vals"]) if ov.get("vals")
                                   else None),
                 },
@@ -2657,7 +2873,13 @@ def main(_ctx=None, once=False):
                     strategy=S, uptrend=last_uptrend, enter=last_enter,
                     last_reject=(_LAST_REJECT or None),
                     enter_bar=last_enter_bar, bb=last_bb,
-                    breadth=breadth_now),
+                    breadth=breadth_now,
+                    # [(abg)] `scan_ran` is set from the SAME `entries_ok`
+                    # the scan loop is gated on, so "carried" can never
+                    # disagree with whether the loop ran — and it is bound at
+                    # the top of the iteration so the early publish paths see
+                    # None rather than a NameError. See the loop top.
+                    scanned=scan_ran),
                 # Advisory only: top liquid Lighter markets this arm is not
                 # currently scanning (for measured universe-evolution reviews).
                 "evolve": {
@@ -3309,6 +3531,7 @@ def main(_ctx=None, once=False):
         # `entries_ok` is five ANDed terms and a False was previously
         # indistinguishable from a universe with no signal — the same
         # ambiguity one level up from the per-coin census below.
+        scan_ran = bool(entries_ok)
         entries_shut = None if entries_ok else (
             "live_retired" if _retired else
             "positions_unreadable" if not pos_readable else
