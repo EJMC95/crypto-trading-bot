@@ -260,13 +260,19 @@ def reconcile(store: Store, venue_positions: Sequence[Position]
             ghosts.append({"symbol": our_sym, "side": ours_row["side"],
                            "quantity": ours_row["quantity"],
                            "why": "in our book, absent at the venue"})
-    clean = not (orphans or ghosts or mismatched or unprotected)
-    out = {"clean": clean, "orphans": orphans, "ghosts": ghosts,
+    # Name the thing that makes it unclean, rather than folding four
+    # collections into a boolean expression. Clearer to read, and it gives the
+    # caller the count it would otherwise have to recompute.
+    problems = orphans + ghosts + mismatched + unprotected
+    clean = not problems
+    action = "none"
+    if not clean:
+        action = ("REVIEW REQUIRED -- reconciliation reports, it never "
+                  "repairs; trading stays halted until a human decides")
+    out = {"clean": clean, "problems": len(problems),
+           "orphans": orphans, "ghosts": ghosts,
            "mismatched": mismatched, "unprotected": unprotected,
-           "ours": len(ours), "venue": len(theirs),
-           "action": ("none" if clean else
-                      "REVIEW REQUIRED -- reconciliation reports, it never "
-                      "repairs; trading stays halted until a human decides")}
+           "ours": len(ours), "venue": len(theirs), "action": action}
     store.record_event("reconcile", out)
     if not clean:
         log.error("reconciliation is NOT clean: %s", _j(out))

@@ -641,3 +641,26 @@ def test_a_flat_paper_round_trip_loses_money(cfg):
     t.book.positions[pos.symbol] = pos
     t._close(pos, 100.0, "manual")
     assert t.equity < before, "a flat round trip cost nothing"
+
+
+def test_reconciliation_counts_its_own_problems(cfg):
+    """`problems` is the count a caller would otherwise recompute by summing
+    four lists — and getting that sum wrong is how a not-clean reconciliation
+    gets reported as clean."""
+    with Store(cfg.state_db) as s:
+        s.upsert_position(Position(symbol=SYMS[0], side="short", quantity=1.0,
+                                   entry_price=100.0, opened_ts=1.0,
+                                   stop_price=103.0, protective_ok=True))
+        venue = [Position(symbol=SYMS[1], side="short", quantity=2.0,
+                          entry_price=50.0, opened_ts=1.0, stop_price=0.0)]
+        rep = reconcile(s, venue)
+        assert not rep["clean"]
+        assert rep["problems"] == (len(rep["orphans"]) + len(rep["ghosts"])
+                                   + len(rep["mismatched"])
+                                   + len(rep["unprotected"]))
+        assert rep["problems"] == 2          # one orphan + one ghost
+    with Store(cfg.state_db) as s:
+        s.drop_position(SYMS[0])
+        clean = reconcile(s, [])
+        assert clean["clean"] and clean["problems"] == 0
+        assert clean["action"] == "none"
