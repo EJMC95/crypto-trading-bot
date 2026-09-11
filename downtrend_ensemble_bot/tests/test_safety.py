@@ -253,8 +253,24 @@ def test_the_declared_dependencies_are_the_ones_actually_imported():
                 if mod and mod not in stdlib and mod not in local:
                     third_party.add(mod.lower())
 
-    # ccxt is a DECLARED optional extra, imported lazily inside a guard.
-    third_party.discard("ccxt")
+    # OPTIONAL, lazily imported inside a guard, and absent by design:
+    #   ccxt         -- a declared extra; installing it enables nothing
+    #   bot_pnl_store -- the surrounding fleet's dashboard publisher, which
+    #                   does not exist in a standalone checkout. Declaring it
+    #                   as a dependency would make the package depend on the
+    #                   repo it is meant to be separable from.
+    # Both must stay INSIDE a try, or "optional" is a wish. Checked here
+    # rather than assumed:
+    import re as _re
+    for mod in ("ccxt", "bot_pnl_store"):
+        for path in glob.glob(os.path.join(root, "src", "downtrend_bot",
+                                           "*.py")):
+            body = open(path).read()
+            if _re.search(rf"^\s*import {mod}\b", body, _re.M):
+                assert _re.search(rf"try:.*?^\s*import {mod}\b", body,
+                                  _re.M | _re.S), \
+                    f"{mod} is imported outside a try in {path}"
+        third_party.discard(mod)
 
     # A DISTRIBUTION name is not an IMPORT name -- `PyYAML` imports as `yaml`,
     # and a test that assumed they matched would fail on the one dependency

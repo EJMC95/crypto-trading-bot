@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 from .config import AppConfig, Mode
 from .exchange_adapter import ExchangeAdapter
+from .fleet_publish import ROW_IDS, publish as fleet_publish
 from .logging_setup import get
 from .models import contained_path
 from .reporting import render_status, write_json
@@ -48,6 +49,10 @@ class SoakReport:
     start_equity: float = 0.0
     equity: float = 0.0
     config_fingerprint: str = ""
+    #: Did the LAST loop's dashboard publish land? False in a standalone
+    #: checkout (no fleet), and False on a real failure -- `enabled()`
+    #: separates the two so they are never confused.
+    published: bool = False
     symbols: list[str] = field(default_factory=list)
     daily: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -179,6 +184,25 @@ def run_paper(cfg: AppConfig, adapter: ExchangeAdapter, *,
                                   "regime": st.regime})
                 day_key, day_start_equity = k, trader.equity
             write_json(cfg.reports_dir, REPORT_NAME, rep.as_dict())
+            # The fleet dashboard row, if this run is inside the fleet. A
+            # no-op in a standalone checkout, and the RETURN VALUE is kept:
+            # a persistence call whose False is discarded is how an organ
+            # looks healthy for three days off frozen state.
+            wins = sum(1 for t in trader.book.closed if t.pnl > 0)
+            rep.published = fleet_publish(
+                row=ROW_IDS["downtrend-ensemble"], mode=cfg.mode.value,
+                equity=trader.equity, start_equity=rep.start_equity,
+                open_trades=len(trader.book.positions),
+                closed_trades=len(trader.book.closed), wins=wins,
+                losses=len(trader.book.closed) - wins,
+                day_pnl=trader.day_pnl,
+                extra={"regime": st.regime, "halts": st.halts,
+                       "risk_multiplier": st.risk_multiplier,
+                       "soak_days": round(rep.days, 3),
+                       "soak_complete": rep.complete()[0],
+                       "exposure_pct": st.exposure_pct,
+                       "effective_bets": st.effective_bets,
+                       "symbols": len(cfg.symbols)})
             if on_state:
                 on_state(st)
             if loops is None or n < loops:

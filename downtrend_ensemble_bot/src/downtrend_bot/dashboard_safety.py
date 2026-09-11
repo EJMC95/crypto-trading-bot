@@ -40,7 +40,15 @@ PROTECTED_CONSTANTS = ("SLOW_LOOP", "STALE_SECONDS", "FAST_LOOP",
 PROTECTED_CALLABLES = ("row_fresh", "is_fresh", "filter_rows",
                        "authoritative_row", "visible_bots")
 #: Registries this package may add a row to, and may do nothing else to.
-APPEND_ONLY = ("EXPECTED", "LABELS", "CURRENT_BOTS")
+#:
+#: `VARIANT_ONLY` was ADDED after the first real patch went through this
+#: verifier: it is the set a shadow-only book actually belongs in (`EXPECTED`
+#: resurrects a placeholder card for a base that never publishes), it feeds
+#: `CURRENT_BOTS`, and it was NOT being checked -- so the one registry the
+#: patch genuinely touched was the one registry nobody was guarding. A
+#: verifier that certifies the change you did not make is worse than none.
+APPEND_ONLY = ("EXPECTED", "LABELS", "CURRENT_BOTS", "VARIANT_ONLY",
+               "SCANNERS", "STOCKS", "FREQTRADE")
 
 
 @dataclass

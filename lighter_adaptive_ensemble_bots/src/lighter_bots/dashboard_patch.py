@@ -149,12 +149,42 @@ def forbidden_edits(before_src: str, after_src: str) -> list[str]:
     it = iter(a_lines)
     for line in b_lines:
         for cand in it:
-            if cand == line:
+            if cand == line or _only_gained_a_separator(line, cand):
                 break
         else:
             problems.append(f"line removed or reordered: {line.strip()[:70]!r}")
             break
     return problems
+
+
+#: A closing bracket that shares its line with the last entry.
+_CLOSERS = "}])"
+
+
+def _only_gained_a_separator(before: str, after: str) -> bool:
+    """True when a line changed ONLY because the collection grew past it.
+
+    THE FALSE POSITIVE THIS EXISTS FOR, found by running a real patch through
+    both of this repo's verifiers and getting two different answers. Appending
+    to a set written as
+
+        VARIANT_ONLY = {"a", ..., "nav-cook"}
+
+    necessarily rewrites the LAST line: `"nav-cook"}` becomes `"nav-cook",`
+    with the brace moving down. Nothing was removed and nothing reordered --
+    but a line-subsequence check calls it a removal, which is the one
+    operation this verifier is supposed to PERMIT.
+
+    A check that fires on the legitimate case is a check that gets waived, and
+    the real removal is waived with it. So this recognises exactly that shape
+    -- same content, closers dropped, at most a trailing comma gained -- and
+    nothing looser: any change to the entry text itself still fails."""
+    b, a = before.rstrip(), after.rstrip()
+    if not b or not a:
+        return False
+    b_core = b.rstrip(_CLOSERS).rstrip()
+    a_core = a.rstrip(",").rstrip().rstrip(_CLOSERS).rstrip()
+    return bool(b_core) and b_core == a_core and b != a
 
 
 def _blocks(src: str, name: str) -> list[str]:

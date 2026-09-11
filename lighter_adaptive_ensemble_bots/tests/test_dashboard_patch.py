@@ -137,3 +137,58 @@ def test_reordering_existing_lines_is_refused():
     before = "A = 1\nB = 2\nC = 3\n"
     after = "C = 3\nA = 1\nB = 2\n"
     assert D.forbidden_edits(before, after)
+
+
+# ------------------------------------------------- the two-verifier finding --
+_SET_BEFORE = '''SLOW_LOOP = {"a"}
+STALE_SECONDS = 180
+VARIANT_ONLY = {"alpha",
+                "beta",
+                "nav-cook"}
+EXPECTED = ["x"]
+'''
+_SET_APPENDED = '''SLOW_LOOP = {"a"}
+STALE_SECONDS = 180
+VARIANT_ONLY = {"alpha",
+                "beta",
+                "nav-cook",
+                "downtrend-ensemble"}
+EXPECTED = ["x"]
+'''
+_SET_REMOVED = '''SLOW_LOOP = {"a"}
+STALE_SECONDS = 180
+VARIANT_ONLY = {"alpha",
+                "downtrend-ensemble"}
+EXPECTED = ["x"]
+'''
+
+
+def test_appending_past_a_shared_closing_brace_is_not_a_removal():
+    """THE FALSE POSITIVE, found by running one real patch through BOTH of
+    this repo's dashboard verifiers and getting two different answers.
+
+    A set written `{..., "nav-cook"}` necessarily rewrites its LAST line when
+    it grows: `"nav-cook"}` becomes `"nav-cook",`. Nothing was removed. The
+    line-subsequence check called it a removal -- which is the one operation
+    this verifier exists to permit, and a check that fires on the legitimate
+    case is a check that gets waived."""
+    assert D.forbidden_edits(_SET_BEFORE, _SET_APPENDED) == []
+
+
+def test_actually_removing_an_entry_is_still_refused():
+    """The other half, and the reason the exemption is written narrowly: only
+    a dropped closer plus an added comma is forgiven. Change the entry TEXT
+    and it still fails."""
+    problems = D.forbidden_edits(_SET_BEFORE, _SET_REMOVED)
+    assert problems and any("removed or reordered" in p for p in problems)
+
+
+def test_renaming_an_entry_is_still_refused():
+    renamed = _SET_BEFORE.replace('"beta",', '"beta-v2",')
+    assert D.forbidden_edits(_SET_BEFORE, renamed)
+
+
+def test_a_protected_constant_change_is_still_refused():
+    assert D.forbidden_edits(_SET_BEFORE,
+                           _SET_BEFORE.replace("STALE_SECONDS = 180",
+                                               "STALE_SECONDS = 5"))

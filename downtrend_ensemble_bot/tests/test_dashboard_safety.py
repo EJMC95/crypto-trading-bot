@@ -213,3 +213,42 @@ def test_renaming_a_local_variable_is_not_reported_as_a_deletion():
                          "    return age < STALE_SECONDS")
     v = check_append_only(BEFORE, bad)
     assert not any("disappeared" in x for x in v.violations), v.violations
+
+
+VARIANT_BEFORE = BEFORE + '''
+VARIANT_ONLY = {"alpha-bot", "beta-bot"}
+FREQTRADE = {"gamma-bot"}
+'''
+VARIANT_AFTER = BEFORE + '''
+VARIANT_ONLY = {"alpha-bot", "beta-bot", "downtrend-ensemble"}
+FREQTRADE = {"gamma-bot"}
+'''
+
+
+def test_variant_only_is_guarded_like_every_other_registry():
+    """The registry a shadow-only book actually belongs in.
+
+    Found by putting a REAL patch through this verifier: the one registry the
+    patch genuinely touched (`VARIANT_ONLY`) was the one registry that was not
+    in `APPEND_ONLY`, so it certified clean while checking nothing that
+    changed. A verifier that certifies the change you did not make is worse
+    than no verifier."""
+    v = check_append_only(VARIANT_BEFORE, VARIANT_AFTER)
+    assert v.append_only, v.violations
+    assert "downtrend-ensemble" in v.added["VARIANT_ONLY"]
+
+
+def test_removing_a_variant_only_entry_is_refused():
+    bad = VARIANT_BEFORE.replace('VARIANT_ONLY = {"alpha-bot", "beta-bot"}',
+                                 'VARIANT_ONLY = {"alpha-bot"}')
+    v = check_append_only(VARIANT_BEFORE, bad)
+    assert not v.append_only and any("VARIANT_ONLY" in x for x in v.violations)
+
+
+def test_every_registry_that_feeds_current_bots_is_append_only():
+    """`CURRENT_BOTS = set(EXPECTED) | VARIANT_ONLY | SCANNERS | STOCKS |
+    FREQTRADE`. Guarding the union and not its parts guards nothing: an entry
+    can be removed from any one of them and `CURRENT_BOTS` still parses."""
+    for name in ("EXPECTED", "VARIANT_ONLY", "SCANNERS", "STOCKS",
+                 "FREQTRADE", "CURRENT_BOTS", "LABELS"):
+        assert name in APPEND_ONLY, f"{name} feeds CURRENT_BOTS and is unguarded"

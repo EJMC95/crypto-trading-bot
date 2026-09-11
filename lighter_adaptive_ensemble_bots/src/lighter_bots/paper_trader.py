@@ -29,7 +29,7 @@ from . import regime as regime_mod
 from . import risk as risk_mod
 from . import signals as sig_mod
 from .config import AppConfig
-from .data import to_columns
+from .fleet_publish import ROW_IDS, publish as fleet_publish
 from .health import check as health_check, kill_switch_active
 from .lighter_adapter import BaseAdapter
 from .logging_setup import event, get
@@ -106,6 +106,10 @@ class Runner:
         self.metadata_version = registry.version
         self.metadata_fetched_at = time.time()
         self.rejections: dict[str, int] = {}
+        #: Did the LAST cycle's dashboard publish land? False in a standalone
+        #: checkout (no fleet) AND on a real failure -- `fleet_publish.enabled`
+        #: separates the two so they are never confused.
+        self.published = False
 
     # ------------------------------------------------------------ helpers --
     def _reject(self, reason: str) -> None:
@@ -192,12 +196,28 @@ class Runner:
         self.soak.save(cfg.state_dir)
 
         marks = self._marks()
+        equity_now = self.state.equity + self.state.book.unrealized(marks)
+        # The fleet dashboard row, if this run is inside the fleet. A no-op in
+        # a standalone checkout; the return value is KEPT rather than
+        # discarded, so a row that is not current says so.
+        wins = sum(1 for t in self.state.book.closed if t.pnl > 0)
+        self.published = fleet_publish(
+            row=ROW_IDS["adaptive-ensemble"], mode=self.mode.value,
+            equity=equity_now, start_equity=self.start_equity,
+            open_trades=len(self.state.book.positions),
+            closed_trades=len(self.state.book.closed), wins=wins,
+            losses=len(self.state.book.closed) - wins,
+            day_pnl=self.state.book.day_pnl,
+            extra={"regime": verdict.regime.value, "kill_switch": killed,
+                   "soak_days": round(self.soak.days, 3),
+                   "signals": self.soak.signals,
+                   "healthy": hc.ok, "symbols": len(symbols)})
         return {"ts": now, "regime": verdict.regime.value,
+                "published": self.published,
                 "regime_reasons": verdict.reasons,
                 "kill_switch": killed, "health": hc.as_dict(),
                 "opened": opened, "book": self.state.book.summary(marks),
-                "equity": round(self.state.equity
-                                + self.state.book.unrealized(marks), 4),
+                "equity": round(equity_now, 4),
                 "rejections": dict(sorted(self.rejections.items(),
                                           key=lambda kv: -kv[1])[:10]),
                 "soak": {"days": round(self.soak.days, 2),

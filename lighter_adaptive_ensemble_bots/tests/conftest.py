@@ -67,3 +67,41 @@ def cfg(tmp_path):
     for d in (c.state_dir, c.runtime_dir, c.reports_dir, c.data_dir):
         os.makedirs(d, exist_ok=True)
     return c
+
+
+def make_runner(tmp_dir=None, symbols=("BTC", "ETH"), bars=420,
+                start_equity=10_000.0):
+    """A paper `Runner` wired to the mock adapter, for tests that need the
+    whole cycle rather than one component.
+
+    `paper_trader` had NO coverage at all before this existed -- worth saying
+    plainly, because a module with no tests and a green suite look identical
+    from the outside."""
+    import tempfile
+
+    from lighter_bots.config import AppConfig, Mode
+    from lighter_bots.lighter_adapter import MockLighterAdapter
+    from lighter_bots.market_metadata import MarketRegistry
+    from lighter_bots.paper_trader import Runner
+
+    tmp_dir = tmp_dir or tempfile.mkdtemp()
+    cfg = AppConfig()
+    cfg.state_dir = os.path.join(tmp_dir, "state")
+    cfg.runtime_dir = os.path.join(tmp_dir, "runtime")
+    cfg.data_dir = os.path.join(tmp_dir, "data")
+    cfg.reports_dir = os.path.join(tmp_dir, "reports")
+    for d in (cfg.state_dir, cfg.runtime_dir, cfg.data_dir, cfg.reports_dir):
+        os.makedirs(d, exist_ok=True)
+
+    markets = [make_market(s, market_id=i) for i, s in enumerate(symbols, 1)]
+    tf = cfg.timeframes
+    candles = {}
+    for k, s in enumerate(symbols):
+        for name, sec in ((tf.regime, 14400), (tf.signal, 3600),
+                          (tf.execution, 900)):
+            candles[(s, name)] = ramp(n=bars, start=100.0 * (k + 1),
+                                      drift=-0.002, wiggle=0.004, tf_sec=sec)
+    adapter = MockLighterAdapter(markets=markets, candles=candles,
+                                 equity=start_equity)
+    return Runner(cfg, adapter, MarketRegistry(markets), mode=Mode.PAPER,
+                  start_equity=start_equity)
