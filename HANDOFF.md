@@ -1,18 +1,21 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 22:00 Sydney (12:00Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 22:02 Sydney (12:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
-
-**🕳️ FEED DARK**
-
-- `/bus.json` UNREACHABLE (https://pnl-dashboard-production-858c.up.railway.app/bus.json) — no gate verdicts read. This section is blind, not clear.
 
 **💵 REAL MONEY, RIGHT NOW**
 
 - `freqtrade-avo-maria-lighter` was shut **29% of the last 14.9d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `daily_halt` (halted_today).
 - `freqtrade-mum-lighter` was shut **19% of the last 14.9d** (69h), mostly `slguard` (48h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+
+**🚦 AT THE GATE**
+
+- `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it. Its mean (0.902%/trade) sits INSIDE the [0.2, 1.1]%/trade band a RANDOM entry pays on this venue — the six bars test against ZERO and cannot tell it from drift ((hm)).
+- `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
+- `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
 
@@ -131,11 +134,13 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (57 commit(s))
+## Shipped today (59 commit(s))
 
+- `a4f2c59` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
 - `e84d3b2` (abe) the brain lost two hours to one truncated read, and nothing recorded it
 - `a7d86cf` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
 - `23628d1` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `bae8920` [deploy-live-mum] (abe) Eamon's manual trades are dated — mum's true drawdown FAILS the bar, avo's is UNDECIDABLE
 - `58b8a71` (abd) the whole judgement layer is in git now — Eamon: "track the rest too"
 - `fb25485` (abb) a blanket renumber swept another session's citations — repoint five, and renumber only your own
 - `1aed728` (aau) a red guard still silences the two behind it, and the marker guard's own remediation was unreachable (#307)

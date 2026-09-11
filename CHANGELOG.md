@@ -1,4 +1,4 @@
-## 2026-09-11 (abe) — ONE TRUNCATED READ BOUGHT TWO HOURS OF SILENT BRAIN BLINDNESS, AND THE TEST THAT WOULD HAVE CAUGHT IT WAS ASSERTING AN EXACT COUNT OVER LIVE PRODUCTION DATA
+## 2026-09-11 (abf) — ONE TRUNCATED READ BOUGHT TWO HOURS OF SILENT BRAIN BLINDNESS, AND THE TEST THAT WOULD HAVE CAUGHT IT WAS ASSERTING AN EXACT COUNT OVER LIVE PRODUCTION DATA
 
 **Eamon, 11-Sep: *"please fix"*** — on the one thing the previous pass had
 declared and explicitly declined to touch as out-of-scope. He was right, and
@@ -103,6 +103,13 @@ network WITHOUT TOLERATING ITS ABSENCE", and exactly one instance existed.**
 That one also happened to be the only one asserting an exact count over live
 production rows. Both halves are now gone from it, and the three tolerant
 checks are untouched.
+
+**[RENUMBERED (abe) -> (abf), 11-Sep.** Another session landed a different
+`(abe)` on main while this was open. Theirs is cited **10 times from tracked
+code** (`scripts/golive_readiness.py` x7, two test files x3) and mine had
+**zero**, so by rule 3 the cited entry keeps the letter and this one moves.
+Renumbered surgically per rule 4b — this entry's own single header occurrence,
+asserted `count == 1` before the write, never a blanket sweep over the tree.**
 
   ENFORCED BY: `bot_learn.py::_read_json_url`, `bot_learn.py::_is_transient`,
   `tests/autonomy/test_phantom_consumers.py::test_an_exhausted_ledger_read_RAISES_and_never_degrades_to_empty`,
