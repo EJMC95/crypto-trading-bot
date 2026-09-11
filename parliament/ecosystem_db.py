@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS trades (
     entry_px REAL, exit_px REAL, size REAL, pnl_abs REAL, reason TEXT,
     features TEXT);
 CREATE INDEX IF NOT EXISTS ix_trades_bot ON trades (bot, closed_ts);
+-- [(aas)] the ML's fetch has no `bot` filter, so the composite index
+-- above cannot serve it; at the 90d retention that is a full scan plus
+-- a sort every 300s. Idempotent, and it serves prune()'s DELETE too.
+CREATE INDEX IF NOT EXISTS ix_trades_closed ON trades (closed_ts);
 
 CREATE TABLE IF NOT EXISTS candles (
     sym TEXT NOT NULL, resolution TEXT NOT NULL, ts INTEGER NOT NULL,

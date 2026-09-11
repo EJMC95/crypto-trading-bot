@@ -903,6 +903,77 @@ def veto_split(rows, vetoed, tag_of=None):
     return out
 
 
+#: [2026-09-11 (aau)] THE BAND A COIN FLIP PAYS ON THIS VENUE, measured at
+#: `(hm)` on 30-Jul and doctrine ever since: *"on this venue a random short
+#: earns +0.2% to +1.1%/trade for free."* Not a bar and not the null itself —
+#: the band the null was measured to occupy.
+RANDOM_BAND_PCT = (0.2, 1.1)
+
+
+def null_band(s, bot, book_class=None):
+    """Does this DIRECTIONAL book's mean sit inside the band a RANDOM entry
+    pays on this venue? REPORTED, never a bar.
+
+    [(aau)] WHY THE GATE NEEDED THIS, and it is the fleet's own doctrine
+    catching up with its own grader. CLAUDE.md has said since 30-Jul:
+    **"GRADE A DIRECTIONAL BOOK AGAINST A RANDOM-ENTRY BENCHMARK, NEVER
+    AGAINST ZERO (hm)... A positive mean is not an edge on a trending tape."**
+    `BAR_NAMES` is six bars and EVERY ONE of them tests against ZERO. The
+    contradiction was inert for 38 days because no book had ever passed; on
+    5-Sep 🎫 the taker became the first, at a mean of **+0.902%/trade —
+    INSIDE the band** — and the payload said `ready: true, fails: []` with
+    nothing anywhere near it saying the book had never been tested against the
+    null its own doctrine requires. Measured afterwards, it ties a coin flip
+    (excess -0.174pp, P=0.636).
+
+    THIS IS A SCREEN, NOT THE TEST, and saying so is the point. It compares
+    one number to a measured band; the real null draws matched-random entries
+    on the book's own coins through its own bracket
+    (`scripts/study_taker_random_null_2026-09-10.py`). A book INSIDE the band
+    has not been distinguished from drift BY THE SIX BARS — which is a claim
+    about what the gate can see, not a verdict on the book.
+
+    FUNDING books get `None`: CLAUDE.md's own caveat says they are "largely
+    direction-agnostic, so it bites them less", and a screen that fires on
+    every book is one the reader learns to ignore ((gl)). The classifier is
+    `fleet_allocation.book_class` — IMPORTED, never re-derived ((hj)), and
+    lazily for the same circular-import reason `t_crit` is.
+
+    Three-valued: `None` when the class cannot be determined or the mean
+    cannot be read, never a guess (I6).
+    """
+    try:
+        if not isinstance(s, dict) or s.get("n", 0) < 2:
+            return None
+        m = s.get("mean_pct")
+        if not isinstance(m, (int, float)) or isinstance(m, bool) \
+                or not math.isfinite(m):
+            return None
+        if book_class is None:
+            from fleet_allocation import book_class as _bc   # noqa: PLC0415
+            book_class = _bc
+        kind = book_class(bot)
+    except Exception:      # noqa: BLE001 — a lost annotation, never a guess
+        return None
+    if kind != "directional":
+        return None
+    lo, hi = RANDOM_BAND_PCT
+    mean_pct = 100.0 * m
+    inside = lo <= mean_pct <= hi
+    out = {"class": kind, "band_pct": [lo, hi],
+           "mean_pct": round(mean_pct, 3), "inside_random_band": inside,
+           "tested": False}
+    if inside:
+        out["why"] = (
+            f"DIRECTIONAL, and its mean {mean_pct:+.3f}%/trade sits INSIDE the "
+            f"[{lo:+.1f}, {hi:+.1f}]%/trade band a RANDOM entry pays on this "
+            f"venue ((hm), 30-Jul). The six bars test against ZERO, so they "
+            f"cannot distinguish this book from the tape's drift. Doctrine "
+            f"requires a matched-random null before a directional promotion; "
+            f"nothing here has run one. This is a SCREEN, not that test.")
+    return out
+
+
 def published_live_policy(extra):
     """A book's OWN declared LIVE-ARM allow-list, or None.
 
@@ -2114,9 +2185,26 @@ def mtm_drawdown(samples, book_usd=None):
     book_usd = BOOK_USD if book_usd is None else book_usd
     peak = pts[0][1]
     dd = 0.0
-    for _, eq in pts:
+    # [2026-09-11 (aau)] ...and the RUNNING-PEAK RATIO, in the same pass.
+    # `max_dd_frac_peak` below divides this loop's running-peak dollar hole by
+    # the GLOBAL peak — numerator and denominator are different objects, and
+    # on a book whose equity later exceeds the peak the hole opened at (every
+    # book that took a DEPOSIT) it understates. `runpeak` is the textbook
+    # definition, the same one `pnl_dashboard._max_drawdown_pct` has always
+    # used, and it is the MAX OF THE RATIO rather than the ratio of the max-$
+    # hole: those pick different episodes (measured across all 35 live series
+    # they differ on 🎫 taker-lshadow, 4.879% vs 4.769%, in the WORSE
+    # direction, on the fleet's first READY book).
+    runpeak = 0.0
+    runpeak_at = None
+    runpeak_denom = None
+    for ts, eq in pts:
         peak = max(peak, eq)
         dd = min(dd, eq - peak)
+        if peak > 0:
+            _r = (peak - eq) / peak
+            if _r > runpeak:
+                runpeak, runpeak_at, runpeak_denom = _r, ts, peak
     days = (pts[-1][0] - pts[0][0]).total_seconds() / 86400.0
     peak_eq = max(e for _, e in pts)
     return {"n": len(pts), "days": days,
@@ -2148,6 +2236,18 @@ def mtm_drawdown(samples, book_usd=None):
             # handed already contains its own peak. None when that peak is
             # non-positive, never 0.0 (I8: unknown degrades to unknown).
             "max_dd_frac_peak": (abs(dd) / peak_eq) if peak_eq > 0 else None,
+            # [(aau)] REPORTED, NEVER A BAR — `apply_mtm`, `grade` and
+            # `bar_map` are byte-unchanged by this commit, exactly as (kw) put
+            # `cluster` beside `t` and (yr) put `max_dd_frac_peak` beside the
+            # $1,000 reading. Switching onto it fails BOTH real-money books
+            # (mum 9.90 -> 13.05, avo 12.32 -> 24.09) and cuts their clip
+            # through `fleet_bus.dd_scale`, so it is an operator decision taken
+            # on a published readback, not a side effect of a correctness fix.
+            # None (never 0.0) when no sample had a positive peak — I8.
+            "max_dd_frac_runpeak": (runpeak if runpeak_at is not None
+                                    else None),
+            "runpeak_at": runpeak_at,
+            "runpeak_denom_usd": runpeak_denom,
             "first_equity": pts[0][1], "last_equity": pts[-1][1],
             "peak_equity": peak_eq}
 
@@ -3362,11 +3462,17 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "live_fillable": ((c.get("live_fillable") or {})
                               if (c.get("live_fillable") or {}).get("why")
                               else None),
+            # [(aau)] and the random-band screen, same rule: only when it is
+            # decision-relevant (a directional book INSIDE the band).
+            "null_band": ((c.get("null_band") or {})
+                          if (c.get("null_band") or {}).get("why")
+                          else None),
             "why": " · ".join(
                 x for x in (hz.get("why") or "",
                             (c.get("class_split") or {}).get("why") or "",
                             (c.get("veto_split") or {}).get("why") or "",
-                            (c.get("live_fillable") or {}).get("why") or "")
+                            (c.get("live_fillable") or {}).get("why") or "",
+                            (c.get("null_band") or {}).get("why") or "")
                 if x),
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
@@ -3470,6 +3576,17 @@ def book_payload(s):
             "max_dd_pct_peak": (round(100 * _m["max_dd_frac_peak"], 2)
                                 if _m.get("max_dd_frac_peak") is not None
                                 else None),
+            # [(aau)] the running-peak reading, published so the size of the
+            # correction is visible BEFORE anything acts on it. `book_payload`
+            # rebuilds a hand-picked whitelist rather than serialising `mtm`,
+            # so a field added to `mtm_drawdown` alone would never reach a
+            # reader — born dark in the payload instead of the import graph.
+            "max_dd_pct_runpeak": (round(100 * _m["max_dd_frac_runpeak"], 2)
+                                   if _m.get("max_dd_frac_runpeak") is not None
+                                   else None),
+            "runpeak_denom_usd": (round(_m["runpeak_denom_usd"], 2)
+                                  if _m.get("runpeak_denom_usd") is not None
+                                  else None),
             "last_equity": _m.get("last_equity"),
             "peak_equity": _m.get("peak_equity")}
     if s.get("max_dd_frac_realised") is not None:
@@ -3599,6 +3716,9 @@ def book_payload(s):
     # [(aan)] REPORTED beside, never a bar — see `live_fillable`.
     if isinstance(s.get("live_fillable"), dict):
         out["live_fillable"] = s["live_fillable"]
+    # [(aau)] same footing: the random-entry screen the bars cannot apply.
+    if isinstance(s.get("null_band"), dict):
+        out["null_band"] = s["null_band"]
     return out
 
 
@@ -4950,6 +5070,10 @@ def main():
         s["live_fillable"] = live_fillable(
             ed.get("scoped_rows") or [], _live_policy.get(bot),
             vetoed=_lens_veto.get(bot))
+        # [(aau)] and the screen the SIX BARS structurally cannot apply: they
+        # test against ZERO, and (hm) has said since 30-Jul that a DIRECTIONAL
+        # book is graded against a random-entry benchmark, never against zero.
+        s["null_band"] = null_band(s, bot)
         if s_all.get("n", 0) < a.min_closes:
             # [2026-08-06 (kv)] BELOW THE FLOOR IS NOT INVISIBLE ANY MORE.
             # `continue` used to be the whole story, and it hid exactly the

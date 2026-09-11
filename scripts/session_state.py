@@ -1094,6 +1094,18 @@ def fleet_signals(pnl=_FETCH, bus=_FETCH):
                 note = (f" Its LIVE arm could have filled {_ef.get('n')} of "
                         f"{(_ef.get('n') or 0) + (_uf.get('n') or 0)} of those "
                         f"closes — read `live_fillable` before promoting.")
+            # [(aau)] and the screen the six bars cannot apply — they test
+            # against ZERO, and (hm) requires a directional book to be graded
+            # against a random-entry benchmark. HANDOFF is where a session
+            # decides what to pick up, so the caveat has to be HERE and not
+            # only in a CLI footer nobody reads.
+            nb = v.get("null_band") if isinstance(
+                v.get("null_band"), dict) else None
+            if nb and nb.get("inside_random_band") is True:
+                note += (f" Its mean ({nb.get('mean_pct')}%/trade) sits INSIDE "
+                         f"the {nb.get('band_pct')}%/trade band a RANDOM entry "
+                         f"pays on this venue — the six bars test against ZERO "
+                         f"and cannot tell it from drift ((hm)).")
             out["gate"].append(
                 f"`{bot}` is **READY — {passed}/{len(bars)} bars**. Going live "
                 "is Eamon's explicit act; it is never an automatic consequence "

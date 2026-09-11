@@ -300,6 +300,46 @@ def golive_blocker(bot, state=None, now=None):
         missing = sorted(k for k, v in bars.items() if v is not True)
         return (f"{bot} is NOT ready ({book.get('bars_passed')}/6 bars"
                 + (f", failing {'+'.join(missing)}" if missing else "") + ")")
+    # [2026-09-11 (aau)] AND THE SIX BARS ARE NOT THE WHOLE QUESTION AT THE
+    # POINT MONEY IS ARMED. `ready` means, precisely, "the six bars pass on the
+    # GRADED sample" — the grader says so in its own docstring, its CLI header
+    # and CLAUDE.md, and it never claims to mean "this book may go live". On a
+    # book whose LIVE mode runs a narrower policy than the arm being graded,
+    # those are different questions, and THIS function is the only machine in
+    # the fleet that turns the answer into real-money permission.
+    #
+    # Measured 11-Sep on 🎫 the taker, the fleet's FIRST-EVER `ready: true`:
+    # 162 of its 208 graded closes are `long-breakoutup`, a family
+    # `LIVE_LENSES` structurally excludes; the 46 it may fill read
+    # -0.788%/trade and fail FOUR of the same six bars; and its own published
+    # `lens_veto` empties even those to ZERO. A go-live there would not have
+    # lost money — it would have filled NOTHING, which is worse than it sounds
+    # because it looks like a decision.
+    #
+    # THE FIX BELONGS HERE AND NOT IN THE GRADER, and that was measured too:
+    # making live-fillability a precondition on `ready` takes the fleet's READY
+    # list from 2 books to ZERO (🙏 avo's shadow twin is the control arm for a
+    # book already trading real money), releases `apply_ready_freeze`'s bracket
+    # hold on the only 6/6 book — the live payload shows it withholding
+    # `taker.tp` right now — and creates a precondition the book can never
+    # clear, which `golive_readiness` itself calls "not a precondition, it is a
+    # retirement". This is I10's own shape instead: the live path reads the
+    # published gate ADDITIONALLY, and fails closed.
+    #
+    # THREE-VALUED, like every other published declaration it reads: a book
+    # that publishes no `live_fillable` (no `live_policy` declared, or an
+    # unreadable tag) is UNCHANGED. Absence is not a refusal here, because the
+    # absence means "this book never claimed a narrower live policy", not
+    # "nobody looked" — the grader omits the key entirely in both cases and a
+    # refusal on absence would block every book that has no live/shadow
+    # asymmetry at all.
+    lf = book.get("live_fillable")
+    if isinstance(lf, dict) and lf.get("inert") is True:
+        eff = (lf.get("effective") or {}).get("n")
+        allowed = (lf.get("allowed") or {}).get("n")
+        return (f"{bot} passes 6/6 bars on its GRADED sample, but a LIVE arm "
+                f"could fill {eff} of them (structurally allowed: {allowed}) — "
+                f"arming it would trade nothing. See live_fillable.why")
     return None
 
 
@@ -1393,6 +1433,42 @@ def _selftest():
             assert golive_blocker(_ROW, {"updated": _fresh,
                                         "books": {BOT: {"ready": _bad}}}, _now), \
                 f"ready={_bad!r} is not True and must refuse"
+
+        # [(aau)] AND 6/6 IS NOT ENOUGH WHEN THE LIVE ARM CAN FILL NOTHING.
+        # `ready` means "the six bars pass on the GRADED sample"; this is the
+        # only machine that turns that into real-money permission, so it reads
+        # the live-fillable verdict ADDITIONALLY (I10's own shape). Measured on
+        # 🎫 the taker: 6/6 on 208 closes, of which a live arm may fill 46, and
+        # its own veto empties even those to 0.
+        _inert = {"ready": True, "bars_passed": 6,
+                  "live_fillable": {"inert": True,
+                                    "allowed": {"n": 46},
+                                    "effective": {"n": 0}}}
+        _msg_i = golive_blocker(_ROW, {"updated": _fresh,
+                                       "books": {_ROW: _inert}}, _now)
+        assert _msg_i and "fill" in _msg_i, _msg_i
+        assert "46" in _msg_i and "6/6" in _msg_i, \
+            "the refusal must NAME the numbers, not just say no ((ht))"
+        # a book whose live arm CAN fill its sample still arms — the guard must
+        # not fail on good news
+        _ok = {"ready": True, "bars_passed": 6,
+               "live_fillable": {"inert": False, "allowed": {"n": 208},
+                                 "effective": {"n": 208}}}
+        assert golive_blocker(_ROW, {"updated": _fresh,
+                                     "books": {_ROW: _ok}}, _now) is None, \
+            "a live-fillable READY book must still arm"
+        # THREE-VALUED: a book that declares no live policy is UNCHANGED.
+        # Absence means "never claimed a narrower live policy", not "nobody
+        # looked" — refusing on absence would block every book with no
+        # live/shadow asymmetry, which is most of the fleet.
+        assert golive_blocker(_ROW, _payload(True), _now) is None, \
+            "no live_fillable key must not refuse"
+        for _junk in (None, {}, "inert", {"inert": "yes"}, {"inert": 1},
+                      {"effective": {"n": 0}}):
+            _b = {"ready": True, "bars_passed": 6, "live_fillable": _junk}
+            assert golive_blocker(_ROW, {"updated": _fresh,
+                                         "books": {_ROW: _b}}, _now) is None, \
+                f"live_fillable={_junk!r} is not an inert verdict"
     finally:
         if _saved_env is None:
             os.environ.pop("FUNDSPREAD_GOLIVE", None)
@@ -1459,6 +1535,7 @@ def _selftest():
 
     print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/"
           "ledger-row/universe-widening; go-live gate: opt-in, ready, "
+          "live-fillable, "
           "freshness, fail-closed, live config pinned)")
 
 

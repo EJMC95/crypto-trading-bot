@@ -175,5 +175,105 @@ def test_a_confirmation_closes_a_claim_without_masking_a_regression():
     assert _rows(m)["fleet_immune"]["state"] == "fixed?"
 
 
+# -- [(aas)] a source's health is a RATE, and the board grades the rate -------
+
+def _sentinel():
+    """The REAL publisher, so the consumer is tested against a payload its
+    publisher built ((hj)) — hand-writing `sources_uptime` here would pin my
+    idea of the shape, which is exactly how four contract defects shipped
+    green."""
+    import importlib.util as _u
+    sp = _u.spec_from_file_location("evsent", os.path.join(ROOT, "event_sentinel.py"))
+    m = _u.module_from_spec(sp)
+    sys.modules["evsent"] = m
+    sp.loader.exec_module(m)
+    return m
+
+
+def _uptime(seq):
+    """Drive `record_sources` over a real sequence -> the published block."""
+    ev = _sentinel()
+    st, out = {}, None
+    for i, v in enumerate(seq):
+        out = ev.record_sources(st, {"gdelt": v, "rss": True},
+                                1_757_000_000.0 + i * 600.0)
+    return out
+
+
+def _p(uptime, gdelt_now):
+    return {"updated": "2026-09-02T04:12:54+00:00", "ttl_sec": 2400,
+            "market_bias": -0.6, "sources_ok": {"rss": True, "gdelt": gdelt_now},
+            "sources_uptime": uptime,
+            "playbook_grades": {"x": {"hit_rate": 0.75}}}
+
+
+def test_a_flapping_source_is_reported_not_watched():
+    """GDELT measured 382/930 up with 474 flaps. That is degraded, delivering,
+    and not fixable from this repo — a watch on it fires on 59% of reads and
+    trains the reader to ignore the channel ((gl))."""
+    up = _uptime([(i % 2 == 0) if i % 5 else False for i in range(400)])
+    assert 0.3 < up["gdelt"]["frac"] < 0.5 and up["gdelt"]["flaps"] > 100, up
+    # ...and the verdict does NOT depend on which side of the flap we landed on,
+    # which is the whole defect: both samples must grade the same.
+    for now in (True, False):
+        state, why = OB._sources_verdict(_p(up, now))
+        assert state == "ok", (now, state, why)
+        assert "flaps" in why and "gdelt" in why, why
+
+
+def test_a_genuinely_dead_source_still_reads_watch():
+    """The fix must not be 'stop looking'. Same frac floor, zero transitions."""
+    up = _uptime([False] * 300)
+    state, why = OB._sources_verdict(_p(up, False))
+    assert state == "watch" and "source(s) down: gdelt" in why, why
+    # rss is UP in the same block, so this is not the every-source case — the
+    # two messages send the reader to different places.
+    assert "EVERY source down" not in why, why
+
+
+def test_every_source_down_is_named_as_such():
+    ev = _sentinel()
+    st, out = {}, None
+    for i in range(300):
+        out = ev.record_sources(st, {"gdelt": False, "rss": False},
+                                1_757_000_000.0 + i * 600.0)
+    state, why = OB._sources_verdict(_p(out, False))
+    assert state == "watch" and "EVERY source down" in why, why
+
+
+def test_a_thin_rate_is_not_a_rate_and_falls_back_to_the_sample():
+    """Below SRC_MIN_N nothing has been measured. Fail back to the single
+    sample AND say it is one — a silent fallback is the same class of lie."""
+    up = _uptime([False] * 3)
+    assert up["gdelt"]["n"] < OB.SRC_MIN_N
+    state, why = OB._sources_verdict(_p(up, False))
+    assert state == "watch" and "ONE sample" in why, why
+    state2, why2 = OB._sources_verdict(_p(up, True))
+    assert state2 == "ok" and "ONE sample" in why2, why2
+
+
+def test_an_absent_uptime_block_keeps_the_old_read_for_the_deploy_window():
+    """The publisher ships before the consumer sees it; nothing may go quiet
+    or crash in between."""
+    p = _p(None, False)
+    p.pop("sources_uptime")
+    state, why = OB._sources_verdict(p)
+    assert state == "watch" and "ONE sample" in why, why
+    # junk is the same story, never an exception
+    for junk in ({}, [], "x", {"gdelt": "nope"}, {"gdelt": {"frac": None, "n": 99}}):
+        st, w = OB._sources_verdict(_p(junk, True))
+        assert st == "ok" and "ONE sample" in w, (junk, st, w)
+
+
+def test_the_two_corrected_confirmations_cite_no_live_verdict_word():
+    """[(aas)] The rot mechanism, pinned: both stale rows quoted a reading.
+    `arm-drift`/`xp-contaminated` are verdict words of the hour."""
+    for organ in ("impl_shortfall", "event_sentinel"):
+        row = OB.CONFIRMED[organ]
+        assert "CORRECTED IN PLACE" in row, organ
+        for word in ("xp-contaminated", "arm-drift"):
+            assert f"reads `{word}`" not in row, (organ, word)
+
+
 def test_selftest_is_green():
     assert OB.selftest() == 0

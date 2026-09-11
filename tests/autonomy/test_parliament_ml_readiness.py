@@ -26,13 +26,15 @@ import ast
 import json
 import random
 import time
+from unittest import mock
 from pathlib import Path
 
 import pytest
 
 from parliament import ml as _ml_mod
 from parliament.ecosystem_db import TRADE_KEEP_DAYS, EcosystemDB
-from parliament.ml import (ACC_Z_BAR, FEATURES, MIN_READY_SAMPLES, TRAIN_DAYS,
+from parliament.ml import (ACC_Z_BAR, FEATURES, MIN_READY_SAMPLES,
+                           TRAIN_DAYS, TRAIN_LIMIT, WINDOW_FULL_FRAC,
                            MLEngine)
 
 pytestmark = pytest.mark.autonomy
@@ -91,15 +93,87 @@ def test_is_ready_is_the_one_owner_so_predict_and_snapshot_cannot_disagree():
 
 def test_a_pool_that_cannot_hold_the_bar_reads_unreachable_and_names_it():
     """`ready: false` was byte-identical between 'ready Tuesday' and 'never'
-    ((lv)). Replays the live 10-Sep state exactly."""
+    ((lv)). Replays the live 10-Sep state — with the span the pool covers.
+
+    [(aas)] RE-AIMED, and the re-aim is the point ((vd): a pin asserts current
+    behaviour, not a property). As written this set `_pool` alone and asserted
+    `unreachable`, which is the verdict the engine gave a 90-close pool
+    whatever tape it spanned — the very reading that let `(aag)` publish "the
+    RETENTION binds" while the gate that actually bound was a 2,000-row fetch
+    cap. `unreachable` now requires a window that is FULL."""
     m = MLEngine()
-    m.n_seen, m._pool = 85, 90
+    m.n_seen, m._pool, m._pool_span_d = 85, 90, TRAIN_DAYS
     m.acc = {"nb": 0.4961, "knn": 0.507, "logit": 0.5082,
              "ridge": 0.5039, "stumps": 0.4944}
     r = m.readiness()
     assert r["verdict"] == "unreachable", r
     assert "RETENTION binds" in r["blocked_by"]
     assert str(int(TRAIN_DAYS)) in r["blocked_by"] and "90" in r["blocked_by"]
+
+
+# -- [(aas)] the three gates in front of the bar, told apart ------------------
+
+def test_a_truncated_fetch_names_the_CAP_and_never_the_retention():
+    """THE DEFECT THIS SHIPPED FOR, replayed. `(aag)` pointed the query at the
+    90d retention and left `closed_trades`' own `limit=2000` in place, so the
+    engine published `train_days: 90` over a pool that had seen ~20 days — and
+    blamed the retention, a gate with room in it. A fetch returning exactly its
+    own limit is truncated until proven otherwise ((qz))."""
+    m = MLEngine()
+    m.n_seen, m._pool, m._pool_span_d, m._truncated = 89, 89, 21.0, True
+    r = m.readiness()
+    assert r["verdict"] == "unreachable", r
+    assert "FETCH CAP" in r["blocked_by"], r
+    assert "RETENTION binds" not in r["blocked_by"], r
+    assert str(TRAIN_LIMIT) in r["blocked_by"], r
+    assert r["truncated"] is True and r["fetch_limit"] == TRAIN_LIMIT
+    assert r["pool_span_d"] == 21.0
+
+
+def test_a_window_that_is_not_full_is_a_countdown_not_an_exclusion():
+    """I17 in the ML: a thin sample is not a measured exclusion. A half-filled
+    retention is still accruing, so the honest verdict is `cold` WITH A DATE —
+    and the ETA must be derived from the observed rate, not asserted."""
+    m = MLEngine()
+    m.n_seen, m._pool, m._pool_span_d = 40, 40, 10.0     # 4.0 trainable/day
+    r = m.readiness()
+    assert r["verdict"] == "cold", r
+    assert "CLOSE RATE binds" in r["blocked_by"], r
+    assert "not the retention" in r["blocked_by"], r
+    assert "~40d" in r["blocked_by"], r      # (200-40)/4.0
+    # ...and the same pool over a FULL window is the other verdict entirely.
+    m._pool_span_d = TRAIN_DAYS
+    assert m.readiness()["verdict"] == "unreachable"
+
+
+def test_an_unknown_span_degrades_to_cold_never_to_unreachable():
+    """I6/I17: `unreachable` is a terminal word. Without knowing how much tape
+    the pool spans we cannot say the window is full, so the engine must fail
+    toward the NON-terminal verdict — the same direction `golive_readiness`
+    fails when its critical-value owner is missing."""
+    m = MLEngine()
+    m.n_seen, m._pool, m._pool_span_d = 85, 90, None
+    assert m.readiness()["verdict"] == "cold"
+
+
+def test_the_full_window_boundary_is_the_declared_fraction():
+    """The word `unreachable` turns on exactly one number; pin where."""
+    assert 0.5 < WINDOW_FULL_FRAC <= 1.0
+    m = MLEngine()
+    m.n_seen, m._pool = 89, 89
+    m._pool_span_d = TRAIN_DAYS * WINDOW_FULL_FRAC * 0.99
+    assert m.readiness()["verdict"] == "cold"
+    m._pool_span_d = TRAIN_DAYS * WINDOW_FULL_FRAC
+    assert m.readiness()["verdict"] == "unreachable"
+
+
+def test_the_truncation_flag_beats_a_full_window():
+    """Order matters: a truncated fetch can also LOOK like a full window (the
+    newest 25k rows may span 90d). The cap is named first because it is the
+    gate with the smaller number, and raising the other one does nothing."""
+    m = MLEngine()
+    m.n_seen, m._pool, m._pool_span_d, m._truncated = 89, 89, TRAIN_DAYS, True
+    assert "FETCH CAP" in m.readiness()["blocked_by"]
 
 
 def test_a_pool_that_can_hold_the_bar_is_a_countdown_not_a_block():
@@ -143,6 +217,52 @@ def test_the_training_window_is_the_pruners_retention_by_identity():
     days = next((k.value for k in calls[0].keywords if k.arg == "days"), None)
     assert isinstance(days, ast.Name) and days.id == "TRAIN_DAYS", \
         "train_from_db must read TRAIN_DAYS, never a retyped literal"
+    # [(aas)] AND THE CAP, for the same reason and a sharper one: `days` was
+    # read correctly all along and the horizon was still wrong, because
+    # `closed_trades` carries `limit=2000` and this call site did not override
+    # it. An UNPASSED limit is the defect, so pin that it is passed at all.
+    lim = next((k.value for k in calls[0].keywords if k.arg == "limit"), None)
+    assert isinstance(lim, ast.Name) and lim.id == "TRAIN_LIMIT", \
+        ("train_from_db must pass TRAIN_LIMIT explicitly — an inherited "
+         "default silently re-specifies the training horizon")
+
+
+def test_the_fetch_cap_binding_is_measured_on_a_REAL_db_not_asserted():
+    """Driven through the real `EcosystemDB`, because the defect lived in the
+    seam between two files and no hand-written fixture would have shown it
+    ((hj): test a consumer against a payload its publisher built).
+
+    Seeds more trainable rows than the cap allows, with the cap forced low, and
+    asserts the engine NOTICES rather than silently learning a truncated
+    window — the (aag) failure, reproduced and then caught."""
+    db = EcosystemDB(path=":memory:")
+    now = time.time()
+    for i in range(30):
+        ts = now - (i + 1) * 3600
+        db.record_trade(f"t{i}", "pm-x", "parliament", "BTC", "long", "t",
+                        ts - 600, ts, 1.0, 1.1, 1.0, 0.5, "tp",
+                        {k: 0.0 for k in FEATURES})
+    m = MLEngine(db=db)
+    if not m.enabled:
+        pytest.skip("numpy absent")
+
+    # (a) cap well above supply -> not truncated, and the span is the real tape
+    m.train_from_db()
+    r = m.readiness()
+    assert r["truncated"] is False, r
+    assert r["pool"] == 30 and r["fetch_limit"] == TRAIN_LIMIT
+    assert 1.0 < r["pool_span_d"] < 2.0, r      # 30 hourly rows ~= 1.25d
+    assert "CLOSE RATE binds" in r["blocked_by"], r
+
+    # (b) cap BELOW supply -> the engine says so, and names the cap
+    m2 = MLEngine(db=db)
+    with mock.patch.object(_ml_mod, "TRAIN_LIMIT", 10):
+        m2.train_from_db()
+        r2 = m2.readiness()
+        assert r2["truncated"] is True, r2
+        assert r2["pool"] == 10, r2
+        assert "FETCH CAP" in r2["blocked_by"], r2
+        assert "RETENTION binds" not in r2["blocked_by"], r2
 
 
 def test_prune_keeps_trades_longer_than_candles():

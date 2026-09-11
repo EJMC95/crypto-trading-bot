@@ -173,9 +173,53 @@ def c_impl_shortfall(p, ctx):
     return ("watch" if v in ("stood_down", "insufficient") else "ok"), why
 
 
+#: [2026-09-11 (aas)] WHEN IS A SOURCE DOWN? This check read
+#: `sources_ok.gdelt` — ONE SAMPLE — and graded `watch` on it. GDELT's public
+#: endpoint flaps: measured over this organ's own retained history, 930
+#: samples, it was up in **382 (41.1%)** with **474 transitions**. So the
+#: 2-Sep review's `gdelt False -> a dead source` and the 10-Sep confirmation's
+#: `GDELT is up` are two draws of the same coin, eight days apart, and neither
+#: is a fact about the source. The publisher now measures the RATE
+#: (`event_sentinel.record_sources`); this grades it.
+#:
+#: DOWN and FLAPPING are different findings and only one is ours: a source at
+#: ~0% over a real sample is dead and worth a watch; a source at 41% with
+#: hundreds of transitions is degraded, still delivering headlines on 41% of
+#: cycles, and not fixable from this repo — so it is REPORTED, never a watch
+#: ((gl): a detector that fires on a condition nobody can act on trains the
+#: reader to ignore the channel).
+SRC_DEAD_FRAC = 0.05
+SRC_MIN_N = 20          # below this no rate has been measured — say so
+
+
+def _sources_verdict(p):
+    """-> (state, fragment). Falls back to the single sample when the rate is
+    absent (the deploy window), and SAYS that is what it is."""
+    up = p.get("sources_uptime")
+    if isinstance(up, dict) and up:
+        meas = {k: v for k, v in up.items()
+                if isinstance(v, dict) and isinstance(v.get("frac"), NUM)
+                and isinstance(v.get("n"), NUM) and v["n"] >= SRC_MIN_N}
+        if meas:
+            dead = sorted(k for k, v in meas.items() if v["frac"] <= SRC_DEAD_FRAC)
+            bits = " ".join(
+                f"{k} {v['frac']:.0%}/{int(v['n'])}"
+                + (f" flaps {int(v['flaps'])}" if isinstance(v.get("flaps"), NUM) else "")
+                for k, v in sorted(meas.items()))
+            if len(dead) == len(meas):
+                return "watch", f"EVERY source down over its window · {bits}"
+            if dead:
+                return "watch", f"source(s) down: {', '.join(dead)} · {bits}"
+            return "ok", f"sources {bits}"
+    gdelt = need(p, "sources_ok.gdelt")
+    return (("ok" if gdelt else "watch"),
+            f"gdelt {gdelt} (ONE sample — no uptime rate published yet)")
+
+
 def c_event_sentinel(p, ctx):
-    gdelt, bias, pg = need(p, "sources_ok.gdelt"), need(p, "market_bias"), p.get("playbook_grades")
-    state, why = ("ok" if gdelt else "watch"), f"market_bias {bias} · gdelt {gdelt}"
+    bias, pg = need(p, "market_bias"), p.get("playbook_grades")
+    state, frag = _sources_verdict(p)
+    why = f"market_bias {bias} · {frag}"
     rates = [g.get("hit_rate") for g in pg.values()
              if isinstance(g, dict) and isinstance(g.get("hit_rate"), NUM)] if isinstance(pg, dict) else []
     if rates:
@@ -278,6 +322,16 @@ REVIEW_2SEP = {
 #: A CONFIRMED organ THAT REGRESSES STILL READS `watch` — the promotion below
 #: only ever applies to a row already grading `ok`, so a confirmation can never
 #: mask a new fault. Pinned by selftest in both directions.
+#:
+#: [2026-09-11 (aas)] AND A ROW MUST CITE A DURABLE PROPERTY, NEVER A LIVE
+#: READING. Two of the five rows written on 10-Sep had rotted by the next
+#: morning, both the same way: each quoted a number that was true at the
+#: instant it was read — `impl_shortfall`'s verdict word, and a single sample
+#: of a source that flaps 41/59. A confirmation is a standing claim; a reading
+#: is not. Cite the thing that changed and cannot change back on its own (the
+#: organ has a live arm; the docket is empty; the budget is split per cohort),
+#: and if the only evidence available is a reading, take enough of them to be
+#: a rate.
 CONFIRMED = {
     "fleet_risk": "2026-09-10: the 2-Sep watch was `light red` with the POOLED "
                   "long budget at 20/20; (wp)/(wy) split it per cohort and the "
@@ -285,13 +339,22 @@ CONFIRMED = {
     "xp_judge": "2026-09-10: was `judging 0 of 4` with avo and mum BOTH "
                 "unjudgeable; the (ye) lever-prefix and (zg) parity fixes "
                 "landed and it now judges 2 of 4 with `unjudgeable []`",
-    "impl_shortfall": "2026-09-10: was `stood_down (live arm retired)` after the "
-                      "(ta) Farmer retirement; it reads `xp-contaminated` now, "
-                      "which is the organ REFUSING an invalid live-vs-shadow "
-                      "comparison while the judge runs a candidate on the twin — "
-                      "its correct output, not a silence",
-    "event_sentinel": "2026-09-10: the watch was `gdelt False`, a dead source; "
-                      "GDELT is up and the playbook grades are earning",
+    "impl_shortfall": "2026-09-11 CORRECTED IN PLACE per I12: the 10-Sep row "
+                      "cited the VERDICT (`xp-contaminated`) as its evidence, "
+                      "and a verdict is a live reading — it read `arm-drift` "
+                      "within a day. What CLOSES the 2-Sep `stood_down (live "
+                      "arm retired)` finding is durable: the organ has a live "
+                      "arm again and publishes a verdict instead of standing "
+                      "down. Which verdict it publishes is its reading, never "
+                      "this row's claim",
+    "event_sentinel": "2026-09-11 CORRECTED IN PLACE per I12: the 10-Sep row "
+                      "read `GDELT is up` — one sample of a source measured up "
+                      "in 382 of 930 published samples (41.1%) with 474 "
+                      "transitions over 7 days, so that reading was a coin "
+                      "flip and so was the 2-Sep watch it confirmed. What is "
+                      "REFUTED is the finding itself — `a dead source` — by "
+                      "the rate: GDELT flaps, it is not dead, and the organ is "
+                      "producing. `(aas)` grades the rate, not the sample",
     "golive_readiness": "2026-09-10: was `docket 7` — seven books awaiting an "
                         "I17 keep-or-retire call; the (wt) September slate took "
                         "five and (zo) took georgia's, so the docket is empty",

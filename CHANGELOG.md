@@ -1,3 +1,235 @@
+## 2026-09-11 (aau) — `ready: true` BESIDE "A LIVE ARM FILLS NOTHING" WAS ONE FIELD ANSWERING TWO QUESTIONS — AND THE FIX BELONGS WHERE MONEY IS ARMED, NOT IN THE GRADER
+
+**Eamon, 11-Sep:** *"it said its been ready to go live for 6 days and now its
+not ready, can we please look into this situation deeply as its a conflict
+that deserves a real look in."* He was right, and the obvious fix was wrong.
+
+**FIRST, THE FACT: `ready` NEVER FLIPPED.** It has read `true`, 6 of 6,
+`fails: []` continuously since **5-Sep 11:12Z** (n=173, t=2.11) — 50 snapshots
+over 200h, not one False. `t` peaked 2.73 on 6-Sep and has drifted to 2.12;
+that is the sample growing, not a verdict moving. What changed was that
+`(aan)` added a second, TRUE sentence beside the first — *"a go-live today
+fills nothing"* — and left both on one line without saying how they relate.
+**Two correct statements about two different arms, printed as one book's
+status.** The conflict was real and it was legibility, not arithmetic.
+
+**AND `ready` HAS NEVER MEANT WHAT IT LOOKS LIKE.** Its every definitional
+sentence — module docstring, CLI header, CLAUDE.md — says *the six bars pass
+on the graded sample*, and each adds that promotion is a separate act. The CLI
+footer even prints the caveat verbatim: *"a DIRECTIONAL book passing here has
+passed in that regime only."* **The gate says the right thing in the one place
+nobody reads.** It is not on the payload, not on the 🚦 card, and was not in
+HANDOFF — which is where the decision actually gets made.
+
+**THE ESCALATION WAS TESTED AND REFUSED — four measured reasons.** Making
+live-fillability a PRECONDITION on `ready`, the way `integrity` is:
+1. **IT RELEASES THE BRACKET FREEZE ON THE ONLY 6/6 BOOK.**
+   `apply_ready_freeze` keys on `ready is True`; the live payload reads
+   `ready_freeze: {..., dropped: ["taker.tp"]}` — **the tuner wanted `taker.tp`
+   this cycle and `ready: true` is the only thing that stopped it.** (`(aan)`'s
+   note that this actuator's record was `dropped: []` is hereby CORRECTED IN
+   PLACE per I12 — it was true when written and is not now.) Flip `ready` and
+   the bracket moves under a 208-close single-policy sample. **That is `(hm)`
+   verbatim** — *"137 shadow closes produced ZERO gradeable ones because the
+   scout tuner moved the bracket ~20 times in a fortnight."* The fix would
+   destroy the evidence it claims to protect.
+2. **IT TAKES THE FLEET'S READY LIST FROM 2 BOOKS TO ZERO.** Measured across
+   all 14 graded books, both variants: 🎫 the taker AND **🙏 avo's shadow twin
+   — the control arm for a book already trading real money** — both flip
+   False. Nine of fourteen books have no live mode at all (`SystemExit` unless
+   `VENUE=lighter_shadow`) and would declare an empty allow-list.
+3. **IT IS A RETIREMENT, NOT A PRECONDITION.** `divergence` is vetoed, and the
+   veto blocks the SHADOW arm's entries too, so no new divergence closes
+   accrue (last: 20-Aug, 22 days) and `effective.n` stays 0 forever. This
+   grader's own code already ruled on that shape when it narrowed `integrity`:
+   **"A precondition a book cannot ever clear is not a precondition, it is a
+   retirement."** The precedent that would be cited is the precedent that was
+   narrowed for exactly this reason.
+4. **IT MAKES THE CARD WORSE.** `bars_passed` is computed independently of
+   `ready`, so the result is a card reading `6/6 ✓✓✓✓✓✓` filed under *not
+   ready* — strictly more contradictory than today. And the whole thing would
+   grade EVIDENCE on CONFIGURATION: the same 208 closes passing or failing on
+   a constant in a real-money module.
+
+---
+
+**SHIPPED (1) — THE REFUSAL GOES WHERE MONEY IS ARMED.**
+`lighter_funding_spread_bot.golive_blocker` is the ONLY machine in this fleet
+that turns `ready` into real-money permission, and it was reading a field that
+means *"the paper book is good"*. It now ALSO reads `live_fillable.inert` and
+refuses, naming the numbers:
+
+> *"…passes 6/6 bars on its GRADED sample, but a LIVE arm could fill 0 of them
+> (structurally allowed: 46) — arming it would trade nothing."*
+
+This is **I10's own shape** — *"a live path must ADDITIONALLY read the
+published gate and refuse unless it says READY — fail-closed."* It keeps the
+freeze armed, leaves `BAR_NAMES` and the grading authority untouched, and
+cannot become a retirement-by-arithmetic because it gates an ACT, not a grade.
+**THREE-VALUED:** a book publishing no `live_fillable` is UNCHANGED — absence
+means *"never claimed a narrower live policy"*, and refusing on it would block
+every book with no live/shadow asymmetry, which is most of the fleet.
+
+**SHIPPED (2) — THE SCREEN THE SIX BARS STRUCTURALLY CANNOT APPLY.**
+CLAUDE.md has said since 30-Jul, in its Rules: **"GRADE A DIRECTIONAL BOOK
+AGAINST A RANDOM-ENTRY BENCHMARK, NEVER AGAINST ZERO (hm) … A positive mean is
+not an edge on a trending tape."** `BAR_NAMES` is six bars and **every one
+tests against ZERO.** The contradiction sat INERT for 38 days because the
+grader published `READY: none` on every cycle; on 5-Sep the taker became the
+fleet's **first-ever pass**, at **+0.902%/trade — inside the [+0.2, +1.1]%
+band a random entry pays on this venue** — and nothing anywhere near the
+verdict said the book had never been tested against the null its own doctrine
+requires. Measured since: it TIES a coin flip (excess −0.174pp, P=0.636).
+
+`null_band` reports it, and the discrimination is the point — measured on the
+live payload it fires on **3 of 14 books**, and of the two READY ones it flags
+🎫 the taker (+0.902%, inside) while staying SILENT on 🙏 avo (+2.231%, above
+it). Funding books get `None` — CLAUDE.md's own caveat says they are *"largely
+direction-agnostic"*, and a screen that fires on everything is one the reader
+learns to ignore ((gl)). The classifier is `fleet_allocation.book_class`,
+IMPORTED and never re-derived ((hj)). **It is a SCREEN, not the test**, and the
+`why` says so: it compares one number to a measured band, where the real null
+draws matched-random entries on the book's own coins through its own bracket.
+
+**AND THE CAVEAT NOW TRAVELS.** Both verdicts reach the 🚦 card (an amber
+`vs random: untested` chip) and **HANDOFF**, which is the first thing a session
+reads (I11) and which said `READY — 6/6 bars` unqualified for six days.
+
+**WHAT DELIBERATELY DID NOT CHANGE:** `ready`, `BAR_NAMES`, `grade()`,
+`bar_map()`, the era, `integrity`, and every existing consumer. Both additions
+are REPORTED beside — the `class_split`/`veto_split` footing, which refused to
+become bars in eight separate declarations and which this respects rather than
+becoming the third exception.
+
+**9 MUTATIONS, ALL RED:** drop the inert refusal · refuse on ABSENCE (the
+three-valued break) · a truthy `inert` arms real money · widen the band · drop
+the funding-class check · make the band one-sided · `null_band` joins
+`BAR_NAMES` · the card drops the chip · HANDOFF drops it. Plus a
+fail-on-good-news test: a book whose live arm CAN fill its sample must still
+arm, and a book above the band must not be flagged.
+
+**HOW THE ANSWER WAS FOUND, because the method is the transferable part.** An
+adversarial lens was given the single job of STOPPING this change, and it won
+on a measured fact — `dropped: ["taker.tp"]` — that a second lens then
+independently priced across all 14 books. Without it I would have shipped the
+precondition. That is the third time today an adversarial pass reversed a
+conclusion I had already reasoned my way to.
+
+## 2026-09-11 (aaw) — THE DRAWDOWN BAR DIVIDES A 10-SEP HOLE BY AN 11-SEP DEPOSIT, AND THE STOP-DEATH PAGER READS A CEILING THE CLIP HAS NOT USED SINCE (vy) — two numbers published beside the ones that are wrong, nothing switched
+
+**Eamon, 11-Sep:** *"do you have any suggestions regarding 1 and 2"*, then
+*"proceed and implement the above, hold off on avo untill her trades are
+empty"*. Both halves shipped as PUBLISH-BESIDE, and **🙏 avo's service was
+deliberately not deployed** — she held 6 positions, so the marker is
+`[deploy-live-mum]` alone and her container keeps running the build it has.
+
+**1 · THE MAXDD BAR'S NUMERATOR AND DENOMINATOR ARE DIFFERENT OBJECTS.**
+`mtm_drawdown` finds the max dollar hole against a RUNNING peak (L1889-1893)
+and divides it by the GLOBAL peak (L1895/L1924), and `apply_mtm` makes that
+field THE BAR while `fleet_bus.dd_scale` reads it to size live clips. On a
+series that later exceeds the peak the hole opened at — **every book that took
+a deposit** — it understates. Measured across all 35 live equity series:
+
+| book | shipped | running-peak | |
+|---|---|---|---|
+| 🙏 avo LIVE | 12.32% | **24.09%** | PASS -> FAIL at the 15% bar |
+| 👩 mum LIVE | 9.90% | **13.05%** | |
+| 🎫 taker shadow | 4.77% | 4.88% | max-% vs max-$ EPISODE |
+| 🌾 carry shadow | 1.75% | 1.81% | |
+| 📊 equities-regime | 0.36% | 0.36% | |
+| the other 30 | — | identical | |
+
+**THE FLEET ALREADY HELD THE RIGHT IMPLEMENTATION AND IT WAS NOT THE ONE
+HOLDING THE GUN:** `pnl_dashboard._max_drawdown_pct` (:6716) has walked
+`min(dd, v/peak - 1.0)` — a running peak on both sides — since the 15-Jul
+salvage. This is "a second copy of a rule is a second rule" with the wrong copy
+governing real money.
+
+**SHIPPED: `max_dd_frac_runpeak` / `runpeak_at` / `runpeak_denom_usd`, REPORTED
+AND NEVER A BAR** — `apply_mtm`, `grade` and `bar_map` are byte-unchanged and a
+test pins that. **The second site was the one that mattered:** `book_payload`
+rebuilds a hand-picked whitelist rather than serialising `mtm`, so a field added
+to `mtm_drawdown` alone is **born dark in the payload**, and
+`test_the_field_actually_reaches_a_reader` keeps that closed.
+
+**WHY IT WAS NOT SWITCHED, which is the substance rather than caution.**
+Switching fails BOTH real-money books and cuts their clip through `dd_scale`
+(avo 24.09% -> scale 0.545, deployed $969.82 -> $528.8). And avo's reading is
+**confounded**: her worst window (22-24 Aug, -$55.65) contains **ZERO bot P&L**
+— 7 closes, all `long_daily_loss` halt events at $0.00 — beside **$66.40 of
+attested operator manual trades** (`MANUAL_PNL_USD`, (td)) that sit in the
+equity series because `snapshot_equity` writes raw venue equity. **Stated
+against the first draft of this entry, which said the drawdown "is not the
+bot's": that is too generous.** Attributing the $66.40 uniformly reads
+**33.81%**, so the confound interval is 24.09%-33.81% and she is past the bar
+at BOTH ends; what is unresolved is the SIZE, not the verdict. **Only Eamon can
+close it** — the dates those trades were taken. 👩 mum's 13.05% is unambiguously
+hers (66 closes, -$65.92, `manual_pnl_usd` 0.0).
+
+**REFUSED, with the number:** reader-side deposit detection. This session's own
+measurement used jump-matching, and it is **measurably wrong in the loosening
+direction** — on 🪁 kelly it invents two phantom flows and would BUY her 51%
+more clip. The flow must be attested at the PUBLISHER; that is the next step,
+and it is forward-only, so it is not in this commit.
+
+**2 · THE STOP-DEATH PAGER READS THE CLIP-OFF CEILING.** `stop_dead_above`
+4.17x is `1/(|stop| + worst_mmf)` with the per-coin mmf clip DISENGAGED, and
+`mmf_clip_factor` has scaled the high-margin coins since (vy) precisely so the
+stop survives. So `protective stop is DEAD at gross 9.5 (ceiling 4.17)` — which
+fired on **~14.5 of ~99 immune cycles** the day mum went to 9.5x — is true at
+ANY gross above 4.17: **I7's trigger met by configuration.** The number that
+actually bound her was published NOWHERE.
+
+**THE CLOSED FORM, and it is the shipped clip's own arithmetic rather than a
+second copy of it.** `mmf_clip_factor` scales by `(sl+REF)/(sl+mmf)` exactly
+where the stop would die, which EQUALISES maintenance-per-deployed-dollar at
+`MMF_CLIP_REF` for every tier at or above it, so the whole family collapses:
+
+    G_dead = 1 / (|stop| + min(mmf, MMF_CLIP_REF))
+
+For mum: **10.0000x nominal · 9.5066x at her measured `overshoot_p90_bps` 51.9
+· 9.4127x at worst observed 62.4**. She is set to 9.5 — headroom **+0.0066x**.
+Pinned by brute-forcing the SHIPPED `mmf_clip_factor` over uniform and mixed
+12-leg baskets, so the form cannot drift from the function it summarises; the
+counter-intuitive half is that the binding basket is the **43 coins at exactly
+600bps** (f=1.0 at every gross), not the 20% tier.
+
+**SHIPPED:** `stop_dead_above_eff` (all three bases), `stop_ceiling_basis`,
+`stop_reachable_eff`, `gross_x_headroom`, `gross_x_max_env`,
+`gross_x_max_alive`; the pager reads the clip-ON verdict when present and keeps
+the old reading otherwise so nothing goes quiet in the deploy window; and **a
+DARK margin read stops being silent** — every limb fired only on `is False`, so
+when `fleet_bus.market_margins()` is empty every verdict degrades to None and
+the organ said nothing, on precisely the state where `mmf_clip_factor` ALSO
+stops protecting. Gated on a levered book: at 1x the question does not arise.
+
+**FAIL-CLOSED ON THE UNKNOWN (I1/I8):** `clipped_stop_ceiling(None)` returns
+None and never the closed form — the formula needs no margin map, so computing
+it anyway would turn a dark read into an affirmative green on a levered
+real-money row.
+
+**REFUSED:** adding `stop_dead` to `fleet_immune.HEADROOM_OK` to quiet the
+page. It silences the structural false positive AND the true positive
+underneath it, and an exemption granted to quiet a pre-existing alarm is how a
+guard stops guarding. **NOT REBUILT:** `(aas)` had already silenced the FLAT
+case hours earlier via `_book_flat`; this builds on it rather than redoing it.
+**NOT CLAMPED:** `GROSS_X_MAX` stays Eamon's env — published beside the derived
+ceiling, never overridden ((sr)/(tg)).
+
+**Enforcement:** `tests/autonomy/test_clipped_stop_ceiling.py` (17 tests) and
+`tests/autonomy/test_runpeak_drawdown.py` (6). Mutations: **7/7 red** across the
+two modules after one survivor was removed as REDUNDANT CODE rather than
+covered — an `and _eff is None` clause the `elif` chain already guaranteed,
+which no test could ever kill, replaced by a test that pins the branch ORDER.
+One further survivor is recorded as a **no-op by proof** (substituting
+`abs(dd)/peak` for `_r` at the update site is identical because `peak` is
+monotone; verified over 200,000 random series, zero counterexamples) so a
+future session does not chase it. Two fixture defects were caught by their own
+tests failing loudly: a margin map written `{"mmf": m}` where the venue's shape
+is `{"mmf_bps": ...}` (every leg silently degraded to `MMF_CLIP_UNKNOWN`), and
+a hand-rolled `stats` sample chased KeyErrors one field at a time until it was
+replaced by a publisher-built one.
+
 ## 2026-09-11 (aar) — 🎫 THE NULL THAT BLOCKED A GO-LIVE INFERRED SIDE FROM A NULLABLE COLUMN, AND REPLAYED 7 LONGS AS SHORTS
 
 **The instrument whose verdict refused the taker's go-live had a sign bug in
@@ -81,6 +313,115 @@ because both push the refusal the same way and neither changes a verdict:**
 Both are CARRIED (`null-basis-and-window-mismatch`) rather than patched in the
 same pass — one surface per pass, verified in the live payload, which is the
 rule `(fz)` was written to enforce.
+
+## 2026-09-11 (aat) — 👩 MUM'S GROSS 5.0x → 9.5x, NOT THE 9.6x ASKED FOR: HER STOPS DIE AT 9.507x, AND THE BINDING BASKET IS THE ONE TIER HER OWN CLIP NEVER SCALES
+
+**Eamon, 11-Sep: *"Adjust mums sizing to her new balance which i just
+deposited"*, then *"change her back to 9.6"*.** He deposited **$265.44** into
+her live arm while she was FLAT (equity 515.13 → 780.57 at 00:36:41Z,
+`capital_adjust` 220.42 → 485.86, `pnl_abs` invariant at −5.29 across the
+boundary — the guard booked it correctly).
+
+**THE SIZING ASK WAS ALREADY SATISFIED, AND THAT IS THE FINDING.** `clip =
+equity × gross_x / max_open` re-derives from a fresh venue equity read every
+loop (`clip_usd`, :799-804, called at :3161), so the deposit had already flowed
+through before he asked: 780.569717 × 5.0 / 12 = **$325.24**, matching the
+published row to 8 significant figures, and `deployed_at_full` 3902.85 pins the
+unrounded clip while simultaneously proving `_clip_scale_now()` is 1.0. The
+notional cap auto-tracks too (`cap_src: "scaled"`, `cap = max(env_floor, equity
+× gross × 1.05)`), so `cap_slots` is 12 = `max_open` and the (sr)
+**deposit-buys-fewer-bets** class is structurally unreachable while scaling is
+on — cap/clip ≡ 12.6 at any equity. `FREQTRADE_MUM_MAX_NOTIONAL=3000` is now a
+FLOOR the scaled cap has outgrown; **that switch is load-bearing for her slot
+count and nobody had recorded it.**
+
+**EXACTLY ONE QUANTITY IS A FIXED DOLLAR AND MOVED WITHOUT BEING CHOSEN:**
+`LIGHTER_MAX_DAILY_LOSS = $105` (`venues/safety.py:93`, unprefixed → per
+service; avo's is $80). It is **$105 = 20% of $525**, her day-start on 3-Sep —
+a frozen snapshot of the 20% leash `MUM_DAILY_LOSS=0.20` expresses. Measured
+across her day-starts: the pct rail bound through 3-Sep, the **abs cap has bound
+since 4-Sep** (19.9% → 18.1% → 19.5%), and the deposit **deepened an
+already-binding rail** to **13.45%**. Corrected in place against the first
+reading of this pass, which said the deposit *created* the bind: it did not.
+NOT MOVED — a cap change is a value decision and the (wh)→revert record is
+explicit that the abs cap is a deliberate tighter fleet rail, with the VALUE
+"presented to Eamon, not a code fix".
+
+**THE GROSS: 9.6 WAS ASKED FOR, 9.5 SHIPPED, AND THE 0.1 IS A MEASURED SAFETY
+PROPERTY.** With `x(G) = 12/(G·Σf) − Σfm/Σf` over the module's own
+`mmf_clip_factor`, the worst achievable 12-leg basket is **NOT** the high-margin
+one — the clip scales those. It is the **43 coins at exactly 600bps**, because
+600bps **IS** `MMF_CLIP_REF`, so `f = 1.0` at every gross and they carry the most
+maintenance margin per deployed dollar: `x(G) = 1/G − 0.06`. Against her own
+`overshoot_p90_bps` **51.9** (stop fills at 4.519%, not 4.000%):
+
+| gross | liquidation at | nominal 4.000% | p90 4.519% | worst 4.624% |
+|---|---|---|---|---|
+| 9.4x | 4.638% | ALIVE | ALIVE | ALIVE |
+| **9.5x** | **4.526%** | ALIVE | **ALIVE** | DEAD |
+| 9.5066x | 4.519% | ALIVE | tie | DEAD |
+| 9.6x | 4.417% | ALIVE | **DEAD** | DEAD |
+
+**At 9.6x the venue liquidates before her stop fills** on that basket. Ceilings:
+`1/(stop+0.06)` = **10.0000x** nominal, **9.5066x** at p90, **9.4127x** at worst
+observed. Shipped **9.5** — inside the p90 ceiling, 1% off the ask — and put the
+three numbers to Eamon, who chose it. **The row does NOT publish this**:
+`stop_dead_above` 4.17 is the clip-OFF per-coin figure; the overshoot-aware
+CLIPPED basket ceiling is what governs and is unpublished. CARRIED.
+
+**PRICED (I19):** per-trade % is clip-invariant ((hl)), so gross moves dollars
+and not edge. At 9.5x on $780.57: clip **$617.95**, gross **$7,425**,
+all-slots-stop **38%** = $296.62 nominal / 43% = $335 at measured overshoot —
+but the **$105 halt fires first, at a 1.40% basket move**, 3.2x before the
+4.53% liquidation point. Measured against her 13 real trading days at their
+OWN gross, a $105 cap at this leverage would have fired on **1 of 13 days**
+(9-Sep only) — it is her binding protection at this gross, not a nuisance.
+Era NOT reset: a clip change is (hc) ordinary tuning. Shipped while she was
+**FLAT and slguard-locked until 04:01:40Z**, the (px) empty-book boundary, so
+no legacy-clip transient. Verified on the row: `gross_x` 9.5, clip 617.95, cap
+7786, `cap_slots` 12, deployment `606b2ad7` SUCCESS. Reverts: `MUM_GROSS_X`.
+
+**AND THE QUESTION UNDERNEATH IT — "they were winning and now they're losing"
+— IS ANSWERED NO, AGAINST A CONTROL ARM.** BTC fell **−4.66%** and SOL
+**−7.32%** 6→10 Sep. Both shadow twins, which take none of the live-arm
+changes, turned down in the same window (mum −1.71%, avo −2.22% peak-to-now).
+Paired on the same coin and close-day, mum's live arm differs from her twin by
+**+0.013pp (t=+0.11, n=77)**; on all matched pairs at wider windows it is
+−0.193pp at **t=−1.33** — not distinguishable from zero in either form, so the
+honest statement is **no measurable edge decay**, not "identical". Her sd(%/
+trade) is **1.09x** the twin's while her sd($/trade) is **4.59x**, tracking the
+clip ratio 4.86x: **the variance is the clip, the edge is unchanged.** The
+leverage residual (live% − twin%·gross) is **−0.605pp/day, t=−0.99** over 9
+days. Her own matched-random control leg lost **1.248%/trade** in the same
+window — the regime, from a third independent direction. **Her gross was
+9.6-9.9x during the winning stretch** (28-Aug–1-Sep, from her own stamped
+clips), cut to 3.73x at (xf) on 3-Sep and set to ~5.0x on 4-Sep — **four days
+before the turn**, so the change moved her exposure DOWN and roughly halved
+what the drawdown cost. **DECLARED, against the first draft of this entry:**
+I25's fleet-wide hot-window reversion is NOT confirmable on her 118-close
+ledger in either direction and is not cited here — the TWIN is the
+counterfactual, which is what I25 actually requires.
+
+**🙏 AVO IS NOT LOSING AND THE ROW SAYS SO:** realised **+$120.99** over 18
+graded closes at an all-time high, unchanged in 56.5h because she has closed
+nothing; open basket **−$17.77** unrealised at live marks (3 independent
+derivations agree within $1.17); bot net **+$102.08**, exactly her published
+`pnl_abs`. Her 27-vs-18 ledger gap is **exactly the 9 zero-basis halt-event
+rows** of 23/24-Aug (the memory class), not quarantine or era. Paired against
+her twin she is **+0.975pp/trade better (t=+1.38)**.
+
+**TWO REAL-MONEY FINDINGS CARRIED, both found by the verification pass:**
+(1) **the go-live maxdd bar divides by the GLOBAL peak, not the running peak at
+which the hole opened** (`golive_readiness.py:2121`), so on a book that took a
+deposit DURING a drawdown it understates ~2x — avo's deciding drawdown reads
+**12.32%** and was **24.09%** when it happened ($55.65 from a running peak of
+$231.02, against a global peak inflated by two deposits). It is verdict-level:
+`bars.maxdd` flips True→False, and `fleet_bus.dd_scale` reads that exact field,
+so her live clip rail would fall 1.0 → 0.545. (2) **a dark margin bus turns the
+mmf clip OFF and nulls the pager** — `mmf_clip_factor` returns 1.0 on an empty
+map and `headroom_sickness` fires only on `is False`, so both-None is silent;
+measured exposure is ~5 minutes in 30 days reaching 5.9% of her closes, but at
+this gross the clip-OFF ceiling is **4.167x**. Neither is changed here.
 
 ## 2026-09-11 (aaq) — 🎫 "WIDEN UNTIL YOU FIND AN EDGE": 126 CELLS ON THE POPULATION THE BOOK NEVER CONDITIONED ON, AND THE BEST ONE IS WORSE THAN NOISE
 
@@ -361,6 +702,117 @@ holds `(aao)` on an open branch — the `(zw)` open-branch arm of
 on the day it was built. Recorded inline per the changelog-letter rule; the
 commit subjects keep the old letter, which is why the commit log is not a
 letter index.**
+## 2026-09-11 (aas) — 🫀 FOUR DETECTORS, ONE DEFECT: AN INSTANT IS NOT A PROPERTY — and two of them were mine, shipped the night before
+
+**[RENUMBERED (aap) -> (aas), 11-Sep.** Another session landed a different `(aap)` on main in the same hour — 🎫 the taker's entry capture — and it was already cited from `lighter_ticket_taker.py` and two tests, so it keeps the letter; this entry moved. Recorded inline per the changelog-letter rule: the commit subject keeps the old letter, which is exactly why the commit log is not a letter index.**
+
+**Eamon, this morning:** *"did the evenings work get completed and everything
+is working okay?"* It did, and it is. Then the morning read found four things
+publishing a standing claim built from a single instantaneous reading, **two of
+them shipped by `(aag)`/(the 10-Sep organ-board confirmations) the night
+before**. The shape is one shape, and it is worth the number:
+
+| | the standing claim | the instant it was built from | measured |
+|---|---|---|---|
+| 🛡️ immune | 👩 mum's *"protective stop is DEAD"* | she is flat **right now** | the bound describes a basket she does not hold |
+| 🫀 board | *"GDELT is up"* (10-Sep) / *"a dead source"* (2-Sep) | one sample each | **382 of 930 samples up (41.1%), 474 flaps in 7d** |
+| 🫀 board | `impl_shortfall` closed because it *"reads `xp-contaminated`"* | one verdict word | read `arm-drift` within a day |
+| 🔭 Keating | *"the RETENTION binds"* at `train_days: 90` | one pool count | the pool was the newest **2,000 rows ≈ 19–22d**; the retention had room |
+
+### 1 · 🛡️ A FLAT BOOK CANNOT HAVE A DEAD STOP (I7)
+
+`fleet_immune.headroom_sickness` paged **06:44 Sydney**: *"protective stop is
+DEAD at gross 5.0 (ceiling 4.17) — liquidation fires before the stop"* on 👩
+mum, who was holding **nothing**. Her own ruin gate said so in the same payload
+— `headroom {ok: true, reason: "flat"}`, `open_trades: 0`,
+`stop_reachable_held: null` — and the organ fell through to `stop_reachable`,
+the **universe-worst margin at full-slot gross**: a statement about positions
+the book is not holding, and False **by configuration** on a levered book. So it
+fired every loop on a hypothetical while she sat behind her own `slguard`.
+
+`_book_flat` gates only that fallback, and **fail-safe is toward the page**:
+flat is asserted on the CONJUNCTION of two independent publishers (the ruin
+gate's own verdict AND the row's position count), so a gate that wrongly reports
+flat while the book holds still pages, an unreadable count is not flat, and a
+measured HELD basket that is dead still pages whatever the count says. Driven
+off mum's real 00:32Z payload, not a fixture that looks like one ((hj)).
+**6 of 6 mutations red, null control green.**
+
+### 2 · 🔭 `(aag)`'s RETENTION FIX WAS LARGELY INERT, AND ITS `blocked_by` NAMED A GATE WITH ROOM IN IT
+
+`(aag)` raised `TRADE_KEEP_DAYS` to 90 and pointed the ML's query at it *by
+identity* — at a `closed_trades(days=TRAIN_DAYS)` whose own signature carries
+`limit: int = 2000`, a default this call site never overrode. Measured on the
+live payload: `train_days: 90` beside `pool: 89`, and 89 is exactly the
+trainable count of the newest **2,000 rows**. The published `blocked_by` then
+read *"the RETENTION binds, not the count"* — **naming the one gate that had
+room**, which is precisely the I18 error the field exists to prevent. I told
+Eamon to watch `pool` climb past 90; it structurally could not.
+
+`TRAIN_LIMIT` is now passed explicitly (AST-pinned, so an inherited default
+cannot silently re-specify the horizon again) and its **binding is published**:
+`truncated` is `len(rows) >= TRAIN_LIMIT`, because a result exactly equal to its
+own limit is a truncation signature and `LIMIT` is silent by construction
+((qz)). `readiness()` now tells the three gates apart, and they take different
+actions — raise the cap, raise the retention, or **wait**:
+
+* **FETCH CAP** — the query returned exactly its limit ⇒ `unreachable`, and it
+  says raising the retention does nothing;
+* **RETENTION** — the window is FULL (`span >= TRAIN_DAYS × WINDOW_FULL_FRAC`)
+  and still short ⇒ `unreachable`;
+* **CLOSE RATE** — the window is **not full yet** ⇒ `cold`, **with a date**
+  derived from the observed rate. This is I17 inside the ML: a half-filled
+  window is still accruing, and calling that `unreachable` is the thin-sample-
+  as-measured-exclusion defect the fleet already paid for once. An UNKNOWN span
+  degrades to `cold`, never to the terminal word — the direction
+  `golive_readiness` fails when its critical-value owner is missing.
+
+Also: `ix_trades_closed`, because the ML's fetch has no `bot` filter and the
+existing composite index could not serve it. **7 mutations red + null control**,
+including the (aag) defect restored as a mutation, and the cap's binding driven
+through a REAL `EcosystemDB` rather than asserted.
+
+### 3 · 🗞️ GDELT IS NOT DEAD, IT FLAPS — 382/930 UP, 474 TRANSITIONS
+
+The organ board graded `sources_ok.gdelt` — **one sample** — and called `watch`
+on it. Over this organ's own retained 7 days the source read up in **382 of 930
+published samples (41.1%)** with **474 transitions**. So the 2-Sep review's
+*"gdelt False → a dead source"* and my 10-Sep *"GDELT is up"* are **two draws of
+the same coin, eight days apart**, and neither is a fact about the source (I1/I2
+— pick the quantity that carries the fault; here the RATE, not the state).
+
+The publisher is the right owner because only it sees every cycle:
+`event_sentinel.record_sources` keeps a bounded 7-day log (int seconds, 1,200
+entries ≈ 18KB/source) and publishes **`frac` AND `flaps`**, which answer
+different questions and are the pair that makes a verdict possible — **~0% with
+~0 flaps is DOWN; 41% with 474 flaps is FLAPPING**, degraded, still delivering
+on 41% of cycles, and not fixable from this repo. Down is a watch; flapping is
+REPORTED, because a detector that fires on 59% of reads trains the reader to
+ignore the channel ((gl)). Below `SRC_MIN_N` no rate has been measured, so the
+check falls back to the single sample **and says so** — a silent fallback is the
+same class of lie. **8 mutations red + null control**, the consumer driven
+against the publisher's own output.
+
+### 4 · 🫀 A CONFIRMATION MUST CITE A DURABLE PROPERTY, NEVER A LIVE READING
+
+Two of the five `CONFIRMED` rows written on 10-Sep had rotted by the next
+morning, both the same way: each quoted a number true only at the instant it was
+read. `impl_shortfall`'s cited *verdict word* had changed within the day
+(`xp-contaminated` → `arm-drift`); `event_sentinel`'s cited one sample of a coin
+flip. Both **CORRECTED IN PLACE per I12** onto the durable fact — *the organ has
+a live arm again and publishes a verdict instead of standing down*; *the rate
+REFUTES the finding: GDELT flaps, it is not dead* — and the map's own docstring
+now carries the rule, pinned by a test that fails if either row quotes a verdict
+word again.
+
+### DECLARED, and it is the (aak) lesson applied before the push rather than after
+
+`(aak)` touched `venues/lighter_client.py` — a `_BUILD_SHARED` file — so the
+shadow image took it, the marker-gated live images did not, and `arm_drift`
+froze the 🧪 judge's promotion lane at 01:41 Sydney. **This pass checked first:
+none of the five changed files is in `_BUILD_SHARED`**, so no live/shadow stamp
+can diverge from it. Main only, no marker — nothing here alters a trade
+((mm)); every file rides the existing `freqtrade-bots` auto-deploy path.
 
 
 ## 2026-09-11 (aao) OPERATION SHORT: a second, deliberately conservative short-biased system — and the 20-point scoring component that was STRUCTURALLY UNREACHABLE

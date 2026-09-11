@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 11:21 Sydney (01:21Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 12:02 Sydney (02:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
@@ -8,12 +8,12 @@ _Generated 2026-09-11 11:21 Sydney (01:21Z) by `scripts/session_state.py`. Do no
 
 - `freqtrade-avo-maria-lighter` was shut **30% of the last 14.5d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (66h), mostly `slguard` (45h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (66h), mostly `slguard` (46h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
 - `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
-- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it. Its mean (0.902%/trade) sits INSIDE the [0.2, 1.1]%/trade band a RANDOM entry pays on this venue — the six bars test against ZERO and cannot tell it from drift ((hm)).
 - `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
 - `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
@@ -129,18 +129,34 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (25 commit(s))
+## Shipped today (41 commit(s))
 
+- `a3c2517` (aao) CodeQL's eleven warnings triaged — and one was a test that proved nothing
+- `85942dc` (aao) repoint the enforcement reference at the renamed guard
+- `4477c44` (aao) the carried-row guard read one number from the source and one from the live list
+- `e2e0f85` (aao) record the eaten carried row: 22 rows in, 21 out, every guard green
+- `7edfbc1` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
 - `e0e524b` (aao) record the one genuinely open item where the next session will hit it
 - `a7c95ea` (aao) the CodeQL warnings: two dead guards in the sizer, eight leaked handles, one dead assignment
+- `f441e53` (aaq) the variance route is closed too; the offered-set feed window is the one cheap widening — carried. (aap) regime presence corrected in place
 - `2e6b8aa` (aao) the last CodeQL error: name what makes a reconciliation unclean
 - `785b21c` (aao) CodeQL's 12 errors were one real bug and one collision that broke both suites together
+- `c8feb42` (aaq) the binding constraint is the sample, not the width — 1.69pp single-hypothesis floor against a 1.38pp book mean
+- `ea00c76` (aar) regenerate HANDOFF for the two new carried rows
+- `59b28cb` (aar) the null inferred side from a nullable column — 7 of 208 era closes replayed as shorts; (aaf) superseded, (aaq) corrected
+- `8542912` (aar) the null instrument inferred side from a nullable column — 7 of 208 era closes replayed as shorts
 - `f5b4763` (aao) the soak override is narrower than its name: measured by trying to open the gate
 - `7890004` (aao) the same paper-optimism in the sibling: entries at the signal price, exits at the mark
 - `57e86de` (aao) paper was a softer test than the backtest that validates it
+- `6a2eb94` (aap) a test that sets env at import reddens every subprocess selftest — the defect the carried row named, reproduced and now ratcheted
 - `529c66d` (aao) a finished soak publishes a terminal row: an attended run that just stops goes stale forever
 - `e29002a` (aao) the two ensemble books get real dashboard rows -- publisher first, then the row
+- `4adbf4a` (aaq) offered-set instrument: fix the permutation units and price Q1's look-ahead
+- `390d21b` (aap) the entry capture was six fields wide and the ticket is eleven — regime never reached a single close
+- `338f21a` (aao) extract entry_evidence to a pure owner — the inline form survived its own mutation
+- `f68b585` (aao) the entry capture was six fields wide and the ticket is eleven — regime never reached a single close
 - `fe13042` (aao) the sweep prints its progress: 40 full backtests is a silence people kill
+- `713dd67` (aao) PRE-REGISTRATION: the taker's offered-set search, written before any outcome was computed
 - `c460258` (aao) Operation short: a conservative short-biased ensemble, and a 20-point scorer that could never fire
 - `f40d2e7` (aam) CodeQL found two real ones: venue-supplied symbols reached a filesystem path, and the live gate copied the whole environment
 - `909637d` (aam) the sweep is also a lever audit: every cell negative, and two knobs that cannot bind

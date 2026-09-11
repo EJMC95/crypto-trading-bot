@@ -83,6 +83,22 @@ SEVERITY_BAR_DEFAULT = float(os.environ.get("EVSENT_SEVERITY_BAR", "0.45"))
 PRIOR_EPISODES = 4.0           # pseudo-episodes behind each playbook prior
 GRADE_HORIZONS_H = (4, 24, 72)
 CACHE_CAP = 900                # ~6 days of 10-min sector-index entries
+# [2026-09-11 (aas)] A SOURCE'S HEALTH IS A RATE, AND `sources_ok` IS ONE
+# SAMPLE OF A COIN FLIP. GDELT's public endpoint flaps: measured over the
+# retained 7 days of this organ's own history — 930 published samples — it read
+# up in **382 of 930 (41.1%)** with **474 transitions**. So a single read of
+# `sources_ok.gdelt` carries almost no information about whether the source is
+# dead, and it has already been read twice as if it did: the 2-Sep organ-board
+# review recorded `gdelt False -> a dead source`, and the 10-Sep confirmation
+# recorded `GDELT is up`. Both were true at the instant they were taken and
+# neither was a fact about the source (I1/I2 — a constant lag is invisible;
+# measure the quantity that carries the fault, here the RATE, not the state).
+#
+# The publisher is the right owner because only it sees every cycle. The log is
+# bounded and cheap: int seconds at a 10-min cadence, so 1,200 entries covers
+# the 7-day window with headroom (~18KB/source).
+SOURCE_WINDOW_H = float(os.environ.get("EVSENT_SOURCE_WINDOW_H", "168"))
+SOURCE_LOG_MAX = 1200
 # [2026-07-17 AUDIT] Grading DEAD-BAND: a sector move smaller than this is not
 # evidence of direction, so the anticipation is left UNGRADED (no n, no hit)
 # rather than scored. 10bps over a 4h horizon is below any move a macro event
@@ -564,6 +580,42 @@ def proposals_for(bias, active, grades):
     return {}
 
 
+def record_sources(state, sources_ok, now_ts):
+    """[(aas)] -> the per-source UPTIME summary, and append this cycle to the
+    durable log. PURE apart from mutating `state` (the caller persists it), so
+    the selftest can drive every branch.
+
+    Publishes `frac` AND `flaps`, which answer different questions and are the
+    pair that makes a verdict possible: `frac` near 0 with `flaps` near 0 is a
+    source that is DOWN; a mid `frac` with a high `flaps` is one that is
+    FLAPPING — degraded, still delivering, and not ours to fix. Reporting only
+    the instantaneous bit cannot tell those apart, which is the whole defect.
+    `now` is kept beside them so nothing goes quiet ((lv))."""
+    log = state.setdefault("source_log", {})
+    cut = now_ts - SOURCE_WINDOW_H * 3600.0
+    out = {}
+    for name in sorted(sources_ok):
+        ok = bool(sources_ok[name])
+        prev = log.get(name) or []
+        hist = [e for e in prev
+                if isinstance(e, (list, tuple)) and len(e) == 2
+                and isinstance(e[0], (int, float))
+                and not isinstance(e[0], bool) and e[0] >= cut]
+        hist = [[int(e[0]), 1 if e[1] else 0] for e in hist]
+        hist.append([int(now_ts), 1 if ok else 0])
+        hist = hist[-SOURCE_LOG_MAX:]
+        log[name] = hist
+        n = len(hist)
+        up = sum(1 for _t, v in hist if v)
+        flaps = sum(1 for i in range(1, n) if hist[i][1] != hist[i - 1][1])
+        span_h = round((hist[-1][0] - hist[0][0]) / 3600.0, 1) if n > 1 else 0.0
+        out[name] = {"now": ok, "up": up, "n": n,
+                     "frac": round(up / n, 3) if n else None,
+                     "flaps": flaps, "span_h": span_h,
+                     "window_h": SOURCE_WINDOW_H}
+    return out
+
+
 def main():
     now = datetime.now(timezone.utc)
     now_ts = now.timestamp()
@@ -585,6 +637,7 @@ def main():
     heads = fetch_rss_headlines()
     gd = fetch_gdelt_headlines()
     sources_ok = {"rss": bool(heads), "gdelt": bool(gd)}
+    sources_uptime = record_sources(state, sources_ok, now_ts)
     clusters = defaultdict(lambda: {"heads": [], "feeds": set(), "strength": 0})
     for feed, title in heads + gd:
         for etype, s_hits in classify(title):
@@ -715,6 +768,8 @@ def main():
                                 "hit_rate": round(v["hit"] / v["n"], 2) if v["n"] else None}
                             for k, v in grade_summary.items()},
         "sources_ok": sources_ok,
+        # [(aas)] the RATE beside the sample — see `record_sources`.
+        "sources_uptime": sources_uptime,
         "counts": {"headlines": len(heads) + len(gd), "events": len(events),
                    "cache": len(cache), "new_grades": new_grades},
     }
@@ -912,6 +967,46 @@ def _selftest():
     assert (0.02 > 0) == (0.5 > 0) and not ((0.02 > 0) == (-0.5 > 0))
     assert (-0.02 > 0) == (-0.5 > 0) and not ((-0.02 > 0) == (0.5 > 0))
     assert abs(-0.02) >= MOVE_EPS and abs(0.02) >= MOVE_EPS
+
+    # ---- [(aas)] SOURCE UPTIME: a rate, not a sample ----------------------
+    # The verdict that matters is DOWN vs FLAPPING, and the instantaneous bit
+    # cannot tell them apart — which is how one source was recorded as "dead"
+    # and, eight days later, as "up", off two single reads of the same coin.
+    _t0 = 1_757_000_000.0
+    _st_ = {}
+    _u = record_sources(_st_, {"rss": True, "gdelt": False}, _t0)
+    assert _u["gdelt"] == {"now": False, "up": 0, "n": 1, "frac": 0.0,
+                           "flaps": 0, "span_h": 0.0,
+                           "window_h": SOURCE_WINDOW_H}, _u
+    # replay GDELT's MEASURED shape: alternating, ~41% up over 930 samples.
+    _st2 = {}
+    _seq = [(i % 2 == 0) if i % 5 else False for i in range(930)]
+    for i, v in enumerate(_seq):
+        _u2 = record_sources(_st2, {"gdelt": v}, _t0 + i * 600.0)
+    _g = _u2["gdelt"]
+    assert _g["n"] == 930 and 0.3 < _g["frac"] < 0.5, _g
+    assert _g["flaps"] > 300, ("a flapping source must SAY it flaps", _g)
+    # ...against a genuinely dead one, which is the distinction the board acts
+    # on: same frac floor, but zero transitions.
+    _st3 = {}
+    for i in range(300):
+        _u3 = record_sources(_st3, {"gdelt": False}, _t0 + i * 600.0)
+    assert _u3["gdelt"]["frac"] == 0.0 and _u3["gdelt"]["flaps"] == 0, _u3
+    # the window trims (a sample older than SOURCE_WINDOW_H is gone)...
+    _st4 = {"source_log": {"gdelt": [[int(_t0 - SOURCE_WINDOW_H * 3600 - 60), 1]]}}
+    assert record_sources(_st4, {"gdelt": False}, _t0)["gdelt"]["n"] == 1
+    # ...and a sample just INSIDE it survives, or the trim is vacuous.
+    _st5 = {"source_log": {"gdelt": [[int(_t0 - SOURCE_WINDOW_H * 3600 + 60), 1]]}}
+    assert record_sources(_st5, {"gdelt": False}, _t0)["gdelt"]["n"] == 2
+    # junk in the durable blob is skipped, never raised (the state is a row a
+    # future schema change can reshape under us)
+    _st6 = {"source_log": {"gdelt": ["x", [None, 1], [_t0, 1], [True, 1], []]}}
+    assert record_sources(_st6, {"gdelt": True}, _t0)["gdelt"]["n"] == 2
+    # the log is BOUNDED — a durable blob that grows without limit is a slow
+    # outage, not a feature
+    _st7 = {"source_log": {"gdelt": [[int(_t0 - 60), 1]] * (SOURCE_LOG_MAX + 500)}}
+    record_sources(_st7, {"gdelt": True}, _t0)
+    assert len(_st7["source_log"]["gdelt"]) == SOURCE_LOG_MAX
 
     # (b) load_state's (ok, state) contract: a FAILED read is never an empty
     # state — main() must be able to tell "first run" from "I could not look",
