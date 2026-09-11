@@ -230,6 +230,25 @@ SELFTEST_MODULES = [
     "scripts.study_georgia_cap5_read_2026-09-09",
     "scripts.study_avo_cap_2026-09-10",
     "scripts.study_taker_random_null_2026-09-10",
+    # [2026-09-11] 🎫 the PRE-REGISTERED ENTRY-CELL EDGE SEARCH (Eamon:
+    # "widen metrics and parameters until you find an edge for it").
+    # SELFTEST_MODULES and deliberately NOT ENFORCED_AUDITS, the
+    # study_taker_random_null reason exactly: the report arm reads the public
+    # ledger, /bus.json and the venue's candles, all of which move with every
+    # publish and no code change. The --selftest is offline, pure and
+    # SUB-SECOND — everything heavy (tape, curves, K=2000 draws, B=2000 shift
+    # placebos) lives in `report()`, which is the constraint this file's own
+    # 120s cap imposes and which the null harness above had to be rebuilt to
+    # meet. What it drives is the machinery a green run would otherwise only
+    # assert: the registration's REFUSAL branch (a mutated sha256 and a
+    # missing file), the I21 admissibility guard (mae_ret / give_back /
+    # peak_ret are unreachable through `feat()` AND rejected by
+    # `admissible()`), that a duplicate cut point is UNCOMPUTABLE and STILL
+    # COUNTED in m (m may not shrink at run time — the (tt) rule), that a
+    # thin or fail-CLOSED cell can never produce a survivor or set the
+    # max-statistic, and that the placebo's held-out draws never enter the
+    # baseline they are differenced against.
+    "scripts.study_taker_edge_search_2026-09-11",
     "scripts.study_taker_offered_2026-09-11",
     # [2026-09-07] the MONTE CARLO RISK AUDIT + benchmark shootout. The gate
     # grades a 15% drawdown bar over the ONE path a book happened to walk;

@@ -98,6 +98,26 @@ DECLARED, so it bounds what a survivor could ever buy: `LIVE_SIDES` admits
 `divergence/short` only, so a `long-breakoutup` survivor buys a SHADOW-lane
 filter — never a live change. Editing `LIVE_SIDES` is out of scope.
 
+WHAT THE FIRST REGISTERED RUN MEASURED (2026-09-11, recorded here because a
+registration that fails its own calibration is the finding, not a bug):
+**the §9 POSITIVE CONTROL FAILED and the run REFUSED.** A planted +2.00pp on
+an n=110 parity cell reads t=+2.91, p=3.03e-03 and CLEARS the selection
+premium (p_max 0.0195) — and still dies on the BH rank-1 threshold of
+3.27e-04. That cell's own multiplicity-adjusted detection floor is
+**3.35pp/trade**; across the 144 judgeable registered cells the smallest is
+**3.10pp/trade**, against a whole-book mean of +1.38%/trade.
+
+So the honest answer to "widen metrics and parameters until you find an edge"
+is arithmetic, not attitude: **widening is what destroys the power.** Every
+cell added raises the threshold every cell must clear, and at m=152 the floor
+is already more than twice the book's entire mean. There is no width of this
+search at which an edge of a plausible size could be found — a narrower,
+genuinely pre-registered single hypothesis graded FORWARD is the only
+instrument that can answer the question, which is the (tt)/I21 shape.
+
+`--diagnostic` downgrades that refusal to a stamped line so the cell
+LANDSCAPE is visible. Nothing printed under it can be called an edge.
+
 Exit: 0 verdict printed · 2 refused.
 """
 import argparse
@@ -487,6 +507,36 @@ def build_cells(pre, base, primary, secondary):
     return cells
 
 
+def t_for_p(p, df, lo=0.0, hi=40.0):
+    """The t value whose one-sided tail is `p` at `df`, by bisection on the
+    OWNER's `winners_docket.t_sf` — never a second copy of the distribution."""
+    if df < 1 or not (0.0 < p < 1.0):
+        return None
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if wd.t_sf(mid, df) > p:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def mde_bh(se_cr, df, alpha):
+    """The per-trade excess this cell would need at 80% power to clear a
+    MULTIPLICITY-ADJUSTED threshold `alpha` — the honest detection floor of a
+    search of this width.
+
+    Same shape as `golive_readiness._mde80` (critical value + the 0.80
+    quantile, times the SE), with the CLUSTERED SE and the BH rank-1
+    threshold substituted, because those are what the test actually uses.
+    This is the number that makes "widen the search" measurable: every cell
+    added raises it, so widening costs detection."""
+    t_req = t_for_p(alpha, df)
+    if t_req is None or not se_cr:
+        return None
+    return (t_req + gr._t_crit(0.8416212, df)) * se_cr
+
+
 def eval_cell(idx, d, keys, coins, min_n):
     """One cell's statistics on the paired differences.
 
@@ -526,6 +576,7 @@ def eval_cell(idx, d, keys, coins, min_n):
         out["p"] = wd.t_sf(out["t"], g - 1)
         if out["mde80_iid"] and se_iid > 0:
             out["mde80_cluster"] = out["mde80_iid"] * (se_cr / se_iid)
+        out["se_cr"] = se_cr
         out["t_coin"] = (out["mean_d"] / se_coin) if se_coin else None
         out["p_coin"] = (wd.t_sf(out["t_coin"], gc - 1)
                          if out["t_coin"] is not None else 1.0)
@@ -770,11 +821,24 @@ def report(argv):                                           # noqa: C901
     t_s = time.time()
     rng = random.Random(int(pre["shift_seed"]))
     span = max(1, int((max(days) - min(days)).days) * 86400)
-    Ms = []
+    # The §9 positive control is judged against ITS OWN multiplicity burden:
+    # the planted cell is an EXTRA hypothesis (m+1), so its null max statistic
+    # is taken over the same m+1 cells. Both maxima come out of one pass —
+    # the shift placebo does not depend on the observed book, so the same
+    # replicates serve the real table and the control.
+    par = [i for i in range(len(base))
+           if int(hashlib.sha256(str(base[i]["_raw"].get("trade_id")
+                                     or i).encode()).hexdigest(), 16) % 2 == 0]
+    cells_ctl = cells + [("CONTROL sha256-parity", pre["primary_family"], par,
+                          "planted; cannot be an edge")]
+    Ms, Ms_ctl = [], []
     for _b in range(B):
         xb = shift_book(base, rng.randrange(3600, span + 3600))
         db = [xb[i] - mus[i] for i in range(len(base))]
-        Ms.append(max(cell_ts(cells, db, days, min_n)))
+        ts_b = cell_ts(cells_ctl, db, days, min_n)
+        Ms.append(max(ts_b[:-1]))
+        Ms_ctl.append(max(ts_b))
+    Ms_ctl.sort()
     Ms.sort()
     m_med = Ms[len(Ms) // 2]
     m_p95 = Ms[int(0.95 * (len(Ms) - 1))]
@@ -789,33 +853,63 @@ def report(argv):                                           # noqa: C901
     # ------------------------------------------- §9 positive control + placebo
     print("\n§9 PIPELINE CALIBRATION — run BEFORE the real table; failure "
           "REFUSES.")
-    par = [i for i in range(len(base))
-           if int(hashlib.sha256(str(base[i]["_raw"].get("trade_id")
-                                     or i).encode()).hexdigest(), 16) % 2 == 0]
+    def p_max_ctl(t):
+        return (1 + sum(1 for v in Ms_ctl if v >= t)) / (B + 1)
+
+    jc = len(cells_ctl) - 1
+    ctl_fired = False
     for eff, gating in ((float(pre["control_effect_pp"]), True),
                         (float(pre["control_graded_pp"]), False)):
         dc = list(d)
         for i in par:
             dc[i] += eff
-        ts_c = cell_ts(cells, dc, days, min_n)
+        ts_c = cell_ts(cells_ctl, dc, days, min_n)
         pv = []
-        for j, (nm, _f, idx, _o) in enumerate(cells):
+        for j, (_nm, _f, idx, _o) in enumerate(cells_ctl):
             g = gr.cluster_se([dc[i] for i in idx], [days[i] for i in idx])[1] \
                 if idx and len(idx) >= min_n else 0
             pv.append((j, wd.t_sf(ts_c[j], g - 1) if g > 1 else 1.0))
         surv = wd.bh_survivors(pv, fdr=float(pre["fdr"]))
-        best = max(ts_c)
-        fires = bool(surv) and p_max(best) <= 0.05
-        print(f"  positive control +{eff:.2f}pp on a sha256-parity cell "
-              f"(n={len(par)}): post-BH survivors {len(surv)}, best t "
-              f"{best:+.2f}, p_max {p_max(best):.4f} -> "
+        fires = (jc in surv) and p_max_ctl(ts_c[jc]) <= 0.05
+        if gating:
+            ctl_fired = fires
+        print(f"  positive control +{eff:.2f}pp planted on a sha256-parity "
+              f"cell (n={len(par)}, an EXTRA hypothesis so it carries the "
+              f"m+1={len(cells_ctl)} burden): t {ts_c[jc]:+.2f}, p "
+              f"{pv[jc][1]:.2e}, p_max {p_max_ctl(ts_c[jc]):.4f}, post-BH "
+              f"survivors {len(surv)} -> "
               f"{'FIRES' if fires else 'does not fire'}"
               f"{'  [GATING]' if gating else '  [reported, not gating]'}")
         if gating and not fires:
-            print("\nREFUSED — the pipeline's real power is below its own "
-                  "mde80 claim: a planted +2.00pp effect does not survive. "
-                  "A gate that never opens is trivially stable and useless.")
-            return 2
+            se_c, g_c, _ = gr.cluster_se([dc[i] for i in par],
+                                         [days[i] for i in par])
+            floor_c = mde_bh(se_c, g_c - 1,
+                             float(pre["fdr"]) / len(cells_ctl))
+            print(f"\n  the control cell's own MULTIPLICITY-ADJUSTED "
+                  f"detection floor is "
+                  f"{(f'{floor_c:.2f}pp' if floor_c else 'uncomputable')}"
+                  f"/trade (n={len(par)}, G={g_c} day clusters, BH rank-1 "
+                  f"threshold {float(pre['fdr'])/len(cells_ctl):.2e}) — "
+                  f"a search this WIDE cannot see +{eff:.2f}pp on a cell "
+                  f"this size, whatever is in the data.")
+            if not argv.diagnostic:
+                print("\nREFUSED — the pipeline's real power is below its "
+                      "own bar: a planted +2.00pp effect does not survive "
+                      "BH at m+1. A gate that never opens is trivially "
+                      "stable and useless, and a null result off it would be "
+                      "indistinguishable from a broken harness. THIS IS NOT "
+                      "A BUG IN THE HARNESS — it is the registration's own "
+                      "§4 arithmetic arriving: the multiplicity burden of "
+                      "m=152 pre-declared cells puts the detection floor "
+                      "above any effect this book could plausibly carry. "
+                      "Re-run with --diagnostic to SEE the cell table; "
+                      "nothing in it can be called an edge.")
+                return 2
+            print("  !! --diagnostic: the control failure is DOWNGRADED to a "
+                  "reported line. Everything below is a LANDSCAPE, not a "
+                  "test. NO cell printed after this point can be called an "
+                  "edge, whatever its p-value, because the pipeline has just "
+                  "FAILED its own positive control at this width.")
 
     pl = []
     for s in range(int(pre["placebo_seeds"])):
@@ -838,8 +932,15 @@ def report(argv):                                           # noqa: C901
               "p-values are not calibrated and a null result off it would be "
               "indistinguishable from a broken harness.")
         return 2
-    print("  pipeline calibration OK — the gate can open, and does not open "
-          "on noise.\n")
+    if ctl_fired:
+        print("  pipeline calibration OK — the gate can open, and does not "
+              "open on noise.\n")
+    else:
+        print("  pipeline calibration: the placebo arm is CLEAN (it does not "
+              "open on noise) but the POSITIVE CONTROL FAILED — so the gate "
+              "does not open on a real +2.00pp effect either. Only one half "
+              "of the calibration passed, and it is the half that cannot "
+              "license a finding.\n")
 
     # ------------------------------------------------------- the real table
     ev = [eval_cell(idx, d, days, coin_of, min_n)
@@ -851,15 +952,15 @@ def report(argv):                                           # noqa: C901
     for rank, j in enumerate(ranked, start=1):
         bh_thr[j] = rank / len(cells) * float(pre["fdr"])
 
-    print("=" * 150)
+    print("=" * 162)
     print("EVERY PRE-DECLARED CELL (all m, not just survivors — a sweep that "
           "prints only the winner is the artifact)")
-    print("=" * 150)
+    print("=" * 162)
     hdr = (f"{'#':>3} {'cell':<38} {'n':>4} {'G':>3} {'book%':>8} "
            f"{'null%':>8} {'excess':>8} {'t_day':>7} {'t_iid':>7} "
-           f"{'p':>8} {'BHthr':>8} {'BH':>3} {'mde80c':>7} {'pmax':>7} {'note'}")
+           f"{'p':>8} {'BHthr':>8} {'BH':>3} {'mde80c':>7} {'mdeBH':>7} {'pmax':>7} {'note'}")
     print(hdr)
-    print("-" * 150)
+    print("-" * 162)
     for j, (nm, famlab, idx, note) in enumerate(cells):
         e = ev[j]
         n = e["n"]
@@ -876,6 +977,10 @@ def report(argv):                                           # noqa: C901
         t_ii = e.get("t_iid")
         s_ti = f"{t_ii:+.2f}" if t_ii is not None else "--"
         s_md = f"{mde:.2f}" if mde else "--"
+        mbh = (mde_bh(e.get("se_cr"), e.get("G", 1) - 1,
+                      float(pre["fdr"]) / len(cells))
+               if e.get("se_cr") and e.get("G", 0) > 1 else None)
+        s_bh = f"{mbh:.2f}" if mbh else "--"
         s_pm = f"{pm:.4f}" if pm is not None else "--"
         s_md_ = e.get("mean_d")
         s_ex = f"{s_md_:+.3f}" if s_md_ is not None else "--"
@@ -883,7 +988,7 @@ def report(argv):                                           # noqa: C901
               f"{bk:>+8.3f} {nu:>+8.3f} {s_ex:>8} "
               f"{s_td:>7} {s_ti:>7} "
               f"{e['p']:>8.4f} {bh_thr[j]:>8.5f} {flag:>3} "
-              f"{s_md:>7} {s_pm:>7} "
+              f"{s_md:>7} {s_bh:>7} {s_pm:>7} "
               f"{e.get('status','')} {note}")
     print("-" * 150)
 
@@ -932,11 +1037,22 @@ def report(argv):                                           # noqa: C901
               f"{e['mean_d']:+.3f}pp  t_day {e['t']:+.2f}  p {e['p']:.4f}  "
               f"p_max {p_max(e['t']):.4f}  (BH needed p <= "
               f"{float(pre['fdr'])/len(cells):.6f} at rank 1)")
+    bhs = [mde_bh(ev[j].get("se_cr"), ev[j].get("G", 1) - 1,
+                  float(pre["fdr"]) / len(cells))
+           for j in live if ev[j].get("se_cr") and ev[j].get("G", 0) > 1]
+    bhs = [v for v in bhs if v]
     if floor:
         print(f"  No admissible entry-time cell of this book detectably beats "
               f"a coin flip at any effect below {floor:.2f}pp/trade, where "
               f"that is the smallest cluster-adjusted mde80 across the "
               f"{len(mdes)} judgeable cells.")
+    if bhs:
+        print(f"  And at the width actually searched (m={len(cells)}), the "
+              f"smallest MULTIPLICITY-ADJUSTED detection floor is "
+              f"{min(bhs):.2f}pp/trade — against a whole-book mean of "
+              f"+1.38%/trade. Widening the search RAISES that floor. That is "
+              f"the measured answer to 'widen until you find an edge': the "
+              f"widening is what destroys the power.")
     print("  This names what could NOT have been seen. It does NOT claim the "
           "book has no edge: the family's own one-sided upper bound is "
           "positive, so nothing is excluded either (I26 — a refusal needs a "
@@ -1029,6 +1145,18 @@ def selftest():
     # the iid t is CONTEXT and is not the statistic the p-value is built on
     assert abs(e["t"] - e["t_iid"]) > 1e-9
 
+    # t_for_p inverts the OWNER's own tail, and mde_bh is monotone in the
+    # width of the search — the property the whole "widen it" answer rests on
+    for df_ in (5, 20, 100):
+        for pq in (0.05, 0.001):
+            tq = t_for_p(pq, df_)
+            assert abs(wd.t_sf(tq, df_) - pq) < 1e-6, (df_, pq, tq)
+    assert t_for_p(0.05, 0) is None and t_for_p(1.5, 10) is None
+    wide = mde_bh(0.5, 30, 0.05 / 500)
+    narrow = mde_bh(0.5, 30, 0.05 / 10)
+    assert wide > narrow > 0, (wide, narrow)
+    assert mde_bh(None, 30, 0.01) is None
+
     # cell_ts: an uncomputable or thin cell contributes -inf, so the
     # max-statistic can never be set by a cell that cannot be judged
     ts = cell_ts([("a", "f", None, ""), ("b", "f", list(range(3)), ""),
@@ -1081,6 +1209,10 @@ def main(argv=None):
     ap.add_argument("--shifts", type=int, default=0,
                     help="override B (DEVIATES from the registration)")
     ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--diagnostic", action="store_true",
+                    help="downgrade the §9 positive-control REFUSAL to a "
+                         "reported line so the cell LANDSCAPE is printed. "
+                         "Nothing printed under it can be called an edge.")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:

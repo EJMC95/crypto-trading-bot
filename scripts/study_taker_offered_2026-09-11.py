@@ -244,7 +244,13 @@ def perm_max(base, cells, eps, draws=PERM, seed=SEED):
     this distribution, not merely its own p-value."""
     import random
     rng = random.Random(seed)
-    rets = [e["_ret"] for e in eps]
+    # [corrected, first run] PERCENT, to match `base`/`bm`. This read
+    # fractions against a percent baseline and produced max-z values of
+    # -170 and +330 where a noise search of this shape yields ~2-3. The BH
+    # column was unaffected (own units, computed separately) so the VERDICT
+    # did not move — but the verdict text CITES this number, and a citation
+    # of a broken number is how a wrong one gets believed later.
+    rets = [100.0 * e["_ret"] for e in eps]
     masks = [[bool(pred(e)) for e in eps] for _, pred in cells]
     bm = st.mean(base) if base else 0.0
     out = []
@@ -446,16 +452,26 @@ def report(args):
         return 2
     print(f"(contrast convention, declared: shipped bars + entry at the "
           f"episode's first sighting, identical on every arm)\n")
-    return verdict(eps, n_taken, args)
+    return verdict(eps, n_taken, args,
+                   own_open_mean=st.mean(sim), own_open_n=len(pairs_cal))
 
 
-def verdict(eps, n_taken, args):
+def verdict(eps, n_taken, args, own_open_mean=None, own_open_n=None):
     """Q1 (admission value) then Q2 (any edge anywhere), both pre-registered."""
     import random
     # ---- Q1: does the taker's ADMISSION beat the population? ------------
     print("=" * 78)
-    print("Q1 — ADMISSION VALUE: is what it TOOK better than what it REFUSED?")
+    print("Q1 — ADMISSION: **CONTAMINATED, and the confound is measured below**")
     print("=" * 78)
+    print("An episode is labelled TAKEN because the book opened it LATER in")
+    print("that episode, but every arm is entered at the episode's FIRST")
+    print("sighting — so the taken arm is conditioned on a decision made")
+    print("after its own entry. That is look-ahead, not admission value. The")
+    print("`own-open` column below prices it: the SAME trades walked from the")
+    print("book's actual open instead of the episode start. Read the GAP, not")
+    print("the excess. Answering admission properly needs the GATES replayed")
+    print("over the tape (lighter_ticket_replay), not a label join.")
+    print()
     print(f"{'lens':12s} {'taken':>6s} {'mean%':>9s} | {'refused':>7s} "
           f"{'mean%':>9s} | {'excess':>8s} {'P(rand>=taken)':>15s}")
     rng = random.Random(SEED)
@@ -475,6 +491,14 @@ def verdict(eps, n_taken, args):
         print(f"{lens:12s} {len(tk):6d} {st.mean(tk):9.3f} | {len(rf):7d} "
               f"{st.mean(rf):9.3f} | {st.mean(tk)-st.mean(rf):8.3f} "
               f"{hits/PERM:15.3f}")
+
+    if own_open_mean is not None:
+        print(f"\n  THE CONFOUND, PRICED: the same book's closes walked from "
+              f"its OWN open read {own_open_mean:+.3f}%/trade (n={own_open_n}) "
+              f"against the {'taken' } column's episode-start entry above. "
+              f"The difference is ENTRY TIMING, not selection — so the "
+              f"`excess` column overstates admission by roughly that gap, and "
+              f"none of it may be read as an edge.")
 
     # ---- Q2: is there ANY edge anywhere in the offered set? -------------
     print()
