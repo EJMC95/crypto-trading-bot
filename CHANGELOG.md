@@ -1,3 +1,50 @@
+## 2026-09-11 (abd) — THE WHOLE JUDGEMENT LAYER IS IN GIT NOW, AND TRACKING IT MOVED TWO THINGS THAT HAD TO MOVE WITH IT
+
+**Eamon, 11-Sep:** *"track the rest too"* — the call `(aba)` put to him after
+shipping only the research log and pricing the rest at 115 files / 1.3 MB.
+
+**WHAT WENT IN:** `reports/*.md` — 114 further files: every daily brief, every
+weekly verdict, every evidence review with its hand-written human layer, and
+the 15 `.superseded-*.md` backups, which are tracked DELIBERATELY because they
+exist only where `preserve_existing_report` refused to destroy an annotation on
+a re-run. Machine state under `reports/` stays ignored: `reports/*` never
+negates `.json`/`.py`/`.log`, so `brain_state.json` and the census logs do not
+follow.
+
+**SCANNED FIRST, TWICE AND INDEPENDENTLY, BECAUSE THE REPO IS PUBLIC.** A
+pattern grep for connection strings, API keys, private keys, bearer tokens and
+passwords over all 115 files found nothing, and `gitleaks --config
+.gitleaks.toml` over 1.43 MB reported no leaks. What these DO carry is
+real-money equity and per-book performance — the same class `CLAUDE.md` has
+published all along, so this is a decision rather than an accident, and it is
+recorded as one in `.gitignore` beside the negation.
+
+**TRACKING IT BROKE THE CADENCE RESOLVER, IN THE ONE DIRECTION THAT LOOKS
+HEALTHY.** `review_cadence.reports_dir_resolved` preferred a LOCAL `reports/`
+holding markdown, else the main checkout — correct while the directory was
+ignored, because a per-session worktree ((oe)) saw an empty one. The moment
+`reports/*.md` is tracked, every worktree checks out ~115 reports frozen at its
+branch point, so "prefer local" reads a SNAPSHOT and invents a gap for every
+report written since. **A stale directory that looks populated is worse than an
+empty one, because nothing about it reads as wrong.** The main checkout now
+wins always: a report is an operator-level artifact on a clock, not a property
+of whatever branch a session is on. Both orders are recorded in the docstring
+with why each was right for its moment, and the selftest pins that a worktree
+never resolves to its own copy.
+
+**AND A TRACKED REPORT NOBODY COMMITS IS THE SWEEP HAZARD THIS FILE ALREADY
+KNOWS.** `(nx)`: a dirty tracked file in a shared checkout gets committed under
+another session's subject. All four routines were told "no pushes" — correct
+while reports were ignored, and now the thing that leaves the hazard behind. So
+each prompt gains ONE narrow exception: commit your own report by explicit path
+through `scripts/session_commit.py`, rebase, push that and nothing else, and on
+a conflict keep BOTH files. The slot-scope line was amended in the same edit so
+the prompt does not contradict itself two sections later.
+
+**One defect in my own first draft, caught before it shipped:** the commit
+command was written with the path in markdown backticks INSIDE a shell fence —
+which is command substitution, so a routine following it literally would have
+tried to execute its own report. Fixed in all four.
 ## 2026-09-11 (abb) — A BLANKET RENUMBER SWEPT ANOTHER SESSION'S CITATIONS, AND THE LETTER GUARD CANNOT SEE IT BECAUSE THEY STILL RESOLVE
 
 **Found because Eamon said "fix".** One feature was citing two different

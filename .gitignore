@@ -30,16 +30,28 @@ sniper_data/
 # reports it ignored by that very line.
 reports/*
 # [2026-09-11] reports/ was ignored as "digest runtime state" and the fleet's
-# JUDGEMENT LAYER then moved in behind that line. The research log is the one
-# file in there that is a durable record rather than a rendering: ~20
-# refutations over 1,762 lines whose entire job is that no idea is tested
-# twice — and it lives in ONE un-backed-up copy that no worktree and no fresh
-# clone can see. A negation cannot re-include a file whose parent directory is
-# excluded, which is why the line above is `reports/*`, not `reports/`.
-# NARROW ON PURPOSE: un-ignoring `reports/*.md` would track 115 files / 1.3 MB
-# of daily renderings in one commit. That is Eamon's call, not a side effect of
-# this one; the refutation record is the part that must survive a machine.
-!reports/expansion_research_log.md
+# JUDGEMENT LAYER then moved in behind that line: the research log's ~20
+# refutations, every daily brief, every weekly verdict, and every evidence
+# review with its hand-written human layer -- all in ONE un-backed-up copy
+# that no worktree and no fresh clone could see. A negation cannot re-include
+# a file whose parent directory is excluded, which is why the line above is
+# `reports/*`, not `reports/`.
+#
+# ALL MARKDOWN IS TRACKED -- Eamon, 11-Sep: "track the rest too", after the
+# narrow version (the research log alone) shipped and the 115-file / 1.3 MB
+# scope was put to him. Scanned before committing, twice and independently: a
+# pattern grep for connection strings, keys, tokens and passwords found
+# nothing, and `gitleaks --config .gitleaks.toml` over 1.43 MB reported no
+# leaks. THE REPO IS PUBLIC -- these carry real-money equity and per-book
+# performance, the same class CLAUDE.md already publishes. A decision, not an
+# accident.
+#
+# `.superseded-*.md` are tracked too, deliberately: those files exist BECAUSE
+# `preserve_existing_report` refuses to destroy a human layer on a re-run, so
+# excluding them would re-create the loss that mechanism prevents.
+# Machine state under reports/ stays ignored -- `reports/*` never negates
+# .json/.py/.log, so brain_state.json and the census logs do not follow.
+!reports/*.md
 
 # ---- Backups / editor / OS cruft ----
 *.bak
