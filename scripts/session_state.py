@@ -47,6 +47,7 @@ reporting rule); everything internal stays UTC.
     python3 scripts/session_state.py --selftest
 """
 import argparse
+import ast
 import datetime as _dt
 import json
 import os
@@ -1186,25 +1187,37 @@ def subject_status():
 
 
 
-def _source_row_count(src: str | None = None) -> int:
-    """How many carried rows the SOURCE TEXT declares, counted independently
-    of how Python parses it. The whole point is to disagree with `len(CARRIED)`
-    when a row has been absorbed by a merge.
+def _source_row_counts(src: str | None = None) -> tuple[int, int]:
+    """(id keys, dict elements) in the CARRIED literal — BOTH read from the
+    SOURCE TEXT, never from the live list.
+
+    The point is to DISAGREE when a row has been absorbed by a merge: drop the
+    `},{` between two rows and Python reads them as ONE dict, so the literal
+    still carries both `"id"` keys while the list is a row shorter. Duplicate
+    keys survive PARSING and collapse only at eval, which is what makes the
+    two numbers separable at all.
+
+    Comparing against `len(CARRIED)` instead — the first shape of this guard —
+    is the SAME check on a healthy file and a FALSE ALARM the moment anything
+    appends a row in memory, which a test legitimately does. Three did, and
+    the guard reddened a clean tree.
 
     Takes the text so it can be TESTED: a counter that can only ever read its
-    own file cannot be shown to disagree with anything."""
+    own file cannot be shown to disagree with anything.
+    """
     src = pathlib.Path(__file__).read_text() if src is None else src
-    start = src.index("\nCARRIED = [")
-    depth, end = 0, start
-    for k in range(src.index("[", start), len(src)):
-        if src[k] == "[":
-            depth += 1
-        elif src[k] == "]":
-            depth -= 1
-            if depth == 0:
-                end = k
-                break
-    return src[start:end].count('        "id": "')
+    for node in ast.parse(src).body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "CARRIED"
+                   for t in node.targets):
+            continue
+        rows = [e for e in getattr(node.value, "elts", [])
+                if isinstance(e, ast.Dict)]
+        ids = sum(1 for d in rows for k in d.keys
+                  if isinstance(k, ast.Constant) and k.value == "id")
+        return ids, len(rows)
+    raise AssertionError("no CARRIED assignment found in the source")
 
 
 def carried_status():
@@ -1303,14 +1316,23 @@ def main(argv=None):
         # so the eaten row leaves NO duplicate and NO empty field: it is simply
         # gone. There is no fingerprint inside the parsed list.
         #
-        # So compare the SOURCE against the PARSE. Every row's id is a literal
-        # in this file; if the text holds more ids than `CARRIED` does, a row
-        # was absorbed. That needs no constant to keep in step and it fails
-        # loudly on the one thing the other arms cannot see.
-        n_src, n_parsed = _source_row_count(), len(CARRIED)
-        if n_src != n_parsed:
+        # So compare the SOURCE against the PARSE -- and take BOTH numbers
+        # from the source. The literal's `"id"` keys against its dict
+        # ELEMENTS: duplicate keys survive parsing and collapse only at eval,
+        # so an absorbed pair reads as one dict holding two ids. No constant
+        # to keep in step, and it fails loudly on the one thing the other
+        # arms cannot see.
+        #
+        # THE SECOND VERSION took the row count from `len(CARRIED)` -- the
+        # LIVE list -- which is the same check on a healthy file and a false
+        # alarm the moment a test appends a row in memory. Three do, and this
+        # arm reddened a clean tree from inside `--check`, which those same
+        # tests assert returns 0. A guard that fires on its own fixtures gets
+        # exempted within a day ((mz)); source-versus-source cannot.
+        n_ids, n_rows = _source_row_counts()
+        if n_ids != n_rows:
             print("audit_session_state: FAIL — the carried list is malformed: "
-                  f"{n_src} row id(s) in the SOURCE but {n_parsed} row(s) "
+                  f"{n_ids} row id(s) in the SOURCE but {n_rows} row(s) "
                   "parsed. A dropped `},{` between two rows makes Python read "
                   "them as ONE dict, the later `\"id\"` wins, and the earlier "
                   "row is silently absorbed -- the file still parses and the "
@@ -1384,8 +1406,10 @@ def selftest():
     import sys as _sys
     import tempfile as _tf
     _src = pathlib.Path(__file__).read_text()
-    assert _source_row_count(_src) == len(CARRIED), (
-        "source row count disagrees with the parsed list")
+    _n_ids, _n_rows = _source_row_counts(_src)
+    assert _n_ids == _n_rows == len(CARRIED), (
+        f"source row counts {(_n_ids, _n_rows)} disagree with the parsed "
+        f"list ({len(CARRIED)})")
     # Drop ONE row boundary: the two dicts then parse as one, the later "id"
     # wins, and a row is silently absorbed.
     _eaten = _src.replace("    },\n    {\n", "", 1)

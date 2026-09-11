@@ -540,11 +540,12 @@ Neither existing arm can see this **by construction**: `stale` asks whether a ro
 predicate says it is done and `orphan` asks whether its subject retired — both computed
 FROM the list, so a row that is GONE is invisible to them.
 
-**THE NEW ARM COMPARES THE SOURCE TO THE PARSE.** Every row's id is a literal in the
-file; if the text declares more ids than `CARRIED` holds, a row was absorbed. No constant
-to keep in step. **And it runs FIRST** — `stale` and `orphan` are computed from this
-list, so running them on a malformed one yields confident verdicts about the wrong rows.
-Structure before content.
+**THE NEW ARM COMPARES THE SOURCE TO THE PARSE — BOTH READ FROM THE SOURCE.** The
+literal's `"id"` keys are counted against its dict ELEMENTS, over one `ast.parse` of the
+file: duplicate keys survive parsing and collapse only at eval, so an absorbed pair shows
+up as one dict holding two ids. No constant to keep in step. **And it runs FIRST** —
+`stale` and `orphan` are computed from this list, so running them on a malformed one
+yields confident verdicts about the wrong rows. Structure before content.
 
 **MY FIRST VERSION OF THE ARM WAS VACUOUS AND THE MUTATIONS SAID SO.** It looked for
 DUPLICATE IDS — but a merged dict has none: Python keeps the last value for every key, so
@@ -554,6 +555,24 @@ defect** in a subprocess on a temp copy rather than re-implementing the check, w
 the only way to kill the vacuity mutations — on a healthy list a correct guard and a
 hollow one are byte-identical. **3 of 3 killed** where the hand-rolled version killed
 **0 of 2**. This is I3 in its purest form, on a guard written minutes earlier.
+
+**AND THE SECOND VERSION WAS WRONG IN THE OTHER DIRECTION — CORRECTED IN PLACE per I12,
+because the paragraph above described a comparison the code was not making.** It read
+`_source_row_count() != len(CARRIED)`: the id count came from the SOURCE and the row
+count from the **LIVE LIST**. On a healthy file that is the same check. The moment
+anything appends a row IN MEMORY the two disagree for a reason that is not a defect — and
+three tests in `tests/autonomy/test_session_handoff.py` do exactly that, legitimately, to
+drive `carried_status` and the subject guard. **The guard reddened a clean tree**, and it
+reddened it inside `--check`, which those tests then assert returns 0. A guard that fires
+on its own test fixtures is one that gets exempted within a day ((mz)), so the comparison
+is now **source-versus-source** and immune to any runtime mutation, while still catching
+the dropped `},{` for the same reason as before. **4 of 4 mutations killed** — the check
+site deleted, the predicate compared to itself, the counter returning its own row count
+twice, and the id keys deduped per-dict by hand (the shape that would silently restore
+the vacuity). The transferable half: **a guard that reads BOTH of its numbers from the
+artefact it is guarding cannot be fooled by the process running it** — mixing a
+source-derived number with a runtime-derived one measures the harness as much as the
+file.
   ENFORCED BY: `scripts/session_state.py::_source_row_count`,
   `scripts/session_state.py::selftest`
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
