@@ -1574,11 +1574,11 @@ def _close_fill_extra(out, measured, fill_reason):
     return out
 
 
-#: [(aao)] The ticket fields the close row carries. SIX were captured and the
+#: [(aap)] The ticket fields the close row carries. SIX were captured and the
 #: ticket publishes ELEVEN — see `entry_evidence` for what the gap cost.
 EV_KEYS_BASE = ("range_pos", "chg_pct", "vol_m", "prem_bps", "apr_pct",
                 "gap_pct")
-#: Added (aao). Omitted when the ticket does not carry them, because ABSENT is
+#: Added (aap). Omitted when the ticket does not carry them, because ABSENT is
 #: UNKNOWN — the convention `peak_ret`/`give_back` already use.
 EV_KEYS_ADDED = ("regime", "noncrypto", "trend", "lighter_apr", "xvenue_apr")
 
@@ -1586,7 +1586,7 @@ EV_KEYS_ADDED = ("regime", "noncrypto", "trend", "lighter_apr", "xvenue_apr")
 def entry_evidence(t):
     """The entry-time evidence a close row carries, from its ticket. Pure.
 
-    [2026-09-11 (aao)] THE CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS
+    [2026-09-11 (aap)] THE CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS
     ELEVEN — `(di)`'s defect one turn later, on different fields. `(di)` added
     brk_quality/up_strength "so winning criteria can be DERIVED from realized
     closes" and recorded the price of the gap in its own words: *"the first 6
@@ -3083,7 +3083,7 @@ def main(_ctx=None):
             ) * gov, 2)
             bmult = _bm
             size = clip / mark
-            # [2026-09-11 (aao)] THE CAPTURE WAS SIX FIELDS WIDE AND THE
+            # [2026-09-11 (aap)] THE CAPTURE WAS SIX FIELDS WIDE AND THE
             # TICKET IS ELEVEN. This is (di)'s defect one turn later: a
             # feature that exists at the entry site and never reaches the
             # ledger is a feature no grader can ever condition on, and the

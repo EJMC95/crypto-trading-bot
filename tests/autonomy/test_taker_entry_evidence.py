@@ -1,4 +1,4 @@
-"""[(aao)] THE ENTRY CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS ELEVEN.
+"""[(aap)] THE ENTRY CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS ELEVEN.
 
 `(di)` captured `brk_quality`/`up_strength` at the entry site "so winning
 criteria can be DERIVED from realized closes", and recorded what the gap had

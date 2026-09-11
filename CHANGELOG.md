@@ -1,3 +1,76 @@
+## 2026-09-11 (aap) — 🎫 THE ENTRY CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS ELEVEN: NOT ONE OF 304 CLOSES CARRIES THE REGIME IT WAS TAKEN IN
+
+**Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for
+it."* The search is running; this is the half that had to ship first, because
+it is the half that cannot be done retroactively.
+
+**THE FINDING.** `lighter_ticket_taker` captured **six** ticket fields at the
+entry site and the scout publishes **eleven**. Measured over 8.3 days of scout
+tape (2,768 ticket episodes, all four lenses): **every lens publishes
+`regime`** — the per-asset oracle verdict,
+`{"dir": ±1|0, "v": "LONG-window" | "SHORT-window" | "dir-flat" |
+"chop-gated"}` — and **not one of this book's 304 closes carries it.** Also
+dropped: `noncrypto` (every lens), `trend` (dip), and `lighter_apr` /
+`xvenue_apr` — the divergence lens's entire thesis.
+
+**WHY IT IS THE ONE THAT MATTERS.** Item 18: Lighter's whole tape is a single
+falling-BTC regime, so a directional grade is a grade *in that regime only* —
+and `regime` is precisely the field that would let a grader split it. 41 days
+of closes cannot answer that question, and no later session can recover it.
+
+**THIS IS `(di)`'s DEFECT, ONE TURN LATER, ON DIFFERENT FIELDS.** `(di)`
+captured `brk_quality`/`up_strength` *"so winning criteria can be DERIVED from
+realized closes"* and recorded what the gap had already cost, in its own
+words: *"the first 6 breakoutup closes shipped without their features
+(unrecoverable from the ledger)."* The lesson was written down and the capture
+list was never revisited. **A feature that exists at the entry site and never
+reaches the ledger is a feature no grader can ever condition on** — which is
+I23's rule (*"a knob must record the quantity it cuts"*) pointed at a SEARCH
+rather than a lever.
+
+**SHIPPED:** `entry_evidence(t)` — a PURE owner beside `_close_extra`, with
+`EV_KEYS_BASE` (the six, unchanged) and `EV_KEYS_ADDED` (the five, added only
+when the ticket carries them). **Absent stays ABSENT, never `null`** — the
+convention `peak_ret`/`give_back` already use, and the reason a grader must
+not read a missing regime as "no regime" (I6).
+
+**OBSERVABLE-ONLY, and the three refusals are pinned:** the `_close_extra`
+merge is by `setdefault`, so evidence can never clobber `bars`/`bars_basis`/
+`policy`; nothing branches on the result; and **the six original keys keep
+their exact prior payload shape** — a breakout close still stamps
+`gap_pct: null` — so no existing consumer's `in extra` test changes meaning.
+`side` is deliberately NOT captured: the close tag already carries it, and a
+second spelling of a field graders key on is the `(xe)` trap.
+
+**THE MUTATION THAT SURVIVED ROUND ONE, and it is why this is a function
+rather than a dict.** The first version left the capture as an inline dict
+comprehension inside `main()`'s entry loop. Replacing the omit-None guard with
+an unconditional `ev[k] = t.get(k)` stayed **GREEN**, because the test built
+the evidence dict *itself* instead of driving the call site — the same
+inspects-nothing shape `(po)` names, and the second time this session that a
+guard has been satisfied by something other than the code it guards. Extracted
+to a pure owner, with an AST test that `main()` **CALLS** it and never rebuilds
+the dict inline. **5 mutations, all red:** drop `regime` · stamp `None` instead
+of omitting · drop a BASE key · capture `side` · inline the comprehension again.
+
+**WHAT THIS DOES NOT DO.** It changes no trade, no gate and no size — the
+taker's live arm is retired and this is publish-only, so it ships to
+`freqtrade-bots` on the auto-path with no live marker. It does not make the
+book gradeable by regime TODAY; it makes it gradeable from today. The first
+regime-stamped close arrives on the next entry.
+
+Pinned by `tests/autonomy/test_taker_entry_evidence.py` (12 tests). The
+offered-set search this came out of is pre-registered in
+`PREREG_TAKER_OFFERED_2026-09-11.md`, committed before any outcome was
+computed; its verdict follows in its own entry.
+
+**[RENUMBERED (aao) -> (aap), 11-Sep.** `origin/claude/market-downturn-bots-afz0cn`
+holds `(aao)` on an open branch — the `(zw)` open-branch arm of
+`audit_changelog_letters` caught it before the push, which is the arm working
+on the day it was built. Recorded inline per the changelog-letter rule; the
+commit subjects keep the old letter, which is why the commit log is not a
+letter index.**
+
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —
