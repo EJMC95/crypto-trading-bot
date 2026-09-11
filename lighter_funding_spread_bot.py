@@ -300,7 +300,7 @@ def golive_blocker(bot, state=None, now=None):
         missing = sorted(k for k, v in bars.items() if v is not True)
         return (f"{bot} is NOT ready ({book.get('bars_passed')}/6 bars"
                 + (f", failing {'+'.join(missing)}" if missing else "") + ")")
-    # [2026-09-11 (aat)] AND THE SIX BARS ARE NOT THE WHOLE QUESTION AT THE
+    # [2026-09-11 (aau)] AND THE SIX BARS ARE NOT THE WHOLE QUESTION AT THE
     # POINT MONEY IS ARMED. `ready` means, precisely, "the six bars pass on the
     # GRADED sample" — the grader says so in its own docstring, its CLI header
     # and CLAUDE.md, and it never claims to mean "this book may go live". On a
@@ -1434,7 +1434,7 @@ def _selftest():
                                         "books": {BOT: {"ready": _bad}}}, _now), \
                 f"ready={_bad!r} is not True and must refuse"
 
-        # [(aat)] AND 6/6 IS NOT ENOUGH WHEN THE LIVE ARM CAN FILL NOTHING.
+        # [(aau)] AND 6/6 IS NOT ENOUGH WHEN THE LIVE ARM CAN FILL NOTHING.
         # `ready` means "the six bars pass on the GRADED sample"; this is the
         # only machine that turns that into real-money permission, so it reads
         # the live-fillable verdict ADDITIONALLY (I10's own shape). Measured on

@@ -903,7 +903,7 @@ def veto_split(rows, vetoed, tag_of=None):
     return out
 
 
-#: [2026-09-11 (aat)] THE BAND A COIN FLIP PAYS ON THIS VENUE, measured at
+#: [2026-09-11 (aau)] THE BAND A COIN FLIP PAYS ON THIS VENUE, measured at
 #: `(hm)` on 30-Jul and doctrine ever since: *"on this venue a random short
 #: earns +0.2% to +1.1%/trade for free."* Not a bar and not the null itself —
 #: the band the null was measured to occupy.
@@ -914,7 +914,7 @@ def null_band(s, bot, book_class=None):
     """Does this DIRECTIONAL book's mean sit inside the band a RANDOM entry
     pays on this venue? REPORTED, never a bar.
 
-    [(aat)] WHY THE GATE NEEDED THIS, and it is the fleet's own doctrine
+    [(aau)] WHY THE GATE NEEDED THIS, and it is the fleet's own doctrine
     catching up with its own grader. CLAUDE.md has said since 30-Jul:
     **"GRADE A DIRECTIONAL BOOK AGAINST A RANDOM-ENTRY BENCHMARK, NEVER
     AGAINST ZERO (hm)... A positive mean is not an edge on a trending tape."**
@@ -3433,7 +3433,7 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "live_fillable": ((c.get("live_fillable") or {})
                               if (c.get("live_fillable") or {}).get("why")
                               else None),
-            # [(aat)] and the random-band screen, same rule: only when it is
+            # [(aau)] and the random-band screen, same rule: only when it is
             # decision-relevant (a directional book INSIDE the band).
             "null_band": ((c.get("null_band") or {})
                           if (c.get("null_band") or {}).get("why")
@@ -3676,7 +3676,7 @@ def book_payload(s):
     # [(aan)] REPORTED beside, never a bar — see `live_fillable`.
     if isinstance(s.get("live_fillable"), dict):
         out["live_fillable"] = s["live_fillable"]
-    # [(aat)] same footing: the random-entry screen the bars cannot apply.
+    # [(aau)] same footing: the random-entry screen the bars cannot apply.
     if isinstance(s.get("null_band"), dict):
         out["null_band"] = s["null_band"]
     return out
@@ -5030,7 +5030,7 @@ def main():
         s["live_fillable"] = live_fillable(
             ed.get("scoped_rows") or [], _live_policy.get(bot),
             vetoed=_lens_veto.get(bot))
-        # [(aat)] and the screen the SIX BARS structurally cannot apply: they
+        # [(aau)] and the screen the SIX BARS structurally cannot apply: they
         # test against ZERO, and (hm) has said since 30-Jul that a DIRECTIONAL
         # book is graded against a random-entry benchmark, never against zero.
         s["null_band"] = null_band(s, bot)

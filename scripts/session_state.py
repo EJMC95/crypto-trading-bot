@@ -1052,7 +1052,7 @@ def fleet_signals(pnl=_FETCH, bus=_FETCH):
                 note = (f" Its LIVE arm could have filled {_ef.get('n')} of "
                         f"{(_ef.get('n') or 0) + (_uf.get('n') or 0)} of those "
                         f"closes — read `live_fillable` before promoting.")
-            # [(aat)] and the screen the six bars cannot apply — they test
+            # [(aau)] and the screen the six bars cannot apply — they test
             # against ZERO, and (hm) requires a directional book to be graded
             # against a random-entry benchmark. HANDOFF is where a session
             # decides what to pick up, so the caveat has to be HERE and not

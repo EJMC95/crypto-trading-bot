@@ -2229,7 +2229,7 @@ def golive_card():
                     + ('live arm fills NOTHING' if _inert
                        else f'live {_ef.get("n")}/{b.get("n")}')
                     + '</span>')
-            # [(aat)] AND THE SCREEN THE SIX BARS CANNOT APPLY. They test
+            # [(aau)] AND THE SCREEN THE SIX BARS CANNOT APPLY. They test
             # against ZERO; (hm) has said since 30-Jul that a DIRECTIONAL book
             # is graded against a random-entry benchmark, never against zero,
             # because on this venue a random entry earns +0.2 to +1.1%/trade

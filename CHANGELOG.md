@@ -1,3 +1,120 @@
+## 2026-09-11 (aau) — `ready: true` BESIDE "A LIVE ARM FILLS NOTHING" WAS ONE FIELD ANSWERING TWO QUESTIONS — AND THE FIX BELONGS WHERE MONEY IS ARMED, NOT IN THE GRADER
+
+**Eamon, 11-Sep:** *"it said its been ready to go live for 6 days and now its
+not ready, can we please look into this situation deeply as its a conflict
+that deserves a real look in."* He was right, and the obvious fix was wrong.
+
+**FIRST, THE FACT: `ready` NEVER FLIPPED.** It has read `true`, 6 of 6,
+`fails: []` continuously since **5-Sep 11:12Z** (n=173, t=2.11) — 50 snapshots
+over 200h, not one False. `t` peaked 2.73 on 6-Sep and has drifted to 2.12;
+that is the sample growing, not a verdict moving. What changed was that
+`(aan)` added a second, TRUE sentence beside the first — *"a go-live today
+fills nothing"* — and left both on one line without saying how they relate.
+**Two correct statements about two different arms, printed as one book's
+status.** The conflict was real and it was legibility, not arithmetic.
+
+**AND `ready` HAS NEVER MEANT WHAT IT LOOKS LIKE.** Its every definitional
+sentence — module docstring, CLI header, CLAUDE.md — says *the six bars pass
+on the graded sample*, and each adds that promotion is a separate act. The CLI
+footer even prints the caveat verbatim: *"a DIRECTIONAL book passing here has
+passed in that regime only."* **The gate says the right thing in the one place
+nobody reads.** It is not on the payload, not on the 🚦 card, and was not in
+HANDOFF — which is where the decision actually gets made.
+
+**THE ESCALATION WAS TESTED AND REFUSED — four measured reasons.** Making
+live-fillability a PRECONDITION on `ready`, the way `integrity` is:
+1. **IT RELEASES THE BRACKET FREEZE ON THE ONLY 6/6 BOOK.**
+   `apply_ready_freeze` keys on `ready is True`; the live payload reads
+   `ready_freeze: {..., dropped: ["taker.tp"]}` — **the tuner wanted `taker.tp`
+   this cycle and `ready: true` is the only thing that stopped it.** (`(aan)`'s
+   note that this actuator's record was `dropped: []` is hereby CORRECTED IN
+   PLACE per I12 — it was true when written and is not now.) Flip `ready` and
+   the bracket moves under a 208-close single-policy sample. **That is `(hm)`
+   verbatim** — *"137 shadow closes produced ZERO gradeable ones because the
+   scout tuner moved the bracket ~20 times in a fortnight."* The fix would
+   destroy the evidence it claims to protect.
+2. **IT TAKES THE FLEET'S READY LIST FROM 2 BOOKS TO ZERO.** Measured across
+   all 14 graded books, both variants: 🎫 the taker AND **🙏 avo's shadow twin
+   — the control arm for a book already trading real money** — both flip
+   False. Nine of fourteen books have no live mode at all (`SystemExit` unless
+   `VENUE=lighter_shadow`) and would declare an empty allow-list.
+3. **IT IS A RETIREMENT, NOT A PRECONDITION.** `divergence` is vetoed, and the
+   veto blocks the SHADOW arm's entries too, so no new divergence closes
+   accrue (last: 20-Aug, 22 days) and `effective.n` stays 0 forever. This
+   grader's own code already ruled on that shape when it narrowed `integrity`:
+   **"A precondition a book cannot ever clear is not a precondition, it is a
+   retirement."** The precedent that would be cited is the precedent that was
+   narrowed for exactly this reason.
+4. **IT MAKES THE CARD WORSE.** `bars_passed` is computed independently of
+   `ready`, so the result is a card reading `6/6 ✓✓✓✓✓✓` filed under *not
+   ready* — strictly more contradictory than today. And the whole thing would
+   grade EVIDENCE on CONFIGURATION: the same 208 closes passing or failing on
+   a constant in a real-money module.
+
+---
+
+**SHIPPED (1) — THE REFUSAL GOES WHERE MONEY IS ARMED.**
+`lighter_funding_spread_bot.golive_blocker` is the ONLY machine in this fleet
+that turns `ready` into real-money permission, and it was reading a field that
+means *"the paper book is good"*. It now ALSO reads `live_fillable.inert` and
+refuses, naming the numbers:
+
+> *"…passes 6/6 bars on its GRADED sample, but a LIVE arm could fill 0 of them
+> (structurally allowed: 46) — arming it would trade nothing."*
+
+This is **I10's own shape** — *"a live path must ADDITIONALLY read the
+published gate and refuse unless it says READY — fail-closed."* It keeps the
+freeze armed, leaves `BAR_NAMES` and the grading authority untouched, and
+cannot become a retirement-by-arithmetic because it gates an ACT, not a grade.
+**THREE-VALUED:** a book publishing no `live_fillable` is UNCHANGED — absence
+means *"never claimed a narrower live policy"*, and refusing on it would block
+every book with no live/shadow asymmetry, which is most of the fleet.
+
+**SHIPPED (2) — THE SCREEN THE SIX BARS STRUCTURALLY CANNOT APPLY.**
+CLAUDE.md has said since 30-Jul, in its Rules: **"GRADE A DIRECTIONAL BOOK
+AGAINST A RANDOM-ENTRY BENCHMARK, NEVER AGAINST ZERO (hm) … A positive mean is
+not an edge on a trending tape."** `BAR_NAMES` is six bars and **every one
+tests against ZERO.** The contradiction sat INERT for 38 days because the
+grader published `READY: none` on every cycle; on 5-Sep the taker became the
+fleet's **first-ever pass**, at **+0.902%/trade — inside the [+0.2, +1.1]%
+band a random entry pays on this venue** — and nothing anywhere near the
+verdict said the book had never been tested against the null its own doctrine
+requires. Measured since: it TIES a coin flip (excess −0.174pp, P=0.636).
+
+`null_band` reports it, and the discrimination is the point — measured on the
+live payload it fires on **3 of 14 books**, and of the two READY ones it flags
+🎫 the taker (+0.902%, inside) while staying SILENT on 🙏 avo (+2.231%, above
+it). Funding books get `None` — CLAUDE.md's own caveat says they are *"largely
+direction-agnostic"*, and a screen that fires on everything is one the reader
+learns to ignore ((gl)). The classifier is `fleet_allocation.book_class`,
+IMPORTED and never re-derived ((hj)). **It is a SCREEN, not the test**, and the
+`why` says so: it compares one number to a measured band, where the real null
+draws matched-random entries on the book's own coins through its own bracket.
+
+**AND THE CAVEAT NOW TRAVELS.** Both verdicts reach the 🚦 card (an amber
+`vs random: untested` chip) and **HANDOFF**, which is the first thing a session
+reads (I11) and which said `READY — 6/6 bars` unqualified for six days.
+
+**WHAT DELIBERATELY DID NOT CHANGE:** `ready`, `BAR_NAMES`, `grade()`,
+`bar_map()`, the era, `integrity`, and every existing consumer. Both additions
+are REPORTED beside — the `class_split`/`veto_split` footing, which refused to
+become bars in eight separate declarations and which this respects rather than
+becoming the third exception.
+
+**9 MUTATIONS, ALL RED:** drop the inert refusal · refuse on ABSENCE (the
+three-valued break) · a truthy `inert` arms real money · widen the band · drop
+the funding-class check · make the band one-sided · `null_band` joins
+`BAR_NAMES` · the card drops the chip · HANDOFF drops it. Plus a
+fail-on-good-news test: a book whose live arm CAN fill its sample must still
+arm, and a book above the band must not be flagged.
+
+**HOW THE ANSWER WAS FOUND, because the method is the transferable part.** An
+adversarial lens was given the single job of STOPPING this change, and it won
+on a measured fact — `dropped: ["taker.tp"]` — that a second lens then
+independently priced across all 14 books. Without it I would have shipped the
+precondition. That is the third time today an adversarial pass reversed a
+conclusion I had already reasoned my way to.
+
 ## 2026-09-11 (aar) — 🎫 THE NULL THAT BLOCKED A GO-LIVE INFERRED SIDE FROM A NULLABLE COLUMN, AND REPLAYED 7 LONGS AS SHORTS
 
 **The instrument whose verdict refused the taker's go-live had a sign bug in
