@@ -67,9 +67,13 @@ WHAT IT NEVER DOES
 
 Run it anywhere: laptop (called by the 2-hourly research scan) or cloud.
 """
+import http.client
 import json
 import os
+import socket
 import sys
+import time
+import urllib.error
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -519,10 +523,86 @@ def _save_state(state):
     return saved
 
 
+#: Transport faults that are worth ONE more attempt. MEASURED 11-Sep-2026, and
+#: it is not hypothetical: a single `IncompleteRead(15472 bytes read, 35722
+#: more expected)` on a payload whose true size is exactly 15472+35722 = 51194,
+#: fetched cleanly 6 of 6 times immediately afterwards.
+#:
+#: WHAT THAT ONE READ COSTS, traced rather than assumed. `run_all.sh` runs this
+#: brain as `python3 /freqtrade/bot_learn.py || true` on a 2h loop and does NOT
+#: route it through `organ_main`, so the exception is swallowed by the SHELL:
+#: nothing is recorded on any key, nothing logs a reason, and the next attempt
+#: is TWO HOURS away. `brain-vitals` carries a 7.2h TTL, so it takes ~3 missed
+#: runs before the watchdog can page. One truncated read therefore buys two
+#: hours of brain blindness that nobody is told about — the I13 shape, where a
+#: loop that does not run cannot report that it did not run.
+LEDGER_TRIES = max(1, int(os.environ.get("LEARN_LEDGER_TRIES", "3") or 3))
+
+_TRANSIENT = (urllib.error.URLError, http.client.HTTPException,
+              ConnectionError, TimeoutError, socket.timeout,
+              json.JSONDecodeError)
+
+
+def _is_transient(e):
+    """Worth one more attempt, or a condition that will just repeat?
+
+    THE TRAP, and the first draft of this helper shipped straight into it:
+    `HTTPError` is a SUBCLASS of `URLError`, so listing `URLError` in
+    `_TRANSIENT` silently retries 404s and 401s too — while the comment sitting
+    beside it said, in as many words, "a 404, a 500 or an auth failure is NOT
+    in here on purpose". The code and its own description disagreed, and only
+    the description was read. That is the "a safety sentence is a claim about
+    behaviour and has to be DRIVEN, not asserted" failure in miniature, so this
+    function exists to make the claim executable rather than written down.
+
+    A 4xx is a CONDITION: retrying it delays the same answer by a second and a
+    half. 429 and 5xx are the server explicitly asking us to come back.
+    """
+    if isinstance(e, urllib.error.HTTPError):
+        return e.code == 429 or e.code >= 500
+    return isinstance(e, _TRANSIENT)
+
+
+def _read_json_url(url, timeout, tries=None):
+    """Fetch and parse JSON, retrying TRANSPORT faults, then RAISING.
+
+    IT RAISES ON EXHAUSTION, DELIBERATELY, and that is the whole design. I4
+    says a silent write failure makes an organ amnesiac while it looks healthy;
+    degrading a failed LEDGER read to `[]` is that trap in its purest form,
+    because an empty ledger is BYTE-IDENTICAL to "no bot closed a trade". The
+    brain would then grade every bucket on nothing, publish fresh-looking
+    vitals off it, and no reader could tell. A raise at least leaves the keys
+    stale — and staleness is the one thing a reader CAN detect (I1).
+
+    So this is not a general-purpose fetch helper and must not become one: it
+    is the ledger reader, and its contract is "return real rows or raise".
+    """
+    # Resolved at CALL time, not baked into the signature: a default argument
+    # is evaluated once at import, so `tries=LEDGER_TRIES` would make the env
+    # var un-overridable after the module loads AND un-testable — a knob that
+    # reads as live and is frozen (I18's registered-but-inert shape).
+    tries = LEDGER_TRIES if tries is None else max(1, int(tries))
+    last = None
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.loads(r.read().decode())
+        except Exception as e:                               # noqa: BLE001,PERF203
+            if not _is_transient(e):
+                raise
+            last = e
+            if i + 1 < tries:
+                # 0.5s then 1.0s. Short on purpose: the caller is a 2h loop,
+                # so a few seconds is free, and a long backoff here would just
+                # move a transient outage into the next scheduled run anyway.
+                time.sleep(0.5 * (2 ** i))
+    raise last
+
+
 def _fetch_trades():
     # Freqtrade bots: the durable bot_trades ledger via the dashboard's HTTP feed.
-    with urllib.request.urlopen(TRADES_URL, timeout=30) as r:
-        d = json.loads(r.read().decode())
+    # Retried, never degraded to empty — see `_read_json_url`.
+    d = _read_json_url(TRADES_URL, timeout=30)
     trades = d if isinstance(d, list) else d.get("trades", d.get("data", []))
     trades = [t for t in trades if isinstance(t, dict) and not t.get("is_open")]
     # [2026-07-05 ALL-BOTS] Perps + sniper close to the paper_trades table, NOT

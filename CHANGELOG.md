@@ -1,3 +1,113 @@
+## 2026-09-11 (abe) — ONE TRUNCATED READ BOUGHT TWO HOURS OF SILENT BRAIN BLINDNESS, AND THE TEST THAT WOULD HAVE CAUGHT IT WAS ASSERTING AN EXACT COUNT OVER LIVE PRODUCTION DATA
+
+**Eamon, 11-Sep: *"please fix"*** — on the one thing the previous pass had
+declared and explicitly declined to touch as out-of-scope. He was right, and
+the scope call was wrong in a way worth recording: what I had filed as *"a
+known fragility in a test"* was a **production defect in the organ that sizes
+real money**, and the test was only the thing that noticed.
+
+**THE MEASUREMENT.** `bot_learn._fetch_trades()` did a bare
+`urllib.request.urlopen(TRADES_URL, timeout=30)` with no retry. It truncated
+once: `IncompleteRead(15472 bytes read, 35722 more expected)` — and
+**15472 + 35722 = 51194, byte-for-byte the live payload**, which then fetched
+cleanly **6 of 6** times immediately after. So: the same resource, cut
+mid-read, once.
+
+**WHAT THAT ONE READ COSTS, TRACED RATHER THAN ASSUMED — and this is why it
+is not a test problem.** `run_all.sh:116` runs the brain as
+`python3 /freqtrade/bot_learn.py || true` on a 2h loop and does **NOT** route
+it through `organ_main`. So the exception is swallowed by the **SHELL**:
+nothing is recorded on any key, nothing logs a reason, and the next attempt is
+**two hours away**. `brain-vitals` carries a 7.2h TTL, so it takes **~3 missed
+runs** before the watchdog can page. One truncated read therefore buys two
+hours of brain blindness that nobody is told about — I13 exactly, a loop that
+does not run cannot report that it did not run. And since (so)/(sp) every
+living book reads this brain through `fleet_bus.brain_clip`, **the live rows
+included**.
+
+**THE FIX IS A RETRY THAT RAISES, AND THE RAISE IS THE DESIGN.** `_read_json_url`
+retries transport faults, then re-raises. Degrading a failed **ledger** read to
+`[]` would be I4 in its purest form: an empty ledger is **byte-identical to
+"no bot closed a trade"**, so the brain would grade every bucket on nothing and
+publish fresh-looking vitals off it, with no reader able to tell. A raise at
+least leaves the keys stale, and staleness is the one thing a reader CAN detect
+(I1). Pinned by a test that mutates the raise to `return {}` **and** to
+`return []`, because the trap has two shapes.
+
+**REFUSED WITH EVIDENCE — the file has four network reads and only ONE deserved
+a change.** Lines 630 (pulse history), 789 (markets map) and 882 (candles) are
+already guarded and degrade correctly: `_mood_at` returns `None` on an empty
+history, the markets map is documented to never fabricate a 0, and the candle
+read returns `None`. Those are **enhancements** under the bus contract, where
+empty correctly means "keep the configured default". The ledger is the one read
+where empty means "lose the information the organ then acts on". Widening the
+change to all four would have bought nothing and enlarged the blast radius on a
+container the live books read.
+
+**THEN THE TEST, AND IT HID A WORSE DEFECT THAN THE ONE I CAME FOR.**
+`test_the_brain_publishes_a_receipt` asserts **`RECEIPT 4`** — an EXACT phantom
+count — while `_fetch_trades` merged the **live production feed** into the
+sample. Measured 11-Sep: 125 rows, **0 phantom**, so the assertion held **by
+luck**. The first real halt-and-flatten — the exact event this test file exists
+for, and which gave 🙏 avo **9 phantom rows of 15** — pushes the receipt above 4
+and **reddens CI on every open PR in the repo**, for a reason no author could
+connect to their change. Both clean-interpreter bodies now stub the feed. The
+function under test is untouched: `_fetch_trades` still really runs, still does
+its own `sys.path` insert, still imports `golive_readiness` for real.
+
+**Proven, not claimed** — with the feed pointed at an unroutable host
+(`127.0.0.1:9`): the OLD test **FAILS** (`URLError: Connection refused`), the
+new one **passes**. Before and after, same command.
+
+**9 OF 9 MUTATIONS KILLED — and the first round had a survivor that mattered.**
+`LEDGER_TRIES = 1` removed the retry from **production** while every test stayed
+green, because they all passed `tries=3` explicitly: the guard was vacuous about
+the only path that ships. Fixed by pinning the **default**. The same round
+exposed a second wart: `def _read_json_url(..., tries=LEDGER_TRIES)` evaluates
+its default once at IMPORT, so the env var read as live and was frozen — I18's
+registered-but-inert shape. Resolved at call time, pinned by a test that moves
+the constant and requires the next call to see it.
+
+**AND THE FIRST DRAFT'S COMMENT DESCRIBED A BEHAVIOUR THE CODE DID NOT HAVE.**
+It said *"a 404, a 500 or an auth failure is NOT in here on purpose"* while
+listing `URLError` in the transient tuple — and **`HTTPError` is a SUBCLASS of
+`URLError`**, so 404s were retried. Code and description disagreed and only the
+description was read. `_is_transient` now makes the claim executable: 4xx never
+retried, 429 and 5xx retried, both pinned.
+
+**THE INSTRUMENT FAILED ITS OWN POSITIVE CONTROL FIRST, which is the only
+reason its answer is worth anything.** To measure how wide the class runs I
+patched `socket.socket.connect` and filtered out local addresses — and it
+reported **`NETHITS none` on a fetch that had just succeeded**. Cause: this
+environment routes outbound HTTPS through a **local agent proxy**, so every
+fetch is a `127.0.0.1` connect and the "skip local" filter swallowed all of it.
+Rebuilt above the proxy at `http.client`, with a positive AND a negative
+control run before trusting it, and moved into a `sitecustomize.py` so
+**subprocess-spawning tests are covered** — a parent-only probe reads "none"
+for exactly the test that motivated the sweep. That is the `(po)`
+inspects-nothing rule landing on my own tooling for the second time tonight.
+
+**AND THE SWEEP SAYS THE CLASS IS ONE INSTANCE WIDE, WHICH IS WHY THE OBVIOUS
+FIX WOULD HAVE BEEN WRONG.** The tempting move was a repo-wide "no network in
+tests" ban. Measured instead: the suite makes **four** live fetches, and
+**three of them are correctly built** — `test_both_shapes_agree_on_the_live_ledger`
+and `test_coin_quality_phantoms` both `pytest.skip` on a dead feed, and the
+first additionally asserts `feed` is non-empty so it *cannot pass vacuously*;
+the remaining pair are script selftests reached through `test_selftests.py`
+(`/bus.json`, `/pnl.json`), whose individual tolerance I did **not** verify and
+am not claiming. A blanket ban would have deleted three deliberately-designed
+live integration checks to fix one defect.
+
+**So the class is not "a test touches the network" — it is "a test touches the
+network WITHOUT TOLERATING ITS ABSENCE", and exactly one instance existed.**
+That one also happened to be the only one asserting an exact count over live
+production rows. Both halves are now gone from it, and the three tolerant
+checks are untouched.
+
+  ENFORCED BY: `bot_learn.py::_read_json_url`, `bot_learn.py::_is_transient`,
+  `tests/autonomy/test_phantom_consumers.py::test_an_exhausted_ledger_read_RAISES_and_never_degrades_to_empty`,
+  `tests/autonomy/test_phantom_consumers.py::test_the_SHIPPED_default_actually_retries`
+
 ## 2026-09-11 (abd) — THE WHOLE JUDGEMENT LAYER IS IN GIT NOW, AND TRACKING IT MOVED TWO THINGS THAT HAD TO MOVE WITH IT
 
 **Eamon, 11-Sep:** *"track the rest too"* — the call `(aba)` put to him after
