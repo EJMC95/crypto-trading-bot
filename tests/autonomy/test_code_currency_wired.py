@@ -53,6 +53,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 WF = ROOT / ".github" / "workflows" / "fleet-weekly-assessment.yml"
+CLW = ROOT / ".github" / "workflows" / "changelog-check.yml"
 
 
 def _job_block(name):
@@ -105,16 +106,109 @@ def test_code_currency_checkout_has_full_history():
         "container reads UNRESOLVED, which does not fail: a vacuous green")
 
 
-def test_code_currency_exit_code_is_not_masked():
-    job = _job_block("code-currency")
-    assert "continue-on-error" not in job, (
-        "continue-on-error on the code-currency job turns BEHIND-OWN into a "
-        "warning — and a guard whose only output is a warning on a passing "
-        "run is not a guard ((gl)/(hj))")
+def _steps(job):
+    """(name, {key: value}) for each `- name:` step in a job block.
+
+    Line-shaped on purpose: `requirements-test.txt` carries no yaml lib, which
+    is the convention `_job_block` above states and which `audit_deploy_coverage`
+    states again. [(zh)] The first cut of these two tests used `import yaml` and
+    went RED on the CI runner while passing locally — and the more instructive
+    half is that the guard's twin in `audit_live_marker_survives_squash`
+    swallowed the same ImportError and went silently INERT instead. Line-shaped
+    and control-pinned beats a parse that is only available on some machines.
+    """
+    out, cur = [], None
     for ln in job.splitlines():
+        m = re.match(r"\s*- name:\s*(.+?)\s*$", ln)
+        if m:
+            cur = (m.group(1), {})
+            out.append(cur)
+            continue
+        m = re.match(r"\s*([a-z-]+):\s*(.*?)\s*$", ln)
+        if m and cur is not None and not ln.lstrip().startswith("#"):
+            cur[1].setdefault(m.group(1), m.group(2))
+    return out
+
+
+def test_the_step_parser_can_actually_see_a_step():
+    """POSITIVE CONTROL ((po)): a line parser that matches nothing would make
+    every test built on it vacuously green. Pin that it reads the real file."""
+    steps = _steps(_job_block("code-currency"))
+    assert len(steps) >= 3, f"parser found {len(steps)} steps in code-currency"
+    names = [n for n, _ in steps]
+    assert any("commit is each container running" in n for n in names), names
+    assert any("roster" in n.lower() for n in names), names
+
+
+def test_code_currency_exit_code_is_not_masked():
+    """MUTATION: add `continue-on-error: true` to any step -> RED.
+
+    [(aay)] STRUCTURAL, was a page-wide substring scan. The old form
+    asserted `"continue-on-error" not in job`, which is `(po)`'s own rule ("a
+    page-wide substring scan is not a structural claim") landing on the test
+    written to honour it: it goes red on a COMMENT that names the key in order
+    to explain why the key was refused, and it cannot tell
+    `continue-on-error: false` — which masks nothing — from `: true`.
+
+    It now matches the KEY with its indentation and reads the VALUE, so a
+    sentence about the setting is not the setting.
+    """
+    job = _job_block("code-currency")
+    for ln in job.splitlines():
+        if ln.lstrip().startswith("#"):
+            continue                       # a comment is not a setting
+        m = re.match(r"\s*continue-on-error:\s*(\S+)\s*$", ln)
+        assert not (m and m.group(1).lower() == "true"), (
+            "continue-on-error: true on the code-currency job turns BEHIND-OWN "
+            "into a warning — and a guard whose only output is a warning on a "
+            "passing run is not a guard ((gl)/(hj))")
         if "audit_code_currency" in ln:
             assert "|| true" not in ln and not re.search(r"\|\|\s*echo", ln), (
                 f"the audit's exit code is masked: {ln.strip()!r}")
+
+
+def test_a_red_guard_never_silences_the_guards_behind_it():
+    """MUTATION: drop either `if:` -> RED.
+
+    [(aay)] THE INCIDENT. Steps abort a job at the first failure, so the two
+    guards placed AFTER `audit_code_currency` in this job only ever ran when it
+    passed. Measured: it went red on three consecutive scheduled runs (16-Aug
+    31979750293, 23-Aug 32674318505, 31-Aug 33347486090) — correctly, naming a
+    BEHIND-OWN container each time — and across those three weeks
+    `audit_live_roster` and `audit_ci_coverage` executed ZERO times. A stale
+    container bought three weeks of silence in two checks that answer a
+    different question, and the job's redness was fully explained by the first
+    guard, so nothing looked missing.
+
+    The condition must be the FEED's outcome, never `always()`: a dark feed
+    still has to skip the roster check (this job treats an empty feed as failure
+    by design), and `always()` would run it against a file that is not there,
+    turning a fetch outage into a fake roster finding.
+    """
+    job = _job_block("code-currency")
+    steps = _steps(job)
+
+    feed = [(n, kv) for n, kv in steps if "feed" in n.lower()]
+    assert feed and feed[0][1].get("id") == "feed", (
+        "the feed-fetch step lost its `id: feed` — the two guards below gate on "
+        "its outcome, and an unknown id makes that expression always false, "
+        "silently skipping both")
+
+    roster = next((kv for n, kv in steps if "roster" in n.lower()), None)
+    assert roster is not None, "the roster guard left this job"
+    cond = roster.get("if", "")
+    assert "cancelled()" in cond and "steps.feed.outcome" in cond, (
+        "the roster guard must run when the guard ABOVE it fails and skip only "
+        f"on a dark feed; its condition is {cond!r}")
+    assert "always()" not in cond, (
+        "always() would run the roster check against a feed that failed to "
+        "download — a fetch outage becomes a fake roster finding")
+
+    ci = next((kv for n, kv in steps if "graded" in n.lower()), None)
+    assert ci is not None, "the ci-coverage guard left this job"
+    assert "cancelled()" in ci.get("if", ""), (
+        "audit_ci_coverage reads git history and `gh run list`, never the feed, "
+        "so a red guard above it must not skip it")
 
 
 def test_the_window_covers_a_week_of_commits():
@@ -229,3 +323,65 @@ def test_ci_coverage_step_is_granted_the_scope_it_needs():
         f"run, whatever the fleet's actual state. This is not hypothetical — "
         f"it is how (pc) shipped on 16-Aug and how run 31979750293 failed. "
         f"Granted here: {sorted(effective)}")
+
+
+def test_a_title_reading_guard_can_be_cleared_by_fixing_the_title():
+    """MUTATION: drop `edited` from changelog-check.yml's types -> RED.
+
+    [11-Sep (aay)] The gap PR #293 shipped the FIX for and never pinned, which is
+    this repo's opening rule landing on the change that honours it: a doctrine
+    with no executable enforcement is a doctrine with no teeth.
+
+    `audit_live_marker_survives_squash` reads the PULL REQUEST TITLE, because
+    `(xh)` measured that under a squash merge the title becomes the commit
+    subject and is therefore the field that decides whether REAL MONEY deploys.
+    GitHub's default `pull_request` types are opened/synchronize/reopened — so
+    a PR that fails this guard cannot re-run it by doing the one thing the
+    guard asks for. Measured on PR #291: red at 12:46Z asking for the marker in
+    the title, title corrected three minutes later, still red, and unclearable
+    short of an empty push — which `(hj)`/`(gl)` forbid as a way to kick CI.
+
+    Both halves are asserted, because either alone is satisfiable trivially: a
+    `types:` list that omits `edited` re-runs on nothing useful, and an
+    `edited` that is not in the `pull_request` block does nothing at all.
+    """
+    text = CLW.read_text()
+    lines = text.splitlines()
+
+    # locate the `pull_request:` block under `on:` and read its `types:`
+    try:
+        on_i = next(i for i, ln in enumerate(lines) if ln.rstrip() == "on:")
+    except StopIteration:                                   # pragma: no cover
+        raise AssertionError("changelog-check.yml has no `on:` block")
+    pr_i = next((i for i in range(on_i + 1, len(lines))
+                 if lines[i].strip() == "pull_request:"), None)
+    assert pr_i is not None, "changelog-check.yml no longer runs on pull_request"
+
+    types_ln = None
+    for ln in lines[pr_i + 1:]:
+        if ln.strip() and not ln.startswith(" "):
+            break                                    # left the `on:` block
+        if ln.strip().startswith("#"):
+            continue                                 # a comment is not a setting
+        if re.match(r"\s*[a-z_]+:\s*$", ln) and ln.strip() != "pull_request:":
+            if not ln.startswith("    "):
+                break                                # next top-level event
+        m = re.match(r"\s*types:\s*\[(.*)\]\s*$", ln)
+        if m:
+            types_ln = [t.strip() for t in m.group(1).split(",") if t.strip()]
+            break
+
+    assert types_ln is not None, (
+        "changelog-check.yml's pull_request block declares no `types:`, so it "
+        "runs on GitHub's defaults — which omit `edited`, and the marker guard "
+        "this workflow hosts reads the PR TITLE ((xh)). A red it raises about "
+        "the title cannot then be cleared by fixing the title.")
+    assert "edited" in types_ln, (
+        f"`edited` is missing from types: {types_ln} — see PR #291, where the "
+        "marker guard stayed red after the title was corrected")
+    # ...and the defaults must be kept, or the guard stops running on new
+    # commits, which is a far larger hole than the one this closes.
+    for needed in ("opened", "synchronize", "reopened"):
+        assert needed in types_ln, (
+            f"declaring `types:` REPLACES the defaults; {needed!r} is now "
+            f"missing, so the workflow stopped running on it: {types_ln}")

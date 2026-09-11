@@ -1,3 +1,64 @@
+## 2026-09-11 (aax) — 🔬 `(aaw)`'s CLOSED FORM HAS A GAP ITS OWN BRUTE-FORCE COULD NOT SEE: THE ALIVE SET IS NOT AN INTERVAL, AND THE CLIP ENGAGES ON THE STOP IT IS NOT MEASURED AGAINST
+
+**NO CODE CHANGE. A measurement against a real-money instrument that shipped
+twenty minutes earlier, recorded so it is not lost.**
+
+Eamon asked me to publish the overshoot-aware clipped ceiling `(aat)` carried.
+**I built it, and while I was verifying it `(aaw)` shipped the same thing** —
+with a cleaner closed form, wired into the pager, and deployed to 👩 mum. Mine
+was a duplicate and is dropped; this is the one thing my derivation has that
+theirs does not, checked against **their** shipped function rather than mine.
+
+**THE GAP.** `(aaw)`'s form is `G_dead = 1/(|stop| + min(mmf, MMF_CLIP_REF))`,
+verified by brute-forcing `mmf_clip_factor` over 12-leg baskets **at mum's 4%
+NOMINAL stop**. At that stop there is nothing to find: the clip's engage test
+and the death test use the same number. But the field it feeds,
+`stop_dead_above_eff`, is published at THREE bases — nominal, p90 overshoot,
+worst observed — and **the moment the stop is widened the two numbers separate**,
+because `mmf_clip_factor` engages on `sl` (`g <= 1/(sl+m)`) while the stop that
+must fill is `sl + overshoot`.
+
+Driven through the SHIPPED `mmf_clip_factor`, a 12-leg all-20% basket, mum's
+p90 fill of 4.519%:
+
+| gross | `f` (shipped) | liquidates at | vs 4.519% fill |
+|---|---|---|---|
+| 4.0000 | 1.0000 | 5.000% | ALIVE |
+| **4.1000** | **1.0000** | **4.390%** | **DEAD** |
+| **4.1666** | **1.0000** | **4.000%** | **DEAD** |
+| 4.2000 | 0.4167 | 37.143% | ALIVE |
+
+`clipped_stop_ceiling(0.20, stop=0.04519)` returns **9.5066x**, i.e. *alive
+anywhere below it* — and the shipped clip disagrees in a band just under its own
+engage point. On mum's full ladder the bands sit at roughly **[4.08, 4.17]**,
+**[5.12, 5.26]** and **[6.89, 7.14]**. **So the alive set is not an interval,
+and `stop_reachable_eff` reads TRUE inside a band where the stop is dead.**
+
+**WHY IT IS NOT URGENT, stated so nobody over-reads it.** Every band is BELOW
+where the levered books run — 👩 mum 9.5x, 🙏 avo 2.33x — so no live verdict is
+wrong today, and `(aaw)`'s headline numbers (10.0000 / 9.5066 / 9.4127x,
+headroom +0.0066x) are unaffected: I reproduced all four independently from
+first principles before finding this.
+
+**WHY IT IS WORTH RECORDING ANYWAY.** The failure direction is the flattering
+one on a levered real-money book — *reads alive where the stop is dead* — and
+gross is not fixed: `dd_scale` and the live clip scale can walk it DOWN, into a
+band. The honest fix is one line in `clipped_stop_ceiling`, not a second
+implementation: test engagement at the SAME effective stop the death test uses,
+or return None where the closed form and the shipped clip disagree. **NOT
+SHIPPED HERE** — that function deployed to real money twenty minutes ago from
+another session, and rewriting it underneath them on a latent case is how two
+sessions turn one fix into three. Eamon's call, with the reproduction above.
+
+**AND THE DAY'S REAL FINDING IS THE DUPLICATION ITSELF.** Three sessions
+converged on overlapping work within two hours: this one and
+`claude/workflow-guards` both ported `(ze)`'s CI half byte-equivalently, and
+this one and `(aaw)` both built the clipped ceiling. Two of the three collisions
+were caught **only** by `audit_changelog_letters`' open-branch arm — which is
+that guard doing a job it was not built for, and the reason it kept reddening
+today. What has no detector is the WORK overlapping; the letters are just where
+it shows.
+
 ## 2026-09-11 (aau) — `ready: true` BESIDE "A LIVE ARM FILLS NOTHING" WAS ONE FIELD ANSWERING TWO QUESTIONS — AND THE FIX BELONGS WHERE MONEY IS ARMED, NOT IN THE GRADER
 
 **Eamon, 11-Sep:** *"it said its been ready to go live for 6 days and now its
@@ -114,6 +175,91 @@ on a measured fact — `dropped: ["taker.tp"]` — that a second lens then
 independently priced across all 14 books. Without it I would have shipped the
 precondition. That is the third time today an adversarial pass reversed a
 conclusion I had already reasoned my way to.
+## 2026-09-11 (aay) — 🔴 PR #293 IS HALF SUPERSEDED AND HALF STRANDED: ITS SUPPLY FIX WOULD NOW *NARROW* AVO, AND ITS CI FIX HAS SAT UNSHIPPED FOR FOUR DAYS
+
+**[RENUMBERED (aav) -> (aay), 11-Sep.** `origin/claude/workflow-guards` took `(aav)` for the SAME port in the same hour — and that is the finding, not the clash: two sessions independently ported `(ze)`'s CI half today, byte-equivalently in both workflow files. Their branch carries one piece this does not — `reruns_on_title_edit()` inside `audit_live_marker_survives_squash` itself, which is a better home for that enforcement than the test here. Recorded inline per the changelog-letter rule; the commit subject keeps the old letter, which is why `git log` is not a letter index.**
+
+**Eamon, 11-Sep: *"proceed with 1, 2 and 3"*** — 2 being *merge PR #293*. It is
+not merged, and this entry is the refusal with evidence plus the half that
+**is** shipped. The PR is four days old and its CI went green **47 hours ago**
+against a base **25 commits behind**; the fleet moved underneath it.
+
+### THE REFUSAL: merging it would REVERSE a later, better-evidenced change on a REAL-MONEY book
+
+`(zf)`'s headline is *"supply widened: avo's crypto 39 → 53"* at a volume floor
+of **0.5 → 0.25**. Measured on current main:
+
+| | avo's `FAMILY_CRYPTO_MIN_VOL_M` | crypto names |
+|---|---|---|
+| when #293 was written (7-Sep) | 0.5 | 39 |
+| **#293 proposes** | **0.25** | 53 |
+| **main today, via `(aae)` 10-Sep** | **0.15** | **53** |
+
+**#293 would move her floor 0.15 → 0.25 — strictly NARROWER — silently
+reverting `(aae)`, which landed a day after #293's checks ran and reached the
+same 53 names by a better route.** `(aae)` did not merely pick a smaller number:
+it re-derived `(vd)`'s own ratio at today's clip (**$684 → $165.95**, 4.1×
+smaller ⇒ $0.121M, shipped at 0.15 to stay strictly above it) and established
+that **volume is a proxy the fleet no longer needs for this job** — the
+coin-quality veto measures execution DIRECTLY on realised fills, and of the
+three coins vetoed for slippage on 10-Sep (**AI $0.210M, SHEIN $0.740M, USELESS
+$3.856M**) *two sit ABOVE #293's proposed floor and the worst is 7.7× above it*.
+A floor at 0.25 excludes names to manage a risk it measurably does not screen.
+
+`(aae)` shipped with `[deploy-live]` in its subject, so **avo's live arm is
+already running 0.15** — verified on her row, not inferred. **The supply goal
+Eamon asked for is already delivered.** Merging #293 would undo it AND restart
+both real-money containers to do so. That is I26 in the direction it is usually
+quoted against: *the burden of proof sits on the refusal* — and the number that
+makes it worse is on the table, so this refusal carries one.
+
+### THE HALF THAT WAS STRANDED, AND IS NOW SHIPPED
+
+`(ze)`'s CI mechanics are **not on main**, are still correct, and touch **no bot
+file, no lever, no live surface** — so this lands with no marker and no deploy:
+
+* **A red guard silenced two guards for three weeks.** `fleet-weekly-assessment`
+  runs three guards as sequential STEPS, and a step failure aborts the job. On
+  the three scheduled runs where `audit_code_currency` went red — **16-Aug
+  `31979750293`, 23-Aug `32674318505`, 31-Aug `33347486090`**, correctly, naming
+  a BEHIND-OWN container each time — `audit_live_roster` and `audit_ci_coverage`
+  executed **ZERO times**. Nothing looked missing, because the job's redness was
+  fully explained by the first guard's honest output. Each now gates on what it
+  actually needs: the roster guard on `steps.feed.outcome == 'success'`
+  (**never `always()`** — a dark feed must still skip it, or a fetch outage
+  becomes a fake roster finding), `audit_ci_coverage` on `!cancelled()` alone.
+* **A guard whose own remedy could not clear it.** `live-marker-survives-squash`
+  reads the **PR TITLE**, because `(xh)` measured that a squash takes the title
+  as the commit subject — the field that decides whether real money deploys. But
+  `changelog-check.yml` used bare `on: pull_request`, whose defaults omit
+  `edited`. Measured on #291: red at 12:46Z asking for the marker in the title,
+  title corrected three minutes later, **still red**, unclearable short of an
+  empty push, which `(hj)`/`(gl)` forbid.
+* **The exit-code test was `(po)`'s own defect wearing its name.** It asserted
+  `"continue-on-error" not in job` — a page-wide substring scan, which goes red
+  on a COMMENT explaining why the key is refused and cannot tell
+  `continue-on-error: false` (masks nothing) from `: true`. Now matches the KEY
+  with its indentation and reads the VALUE.
+
+### AND THE FIX `(ze)` SHIPPED WITHOUT A PIN NOW HAS ONE
+
+`(ze)` added the `edited` trigger and **nothing enforced it** — this file's own
+opening rule landing on the change that honours it. `test_a_title_reading_guard_
+can_be_cleared_by_fixing_the_title` asserts BOTH halves, because either alone is
+trivially satisfiable: `edited` must be present, AND the three defaults must
+survive, since **declaring `types:` REPLACES them** — losing `synchronize` would
+stop the workflow running on new commits, a far larger hole than the one this
+closes.
+
+**10 mutations, 8 RED + 2 GREEN CONTROLS**, and the controls are the point: a
+comment naming `continue-on-error`, and `continue-on-error: false`, both stay
+green — they are exactly the two false positives the old form produced.
+
+**NOT PORTED, deliberately:** `lighter_family_bot.py` and `test_mum_supply.py`
+(the superseded floor), and the `avo-supply-floor-staged-read` carried row,
+whose pre-registered read is moot now that `(aae)` owns the floor at a different
+value. `scripts/audit_live_marker_survives_squash.py` is already on main.
+  ENFORCED BY: `tests/autonomy/test_code_currency_wired.py::test_a_red_guard_never_silences_the_guards_behind_it`, `tests/autonomy/test_code_currency_wired.py::test_a_title_reading_guard_can_be_cleared_by_fixing_the_title`
 
 ## 2026-09-11 (aaw) — THE DRAWDOWN BAR DIVIDES A 10-SEP HOLE BY AN 11-SEP DEPOSIT, AND THE STOP-DEATH PAGER READS A CEILING THE CLIP HAS NOT USED SINCE (vy) — two numbers published beside the ones that are wrong, nothing switched
 
