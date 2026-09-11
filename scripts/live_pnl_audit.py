@@ -50,10 +50,74 @@ import subprocess
 import sys
 import urllib.request
 
+# Both invocation paths must resolve the same modules. `python3
+# scripts/live_pnl_audit.py` (how the workflow runs it) puts `scripts/` on the
+# path; `python -m scripts.live_pnl_audit` (how tests/test_selftests.py runs
+# it) puts the ROOT there and `scripts/` nowhere — so every sibling import
+# below silently degraded to its fallback under test. Measured: the phantom
+# filter read `None` and `EXPECTED_LIVE_ROWS` read `()` under `-m`, which is
+# why a mutation deleting the phantom branch SURVIVED its own new test. And
+# the two owners live in DIFFERENT places — `golive_readiness` under scripts/,
+# `bot_pnl_store` at the root — so exactly one of them resolved under each
+# path and neither invocation had both until this loop.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (_HERE, os.path.dirname(_HERE)):        # scripts/ AND the repo root
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 try:
     from fleet_books import DECLARED_LIVE as EXPECTED_LIVE_ROWS
 except Exception:  # noqa: BLE001
     EXPECTED_LIVE_ROWS = ()
+
+# [2026-09-11] THE PUBLIC LEDGER FEED IS UNFILTERED, AND THIS IS THE DAILY
+# REAL-MONEY AUDIT. CLAUDE.md says it in as many words: `/trades.json` "does
+# NOT apply LEDGER_QUARANTINE ... an outside consumer grading from it must
+# apply `bot_pnl_store.is_quarantined` + `golive_readiness.is_phantom_close`
+# itself or it grades a sample the gate refuses". `edge_audit` and `ceiling`
+# do; this script did not, and it runs every day in CI over the live books.
+# MEASURED the day this shipped, on 🙏 avo's LIVE arm:
+#   RAW      n=27  +2.184%/trade  t=+2.45
+#   FILTERED n=18  +3.275%/trade  t=+2.58
+# — 9 halt/flatten EVENTS ($0.00 P&L, no entry price) counted as trades, and
+# 9 of the fleet's 13 phantoms are hers, so the hazard concentrates on real
+# money. IMPORT the owners, never re-implement: a second copy of a filter is
+# a second filter ((hj)), and both fail OPEN so an unparseable row is kept.
+try:
+    from bot_pnl_store import is_quarantined as _is_quarantined
+except Exception:  # noqa: BLE001
+    _is_quarantined = None
+try:
+    from golive_readiness import is_phantom_close as _is_phantom
+except Exception:  # noqa: BLE001
+    _is_phantom = None
+
+
+def graded_rows(trades):
+    """-> (rows, note) — the ledger the GATE would grade, plus what was cut.
+
+    FAIL-OPEN on a missing owner: if neither filter could be imported the rows
+    pass through unchanged and the note says so, because an audit that
+    silently grades a different sample than it claims is the defect being
+    fixed. The note is printed, so "unfiltered" can never again be invisible.
+    """
+    rows = list(trades or [])
+    if _is_quarantined is None and _is_phantom is None:
+        return rows, ("ledger filters UNAVAILABLE (imports failed) — grading "
+                      "the RAW public feed, which the gate does not")
+    kept, n_ph, n_q = [], 0, 0
+    for r in rows:
+        if _is_phantom is not None and _is_phantom(r):
+            n_ph += 1
+            continue
+        if _is_quarantined is not None and _is_quarantined(
+                r.get("bot"), r.get("pair"), r.get("closed_at")):
+            n_q += 1
+            continue
+        kept.append(r)
+    return kept, (f"ledger filtered to the graded sample: "
+                  f"-{n_ph} phantom halt/flatten rows, -{n_q} quarantined "
+                  f"({len(kept)} of {len(rows)} kept)")
 
 DASH = "https://pnl-dashboard-production-858c.up.railway.app"
 
@@ -800,6 +864,15 @@ def main(argv=None):
         return 2
     trades_payload = fetch_json(args.trades_json)
     trades = (trades_payload or {}).get("trades")
+    # (qz): a result exactly equal to its own cap is a truncation signature,
+    # and this one is a SILENT sampling step in a real-money audit.
+    if isinstance(trades, list) and f"limit={len(trades)}" in args.trades_json:
+        print(f"live_pnl_audit: trades feed returned EXACTLY its limit "
+              f"({len(trades)}) — assume TRUNCATED; every window below is a "
+              f"sample, not the ledger. Raise --trades-json limit.")
+    if trades is not None:
+        trades, _filter_note = graded_rows(trades)
+        print(f"live_pnl_audit: {_filter_note}")
     bus = fetch_json(args.bus_json)
     if trades is None:
         print("live_pnl_audit: trades feed dark — attribution and window "
@@ -935,6 +1008,47 @@ def selftest():
 
     report = render(pnl, trades, bus, "daily", now, reds, ambers)
     assert "FROZEN" in report and "live-a" in report
+
+    # ---- the ledger the GATE would grade (2026-09-11) ---------------------
+    # This audit read the RAW public feed for its whole life and CLAUDE.md
+    # warns about exactly that. Both filters fail OPEN, so the test drives
+    # BOTH directions: a real row survives, a phantom does not, and a missing
+    # owner is reported rather than silently grading the wrong sample.
+    _real = {"bot": "b", "pair": "X/USD", "closed_at": "2026-09-10T00:00:00Z",
+             "pnl_abs": 1.5, "pnl_pct": 0.02, "entry_price": 100.0}
+    _phantom = {"bot": "b", "pair": "X/USD", "closed_at": "2026-09-10T00:00:00Z",
+                "pnl_abs": 0.0, "pnl_pct": 0.0, "entry_price": None}
+    assert _is_phantom is not None and _is_quarantined is not None, (
+        "both filter owners must import under EVERY invocation path — they did "
+        "not under `python -m scripts.live_pnl_audit`, which made this very "
+        "test vacuous and let a mutation through")
+    _kept, _note = graded_rows([_real, _phantom])
+    assert _kept == [_real], f"a $0.00 no-entry halt row is not a trade: {_kept}"
+    assert "phantom" in _note and "1 of 2 kept" in _note, _note
+    assert graded_rows([])[0] == []
+    _g = globals()
+    # The QUARANTINE branch needs its own drive — the real table is keyed on
+    # live bots and windows, so a fixture cannot reach it without pinning a
+    # book. Inject a stub instead: the branch, not the table, is what this
+    # file owns.
+    _sq = _g["_is_quarantined"]
+    try:
+        _g["_is_quarantined"] = lambda bot, pair, ts: pair == "Q/USD"
+        _q = dict(_real, pair="Q/USD")
+        _k, _n = graded_rows([_real, _q])
+        assert _k == [_real], f"a quarantined row is not evidence: {_k}"
+        assert "-1 quarantined" in _n, _n
+    finally:
+        _g["_is_quarantined"] = _sq
+    _saved = (_g["_is_quarantined"], _g["_is_phantom"])
+    try:
+        _g["_is_quarantined"], _g["_is_phantom"] = None, None
+        _k, _n = graded_rows([_real, _phantom])
+        assert _k == [_real, _phantom], "fail-OPEN: no owner, no filtering"
+        assert "UNAVAILABLE" in _n and "RAW" in _n, \
+            f"unfiltered must ANNOUNCE itself, never pass silently: {_n}"
+    finally:
+        _g["_is_quarantined"], _g["_is_phantom"] = _saved
 
     print("live_pnl_audit selftest OK")
     return 0

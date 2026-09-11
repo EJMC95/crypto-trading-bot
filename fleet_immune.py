@@ -91,6 +91,22 @@ FUTURE_SKEW_S = float(os.environ.get("IMMUNE_FUTURE_SKEW_S", "2"))
 ANTIBODIES = [
     ("live vs shadow P&L gap", "retired whole-book divergence artifact "
                                "(replaced 15-Jul by the paired per-coin check)"),
+    # [2026-09-11] 🧲 Snap Back was RETIRED 4-Aug (jh) and its frozen census is
+    # still being re-alerted every cycle: `market_context.fire_alerts` reads
+    # `lighter-dislocation-lshadow` with NO age check (I1 — content before
+    # liveness), and `_alert`'s dedup refreshes `last_seen`, so the age arm
+    # above can never reach them. MEASURED on the 10-Sep review: **19 of 23
+    # verdict rows** were this one dead book, each repeating the same sentence,
+    # every day for five weeks — the fleet's most-read table, 83% fossil.
+    # Both substrings are taken from the publisher's own format strings
+    # (market_context.py:390-396), not guessed.
+    # THE SOURCE FIX is the age gate at that read; this neutralises the
+    # bloodstream today for every consumer, and is removed the day 🧲 is
+    # resurrected (`SNAPBACK_RETIRED_OVERRIDE=run`).
+    ("🧲 tradeable dislocation on", "🧲 Snap Back retired 4-Aug (jh) — its "
+                                    "census is frozen, not a live condition"),
+    ("🧲 dislocation census reached", "🧲 Snap Back retired 4-Aug (jh) — its "
+                                      "census is frozen, not a live condition"),
 ]
 
 
@@ -705,7 +721,7 @@ def headroom_sickness(bot_rows, ok=None):
                                       f"(ceiling {lev.get('stop_dead_above_held')}, "
                                       f"mmf_held {lev.get('mmf_held')}) — "
                                       f"liquidation fires before the stop"})
-        # [(aau)] THE CLIP-ON VERDICT SITS BETWEEN THE HELD MEASUREMENT AND
+        # [(aaw)] THE CLIP-ON VERDICT SITS BETWEEN THE HELD MEASUREMENT AND
         # THE CLIP-OFF BOUND. `stop_reachable` below is computed with the
         # per-coin mmf clip DISENGAGED, so on a levered book it is False by
         # CONFIGURATION — I7's "a trigger a book satisfies structurally is
@@ -731,7 +747,7 @@ def headroom_sickness(bot_rows, ok=None):
               # [(aas)] ...and the book actually holds something. See
               # `_book_flat` above: the bound describes a basket, so an empty
               # book cannot fail it.
-              # [(aau)] Reaching this limb already IMPLIES `_eff is None`:
+              # [(aaw)] Reaching this limb already IMPLIES `_eff is None`:
               # the clip-ON branch above claims every row that publishes it,
               # and its two escapes (`stop_dead` allowed, book flat) are both
               # re-tested here. An explicit `and _eff is None` was written,
@@ -746,7 +762,7 @@ def headroom_sickness(bot_rows, ok=None):
                                   f"{lev.get('set')} (ceiling "
                                   f"{lev.get('stop_dead_above')}) — "
                                   f"liquidation fires before the stop"})
-        # [(aau)] AND AN UNKNOWN MUST NOT READ HEALTHY (I1/I4). Every limb
+        # [(aaw)] AND AN UNKNOWN MUST NOT READ HEALTHY (I1/I4). Every limb
         # above fires only on `is False`, so when `fleet_bus.market_margins()`
         # is dark EVERY stop verdict degrades to None and this organ went
         # SILENT — on precisely the state that means "I cannot tell whether

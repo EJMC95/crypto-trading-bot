@@ -637,7 +637,7 @@ def clipped_stop_ceiling(mmf, stop=None):
     """The gross at which the protective stop dies WITH the per-coin mmf clip
     ENGAGED — i.e. the number that actually binds on this book.
 
-    [2026-09-11 (aau)] `stop_dead_above` beside it is the clip-OFF bound, and
+    [2026-09-11 (aaw)] `stop_dead_above` beside it is the clip-OFF bound, and
     on a levered book it is neither what governs nor what the operator can act
     on. It reads 4.17x for mum while her clip-ON ceiling is 10.0x, so it is
     "DEAD" at every gross above 4.17 — a condition met by CONFIGURATION, which
@@ -2212,7 +2212,7 @@ def main(_ctx=None, once=False):
             _stop_ok_held, _stop_ceiling_held = (
                 stop_reachable(_held_mmf, _lev_now)
                 if (_held_mmf is not None and _lev_now) else (None, None))
-            # [(aau)] THE CEILING THE CLIP ACTUALLY ENFORCES, at every stop
+            # [(aaw)] THE CEILING THE CLIP ACTUALLY ENFORCES, at every stop
             # basis this book can evidence. `_stop_ceiling` above is the
             # clip-OFF bound and is structurally exceeded on any levered
             # book (I7); this is what binds. None throughout on a dark
@@ -2371,7 +2371,7 @@ def main(_ctx=None, once=False):
                     # protective stop is dead code. Reported, never a gate.
                     "stop_reachable": _stop_ok,
                     "stop_dead_above": _stop_ceiling,
-                    # [(aau)] ...and the SAME question with the per-coin mmf
+                    # [(aaw)] ...and the SAME question with the per-coin mmf
                     # clip engaged, which is the one that governs. Three
                     # bases: the nominal stop, and — only when the overshoot
                     # sample clears OVERSHOOT_MIN_N — where this book's fills

@@ -112,6 +112,43 @@ def _ensemble_rows_publishing() -> bool:
 
 CARRIED = [
     {
+        "id": "market-context-realerts-a-retired-books-frozen-census",
+        "owner": "session",
+        "what": "(aba) THE SOURCE HALF OF THE FOSSIL-ALERT FIX IS NOT SHIPPED. "
+                "`market_context.fire_alerts` reads "
+                "`lighter-dislocation-lshadow` and fires one `disloc:<coin>` "
+                "alert per census entry with NO age check on the publisher -- "
+                "content before liveness, which is I1 -- and `_alert`'s dedup "
+                "refreshes `last_seen` on every hit, so `fleet_immune."
+                "alert_fossils`' age arm can never reach them. 🧲 Snap Back "
+                "was retired 4-Aug (jh); its census has been frozen since, "
+                "and it was still manufacturing 19 fresh alerts a day five "
+                "weeks later. MEASURED on the 10-Sep evidence review: 19 of "
+                "23 verdict rows were that one dead book repeating one "
+                "sentence. TWO layers shipped today -- the antibodies that "
+                "neutralise it in the bloodstream (`fleet_immune.ANTIBODIES`, "
+                "aim-tested against the publisher's own format strings) and "
+                "the render-side fold that stops the report being 83% fossil "
+                "-- and BOTH are downstream of a source that keeps lying.",
+        "why_open": "The source fix is an age gate at that read, in "
+                    "`market_context.py`, which is a SHIPPED service: it "
+                    "needs the publisher's `updated` stamp read and a bar "
+                    "chosen, then a deploy and a payload readback, which is "
+                    "more than an antibody costs and was not done in the pass "
+                    "that found it. The same `_alert` shape appears at SIX "
+                    "other call sites in that file, so the honest fix is the "
+                    "CLASS (a freshness gate every alert source passes "
+                    "through), not a seventh instance. Closes when "
+                    "`market_context.py` reads the publisher's age before its "
+                    "census and the CHANGELOG records it -- at which point "
+                    "the two antibodies can be deleted and this row with them.",
+        # Closes when the SOURCE reads the publisher's age. Keyed on the
+        # CHANGELOG rather than on market_context's source, so a half-edit
+        # that adds the words without shipping the behaviour cannot close it.
+        "closes_when": lambda: _has("CHANGELOG.md",
+                                    "fossil-alert source gate READ:"),
+    },
+    {
         "id": "offered-set-feed-window-caps-the-only-powered-search",
         "owner": "session",
         "what": "(aaq) THE CHEAPEST LARGE WIDENING AVAILABLE TO THIS FLEET, "

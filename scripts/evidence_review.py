@@ -1616,6 +1616,110 @@ def preserve_existing_report(path):
         return None
 
 
+def cadence_gap_line():
+    """-> the one-line cadence header, or None when there is nothing to say.
+
+    [2026-09-11] The review compares against "yesterday's report" and never
+    checked that yesterday's report EXISTS. Measured 4-Aug..10-Sep: this job
+    produced 20 reports in 38 days and the daily brief 18 — so roughly half
+    the time "since yesterday" silently meant "since some day last week", and
+    no report ever said so. Fail-soft and QUIET when current: a header that
+    fires every day is a header nobody reads ((gl)).
+    """
+    try:
+        import review_cadence
+        return quiet_when_current(review_cadence.gap_line(review_cadence.survey()))
+    except Exception:                                             # noqa: BLE001
+        return None
+
+
+def quiet_when_current(line):
+    """-> the cadence line, or None when every routine is current.
+
+    Split out from the I/O so it can be DRIVEN: as one expression inside a
+    function that surveys the live filesystem, the "say nothing when healthy"
+    branch was untestable, and a mutation round confirmed it — deleting the
+    quiet half survived the whole suite. A header that fires every single day
+    is a header nobody reads ((gl)), so this branch is the whole point.
+    """
+    if not line or line.startswith("CADENCE: all"):
+        return None
+    return line
+
+
+def carried_rows():
+    """-> [(id, owner, done, why_open)] from the DERIVED handoff, or [].
+
+    THE CARRIED LIST IS NOT WRITTEN DOWN HERE, deliberately. I11's enforcement
+    (`scripts/session_state.CARRIED`) already owns it, evaluates a
+    `closes_when` predicate per row against the repo, and reddens CI on a row
+    that is finished. The review prompt kept a SECOND, hand-maintained list —
+    last refreshed 4-Aug, still naming books retired since — which is the
+    "second copy of a rule is a second rule" defect ((hj)) applied to the
+    fleet's own to-do list. Reading the derived one means a carried item can
+    never again silently disappear from a daily report, which is the single
+    failure mode Eamon has asked about most.
+    """
+    try:
+        import session_state
+        return [(it["id"], it.get("owner", "?"), done,
+                 (it.get("why_open") or "").strip())
+                for it, done in session_state.carried_status()]
+    except Exception:                                             # noqa: BLE001
+        return []
+
+
+#: How many verdicts must share one cause before the REPORT collapses them.
+#: 3 is deliberately low: two rows reading the same sentence is already a
+#: table the eye skips, and the whole cost of this defect was a reader who
+#: stopped reading the section.
+COLLAPSE_MIN = 3
+
+
+def collapsed_verdict_rows(verdicts):
+    """Render the verdicts table with same-cause rows folded into one.
+
+    [2026-09-11] MEASURED on the 10-Sep report: **19 of 23 rows** were the
+    SAME 40-word sentence — `disloc:*`/`census:*` alerts all stale for the one
+    reason, that 🧲 Snap Back was retired on 4-Aug. The table has read like
+    that every day for five weeks, so the review's most prominent section is
+    83% one fossil, and the two rows that matter (a live-money recovery, an
+    active slip veto) sit underneath it.
+
+    THE FIX IS IN THE RENDERER, NOT THE PAYLOAD, and that boundary is the
+    point: `payload["verdicts"]` is a per-key CONSUMER CONTRACT (the dashboard
+    reads it, `upsert` publishes it), so folding there would silently change
+    what every consumer sees. A report is for a human; a payload is for a
+    machine. Only the human artifact had the problem.
+
+    Grouping is by (status, note) — the note already names the cause and the
+    object to act on (I8), so an identical note IS the same finding. Groups
+    below `COLLAPSE_MIN` render unchanged, because collapsing two rows hides
+    one key and saves nothing.
+    """
+    groups, order = {}, []
+    for v in verdicts:
+        k = (v["status"], v["note"])
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(v["key"])
+    rows = []
+    for k in order:
+        status, note = k
+        keys = groups[k]
+        if len(keys) < COLLAPSE_MIN:
+            rows += [f"| {key} | {status} | {note} |" for key in keys]
+            continue
+        # Name enough keys that the operator can find them, then say how many
+        # more there are — a truncation that does not announce itself is the
+        # (qz) defect, and here it would hide which books are affected.
+        shown = ", ".join(f"`{x}`" for x in keys[:4])
+        more = f" +{len(keys) - 4} more" if len(keys) > 4 else ""
+        rows.append(f"| **{len(keys)} keys** ({shown}{more}) | {status} | {note} |")
+    return rows
+
+
 def write_report(payload, repo_root):
     day = report_day(payload["reviewed_at"])
     path = os.path.join(repo_root, "reports", f"evidence_review_{day}.md")
@@ -1623,6 +1727,13 @@ def write_report(payload, repo_root):
     act = action_items(payload["new_evidence"])
     lines = [f"# Evidence Review — {day}", "",
              f"_Reviewed {sydney_stamp(payload['reviewed_at'])}._", ""]
+    gap = cadence_gap_line()
+    if gap:
+        # I1 at the level of the REVIEW ITSELF: before interpreting "since
+        # yesterday", establish that yesterday's report exists.
+        lines += [f"> ⏱️ **{gap}** — this report's "
+                  f"\"since the last review\" window is WIDER than one day; "
+                  f"say so and cover the gap.", ""]
     if act:
         lines += ["## ⚠️ ACTION — needs an operator decision", ""]
         lines += [f"- {e}" for e in act] + [""]
@@ -1630,10 +1741,41 @@ def write_report(payload, repo_root):
         lines += ["## ⚠️ Sections that failed (review still published)", ""]
         lines += [f"- `{e}`" for e in payload["errors"]] + [""]
     lines += ["## Verdicts", "", "| Key | Status | Why |", "|-----|--------|-----|"]
-    lines += [f"| {v['key']} | {v['status']} | {v['note']} |" for v in payload["verdicts"]]
+    lines += collapsed_verdict_rows(payload["verdicts"])
     lines += ["", "## New evidence", ""]
     lines += [f"- {e}" for e in payload["new_evidence"]]
     lines += ["", "## Summary", "", payload["summary"], ""]
+
+    # ---- THE DELIVERABLE, EMITTED BY THE SCRIPT (2026-09-11) --------------
+    # Eamon, 6-Sep: "suggestions on improvement permanently every day also
+    # please." Until now that section existed only if the model wrote it by
+    # hand AFTER this file was written — so a run that died between the script
+    # and the human layer produced a report with the deliverable MISSING, and
+    # the carried-forward half (the part he asks about most) had no mechanical
+    # source at all. The script cannot invent a suggestion; it CAN guarantee
+    # the section exists, carry the derived items forward, and make an unfilled
+    # section visibly unfinished rather than absent.
+    lines += ["## 📈 OPTIONS TO OPTIMISE", ""]
+    carried = carried_rows()
+    if carried:
+        lines += ["**Carried (derived from `scripts/session_state.py` -> "
+                  "HANDOFF.md — I11: start from this list, not from what is "
+                  "most interesting):**", "",
+                  "| Item | Owner | Predicate |", "|---|---|---|"]
+        for cid, owner, done, _why in carried:
+            state = "**CLOSE THIS** (predicate passes)" if done else "still open"
+            lines += [f"| `{cid}` | {owner} | {state} |"]
+        lines += [""]
+    else:
+        lines += ["_Carried list unavailable (`session_state` did not import) "
+                  "— say so in the human layer rather than omitting it._", ""]
+    lines += ["**Ranked suggestions — the human layer adds at least THREE "
+              "here, each with the lever/change, its current value and bound, "
+              "the measured evidence, the expectancy price, and an OWNER. "
+              "Fewer than three ⇒ say what was checked and rejected, with the "
+              "number that killed each.**", "",
+              "- [ ] 1.", "- [ ] 2.", "- [ ] 3.", ""]
+
     if kept:
         # A silent rename is the same class of defect as the silent overwrite
         # it replaces: the operator must be able to find the annotations.
@@ -1786,6 +1928,33 @@ def selftest():
         "CENSUS_STALE_H must be tighter than the incident it exists to catch"
 
     # the operator-facing note names the object to act on (I8)
+    # ---- the verdicts table folds same-cause rows (2026-09-11) ------------
+    # Measured on the 10-Sep report: 19 of 23 rows were one retired book's
+    # fossil. The PAYLOAD must keep every key (consumer contract); only the
+    # rendered table folds.
+    _many = [{"key": f"disloc:{c}", "status": "stale", "note": "census dark"}
+             for c in ("AVAX", "BIO", "GMX", "KAITO", "NEAR", "WTI")]
+    _few = [{"key": "veto:AI", "status": "active", "note": "slip 33.9bps"},
+            {"key": "factor-sample:23", "status": "active", "note": "n=704"}]
+    _rows = collapsed_verdict_rows(_many + _few)
+    assert len(_rows) == 3, f"6 same-cause rows must fold to 1: {_rows}"
+    assert "**6 keys**" in _rows[0], _rows[0]
+    assert "+2 more" in _rows[0], "a truncation must announce itself ((qz))"
+    assert "`disloc:AVAX`" in _rows[0], "the operator must still find the books"
+    assert any("veto:AI" in r for r in _rows[1:]), "distinct causes stay separate"
+    # BELOW the floor nothing folds — collapsing two rows hides a key for free
+    _pair = [{"key": "a", "status": "stale", "note": "x"},
+             {"key": "b", "status": "stale", "note": "x"}]
+    assert len(collapsed_verdict_rows(_pair)) == 2, "2 < COLLAPSE_MIN stays open"
+    # and the fold NEVER touches the payload the dashboard reads
+    assert len(_many + _few) == 8, "fixture intact"
+
+    # ---- the cadence header is QUIET when every routine is current --------
+    assert quiet_when_current("CADENCE: all review routines current.") is None
+    assert quiet_when_current("CADENCE GAP — 📨 daily P&L brief 2 periods "
+                              "behind") is not None
+    assert quiet_when_current("") is None and quiet_when_current(None) is None
+
     _note = census_dark_note(23.5)
     assert "lighter-dislocation-lshadow" in _note, "name the publisher"
     assert "23.5h" in _note and "retired" in _note
