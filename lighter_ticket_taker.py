@@ -1574,6 +1574,55 @@ def _close_fill_extra(out, measured, fill_reason):
     return out
 
 
+#: [(aao)] The ticket fields the close row carries. SIX were captured and the
+#: ticket publishes ELEVEN — see `entry_evidence` for what the gap cost.
+EV_KEYS_BASE = ("range_pos", "chg_pct", "vol_m", "prem_bps", "apr_pct",
+                "gap_pct")
+#: Added (aao). Omitted when the ticket does not carry them, because ABSENT is
+#: UNKNOWN — the convention `peak_ret`/`give_back` already use.
+EV_KEYS_ADDED = ("regime", "noncrypto", "trend", "lighter_apr", "xvenue_apr")
+
+
+def entry_evidence(t):
+    """The entry-time evidence a close row carries, from its ticket. Pure.
+
+    [2026-09-11 (aao)] THE CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS
+    ELEVEN — `(di)`'s defect one turn later, on different fields. `(di)` added
+    brk_quality/up_strength "so winning criteria can be DERIVED from realized
+    closes" and recorded the price of the gap in its own words: *"the first 6
+    breakoutup closes shipped without their features (unrecoverable from the
+    ledger)."* A feature that exists at the entry site and never reaches the
+    ledger is one no grader can ever condition on, and no later session can
+    recover it.
+
+    Measured 11-Sep over 8.3d of scout tape (2,768 ticket episodes): EVERY
+    lens publishes `regime` — the per-asset oracle verdict, `{"dir": ±1|0,
+    "v": "LONG-window"|"SHORT-window"|"dir-flat"|"chop-gated"}` — and NOT ONE
+    of this book's 304 closes carries it. That is the conditioning variable
+    item 18 says the fleet most needs: the whole Lighter tape is a single
+    falling-BTC regime, so a directional grade is a grade in that regime only.
+
+    EXTRACTED AS A PURE FUNCTION rather than left inline, for the reason
+    `_close_extra` is one: a mutation of an inline dict comprehension inside
+    `main()`'s entry loop SURVIVED its own test round, because the test built
+    the dict itself instead of driving the call site.
+
+    The six BASE keys keep their exact prior shape — a breakout close still
+    stamps `gap_pct: null` — so no existing consumer's `in extra` test changes
+    meaning. `side` is deliberately absent: the close tag already carries it,
+    and a second spelling of a field graders key on is the (xe) trap.
+
+    OBSERVABLE-ONLY. Nothing branches on the result.
+    """
+    t = t if isinstance(t, dict) else {}
+    ev = {k: t.get(k) for k in EV_KEYS_BASE}
+    for k in EV_KEYS_ADDED:
+        v = t.get(k)
+        if v is not None:
+            ev[k] = v
+    return ev
+
+
 def _close_extra(m):
     """The close row's extra: the governing bars stamp PLUS the entry-time
     evidence. Pure — selftested.
@@ -3057,18 +3106,7 @@ def main(_ctx=None):
             # decision reads them. `side` is deliberately NOT captured — the
             # close tag already carries it, and a second spelling of a field
             # graders already key on is the (xe) trap.
-            ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
-                                        "prem_bps", "apr_pct", "gap_pct")}
-            # The NEW keys are added only when the ticket actually carries
-            # them, so the six above keep their exact prior payload shape
-            # (a breakout close still stamps `gap_pct: null`) and no existing
-            # consumer's `in extra` test changes meaning. Absent = UNKNOWN,
-            # the convention `peak_ret`/`give_back` already use.
-            for _k in ("regime", "noncrypto", "trend",
-                       "lighter_apr", "xvenue_apr"):
-                _v = t.get(_k)
-                if _v is not None:
-                    ev[_k] = _v
+            ev = entry_evidence(t)
             # [2026-07-24 (di)] capture the scanner-sidekick features for a
             # breakout entry (stashed by the bull gate above) so the close row
             # carries them — the raw material for DERIVING the winning criteria.

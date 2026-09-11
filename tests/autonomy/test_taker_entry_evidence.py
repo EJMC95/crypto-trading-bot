@@ -50,55 +50,48 @@ OLD = ("range_pos", "chg_pct", "vol_m", "prem_bps", "apr_pct", "gap_pct")
 
 
 def _ev_source():
-    """The entry site's evidence construction, as source."""
     src = (ROOT / "lighter_ticket_taker.py").read_text()
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and len(node.targets) == 1 \
-                and getattr(node.targets[0], "id", None) == "ev" \
-                and isinstance(node.value, ast.DictComp):
-            return tree, src
-    raise AssertionError("the entry-site `ev = {...}` comprehension is gone")
+    return ast.parse(src), src
 
 
 def test_the_six_original_keys_are_still_captured_verbatim():
-    """Mutation: drop any of the six => red. Their payload shape must not
-    move, because consumers already test `in extra` on them."""
-    _tree, src = _ev_source()
-    i = src.index('ev = {k: t.get(k) for k in (')
-    seg = src[i:i + 400]
+    """DRIVEN, not grepped. Their payload shape must not move: consumers
+    already test `in extra` on them, and a breakout ticket with no gap_pct
+    must still stamp `gap_pct: null`.
+
+    Mutation: drop any of the six from EV_KEYS_BASE => red.
+    """
+    ev = tt.entry_evidence(TICKET)
     for k in OLD:
-        assert f'"{k}"' in seg, f"{k} dropped from the entry capture: {seg}"
+        assert k in ev, f"{k} dropped from the entry capture: {ev}"
+    bare = tt.entry_evidence({"sym": "AAA"})
+    assert set(bare) == set(OLD) and bare["gap_pct"] is None, bare
 
 
 def test_the_regime_verdict_reaches_the_close_row():
-    """THE point of the entry. Mutation: remove `regime` from the NEW loop,
-    or drop the loop => red."""
-    _tree, src = _ev_source()
-    assert '"regime"' in src[src.index('ev = {k: t.get(k)'):][:900], \
-        "regime is not captured at the entry site"
+    """THE point of the entry, driven end to end: ticket -> entry_evidence ->
+    _close_extra. Mutation: drop "regime" from EV_KEYS_ADDED => red."""
+    out = tt._close_extra({"bars": {"tp": 0.04, "sl": -0.07, "max_hold_h": 24},
+                           "evidence": tt.entry_evidence(TICKET)})
+    assert out["regime"] == {"dir": 1, "v": "LONG-window"}, out
 
 
 @pytest.mark.parametrize("key", NEW)
 def test_each_new_field_reaches_the_close_extra(key):
     """Driven through the REAL `_close_extra`, not grepped — the (di) failure
     was that the capture stopped short of the ledger row."""
-    ev = {k: TICKET.get(k) for k in OLD}
-    for k in NEW:
-        if TICKET.get(k) is not None:
-            ev[k] = TICKET[k]
     out = tt._close_extra({"bars": {"tp": 0.04, "sl": -0.07,
-                                    "max_hold_h": 24}, "evidence": ev})
+                                    "max_hold_h": 24},
+                           "evidence": tt.entry_evidence(TICKET)})
     assert out[key] == TICKET[key], out
 
 
 def test_side_is_deliberately_not_captured():
     """The tag carries it. A second spelling of a field graders key on is the
-    (xe) one-position-two-spellings trap."""
-    _tree, src = _ev_source()
-    i = src.index('ev = {k: t.get(k) for k in (')
-    assert '"side"' not in src[i:i + 900], \
-        "side must not become a second spelling of the close tag"
+    (xe) one-position-two-spellings trap. The TICKET carries side='short';
+    the evidence must not."""
+    assert TICKET["side"] == "short"
+    assert "side" not in tt.entry_evidence(TICKET)
 
 
 def test_evidence_can_never_clobber_the_bars_or_policy_stamp():
@@ -117,20 +110,41 @@ def test_an_absent_new_field_is_omitted_not_stamped_null():
     """Absent is UNKNOWN — the convention `peak_ret`/`give_back` already use,
     and the reason a grader must not read a missing regime as 'no regime'.
     Mutation: stamp None for a missing key => red."""
-    ev = {k: TICKET.get(k) for k in OLD}
-    ev["regime"] = {"dir": 0, "v": "dir-flat"}     # trend/apr pair absent
+    thin = {k: TICKET[k] for k in ("sym", "range_pos", "chg_pct", "vol_m",
+                                   "prem_bps", "apr_pct")}
+    thin["regime"] = {"dir": 0, "v": "dir-flat"}   # trend/apr pair absent
     out = tt._close_extra({"bars": {"tp": 0.04, "sl": -0.07,
-                                    "max_hold_h": 24}, "evidence": ev})
+                                    "max_hold_h": 24},
+                           "evidence": tt.entry_evidence(thin)})
     assert "trend" not in out and "lighter_apr" not in out, out
     assert out["regime"]["v"] == "dir-flat"
 
 
 def test_the_capture_changes_no_decision():
-    """Observable-only. The entry site's evidence dict must not be read by
-    any gate: assert it is only ever WRITTEN into meta/raw, never branched on.
-    """
+    """Observable-only. The entry site must only ever WRITE `ev` into
+    meta/raw, never branch on it."""
     _tree, src = _ev_source()
-    i = src.index('ev = {k: t.get(k) for k in (')
+    i = src.index("ev = entry_evidence(t)")
     after = src[i:i + 4000]
-    for bad in ("if ev", "if not ev", "ev.get(", "ev[\"regime\"]"):
+    for bad in ("if ev", "if not ev", "ev.get("):
         assert bad not in after, f"the evidence dict is being READ: {bad!r}"
+
+
+def test_the_call_site_ASKS_the_owner_and_never_rebuilds_the_dict():
+    """The mutation that survived round one: an inline dict comprehension in
+    `main()` is not reachable by a test that builds the dict itself. The call
+    site must CALL `entry_evidence`.
+
+    Mutation: inline the comprehension again at the call site => red.
+    """
+    tree, _src = _ev_source()
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "main")
+    calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+             and getattr(n.func, "id", None) == "entry_evidence"]
+    assert calls, "main() no longer asks entry_evidence for the capture"
+    assigns = [n for n in ast.walk(fn) if isinstance(n, ast.Assign)
+               and len(n.targets) == 1
+               and getattr(n.targets[0], "id", None) == "ev"]
+    assert assigns and all(isinstance(a.value, ast.Call) for a in assigns), \
+        "the entry site must CALL the owner, never rebuild the dict inline"
