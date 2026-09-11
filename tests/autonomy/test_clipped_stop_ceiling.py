@@ -1,6 +1,6 @@
 """The ceiling the mmf clip ACTUALLY enforces, and the pager that reads it.
 
-INCIDENT (2026-09-11 (aau)). Eamon raised 👩 mum's gross 5.0x -> 9.5x. The
+INCIDENT (2026-09-11 (aaw)). Eamon raised 👩 mum's gross 5.0x -> 9.5x. The
 immune organ paged `protective stop is DEAD at gross 9.5 (ceiling 4.17) —
 liquidation fires before the stop`, and it fired on ~14.5 of ~99 cycles that
 day. The number is real and the verdict is wrong: **4.17 is the CLIP-OFF
@@ -106,7 +106,7 @@ def test_a_mixed_basket_is_bound_by_the_reference_tier_not_the_worst_coin():
 
 def test_every_tier_at_or_above_the_clip_reference_collapses_to_one_ceiling():
     """The clip equalises them — so the binding basket is the REF tier, not
-    the highest-margin one, which is the counter-intuitive half of (aau)."""
+    the highest-margin one, which is the counter-intuitive half of (aaw)."""
     stop = STOP
     ref = host.clipped_stop_ceiling(host.MMF_CLIP_REF, stop)
     for m in (0.075, 0.12, 0.20, 0.30, 0.50):

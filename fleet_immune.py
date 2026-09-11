@@ -705,7 +705,7 @@ def headroom_sickness(bot_rows, ok=None):
                                       f"(ceiling {lev.get('stop_dead_above_held')}, "
                                       f"mmf_held {lev.get('mmf_held')}) — "
                                       f"liquidation fires before the stop"})
-        # [(aau)] THE CLIP-ON VERDICT SITS BETWEEN THE HELD MEASUREMENT AND
+        # [(aaw)] THE CLIP-ON VERDICT SITS BETWEEN THE HELD MEASUREMENT AND
         # THE CLIP-OFF BOUND. `stop_reachable` below is computed with the
         # per-coin mmf clip DISENGAGED, so on a levered book it is False by
         # CONFIGURATION — I7's "a trigger a book satisfies structurally is
@@ -731,7 +731,7 @@ def headroom_sickness(bot_rows, ok=None):
               # [(aas)] ...and the book actually holds something. See
               # `_book_flat` above: the bound describes a basket, so an empty
               # book cannot fail it.
-              # [(aau)] Reaching this limb already IMPLIES `_eff is None`:
+              # [(aaw)] Reaching this limb already IMPLIES `_eff is None`:
               # the clip-ON branch above claims every row that publishes it,
               # and its two escapes (`stop_dead` allowed, book flat) are both
               # re-tested here. An explicit `and _eff is None` was written,
@@ -746,7 +746,7 @@ def headroom_sickness(bot_rows, ok=None):
                                   f"{lev.get('set')} (ceiling "
                                   f"{lev.get('stop_dead_above')}) — "
                                   f"liquidation fires before the stop"})
-        # [(aau)] AND AN UNKNOWN MUST NOT READ HEALTHY (I1/I4). Every limb
+        # [(aaw)] AND AN UNKNOWN MUST NOT READ HEALTHY (I1/I4). Every limb
         # above fires only on `is False`, so when `fleet_bus.market_margins()`
         # is dark EVERY stop verdict degrades to None and this organ went
         # SILENT — on precisely the state that means "I cannot tell whether

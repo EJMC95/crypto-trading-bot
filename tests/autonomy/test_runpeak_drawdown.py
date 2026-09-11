@@ -1,6 +1,6 @@
 """The maxDD bar's numerator and denominator must be the same object.
 
-INCIDENT (2026-09-11 (aau)). `mtm_drawdown` finds the max dollar hole against
+INCIDENT (2026-09-11 (aaw)). `mtm_drawdown` finds the max dollar hole against
 a RUNNING peak and then divides it by the GLOBAL peak. On a series that later
 exceeds the peak the hole opened at — every book that took a DEPOSIT — that
 understates, and `apply_mtm` makes the field THE BAR while `fleet_bus.dd_scale`

@@ -903,7 +903,7 @@ def veto_split(rows, vetoed, tag_of=None):
     return out
 
 
-#: [2026-09-11 (aau)] THE BAND A COIN FLIP PAYS ON THIS VENUE, measured at
+#: [2026-09-11 (aaw)] THE BAND A COIN FLIP PAYS ON THIS VENUE, measured at
 #: `(hm)` on 30-Jul and doctrine ever since: *"on this venue a random short
 #: earns +0.2% to +1.1%/trade for free."* Not a bar and not the null itself —
 #: the band the null was measured to occupy.
@@ -914,7 +914,7 @@ def null_band(s, bot, book_class=None):
     """Does this DIRECTIONAL book's mean sit inside the band a RANDOM entry
     pays on this venue? REPORTED, never a bar.
 
-    [(aau)] WHY THE GATE NEEDED THIS, and it is the fleet's own doctrine
+    [(aaw)] WHY THE GATE NEEDED THIS, and it is the fleet's own doctrine
     catching up with its own grader. CLAUDE.md has said since 30-Jul:
     **"GRADE A DIRECTIONAL BOOK AGAINST A RANDOM-ENTRY BENCHMARK, NEVER
     AGAINST ZERO (hm)... A positive mean is not an edge on a trending tape."**
@@ -2185,7 +2185,7 @@ def mtm_drawdown(samples, book_usd=None):
     book_usd = BOOK_USD if book_usd is None else book_usd
     peak = pts[0][1]
     dd = 0.0
-    # [2026-09-11 (aau)] ...and the RUNNING-PEAK RATIO, in the same pass.
+    # [2026-09-11 (aaw)] ...and the RUNNING-PEAK RATIO, in the same pass.
     # `max_dd_frac_peak` below divides this loop's running-peak dollar hole by
     # the GLOBAL peak — numerator and denominator are different objects, and
     # on a book whose equity later exceeds the peak the hole opened at (every
@@ -2236,7 +2236,7 @@ def mtm_drawdown(samples, book_usd=None):
             # handed already contains its own peak. None when that peak is
             # non-positive, never 0.0 (I8: unknown degrades to unknown).
             "max_dd_frac_peak": (abs(dd) / peak_eq) if peak_eq > 0 else None,
-            # [(aau)] REPORTED, NEVER A BAR — `apply_mtm`, `grade` and
+            # [(aaw)] REPORTED, NEVER A BAR — `apply_mtm`, `grade` and
             # `bar_map` are byte-unchanged by this commit, exactly as (kw) put
             # `cluster` beside `t` and (yr) put `max_dd_frac_peak` beside the
             # $1,000 reading. Switching onto it fails BOTH real-money books
@@ -3462,7 +3462,7 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "live_fillable": ((c.get("live_fillable") or {})
                               if (c.get("live_fillable") or {}).get("why")
                               else None),
-            # [(aau)] and the random-band screen, same rule: only when it is
+            # [(aaw)] and the random-band screen, same rule: only when it is
             # decision-relevant (a directional book INSIDE the band).
             "null_band": ((c.get("null_band") or {})
                           if (c.get("null_band") or {}).get("why")
@@ -3576,7 +3576,7 @@ def book_payload(s):
             "max_dd_pct_peak": (round(100 * _m["max_dd_frac_peak"], 2)
                                 if _m.get("max_dd_frac_peak") is not None
                                 else None),
-            # [(aau)] the running-peak reading, published so the size of the
+            # [(aaw)] the running-peak reading, published so the size of the
             # correction is visible BEFORE anything acts on it. `book_payload`
             # rebuilds a hand-picked whitelist rather than serialising `mtm`,
             # so a field added to `mtm_drawdown` alone would never reach a
@@ -3716,7 +3716,7 @@ def book_payload(s):
     # [(aan)] REPORTED beside, never a bar — see `live_fillable`.
     if isinstance(s.get("live_fillable"), dict):
         out["live_fillable"] = s["live_fillable"]
-    # [(aau)] same footing: the random-entry screen the bars cannot apply.
+    # [(aaw)] same footing: the random-entry screen the bars cannot apply.
     if isinstance(s.get("null_band"), dict):
         out["null_band"] = s["null_band"]
     return out
@@ -5070,7 +5070,7 @@ def main():
         s["live_fillable"] = live_fillable(
             ed.get("scoped_rows") or [], _live_policy.get(bot),
             vetoed=_lens_veto.get(bot))
-        # [(aau)] and the screen the SIX BARS structurally cannot apply: they
+        # [(aaw)] and the screen the SIX BARS structurally cannot apply: they
         # test against ZERO, and (hm) has said since 30-Jul that a DIRECTIONAL
         # book is graded against a random-entry benchmark, never against zero.
         s["null_band"] = null_band(s, bot)
