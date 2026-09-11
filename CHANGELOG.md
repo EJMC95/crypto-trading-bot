@@ -528,6 +528,34 @@ neither package is a Railway service. `session_state.CARRIED` holds
 `ensemble-rows-registered-but-unpublished`, owner **OPERATOR**, closing when either row
 appears on the live feed. An empty registration costs nothing precisely because it is not
 in `EXPECTED`.
+
+**[SAME DAY — A CARRIED ROW WAS EATEN BY MY OWN MERGE, AND NEITHER AUDIT ARM COULD SEE
+IT.]** Resolving the conflict between main's two new carried rows and mine, the `},{`
+between one of theirs and mine was dropped. **Python then read the pair as ONE dict
+literal, the later `"id"` won, and their row was silently absorbed** — the file PARSED,
+`--check` reported *"21 carried item(s), none stale, none orphaned"*, and `HANDOFF.md`
+simply did not mention it. **22 rows went in, 21 came out, and every guard agreed.**
+
+Neither existing arm can see this **by construction**: `stale` asks whether a row's
+predicate says it is done and `orphan` asks whether its subject retired — both computed
+FROM the list, so a row that is GONE is invisible to them.
+
+**THE NEW ARM COMPARES THE SOURCE TO THE PARSE.** Every row's id is a literal in the
+file; if the text declares more ids than `CARRIED` holds, a row was absorbed. No constant
+to keep in step. **And it runs FIRST** — `stale` and `orphan` are computed from this
+list, so running them on a malformed one yields confident verdicts about the wrong rows.
+Structure before content.
+
+**MY FIRST VERSION OF THE ARM WAS VACUOUS AND THE MUTATIONS SAID SO.** It looked for
+DUPLICATE IDS — but a merged dict has none: Python keeps the last value for every key, so
+the eaten row leaves no duplicate and no empty field. Reproducing the real defect ran
+**GREEN** straight through it. The selftest now **runs the real guard against a planted
+defect** in a subprocess on a temp copy rather than re-implementing the check, which was
+the only way to kill the vacuity mutations — on a healthy list a correct guard and a
+hollow one are byte-identical. **3 of 3 killed** where the hand-rolled version killed
+**0 of 2**. This is I3 in its purest form, on a guard written minutes earlier.
+  ENFORCED BY: `scripts/session_state.py::_source_row_count`,
+  `scripts/session_state.py::selftest`
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —
