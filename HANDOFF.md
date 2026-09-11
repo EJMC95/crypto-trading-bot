@@ -1,14 +1,13 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 12:26 Sydney (02:26Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 14:37 Sydney (04:37Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` was shut **30% of the last 14.5d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
-- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (67h), mostly `slguard` (47h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-avo-maria-lighter` was shut **30% of the last 14.6d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **19% of the last 14.6d** (68h), mostly `slguard` (48h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -134,9 +133,12 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (49 commit(s))
+## Shipped today (52 commit(s))
 
+- `23628d1` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `0d779e6` (aba) the five routines that review this fleet were the one thing it did not instrument
 - `03e74b0` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `09488a1` (aaw) fix 17 stale self-citations: the code said (aau), which is another session's entry
 - `a3c2517` (aao) CodeQL's eleven warnings triaged — and one was a test that proved nothing
 - `85942dc` (aao) repoint the enforcement reference at the renamed guard
 - `a4a0688` [deploy-live-mum] (aaw) the drawdown bar's two peaks, and the stop-death pager's clip-OFF ceiling — both published beside, neither switched

@@ -10,7 +10,8 @@ PROJECT_DIR = /Users/eamonjuaomartins-carrick/Claude/Projects/Crypto Trading Bot
 ## SLOT SCOPE (tighter than the repo's, on purpose)
 
 READ-ONLY on the fleet: no trades, no `dry_run`/keys/lever/config changes, no
-deploys, no pushes. This is an unattended reporting slot's scope, **not the
+deploys, no pushes EXCEPT the one that commits this run's own report
+(see the last section). This is an unattended reporting slot's scope, **not the
 repo's doctrine** — CLAUDE.md delegates much more to an interactive session.
 Do not carry it out of this slot.
 
@@ -117,3 +118,19 @@ Sydney-local times, labelled. Real money outranks paper in every ordering.
 Shadow books are paper; not financial advice. Go-live, retirements and every
 real-money change are explicit operator acts — recommend with the exact
 command or lever named, never execute.
+
+**THE REPORT IS A TRACKED FILE NOW — COMMIT IT.** `reports/*.md` went into git
+on 11-Sep (Eamon: *"track the rest too"*), so a report left sitting
+uncommitted is a DIRTY TRACKED FILE in a checkout other sessions share, and
+the next `git commit` anywhere near it sweeps your report into their commit
+under their subject — the (nx) class this repo has already paid for. Commit
+yours, by explicit path, and push only that:
+
+```
+python3 scripts/session_commit.py reports/weekly_verdict_<monday>.md -m "weekly verdict — <monday>"
+git fetch origin && git rebase origin/main && git push origin HEAD:main
+```
+
+This is the ONE push this slot makes: it publishes your own artifact and
+touches nothing else. If the rebase conflicts, another routine wrote the same
+day — keep BOTH files, never resolve by dropping one.

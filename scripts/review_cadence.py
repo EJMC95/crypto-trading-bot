@@ -91,25 +91,27 @@ REPORTS = os.path.join(ROOT, "reports")
 def reports_dir_resolved(root=ROOT):
     """-> the directory the routines actually WRITE to, from any worktree.
 
-    `reports/` is gitignored, so a session working in one of this repo's
-    per-session worktrees (now the default, (oe)) sees an EMPTY `reports/`
-    while every real report sits in the main checkout. Measured the hour this
-    shipped: run from a worktree, the first version reported all five routines
-    "no output of this kind has ever been seen here" — a false alarm on the
-    first run, which is precisely how a detector teaches its reader to ignore
-    it ((gl)).
+    THE MAIN CHECKOUT WINS, ALWAYS. A report is an OPERATOR-level artifact on
+    a clock — "did the 08:07 brief run today?" — not a property of whatever
+    branch a session happens to be on, and the routines write into the main
+    checkout. So this resolves the main worktree from git (never guessed) and
+    only falls back to the local path.
 
-    So: prefer a local `reports/` that actually holds reports, else the MAIN
-    worktree's (derived from git, never guessed), else fail closed to the
-    local path so the caller still gets UNKNOWN rather than a wrong answer.
+    THE ORDER WAS THE OTHER WAY ROUND FOR ONE DAY, and both orders were right
+    for their moment — which is the point worth keeping:
+      * while `reports/` was GITIGNORED, a per-session worktree (the default
+        since (oe)) had an EMPTY `reports/`, so "prefer local, else main" was
+        correct and the first live run from a worktree reported all five
+        routines "never seen" until it was added.
+      * once `reports/*.md` became TRACKED (11-Sep, Eamon: "track the rest
+        too"), every worktree checks out ~115 reports frozen at its branch
+        point — so "prefer local" would read a SNAPSHOT and invent gaps for
+        every report written since. A stale directory that looks populated is
+        worse than an empty one, because nothing about it reads as wrong.
+    Fail-closed either way: if neither resolves to a real directory the caller
+    gets UNKNOWN, never a clean bill.
     """
     local = os.path.join(root, "reports")
-    try:
-        if os.path.isdir(local) and any(
-                n.endswith(".md") for n in os.listdir(local)):
-            return local
-    except OSError:
-        pass
     try:
         import subprocess
         common = subprocess.run(
@@ -539,10 +541,19 @@ def _selftest():
     with tempfile.TemporaryDirectory() as wt:
         os.makedirs(os.path.join(wt, "reports"))
         assert reports_dir_resolved(wt) == os.path.join(wt, "reports"), \
-            "no git, no reports: fail closed to the local path"
+            "outside a git tree: fail closed to the local path"
+        # A POPULATED local dir must NOT win — once reports/*.md is tracked, a
+        # worktree's copy is a snapshot frozen at its branch point, and
+        # preferring it invents a gap for every report written since.
         open(os.path.join(wt, "reports", "daily_pnl_2026-09-10.md"), "w").close()
         assert reports_dir_resolved(wt) == os.path.join(wt, "reports"), \
-            "a local dir that HOLDS reports is preferred"
+            "no git here, so local is still the only answer"
+    # From THIS worktree (a real one), the resolver must reach the MAIN
+    # checkout, not the sibling copy under .claude/worktrees/.
+    _r = reports_dir_resolved()
+    assert "/.claude/worktrees/" not in _r, (
+        f"a worktree must read the main checkout's reports, not its own "
+        f"snapshot: {_r}")
 
     # -- the write gate ----------------------------------------------------
     try:

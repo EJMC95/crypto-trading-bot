@@ -49,6 +49,10 @@ MARKERS = ("[deploy-live]", "[deploy-live-taker]", "[deploy-live-georgia]",
 
 WORKFLOW = ".github/workflows/railway-redeploy.yml"
 
+#: The workflow that RUNS this guard. Its trigger is load-bearing for the
+#: guard itself, which is why it is named here and checked below.
+CHECK_WORKFLOW = ".github/workflows/changelog-check.yml"
+
 
 def markers_in(text):
     """The live markers present in `text`, as a set. Substring, exactly as the
@@ -76,6 +80,41 @@ def workflow_markers(path=WORKFLOW):
     except OSError:
         return None                      # not in a checkout — no claim
     return set(re.findall(r"\[deploy-live[a-z-]*\]", body))
+
+
+def reruns_on_title_edit(path=CHECK_WORKFLOW):
+    """Does the workflow that runs this guard re-run when a PR TITLE changes?
+
+    True / False, or None when there is no checkout to read (no claim).
+
+    THIS GUARD READS THE PULL REQUEST TITLE. GitHub's default
+    `pull_request` activity types are opened/synchronize/reopened — `edited`
+    is NOT among them — so without it a PR whose title is the very thing this
+    guard rejects can never re-run it by fixing that title. Measured on PR
+    #291: red at 12:46Z asking for the marker in the title, title corrected
+    three minutes later, check stayed red with no way to clear it short of an
+    empty push, which (hj)/(gl) forbid as a way to kick CI.
+
+    Line-shaped on purpose: requirements-test.txt carries no YAML library, and
+    this property is one key deep.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return None                      # not in a checkout — no claim
+    try:
+        start = next(i for i, ln in enumerate(lines)
+                     if re.fullmatch(r"  pull_request:\s*", ln))
+    except StopIteration:
+        return False                     # no pull_request trigger at all
+    for ln in lines[start + 1:]:
+        if re.match(r"  \S", ln):        # next 2-space key ends the block
+            break
+        m = re.match(r"\s+types:\s*\[(.*)\]\s*$", ln)
+        if m:
+            return "edited" in {t.strip() for t in m.group(1).split(",")}
+    return False                         # types: omitted => GitHub's defaults
 
 
 def _selftest():
@@ -113,6 +152,15 @@ def _selftest():
             ok = False
             print(f"FAIL MARKERS is missing {missing} — the workflow greps for "
                   f"them, so a PR carrying one would escape this guard")
+
+    # the workflow that runs this guard must re-run on a TITLE edit, or the
+    # guard's own remediation ("put the marker in the PR title") is unreachable
+    rerun = reruns_on_title_edit()
+    if rerun is False:
+        ok = False
+        print(f"FAIL {CHECK_WORKFLOW} does not list `edited` in its "
+              "pull_request types — this guard reads the PR TITLE, so a "
+              "corrected title could never re-run it (the PR #291 incident)")
 
     print("audit_live_marker_survives_squash --selftest:", "OK" if ok else "FAILED")
     return 0 if ok else 1

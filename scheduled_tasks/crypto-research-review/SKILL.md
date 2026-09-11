@@ -124,3 +124,19 @@ negation) — so commit it, and a refutation now survives a fresh clone.
 
 One hypothesis, finished, beats three started (I11). Sydney-local times.
 Not financial advice; go-live and real-money changes are operator acts.
+
+**THE REPORT IS A TRACKED FILE NOW — COMMIT IT.** `reports/*.md` went into git
+on 11-Sep (Eamon: *"track the rest too"*), so a report left sitting
+uncommitted is a DIRTY TRACKED FILE in a checkout other sessions share, and
+the next `git commit` anywhere near it sweeps your report into their commit
+under their subject — the (nx) class this repo has already paid for. Commit
+yours, by explicit path, and push only that:
+
+```
+python3 scripts/session_commit.py reports/expansion_research_log.md -m "expansion research — <date>"
+git fetch origin && git rebase origin/main && git push origin HEAD:main
+```
+
+This is the ONE push this slot makes: it publishes your own artifact and
+touches nothing else. If the rebase conflicts, another routine wrote the same
+day — keep BOTH files, never resolve by dropping one.

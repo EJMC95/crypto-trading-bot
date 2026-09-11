@@ -204,3 +204,19 @@ Where the headroom has actually been, in order:
 * No trading actions. No real-money deploys from this unattended slot.
 * Report honestly: if a section failed or a key could not be verified, say so
   rather than dropping it. Sydney-local times, labelled, never bare UTC.
+
+**THE REPORT IS A TRACKED FILE NOW — COMMIT IT.** `reports/*.md` went into git
+on 11-Sep (Eamon: *"track the rest too"*), so a report left sitting
+uncommitted is a DIRTY TRACKED FILE in a checkout other sessions share, and
+the next `git commit` anywhere near it sweeps your report into their commit
+under their subject — the (nx) class this repo has already paid for. Commit
+yours, by explicit path, and push only that:
+
+```
+python3 scripts/session_commit.py reports/evidence_review_<date>.md -m "evidence review — <date>"
+git fetch origin && git rebase origin/main && git push origin HEAD:main
+```
+
+This is the ONE push this slot makes: it publishes your own artifact and
+touches nothing else. If the rebase conflicts, another routine wrote the same
+day — keep BOTH files, never resolve by dropping one.

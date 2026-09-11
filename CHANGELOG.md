@@ -1,3 +1,168 @@
+## 2026-09-11 (abd) — THE WHOLE JUDGEMENT LAYER IS IN GIT NOW, AND TRACKING IT MOVED TWO THINGS THAT HAD TO MOVE WITH IT
+
+**Eamon, 11-Sep:** *"track the rest too"* — the call `(aba)` put to him after
+shipping only the research log and pricing the rest at 115 files / 1.3 MB.
+
+**WHAT WENT IN:** `reports/*.md` — 114 further files: every daily brief, every
+weekly verdict, every evidence review with its hand-written human layer, and
+the 15 `.superseded-*.md` backups, which are tracked DELIBERATELY because they
+exist only where `preserve_existing_report` refused to destroy an annotation on
+a re-run. Machine state under `reports/` stays ignored: `reports/*` never
+negates `.json`/`.py`/`.log`, so `brain_state.json` and the census logs do not
+follow.
+
+**SCANNED FIRST, TWICE AND INDEPENDENTLY, BECAUSE THE REPO IS PUBLIC.** A
+pattern grep for connection strings, API keys, private keys, bearer tokens and
+passwords over all 115 files found nothing, and `gitleaks --config
+.gitleaks.toml` over 1.43 MB reported no leaks. What these DO carry is
+real-money equity and per-book performance — the same class `CLAUDE.md` has
+published all along, so this is a decision rather than an accident, and it is
+recorded as one in `.gitignore` beside the negation.
+
+**TRACKING IT BROKE THE CADENCE RESOLVER, IN THE ONE DIRECTION THAT LOOKS
+HEALTHY.** `review_cadence.reports_dir_resolved` preferred a LOCAL `reports/`
+holding markdown, else the main checkout — correct while the directory was
+ignored, because a per-session worktree ((oe)) saw an empty one. The moment
+`reports/*.md` is tracked, every worktree checks out ~115 reports frozen at its
+branch point, so "prefer local" reads a SNAPSHOT and invents a gap for every
+report written since. **A stale directory that looks populated is worse than an
+empty one, because nothing about it reads as wrong.** The main checkout now
+wins always: a report is an operator-level artifact on a clock, not a property
+of whatever branch a session is on. Both orders are recorded in the docstring
+with why each was right for its moment, and the selftest pins that a worktree
+never resolves to its own copy.
+
+**AND A TRACKED REPORT NOBODY COMMITS IS THE SWEEP HAZARD THIS FILE ALREADY
+KNOWS.** `(nx)`: a dirty tracked file in a shared checkout gets committed under
+another session's subject. All four routines were told "no pushes" — correct
+while reports were ignored, and now the thing that leaves the hazard behind. So
+each prompt gains ONE narrow exception: commit your own report by explicit path
+through `scripts/session_commit.py`, rebase, push that and nothing else, and on
+a conflict keep BOTH files. The slot-scope line was amended in the same edit so
+the prompt does not contradict itself two sections later.
+
+**One defect in my own first draft, caught before it shipped:** the commit
+command was written with the path in markdown backticks INSIDE a shell fence —
+which is command substitution, so a routine following it literally would have
+tried to execute its own report. Fixed in all four.
+## 2026-09-11 (abb) — A BLANKET RENUMBER SWEPT ANOTHER SESSION'S CITATIONS, AND THE LETTER GUARD CANNOT SEE IT BECAUSE THEY STILL RESOLVE
+
+**Found because Eamon said "fix".** One feature was citing two different
+changelog letters depending on which file you opened.
+
+**WHAT HAPPENED.** `(aau)` shipped the random-band screen and the
+`golive_blocker` refusal across five files, ten citations. Within the hour a
+concurrent session — whose own comments had been written under `(aau)` before
+the letter guard assigned it `(aaw)` — renumbered `(aau)` -> `(aaw)`
+tree-wide. That sweep was correct for its own ten citations and **caught five
+of mine**, all in `scripts/golive_readiness.py`. The result on main:
+
+| file | the random-band feature cited |
+|---|---|
+| `scripts/golive_readiness.py` (`null_band`, `RANDOM_BAND_PCT`) | **`(aaw)`** — wrong |
+| `pnl_dashboard.py`, `lighter_funding_spread_bot.py`, its test, `session_state.py` | `(aau)` — right |
+
+So `null_band`'s own docstring pointed at an entry about **drawdown peaks and
+a stop-death pager**, and a reader following it landed nowhere near the gate.
+
+**THE GUARD CANNOT CATCH THIS, AND THE OTHER SESSION SAID SO IN ITS OWN COMMIT
+MESSAGE:** *"The letter guard passed because the citation RESOLVES — just to
+the wrong entry."* `audit_changelog_letters` checks that every cited letter
+has an entry; a swept citation resolves **perfectly**, to somebody else's.
+That is the same shape as `(po)`'s inspects-nothing rule — a green check over
+a question nobody asked.
+
+**FIXED SURGICALLY, which is the whole point.** Five citations repointed to
+`(aau)` by exact-string replace with `count == 1` asserted at each site; the
+other session's three in the same file (`RUNNING-PEAK RATIO`, `apply_mtm`, the
+running-peak publish) verified untouched, and its seven elsewhere never
+opened. Both features' suites pass — `test_null_band_screen`,
+`test_clipped_stop_ceiling`, `test_runpeak_drawdown`.
+
+**DOCTRINE, added to the changelog-letter rule in CLAUDE.md as 4b:
+RENUMBER ONLY THE CITATIONS YOU INTRODUCED — never a blanket sweep.** In a
+shared tree both letters are usually live, and a tree-wide
+`perl -pi -e 's/(old)/(new)/g'` cannot tell your citations from a concurrent
+session's. **It bit in BOTH directions within one hour today:** this sweep,
+and — earlier — my own `(aat)` -> `(aau)` renumber, which was safe only
+because it listed five explicit paths rather than walking the tree. Find your
+own with `git diff`/`git blame` against the commit that introduced them, or
+list the exact strings; the safe form asserts `count == 1` per site.
+
+**NO CODE BEHAVIOUR CHANGED** — five comments and one doctrine rule. The
+random-band screen, the `golive_blocker` refusal, the running-peak reading and
+the clipped-stop ceiling all run exactly as they did.
+
+## 2026-09-11 (aaz) — A RED GUARD STILL SILENCES THE TWO BEHIND IT, AND THE MARKER GUARD'S OWN REMEDIATION WAS UNREACHABLE
+
+**[RENUMBERED (aau) -> (aav) -> (aaw) -> (aaz), 2026-09-11 — THREE MOVES, AND
+THE THIRD ONE IS THE FINDING.** `(aau)` and `(aaw)` were each taken by a
+concurrent session and MERGED to main while this entry was being written;
+`(aav)` was taken on an open branch by **PR #306**, another session's
+near-duplicate salvage of this same PR #293. All three were caught — twice on
+CI — by the cross-branch and open-branch arms shipped in `(zw)` the night
+before, on their first real races, and each fix was one `--next` away.
+**THE GAP THAT REMAINS, recorded rather than patched:** `--next` is a READ with
+no RESERVATION, so two sessions asking in the same minute get the same answer —
+which is exactly how #306 and this entry both landed on `(aaw)`. A cross-machine
+lock is not available and is not the fix; the fix is to stop two sessions
+duplicating one salvage. **The duplication is the house, the letter is the
+smoke** — and a guard that says so three times in one hour is working.**
+
+**Salvaged from PR #293, whose real-money limb is superseded and whose CI limb
+never landed.** #293 carried two things: 🙏 avo's volume floor `0.5 -> 0.25`
+and a pair of workflow fixes. `(aae)` has since re-derived that floor from her
+own clip ratio to **0.15** — wider, better argued — so merging #293 would have
+**narrowed a live book from 0.15 back to 0.25**, a step backward on real money
+shipped under a title about CI. The floor limb is dropped and #293 closed; the
+CI limb is here, rebased onto main and re-verified, because main has **neither
+fix** and both defects are live today.
+
+**① A RED STEP STILL ABORTS THE TWO GUARDS BEHIND IT.** Steps abort the job at
+the first failure, so for three consecutive scheduled weeks — 16-Aug
+`31979750293`, 23-Aug `32674318505`, 31-Aug `33347486090` — `audit_code_currency`
+went red, **correctly**, naming a BEHIND-OWN container, and
+`audit_live_roster` and `audit_ci_coverage` never executed at all. A stale
+container bought **three weeks of blindness** in two checks placed there to
+catch an entirely different class. The roster guard is now gated on the FEED's
+own outcome (`steps.feed.outcome == 'success'`), never on `always()` — a dark
+feed must still skip it, because this job treats a dark feed as failure BY
+DESIGN — and the ci-coverage guard, which reads git history and `gh run list`
+and touches the feed not at all, on `!cancelled()`. `continue-on-error` is
+refused: it would mask the exit code `test_code_currency_exit_code_is_not_masked`
+pins, and a guard whose only output is a warning on a passing run is not a
+guard ((gl)/(hj)).
+
+**② THE MARKER GUARD'S OWN FIX COULD NOT CLEAR IT — and this half was
+UNGUARDED, which is why it is the half this entry adds.** `(xh)` made the PULL
+REQUEST TITLE the field that decides whether real money deploys, and
+`audit_live_marker_survives_squash` reads that title. GitHub's default
+`pull_request` activity types are opened/synchronize/reopened — **`edited` is
+not among them** — so a PR rejected *for its title* could never re-run the
+check by fixing that title. Measured on PR #291: red at 12:46Z asking for the
+marker in the title, title corrected three minutes later, **check stayed red**
+with no way to clear it short of an empty push, which `(hj)`/`(gl)` forbid as a
+way to kick CI. #293 added `edited` to the trigger and shipped **no test for
+it**; `reruns_on_title_edit` now pins the property inside the guard whose
+remediation depends on it — ONE owner, read from the workflow rather than
+retyped, and `None` (no claim) when there is no checkout to read, the
+`workflow_markers` fail-open precedent beside it.
+
+**MUTATIONS, 5 of 5 red, each against a green control:** drop either `if:` ->
+`test_a_red_guard_never_silences_the_guards_behind_it`; blind the step parser
+-> `test_the_step_parser_can_actually_see_a_step` (the (po) positive control —
+a line parser that matches nothing reports clean); drop `edited` from the
+trigger, **and** delete the `types:` line entirely so GitHub's defaults apply
+-> the new selftest arm. The second of those matters: omitting `types:` is
+byte-identical in effect to excluding `edited` and looks innocent in a diff.
+
+**WHAT THIS DOES NOT CARRY, stated so nobody re-mines #293 for it:** the avo
+floor value, its tests, and its `session_state` carried row are all superseded
+by `(aae)` — main's `test_no_family_floor_sits_at_or_below_the_measured_slippage_cliff`
+already pins the same durable property at the same measured `(qq)` cliff, and
+its derivation is better. #293's letters `(ze)`/`(zh)` are abandoned with it:
+`(zh)` had already been renumbered once off `(zg)` and collided a second time
+with a merged entry, and `(ze)` was held simultaneously by open PR #294.
 ## 2026-09-11 (aba) — THE FIVE ROUTINES THAT REVIEW THIS FLEET WERE THE ONE THING IT DID NOT INSTRUMENT: HALF THEIR DAYS ARE MISSING, AND NOTHING NOTICED
 
 **Eamon, 11-Sep:** *"improve crypto research review, daily evidence review,

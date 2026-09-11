@@ -14,7 +14,8 @@ this is the 5-minute read with the growth headline.
 ## SLOT SCOPE (tighter than the repo's, on purpose)
 
 READ-ONLY on the fleet: no trades, no `dry_run`/keys/lever/config changes, no
-deploys, no pushes. **This is a scope for an unattended reporting slot, NOT the
+deploys, no pushes EXCEPT the one that commits this run's own report
+(see the last section). **This is a scope for an unattended reporting slot, NOT the
 repo's doctrine** — CLAUDE.md delegates far more to an interactive session
 ((kd) levers, (lm) real money, (vd) ship-it-now). Do not carry this restriction
 out of this slot, and do not read it as "Lucy may not do that."
@@ -115,3 +116,19 @@ Sydney-local times, labelled. Tables small, prose short. Shadow books are
 paper; the live rows are real money; not financial advice. Go-live and every
 real-money change stay explicit operator acts — this brief proposes, never
 executes.
+
+**THE REPORT IS A TRACKED FILE NOW — COMMIT IT.** `reports/*.md` went into git
+on 11-Sep (Eamon: *"track the rest too"*), so a report left sitting
+uncommitted is a DIRTY TRACKED FILE in a checkout other sessions share, and
+the next `git commit` anywhere near it sweeps your report into their commit
+under their subject — the (nx) class this repo has already paid for. Commit
+yours, by explicit path, and push only that:
+
+```
+python3 scripts/session_commit.py reports/daily_pnl_<date>.md -m "daily brief — <date>"
+git fetch origin && git rebase origin/main && git push origin HEAD:main
+```
+
+This is the ONE push this slot makes: it publishes your own artifact and
+touches nothing else. If the rebase conflicts, another routine wrote the same
+day — keep BOTH files, never resolve by dropping one.
