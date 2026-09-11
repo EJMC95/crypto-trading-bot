@@ -91,7 +91,47 @@ def _has(path, needle):
 # `owner` is who can close it. "session" = the next session may just do it;
 # "OPERATOR" = it needs a decision this repo may not make.
 # ---------------------------------------------------------------------------
+
+def _ensemble_rows_publishing() -> bool:
+    """The two ensemble research rows are REGISTERED on the dashboard and
+    nothing publishes them until a paper soak runs somewhere.
+
+    Closes when either row appears on the live feed: that is the receipt that
+    a soak exists, which is the whole open question. Fail-CLOSED on a dark or
+    unreadable feed -- an unreachable dashboard is not evidence the rows are
+    live, and this row must not close itself on a network blip."""
+    feed = _fetch(FEED_URL)
+    rows = (feed or {}).get("bots") if isinstance(feed, dict) else feed
+    if not rows:
+        return False
+    want = {"downtrend-ensemble-lshadow", "adaptive-ensemble-lshadow"}
+    return any(str(r.get("bot")) in want for r in rows
+               if isinstance(r, dict))
+
 CARRIED = [
+    {
+        "id": "ensemble-rows-registered-but-unpublished",
+        "owner": "OPERATOR",
+        "what": "(aao) registered `downtrend-ensemble` and `adaptive-ensemble` "
+                "on the dashboard (VARIANT_ONLY + LABELS, certified "
+                "append-only against the live feed by BOTH verifiers), and "
+                "wired an optional `fleet_publish` into each package's paper "
+                "loop so the row is real when a soak runs. Nothing publishes "
+                "them today: neither package is a Railway service, so both "
+                "rows are registered and empty. Deliberately NOT in `EXPECTED` "
+                "— that is the bucket that resurrects a permanent 'no data "
+                "yet' ghost card, which this dashboard has carried twice "
+                "before — so an empty registration costs nothing while the "
+                "decision is open.",
+        "why_open": "provisioning a Railway service per book costs a container "
+                    "on Eamon's account and is outward-facing, so it is his "
+                    "call rather than a session's. The code half is done and "
+                    "tested; what remains is one provisioning dispatch per "
+                    "book (the (lr)/(mk) one-shot pattern) plus a Dockerfile "
+                    "and a deploy route. Until then the rows are inert and "
+                    "harmless.",
+        "closes_when": lambda: _ensemble_rows_publishing(),
+    },
     {
         "id": "live-vs-graded-policy-two-mechanisms-uncovered",
         "owner": "session",

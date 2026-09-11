@@ -1,23 +1,28 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 09:42 Sydney (23:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 11:07 Sydney (01:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` was shut **31% of the last 14.4d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-avo-maria-lighter` was shut **30% of the last 14.5d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **19% of the last 14.4d** (64h), mostly `slguard` (44h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (65h), mostly `slguard` (45h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
 - `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
-- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it.
 - `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
 - `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
+
+### `ensemble-rows-registered-but-unpublished`  ·  owner: **OPERATOR**
+(aao) registered `downtrend-ensemble` and `adaptive-ensemble` on the dashboard (VARIANT_ONLY + LABELS, certified append-only against the live feed by BOTH verifiers), and wired an optional `fleet_publish` into each package's paper loop so the row is real when a soak runs. Nothing publishes them today: neither package is a Railway service, so both rows are registered and empty. Deliberately NOT in `EXPECTED` — that is the bucket that resurrects a permanent 'no data yet' ghost card, which this dashboard has carried twice before — so an empty registration costs nothing while the decision is open.
+
+_Still open because:_ provisioning a Railway service per book costs a container on Eamon's account and is outward-facing, so it is his call rather than a session's. The code half is done and tested; what remains is one provisioning dispatch per book (the (lr)/(mk) one-shot pattern) plus a Dockerfile and a deploy route. Until then the rows are inert and harmless.
 
 ### `live-vs-graded-policy-two-mechanisms-uncovered`  ·  owner: **session**
 (aan) shipped `golive_readiness.live_fillable`, which closes ONE of the three mechanisms by which a book's LIVE arm can run a narrower or different policy than the arm the go-live gate grades: the per-mode LENS/SIDE allow-list. A fleet sweep of all 14 graded books confirms the other two are real and UNCOVERED. (2) THE LEVER LANE: `apply_tuning()` returns {} on 🎫 the taker's live arm, so a live arm takes NO growth-rail lever while the graded shadow ran tuner-moved bars -- its era spans 19 distinct bracket settings (tp in {0.03,0.04,0.05,0.06}, max_hold_h in {24,48,72}, brk_range in {0.91,0.93,0.95,0.97}). Intersecting both taker mechanisms: **2 of 208 closes (1.0%) are BOTH live-fillable AND booked at bars a live arm would run.** (3) THE CAPACITY PIN: ⚖️ Counterweight's live arm pins `K = GOLIVE_K` and refuses the `fundspread.k` lever; K is a rank truncation, so it changes WHICH coins are held. LATENT today (env default K=5 == GOLIVE_K=5, no lever open), not absent. AND A SECOND CONFIRMED BOOK, DIRECTION INVERTED: 👩 mum's shadow is NARROWER than live -- the judge's `xp.mum.vel_lo/vel_hi` steer the twin only, the velocity band is an ENTRY filter, and her own census reads `vel_in_band 2 of vel_read 102`, so the graded sample is a strict SUBSET of the live population. CLAUDE.md already says 'while running, the twin is an EXPERIMENT arm, not a control arm'; the GRADER does not know it.
@@ -114,8 +119,22 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (40 commit(s), entries (zt))
+## Shipped today (24 commit(s))
 
+- `a7c95ea` (aao) the CodeQL warnings: two dead guards in the sizer, eight leaked handles, one dead assignment
+- `2e6b8aa` (aao) the last CodeQL error: name what makes a reconciliation unclean
+- `785b21c` (aao) CodeQL's 12 errors were one real bug and one collision that broke both suites together
+- `f5b4763` (aao) the soak override is narrower than its name: measured by trying to open the gate
+- `7890004` (aao) the same paper-optimism in the sibling: entries at the signal price, exits at the mark
+- `57e86de` (aao) paper was a softer test than the backtest that validates it
+- `529c66d` (aao) a finished soak publishes a terminal row: an attended run that just stops goes stale forever
+- `e29002a` (aao) the two ensemble books get real dashboard rows -- publisher first, then the row
+- `fe13042` (aao) the sweep prints its progress: 40 full backtests is a silence people kill
+- `c460258` (aao) Operation short: a conservative short-biased ensemble, and a 20-point scorer that could never fire
+- `f40d2e7` (aam) CodeQL found two real ones: venue-supplied symbols reached a filesystem path, and the live gate copied the whole environment
+- `909637d` (aam) the sweep is also a lever audit: every cell negative, and two knobs that cannot bind
+- `579ab50` (aam) Two short mirrors of mum and avo, measured and both refused - and the ensemble system that refusal argues for
+- `3f10ddf` (aan) the sweep: it is a class, three mechanisms deep, and mum's shadow runs the other way — two carried
 - `0faaa04` (aan) verified on the deployed payload: live_policy on the row, live_fillable inert=true, ready unchanged at 6/6
 - `1b94335` (aan) the growth lens: breakoutup TIES random, not beaten — and two structural blockers on re-aiming LIVE_SIDES; (aaf) corrected in place
 - `6f5c972` (aan) gitignore the study tape caches — 3.5MB untracked beside a registered selftest
@@ -126,36 +145,6 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `755816d` (aan) scope the declaration guard to the live_policy node — the module-wide form survived its own mutation
 - `91fdc55` (aan) WIP: live_fillable + the taker's live-arm declaration
 - `0b9f9e6` (aag)(aah)(aai)(aaj)(aak)(aal) 🫀 Sick organs: six systems that knew something and had no way to say it (#303)
-- `0df3303` (aaf) the taker's random-entry null: random beats it on every family, and the one family LIVE_SIDES admits is negative
-- `d2c6547` [deploy-live] (aae) avo's volume floor was a proxy for a thing the fleet now measures directly — re-derived 0.5 -> 0.15 from (vd)'s own clip ratio
-- `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact
-- `98738b3` (aab) the handoff reads the live fleet: two books have been READY for six days and nothing said so
-- `fc48964` (zy)(zz)(aaa) the letter guard sees open branches; Rich Dad gets a census series; Hull's cap raise measured and deferred to one turnover
-- `c62297f` (zw) pin skip_if_same, the baseline flag, and next_letter's extra_claimed — the preventive half had no test at all
-- `b2c3665` (zw) drive the open-branch arm from main(): a 24-mutation round left 8 alive and every survivor was the WIRING, not the comparison
-- `f1fa9ae` (zw) the letters guard sees OPEN BRANCHES, not just origin/main — nine renumbers in one day, and (ze)/(zf) are held on branches it cannot see
-- `055be0b` (zw) pin the census wiring by AST: a mutation round showed the substring check left BOTH halves deletable
-- `95eb6ae` (zw) 🏦 Rich Dad publishes a census TIME SERIES, not just this loop's instant — its refusals were a sample of n=1 cycle
-- `6195699` (zw)(zx) renumber: origin took (zt) and (zu) — ninth collision today; both letters picked by checking every OPEN BRANCH, not just origin/main
-- `7c76fa8` (zw) renumber the cohort-reader citations: origin took (zt)
-- `ea7bdfc` (zt) regenerate HANDOFF after the daily review
-- `c14f08d` (zt) changelog: the cohort reader's history-shape blind spot, measured at 2,174 of 17,261 snapshots
-- `bb394ea` (zu) renumber: origin took (zs) for the Counterweight date move — seventh collision on this branch today
-- `121d2fc` (zt) the cohort reader knew the live key's dict and not the history's compacted list: 2,174 fleet-risk snapshots read as '0 longs against a budget of 1e9'
-- `0282715` (zq) the record: the daily review's two stale rule copies and the publish stall it caused (renumbered (zn)->(zq): (zn) landed on main via #298 while this sat unpushed); store-side hazard CARRIED; HANDOFF regenerated
-- `5674619` (zn) the review stalled the fleet's publishes three times today: a never-committed read transaction held bot_pnl while the grader's lazy import ran the store's ALTER on a second connection — autocommit, lock_timeout, idle-in-transaction timeout, and the store session hardened
-- `387daad` (zi) the MTM fetch is scoped to the books it can decide — worse-of-both cannot pass a failing book, and fetching every living book's series took the review past a 10-minute timeout
-- `ca35883` (zi) the daily review graded the maxDD bar REALISED-only while the canonical grader folds MTM — the taker read 2.5% here beside a published 4.6% (basis mtm)
-- `feb42c6` (zi) the daily review's REACH ceiling was computed on a number no consumer enforces: pooled 20/20 RED over two cohorts with ten free slots each
-- `40c5397` (zv) The four findings the review ran out of budget to verify — and one says (zu) mislabelled a real-money number
-- `d47c580` (zu) the health banner's three permanently-true lines, and two more descriptions
-- `0f2d863` (zu) correct the renumber count: 41 citations moved, the 42nd was the generated HANDOFF
-- `8074820` (zu) the spend row's days-to-gate is days-to-DECIDABILITY, and said so
-- `7a8e1cc` (zu) regenerate HANDOFF.md after the dashboard pass
-- `0cbdd64` (zu) RENUMBERED (zt) -> (zu): a concurrent session landed its own (zt) on main
-- `5d31030` (zt) The week's telemetry reaches the card — and the page was still running the go-live gate the fleet retired in July
-- `250a9df` (zt) regenerate HANDOFF.md after the basis declaration
-- `ab9db2f` (zt) Two sessions read ⚖️ Counterweight's sample definition differently on the same day — the fleet's only pre-registered read with no instrument
 
 ## How this file stays honest
 

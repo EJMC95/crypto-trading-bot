@@ -88,6 +88,81 @@ result and is not one.
 silently excluding every `.env.example` template, so `lighter_adaptive_ensemble_bots/`
 shipped without the file its README tells the reader to copy. One exception line, both
 packages.
+
+**[SAME DAY, THE DASHBOARD HALF — Eamon: *"remember to update the pnl dashboard with
+the new bots when youre finished and double check the works doen"*.]**
+
+**PUBLISHER FIRST, THEN THE ROW, and the order is the whole point.** A dashboard row
+for a bot that publishes nothing is a permanent *"no data yet"* ghost card, and
+`pnl_dashboard.py`'s own source records having carried two of them (*"a retirement must
+not leave a placeholder haunting the staged sections"*). So both packages gained an
+OPTIONAL `fleet_publish` — `bot_pnl_store` imported lazily, a silent no-op without it,
+so each package's suite still runs with no fleet and no database. `status` is **`paper`,
+never `online`** (checked against `fleet_watchdog_svc`'s OWN accepted tuple, parsed from
+its source rather than read from a doc block), and the return value is KEPT rather than
+discarded. Then the row: `VARIANT_ONLY` + `LABELS` only, **never `EXPECTED`** — that is
+the bucket that resurrects the ghost. `SLOW_LOOP`, `STALE_SECONDS`, every existing row
+and the other `CURRENT_BOTS` members untouched; the live feed is byte-identical before
+and after (15 rows, none lost, none gained).
+
+**THE DOUBLE-CHECK FOUND MORE THAN THE BUILD DID. Seven, and the last two are the
+interesting ones:**
+* **My first dashboard patch CORRUPTED `nav-cook`.** Inserting before a closing brace
+  that shares its line with the last entry produced `"nav-cookdowntrend-ensemble"` — a
+  glued entry and `nav-cook` LOST. The AST verifier caught it on its first real use.
+* **`VARIANT_ONLY` was not in `APPEND_ONLY`** — the one registry the patch actually
+  touched was the one nobody guarded. Added, with `SCANNERS`/`STOCKS`/`FREQTRADE`:
+  guarding `CURRENT_BOTS` and not its parts guards nothing.
+* **THE TWO VERIFIERS DISAGREED**, which is why there are two. The line-based one called
+  the legitimate append a REMOVAL, because growing a set rewrites the line its brace sits
+  on. A check that fires on the one operation it exists to permit is a check that gets
+  waived — and the real removal is waived with it. Narrowed to forgive exactly that shape
+  and nothing looser.
+* **PAPER WAS A SOFTER TEST THAN THE BACKTEST THAT VALIDATES IT.** Fills landed at the
+  exact quote with no slippage and a round trip charged one leg of fees, while the
+  backtester charged spread, slippage and both. The soak GATES LIVE TRADING, so that
+  fails in the expensive direction. Both packages now charge `slippage + spread/2` on
+  both legs, pinned by the sanity check the frictions exist for: open and close at the
+  same price and the book must be DOWN.
+* **AN ATTENDED SOAK THAT SIMPLY STOPS goes stale forever.** Unlike every other row here
+  it ends, and `stale` is computed from row age regardless of status — the *"a line that
+  is always present is a line nobody reads"* failure `fleet_watchdog_svc` warns about in
+  its own words. Both publish a terminal `halted` row carrying `extra.soak_ended`.
+* **CODEQL: 12 ERRORS, AND ONE OF THEM WAS HIDING SOMETHING WORSE.** Seven were "wrong
+  number of arguments" — CodeQL had resolved the SIBLING package's helper, because both
+  packages have a `tests/conftest.py` defining `make_market` and `from conftest import`
+  goes through `sys.path`. **Measured: running both suites in ONE pytest invocation
+  failed to COLLECT 8 files.** Each green alone and broken together, which is the worst
+  shape because every local run looks fine. Fixed at the root twice — helpers into
+  uniquely-named modules (explicitly importing `conftest` is the anti-pattern), which
+  then exposed six shared test-file BASENAMES, renamed per pytest's own hint.
+* **THE `-O` FINDING.** Two flagged asserts opened files inside the assertion; four
+  CodeQL did NOT flag were the load-bearing ones — `assert e.update(inp).regime is ...`
+  advances the regime engine as a SIDE EFFECT of the assertion, so under `python -O` the
+  hysteresis sequence those tests are ENTIRELY ABOUT never runs and they pass while
+  testing nothing. Class closed; both suites verified under `-O`.
+
+Remaining CodeQL warnings triaged in the same pass: **two DEAD guards in the position
+sizer** (`eq <= 0` re-checked after an early return already refused it — removed, with
+the precondition named so whoever moves that return knows what they break), eight leaked
+file handles (two in production code), and a dead double-assignment in a parametrised
+test. Plus a lint sweep: 24 unused imports, three unused locals, a loop variable
+shadowing a module-level import. pyflakes clean across both packages.
+
+**The 40-cell sweep finished** on the 166-day example tapes (~29 min, and it now prints
+per-cell progress with an ETA — 40 silent backtests is a silence people kill):
+`ema_fast` **SENSITIVE at 7.17pp**, the largest in the grid; seven knobs PLATEAU; and
+**two measured INERT** — `ema_mid`, and `minimum_reward_risk` for a STRUCTURAL reason
+worth recording: targets are fixed R-multiples of the stop, so reward/risk is `tp2_r`
+**by construction** and the bar can never bind below it. Declared in `config.py` and
+pinned by a test, not quietly left inert. Shipped config: 14 trades, +0.60%, and the
+robustness gate **REFUSES** it as underpowered.
+
+**CARRIED (I11):** the two rows are REGISTERED and nothing publishes them, because
+neither package is a Railway service. `session_state.CARRIED` holds
+`ensemble-rows-registered-but-unpublished`, owner **OPERATOR**, closing when either row
+appears on the live feed. An empty registration costs nothing precisely because it is not
+in `EXPECTED`.
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —
