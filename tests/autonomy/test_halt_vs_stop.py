@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-import math
 import pathlib
 import re
 import sys
