@@ -12,10 +12,15 @@ state/*.tmp
 # is tracked; the switch itself is not.
 runtime/KILL_SWITCH
 
-# Generated reports, except the ones deliberately kept as evidence.
+# Generated reports. All of them: the negation that used to sit here kept
+# `reports/pnl_baseline.json`, and it was pointing at the wrong copy --
+# MEASURED byte-identical to `docs/pnl_baseline.json`, which is tracked and is
+# the path the changelog entry actually cites. Two copies of one piece of
+# evidence is how the two drift, and the `reports/` one is rewritten by any
+# run of `dashboard_patch`. The canonical baseline lives in `docs/`.
+# `.gitkeep` is NOT matched, so the directory stays tracked.
 reports/*.json
 reports/*.log
-!reports/pnl_baseline.json
 
 __pycache__/
 *.py[cod]
