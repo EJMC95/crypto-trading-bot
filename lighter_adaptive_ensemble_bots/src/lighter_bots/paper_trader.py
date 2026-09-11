@@ -338,6 +338,22 @@ class Runner:
                 break
         return opened
 
+    def _adverse(self, price: float, side: str, *, closing: bool) -> float:
+        """Move a simulated fill AGAINST us by the backtest's own frictions.
+
+        PAPER MUST NOT BE KINDER THAN THE BACKTEST. Entries were booked at the
+        exact signal price and exits at the exact mark, while the backtester
+        charges spread and slippage on both -- so the soak that GATES LIVE
+        TRADING was a softer test than the backtest it validates, and a book
+        could look gradeable on costs it will never enjoy for real. (Fees were
+        already charged on both legs here; it is the price that was free.)"""
+        from .backtester import Frictions
+        fr = Frictions()
+        bps = fr.slippage_bps + fr.spread_bps / 2.0
+        adj = price * bps / 10_000.0
+        worse_up = (side == "long") if not closing else (side == "short")
+        return price + adj if worse_up else price - adj
+
     @staticmethod
     def _safe(fn):
         try:
@@ -350,7 +366,7 @@ class Runner:
         exact intended order set and submits nothing."""
         if self.mode is Mode.SHADOW:
             self.state.shadow_orders.append(rec)
-        entry = sig.entry
+        entry = self._adverse(sig.entry, sig.side, closing=False)
         self.state.book.positions[sig.symbol] = Position(
             symbol=sig.symbol, side=sig.side, quantity=dec.quantity,
             entry_price=entry, opened_ts=now, stop_price=sig.stop,
@@ -382,14 +398,18 @@ class Runner:
                 continue
             reason = "stop" if hit_stop else ("target" if hit_tp else "max_hold")
             sgn = 1.0 if long else -1.0
-            gross = sgn * (mark - pos.entry_price) * pos.quantity
+            # The exit price pays the same frictions as the entry. Booking an
+            # exit at the exact mark is the second half of the same optimism.
+            fill = self._adverse(mark, pos.side, closing=True)
+            gross = sgn * (fill - pos.entry_price) * pos.quantity
             fees = pos.meta.get("entry_fee", 0.0) * 2.0
             pnl = gross - fees
             r_unit = pos.meta.get("r") or 1e-9
             tr = Trade(symbol=s, side=pos.side, strategy=pos.strategy,
                        regime=str(pos.meta.get("regime", "")),
                        opened_ts=pos.opened_ts, closed_ts=now,
-                       entry=pos.entry_price, exit=mark, quantity=pos.quantity,
+                       entry=pos.entry_price, exit=fill,
+                       quantity=pos.quantity,
                        pnl=pnl, fees=fees, funding=0.0,
                        r_multiple=gross / (r_unit * pos.quantity)
                        if pos.quantity else 0.0,

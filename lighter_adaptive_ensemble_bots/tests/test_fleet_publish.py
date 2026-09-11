@@ -184,3 +184,38 @@ def test_the_watchdog_vocabulary_is_the_one_we_publish():
     assert m, "the watchdog's accepted-status tuple has moved"
     accepted = set(re.findall(r'"([a-z]+)"', m.group(1)))
     assert {"paper", "halted"} <= accepted
+
+
+def test_paper_fills_are_never_kinder_than_the_backtest():
+    """The soak GATES live trading, so it must not be a softer test than the
+    backtest it validates. Entries were booked at the exact signal price and
+    exits at the exact mark while the backtester charged spread and slippage
+    on both."""
+    from conftest import make_runner
+    r = make_runner()
+    assert r._adverse(100.0, "long", closing=False) > 100.0
+    assert r._adverse(100.0, "short", closing=False) < 100.0
+    assert r._adverse(100.0, "long", closing=True) < 100.0
+    assert r._adverse(100.0, "short", closing=True) > 100.0
+
+
+def test_a_flat_paper_round_trip_loses_money():
+    """The sanity check the frictions exist for: open and close at the same
+    price and the book must be DOWN. A paper book that breaks even on a flat
+    round trip is one whose costs are not wired in -- which reads identically
+    to a book with an edge."""
+    from lighter_bots.models import Position
+    from conftest import make_runner
+    r = make_runner()
+    before = r.state.equity
+    entry = r._adverse(100.0, "short", closing=False)
+    r.state.book.positions["BTC"] = Position(
+        symbol="BTC", side="short", quantity=1.0, entry_price=entry,
+        opened_ts=0.0, stop_price=103.0, targets=[97.0], strategy="s",
+        signal_id="x", protective_ok=True,
+        meta={"regime": "BEARISH", "atr": 2.0, "r": 3.0, "leverage": 1.0,
+              "entry_fee": 0.05})
+    r.adapter.marks["BTC"] = 100.0
+    r._manage(now=10 * 86400)        # a time stop, at the same price
+    assert not r.state.book.positions, "the position never closed"
+    assert r.state.equity < before, "a flat round trip cost nothing"
