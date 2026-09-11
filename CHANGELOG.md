@@ -1,3 +1,51 @@
+## 2026-09-11 (abb) — A BLANKET RENUMBER SWEPT ANOTHER SESSION'S CITATIONS, AND THE LETTER GUARD CANNOT SEE IT BECAUSE THEY STILL RESOLVE
+
+**Found because Eamon said "fix".** One feature was citing two different
+changelog letters depending on which file you opened.
+
+**WHAT HAPPENED.** `(aau)` shipped the random-band screen and the
+`golive_blocker` refusal across five files, ten citations. Within the hour a
+concurrent session — whose own comments had been written under `(aau)` before
+the letter guard assigned it `(aaw)` — renumbered `(aau)` -> `(aaw)`
+tree-wide. That sweep was correct for its own ten citations and **caught five
+of mine**, all in `scripts/golive_readiness.py`. The result on main:
+
+| file | the random-band feature cited |
+|---|---|
+| `scripts/golive_readiness.py` (`null_band`, `RANDOM_BAND_PCT`) | **`(aaw)`** — wrong |
+| `pnl_dashboard.py`, `lighter_funding_spread_bot.py`, its test, `session_state.py` | `(aau)` — right |
+
+So `null_band`'s own docstring pointed at an entry about **drawdown peaks and
+a stop-death pager**, and a reader following it landed nowhere near the gate.
+
+**THE GUARD CANNOT CATCH THIS, AND THE OTHER SESSION SAID SO IN ITS OWN COMMIT
+MESSAGE:** *"The letter guard passed because the citation RESOLVES — just to
+the wrong entry."* `audit_changelog_letters` checks that every cited letter
+has an entry; a swept citation resolves **perfectly**, to somebody else's.
+That is the same shape as `(po)`'s inspects-nothing rule — a green check over
+a question nobody asked.
+
+**FIXED SURGICALLY, which is the whole point.** Five citations repointed to
+`(aau)` by exact-string replace with `count == 1` asserted at each site; the
+other session's three in the same file (`RUNNING-PEAK RATIO`, `apply_mtm`, the
+running-peak publish) verified untouched, and its seven elsewhere never
+opened. Both features' suites pass — `test_null_band_screen`,
+`test_clipped_stop_ceiling`, `test_runpeak_drawdown`.
+
+**DOCTRINE, added to the changelog-letter rule in CLAUDE.md as 4b:
+RENUMBER ONLY THE CITATIONS YOU INTRODUCED — never a blanket sweep.** In a
+shared tree both letters are usually live, and a tree-wide
+`perl -pi -e 's/(old)/(new)/g'` cannot tell your citations from a concurrent
+session's. **It bit in BOTH directions within one hour today:** this sweep,
+and — earlier — my own `(aat)` -> `(aau)` renumber, which was safe only
+because it listed five explicit paths rather than walking the tree. Find your
+own with `git diff`/`git blame` against the commit that introduced them, or
+list the exact strings; the safe form asserts `count == 1` per site.
+
+**NO CODE BEHAVIOUR CHANGED** — five comments and one doctrine rule. The
+random-band screen, the `golive_blocker` refusal, the running-peak reading and
+the clipped-stop ceiling all run exactly as they did.
+
 ## 2026-09-11 (aaz) — A RED GUARD STILL SILENCES THE TWO BEHIND IT, AND THE MARKER GUARD'S OWN REMEDIATION WAS UNREACHABLE
 
 **[RENUMBERED (aau) -> (aav) -> (aaw) -> (aaz), 2026-09-11 — THREE MOVES, AND

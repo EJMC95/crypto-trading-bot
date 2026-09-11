@@ -2650,6 +2650,20 @@ All new bots:
   4. **A renumber is recorded INLINE** in the moved entry — and note that
      `git log` subjects keep the OLD letter, so **the commit log is not a
      reliable letter index**; grep the CHANGELOG headers.
+  4b. **RENUMBER ONLY THE CITATIONS *YOU* INTRODUCED — never a blanket sweep
+     (11-Sep (abb)).** A tree-wide `perl -pi -e 's/\(old\)/(new)/g'` cannot
+     tell your citations from a concurrent session's, and in a shared tree
+     both letters are usually live. **Measured the day this was written, in
+     BOTH directions within one hour:** one session's renumber of `(aau)` ->
+     `(aaw)` swept up 5 of another session's citations in
+     `scripts/golive_readiness.py`, leaving ONE feature citing `(aaw)` in that
+     file and `(aau)` in the four others it also touches — so `null_band`'s
+     own docstring pointed at an unrelated entry about drawdown peaks. **The
+     letter guard CANNOT catch this**: it checks that a citation RESOLVES, and
+     a swept citation resolves perfectly — to the wrong entry. Find your own
+     with `git diff`/`git blame` against the commit that introduced them, or
+     list the exact strings; the safe form is a targeted replace that
+     ASSERTS `count == 1` per site, not a regex over the tree.
   5. Date an entry by **git's clock, not by the handoff you are executing**
      (29-Jul: five entries were dated 30-Jul because the session was running
      `NEXT_SESSION_2026-07-30.md`; git said 29-Jul in both UTC and Sydney).
