@@ -2229,6 +2229,21 @@ def golive_card():
                     + ('live arm fills NOTHING' if _inert
                        else f'live {_ef.get("n")}/{b.get("n")}')
                     + '</span>')
+            # [(aat)] AND THE SCREEN THE SIX BARS CANNOT APPLY. They test
+            # against ZERO; (hm) has said since 30-Jul that a DIRECTIONAL book
+            # is graded against a random-entry benchmark, never against zero,
+            # because on this venue a random entry earns +0.2 to +1.1%/trade
+            # for free. A book whose mean sits INSIDE that band has not been
+            # distinguished from the tape's drift BY THESE BARS — which is a
+            # statement about what the card can see, so the card says it.
+            nb = b.get("null_band") if isinstance(
+                b.get("null_band"), dict) else None
+            if nb and nb.get("inside_random_band") is True:
+                era_chip += (
+                    f'<span title="{html.escape(str(nb.get("why") or ""))}" '
+                    f'style="color:#d29922;background:rgba(210,153,34,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f'vs random: untested</span>')
             # [(zu)] THE DRAWDOWN DISTRIBUTION BESIDE THE SINGLE PATH.
             # `(za)` shipped `dd_resampled` because *"the gate grades a 15%
             # bar over the ONE ordering a book happened to walk and cannot
