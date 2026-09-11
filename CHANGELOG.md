@@ -1,3 +1,69 @@
+## 2026-09-11 (abc) — FOUR WORKFLOWS AIMED AT BOOKS THAT NO LONGER EXIST, AND ONE RED EVERY WEEK SINCE THE NRL SEASON ENDED
+
+**Eamon, 11-Sep: *"lets clean up any workflows remaining"*** — after #293's
+triage found its CI half stranded. This is the rest of that sweep, and two of
+the four deletions are a HAZARD rather than clutter.
+
+**① THE TWO TAKER WORKFLOWS DEFAULT TO A REAL-MONEY SERVICE THAT RUNS A
+DIFFERENT BOOK.** `taker-bull-mode.yml` (`TT_BULL_MODE`) and
+`taker-live-bars.yml` (`TT_TP`/`TT_SL`/`TT_MAX_HOLD_H`) both declare
+`default: "tide-rider-lighter-live"` — **REAL MONEY**, and their own comment
+still labels it *"the Ticket Taker"*. 🎫 the Taker's live arm was retired
+**13-Aug** and 🙏 Avo Maria took that same service/keys/sub-account ((ma)), so a
+dispatch today would (a) set `TT_*` variables a book that does not read them,
+and (b) **redeploy a live real-money service** — which wipes memory-only halts
+([[lighter-flatten-silent-halt-redeploy-incident]]). A stale dropdown pointed at
+a live book is the standing-audit-roster rot this file has now recorded FOUR
+times, in a place nobody re-reads. The shadow arm keeps its bracket: `taker.tp`
+/ `taker.sl` / `taker.max_hold_h` are registered levers the rail already
+steers, under `(ye)`'s ready-freeze. Both files are DELETED.
+
+**② TWO MORE POINT AT RETIRED BOOKS.** `explore-floor.yml`'s only target is
+`funding-farmer-shadow`, and `perps-funding-lighter-lshadow` has been in
+`RETIRED_SHADOW_BOOKS` since **2-Sep (wt)**. `georgia-takes-the-slot.yml`
+opens with its own instruction — *"ONE-SHOT: 🔮 georgia takes 💸 the Farmer's
+sub-account. **DELETE AFTER USE**"* — it was used 22-Aug, her live arm retired
+2-Sep and her v1 shadow 9-Sep. Neither has a reference outside the changelog.
+
+**③ THE NRL PIPELINE HAS BEEN RED EVERY SCHEDULED RUN SINCE THE SEASON ENDED,
+AND THE CAUSE IS TWO LINES.** Last green **24-Aug**; **15 consecutive
+scheduled reds** since, every one identical. `src/ingest/nrl_stats.py:195`
+writes `fixtures_next.parquet` only `if not fixtures.empty`, and
+`run_phase3.py:170` / `run_phase4.py:197` read it unguarded — so the first
+run after the last unplayed fixture dies on `FileNotFoundError` and so does
+every run after it. (The file is NOT committed to the mirror branch — only
+`team_stats.parquet` is — so its absence is a genuine "no next round", and
+GitHub's default `bash -eo pipefail` is why `predict` aborts the step.)
+**A permanently-red scheduled job is how a reader learns to ignore red ((gl))**,
+and this one was doing it for two and a half weeks in the same Actions tab that
+carries the fleet's own guards.
+
+**THE GATE IS NARROW ON PURPOSE, and what stays red is the point.**
+`refresh` is **NOT** gated and still fails the job loudly — a broken scraper
+also returns no fixtures, and that must stay red. Only the FORWARD-LOOKING half
+(predict/signals/odds/props/snapshot/season) is skipped, on the one condition
+that separates the benign case: **refresh SUCCEEDED and produced no next
+round.** The settling half (`grade`, xStats) has already run above, which is
+exactly right at season end, and `feed` is deliberately left OUTSIDE the gate
+so the dashboard rebuilds on the final graded round rather than serving the last
+in-season prediction. Positive control run both ways: parquet absent -> notice +
+skip + `feed` + rc=0; parquet present -> predict + season + `feed` + rc=0;
+`bash -n` clean and the YAML parses to 6 steps.
+
+**REFUSED, WITH THE REASON — this is a sweep with two survivors.**
+`railway-volume.yml` looks equally spent (one-off, last run failed 1-Jul) and
+**stays**: the LIVE `db-backup.yml` cites it THREE times as its reference
+implementation (*"reusing the SAME account-token pattern"*, *"Install Railway
+CLI (retry — see railway-volume.yml)"*, the dead-account-token note), so
+deleting it to tidy would break three citations in the database-backup path for
+a dispatch-only file that never fires. `dashboard-auth-rotate.yml` has **never
+run** and also stays — it is a standing credential-rotation tool, and "unused"
+is its correct resting state.
+
+**NOT A LIVE DEPLOY.** Deleting dispatch-only workflows and gating a scheduled
+one changes no trade any book takes, so this is main-only per `(mm)` and
+carries no marker.
+
 ## 2026-09-11 (aaz) — A RED GUARD STILL SILENCES THE TWO BEHIND IT, AND THE MARKER GUARD'S OWN REMEDIATION WAS UNREACHABLE
 
 **[RENUMBERED (aau) -> (aav) -> (aaw) -> (aaz), 2026-09-11 — THREE MOVES, AND

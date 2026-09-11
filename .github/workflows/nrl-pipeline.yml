@@ -56,6 +56,25 @@ jobs:
           python -m src.ingest.champion_stats --refresh 2026 || echo "::warning::xStats refresh failed (non-fatal)"
           # Settle last round's paper ledger AND prediction track record.
           python -m src.cli grade --auto || echo "::warning::grading failed (non-fatal)"
+          # [2026-09-11 (abc)] SEASON-END IS NOT A FAILURE. `nrl_stats.refresh`
+          # writes fixtures_next.parquet only `if not fixtures.empty`, and
+          # run_phase3/run_phase4 read it unguarded — so the first scheduled run
+          # after the last unplayed fixture dies on FileNotFoundError and every
+          # run after it does too. Measured: last green 24-Aug, then 15
+          # consecutive scheduled reds, all identical. A permanently-red
+          # scheduled job is how a reader learns to ignore red ((gl)), and this
+          # one was drowning a real signal for two and a half weeks.
+          #
+          # The refresh above is NOT gated and still fails the job loudly: a
+          # broken scraper returns no fixtures too, and that must stay red. What
+          # is gated is only the FORWARD-LOOKING half, on the one condition that
+          # distinguishes the benign case — refresh SUCCEEDED and produced no
+          # next round. The settling half (grade, xStats) has already run above,
+          # which is exactly what you want at season end, and the commit/deploy
+          # steps below still publish the final standings.
+          if [ ! -f data/processed/fixtures_next.parquet ]; then
+            echo "::notice::No unplayed fixtures after a successful refresh — season complete. Settled the final round; skipping predict/signals/odds/props/snapshot/season."
+          else
           # This round's baseline predictions (saves fitted model artifacts).
           python -m src.cli predict
           # On-the-day intel: named team lists + venue weather + news flags.
@@ -68,7 +87,11 @@ jobs:
           python -m src.cli snapshot || echo "::warning::snapshot failed (non-fatal)"
           # Predict EVERY remaining round (self-updating season outlook).
           python -m src.cli season
+          fi
           # Dashboard (round selector + intel + track record) + JSON feed.
+          # OUTSIDE the gate on purpose: the dashboard must still rebuild at
+          # season end so the final round's graded result is what the feed
+          # serves, rather than the last in-season prediction.
           python -m src.cli feed
           echo "--- outputs ---"; ls -la outputs/ | head -25
 
