@@ -168,6 +168,34 @@ def family_of(r):
     return tag.split("_")[0]        # 'long-breakoutup' / 'short-divergence'
 
 
+def side_is_long(r):
+    """Is this close a LONG? **THE TAG IS THE RECORD** — `lens_of`'s own rule,
+    one field over.
+
+    [2026-09-11 (aar)] CORRECTED. Both call sites read
+    `str(r.get("side")) == "long"`, and the public `/trades.json` feed carries
+    `side: null` on a large minority of rows — so `str(None) == "long"` is
+    False and the row was replayed as a SHORT. Measured on the graded era:
+    155 rows side=long/reason=long, 34 side=short/reason=short, 12
+    side=None/reason=short (right by accident), and **7 side=None with a LONG
+    reason — sign-flipped**, every one `long-breakoutup`.
+
+    The error was silent because it cancels in aggregate: the calibration gate
+    still read 0.009pp, and a flipped row is wrong by up to 38pp on its own.
+    It sits in `draw_null` too, so it mis-signed the NULL as well as the
+    replay.
+
+    Derived from the reason/tag prefix, which every row carries, with the
+    `side` column only as a fallback for a row whose tag is unreadable."""
+    tag = str(r.get("tag") or r.get("reason") or "")
+    head = tag.split("_")[0]
+    if head.startswith("long"):
+        return True
+    if head.startswith("short"):
+        return False
+    return str(r.get("side")) == "long"
+
+
 def routing(lens, stamped):
     """The taker's OWN exit routing for `lens`, with the stamped max-hold
     grafted on exactly as the live call site does.
@@ -300,7 +328,7 @@ def replay_real(rows, tape):
         bars, trail = rt
         w = walk(float(r.get("entry_price") or 0),
                  _ts(r["opened_at"]).timestamp(),
-                 str(r.get("side")) == "long", bars, trail, s)
+                 side_is_long(r), bars, trail, s)
         if w:
             out.append(w[0] * 100.0)
             used.append(r)
@@ -322,7 +350,7 @@ def draw_null(rows, tape, k=DRAWS, seed=20260910):
         if rt is None:
             return None
         bars, trail = rt
-        is_long = str(r.get("side")) == "long"
+        is_long = side_is_long(r)
         got = []
         for _ in range(k):
             i = rng.randrange(0, len(s) - 2)
@@ -507,6 +535,24 @@ def selftest():
             for h in (1, 2, 3)]
     assert cluster_days(rows, [1.0, 2.0, 3.0]) == [2.0]
 
+    # [(aar)] THE SIDE BUG. `side: null` on the public feed made
+    # `str(None) == "long"` False, so 7 of 208 era closes — every one
+    # `long-breakoutup` — were replayed and NULLED as shorts. The tag is the
+    # record. Mutation: revert either call site to `str(r.get("side"))` => red.
+    assert side_is_long({"side": None, "reason": "long-breakoutup_trail"})
+    assert side_is_long({"side": None, "tag": "long-breakoutup"})
+    assert not side_is_long({"side": None, "reason": "short-divergence_tp"})
+    assert side_is_long({"side": "long", "reason": ""}), "fallback to the column"
+    assert not side_is_long({"side": None, "reason": ""}), "no tag, no side"
+    import ast as _ast
+    _src = open(__file__).read()
+    for _fn in ("replay_real", "draw_null"):
+        _f = next(n for n in _ast.walk(_ast.parse(_src))
+                  if isinstance(n, _ast.FunctionDef) and n.name == _fn)
+        _u = _ast.unparse(_f)
+        assert "side_is_long(" in _u, f"{_fn} must ASK the owner"
+        assert "'side') == 'long'" not in _u, \
+            f"{_fn} still infers side from the nullable column"
     print("study_taker_random_null selftest OK")
     return 0
 

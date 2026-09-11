@@ -1,0 +1,35 @@
+🎫 THE TICKET TAKER — PRE-REGISTERED ENTRY-CELL EDGE SEARCH
+
+registration PREREG_TAKER_CELLS_2026-09-11.json  sha256 daa496cd38c7c7bc…  m=152  FDR=0.05
+BAR: A cell is an EDGE iff it survives BH at FDR 0.05 across all m=152 pre-declared cells on the day-clustered one-sided paired-difference t, AND its selection-adjusted p_max <= 0.05 against the shift-placebo max statistic, AND it survives coin-clustering, AND it passes every concentration test, AND its point excess exceeds its own mde80_cluster. Even then it ships only as a shadow-lane restriction with a pre-registered forward read, never as a live change.
+
+K=2000 null draws/close (seed 20260910)  ·  B=2000 shift placebos (seed 20260911)  ·  n floor = fleet_allocation.MIN_N = 10  ·  t_crit(30) = 1.3114
+
+[bot_pnl_store] disabled: DATABASE_URL not set
+ledger   304 kept after quarantine/phantom/adopted  ->  era n=208  since 2026-07-30T11:09:46+00:00 (policy-stamp)
+families {'long-breakoutup': 162, 'short-divergence': 46}
+LIVE_SIDES = {'divergence': ['short']}   <- a long-breakoutup survivor can only buy a SHADOW-lane filter
+
+era reproduction  mine {'n': 208, 't': 2.12, 'h1': 46.06, 'h2': 70.59}  vs published {'n': 208, 't': 2.12, 'h1': 46.06, 'h2': 70.59}  -> MATCH
+
+long-breakoutup  era n=162  carrying all 7 entry features: 162  (floor 140)
+
+tape  49 coins, 46d (cache /Users/eamonjuaomartins-carrick/Claude/Projects/Crypto Trading Bot/.claude/worktrees/taker-edge/scripts/.taker_null_tape) …
+  covers 46/49 coins (94%, floor 60%)
+
+calibration  replayed +0.728%/trade vs ledger +0.809% on the SAME 196 closes (|drift| 0.081pp, tol 0.60pp)
+calibration OK
+
+outcome curves  196 closes (12 dropped: coin absent from the tape)  2.2s
+null  K=2000 draws/close  median MC SE of mu_i = 0.124pp (ceiling 0.15pp)
+paired unit  d_i = x_i - mu_i   book +0.809%/trade  null +1.063%/trade  excess -0.254pp
+
+selection premium  B=2000 shift placebos: null max-t median +1.38, p95 +2.57  (5.3s)
+  (a cell must beat that BEFORE it means anything — the already-measured premium on this book was ~+0.96 to +1.17 z-units)
+
+§9 PIPELINE CALIBRATION — run BEFORE the real table; failure REFUSES.
+  positive control +2.00pp planted on a sha256-parity cell (n=110, an EXTRA hypothesis so it carries the m+1=153 burden): t +2.91, p 3.03e-03, p_max 0.0195, post-BH survivors 0 -> does not fire  [GATING]
+
+  the control cell's own MULTIPLICITY-ADJUSTED detection floor is 3.35pp/trade (n=110, G=39 day clusters, BH rank-1 threshold 3.27e-04) — a search this WIDE cannot see +2.00pp on a cell this size, whatever is in the data.
+
+REFUSED — the pipeline's real power is below its own bar: a planted +2.00pp effect does not survive BH at m+1. A gate that never opens is trivially stable and useless, and a null result off it would be indistinguishable from a broken harness. THIS IS NOT A BUG IN THE HARNESS — it is the registration's own §4 arithmetic arriving: the multiplicity burden of m=152 pre-declared cells puts the detection floor above any effect this book could plausibly carry. Re-run with --diagnostic to SEE the cell table; nothing in it can be called an edge.

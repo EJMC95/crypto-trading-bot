@@ -50,6 +50,7 @@ import argparse
 import datetime as _dt
 import json
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -109,6 +110,81 @@ def _ensemble_rows_publishing() -> bool:
                if isinstance(r, dict))
 
 CARRIED = [
+    {
+        "id": "offered-set-feed-window-caps-the-only-powered-search",
+        "owner": "session",
+        "what": "(aaq) THE CHEAPEST LARGE WIDENING AVAILABLE TO THIS FLEET, "
+                "and it is a FEED CONSTANT rather than a recording gap. The "
+                "scout's OFFERED ticket population -- the only taker "
+                "population with enough power to resolve an effect the size "
+                "anyone hopes for (mde80 0.30%/trade at n=2,736, against the "
+                "ledger's 1.26) -- is retained for 60 DAYS by "
+                "`bot_pnl_store.prune_history`, and the only reason the "
+                "11-Sep search saw 8.3 of them is that `pnl_dashboard` caps "
+                "`/bus.json?hours=` at 200h. Measured: `tickets` are 9.7% of "
+                "the lighter-market payload (1.09 MB of 11.21 MB per 24h), so "
+                "60d of TICKETS is ~65 MB against 672 MB for the whole "
+                "payload. A tickets-only projection on that SELECT plus a "
+                "higher cap on that path takes the search from 8.3d to 60d -- "
+                "~7x n, mde80 0.30 -> ~0.11%/trade -- and it is "
+                "DASHBOARD-ONLY: no trading image, no deploy marker, no "
+                "expectancy price, no trade changes.",
+        "why_open": "NOT shipped in the pass that found it, deliberately. It "
+                    "changes a shared READ PATH on `bot_state_history` -- the "
+                    "table behind (zq)'s lock convoy, where a never-committed "
+                    "read transaction blocked every bot's publish fleet-wide "
+                    "for ~40 minutes including both real-money rows. A wider "
+                    "SELECT on that table earns its own careful pass with the "
+                    "autocommit/lock_timeout discipline and a measured query "
+                    "plan, not a tired one at the end of a long session. "
+                    "BEFORE SHIPPING: confirm the projection actually reduces "
+                    "the scan (not just the payload), check "
+                    "`pg_blocking_pids` during a trial run, and verify no "
+                    "publisher queues behind it. THEN re-run "
+                    "`scripts/study_taker_offered_2026-09-11.py` at the wider "
+                    "window -- its pre-registration "
+                    "(PREREG_TAKER_OFFERED_2026-09-11.md) still governs and "
+                    "the bar does not move. Closes when the CHANGELOG records "
+                    "'offered-set 60d READ:' with the re-run verdict.",
+        "closes_when": lambda: _has("CHANGELOG.md", "offered-set 60d READ:"),
+    },
+    {
+        "id": "null-basis-and-window-mismatch",
+        "owner": "session",
+        "what": "(aar) adversarial verification of the taker's random-entry "
+                "null found THREE defects. One is FIXED (the side inference "
+                "read a nullable column and replayed 7 of 208 era closes as "
+                "SHORTS; corrected to derive from the tag, AST-pinned at both "
+                "call sites, verdict unchanged and stronger on every family). "
+                "TWO ARE RECORDED AND NOT PATCHED. (1) THE CALIBRATION GATE "
+                "CERTIFIES A PRICE BASIS THE NULL NEVER USES: `replay_real` "
+                "enters at the ledger's own FILL price while the null's `mu` "
+                "enters at an HOURLY BAR CLOSE, so `d_i` mixes two bases; run "
+                "the book's own closes through the null's path and the drift "
+                "is 0.661pp, ABOVE the 0.60pp tolerance -- i.e. on one "
+                "consistent basis the gate would REFUSE, and the family "
+                "excess reads -0.993pp (t -1.17) rather than -0.242pp. (2) "
+                "THE NULL IS TIME-BLIND: both docstrings claim 'same coin, "
+                "SAME window' and the draw is uniform over the coin's entire "
+                "~46d tape. Hour bias is small (-0.100 to +0.136pp); WEEKEND "
+                "bias is +0.632pp.",
+        "why_open": "NOT patched in the same pass under the fleet's own 'ship "
+                    "narrow, verify in the live payload, then widen' rule -- "
+                    "(fz) changed six surfaces at once and spent six entries "
+                    "repairing itself. BOTH defects push the refusal the SAME "
+                    "way (against the book), so no verdict of (aaf)/(aan)/"
+                    "(aar) depends on them and nothing is blocked on this. "
+                    "What IS blocked: no time-conditioned cell from this null "
+                    "may be read as matched until (2) is fixed, and no "
+                    "absolute level from it may be quoted until (1) is. Fix "
+                    "(1) by walking BOTH arms from the same price basis "
+                    "(prefer the bar close, which the null cannot avoid) and "
+                    "re-running the gate; fix (2) by drawing within a matched "
+                    "window rather than the whole tape. Closes when the "
+                    "CHANGELOG records 'null basis+window READ:' with the "
+                    "re-run numbers.",
+        "closes_when": lambda: _has("CHANGELOG.md", "null basis+window READ:"),
+    },
     {
         "id": "ensemble-rows-registered-but-unpublished",
         "owner": "OPERATOR",
@@ -1109,6 +1185,28 @@ def subject_status():
             for it in CARRIED for row in it.get("subject", ()) if row in dead]
 
 
+
+def _source_row_count(src: str | None = None) -> int:
+    """How many carried rows the SOURCE TEXT declares, counted independently
+    of how Python parses it. The whole point is to disagree with `len(CARRIED)`
+    when a row has been absorbed by a merge.
+
+    Takes the text so it can be TESTED: a counter that can only ever read its
+    own file cannot be shown to disagree with anything."""
+    src = pathlib.Path(__file__).read_text() if src is None else src
+    start = src.index("\nCARRIED = [")
+    depth, end = 0, start
+    for k in range(src.index("[", start), len(src)):
+        if src[k] == "[":
+            depth += 1
+        elif src[k] == "]":
+            depth -= 1
+            if depth == 0:
+                end = k
+                break
+    return src[start:end].count('        "id": "')
+
+
 def carried_status():
     """-> [(item, done)]. A predicate that RAISES counts as not-done, and says
     so: a broken predicate must not silently close an item."""
@@ -1199,6 +1297,40 @@ def main(argv=None):
         # `render` learned to read the live feeds, rendering here would make
         # every push depend on the dashboard being up. A guard has two regimes
         # and the CI one has no network.
+        # THE FIRST VERSION OF THIS ARM LOOKED FOR DUPLICATE IDS AND WAS
+        # VACUOUS -- a mutation reproducing the exact defect ran GREEN through
+        # it. When two dicts merge, Python keeps the LAST value for every key,
+        # so the eaten row leaves NO duplicate and NO empty field: it is simply
+        # gone. There is no fingerprint inside the parsed list.
+        #
+        # So compare the SOURCE against the PARSE. Every row's id is a literal
+        # in this file; if the text holds more ids than `CARRIED` does, a row
+        # was absorbed. That needs no constant to keep in step and it fails
+        # loudly on the one thing the other arms cannot see.
+        n_src, n_parsed = _source_row_count(), len(CARRIED)
+        if n_src != n_parsed:
+            print("audit_session_state: FAIL — the carried list is malformed: "
+                  f"{n_src} row id(s) in the SOURCE but {n_parsed} row(s) "
+                  "parsed. A dropped `},{` between two rows makes Python read "
+                  "them as ONE dict, the later `\"id\"` wins, and the earlier "
+                  "row is silently absorbed -- the file still parses and the "
+                  "count still looks plausible.")
+            return 1
+        missing = [i.get("id") for i in CARRIED if not i.get("id")]
+        if missing:
+            print(f"audit_session_state: FAIL — {len(missing)} row(s) have "
+                  "no id.")
+            return 1
+        for i in CARRIED:
+            for field in ("owner", "what", "why_open", "closes_when"):
+                if not i.get(field):
+                    print(f"audit_session_state: FAIL — carried row "
+                          f"{i.get('id')!r} has no {field}.")
+                    return 1
+
+        # STRUCTURE BEFORE CONTENT, and the ordering is load-bearing: `stale`
+        # and `orphan` are both computed FROM this list, so running them on a
+        # malformed one yields confident verdicts about the wrong rows.
         stale = [i["id"] for i, d in carried_status() if d]
         if stale:
             print("audit_session_state: FAIL — carried item(s) whose own "
@@ -1209,6 +1341,15 @@ def main(argv=None):
         # under it. Reported separately from `stale` because the remedy
         # differs — a done row is DELETED, a dead-subject row is RE-POINTED at
         # a living book or closed with a reason.
+        # [(aao)] A THIRD WAY THE LIST ROTS, AND IT PASSED BOTH ARMS ABOVE:
+        # a row SILENTLY EATEN BY A MERGE. Resolving a conflict between two
+        # sessions' added rows, a dropped `},{` between them makes Python read
+        # the pair as ONE dict literal -- the later `"id"` wins, the earlier
+        # row's fields are absorbed, the file PARSES, and the count looks
+        # plausible. Measured: 22 rows merged to 21 and `--check` said "none
+        # stale, none orphaned", because neither arm asks whether a row is
+        # MISSING.
+        #
         orphan = subject_status()
         if orphan:
             print("audit_session_state: FAIL — carried item(s) pointed at a "
@@ -1230,6 +1371,37 @@ def main(argv=None):
 
 
 def selftest():
+    # [(aao)] THE SOURCE-VS-PARSE ARM NEEDS ITS OWN CONTROL, because a guard
+    # that is VACUOUS and one that is CORRECT are byte-identical on a healthy
+    # list. Measured: breaking the real list reddened `--check`, and two
+    # mutations that made the guard compare the parse to ITSELF both ran
+    # green -- the guard could not tell me it had stopped working.
+    #
+    # So RUN THE REAL GUARD against a planted defect, in a subprocess, on a
+    # temp copy of this file. Nothing here re-implements the check; if the
+    # guard is hollowed out, this arm goes red.
+    import subprocess as _sp
+    import sys as _sys
+    import tempfile as _tf
+    _src = pathlib.Path(__file__).read_text()
+    assert _source_row_count(_src) == len(CARRIED), (
+        "source row count disagrees with the parsed list")
+    # Drop ONE row boundary: the two dicts then parse as one, the later "id"
+    # wins, and a row is silently absorbed.
+    _eaten = _src.replace("    },\n    {\n", "", 1)
+    assert _eaten != _src, "the fixture found no row boundary to remove"
+    with _tf.TemporaryDirectory() as _d:
+        _f = pathlib.Path(_d) / "session_state_eaten.py"
+        _f.write_text(_eaten)
+        _r = _sp.run([_sys.executable, str(_f), "--check"],
+                     capture_output=True, text=True, cwd=ROOT, timeout=180)
+    assert _r.returncode != 0, (
+        "a row eaten by a dropped `},{` did NOT redden --check; the "
+        "source-vs-parse arm is vacuous:\n" + (_r.stdout or _r.stderr))
+    assert "malformed" in (_r.stdout + _r.stderr), (
+        "--check went red for some OTHER reason than the eaten row:\n"
+        + (_r.stdout or _r.stderr))
+
     # every row is well-formed and its predicate is callable and total
     ids = [i["id"] for i in CARRIED]
     assert len(ids) == len(set(ids)), f"duplicate carried id: {ids}"

@@ -1,3 +1,368 @@
+## 2026-09-11 (aar) — 🎫 THE NULL THAT BLOCKED A GO-LIVE INFERRED SIDE FROM A NULLABLE COLUMN, AND REPLAYED 7 LONGS AS SHORTS
+
+**The instrument whose verdict refused the taker's go-live had a sign bug in
+it, found by adversarially verifying my own morning's work.** The verdict does
+not move. Every number in it does, and all of them in the same direction.
+
+**THE DEFECT.** `scripts/study_taker_random_null_2026-09-10.py` decided
+direction with `str(r.get("side")) == "long"`, at BOTH call sites —
+`replay_real` (the calibration arm) and `draw_null` (the null itself). The
+public `/trades.json` feed carries **`side: null`** on a large minority of
+rows, and `str(None) == "long"` is False, so a null-sided row was replayed as
+a **SHORT**. Measured on the graded era (n=208):
+
+| side column | reason prefix | n | replayed as |
+|---|---|---|---|
+| `long` | long | 155 | long ✓ |
+| `short` | short | 34 | short ✓ |
+| `null` | short | 12 | short ✓ *by accident* |
+| **`null`** | **long** | **7** | **short ✗ — SIGN-FLIPPED** |
+
+All seven are `long-breakoutup`. Across the whole retained ledger (349 rows)
+it is **63**.
+
+**WHY IT SURVIVED A CALIBRATION GATE BUILT TO CATCH EXACTLY THIS.** The gate
+compares MEANS, and seven flipped rows out of 208 cancel: `(aaf)` reported
+|drift| **0.009pp** against a 0.60pp tolerance and passed honestly. A single
+flipped row is wrong by up to **38pp**. **A gate on an aggregate cannot see a
+per-row sign error** — which is `(po)`'s "pick a test that could detect the
+damage" one level down, and the reason the fix is pinned by an AST assertion
+at both call sites rather than by the drift number.
+
+**THE FIX: THE TAG IS THE RECORD** — `lens_of`'s own rule, one field over, in
+the same module. `side_is_long(r)` derives direction from the reason/tag
+prefix, which every row carries, and falls back to the `side` column only for
+a tag it cannot read. Pinned in the module's selftest by AST at BOTH sites
+(`side_is_long(` present, `'side') == 'long'` absent) — a substring check on
+one site would have left the other deletable. Mutation red.
+
+**RE-RUN, CORRECTED (1,000 draws, calibration |drift| 0.019pp on all 208
+closes — better than before):**
+
+| family | `(aaf)` published | **corrected** |
+|---|---|---|
+| POOLED | +0.953 vs +1.064, −0.111pp, P=0.590 | **+0.902 vs +1.075, −0.174pp, P=0.636** |
+| **short-divergence** | −0.788 vs −0.564, −0.224pp, P=0.660 | **−0.788 vs −0.371, −0.417pp, P=0.734** |
+| long-breakoutup | +1.454 vs +1.532, −0.078pp, P=0.520 | **+1.382 vs +1.486, −0.105pp, P=0.567** |
+
+**THE VERDICT IS UNCHANGED AND STRONGER ON EVERY FAMILY.** No family beats a
+coin flip; the only family `LIVE_SIDES` admits reads **P=0.734**, worse than
+published. `(aaf)`'s table is superseded and corrected in place per I12 — a
+future session quoting the old digits would be quoting a mis-signed replay.
+
+**`(aan)`'s CORRECTION OF `(aaf)` SURVIVES, re-checked against the fixed
+instrument:** `long-breakoutup` at −0.105pp / P=0.567 is still **TIED** with
+random rather than beaten, and its one-sided upper bound still excludes
+nothing — so I17-as-amended still forbids retiring the book on this evidence.
+
+**HOW IT WAS FOUND, because the method is the transferable part.** Not by
+re-reading the code — by an adversarial verification lens that **recomputed
+seven cells from scratch** through its own loader, its own quantiles, its own
+cluster-SE and its own t-tail, and then reported the disagreements. It also
+refuted the headline of the work it was verifying (below), which is what an
+independent check is for. Three defects today were found this way and none by
+inspection.
+
+**TWO MORE DEFECTS IT FOUND IN THE SAME PASS, recorded rather than fixed,
+because both push the refusal the same way and neither changes a verdict:**
+* **THE CALIBRATION GATE CERTIFIES A PRICE BASIS THE NULL NEVER USES.**
+  `replay_real` enters at the ledger's own FILL price; `mu` is built from a
+  path that enters at an hourly BAR CLOSE. Run the book's own 208 closes
+  through *that* path and the drift is **0.661pp** — above the 0.60pp
+  tolerance, i.e. it would REFUSE. So `d_i` mixes two price bases and the
+  asymmetry (0.32–0.58pp) is LARGER than the excess it measures. On one
+  consistent basis the family excess reads **−0.993pp (t −1.17)**, not
+  −0.242pp. **Against the book, so the refusal strengthens.**
+* **THE NULL IS TIME-BLIND.** Both docstrings say *"same coin, same window"*;
+  the draw is in fact uniform over the coin's entire ~46d tape. Hour-matched
+  bias is small (−0.100 to +0.136pp) but **weekend bias is +0.632pp**. No
+  verdict moves; no time-conditioned cell may be read as matched.
+
+Both are CARRIED (`null-basis-and-window-mismatch`) rather than patched in the
+same pass — one surface per pass, verified in the live payload, which is the
+rule `(fz)` was written to enforce.
+
+## 2026-09-11 (aaq) — 🎫 "WIDEN UNTIL YOU FIND AN EDGE": 126 CELLS ON THE POPULATION THE BOOK NEVER CONDITIONED ON, AND THE BEST ONE IS WORSE THAN NOISE
+
+**Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for
+it."* Run properly, pre-registered, and reported whichever way it came out.
+
+**THE ANSWER: NO CELL SURVIVES.** 126 pre-declared cells, 2,736 graded
+episodes, four lenses, 8.3 days. The best cell found
+(`momentum/prem_bps>=p75`, **z=2.13**) sits **BELOW the noise-search p95 of
+2.37**: a pure-noise search of the same shape produces a better best cell than
+this one did.
+
+**AND THE PERMUTATION ALONE IS WHAT KILLS IT — stated precisely, because the
+bar here is deliberately belt-and-braces and it would be easy to credit the
+wrong half.** The pre-registered rule requires BH at FDR 0.05 **and** beating
+the permutation max-statistic. A parallel adversarial review of the sibling
+sweep measured that stacking those two DOUBLE-COUNTS: Westfall-Young max-T
+already controls family-wise error and adapts to the dependence, while
+BH-at-rank-1 is Bonferroni and does not — effective multiplicity there
+measured **8-9, not 152**, a ~17x over-penalty, enough to kill a planted
++2.00pp positive control that max-T alone correctly FIRES on. **That critique
+does not rescue anything here:** this run's best cell fails the permutation
+test on its own, before BH is ever consulted. So the refusal rests on the
+half that is not over-penalised.
+
+**WHY THE OFFERED SET, AND IT IS THE WHOLE METHODOLOGICAL POINT.** A threshold
+sweep over the book's own closes searches a population it already SELECTED,
+**on the very features being swept** — and conditioning on a variable removes
+the information in it. Measured on the same feature vocabulary: offered
+`vol_m` p50 **0.49** against taken **2.67**; offered `range_pos` spans
+**[0.84, 1.13]** against taken **[0.94, 1.01]**. That is why `(aan)`'s sweep
+found `brk_quality` **INVERSELY** related to excess (>=0.6 -> −0.821pp) — there
+was nothing left in it. So this searched the scout's OFFERED tickets, which
+the fleet has been recording all along in `bot_state_history`/`lighter-market`
+and which nothing had ever graded.
+
+**THE SAMPLE IS THE REASON IT WAS WORTH RUNNING:** the public `/bus.json`
+serves **200 hours**, not the 24 assumed — 2,351 snapshots, **2,768 ticket
+EPISODES** (a (lens, sym) run; a >2h gap starts a new one) against 208 era
+closes. **mde80 0.30%/trade at full n against the ledger's 1.26** — roughly 4x
+the resolving power, and the first search in this line able to see an effect
+the size anyone actually hopes for.
+
+**THE CALIBRATION GATE REFUSED THE FIRST RUN, AND IT WAS RIGHT.** v1 graded
+every episode under SHIPPED-DEFAULT bars and then compared the taken ones
+against closes that ran their OWN stamped bars at their OWN open: replayed
++4.469%/trade against a realised +1.961%, **drift 2.508pp** against a 0.60pp
+tolerance, **no verdict printed**. That comparison was invalid by
+construction, not merely noisy. **The harness was fixed, not the tolerance** —
+calibration is now a PAIRED walk-fidelity test (each real close at its own
+open with its own bars, against its own realised return) and reads **+2.020%
+vs +1.961% on the same n=51, |drift| 0.059pp**. The contrast keeps ONE
+convention on both arms, declared rather than discovered.
+
+**TWO DEFECTS OF MY OWN, BOTH RECORDED BECAUSE THEY ARE THE POINT.**
+* **The permutation column was garbage** — `rets` in FRACTIONS against a
+  baseline in PERCENT, yielding max-z values of **−170 and +330** where a
+  noise search of this shape yields ~2–3. It did not move the verdict (BH runs
+  in its own units) but **the verdict text CITES that number**, and a citation
+  of a broken number is how a wrong one gets believed later. Corrected: the
+  p95 now reads 2.37 and the refusal is *stronger* for it.
+* **Q1 HAD LOOK-AHEAD, AND IT LOOKED SPECTACULAR.** It read breakout taken
+  **+4.469%/trade** against refused **+0.643%** — excess **+3.826pp,
+  P=0.000** — and that is NOT admission value. An episode is labelled TAKEN
+  because the book opened it LATER in that episode, while every arm enters at
+  the episode's FIRST sighting: the taken arm is conditioned on a decision
+  made after its own entry. **The calibration prices the confound exactly:**
+  those same trades from the book's ACTUAL open read **+2.020%**, not +4.469%.
+  The gap is ENTRY TIMING, not selection. Q1 now prints under a
+  **CONTAMINATED** header with the confound as a printed number, because
+  deleting it would hide the one measurement that bounds it. Answering
+  admission honestly needs the GATES replayed over the tape
+  (`lighter_ticket_replay`), not a label join — named as the next instrument,
+  not as a result.
+
+**AND THE REAL ANSWER TO "WIDEN UNTIL YOU FIND AN EDGE" IS THAT WIDTH WAS
+NEVER THE BINDING CONSTRAINT — THE SAMPLE IS.** The sibling sweep's
+verification decomposed its own detection floor on the control cell (n=110,
+sd_d 6.281pp, G=39) and the arithmetic settles it:
+
+| bar | mde80 | multiplier |
+|---|---|---|
+| a SINGLE pre-registered hypothesis, iid | **1.69pp/trade** | — |
+| + day clustering | 1.88pp | x1.11 |
+| + BH across 153 cells | 3.38pp | x1.80 |
+
+**The book's entire mean is 1.38pp/trade, so the FIRST bar already exceeds it —
+before any multiplicity at all.** The measured price of the whole width is only
+**2.0x**. So "widening destroys the power" is half wrong and is corrected here:
+testing ONE hypothesis on this ledger could not resolve an effect the size of
+the book's own mean. **No search design fixes that; only more closes do** —
+which is exactly why the offered set (n=2,736, mde80 **0.30pp**) was the right
+population to ask, and it is the one that came back empty with adequate power
+to see an answer.
+
+Same verification also measured the test as **CONSERVATIVE, not permissive**:
+over 200 held-out null books, P(p<=0.05) = **2.19% +/- 0.38%** against a
+nominal 5%, and family-wise error 0.5% against a nominal 5%. The refusal is if
+anything understated.
+
+**WHAT THE SEARCH CAN AND CANNOT SAY.** Every cell prints its own **mde80**,
+so a null reads *"could not have detected an edge below X"* rather than *"no
+edge"* — for the big breakout cells that floor is ~0.5%/trade, for the thin
+momentum ones ~1.5%. Combined with `(aaf)`/`(aan)` — the matched-random null
+TYING `long-breakoutup` at P=0.500, and the entries carrying no measurable
+directional information — the weight of evidence is that **this book's signal
+is not there to be found by filtering.** That is a refusal with evidence, which
+this fleet counts as compliance (I26), and it is NOT a retirement case: the
+upper bound on the breakoutup excess is **+0.68pp > 0**, so nothing has been
+excluded (I17-as-amended).
+
+**AND THE VARIANCE ROUTE IS CLOSED TOO, WHICH IS THE OTHER HALF OF "WIDEN".**
+Splitting is what the cells tested; the alternative is a covariate that
+shrinks the residual and therefore the detection floor (`mde ∝ sqrt(1−R²)`).
+Measured per-feature eta² on the era's 162 breakoutup closes against a null
+E[eta²] of **0.0124**: `hour_utc` 0.0185 · `brk_quality` 0.0147 · `chg_pct`
+0.0091 · `apr_pct` 0.0063 · `prem_bps` 0.0053 · `range_pos` 0.0047 · `vol_m`
+0.0030 · `up_strength` 0.0029. **Not one recorded entry-time feature explains
+more of the per-trade variance than chance does.** The best real covariate
+available is `exit_reason` — an OUTCOME, so inadmissible — and even it is
+worth only 2.27pp → 2.17pp. **Halving the floor would need R²=0.75.**
+
+**A FOUND-AND-REPORTED ARTIFACT IN THAT TABLE, and it is the instructive
+one:** `apr_pct` first read **eta²=0.2867**, monotone across terciles
+(−2.39 / +0.51 / +6.02) — a headline. It was a tie-ordering artifact: **118 of
+162 closes carry the identical venue resting default 10.5**, and sorting
+`(value, pnl)` tuples ordered those ties BY OUTCOME. Under 200 random
+tie-breaks the median is **0.0063 — below the null.** The sibling sweep hit
+the same wall honestly, printing `UNCOMPUTABLE: duplicate cut point` on its
+`apr_pct` p40/p60/p80 cells.
+
+**THE ONE CHEAP, LARGE, ACTIONABLE WIDENING FOUND ALL DAY — and it is a FEED
+CONSTANT, not a recording gap.** The offered population is already recorded
+for **60 days** (`bot_pnl_store.prune_history`), and the only reason this
+search saw 8.3 of them is that `pnl_dashboard` caps `/bus.json?hours=` at
+**200h**. Measured: `tickets` are **9.7% of the payload** (1.09 MB of 11.21 MB
+per 24h), so 60d of tickets is ~**65 MB** against 672 MB for the whole thing.
+A tickets-only projection plus a higher cap on that path is **dashboard-only —
+no trading image, no deploy marker, no expectancy price — and takes the one
+population that HAS power from 8.3d to 60d, ~7x n, mde80 0.30pp → ~0.11pp.**
+CARRIED as `offered-set-feed-window-caps-the-only-powered-search` rather than
+shipped in this pass: it changes a shared read path on
+`bot_state_history`, the table behind `(zq)`'s lock convoy, and that earns its
+own careful pass rather than a tired one.
+
+**THE PRODUCTIVE HALF, and it shipped separately as `(aap)`:** the search's
+real constraint is not the threshold, it is **what the book records**. The
+taker captured SIX ticket fields where the scout publishes ELEVEN, and not one
+of 304 closes carries `regime` — the per-asset oracle verdict, and the exact
+variable item 18 says the fleet most needs, since the whole Lighter tape is a
+single falling-BTC regime. Fixed at the entry site; it pays forward from the
+next entry and could never have been recovered retroactively.
+
+Pre-registration: `PREREG_TAKER_OFFERED_2026-09-11.md`, committed BEFORE any
+outcome was computed, including the bar (BH + permutation max-stat +
+drop-worst-3 + leave-one-coin-out + leave-one-day-out, n>=10). Instrument:
+`scripts/study_taker_offered_2026-09-11.py`, registered in `SELFTEST_MODULES`,
+exits 2 on refusal. **Every cell is printed, survivor or not** — a sweep that
+prints only its winner is the artifact.
+
+## 2026-09-11 (aap) — 🎫 THE ENTRY CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS ELEVEN: NOT ONE OF 304 CLOSES CARRIES THE REGIME IT WAS TAKEN IN
+
+**Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for
+it."* The search is running; this is the half that had to ship first, because
+it is the half that cannot be done retroactively.
+
+**THE FINDING.** `lighter_ticket_taker` captured **six** ticket fields at the
+entry site and the scout publishes **eleven**. Measured over 8.3 days of scout
+tape (2,768 ticket episodes, all four lenses): **every lens publishes
+`regime`** — the per-asset oracle verdict,
+`{"dir": ±1|0, "v": "LONG-window" | "SHORT-window" | "dir-flat" |
+"chop-gated"}` — and **not one of this book's 304 closes carries it.** Also
+dropped: `noncrypto` (every lens), `trend` (dip), and `lighter_apr` /
+`xvenue_apr` — the divergence lens's entire thesis.
+
+**WHY IT IS THE ONE THAT MATTERS.** Item 18: Lighter's whole tape is a single
+falling-BTC regime, so a directional grade is a grade *in that regime only* —
+and `regime` is precisely the field that would let a grader split it. 41 days
+of closes cannot answer that question, and no later session can recover it.
+
+**[CORRECTED IN PLACE the same day per I12 — "every lens publishes `regime`"
+OVERSTATES IT, in the direction that oversells this fix.** Every lens EMITS
+the key, which is what was checked; the measured PRESENCE rate over 68,774
+ticket observations is **23.6%** — breakout 26.6%, momentum 37.4%, dip 20.0%,
+divergence **7.6%** — and when present it is **64% `LONG-window`**, with
+`SHORT-window` on 164 observations of 16,203. On this book's own
+crypto-breakout tickets at its own conviction bars a parallel measurement puts
+presence at 48.6% and `LONG-window` at 643 of 692. **So `regime` will land on
+roughly a quarter to a half of future closes and is NEAR-DEGENERATE as a split
+today.** The capture is still right — absent stays absent, it costs nothing,
+and it is the field that becomes informative the day the regime actually
+changes, which is the only day it could ever be checked. But it is a FORWARD
+RECORD, not an analysis unlock, and this entry read as the latter. The number
+was in front of me when I wrote it (`regime types: dict 2650, NoneType 7380`)
+and I generalised past it.**
+
+**THIS IS `(di)`'s DEFECT, ONE TURN LATER, ON DIFFERENT FIELDS.** `(di)`
+captured `brk_quality`/`up_strength` *"so winning criteria can be DERIVED from
+realized closes"* and recorded what the gap had already cost, in its own
+words: *"the first 6 breakoutup closes shipped without their features
+(unrecoverable from the ledger)."* The lesson was written down and the capture
+list was never revisited. **A feature that exists at the entry site and never
+reaches the ledger is a feature no grader can ever condition on** — which is
+I23's rule (*"a knob must record the quantity it cuts"*) pointed at a SEARCH
+rather than a lever.
+
+**SHIPPED:** `entry_evidence(t)` — a PURE owner beside `_close_extra`, with
+`EV_KEYS_BASE` (the six, unchanged) and `EV_KEYS_ADDED` (the five, added only
+when the ticket carries them). **Absent stays ABSENT, never `null`** — the
+convention `peak_ret`/`give_back` already use, and the reason a grader must
+not read a missing regime as "no regime" (I6).
+
+**OBSERVABLE-ONLY, and the three refusals are pinned:** the `_close_extra`
+merge is by `setdefault`, so evidence can never clobber `bars`/`bars_basis`/
+`policy`; nothing branches on the result; and **the six original keys keep
+their exact prior payload shape** — a breakout close still stamps
+`gap_pct: null` — so no existing consumer's `in extra` test changes meaning.
+`side` is deliberately NOT captured: the close tag already carries it, and a
+second spelling of a field graders key on is the `(xe)` trap.
+
+**THE MUTATION THAT SURVIVED ROUND ONE, and it is why this is a function
+rather than a dict.** The first version left the capture as an inline dict
+comprehension inside `main()`'s entry loop. Replacing the omit-None guard with
+an unconditional `ev[k] = t.get(k)` stayed **GREEN**, because the test built
+the evidence dict *itself* instead of driving the call site — the same
+inspects-nothing shape `(po)` names, and the second time this session that a
+guard has been satisfied by something other than the code it guards. Extracted
+to a pure owner, with an AST test that `main()` **CALLS** it and never rebuilds
+the dict inline. **5 mutations, all red:** drop `regime` · stamp `None` instead
+of omitting · drop a BASE key · capture `side` · inline the comprehension again.
+
+**WHAT THIS DOES NOT DO.** It changes no trade, no gate and no size — the
+taker's live arm is retired and this is publish-only, so it ships to
+`freqtrade-bots` on the auto-path with no live marker. It does not make the
+book gradeable by regime TODAY; it makes it gradeable from today. The first
+regime-stamped close arrives on the next entry.
+
+**AND THE TEST FILE REPRODUCED THE EXACT DEFECT THE CARRIED ROW NAMED — the
+same morning that row was read.** Its first version did
+`os.environ.setdefault("TT_BULL_MODE", "on")` at MODULE level. pytest collects
+every test module into ONE process, so it leaked into the environment every
+subprocess selftest inherits and turned **three already-green suites red** —
+`lighter_scout_tuner`, `lighter_ticket_replay` and `lighter_ticket_taker
+--selftest-live`, all reporting **zero fills**, plus `fleet_proprioception` at
+`too-few-trades`. Verified as mine, not pre-existing, by running the same test
+against `origin/main`'s module (green). That is blocker (1) of
+`taker-random-entry-null-blocked-on-ci` verbatim, which `(aaf)` had closed by
+construction the night before: *"the prior design did
+os.environ.setdefault('TT_BULL_MODE','on') at import and raced the taker's
+import, reddening three unrelated selftests."*
+
+**A lesson recorded in prose and violated the same day is the argument for a
+guard, so the class is closed:**
+`tests/autonomy/test_no_test_mutates_process_env.py` walks every test module's
+IMPORT-time scope by AST (module body plus module-level `if`/`try`/`with`/`for`
+bodies, which all run at import; function and class bodies deliberately not
+walked) and refuses a new `os.environ` assignment, `setdefault`, `update`,
+`pop` or `del`. Scoped sets inside a test or a fixture are allowed, and so are
+reads. **It is a RATCHET at the measured backlog of 9** — nine modules already
+do it, every one a `setdefault` on a VENUE variable its import genuinely needs
+— because a guard that reddens the build on a pre-existing backlog is exempted
+within a day and then guards nothing ((mz); I23 ships its own guards this way
+for the same reason). The backlog may only SHRINK: if it does, the guard FAILS
+ON THE GOOD NEWS and tells you to lower the number, because a ratchet nobody
+tightens stops being one. It carries its own positive control per `(po)` —
+empty output is not a negative result until the check has produced a positive
+one. 2 mutations red: a new offender, and raising the ratchet.
+
+Pinned by `tests/autonomy/test_taker_entry_evidence.py` (12 tests) and
+`tests/autonomy/test_no_test_mutates_process_env.py` (2). The
+offered-set search this came out of is pre-registered in
+`PREREG_TAKER_OFFERED_2026-09-11.md`, committed before any outcome was
+computed; its verdict follows in its own entry.
+
+**[RENUMBERED (aao) -> (aap), 11-Sep.** `origin/claude/market-downturn-bots-afz0cn`
+holds `(aao)` on an open branch — the `(zw)` open-branch arm of
+`audit_changelog_letters` caught it before the push, which is the arm working
+on the day it was built. Recorded inline per the changelog-letter rule; the
+commit subjects keep the old letter, which is why the commit log is not a
+letter index.**
+
+
 ## 2026-09-11 (aao) OPERATION SHORT: a second, deliberately conservative short-biased system — and the 20-point scoring component that was STRUCTURALLY UNREACHABLE
 
 **Eamon, 10-Sep: *"Please review and start operation short."*** `downtrend_ensemble_bot/`
@@ -1029,6 +1394,15 @@ calibration gate that reproduces the ledger to **0.009pp**.
 | POOLED | 206 | +0.953% | **+1.064%** | −0.111pp | **0.590** | +0.74 |
 | **short-divergence** | 46 | **−0.788%** | −0.564% | −0.224pp | **0.660** | −0.80 |
 | long-breakoutup | 160 | +1.454% | **+1.532%** | −0.078pp | **0.520** | +1.49 |
+
+**[11-Sep (aar)] SUPERSEDED — this table was computed by an instrument that
+inferred direction from a NULLABLE column and replayed 7 of 208 era closes
+(all `long-breakoutup`) as SHORTS.** The calibration gate could not see it: it
+compares means, and seven flipped rows cancel to 0.009pp. Corrected instrument,
+1,000 draws, |drift| 0.019pp on all 208: **POOLED −0.174pp P=0.636 ·
+short-divergence −0.417pp P=0.734 · long-breakoutup −0.105pp P=0.567.** The
+verdict is unchanged and STRONGER on every family — quote those digits, not
+these.
 
 **Random wins in all three splits.** Same result (hm) got six times on this
 book in July; this is confirmation on the CURRENT era and the CURRENT policy,

@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 11:07 Sydney (01:07Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 11:21 Sydney (01:21Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
@@ -8,7 +8,7 @@ _Generated 2026-09-11 11:07 Sydney (01:07Z) by `scripts/session_state.py`. Do no
 
 - `freqtrade-avo-maria-lighter` was shut **30% of the last 14.5d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (65h), mostly `slguard` (45h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (66h), mostly `slguard` (45h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -18,6 +18,16 @@ _Generated 2026-09-11 11:07 Sydney (01:07Z) by `scripts/session_state.py`. Do no
 - `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
+
+### `offered-set-feed-window-caps-the-only-powered-search`  ·  owner: **session**
+(aaq) THE CHEAPEST LARGE WIDENING AVAILABLE TO THIS FLEET, and it is a FEED CONSTANT rather than a recording gap. The scout's OFFERED ticket population -- the only taker population with enough power to resolve an effect the size anyone hopes for (mde80 0.30%/trade at n=2,736, against the ledger's 1.26) -- is retained for 60 DAYS by `bot_pnl_store.prune_history`, and the only reason the 11-Sep search saw 8.3 of them is that `pnl_dashboard` caps `/bus.json?hours=` at 200h. Measured: `tickets` are 9.7% of the lighter-market payload (1.09 MB of 11.21 MB per 24h), so 60d of TICKETS is ~65 MB against 672 MB for the whole payload. A tickets-only projection on that SELECT plus a higher cap on that path takes the search from 8.3d to 60d -- ~7x n, mde80 0.30 -> ~0.11%/trade -- and it is DASHBOARD-ONLY: no trading image, no deploy marker, no expectancy price, no trade changes.
+
+_Still open because:_ NOT shipped in the pass that found it, deliberately. It changes a shared READ PATH on `bot_state_history` -- the table behind (zq)'s lock convoy, where a never-committed read transaction blocked every bot's publish fleet-wide for ~40 minutes including both real-money rows. A wider SELECT on that table earns its own careful pass with the autocommit/lock_timeout discipline and a measured query plan, not a tired one at the end of a long session. BEFORE SHIPPING: confirm the projection actually reduces the scan (not just the payload), check `pg_blocking_pids` during a trial run, and verify no publisher queues behind it. THEN re-run `scripts/study_taker_offered_2026-09-11.py` at the wider window -- its pre-registration (PREREG_TAKER_OFFERED_2026-09-11.md) still governs and the bar does not move. Closes when the CHANGELOG records 'offered-set 60d READ:' with the re-run verdict.
+
+### `null-basis-and-window-mismatch`  ·  owner: **session**
+(aar) adversarial verification of the taker's random-entry null found THREE defects. One is FIXED (the side inference read a nullable column and replayed 7 of 208 era closes as SHORTS; corrected to derive from the tag, AST-pinned at both call sites, verdict unchanged and stronger on every family). TWO ARE RECORDED AND NOT PATCHED. (1) THE CALIBRATION GATE CERTIFIES A PRICE BASIS THE NULL NEVER USES: `replay_real` enters at the ledger's own FILL price while the null's `mu` enters at an HOURLY BAR CLOSE, so `d_i` mixes two bases; run the book's own closes through the null's path and the drift is 0.661pp, ABOVE the 0.60pp tolerance -- i.e. on one consistent basis the gate would REFUSE, and the family excess reads -0.993pp (t -1.17) rather than -0.242pp. (2) THE NULL IS TIME-BLIND: both docstrings claim 'same coin, SAME window' and the draw is uniform over the coin's entire ~46d tape. Hour bias is small (-0.100 to +0.136pp); WEEKEND bias is +0.632pp.
+
+_Still open because:_ NOT patched in the same pass under the fleet's own 'ship narrow, verify in the live payload, then widen' rule -- (fz) changed six surfaces at once and spent six entries repairing itself. BOTH defects push the refusal the SAME way (against the book), so no verdict of (aaf)/(aan)/(aar) depends on them and nothing is blocked on this. What IS blocked: no time-conditioned cell from this null may be read as matched until (2) is fixed, and no absolute level from it may be quoted until (1) is. Fix (1) by walking BOTH arms from the same price basis (prefer the bar close, which the null cannot avoid) and re-running the gate; fix (2) by drawing within a matched window rather than the whole tape. Closes when the CHANGELOG records 'null basis+window READ:' with the re-run numbers.
 
 ### `ensemble-rows-registered-but-unpublished`  ·  owner: **OPERATOR**
 (aao) registered `downtrend-ensemble` and `adaptive-ensemble` on the dashboard (VARIANT_ONLY + LABELS, certified append-only against the live feed by BOTH verifiers), and wired an optional `fleet_publish` into each package's paper loop so the row is real when a soak runs. Nothing publishes them today: neither package is a Railway service, so both rows are registered and empty. Deliberately NOT in `EXPECTED` — that is the bucket that resurrects a permanent 'no data yet' ghost card, which this dashboard has carried twice before — so an empty registration costs nothing while the decision is open.
@@ -119,8 +129,9 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (24 commit(s))
+## Shipped today (25 commit(s))
 
+- `e0e524b` (aao) record the one genuinely open item where the next session will hit it
 - `a7c95ea` (aao) the CodeQL warnings: two dead guards in the sizer, eight leaked handles, one dead assignment
 - `2e6b8aa` (aao) the last CodeQL error: name what makes a reconciliation unclean
 - `785b21c` (aao) CodeQL's 12 errors were one real bug and one collision that broke both suites together
