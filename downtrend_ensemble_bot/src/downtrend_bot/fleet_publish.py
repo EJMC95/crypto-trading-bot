@@ -85,13 +85,24 @@ def publish(*, row: str, mode: str, equity: float, start_equity: float,
     payload = dict(extra or {})
     payload.update({"mode": mode, "engine": "downtrend_ensemble_bot",
                     "real_money": False})
+    status = "halted" if payload.get("soak_ended") else "paper"
     try:
         ok = store.publish(
             bot=row,
             # NEVER "online": this is a paper book, and the watchdog's own
             # vocabulary has a word for that. `online` on a paper row is a
             # claim the book is not entitled to make.
-            status="paper",
+            #
+            # A FINISHED SOAK PUBLISHES `halted`, WITH ITS REASON. A research
+            # soak is attended and time-boxed, so unlike every other row here
+            # it STOPS -- and a row that simply stops updating joins the
+            # watchdog's stale list hourly, forever, which is precisely the
+            # "a line that is always present is a line nobody reads" failure
+            # that file warns about. `halted` is reported as a visible warning
+            # rather than a page, and `extra.soak_ended` keeps `halted` from
+            # being byte-identical between "the run finished" and "this book
+            # lost 5% today".
+            status=status,
             equity=round(float(equity), 6),
             pnl_abs=round(float(pnl_abs), 6),
             pnl_pct=round(float(pnl_pct), 8),

@@ -119,9 +119,11 @@ def test_the_paper_loop_publishes_and_records_whether_it_landed(cfg,
                                for tf, b in tp.items()},
                       equity=cfg.backtest.start_equity)
     rep = run_paper(cfg, ex, loops=2, interval_s=0.0, sleep=lambda s: None)
-    assert len(calls) == 2, "the soak did not publish every loop"
+    # 2 running rows + 1 TERMINAL row on exit (see the terminal-row test).
+    per_loop = [c for c in calls if not c["extra"].get("soak_ended")]
+    assert len(per_loop) == 2, "the soak did not publish every loop"
     assert rep.published is True
-    row = calls[-1]
+    row = per_loop[-1]
     assert row["bot"] == FP.ROW_IDS["downtrend-ensemble"]
     assert row["status"] == "paper"
     assert row["equity"] == pytest.approx(cfg.backtest.start_equity, rel=0.5)
@@ -149,3 +151,58 @@ def test_the_real_store_accepts_the_arguments_we_send(monkeypatch):
     sent = {"bot", "status", "equity", "pnl_abs", "pnl_pct", "open_trades",
             "closed_trades", "wins", "losses", "pnl_daily", "extra"}
     assert sent <= accepted, f"we send arguments publish() rejects: {sent - accepted}"
+
+
+def test_a_finished_soak_publishes_a_terminal_row_that_explains_itself(cfg,
+                                                                       monkeypatch):
+    """A research soak is attended and TIME-BOXED, so unlike every other row
+    on this dashboard it stops. A row that simply stops updating joins the
+    watchdog's stale list every hour for the rest of its life -- the exact
+    "a line that is always present is a line nobody reads" failure that file
+    warns about.
+
+    So the last publish says `halted` and carries WHY, keeping `halted` from
+    being byte-identical between 'the run finished' and 'this book lost 5%
+    today'."""
+    calls = []
+    monkeypatch.setitem(sys.modules, "bot_pnl_store",
+                        types.SimpleNamespace(
+                            publish=lambda **kw: calls.append(kw) or True))
+    monkeypatch.setenv("DATABASE_URL", "postgres://x")
+
+    from downtrend_bot.exchange_adapter import MockExchange
+    from downtrend_bot.paper_trader import run_paper
+    from downtrend_bot.synthetic import make_market, tapes
+    t = tapes(cfg.symbols, bars_1h=300)
+    ex = MockExchange(markets=[make_market(s) for s in cfg.symbols],
+                      candles={(s, tf): b for s, tp in t.items()
+                               for tf, b in tp.items()},
+                      equity=cfg.backtest.start_equity)
+    run_paper(cfg, ex, loops=1, interval_s=0.0, sleep=lambda s: None)
+
+    running, final = calls[0], calls[-1]
+    assert running["status"] == "paper", "a running soak must not read halted"
+    assert final["status"] == "halted", "a finished soak left no terminal row"
+    assert final["extra"]["soak_ended"] is True
+    assert final["extra"]["reason"]
+    assert "soak_complete" in final["extra"]
+
+
+def test_the_watchdog_vocabulary_is_the_one_we_publish():
+    """Both statuses checked against the WATCHDOG'S OWN accepted set, read
+    from its source -- not from a doc block. This repo has already shipped a
+    bot that followed a doc listing five parameters the function did not take,
+    and raised TypeError inside its trading loop."""
+    import os
+    import re
+    root = os.path.join(os.path.dirname(__file__), "..", "..")
+    wd = os.path.join(root, "fleet_watchdog_svc.py")
+    if not os.path.exists(wd):
+        pytest.skip("standalone checkout: no fleet watchdog to check against")
+    body = open(wd).read()
+    m = re.search(r'get\("status"\)\s+not\s+in\s+\(([^)]*)\)', body)
+    assert m, "the watchdog's accepted-status tuple has moved"
+    accepted = set(re.findall(r'"([a-z]+)"', m.group(1)))
+    assert {"paper", "halted"} <= accepted, (
+        f"we publish statuses the watchdog would page on: "
+        f"{{'paper', 'halted'}} - {accepted}")

@@ -241,6 +241,8 @@ def _run_loop(cfg: AppConfig, mode: Mode, args) -> int:
                             "soak": {"days": runner.soak.days,
                                      "signals": runner.soak.signals}},
                            runner.health.snapshot(), cfg.reports_dir)
+    runner.publish_final(f"{mode.value} loop finished after "
+                         f"{max(1, args.cycles)} cycle(s)")
     return 0
 
 

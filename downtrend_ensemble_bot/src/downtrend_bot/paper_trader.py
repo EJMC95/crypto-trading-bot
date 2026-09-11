@@ -211,6 +211,21 @@ def run_paper(cfg: AppConfig, adapter: ExchangeAdapter, *,
         log.info("paper soak interrupted; report saved")
     finally:
         write_json(cfg.reports_dir, REPORT_NAME, rep.as_dict())
+        # A TERMINAL ROW, so a finished soak explains itself. Without it the
+        # row simply stops updating and joins the watchdog's stale list every
+        # hour for the rest of its life.
+        ok, why = rep.complete()
+        wins = sum(1 for t in trader.book.closed if t.pnl > 0)
+        fleet_publish(
+            row=ROW_IDS["downtrend-ensemble"], mode=cfg.mode.value,
+            equity=trader.equity, start_equity=rep.start_equity,
+            open_trades=len(trader.book.positions),
+            closed_trades=len(trader.book.closed), wins=wins,
+            losses=len(trader.book.closed) - wins,
+            extra={"soak_ended": True, "soak_days": round(rep.days, 3),
+                   "soak_complete": ok, "why_incomplete": why,
+                   "loops": rep.loops,
+                   "reason": "the paper soak process exited"})
         store.close()
     return rep
 

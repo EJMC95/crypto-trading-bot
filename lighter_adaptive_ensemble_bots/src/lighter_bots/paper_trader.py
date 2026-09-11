@@ -223,6 +223,28 @@ class Runner:
                 "soak": {"days": round(self.soak.days, 2),
                          "signals": self.soak.signals}}
 
+    def publish_final(self, reason: str = "the run exited") -> bool:
+        """A TERMINAL dashboard row, so a finished run explains itself.
+
+        A research run is attended and time-boxed, so unlike every other row
+        on this dashboard it STOPS. A row that simply stops updating joins the
+        watchdog's stale list every hour for the rest of its life -- which is
+        the "a line that is always present is a line nobody reads" failure
+        that file warns about in its own words."""
+        marks = self._marks()
+        equity_now = self.state.equity + self.state.book.unrealized(marks)
+        wins = sum(1 for t in self.state.book.closed if t.pnl > 0)
+        self.published = fleet_publish(
+            row=ROW_IDS["adaptive-ensemble"], mode=self.mode.value,
+            equity=equity_now, start_equity=self.start_equity,
+            open_trades=len(self.state.book.positions),
+            closed_trades=len(self.state.book.closed), wins=wins,
+            losses=len(self.state.book.closed) - wins,
+            extra={"soak_ended": True, "reason": reason,
+                   "soak_days": round(self.soak.days, 3),
+                   "signals": self.soak.signals})
+        return self.published
+
     def _scan(self, symbols: list[str], tapes, regime: Regime,
               now: float) -> list[dict[str, Any]]:
         cfg = self.cfg

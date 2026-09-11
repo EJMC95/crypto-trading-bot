@@ -148,3 +148,39 @@ def test_the_real_store_accepts_the_arguments_we_send(monkeypatch):
     sent = {"bot", "status", "equity", "pnl_abs", "pnl_pct", "open_trades",
             "closed_trades", "wins", "losses", "pnl_daily", "extra"}
     assert sent <= accepted, f"we send arguments publish() rejects: {sent - accepted}"
+
+
+def test_a_finished_run_publishes_a_terminal_row_that_explains_itself(
+        monkeypatch):
+    """A research run STOPS, unlike every other row on this dashboard. Without
+    a terminal row it joins the watchdog's stale list every hour forever --
+    the "a line that is always present is a line nobody reads" failure that
+    file warns about in its own words."""
+    calls = []
+    monkeypatch.setitem(sys.modules, "bot_pnl_store",
+                        types.SimpleNamespace(
+                            publish=lambda **kw: calls.append(kw) or True))
+    monkeypatch.setenv("DATABASE_URL", "postgres://x")
+    from conftest import make_runner
+    runner = make_runner()
+    runner.cycle(["BTC", "ETH"], now=1_700_000_000.0)
+    assert calls[-1]["status"] == "paper"
+    assert runner.publish_final("test") is True
+    final = calls[-1]
+    assert final["status"] == "halted"
+    assert final["extra"]["soak_ended"] is True and final["extra"]["reason"]
+
+
+def test_the_watchdog_vocabulary_is_the_one_we_publish():
+    """Checked against the WATCHDOG'S OWN accepted set, read from its source
+    rather than from a doc block."""
+    import os
+    import re
+    root = os.path.join(os.path.dirname(__file__), "..", "..")
+    wd = os.path.join(root, "fleet_watchdog_svc.py")
+    if not os.path.exists(wd):
+        pytest.skip("standalone checkout: no fleet watchdog to check against")
+    m = re.search(r'get\("status"\)\s+not\s+in\s+\(([^)]*)\)', open(wd).read())
+    assert m, "the watchdog's accepted-status tuple has moved"
+    accepted = set(re.findall(r'"([a-z]+)"', m.group(1)))
+    assert {"paper", "halted"} <= accepted
