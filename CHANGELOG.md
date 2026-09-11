@@ -1,4 +1,161 @@
 
+## 2026-09-11 (abk) — 👩 MUM'S SUPPLY PROBLEM IS NEITHER HER BAR NOR HER LIST: THE ONLY NAMES IN HER CELL ARE ONES HER OWN ORACLE GATE CANNOT GRADE — and the fleet now has an instrument that says so every five minutes
+
+**Eamon, 11-Sep:** *"Let's use this knowledge we now have about the uptrend and
+entertain the idea of having something dedicated to providing bots the reaction
+time"* → *"Yes fantastic work let's do it"*.
+
+`(abg)`–`(abj)` fixed four real rails on 👩 mum — a daily-loss halt that fired
+at a 1.4% basket move while her stop sat at 4.00%, a durable latch with no
+release, a `maxdd` trigger that re-created itself, and an RSI bar at 36. She
+still held nothing her cell had chosen. `(abj)` already recorded that the bar
+was not the binding constraint. **This entry finds what is, and it is a third
+thing neither of those passes could see.**
+
+### THE MEASUREMENT, on her live row and on a full sweep of her own universe
+
+Her row at 14:45Z: `status online`, **not halted** (`locked_until: null`,
+`shut_now: null`), **11 of 12 slots free**, `both_terms_n: 0` — and her one
+open position is `{"NEAR": "adopted"}`, a leg she INHERITED, not one her cell
+picked.
+
+A sweep through her REAL `signals()` over every name she scans found **six
+below her RSI bar of 42**, and not one of them was available to her:
+
+| coin | RSI(14) | refused by |
+|---|---|---|
+| SMIC | 30.1 | **zero volume** (underlying market shut) — and its oracle gate is ungraded anyway |
+| SNDK | 31.2 | inside an uptrend (by design — her cell is the NOT-uptrend half) |
+| TRX | 39.0 | uptrend |
+| WTI | 39.0 | uptrend |
+| MU | 40.0 | **oracle ungraded** — cell OPEN, entry site refuses |
+| BRENTOIL | 41.4 | uptrend |
+
+Four are uptrend-blocked, which is the rule working. Of the two that clear
+every term of her cell, **both are non-crypto books her per-asset regime gate
+cannot grade** — and both appear in her row's own `scan.ungraded` list, which
+names **15 of her 87 scanned coins**. `noncrypto_entry_blocked` fail-closes
+until the oracle has 203 daily bars for a book, so those 15 names can produce
+no entry at any RSI bar and at any universe width.
+
+**So the honest diagnosis is: gate-refused, not bar-refused and not
+list-refused.** Widening her universe would not have reached either name.
+Lowering her bar would not have reached either name. `(uw)` reached exactly
+this verdict on 🙏 avo by hand — *"held-starved and gate-refused, not
+signal-starved"* — and the cost of it being a HAND reading is that the same
+shape then ran undiagnosed on a second live book for two weeks.
+
+Her cell is also genuinely out of season, which matters and is not a defect:
+median RSI across her universe is **64.2** against a bar of 42. She is a
+dip-buyer in a market that is not dipping, her unrailed paper twin holds
+nothing on the identical reading, and **that is the rule being right.**
+
+### SHIPPED: `entry_cell_observer.py` — 🔭 the entry-cell observer
+
+A publish-only instrument answering the two questions a book's own
+`scan_census` structurally cannot, because it only ever looks at the names the
+book already scans:
+
+* **did the cell open somewhere OUTSIDE this book's list** (`missed_n`) — I26's
+  number, the measured cost of a narrow LIST rather than an argued one;
+* **how long does an opening LAST** (`dwell`) — Eamon's reaction-time question,
+  and the one that decides the build. A missed opening that dwells four hours
+  says widen the universe; one that dwells five minutes says the universe is
+  beside the point and speed is the constraint. Nothing in the fleet could tell
+  those apart.
+
+**And a third count the live reading forced into existence: `gate_blocked_n`**
+— openings the entry site refuses, in NEITHER headline count. Without it this
+instrument would have published *"two openings she missed"* on 11-Sep and
+argued for a universe widening that could not have reached either name. An
+instrument that counts an unreachable opening as a missed one is an argument
+generator, not a measurement.
+
+**IT HOLDS NO COPY OF ANY RULE.** It calls `carrier.signals(bars, extra)` — the
+real method the live arm calls — resolves the scanned set through
+`lighter_family_bot.carrier_universe`, asks the gate through
+`noncrypto_entry_blocked`, and reads the oracle map through
+`noncrypto_regimes()`. All four are the declared one owners. A
+re-implementation would drift within a week and the measurement would then be
+about the instrument ((hj)).
+
+**PUBLISH-ONLY, and structurally so:** no lever write, no order path, no
+dashboard row (I22 — an instrument does not get a row), and its venue client is
+built `with_signer=False`, so an order is unreachable even from a later edit.
+AST-pinned, the `fleet_allocation` contract.
+
+### THE FOUR WAYS IT COULD HAVE LIED QUIETLY — each found, each closed
+
+1. **A dark venue list reads as "she missed nothing".** Its own first live run
+   had `DATABASE_URL` unset, so `scout_universe()` returned `[]`, the sweep saw
+   only her own 43 names, and `missed_n` read **0** — the exact opposite of the
+   claim the instrument exists to test, published as a clean zero. `missed_n` is
+   now **null** on a dark read and `venue_basis` publishes `scout`/`dark`
+   (I1/I6: an absence is evidence only against a control group).
+2. **A fetch budget that closes its own dwells.** Coverage is governed (one
+   fetch per coin/timeframe per closed candle, capped per cycle), so a skipped
+   coin must CARRY its open stance. Closing it would manufacture short dwells
+   out of the budget — the measurement reporting on itself.
+3. **A broken gate check reading as actionable.** `admits` fails CLOSED, the
+   direction the live entry site fails in.
+4. **`coverage.basis`** is `partial` whenever anything is pending OR the venue
+   list is dark, so `open: 0` is never byte-identical between "nothing
+   qualified" and "not looked at yet" (the (lv) ambiguity).
+
+### ALSO SHIPPED: `OversoldRebound.signals` publishes `vol` (I23)
+
+Her cell has four terms and the returned dict published three. A candle refused
+purely for **zero volume** was byte-identical to one that passed every term and
+failed elsewhere — and on a tokenised equity out of hours that is the NORMAL
+refusal. It was **1 of 43 names in the sweep** (SMIC, the single deepest
+oversold reading she had) and it reported as `opaque`, because no consumer could
+name a term the book did not publish. Telemetry only; `enter` is unchanged.
+
+### WHAT THIS DOES NOT CLAIM, published in the payload itself
+
+`limits` ships beside the numbers, because a detector that overstates is one
+the operator learns to ignore ((gl)): an opening is **not a trade** (slots,
+held, cooldown, the long-budget veto and the notional cap are not modelled, so
+`missed_n` is an **upper bound**); an opening is **not edge** (admitting a name
+is a separate priced measurement, I19/I26); `dwell` is **quantised** by the
+sample cadence and is a floor; and `gate_blocked_n` belongs to neither headline.
+
+### VERIFICATION
+
+`--selftest` registered in `LIVE_SELFTESTS`; **16 of 16 mutations redden it**,
+with a **positive control that correctly survives** so the harness is known to
+be capable of reporting a survival at all. One mutation SURVIVED the first
+round and named a real gap — the dwell retention cap was tested on the load
+path and not on the close path — now tested, re-mutated, red.
+`tests/autonomy/test_entry_cell_observer.py` (17 tests) pins what a selftest
+cannot: publish-only by AST, one `save_state` target, a read-only venue client,
+no local copy of the entry rule, and `vol` asserted on the REAL carrier rather
+than a fixture this author wrote ((hj)'s payload-contract rule).
+
+Wired end to end in one commit, per the born-dark and orphan rules:
+`Dockerfile.freqtrade` COPY, a `run_all.sh` loop (its OWN loop — a warm
+`CandleCache` is the whole point; the one-shot-per-cycle form would refetch the
+venue from cold every time, the expensive way to learn less), a `paths:` entry
+and decide-grep in `railway-redeploy.yml`, an `ORGAN_SPECS` vitals row, and a
+`UNPAGEABLE_OK` declaration with its reason. `organ_main` wraps the entry point
+so a crash records on its own key, and the happy publish clears it.
+
+### TWO REAL-MONEY OBSERVATIONS MADE IN PASSING, neither acted on
+
+* **Her gross is 0.9% over its own margin-derived ceiling**: `gross_x` 9.5
+  against `gross_x_max_alive` **9.4127** (`gross_x_headroom −0.0873`) at the
+  measured-p90 stop-overshoot basis. Eamon has twice asked for 9.5 to stay, so
+  it stays — recorded, not changed, and it is her own published arithmetic
+  rather than a new opinion about leverage.
+* **The adopted NEAR leg is $1,828 of notional on a $639 book** — 2.86x equity
+  in ONE name at `n_eff 1.0`, about 4.8 of her own clips, liquidation 32.2%
+  away and her 4% stop reachable. It is not an entry her cell chose and it is
+  not sized by her clip.
+* **She has been locked out 71.49h of the last 361.30h (19.8%)**, and the
+  largest single contributor is not the daily halt the last three entries fixed
+  — it is **`slguard` at 48.13h**. That is the next thing worth reading, and it
+  is a measurement nobody has taken yet.
+
 ## 2026-09-11 (abj) — 👩 MUM'S RSI BAR 36 → 42 ON EAMON'S CALL, AND IT PRODUCED NOTHING: THE BAR WAS NEVER THE BINDING CONSTRAINT, THE NOT-UPTREND CONJUNCT IS — a refutation recorded so nobody re-proposes the same knob
 
 **Eamon, 11-Sep: *"Would just like her to start trading"*, then *"Inflate the

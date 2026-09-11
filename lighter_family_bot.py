@@ -1570,7 +1570,14 @@ class OversoldRebound(Carrier):
         # never byte-identical between "quiet" and "the band refused it" (I18).
         return {"enter": "oversold-rebound" if enter else None,
                 "exit": False, "exit_reason": "bracket",
-                "rsi": rsi[i], "uptrend": not outside_uptrend,
+                # [(abk)] `vol` is the FOURTH term of this cell and was the one
+                # term the dict did not publish, so a candle refused purely for
+                # zero volume was byte-identical to one that passed every term
+                # and then failed somewhere else — on a tokenised equity out of
+                # hours that is the NORMAL refusal, and it reads as `opaque` to
+                # any census. I23: the gate records the quantity it cuts.
+                # Telemetry only; `enter` above is unchanged.
+                "vol": v[i], "rsi": rsi[i], "uptrend": not outside_uptrend,
                 "vel": (rsi[i - int(self.VEL_LOOKBACK)] - rsi[i])
                        if i >= int(self.VEL_LOOKBACK)
                        and rsi[i - int(self.VEL_LOOKBACK)] is not None else None,
