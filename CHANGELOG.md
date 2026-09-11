@@ -279,6 +279,102 @@ EVENT type, and `pnl_dashboard` says why in its own words — a row permanently
 DARK by design is how operators learn to ignore DARK; the liveness question
 needed a key of its own, not a re-type of an event key).
 
+## 2026-09-11 (abe) — EAMON'S MANUAL TRADES ARE DATED, AND THE DATING MOVES A REAL-MONEY VERDICT: 👩 mum's true drawdown FAILS the bar the gate shows her passing, and 🙏 avo's is UNDECIDABLE rather than either number published so far
+
+**[RENUMBERED (abb) -> (abe), 11-Sep.** Another session landed a different `(abb)` on main while this was open — itself an entry about a blanket renumber sweeping citations. Theirs has ZERO citations from tracked code and mine had three files, so by the rule mine keeps it; it moved anyway, because theirs is already ON MAIN and mine was not, and editing a landed entry that another session may be citing from an unpushed branch creates exactly the ambiguity the rule prevents. Renumbered surgically — this entry's own citations only, never a blanket sweep.**
+
+**Eamon, 11-Sep: *"cant you find that out?"*** — about the $66.40 of his own
+manual fills that `(aaw)` could only place "somewhere before 25-Aug". Yes.
+Then *"please proceed"*.
+
+**DATED: 22-24 AUGUST, ~$4.4 / $21.0 / $41.3.** Three independent lines agree
+to **33 cents**:
+1. **The SHADOW TWIN** — same strategy, same coins, no manual interference —
+   moved **-0.00% / +0.05% / -0.07%** on 22/23/24-Aug while the live arm lost
+   **-1.92% / -9.12% / -10.88%** of book. Unexplained excess **-$66.73** against
+   an attested **-$66.40**.
+2. **`venue_orders`**, which records every order the BOT places, holds **ZERO**
+   bot orders in either loss window (23-Aug 03:00-06:00, 24-Aug 03:00-09:00)
+   while **$62 left the account**.
+3. The operator's own attestation total.
+The bot's only records there are `long_daily_loss` rows at **$0.00** — halt
+EVENTS, the rail standing the book down *while* it drained, not trades that
+lost the money. The instrument was `bot_equity_history`, which carries `equity`
+(venue truth) and `pnl_abs` (the bot's own) on the SAME timestamps: their
+difference is constant except at capital events, and it stepped exactly three
+times in avo's life — +167.76 (21-Aug), +150.00 (24-Aug), **-66.40 (25-Aug
+20:46:54, the attestation env landing, not the trades)**.
+
+**SHIPPED: `NON_BOT_FLOWS`** — a declared, dated, per-book table of money that
+moved without the book trading it, and `max_dd_frac_botonly`, a TIME-WEIGHTED
+RETURN index with those flows removed. **REPORTED, NEVER A BAR** (`grade`/
+`bar_map`/`apply_mtm` byte-unchanged, pinned).
+
+**AND THE RESULT IS NOT THE ONE THE PREVIOUS ENTRY EXPECTED. Corrected in place
+per I12 — `(aaw)` said avo's confound interval was 24.09-33.81%, "past the bar
+at both ends"; that was computed by spreading the manual UNIFORMLY over her
+whole history, and the dating refutes it.**
+
+| book | published | (aaw) runpeak | **bot-only** | band | vs 15% |
+|---|---|---|---|---|---|
+| 🙏 avo LIVE | 12.32% | 24.09% | **14.64%** | 14.64-20.44% | **UNDECIDED** |
+| 👩 mum LIVE | 9.90% | 13.05% | **17.64%** | exact | **FAILS** |
+
+* **🙏 avo: the dating resolves the ATTRIBUTION and not the VERDICT.** The
+  intraday shape is unknown and it DECIDES: 14.64% spread evenly, 20.44% if it
+  all landed at the window's open. The 15% bar sits inside. So the band is the
+  product and the point estimate is not — `max_dd_frac_botonly_lo`/`_hi`
+  publish it, because a settled-looking number whose verdict flips on an
+  unmeasured assumption is worse than an honest range. **A session's own
+  earlier reading of 12.18% "robust 11.9-13.5%, passes" is WITHDRAWN**: it came
+  from a cruder equity-level reconstruction, and the TWR index is the right
+  object. Closing it needs the venue's intraday fill history, which this
+  database does not hold.
+* **👩 mum: exact, and it fails.** Her flows are all instants, so there is no
+  shape uncertainty — **17.64% against a 15% bar the gate currently shows her
+  passing at 9.90%**, on a book running **9.5x gross**. Nothing was switched;
+  this is the number, published.
+
+**FOUR DEFECTS FOUND IN MY OWN WORK BY DRIVING IT, each recorded because each
+is a class:**
+1. **The dates came from the wrong table.** The deposit instants were taken
+   from `bot_equity_history` while the grader walks
+   `bot_state_history["<bot>:equity"]` — DIFFERENT sample times. The flow
+   landed one step late, leaving the raw jump in one step and subtracting it
+   from the next: **+266% then -73%, and a fabricated 75.92% "drawdown"**.
+   Instants are now declared from the grader's OWN series.
+2. **So the removal FAILS CLOSED.** `MAX_STEP_RETURN` (0.50): a mis-dated flow
+   does not degrade gracefully, so a single-sample return beyond +/-50% means
+   the declaration is wrong and the honest output is **None**, never a number
+   nobody can see is broken (I8).
+3. **The naive capital subtraction reads 121%.** Subtracting contributed
+   capital from equity drives the denominator toward zero on a deposit-funded
+   book — avo's $62.80 of original capital against $317.76 of deposits. A TWR
+   index removes the flow from the STEP'S RETURN and keeps a denominator of 1.0.
+4. **Two "strengthened" tests were vacuous and a mutation round said so.** One
+   asserted `is None or ...`, which accepts both branches — an assertion with
+   an `or` in it is usually a test that has not decided what it believes. The
+   other called `_botonly_band` DIRECTLY while the mutation changed the CALL
+   SITE, so it exercised the function and never the wiring ("a substring test
+   is not a wiring test", one level up). Both re-aimed; **6/6 mutations red**.
+   A seventh never ran — a typo'd target — and the harness reported it as
+   **"NOT a pass"** rather than a survivor, which is that harness earning its
+   keep.
+
+**REFUSED, with the number:** reader-side jump detection. On 🪁 kelly, a book
+with NO capital moves, a 5%/$5 threshold invents **two phantom flows** and
+reports 21.44% where the truth is 26.02% — which would have RAISED her
+`dd_scale` 0.449 -> 0.678 and bought her **51% more clip**. It is
+threshold-dependent exactly where it matters. Flows are attested, never
+inferred. **The durable fix is forward and is not this**: `snapshot_equity`
+should carry the publisher's own contributed capital per sample so no consumer
+ever reconstructs it — that cannot repair a series already written, which is
+what this table is for. CARRIED.
+
+**avo's `(aaw)` ceiling fields are still NOT deployed** — Eamon: *"hold off on
+avo untill her trades are empty"*, and she holds 6 positions. Marker is
+`[deploy-live-mum]` alone again.
+
 ## 2026-09-11 (aau) — `ready: true` BESIDE "A LIVE ARM FILLS NOTHING" WAS ONE FIELD ANSWERING TWO QUESTIONS — AND THE FIX BELONGS WHERE MONEY IS ARMED, NOT IN THE GRADER
 
 **Eamon, 11-Sep:** *"it said its been ready to go live for 6 days and now its

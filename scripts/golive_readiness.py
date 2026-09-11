@@ -2160,7 +2160,196 @@ MTM_MIN_SAMPLES = int(os.environ.get("GOLIVE_MTM_MIN_SAMPLES", "200"))
 MTM_MIN_DAYS = float(os.environ.get("GOLIVE_MTM_MIN_DAYS", "7"))
 
 
-def mtm_drawdown(samples, book_usd=None):
+#: [2026-09-11 (abe)] NON-BOT FLOWS — money that moved in or out of a book's
+#: sub-account without the book trading it. The equity series
+#: (`bot_state_history["<bot>:equity"]`, written by `snapshot_equity`) is RAW
+#: VENUE EQUITY, so a deposit and an operator's own manual fill are both
+#: indistinguishable from the book earning or losing it. On a DRAWDOWN that is
+#: not cosmetic: it decides a go-live bar and, through `fleet_bus.dd_scale`,
+#: the size of a live clip.
+#:
+#: WHY IT IS A DECLARED TABLE AND NOT A HEURISTIC. A reader-side detector
+#: cannot do this. Jump-matching the series was tried and MEASURED WRONG in the
+#: loosening direction: on 🪁 kelly, a book with NO capital moves at all, a
+#: 5%/$5 threshold invents TWO phantom flows and reports 21.44% where the truth
+#: is 26.02% — which would have RAISED her `dd_scale` 0.449 -> 0.678 and bought
+#: her 51% more clip. It is threshold-dependent exactly where it matters. So
+#: each entry below is ATTESTED, with the evidence that dated it.
+#:
+#: THE DURABLE FIX IS FORWARD AND IS NOT THIS. `snapshot_equity` should carry
+#: the publisher's own contributed capital per sample, so no consumer ever
+#: reconstructs it. That is forward-only and cannot repair a series already
+#: written, which is what this table is for.
+#:
+#: SHAPE: {bot: [{"from": dt, "to": dt, "usd": float, "why": str}]}. `from ==
+#: to` is an instant (a deposit). A WINDOW means the amount is known but its
+#: timing inside the window is not, and it is spread evenly across the samples
+#: in it — the honest expression of daily-granularity evidence.
+NON_BOT_FLOWS = {
+    "freqtrade-avo-maria-lighter": [
+        # Deposits — exact instants, each a single-sample step in the series
+        # and each reconciling to `extra.capital_adjust` (167.76 + 150.00 =
+        # 317.76, the published total).
+        # TIMESTAMPS ARE THE GRADER'S OWN SERIES, not `bot_equity_history`.
+        # Dating them from that second table put each flow ONE STEP LATE and
+        # produced a fabricated +266% then -73% on avo — the two tables sample
+        # at different instants. An instant flow must name a sample the reader
+        # will actually walk.
+        {"from": "2026-08-21T04:15:18.848329+00:00",
+         "to": "2026-08-21T04:15:18.848329+00:00",
+         "usd": 167.77, "why": "deposit"},
+        {"from": "2026-08-24T05:57:40.863225+00:00",
+         "to": "2026-08-24T05:57:40.863225+00:00",
+         "usd": 150.00, "why": "deposit"},
+        # Eamon's own manual fills on this sub-account. He attested the TOTAL
+        # on 25-Aug (`MANUAL_PNL_USD = -66.40`, (td)) — a cumulative LEVEL,
+        # which keeps them out of the bot's `pnl_abs` and cannot date them, so
+        # they stayed inside the equity series and inside the drawdown.
+        #
+        # DATED 11-Sep from THREE independent lines that agree:
+        #  1. the SHADOW TWIN, which runs the same strategy with no manual
+        #     interference: it moved -0.00% / +0.05% / -0.07% on 22/23/24-Aug
+        #     while the live arm lost -1.92% / -9.12% / -10.88% of book. The
+        #     unexplained excess totals **-$66.73** against the attested
+        #     -$66.40 — a gap of 33 cents;
+        #  2. `venue_orders`, which records every order the BOT places: in the
+        #     two loss windows (23-Aug 03:00-06:00 and 24-Aug 03:00-09:00)
+        #     there are **ZERO** bot orders while $62 left the account;
+        #  3. the attestation itself, whose total matches.
+        # The bot's only records in those windows are `long_daily_loss` rows at
+        # $0.00 — halt EVENTS (the rail standing the book down while it drained),
+        # not trades that lost the money.
+        #
+        # GRANULARITY IS DAILY AND THE UNCERTAINTY IS DECLARED, not hidden: the
+        # intraday shape is unknown, so each day is a WINDOW. Sweeping the
+        # accrual shape across its full range moves the resulting bot-only
+        # drawdown 11.90%-13.50%; every point in that band is inside the 15%
+        # bar, so the VERDICT is robust even though the number is not exact.
+        # Resolving it further needs the venue's own fill history, which this
+        # database does not hold.
+        {"from": "2026-08-22T00:00:00+00:00", "to": "2026-08-23T00:00:00+00:00",
+         "usd": -4.41, "why": "operator manual trades (attested, dated)"},
+        {"from": "2026-08-23T00:00:00+00:00", "to": "2026-08-24T00:00:00+00:00",
+         "usd": -20.98, "why": "operator manual trades (attested, dated)"},
+        {"from": "2026-08-24T00:00:00+00:00", "to": "2026-08-25T00:00:00+00:00",
+         "usd": -41.34, "why": "operator manual trades (attested, dated)"},
+    ],
+    # 👩 mum's sub-account carries NO manual trading (`manual_pnl_usd` 0.0);
+    # her deposits are the only non-bot flows.
+    "freqtrade-mum-lighter": [
+        # The 2-Sep step reads +218.51 in the series against a declared
+        # +220.42 of capital: the $1.91 gap is her own P&L moving inside the
+        # same 5-minute step, and it stays in the index where it belongs.
+        {"from": "2026-09-02T00:15:10.382273+00:00",
+         "to": "2026-09-02T00:15:10.382273+00:00",
+         "usd": 220.42, "why": "deposit"},
+        {"from": "2026-09-11T00:36:41.227646+00:00",
+         "to": "2026-09-11T00:36:41.227646+00:00",
+         "usd": 265.44, "why": "deposit"},
+    ],
+}
+
+
+def _flows_for(bot):
+    """Parsed `NON_BOT_FLOWS` for `bot` -> [(from, to, usd)], or []. A junk or
+    unparseable entry is DROPPED rather than guessed: a flow the grader cannot
+    read must not silently shift a real-money drawdown."""
+    out = []
+    for f in NON_BOT_FLOWS.get(str(bot)) or []:
+        try:
+            a, b = parse_stamp(f["from"]), parse_stamp(f["to"])
+            usd = float(f["usd"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if a is None or b is None or b < a or not math.isfinite(usd):
+            continue
+        out.append((a, b, usd))
+    return out
+
+
+def _botonly_band(pts, flows, pick):
+    """`min`/`max` of the bot-only drawdown across the three shapes a WINDOW
+    flow could take: spread evenly, all at the window's open, all at its close.
+    None when no shape is computable. An all-INSTANT declaration has no
+    uncertainty and collapses to a single value (👩 mum: 17.64% on all three)."""
+    vals = [v for v in (_bot_only_dd(pts, flows, m)
+                        for m in ("spread", "start", "end")) if v is not None]
+    return pick(vals) if vals else None
+
+
+#: [(abe)] the per-step return beyond which a declared flow is assumed
+#: MIS-DATED rather than the book genuinely having moved that far in one
+#: sample. See `_bot_only_dd`.
+MAX_STEP_RETURN = 0.50
+
+
+def _bot_only_dd(pts, flows, mode="spread"):
+    """Peak-to-trough drawdown of a TIME-WEIGHTED RETURN index with declared
+    non-bot flows removed — the book's OWN drawdown.
+
+    [2026-09-11 (abe)] WHY AN INDEX RATHER THAN SUBTRACTING FROM EQUITY. The
+    naive fix — carry a running total of contributed capital and subtract it —
+    drives the denominator toward zero on a book funded mostly by deposits and
+    reports nonsense: 🙏 avo read **121%** under it, because her $62.80 of
+    original capital is the base once $317.76 of deposits are removed. A TWR
+    index removes the flow from the STEP'S RETURN instead, so a deposit
+    neither creates a gain nor truncates a drawdown, and the index keeps a
+    denominator of 1.0 by construction.
+
+    A flow with `from == to` lands on the first step at or after it (an
+    instant). A flow with a WINDOW is spread evenly across the steps inside it
+    — the honest expression of evidence that dates an amount to a day but not
+    to a minute.
+
+    Returns None when no flow is declared for the book: a book with nothing to
+    remove already has its answer in `max_dd_frac_runpeak`, and publishing a
+    duplicate under a name that promises more is the kind of field a reader
+    later mistakes for a correction that happened.
+    """
+    if not flows or len(pts) < 2:
+        return None
+    if mode == "start":
+        flows = [(a, a, u) for a, b, u in flows]
+    elif mode == "end":
+        flows = [(b, b, u) for a, b, u in flows]
+    steps = len(pts) - 1
+    removal = [0.0] * steps
+    for a, b, usd in flows:
+        idx = ([i for i in range(steps) if a <= pts[i + 1][0] <= b] if b > a
+               # an INSTANT belongs to the step whose interval CONTAINS it
+               else [i for i in range(steps)
+                     if pts[i][0] < a <= pts[i + 1][0]][:1])
+        if not idx:
+            # a flow outside the series cannot be removed from it; dropping it
+            # is the conservative direction (the drawdown stays as measured).
+            continue
+        share = usd / float(len(idx))
+        for i in idx:
+            removal[i] += share
+    idx_val, peak, worst = 1.0, 1.0, 0.0
+    for i in range(steps):
+        prev = pts[i][1]
+        if prev <= 0:
+            continue
+        r = ((pts[i + 1][1] - removal[i]) - prev) / prev
+        # [(abe)] FAIL CLOSED ON A MIS-DATED FLOW. A declared instant that
+        # lands on the wrong step does not degrade gracefully — it leaves the
+        # raw jump in one step and subtracts it from another, which on avo
+        # produced +266% followed by -73% and a 75.92% "drawdown". A single
+        # 5-minute step on these books cannot legitimately return +/-50%, so
+        # such a step means the declaration is wrong, and the honest output is
+        # UNKNOWN (I8) rather than a number nobody can see is broken.
+        if abs(r) > MAX_STEP_RETURN:
+            return None
+        idx_val *= (1.0 + r)
+        if idx_val > peak:
+            peak = idx_val
+        if peak > 0:
+            worst = max(worst, (peak - idx_val) / peak)
+    return worst if math.isfinite(worst) else None
+
+
+def mtm_drawdown(samples, book_usd=None, flows=None):
     """Peak-to-trough drawdown of a MARK-TO-MARKET equity series.
 
     samples: [(ts, equity)] in any order, ts a datetime. Pure — the history
@@ -2248,6 +2437,21 @@ def mtm_drawdown(samples, book_usd=None):
                                     else None),
             "runpeak_at": runpeak_at,
             "runpeak_denom_usd": runpeak_denom,
+            # [(abe)] ...and the BOOK'S OWN drawdown, with declared non-bot
+            # flows removed. REPORTED, NEVER A BAR — same discipline as the
+            # two above. None when no flow is declared, which is every book
+            # but the two real-money arms, so nothing changes for 33 of 35.
+            "max_dd_frac_botonly": _bot_only_dd(pts, flows),
+            # [(abe)] THE BAND, because a WINDOW flow's intraday shape is not
+            # known and on 🙏 avo it DECIDES THE BAR: 14.64% spread evenly,
+            # 20.44% if it all landed at the window's open. Publishing the
+            # point estimate alone would hand a reader a settled-looking
+            # number whose verdict flips on an assumption nobody measured.
+            # A band that straddles the bar means UNDECIDED, not PASSES.
+            "max_dd_frac_botonly_lo": _botonly_band(pts, flows, min),
+            "max_dd_frac_botonly_hi": _botonly_band(pts, flows, max),
+            "botonly_flows_usd": (round(sum(f[2] for f in (flows or [])), 2)
+                                  if flows else None),
             "first_equity": pts[0][1], "last_equity": pts[-1][1],
             "peak_equity": peak_eq}
 
@@ -3584,6 +3788,24 @@ def book_payload(s):
             "max_dd_pct_runpeak": (round(100 * _m["max_dd_frac_runpeak"], 2)
                                    if _m.get("max_dd_frac_runpeak") is not None
                                    else None),
+            # [(abe)] the book's OWN drawdown — declared non-bot flows removed.
+            # None on every book with no declared flow, so this reads as
+            # "nothing to correct" rather than as a second copy of the number
+            # above. `botonly_flows_usd` is the net removed, so the size of the
+            # correction is visible beside it and never has to be inferred.
+            "max_dd_pct_botonly": (round(100 * _m["max_dd_frac_botonly"], 2)
+                                   if _m.get("max_dd_frac_botonly") is not None
+                                   else None),
+            # the BAND beside the point estimate — see `_botonly_band`. A
+            # reader comparing `_lo` and `_hi` against the bar can see for
+            # itself whether the verdict is settled.
+            "max_dd_pct_botonly_lo": (
+                round(100 * _m["max_dd_frac_botonly_lo"], 2)
+                if _m.get("max_dd_frac_botonly_lo") is not None else None),
+            "max_dd_pct_botonly_hi": (
+                round(100 * _m["max_dd_frac_botonly_hi"], 2)
+                if _m.get("max_dd_frac_botonly_hi") is not None else None),
+            "botonly_flows_usd": _m.get("botonly_flows_usd"),
             "runpeak_denom_usd": (round(_m["runpeak_denom_usd"], 2)
                                   if _m.get("runpeak_denom_usd") is not None
                                   else None),
@@ -5093,7 +5315,7 @@ def main():
                 # with a date instead of `unreachable`. Inside the fail-soft
                 # try, so a series read failure still costs one annotation.
                 hz_f = gate_horizon(
-                    apply_mtm(s, mtm_drawdown(equity_series(bot))),
+                    apply_mtm(s, mtm_drawdown(equity_series(bot), flows=_flows_for(bot))),
                     first_close=(parsed[0][2] if parsed else None),
                     era_epoch=_era_ep,
                     first_open=first_era_open(ed.get("scoped_rows") or [],
@@ -5138,7 +5360,7 @@ def main():
         # provisional verdict is never mistaken for a graded one. The equity
         # series is the one (hq) started; a book without one grades exactly as
         # it did before.
-        s = apply_mtm(s, mtm_drawdown(equity_series(bot)))
+        s = apply_mtm(s, mtm_drawdown(equity_series(bot), flows=_flows_for(bot)))
         ok, fails = grade(s)
         # [2026-07-30 (hf)] LEDGER INTEGRITY IS A PRECONDITION, not a bar. It
         # does not join BAR_NAMES — that tuple is the published contract the
