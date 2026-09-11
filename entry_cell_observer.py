@@ -113,6 +113,30 @@ DWELL_MAX_SAMPLES = 200
 TOP_MISSED = 12
 
 
+#: THE CEILINGS, PUBLISHED WITH THE NUMBERS. Named one per constant rather
+#: than written inline, because a multi-line string inside a LIST literal is
+#: byte-indistinguishable from a dropped comma — four of these were flagged by
+#: CodeQL on this module's first review, and it was right: the hazard is not
+#: the wrapping but that a later edit deleting a line would silently shorten
+#: the list instead of failing. In an assignment there is no comma to miss.
+LIMIT_NOT_A_TRADE = (
+    "an opening is not a trade: slots/held/cooldown/budget/cap gates are NOT "
+    "modelled, so missed_n is an upper bound")
+LIMIT_NOT_EDGE = (
+    "an opening is not edge: admitting a name is a separate priced "
+    "measurement (I19/I26)")
+LIMIT_DWELL_QUANTISED = (
+    "dwell is quantised by dwell_resolution_s and is a floor, never an exact "
+    "duration")
+LIMIT_GATE_BLOCKED_IS_NEITHER = (
+    "gate_blocked_n is in NEITHER actionable_n nor missed_n: the cell is open "
+    "and the entry site refuses the name, so no universe change reaches it")
+
+#: The published order. A tuple so a consumer cannot mutate the contract.
+LIMITS = (LIMIT_NOT_A_TRADE, LIMIT_NOT_EDGE, LIMIT_DWELL_QUANTISED,
+          LIMIT_GATE_BLOCKED_IS_NEITHER)
+
+
 # ---------------------------------------------------------------------------
 # Pure arithmetic. No venue, no database — every function below is testable
 # against a hand-built reading, and the tests do exactly that.
@@ -400,16 +424,7 @@ def build_payload(books, venue_n, covered_n, pending_n, now_ts,
            "books": {},
            # Stated in the payload itself, not only in this file: a reader who
            # finds `missed_n` on a dashboard must meet its ceiling there too.
-           "limits": ["an opening is not a trade: slots/held/cooldown/budget/"
-                      "cap gates are NOT modelled, so missed_n is an upper "
-                      "bound",
-                      "an opening is not edge: admitting a name is a separate "
-                      "priced measurement (I19/I26)",
-                      "dwell is quantised by dwell_resolution_s and is a "
-                      "floor, never an exact duration",
-                      "gate_blocked_n is in NEITHER actionable_n nor "
-                      "missed_n: the cell is open and the entry site refuses "
-                      "the name, so no universe change reaches it"]}
+           "limits": list(LIMITS)}
     for b in books:
         bot = b.get("bot")
         if not bot:
@@ -816,6 +831,13 @@ def _selftest():
     # Non-finite never reaches storage (I5).
     assert _finite(float("nan")) is None and _finite(float("inf")) is None
     assert summarize_dwell([float("nan"), 10.0], 300)["n"] == 1
+
+    # The ceilings are a published CONTRACT: four of them, in order, each a
+    # single string. A line deleted from the old inline list would have
+    # shortened this silently — which is exactly what CodeQL flagged.
+    assert len(LIMITS) == 4 and len(set(LIMITS)) == 4
+    assert all(isinstance(x, str) and len(x) > 40 for x in LIMITS), LIMITS
+    assert build_payload([], 1, 1, 0, 0.0)["limits"] == list(LIMITS)
 
     p = build_payload([dict(obs, bot="book", cycles={"n": 4,
                                                      "with_open_venue": 3,
