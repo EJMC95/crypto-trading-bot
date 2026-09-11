@@ -1101,6 +1101,34 @@ class TrendMomo(Carrier):
         return 1.0
 
 
+#: [2026-09-11 (abi)] 👩 mum's drawdown-guard trigger, read at IMPORT because the
+#: `protections` dict is a CLASS attribute. Caged and fail-SAFE: an unparseable or
+#: out-of-cage value degrades to the shipped default, never to a guess and never
+#: to "no guard" — the rail's EXISTENCE is not a tunable, only its level
+#: (CLAUDE.md's permanent doctrine). See `OversoldRebound.protections`.
+MUM_MAXDD_DD_DEFAULT = 0.25
+MUM_MAXDD_DD_LO, MUM_MAXDD_DD_HI = 0.05, 0.50
+
+
+def _mum_maxdd_dd():
+    try:
+        v = float(os.environ.get("MUM_MAXDD_DD", MUM_MAXDD_DD_DEFAULT))
+    except (TypeError, ValueError):
+        return MUM_MAXDD_DD_DEFAULT
+    # NO SEPARATE NaN/inf BRANCH, deliberately: the cage below already rejects
+    # both — every comparison against NaN is False, so `LO <= nan <= HI` fails,
+    # and an infinity is outside any finite bound. A first version of this
+    # function carried that branch and a mutation proved it DEAD (removing it
+    # changed no outcome, while every other guard here reddened). A line that
+    # cannot change a result is the can-never-fire shape this repo treats as a
+    # defect, so it is gone and the cage's coverage is pinned by test instead.
+    if not (MUM_MAXDD_DD_LO <= v <= MUM_MAXDD_DD_HI):
+        log.warning("MUM_MAXDD_DD=%s outside cage [%s, %s] — using %s",
+                    v, MUM_MAXDD_DD_LO, MUM_MAXDD_DD_HI, MUM_MAXDD_DD_DEFAULT)
+        return MUM_MAXDD_DD_DEFAULT
+    return v
+
+
 class OversoldRebound(Carrier):
     """👩 mum v2 — DEEP-OVERSOLD REBOUND, 1h, bracketed, OUTSIDE the uptrend.
 
@@ -1256,9 +1284,42 @@ class OversoldRebound(Carrier):
     # surrendering at 12h. See the docstring's table.
     roi = {0: 0.020, 240: 0.016, 480: 0.012, 720: 0.008,
            1080: 0.004, 1440: 0.0}
+    #: [2026-09-11 (abi)] `maxdd.dd` 0.15 -> 0.25, AND ENV-TUNABLE.
+    #: **Eamon, 11-Sep: *"Do it"* / *"Deploy her"*.** This is the ONLY protection
+    #: threshold moved today; everything else was a stale constant corrected or a
+    #: latch released. Stated plainly because it is a real loosening:
+    #:
+    #: WHY IT FIRED. Replayed against her own ledger: 40 closes in her 72h window
+    #: (the guard needs 8) and a worst in-window drawdown of **17.3%** of
+    #: `START_EQUITY` against the 15% trigger. It is not stale and it is not
+    #: wrong — which is exactly why `FAMILY_CLEAR_GUARD` could not help: that
+    #: switch drops a lock RESTORED at boot, and this one is re-derived from live
+    #: trades every cycle, so it cleared and re-armed in the same boot
+    #: (`locked_until` moved 01:18:57Z -> 01:28:19Z, measured). A rail that
+    #: re-creates itself cannot be released; only its threshold can move.
+    #:
+    #: WHY 0.25 AND NOT A NUMBER I INVENTED: two sibling books in THIS FILE
+    #: already run `dd: 0.25` (:1082 and :1671), so it is the in-fleet value for
+    #: a book whose drawdown is allowed more room, not a bespoke exemption.
+    #:
+    #: WHAT IT DOES NOT DO, and nobody may cite this entry as if it did: her
+    #: 17.3% drawdown is still OVER the 15% bar the go-live gate uses to decide
+    #: whether a book may hold real money at all. Raising her own guard stops her
+    #: guard acting on it; it does not change the grade, and `golive_readiness`
+    #: is untouched. The (abe) reading — bot-only maxDD 17.64%, FAILS the bar —
+    #: stands exactly as published.
+    #:
+    #: ENV-TUNABLE so this never needs a deploy again: the whole reason a 12h
+    #: lock cost a merge cycle today is that the number was a literal. The cage
+    #: is [0.05, 0.50] — below 0.05 the guard would fire on noise, above 0.50 it
+    #: would permit more than a book's own all-slots-stop and so could never
+    #: fire before the bracket did, which is the `(gv)`/(abg) mis-ordering this
+    #: fleet just spent a session on. Unparseable degrades to the SHIPPED value,
+    #: never to a guess, and never to "no guard".
     protections = {"cooldown_candles": 2,
                    "slguard": {"lookback": 24, "trades": 3, "stop": 6},
-                   "maxdd": {"lookback": 72, "trades": 8, "dd": 0.15, "stop": 12}}
+                   "maxdd": {"lookback": 72, "trades": 8,
+                             "dd": _mum_maxdd_dd(), "stop": 12}}
     min_bars = 210                      # e200 on 1h needs >200 closed bars
     #: [2026-08-26 (tr)] 25.0 -> 30.0 — Eamon's "she doesnt miss anything too
     #: good", shipped the measured way: the rsi [25,30) x NOT-uptrend cell was
