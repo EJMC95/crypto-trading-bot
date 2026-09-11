@@ -146,7 +146,39 @@ taker's live arm is retired and this is publish-only, so it ships to
 book gradeable by regime TODAY; it makes it gradeable from today. The first
 regime-stamped close arrives on the next entry.
 
-Pinned by `tests/autonomy/test_taker_entry_evidence.py` (12 tests). The
+**AND THE TEST FILE REPRODUCED THE EXACT DEFECT THE CARRIED ROW NAMED — the
+same morning that row was read.** Its first version did
+`os.environ.setdefault("TT_BULL_MODE", "on")` at MODULE level. pytest collects
+every test module into ONE process, so it leaked into the environment every
+subprocess selftest inherits and turned **three already-green suites red** —
+`lighter_scout_tuner`, `lighter_ticket_replay` and `lighter_ticket_taker
+--selftest-live`, all reporting **zero fills**, plus `fleet_proprioception` at
+`too-few-trades`. Verified as mine, not pre-existing, by running the same test
+against `origin/main`'s module (green). That is blocker (1) of
+`taker-random-entry-null-blocked-on-ci` verbatim, which `(aaf)` had closed by
+construction the night before: *"the prior design did
+os.environ.setdefault('TT_BULL_MODE','on') at import and raced the taker's
+import, reddening three unrelated selftests."*
+
+**A lesson recorded in prose and violated the same day is the argument for a
+guard, so the class is closed:**
+`tests/autonomy/test_no_test_mutates_process_env.py` walks every test module's
+IMPORT-time scope by AST (module body plus module-level `if`/`try`/`with`/`for`
+bodies, which all run at import; function and class bodies deliberately not
+walked) and refuses a new `os.environ` assignment, `setdefault`, `update`,
+`pop` or `del`. Scoped sets inside a test or a fixture are allowed, and so are
+reads. **It is a RATCHET at the measured backlog of 9** — nine modules already
+do it, every one a `setdefault` on a VENUE variable its import genuinely needs
+— because a guard that reddens the build on a pre-existing backlog is exempted
+within a day and then guards nothing ((mz); I23 ships its own guards this way
+for the same reason). The backlog may only SHRINK: if it does, the guard FAILS
+ON THE GOOD NEWS and tells you to lower the number, because a ratchet nobody
+tightens stops being one. It carries its own positive control per `(po)` —
+empty output is not a negative result until the check has produced a positive
+one. 2 mutations red: a new offender, and raising the ratchet.
+
+Pinned by `tests/autonomy/test_taker_entry_evidence.py` (12 tests) and
+`tests/autonomy/test_no_test_mutates_process_env.py` (2). The
 offered-set search this came out of is pre-registered in
 `PREREG_TAKER_OFFERED_2026-09-11.md`, committed before any outcome was
 computed; its verdict follows in its own entry.
