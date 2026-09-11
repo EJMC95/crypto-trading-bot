@@ -190,3 +190,43 @@ def test_exits_are_never_gated_by_any_of_this():
                         and n.func.id == "_clear_halt_books":
                     users.add(fn.name)
     assert users == {"main"}, users
+
+
+def test_with_the_env_unset_the_behaviour_is_byte_identical_to_before():
+    """THE PRECONDITION FOR DEPLOYING THIS AT ALL. The release ships to a
+    real-money service before it is merged, and the only thing that makes that
+    defensible is that it is INERT until an operator names the book: with
+    `FAMILY_CLEAR_DAILY_HALT` unset, a stored latch must still halt the book
+    exactly as it did before this change existed.
+
+    Driven structurally rather than asserted: the call site's condition is
+    `BOT_ROW in _clear_halt_books() and not _halt_cleared[0]`, whose `else`
+    branch is the original `halted_today = True`. With an empty book set the
+    condition is False for EVERY row id, so the else branch is the only
+    reachable path — which is the pre-change behaviour.
+    """
+    m = _mod()
+    import os
+    old = os.environ.pop("FAMILY_CLEAR_DAILY_HALT", None)
+    try:
+        assert m._clear_halt_books() == set()
+        # False for any conceivable row id, including the live ones
+        for row in ("freqtrade-mum-lighter", "freqtrade-avo-maria-lighter",
+                    "", "anything"):
+            assert row not in m._clear_halt_books(), row
+    finally:
+        if old is not None:
+            os.environ["FAMILY_CLEAR_DAILY_HALT"] = old
+
+    # and the else branch must be exactly the original single statement
+    fn = _main_fn()
+    target = None
+    for n in ast.walk(fn):
+        if isinstance(n, ast.If) and "_clear_halt_books" in ast.dump(n.test):
+            target = n
+    assert target is not None, "release branch not found"
+    assert len(target.orelse) == 1, "the inert path must be ONE statement"
+    stmt = target.orelse[0]
+    assert isinstance(stmt, ast.Assign)
+    assert [t.id for t in stmt.targets] == ["halted_today"]
+    assert stmt.value.value is True, "the inert path must latch halted_today"
