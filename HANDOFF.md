@@ -1,23 +1,28 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 09:42 Sydney (23:42Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 10:47 Sydney (00:47Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` was shut **31% of the last 14.4d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-avo-maria-lighter` was shut **30% of the last 14.5d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 - `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **19% of the last 14.4d** (64h), mostly `slguard` (44h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (65h), mostly `slguard` (45h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
 - `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
-- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it.
 - `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
 - `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
+
+### `null-basis-and-window-mismatch`  ·  owner: **session**
+(aar) adversarial verification of the taker's random-entry null found THREE defects. One is FIXED (the side inference read a nullable column and replayed 7 of 208 era closes as SHORTS; corrected to derive from the tag, AST-pinned at both call sites, verdict unchanged and stronger on every family). TWO ARE RECORDED AND NOT PATCHED. (1) THE CALIBRATION GATE CERTIFIES A PRICE BASIS THE NULL NEVER USES: `replay_real` enters at the ledger's own FILL price while the null's `mu` enters at an HOURLY BAR CLOSE, so `d_i` mixes two bases; run the book's own closes through the null's path and the drift is 0.661pp, ABOVE the 0.60pp tolerance -- i.e. on one consistent basis the gate would REFUSE, and the family excess reads -0.993pp (t -1.17) rather than -0.242pp. (2) THE NULL IS TIME-BLIND: both docstrings claim 'same coin, SAME window' and the draw is uniform over the coin's entire ~46d tape. Hour bias is small (-0.100 to +0.136pp); WEEKEND bias is +0.632pp.
+
+_Still open because:_ NOT patched in the same pass under the fleet's own 'ship narrow, verify in the live payload, then widen' rule -- (fz) changed six surfaces at once and spent six entries repairing itself. BOTH defects push the refusal the SAME way (against the book), so no verdict of (aaf)/(aan)/(aar) depends on them and nothing is blocked on this. What IS blocked: no time-conditioned cell from this null may be read as matched until (2) is fixed, and no absolute level from it may be quoted until (1) is. Fix (1) by walking BOTH arms from the same price basis (prefer the bar close, which the null cannot avoid) and re-running the gate; fix (2) by drawing within a matched window rather than the whole tape. Closes when the CHANGELOG records 'null basis+window READ:' with the re-run numbers.
 
 ### `live-vs-graded-policy-two-mechanisms-uncovered`  ·  owner: **session**
 (aan) shipped `golive_readiness.live_fillable`, which closes ONE of the three mechanisms by which a book's LIVE arm can run a narrower or different policy than the arm the go-live gate grades: the per-mode LENS/SIDE allow-list. A fleet sweep of all 14 graded books confirms the other two are real and UNCOVERED. (2) THE LEVER LANE: `apply_tuning()` returns {} on 🎫 the taker's live arm, so a live arm takes NO growth-rail lever while the graded shadow ran tuner-moved bars -- its era spans 19 distinct bracket settings (tp in {0.03,0.04,0.05,0.06}, max_hold_h in {24,48,72}, brk_range in {0.91,0.93,0.95,0.97}). Intersecting both taker mechanisms: **2 of 208 closes (1.0%) are BOTH live-fillable AND booked at bars a live arm would run.** (3) THE CAPACITY PIN: ⚖️ Counterweight's live arm pins `K = GOLIVE_K` and refuses the `fundspread.k` lever; K is a rank truncation, so it changes WHICH coins are held. LATENT today (env default K=5 == GOLIVE_K=5, no lever open), not absent. AND A SECOND CONFIRMED BOOK, DIRECTION INVERTED: 👩 mum's shadow is NARROWER than live -- the judge's `xp.mum.vel_lo/vel_hi` steer the twin only, the velocity band is an ENTRY filter, and her own census reads `vel_in_band 2 of vel_read 102`, so the graded sample is a strict SUBSET of the live population. CLAUDE.md already says 'while running, the twin is an EXPERIMENT arm, not a control arm'; the GRADER does not know it.
@@ -114,8 +119,17 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (40 commit(s), entries (zt))
+## Shipped today (49 commit(s), entries (zt))
 
+- `59b28cb` (aar) the null inferred side from a nullable column — 7 of 208 era closes replayed as shorts; (aaf) superseded, (aaq) corrected
+- `8542912` (aar) the null instrument inferred side from a nullable column — 7 of 208 era closes replayed as shorts
+- `6a2eb94` (aap) a test that sets env at import reddens every subprocess selftest — the defect the carried row named, reproduced and now ratcheted
+- `4adbf4a` (aaq) offered-set instrument: fix the permutation units and price Q1's look-ahead
+- `390d21b` (aap) the entry capture was six fields wide and the ticket is eleven — regime never reached a single close
+- `338f21a` (aao) extract entry_evidence to a pure owner — the inline form survived its own mutation
+- `f68b585` (aao) the entry capture was six fields wide and the ticket is eleven — regime never reached a single close
+- `713dd67` (aao) PRE-REGISTRATION: the taker's offered-set search, written before any outcome was computed
+- `3f10ddf` (aan) the sweep: it is a class, three mechanisms deep, and mum's shadow runs the other way — two carried
 - `0faaa04` (aan) verified on the deployed payload: live_policy on the row, live_fillable inert=true, ready unchanged at 6/6
 - `1b94335` (aan) the growth lens: breakoutup TIES random, not beaten — and two structural blockers on re-aiming LIVE_SIDES; (aaf) corrected in place
 - `6f5c972` (aan) gitignore the study tape caches — 3.5MB untracked beside a registered selftest
