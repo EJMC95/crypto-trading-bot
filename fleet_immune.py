@@ -626,6 +626,34 @@ HEADROOM_OK = {
 }
 
 
+# [2026-09-11 (aas)] A FLAT BOOK HAS NO BASKET TO LIQUIDATE.
+# `stop_reachable` is the UNIVERSE-WORST margin at full-slot gross — a
+# statement about positions the book is not holding — and on a levered book it
+# is False BY CONFIGURATION, so on an empty book it pages every loop on a
+# hypothetical (I7: a trigger a book satisfies structurally is not a
+# measurement). Measured 11-Sep 00:32Z: 👩 mum FLAT behind her own `slguard`,
+# her ruin gate publishing `headroom {ok: true, reason: "flat"}` and
+# `open_trades: 0`, `stop_reachable_held: None` — and this organ paged
+# "protective stop is DEAD at gross 5.0" on the one state in which nothing
+# can be liquidated at all.
+#
+# FAIL-SAFE IS TOWARD THE PAGE, so flat is asserted only on the CONJUNCTION of
+# two independent publishers: the ruin gate's OWN verdict (it is the thing
+# that walked the positions) AND the row's position count. A gate that wrongly
+# reports flat while the book holds still pages; a missing or unparseable
+# count is not flat. Nothing is silenced on a book that holds anything.
+def _book_flat(row, lev) -> bool:
+    """True only when the row POSITIVELY says the book holds nothing."""
+    hd = lev.get("headroom")
+    if not (isinstance(hd, dict) and hd.get("ok") is True
+            and str(hd.get("reason") or "") == "flat"):
+        return False
+    n = row.get("open_trades")
+    if isinstance(n, bool) or not isinstance(n, (int, float)):
+        return False
+    return int(n) == 0
+
+
 def headroom_sickness(bot_rows, ok=None):
     """[2026-08-25 (th)] THE RUIN GATE'S VERDICT, WATCHED. The variant host
     publishes `extra.leverage.headroom` (SafetyRails.headroom_check — the
@@ -676,7 +704,12 @@ def headroom_sickness(bot_rows, ok=None):
                                       f"(ceiling {lev.get('stop_dead_above_held')}, "
                                       f"mmf_held {lev.get('mmf_held')}) — "
                                       f"liquidation fires before the stop"})
-        elif lev.get("stop_reachable") is False and "stop_dead" not in allowed:
+        elif (lev.get("stop_reachable") is False
+              and "stop_dead" not in allowed
+              # [(aas)] ...and the book actually holds something. See
+              # `_book_flat` above: the bound describes a basket, so an empty
+              # book cannot fail it.
+              and not _book_flat(r, lev)):
             out.append({"organ": bot,
                         "detail": f"protective stop is DEAD at gross "
                                   f"{lev.get('set')} (ceiling "
@@ -1963,6 +1996,53 @@ def _selftest():
     _r3 = _hrow("freqtrade-x-lighter", stop_ok=False)
     _r3["extra"]["leverage"]["stop_reachable_held"] = None
     assert headroom_sickness([_r3], ok={}), "None held -> the bound pages"
+
+    # ---- [2026-09-11 (aas)] THE FLAT BOOK ------------------------------
+    # Driven off 👩 mum's REAL 11-Sep 00:32Z payload, not a fixture that
+    # "looks like" one ((hj)): gross 5.0 against a 4.17 ceiling, her ruin
+    # gate saying flat, zero positions. This organ paged "protective stop is
+    # DEAD" on it every loop.
+    def _flatrow(**over):
+        lev = {"set": 5.0, "stop_dead_above": 4.17, "stop_reachable": False,
+               "stop_reachable_held": None, "leverage_now": None,
+               "mmf_held": None, "liq_gap_held_pct": None,
+               "headroom": {"ok": True, "reason": "flat",
+                            "gap_stop_widths": None}}
+        lev.update(over.pop("lev", {}))
+        row = {"bot": "freqtrade-mum-lighter", "age_sec": 60, "ttl_sec": 900,
+               "open_trades": 0, "extra": {"leverage": lev}}
+        row.update(over)
+        return row
+
+    assert headroom_sickness([_flatrow()], ok={}) == [], \
+        "a book holding NOTHING cannot have a dead stop (I7)"
+    # ...and every way of not being flat still pages, because the failure
+    # direction here is a real-money one.
+    assert headroom_sickness([_flatrow(open_trades=1)], ok={}), \
+        "the gate claiming flat never silences a book that HOLDS"
+    assert headroom_sickness([_flatrow(open_trades=None)], ok={}), \
+        "an unreadable position count is not flat"
+    assert headroom_sickness(
+        [_flatrow(open_trades=False)], ok={}), \
+        "a bool is not a count — int(False)==0 must NOT read as flat"
+    # the gate must be SAYING the book is fine, not merely naming flat: a
+    # refused verdict is a refusal whatever its reason word.
+    assert headroom_sickness(
+        [_flatrow(lev={"headroom": {"ok": False, "reason": "flat"}})],
+        ok={"freqtrade-mum-lighter": {"flat"}}), \
+        "a REFUSED headroom is never flat, even when its reason says flat"
+    assert headroom_sickness(
+        [_flatrow(lev={"headroom": {"ok": True, "reason": "ok"}})], ok={}), \
+        "only the gate's own FLAT verdict silences, not any clean verdict"
+    assert headroom_sickness(
+        [_flatrow(lev={"headroom": None})], ok={}), \
+        "no headroom block -> not flat -> the bound still pages"
+    # the guard is scoped to the universe BOUND: a measured HELD basket that
+    # is dead still pages, flat or not (a publisher bug must not go quiet).
+    _fh = headroom_sickness(
+        [_flatrow(lev={"stop_reachable_held": False, "leverage_now": 5.0,
+                       "stop_dead_above_held": 4.17})], ok={})
+    assert _fh and "HELD basket" in _fh[0]["detail"], _fh
     # [(wp)] liq_unpriced is DECLARED structural on both cross-margin rows
     assert headroom_sickness([_hrow(
         "freqtrade-avo-maria-lighter",

@@ -470,6 +470,117 @@ holds `(aao)` on an open branch — the `(zw)` open-branch arm of
 on the day it was built. Recorded inline per the changelog-letter rule; the
 commit subjects keep the old letter, which is why the commit log is not a
 letter index.**
+## 2026-09-11 (aas) — 🫀 FOUR DETECTORS, ONE DEFECT: AN INSTANT IS NOT A PROPERTY — and two of them were mine, shipped the night before
+
+**[RENUMBERED (aap) -> (aas), 11-Sep.** Another session landed a different `(aap)` on main in the same hour — 🎫 the taker's entry capture — and it was already cited from `lighter_ticket_taker.py` and two tests, so it keeps the letter; this entry moved. Recorded inline per the changelog-letter rule: the commit subject keeps the old letter, which is exactly why the commit log is not a letter index.**
+
+**Eamon, this morning:** *"did the evenings work get completed and everything
+is working okay?"* It did, and it is. Then the morning read found four things
+publishing a standing claim built from a single instantaneous reading, **two of
+them shipped by `(aag)`/(the 10-Sep organ-board confirmations) the night
+before**. The shape is one shape, and it is worth the number:
+
+| | the standing claim | the instant it was built from | measured |
+|---|---|---|---|
+| 🛡️ immune | 👩 mum's *"protective stop is DEAD"* | she is flat **right now** | the bound describes a basket she does not hold |
+| 🫀 board | *"GDELT is up"* (10-Sep) / *"a dead source"* (2-Sep) | one sample each | **382 of 930 samples up (41.1%), 474 flaps in 7d** |
+| 🫀 board | `impl_shortfall` closed because it *"reads `xp-contaminated`"* | one verdict word | read `arm-drift` within a day |
+| 🔭 Keating | *"the RETENTION binds"* at `train_days: 90` | one pool count | the pool was the newest **2,000 rows ≈ 19–22d**; the retention had room |
+
+### 1 · 🛡️ A FLAT BOOK CANNOT HAVE A DEAD STOP (I7)
+
+`fleet_immune.headroom_sickness` paged **06:44 Sydney**: *"protective stop is
+DEAD at gross 5.0 (ceiling 4.17) — liquidation fires before the stop"* on 👩
+mum, who was holding **nothing**. Her own ruin gate said so in the same payload
+— `headroom {ok: true, reason: "flat"}`, `open_trades: 0`,
+`stop_reachable_held: null` — and the organ fell through to `stop_reachable`,
+the **universe-worst margin at full-slot gross**: a statement about positions
+the book is not holding, and False **by configuration** on a levered book. So it
+fired every loop on a hypothetical while she sat behind her own `slguard`.
+
+`_book_flat` gates only that fallback, and **fail-safe is toward the page**:
+flat is asserted on the CONJUNCTION of two independent publishers (the ruin
+gate's own verdict AND the row's position count), so a gate that wrongly reports
+flat while the book holds still pages, an unreadable count is not flat, and a
+measured HELD basket that is dead still pages whatever the count says. Driven
+off mum's real 00:32Z payload, not a fixture that looks like one ((hj)).
+**6 of 6 mutations red, null control green.**
+
+### 2 · 🔭 `(aag)`'s RETENTION FIX WAS LARGELY INERT, AND ITS `blocked_by` NAMED A GATE WITH ROOM IN IT
+
+`(aag)` raised `TRADE_KEEP_DAYS` to 90 and pointed the ML's query at it *by
+identity* — at a `closed_trades(days=TRAIN_DAYS)` whose own signature carries
+`limit: int = 2000`, a default this call site never overrode. Measured on the
+live payload: `train_days: 90` beside `pool: 89`, and 89 is exactly the
+trainable count of the newest **2,000 rows**. The published `blocked_by` then
+read *"the RETENTION binds, not the count"* — **naming the one gate that had
+room**, which is precisely the I18 error the field exists to prevent. I told
+Eamon to watch `pool` climb past 90; it structurally could not.
+
+`TRAIN_LIMIT` is now passed explicitly (AST-pinned, so an inherited default
+cannot silently re-specify the horizon again) and its **binding is published**:
+`truncated` is `len(rows) >= TRAIN_LIMIT`, because a result exactly equal to its
+own limit is a truncation signature and `LIMIT` is silent by construction
+((qz)). `readiness()` now tells the three gates apart, and they take different
+actions — raise the cap, raise the retention, or **wait**:
+
+* **FETCH CAP** — the query returned exactly its limit ⇒ `unreachable`, and it
+  says raising the retention does nothing;
+* **RETENTION** — the window is FULL (`span >= TRAIN_DAYS × WINDOW_FULL_FRAC`)
+  and still short ⇒ `unreachable`;
+* **CLOSE RATE** — the window is **not full yet** ⇒ `cold`, **with a date**
+  derived from the observed rate. This is I17 inside the ML: a half-filled
+  window is still accruing, and calling that `unreachable` is the thin-sample-
+  as-measured-exclusion defect the fleet already paid for once. An UNKNOWN span
+  degrades to `cold`, never to the terminal word — the direction
+  `golive_readiness` fails when its critical-value owner is missing.
+
+Also: `ix_trades_closed`, because the ML's fetch has no `bot` filter and the
+existing composite index could not serve it. **7 mutations red + null control**,
+including the (aag) defect restored as a mutation, and the cap's binding driven
+through a REAL `EcosystemDB` rather than asserted.
+
+### 3 · 🗞️ GDELT IS NOT DEAD, IT FLAPS — 382/930 UP, 474 TRANSITIONS
+
+The organ board graded `sources_ok.gdelt` — **one sample** — and called `watch`
+on it. Over this organ's own retained 7 days the source read up in **382 of 930
+published samples (41.1%)** with **474 transitions**. So the 2-Sep review's
+*"gdelt False → a dead source"* and my 10-Sep *"GDELT is up"* are **two draws of
+the same coin, eight days apart**, and neither is a fact about the source (I1/I2
+— pick the quantity that carries the fault; here the RATE, not the state).
+
+The publisher is the right owner because only it sees every cycle:
+`event_sentinel.record_sources` keeps a bounded 7-day log (int seconds, 1,200
+entries ≈ 18KB/source) and publishes **`frac` AND `flaps`**, which answer
+different questions and are the pair that makes a verdict possible — **~0% with
+~0 flaps is DOWN; 41% with 474 flaps is FLAPPING**, degraded, still delivering
+on 41% of cycles, and not fixable from this repo. Down is a watch; flapping is
+REPORTED, because a detector that fires on 59% of reads trains the reader to
+ignore the channel ((gl)). Below `SRC_MIN_N` no rate has been measured, so the
+check falls back to the single sample **and says so** — a silent fallback is the
+same class of lie. **8 mutations red + null control**, the consumer driven
+against the publisher's own output.
+
+### 4 · 🫀 A CONFIRMATION MUST CITE A DURABLE PROPERTY, NEVER A LIVE READING
+
+Two of the five `CONFIRMED` rows written on 10-Sep had rotted by the next
+morning, both the same way: each quoted a number true only at the instant it was
+read. `impl_shortfall`'s cited *verdict word* had changed within the day
+(`xp-contaminated` → `arm-drift`); `event_sentinel`'s cited one sample of a coin
+flip. Both **CORRECTED IN PLACE per I12** onto the durable fact — *the organ has
+a live arm again and publishes a verdict instead of standing down*; *the rate
+REFUTES the finding: GDELT flaps, it is not dead* — and the map's own docstring
+now carries the rule, pinned by a test that fails if either row quotes a verdict
+word again.
+
+### DECLARED, and it is the (aak) lesson applied before the push rather than after
+
+`(aak)` touched `venues/lighter_client.py` — a `_BUILD_SHARED` file — so the
+shadow image took it, the marker-gated live images did not, and `arm_drift`
+froze the 🧪 judge's promotion lane at 01:41 Sydney. **This pass checked first:
+none of the five changed files is in `_BUILD_SHARED`**, so no live/shadow stamp
+can diverge from it. Main only, no marker — nothing here alters a trade
+((mm)); every file rides the existing `freqtrade-bots` auto-deploy path.
 
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
