@@ -1,0 +1,49 @@
+{
+  "registration": "PREREG_TAKER_CELLS_2026-09-11",
+  "frozen_utc": "2026-09-11",
+  "ask": "Eamon, 11-Sep: 'widen metrics and parameters until you find an edge for it'",
+  "bot": "lighter-ticket-taker-lshadow",
+  "primary_family": "long-breakoutup",
+  "report_only_family": "short-divergence",
+
+  "features": ["vol_m", "apr_pct", "chg_pct", "prem_bps", "range_pos",
+               "brk_quality", "up_strength"],
+  "marginal_quantiles": [0.20, 0.40, 0.60, 0.80],
+  "directions": ["ge", "le"],
+  "conjunction_quantile": 0.50,
+  "conjunction_signs": ["ge_ge", "ge_le", "le_ge", "le_le"],
+  "time_blocks": [[0, 6], [6, 12], [12, 18], [18, 24]],
+  "weekday_cells": ["weekday", "weekend"],
+  "bracket_cells": [["tp", 0.03], ["tp", 0.04],
+                    ["max_hold_h", 24.0], ["max_hold_h", 48.0]],
+  "family_cells": ["long-breakoutup", "short-divergence"],
+
+  "m": 152,
+  "m_breakdown": {"marginals": 56, "time_blocks": 4, "weekday": 2,
+                  "bracket": 4, "conjunctions": 84, "family": 2},
+  "fdr": 0.05,
+
+  "draws_k": 2000,
+  "null_seed": 20260910,
+  "shift_b": 2000,
+  "shift_seed": 20260911,
+  "placebo_seeds": 20,
+  "placebo_max_post_bh_survivors": 2,
+  "control_effect_pp": 2.0,
+  "control_graded_pp": 1.0,
+  "power_effects_pp": [1.0, 2.0],
+
+  "min_feature_rows": 140,
+  "mc_se_max_pp": 0.15,
+  "tape_coverage_min": 0.60,
+  "duplicate_cut_eps": 1e-9,
+
+  "concentration": {
+    "drop_best_k_frac": 0.05, "drop_best_t_floor": 1.0,
+    "loo_coin_positive_frac": 0.90, "loo_worst_t_floor": 0.0,
+    "share_best_max": 0.40, "share_top3_max": 0.80
+  },
+
+  "bar": "A cell is an EDGE iff it survives BH at FDR 0.05 across all m=152 pre-declared cells on the day-clustered one-sided paired-difference t, AND its selection-adjusted p_max <= 0.05 against the shift-placebo max statistic, AND it survives coin-clustering, AND it passes every concentration test, AND its point excess exceeds its own mde80_cluster. Even then it ships only as a shadow-lane restriction with a pre-registered forward read, never as a live change.",
+  "refusal": "The search is a REFUSAL iff no cell meets that conjunction. It is reported with the best cell's excess, its p_max, and the smallest cluster-adjusted mde80 across the tested cells — it names what could NOT have been seen; it does not claim the book has no edge."
+}

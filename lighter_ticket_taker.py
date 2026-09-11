@@ -3034,8 +3034,41 @@ def main(_ctx=None):
             ) * gov, 2)
             bmult = _bm
             size = clip / mark
+            # [2026-09-11 (aao)] THE CAPTURE WAS SIX FIELDS WIDE AND THE
+            # TICKET IS ELEVEN. This is (di)'s defect one turn later: a
+            # feature that exists at the entry site and never reaches the
+            # ledger is a feature no grader can ever condition on, and the
+            # search that wants it cannot be run retroactively — (di) said so
+            # in as many words ("the first 6 breakoutup closes shipped without
+            # their features (unrecoverable from the ledger)").
+            #
+            # Measured 11-Sep over 8.3d of scout tape: EVERY lens publishes
+            # `regime` — the per-asset oracle verdict, `{"dir": ±1|0, "v":
+            # "LONG-window"|"SHORT-window"|"dir-flat"|"chop-gated"}` — and NOT
+            # ONE close carries it. That is the one conditioning variable item
+            # 18 says this fleet most needs (the whole Lighter tape is a single
+            # falling-BTC regime, so a directional grade is a grade in that
+            # regime only), and 41 days of closes cannot answer it.
+            # `noncrypto` rides every lens; `trend` rides dip; the divergence
+            # apr pair is its whole thesis. All were dropped.
+            #
+            # OBSERVABLE-ONLY: `_close_extra` merges evidence by setdefault, so
+            # these can never clobber `bars`/`bars_basis`/`policy`, and no
+            # decision reads them. `side` is deliberately NOT captured — the
+            # close tag already carries it, and a second spelling of a field
+            # graders already key on is the (xe) trap.
             ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
                                         "prem_bps", "apr_pct", "gap_pct")}
+            # The NEW keys are added only when the ticket actually carries
+            # them, so the six above keep their exact prior payload shape
+            # (a breakout close still stamps `gap_pct: null`) and no existing
+            # consumer's `in extra` test changes meaning. Absent = UNKNOWN,
+            # the convention `peak_ret`/`give_back` already use.
+            for _k in ("regime", "noncrypto", "trend",
+                       "lighter_apr", "xvenue_apr"):
+                _v = t.get(_k)
+                if _v is not None:
+                    ev[_k] = _v
             # [2026-07-24 (di)] capture the scanner-sidekick features for a
             # breakout entry (stashed by the bull gate above) so the close row
             # carries them — the raw material for DERIVING the winning criteria.
