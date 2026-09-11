@@ -1,3 +1,90 @@
+## 2026-09-11 (aaq) — 🎫 "WIDEN UNTIL YOU FIND AN EDGE": 126 CELLS ON THE POPULATION THE BOOK NEVER CONDITIONED ON, AND THE BEST ONE IS WORSE THAN NOISE
+
+**Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for
+it."* Run properly, pre-registered, and reported whichever way it came out.
+
+**THE ANSWER: NO CELL SURVIVES.** 126 pre-declared cells, 2,736 graded
+episodes, four lenses, 8.3 days. Not one clears Benjamini-Hochberg at FDR 0.05
+— and the best cell found (`momentum/prem_bps>=p75`, **z=2.13**) sits **BELOW
+the noise-search p95 of 2.37**: a pure-noise search of the same shape produces
+a better best cell than this one did.
+
+**WHY THE OFFERED SET, AND IT IS THE WHOLE METHODOLOGICAL POINT.** A threshold
+sweep over the book's own closes searches a population it already SELECTED,
+**on the very features being swept** — and conditioning on a variable removes
+the information in it. Measured on the same feature vocabulary: offered
+`vol_m` p50 **0.49** against taken **2.67**; offered `range_pos` spans
+**[0.84, 1.13]** against taken **[0.94, 1.01]**. That is why `(aan)`'s sweep
+found `brk_quality` **INVERSELY** related to excess (>=0.6 -> −0.821pp) — there
+was nothing left in it. So this searched the scout's OFFERED tickets, which
+the fleet has been recording all along in `bot_state_history`/`lighter-market`
+and which nothing had ever graded.
+
+**THE SAMPLE IS THE REASON IT WAS WORTH RUNNING:** the public `/bus.json`
+serves **200 hours**, not the 24 assumed — 2,351 snapshots, **2,768 ticket
+EPISODES** (a (lens, sym) run; a >2h gap starts a new one) against 208 era
+closes. **mde80 0.30%/trade at full n against the ledger's 1.26** — roughly 4x
+the resolving power, and the first search in this line able to see an effect
+the size anyone actually hopes for.
+
+**THE CALIBRATION GATE REFUSED THE FIRST RUN, AND IT WAS RIGHT.** v1 graded
+every episode under SHIPPED-DEFAULT bars and then compared the taken ones
+against closes that ran their OWN stamped bars at their OWN open: replayed
++4.469%/trade against a realised +1.961%, **drift 2.508pp** against a 0.60pp
+tolerance, **no verdict printed**. That comparison was invalid by
+construction, not merely noisy. **The harness was fixed, not the tolerance** —
+calibration is now a PAIRED walk-fidelity test (each real close at its own
+open with its own bars, against its own realised return) and reads **+2.020%
+vs +1.961% on the same n=51, |drift| 0.059pp**. The contrast keeps ONE
+convention on both arms, declared rather than discovered.
+
+**TWO DEFECTS OF MY OWN, BOTH RECORDED BECAUSE THEY ARE THE POINT.**
+* **The permutation column was garbage** — `rets` in FRACTIONS against a
+  baseline in PERCENT, yielding max-z values of **−170 and +330** where a
+  noise search of this shape yields ~2–3. It did not move the verdict (BH runs
+  in its own units) but **the verdict text CITES that number**, and a citation
+  of a broken number is how a wrong one gets believed later. Corrected: the
+  p95 now reads 2.37 and the refusal is *stronger* for it.
+* **Q1 HAD LOOK-AHEAD, AND IT LOOKED SPECTACULAR.** It read breakout taken
+  **+4.469%/trade** against refused **+0.643%** — excess **+3.826pp,
+  P=0.000** — and that is NOT admission value. An episode is labelled TAKEN
+  because the book opened it LATER in that episode, while every arm enters at
+  the episode's FIRST sighting: the taken arm is conditioned on a decision
+  made after its own entry. **The calibration prices the confound exactly:**
+  those same trades from the book's ACTUAL open read **+2.020%**, not +4.469%.
+  The gap is ENTRY TIMING, not selection. Q1 now prints under a
+  **CONTAMINATED** header with the confound as a printed number, because
+  deleting it would hide the one measurement that bounds it. Answering
+  admission honestly needs the GATES replayed over the tape
+  (`lighter_ticket_replay`), not a label join — named as the next instrument,
+  not as a result.
+
+**WHAT THE SEARCH CAN AND CANNOT SAY.** Every cell prints its own **mde80**,
+so a null reads *"could not have detected an edge below X"* rather than *"no
+edge"* — for the big breakout cells that floor is ~0.5%/trade, for the thin
+momentum ones ~1.5%. Combined with `(aaf)`/`(aan)` — the matched-random null
+TYING `long-breakoutup` at P=0.500, and the entries carrying no measurable
+directional information — the weight of evidence is that **this book's signal
+is not there to be found by filtering.** That is a refusal with evidence, which
+this fleet counts as compliance (I26), and it is NOT a retirement case: the
+upper bound on the breakoutup excess is **+0.68pp > 0**, so nothing has been
+excluded (I17-as-amended).
+
+**THE PRODUCTIVE HALF, and it shipped separately as `(aap)`:** the search's
+real constraint is not the threshold, it is **what the book records**. The
+taker captured SIX ticket fields where the scout publishes ELEVEN, and not one
+of 304 closes carries `regime` — the per-asset oracle verdict, and the exact
+variable item 18 says the fleet most needs, since the whole Lighter tape is a
+single falling-BTC regime. Fixed at the entry site; it pays forward from the
+next entry and could never have been recovered retroactively.
+
+Pre-registration: `PREREG_TAKER_OFFERED_2026-09-11.md`, committed BEFORE any
+outcome was computed, including the bar (BH + permutation max-stat +
+drop-worst-3 + leave-one-coin-out + leave-one-day-out, n>=10). Instrument:
+`scripts/study_taker_offered_2026-09-11.py`, registered in `SELFTEST_MODULES`,
+exits 2 on refusal. **Every cell is printed, survivor or not** — a sweep that
+prints only its winner is the artifact.
+
 ## 2026-09-11 (aap) — 🎫 THE ENTRY CAPTURE WAS SIX FIELDS WIDE AND THE TICKET IS ELEVEN: NOT ONE OF 304 CLOSES CARRIES THE REGIME IT WAS TAKEN IN
 
 **Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for

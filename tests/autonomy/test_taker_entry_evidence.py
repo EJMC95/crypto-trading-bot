@@ -25,7 +25,6 @@ shape, so no existing consumer's `in extra` test changes meaning.
 second spelling of a field graders key on is the (xe) trap.
 """
 import ast
-import os
 import pathlib
 
 import pytest
@@ -35,8 +34,23 @@ pytestmark = pytest.mark.autonomy
 import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-os.environ.setdefault("TT_BULL_MODE", "on")
 
+# NO `os.environ.setdefault("TT_BULL_MODE", ...)` HERE, and the omission is
+# load-bearing. The first version of this file set it at import; pytest imports
+# every test module into ONE process, so the variable leaked into the
+# environment every subprocess selftest inherits and turned THREE already-green
+# suites red — `lighter_scout_tuner`, `lighter_ticket_replay` and
+# `lighter_ticket_taker --selftest-live`, all reporting zero fills.
+#
+# That is the identical defect the carried row `taker-random-entry-null-
+# blocked-on-ci` named as blocker (1) and that `(aaf)` closed by construction:
+# *"the prior design did os.environ.setdefault('TT_BULL_MODE','on') at import
+# and raced the taker's import, reddening three unrelated selftests."*
+# Reproduced here after reading that entry the same morning, which is the
+# argument for a test rather than a note.
+#
+# Nothing below needs it: `entry_evidence` is PURE, and `_close_extra` reads
+# the mode only for its `policy` stamp, which these tests never assert on.
 import lighter_ticket_taker as tt                              # noqa: E402
 
 #: what the scout actually publishes, measured off the live tape
