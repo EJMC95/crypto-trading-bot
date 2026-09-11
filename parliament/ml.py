@@ -85,6 +85,32 @@ TRAIN_DAYS = TRADE_KEEP_DAYS
 #: the Parliament keeps its self-contained import graph (born-dark rule).
 ACC_Z_BAR = float(os.environ.get("PARL_ML_ACC_Z", "1.28"))
 
+#: [(aas)] THE FETCH CAP IS PART OF THE HORIZON, AND A SILENT ONE IS A LIE.
+#: `(aag)` raised the retention to 90d and pointed the query at it — and the
+#: query it pointed carried `closed_trades(..., limit=2000)`, a default this
+#: call site never overrode, so the horizon it published was not the horizon it
+#: read. Measured 11-Sep on the live payload: `train_days: 90` beside
+#: `pool: 89`, where 89 is exactly the trainable count of the newest **2,000**
+#: rows — about 19-22 days of the ingested fleet. The `blocked_by` string then
+#: named the RETENTION as the binding gate (I18) while the gate that actually
+#: bound was the cap, and the fix shipped the night before was largely inert.
+#:
+#: So the cap is DECLARED, and — the half that closes the class — its binding
+#: is PUBLISHED. `(qz)`: a result exactly equal to its own limit is a
+#: truncation signature, and `head`/`LIMIT` are silent by construction, so the
+#: only durable defence is to notice the equality and say so. The default is
+#: set well above what the retention can hold (measured ~95 rows/day fleet-wide
+#: => ~8.5k at 90d), which makes it a memory backstop rather than a horizon;
+#: if the fleet ever outgrows it, `readiness().truncated` says so on the
+#: payload instead of the pool quietly flattening again.
+TRAIN_LIMIT = int(os.environ.get("PARL_ML_TRAIN_LIMIT", "25000"))
+
+#: [(aas)] when is the retention window "full"? Only a FULL window licenses
+#: the word `unreachable` — a half-filled one is still accruing, and calling
+#: that unreachable is exactly the defect I17 was amended for (a thin sample
+#: reported as a measured exclusion). 0.95 leaves a day of slack at 90d.
+WINDOW_FULL_FRAC = 0.95
+
 
 def featurize(sym: str, direction: int, data, signal: dict | None = None) -> dict:
     """Entry-time feature dict from the shared LighterData. Pure reads —
@@ -334,6 +360,11 @@ class MLEngine:
         #: distinguishable. None until a pass has run: UNKNOWN, never 0, or a
         #: dark DB would publish a confident `unreachable` (I6).
         self._pool: int | None = None
+        #: [(aas)] did the FETCH cap bind at the last pass, and how many days
+        #: of tape did the pool actually span? Both None/False until a pass
+        #: has run — UNKNOWN is never 0 (I6).
+        self._truncated = False
+        self._pool_span_d: float | None = None
         #: [(aaj)] set once, on the first training pass — see `_restore_state`.
         self._restored = False
         self._provenance = "cold"
@@ -368,26 +399,61 @@ class MLEngine:
         names the gate that actually binds (I18) — the retention window, not
         the sample count."""
         z, pool = self.acc_z(), self._pool
+        span = self._pool_span_d
         d = {"n_seen": self.n_seen, "min_samples": MIN_READY_SAMPLES,
              # [(aaj)] where this history came from. A restored `n_seen` and a
              # replayed one are byte-identical numbers about different things.
              "provenance": self._provenance, "warmed": self._warmed,
              "n_short": max(0, MIN_READY_SAMPLES - self.n_seen),
              "pool": pool, "train_days": TRAIN_DAYS,
+             # [(aas)] the fetch cap and the tape the pool ACTUALLY spans.
+             # Without these, `pool` is a number with no horizon attached and
+             # `train_days` reads as one it may never have seen.
+             "fetch_limit": TRAIN_LIMIT, "truncated": self._truncated,
+             "pool_span_d": None if span is None else round(span, 1),
              "acc_z": None if z is None else round(z, 3),
              "acc_z_bar": ACC_Z_BAR}
         if not self.enabled:
             d["verdict"], d["blocked_by"] = "disabled", "numpy absent"
         elif self.n_seen < MIN_READY_SAMPLES:
-            if isinstance(pool, int) and pool < MIN_READY_SAMPLES:
-                d["verdict"] = "unreachable"
-                d["blocked_by"] = (
-                    f"the {TRAIN_DAYS:g}d training pool holds {pool} trainable "
-                    f"closes against a {MIN_READY_SAMPLES} bar — the RETENTION "
-                    f"binds, not the count; more time alone never arms this")
-            else:
+            # [(aas)] NAME THE GATE THAT ACTUALLY BINDS (I18). There are three
+            # here and they take different actions: raise the cap, raise the
+            # retention, or wait. Naming the wrong one sends the next session
+            # to fix a gate with room in it — which is what happened to (aag).
+            if not isinstance(pool, int):
+                d["verdict"] = "cold"
+                d["blocked_by"] = "no training pass has run yet — pool UNKNOWN"
+            elif pool >= MIN_READY_SAMPLES:
                 d["verdict"] = "cold"
                 d["blocked_by"] = f"{d['n_short']} more sample(s)"
+            elif self._truncated:
+                d["verdict"] = "unreachable"
+                d["blocked_by"] = (
+                    f"the {TRAIN_LIMIT}-row FETCH CAP binds: the query returned "
+                    f"exactly its own limit"
+                    + (f", spanning {span:.1f}d" if span else "")
+                    + f" of a {TRAIN_DAYS:g}d retention — raise "
+                      f"PARL_ML_TRAIN_LIMIT; raising the retention does nothing")
+            elif span is not None and span >= TRAIN_DAYS * WINDOW_FULL_FRAC:
+                d["verdict"] = "unreachable"
+                d["blocked_by"] = (
+                    f"the {TRAIN_DAYS:g}d RETENTION binds: {pool} trainable "
+                    f"closes over a window that is FULL ({span:.1f}d) against a "
+                    f"{MIN_READY_SAMPLES} bar — more time alone never arms this")
+            else:
+                # The window is not full, so supply is still accruing. Calling
+                # that `unreachable` is the I17 defect (a thin sample reported
+                # as an exclusion); it is `cold`, and it has a date.
+                rate = (pool / span) if (span and span > 0) else None
+                eta = ((MIN_READY_SAMPLES - pool) / rate) if rate else None
+                d["verdict"] = "cold"
+                d["blocked_by"] = (
+                    f"{pool} trainable close(s)"
+                    + (f" in {span:.1f}d of a {TRAIN_DAYS:g}d window that is "
+                       f"NOT full yet" if span is not None else "")
+                    + " — the CLOSE RATE binds, not the retention"
+                    + (f"; at {rate:.1f}/day the {MIN_READY_SAMPLES} bar "
+                       f"arrives in ~{eta:.0f}d" if eta is not None else ""))
         elif z is None or z < ACC_Z_BAR:
             best = max([v for v in self.acc.values()
                         if isinstance(v, (int, float))], default=None)
@@ -546,10 +612,19 @@ class MLEngine:
         restart-proof memory, and the door other bots' rows come in through."""
         if not self.enabled or self.db is None:
             return 0
-        rows = self.db.closed_trades(days=TRAIN_DAYS)
+        rows = self.db.closed_trades(days=TRAIN_DAYS, limit=TRAIN_LIMIT)
+        # [(aas)] the cap is passed EXPLICITLY so the horizon this engine
+        # publishes is the horizon it reads, and its binding is measured here
+        # rather than inferred downstream: a fetch that returns exactly its
+        # own limit is truncated until proven otherwise ((qz)).
+        self._truncated = len(rows) >= TRAIN_LIMIT
         trainable = [r for r in rows
                      if r["features"] and r["pnl_abs"] is not None]
         self._pool = len(trainable)
+        _ts = [r["closed_ts"] for r in trainable
+               if isinstance(r.get("closed_ts"), NUM_T)]
+        self._pool_span_d = (
+            max(0.0, (time.time() - min(_ts)) / 86400.0) if _ts else None)
         if not self._restored:
             # [(aaj)] ONCE per process, and BEFORE the new-row filter, because
             # what it restores is exactly the set that filter reads.
